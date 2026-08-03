@@ -9,11 +9,14 @@
  * Finished:
  *   - renderer resolution, with one copyable install command on failure
  *   - the Paged.js version gate, fail-closed, checked against the RESOLVED artefact
+ *   - the evidence path (`src/render/`): rasteriser, overlay, PDF-against-PDF binding. It is
+ *     verified against a real browser by `tests/live/`, and it is NOT called from here yet,
+ *     because it attaches evidence to findings and there are no findings without a snapshot.
  *
  * Not finished, and therefore fail-closed rather than silently empty:
- *   - the in-page measurement probe (`src/measure/`), the collector (`src/paginate/`) and the
- *     evidence rasteriser (`src/render/`). Until those run against a real browser, the live
- *     path reports `checker-crashed` for the measurement stage instead of returning a snapshot.
+ *   - the in-page measurement probe (`src/measure/`) and the collector (`src/paginate/`).
+ *     Until those run against a real browser, the live path reports `checker-crashed` for the
+ *     measurement stage instead of returning a snapshot.
  *
  * The reason this is a hard gate and not a warning: the break cause is read from attributes the
  * paginator writes into the tree and does not guarantee as an interface. A report produced on an
@@ -21,9 +24,9 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { join } from "node:path";
 
+import { resolveBrowser, resolvePackageRoot } from "./browser.ts";
 import { SUPPORTED_PAGEDJS_VERSION } from "../core/enums.ts";
 import type { DocumentInput } from "../core/engine.ts";
 
@@ -40,33 +43,6 @@ export interface RenderResult {
   fatal: { message: string; exitCode: 2 | 3 } | null;
 }
 
-const CHROME_CANDIDATES_BY_PLATFORM: Readonly<Record<string, readonly string[]>> = {
-  darwin: [
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/Applications/Chromium.app/Contents/MacOS/Chromium",
-  ],
-  linux: ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser"],
-};
-
-/**
- * Where the browser is. The chain is explicit so that a failure can name every place it looked
- * rather than saying "not found" — a reader who sees the list can tell whether their browser is
- * simply somewhere else.
- */
-export function resolveBrowser(): { path: string | null; searched: string[] } {
-  const searched: string[] = [];
-  const fromEnv = process.env.BREAKLINT_CHROME;
-  if (fromEnv) {
-    searched.push(`$BREAKLINT_CHROME (${fromEnv})`);
-    if (existsSync(fromEnv)) return { path: fromEnv, searched };
-  }
-  for (const candidate of CHROME_CANDIDATES_BY_PLATFORM[process.platform] ?? []) {
-    searched.push(candidate);
-    if (existsSync(candidate)) return { path: candidate, searched };
-  }
-  return { path: null, searched };
-}
-
 /**
  * The Paged.js gate.
  *
@@ -81,15 +57,11 @@ export function resolvePagedjs(fromDir: string): {
   path: string | null;
   detail: string;
 } {
-  const require = createRequire(join(fromDir, "noop.js"));
-  let packageRoot: string;
-  try {
-    // `pagedjs` exports no subpaths — neither `pagedjs/package.json` nor `pagedjs/dist/paged.js`
-    // resolves. Only the package name does, so the root is derived from that and the package
-    // file is read from disk rather than imported.
-    const entry = require.resolve("pagedjs");
-    packageRoot = entry.slice(0, entry.lastIndexOf("/node_modules/pagedjs/") + "/node_modules/pagedjs/".length);
-  } catch {
+  // `pagedjs` exports no subpaths — neither `pagedjs/package.json` nor `pagedjs/dist/paged.js`
+  // resolves. Only the package name does, so the root is derived from that and the package file
+  // is read from disk rather than imported.
+  const packageRoot = resolvePackageRoot("pagedjs", fromDir);
+  if (packageRoot === null) {
     return {
       ok: false,
       version: null,

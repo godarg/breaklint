@@ -45,6 +45,19 @@ jobs:
       - name: licences
         run: npm run test:licenses
 
+      - name: poppler, as an independent rasteriser for the live suite
+        # Never a dependency of the tool. It is here so that the live suite can check the product
+        # rasteriser against something that is not Chrome — Chrome both produces and rasterises
+        # every PDF, and without a second opinion a whole class of error cannot show up.
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+
+      - name: live evidence path
+        # This suite carries every claim about the rasteriser and the evidence binding. It FAILS
+        # on a missing prerequisite rather than skipping, because a suite that goes green by
+        # running nothing is how a check disappears. ubuntu-latest ships Chrome; paged.js and
+        # pdfjs-dist come from `npm ci`.
+        run: npm run test:live
+
       - name: self-application
         # The tool's own HTML report and its own docs pass its own error rules.
         run: npm run selfcheck

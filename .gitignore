@@ -13,3 +13,7 @@ breaklint-report/
 # Local scratch
 .tmp/
 coverage/
+
+# Local agent tooling. These are symlinks into a checkout outside this repository; committing
+# them would publish absolute paths from the machine they were made on.
+.claude/
