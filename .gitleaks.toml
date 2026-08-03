@@ -1,0 +1,12 @@
+title = "breaklint"
+
+[extend]
+useDefault = true
+
+[[rules]]
+  id = "absolute-home-path"
+  description = "Absolute path of a build machine must never reach the public repository."
+  regex = '''/(Users|home)/[a-z][a-z0-9_-]+/'''
+  [rules.allowlist]
+    regexTarget = "line"
+    regexes = ['''file:///…''', '''/Users/…''', '''/home/…''']

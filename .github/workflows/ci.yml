@@ -1,0 +1,76 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # Belt and braces: the names of these two have changed across versions, so both are set.
+      # A browser downloaded during install would make the licence job meaningless and the
+      # install size a fiction.
+      PUPPETEER_SKIP_DOWNLOAD: "1"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: no browser was downloaded
+        # Measured, not assumed. A guard whose effect nobody checks is a claim.
+        run: |
+          if [ -d "$HOME/.cache/puppeteer" ] || [ -d node_modules/puppeteer ]; then
+            echo "a browser was downloaded during install; the skip flags did not hold"
+            exit 1
+          fi
+          echo "no browser cache, no full puppeteer package"
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: unit and e2e tests
+        run: npm test
+
+      - name: mutation guard
+        # A suite that passes tells you nothing until you know it can fail.
+        run: npm run test:mutants
+
+      - name: licences
+        run: npm run test:licenses
+
+      - name: self-application
+        # The tool's own HTML report and its own docs pass its own error rules.
+        run: npm run selfcheck
+
+      - name: demo ends with exit 1
+        # The one documented command. It must end with 1, because the fixture contains findings
+        # on purpose — a demo that ends 0 never shows what a finding looks like.
+        run: |
+          set +e
+          node --experimental-strip-types src/cli/index.ts --demo > /dev/null
+          code=$?
+          set -e
+          test "$code" -eq 1 || { echo "--demo exited $code, expected 1"; exit 1; }
+          echo "--demo exit 1 as documented"
+
+      - name: a live run with a missing prerequisite ends with exit 3 and a command to fix it
+        # The promise is exit 3 plus ONE copyable install command on stderr — not exit 0, not
+        # exit 1, not an empty success. Which prerequisite is missing depends on the runner:
+        # ubuntu-latest ships Chrome, so the run gets past the browser and stops at paged.js.
+        # Asserting on the specific message would make this step pass or fail for reasons that
+        # have nothing to do with the promise, so it asserts on the promise itself.
+        run: |
+          set +e
+          BREAKLINT_CHROME=/nonexistent node --experimental-strip-types src/cli/index.ts README.md 2>err.txt
+          code=$?
+          set -e
+          test "$code" -eq 3 || { echo "expected exit 3, got $code"; cat err.txt; exit 1; }
+          grep -q "install:" err.txt || { echo "no install command on stderr"; cat err.txt; exit 1; }
+          echo "exit 3 with an install command:"; cat err.txt

@@ -1,0 +1,700 @@
+{
+  "breaklintDemo": {
+    "documentPath": "examples/demo.html",
+    "source": "handwritten snapshot fixture",
+    "note": "Hand-written so that every rule path in the demo is reachable. The report says so in its own source field."
+  },
+  "snapshot": {
+    "schemaVersion": 2,
+    "meta": {
+      "renderer": null,
+      "browserVersion": "",
+      "pagedjsVersion": "0.4.3",
+      "platform": "",
+      "locale": "de-DE",
+      "inputIdentity": null,
+      "freezeSignature": "demo",
+      "freezeRetries": 0,
+      "epochCount": 1,
+      "interventions": [
+        "animations-disabled"
+      ]
+    },
+    "source": {
+      "map": {
+        "s1": {
+          "file": "examples/demo.html",
+          "line": 12,
+          "column": 3,
+          "offset": 240
+        },
+        "s2": {
+          "file": "examples/demo.html",
+          "line": 31,
+          "column": 3,
+          "offset": 980
+        },
+        "s3": {
+          "file": "examples/demo.html",
+          "line": 58,
+          "column": 3,
+          "offset": 1720
+        },
+        "s4": {
+          "file": "examples/demo.html",
+          "line": 70,
+          "column": 3,
+          "offset": 2100
+        }
+      },
+      "parser": "demo",
+      "complete": true,
+      "injectedAttribute": "data-bl-sid",
+      "collisionChecked": true
+    },
+    "pages": [
+      {
+        "pageNumber": 1,
+        "nodeKey": "pg1",
+        "epoch": 0,
+        "blank": false,
+        "isLast": false,
+        "contentBox": {
+          "x": 48,
+          "y": 48,
+          "width": 399,
+          "height": 606
+        },
+        "marginBoxes": [],
+        "incomingBreakCause": {
+          "kind": "document-start",
+          "determinedBy": "document-boundary",
+          "cascadeHint": null
+        },
+        "outgoingBreakCause": {
+          "kind": "overflow",
+          "determinedBy": "break-token",
+          "cascadeHint": null
+        },
+        "fill": {
+          "vertical": 0.94,
+          "topGap": 0.02,
+          "net": 0.66,
+          "area": 1
+        },
+        "firstSemanticBlockKey": "sig:page1",
+        "notMeasured": []
+      },
+      {
+        "pageNumber": 2,
+        "nodeKey": "pg2",
+        "epoch": 0,
+        "blank": false,
+        "isLast": false,
+        "contentBox": {
+          "x": 48,
+          "y": 48,
+          "width": 399,
+          "height": 606
+        },
+        "marginBoxes": [],
+        "incomingBreakCause": {
+          "kind": "overflow",
+          "determinedBy": "break-token",
+          "cascadeHint": null
+        },
+        "outgoingBreakCause": {
+          "kind": "overflow",
+          "determinedBy": "break-token",
+          "cascadeHint": null
+        },
+        "fill": {
+          "vertical": 0.94,
+          "topGap": 0.02,
+          "net": 0.66,
+          "area": 1
+        },
+        "firstSemanticBlockKey": "sig:page2",
+        "notMeasured": []
+      },
+      {
+        "pageNumber": 3,
+        "nodeKey": "pg3",
+        "epoch": 0,
+        "blank": false,
+        "isLast": false,
+        "contentBox": {
+          "x": 48,
+          "y": 48,
+          "width": 399,
+          "height": 606
+        },
+        "marginBoxes": [],
+        "incomingBreakCause": {
+          "kind": "overflow",
+          "determinedBy": "break-token",
+          "cascadeHint": null
+        },
+        "outgoingBreakCause": {
+          "kind": "overflow",
+          "determinedBy": "break-token",
+          "cascadeHint": null
+        },
+        "fill": {
+          "vertical": 0.21,
+          "topGap": 0.02,
+          "net": 0.12,
+          "area": 1
+        },
+        "firstSemanticBlockKey": "sig:tail",
+        "notMeasured": []
+      },
+      {
+        "pageNumber": 4,
+        "nodeKey": "pg4",
+        "epoch": 0,
+        "blank": true,
+        "isLast": false,
+        "contentBox": {
+          "x": 48,
+          "y": 48,
+          "width": 399,
+          "height": 606
+        },
+        "marginBoxes": [],
+        "incomingBreakCause": {
+          "kind": "parity",
+          "determinedBy": "page-blank",
+          "cascadeHint": null
+        },
+        "outgoingBreakCause": {
+          "kind": "parity",
+          "determinedBy": "page-blank",
+          "cascadeHint": null
+        },
+        "fill": {
+          "vertical": 0,
+          "topGap": 0,
+          "net": 0,
+          "area": 0
+        },
+        "firstSemanticBlockKey": null,
+        "notMeasured": []
+      },
+      {
+        "pageNumber": 5,
+        "nodeKey": "pg5",
+        "epoch": 0,
+        "blank": false,
+        "isLast": true,
+        "contentBox": {
+          "x": 48,
+          "y": 48,
+          "width": 399,
+          "height": 606
+        },
+        "marginBoxes": [],
+        "incomingBreakCause": {
+          "kind": "overflow",
+          "determinedBy": "break-token",
+          "cascadeHint": null
+        },
+        "outgoingBreakCause": {
+          "kind": "document-end",
+          "determinedBy": "document-boundary",
+          "cascadeHint": null
+        },
+        "fill": {
+          "vertical": 0.3,
+          "topGap": 0.02,
+          "net": 0.28,
+          "area": 1
+        },
+        "firstSemanticBlockKey": "sig:last",
+        "notMeasured": []
+      }
+    ],
+    "blocks": [
+      {
+        "nodeKey": "b1",
+        "sid": "s1",
+        "authorId": "intro",
+        "blockSignature": "An introduction that runs across the boundary.",
+        "fragmentIndex": 0,
+        "fragmentCount": 2,
+        "page": 1,
+        "box": {
+          "x": 48,
+          "y": 520,
+          "width": 399,
+          "height": 134
+        },
+        "tag": "p",
+        "classList": [],
+        "lineHeight": 15.4,
+        "spaceWidth": 4.2,
+        "effectiveStyle": {
+          "breakInside": "auto",
+          "breakBefore": "auto",
+          "breakAfter": "auto",
+          "columns": "auto",
+          "writingMode": "horizontal-tb",
+          "visibility": "visible",
+          "widows": 2,
+          "orphans": 2,
+          "textAlign": "left",
+          "wordSpacing": "normal",
+          "fontFamily": "Source Serif",
+          "fontSize": 11,
+          "lineHeight": 15.4,
+          "lang": "de"
+        },
+        "lines": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      {
+        "nodeKey": "b2",
+        "sid": "s1",
+        "authorId": "intro",
+        "blockSignature": "An introduction that runs across the boundary.",
+        "fragmentIndex": 1,
+        "fragmentCount": 2,
+        "page": 2,
+        "box": {
+          "x": 48,
+          "y": 48,
+          "width": 399,
+          "height": 16
+        },
+        "tag": "p",
+        "classList": [],
+        "lineHeight": 15.4,
+        "spaceWidth": 4.2,
+        "effectiveStyle": {
+          "breakInside": "auto",
+          "breakBefore": "auto",
+          "breakAfter": "auto",
+          "columns": "auto",
+          "writingMode": "horizontal-tb",
+          "visibility": "visible",
+          "widows": 2,
+          "orphans": 2,
+          "textAlign": "left",
+          "wordSpacing": "normal",
+          "fontFamily": "Source Serif",
+          "fontSize": 11,
+          "lineHeight": 15.4,
+          "lang": "de"
+        },
+        "lines": [
+          8
+        ]
+      },
+      {
+        "nodeKey": "b3",
+        "sid": "s2",
+        "authorId": null,
+        "blockSignature": "A table that promises not to break and is far too tall.",
+        "fragmentIndex": 0,
+        "fragmentCount": 1,
+        "page": 2,
+        "box": {
+          "x": 48,
+          "y": 80,
+          "width": 399,
+          "height": 848
+        },
+        "tag": "table",
+        "classList": [],
+        "lineHeight": 15.4,
+        "spaceWidth": 4.2,
+        "effectiveStyle": {
+          "breakInside": "avoid",
+          "breakBefore": "auto",
+          "breakAfter": "auto",
+          "columns": "auto",
+          "writingMode": "horizontal-tb",
+          "visibility": "visible",
+          "widows": 2,
+          "orphans": 2,
+          "textAlign": "left",
+          "wordSpacing": "normal",
+          "fontFamily": "Source Serif",
+          "fontSize": 11,
+          "lineHeight": 15.4,
+          "lang": "de"
+        },
+        "lines": []
+      },
+      {
+        "nodeKey": "b4",
+        "sid": "s3",
+        "authorId": null,
+        "blockSignature": "Der Prüfer - und nur er - entscheidet.",
+        "fragmentIndex": 0,
+        "fragmentCount": 1,
+        "page": 3,
+        "box": {
+          "x": 48,
+          "y": 48,
+          "width": 399,
+          "height": 32
+        },
+        "tag": "p",
+        "classList": [],
+        "lineHeight": 15.4,
+        "spaceWidth": 4.2,
+        "effectiveStyle": {
+          "breakInside": "auto",
+          "breakBefore": "auto",
+          "breakAfter": "auto",
+          "columns": "auto",
+          "writingMode": "horizontal-tb",
+          "visibility": "visible",
+          "widows": 2,
+          "orphans": 2,
+          "textAlign": "left",
+          "wordSpacing": "normal",
+          "fontFamily": "Source Serif",
+          "fontSize": 11,
+          "lineHeight": 15.4,
+          "lang": "de"
+        },
+        "lines": [
+          0,
+          1
+        ]
+      },
+      {
+        "nodeKey": "b5",
+        "sid": "s4",
+        "authorId": null,
+        "blockSignature": "A chart with a clipped label.",
+        "fragmentIndex": 0,
+        "fragmentCount": 1,
+        "page": 5,
+        "box": {
+          "x": 48,
+          "y": 48,
+          "width": 300,
+          "height": 200
+        },
+        "tag": "figure",
+        "classList": [],
+        "lineHeight": 15.4,
+        "spaceWidth": 4.2,
+        "effectiveStyle": {
+          "breakInside": "auto",
+          "breakBefore": "auto",
+          "breakAfter": "auto",
+          "columns": "auto",
+          "writingMode": "horizontal-tb",
+          "visibility": "visible",
+          "widows": 2,
+          "orphans": 2,
+          "textAlign": "left",
+          "wordSpacing": "normal",
+          "fontFamily": "Source Serif",
+          "fontSize": 11,
+          "lineHeight": 15.4,
+          "lang": "de"
+        },
+        "lines": []
+      }
+    ],
+    "textLines": [
+      {
+        "blockKey": "b1",
+        "index": 0,
+        "box": {
+          "x": 48,
+          "y": 520,
+          "width": 399,
+          "height": 15.4
+        },
+        "visible": true,
+        "width": 399,
+        "wordBoxes": null
+      },
+      {
+        "blockKey": "b1",
+        "index": 1,
+        "box": {
+          "x": 48,
+          "y": 535.4,
+          "width": 399,
+          "height": 15.4
+        },
+        "visible": true,
+        "width": 399,
+        "wordBoxes": null
+      },
+      {
+        "blockKey": "b1",
+        "index": 2,
+        "box": {
+          "x": 48,
+          "y": 550.8,
+          "width": 399,
+          "height": 15.4
+        },
+        "visible": true,
+        "width": 399,
+        "wordBoxes": null
+      },
+      {
+        "blockKey": "b1",
+        "index": 3,
+        "box": {
+          "x": 48,
+          "y": 566.2,
+          "width": 399,
+          "height": 15.4
+        },
+        "visible": true,
+        "width": 399,
+        "wordBoxes": null
+      },
+      {
+        "blockKey": "b1",
+        "index": 4,
+        "box": {
+          "x": 48,
+          "y": 581.6,
+          "width": 399,
+          "height": 15.4
+        },
+        "visible": true,
+        "width": 399,
+        "wordBoxes": null
+      },
+      {
+        "blockKey": "b1",
+        "index": 5,
+        "box": {
+          "x": 48,
+          "y": 597,
+          "width": 399,
+          "height": 15.4
+        },
+        "visible": true,
+        "width": 399,
+        "wordBoxes": null
+      },
+      {
+        "blockKey": "b1",
+        "index": 6,
+        "box": {
+          "x": 48,
+          "y": 612.4,
+          "width": 399,
+          "height": 15.4
+        },
+        "visible": true,
+        "width": 399,
+        "wordBoxes": null
+      },
+      {
+        "blockKey": "b1",
+        "index": 7,
+        "box": {
+          "x": 48,
+          "y": 627.8,
+          "width": 399,
+          "height": 15.4
+        },
+        "visible": true,
+        "width": 399,
+        "wordBoxes": null
+      },
+      {
+        "blockKey": "b2",
+        "index": 8,
+        "box": {
+          "x": 48,
+          "y": 48,
+          "width": 120,
+          "height": 15.4
+        },
+        "visible": true,
+        "width": 120,
+        "wordBoxes": null
+      },
+      {
+        "blockKey": "b4",
+        "index": 0,
+        "box": {
+          "x": 48,
+          "y": 48,
+          "width": 399,
+          "height": 15.4
+        },
+        "visible": true,
+        "width": 399,
+        "wordBoxes": null
+      },
+      {
+        "blockKey": "b4",
+        "index": 1,
+        "box": {
+          "x": 48,
+          "y": 63,
+          "width": 399,
+          "height": 15.4
+        },
+        "visible": true,
+        "width": 399,
+        "wordBoxes": null
+      }
+    ],
+    "textRuns": [
+      {
+        "blockKey": "b4",
+        "text": "Der Prüfer - und nur er - entscheidet.",
+        "nodeType": "text",
+        "ancestorTags": [
+          "p",
+          "body"
+        ],
+        "lang": "de",
+        "excluded": false
+      },
+      {
+        "blockKey": "b4",
+        "text": "Für x - y = 0 gilt die folgende Lösung.",
+        "nodeType": "text",
+        "ancestorTags": [
+          "p",
+          "body"
+        ],
+        "lang": "de",
+        "excluded": false
+      },
+      {
+        "blockKey": "b4",
+        "text": "a - b in English",
+        "nodeType": "text",
+        "ancestorTags": [
+          "span",
+          "p",
+          "body"
+        ],
+        "lang": "en",
+        "excluded": false
+      }
+    ],
+    "svg": [
+      {
+        "nodeKey": "b5",
+        "sourceKey": "svgsig:chart",
+        "measurable": true,
+        "viewportScreen": {
+          "x": 48,
+          "y": 48,
+          "width": 300,
+          "height": 200
+        },
+        "overflow": "hidden",
+        "textTargetCount": 2,
+        "textTargetsCapped": false,
+        "texts": [
+          {
+            "targetKey": "bt001",
+            "svgTextKey": "svg:svgsig:chart|id:label-left",
+            "boxScreen": {
+              "x": 60,
+              "y": 120,
+              "width": 80,
+              "height": 12
+            },
+            "clipState": "clip-path",
+            "ink": {
+              "T": {
+                "count": 1420,
+                "maskHash": "h1420",
+                "intersectShapes": 0,
+                "missingInFull": 0
+              },
+              "T0": {
+                "count": 3810,
+                "maskHash": "h3810"
+              }
+            }
+          },
+          {
+            "targetKey": "bt002",
+            "svgTextKey": "svg:svgsig:chart|id:label-right",
+            "boxScreen": {
+              "x": 300,
+              "y": 60,
+              "width": 120,
+              "height": 12
+            },
+            "clipState": "none",
+            "ink": {
+              "T": {
+                "count": 2100,
+                "maskHash": "h2100",
+                "intersectShapes": 0,
+                "missingInFull": 0
+              },
+              "T0": {
+                "count": 2100,
+                "maskHash": "h2100"
+              }
+            }
+          }
+        ],
+        "shapes": [
+          {
+            "boxScreen": {
+              "x": 60,
+              "y": 60,
+              "width": 200,
+              "height": 120
+            },
+            "strokeWidth": 2
+          }
+        ],
+        "paths": [],
+        "inkPasses": {
+          "E": {
+            "count": 0,
+            "maskHash": "h0"
+          },
+          "S": {
+            "count": 9000,
+            "maskHash": "h9000"
+          },
+          "F": {
+            "count": 11100,
+            "maskHash": "h11100"
+          }
+        },
+        "inkStable": true
+      }
+    ],
+    "uriRefs": [
+      {
+        "nodeKey": "b5",
+        "attribute": "src",
+        "rawValue": "file:///build/machine/logo.png",
+        "resolvedUri": "file:///build/machine/logo.png",
+        "scheme": "file",
+        "origin": "file://",
+        "requested": false,
+        "insideDistributionRoot": false
+      }
+    ],
+    "resources": [],
+    "notMeasured": []
+  }
+}

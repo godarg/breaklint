@@ -1,0 +1,65 @@
+{
+  "name": "breaklint",
+  "version": "0.1.0",
+  "description": "Layout checks for documents generated from HTML to PDF: measures every page after pagination and reports the measured value next to the threshold it failed.",
+  "keywords": [
+    "pagedjs",
+    "html-to-pdf",
+    "pdf",
+    "layout",
+    "pagination",
+    "linter",
+    "typography"
+  ],
+  "license": "MIT",
+  "author": "Gottlieb Dargel",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "breaklint": "dist/cli/index.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/",
+    "profiles/",
+    "examples/",
+    "report.schema.json",
+    "breaklint.schema.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --experimental-strip-types tests/unit/*.test.ts tests/e2e/*.test.ts",
+    "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
+    "test:mutants": "node --experimental-strip-types tests/tools/mutants.ts",
+    "test:licenses": "node --experimental-strip-types tests/tools/licenses.ts",
+    "selfcheck": "node --experimental-strip-types tests/tools/selfcheck.ts"
+  },
+  "peerDependencies": {
+    "pagedjs": "0.4.3",
+    "pdfjs-dist": "^6.2.108",
+    "puppeteer-core": ">=22"
+  },
+  "peerDependenciesMeta": {
+    "pagedjs": {
+      "optional": true
+    },
+    "pdfjs-dist": {
+      "optional": true
+    },
+    "puppeteer-core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "5.9.2"
+  }
+}

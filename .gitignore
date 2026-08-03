@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+npm-debug.log*
+
+# Generated during a run. Evidence images and PDFs are produced, never committed.
+breaklint-report/
+*.png
+*.pdf
+!tests/fixtures/**/expected-*.png
+
+# Local scratch
+.tmp/
+coverage/
