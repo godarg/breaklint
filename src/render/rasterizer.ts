@@ -16,10 +16,11 @@
  *      shape the evidence path actually needs.
  *
  *   3. Rasterising must happen AFTER the content page is closed. Measured at the product, not
- *      inherited: with a paginated page open, the rasteriser answered after 45 003 ms — that is,
- *      it did not answer, it timed out; with the page closed, the same PDF came back in 109 ms.
- *      `contentPagesOpen` is therefore a REQUIRED argument. It was optional once, which meant
- *      the rule held for exactly one caller: the test that wired it.
+ *      inherited: with a paginated page open the rasteriser did not answer inside the live
+ *      suite's 15 s window; with every page closed the same PDF came back with its pages in
+ *      well under a second (84 ms and 119 ms on two runs). `contentPagesOpen` is therefore a
+ *      REQUIRED argument. It was optional once, which meant the rule held for exactly one
+ *      caller: the test that wired it.
  *
  *   4. The rasteriser is served over a loopback HTTP origin, not read from `file://`. Loading it
  *      from disk needs `--allow-file-access-from-files`, and that switch is browser-wide: it
@@ -393,8 +394,8 @@ export async function openRasterizer(
  *
  * A comment saying "close the content page first" is a comment. This throws, because the
  * failure it prevents does not look like a failure: measured at this product, the rasteriser
- * page stopped answering for 45 003 ms with a content page open and answered in 109 ms without
- * one. The symptom is a timeout that names nothing.
+ * page did not answer at all inside a 15 s window with a content page open, and answered in
+ * well under a second without one. The symptom is a timeout that names nothing.
  */
 function assertContentPagesClosed(open: () => number, what: string): void {
   const n = open();

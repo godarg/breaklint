@@ -64,7 +64,7 @@ describe("matchMarks", () => {
     assert.equal(page.marksMatched, 2);
     assert.equal(page.targetsBound, 1);
     assert.equal(page.targetsTotal, 1);
-    assert.equal(page.dyNormalisable, true);
+    assert.equal(page.referenceFrom, "page");
     assert.ok(page.maxDxMm < 1e-9, `maxDxMm ${page.maxDxMm}`);
   });
 
@@ -75,7 +75,7 @@ describe("matchMarks", () => {
     const result = matchMarks(marks, [textPage([{ token: "BLSID000A", xMm: 20, yMm: 70 }])]);
     const page = result.byPage.get(1)!;
     assert.equal(page.marksMatched, 1, "the mark was found, so the guard is what has to refuse it");
-    assert.equal(page.dyNormalisable, false);
+    assert.equal(page.referenceFrom, "none", "a single pair in the whole document has no reference at all");
     assert.equal(page.targetsBound, 0);
     assert.deepEqual([...result.boundSids], []);
     // And the arithmetic of the self-referential criterion is shown, not just its consequence.
@@ -141,7 +141,7 @@ describe("matchMarks", () => {
     assert.equal(result.ambiguous, 1);
     const page = result.byPage.get(1)!;
     assert.equal(page.marksMatched, 1);
-    assert.equal(page.dyNormalisable, false, "one usable pair left, so Δy says nothing");
+    assert.equal(page.referenceFrom, "none", "one usable pair left in the whole document — no reference");
     assert.deepEqual([...result.boundSids], []);
   });
 
@@ -174,6 +174,111 @@ describe("matchMarks", () => {
       const bound = [...result.boundSids].filter((s) => s === "b2");
       assert.deepEqual(bound, [...expected], `displacement ${displacement} mm in x`);
     }
+  });
+
+  it("a page with one pair borrows the document's reference and is judged, not waved through", () => {
+    // The contract binds a target on ONE mark. Judging Δy against the page's own median makes
+    // that vacuous when the page has a single pair — the median IS the value. The reference
+    // therefore comes from the document, and the single mark is really judged.
+    const marks = [
+      mark("b1", "BLSID000A", 20, 30, 1),
+      mark("b1", "BLSID000E", 20, 36, 1),
+      mark("b2", "BLSID001A", 20, 50, 1),
+      mark("b2", "BLSID001E", 20, 56, 1),
+      mark("b3", "BLSID002A", 20, 20, 2),
+    ];
+    const good = matchMarks(marks, [
+      textPage([
+        { token: "BLSID000A", xMm: 20, yMm: 30 },
+        { token: "BLSID000E", xMm: 20, yMm: 36 },
+        { token: "BLSID001A", xMm: 20, yMm: 50 },
+        { token: "BLSID001E", xMm: 20, yMm: 56 },
+      ]),
+      textPage([{ token: "BLSID002A", xMm: 20, yMm: 20 }]),
+    ]);
+    assert.equal(good.byPage.get(2)!.referenceFrom, "document");
+    assert.ok(good.boundSids.has("b3"), "a correctly placed single mark lost its binding");
+
+    // ... and the same page with the mark 40 mm out does NOT bind. Under the old rule it did.
+    const bad = matchMarks(marks, [
+      textPage([
+        { token: "BLSID000A", xMm: 20, yMm: 30 },
+        { token: "BLSID000E", xMm: 20, yMm: 36 },
+        { token: "BLSID001A", xMm: 20, yMm: 50 },
+        { token: "BLSID001E", xMm: 20, yMm: 56 },
+      ]),
+      textPage([{ token: "BLSID002A", xMm: 20, yMm: 60 }]),
+    ]);
+    assert.equal(bad.byPage.get(2)!.referenceFrom, "document");
+    assert.ok(!bad.boundSids.has("b3"), "a mark 40 mm out was bound against a borrowed reference");
+    assert.equal(bad.byPage.get(2)!.divergent, false, "a page without its own reference is never called divergent");
+  });
+
+  it("a page that has its own reference and binds nothing is divergent", () => {
+    // Every mark shifted 40 mm in x. Δx is judged absolutely, so no target binds — while the
+    // marks agree among themselves about where the reference is. That is the difference between
+    // 'this document has an odd page' and 'the PDF does not reproduce what the rules measured'.
+    const marks = [
+      mark("b1", "BLSID000A", 20, 30),
+      mark("b1", "BLSID000E", 20, 36),
+      mark("b2", "BLSID001A", 20, 50),
+      mark("b2", "BLSID001E", 20, 56),
+    ];
+    const result = matchMarks(marks, [
+      textPage([
+        { token: "BLSID000A", xMm: 60, yMm: 30 },
+        { token: "BLSID000E", xMm: 60, yMm: 36 },
+        { token: "BLSID001A", xMm: 60, yMm: 50 },
+        { token: "BLSID001E", xMm: 60, yMm: 56 },
+      ]),
+    ]);
+    assert.equal(result.byPage.get(1)!.referenceFrom, "page");
+    assert.equal(result.byPage.get(1)!.targetsBound, 0);
+    assert.equal(result.byPage.get(1)!.divergent, true);
+    assert.equal(result.divergentPages, 1);
+  });
+
+  it("a page with one bad target among good ones is NOT divergent", () => {
+    // The counterpart, and the reason divergence is not simply 'something is out of tolerance'.
+    // One displaced target is a finding without evidence; it is not a broken apparatus.
+    const marks = [
+      mark("b1", "BLSID000A", 20, 30),
+      mark("b1", "BLSID000E", 20, 36),
+      mark("b2", "BLSID001A", 20, 50),
+      mark("b2", "BLSID001E", 20, 56),
+    ];
+    const result = matchMarks(marks, [
+      textPage([
+        { token: "BLSID000A", xMm: 20, yMm: 30 },
+        { token: "BLSID000E", xMm: 20, yMm: 36 },
+        { token: "BLSID001A", xMm: 60, yMm: 50 },
+        { token: "BLSID001E", xMm: 60, yMm: 56 },
+      ]),
+    ]);
+    assert.equal(result.byPage.get(1)!.divergent, false);
+    assert.equal(result.divergentPages, 0);
+    assert.deepEqual([...result.boundSids], ["b1"]);
+  });
+
+  it("the reference is a median, so one grossly displaced mark cannot drag it", () => {
+    // A mean would move by a quarter of the outlier's error and could pull correct marks out of
+    // tolerance with it. Three good marks and one 40 mm out: the good ones must survive.
+    const marks = [
+      mark("b1", "BLSID000A", 20, 30),
+      mark("b1", "BLSID000E", 20, 36),
+      mark("b2", "BLSID001A", 20, 50),
+      mark("b3", "BLSID002A", 20, 70),
+    ];
+    const result = matchMarks(marks, [
+      textPage([
+        { token: "BLSID000A", xMm: 20, yMm: 30 },
+        { token: "BLSID000E", xMm: 20, yMm: 36 },
+        { token: "BLSID001A", xMm: 20, yMm: 50 },
+        { token: "BLSID002A", xMm: 20, yMm: 110 },
+      ]),
+    ]);
+    assert.deepEqual([...result.boundSids].sort(), ["b1", "b2"]);
+    assert.equal(result.byPage.get(1)!.divergent, false);
   });
 
   it("a mark on a page the PDF does not have is ambiguous, never bound", () => {

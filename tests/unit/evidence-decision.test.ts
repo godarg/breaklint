@@ -23,6 +23,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
 import type { PageLike } from "../../src/acquire/browser.ts";
+import { IS } from "../../src/core/enums.ts";
 import { produceEvidence } from "../../src/render/evidence.ts";
 import type { PlacedMark } from "../../src/render/overlay.ts";
 import type { PdfTextPage, RasterDiff, RasterPage, Rasterizer } from "../../src/render/rasterizer.ts";
@@ -275,6 +276,47 @@ describe("the evidence verdict", () => {
     assert.deepEqual([...r.boundSids].sort(), ["b1", "b2"]);
     assert.equal(r.deliveredWithOverlay, true);
     assert.equal(r.infrastructure.length, 0, `unexpected: ${JSON.stringify(r.infrastructure)}`);
+  });
+
+  it("a divergent page raises render-unstable, which is a fatal infrastructure kind", async () => {
+    // Both marks of both targets refound, all shifted 40 mm in x. The page carried its own
+    // reference and bound nothing: the PDF does not reproduce what the rules measured. Unlike
+    // `mark-raster-diff`, this one is meant to end the run.
+    const r = await run({}, {
+      diff: 0,
+      textItems: [
+        textPage([
+          { token: "BLSID000A", xMm: 60, yMm: 30 },
+          { token: "BLSID000E", xMm: 60, yMm: 36 },
+          { token: "BLSID001A", xMm: 60, yMm: 50 },
+          { token: "BLSID001E", xMm: 60, yMm: 56 },
+        ]),
+      ],
+    });
+    assert.equal(r.boundSids.size, 0);
+    const event = r.infrastructure.find((e) => e.kind === "render-unstable");
+    assert.ok(event, `no render-unstable event: ${JSON.stringify(r.infrastructure.map((e) => e.kind))}`);
+    assert.match(event.detail, /dom-pdf-divergence/u);
+    assert.equal(IS.nonFatalInfraEventKind.has("render-unstable"), false, "divergence must end the run");
+    assert.equal(r.evidence[0]?.pdfConformance, "unverified");
+  });
+
+  it("one displaced target among good ones does NOT raise render-unstable", async () => {
+    // The red condition for the case above. Without it, 'divergence' would just mean
+    // 'something was out of tolerance' and every ordinary displaced mark would end the run.
+    const r = await run({}, {
+      diff: 0,
+      textItems: [
+        textPage([
+          { token: "BLSID000A", xMm: 20, yMm: 30 },
+          { token: "BLSID000E", xMm: 20, yMm: 36 },
+          { token: "BLSID001A", xMm: 60, yMm: 50 },
+          { token: "BLSID001E", xMm: 60, yMm: 56 },
+        ]),
+      ],
+    });
+    assert.deepEqual([...r.boundSids], ["b1"]);
+    assert.equal(r.infrastructure.some((e) => e.kind === "render-unstable"), false);
   });
 
   it("a counted pixel difference delivers the baseline and binds nothing", async () => {

@@ -6,7 +6,7 @@
  * green run, and it was being cited as one.
  */
 import { spawn } from "node:child_process";
-import { existsSync, renameSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, rmSync } from "node:fs";
 
 const target = process.env.BREAKLINT_LIVE_REPORT;
 const partial = target ? `${target}.partial` : null;
@@ -19,10 +19,27 @@ const child = spawn(
 );
 child.on("exit", (code) => {
   if (partial && existsSync(partial)) {
-    if (code === 0) renameSync(partial, target);
+    // Exit 0 is not enough. A run whose prerequisites were declared optional skips every case and
+    // still exits 0, and the report it leaves behind is a green verdict over nothing measured —
+    // the mirror image of the defect this file was written to fix. A report with no cases is not
+    // promoted, and the reason is said out loud.
+    let cases = 0;
+    let missing = [];
+    try {
+      const report = JSON.parse(readFileSync(partial, "utf8"));
+      cases = Object.keys(report.cases ?? {}).length;
+      missing = report.missingPrerequisites ?? [];
+    } catch {
+      cases = 0;
+    }
+    if (code === 0 && cases > 0) renameSync(partial, target);
     else {
       rmSync(partial);
-      console.error(`breaklint: the live suite exited ${code}; no measurement report was written.`);
+      const why =
+        code !== 0
+          ? `the live suite exited ${code}`
+          : `the live suite measured nothing (0 cases${missing.length ? `, missing: ${missing.join(", ")}` : ""})`;
+      console.error(`breaklint: ${why}; no measurement report was written.`);
     }
   }
   process.exit(code ?? 1);

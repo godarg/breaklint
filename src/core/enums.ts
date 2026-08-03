@@ -52,6 +52,25 @@ export const INFRA_EVENT_KINDS = [
 ] as const;
 export type InfraEventKind = (typeof INFRA_EVENT_KINDS)[number];
 
+/**
+ * The infrastructure kinds that do NOT make a run exit 3.
+ *
+ * Everything else about the measuring apparatus failing means the report cannot be trusted. These
+ * three mean something narrower and the contract says so in as many words: for the two mark
+ * kinds, "the document is in order, only the binding is not" (§11.4.1). Losing the evidence for a
+ * finding is not the same as being unable to measure the document, and a tool that exits 3
+ * because a hostile stylesheet reached its own overlay would be unusable on exactly the documents
+ * it exists for. `empty-input` is here because an empty document is a coverage question.
+ *
+ * The list is deliberately small and deliberately explicit: an infrastructure kind added later is
+ * fatal unless someone decides otherwise, which is the safe default direction.
+ */
+export const NON_FATAL_INFRA_EVENT_KINDS = [
+  "empty-input",
+  "mark-style-overridden",
+  "mark-raster-diff",
+] as const satisfies readonly InfraEventKind[];
+
 /** Fingerprint key types. */
 export const KEY_TYPES = ["block", "page", "resource", "generated", "svg-text"] as const;
 export type KeyType = (typeof KEY_TYPES)[number];
@@ -208,6 +227,7 @@ const asSet = <T extends string>(values: readonly T[]): ReadonlySet<string> => n
 export const IS = {
   envId: asSet(ENV_IDS),
   infraEventKind: asSet(INFRA_EVENT_KINDS),
+  nonFatalInfraEventKind: asSet(NON_FATAL_INFRA_EVENT_KINDS),
   keyType: asSet(KEY_TYPES),
   notMeasuredScope: asSet(NOT_MEASURED_SCOPES),
   rasterizer: asSet(RASTERIZERS),

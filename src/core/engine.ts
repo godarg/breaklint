@@ -15,8 +15,11 @@
  * level up.
  */
 
-import { COVERAGE_FLOOR_BY_SEVERITY, EXIT_CODE_BY_VERDICT, VERDICT_PRECEDENCE } from "./enums.ts";
+import { COVERAGE_FLOOR_BY_SEVERITY, EXIT_CODE_BY_VERDICT, IS, VERDICT_PRECEDENCE } from "./enums.ts";
 import type { FailOn, RunVerdict, Severity } from "./enums.ts";
+
+/** Whether this event alone makes the run exit 3. See `NON_FATAL_INFRA_EVENT_KINDS`. */
+const isFatalInfra = (event: InfraEvent): boolean => !IS.nonFatalInfraEventKind.has(event.kind);
 import { fingerprint } from "./fingerprint.ts";
 import type { Rule, RuleOptions } from "./rule.ts";
 import { aggregateNotMeasured } from "./rule.ts";
@@ -64,7 +67,7 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
       report: {
         path: input.path,
         inputIdentity: null,
-        verdict: infrastructure.some((e) => e.kind !== "empty-input") ? "infrastructure" : "insufficient-coverage",
+        verdict: infrastructure.some((e) => isFatalInfra(e)) ? "infrastructure" : "insufficient-coverage",
         exitReason: infrastructure[0]?.kind ?? "empty-input",
         pages: 0,
         coverage: {},
@@ -151,9 +154,10 @@ function documentVerdict(input: {
   findings: Finding[];
   failOn: FailOn;
 }): RunVerdict {
-  // `empty-input` is the one infrastructure kind that does not mean exit 3: an empty document
+  // Not every infrastructure event means exit 3. `NON_FATAL_INFRA_EVENT_KINDS` names the three
+  // that do not, each for a reason the contract states; everything else does.
   // is a coverage question, not a broken renderer.
-  if (input.infrastructure.some((e) => e.kind !== "empty-input")) return "infrastructure";
+  if (input.infrastructure.some((e) => isFatalInfra(e))) return "infrastructure";
   if (input.measuredRuleCount === 0) return "insufficient-coverage";
   if (Object.values(input.coverage).some((c) => !c.ok)) return "insufficient-coverage";
   return gateTriggeredBy(input.findings, input.failOn) ? "findings" : "clean";
@@ -166,7 +170,7 @@ function exitReasonFor(
   measuredRuleCount: number,
 ): string | null {
   if (verdict === "infrastructure") {
-    return infrastructure.find((e) => e.kind !== "empty-input")?.kind ?? null;
+    return infrastructure.find((e) => isFatalInfra(e))?.kind ?? null;
   }
   if (verdict === "insufficient-coverage") {
     if (infrastructure.some((e) => e.kind === "empty-input")) return "empty-input";

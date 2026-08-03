@@ -62,13 +62,31 @@ const MM_PER_PT = 25.4 / 72;
 export const CONFORMANCE_TOLERANCE_MM = 0.35;
 
 /**
- * A page's `Δy` values are judged against their own mean, because a mark's `top` is a box edge
+ * `Δy` is judged against a REFERENCE rather than absolutely, because a mark's `top` is a box edge
  * while the PDF item's `y` is a glyph baseline — every `Δy` carries the same constant offset.
- * With a single pair that mean IS the value, so `|Δy − mean|` is 0 no matter how wrong the mark
- * is. Measured: a mark placed 40 mm off came out bound. A page therefore needs at least this
- * many pairs before the `Δy` criterion means anything.
+ * Judging `|Δy|` absolutely would measure that offset instead of the divergence.
+ *
+ * The reference is chosen in this order, and the order is the whole point:
+ *
+ *   - the page's own median, when the page has at least this many refound pairs. This is what
+ *     the contract intends, and it is immune to a document whose zones differ — a title page in
+ *     a display face and a body page in a text face need not share an offset.
+ *   - otherwise the DOCUMENT's median. A page with a single pair has no usable reference of its
+ *     own: with one value the median IS that value, so `|Δy − median|` is 0 however wrong the
+ *     mark is. Measured before this existed: a mark placed 40 mm off came out bound.
+ *
+ * A document with fewer than this many refound pairs in total has no reference at all, and
+ * nothing in it binds. That case is stated in the report rather than resolved.
  */
-const MIN_PAIRS_FOR_DY = 2;
+const MIN_PAIRS_FOR_REFERENCE = 2;
+
+/** The median, not the mean: one grossly displaced mark drags a mean and does not move a median. */
+function median(values: readonly number[]): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
+}
 
 export interface EvidenceOptions {
   outDir: string;
@@ -145,16 +163,46 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
     });
   }
 
-  // --- 2 and 3 -------------------------------------------------------------------------------
-  const installation = await installOverlay(page);
-  const violations = await readbackViolations(page);
-
-  // --- 4 and 5 -------------------------------------------------------------------------------
-  const marked = await page.pdf({ printBackground: true, preferCSSPageSize: true });
-  const detached = await detachOverlay(page);
-  await removeOverlay(page);
+  // --- 2 to 5 --------------------------------------------------------------------------------
+  // Everything that touches the page sits inside one try, and the page is closed in the finally.
+  // Without it, a throw anywhere in here leaves the content page open — and since the ordering
+  // guard now refuses every rasteriser call while one is, a single failed document would take
+  // every later document of the run down with it.
+  let installation, violations, marked: Uint8Array, detached: number;
+  try {
+    installation = await installOverlay(page);
+    violations = await readbackViolations(page);
+    marked = await page.pdf({ printBackground: true, preferCSSPageSize: true });
+    detached = await detachOverlay(page);
+    await removeOverlay(page);
+  } catch (error) {
+    await closePage();
+    infrastructure.push({
+      kind: "checker-crashed",
+      detail: `the evidence overlay failed on this document: ${String(error).slice(0, 300)}`,
+      measured: null,
+    });
+    return finish({
+      pdf: baseline,
+      withOverlay: false,
+      candidates: { marked: null, baseline },
+      marks: [],
+      ambiguousMarks: 0,
+      styleViolations: 0,
+      rasterDiffPx: -1,
+      overlayRemoved: true,
+      bindingPossible: false,
+      overlayInstalled: true,
+      rasterizer,
+      options,
+      dpi,
+      infrastructure,
+      notMeasured,
+      errorsAtStart,
+    });
+  }
   // §11.4a.2: everything below this line needs the content page gone. Measured at this product:
-  // 45 003 ms with a page open, 109 ms without.
+  // no answer at all inside 15 s with a page open, well under a second without one.
   await closePage();
 
   // Two measurements that used to be recorded and never consulted. A layer that could not be
@@ -281,6 +329,31 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
     const textPages = clean ? await rasterizer.textItems(marked) : null;
     const conformance = textPages ? matchMarks(installation.marks, textPages) : null;
 
+    // §11.4.3 names `dom-pdf-divergence` and gives it exit 3, next to a rule that gives the same
+    // case a false binding flag. Both are right, for different scopes: a target out of tolerance
+    // is a finding without evidence, and a PAGE whose own marks all miss is an apparatus that
+    // disagrees with itself. The rules measured the DOM; if the PDF does not reproduce that page,
+    // a report of findings on it describes a document nobody will see.
+    if (conformance && conformance.divergentPages > 0) {
+      const pages = [...conformance.byPage].filter(([, c]) => c.divergent).map(([n]) => n);
+      infrastructure.push({
+        kind: "render-unstable",
+        detail:
+          `dom-pdf-divergence: on page(s) ${pages.join(", ")} every mark was refound in the PDF ` +
+          "and not one of them sits where the DOM says it does. These pages carried their own " +
+          "reference, so this is not a reference artefact.",
+        measured: {
+          divergentPages: conformance.divergentPages,
+          pages,
+          toleranceMm: CONFORMANCE_TOLERANCE_MM,
+          perPage: pages.map((n) => {
+            const c = conformance.byPage.get(n)!;
+            return { page: n, marksMatched: c.marksMatched, maxDxMm: c.maxDxMm, maxDyMm: c.maxDyMm };
+          }),
+        },
+      });
+    }
+
     return await finish({
       pdf: clean ? marked : baseline,
       withOverlay: clean,
@@ -322,6 +395,9 @@ export interface MarkConformance {
   byPage: Map<number, PageConformance>;
   /** Marks whose token appeared zero times or more than once in the page's text stream. */
   ambiguous: number;
+  /** Pages that had their own reference and still bound nothing. See `PageConformance.divergent`. */
+  divergentPages: number;
+  documentMedianDyMm: number;
 }
 
 export interface PageConformance {
@@ -334,8 +410,15 @@ export interface PageConformance {
   targetsTotal: number;
   /** Of those, the ones with at least one uniquely refound mark inside the tolerance. */
   targetsBound: number;
-  /** False when the page has too few pairs for the mean-relative `Δy` criterion to say anything. */
-  dyNormalisable: boolean;
+  /** Where the `Δy` reference came from. `none` means the document had too few pairs as well. */
+  referenceFrom: "page" | "document" | "none";
+  /**
+   * The page carried its own reference and still bound nothing — its marks are in the PDF and
+   * they are in the wrong place. This is `dom-pdf-divergence`, and it is an infrastructure fault
+   * rather than a document property: the rules measured the DOM, and the PDF does not reproduce
+   * it. A report of findings on such a page would describe a document nobody will see.
+   */
+  divergent: boolean;
 }
 
 /**
@@ -397,21 +480,27 @@ export function matchMarks(marks: readonly PlacedMark[], pages: readonly PdfText
 
   const boundSids = new Set<string>();
   const byPage = new Map<number, PageConformance>();
+  const allDys = [...pairedByPage.values()].flat().map((p) => p.dyMm);
+  const documentMedian = median(allDys);
+  const documentReferenceUsable = allDys.length >= MIN_PAIRS_FOR_REFERENCE;
+  let divergentPages = 0;
 
   for (const [pageNumber, targets] of targetsByPage) {
     const paired = pairedByPage.get(pageNumber) ?? [];
     const dys = paired.map((p) => p.dyMm);
+    const ownReference = paired.length >= MIN_PAIRS_FOR_REFERENCE;
+    const reference = ownReference ? median(dys) : documentMedian;
+    const referenceUsable = ownReference || documentReferenceUsable;
     const meanDy = dys.length ? dys.reduce((a, b) => a + b, 0) / dys.length : 0;
     const sdDy =
       dys.length > 1 ? Math.sqrt(dys.reduce((s, v) => s + (v - meanDy) ** 2, 0) / (dys.length - 1)) : 0;
-    const dyNormalisable = paired.length >= MIN_PAIRS_FOR_DY;
 
     const boundHere = new Set<string>();
-    if (dyNormalisable) {
+    if (referenceUsable) {
       for (const p of paired) {
         if (
           Math.abs(p.dxMm) <= CONFORMANCE_TOLERANCE_MM &&
-          Math.abs(p.dyMm - meanDy) <= CONFORMANCE_TOLERANCE_MM
+          Math.abs(p.dyMm - reference) <= CONFORMANCE_TOLERANCE_MM
         ) {
           boundHere.add(p.mark.sid);
           boundSids.add(p.mark.sid);
@@ -419,18 +508,28 @@ export function matchMarks(marks: readonly PlacedMark[], pages: readonly PdfText
       }
     }
 
+    // A page that carried its OWN reference and still bound nothing is divergent, and the word
+    // is precise: its marks disagree with the DOM beyond the tolerance while agreeing among
+    // themselves about where the reference is. A systematic horizontal shift does exactly that,
+    // because `Δx` is judged absolutely. This cannot be a reference artefact — the reference came
+    // from the page itself — which is why the condition is restricted to `ownReference`. A page
+    // with a single pair simply has no reference and is silent, never divergent.
+    const divergent = ownReference && boundHere.size === 0;
+    if (divergent) divergentPages++;
+
     byPage.set(pageNumber, {
       marksMatched: paired.length,
       marksTotal: totalByPage.get(pageNumber) ?? 0,
       maxDxMm: paired.length ? round4(Math.max(...paired.map((p) => Math.abs(p.dxMm)))) : 0,
-      maxDyMm: paired.length ? round4(Math.max(...paired.map((p) => Math.abs(p.dyMm - meanDy)))) : 0,
+      maxDyMm: paired.length ? round4(Math.max(...paired.map((p) => Math.abs(p.dyMm - reference)))) : 0,
       sdDyMm: round4(sdDy),
       targetsTotal: targets.size,
       targetsBound: boundHere.size,
-      dyNormalisable,
+      referenceFrom: ownReference ? "page" : referenceUsable ? "document" : "none",
+      divergent,
     });
   }
-  return { boundSids, byPage, ambiguous };
+  return { boundSids, byPage, ambiguous, divergentPages, documentMedianDyMm: round4(documentMedian) };
 }
 
 const round4 = (v: number): number => Math.round(v * 10_000) / 10_000;
@@ -531,7 +630,8 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
         const pageBound =
           input.bindingPossible &&
           perPage !== null &&
-          perPage.dyNormalisable &&
+          perPage.referenceFrom !== "none" &&
+          !perPage.divergent &&
           perPage.targetsTotal > 0 &&
           perPage.targetsBound === perPage.targetsTotal;
         evidence.push({

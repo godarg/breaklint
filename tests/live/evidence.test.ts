@@ -220,11 +220,14 @@ const hasPoppler = (() => {
   }
 })();
 
-const chromeAvailable =
-  process.env.BREAKLINT_CHROME !== undefined ||
-  existsSync("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome") ||
-  existsSync("/usr/bin/google-chrome") ||
-  existsSync("/usr/bin/chromium");
+// The env var is checked for what it POINTS AT, not for being set. Reading it as "a browser is
+// available" made `BREAKLINT_CHROME=/nonexistent` a green prerequisite — the variable answered a
+// question about itself instead of about the machine.
+const chromeAvailable = process.env.BREAKLINT_CHROME
+  ? existsSync(process.env.BREAKLINT_CHROME)
+  : existsSync("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome") ||
+    existsSync("/usr/bin/google-chrome") ||
+    existsSync("/usr/bin/chromium");
 const pagedjsRoot = resolvePackageRoot("pagedjs", REPO);
 const pdfjsPresent = resolvePackageRoot("pdfjs-dist", REPO) !== null;
 const optional = process.env.BREAKLINT_LIVE_OPTIONAL === "1";

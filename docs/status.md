@@ -28,15 +28,17 @@ running nothing makes every claim on this page look checked.
 | Rasteriser | `pdfjs-dist`, on a second page of the same browser instance, served over a loopback origin. No native canvas binding, no poppler in the product. |
 | Rasteriser version | read from the library that loaded, and compared against the declared one |
 | Local file access | measured, not declared: a document loaded from disk cannot read a neighbouring file (`BLOCKED: TypeError: Failed to fetch`). The browser-wide switch that used to allow it is gone, and the check is in the suite because removing the *reason* for a switch and leaving the switch is a mistake that was actually made here. |
-| Ordering | measured at this product: with a content page open the rasteriser did not answer within 15 s; with every page closed the same PDF came back with its pages in 111 ms and 115 ms on two runs |
+| Ordering | measured at this product: with a content page open the rasteriser did not answer within the suite's 15 s window; with every page closed the same PDF came back with its pages, in 84 ms and 119 ms on two runs |
 | Baseline | the unmarked PDF is produced BEFORE the overlay has ever existed, not by detaching it again |
 | Binding | marked PDF against baseline PDF, compared on the PDF raster — not on a screenshot |
 | Detach, not hide | the layer leaves the tree, so a presence selector stops matching |
 | Own nodes only | layers and marks are held as references; nothing is found again by class name |
 | Evidence files | one PNG per page; the header is read back out of the bytes and checked against the size the rasteriser reported. A page that fails that check withdraws the bindings of the whole document. |
 
-**Measured over eight documents, two runs, 209 recorded leaf values, one of which differed
-between the runs — a wall-clock time (111 ms against 115 ms).** Nothing else moved.
+**Measured over eight documents, two runs, one differing value.** The measurement report has 209
+leaf values, counting every scalar and every empty object or array as one leaf; exactly one of
+them differs between the runs, and it is a wall-clock time (84 ms against 119 ms). Nothing else
+moved. The counting rule is stated because the number is otherwise not one a reader can check.
 
 | Case | raster diff | style violations | binding |
 |---|---:|---:|---|
@@ -49,7 +51,7 @@ between the runs — a wall-clock time (111 ms against 115 ms).** Nothing else m
 | document deletes our layer as fast as we attach it | 0 | 20 | lost |
 | script rewrites the marks' style | 120 | 20 | lost |
 
-Marks were refound in the PDF with `max |Δx| = 0.0000 mm` and `max |Δy − mean| = 0.1439 mm`
+Marks were refound in the PDF with `max |Δx| = 0.0000 mm` and `max |Δy − reference| = 0.215 mm`
 against a stated tolerance of 0.35 mm; no mark failed to be found exactly once. The delivered PDF
 was pixel-identical to a PDF of the same document produced on a page that never carried an
 overlay — in all eight cases, including the five where the binding was lost. An independent
@@ -78,25 +80,54 @@ fixture green. The isolated gate is the unit test.
 catch.** It contributes diagnosis — it names the offending mark and the reason — and not coverage.
 
 **The tolerance of 0.35 mm** is justified in the contract by a measured `sd(Δy)` of 0.0777 mm,
-which would be about fourfold headroom. This build measures 0.1141 mm on its own document, so the
-headroom here is about threefold. The number is unchanged; the margin is smaller than the
-justification for it suggests.
+which would be about fourfold headroom. Over this corpus the largest `sd(Δy)` on any document is
+0.1286 mm and the largest single deviation is 0.215 mm — so the headroom is about 2.7-fold on the
+spread and about 1.6-fold on the worst mark. The number is unchanged; the margin is a good deal
+smaller than the justification for it suggests, and the corpus MAXIMUM is quoted here rather than
+the friendliest document in it.
 
-### Two declared deviations from the normative contract
+### Three declared changes to the normative contract
 
-Both are in the safe direction — they withhold evidence, they never assert it — and both are
-written here rather than left in a source comment, because a deviation nobody outside the file
-knows about is a deviation nobody can overrule.
+All are written here rather than left in a source comment, because a deviation nobody outside the
+file knows about is a deviation nobody can overrule.
 
 1. **The baseline PDF is taken before the overlay exists.** §11.4a.3 prescribes producing the
    unmarked PDF by detaching the overlay again. Measured: a document that mutates itself when the
    layer arrives leaves that change behind, both PDFs then carry it, the comparison reports zero
    and the damaged file is delivered as evidence-bearing. The contract's order cannot see its own
-   failure case.
-2. **A page needs at least two uniquely refound marks before its `Δy` criterion counts.** §11.4.3
-   binds a target on one mark. With one pair the mean-relative deviation is zero by construction,
-   so a mark placed anywhere at all would bind. The loss is confined to pages where exactly one
-   mark could be refound; a normal single-fragment page carries two and is unaffected (measured).
+   failure case. The re-attach step falls away with it.
+2. **The `Δy` reference is the page's own median where the page has at least two refound pairs,
+   and the document's median otherwise.** §11.4.3 binds a target on one mark, and judges `Δy`
+   against a mean. With a single pair on a page that mean IS the value, so the criterion is empty
+   and a mark placed anywhere binds. Taking the reference from the page keeps the contract's
+   behaviour wherever the page can supply one — which matters, because a document whose zones
+   differ need not share an offset. Falling back to the document keeps the contract's one-mark
+   rule alive on short pages instead of dropping them. A median rather than a mean, because one
+   grossly displaced mark drags a mean and does not move a median. A document with fewer than two
+   refound pairs in total has no reference at all and binds nothing.
+3. **`dom-pdf-divergence` gets a structural trigger instead of a contradiction.** §11.4.3 gives
+   the same case two different dispositions — `bindsFinding = false` in its algorithm, and exit 3
+   two paragraphs later — and the second is worded as "falling below the threshold", which is the
+   good case. Both dispositions are right for different scopes. A target out of tolerance is a
+   finding without evidence. A PAGE that supplied its own reference and still bound nothing is an
+   apparatus disagreeing with itself: its marks are in the PDF and none of them is where the DOM
+   says. That is exit 3, `render-unstable`, `dom-pdf-divergence`. The boundary is zero against
+   non-zero, not a chosen number, and it is restricted to pages with their own reference so that
+   it can never fire because a borrowed reference was wrong.
+
+   Related, and found while wiring it: the engine treated EVERY infrastructure event except
+   `empty-input` as exit 3. §11.4.1 says the opposite for the two mark events — "the document is
+   in order, only the binding is not". A tool that exits 3 whenever a hostile stylesheet reaches
+   its own overlay would be unusable on the documents it exists for. The non-fatal kinds are now
+   a named, deliberately short list.
+
+### What the corpus still cannot reach
+
+Extreme layout collapse is not covered. If the PDF's text stream degrades so far that the marks
+are no longer found as whole tokens, the run does not reach `dom-pdf-divergence` at all — it ends
+in `unverified`, which says "no evidence" rather than "the apparatus is broken". That is the
+honest weaker statement, and it is a limit of the mark-based method rather than of this
+implementation.
 
 ## Not finished
 

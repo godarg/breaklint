@@ -234,6 +234,53 @@ const rows: Row[] = [
       }),
   },
   {
+    id: "P5",
+    what: "findings plus a lost evidence binding — the document is in order, only the binding is not",
+    // §11.4.1 says this in as many words. The engine used to treat every infrastructure kind
+    // except `empty-input` as exit 3, which would have made a tool that exits 3 whenever a
+    // hostile stylesheet reached its own overlay — on exactly the documents it exists for.
+    exit: 1,
+    verdict: "findings",
+    gate: "error",
+    build: () =>
+      run({
+        documents: [
+          { ...ERROR_DOC, infrastructure: [{ kind: "mark-raster-diff", detail: "84711 px", measured: null }] },
+        ],
+        failOn: "error",
+      }),
+  },
+  {
+    id: "P6",
+    what: "a clean document whose marks were overridden — still clean, still exit 0",
+    exit: 0,
+    verdict: "clean",
+    gate: null,
+    build: () =>
+      run({
+        documents: [
+          { ...CLEAN_DOC, infrastructure: [{ kind: "mark-style-overridden", detail: "20 marks", measured: null }] },
+        ],
+        failOn: "error",
+      }),
+  },
+  {
+    id: "P7",
+    what: "findings plus dom-pdf-divergence — the PDF does not reproduce the page the rules measured",
+    // The counterpart to P5, and the reason the non-fatal list is a list rather than a rule of
+    // thumb: losing the evidence is narrow, and a page whose own marks all miss is not.
+    exit: 3,
+    verdict: "infrastructure",
+    gate: null,
+    build: () =>
+      run({
+        documents: [
+          { ...ERROR_DOC, infrastructure: [{ kind: "render-unstable", detail: "dom-pdf-divergence", measured: null }] },
+        ],
+        failOn: "error",
+      }),
+  },
+  {
     id: "P4",
     what: "zero pages because pagination aborted — the same page count, a different cause",
     exit: 3,
