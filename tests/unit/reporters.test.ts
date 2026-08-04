@@ -119,4 +119,57 @@ describe("output formats", () => {
     assert.equal(parsed.exitCode, report.exitCode);
     assert.equal(parsed.schemaVersion, 2);
   });
+
+  /**
+   * The error state has to be distinguishable from the empty state, on the surface a user reads.
+   *
+   * Measured before this existed: a run that exited 3 because the PDF did not reproduce the page
+   * the rules measured printed `checked 0 pages in 1 document, no findings` — the wording of a
+   * clean run — and the reason appeared nowhere in the console output at all. Every diagnostic
+   * this project wrote into its infrastructure events reached the JSON and never a reader. The
+   * console reporter had guarded its empty state against exactly this since it was written, and
+   * had left the error state open.
+   *
+   * Red condition: stop projecting infrastructure events, or let the empty-state sentence apply
+   * to an infrastructure verdict, and one of the assertions below fails.
+   */
+  it("an infrastructure failure is visible on the console and is not worded as a clean run", () => {
+    const outcome = runDocument(
+      {
+        path: "doc.html",
+        snapshot: null,
+        infrastructure: [
+          {
+            kind: "render-unstable",
+            detail: "dom-pdf-divergence on page(s) 2: the PDF does not reproduce the geometry the rules measured.",
+            measured: { divergentPages: 1 },
+          },
+        ],
+      },
+      { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+    );
+    const broken = buildReport({
+      outcomes: [outcome],
+      mode: "live",
+      source: "rendered",
+      toolVersion: "0.1.0",
+      commit: null,
+      startedAt: new Date(0).toISOString(),
+      durationMs: 0,
+      rulesRun: 0,
+      failOn: "error",
+      environment: report.environment,
+      config: report.config,
+    });
+    const text = render(broken, "console");
+
+    assert.equal(broken.exitCode, 3, "precondition: this is an infrastructure run");
+    assert.match(text, /render-unstable/u, "the kind that caused the exit must appear");
+    assert.match(text, /dom-pdf-divergence/u, "and so must the reason, which is the useful half");
+    assert.doesNotMatch(
+      text,
+      /no findings/u,
+      "'no findings' is the wording of a clean run; this run did not look at anything",
+    );
+  });
 });
