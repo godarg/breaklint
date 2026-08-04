@@ -21,7 +21,6 @@
     "breaklint": "dist/cli/index.js"
   },
   "exports": {
-    ".": "./dist/index.js",
     "./package.json": "./package.json"
   },
   "files": [

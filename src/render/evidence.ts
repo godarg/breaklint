@@ -122,7 +122,7 @@ const MIN_PAIRS_FOR_DIVERGENCE = 3;
  * it fails in the conservative direction: too small a bound withdraws bindings, it never invents
  * them.
  */
-const MAX_REFERENCE_DY_MM = 1.0;
+export const MAX_REFERENCE_DY_MM = 1.0;
 
 /**
  * The largest absolute reference measured over the live corpus, in millimetres.

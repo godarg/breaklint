@@ -50,19 +50,49 @@ describe("the packaging manifest names only things that exist", () => {
     }
   });
 
+  /**
+   * Both halves matter, and the first version of this test only had the first.
+   *
+   * Being inside `files` means the file gets PACKED. It does not mean the file EXISTS — and a
+   * build product cannot be checked by looking for it, because it is absent until `npm run build`.
+   * The first version therefore compared only the top-level path segment and skipped anything
+   * under `dist/`, which left it green over a real defect sitting in the manifest: `exports["."]`
+   * named `./dist/index.js` while no `src/index.ts` existed, so `import … from "breaklint"` on an
+   * installed package failed with ERR_MODULE_NOT_FOUND. An audit measured that pointing `exports`
+   * at `./dist/this/does/not/exist.js` left the unit suite at 110/110.
+   *
+   * A `dist/` target is therefore checked against its SOURCE: `dist/cli/index.js` requires
+   * `src/cli/index.ts`. That is verifiable without a build and fails for exactly the reason the
+   * defect existed.
+   */
+  const sourceFor = (target: string): string => target.replace(/^\.\/dist\//u, "src/").replace(/\.js$/u, ".ts");
+
   it("`bin` and `exports` point inside the published set", () => {
     const published = pkg.files.map((f) => f.replace(/\/$/u, ""));
-    for (const [name, target] of Object.entries(pkg.bin)) {
-      const top = target.replace(/^\.\//u, "").split("/")[0]!;
+    for (const [name, target] of Object.entries({ ...pkg.bin, ...pkg.exports })) {
+      if (target === "./package.json" || target === "package.json") continue;
+      const top = target.replace(/^\.?\/?/u, "").split("/")[0]!;
       assert.ok(
         published.includes(top),
-        `bin "${name}" points at ${target}, which is outside "files" — the installed command would not exist`,
+        `"${name}" points at ${target}, which is outside "files" — it would not be packed`,
       );
     }
-    for (const [name, target] of Object.entries(pkg.exports)) {
-      if (!target.startsWith("./") || target === "./package.json") continue;
-      const top = target.replace(/^\.\//u, "").split("/")[0]!;
-      assert.ok(published.includes(top), `exports "${name}" points at ${target}, which is outside "files"`);
+  });
+
+  it("every `bin` and `exports` target has a source that produces it", () => {
+    for (const [name, target] of Object.entries({ ...pkg.bin, ...pkg.exports })) {
+      if (target === "./package.json" || target === "package.json") continue;
+      const normalised = target.startsWith("./") ? target : `./${target}`;
+      assert.ok(
+        normalised.startsWith("./dist/"),
+        `"${name}" points at ${target}; this package publishes build products only`,
+      );
+      const source = sourceFor(normalised);
+      assert.ok(
+        existsSync(new URL(`../../${source}`, import.meta.url)),
+        `"${name}" points at ${target}, but ${source} does not exist — the published entry point ` +
+          `cannot be built, and an installed package would fail with ERR_MODULE_NOT_FOUND`,
+      );
     }
   });
 

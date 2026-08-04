@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { CONFORMANCE_TOLERANCE_MM, matchMarks } from "../../src/render/evidence.ts";
+import { CONFORMANCE_TOLERANCE_MM, MAX_REFERENCE_DY_MM, matchMarks } from "../../src/render/evidence.ts";
 import type { PlacedMark } from "../../src/render/overlay.ts";
 import type { PdfTextPage } from "../../src/render/rasterizer.ts";
 
@@ -323,6 +323,71 @@ describe("matchMarks", () => {
     // The point of the case: the residual saw nothing. Only the reference did.
     assert.equal(page.maxDyMm, 0, "the residual is zero by construction — this is why it cannot gate");
     assert.equal(Math.round(page.referenceDyMm), -40);
+  });
+
+  /**
+   * The bound's VALUE, not merely its existence.
+   *
+   * An audit measured that `MAX_REFERENCE_DY_MM` could be raised from 1.0 mm to 39 mm — 429× the
+   * measured corpus maximum, enough to re-admit a 38 mm uniform displacement — with all 159 unit
+   * and e2e tests and all 17 live tests still green. The reason was that the only fixture
+   * exercising it used a 40 mm displacement, so it pinned the constant at "somewhere below 40".
+   * A gate that fires only for absurd inputs is a gate whose threshold nobody chose.
+   *
+   * The two cases below sit immediately either side of the bound, so the constant is pinned from
+   * both directions and cannot move without one of them going red.
+   *
+   * Red condition: any change to `MAX_REFERENCE_DY_MM` makes one of these two fail, and the
+   * literal assertion makes the number itself a stated commitment rather than an implementation
+   * detail — the same treatment `CONFORMANCE_TOLERANCE_MM` already had.
+   */
+  it("the reference bound is 1.0 mm, and the number is pinned rather than implied", () => {
+    assert.equal(MAX_REFERENCE_DY_MM, 1.0);
+  });
+
+  it("a uniform displacement just INSIDE the bound still binds — the gate is not merely 'large'", () => {
+    const marks = [
+      mark("b1", "BLSID000A", 20, 30),
+      mark("b1", "BLSID000E", 20, 36),
+      mark("b2", "BLSID001A", 20, 50),
+      mark("b2", "BLSID001E", 20, 56),
+    ];
+    // 0.99 mm: under the 1.0 mm bound, over the 0.35 mm residual tolerance. Binds by design.
+    const result = matchMarks(marks, [
+      textPage([
+        { token: "BLSID000A", xMm: 20, yMm: 30.99 },
+        { token: "BLSID000E", xMm: 20, yMm: 36.99 },
+        { token: "BLSID001A", xMm: 20, yMm: 50.99 },
+        { token: "BLSID001E", xMm: 20, yMm: 56.99 },
+      ]),
+    ]);
+    const page = result.byPage.get(1)!;
+    assert.equal(page.referenceOutOfRange, false, "0.99 mm is inside the bound");
+    assert.deepEqual([...result.boundSids].sort(), ["b1", "b2"]);
+    assert.equal(page.divergent, false);
+  });
+
+  it("a uniform displacement just OUTSIDE the bound does not bind", () => {
+    const marks = [
+      mark("b1", "BLSID000A", 20, 30),
+      mark("b1", "BLSID000E", 20, 36),
+      mark("b2", "BLSID001A", 20, 50),
+      mark("b2", "BLSID001E", 20, 56),
+    ];
+    // 1.01 mm: the smallest displacement this build refuses. One hundredth of a millimetre more
+    // than the case above, and the opposite verdict — which is what makes the pair a pin.
+    const result = matchMarks(marks, [
+      textPage([
+        { token: "BLSID000A", xMm: 20, yMm: 31.01 },
+        { token: "BLSID000E", xMm: 20, yMm: 37.01 },
+        { token: "BLSID001A", xMm: 20, yMm: 51.01 },
+        { token: "BLSID001E", xMm: 20, yMm: 57.01 },
+      ]),
+    ]);
+    const page = result.byPage.get(1)!;
+    assert.equal(page.referenceOutOfRange, true, "1.01 mm is outside the bound");
+    assert.deepEqual([...result.boundSids], []);
+    assert.equal(page.divergent, true);
   });
 
   it("CONTROL: the same four marks, undisplaced, bind and are not divergent", () => {
