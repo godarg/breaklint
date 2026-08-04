@@ -1,13 +1,15 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import { OUTPUT_FORMATS } from "../../src/core/enums.ts";
 import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
 import { render } from "../../src/report/index.ts";
-import { hasAbsoluteUserPath } from "../../src/report/redact.ts";
+import { hasAbsoluteUserPath, redactPaths } from "../../src/report/redact.ts";
 import { LABELS } from "../../src/report/mandatory.ts";
 import type { Report, Snapshot } from "../../src/core/types.ts";
 
@@ -213,7 +215,12 @@ describe("output formats", () => {
           {
             kind: "checker-crashed",
             detail: "the probe is not wired to a browser in this build.",
-            measured: { stage: "measure", browser: "/Users/someone/Library/Caches/chrome/Chromium" },
+            // The REAL leak path: a puppeteer-cached Chrome under THIS process's home directory.
+            // A first version used a hard-coded `/Users/someone/…`, which the redaction no longer
+            // touches by design — foreign-machine paths cannot be redacted without guessing which
+            // segment is an account name, and guessing corrupts legitimate output. Testing with a
+            // foreign path measured a scope the tool deliberately does not have.
+            measured: { stage: "measure", browser: join(homedir(), ".cache/puppeteer/chrome/chrome") },
           },
         ],
       },
@@ -229,14 +236,116 @@ describe("output formats", () => {
       durationMs: 0,
       rulesRun: 0,
       failOn: "error",
-      environment: { ...report.environment, rendererPath: "/Users/someone/bin/chrome" },
+      environment: { ...report.environment, rendererPath: join(homedir(), "bin/chrome") },
       config: report.config,
     });
     for (const format of OUTPUT_FORMATS) {
       const text = render(leaky, format);
-      assert.ok(!hasAbsoluteUserPath(text), `${format} leaked an absolute user path`);
-      assert.doesNotMatch(text, /\/Users\//u, `${format} contains a literal /Users/ path`);
+      assert.ok(!hasAbsoluteUserPath(text), `${format} leaked this machine's home directory`);
+      assert.ok(!text.includes(homedir()), `${format} contains the literal home directory`);
+      // and the redaction marker is there, so the case is not passing because nothing was emitted
+      assert.match(text, /~/u, `${format} shows no redaction marker — did the payload reach it at all?`);
     }
+  });
+
+  /**
+   * `detail` is built from arbitrary `Error.message` values in `engine.ts`, so it can contain a
+   * newline and a control character. Markdown escapes `|` and has no escape for a line break: one
+   * `\n` turned one table row into three and destroyed the Checker table. XML 1.0 forbids most C0
+   * characters outright and the junit escape helper covers only `& < > "`, so a U+0007 made the
+   * report reject as not well-formed.
+   *
+   * Red condition: stop flattening in `oneLine()` and both assertions fail.
+   */
+  it("a hostile detail cannot break the markdown table or the XML", () => {
+    const outcome = runDocument(
+      {
+        path: "doc.html",
+        snapshot: null,
+        infrastructure: [
+          {
+            kind: "checker-crashed",
+            detail: "line one\nline two | with a pipe\r\nand a bell \u0007 and a \u0001 here",
+            measured: { note: "second\nline" },
+          },
+        ],
+      },
+      { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+    );
+    const hostile = buildReport({
+      outcomes: [outcome], mode: "live", source: "rendered", toolVersion: "0.1.0", commit: null,
+      startedAt: new Date(0).toISOString(), durationMs: 0, rulesRun: 0, failOn: "error",
+      environment: report.environment, config: report.config,
+    });
+
+    // The Checker table keeps one row per event: find it and count its lines.
+    const md = render(hostile, "markdown");
+    // Scope to the Checker section only: the slice must stop at the next heading, or it counts
+    // the Findings table's rows too and the assertion measures the wrong thing.
+    const start = md.indexOf("## Checker");
+    const rest = md.slice(start + "## Checker".length);
+    const next = rest.indexOf("\n## ");
+    const checker = next === -1 ? md.slice(start) : md.slice(start, start + "## Checker".length + next);
+    const rows = checker.split("\n").filter((l) => l.startsWith("| `checker-crashed`"));
+    assert.equal(rows.length, 1, "one event must be one markdown row");
+    // The property is CONTIGUITY, not a count of `|` lines. A spilled row leaves continuation
+    // lines that do not start with `|`, so counting `|` lines is blind to exactly this breakage —
+    // measured: removing the newline flattening left a count-based assertion green. A spill shows
+    // up as a gap in the run of table lines.
+    // The property is CELL COUNT per row, and it took three attempts to state correctly — worth
+    // recording, because each earlier version looked right and gated nothing:
+    //   counting `|` lines      — blind: the spill lines do not start with `|`
+    //   contiguity of `|` lines — blind: the spill lands AFTER the row, so the run stays contiguous
+    // A row broken by a newline loses cells, so comparing each row's delimiter count against the
+    // header's is the check that actually fails when the table breaks.
+    const tableLines = checker.split("\n").filter((l) => l.startsWith("|"));
+    assert.equal(tableLines.length, 3, `header, separator and one row; got ${tableLines.length}`);
+    // Unescaped delimiters only. The reporter escapes a literal pipe as `\|`, and a naive
+    // `split("|")` counts that too — which made this assertion fail on the CLEAN build.
+    const cells = (l: string) => (l.match(/(?<!\\)\|/gu) ?? []).length;
+    for (const line of tableLines) {
+      assert.equal(
+        cells(line),
+        cells(tableLines[0]!),
+        `a table row has ${cells(line)} cells against the header's ${cells(tableLines[0]!)} — ` +
+          `a value spilled onto its own line: ${JSON.stringify(line)}`,
+      );
+    }
+
+    for (const format of ["junit", "sarif", "html"] as const) {
+      const out = render(hostile, format);
+      assert.doesNotMatch(out, /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/u, `${format} carries a raw C0 control character`);
+    }
+    // and the junit really parses
+    const xml = render(hostile, "junit");
+    assert.doesNotMatch(xml, /[\u0000-\u0008]/u);
+    assert.match(xml, /<testsuites\b/u);
+  });
+
+  /**
+   * Redaction must not damage what a finding exists to say.
+   *
+   * The first version rewrote any `/Users/<x>` or `/home/<x>` prefix, consuming the root AND one
+   * following segment. Measured: `/home/img/logo.png` became `~/logo.png` — the `img` segment
+   * vanished — and `https://example.com/home/index.html` became `https://example.com~`. Both are
+   * reachable through `artifact/local-uri`, the one rule whose entire purpose is to report a
+   * reference the document makes, so the redaction was deleting the thing the finding names.
+   *
+   * Red condition: reinstate a rule that eats a path segment and these fail.
+   */
+  it("redaction leaves paths that are not this machine's home alone", () => {
+    for (const [input, why] of [
+      ["/home/img/logo.png", "a directory that merely begins with a user root"],
+      ["https://example.com/home/index.html", "a URL path"],
+      ["/Users/Shared/templates/a.css", "a shared, non-account path"],
+    ] as const) {
+      assert.equal(redactPaths(input), input, `redaction damaged ${why}`);
+    }
+    // and it still removes what it is for
+    const mine = join(homedir(), "Library/Caches/chrome/chrome");
+    assert.ok(!redactPaths(mine).includes(homedir()), "this machine's home must be redacted");
+    // a sibling directory sharing the home prefix is NOT this home
+    assert.equal(redactPaths(`${homedir()}XTRA/secret/a.html`), `${homedir()}XTRA/secret/a.html`);
   });
 
   /**
@@ -254,7 +363,15 @@ describe("output formats", () => {
         infrastructure: [
           {
             kind: "render-unstable",
-            detail: "dom-pdf-divergence",
+            // The REAL producer's shape. `src/render/evidence.ts` builds this detail with
+            // `pages.join(", ")`, so fifty divergent pages make a ~490-character sentence. A first
+            // version of this test used an 18-character stub, measured 185 characters, and passed
+            // a 400-character threshold that the very scenario it names violates at 505.
+            detail:
+              `dom-pdf-divergence on page(s) ${pages.join(", ")}: the PDF does not reproduce the ` +
+              "geometry the rules measured. Per page below, `refound` of `placed` marks were located " +
+              "uniquely in the text stream, and `reason` says whether those marks scattered around " +
+              "their own reference or agreed on a reference that is itself displaced.",
             measured: {
               divergentPages: pages.length,
               pages,

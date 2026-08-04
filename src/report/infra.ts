@@ -34,6 +34,34 @@ export interface InfraLine {
 const MAX_COLLECTION_ENTRIES = 3;
 /** Beyond this many characters a single value is truncated. */
 const MAX_VALUE_CHARS = 160;
+/**
+ * Beyond this many characters `detail` is truncated.
+ *
+ * The first version of this module capped `measured` and left `detail` alone — and the same page
+ * list travels in BOTH. `evidence.ts` builds its divergence detail with `pages.join(", ")`, so
+ * fifty divergent pages produce a ~490-character sentence and five hundred produce ~2 900. The
+ * cap on collections took the worst line from 7 488 to 505 characters and the test that was
+ * supposed to prove it used an 18-character stub, so it measured 185 and passed a 400-character
+ * threshold that the real payload violates.
+ */
+const MAX_DETAIL_CHARS = 220;
+
+/**
+ * Make a string safe to place on one line of any of the six formats.
+ *
+ * Newlines: markdown escapes `|` but has no escape for a line break, so one `\n` in `detail`
+ * turns one table row into three and destroys the table. `detail` is built from arbitrary
+ * `Error.message` values in `engine.ts`, so this is reachable without anything exotic.
+ *
+ * C0 control characters: XML 1.0 forbids most of them outright, and the junit escape helper
+ * covers only `& < > "`. Measured: a U+0007 in `detail` made `xmllint --noout` reject the report
+ * as not well-formed. They are replaced rather than escaped, because no reader wants them.
+ */
+function oneLine(text: string): string {
+  // eslint-disable-next-line no-control-regex -- the point is to remove exactly these
+  const flattened = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/gu, " ").replace(/[\r\n]+/gu, " ");
+  return flattened.length > MAX_DETAIL_CHARS ? `${flattened.slice(0, MAX_DETAIL_CHARS)}… (${flattened.length} chars)` : flattened;
+}
 
 function renderValue(value: unknown): string {
   if (value === null || value === undefined) return String(value);
@@ -51,7 +79,7 @@ function renderValue(value: unknown): string {
     if (entries.length > MAX_COLLECTION_ENTRIES) return `{${entries.length} fields}`;
     return `{${entries.map(([k, v]) => `${k}=${renderValue(v)}`).join(" ")}}`;
   }
-  const text = String(value);
+  const text = oneLine(String(value));
   return text.length > MAX_VALUE_CHARS ? `${text.slice(0, MAX_VALUE_CHARS)}…` : text;
 }
 
@@ -62,7 +90,7 @@ export function infraLines(report: Report): InfraLine[] {
       lines.push({
         document: doc.path,
         kind: event.kind,
-        detail: event.detail,
+        detail: oneLine(event.detail),
         measured: event.measured
           ? Object.entries(event.measured).map(([key, value]) => `${key}=${renderValue(value)}`)
           : [],

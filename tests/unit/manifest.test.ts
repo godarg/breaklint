@@ -140,18 +140,19 @@ describe("the packaging manifest names only things that exist", () => {
     const required = new Map<string, string>();
     for (const file of shipped) {
       const text = readFileSync(file, "utf8");
-      // Two shapes reach package data in this codebase, and the first version of this scan knew
-      // only one — which is why the positive control below exists and fired.
-      //   new URL("../../<dir>/…", import.meta.url)
-      //   resolvePath(HERE, "../../<dir>/…")
-      const patterns = [
-        /new URL\(\s*["'`](?:\.\.\/)+([A-Za-z0-9._-]+)\//gu,
-        // Data only. A relative specifier ending in .ts/.js is a source import: it is COMPILED
-        // into dist and needs no packing of its own, and treating it as package data made this
-        // scan demand that `core/` be listed in `files`.
-        /["'`](?:\.\.\/)+([A-Za-z0-9._-]+)\/[A-Za-z0-9._-]+\.(?:json|html|css|svg|txt|md)["'`]/gu,
-      ];
-      for (const m of patterns.flatMap((re) => [...text.matchAll(re)])) {
+      // ONE shape, because one is what this codebase uses: a relative literal ending in a data
+      // extension, e.g. `resolvePath(HERE, "../../examples/demo-snapshot.json")`.
+      //
+      // A first version carried a second pattern for `new URL("../../<dir>/…", import.meta.url)`
+      // and described the two as "the two shapes that reach package data in this codebase".
+      // Measured: that pattern yields ZERO directories over all of `src/`, and removing it leaves
+      // this suite green. It was dead code documenting a coverage claim the live code never made.
+      //
+      // A specifier ending in .ts/.js is a source import — compiled into dist, needing no packing
+      // of its own — so only data extensions count; treating imports as package data made an
+      // earlier version of this scan demand that `core/` be listed in `files`.
+      const pattern = /["'`](?:\.\.\/)+([A-Za-z0-9._-]+)\/[A-Za-z0-9._-]+\.(?:json|html|css|svg|txt|md)["'`]/gu;
+      for (const m of text.matchAll(pattern)) {
         const dir = m[1]!;
         // `..` and `.` are path steps the greedy prefix can leave behind, not directories.
         if (dir === ".." || dir === ".") continue;
@@ -159,7 +160,19 @@ describe("the packaging manifest names only things that exist", () => {
         required.set(dir, file.pathname.replace(/^.*\/src\//u, "src/"));
       }
     }
-    assert.ok(required.size > 0, "the scan found no runtime data directory at all — it is not looking");
+    // The positive control names the dependency it must keep seeing. `size > 0` alone proves only
+    // that SOMETHING was found and would stay green while the one real dependency became invisible.
+    assert.ok(
+      required.has("examples"),
+      `the scan no longer sees examples/, which src/cli/index.ts reads for --demo; it found: ` +
+        `${[...required.keys()].join(", ") || "nothing"}`,
+    );
+
+    // The limit, stated because it is real and a reader would otherwise assume more. This scan
+    // sees LITERAL relative data paths. A path assembled at runtime — `"../../profiles/" + name +
+    // ".json"`, a `path.join` with a variable segment, an extension not in the list above — is
+    // invisible to it, and an audit demonstrated exactly that with a concatenated `profiles/`
+    // path that left this suite green. Recorded as a gap rather than implied to be covered.
     for (const [dir, source] of required) {
       assert.ok(
         published.has(dir),
