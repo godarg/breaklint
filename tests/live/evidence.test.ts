@@ -43,7 +43,7 @@ import { after, before, describe, it } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { launchBrowser, resolvePackageRoot, type BrowserLike } from "../../src/acquire/browser.ts";
-import { produceEvidence, type EvidenceOutcome } from "../../src/render/evidence.ts";
+import { produceEvidence, REFERENCE_CORPUS_MAX_ABS_MM, type EvidenceOutcome } from "../../src/render/evidence.ts";
 import { openRasterizer, readPngHeader, type Rasterizer } from "../../src/render/rasterizer.ts";
 import { comparePng, decodePng, inkPixels } from "../tools/png.ts";
 
@@ -350,6 +350,7 @@ describe("evidence path, live", () => {
           maxDxMm: Math.max(0, ...r.evidence.map((e) => e.conformance?.maxDxMm ?? 0)),
           maxDyMm: Math.max(0, ...r.evidence.map((e) => e.conformance?.maxDyMm ?? 0)),
           sdDyMm: Math.max(0, ...r.evidence.map((e) => e.conformance?.sdDyMm ?? 0)),
+          maxAbsReferenceDyMm: Math.max(0, ...r.evidence.map((e) => Math.abs(e.conformance?.referenceDyMm ?? 0))),
           foreignRasterDiffPx: r.foreignDiff,
           deliveredVsUnmarkedPx: r.referenceDiff,
           evidencePngs: r.evidence.map((e) => {
@@ -465,7 +466,15 @@ describe("evidence path, live", () => {
       assert.ok(e.conformance, `page ${e.page} carries no conformance record`);
       assert.equal(e.conformance.marksMatched, e.conformance.marksTotal, `page ${e.page} lost marks`);
       assert.ok(e.conformance.maxDxMm <= 0.35, `page ${e.page}: max |dx| ${e.conformance.maxDxMm} mm`);
-      assert.ok(e.conformance.maxDyMm <= 0.35, `page ${e.page}: max |dy - mean| ${e.conformance.maxDyMm} mm`);
+      assert.ok(e.conformance.maxDyMm <= 0.35, `page ${e.page}: max |dy - reference| ${e.conformance.maxDyMm} mm`);
+      // The residual above says the marks agree with EACH OTHER. This says what they agree ON.
+      // Without it a uniform displacement of any size passes the line above with maxDyMm 0, and
+      // the bound in `MAX_REFERENCE_DY_MM` would have nothing measured behind its headroom claim.
+      assert.ok(
+        Math.abs(e.conformance.referenceDyMm) <= REFERENCE_CORPUS_MAX_ABS_MM,
+        `page ${e.page}: reference ${e.conformance.referenceDyMm} mm exceeds the measured corpus ` +
+          `maximum ${REFERENCE_CORPUS_MAX_ABS_MM} mm — the headroom behind MAX_REFERENCE_DY_MM has eroded`,
+      );
     }
     const marks = r.evidence.reduce((s, e) => s + (e.conformance?.marksTotal ?? 0), 0);
     // Two marks per fragment, and every fragment carries both — including a middle one. Fewer

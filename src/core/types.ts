@@ -335,6 +335,12 @@ export interface Evidence {
     maxDxMm: number;
     maxDyMm: number;
     sdDyMm: number;
+    /**
+     * The value `maxDyMm` is a residual around. Reported because the residual alone cannot
+     * distinguish "the marks sit where the DOM says" from "the marks all sit in the same wrong
+     * place": under a uniform vertical displacement the residual is 0 for any displacement.
+     */
+    referenceDyMm: number;
   } | null;
   overlayCheck: { styleViolations: number; rasterDiffPx: number; removed: boolean };
   bindsFinding: boolean;

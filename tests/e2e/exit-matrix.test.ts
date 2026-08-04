@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import type { DocumentInput } from "../../src/core/engine.ts";
+import { INFRA_EVENT_KINDS, NON_FATAL_INFRA_EVENT_KINDS } from "../../src/core/enums.ts";
 import type { FailOn } from "../../src/core/enums.ts";
 import { ALL_RULES, RULES_BY_ID } from "../../src/rules/index.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
@@ -295,7 +296,7 @@ const rows: Row[] = [
       }),
   },
   {
-    id: "P5",
+    id: "P8",
     what: "a shell glob that matched nothing — a legitimate call that judged nothing",
     exit: 4,
     verdict: "insufficient-coverage",
@@ -303,7 +304,7 @@ const rows: Row[] = [
     build: () => run({ documents: [], failOn: "error" }),
   },
   {
-    id: "P6",
+    id: "P9",
     what: "usage beats everything: an invalid invocation was never validly configured",
     exit: 2,
     verdict: "usage",
@@ -449,6 +450,95 @@ describe("exit matrix", () => {
       assert.equal(report.summary.gateTriggeredBy, row.gate, `gateTriggeredBy (${row.id})`);
     });
   }
+
+  /**
+   * Every infrastructure kind, one row each, asserting the exit it produces on an otherwise clean
+   * document. The three named non-fatal kinds must leave the run at 0; all thirteen others must
+   * take it to 3.
+   *
+   * This exists because the enumeration was previously covered only where a hand-written row
+   * happened to mention a kind. A foreign verifier measured the consequence: five kinds
+   * (`limit-exceeded`, `document-not-quiescent`, `renderer-missing`, `pagedjs-version-unsupported`,
+   * `injection-interference`) could each be moved onto the non-fatal list one at a time with the
+   * whole suite staying at 129/129. The comment on `NON_FATAL_INFRA_EVENT_KINDS` promises that a
+   * kind added later is fatal by default; that promise was a type-level default with nothing
+   * enforcing it, and a promise nothing enforces is the failure class this project keeps finding.
+   *
+   * Red condition: move any kind between the two lists and exactly one row here goes red. Adding a
+   * kind to `INFRA_EVENT_KINDS` without deciding its fatality also goes red, because the table is
+   * driven from the enumeration rather than from a copy of it.
+   */
+  describe("every infrastructure kind has a decided fatality", () => {
+    /**
+     * The expected fatality is written out HERE, as a literal, and deliberately not derived from
+     * `NON_FATAL_INFRA_EVENT_KINDS`.
+     *
+     * The first version of this block computed the expectation from the production list. A
+     * mutation moving `limit-exceeded` onto that list was then measured GREEN across all 153
+     * tests: the expectation moved with the thing it was supposed to pin. That is the oracle
+     * drawing its truth from the object under test — this project's oldest failure class — and it
+     * appeared in the test written to prevent that exact drift.
+     *
+     * Now a kind can only change fatality if someone edits both this literal and the production
+     * list, and the equality assertion below makes the two disagree loudly rather than silently.
+     */
+    const EXPECTED_NON_FATAL = ["empty-input", "mark-style-overridden", "mark-raster-diff"];
+
+    it("the production non-fatal list is exactly the list this file expects", () => {
+      assert.deepEqual(
+        [...NON_FATAL_INFRA_EVENT_KINDS].sort(),
+        [...EXPECTED_NON_FATAL].sort(),
+        "the non-fatal set changed; that is a contract decision, so change it here too and say why",
+      );
+    });
+
+    it("every declared kind is covered by a row below", () => {
+      assert.equal(INFRA_EVENT_KINDS.length, 16, "a kind was added or removed without deciding its fatality");
+    });
+
+    for (const kind of INFRA_EVENT_KINDS) {
+      const nonFatal = EXPECTED_NON_FATAL.includes(kind);
+      it(`${kind} -> exit ${nonFatal ? 0 : 3}`, () => {
+        const report = run({
+          documents: [{ ...CLEAN_DOC, infrastructure: [{ kind, detail: `synthetic ${kind}`, measured: null }] }],
+          failOn: "error",
+        });
+        assert.equal(report.exitCode, nonFatal ? 0 : 3, `exit code for ${kind}`);
+        assert.equal(report.runVerdict, nonFatal ? "clean" : "infrastructure", `verdict for ${kind}`);
+      });
+    }
+  });
+
+  /**
+   * The reason named for an exit has to be the event that CAUSED it.
+   *
+   * With no snapshot the engine took `infrastructure[0]` as `exitReason`, so a run could exit 3
+   * while naming a kind the engine itself classifies as non-fatal. The snapshot path already
+   * searched for the first fatal event; the two paths disagreed and only one was covered.
+   *
+   * Red condition: restore `infrastructure[0]?.kind` and this goes red, because the non-fatal
+   * event is deliberately placed first.
+   */
+  it("with no snapshot, exitReason names the fatal event and not merely the first one", () => {
+    const report = run({
+      documents: [
+        {
+          name: "__empty__",
+          infrastructure: [
+            { kind: "mark-raster-diff", detail: "84711 px", measured: null },
+            { kind: "checker-crashed", detail: "the probe threw", measured: null },
+          ],
+        },
+      ],
+      failOn: "error",
+    });
+    assert.equal(report.exitCode, 3, "a fatal event is present, so the run is exit 3");
+    assert.equal(
+      report.documents[0]!.exitReason,
+      "checker-crashed",
+      "the reason must be the fatal event, not the non-fatal one that happened to arrive first",
+    );
+  });
 
   it("G2 and G3 differ only in configuration — otherwise the row proves nothing", () => {
     const g2 = rows.find((r) => r.id === "G2")!.build();

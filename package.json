@@ -26,10 +26,7 @@
   },
   "files": [
     "dist/",
-    "profiles/",
     "examples/",
-    "report.schema.json",
-    "breaklint.schema.json",
     "README.md",
     "LICENSE"
   ],

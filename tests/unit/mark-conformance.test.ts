@@ -79,7 +79,7 @@ describe("matchMarks", () => {
     assert.equal(page.targetsBound, 0);
     assert.deepEqual([...result.boundSids], []);
     // And the arithmetic of the self-referential criterion is shown, not just its consequence.
-    assert.equal(page.maxDyMm, 0, "with one pair the mean-relative deviation is 0 by construction");
+    assert.equal(page.maxDyMm, 0, "with one pair the residual around the reference is 0 by construction");
   });
 
   it("binds only the target that is in tolerance, not the page around it", () => {
@@ -288,5 +288,121 @@ describe("matchMarks", () => {
     assert.deepEqual([...result.boundSids], []);
     assert.equal(result.byPage.get(3)!.marksMatched, 0);
     assert.equal(result.byPage.get(3)!.targetsTotal, 1);
+  });
+
+  /**
+   * The residual is blind to a displacement every mark shares — the reference absorbs it exactly.
+   * This is the one hole in the asymmetry that cannot be closed by any tolerance on the residual,
+   * because the residual is 0 by construction however large the shift.
+   *
+   * Red condition: remove the `MAX_REFERENCE_DY_MM` bound and the first assertion fails, because
+   * every target binds and `maxDyMm` reports 0 for a 40 mm displacement. The CONTROL below is the
+   * other half — without it this case would also pass if `matchMarks` bound nothing at all.
+   */
+  it("a displacement shared by every mark on the page is caught, though the residual is zero", () => {
+    const marks = [
+      mark("b1", "BLSID000A", 20, 30),
+      mark("b1", "BLSID000E", 20, 36),
+      mark("b2", "BLSID001A", 20, 50),
+      mark("b2", "BLSID001E", 20, 56),
+    ];
+    // Every glyph sits 40 mm below where the DOM says. The marks agree with each other perfectly.
+    const result = matchMarks(marks, [
+      textPage([
+        { token: "BLSID000A", xMm: 20, yMm: 70 },
+        { token: "BLSID000E", xMm: 20, yMm: 76 },
+        { token: "BLSID001A", xMm: 20, yMm: 90 },
+        { token: "BLSID001E", xMm: 20, yMm: 96 },
+      ]),
+    ]);
+    const page = result.byPage.get(1)!;
+    assert.deepEqual([...result.boundSids], [], "a 40 mm uniform displacement must bind nothing");
+    assert.equal(page.referenceOutOfRange, true);
+    assert.equal(page.divergent, true, "a displaced reference is a divergence, not a silent pass");
+    assert.equal(result.divergentPages, 1);
+    // The point of the case: the residual saw nothing. Only the reference did.
+    assert.equal(page.maxDyMm, 0, "the residual is zero by construction — this is why it cannot gate");
+    assert.equal(Math.round(page.referenceDyMm), -40);
+  });
+
+  it("CONTROL: the same four marks, undisplaced, bind and are not divergent", () => {
+    const marks = [
+      mark("b1", "BLSID000A", 20, 30),
+      mark("b1", "BLSID000E", 20, 36),
+      mark("b2", "BLSID001A", 20, 50),
+      mark("b2", "BLSID001E", 20, 56),
+    ];
+    const result = matchMarks(marks, [
+      textPage([
+        { token: "BLSID000A", xMm: 20, yMm: 30 },
+        { token: "BLSID000E", xMm: 20, yMm: 36 },
+        { token: "BLSID001A", xMm: 20, yMm: 50 },
+        { token: "BLSID001E", xMm: 20, yMm: 56 },
+      ]),
+    ]);
+    const page = result.byPage.get(1)!;
+    assert.deepEqual([...result.boundSids].sort(), ["b1", "b2"]);
+    assert.equal(page.referenceOutOfRange, false);
+    assert.equal(page.divergent, false);
+  });
+
+  /**
+   * At two pairs the median IS the mean, so "a median resists one outlier" is false exactly at the
+   * minimum. One correct mark beside one 40 mm outlier used to abort the whole run.
+   *
+   * Red condition: lower `MIN_PAIRS_FOR_DIVERGENCE` to 2 and `divergent` becomes true again.
+   */
+  it("two pairs, one correct and one wild, is unverified — never a fatal divergence", () => {
+    const marks = [mark("b1", "BLSID000A", 20, 30), mark("b1", "BLSID000E", 20, 36)];
+    const result = matchMarks(marks, [
+      textPage([
+        { token: "BLSID000A", xMm: 20, yMm: 30 },
+        { token: "BLSID000E", xMm: 20, yMm: 76 },
+      ]),
+    ]);
+    const page = result.byPage.get(1)!;
+    assert.equal(page.marksMatched, 2, "both marks were refound; the disagreement is between them");
+    assert.deepEqual([...result.boundSids], [], "neither mark can vouch for the other");
+    assert.equal(page.divergent, false, "two pairs cannot carry a fatal verdict");
+    assert.equal(result.divergentPages, 0);
+  });
+
+  /**
+   * The divergence trigger is PAGE-scoped, and that is the decision ADR-040 E11 singles out: a
+   * single accidental hit on page 1 must not mask a collapse on page 2. Every earlier divergence
+   * fixture was a single-page document, where page scope and document scope are the same thing —
+   * so the scoping was untested and a foreign verifier reverted it to document-wide with the
+   * entire suite, live included, staying green.
+   *
+   * Red condition: make `divergent` depend on `boundSids.size === 0` (document-wide) instead of
+   * this page's own bindings, and page 2 stops being divergent while page 1 keeps binding.
+   */
+  it("a bound page does not mask a collapsed one — divergence is per page", () => {
+    const marks = [
+      // page 1: three pairs, all correct
+      mark("b1", "BLSID000A", 20, 30, 1),
+      mark("b1", "BLSID000E", 20, 36, 1),
+      mark("b2", "BLSID001A", 20, 50, 1),
+      // page 2: three pairs, all shifted 40 mm HORIZONTALLY, so dx is absolute and none binds
+      mark("b3", "BLSID002A", 20, 30, 2),
+      mark("b3", "BLSID002E", 20, 36, 2),
+      mark("b4", "BLSID003A", 20, 50, 2),
+    ];
+    const result = matchMarks(marks, [
+      textPage([
+        { token: "BLSID000A", xMm: 20, yMm: 30 },
+        { token: "BLSID000E", xMm: 20, yMm: 36 },
+        { token: "BLSID001A", xMm: 20, yMm: 50 },
+      ]),
+      textPage([
+        { token: "BLSID002A", xMm: 60, yMm: 30 },
+        { token: "BLSID002E", xMm: 60, yMm: 36 },
+        { token: "BLSID003A", xMm: 60, yMm: 50 },
+      ]),
+    ]);
+    assert.equal(result.byPage.get(1)!.divergent, false, "page 1 is fine and must stay fine");
+    assert.deepEqual([...result.boundSids].sort(), ["b1", "b2"], "page 1 binds, so the document has bindings");
+    assert.equal(result.byPage.get(2)!.divergent, true, "page 2 collapsed and must say so");
+    assert.equal(result.divergentPages, 1, "a document-wide trigger would report 0 here");
   });
 });

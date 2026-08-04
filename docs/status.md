@@ -28,17 +28,31 @@ running nothing makes every claim on this page look checked.
 | Rasteriser | `pdfjs-dist`, on a second page of the same browser instance, served over a loopback origin. No native canvas binding, no poppler in the product. |
 | Rasteriser version | read from the library that loaded, and compared against the declared one |
 | Local file access | measured, not declared: a document loaded from disk cannot read a neighbouring file (`BLOCKED: TypeError: Failed to fetch`). The browser-wide switch that used to allow it is gone, and the check is in the suite because removing the *reason* for a switch and leaving the switch is a mistake that was actually made here. |
-| Ordering | measured at this product: with a content page open the rasteriser did not answer within the suite's 15 s window; with every page closed the same PDF came back with its pages, in 84 ms and 119 ms on two runs |
+| Ordering | measured at this product: with a content page open the rasteriser did not answer within the suite's 15 s window; with every page closed the same PDF came back with its pages, in 124 ms and 120 ms on two runs |
 | Baseline | the unmarked PDF is produced BEFORE the overlay has ever existed, not by detaching it again |
 | Binding | marked PDF against baseline PDF, compared on the PDF raster — not on a screenshot |
 | Detach, not hide | the layer leaves the tree, so a presence selector stops matching |
 | Own nodes only | layers and marks are held as references; nothing is found again by class name |
 | Evidence files | one PNG per page; the header is read back out of the bytes and checked against the size the rasteriser reported. A page that fails that check withdraws the bindings of the whole document. |
 
-**Measured over eight documents, two runs, one differing value.** The measurement report has 209
+**Measured over eight documents, two runs, one differing value.** The measurement report has 219
 leaf values, counting every scalar and every empty object or array as one leaf; exactly one of
-them differs between the runs, and it is a wall-clock time (84 ms against 119 ms). Nothing else
-moved. The counting rule is stated because the number is otherwise not one a reader can check.
+them differs between the runs, and it is a wall-clock time (124 ms against 120 ms). Nothing else
+moved, and no path appears in one run and not the other.
+
+The count is not a number to be taken on trust — an audit established that the figure previously
+stated here, 209, was not reachable under any plausible counting rule, and nothing in the
+repository computed it. It is now a command:
+
+```
+BREAKLINT_LIVE_REPORT=.tmp/a.json npm run test:live
+BREAKLINT_LIVE_REPORT=.tmp/b.json npm run test:live
+node tests/tools/leaves.mjs .tmp/a.json .tmp/b.json
+```
+
+which prints both counts, every leaf that differs, and exits non-zero if the two runs disagree in
+SHAPE rather than merely in a value. A wall-clock difference is not a contract value; a missing
+field is.
 
 | Case | raster diff | style violations | binding |
 |---|---:|---:|---|
@@ -58,7 +72,37 @@ overlay — in all eight cases, including the five where the binding was lost. A
 rasteriser (poppler, never a dependency of this tool) counted a difference on exactly the same
 four and agreed in sign on all eight.
 
+### A hole in the evidence binding that two audits found, and what closed it
+
+The `Δy` check is a residual around a reference taken from the marks themselves, because a mark's
+`top` is a box edge and a PDF item's `y` is a glyph baseline. That normalisation had no floor, and
+the consequence is not a matter of degree: **if every mark on a page is displaced by the same
+amount, the reference absorbs it exactly.** Measured on a constructed case, a 40 mm uniform
+displacement bound every target and reported `maxDyMm: 0.0000` — the most confident answer this
+tool can give — while the PDF did not reproduce the DOM at all. `Δx` never had the hole; it is
+judged absolutely.
+
+The residual cannot be made to see this by tightening it, because the residual is zero by
+construction. What closed it is a bound on the REFERENCE, and the report now carries the reference
+next to the residual so the two can be read together. The bound is 1.0 mm against a measured
+corpus maximum of 0.0909 mm; the live suite fails if the corpus ever exceeds that maximum, so the
+headroom cannot erode unnoticed. It is not calibrated, and it is **L-36**.
+
+The same audit round found that the fatal `dom-pdf-divergence` verdict rested on a two-point
+median. At two values a median IS the mean, so one extraction outlier beside one correct mark
+produced a reference halfway between them, bound nothing, and aborted the run on a sound document.
+Declaring a page divergent now needs three pairs; a two-pair page that binds nothing is
+`unverified` — "no evidence" — which is the weaker and honest statement.
+
 ### What these runs do not establish, stated because it was nearly claimed
+
+**A fourth audit round reverted seven repairs one at a time; one of them stayed green.** The
+mutation moved an infrastructure kind onto the non-fatal list, and the table-driven test written
+to catch exactly that drift computed its own expectation FROM the list under test — so the
+expectation moved with it. The oracle drew its truth from the object under test, inside the test
+written to prevent that. The expected set is now a literal in the test file, and a second
+assertion makes the two disagree loudly rather than silently. The other six mutations were red,
+each measured singly.
 
 **Four repairs were once green in every suite while being reverted.** An audit turned each of them
 back into its defect — the tolerance-free page verdict, the unread integrity count, the unread

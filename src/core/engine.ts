@@ -68,7 +68,12 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
         path: input.path,
         inputIdentity: null,
         verdict: infrastructure.some((e) => isFatalInfra(e)) ? "infrastructure" : "insufficient-coverage",
-        exitReason: infrastructure[0]?.kind ?? "empty-input",
+        // The reason has to be the event that DECIDED the verdict, not whichever arrived first.
+        // Taking `infrastructure[0]` let a run exit 3 while naming a kind this file explicitly
+        // classifies as non-fatal: `[mark-raster-diff, checker-crashed]` reported the raster diff
+        // as the reason for an exit it cannot cause. `exitReasonFor` below already searched for
+        // the first fatal event; the two paths disagreed and only one of them was covered.
+        exitReason: (infrastructure.find((e) => isFatalInfra(e)) ?? infrastructure[0])?.kind ?? "empty-input",
         pages: 0,
         coverage: {},
         findings: [],
@@ -156,7 +161,6 @@ function documentVerdict(input: {
 }): RunVerdict {
   // Not every infrastructure event means exit 3. `NON_FATAL_INFRA_EVENT_KINDS` names the three
   // that do not, each for a reason the contract states; everything else does.
-  // is a coverage question, not a broken renderer.
   if (input.infrastructure.some((e) => isFatalInfra(e))) return "infrastructure";
   if (input.measuredRuleCount === 0) return "insufficient-coverage";
   if (Object.values(input.coverage).some((c) => !c.ok)) return "insufficient-coverage";

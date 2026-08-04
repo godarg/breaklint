@@ -20,3 +20,18 @@ First working shape. Not published.
 - Not every infrastructure event ends a run. `mark-style-overridden` and `mark-raster-diff` mean
   the evidence was lost, not that the document could not be measured; `render-unstable` from a
   page whose own marks all miss does end it.
+- The `Δy` reference is bounded, not only the residual around it. A displacement shared by every
+  mark on a page was previously invisible by construction — the reference absorbed it, and the page
+  reported a maximum deviation of zero for a displacement of any size. The reference is now
+  reported next to the residual and bounded against a measured corpus maximum.
+- Declaring a page divergent, which ends the run, needs three refound pairs rather than two. At two
+  a median is a mean, so one extraction outlier beside one correct mark aborted the run on a sound
+  document. A two-pair page that binds nothing is `unverified` instead.
+- The reason reported for an exit names the event that caused it. A run without a snapshot used to
+  name whichever event arrived first, so a fatal exit could be attributed to a kind that cannot
+  cause one.
+- Every infrastructure kind now has its fatality asserted individually, against a list written out
+  in the test rather than derived from the list under test.
+- The unfinished live path has a test. Its only promise is how it fails, and that promise was
+  carried by a comment alone until an audit removed the comment's subject and nothing went red.
+- `package.json` no longer lists files that do not exist, and a test now checks that it cannot.

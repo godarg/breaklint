@@ -80,6 +80,56 @@ export const CONFORMANCE_TOLERANCE_MM = 0.35;
  */
 const MIN_PAIRS_FOR_REFERENCE = 2;
 
+/**
+ * Pairs a page needs before it may be called DIVERGENT — which is fatal, unlike merely binding
+ * nothing.
+ *
+ * Two is enough to carry a reference and not enough to defend one. At two the median IS the mean,
+ * so a single outlier moves it by half its own error and drags a CORRECT neighbour out of
+ * tolerance with it. Measured on this build: one mark placed exactly right beside one displaced by
+ * 40 mm bound nothing and raised `dom-pdf-divergence`, aborting the run over a page that contained
+ * a perfectly good mark. At three, an outlier cannot move the median past the two that agree.
+ *
+ * A two-pair page that binds nothing is therefore `unverified` — "no evidence" — rather than
+ * `render-unstable`. That is the weaker and honest statement, and it is the direction this whole
+ * mechanism is supposed to fail in.
+ */
+const MIN_PAIRS_FOR_DIVERGENCE = 3;
+
+/**
+ * The largest `Δy` reference this build treats as a baseline offset rather than as a displacement.
+ *
+ * WHY A BOUND IS NEEDED AT ALL. `Δy` is judged as a residual around a reference taken from the
+ * marks themselves. That normalisation has no floor: if EVERY mark is displaced by the same
+ * amount, the reference absorbs it, every residual is 0, and the page reports `maxDyMm: 0.0000` —
+ * the most confident answer the tool can give — while the PDF does not reproduce the DOM at all.
+ * Measured on this build before the bound existed: a constructed 40 mm uniform displacement bound
+ * every target and reported `maxDyMm: 0`. `Δx` never had this hole; it is judged absolutely.
+ *
+ * WHY THIS NUMBER. Measured first, then set — in that order, because the reverse is how this
+ * project has produced most of its defects. Over the live corpus the largest absolute reference on
+ * any binding page is `REFERENCE_CORPUS_MAX_ABS_MM` (0.0909 mm), which is what the mark's own
+ * styling predicts: `font-size: 1px; line-height: 0` puts the glyph baseline within about a pixel
+ * of the box edge, and a pixel is 0.26 mm. The bound is 1.0 mm — eleven times the measured maximum,
+ * so it cannot fire on the baseline offset it exists to tolerate, and under three times the
+ * residual tolerance, so it catches displacements long before they reach the scale any rule
+ * reasons about. The live suite fails if the corpus ever exceeds the measured maximum, so the
+ * headroom cannot silently erode.
+ *
+ * WHAT IT IS NOT. It is not calibrated. Three binding documents on one machine with one font stack
+ * are not a corpus, and the bound would have to move for a document whose marks sit in a writing
+ * mode or font this build never rendered. It is a named gap (L-36), not a settled threshold, and
+ * it fails in the conservative direction: too small a bound withdraws bindings, it never invents
+ * them.
+ */
+const MAX_REFERENCE_DY_MM = 1.0;
+
+/**
+ * The largest absolute reference measured over the live corpus, in millimetres.
+ * Measured 2026-08-04 over eight documents; the three that bind report 0.0909, 0.0909 and 0.0496.
+ */
+export const REFERENCE_CORPUS_MAX_ABS_MM = 0.0909;
+
 /** The median, not the mean: one grossly displaced mark drags a mean and does not move a median. */
 function median(values: readonly number[]): number {
   if (!values.length) return 0;
@@ -338,17 +388,36 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
       const pages = [...conformance.byPage].filter(([, c]) => c.divergent).map(([n]) => n);
       infrastructure.push({
         kind: "render-unstable",
+        // The message states what was measured per page rather than a summary that holds for some
+        // pages and not others. An earlier wording said "every mark was refound", which the
+        // trigger does not require: a page needs only enough uniquely refound pairs to carry a
+        // reference, so 2 of 20 marks refound produced a fatal event claiming all 20 were.
         detail:
-          `dom-pdf-divergence: on page(s) ${pages.join(", ")} every mark was refound in the PDF ` +
-          "and not one of them sits where the DOM says it does. These pages carried their own " +
-          "reference, so this is not a reference artefact.",
+          `dom-pdf-divergence on page(s) ${pages.join(", ")}: the PDF does not reproduce the ` +
+          "geometry the rules measured. Per page below, `refound` of `placed` marks were located " +
+          "uniquely in the text stream, and `reason` says whether those marks scattered around " +
+          "their own reference or agreed on a reference that is itself displaced.",
         measured: {
           divergentPages: conformance.divergentPages,
           pages,
           toleranceMm: CONFORMANCE_TOLERANCE_MM,
+          maxReferenceDyMm: MAX_REFERENCE_DY_MM,
+          // The reference a page BORROWS when it has too few pairs of its own. Reported because a
+          // displaced document median explains several pages at once, and reading the per-page
+          // numbers without it invites the same mistake twice.
+          documentMedianDyMm: conformance.documentMedianDyMm,
           perPage: pages.map((n) => {
             const c = conformance.byPage.get(n)!;
-            return { page: n, marksMatched: c.marksMatched, maxDxMm: c.maxDxMm, maxDyMm: c.maxDyMm };
+            return {
+              page: n,
+              refound: c.marksMatched,
+              placed: c.marksTotal,
+              maxDxMm: c.maxDxMm,
+              maxDyMm: c.maxDyMm,
+              referenceDyMm: c.referenceDyMm,
+              referenceFrom: c.referenceFrom,
+              reason: c.referenceOutOfRange ? "reference-displaced" : "marks-scattered",
+            };
           }),
         },
       });
@@ -413,6 +482,16 @@ export interface PageConformance {
   /** Where the `Δy` reference came from. `none` means the document had too few pairs as well. */
   referenceFrom: "page" | "document" | "none";
   /**
+   * The reference itself, in millimetres — the value `maxDyMm` is a residual around.
+   *
+   * Reported because without it `maxDyMm` cannot be read honestly: a page whose marks are ALL
+   * displaced by the same amount reports `maxDyMm: 0` however large that amount is. The residual
+   * says the marks agree with each other; only the reference says what they agree ON.
+   */
+  referenceDyMm: number;
+  /** The reference exceeded `MAX_REFERENCE_DY_MM` — a common displacement, not a baseline offset. */
+  referenceOutOfRange: boolean;
+  /**
    * The page carried its own reference and still bound nothing — its marks are in the PDF and
    * they are in the wrong place. This is `dom-pdf-divergence`, and it is an infrastructure fault
    * rather than a document property: the rules measured the DOM, and the PDF does not reproduce
@@ -424,15 +503,26 @@ export interface PageConformance {
 /**
  * Pair each placed mark with its text item in the produced PDF.
  *
- * The comparison is deliberately asymmetric: `Δx` is judged in absolute terms, `Δy` against the
- * MEAN of all `Δy` on the page. A mark's `top` is a box edge; the PDF item's `y` is a glyph
- * baseline, so every `Δy` carries the same small constant offset. Judging `|Δy|` absolutely
- * would measure that offset rather than the divergence, and the tolerance would be describing a
- * font metric.
+ * The comparison is deliberately asymmetric: `Δx` is judged in absolute terms, `Δy` as a residual
+ * around a REFERENCE. A mark's `top` is a box edge; the PDF item's `y` is a glyph baseline, so
+ * every `Δy` carries the same small constant offset. Judging `|Δy|` absolutely would measure that
+ * offset rather than the divergence, and the tolerance would be describing a font metric.
  *
- * That asymmetry has a hole at the bottom, and it is guarded rather than hoped away: with one
- * pair the mean is the value, so `|Δy − mean|` is zero however wrong the mark is. Below
- * `MIN_PAIRS_FOR_DY` the page reports `dyNormalisable: false` and binds nothing.
+ * The reference is staged: the page's own median where it has at least `MIN_PAIRS_FOR_REFERENCE`
+ * uniquely refound pairs, otherwise the document's median, and where the document has too few
+ * pairs there is no reference and nothing binds.
+ *
+ * That asymmetry has two holes. Both are guarded rather than hoped away, because both were
+ * measured OPEN on an earlier build of this file:
+ *
+ *   - At the bottom. With one pair the median is the value, so `|Δy − reference|` is zero however
+ *     wrong the mark is; a verifier measured a mark displaced 40 mm counted as bound. Binding
+ *     needs `MIN_PAIRS_FOR_REFERENCE`; calling a page DIVERGENT — which is fatal — needs
+ *     `MIN_PAIRS_FOR_DIVERGENCE`, because at two pairs the median is the mean and one outlier
+ *     drags a correct neighbour out of tolerance with it.
+ *   - In the middle, and this one is not a matter of degree. A residual cannot see a displacement
+ *     shared by every mark: the reference absorbs it and `maxDyMm` reports 0.0000 for a uniform
+ *     shift of any size. `MAX_REFERENCE_DY_MM` bounds the reference itself for that reason.
  *
  * An earlier release stated a global quota — "at least 90 % of marks matched". That is unusable:
  * the missing tenth can be exactly the targets a finding hangs on. Binding is decided per target,
@@ -495,8 +585,13 @@ export function matchMarks(marks: readonly PlacedMark[], pages: readonly PdfText
     const sdDy =
       dys.length > 1 ? Math.sqrt(dys.reduce((s, v) => s + (v - meanDy) ** 2, 0) / (dys.length - 1)) : 0;
 
+    // A reference far from zero is not a baseline offset, it is a common displacement, and the
+    // residual below cannot see it — which is why this is not expressed as a tolerance on
+    // `dyMm - reference`. Nothing on such a page binds.
+    const referenceOutOfRange = referenceUsable && Math.abs(reference) > MAX_REFERENCE_DY_MM;
+
     const boundHere = new Set<string>();
-    if (referenceUsable) {
+    if (referenceUsable && !referenceOutOfRange) {
       for (const p of paired) {
         if (
           Math.abs(p.dxMm) <= CONFORMANCE_TOLERANCE_MM &&
@@ -514,7 +609,22 @@ export function matchMarks(marks: readonly PlacedMark[], pages: readonly PdfText
     // because `Δx` is judged absolutely. This cannot be a reference artefact — the reference came
     // from the page itself — which is why the condition is restricted to `ownReference`. A page
     // with a single pair simply has no reference and is silent, never divergent.
-    const divergent = ownReference && boundHere.size === 0;
+    // Two disjoint ways for a page to be divergent, and both need the same robustness floor.
+    //
+    //   `boundHere.size === 0` — the marks agreed on a reference and none sits within tolerance
+    //   OF it: they scatter.
+    //   `referenceOutOfRange`  — they agreed on a reference that is itself displaced. The residual
+    //   is then small or zero, so the first condition would never fire.
+    //
+    // The floor applies to both because a two-point reference is evidence of neither: one good
+    // mark beside one outlier produces a reference halfway between them, which is simultaneously
+    // out of range AND leaves both marks unbound. Reading that as a collapsed page aborts the run
+    // over a single bad extraction. Below the floor the page binds nothing and stays `unverified`.
+    //
+    // `paired.length >= MIN_PAIRS_FOR_DIVERGENCE` implies `ownReference`, since the divergence
+    // floor is the higher of the two — so a page can never be called divergent on a BORROWED
+    // reference, which is what stops a wrong document median from aborting a run.
+    const divergent = paired.length >= MIN_PAIRS_FOR_DIVERGENCE && (referenceOutOfRange || boundHere.size === 0);
     if (divergent) divergentPages++;
 
     byPage.set(pageNumber, {
@@ -526,6 +636,8 @@ export function matchMarks(marks: readonly PlacedMark[], pages: readonly PdfText
       targetsTotal: targets.size,
       targetsBound: boundHere.size,
       referenceFrom: ownReference ? "page" : referenceUsable ? "document" : "none",
+      referenceDyMm: referenceUsable ? round4(reference) : 0,
+      referenceOutOfRange,
       divergent,
     });
   }
@@ -650,6 +762,7 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
                 maxDxMm: perPage.maxDxMm,
                 maxDyMm: perPage.maxDyMm,
                 sdDyMm: perPage.sdDyMm,
+                referenceDyMm: perPage.referenceDyMm,
               }
             : null,
           overlayCheck: {

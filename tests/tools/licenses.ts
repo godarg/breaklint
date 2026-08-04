@@ -1,7 +1,12 @@
 /**
  * The licence gate.
  *
- * MIT only, and the walk covers `dependencies` AND `optionalDependencies` — an earlier version
+ * Permissive only — the exact set is `ALLOWED` below, and it is wider than MIT because the tree
+ * genuinely ships Apache-2.0 (`pdfjs-dist`) and BSD. This header used to say "MIT only" while the
+ * check admitted eight licences: a promise the code does not keep, in the file whose whole job is
+ * keeping it. What the gate enforces is no copyleft and no package whose terms nobody stated.
+ *
+ * The walk covers `dependencies` AND `optionalDependencies` — an earlier version
  * of this check in a comparable project walked only the first, and an optional dependency is
  * still installed by a plain `npm i`. "Optional" means tolerant of install failure, not absent.
  *
