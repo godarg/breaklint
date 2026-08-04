@@ -1,5 +1,6 @@
 import type { Report } from "../core/types.ts";
 import { LABELS, mandatoryFacts } from "./mandatory.ts";
+import { emptyStateSentence, infraLines } from "./infra.ts";
 
 const esc = (s: string) =>
   String(s).replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
@@ -30,6 +31,24 @@ export function renderHtml(report: Report): string {
     <tr class="detail"><td colspan="6">${esc(x.message)}</td></tr>`,
     )
     .join("\n");
+
+  // The checker's own failures, before the findings. This reporter printed the clean-run
+  // sentence on an exit-3 run until an audit measured it — the console fix had been applied to
+  // the console only.
+  const infra = infraLines(report);
+  const infraSection =
+    infra.length === 0
+      ? ""
+      : `<h2>Checker</h2>\n<div class="scroll"><table>\n` +
+        `<thead><tr><th>kind</th><th>document</th><th>detail</th><th>measured</th></tr></thead>\n<tbody>\n` +
+        infra
+          .map(
+            (l) =>
+              `<tr><td>${esc(l.kind)}</td><td>${esc(l.document)}</td><td>${esc(l.detail)}</td>` +
+              `<td>${esc(l.measured.join("; ")) || "&mdash;"}</td></tr>`,
+          )
+          .join("\n") +
+        `\n</tbody></table></div>`;
 
   const coverageRows = report.documents
     .flatMap((doc) =>
@@ -106,10 +125,11 @@ export function renderHtml(report: Report): string {
   <div><dt>${esc(LABELS.gateTriggeredBy)}</dt><dd>${esc(f.gateTriggeredBy)}</dd></div>
 </dl>
 
+${infraSection}
 <h2>Findings</h2>
 ${
   report.findings.length === 0
-    ? `<p class="empty">Checked ${report.pagesAnalysed} page${report.pagesAnalysed === 1 ? "" : "s"} in ${report.inputsFound} document${report.inputsFound === 1 ? "" : "s"}. No findings.</p>`
+    ? `<p class="empty">${esc(emptyStateSentence(report))}</p>`
     : `<div class="scroll"><table>
 <thead><tr><th>severity</th><th>rule</th><th>page</th><th>measured</th><th>threshold</th><th>source</th></tr></thead>
 <tbody>

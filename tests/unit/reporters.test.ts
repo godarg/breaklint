@@ -7,6 +7,7 @@ import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
 import { render } from "../../src/report/index.ts";
+import { hasAbsoluteUserPath } from "../../src/report/redact.ts";
 import { LABELS } from "../../src/report/mandatory.ts";
 import type { Report, Snapshot } from "../../src/core/types.ts";
 
@@ -161,15 +162,125 @@ describe("output formats", () => {
       environment: report.environment,
       config: report.config,
     });
-    const text = render(broken, "console");
-
     assert.equal(broken.exitCode, 3, "precondition: this is an infrastructure run");
-    assert.match(text, /render-unstable/u, "the kind that caused the exit must appear");
-    assert.match(text, /dom-pdf-divergence/u, "and so must the reason, which is the useful half");
-    assert.doesNotMatch(
-      text,
-      /no findings/u,
-      "'no findings' is the wording of a clean run; this run did not look at anything",
+
+    // EVERY format, not the one this repair was written in. The first version of this test
+    // asserted on `console` alone, and an audit then measured the other five: markdown and html
+    // still printed "No findings." on an exit-3 run, junit rendered failures="0" — which every
+    // CI front-end reads as a green build — and sarif set executionSuccessful:false while naming
+    // neither the kind nor the reason. The repair had generalised over the reporter it lived in
+    // rather than over the property it was about.
+    for (const format of OUTPUT_FORMATS) {
+      const text = render(broken, format);
+      assert.match(text, /render-unstable/u, `${format}: the kind that caused the exit must appear`);
+      assert.match(text, /dom-pdf-divergence/u, `${format}: and so must the reason, the useful half`);
+      assert.doesNotMatch(
+        text,
+        /No findings/iu,
+        `${format}: that is the wording of a clean run, and this run did not look at anything`,
+      );
+    }
+
+    // The number a CI system reads first has to reflect it too — and it is the attribute on the
+    // ROOT `<testsuites>` element, not any `failures="…"` anywhere in the document. A first
+    // version of this line matched the whole string and was satisfied by the inner checker
+    // suite while the root still said failures="0": the assertion looked right and gated nothing,
+    // measured green under the mutation it existed to catch.
+    const junit = render(broken, "junit");
+    const root = /<testsuites\b[^>]*>/u.exec(junit)?.[0] ?? "";
+    assert.ok(root.length > 0, "no <testsuites> root element in the junit output");
+    const rootFailures = /failures="(\d+)"/u.exec(root)?.[1];
+    assert.equal(rootFailures, "1", `the root <testsuites> reports failures=${rootFailures}; CI reads this as green`);
+  });
+
+  /**
+   * A report is something a user pastes into an issue, so it must not carry the account name of
+   * whoever ran the tool. `/Users/…` is a hard blocklist item for this project.
+   *
+   * Measured before the redaction existed: projecting infrastructure events to the console was
+   * right, but it printed `InfraEvent.measured` raw, and `render-run.ts` puts the resolved browser
+   * path in that field — so the repair that made the error state visible ALSO made an absolute
+   * path visible. The realistic trigger is a puppeteer-cached Chrome under the home directory.
+   *
+   * Red condition: remove the redaction from `render()` and every format below fails.
+   */
+  it("no format leaks an absolute user path", () => {
+    const outcome = runDocument(
+      {
+        path: "doc.html",
+        snapshot: null,
+        infrastructure: [
+          {
+            kind: "checker-crashed",
+            detail: "the probe is not wired to a browser in this build.",
+            measured: { stage: "measure", browser: "/Users/someone/Library/Caches/chrome/Chromium" },
+          },
+        ],
+      },
+      { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
     );
+    const leaky = buildReport({
+      outcomes: [outcome],
+      mode: "live",
+      source: "rendered",
+      toolVersion: "0.1.0",
+      commit: null,
+      startedAt: new Date(0).toISOString(),
+      durationMs: 0,
+      rulesRun: 0,
+      failOn: "error",
+      environment: { ...report.environment, rendererPath: "/Users/someone/bin/chrome" },
+      config: report.config,
+    });
+    for (const format of OUTPUT_FORMATS) {
+      const text = render(leaky, format);
+      assert.ok(!hasAbsoluteUserPath(text), `${format} leaked an absolute user path`);
+      assert.doesNotMatch(text, /\/Users\//u, `${format} contains a literal /Users/ path`);
+    }
+  });
+
+  /**
+   * `measured` grows with the document. A `render-unstable` over fifty divergent pages produced a
+   * single 7 488-character console line before the collections were summarised.
+   *
+   * Red condition: print `measured` raw again and this fails on length.
+   */
+  it("a large measured payload does not become one unreadable line", () => {
+    const pages = Array.from({ length: 50 }, (_, i) => i + 1);
+    const outcome = runDocument(
+      {
+        path: "doc.html",
+        snapshot: null,
+        infrastructure: [
+          {
+            kind: "render-unstable",
+            detail: "dom-pdf-divergence",
+            measured: {
+              divergentPages: pages.length,
+              pages,
+              perPage: pages.map((n) => ({ page: n, refound: 4, placed: 4, maxDxMm: 40, maxDyMm: 0 })),
+            },
+          },
+        ],
+      },
+      { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+    );
+    const big = buildReport({
+      outcomes: [outcome],
+      mode: "live",
+      source: "rendered",
+      toolVersion: "0.1.0",
+      commit: null,
+      startedAt: new Date(0).toISOString(),
+      durationMs: 0,
+      rulesRun: 0,
+      failOn: "error",
+      environment: report.environment,
+      config: report.config,
+    });
+    const longest = Math.max(...render(big, "console").split("\n").map((l) => l.length));
+    assert.ok(longest < 400, `the longest console line is ${longest} characters`);
+    // and the count a reader needs is still there
+    assert.match(render(big, "console"), /50 entries/u);
   });
 });

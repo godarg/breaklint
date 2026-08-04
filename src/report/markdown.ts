@@ -1,5 +1,6 @@
 import type { Report } from "../core/types.ts";
 import { LABELS, mandatoryFacts } from "./mandatory.ts";
+import { emptyStateSentence, infraLines } from "./infra.ts";
 
 export function renderMarkdown(report: Report): string {
   const f = mandatoryFacts(report);
@@ -16,8 +17,24 @@ export function renderMarkdown(report: Report): string {
   out.push(`| ${LABELS.failOn} | ${f.failOn} |`);
   out.push(`| ${LABELS.gateTriggeredBy} | ${f.gateTriggeredBy} |`, "");
 
+  // The apparatus before the findings: a run that could not measure has to say so here, not
+  // only in the verdict cell above. This reporter printed the clean-run sentence on an exit-3
+  // run until an audit measured it.
+  const infra = infraLines(report);
+  if (infra.length > 0) {
+    out.push("## Checker", "");
+    out.push("| kind | document | detail | measured |", "|---|---|---|---|");
+    for (const line of infra) {
+      out.push(
+        `| \`${line.kind}\` | ${line.document} | ${line.detail.replace(/\|/gu, "\\|")} | ` +
+          `${line.measured.join("; ").replace(/\|/gu, "\\|") || "—"} |`,
+      );
+    }
+    out.push("");
+  }
+
   if (report.findings.length === 0) {
-    out.push(`Checked ${report.pagesAnalysed} pages in ${report.inputsFound} documents. No findings.`, "");
+    out.push(emptyStateSentence(report), "");
   } else {
     out.push("| severity | rule | page | measured | threshold | source |", "|---|---|---|---|---|---|");
     for (const finding of report.findings) {

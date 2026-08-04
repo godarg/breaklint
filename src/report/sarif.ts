@@ -1,5 +1,6 @@
 import type { Finding, Report } from "../core/types.ts";
 import { summaryLine } from "./mandatory.ts";
+import { infraLines } from "./infra.ts";
 import { ALL_RULES } from "../rules/index.ts";
 
 /**
@@ -39,6 +40,14 @@ export function renderSarif(report: Report): string {
             exitCode: report.exitCode,
             // The honesty layer, in the one free-text field every SARIF consumer shows.
             workingDirectory: { uri: "." },
+            // `executionSuccessful: false` says the run failed and not WHY. A reader of this
+            // format got no kind and no reason at all until an audit measured it; SARIF has a
+            // standard place for exactly this, and it is `toolExecutionNotifications`.
+            toolExecutionNotifications: infraLines(report).map((line) => ({
+              level: "error",
+              message: { text: `${line.kind}: ${line.detail}` },
+              properties: { kind: line.kind, document: line.document, measured: line.measured },
+            })),
             properties: { summary: summaryLine(report) },
           },
         ],

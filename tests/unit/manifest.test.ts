@@ -23,7 +23,19 @@ const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.ur
   bin: Record<string, string>;
   exports: Record<string, string>;
   scripts: Record<string, string>;
+  main?: string;
 };
+
+/** Every `.ts` under a directory. Used to derive runtime data dependencies from the source. */
+function walk(dir: URL): URL[] {
+  const out: URL[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const child = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, dir);
+    if (entry.isDirectory()) out.push(...walk(child));
+    else if (entry.name.endsWith(".ts")) out.push(child);
+  }
+  return out;
+}
 
 /** `dist/` is a build product, so its ABSENCE before a build is normal and not what this checks. */
 const isBuildProduct = (entry: string): boolean => entry === "dist/" || entry.startsWith("dist/");
@@ -67,9 +79,20 @@ describe("the packaging manifest names only things that exist", () => {
    */
   const sourceFor = (target: string): string => target.replace(/^\.\/dist\//u, "src/").replace(/\.js$/u, ".ts");
 
-  it("`bin` and `exports` point inside the published set", () => {
+  it("the one documented command points at the CLI and nothing else", () => {
+    // Measured: `bin` could be repointed at `dist/report/console.js` with the whole suite green —
+    // the target was inside `files` and its source existed, so both earlier assertions passed,
+    // and the installed command would have run a reporter module and done nothing. A package with
+    // one documented command should pin where that command lives.
+    assert.deepEqual(Object.keys(pkg.bin), ["breaklint"], "this package publishes exactly one command");
+    assert.equal(pkg.bin.breaklint, "dist/cli/index.js", "the command is the CLI entry, not another module");
+  });
+
+  it("`bin`, `exports` and `main` point inside the published set", () => {
     const published = pkg.files.map((f) => f.replace(/\/$/u, ""));
-    for (const [name, target] of Object.entries({ ...pkg.bin, ...pkg.exports })) {
+    // `main` was not iterated at all by the first version: `"main": "./dist/nope.js"` stayed green
+    // under a test titled "names only things that exist".
+    for (const [name, target] of Object.entries({ ...pkg.bin, ...pkg.exports, ...(pkg.main ? { main: pkg.main } : {}) })) {
       if (target === "./package.json" || target === "package.json") continue;
       const top = target.replace(/^\.?\/?/u, "").split("/")[0]!;
       assert.ok(
@@ -80,7 +103,7 @@ describe("the packaging manifest names only things that exist", () => {
   });
 
   it("every `bin` and `exports` target has a source that produces it", () => {
-    for (const [name, target] of Object.entries({ ...pkg.bin, ...pkg.exports })) {
+    for (const [name, target] of Object.entries({ ...pkg.bin, ...pkg.exports, ...(pkg.main ? { main: pkg.main } : {}) })) {
       if (target === "./package.json" || target === "package.json") continue;
       const normalised = target.startsWith("./") ? target : `./${target}`;
       assert.ok(
@@ -92,6 +115,56 @@ describe("the packaging manifest names only things that exist", () => {
         existsSync(new URL(`../../${source}`, import.meta.url)),
         `"${name}" points at ${target}, but ${source} does not exist — the published entry point ` +
           `cannot be built, and an installed package would fail with ERR_MODULE_NOT_FOUND`,
+      );
+    }
+  });
+
+  /**
+   * The direction the first two versions of this file both missed.
+   *
+   * Everything above asks "does what is LISTED exist?". Nothing asked "is what is REQUIRED
+   * listed?" — and those are different questions with different failure modes. An audit measured
+   * the consequence: removing `examples/` from `files` left this suite at 164/164 while
+   * `npm pack --dry-run` packed zero `examples` entries. `src/cli/index.ts` resolves
+   * `../../examples/demo-snapshot.json` from `dist/cli/`, so the published `npx breaklint --demo`
+   * — the one command the README and `--help` document — would have failed with ENOENT.
+   *
+   * The check is derived from the SOURCE rather than from a hand-written list, so a new runtime
+   * dependency on a new directory is covered the day it is written.
+   *
+   * Red condition: drop any directory the shipped code reads at runtime from `files`.
+   */
+  it("every directory the shipped code reads at runtime is packed", () => {
+    const published = new Set(pkg.files.map((f) => f.replace(/\/$/u, "")));
+    const shipped = walk(new URL("../../src/", import.meta.url));
+    const required = new Map<string, string>();
+    for (const file of shipped) {
+      const text = readFileSync(file, "utf8");
+      // Two shapes reach package data in this codebase, and the first version of this scan knew
+      // only one — which is why the positive control below exists and fired.
+      //   new URL("../../<dir>/…", import.meta.url)
+      //   resolvePath(HERE, "../../<dir>/…")
+      const patterns = [
+        /new URL\(\s*["'`](?:\.\.\/)+([A-Za-z0-9._-]+)\//gu,
+        // Data only. A relative specifier ending in .ts/.js is a source import: it is COMPILED
+        // into dist and needs no packing of its own, and treating it as package data made this
+        // scan demand that `core/` be listed in `files`.
+        /["'`](?:\.\.\/)+([A-Za-z0-9._-]+)\/[A-Za-z0-9._-]+\.(?:json|html|css|svg|txt|md)["'`]/gu,
+      ];
+      for (const m of patterns.flatMap((re) => [...text.matchAll(re)])) {
+        const dir = m[1]!;
+        // `..` and `.` are path steps the greedy prefix can leave behind, not directories.
+        if (dir === ".." || dir === ".") continue;
+        if (dir === "src" || dir === "tests" || dir === "dist" || dir === "node_modules") continue;
+        required.set(dir, file.pathname.replace(/^.*\/src\//u, "src/"));
+      }
+    }
+    assert.ok(required.size > 0, "the scan found no runtime data directory at all — it is not looking");
+    for (const [dir, source] of required) {
+      assert.ok(
+        published.has(dir),
+        `${source} reads ${dir}/ at runtime, but "files" does not pack it — the installed package ` +
+          `would fail with ENOENT on the very command that needs it`,
       );
     }
   });

@@ -334,12 +334,17 @@ describe("matchMarks", () => {
    * exercising it used a 40 mm displacement, so it pinned the constant at "somewhere below 40".
    * A gate that fires only for absurd inputs is a gate whose threshold nobody chose.
    *
-   * The two cases below sit immediately either side of the bound, so the constant is pinned from
-   * both directions and cannot move without one of them going red.
+   * What pins the constant and what does not, stated precisely — because the first version of this
+   * comment claimed more than it delivered and an audit measured it false.
    *
-   * Red condition: any change to `MAX_REFERENCE_DY_MM` makes one of these two fail, and the
-   * literal assertion makes the number itself a stated commitment rather than an implementation
-   * detail — the same treatment `CONFORMANCE_TOLERANCE_MM` already had.
+   *   The LITERAL assertion pins the value. It is what fails for 0.36, 1.005 and 39 alike.
+   *   The two boundary cases below pin the BEHAVIOUR at the edge: that 0.99 mm binds and 1.01 mm
+   *   does not, so the bound is a real edge rather than a number that happens to sit below the
+   *   absurd. On their own they constrain only the interval [0.99, 1.01) — with the literal
+   *   assertion neutralised and the constant at 1.005 the suite was measured at 164/164.
+   *
+   * Both are needed and neither is sufficient: a literal alone would not show the edge does
+   * anything, and the pair alone would let the constant drift within its own interval.
    */
   it("the reference bound is 1.0 mm, and the number is pinned rather than implied", () => {
     assert.equal(MAX_REFERENCE_DY_MM, 1.0);

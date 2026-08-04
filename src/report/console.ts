@@ -1,5 +1,6 @@
 import type { Finding, Report } from "../core/types.ts";
 import { summaryLine } from "./mandatory.ts";
+import { emptyStateSentence, infraLines } from "./infra.ts";
 
 const ESC = "[";
 const RESET = `${ESC}0m`;
@@ -35,31 +36,22 @@ export function renderConsole(report: Report, opts: { colour?: boolean } = {}): 
    * never a human. The comment below has warned against exactly this since the file was written:
    * the empty state was guarded and the ERROR state was not.
    */
-  for (const doc of report.documents) {
-    for (const event of doc.infrastructure) {
-      out.push(
-        `${paint("31", "checker")} ${event.kind}  ${doc.path}\n` +
-          `  detail     ${event.detail}` +
-          (event.measured ? `\n  measured   ${JSON.stringify(event.measured)}` : ""),
-      );
-    }
+  for (const line of infraLines(report)) {
+    out.push(
+      `${paint("31", "checker")} ${line.kind}  ${line.document}\n` +
+        `  detail     ${line.detail}` +
+        // One `key=value` per line. The first version printed `JSON.stringify(measured)` raw and
+        // a divergence over fifty pages produced a single 7 488-character line.
+        line.measured.map((m) => `\n  measured   ${m}`).join(""),
+    );
   }
 
   if (report.findings.length === 0) {
     // The empty state has to say what was checked. A tool that prints nothing when it passed
     // and nothing when it did nothing reports its own idleness as success — and that is a
-    // silent failure wearing the costume of a clean run.
-    //
-    // "No findings" is only true when the tool actually looked. Where the verdict is
-    // `infrastructure` it did not, and reporting that in the words of a clean run is the same
-    // failure one level up.
-    out.push(
-      report.runVerdict === "infrastructure"
-        ? `checked nothing: the run stopped before it could measure ${report.inputsFound} ` +
-            `document${report.inputsFound === 1 ? "" : "s"}. This is not a clean result.`
-        : `checked ${report.pagesAnalysed} page${report.pagesAnalysed === 1 ? "" : "s"} in ` +
-            `${report.inputsFound} document${report.inputsFound === 1 ? "" : "s"}, no findings`,
-    );
+    // silent failure wearing the costume of a clean run. `emptyStateSentence` also refuses the
+    // clean-run wording for an infrastructure verdict, identically in all six reporters.
+    out.push(emptyStateSentence(report));
   }
 
   out.push("");
