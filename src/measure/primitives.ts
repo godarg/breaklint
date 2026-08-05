@@ -46,6 +46,15 @@ export const PRIMITIVES_SOURCE = `(() => {
   const qsaFn = Element.prototype.querySelectorAll;
   const docQsaFn = Document.prototype.querySelectorAll;
   const sliceFn = Array.prototype.slice;
+  // Attribute access belongs here for the same reason geometry does. An audit found the break
+  // collector calling 'el.getAttribute' and 'el.hasAttribute' directly while its own header claimed
+  // everything went through captured references — a comment promising more than the code delivered.
+  // Those two methods decide the break cause: a replaced 'getAttribute' returning "page" makes
+  // every boundary look forced, which silences four layout rules on a whole document.
+  const getAttrFn = Element.prototype.getAttribute;
+  const hasAttrFn = Element.prototype.hasAttribute;
+  const closestFn = Element.prototype.closest;
+  const textOf = Object.getOwnPropertyDescriptor(Node.prototype, "textContent").get;
 
   Object.defineProperty(window, "__blPrimitives", {
     value: Object.freeze({
@@ -56,6 +65,10 @@ export const PRIMITIVES_SOURCE = `(() => {
         const fn = root === document ? docQsaFn : qsaFn;
         return call.call(sliceFn, call.call(fn, root, selector));
       },
+      attr: (el, name) => (el ? call.call(getAttrFn, el, name) : null),
+      hasAttr: (el, name) => (el ? call.call(hasAttrFn, el, name) === true : false),
+      closest: (el, selector) => (el ? call.call(closestFn, el, selector) : null),
+      text: (node) => (node ? call.call(textOf, node) : ""),
       installed: true,
     }),
     writable: false,

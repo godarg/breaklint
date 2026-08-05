@@ -24,6 +24,7 @@ const child = spawn(
     // shape the promotion check below exists to stop, one level further out.
     "tests/live/evidence.test.ts",
     "tests/live/measure.test.ts",
+    "tests/live/breaks.test.ts",
   ],
   { stdio: "inherit" },
 );

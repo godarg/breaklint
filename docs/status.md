@@ -194,9 +194,9 @@ implementation.
 enforces the Paged.js version gate, and then stops with exit 3 and an infrastructure event
 naming the stage. It does not return an empty snapshot and it never reports a clean document.
 
-Still to build: the snapshot collection itself and the collector that reads the paginator's own
-break attributes. Until those exist there is no snapshot, so the evidence path above has no
-report to attach itself to — it is exercised by its own live suite and by nothing else.
+Still to build: the snapshot collection itself, and the loader that ties the pieces below into one
+run. Until those exist there is no snapshot, so the evidence path above has no report to attach
+itself to — it is exercised by its own live suite and by nothing else.
 
 **Three pieces of the measurement path do exist and are checked against a real browser.** They
 are listed separately from the finished work above because on their own they produce no report:
@@ -207,6 +207,63 @@ are listed separately from the finished work above because on their own they pro
 | Freeze signature | all seven components of §11.3, 250 ms window, 3 retries, and a drift report that names WHICH components moved |
 | Untouched primitives | references captured before any author script runs. Measured: a document that replaces `getBoundingClientRect`, `getComputedStyle` and `querySelectorAll` after pagination sees `x:999` and `"HIJACKED"`, and the probe reads values byte-identical to a clean run across all seven components. The positive control is in the same test — a naive collector under the same attack loses its boxes entirely, 5 097 characters to 0 |
 | Geometry cross-check | a sample compared against CDP `DOM.getBoxModel`, which reads the browser's layout tree out of process. The two agree EXACTLY on this corpus, twice; a systematic 0.002 px disagreement fails the suite |
+| Break-cause collector | all five Paged.js hooks registered and each one verified to have fired; boundaries classified from the three attributes the paginator writes, on a document carrying six boundary kinds at once |
+
+**The break cause comes from the paginator's own attributes, and the two alternatives are
+measured-refuted rather than merely rejected.** Reading the browser cascade is wrong in 4 of 19
+fixtures, because Paged.js resolves CSS with its own parser and the two diverge in both directions.
+Reading the remaining fill of the page is worse: a FREE boundary in front of a tall unbreakable
+block leaves 0.8542 of the page, while the smallest remainder at a FORCED boundary is 0.665 — so no
+threshold separates the groups and there was never a number to calibrate.
+
+Measured against Paged.js 0.4.3 for this build, on one document containing every kind at once:
+
+| declaration | what the paginator writes | boundary |
+|---|---|---|
+| `break-before` via stylesheet class or id | `data-break-before="page"` | forced |
+| `break-before: recto` | `data-break-before="recto"`, plus a blank page | forced, and the blank page is `parity` |
+| `break-after` via class, id or `p.adj + p` | `data-previous-break-after="page"` on the node AFTER | forced |
+| `page: named` | `data-page="named"` and **no break attribute at all** | forced — the third branch of `shouldBreak()` |
+| `break-before` or `break-after` **inline** | nothing | **no boundary** — inert in 0.4.3 |
+| nothing | a break token from `afterPageLayout` | overflow |
+
+The named-page case is the one a partial implementation misses, and it is not hypothetical: a
+reader that knows only the two break attributes calls that boundary free, and a free boundary in
+front of a deliberately started page is exactly the false `layout/half-empty-page` finding this
+classification exists to prevent. Deleting that branch reddens two live cases.
+
+A fourth attribute exists and is deliberately not read. Paged.js also writes `data-break-after` on
+the node that CARRIES the declaration; reading it would answer a question about a different
+boundary whenever the declaring node is not the last one on its page.
+
+**Every hook is counted, and that is a build requirement rather than diagnostics.** Paged.js wires
+handlers by bare method-name equality — no interface, no registration list, no error for a name it
+does not recognise. A typo in `afterPageLayout` is a silent no-op, and a silent no-op there means
+no break tokens, every boundary classified `unknown`, and a report that looks clean.
+
+**A named page is resolved through the nearest ancestor, and reading the leaf alone was wrong in
+both directions.** A named region is normally declared on a container — `section.chapter { page:
+chapter }` — and the paginator puts `data-page` on the SECTION, not on the paragraphs inside it.
+Measured on a section spanning three pages: the leaf reported `null`, the ancestor reported
+`chapter`. Reverting to the leaf-only read on the live fixture produces a **false `forced`** on a
+boundary inside the region and **misses the real `forced`** on the boundary leaving it — the second
+being the more expensive error, because a false `forced` silences four rules.
+
+**A page the paginator never reported is `unknown`, not a page with default values.** A final page
+with no `afterPageLayout` record used to receive a fabricated record and be counted nowhere, so a
+page inserted after `afterRendered` was classified from whatever attributes sat on it. Such pages
+are counted as `unreconciledPages` now, and the boundaries touching them are `unknown` — which
+suppresses nothing, and is the direction in which uncertainty is cheap.
+
+**Both edges of a blank page are `parity`.** §11.6 says so as an invariant on the page, while the
+four-branch algorithm a few paragraphs earlier only asks whether the NEXT page is blank. Those two
+disagree, and following only the algorithm gave the blank page `parity` incoming and `forced`
+outgoing, because the page after it carries the recto declaration. The explicit invariant wins.
+
+**The forcing comparison is exact.** An earlier version normalised with `trim().toLowerCase()`,
+reasoning that the attribute comes from a third party. That is backwards — the attribute is written
+by the paginator, which compares exactly. Measured: an author-written `data-break-before=" Page "`
+produced no break at all, while the normalising version would have called such a boundary forced.
 
 **Two limits of the freeze signature, measured rather than assumed.**
 

@@ -291,7 +291,6 @@ describe("the measurement probe, live", () => {
     await page.close();
 
     const result = compareGeometry(inPage, outOfProcess);
-    console.log("MEASURED maxDelta =", result.maxDelta, "over", result.checked, "elements; worst model.width delta =", worstModelDelta);
     assert.equal(result.ok, true, `disagreements: ${JSON.stringify(result.disagreements)}`);
     assert.ok(
       result.maxDelta <= CROSS_CHECK_MEASURED_MAX_PX,
