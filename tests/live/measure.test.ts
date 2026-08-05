@@ -22,6 +22,18 @@ import { fileURLToPath } from "node:url";
 import { launchBrowser, resolveBrowser, resolvePackageRoot, type BrowserLike, type PageLike } from "../../src/acquire/browser.ts";
 import { FREEZE_COMPONENTS, FREEZE_SOURCE, sampleParts, type FreezeParts } from "../../src/measure/freeze.ts";
 import { PRIMITIVES_CHECK, PRIMITIVES_SOURCE, type PrimitivesStatus } from "../../src/measure/primitives.ts";
+import {
+  compareGeometry,
+  CROSS_CHECK_MEASURED_MAX_PX,
+  CROSS_CHECK_SAMPLE_SIZE,
+  SAMPLE_SOURCE,
+  type GeometrySample,
+} from "../../src/measure/cross-check.ts";
+
+/** Only the two members this suite calls; the driver's session type is not a published interface. */
+interface CdpSession {
+  send<R = unknown>(method: string, params?: Record<string, unknown>): Promise<R>;
+}
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 
@@ -45,7 +57,7 @@ const missing = [chromeAvailable ? null : "a browser", pagedjsRoot ? null : "pag
 function documentSource(pagedjs: string): string {
   const filler = Array.from(
     { length: 14 },
-    (_, i) => `<p>${i + 1}. filler text long enough to force pagination across several pages.</p>`,
+    (_, i) => `<p id="f${i}">${i + 1}. filler text long enough to force pagination across several pages.</p>`,
   ).join("\n");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
 @page{size:148mm 105mm;margin:12mm; @bottom-center{ content: "page " counter(page); } }
@@ -234,6 +246,62 @@ describe("the measurement probe, live", () => {
     );
     assert.match(parts.canvas, /:0$/u, "zero non-zero bytes is the measured value");
     await page.close();
+  });
+
+  /**
+   * The second opinion, from the browser's own layout tree.
+   *
+   * This is the only check in the whole measurement path whose truth comes from outside the page.
+   * Everything else — however carefully the primitives are captured — is still the page reporting
+   * on itself.
+   *
+   * Two measured facts are asserted rather than assumed. The quad agrees with
+   * `getBoundingClientRect` to within thousandths of a pixel; `model.width`/`model.height` do NOT,
+   * because CDP rounds them to integers (469 against 468.66). A tolerance chosen to accommodate
+   * that rounding would have been about seventy times too loose, and would have been a number
+   * invented to cover reading the wrong field. The second assertion below exists so that if a
+   * future build ever makes `model.width` exact, this stops claiming a discrepancy that is gone.
+   */
+  it("the browser's layout tree agrees with the probe, and the rounded fields are why the quad is used", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const page = await paginated();
+    const inPage = await page.evaluate<GeometrySample[]>(`(${SAMPLE_SOURCE})(${CROSS_CHECK_SAMPLE_SIZE})`);
+    assert.ok(inPage.length > 0, "the sample is empty — this case would confirm nothing");
+
+    const session = await (page as unknown as { createCDPSession(): Promise<CdpSession> }).createCDPSession();
+    await session.send("DOM.enable");
+    const { root } = await session.send<{ root: { nodeId: number } }>("DOM.getDocument", { depth: -1, pierce: false });
+
+    const outOfProcess: GeometrySample[] = [];
+    let worstModelDelta = 0;
+    for (const sample of inPage) {
+      const { nodeId } = await session.send<{ nodeId: number }>("DOM.querySelector", {
+        nodeId: root.nodeId,
+        selector: `#${sample.key}`,
+      });
+      if (!nodeId) continue;
+      const { model } = await session.send<{ model: { border: number[]; width: number; height: number } }>(
+        "DOM.getBoxModel",
+        { nodeId },
+      );
+      const q = model.border;
+      outOfProcess.push({ key: sample.key, x: q[0]!, y: q[1]!, width: q[2]! - q[0]!, height: q[5]! - q[1]! });
+      worstModelDelta = Math.max(worstModelDelta, Math.abs(model.width - sample.width));
+    }
+    await page.close();
+
+    const result = compareGeometry(inPage, outOfProcess);
+    console.log("MEASURED maxDelta =", result.maxDelta, "over", result.checked, "elements; worst model.width delta =", worstModelDelta);
+    assert.equal(result.ok, true, `disagreements: ${JSON.stringify(result.disagreements)}`);
+    assert.ok(
+      result.maxDelta <= CROSS_CHECK_MEASURED_MAX_PX,
+      `the corpus exceeded its own measured maximum: ${result.maxDelta} > ${CROSS_CHECK_MEASURED_MAX_PX}. ` +
+        "The tolerance's headroom cannot be allowed to erode unnoticed.",
+    );
+    assert.ok(
+      worstModelDelta > CROSS_CHECK_MEASURED_MAX_PX,
+      "model.width is no longer rounded; the reason this code reads the quad instead has expired",
+    );
   });
 
   /**

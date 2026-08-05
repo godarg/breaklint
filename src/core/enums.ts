@@ -49,6 +49,14 @@ export const INFRA_EVENT_KINDS = [
   "renderer-not-terminated",
   "break-cause-undetermined",
   "pagedjs-version-unsupported",
+  /**
+   * The in-page probe and the browser's own layout tree disagree about where something is.
+   *
+   * Fatal, and it has to be: every number in the snapshot comes from the probe, so a probe whose
+   * geometry does not match what CDP reads out of process is describing a document that does not
+   * exist. No partial report is worth writing from that.
+   */
+  "geometry-cross-check-failed",
 ] as const;
 export type InfraEventKind = (typeof INFRA_EVENT_KINDS)[number];
 
