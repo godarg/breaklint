@@ -194,9 +194,41 @@ implementation.
 enforces the Paged.js version gate, and then stops with exit 3 and an infrastructure event
 naming the stage. It does not return an empty snapshot and it never reports a clean document.
 
-Still to build: the in-page measurement probe and the collector that reads the paginator's own
-break attributes. Until they exist there is no snapshot, so the evidence path above has no
+Still to build: the snapshot collection itself and the collector that reads the paginator's own
+break attributes. Until those exist there is no snapshot, so the evidence path above has no
 report to attach itself to — it is exercised by its own live suite and by nothing else.
+
+**Three pieces of the measurement path do exist and are checked against a real browser.** They
+are listed separately from the finished work above because on their own they produce no report:
+
+| | |
+|---|---|
+| Source provenance | ids injected into the source TEXT before parsing, with the map built from the parser's positions; the reserved-prefix collision gate refuses a document that already uses `data-bl-`, and reports what it searched as well as what it structurally cannot reach |
+| Freeze signature | all seven components of §11.3, 250 ms window, 3 retries, and a drift report that names WHICH components moved |
+| Untouched primitives | references captured before any author script runs. Measured: a document that replaces `getBoundingClientRect`, `getComputedStyle` and `querySelectorAll` after pagination sees `x:999` and `"HIJACKED"`, and the probe reads values byte-identical to a clean run across all seven components. The positive control is in the same test — a naive collector under the same attack loses its boxes entirely, 5 097 characters to 0 |
+| Geometry cross-check | a sample compared against CDP `DOM.getBoxModel`, which reads the browser's layout tree out of process. The two agree EXACTLY on this corpus, twice; a systematic 0.002 px disagreement fails the suite |
+
+**Two limits of the freeze signature, measured rather than assumed.**
+
+*Canvas content cannot be a drift signal.* A canvas drawn on before pagination reports ink and
+reports exactly zero non-zero bytes afterwards — in the clone inside the page and in the
+`<template>` where Paged.js parks the source. §11.3's drift table lists canvas content as newly
+detected; §15.1b two sections later says the bitmap does not survive the clone. The second is what
+this build measures. The component detects a canvas DIMENSION change, which does move layout, and
+the report carries `canvasInkReadable: false` so that a reader can tell "readable and unchanged"
+from "never readable at all" — which are identical inside a hash.
+
+*Generated content is the declaration, not the rendered text.* §11.3 is right that a running
+footer lives in `::after` with `textContent` empty. But `getComputedStyle` returns
+`"page " counter(page)` unresolved, identically on every page, and no API returns a
+pseudo-element's rendered text. A page number that changed between two samples would not move that
+component. Its box would.
+
+**The document is loaded by NAVIGATING to a loopback origin, and both reasons are measured.**
+`setContent` does not install the primitives at all — CDP's on-new-document script never fires,
+because `setContent` writes into the existing document; `window.__blPrimitives` came back
+`undefined` and the collector threw. And a `file://` origin cannot read `cssRules`, which is where
+the cascade hint comes from. Both are pinned by tests that fail if either ever changes.
 
 **What the evidence path does not yet get from the product.** The marks are placed on elements
 carrying `data-bl-sid`. That attribute is injected into the source text before parsing, and that
