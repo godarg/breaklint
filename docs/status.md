@@ -207,12 +207,30 @@ Everything downstream of the attribute is the production path; the attribute its
 whole rasterised document in the page while it compares, so peak memory grows with the page
 count and a long book can exhaust it; the pixel buffers are dropped as soon as the comparison is
 done, which halves the peak from that point on, but the comparison itself needs both documents
-resident. And the browser no longer runs with `--allow-file-access-from-files`, which is right
-for an untrusted document but has a consequence for the not-yet-written document loader: a
-`file://` document with a linked stylesheet may not expose its rules to the paginator. That
-consequence is reasoned from how the browser treats file origins and is NOT measured here. The
-resolution is to serve the audited document from the same loopback origin the rasteriser uses,
-which is a decision for the loader and is recorded here so it is not discovered by accident.
+resident.
+
+**The `file://` consequence is now measured, and it is narrower than the guess was.** This
+paragraph used to say that a `file://` document with a linked stylesheet "may not expose its rules
+to the paginator", reasoned from how the browser treats file origins and marked as not measured.
+Measured, on a document with one linked sheet, in both origins:
+
+| | `file://` | loopback origin |
+|---|---|---|
+| the rule APPLIES (computed value) | yes — `rgb(1, 2, 3)` | yes — `rgb(1, 2, 3)` |
+| `sheet.cssRules` readable | **no** — `SecurityError` | yes |
+| `break-before: page` visible in the CSSOM | no | yes |
+
+Layout is therefore unaffected: the paginator lays a document out correctly from a file, because
+applying a rule never requires reading it back. What is lost is the CSSOM — and the only thing
+that reads the CSSOM is the cascade HINT, the field beside `breakCause` that this contract marks
+as explicitly non-normative. A `file://` run would report `cascadeHint: null` and change nothing
+else.
+
+That still settles the loader — the document is served from the same loopback origin the
+rasteriser already uses, so the hint exists at all — but the reason is one diagnostic field rather
+than a wrong layout. Both numbers are written down because the difference between "the layout is
+wrong" and "one non-normative field is null" is exactly the sort of thing that gets remembered as
+the larger of the two.
 
 **What that means for a reader today.** `--demo` shows what the rules do and what a report looks
 like. It does not show the render path, and the report says so in its own `mode` and `source`
