@@ -61,5 +61,8 @@
     "pdfjs-dist": "^6.2.108",
     "puppeteer-core": "^24.10.1",
     "typescript": "5.9.2"
+  },
+  "dependencies": {
+    "parse5": "8.0.1"
   }
 }
