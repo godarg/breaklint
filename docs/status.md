@@ -11,7 +11,7 @@ stated here rather than left to be inferred from a passing test suite.
 | 15 rules as pure functions over a snapshot | `src/rules/` |
 | Mutation guard | 15/15 rules kill every mutant, each on a fixture that actually triggers it |
 | False-alarm corpus | every clean fixture stays silent, every trigger fixture fires and is attributed correctly |
-| Exit matrix | 27 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
+| Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
 | `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 8 findings across 7 rules |

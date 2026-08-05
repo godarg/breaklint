@@ -87,7 +87,15 @@ const STYLE_MARK =
  * origin — measured at the real renderer, because the cascade order at this exact point is the
  * question half the procedure depends on. An inline declaration WITHOUT the priority loses.
  */
-const SOURCE = `(() => {
+/**
+ * The script installed into the page.
+ *
+ * Exported so a test can check that the names in `OVERLAY_GLOBALS` are the names this script
+ * actually defines. Those two are a contract with no compiler between them: the constants are
+ * TypeScript and this is a string the browser parses, so renaming one side alone produces a call
+ * to a function that does not exist, and only the live suite would notice.
+ */
+export const OVERLAY_SOURCE = `(() => {
   const STYLE_LAYER = ${JSON.stringify(STYLE_LAYER)};
   const STYLE_MARK = ${JSON.stringify(STYLE_MARK)};
 
@@ -205,19 +213,34 @@ async function call<R>(page: PageLike, name: string): Promise<R> {
   return page.evaluate<R>(`window.${name}()`);
 }
 
+/**
+ * The four in-page entry points, by name.
+ *
+ * Exported so a test can dispatch on them without transcribing them. A unit stub matched on
+ * hand-copied literals, and renaming any of these left the whole suite at 175/175 while the stub
+ * silently stopped recognising the call it exists to answer — a fake that keeps passing after it
+ * has stopped faking the right thing.
+ */
+export const OVERLAY_GLOBALS = {
+  install: "__blOverlayInstall",
+  readback: "__blOverlayReadback",
+  detach: "__blOverlayDetach",
+  remove: "__blOverlayRemove",
+} as const;
+
 export async function installOverlay(page: PageLike): Promise<OverlayInstallation> {
-  await page.evaluate<void>(SOURCE);
-  return call<OverlayInstallation>(page, "__blOverlayInstall");
+  await page.evaluate<void>(OVERLAY_SOURCE);
+  return call<OverlayInstallation>(page, OVERLAY_GLOBALS.install);
 }
 
 export async function readbackViolations(page: PageLike): Promise<{ token: string; why: string }[]> {
-  return call<{ token: string; why: string }[]>(page, "__blOverlayReadback");
+  return call<{ token: string; why: string }[]>(page, OVERLAY_GLOBALS.readback);
 }
 
 export async function detachOverlay(page: PageLike): Promise<number> {
-  return call<number>(page, "__blOverlayDetach");
+  return call<number>(page, OVERLAY_GLOBALS.detach);
 }
 
 export async function removeOverlay(page: PageLike): Promise<number> {
-  return call<number>(page, "__blOverlayRemove");
+  return call<number>(page, OVERLAY_GLOBALS.remove);
 }

@@ -25,6 +25,7 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import type { PageLike } from "../../src/acquire/browser.ts";
 import { IS } from "../../src/core/enums.ts";
 import { produceEvidence } from "../../src/render/evidence.ts";
+import { OVERLAY_GLOBALS, OVERLAY_SOURCE } from "../../src/render/overlay.ts";
 import type { PlacedMark } from "../../src/render/overlay.ts";
 import type { PdfTextPage, RasterDiff, RasterPage, Rasterizer } from "../../src/render/rasterizer.ts";
 
@@ -78,12 +79,16 @@ class FakePage implements PageLike {
   // form; the return is deliberately loose because each call site asks for a different shape.
   async evaluate(fn: unknown): Promise<unknown> {
     if (typeof fn !== "string") return undefined;
-    if (fn.includes("__blOverlayInstall")) {
+    // The names come FROM the module under test, not from a copy of it. They were four hand-typed
+    // literals, and renaming one in `overlay.ts` left the suite at 175/175 while this stub quietly
+    // stopped recognising that call and answered `undefined` — a fake that goes on passing after
+    // it has stopped faking the right thing.
+    if (fn.includes(OVERLAY_GLOBALS.install)) {
       return { marks: this.state.marks, layers: this.state.layers, staticPageAreas: this.state.staticPageAreas };
     }
-    if (fn.includes("__blOverlayReadback")) return this.state.violations;
-    if (fn.includes("__blOverlayDetach")) return this.state.detached;
-    if (fn.includes("__blOverlayRemove")) return 0;
+    if (fn.includes(OVERLAY_GLOBALS.readback)) return this.state.violations;
+    if (fn.includes(OVERLAY_GLOBALS.detach)) return this.state.detached;
+    if (fn.includes(OVERLAY_GLOBALS.remove)) return 0;
     return undefined;
   }
   async waitForFunction(): Promise<unknown> {
@@ -166,6 +171,32 @@ const MATCHING_TEXT = [
     { token: "BLSID001E", xMm: 20, yMm: 56 },
   ]),
 ];
+
+describe("the overlay's in-page contract", () => {
+  /**
+   * The four names the TypeScript side calls are the four names the injected script defines.
+   *
+   * There is no compiler between those two: one side is a constant, the other is a string a
+   * browser parses. Renaming one alone produces `window.<name> is not a function` at runtime, and
+   * before this test only the live suite could have noticed — which means only on a machine with
+   * Chrome, Paged.js, pdfjs and poppler all present.
+   *
+   * Red condition: rename any entry of `OVERLAY_GLOBALS` without renaming it inside
+   * `OVERLAY_SOURCE`, and this names the one that no longer exists.
+   */
+  it("every name the module calls is a name the injected script defines", () => {
+    const missing = Object.entries(OVERLAY_GLOBALS)
+      .filter(([, global]) => !OVERLAY_SOURCE.includes(`window.${global} =`))
+      .map(([role, global]) => `${role} -> window.${global}`);
+    assert.deepEqual(missing, [], `these are called but never defined in the page:\n${missing.join("\n")}`);
+    // And the reverse count, so a global can neither be added without a caller nor silently lost.
+    const defined = [...OVERLAY_SOURCE.matchAll(/window\.(__blOverlay[A-Za-z]*) =/gu)].map((m) => m[1]);
+    const uncalled = defined.filter(
+      (g) => g !== "__blOverlay" && g !== "__blOverlayReady" && !Object.values(OVERLAY_GLOBALS).includes(g as never),
+    );
+    assert.deepEqual(uncalled, [], `defined in the page but never called: ${uncalled.join(", ")}`);
+  });
+});
 
 describe("the evidence verdict", () => {
   let outDir: string;

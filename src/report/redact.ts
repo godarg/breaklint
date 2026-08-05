@@ -141,7 +141,18 @@ export function redactReport<T>(value: T): T {
   if (value !== null && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
-      out[redactPaths(key)] = redactReport(v);
+      // `defineProperty` rather than `out[key] =`, because an own key named `__proto__` is a
+      // SETTER on a plain object literal: the assignment would change the prototype and the key
+      // would silently vanish from the copy. Measured on the previous version:
+      // `redactReport(JSON.parse('{"__proto__":"/x/y","keep":1}'))` returned `["keep"]`.
+      // Not reachable from any current producer — every `measured` key in `src/` is a literal —
+      // but silent data loss in the function that copies the report is not a thing to leave in.
+      Object.defineProperty(out, redactPaths(key), {
+        value: redactReport(v),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
     }
     return out as unknown as T;
   }

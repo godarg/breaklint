@@ -27,6 +27,7 @@ import type { ConfigFile } from "../config/resolve.ts";
 import { render } from "../report/index.ts";
 import { parseArgs } from "./args.ts";
 import type { Snapshot } from "../core/types.ts";
+import { err, out } from "./out.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VERSION = readPackageVersion();
@@ -36,16 +37,16 @@ export async function main(argv: string[]): Promise<number> {
   try {
     args = parseArgs(argv);
   } catch (error) {
-    process.stderr.write(`breaklint: ${(error as Error).message}\n`);
+    err(`breaklint: ${(error as Error).message}\n`);
     return 2;
   }
 
   if (args.help) {
-    process.stdout.write(helpText());
+    out(helpText());
     return 0;
   }
   if (args.version) {
-    process.stdout.write(`${VERSION}\n`);
+    out(`${VERSION}\n`);
     return 0;
   }
 
@@ -54,7 +55,7 @@ export async function main(argv: string[]): Promise<number> {
     config = resolveConfig({ file: loadConfigFile(args.config), cli: args });
   } catch (error) {
     if (error instanceof UsageError) {
-      process.stderr.write(`breaklint: ${error.message}\n`);
+      err(`breaklint: ${error.message}\n`);
       return 2;
     }
     throw error;
@@ -76,7 +77,7 @@ export async function main(argv: string[]): Promise<number> {
     mode = "live";
     source = "rendered";
     if (args.paths.length === 0) {
-      process.stderr.write(
+      err(
         "breaklint: no input files given.\n" +
           "  usage: breaklint [options] <file.html> [more.html ...]\n" +
           "  try:   npx breaklint --demo\n",
@@ -87,7 +88,7 @@ export async function main(argv: string[]): Promise<number> {
       if (!existsSync(p)) {
         // A path that does not exist is a typo in the invocation, not a finding about a
         // document. Exit 2, and the message names the path rather than the count.
-        process.stderr.write(`breaklint: input not found: ${p}\n`);
+        err(`breaklint: input not found: ${p}\n`);
         return 2;
       }
     }
@@ -102,7 +103,7 @@ export async function main(argv: string[]): Promise<number> {
       locale: config.locale,
     });
     if (rendered.fatal) {
-      process.stderr.write(rendered.fatal.message + "\n");
+      err(rendered.fatal.message + "\n");
       return rendered.fatal.exitCode;
     }
     inputs = rendered.documents;
@@ -156,9 +157,9 @@ export async function main(argv: string[]): Promise<number> {
   if (args.outFile) {
     mkdirSync(dirname(resolvePath(args.outFile)), { recursive: true });
     writeFileSync(args.outFile, rendered);
-    process.stdout.write(`breaklint: ${config.format} report written to ${relative(process.cwd(), args.outFile)}\n`);
+    out(`breaklint: ${config.format} report written to ${relative(process.cwd(), args.outFile)}\n`);
   } else {
-    process.stdout.write(rendered);
+    out(rendered);
   }
   return report.exitCode;
 }
@@ -253,7 +254,7 @@ if (invokedDirectly) {
   main(process.argv.slice(2))
     .then((code) => process.exit(code))
     .catch((error: unknown) => {
-      process.stderr.write(`breaklint: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
+      err(`breaklint: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
       process.exit(3);
     });
 }

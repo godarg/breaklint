@@ -5,7 +5,12 @@ import { readFileSync } from "node:fs";
 import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import type { DocumentInput } from "../../src/core/engine.ts";
-import { INFRA_EVENT_KINDS, NON_FATAL_INFRA_EVENT_KINDS } from "../../src/core/enums.ts";
+import {
+  COVERAGE_FLOOR_BY_SEVERITY,
+  INFRA_EVENT_KINDS,
+  NON_FATAL_INFRA_EVENT_KINDS,
+  VERDICT_PRECEDENCE,
+} from "../../src/core/enums.ts";
 import type { FailOn } from "../../src/core/enums.ts";
 import { ALL_RULES, RULES_BY_ID } from "../../src/rules/index.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
@@ -305,6 +310,32 @@ const rows: Row[] = [
     build: () => run({ documents: [], failOn: "error" }),
   },
   {
+    id: "P10",
+    what: "a broken renderer on one document and a coverage gap on another — the renderer wins",
+    // The edge `infrastructure` > `insufficient-coverage`, which had NO row for ten rounds. The
+    // matrix carried rows for every OTHER pair, and `docs/status.md` said "every precedence edge".
+    // Measured: swapping the two entries in `VERDICT_PRECEDENCE` left 175/175, 15/15 mutants and
+    // selfcheck green, and this run answered 4 instead of 3 — sending a reader into the document
+    // while the renderer is what is broken, which is the exact misdirection the comment above
+    // `VERDICT_PRECEDENCE` says the ordering exists to prevent.
+    //
+    // Why no earlier row reached it: every existing multi-document row pairs a non-clean verdict
+    // with a CLEAN one, so only one non-clean verdict was ever in play and the ordering between
+    // two of them was never consulted.
+    exit: 3,
+    verdict: "infrastructure",
+    gate: null,
+    build: () =>
+      run({
+        documents: [
+          { name: "__empty__", infrastructure: [{ kind: "font-load-failed", detail: "@font-face 404", measured: null }] },
+          { name: "widow-clean-multicolumn", ruleIds: ["layout/widow"] },
+        ],
+        failOn: "error",
+        raisedFloors: { "layout/widow": 1 },
+      }),
+  },
+  {
     id: "P9",
     what: "usage beats everything: an invalid invocation was never validly configured",
     exit: 2,
@@ -441,19 +472,54 @@ describe("exit matrix", () => {
   // and the whole battery stayed green while `docs/status.md` went on saying 27. A floor cannot
   // make that claim. The literal can, and the contract's minimum is kept beside it so the reason
   // for the number does not disappear with it.
-  const EXPECTED_ROWS = 27;
+  const EXPECTED_ROWS = 28;
   const CONTRACT_MINIMUM = 21;
+
+  /**
+   * The precedence ORDER itself, as a literal.
+   *
+   * Every row below exercises the table through a scenario, and for ten rounds that left one pair
+   * untouched — a scenario can only test an edge if a run actually puts both verdicts in play, and
+   * none did for `infrastructure` against `insufficient-coverage`. Row P10 now does. This literal
+   * is the second, cheaper guard: it fails for ANY reordering, including one no scenario reaches.
+   *
+   * Both are needed. The literal alone would not show the order does anything; the scenarios alone
+   * leave whichever pair nobody thought to construct.
+   */
+  it("the precedence order is exactly the one the exit-code contract is written against", () => {
+    assert.deepEqual(
+      [...VERDICT_PRECEDENCE],
+      ["usage", "infrastructure", "insufficient-coverage", "findings", "clean"],
+      "reordering this table changes which exit code a mixed run reports",
+    );
+    // And the floor the `error` severity is documented to demand. Measured ungated: 1.0 -> 0.5
+    // left the whole battery green, because every floor-exercising row passes an explicit floor
+    // and so never reads the default.
+    assert.equal(COVERAGE_FLOOR_BY_SEVERITY.error, 1.0, "`error` is documented to demand full coverage");
+    assert.equal(COVERAGE_FLOOR_BY_SEVERITY.warn, 0.5);
+    assert.equal(COVERAGE_FLOOR_BY_SEVERITY.info, 0);
+  });
   it("has exactly the rows it says it has, and never fewer than the contract asks", () => {
     assert.equal(rows.length, EXPECTED_ROWS, "a row was added or removed; update this literal deliberately");
     assert.ok(EXPECTED_ROWS >= CONTRACT_MINIMUM, "the matrix has fallen below the contract's minimum");
     // Row ids must be unique, or two rows can collapse into one without the count moving. An
     // earlier audit found duplicate ids (P5, P6) in this table.
     assert.equal(new Set(rows.map((r) => r.id)).size, rows.length, "duplicate row id");
-    // And the number as `docs/status.md` prints it, matched WHOLE for the same reason the demo
-    // row is: a substring match passes inside a sentence that says the opposite.
+    // And the row as `docs/status.md` prints it, matched WHOLE.
+    //
+    // This comment said "matched WHOLE" for one round while the code below it was a substring
+    // match — the repair had been applied to the demo row and the comment here was updated to
+    // describe a fix that was never made here. Measured: the row was replaced with
+    // "27 rows over all five exit codes, NONE of which is executed; the row assertions were
+    // removed and the exit codes are not checked" and the battery stayed at 175/175.
     const status = readFileSync(new URL("../../docs/status.md", import.meta.url), "utf8");
     const row = status.split("\n").find((l) => l.startsWith("| Exit matrix |"));
-    assert.ok(row?.includes(`| ${rows.length} rows over all five exit codes,`), `docs/status.md row: ${row}`);
+    assert.equal(
+      row,
+      `| Exit matrix | ${rows.length} rows over all five exit codes, all nine \`failOn\` rows and every ` +
+        "precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |",
+      "the docs/status.md row for the exit matrix does not match what the matrix is",
+    );
   });
 
   for (const row of rows) {

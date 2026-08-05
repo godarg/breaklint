@@ -42,7 +42,7 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { launchBrowser, resolvePackageRoot, type BrowserLike } from "../../src/acquire/browser.ts";
+import { launchBrowser, resolveBrowser, resolvePackageRoot, type BrowserLike } from "../../src/acquire/browser.ts";
 import { produceEvidence, REFERENCE_CORPUS_MAX_ABS_MM, type EvidenceOutcome } from "../../src/render/evidence.ts";
 import { openRasterizer, readPngHeader, type Rasterizer } from "../../src/render/rasterizer.ts";
 import { comparePng, decodePng, inkPixels } from "../tools/png.ts";
@@ -223,11 +223,18 @@ const hasPoppler = (() => {
 // The env var is checked for what it POINTS AT, not for being set. Reading it as "a browser is
 // available" made `BREAKLINT_CHROME=/nonexistent` a green prerequisite — the variable answered a
 // question about itself instead of about the machine.
-const chromeAvailable = process.env.BREAKLINT_CHROME
-  ? existsSync(process.env.BREAKLINT_CHROME)
-  : existsSync("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome") ||
-    existsSync("/usr/bin/google-chrome") ||
-    existsSync("/usr/bin/chromium");
+// and it is answered by the PRODUCTION resolver, called — not by a reimplementation of it.
+//
+// This used to be a hand-copy, and it had already diverged in two ways at once. It listed three
+// candidate paths where `resolveBrowser()` lists six (it did not know `Chromium.app`,
+// `google-chrome-stable` or `chromium-browser`), and it treated `BREAKLINT_CHROME` as EXCLUSIVE
+// while production treats it as the first candidate and falls through when it does not exist.
+// Measured: with `BREAKLINT_CHROME=/nonexistent/chrome` this gate announced `cannot run without:
+// a browser` and failed the run — while `before()` two lines later launched the real Chrome
+// through `launchBrowser()` and all sixteen measurements completed. The gate on which
+// `docs/status.md` rests every live claim was answering a different question from the suite it
+// guards. A false FAIL rather than a false green, which is the safe direction, and still wrong.
+const chromeAvailable = resolveBrowser().path !== null;
 const pagedjsRoot = resolvePackageRoot("pagedjs", REPO);
 const pdfjsPresent = resolvePackageRoot("pdfjs-dist", REPO) !== null;
 const optional = process.env.BREAKLINT_LIVE_OPTIONAL === "1";

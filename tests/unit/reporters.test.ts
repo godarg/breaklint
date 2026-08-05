@@ -9,7 +9,7 @@ import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
 import { render } from "../../src/report/index.ts";
-import { redactPaths } from "../../src/report/redact.ts";
+import { redactPaths, redactReport } from "../../src/report/redact.ts";
 import { infraLines, MAX_DETAIL_CHARS, MAX_VALUE_CHARS } from "../../src/report/infra.ts";
 import { divergenceDetail } from "../../src/render/evidence.ts";
 import { LABELS } from "../../src/report/mandatory.ts";
@@ -333,6 +333,65 @@ describe("output formats", () => {
     for (const [label, fakeHome] of Object.entries(homes)) {
       assertHomeIsRedacted(label, fakeHome, account);
     }
+  });
+
+  /**
+   * A home directory used as an object KEY.
+   *
+   * `redactReport` redacts keys as well as values, and that line was ungated: removing it left the
+   * whole battery green while a probe leaked the account name in all six formats. No producer in
+   * `src/` builds a `measured` key from anything but a literal today, so this is a forward-looking
+   * guard — but an unmeasured guard is a comment, and this file has already had to withdraw one
+   * claim of that kind.
+   *
+   * Red condition: write the key through unredacted in `redactReport` and every format fails.
+   */
+  it("a home directory used as a key is redacted too", () => {
+    const account = "zqjvax5150";
+    const fakeHome = `/tmp/bl-key-${account}`;
+    const realHome = process.env.HOME;
+    try {
+      process.env.HOME = fakeHome;
+      const outcome = runDocument(
+        {
+          path: "doc.html",
+          snapshot: null,
+          infrastructure: [
+            {
+              kind: "checker-crashed",
+              detail: "probe",
+              // The key carries the path, the value does not.
+              measured: { [`${fakeHome}/keyed`]: 1, stage: "measure" },
+            },
+          ],
+        },
+        { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+      );
+      const leaky = buildReport({
+        outcomes: [outcome], mode: "live", source: "rendered", toolVersion: "0.1.0", commit: null,
+        startedAt: new Date(0).toISOString(), durationMs: 0, rulesRun: 0, failOn: "error",
+        environment: report.environment, config: report.config,
+      });
+      for (const format of OUTPUT_FORMATS) {
+        assert.ok(!render(leaky, format).includes(account), `${format} leaked an account name in a KEY`);
+      }
+    } finally {
+      if (realHome === undefined) delete process.env.HOME;
+      else process.env.HOME = realHome;
+    }
+  });
+
+  /**
+   * The copy must not lose an own key called `__proto__`. On a plain object literal that name is a
+   * setter, so `out[key] = value` changes the prototype and drops the entry.
+   *
+   * Red condition: go back to `out[key] = …` and the key vanishes from the copy.
+   */
+  it("redactReport copies an own __proto__ key instead of swallowing it", () => {
+    const source = JSON.parse('{"__proto__": "/x/y", "keep": 1}') as Record<string, unknown>;
+    const copy = redactReport(source);
+    assert.deepEqual(Object.keys(copy).sort(), ["__proto__", "keep"]);
+    assert.equal(Object.getPrototypeOf(copy), Object.prototype, "the prototype must not have moved");
   });
 
   /**
