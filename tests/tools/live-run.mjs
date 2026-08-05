@@ -14,7 +14,17 @@ if (partial && existsSync(partial)) rmSync(partial);
 
 const child = spawn(
   process.execPath,
-  ["--test", "--test-timeout", "600000", "--experimental-strip-types", "tests/live/evidence.test.ts"],
+  [
+    "--test",
+    "--test-timeout",
+    "600000",
+    "--experimental-strip-types",
+    // Named individually rather than globbed. A glob that matched nothing would run zero files,
+    // exit 0, and leave no suite to report a missing prerequisite — the same green-over-nothing
+    // shape the promotion check below exists to stop, one level further out.
+    "tests/live/evidence.test.ts",
+    "tests/live/measure.test.ts",
+  ],
   { stdio: "inherit" },
 );
 child.on("exit", (code) => {
