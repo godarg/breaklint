@@ -14,7 +14,7 @@ stated here rather than left to be inferred from a passing test suite.
 | Exit matrix | 27 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
-| `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 8 findings across 8 rules |
+| `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 8 findings across 7 rules |
 
 ## Finished and verified against a real browser
 
@@ -22,6 +22,14 @@ The evidence path — rasteriser, overlay, binding — runs against real Chrome,
 real `pdfjs-dist`. `npm run test:live` needs all four prerequisites including poppler's
 `pdftoppm`, and a missing one FAILS the suite rather than skipping it: a suite that goes green by
 running nothing makes every claim on this page look checked.
+
+There is one way to turn that failure back into a skip, and it is written here rather than only in
+the test file, because a property stated without its exception is a property overstated.
+`BREAKLINT_LIVE_OPTIONAL=1` downgrades the missing prerequisite to a skip — and the run then exits
+**0** with sixteen cases skipped. No measurement report is promoted and the reason is printed, but
+the exit code is what a release gate reads, so the variable belongs to a local run on a machine
+without poppler and nowhere else. Measured both ways: without it, exit 1 and `no measurement report
+was written`; with it, exit 0, one pass, sixteen skipped.
 
 | | |
 |---|---|
@@ -35,10 +43,17 @@ running nothing makes every claim on this page look checked.
 | Own nodes only | layers and marks are held as references; nothing is found again by class name |
 | Evidence files | one PNG per page; the header is read back out of the bytes and checked against the size the rasteriser reported. A page that fails that check withdraws the bindings of the whole document. |
 
-**Measured over eight documents, two runs, one differing value.** The measurement report has 219
-leaf values, counting every scalar and every empty object or array as one leaf; exactly one of
-them differs between the runs, and it is a wall-clock time (124 ms against 120 ms). Nothing else
-moved, and no path appears in one run and not the other.
+**Measured over eight documents, two runs.** The measurement report has 219 leaf values, counting
+every scalar and every empty object or array as one leaf, and no path appears in one run and not
+the other.
+
+The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
+flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (124 ms against
+120 ms). A later pair of runs differed in two, because Chrome updated itself between them and
+`browserVersion` is in the report — which is the report doing its job. What the tool actually gates
+is SHAPE: `tests/tools/leaves.mjs` exits non-zero when a path appears in one run and not the other,
+and zero when only values move. A differing value can be a fact about the environment; a missing
+field cannot.
 
 The count is not a number to be taken on trust — an audit established that the figure previously
 stated here, 209, was not reachable under any plausible counting rule, and nothing in the

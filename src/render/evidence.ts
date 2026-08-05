@@ -125,6 +125,29 @@ const MIN_PAIRS_FOR_DIVERGENCE = 3;
 export const MAX_REFERENCE_DY_MM = 1.0;
 
 /**
+ * The `render-unstable` sentence, as one exported function.
+ *
+ * Exported for one reason: the test that proves this text is capped in the reporters used to carry
+ * a hand-written COPY of it. The copy was accurate, and being accurate is not the property that
+ * matters — a copy does not follow the original. The round before that, the same test used an
+ * 18-character stub against a producer that emits ~490 characters for the fifty-page scenario the
+ * test names, so it measured 185 against a 400-character threshold and could not fail.
+ *
+ * The wording states what was measured per page rather than a summary that holds for some pages and
+ * not others. An earlier version said "every mark was refound", which the trigger does not require:
+ * a page needs only enough uniquely refound pairs to carry a reference, so 2 of 20 marks refound
+ * produced a fatal event claiming all 20 were.
+ */
+export function divergenceDetail(pages: readonly number[]): string {
+  return (
+    `dom-pdf-divergence on page(s) ${pages.join(", ")}: the PDF does not reproduce the ` +
+    "geometry the rules measured. Per page below, `refound` of `placed` marks were located " +
+    "uniquely in the text stream, and `reason` says whether those marks scattered around " +
+    "their own reference or agreed on a reference that is itself displaced."
+  );
+}
+
+/**
  * The largest absolute reference measured over the live corpus, in millimetres.
  * Measured 2026-08-04 over eight documents; the three that bind report 0.0909, 0.0909 and 0.0496.
  */
@@ -388,15 +411,7 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
       const pages = [...conformance.byPage].filter(([, c]) => c.divergent).map(([n]) => n);
       infrastructure.push({
         kind: "render-unstable",
-        // The message states what was measured per page rather than a summary that holds for some
-        // pages and not others. An earlier wording said "every mark was refound", which the
-        // trigger does not require: a page needs only enough uniquely refound pairs to carry a
-        // reference, so 2 of 20 marks refound produced a fatal event claiming all 20 were.
-        detail:
-          `dom-pdf-divergence on page(s) ${pages.join(", ")}: the PDF does not reproduce the ` +
-          "geometry the rules measured. Per page below, `refound` of `placed` marks were located " +
-          "uniquely in the text stream, and `reason` says whether those marks scattered around " +
-          "their own reference or agreed on a reference that is itself displaced.",
+        detail: divergenceDetail(pages),
         measured: {
           divergentPages: conformance.divergentPages,
           pages,

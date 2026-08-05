@@ -9,7 +9,9 @@ import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
 import { render } from "../../src/report/index.ts";
-import { hasAbsoluteUserPath, redactPaths } from "../../src/report/redact.ts";
+import { redactPaths } from "../../src/report/redact.ts";
+import { infraLines, MAX_DETAIL_CHARS, MAX_VALUE_CHARS } from "../../src/report/infra.ts";
+import { divergenceDetail } from "../../src/render/evidence.ts";
 import { LABELS } from "../../src/report/mandatory.ts";
 import type { Report, Snapshot } from "../../src/core/types.ts";
 
@@ -241,10 +243,201 @@ describe("output formats", () => {
     });
     for (const format of OUTPUT_FORMATS) {
       const text = render(leaky, format);
-      assert.ok(!hasAbsoluteUserPath(text), `${format} leaked this machine's home directory`);
+      // One assertion, and its truth does not come from `redact.ts`. There used to be a second one
+      // above this line calling `hasAbsoluteUserPath`, a helper that re-implemented the redaction's
+      // own matching rule — so the check asked the redaction its own question and could only agree
+      // with it. An audit reverted that helper to an earlier, disagreeing version and the suite
+      // stayed 170/170, because this fixture contains none of the strings the two versions differ
+      // on. The helper had no caller in `src/` at all. It is deleted rather than gated: a checker
+      // whose only consumer is the assertion it cannot fail is not a gate.
       assert.ok(!text.includes(homedir()), `${format} contains the literal home directory`);
       // and the redaction marker is there, so the case is not passing because nothing was emitted
       assert.match(text, /~/u, `${format} shows no redaction marker — did the payload reach it at all?`);
+    }
+  });
+
+  /**
+   * The demo's own numbers, so `docs/status.md` cannot state them wrong again.
+   *
+   * That file said "8 findings across 8 rules". Measured from the product's own output: eight
+   * findings across SEVEN rules — `layout/half-empty-page` fires twice. Nothing in the repository
+   * computed either number, which is precisely how the earlier "209 leaf values" survived: a
+   * figure in the file designated as the truth source, arrived at by counting once, by hand.
+   *
+   * Red condition: change either number here, or change the demo fixture so the counts move, and
+   * this fails with both values named.
+   */
+  it("the demo produces the counts docs/status.md states", () => {
+    const demo = demoReport();
+    const ruleIds = new Set(demo.findings.map((f) => f.ruleId));
+    assert.equal(demo.findings.length, 8, "findings in the demo");
+    assert.equal(ruleIds.size, 7, "distinct rules in the demo");
+    assert.equal(demo.exitCode, 1, "the demo must end 1 — a demo that ends 0 shows no finding");
+    // The doc sentence itself, so a reader of that file and this test cannot drift apart.
+    const status = readFileSync(new URL("../../docs/status.md", import.meta.url), "utf8");
+    assert.ok(
+      status.includes(`exit 1, ${demo.findings.length} findings across ${ruleIds.size} rules`),
+      "docs/status.md states demo counts that the demo does not produce",
+    );
+  });
+
+  /**
+   * A home directory the serialiser has to escape.
+   *
+   * The redaction runs at `render()`, on text a reporter has already produced. For `json` and
+   * `sarif` that text came out of `JSON.stringify`, so a backslash in the home directory arrives
+   * doubled and a search for the raw spelling finds nothing. Measured before the fix, with
+   * `HOME=/tmp/…\<account>`: `json` and `sarif` carried the account name in full while every check
+   * reported clean, because the checks were searching for a string that no longer occurred.
+   *
+   * The oracle here is a literal this test chose. It is not `homedir()` and not anything from
+   * `redact.ts` — both of those are blind in exactly the way the defect is, which is why the defect
+   * survived a round.
+   *
+   * Red condition: drop the serialised spelling from `needles()` in `redact.ts` and `json` and
+   * `sarif` fail on the account token.
+   */
+  it("a home directory that JSON escapes is still redacted in every format", () => {
+    const account = "acct7391unlikely";
+    const fakeHome = `/tmp/bl-home\\${account}`;
+    const realHome = process.env.HOME;
+    try {
+      process.env.HOME = fakeHome;
+      assert.equal(homedir(), fakeHome, "premise: os.homedir() follows $HOME at call time");
+      assert.notEqual(
+        JSON.stringify(fakeHome).slice(1, -1),
+        fakeHome,
+        "premise: this home has a spelling the serialiser changes — otherwise the case is vacuous",
+      );
+
+      const outcome = runDocument(
+        {
+          path: "doc.html",
+          snapshot: null,
+          infrastructure: [
+            {
+              kind: "checker-crashed",
+              detail: "the probe is not wired to a browser in this build.",
+              measured: { stage: "measure", browser: `${fakeHome}/.cache/puppeteer/chrome` },
+            },
+          ],
+        },
+        { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+      );
+      const leaky = buildReport({
+        outcomes: [outcome],
+        mode: "live",
+        source: "rendered",
+        toolVersion: "0.1.0",
+        commit: null,
+        startedAt: new Date(0).toISOString(),
+        durationMs: 0,
+        rulesRun: 0,
+        failOn: "error",
+        environment: { ...report.environment, rendererPath: `${fakeHome}/bin/chrome` },
+        config: report.config,
+      });
+      for (const format of OUTPUT_FORMATS) {
+        const text = render(leaky, format);
+        assert.ok(!text.includes(account), `${format} leaked the account name of an escaped home`);
+        assert.match(text, /~/u, `${format} shows no redaction marker — did the payload reach it?`);
+      }
+    } finally {
+      if (realHome === undefined) delete process.env.HOME;
+      else process.env.HOME = realHome;
+    }
+  });
+
+  /**
+   * The two caps, pinned by literal and measured on both sides of each boundary.
+   *
+   * Both constants have been wrong in a way a suite could not see. `MAX_VALUE_CHARS` was
+   * unreachable for a round — `renderValue` cut at the longer `detail` limit first, so nothing
+   * could still exceed 160 when the comparison ran, and the constant could be raised to 10 000
+   * with everything green. `MAX_DETAIL_CHARS` was gated only indirectly, through a downstream
+   * `longest < 400` assertion, so it could be raised from 220 to 340 unnoticed.
+   *
+   * Red condition: change either literal and the first two assertions fail; change the behaviour
+   * without the literal and the boundary pairs below fail.
+   */
+  it("both caps are pinned by literal and fire at their own boundary", () => {
+    assert.equal(MAX_DETAIL_CHARS, 220);
+    assert.equal(MAX_VALUE_CHARS, 160);
+
+    const lineFor = (detail: string, measured: Record<string, unknown>): { detail: string; measured: string[] } => {
+      const outcome = runDocument(
+        { path: "doc.html", snapshot: null, infrastructure: [{ kind: "checker-crashed", detail, measured }] },
+        { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+      );
+      const built = buildReport({
+        outcomes: [outcome], mode: "live", source: "rendered", toolVersion: "0.1.0", commit: null,
+        startedAt: new Date(0).toISOString(), durationMs: 0, rulesRun: 0, failOn: "error",
+        environment: report.environment, config: report.config,
+      });
+      return infraLines(built)[0]!;
+    };
+
+    // `detail`, one character under and one character over.
+    assert.equal(lineFor("d".repeat(MAX_DETAIL_CHARS), {}).detail.length, MAX_DETAIL_CHARS);
+    // The cut point itself, pinned from both sides. Asserting on total LENGTH does not work and
+    // the first version of this test did exactly that: the disclosure suffix makes a cut string
+    // LONGER than the limit, so `length < limit + 1` fails on correct output. It measured the
+    // wrong property and went red on a working cap.
+    const overDetail = lineFor("d".repeat(MAX_DETAIL_CHARS + 1), {}).detail;
+    assert.ok(overDetail.startsWith("d".repeat(MAX_DETAIL_CHARS)), "the cut must keep exactly the limit");
+    assert.ok(!overDetail.startsWith("d".repeat(MAX_DETAIL_CHARS + 1)), "the cut must not keep more");
+    assert.match(overDetail, /… \(221 chars\)$/u, "the cut must disclose the original length");
+
+    // A value inside `measured`, one under and one over ITS limit — which is below the detail cap,
+    // so a value cut at the detail limit would pass the first of these and fail the second.
+    assert.equal(lineFor("x", { v: "v".repeat(MAX_VALUE_CHARS) }).measured[0]!.length, MAX_VALUE_CHARS + 2);
+    const overValue = lineFor("x", { v: "v".repeat(MAX_VALUE_CHARS + 1) }).measured[0]!;
+    assert.match(overValue, /… \(161 chars\)$/u, "a long value must be cut at its own limit, with its length");
+
+    // The producer's own payload, imported rather than transcribed. A hand-written copy was
+    // accurate and still wrong as a method: it does not follow a change to the original.
+    const real = divergenceDetail(Array.from({ length: 50 }, (_, i) => i + 1));
+    assert.ok(real.length > MAX_DETAIL_CHARS, `the real producer must exceed the cap, got ${real.length}`);
+    assert.match(lineFor(real, {}).detail, /… \(\d+ chars\)$/u);
+
+    // A cut that lands on a surrogate pair must not leave half of one behind.
+    const astral = `${"a".repeat(MAX_DETAIL_CHARS - 1)}\u{1F600}tail`;
+    const cutAstral = lineFor(astral, {}).detail;
+    assert.equal(cutAstral.match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/gu)?.length ?? 0, 0, "no lone surrogate");
+  });
+
+  /**
+   * Which formats the cap governs — both halves, because the claim was once made too widely.
+   *
+   * "capped in all six reporters" was stated and is false: `renderJson` serialises the report
+   * itself and never passes through `infraLines`, so the JSON carries `detail` at full length.
+   * That is the intended design — the JSON is canonical and the other five are lossy projections
+   * of it — but an unstated exception in a claim about six things is a claim about five.
+   *
+   * Red condition: cap `detail` inside the report before serialisation and the first assertion
+   * fails; stop capping in `infraLines` and the second fails for the five projections.
+   */
+  it("the cap governs the five projections and deliberately not the canonical JSON", () => {
+    const long = divergenceDetail(Array.from({ length: 50 }, (_, i) => i + 1));
+    assert.ok(long.length > MAX_DETAIL_CHARS, "premise: the producer's payload exceeds the cap");
+    const outcome = runDocument(
+      { path: "doc.html", snapshot: null, infrastructure: [{ kind: "render-unstable", detail: long, measured: null }] },
+      { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+    );
+    const built = buildReport({
+      outcomes: [outcome], mode: "live", source: "rendered", toolVersion: "0.1.0", commit: null,
+      startedAt: new Date(0).toISOString(), durationMs: 0, rulesRun: 0, failOn: "error",
+      environment: report.environment, config: report.config,
+    });
+
+    // Canonical: the whole sentence survives, so nothing is lost from the record of record.
+    assert.ok(render(built, "json").includes(long), "the JSON must keep the full detail");
+
+    // Projections: the full sentence must NOT appear, and the disclosure must.
+    for (const format of OUTPUT_FORMATS.filter((f) => f !== "json")) {
+      const text = render(built, format);
+      assert.ok(!text.includes(long), `${format} carries the uncapped detail`);
+      assert.match(text, /… \(\d+ chars\)/u, `${format} shows no length disclosure`);
     }
   });
 

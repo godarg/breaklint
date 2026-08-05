@@ -248,9 +248,24 @@ if (invokedDirectly) {
       console.log(`${line}  (fixture ${r.triggerFixture})`);
     }
   }
-  console.log(
-    `\n${reports.filter((r) => r.survived.length === 0 && r.triggerFixture).length}/${reports.length} rules ` +
-      `killed every mutant on a fixture that actually triggers them.`,
-  );
+  // The denominator is a LITERAL, not `reports.length`.
+  //
+  // It used to be `reports.length`, which is derived from `ALL_RULES` — the list under test. An
+  // audit deleted a rule from that list and this guard printed "14/14 rules killed every mutant"
+  // and exited 0: the headline moved with the thing it was reporting on. That is the same oracle
+  // drift this guard exists to catch, in the guard itself. The scenario was caught elsewhere, by
+  // the false-alarm corpus in `npm test` — but a guard whose own summary line cannot notice a
+  // missing rule should not be the thing anyone reads to decide the rules are covered.
+  const EXPECTED_RULE_COUNT = 15;
+  const clean = reports.filter((r) => r.survived.length === 0 && r.triggerFixture).length;
+  console.log(`\n${clean}/${EXPECTED_RULE_COUNT} rules killed every mutant on a fixture that actually triggers them.`);
+  if (reports.length !== EXPECTED_RULE_COUNT) {
+    failed = true;
+    console.log(
+      `RULE SET CHANGED: the guard ran over ${reports.length} rules and this file expects ` +
+        `${EXPECTED_RULE_COUNT}. Either a rule was added and this number needs raising, or a rule ` +
+        `vanished and the guard was about to report full coverage of a smaller set.`,
+    );
+  }
   process.exit(failed ? 1 : 0);
 }

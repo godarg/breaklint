@@ -17,6 +17,14 @@
  * `JSON.stringify` line, and a `render-unstable` over fifty divergent pages produced a single
  * 7 488-character line. `measured` grows with the document, so a book-length divergence yields a
  * five-figure line that no terminal and no reader can use.
+ *
+ * WHERE THE CAPS APPLY, stated because it was once claimed too widely. Five of the six formats
+ * project through this module and are capped. `json` does not: `renderJson` serialises the report
+ * itself, so it carries `detail` and `measured` at full length. That is deliberate — the JSON is
+ * the canonical format and every other one is a lossy projection of it, and a truncated canonical
+ * record would be a record that lost the thing a reader went to it for. The claim "capped in all
+ * six reporters" was made once and is withdrawn; the property is five of six, by design, and the
+ * test pins both halves.
  */
 
 import type { DocumentReport, InfraEvent, Report } from "../core/types.ts";
@@ -31,9 +39,17 @@ export interface InfraLine {
 }
 
 /** Beyond this many entries a collection is summarised. A reader cannot use fifty rows inline. */
-const MAX_COLLECTION_ENTRIES = 3;
-/** Beyond this many characters a single value is truncated. */
-const MAX_VALUE_CHARS = 160;
+export const MAX_COLLECTION_ENTRIES = 3;
+/**
+ * Beyond this many characters a single value inside `measured` is truncated.
+ *
+ * This constant was unreachable for one round. `renderValue` called `oneLine` first, which caps at
+ * `MAX_DETAIL_CHARS`, so nothing could still exceed 160 by the time the comparison ran — the
+ * constant could be raised to 10 000 with the whole suite green, and the truncation it names never
+ * fired. The flattening and the capping are separate operations now, and each cap is applied once
+ * at its own limit.
+ */
+export const MAX_VALUE_CHARS = 160;
 /**
  * Beyond this many characters `detail` is truncated.
  *
@@ -44,7 +60,7 @@ const MAX_VALUE_CHARS = 160;
  * supposed to prove it used an 18-character stub, so it measured 185 and passed a 400-character
  * threshold that the real payload violates.
  */
-const MAX_DETAIL_CHARS = 220;
+export const MAX_DETAIL_CHARS = 220;
 
 /**
  * Make a string safe to place on one line of any of the six formats.
@@ -57,10 +73,32 @@ const MAX_DETAIL_CHARS = 220;
  * covers only `& < > "`. Measured: a U+0007 in `detail` made `xmllint --noout` reject the report
  * as not well-formed. They are replaced rather than escaped, because no reader wants them.
  */
-function oneLine(text: string): string {
+function flatten(text: string): string {
   // eslint-disable-next-line no-control-regex -- the point is to remove exactly these
   const flattened = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/gu, " ").replace(/[\r\n]+/gu, " ");
-  return flattened.length > MAX_DETAIL_CHARS ? `${flattened.slice(0, MAX_DETAIL_CHARS)}… (${flattened.length} chars)` : flattened;
+  return flattened;
+}
+
+/**
+ * Cut to `limit`, and say how long the original was.
+ *
+ * The length disclosure is the point of the cut rather than decoration: a bare ellipsis tells a
+ * reader that something was removed and not whether it was ten characters or ten thousand. The
+ * previous version applied two caps in sequence and the second one sliced the first one's
+ * disclosure back off, so a long value ended in an ellipsis with no size attached.
+ *
+ * The cut never falls inside a surrogate pair. Measured before this: 219 ASCII characters followed
+ * by U+1F600 left one lone surrogate, which Node writes out as U+FFFD — mojibake in the last
+ * character of any truncated value that happens to end on an astral character.
+ */
+function cap(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  const end = /[\uD800-\uDBFF]/u.test(text[limit - 1] ?? "") ? limit - 1 : limit;
+  return `${text.slice(0, end)}… (${text.length} chars)`;
+}
+
+function oneLine(text: string): string {
+  return cap(flatten(text), MAX_DETAIL_CHARS);
 }
 
 function renderValue(value: unknown): string {
@@ -79,8 +117,10 @@ function renderValue(value: unknown): string {
     if (entries.length > MAX_COLLECTION_ENTRIES) return `{${entries.length} fields}`;
     return `{${entries.map(([k, v]) => `${k}=${renderValue(v)}`).join(" ")}}`;
   }
-  const text = oneLine(String(value));
-  return text.length > MAX_VALUE_CHARS ? `${text.slice(0, MAX_VALUE_CHARS)}…` : text;
+  // Flatten first, then cut once at THIS limit. Calling `oneLine` here applied the longer
+  // `detail` cap before the shorter value cap could be reached, which made `MAX_VALUE_CHARS`
+  // unreachable and threw away the length disclosure the first cut had added.
+  return cap(flatten(String(value)), MAX_VALUE_CHARS);
 }
 
 export function infraLines(report: Report): InfraLine[] {

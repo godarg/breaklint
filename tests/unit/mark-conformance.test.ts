@@ -14,7 +14,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { CONFORMANCE_TOLERANCE_MM, MAX_REFERENCE_DY_MM, matchMarks } from "../../src/render/evidence.ts";
+import {
+  CONFORMANCE_TOLERANCE_MM,
+  MAX_REFERENCE_DY_MM,
+  REFERENCE_CORPUS_MAX_ABS_MM,
+  matchMarks,
+} from "../../src/render/evidence.ts";
 import type { PlacedMark } from "../../src/render/overlay.ts";
 import type { PdfTextPage } from "../../src/render/rasterizer.ts";
 
@@ -348,6 +353,17 @@ describe("matchMarks", () => {
    */
   it("the reference bound is 1.0 mm, and the number is pinned rather than implied", () => {
     assert.equal(MAX_REFERENCE_DY_MM, 1.0);
+    // The measured corpus maximum the bound stands against. It had no literal for a round: it is
+    // consumed only as a CEILING in the live suite (`|referenceDyMm| <= REFERENCE_CORPUS_MAX_ABS_MM`),
+    // so raising it can only loosen, and an audit moved it from 0.0909 to 9.9 with everything green.
+    // The claim it carries — "the live suite fails if the corpus ever exceeds this, so the headroom
+    // cannot erode unnoticed" — rested on a number nothing pinned. It does now.
+    assert.equal(REFERENCE_CORPUS_MAX_ABS_MM, 0.0909);
+    // And the relation itself, so the pair cannot drift into meaninglessness together.
+    assert.ok(
+      REFERENCE_CORPUS_MAX_ABS_MM < MAX_REFERENCE_DY_MM,
+      "the bound must sit above the measured corpus maximum, or it has no headroom to speak of",
+    );
   });
 
   it("a uniform displacement just INSIDE the bound still binds — the gate is not merely 'large'", () => {
