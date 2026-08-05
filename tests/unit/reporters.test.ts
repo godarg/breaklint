@@ -146,7 +146,10 @@ describe("output formats", () => {
         infrastructure: [
           {
             kind: "render-unstable",
-            detail: "dom-pdf-divergence on page(s) 2: the PDF does not reproduce the geometry the rules measured.",
+            // The producer, called. This test is about the console naming the kind and the reason,
+            // not about length — but a shortened hand-copy of a production sentence is still a copy
+            // that does not follow the original, and this was the last one in the repo.
+            detail: divergenceDetail([2]),
             measured: { divergentPages: 1 },
           },
         ],
@@ -273,11 +276,18 @@ describe("output formats", () => {
     assert.equal(demo.findings.length, 8, "findings in the demo");
     assert.equal(ruleIds.size, 7, "distinct rules in the demo");
     assert.equal(demo.exitCode, 1, "the demo must end 1 — a demo that ends 0 shows no finding");
-    // The doc sentence itself, so a reader of that file and this test cannot drift apart.
+    // The doc row itself, matched WHOLE. A substring match is not enough and was measured not
+    // enough: an audit replaced the row with "NOT VERIFIED: the demo does not run at all, and never
+    // produced exit 1, 8 findings across 7 rules" and the assertion still passed, because the
+    // phrase it looked for was still in there — inside a sentence saying the opposite. Whole-line
+    // equality is brittle by design: any rewording of this row is meant to come back here.
     const status = readFileSync(new URL("../../docs/status.md", import.meta.url), "utf8");
-    assert.ok(
-      status.includes(`exit 1, ${demo.findings.length} findings across ${ruleIds.size} rules`),
-      "docs/status.md states demo counts that the demo does not produce",
+    const row = status.split("\n").find((l) => l.includes("`npx breaklint --demo`"));
+    assert.equal(
+      row,
+      "| `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, " +
+        `${demo.findings.length} findings across ${ruleIds.size} rules |`,
+      "the docs/status.md row for --demo does not match what the demo produces",
     );
   });
 
@@ -297,18 +307,55 @@ describe("output formats", () => {
    * Red condition: drop the serialised spelling from `needles()` in `redact.ts` and `json` and
    * `sarif` fail on the account token.
    */
-  it("a home directory that JSON escapes is still redacted in every format", () => {
-    const account = "acct7391unlikely";
-    const fakeHome = `/tmp/bl-home\\${account}`;
+  it("a home a reporter has to transform is still redacted in every format", () => {
+    // Distinctive on purpose: the assertion below also checks a short PREFIX of this token, so it
+    // must be a string no report can contain by accident.
+    const account = "zqjvax7391";
+    // Every character class a reporter transforms on its way to text. The first version of this
+    // test carried only the backslash, because a backslash was the one an audit had just shown me
+    // — and the repair it gated generalised over `JSON.stringify` instead of over the property.
+    // A later audit produced the other four in a single probe and the account name appeared in
+    // full in five of six formats. The transformers, measured:
+    //   \  json, sarif via JSON.stringify      &  <  >  "  html, junit via XML escaping
+    //   |  markdown                            \n every format, via flatten() in infra.ts
+    // The cut a length cap makes through the middle of a path is the same class again, and it is
+    // covered by the padding case at the end.
+    const homes: Record<string, string> = {
+      backslash: `/tmp/bl-home\\${account}`,
+      ampersand: `/tmp/bl-home&${account}`,
+      lessThan: `/tmp/bl-home<${account}`,
+      greaterThan: `/tmp/bl-home>${account}`,
+      quote: `/tmp/bl-home"${account}`,
+      pipe: `/tmp/bl-home|${account}`,
+      newline: `/tmp/bl-home\n${account}`,
+      plain: `/tmp/bl-home-${account}`,
+    };
+    for (const [label, fakeHome] of Object.entries(homes)) {
+      assertHomeIsRedacted(label, fakeHome, account);
+    }
+  });
+
+  /**
+   * The cap used to run before the redaction, so a cut landing inside the home left a PREFIX of
+   * the account name that no search for the whole path could find. Measured with
+   * `HOME=/Users/annabelle9x`: `xx/Users/annabell… (234 chars)`.
+   *
+   * Red condition: redact after capping instead of before, and the padded cases fail.
+   */
+  it("a length cap cannot cut a home path in half and leave the account name showing", () => {
+    const account = "zqjvaxbelle9x";
+    const fakeHome = `/Users/${account}`;
+    // Sweep the cut across the whole path, so no single lucky offset can carry the case.
+    for (let pad = MAX_DETAIL_CHARS - fakeHome.length - 2; pad <= MAX_DETAIL_CHARS + 2; pad += 1) {
+      assertHomeIsRedacted(`pad=${pad}`, fakeHome, account, "x".repeat(Math.max(pad, 0)));
+    }
+  });
+
+  function assertHomeIsRedacted(label: string, fakeHome: string, account: string, pad = ""): void {
     const realHome = process.env.HOME;
     try {
       process.env.HOME = fakeHome;
-      assert.equal(homedir(), fakeHome, "premise: os.homedir() follows $HOME at call time");
-      assert.notEqual(
-        JSON.stringify(fakeHome).slice(1, -1),
-        fakeHome,
-        "premise: this home has a spelling the serialiser changes — otherwise the case is vacuous",
-      );
+      assert.equal(homedir(), fakeHome, `${label}: premise — os.homedir() follows $HOME at call time`);
 
       const outcome = runDocument(
         {
@@ -317,7 +364,9 @@ describe("output formats", () => {
           infrastructure: [
             {
               kind: "checker-crashed",
-              detail: "the probe is not wired to a browser in this build.",
+              // `pad` pushes the home path across the length cap's cut point, so the sweep in the
+              // test below drives the cut through every position inside the path.
+              detail: `${pad}${fakeHome}/build/out.html could not be measured.`,
               measured: { stage: "measure", browser: `${fakeHome}/.cache/puppeteer/chrome` },
             },
           ],
@@ -339,14 +388,23 @@ describe("output formats", () => {
       });
       for (const format of OUTPUT_FORMATS) {
         const text = render(leaky, format);
-        assert.ok(!text.includes(account), `${format} leaked the account name of an escaped home`);
-        assert.match(text, /~/u, `${format} shows no redaction marker — did the payload reach it?`);
+        // The oracle is the account token this test chose. It is deliberately NOT `homedir()` and
+        // deliberately not anything from `redact.ts`: both are blind in exactly the way the defect
+        // is, which is how the defect survived two rounds.
+        assert.ok(!text.includes(account), `${label}: ${format} leaked the account name`);
+        // And a PREFIX of it, because the whole token is the wrong thing to look for. A length cap
+        // that cuts through the middle of a path leaves `/Users/zqjvaxbel` — which does not contain
+        // the full account name, so an assertion on the full name passes while the account is
+        // plainly readable. The first version of this test asserted only on the full token and was
+        // measured GREEN against the very defect it was written for.
+        assert.ok(!text.includes(account.slice(0, 6)), `${label}: ${format} leaked a prefix of the account name`);
+        assert.match(text, /~/u, `${label}: ${format} shows no redaction marker — did the payload reach it?`);
       }
     } finally {
       if (realHome === undefined) delete process.env.HOME;
       else process.env.HOME = realHome;
     }
-  });
+  }
 
   /**
    * The two caps, pinned by literal and measured on both sides of each boundary.
@@ -556,15 +614,15 @@ describe("output formats", () => {
         infrastructure: [
           {
             kind: "render-unstable",
-            // The REAL producer's shape. `src/render/evidence.ts` builds this detail with
-            // `pages.join(", ")`, so fifty divergent pages make a ~490-character sentence. A first
-            // version of this test used an 18-character stub, measured 185 characters, and passed
-            // a 400-character threshold that the very scenario it names violates at 505.
-            detail:
-              `dom-pdf-divergence on page(s) ${pages.join(", ")}: the PDF does not reproduce the ` +
-              "geometry the rules measured. Per page below, `refound` of `placed` marks were located " +
-              "uniquely in the text stream, and `reason` says whether those marks scattered around " +
-              "their own reference or agreed on a reference that is itself displaced.",
+            // The REAL producer, CALLED — not copied. `src/render/evidence.ts` builds this detail
+            // with `pages.join(", ")`, so fifty divergent pages make a ~490-character sentence. A
+            // first version of this test used an 18-character stub, measured 185 characters, and
+            // passed a 400-character threshold that the very scenario it names violates at 505.
+            // The version after that transcribed the producer's sentence by hand. The copy was
+            // byte-identical, which is not the property that matters: an audit shortened
+            // `divergenceDetail` and this test went on measuring a 492-character payload it had
+            // invented, while the two tests that DO import the producer went red.
+            detail: divergenceDetail(pages),
             measured: {
               divergentPages: pages.length,
               pages,

@@ -26,22 +26,36 @@
  * needs. That limit is stated here rather than papered over with a rule that looks broader and
  * silently damages output.
  *
- * TWO SPELLINGS, not one, and the reason is measured.
+ * WHERE THE REDACTION RUNS, and why it moved. This is the part that was wrong twice.
  *
- * The redaction runs at `render()`, on the text a reporter has already produced — which for `json`
- * and `sarif` means a string that went through `JSON.stringify`. A home directory containing a
- * character the serialiser escapes therefore does not occur in that text in the spelling
- * `homedir()` returns: with `HOME=/tmp/x\name`, the report carries `/tmp/x\\name` and a search for
- * the raw form finds nothing. Measured before this was fixed: `json` and `sarif` carried the
- * account name in full while every check said clean.
+ * It first ran on the RENDERED TEXT, at the one choke point all six reporters share. That looked
+ * like the careful choice — one place instead of six — and it is unsound, because by the time a
+ * reporter has produced text, the reporter has TRANSFORMED the path. Each transformation yields a
+ * spelling the search does not contain:
  *
- * Both spellings are therefore matched, and both are derived from `homedir()` by construction —
- * this is the same directory written two ways, not a guess about what a path might look like.
+ *     json, sarif      JSON.stringify        `/tmp/x\name`  ->  `/tmp/x\\name`
+ *     html, junit      XML escaping          `/tmp/x&name`  ->  `/tmp/x&amp;name`
+ *     markdown         pipe escaping         `/tmp/x|name`  ->  `/tmp/x\|name`
+ *     all six          flatten() in infra    a newline      ->  a space
+ *
+ * The first of those was found and repaired by adding the serialised spelling as a second needle.
+ * That repair was measured and it was still the wrong move: it generalised over the SERIALISER it
+ * had just been shown, not over the property. An audit then produced the other three classes in a
+ * single probe, and the account name appeared in full in five of six formats.
+ *
+ * A cap made it worse in a fourth way. `infraLines` truncates `detail` before `render()` was
+ * reached, so a cut landing inside the home left a PREFIX of the account name — `/Users/annabell`
+ * — which no search for the whole path can find.
+ *
+ * So the redaction runs on the REPORT, before any reporter sees it. There is no transformation
+ * between `homedir()` and the match, because the match happens first. Adding a seventh reporter,
+ * a new escape or another cap cannot reopen this: they all operate on text that no longer contains
+ * the path. That is a property of the ORDER, not of the needle list, which is why the needle list
+ * is back down to the one spelling `homedir()` actually returns.
  *
  * A claim this file previously made and no longer makes: that `homedir()` "is correct on Windows
- * too, so a Windows run redacts its own home". A Windows home is `C:\Users\name`, every separator
- * of which the serialiser escapes, so two of the six formats leaked it. `README.md` states that
- * Windows is not supported; the sentence is withdrawn rather than narrowed.
+ * too, so a Windows run redacts its own home". `README.md` states that Windows is not supported,
+ * and the sentence was measured false besides. It is withdrawn rather than narrowed.
  */
 
 import { homedir } from "node:os";
@@ -57,9 +71,7 @@ export const REDACTION = "~";
 function needles(): string[] {
   const dir = homedir();
   if (typeof dir !== "string" || dir.length <= 1) return [];
-  // What `JSON.stringify` writes for this exact string, minus its quotes. Derived, never guessed.
-  const serialised = JSON.stringify(dir).slice(1, -1);
-  return serialised === dir ? [dir] : [dir, serialised];
+  return [dir];
 }
 
 /**
@@ -84,7 +96,7 @@ function nextBoundedHit(text: string, needle: string, from: number): number {
   }
 }
 
-/** Replace occurrences of this process's home directory, in either spelling, with `~`. */
+/** Replace occurrences of this process's home directory with `~`. */
 export function redactPaths(text: string): string {
   const all = needles();
   if (all.length === 0) return text;
@@ -110,4 +122,28 @@ export function redactPaths(text: string): string {
     out += text.slice(from, bestAt) + REDACTION;
     from = bestAt + bestLen;
   }
+}
+
+/**
+ * The same redaction, applied to the report itself rather than to rendered text.
+ *
+ * Every string anywhere in the structure, including object KEYS — a `measured` map can be keyed by
+ * a path as easily as valued by one. Numbers, booleans and nulls pass through untouched, so no
+ * counter and no threshold can be altered by this.
+ *
+ * The report is copied rather than edited: the caller may render the same report in several
+ * formats, and a function that quietly rewrote its argument would make the second render depend on
+ * whether the first had happened.
+ */
+export function redactReport<T>(value: T): T {
+  if (typeof value === "string") return redactPaths(value) as unknown as T;
+  if (Array.isArray(value)) return value.map((v) => redactReport(v)) as unknown as T;
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+      out[redactPaths(key)] = redactReport(v);
+    }
+    return out as unknown as T;
+  }
+  return value;
 }

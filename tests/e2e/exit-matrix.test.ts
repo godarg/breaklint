@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
+import { readFileSync } from "node:fs";
 
 import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument } from "../../src/core/engine.ts";
@@ -434,10 +435,25 @@ const rows: Row[] = [
 
 describe("exit matrix", () => {
   // The contract asks for at least 21 multi-document runs across every row of the precedence
-  // table and all nine failOn rows. The count is asserted so that deleting a row is a failure
-  // rather than a quiet reduction in scope.
-  it("has at least 21 rows", () => {
-    assert.ok(rows.length >= 21, `only ${rows.length} rows; the matrix asks for at least 21`);
+  // table and all nine failOn rows. This used to assert exactly that — `rows.length >= 21` —
+  // under a comment claiming that "deleting a row is a failure rather than a quiet reduction in
+  // scope". With 27 rows present, six could vanish and the floor still held; an audit deleted one
+  // and the whole battery stayed green while `docs/status.md` went on saying 27. A floor cannot
+  // make that claim. The literal can, and the contract's minimum is kept beside it so the reason
+  // for the number does not disappear with it.
+  const EXPECTED_ROWS = 27;
+  const CONTRACT_MINIMUM = 21;
+  it("has exactly the rows it says it has, and never fewer than the contract asks", () => {
+    assert.equal(rows.length, EXPECTED_ROWS, "a row was added or removed; update this literal deliberately");
+    assert.ok(EXPECTED_ROWS >= CONTRACT_MINIMUM, "the matrix has fallen below the contract's minimum");
+    // Row ids must be unique, or two rows can collapse into one without the count moving. An
+    // earlier audit found duplicate ids (P5, P6) in this table.
+    assert.equal(new Set(rows.map((r) => r.id)).size, rows.length, "duplicate row id");
+    // And the number as `docs/status.md` prints it, matched WHOLE for the same reason the demo
+    // row is: a substring match passes inside a sentence that says the opposite.
+    const status = readFileSync(new URL("../../docs/status.md", import.meta.url), "utf8");
+    const row = status.split("\n").find((l) => l.startsWith("| Exit matrix |"));
+    assert.ok(row?.includes(`| ${rows.length} rows over all five exit codes,`), `docs/status.md row: ${row}`);
   });
 
   for (const row of rows) {

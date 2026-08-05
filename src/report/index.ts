@@ -6,7 +6,7 @@ import { renderMarkdown } from "./markdown.ts";
 import { renderJunit } from "./junit.ts";
 import { renderSarif } from "./sarif.ts";
 import { renderHtml } from "./html.ts";
-import { redactPaths } from "./redact.ts";
+import { redactReport } from "./redact.ts";
 
 /**
  * One reporter module. `--demo` and the live path both come through here, nothing else.
@@ -16,9 +16,16 @@ import { redactPaths } from "./redact.ts";
  * an absolute path: projecting infrastructure events to the console was right, but the projection
  * printed `InfraEvent.measured` raw and the resolved browser path lives in that field. A report is
  * something a user pastes into an issue.
+ *
+ * It runs on the REPORT and not on the rendered text, and the order is the whole property. Applied
+ * to text, the search had to know every spelling each reporter produces — JSON escaping, XML
+ * escaping, markdown's pipe escape, the newline flattening in `infra.ts`, and any cut a length cap
+ * had already made through the middle of a path. Two rounds were spent adding spellings one at a
+ * time. Applied to the report, there is nothing between `homedir()` and the match, so a seventh
+ * reporter or a new escape cannot reopen it. See `redact.ts` for the measurement.
  */
 export function render(report: Report, format: OutputFormat, opts: { colour?: boolean } = {}): string {
-  return redactPaths(renderRaw(report, format, opts));
+  return renderRaw(redactReport(report), format, opts);
 }
 
 function renderRaw(report: Report, format: OutputFormat, opts: { colour?: boolean }): string {
