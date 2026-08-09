@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><style>@page{size:120mm 80mm;margin:10mm}</style></head>
+<body>
+  <p>Netzaktivitaet nach dem Messzustand muss den Lauf invalidieren.</p>
+  <script>
+    const arm = setInterval(() => {
+      if (!document.querySelector(".pagedjs_page")) return;
+      clearInterval(arm);
+      setTimeout(() => { void fetch('/late.txt').catch(() => undefined); }, 600);
+    }, 10);
+  </script>
+</body></html>

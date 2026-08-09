@@ -1,0 +1,14 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><style>
+@font-face { font-family: MissingBreaklintFont; src: url(definitely-missing.woff2) format("woff2"); }
+@page { size: 120mm 80mm; margin: 10mm; }
+body { font-family: serif; }
+@media print { body { font-family: MissingBreaklintFont, serif; } }
+</style><script>
+// Hostile-script control: every mutable JS-facing font oracle lies. The loader must retain the
+// references captured before this script and still see the print-only FontFace error.
+try { Object.defineProperty(Document.prototype, "fonts", { configurable: true, get() { return { ready: Promise.resolve(), *[Symbol.iterator]() {} }; } }); } catch {}
+try { Object.defineProperty(FontFaceSet.prototype, "ready", { configurable: true, get() { return Promise.resolve(); } }); } catch {}
+try { FontFaceSet.prototype[Symbol.iterator] = function* () {}; } catch {}
+try { Object.defineProperty(FontFace.prototype, "status", { configurable: true, get() { return "loaded"; } }); } catch {}
+try { Object.defineProperty(FontFace.prototype, "family", { configurable: true, get() { return "masked"; } }); } catch {}
+</script></head><body><p>Diese Schriftressource muss fail-closed fehlschlagen.</p></body></html>

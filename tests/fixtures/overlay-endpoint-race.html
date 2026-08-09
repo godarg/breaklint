@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>overlay endpoint race</title></head>
+<body>
+  <script>
+    const race = setInterval(() => {
+      if (typeof window.__blOverlayControl !== "function") return;
+      clearInterval(race);
+      try { window.__blOverlayControl("author-controlled-token", "install"); } catch {}
+    }, 0);
+  </script>
+  <p>"The author must not control evidence overlay stages."</p>
+</body>
+</html>

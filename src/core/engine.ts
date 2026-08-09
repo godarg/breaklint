@@ -25,6 +25,7 @@ import type { Rule, RuleOptions } from "./rule.ts";
 import { aggregateNotMeasured } from "./rule.ts";
 import type {
   DocumentReport,
+  Evidence,
   Finding,
   InfraEvent,
   NotMeasured,
@@ -37,6 +38,12 @@ export interface DocumentInput {
   snapshot: Snapshot | null;
   /** Infrastructure events collected before or during measurement. Fail-closed: never dropped. */
   infrastructure: InfraEvent[];
+  /** PDF-raster evidence produced from the same paginated page before the rules run. */
+  evidence?: Evidence[];
+  /** Source ids whose overlay marks were refound and bound in the delivered PDF. */
+  boundSids?: readonly string[];
+  /** Document-level measurement declines emitted by acquisition/evidence apparatus. */
+  notMeasured?: readonly NotMeasured[];
 }
 
 export interface EngineConfig {
@@ -55,7 +62,7 @@ export interface DocumentOutcome {
 export function runDocument(input: DocumentInput, config: EngineConfig): DocumentOutcome {
   const findings: Finding[] = [];
   const coverage: Record<string, RuleCoverage> = {};
-  const documentNotMeasured: NotMeasured[] = [];
+  const documentNotMeasured: NotMeasured[] = [...(input.notMeasured ?? [])];
   const infrastructure: InfraEvent[] = [...input.infrastructure];
   const measuredRuleIds: string[] = [];
 
@@ -77,9 +84,9 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
         pages: 0,
         coverage: {},
         findings: [],
-        notMeasured: [],
+        notMeasured: aggregateNotMeasured(documentNotMeasured),
         infrastructure,
-        evidence: [],
+        evidence: input.evidence ?? [],
       },
       measuredRuleIds: [],
     };
@@ -135,6 +142,23 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
     failOn: config.failOn,
   });
 
+  // Evidence is produced before rule evaluation because it marks every source block. Rules remain
+  // pure and invent no file path; this is the one projection point from page/SID binding onto the
+  // findings they produced. A page finding binds to its page. A block finding additionally needs
+  // its exact SID in the conformance set, so one good mark cannot lend evidence to another block.
+  const boundSids = new Set(input.boundSids ?? []);
+  for (const finding of findings) {
+    const pageEvidence = input.evidence?.find((e) => e.page === finding.page) ?? null;
+    if (!pageEvidence) continue;
+    const targetBound =
+      finding.target.keyType === "page" ||
+      (finding.target.sid !== null && boundSids.has(finding.target.sid));
+    finding.evidence = {
+      ref: pageEvidence.path,
+      bindsFinding: pageEvidence.bindsFinding && targetBound,
+    };
+  }
+
   return {
     report: {
       path: input.path,
@@ -146,7 +170,7 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
       findings,
       notMeasured: aggregateNotMeasured(documentNotMeasured),
       infrastructure,
-      evidence: [],
+      evidence: input.evidence ?? [],
     },
     measuredRuleIds,
   };

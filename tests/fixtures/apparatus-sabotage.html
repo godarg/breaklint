@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><style>@page{size:120mm 80mm;margin:10mm}</style></head>
+<body>
+  <p>"Dieser Befund muss trotz spaeter Prototyp-Vergiftung an seiner echten Position binden."</p>
+  <script>
+    const attack = setInterval(() => {
+      try {
+        if (!document.querySelector(".pagedjs_page")) return;
+        clearInterval(attack);
+        window.__blCollectorResult = () => ({ pages: [], hooks: {}, discardedRecords: 0, unreconciledPages: 0, attributeDrift: [], epochCount: 1 });
+        window.__blFreezeParts = () => ({ pageCount: '0' });
+        Element.prototype.getClientRects = () => [{ x: 777, y: 777, bottom: 778, width: 1, height: 1 }];
+        Element.prototype.getBoundingClientRect = () => ({ x: 777, y: 777, bottom: 778, width: 1, height: 1 });
+        Element.prototype.querySelectorAll = () => [];
+        window.getComputedStyle = () => ({ position: 'static', color: 'red', fontSize: '99px' });
+        for (const key of ['x', 'y', 'top', 'bottom', 'left', 'right', 'width', 'height']) {
+          try { Object.defineProperty(DOMRectReadOnly.prototype, key, { configurable: true, get() { return 777; } }); } catch (_) {}
+        }
+      } catch (_) {}
+    }, 10);
+  </script>
+</body></html>

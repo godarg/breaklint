@@ -96,26 +96,29 @@ const STYLE_MARK =
  * to a function that does not exist, and only the live suite would notice.
  */
 export const OVERLAY_SOURCE = `(() => {
+  const P = window.__blPrimitives;
   const STYLE_LAYER = ${JSON.stringify(STYLE_LAYER)};
   const STYLE_MARK = ${JSON.stringify(STYLE_MARK)};
+  const capability = P.randomToken();
+  let stage = 0, unauthorizedCalls = 0;
+  let state = { layers: [], marks: [], detached: [] };
 
-  window.__blOverlay = { layers: [], marks: [], detached: [] };
-
-  window.__blOverlayInstall = () => {
+  const install = () => {
     const marks = [];
     let staticPageAreas = 0, ordinal = 0;
-    window.__blOverlay = { layers: [], marks: [], detached: [] };
-    const pages = document.querySelectorAll(".pagedjs_page");
-    pages.forEach((pageEl, pageIndex) => {
-      const area = pageEl.querySelector(".pagedjs_page_content") || pageEl;
-      if (getComputedStyle(area).position === "static") staticPageAreas++;
-      const areaBox = area.getBoundingClientRect();
-      const pageBox = pageEl.getBoundingClientRect();
-      const layer = document.createElement("div");
-      layer.className = "bl-overlay";
-      layer.style.cssText = STYLE_LAYER;
-      for (const el of pageEl.querySelectorAll("[data-bl-sid]")) {
-        const rects = el.getClientRects();
+    state = { layers: [], marks: [], detached: [] };
+    const pages = P.all(document, ".pagedjs_page");
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+      const pageEl = pages[pageIndex];
+      const area = P.all(pageEl, ".pagedjs_page_content")[0] || pageEl;
+      if (P.style(area, null).position === "static") staticPageAreas++;
+      const areaBox = P.rect(area);
+      const pageBox = P.rect(pageEl);
+      const layer = P.create("div");
+      P.setAttr(layer, "class", "bl-overlay");
+      P.setCssText(layer, STYLE_LAYER);
+      for (const el of P.all(pageEl, "[data-bl-sid]")) {
+        const rects = P.rects(el);
         if (!rects.length) continue;
         const ord = ordinal++;
         const digits = String(ord).padStart(3, "0");
@@ -123,20 +126,20 @@ export const OVERLAY_SOURCE = `(() => {
           ["A", "start", rects[0], "top"],
           ["E", "end", rects[rects.length - 1], "bottom"],
         ]) {
-          const mark = document.createElement("span");
-          mark.className = "bl-mark";
-          mark.style.cssText = STYLE_MARK;
+          const mark = P.create("span");
+          P.setAttr(mark, "class", "bl-mark");
+          P.setCssText(mark, STYLE_MARK);
           const x = rect.x, y = edge === "top" ? rect.y : rect.bottom;
-          mark.style.setProperty("left", (x - areaBox.x) + "px", "important");
-          mark.style.setProperty("top", (y - areaBox.y) + "px", "important");
-          mark.textContent = "BLSID" + digits + suffix;
-          layer.appendChild(mark);
+          P.setStyle(mark, "left", (x - areaBox.x) + "px", "important");
+          P.setStyle(mark, "top", (y - areaBox.y) + "px", "important");
+          P.setText(mark, "BLSID" + digits + suffix);
+          P.append(layer, mark);
           // The node itself is remembered. Everything downstream walks these references and
           // never a selector, so an author element of the same class is invisible to us.
-          window.__blOverlay.marks.push(mark);
+          state.marks.push(mark);
           marks.push({
-            token: mark.textContent,
-            sid: el.getAttribute("data-bl-sid"),
+            token: P.text(mark),
+            sid: P.attr(el, "data-bl-sid"),
             fragmentOrdinal: ord,
             side,
             page: pageIndex + 1,
@@ -147,20 +150,20 @@ export const OVERLAY_SOURCE = `(() => {
           });
         }
       }
-      area.appendChild(layer);
-      window.__blOverlay.layers.push(layer);
-    });
-    return { marks, layers: window.__blOverlay.layers.length, staticPageAreas };
+      P.append(area, layer);
+      state.layers.push(layer);
+    }
+    return { marks, layers: state.layers.length, staticPageAreas };
   };
 
   // Stage 1: read the computed style of every mark back. Cheap, specific, and NOT conclusive —
   // it names the offending mark and the reason, which the raster comparison cannot. It is the
   // diagnosis in front of the closing check, not a substitute for it.
-  window.__blOverlayReadback = () => {
+  const readback = () => {
     const violations = [];
-    for (const mark of window.__blOverlay.marks) {
-      const cs = getComputedStyle(mark);
-      const box = mark.getBoundingClientRect();
+    for (const mark of state.marks) {
+      const cs = P.style(mark, null);
+      const box = P.rect(mark);
       const rgba = /rgba?\\(([^)]+)\\)/.exec(cs.color);
       const parts = rgba ? rgba[1].split(",") : [];
       const alpha = parts.length === 4 ? parseFloat(parts[3]) : 1;
@@ -175,9 +178,10 @@ export const OVERLAY_SOURCE = `(() => {
       // would fire on the neutral case and switch binding off in every document in the world.
       // That happened, and its own red condition caught it: the check must fire on a mark that
       // was actually reached and stay silent on an untouched one.
-      const allowed = mark.textContent.length * parseFloat(cs.fontSize) * 1.2 + 2;
+      const token = P.text(mark);
+      const allowed = token.length * parseFloat(cs.fontSize) * 1.2 + 2;
       if (box.width > allowed) why.push("width=" + box.width.toFixed(2) + " > " + allowed.toFixed(2));
-      if (why.length) violations.push({ token: mark.textContent, why: why.join(", ") });
+      if (why.length) violations.push({ token, why: why.join(", ") });
     }
     return violations;
   };
@@ -187,30 +191,56 @@ export const OVERLAY_SOURCE = `(() => {
   // keeps applying. Measured on this product: replacing the detach with a hide turned a case
   // that reports 84 711 differing pixels into one that reports 0 and kept a binding it should
   // have lost.
-  window.__blOverlayDetach = () => {
-    window.__blOverlay.detached = [];
-    for (const layer of window.__blOverlay.layers) {
-      if (!layer.parentNode) continue;
-      window.__blOverlay.detached.push([layer, layer.parentNode, layer.nextSibling]);
-      layer.remove();
+  const detach = () => {
+    state.detached = [];
+    for (const layer of state.layers) {
+      const parent = P.parent(layer);
+      if (!parent) continue;
+      state.detached.push([layer, parent, P.next(layer)]);
+      P.remove(layer);
     }
-    return window.__blOverlay.detached.length;
+    return state.detached.length;
   };
 
-  window.__blOverlayRemove = () => {
+  const remove = () => {
     let n = 0;
-    for (const layer of window.__blOverlay.layers) {
-      if (layer.parentNode) { layer.remove(); n++; }
+    for (const layer of state.layers) {
+      if (P.parent(layer)) { P.remove(layer); n++; }
     }
-    window.__blOverlay = { layers: [], marks: [], detached: [] };
+    state = { layers: [], marks: [], detached: [] };
     return n;
   };
 
-  window.__blOverlayReady = true;
+  const control = (token, action) => {
+    if (token !== capability) {
+      unauthorizedCalls += 1;
+      throw new Error("unauthorized evidence-overlay control call");
+    }
+    const expected = ["install", "readback", "detach", "remove"][stage];
+    if (action !== expected) throw new Error("evidence-overlay action out of sequence: " + action + " != " + expected);
+    const value = action === "install" ? install()
+      : action === "readback" ? readback()
+      : action === "detach" ? detach()
+      : remove();
+    stage += 1;
+    return { value, unauthorizedCalls };
+  };
+  P.publishOverlay(control);
+  return capability;
 })()`;
 
-async function call<R>(page: PageLike, name: string): Promise<R> {
-  return page.evaluate<R>(`window.${name}()`);
+const capabilities = new WeakMap<PageLike, string>();
+
+async function call<R>(page: PageLike, action: "install" | "readback" | "detach" | "remove"): Promise<R> {
+  const capability = capabilities.get(page);
+  if (!capability) throw new Error("evidence-overlay capability is unavailable");
+  const result = await page.evaluate<{ value: R; unauthorizedCalls: number }>(
+    `window.${OVERLAY_GLOBALS.control}(${JSON.stringify(capability)}, ${JSON.stringify(action)})`,
+  );
+  if (result.unauthorizedCalls > 0) {
+    throw new Error(`evidence-overlay control raced by author code: ${result.unauthorizedCalls} unauthorized call(s)`);
+  }
+  return result.value;
 }
 
 /**
@@ -222,25 +252,25 @@ async function call<R>(page: PageLike, name: string): Promise<R> {
  * has stopped faking the right thing.
  */
 export const OVERLAY_GLOBALS = {
-  install: "__blOverlayInstall",
-  readback: "__blOverlayReadback",
-  detach: "__blOverlayDetach",
-  remove: "__blOverlayRemove",
+  control: "__blOverlayControl",
 } as const;
 
 export async function installOverlay(page: PageLike): Promise<OverlayInstallation> {
-  await page.evaluate<void>(OVERLAY_SOURCE);
-  return call<OverlayInstallation>(page, OVERLAY_GLOBALS.install);
+  const capability = await page.evaluate<string>(OVERLAY_SOURCE);
+  capabilities.set(page, capability);
+  return call<OverlayInstallation>(page, "install");
 }
 
 export async function readbackViolations(page: PageLike): Promise<{ token: string; why: string }[]> {
-  return call<{ token: string; why: string }[]>(page, OVERLAY_GLOBALS.readback);
+  return call<{ token: string; why: string }[]>(page, "readback");
 }
 
 export async function detachOverlay(page: PageLike): Promise<number> {
-  return call<number>(page, OVERLAY_GLOBALS.detach);
+  return call<number>(page, "detach");
 }
 
 export async function removeOverlay(page: PageLike): Promise<number> {
-  return call<number>(page, OVERLAY_GLOBALS.remove);
+  const removed = await call<number>(page, "remove");
+  capabilities.delete(page);
+  return removed;
 }

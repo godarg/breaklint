@@ -51,6 +51,10 @@ export const STABILITY_WINDOW_MS = 250;
 export const MAX_STABILITY_RETRIES = 3;
 export const PAGINATION_TIMEOUT_MS = 30_000;
 export const DOCUMENT_TIMEOUT_MS = 120_000;
+export const MAX_PAGES = 2_000;
+export const MAX_DOM_NODES = 500_000;
+export const MAX_MUTATIONS_AFTER_RENDERED = 200;
+export const MAX_RESOURCE_BYTES = 268_435_456;
 
 /**
  * The seven components, in order. Exported as a literal so a test can assert the set rather than
@@ -183,8 +187,8 @@ export async function awaitStableLayout(deps: StabilityDeps): Promise<StabilityO
 /**
  * The in-page collector.
  *
- * Every measurement here is taken through references captured BEFORE any author script could run
- * (see `src/measure/primitives.ts`), so a document that overwrites `Element.prototype
+ * The load-bearing geometry, resource, bitmap and text primitives used here are references captured
+ * BEFORE any author script could run (see `src/measure/primitives.ts`), so a document that overwrites `Element.prototype
  * .getBoundingClientRect` cannot feed this synthetic numbers. That is Gemini's A3 finding, taken
  * as far as it goes: the geometry a spot-check can cross-examine is cross-examined out of process
  * against CDP, and the parts that must run in the page say so rather than pretending otherwise.
@@ -196,7 +200,7 @@ export const FREEZE_SOURCE = `(() => {
   const round = (n) => Math.round(n * 100) / 100;
   const box = (el) => { const b = rect(el); return round(b.x) + "," + round(b.y) + "," + round(b.width) + "," + round(b.height); };
 
-  window.__blFreezeParts = () => {
+  const freezeParts = () => {
     const pages = P.all(document, ".pagedjs_page");
     const parts = {};
     parts.pageCount = String(pages.length);
@@ -231,12 +235,11 @@ export const FREEZE_SOURCE = `(() => {
     const svg = [];
     for (const page of pages) {
       for (const el of P.all(page, "svg *")) {
-        if (typeof el.getBBox !== "function" || typeof el.getScreenCTM !== "function") continue;
-        let bb, m;
-        try { bb = el.getBBox(); m = el.getScreenCTM(); } catch (e) { svg.push(el.tagName + ":unreadable"); continue; }
-        if (!m) { svg.push(el.tagName + ":noctm"); continue; }
-        const at = (x, y) => { const p = new DOMPoint(x, y).matrixTransform(m); return round(p.x) + "," + round(p.y); };
-        svg.push(el.tagName + ":" + at(bb.x, bb.y) + ":" + at(bb.x + bb.width, bb.y + bb.height));
+        let bounds;
+        try { bounds = P.svgBounds(el); } catch (e) { svg.push(el.tagName + ":unreadable"); continue; }
+        if (!bounds) { svg.push(el.tagName + ":noctm"); continue; }
+        svg.push(el.tagName + ":" + round(bounds.first.x) + "," + round(bounds.first.y) + ":" +
+          round(bounds.last.x) + "," + round(bounds.last.y));
       }
     }
     parts.svgGeometry = svg.join(";");
@@ -246,8 +249,9 @@ export const FREEZE_SOURCE = `(() => {
     const replaced = [];
     for (const page of pages) {
       for (const el of P.all(page, "img,video,object,iframe")) {
-        const src = el.currentSrc || el.src || el.data || "";
-        const natural = (el.naturalWidth || 0) + "x" + (el.naturalHeight || 0);
+        const measured = P.replaced(el);
+        const src = measured.source;
+        const natural = measured.naturalWidth + "x" + measured.naturalHeight;
         replaced.push(el.tagName + ":" + src.length + ":" + src.slice(-24) + ":" + natural + ":" + box(el));
       }
     }
@@ -261,14 +265,18 @@ export const FREEZE_SOURCE = `(() => {
     for (const page of pages) {
       for (const el of P.all(page, "canvas")) {
         let ink = "unreadable";
+        let dimensions = { width: 0, height: 0, data: null };
         try {
-          const data = el.getContext("2d").getImageData(0, 0, el.width, el.height).data;
-          let nonZero = 0;
-          for (let i = 0; i < data.length; i += 1) if (data[i] !== 0) nonZero += 1;
-          ink = String(nonZero);
-          if (nonZero > 0) inkReadable = true;
+          dimensions = P.canvas(el);
+          const data = dimensions.data;
+          if (data) {
+            let nonZero = 0;
+            for (let i = 0; i < data.length; i += 1) if (data[i] !== 0) nonZero += 1;
+            ink = String(nonZero);
+            if (nonZero > 0) inkReadable = true;
+          }
         } catch (e) { ink = "tainted"; }
-        canvas.push(el.width + "x" + el.height + ":" + box(el) + ":" + ink);
+        canvas.push(dimensions.width + "x" + dimensions.height + ":" + box(el) + ":" + ink);
       }
     }
     parts.canvas = canvas.join(";");
@@ -281,7 +289,7 @@ export const FREEZE_SOURCE = `(() => {
     for (const page of pages) {
       for (const el of P.all(page, '[class*="pagedjs_margin"]')) {
         const after = style(el, "::after").content;
-        const text = el.textContent.replace(/\\s+/g, " ").trim();
+        const text = P.text(el).replace(/\\s+/g, " ").trim();
         if (after === "none" && text === "") { margins.push(el.className + ":" + box(el)); continue; }
         margins.push(el.className + ":" + box(el) + ":" + after + ":" + text);
       }
@@ -290,6 +298,7 @@ export const FREEZE_SOURCE = `(() => {
 
     return parts;
   };
+  P.publishFreeze(freezeParts);
 })()`;
 
 /** Take one sample from a live page. */

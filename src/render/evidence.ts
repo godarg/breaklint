@@ -182,6 +182,8 @@ export interface EvidenceOutcome {
   deliveredPdf: Uint8Array;
   /** True only when the delivered PDF is the one that carried the overlay. */
   deliveredWithOverlay: boolean;
+  /** True only when installOverlay completed; option state and attempted installation are insufficient. */
+  overlayInstalled: boolean;
   /**
    * Both candidates, kept for one purpose: an independent rasteriser has to be able to judge
    * the same bytes this module judged. Re-creating the overlay dance in a test to get at them
@@ -192,6 +194,8 @@ export interface EvidenceOutcome {
 
 export interface ProduceEvidenceInput {
   page: PageLike;
+  /** The only PDF boundary: caller reconciles mutation/SID/freeze/network immediately around it. */
+  pdf?: (stage: "baseline" | "marked") => Promise<Uint8Array>;
   /** Closes the paginated document page. Called before any rasterising, never after. */
   closePage: () => Promise<void>;
   /** Null when no rasteriser could be opened. Then nothing binds, and the report says so. */
@@ -201,6 +205,7 @@ export interface ProduceEvidenceInput {
 
 export async function produceEvidence(input: ProduceEvidenceInput): Promise<EvidenceOutcome> {
   const { page, closePage, rasterizer, options } = input;
+  const pdf = input.pdf ?? (() => page.pdf({ printBackground: true, preferCSSPageSize: true }));
   const dpi = options.dpi ?? 96;
   const infrastructure: InfraEvent[] = [];
   const notMeasured: NotMeasured[] = [];
@@ -209,7 +214,7 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
   const errorsAtStart = rasterizer?.pageErrors().length ?? 0;
 
   // --- 1. the baseline, taken before anything of ours exists in the document -----------------
-  const baseline = await page.pdf({ printBackground: true, preferCSSPageSize: true });
+  const baseline = await pdf("baseline");
 
   if (!options.binding) {
     await closePage();
@@ -242,10 +247,12 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
   // guard now refuses every rasteriser call while one is, a single failed document would take
   // every later document of the run down with it.
   let installation, violations, marked: Uint8Array, detached: number;
+  let overlayInstalled = false;
   try {
     installation = await installOverlay(page);
+    overlayInstalled = true;
     violations = await readbackViolations(page);
-    marked = await page.pdf({ printBackground: true, preferCSSPageSize: true });
+    marked = await pdf("marked");
     detached = await detachOverlay(page);
     await removeOverlay(page);
   } catch (error) {
@@ -265,7 +272,7 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
       rasterDiffPx: -1,
       overlayRemoved: true,
       bindingPossible: false,
-      overlayInstalled: true,
+      overlayInstalled,
       rasterizer,
       options,
       dpi,
@@ -840,6 +847,7 @@ function outcome(input: FinishInput, evidence: Evidence[], boundSids: Set<string
     ambiguousMarks: input.ambiguousMarks,
     deliveredPdf: input.pdf,
     deliveredWithOverlay: input.withOverlay,
+    overlayInstalled: input.overlayInstalled,
     candidates: input.candidates,
   };
 }

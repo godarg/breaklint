@@ -47,7 +47,8 @@ import { randomBytes } from "node:crypto";
 import type { AddressInfo } from "node:net";
 
 import type { BrowserLike, PageLike } from "../acquire/browser.ts";
-import { resolvePackageRoot } from "../acquire/browser.ts";
+import { SUPPORTED_PDFJS_VERSION } from "../core/enums.ts";
+import { ownServerLifecycle, resolvePackageRoot, type OwnedServerLifecycle } from "../acquire/browser.ts";
 import type { Rasterizer as RasterizerName } from "../core/enums.ts";
 
 /** Device pixels. What the rasteriser produced for one page, never the pixels themselves. */
@@ -105,6 +106,21 @@ export interface Rasterizer {
 export interface RasterizerUnavailable {
   rasterizer: null;
   detail: string;
+  fatal?: boolean;
+}
+
+export function pdfjsVersionIntegrity(
+  declaredVersion: string | null,
+  loadedVersion: string | null,
+): { ok: boolean; detail: string } {
+  const ok = declaredVersion === SUPPORTED_PDFJS_VERSION && loadedVersion === SUPPORTED_PDFJS_VERSION;
+  return {
+    ok,
+    detail:
+      `breaklint: pdfjs-dist version integrity failed (declared=${declaredVersion ?? "missing"}, ` +
+      `loaded=${loadedVersion ?? "missing"}, supported=${SUPPORTED_PDFJS_VERSION}). ` +
+      "Evidence binding is disabled fail-closed.",
+  };
 }
 
 export type OpenRasterizerResult = { rasterizer: Rasterizer; detail: "" } | RasterizerUnavailable;
@@ -213,7 +229,10 @@ window.__blReady = true;
  * `127.0.0.1`, and while the three files it would find are a public library and a loader, a
  * guessable path is a habit worth not forming.
  */
-function serveRasterizer(root: string, token: string): Promise<{ server: Server; origin: string }> {
+function serveRasterizer(
+  root: string,
+  token: string,
+): Promise<{ server: Server; origin: string; lifecycle: OwnedServerLifecycle }> {
   const files: Record<string, { type: string; body: () => Buffer }> = {
     [`/${token}/`]: { type: "text/html; charset=utf-8", body: () => Buffer.from(loaderHtml(token), "utf8") },
     [`/${token}/pdf.mjs`]: { type: "text/javascript", body: () => readFileSync(join(root, "build", "pdf.mjs")) },
@@ -232,11 +251,12 @@ function serveRasterizer(root: string, token: string): Promise<{ server: Server;
       res.writeHead(500).end();
     }
   });
+  const lifecycle = ownServerLifecycle(server);
   return new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", () => {
       const address = server.address() as AddressInfo;
-      resolve({ server, origin: `http://127.0.0.1:${address.port}` });
+      resolve({ server, origin: `http://127.0.0.1:${address.port}`, lifecycle });
     });
   });
 }
@@ -275,8 +295,11 @@ export async function openRasterizer(
   }
 
   const token = randomBytes(9).toString("hex");
-  const { server, origin } = await serveRasterizer(root, token);
-  const closeServer = (): Promise<void> => new Promise((resolve) => server.close(() => resolve()));
+  const { origin, lifecycle } = await serveRasterizer(root, token);
+  const closeServer = async (): Promise<void> => {
+    const error = await lifecycle.close();
+    if (error) throw new Error(`rasterizer loopback cleanup failed: ${error}`);
+  };
 
   // From here the server is OWNED by this function until a `Rasterizer` is handed back. Every
   // throw in between has to give it up, or a failed start leaves a listening socket behind and
@@ -296,8 +319,9 @@ export async function openRasterizer(
   page.on("pageerror", (e: unknown) => errors.push(String(e).slice(0, 300)));
 
   const shutDown = async (): Promise<void> => {
-    await page.close().catch(() => undefined);
-    await closeServer();
+    const results = await Promise.allSettled([page.close(), closeServer()]);
+    const failures = results.flatMap((result) => result.status === "rejected" ? [String(result.reason)] : []);
+    if (failures.length > 0) throw new Error(`rasterizer ownership cleanup failed: ${failures.join("; ")}`);
   };
 
   let version: string;
@@ -313,6 +337,16 @@ export async function openRasterizer(
         `breaklint: pdfjs-dist was found at ${root} but did not load in the browser.\n` +
         `  ${String(error).slice(0, 200)}\n` +
         (errors.length ? `  the page reported: ${errors.join(" | ")}` : "  the page reported nothing."),
+    };
+  }
+
+  const versionIntegrity = pdfjsVersionIntegrity(declaredVersion, version || null);
+  if (!versionIntegrity.ok) {
+    await shutDown();
+    return {
+      rasterizer: null,
+      fatal: true,
+      detail: versionIntegrity.detail,
     };
   }
 
@@ -410,7 +444,7 @@ function assertContentPagesClosed(open: () => number, what: string): void {
 
 /** The PNG file that `Evidence.path` points at. Written by Node from bytes made in the page. */
 export function writeEvidencePng(path: string, bytes: Uint8Array): void {
-  writeFileSync(path, bytes);
+  writeFileSync(path, bytes, { flag: "wx" });
 }
 
 /**

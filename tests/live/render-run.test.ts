@@ -1,0 +1,476 @@
+/**
+ * The M2d production seam, through the real browser, paginator, loopback server and rasteriser.
+ *
+ * These cases are deliberately absent from unit mocks: their red conditions live at process and
+ * HTTP boundaries. The style fixture constructs the reserved attribute name at runtime, so the
+ * collision scanner cannot reject it before the paired injected/uninjected control is exercised.
+ */
+
+import assert from "node:assert/strict";
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { join } from "node:path";
+import { after, before, describe, it, type TestContext } from "node:test";
+import { fileURLToPath } from "node:url";
+
+import { renderDocuments, type RenderOptions, type RenderResult } from "../../src/acquire/render-run.ts";
+import { runDocument } from "../../src/core/engine.ts";
+import { resolveBrowser, resolvePackageRoot } from "../../src/acquire/browser.ts";
+import { straightQuotes } from "../../src/rules/type/straight-quotes.ts";
+import { blockKey } from "../../src/core/fingerprint.ts";
+
+const REPO = fileURLToPath(new URL("../..", import.meta.url));
+const FIXTURES = join(REPO, "tests", "fixtures");
+const optional = process.env.BREAKLINT_LIVE_OPTIONAL === "1";
+const missing = [
+  resolveBrowser().path ? null : "a browser",
+  resolvePackageRoot("pagedjs", REPO) ? null : "pagedjs",
+  resolvePackageRoot("pdfjs-dist", REPO) ? null : "pdfjs-dist",
+].filter((value): value is string => value !== null);
+
+function options(outDir: string, sourceMapInjection = true): RenderOptions {
+  return {
+    outDir,
+    evidenceBinding: true,
+    sourceMapInjection,
+    network: { mode: "offline", allowed: [] },
+    locale: "de-DE",
+  };
+}
+
+describe("the M2d live production chain", () => {
+  let root = "";
+  let outside = "";
+  let chain = "";
+  let result: RenderResult | null = null;
+  let noSource: RenderResult | null = null;
+
+  const completeChain = (t: TestContext): boolean => {
+    if (result?.documents.length === 19 && noSource?.documents.length === 4) return true;
+    t.skip(
+      `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
+      `no-source=${noSource?.documents.length ?? 0}`,
+    );
+    return false;
+  };
+
+  before(async () => {
+    if (missing.length > 0) {
+      if (optional) return;
+      assert.fail(`this suite cannot run without: ${missing.join(", ")}. Set BREAKLINT_LIVE_OPTIONAL=1 to skip.`);
+    }
+    root = mkdtempSync(join(tmpdir(), "breaklint-m2d-"));
+    outside = mkdtempSync(join(tmpdir(), "breaklint-m2d-outside-"));
+    writeFileSync(join(root, "secret.txt"), "the loopback origin must not expose this sibling");
+    writeFileSync(
+      join(root, "allowed.svg"),
+      '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="black"/></svg>',
+    );
+    writeFileSync(join(outside, "outside.txt"), "the loopback origin must not follow this symlink");
+    symlinkSync(join(outside, "outside.txt"), join(root, "escape.txt"));
+
+    // Synchronous same-origin XHR makes the HTTP status part of the paginated text. In
+    // --no-source-map mode the snapshot's fallback text runs therefore give an independent read
+    // of the server boundary: changing either 403 response to 200 makes the assertion red.
+    const policyProbe = `<p id="server-status">pending</p><img src="allowed.svg" alt=""><link rel="preload" href="escape.txt" as="fetch">\n<script>
+      const status = (path) => { const request = new XMLHttpRequest(); request.open('GET', path, false); request.send(); return request.status; };
+      document.getElementById('server-status').textContent = 'server-status:' + status('/secret.txt') + ',' + status('/escape.txt');
+    </script>`;
+    chain = join(root, "live-chain.html");
+    const source = readFileSync(join(FIXTURES, "live-chain.html"), "utf8").replace("</body>", `${policyProbe}</body>`);
+    writeFileSync(chain, source);
+
+    result = await renderDocuments(
+      [
+        chain,
+        join(FIXTURES, "injection-style-sabotage.html"),
+        join(FIXTURES, "layout-drift.html"),
+        join(FIXTURES, "injection-resource-sabotage.html"),
+        join(FIXTURES, "fill-probe.html"),
+        join(FIXTURES, "missing-font.html"),
+        join(FIXTURES, "no-source-identities.html"),
+        join(FIXTURES, "image-hidden-fill.html"),
+        join(FIXTURES, "inline-fill.html"),
+        join(FIXTURES, "runtime-sid-swap.html"),
+        join(FIXTURES, "apparatus-sabotage.html"),
+        join(FIXTURES, "late-mutation.html"),
+        join(FIXTURES, "isolated-control.html"),
+        join(FIXTURES, "late-network.html"),
+        join(FIXTURES, "pagination-endpoint-race.html"),
+        join(FIXTURES, "overlay-endpoint-race.html"),
+        join(FIXTURES, "collector-preemption.html"),
+        join(FIXTURES, "pdf-beforeprint-mutation.html"),
+        join(FIXTURES, "animation-intervention-removal.html"),
+      ],
+      options(join(root, "evidence")),
+    );
+    noSource = await renderDocuments(
+      [
+        join(FIXTURES, "live-chain.html"),
+        join(FIXTURES, "no-source-identities.html"),
+        join(FIXTURES, "no-source-identities.html"),
+        join(FIXTURES, "no-source-ambiguous.html"),
+      ],
+      options(join(root, "no-source-evidence"), false),
+    );
+  });
+
+  after(() => {
+    if (root) rmSync(root, { recursive: true, force: true });
+    if (outside) rmSync(outside, { recursive: true, force: true });
+  });
+
+  it("binds findings and real environment metadata on the mixed break document", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const resultSummary = result?.documents.map((document, index) => ({
+      index,
+      infrastructure: document.infrastructure.map((event) => ({ kind: event.kind, measured: event.measured })),
+    }));
+    assert.equal(
+      result?.documents.length,
+      19,
+      `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
+    );
+    assert.equal(
+      noSource?.documents.length,
+      4,
+      `the sid-less run stopped before every document; timeout/root cause=${JSON.stringify(noSource?.documents.map((d) => d.infrastructure))}`,
+    );
+    assert.ok(result?.environment);
+    assert.notEqual(result.environment.browserVersion, "");
+    assert.equal(result.environment.rendererPresent, true);
+    assert.ok(result.environment.rendererPath);
+    assert.equal(result.environment.pagedjsVersion, "0.4.3");
+    assert.ok(result.environment.rasterizer);
+    assert.ok(result.environment.fontFamiliesResolved.some((family) => family.includes("Georgia")));
+    assert.ok(result.environment.fontFamiliesResolved.some((family) => family === "serif"));
+
+    const document = result.documents[0]!;
+    assert.ok(document.snapshot);
+    assert.equal(document.infrastructure.some((event) => event.kind === "checker-crashed"), false);
+    const causes = document.snapshot.pages.flatMap((page) => [page.incomingBreakCause.kind, page.outgoingBreakCause.kind]);
+    assert.ok(causes.includes("forced"), "the production chain lost its forced break");
+    assert.ok(causes.includes("overflow"), "the production chain lost its overflow break");
+    assert.ok(causes.includes("parity"), "the production chain lost its recto/parity break");
+
+    const outcome = runDocument(document, {
+      failOn: "warn",
+      activeRules: [straightQuotes],
+      optionsByRule: {},
+      loweredFloors: {},
+    });
+    const finding = outcome.report.findings.find((item) => item.ruleId === "type/straight-quotes");
+    assert.ok(finding);
+    assert.ok(finding.evidence?.ref);
+    assert.equal(finding.evidence.bindsFinding, true);
+    assert.equal(existsSync(finding.evidence.ref), true);
+    assert.ok(outcome.report.evidence.length > 0);
+  });
+
+  it("returns real 403s for an unknown sibling and a referenced symlink escape", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    assert.ok(result?.environment);
+    assert.ok(result.environment.networkBlocked >= 2, "the loopback deny branches were not reached");
+    const document = result.documents[0]!;
+    assert.ok(document.snapshot);
+    const resources = document.snapshot.resources;
+    assert.ok(resources.some((resource) => resource.resolvedUri.endsWith("/allowed.svg") &&
+      resource.status === 200 && (resource.bytes ?? 0) > 0 && /^[a-f0-9]{64}$/u.test(resource.sha256 ?? "")));
+    assert.ok(resources.some((resource) => resource.resolvedUri.endsWith("/secret.txt") &&
+      resource.status === 403 && resource.bytes === 0 && resource.sha256 === null));
+    assert.ok(resources.some((resource) => resource.resolvedUri.endsWith("/escape.txt") &&
+      resource.status === 403 && resource.bytes === 0 && resource.sha256 === null));
+    assert.deepEqual(
+      document.snapshot.meta.inputIdentity?.resources,
+      resources.map(({ resolvedUri, status, bytes, sha256, outcome }) => ({ resolvedUri, status, bytes, sha256, outcome }))
+        .sort((a, b) => a.resolvedUri.localeCompare(b.resolvedUri)),
+    );
+  });
+
+  it("keeps measuring without source ids and never treats data-ref as source identity", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = noSource!.documents[0]!;
+    assert.ok(document.snapshot);
+    assert.ok(document.snapshot.blocks.length > 0);
+    assert.ok(document.snapshot.blocks.every((block) => block.sid === null));
+    assert.equal(document.snapshot.source.complete, false);
+    assert.deepEqual(document.snapshot.source.map, {});
+    assert.deepEqual(document.boundSids, []);
+    assert.ok(document.evidence?.every((evidence) => evidence.bindsFinding === false));
+    assert.ok(document.snapshot.blocks.every((block) => block.nodeKey.startsWith("bl:ref:")));
+    const causes = document.snapshot.pages.flatMap((page) => [page.incomingBreakCause.kind, page.outgoingBreakCause.kind]);
+    assert.ok(causes.includes("forced"));
+    assert.ok(causes.includes("overflow"));
+    assert.ok(causes.includes("parity"));
+  });
+
+  it("detects a style-only injection effect in the paired real-browser control", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const sabotage = result!.documents[1]!;
+    const event = sabotage.infrastructure.find((item) => item.kind === "injection-interference");
+    assert.ok(event, "the paired control did not detect the constructed attribute selector");
+    assert.deepEqual((event.measured as { changed?: string[] } | null)?.changed, ["style"]);
+    assert.equal(
+      sabotage.snapshot?.meta.interventions.includes("evidence-overlay"),
+      false,
+      "a fatal pre-evidence path claimed an overlay it never ran",
+    );
+  });
+
+  it("disables animations before measurement and reports that intervention", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const animated = result!.documents[2]!;
+    assert.ok(animated.snapshot);
+    assert.equal(animated.infrastructure.some((item) => item.kind === "document-not-quiescent"), false);
+    assert.ok(animated.snapshot.meta.interventions.includes("animations-disabled"));
+  });
+
+  it("detects a runtime-only URI change in the paired resource signature", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const sabotage = result!.documents[3]!;
+    const event = sabotage.infrastructure.find((item) => item.kind === "injection-interference");
+    assert.ok(event, "the paired control ignored a URI changed only when the injected id existed");
+    assert.deepEqual((event.measured as { changed?: string[] } | null)?.changed, ["resources"]);
+  });
+
+  it("measures fill from visible line/replaced/table rectangles, including foot and blank controls", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const snapshot = result!.documents[4]!.snapshot;
+    assert.ok(snapshot);
+    const footer = snapshot.blocks.find((block) => block.authorId === "footer-line");
+    assert.ok(footer);
+    const footerFill = snapshot.pages[footer.page - 1]!.fill;
+    assert.ok(footerFill.vertical > 0.8, `footer vertical=${footerFill.vertical}`);
+    assert.ok(footerFill.topGap > 0.7, `footer topGap=${footerFill.topGap}`);
+    assert.ok(footerFill.net < 0.2, `footer net=${footerFill.net}`);
+    assert.ok(footerFill.area < 0.2, `footer area=${footerFill.area}`);
+    assert.ok(snapshot.pages[0]!.fill.net > 0.45, `full net=${snapshot.pages[0]!.fill.net}`);
+    const blank = result!.documents[0]!.snapshot!.pages.find((page) => page.blank);
+    assert.ok(blank);
+    assert.deepEqual(blank.fill, { vertical: 0, topGap: 0, net: 0, area: 0 });
+  });
+
+  it("turns a failed @font-face into fatal font-load-failed", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[5]!;
+    assert.equal(document.snapshot, null);
+    assert.ok(document.infrastructure.some((event) => event.kind === "font-load-failed"));
+  });
+
+  it("counts a naked image but excludes hidden descendant text from fill", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const snapshot = result!.documents[7]!.snapshot;
+    assert.ok(snapshot);
+    assert.equal(snapshot.pages[0]!.blank, false, "an image-only page was classified as blank");
+    assert.ok(snapshot.pages[0]!.fill.area > 0, "the image rectangle did not contribute real area");
+    const hidden = snapshot.blocks.find((block) => block.authorId === "hidden-page");
+    assert.ok(hidden);
+    assert.deepEqual(hidden.lines, []);
+    const hiddenPage = snapshot.pages[hidden.page - 1]!;
+    assert.equal(hiddenPage.blank, false, "an authored empty-visual block became a generated blank page");
+    assert.deepEqual(hiddenPage.fill, { vertical: 0, topGap: 0, net: 0, area: 0 });
+  });
+
+  it("measures anonymous and inline-only visible text without inventing a source block", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const snapshot = result!.documents[8]!.snapshot;
+    assert.ok(snapshot);
+    assert.equal(snapshot.pages[0]!.blank, false);
+    assert.ok(snapshot.pages[0]!.fill.net > 0);
+    assert.ok(snapshot.pages[0]!.fill.area > 0);
+  });
+
+  it("keeps sid-less source identity, exclusions and page anchors stable across two renders", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const outcomes = noSource!.documents.slice(1, 3).map((document) => runDocument(document, {
+      failOn: "warn",
+      activeRules: [straightQuotes],
+      optionsByRule: {},
+      loweredFloors: {},
+    }));
+    for (const outcome of outcomes) {
+      assert.equal(outcome.report.findings.length, 2, "the quote inside code was not excluded");
+      assert.ok(outcome.report.findings.every((finding) => finding.source === null));
+      assert.equal(new Set(outcome.report.findings.map((finding) => finding.fingerprint)).size, 2);
+      assert.ok(noSource!.documents[1]!.snapshot!.pages.every((page) => page.blank || page.firstSemanticBlockKey));
+    }
+    const sidlessSnapshot = noSource!.documents[1]!.snapshot!;
+    const emptyAnchor = sidlessSnapshot.blocks.find((block) => block.authorId === "empty-anchor");
+    const emptyFigure = sidlessSnapshot.blocks.find((block) => block.authorId === "empty-figure");
+    assert.ok(emptyAnchor);
+    assert.ok(emptyFigure);
+    assert.equal(emptyAnchor.blockSignature, "");
+    assert.equal(emptyFigure.blockSignature, "");
+    assert.equal(
+      sidlessSnapshot.pages[0]!.firstSemanticBlockKey,
+      blockKey({ authorId: "empty-anchor", blockSignature: "" }),
+      "an empty first semantic source block was skipped as if empty signature meant no identity",
+    );
+    assert.deepEqual(
+      outcomes[0]!.report.findings.map((finding) => finding.fingerprint).sort(),
+      outcomes[1]!.report.findings.map((finding) => finding.fingerprint).sort(),
+    );
+    const mapped = runDocument(result!.documents[6]!, {
+      failOn: "warn", activeRules: [straightQuotes], optionsByRule: {}, loweredFloors: {},
+    });
+    assert.equal(mapped.report.findings.length, 2);
+  });
+
+  it("fails closed when author code swaps injected source ids at runtime", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[9]!;
+    assert.equal(document.snapshot, null);
+    assert.ok(document.infrastructure.some((event) =>
+      event.kind === "checker-crashed" && /runtime source-id integrity/u.test(event.detail)));
+  });
+
+  it("keeps collector/freeze/overlay measurements pristine after post-pagination global poisoning", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[10]!;
+    assert.ok(document.snapshot);
+    assert.equal(document.infrastructure.some((event) => event.kind === "checker-crashed"), false);
+    const outcome = runDocument(document, {
+      failOn: "warn", activeRules: [straightQuotes], optionsByRule: {}, loweredFloors: {},
+    });
+    assert.equal(outcome.report.findings.length, 1);
+    assert.equal(outcome.report.findings[0]!.evidence?.bindsFinding, true);
+  });
+
+  it("rejects late scripted content through the paired control or pre-PDF reconciliation", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const event = result!.documents[11]!.infrastructure.find((item) =>
+      item.kind === "document-not-quiescent" || item.kind === "injection-interference");
+    assert.ok(event, "late DOM content reached the delivered state without invalidating measurement");
+    assert.ok(Number(event.measured?.mutationDelta ?? 0) > 0 || event.detail.includes("control quantities"));
+  });
+
+  it("runs paired controls at one pathname in fresh storage-isolated contexts", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[12]!;
+    assert.ok(document.snapshot);
+    assert.equal(document.infrastructure.some((event) => event.kind === "injection-interference"), false);
+  });
+
+  it("rejects network activity that begins after the measured state", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const event = result!.documents[13]!.infrastructure.find((item) => item.kind === "document-not-quiescent");
+    assert.ok(event);
+    assert.ok(Number(event.measured?.networkActivity ?? 0) > 0);
+  });
+
+  it("rejects an author-triggered pagination preview before the Node-controlled epoch", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[14]!;
+    assert.equal(document.snapshot, null);
+    assert.ok(document.infrastructure.some((event) =>
+      event.kind === "checker-crashed" && /pagination|Paged was defined/iu.test(event.detail)));
+  });
+
+  it("rejects an author call racing the capability-gated evidence overlay", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[15]!;
+    assert.ok(document.snapshot);
+    assert.ok(document.infrastructure.some((event) =>
+      event.kind === "checker-crashed" && /overlay.*raced by author code/u.test(event.detail)));
+  });
+
+  it("rejects author collector installation without the Node-held capability", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[16]!;
+    assert.equal(document.snapshot, null);
+    assert.ok(document.infrastructure.some((event) =>
+      event.kind === "checker-crashed" && /capability rejected|page error/iu.test(event.detail)));
+  });
+
+  it("invalidates a PDF when beforeprint mutates the measured page", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[17]!;
+    assert.equal(document.snapshot, null, "a PDF produced across mutation remained reportable");
+    assert.ok(document.infrastructure.some((event) =>
+      event.kind === "checker-crashed" && /PDF changed the measured state|PDF precondition failed/iu.test(event.detail)));
+  });
+
+  it("fails closed when author code removes the animation intervention", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[18]!;
+    assert.equal(document.snapshot, null);
+    assert.ok(document.infrastructure.some((event) =>
+      event.kind === "checker-crashed" && /animation intervention failed/iu.test(event.detail)));
+  });
+
+  it("refuses an ambiguous sid-less source join instead of inventing author identity", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = noSource!.documents[3]!;
+    assert.equal(document.snapshot, null);
+    assert.ok(document.infrastructure.some((event) =>
+      event.kind === "checker-crashed" && /sid-less exact source identity join ambiguous/iu.test(event.detail)));
+  });
+
+  it("keeps duplicate-input evidence paths disjoint and records loaded redirect provenance", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const duplicate = await renderDocuments(
+      [join(FIXTURES, "apparatus-sabotage.html"), join(FIXTURES, "apparatus-sabotage.html")],
+      options(join(root, "duplicate-evidence")),
+    );
+    const paths = duplicate.documents.flatMap((document) => document.evidence?.map((item) => item.path) ?? []);
+    assert.ok(paths.length >= 2);
+    assert.equal(new Set(paths).size, paths.length, "a later duplicate input overwrote an earlier evidence path");
+
+    const server = createServer((request, response) => {
+      if (request.url === "/redirect.svg") { response.writeHead(302, { location: "/image.svg" }).end(); return; }
+      if (request.url === "/image.svg") {
+        const body = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8"/></svg>';
+        response.writeHead(200, {
+          "content-type": "image/svg+xml", "content-length": Buffer.byteLength(body), "access-control-allow-origin": "*",
+        }).end(body);
+        return;
+      }
+      response.writeHead(404).end();
+    });
+    await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+    const address = server.address() as AddressInfo;
+    const origin = `http://127.0.0.1:${address.port}`;
+    const networkDoc = join(root, "network.html");
+    writeFileSync(networkDoc, `<!doctype html><img src="${origin}/redirect.svg"><p>network provenance</p>`);
+    try {
+      const network = await renderDocuments([networkDoc], {
+        ...options(join(root, "network-evidence")), network: { mode: "allowlist", allowed: [origin] },
+      });
+      const snapshot = network.documents[0]!.snapshot;
+      assert.ok(snapshot);
+      const loaded = snapshot.resources.find((resource) => resource.resolvedUri === `${origin}/image.svg`);
+      assert.equal(loaded?.outcome, "loaded");
+      assert.equal(loaded?.status, 200);
+      assert.ok((loaded?.bytes ?? 0) > 0);
+      assert.match(loaded?.sha256 ?? "", /^[a-f0-9]{64}$/u);
+      assert.deepEqual(snapshot.meta.inputIdentity?.redirects, [
+        { from: `${origin}/redirect.svg`, to: `${origin}/image.svg`, status: 302 },
+      ]);
+    } finally {
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    }
+  });
+});

@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><style>@page{size:120mm 80mm;margin:10mm}</style></head>
+<body>
+  <p>Beide Kontrollarme muessen denselben Pfad und frischen Storage sehen.</p>
+  <script>
+    const contaminated = location.pathname !== '/document.html' || localStorage.getItem('breaklint-control-seen') !== null;
+    localStorage.setItem('breaklint-control-seen', 'yes');
+    if (contaminated) document.querySelector('p').style.color = 'rgb(200, 0, 0)';
+  </script>
+</body></html>

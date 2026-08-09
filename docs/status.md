@@ -188,18 +188,17 @@ in `unverified`, which says "no evidence" rather than "the apparatus is broken".
 honest weaker statement, and it is a limit of the mark-based method rather than of this
 implementation.
 
-## Not finished
+## Live measurement path and remaining work
 
-**The live render path as a whole.** `src/acquire/render-run.ts` resolves the browser and
-enforces the Paged.js version gate, and then stops with exit 3 and an infrastructure event
-naming the stage. It does not return an empty snapshot and it never reports a clean document.
+**M2/M2d is built as one live chain.** `src/acquire/render-run.ts` loads each document from an
+owned loopback origin, enforces the renderer and paginator gates, waits at the resource boundary,
+paginates, collects and validates the snapshot, runs the rule engine, and attaches the evidence
+outcome to the document report. The old unconditional `checker-crashed` branch is gone.
+`checker-crashed` itself is not gone: driver resets, deliberately injected boundary failures,
+apparatus races, unverified cleanup and other real process-boundary faults still produce that
+fatal result and exercise the exit matrix.
 
-Still to build: the snapshot collection itself, and the loader that ties the pieces below into one
-run. Until those exist there is no snapshot, so the evidence path above has no report to attach
-itself to — it is exercised by its own live suite and by nothing else.
-
-**Three pieces of the measurement path do exist and are checked against a real browser.** They
-are listed separately from the finished work above because on their own they produce no report:
+The components below are now connected rather than isolated pieces:
 
 | | |
 |---|---|
@@ -208,6 +207,19 @@ are listed separately from the finished work above because on their own they pro
 | Untouched primitives | references captured before any author script runs. Measured: a document that replaces `getBoundingClientRect`, `getComputedStyle` and `querySelectorAll` after pagination sees `x:999` and `"HIJACKED"`, and the probe reads values byte-identical to a clean run across all seven components. The positive control is in the same test — a naive collector under the same attack loses its boxes entirely, 5 097 characters to 0 |
 | Geometry cross-check | a sample compared against CDP `DOM.getBoxModel`, which reads the browser's layout tree out of process. The two agree EXACTLY on this corpus, twice; a systematic 0.002 px disagreement fails the suite |
 | Break-cause collector | all five Paged.js hooks registered and each one verified to have fired; boundaries classified from the three attributes the paginator writes, on a document carrying six boundary kinds at once |
+
+**Still unfinished:** M3's real-renderer SVG ink passes and calibration of every threshold; the
+M4+ corpus, packaging and release milestones also remain open. A green M2/M2d run therefore says
+that the implemented measurement chain behaved as specified for that run, not that its rule
+thresholds have been validated against human-labelled production documents.
+
+**Input identity remains bounded by L-07.** The report records the HTML hash, observed resource
+status/bytes/hash and redirects, renderer/platform data and resolved font-family names. It does
+not yet supply platform-stable `systemFontIds`, and canonical treatment of every dynamically
+loaded resource is not complete. “Same input identity implies the same findings” is therefore
+still an intended contract, not a guarantee over inputs outside the fields actually captured.
+The process-tree and profile-cleanup behaviour has real macOS evidence; an equivalent empirical
+Linux run is still missing, and Windows remains unsupported.
 
 **The break cause comes from the paginator's own attributes, and the two alternatives are
 measured-refuted rather than merely rejected.** Reading the browser cascade is wrong in 4 of 19
@@ -287,10 +299,11 @@ because `setContent` writes into the existing document; `window.__blPrimitives` 
 `undefined` and the collector threw. And a `file://` origin cannot read `cssRules`, which is where
 the cascade hint comes from. Both are pinned by tests that fail if either ever changes.
 
-**What the evidence path does not yet get from the product.** The marks are placed on elements
-carrying `data-bl-sid`. That attribute is injected into the source text before parsing, and that
-injector is part of the probe. The live suite therefore supplies the attribute in its fixtures.
-Everything downstream of the attribute is the production path; the attribute itself is not.
+**Source identity is part of the product path.** The live loader injects `data-bl-sid` into source
+text before parsing and carries the resulting source map through snapshot assembly and evidence
+binding. With `--no-source-map`, measurement continues without those attributes and source
+locations/evidence binding are deliberately unavailable; source-null does not erase the stable
+block identity used by rule fingerprints.
 
 **Two limits of the evidence path that are known and not yet fixed.** The rasteriser holds a
 whole rasterised document in the page while it compares, so peak memory grows with the page
@@ -321,9 +334,9 @@ than a wrong layout. Both numbers are written down because the difference betwee
 wrong" and "one non-normative field is null" is exactly the sort of thing that gets remembered as
 the larger of the two.
 
-**What that means for a reader today.** `--demo` shows what the rules do and what a report looks
-like. It does not show the render path, and the report says so in its own `mode` and `source`
-fields rather than leaving you to assume.
+**What that means for a reader today.** `--demo` still shows the rule and reporter chain over its
+stored fixture. Passing HTML paths exercises the M2/M2d render path, and the report distinguishes
+those two cases in its own `mode` and `source` fields rather than leaving the reader to infer it.
 
 ## What no amount of testing here establishes
 

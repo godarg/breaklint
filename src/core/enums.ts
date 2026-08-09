@@ -225,6 +225,7 @@ export const COVERAGE_FLOOR_BY_SEVERITY: Readonly<Record<Severity, number>> = {
 
 /** The one Paged.js version this release is measured against. Not a range — see `docs/`. */
 export const SUPPORTED_PAGEDJS_VERSION = "0.4.3";
+export const SUPPORTED_PDFJS_VERSION = "6.2.108";
 
 /** Report and snapshot schema version. Raised on every incompatible change, both together. */
 export const SCHEMA_VERSION = 2;

@@ -230,6 +230,7 @@ export interface ResourceRecord {
   status: number | null;
   bytes: number | null;
   sha256: string | null;
+  outcome: "loaded" | "blocked" | "failed";
 }
 
 export interface NotMeasured {
@@ -243,7 +244,13 @@ export interface NotMeasured {
 
 export interface InputIdentity {
   html: string;
-  resources: { resolvedUri: string; status: number | null; bytes: number | null; sha256: string | null }[];
+  resources: {
+    resolvedUri: string;
+    status: number | null;
+    bytes: number | null;
+    sha256: string | null;
+    outcome: "loaded" | "blocked" | "failed";
+  }[];
   resourcesHash: string;
   browserVersion: string;
   platform: string;

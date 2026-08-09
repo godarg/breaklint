@@ -71,8 +71,10 @@ authoritative.
 
 **PNG output is evidence, never a comparison basis.** Byte-identical rendering across machines
 is not achievable — browser rendering varies with the host OS, version, settings, hardware and
-headless mode. This tool guarantees finding determinism for a given input identity and nothing
-about pixels. No check compares file hashes.
+headless mode. The report records an input identity so that reproducibility can eventually be
+stated over more than the HTML file alone, but that is an intention rather than a determinism
+guarantee today. L-07 remains open: system-font identifiers and the canonical treatment of
+dynamically loaded resources are not complete. No check compares output file hashes.
 
 **Findings depend on font availability.** A missing `@font-face` changes metrics, line breaks
 and page breaks, and turns a correct page into a phantom half-empty-page finding. The run waits
@@ -88,12 +90,16 @@ writes into the tree and does not guarantee as an interface. Any other resolved 
 the run with exit 3, and no flag overrides that: a report produced on an unmeasured paginator
 states things nobody measured.
 
-**Windows is not supported.** Process termination here rests on POSIX process groups, measured
-on macOS and Linux. Windows job objects are neither designed for nor measured.
+**Windows is not supported.** Process termination here rests on POSIX process groups. The
+termination and profile-cleanup path is measured on macOS; equivalent Linux behaviour has not
+yet been established empirically. Windows job objects are neither designed for nor measured.
 
-**The live render path is not finished in this release.** `--demo` exercises the rule and
-reporter chain over a stored snapshot. A live run resolves the browser and the paginator, and
-then stops with exit 3 rather than returning an empty document — see `docs/status.md`.
+**The M2/M2d live render path is built.** A live run loads the document through an owned loopback
+origin, paginates it, assembles and validates the snapshot, runs the rules, and binds evidence to
+the report. `checker-crashed` remains a real exit-3 path for injected driver failures, apparatus
+interference and process-boundary faults; it is not a placeholder for an unbuilt live path.
+M3's SVG ink passes and threshold calibration, and the M4+ release work, remain unfinished — see
+`docs/status.md`.
 
 ## Exit codes
 
@@ -128,11 +134,11 @@ code from a foreign repository inside CI.
 
 ## Requirements
 
-Node 20 or newer. A live run additionally needs a Chromium-based browser and
-`pagedjs@0.4.3`; `pdftoppm` is detected if present and never shipped.
+Node 20 or newer. A live run additionally needs a Chromium-based browser, `pagedjs@0.4.3` and
+`pdfjs-dist`; `pdftoppm` is detected if present and never shipped.
 
 ```bash
-npm i -D puppeteer-core pagedjs@0.4.3
+npm i -D puppeteer-core pagedjs@0.4.3 pdfjs-dist@6.2.108
 ```
 
 ## Running foreign HTML

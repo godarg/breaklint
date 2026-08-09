@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><style>@page{size:120mm 80mm;margin:10mm}</style></head>
+<body>
+  <p>The snapshot is taken before PDF production.</p>
+  <script>
+    addEventListener('beforeprint', () => {
+      if (!document.querySelector('.pagedjs_page')) return;
+      const node = document.createElement('span');
+      node.textContent = 'mutation during page.pdf';
+      document.querySelector('.pagedjs_page_content').appendChild(node);
+    });
+  </script>
+</body></html>

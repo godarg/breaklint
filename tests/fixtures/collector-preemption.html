@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><style>@page{size:120mm 80mm;margin:10mm}</style></head>
+<body>
+  <script>
+    // The capability is held by Node. A wrong install attempt must throw and be captured as a
+    // fatal pageerror; it must never reserve a public collector endpoint.
+    window.__blPrimitives.installCollector('author-does-not-know-the-capability', 'forged', () => ({
+      pages: [], hooks: { beforePageLayout: 1, layoutNode: 1, renderNode: 1, afterPageLayout: 1, afterRendered: 1 },
+      discardedRecords: 0, unreconciledPages: 0, attributeDrift: [], epochCount: 1,
+    }));
+  </script>
+  <p>Collector preemption must stop the document.</p>
+</body></html>

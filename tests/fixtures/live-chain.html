@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: 120mm 80mm; margin: 10mm; }
+    body { margin: 0; font: 9pt/1.4 Georgia, serif; }
+    p, h2 { margin: 0 0 7px; }
+    .chapter { break-before: page; }
+    .recto { break-before: recto; }
+  </style>
+</head>
+<body>
+  <p id="opening">Er sagte "ja". Dieser Satz liefert zugleich einen echten Typografie-Befund.</p>
+  <p>Text vor dem erzwungenen Umbruch.</p>
+  <h2 class="chapter">Kapitel</h2>
+  <p>Text nach dem erzwungenen Umbruch.</p>
+  <p>Fülltext eins, der gemeinsam mit den folgenden Absätzen einen natürlichen Überlauf erzeugt.</p>
+  <p>Fülltext zwei, der gemeinsam mit den folgenden Absätzen einen natürlichen Überlauf erzeugt.</p>
+  <p>Fülltext drei, der gemeinsam mit den folgenden Absätzen einen natürlichen Überlauf erzeugt.</p>
+  <p>Fülltext vier, der gemeinsam mit den folgenden Absätzen einen natürlichen Überlauf erzeugt.</p>
+  <p>Fülltext fünf, der gemeinsam mit den folgenden Absätzen einen natürlichen Überlauf erzeugt.</p>
+  <p>Fülltext sechs, der gemeinsam mit den folgenden Absätzen einen natürlichen Überlauf erzeugt.</p>
+  <h2 class="recto">Recto-Kapitel</h2>
+  <p>Text nach der paritätsbedingten Leerseite.</p>
+  <script>
+    fetch('/secret.txt').then((response) => { window.__localSiblingStatus = response.status; });
+  </script>
+</body>
+</html>

@@ -38,7 +38,11 @@
  * a worker before this runs, and none is claimed: this raises the cost of the attack, and the
  * raster comparison in `evidence.ts` remains the check that does not run in the page at all.
  */
-export const PRIMITIVES_SOURCE = `(() => {
+const TEST_APPARATUS_CAPABILITY = "breaklint-static-test-capability";
+const APPARATUS_CAPABILITY_MARKER = "__BREAKLINT_NODE_CAPABILITY__";
+
+const PRIMITIVES_TEMPLATE = `(() => {
+  const apparatusCapability = "${APPARATUS_CAPABILITY_MARKER}";
   const call = Function.prototype.call;
   const rectFn = Element.prototype.getBoundingClientRect;
   const rectsFn = Element.prototype.getClientRects;
@@ -46,29 +50,244 @@ export const PRIMITIVES_SOURCE = `(() => {
   const qsaFn = Element.prototype.querySelectorAll;
   const docQsaFn = Document.prototype.querySelectorAll;
   const sliceFn = Array.prototype.slice;
+  const startsWithFn = String.prototype.startsWith;
   // Attribute access belongs here for the same reason geometry does. An audit found the break
   // collector calling 'el.getAttribute' and 'el.hasAttribute' directly while its own header claimed
   // everything went through captured references — a comment promising more than the code delivered.
   // Those two methods decide the break cause: a replaced 'getAttribute' returning "page" makes
   // every boundary look forced, which silences four layout rules on a whole document.
   const getAttrFn = Element.prototype.getAttribute;
+  const setAttrFn = Element.prototype.setAttribute;
   const hasAttrFn = Element.prototype.hasAttribute;
   const closestFn = Element.prototype.closest;
   const textOf = Object.getOwnPropertyDescriptor(Node.prototype, "textContent").get;
+  const textSet = Object.getOwnPropertyDescriptor(Node.prototype, "textContent").set;
+  const parentOf = Object.getOwnPropertyDescriptor(Node.prototype, "parentNode").get;
+  const nextOf = Object.getOwnPropertyDescriptor(Node.prototype, "nextSibling").get;
+  const childrenOf = Object.getOwnPropertyDescriptor(Node.prototype, "childNodes").get;
+  const createElementFn = Document.prototype.createElement;
+  const appendChildFn = Node.prototype.appendChild;
+  const removeChildFn = Node.prototype.removeChild;
+  const addEventListenerFn = EventTarget.prototype.addEventListener;
+  const definePropertyFn = Object.defineProperty;
+  const freezeFn = Object.freeze;
+  const randomValuesFn = Crypto.prototype.getRandomValues;
+  const numberToStringFn = Number.prototype.toString;
+  const padStartFn = String.prototype.padStart;
+  const cssTextSet = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, "cssText").set;
+  const setPropertyFn = CSSStyleDeclaration.prototype.setProperty;
+  const createRangeFn = Document.prototype.createRange;
+  const rangeSelectNodeFn = Range.prototype.selectNodeContents;
+  const rangeSetStartFn = Range.prototype.setStart;
+  const rangeSetEndFn = Range.prototype.setEnd;
+  const rangeRectsFn = Range.prototype.getClientRects;
+  const imageDecodeFn = HTMLImageElement.prototype.decode;
+  const descriptor = Object.getOwnPropertyDescriptor;
+  const getter = (prototype, name) => {
+    let at = prototype;
+    while (at) {
+      const found = descriptor(at, name);
+      if (found && found.get) return found.get;
+      at = Object.getPrototypeOf(at);
+    }
+    return null;
+  };
+  const rectXGet = getter(DOMRectReadOnly.prototype, "x");
+  const rectYGet = getter(DOMRectReadOnly.prototype, "y");
+  const rectWidthGet = getter(DOMRectReadOnly.prototype, "width");
+  const rectHeightGet = getter(DOMRectReadOnly.prototype, "height");
+  const rectTopGet = getter(DOMRectReadOnly.prototype, "top");
+  const rectRightGet = getter(DOMRectReadOnly.prototype, "right");
+  const rectBottomGet = getter(DOMRectReadOnly.prototype, "bottom");
+  const rectLeftGet = getter(DOMRectReadOnly.prototype, "left");
+  const rectValue = (value) => ({
+    x: call.call(rectXGet, value), y: call.call(rectYGet, value),
+    width: call.call(rectWidthGet, value), height: call.call(rectHeightGet, value),
+    top: call.call(rectTopGet, value), right: call.call(rectRightGet, value),
+    bottom: call.call(rectBottomGet, value), left: call.call(rectLeftGet, value),
+  });
+  const rectValues = (list) => {
+    const raw = call.call(sliceFn, list), out = [];
+    for (let index = 0; index < raw.length; index += 1) out[index] = rectValue(raw[index]);
+    return out;
+  };
+  const styleGet = getter(HTMLElement.prototype, "style");
+  const fontsGet = getter(Document.prototype, "fonts");
+  const fontReadyGet = getter(FontFaceSet.prototype, "ready");
+  const fontIteratorFn = FontFaceSet.prototype[Symbol.iterator];
+  const fontIterator = call.call(fontIteratorFn, call.call(fontsGet, document));
+  const fontIteratorNextFn = fontIterator.next;
+  const fontStatusGet = getter(FontFace.prototype, "status");
+  const fontFamilyGet = getter(FontFace.prototype, "family");
+  const imageCurrentSrcGet = getter(HTMLImageElement.prototype, "currentSrc");
+  const imageSrcGet = getter(HTMLImageElement.prototype, "src");
+  const imageNaturalWidthGet = getter(HTMLImageElement.prototype, "naturalWidth");
+  const imageNaturalHeightGet = getter(HTMLImageElement.prototype, "naturalHeight");
+  const videoCurrentSrcGet = getter(HTMLMediaElement.prototype, "currentSrc");
+  const videoSrcGet = getter(HTMLMediaElement.prototype, "src");
+  const objectDataGet = getter(HTMLObjectElement.prototype, "data");
+  const frameSrcGet = getter(HTMLIFrameElement.prototype, "src");
+  const svgBBoxFn = SVGGraphicsElement.prototype.getBBox;
+  const svgScreenCtmFn = SVGGraphicsElement.prototype.getScreenCTM;
+  const DOMPointCtor = DOMPoint;
+  const matrixTransformFn = DOMPoint.prototype.matrixTransform;
+  const canvasContextFn = HTMLCanvasElement.prototype.getContext;
+  const canvasWidthGet = getter(HTMLCanvasElement.prototype, "width");
+  const canvasHeightGet = getter(HTMLCanvasElement.prototype, "height");
+  const imageDataFn = CanvasRenderingContext2D.prototype.getImageData;
+  const imageDataGet = getter(ImageData.prototype, "data");
+  const styleSheetsGet = getter(Document.prototype, "styleSheets");
+  const adoptedStyleSheetsGet = getter(Document.prototype, "adoptedStyleSheets");
+  const sheetHrefGet = getter(StyleSheet.prototype, "href");
+  const sheetRulesGet = getter(CSSStyleSheet.prototype, "cssRules");
+  const ruleCssTextGet = getter(CSSRule.prototype, "cssText");
+  const groupingRulesGet = typeof CSSGroupingRule === "undefined" ? null : getter(CSSGroupingRule.prototype, "cssRules");
+  const mutationTypeGet = getter(MutationRecord.prototype, "type");
+  const mutationAttributeNameGet = getter(MutationRecord.prototype, "attributeName");
+  let integrity = null;
+  let collector = null;
+  const requireCapability = (candidate) => {
+    if (candidate !== apparatusCapability) throw new Error("breaklint apparatus capability rejected");
+  };
 
   Object.defineProperty(window, "__blPrimitives", {
-    value: Object.freeze({
-      rect: (el) => call.call(rectFn, el),
-      rects: (el) => call.call(rectsFn, el),
+    value: call.call(freezeFn, Object, {
+      rect: (el) => rectValue(call.call(rectFn, el)),
+      rects: (el) => rectValues(call.call(rectsFn, el)),
       style: (el, pseudo) => call.call(styleFn, window, el, pseudo),
       all: (root, selector) => {
         const fn = root === document ? docQsaFn : qsaFn;
         return call.call(sliceFn, call.call(fn, root, selector));
       },
+      startsWith: (value, prefix) => call.call(startsWithFn, String(value), prefix),
       attr: (el, name) => (el ? call.call(getAttrFn, el, name) : null),
+      setAttr: (el, name, value) => call.call(setAttrFn, el, name, value),
       hasAttr: (el, name) => (el ? call.call(hasAttrFn, el, name) === true : false),
       closest: (el, selector) => (el ? call.call(closestFn, el, selector) : null),
       text: (node) => (node ? call.call(textOf, node) : ""),
+      setText: (node, value) => call.call(textSet, node, value),
+      parent: (node) => call.call(parentOf, node),
+      next: (node) => call.call(nextOf, node),
+      children: (node) => (node ? call.call(sliceFn, call.call(childrenOf, node)) : []),
+      create: (tag) => call.call(createElementFn, document, tag),
+      append: (parent, child) => call.call(appendChildFn, parent, child),
+      remove: (node) => { const parent = call.call(parentOf, node); return parent ? call.call(removeChildFn, parent, node) : null; },
+      setCssText: (el, value) => call.call(cssTextSet, call.call(styleGet, el), value),
+      setStyle: (el, name, value, priority) => call.call(setPropertyFn, call.call(styleGet, el), name, value, priority),
+      on: (target, name, listener, options) => call.call(addEventListenerFn, target, name, listener, options),
+      invoke0: (fn, receiver) => call.call(fn, receiver),
+      installIntegrity: (capability, value) => {
+        requireCapability(capability);
+        if (integrity !== null) throw new Error("breaklint integrity apparatus installed twice");
+        integrity = call.call(freezeFn, Object, value);
+      },
+      integrityArmLate: (capability) => { requireCapability(capability); return integrity.armLate(); },
+      integrityRecordPreview: (capability) => { requireCapability(capability); return integrity.recordPreview(); },
+      integrityStatus: (capability) => { requireCapability(capability); return integrity.status(); },
+      installCollector: (capability, nonce, value) => {
+        requireCapability(capability);
+        if (collector !== null) throw new Error("breaklint collector installed twice");
+        collector = call.call(freezeFn, Object, { nonce, value });
+      },
+      collectorResult: (capability, nonce) => {
+        requireCapability(capability);
+        if (!collector || collector.nonce !== nonce) throw new Error("breaklint collector identity rejected");
+        return collector.value();
+      },
+      lockPagination: (target, name, value) => {
+        if (target !== window.Paged?.Previewer?.prototype || name !== "preview") {
+          throw new Error("breaklint pagination lock target rejected");
+        }
+        return call.call(definePropertyFn, Object, target, name, {
+          value, writable: false, configurable: false, enumerable: false,
+        });
+      },
+      lockPreviewer: (target, name, value) => {
+        if (target !== window.Paged || name !== "Previewer" || value !== window.Paged.Previewer) {
+          throw new Error("breaklint Previewer lock target rejected");
+        }
+        return call.call(definePropertyFn, Object, target, name, {
+          value, writable: false, configurable: false, enumerable: false,
+        });
+      },
+      publishFreeze: (value) => call.call(definePropertyFn, Object, window, "__blFreezeParts", {
+        value, writable: false, configurable: false, enumerable: false,
+      }),
+      publishOverlay: (value) => call.call(definePropertyFn, Object, window, "__blOverlayControl", {
+        value, writable: false, configurable: false, enumerable: false,
+      }),
+      mutationType: (record) => call.call(mutationTypeGet, record),
+      mutationAttributeName: (record) => call.call(mutationAttributeNameGet, record),
+      randomToken: () => {
+        const words = new Uint32Array(4);
+        call.call(randomValuesFn, window.crypto, words);
+        let token = "";
+        for (let index = 0; index < words.length; index += 1) {
+          token += call.call(padStartFn, call.call(numberToStringFn, words[index], 16), 8, "0");
+        }
+        return token;
+      },
+      decodeImage: (image) => call.call(imageDecodeFn, image),
+      imageUri: (image) => call.call(imageCurrentSrcGet, image) || call.call(imageSrcGet, image) || "",
+      fonts: () => call.call(fontsGet, document),
+      fontsReady: (set) => call.call(fontReadyGet, set),
+      fontFaces: (set) => {
+        const out = [];
+        const iterator = call.call(fontIteratorFn, set);
+        while (true) {
+          const item = call.call(fontIteratorNextFn, iterator);
+          if (item.done) return out;
+          out.push(item.value);
+        }
+      },
+      fontStatus: (face) => call.call(fontStatusGet, face),
+      fontFamily: (face) => call.call(fontFamilyGet, face),
+      svgBounds: (el) => {
+        const bb = call.call(svgBBoxFn, el);
+        const matrix = call.call(svgScreenCtmFn, el);
+        if (!matrix) return null;
+        const point = (x, y) => call.call(matrixTransformFn, new DOMPointCtor(x, y), matrix);
+        return { bb, first: point(bb.x, bb.y), last: point(bb.x + bb.width, bb.y + bb.height) };
+      },
+      replaced: (el) => {
+        const tag = el.tagName;
+        if (tag === "IMG") return { source: call.call(imageCurrentSrcGet, el) || call.call(imageSrcGet, el) || "",
+          naturalWidth: call.call(imageNaturalWidthGet, el), naturalHeight: call.call(imageNaturalHeightGet, el) };
+        if (tag === "VIDEO") return { source: call.call(videoCurrentSrcGet, el) || call.call(videoSrcGet, el) || "",
+          naturalWidth: 0, naturalHeight: 0 };
+        if (tag === "OBJECT") return { source: call.call(objectDataGet, el) || "", naturalWidth: 0, naturalHeight: 0 };
+        return { source: call.call(frameSrcGet, el) || "", naturalWidth: 0, naturalHeight: 0 };
+      },
+      canvas: (el) => {
+        const width = call.call(canvasWidthGet, el), height = call.call(canvasHeightGet, el);
+        try {
+          const context = call.call(canvasContextFn, el, "2d");
+          const image = call.call(imageDataFn, context, 0, 0, width, height);
+          return { width, height, data: call.call(imageDataGet, image) };
+        } catch (_) {
+          // Layout dimensions remain measurable even when the bitmap is tainted/unreadable.
+          return { width, height, data: null };
+        }
+      },
+      styleSheets: () => {
+        const regular = call.call(sliceFn, call.call(styleSheetsGet, document));
+        const adopted = adoptedStyleSheetsGet ? call.call(sliceFn, call.call(adoptedStyleSheetsGet, document)) : [];
+        return regular.concat(adopted);
+      },
+      sheetHref: (sheet) => call.call(sheetHrefGet, sheet),
+      sheetRules: (sheet) => call.call(sliceFn, call.call(sheetRulesGet, sheet)),
+      ruleCssText: (rule) => call.call(ruleCssTextGet, rule),
+      nestedRules: (rule) => groupingRulesGet ? call.call(sliceFn, call.call(groupingRulesGet, rule)) : [],
+      range: (node, start, end) => {
+        const range = call.call(createRangeFn, document);
+        if (typeof start === "number" && typeof end === "number") {
+          call.call(rangeSetStartFn, range, node, start);
+          call.call(rangeSetEndFn, range, node, end);
+        } else {
+          call.call(rangeSelectNodeFn, range, node);
+        }
+        return rectValues(call.call(rangeRectsFn, range));
+      },
       installed: true,
     }),
     writable: false,
@@ -76,6 +295,18 @@ export const PRIMITIVES_SOURCE = `(() => {
     enumerable: false,
   });
 })()`;
+
+/** Build the pristine-realm payload with a Node-held capability that never enters served HTML. */
+export function primitivesSource(capability: string): string {
+  if (!/^[a-f0-9]{32,128}$/u.test(capability) && capability !== TEST_APPARATUS_CAPABILITY) {
+    throw new Error("invalid apparatus capability");
+  }
+  return PRIMITIVES_TEMPLATE.replace(APPARATUS_CAPABILITY_MARKER, capability);
+}
+
+/** Static payload for direct primitive tests. Production creates a fresh capability per page. */
+export const PRIMITIVES_SOURCE = primitivesSource(TEST_APPARATUS_CAPABILITY);
+export const TEST_PRIMITIVES_CAPABILITY = TEST_APPARATUS_CAPABILITY;
 
 /**
  * Whether the primitives survived to measurement time.
@@ -92,6 +323,14 @@ export const PRIMITIVES_CHECK = `(() => {
   const d = Object.getOwnPropertyDescriptor(window, "__blPrimitives");
   if (!d || d.writable === true || d.configurable === true) {
     return { ok: false, reason: "the primitive references are replaceable, so they prove nothing" };
+  }
+  for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
+    "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
+    "rects", "setAttr", "setText", "parent", "next", "create", "append", "remove", "setCssText",
+    "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityRecordPreview",
+    "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",
+    "publishFreeze", "publishOverlay", "mutationType", "mutationAttributeName", "randomToken", "startsWith"]) {
+    if (typeof p[name] !== "function") return { ok: false, reason: "captured primitive missing: " + name };
   }
   return { ok: true, reason: "" };
 })()`;

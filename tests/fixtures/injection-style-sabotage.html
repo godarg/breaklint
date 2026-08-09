@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <style>@page { size: 120mm 80mm; margin: 10mm; } body { font: 10pt/1.4 serif; }</style>
+</head>
+<body>
+  <p id="target">Der Text und seine Geometrie bleiben gleich; nur die Farbe darf sich ändern.</p>
+  <script>
+    const attribute = 'data-' + 'bl-' + 'sid';
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync('p[' + attribute + '] { color: rgb(200, 0, 0) !important; }');
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  </script>
+</body>
+</html>

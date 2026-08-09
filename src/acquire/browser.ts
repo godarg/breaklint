@@ -9,9 +9,14 @@
  * document.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import type { Server } from "node:http";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import type { Socket } from "node:net";
+import { tmpdir } from "node:os";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 /** Only the members this project actually calls. Anything else is the driver's business. */
 export interface PageLike {
@@ -24,13 +29,270 @@ export interface PageLike {
   setViewport(viewport: { width: number; height: number; deviceScaleFactor?: number }): Promise<void>;
   pdf(options: { printBackground?: boolean; preferCSSPageSize?: boolean }): Promise<Uint8Array>;
   on(event: string, handler: (payload: unknown) => void): void;
+  evaluateOnNewDocument?(source: string): Promise<unknown>;
+  setRequestInterception?(enabled: boolean): Promise<void>;
+  createCDPSession?(): Promise<CdpSessionLike>;
   close(): Promise<void>;
+}
+
+export interface RequestLike {
+  url(): string;
+  response?(): ResponseLike | null;
+  redirectChain?(): RequestLike[];
+  failure?(): { errorText?: string } | null;
+  continue(): Promise<void>;
+  abort(errorCode?: string): Promise<void>;
+}
+
+export interface ResponseLike {
+  url(): string;
+  status(): number;
+  headers?(): Record<string, string>;
+  buffer(): Promise<Buffer>;
+  request?(): RequestLike;
+}
+
+export interface CdpSessionLike {
+  send<R = unknown>(method: string, params?: Record<string, unknown>): Promise<R>;
+  detach(): Promise<void>;
 }
 
 export interface BrowserLike {
   newPage(): Promise<PageLike>;
+  createBrowserContext?(): Promise<BrowserContextLike>;
   version(): Promise<string>;
+  process?(): { pid?: number; kill?(signal?: NodeJS.Signals | number): boolean } | null;
   close(): Promise<void>;
+}
+
+export interface BrowserContextLike {
+  newPage(): Promise<PageLike>;
+  close(): Promise<void>;
+}
+
+export interface ResolvedDocumentUri {
+  url: URL;
+  filePath: string | null;
+  insideDistributionRoot: boolean;
+}
+
+/** Canonical root-aware URI resolver shared by serving, collision scan and snapshot provenance. */
+export function resolveDocumentUri(raw: string, file: string, distributionRoot: string): ResolvedDocumentUri {
+  const trimmed = raw.trim();
+  let root = resolve(distributionRoot);
+  try { root = realpathSync(root); } catch { /* lexical root remains fail-closed for absent fixtures */ }
+  const authoredScheme = /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(trimmed);
+  let url: URL;
+  if (authoredScheme) {
+    url = new URL(trimmed);
+  } else {
+    const withoutSuffix = trimmed.split(/[?#]/u, 1)[0] ?? "";
+    const lexical = withoutSuffix.startsWith("/")
+      ? resolve(root, `.${withoutSuffix}`)
+      : resolve(dirname(resolve(file)), withoutSuffix);
+    url = pathToFileURL(lexical);
+  }
+  if (url.protocol !== "file:") {
+    return { url, filePath: null, insideDistributionRoot: url.protocol === "data:" || url.protocol === "blob:" };
+  }
+  let candidate = fileURLToPath(url);
+  if (existsSync(candidate)) candidate = realpathSync(candidate);
+  else candidate = resolve(candidate);
+  const rel = relative(root, candidate);
+  const inside = rel === "" || (!rel.startsWith("..") && !rel.includes(`..${sep}`));
+  return { url: pathToFileURL(candidate), filePath: candidate, insideDistributionRoot: inside };
+}
+
+export interface ProcessTreeTermination {
+  rootPid: number;
+  pgid: number | null;
+  initialPids: number[];
+  survivingPids: number[];
+  groupSafe: boolean;
+  termSent: boolean;
+  killSent: boolean;
+  verified: boolean;
+}
+
+type ProcessRow = { pid: number; ppid: number; pgid: number };
+export type ProcessTableReader = () => ProcessRow[];
+
+function processTable(): ProcessRow[] {
+  if (process.platform === "win32") throw new Error("POSIX process table unavailable on Windows");
+  const output = execFileSync("ps", ["-axo", "pid=,ppid=,pgid="], { encoding: "utf8" }).trim();
+  if (!output) throw new Error("ps returned no process rows");
+  return output.split("\n").map((line) => {
+    const values = line.trim().split(/\s+/u).map(Number);
+    if (values.length !== 3 || values.some((value) => !Number.isInteger(value) || value < 0)) {
+      throw new Error(`unparseable ps row: ${line}`);
+    }
+    return { pid: values[0]!, ppid: values[1]!, pgid: values[2]! };
+  });
+}
+
+function alive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+function descendantsOf(table: ProcessRow[], rootPid: number): number[] {
+  const descendants = new Set<number>([rootPid]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const entry of table) {
+      if (descendants.has(entry.ppid) && !descendants.has(entry.pid)) {
+        descendants.add(entry.pid);
+        changed = true;
+      }
+    }
+  }
+  return [...descendants].sort((a, b) => a - b);
+}
+
+function groupMembers(table: ProcessRow[], pgid: number | null): number[] {
+  return pgid === null ? [] : table.filter((entry) => entry.pgid === pgid).map((entry) => entry.pid).sort((a, b) => a - b);
+}
+
+const wait = (ms: number): Promise<void> => new Promise((resolveWait) => setTimeout(resolveWait, ms));
+
+export interface OwnedServerLifecycle {
+  close(timeoutMs?: number): Promise<string | null>;
+  openSockets(): number;
+}
+
+/** Close one server and only the connections accepted by that server; callback delivery alone is not proof. */
+export function ownServerLifecycle(server: Server): OwnedServerLifecycle {
+  const sockets = new Set<Socket>();
+  server.on("connection", (socket: Socket) => {
+    sockets.add(socket);
+    socket.once("close", () => sockets.delete(socket));
+  });
+  return {
+    openSockets: () => [...sockets].filter((socket) => !socket.destroyed).length,
+    async close(timeoutMs = 5_000): Promise<string | null> {
+      let callbackReached = false;
+      let closeError: Error | null = null;
+      const callback = new Promise<void>((resolveClose) => {
+        try {
+          server.close((error) => {
+            callbackReached = true;
+            closeError = error ?? null;
+            resolveClose();
+          });
+        } catch (error) {
+          closeError = error instanceof Error ? error : new Error(String(error));
+          resolveClose();
+        }
+      });
+      server.closeIdleConnections?.();
+      server.closeAllConnections?.();
+      for (const socket of sockets) socket.destroy();
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      await Promise.race([
+        callback,
+        new Promise<void>((resolveTimeout) => { timer = setTimeout(resolveTimeout, timeoutMs); }),
+      ]);
+      if (timer) clearTimeout(timer);
+      server.closeAllConnections?.();
+      for (const socket of sockets) socket.destroy();
+      await wait(0);
+      const survivors = [...sockets].filter((socket) => !socket.destroyed).length;
+      const observedCloseError = closeError as Error | null;
+      if (observedCloseError && (observedCloseError as NodeJS.ErrnoException).code !== "ERR_SERVER_NOT_RUNNING") {
+        return `server.close failed: ${observedCloseError.message}`;
+      }
+      if (server.listening || survivors > 0 || !callbackReached) {
+        return `loopback server cleanup unverified (listening=${server.listening}, sockets=${survivors}, callback=${callbackReached})`;
+      }
+      return null;
+    },
+  };
+}
+
+/** POSIX process-group termination with a post-signal existence check; signal delivery alone is not success. */
+export async function terminateProcessTree(
+  rootPid: number,
+  readProcessTable: ProcessTableReader = processTable,
+  operations: {
+    alive(pid: number): boolean;
+    signal(pid: number, signal: NodeJS.Signals): void;
+    wait(ms: number): Promise<void>;
+  } = { alive, signal: (pid, signal) => process.kill(pid, signal), wait },
+): Promise<ProcessTreeTermination> {
+  let table: ProcessRow[];
+  try {
+    table = readProcessTable();
+  } catch {
+    const initialPids = operations.alive(rootPid) ? [rootPid] : [];
+    let termSent = false;
+    let killSent = false;
+    if (initialPids.length > 0) {
+      try { operations.signal(rootPid, "SIGTERM"); termSent = true; } catch { /* alive recheck below is authoritative */ }
+      const deadline = Date.now() + 2_000;
+      while (Date.now() < deadline && operations.alive(rootPid)) await operations.wait(50);
+      if (operations.alive(rootPid)) {
+        try { operations.signal(rootPid, "SIGKILL"); killSent = true; } catch { /* final recheck below */ }
+        await operations.wait(100);
+      }
+    }
+    const survivingPids = operations.alive(rootPid) ? [rootPid] : [];
+    return {
+      rootPid, pgid: null, initialPids, survivingPids,
+      groupSafe: false, termSent, killSent, verified: false,
+    };
+  }
+  const root = table.find((entry) => entry.pid === rootPid);
+  const own = table.find((entry) => entry.pid === process.pid);
+  const pgid = root?.pgid ?? null;
+  const groupSafe = process.platform !== "win32" && pgid === rootPid && pgid !== own?.pgid;
+  // A shared process group is never an ownership oracle. Only descendants of the browser root
+  // belong to breaklint in that case; signalling every member could include this process, its
+  // shell and unrelated CI siblings. Group membership is used only after isolation is proven.
+  const owned = (): number[] => groupSafe ? groupMembers(table, pgid) : descendantsOf(table, rootPid);
+  const initialPids = owned().filter(operations.alive);
+  let termSent = false;
+  let killSent = false;
+  try {
+    if (groupSafe) operations.signal(-rootPid, "SIGTERM");
+    else for (const pid of [...initialPids].reverse()) operations.signal(pid, "SIGTERM");
+    termSent = true;
+  } catch { /* the recheck below decides whether this mattered */ }
+
+  let processTableVerified = true;
+  const refresh = (): number[] => {
+    let current: number[] = [];
+    try {
+      const fresh = readProcessTable();
+      current = (groupSafe ? groupMembers(fresh, pgid) : descendantsOf(fresh, rootPid)).filter(operations.alive);
+    } catch {
+      processTableVerified = false;
+    }
+    return [...new Set([...initialPids.filter(operations.alive), ...current])].sort((a, b) => a - b);
+  };
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline && refresh().length > 0) await operations.wait(50);
+  let survivors = refresh();
+  if (survivors.length > 0) {
+    try {
+      if (groupSafe) operations.signal(-rootPid, "SIGKILL");
+      killSent = true;
+    } catch { /* individual fallback below */ }
+    await operations.wait(100);
+    survivors = refresh();
+    for (const pid of [...survivors].reverse()) {
+      try { operations.signal(pid, "SIGKILL"); killSent = true; } catch { /* final recheck decides */ }
+    }
+    await operations.wait(100);
+  }
+  // A new process can be born or reparented after the initial snapshot. Contract success is
+  // therefore based on a fresh descendant/process-group table, not signal delivery or old PIDs.
+  const survivingPids = refresh();
+  return {
+    rootPid, pgid, initialPids, survivingPids, groupSafe, termSent, killSent,
+    verified: processTableVerified && survivingPids.length === 0,
+  };
 }
 
 const CHROME_CANDIDATES_BY_PLATFORM: Readonly<Record<string, readonly string[]>> = {
@@ -86,6 +348,8 @@ export interface LaunchResult {
   /** Populated when `browser` is null. One copyable command, plus every path that was tried. */
   detail: string;
   executablePath: string | null;
+  /** Explicit profile owned by the caller; never Puppeteer's implicit, untracked temp directory. */
+  userDataDir?: string | null;
 }
 
 /**
@@ -101,6 +365,7 @@ export async function launchBrowser(fromDir: string = process.cwd()): Promise<La
     return {
       browser: null,
       executablePath: null,
+      userDataDir: null,
       detail:
         "breaklint: no renderer available.\n" +
         "  install: npm i -D puppeteer-core\n" +
@@ -114,6 +379,7 @@ export async function launchBrowser(fromDir: string = process.cwd()): Promise<La
     return {
       browser: null,
       executablePath: found.path,
+      userDataDir: null,
       detail:
         "breaklint: a browser was found but no driver to speak to it.\n" +
         `  found: ${found.path}\n` +
@@ -130,13 +396,18 @@ export async function launchBrowser(fromDir: string = process.cwd()): Promise<La
     return {
       browser: null,
       executablePath: found.path,
+      userDataDir: null,
       detail: `breaklint: puppeteer-core resolved at ${driverRoot} but exposes no launch().`,
     };
   }
 
-  const browser = await launch({
-    executablePath: found.path,
-    headless: true,
+  const userDataDir = mkdtempSync(join(tmpdir(), "breaklint-chrome-profile-"));
+  let browser: BrowserLike;
+  try {
+    browser = await launch({
+      executablePath: found.path,
+      headless: true,
+      userDataDir,
     // No `--allow-file-access-from-files`. It was here so the rasteriser page could import its
     // library over a `file://` URL, but the switch is browser-WIDE: it would also let the
     // audited document — untrusted HTML, often loaded from disk — read other local files. The
@@ -144,10 +415,15 @@ export async function launchBrowser(fromDir: string = process.cwd()): Promise<La
     // Removing the reason for a switch and leaving the switch is not removing the switch; that
     // mistake was made here once and caught by an audit, not by a test.
     args: [],
+    detached: process.platform !== "win32",
     // Rasterising a many-page document is one long call over the control bridge. The driver's
     // default cuts it off well before a real book finishes, and the symptom then looks like a
     // renderer fault rather than a timeout.
-    protocolTimeout: 300_000,
-  });
-  return { browser, executablePath: found.path, detail: "" };
+      protocolTimeout: 300_000,
+    });
+  } catch (error) {
+    rmSync(userDataDir, { recursive: true, force: true });
+    throw error;
+  }
+  return { browser, executablePath: found.path, userDataDir, detail: "" };
 }

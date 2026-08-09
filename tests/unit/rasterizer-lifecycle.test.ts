@@ -18,6 +18,8 @@ import { spawn } from "node:child_process";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { pdfjsVersionIntegrity } from "../../src/render/rasterizer.ts";
+
 const PROBE = fileURLToPath(new URL("../tools/leak-probe.ts", import.meta.url));
 
 interface ProbeResult {
@@ -45,6 +47,12 @@ function runProbe(failAt: string, timeoutMs = 8000): Promise<ProbeResult> {
 }
 
 describe("openRasterizer, resource ownership", () => {
+  it("rejects an equally declared and loaded but unsupported pdfjs build", () => {
+    const result = pdfjsVersionIntegrity("6.2.109", "6.2.109");
+    assert.equal(result.ok, false);
+    assert.match(result.detail, /supported=6\.2\.108/u);
+    assert.equal(pdfjsVersionIntegrity("6.2.108", "6.2.108").ok, true);
+  });
   for (const failAt of ["newPage", "goto", "evaluate"] as const) {
     it(`the process still ends when ${failAt}() throws`, async () => {
       const r = await runProbe(failAt);
@@ -53,6 +61,13 @@ describe("openRasterizer, resource ownership", () => {
       assert.equal(r.code, 0);
     });
   }
+
+  it("refuses a loaded pdfjs version that differs from its own manifest and releases ownership", async () => {
+    const r = await runProbe("version-mismatch");
+    assert.match(r.stdout, /refused/u);
+    assert.equal(r.exited, true, "the mismatch refusal leaked its rasterizer page/server");
+    assert.equal(r.code, 0);
+  });
 
   it("the process ends on the success path once the rasteriser is closed", async () => {
     const r = await runProbe("never");

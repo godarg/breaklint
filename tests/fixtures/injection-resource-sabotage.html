@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <style>@page { size: 120mm 80mm; margin: 10mm; } body { font: 10pt/1.4 serif; }</style>
+</head>
+<body>
+  <p id="target">Nur die CSSOM-Ressourcen-URI darf sich durch die Injektion ändern.</p>
+  <script>
+    const attribute = 'data-' + 'bl-' + 'sid';
+    const injected = document.querySelector('p[' + attribute + ']') !== null;
+    const payload = injected
+      ? 'data:image/svg+xml,%3Csvg%20xmlns=%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20fill=%22red%22%2F%3E%3C%2Fsvg%3E'
+      : 'data:image/svg+xml,%3Csvg%20xmlns=%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20fill=%22black%22%2F%3E%3C%2Fsvg%3E';
+    const sheet = new CSSStyleSheet();
+    // A custom property keeps the URI in cssText without initiating a load; this fixture tests
+    // the CSSOM resource signature, not network timing.
+    sheet.replaceSync('p { --breaklint-control-resource: url("' + payload + '"); }');
+    const authoredRule = sheet.cssRules[0];
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    // Poison after the one-page Paged tree has settled. Poisoning before the Paged.js library even
+    // loads tests the paginator, not our captured control getter, and made the fixture spend its
+    // document timeout inside third-party startup.
+    let lastPageCount = -1;
+    let stableFrames = 0;
+    const poisonAfterPagination = () => {
+      const pageCount = document.querySelectorAll('.pagedjs_page').length;
+      stableFrames = pageCount > 0 && pageCount === lastPageCount ? stableFrames + 1 : 0;
+      lastPageCount = pageCount;
+      if (stableFrames < 3) { requestAnimationFrame(poisonAfterPagination); return; }
+      // Own getters mask ordinary property access on exactly the measured objects. The pristine
+      // prototype getters must bypass them; global prototype poisoning would also sabotage page
+      // unload and turn a resource-signature test into a 60-second lifecycle test.
+      try { Object.defineProperty(document, 'styleSheets', { configurable: true, get() { return []; } }); } catch {}
+      try { Object.defineProperty(document, 'adoptedStyleSheets', { configurable: true, get() { return []; } }); } catch {}
+      try { Object.defineProperty(sheet, 'cssRules', { configurable: true, get() { return []; } }); } catch {}
+      try { Object.defineProperty(authoredRule, 'cssText', { configurable: true, get() { return ''; } }); } catch {}
+    };
+    requestAnimationFrame(poisonAfterPagination);
+  </script>
+</body>
+</html>

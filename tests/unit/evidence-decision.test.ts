@@ -79,16 +79,21 @@ class FakePage implements PageLike {
   // form; the return is deliberately loose because each call site asks for a different shape.
   async evaluate(fn: unknown): Promise<unknown> {
     if (typeof fn !== "string") return undefined;
-    // The names come FROM the module under test, not from a copy of it. They were four hand-typed
-    // literals, and renaming one in `overlay.ts` left the suite at 175/175 while this stub quietly
-    // stopped recognising that call and answered `undefined` — a fake that goes on passing after
-    // it has stopped faking the right thing.
-    if (fn.includes(OVERLAY_GLOBALS.install)) {
-      return { marks: this.state.marks, layers: this.state.layers, staticPageAreas: this.state.staticPageAreas };
+    if (fn === OVERLAY_SOURCE) return "fake-overlay-capability";
+    if (fn.includes(OVERLAY_GLOBALS.control) && fn.includes('"install"')) {
+      return { value: {
+        marks: this.state.marks, layers: this.state.layers, staticPageAreas: this.state.staticPageAreas,
+      }, unauthorizedCalls: 0 };
     }
-    if (fn.includes(OVERLAY_GLOBALS.readback)) return this.state.violations;
-    if (fn.includes(OVERLAY_GLOBALS.detach)) return this.state.detached;
-    if (fn.includes(OVERLAY_GLOBALS.remove)) return 0;
+    if (fn.includes(OVERLAY_GLOBALS.control) && fn.includes('"readback"')) {
+      return { value: this.state.violations, unauthorizedCalls: 0 };
+    }
+    if (fn.includes(OVERLAY_GLOBALS.control) && fn.includes('"detach"')) {
+      return { value: this.state.detached, unauthorizedCalls: 0 };
+    }
+    if (fn.includes(OVERLAY_GLOBALS.control) && fn.includes('"remove"')) {
+      return { value: 0, unauthorizedCalls: 0 };
+    }
     return undefined;
   }
   async waitForFunction(): Promise<unknown> {
@@ -105,6 +110,28 @@ class FakePage implements PageLike {
   on(): void {}
   async close(): Promise<void> {
     this.closed = true;
+  }
+}
+
+class InstallFailurePage extends FakePage {
+  override async evaluate(fn: unknown): Promise<unknown> {
+    if (typeof fn === "string" && fn !== OVERLAY_SOURCE &&
+        fn.includes(OVERLAY_GLOBALS.control) && fn.includes('"install"')) {
+      throw new Error("install boundary failed before completion");
+    }
+    return super.evaluate(fn);
+  }
+}
+
+class UnauthorizedOverlayRacePage extends FakePage {
+  override async evaluate(fn: unknown): Promise<unknown> {
+    const result = await super.evaluate(fn);
+    if (typeof fn === "string" && fn !== OVERLAY_SOURCE &&
+        fn.includes(OVERLAY_GLOBALS.control) && fn.includes('"install"') &&
+        result && typeof result === "object") {
+      return { ...(result as { value: unknown }), unauthorizedCalls: 1 };
+    }
+    return result;
   }
 }
 
@@ -174,7 +201,7 @@ const MATCHING_TEXT = [
 
 describe("the overlay's in-page contract", () => {
   /**
-   * The four names the TypeScript side calls are the four names the injected script defines.
+   * The capability-gated name the TypeScript side calls is the name the injected script defines.
    *
    * There is no compiler between those two: one side is a constant, the other is a string a
    * browser parses. Renaming one alone produces `window.<name> is not a function` at runtime, and
@@ -186,15 +213,18 @@ describe("the overlay's in-page contract", () => {
    */
   it("every name the module calls is a name the injected script defines", () => {
     const missing = Object.entries(OVERLAY_GLOBALS)
-      .filter(([, global]) => !OVERLAY_SOURCE.includes(`window.${global} =`))
+      .filter(([, global]) => global !== "__blOverlayControl" || !OVERLAY_SOURCE.includes("P.publishOverlay(control)"))
       .map(([role, global]) => `${role} -> window.${global}`);
     assert.deepEqual(missing, [], `these are called but never defined in the page:\n${missing.join("\n")}`);
     // And the reverse count, so a global can neither be added without a caller nor silently lost.
-    const defined = [...OVERLAY_SOURCE.matchAll(/window\.(__blOverlay[A-Za-z]*) =/gu)].map((m) => m[1]);
-    const uncalled = defined.filter(
-      (g) => g !== "__blOverlay" && g !== "__blOverlayReady" && !Object.values(OVERLAY_GLOBALS).includes(g as never),
-    );
+    const defined = OVERLAY_SOURCE.includes("P.publishOverlay(control)") ? ["__blOverlayControl"] : [];
+    const uncalled = defined.filter((g) => !Object.values(OVERLAY_GLOBALS).includes(g as never));
     assert.deepEqual(uncalled, [], `defined in the page but never called: ${uncalled.join(", ")}`);
+    assert.equal(defined.length, 1, "overlay exposed more than its single capability-gated controller");
+    for (const hostileSurface of ["document.querySelectorAll", "pageEl.querySelector", "getComputedStyle(",
+      ".getBoundingClientRect(", ".getClientRects(", ".getAttribute(", ".appendChild(", "layer.remove("]) {
+      assert.equal(OVERLAY_SOURCE.includes(hostileSurface), false, `overlay bypasses captured primitive: ${hostileSurface}`);
+    }
   });
 });
 
@@ -377,6 +407,36 @@ describe("the evidence verdict", () => {
     // overlay had an effect". The report carries `config.evidenceBinding` for the former.
     assert.equal(r.notMeasured.length, 0);
     assert.ok(r.evidence.length > 0, "the evidence image is still produced");
+    assert.equal(r.overlayInstalled, false);
+  });
+
+  it("an install failure does not claim that the evidence overlay was installed", async () => {
+    const page = new InstallFailurePage({ marks: MARKS, layers: 1, staticPageAreas: 0, detached: 1, violations: [] });
+    const r = await produceEvidence({
+      page,
+      closePage: async () => page.close(),
+      rasterizer: fakeRasterizer({ diff: 0 }),
+      options: { outDir, documentKey: "case", binding: true },
+    });
+    assert.equal(r.overlayInstalled, false);
+    assert.equal(r.notMeasured.some((item) => item.reason === "env/evidence-overlay-removed"), false);
+    assert.ok(r.infrastructure.some((item) => item.kind === "checker-crashed"));
+  });
+
+  it("an author call racing the overlay capability fails closed before installation is trusted", async () => {
+    const page = new UnauthorizedOverlayRacePage({
+      marks: MARKS, layers: 1, staticPageAreas: 0, detached: 1, violations: [],
+    });
+    const r = await produceEvidence({
+      page,
+      closePage: async () => page.close(),
+      rasterizer: fakeRasterizer({ diff: 0 }),
+      options: { outDir, documentKey: "overlay-race", binding: true },
+    });
+    assert.equal(r.overlayInstalled, false);
+    assert.equal(r.boundSids.size, 0);
+    assert.ok(r.infrastructure.some((item) =>
+      item.kind === "checker-crashed" && /raced by author code/u.test(item.detail)));
   });
 
   it("without a rasteriser the baseline is delivered and nothing binds", async () => {

@@ -12,13 +12,19 @@
  */
 
 import { createServer } from "node:http";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { BrowserLike, PageLike } from "../../src/acquire/browser.ts";
+import { resolvePackageRoot, type BrowserLike, type PageLike } from "../../src/acquire/browser.ts";
 import { openRasterizer } from "../../src/render/rasterizer.ts";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 const failAt = process.argv[2] ?? "never";
+const pdfRoot = resolvePackageRoot("pdfjs-dist", REPO);
+const declaredVersion = pdfRoot
+  ? (JSON.parse(readFileSync(join(pdfRoot, "package.json"), "utf8")) as { version: string }).version
+  : "missing";
 
 if (failAt === "leak") {
   // The control. If this one exits too, the probe is measuring nothing.
@@ -33,7 +39,7 @@ if (failAt === "leak") {
     async setContent() {},
     async evaluate() {
       if (failAt === "evaluate") throw new Error("probe: evaluate failed");
-      return undefined as never;
+      return (failAt === "version-mismatch" ? "0.0.0" : declaredVersion) as never;
     },
     async waitForFunction() {
       return undefined;

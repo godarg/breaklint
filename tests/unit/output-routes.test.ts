@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { join, relative } from "node:path";
 
 import { err, out } from "../../src/cli/out.ts";
+import { unionSnapshotInterventions } from "../../src/cli/index.ts";
 
 /**
  * Nothing writes to a terminal except the one file that redacts.
@@ -38,6 +39,15 @@ function sourceFiles(dir: string): string[] {
 }
 
 describe("output routes", () => {
+  it("reports the deterministic union of interventions across every document", () => {
+    const interventions = unionSnapshotInterventions([
+      { snapshot: null },
+      { snapshot: { meta: { interventions: ["pagedjs-pagination", "evidence-overlay"] } } },
+      { snapshot: { meta: { interventions: ["source-id-injection", "pagedjs-pagination"] } } },
+    ]);
+    assert.deepEqual(interventions, ["evidence-overlay", "pagedjs-pagination", "source-id-injection"]);
+  });
+
   it("only src/cli/out.ts writes to stdout or stderr", () => {
     const offenders: string[] = [];
     const files = sourceFiles(SRC);

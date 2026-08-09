@@ -27,10 +27,17 @@ import type { ConfigFile } from "../config/resolve.ts";
 import { render } from "../report/index.ts";
 import { parseArgs } from "./args.ts";
 import type { Snapshot } from "../core/types.ts";
+import type { RenderEnvironment } from "../acquire/render-run.ts";
 import { err, out } from "./out.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VERSION = readPackageVersion();
+
+export function unionSnapshotInterventions(
+  inputs: readonly { snapshot: { meta: { interventions: string[] } } | null }[],
+): string[] {
+  return [...new Set(inputs.flatMap((input) => input.snapshot?.meta.interventions ?? []))].sort();
+}
 
 export async function main(argv: string[]): Promise<number> {
   let args;
@@ -67,6 +74,7 @@ export async function main(argv: string[]): Promise<number> {
   let inputs: DocumentInput[];
   let mode: "demo" | "live";
   let source: "rendered" | "recorded snapshot fixture" | "handwritten snapshot fixture";
+  let liveEnvironment: RenderEnvironment | null = null;
 
   if (args.demo) {
     mode = "demo";
@@ -107,6 +115,7 @@ export async function main(argv: string[]): Promise<number> {
       return rendered.fatal.exitCode;
     }
     inputs = rendered.documents;
+    liveEnvironment = rendered.environment;
   }
 
   const outcomes = inputs.map((input) =>
@@ -129,15 +138,15 @@ export async function main(argv: string[]): Promise<number> {
     rulesRun: config.activeRules.length,
     failOn: config.failOn,
     environment: {
-      browserVersion: inputs[0]?.snapshot?.meta.browserVersion ?? "",
-      platform: process.platform,
-      rendererPath: null,
-      rendererPresent: mode === "live",
-      pagedjsVersion: inputs[0]?.snapshot?.meta.pagedjsVersion ?? SUPPORTED_PAGEDJS_VERSION,
-      rasterizer: null,
-      rasterizerVersion: null,
-      textPositionExtractor: null,
-      fontFamiliesResolved: inputs[0]?.snapshot?.meta.inputIdentity?.fontFamilies ?? [],
+      browserVersion: liveEnvironment?.browserVersion ?? inputs[0]?.snapshot?.meta.browserVersion ?? "",
+      platform: liveEnvironment?.platform ?? process.platform,
+      rendererPath: liveEnvironment?.rendererPath ?? null,
+      rendererPresent: liveEnvironment?.rendererPresent ?? false,
+      pagedjsVersion: liveEnvironment?.pagedjsVersion ?? inputs[0]?.snapshot?.meta.pagedjsVersion ?? SUPPORTED_PAGEDJS_VERSION,
+      rasterizer: liveEnvironment?.rasterizer ?? null,
+      rasterizerVersion: liveEnvironment?.rasterizerVersion ?? null,
+      textPositionExtractor: liveEnvironment?.textPositionExtractor ?? null,
+      fontFamiliesResolved: liveEnvironment?.fontFamiliesResolved ?? inputs[0]?.snapshot?.meta.inputIdentity?.fontFamilies ?? [],
       locale: config.locale,
     },
     config: {
@@ -146,10 +155,10 @@ export async function main(argv: string[]): Promise<number> {
       activeRules: config.activeRules.map((r) => r.id),
       disabledRules: config.disabledRuleIds,
       loweredFloors: config.loweredFloors,
-      interventions: inputs[0]?.snapshot?.meta.interventions ?? [],
+      interventions: unionSnapshotInterventions(inputs),
       sourceMapInjection: config.sourceMapInjection,
       evidenceBinding: config.evidenceBinding,
-      network: { ...config.network, blocked: 0 },
+      network: { ...config.network, blocked: liveEnvironment?.networkBlocked ?? 0 },
     },
   });
 

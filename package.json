@@ -41,7 +41,7 @@
   },
   "peerDependencies": {
     "pagedjs": "0.4.3",
-    "pdfjs-dist": "^6.2.108",
+    "pdfjs-dist": "6.2.108",
     "puppeteer-core": ">=22"
   },
   "peerDependenciesMeta": {
@@ -58,7 +58,7 @@
   "devDependencies": {
     "@types/node": "^22.20.1",
     "pagedjs": "^0.4.3",
-    "pdfjs-dist": "^6.2.108",
+    "pdfjs-dist": "6.2.108",
     "puppeteer-core": "^24.10.1",
     "typescript": "5.9.2"
   },

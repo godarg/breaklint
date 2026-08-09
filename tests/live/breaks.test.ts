@@ -14,16 +14,23 @@
  */
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { launchBrowser, resolveBrowser, resolvePackageRoot, type BrowserLike, type PageLike } from "../../src/acquire/browser.ts";
-import { PRIMITIVES_SOURCE } from "../../src/measure/primitives.ts";
+import {
+  launchBrowser, ownServerLifecycle, resolveBrowser, resolvePackageRoot, type BrowserLike, type PageLike,
+} from "../../src/acquire/browser.ts";
+import {
+  cleanupBrowserProfile, closeBrowserBounded, integritySource, integrityStatusSource,
+  paginationApparatusSource, PAGINATION_PREVIEW_SOURCE, withPagination,
+  type RuntimeIntegrityStatus,
+} from "../../src/acquire/render-run.ts";
+import { PRIMITIVES_SOURCE, TEST_PRIMITIVES_CAPABILITY } from "../../src/measure/primitives.ts";
 import { assignPageCauses, classifyBoundary } from "../../src/paginate/breaks.ts";
-import { boundaryFactsFrom, COLLECTOR_SOURCE, silentHooks, type CollectorResult } from "../../src/paginate/collector.ts";
+import { boundaryFactsFrom, collectorSource, silentHooks, type CollectorResult } from "../../src/paginate/collector.ts";
 import { detectCollision } from "../../src/source/collision.ts";
 import { injectSourceIds } from "../../src/source/inject.ts";
 
@@ -87,16 +94,11 @@ ${Array.from({ length: 7 }, (_, i) => `<p id="r${i}">R${i} paragraph inside a NA
  * file timed out waiting for a pagination that could never happen. A replacer function receives
  * the replacement verbatim and has no such substitution.
  */
-function withPagination(html: string, pagedjs: string, collector: string): string {
-  const scripts =
-    `<script>${pagedjs}</script>\n<script>${collector}</script>\n` +
-    `<script>window.__blPaginated = false; new Paged.Previewer().preview();</script>\n</body>`;
-  return html.replace("</body>", () => scripts);
-}
-
 describe("the collector, live", () => {
   let browser: BrowserLike | null = null;
+  let browserProfile: string | null = null;
   let server: Server | null = null;
+  let serverLifecycle: ReturnType<typeof ownServerLifecycle> | null = null;
   let origin = "";
   let served = "";
   let sidByAuthorId: Record<string, string> = {};
@@ -121,35 +123,60 @@ describe("the collector, live", () => {
       if (id) sidByAuthorId[id] = sid;
     }
     const pagedjs = readFileSync(join(pagedjsRoot!, "dist", "paged.js"), "utf8");
-    served = withPagination(injected.html, pagedjs, COLLECTOR_SOURCE);
+    served = withPagination(injected.html, pagedjs, true);
 
     server = createServer((_req, res) => {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(served);
     });
+    serverLifecycle = ownServerLifecycle(server);
     await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", () => resolve()));
     const address = server!.address();
     origin = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
     const launched = await launchBrowser(REPO);
     assert.ok(launched.browser, launched.detail);
     browser = launched.browser;
+    browserProfile = launched.userDataDir ?? null;
   });
 
   after(async () => {
-    await browser?.close();
-    server?.close();
+    let browserError: string | null = null;
+    let serverError: string | null = null;
+    let profileError: string | null = null;
+    const serverClose = serverLifecycle?.close() ?? Promise.resolve(null);
+    try {
+      if (browser) browserError = await closeBrowserBounded(browser);
+    } finally {
+      serverError = await serverClose;
+      profileError = cleanupBrowserProfile(browserProfile);
+    }
+    assert.equal(browserError, null);
+    assert.equal(serverError, null);
+    assert.equal(profileError, null);
+    assert.equal(browserProfile ? existsSync(browserProfile) : false, false);
   });
 
   async function collect(): Promise<{ page: PageLike; result: CollectorResult }> {
+    const collectorNonce = "breaks-live-collector";
     const page = await browser!.newPage();
     await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(
       PRIMITIVES_SOURCE,
     );
+    await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(
+      integritySource([]),
+    );
     await page.setViewport({ width: 900, height: 700 });
     await page.emulateMediaType("print");
     await page.goto(`${origin}/doc.html`, { waitUntil: "load", timeout: 30_000 });
-    await page.waitForFunction("window.__blPaginated === true", { timeout: 30_000 });
-    const result = await page.evaluate<CollectorResult>("window.__blCollectorResult()");
+    await page.evaluate<void>(collectorSource(TEST_PRIMITIVES_CAPABILITY, collectorNonce));
+    await page.evaluate<void>(paginationApparatusSource(TEST_PRIMITIVES_CAPABILITY));
+    const pagination = await page.evaluate<{ paginationError: string | null }>(PAGINATION_PREVIEW_SOURCE);
+    assert.equal(pagination.paginationError, null);
+    const epoch = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(TEST_PRIMITIVES_CAPABILITY));
+    assert.equal(epoch.paginationPreviewCalls, 1);
+    const result = await page.evaluate<CollectorResult>(
+      `window.__blPrimitives.collectorResult(${JSON.stringify(TEST_PRIMITIVES_CAPABILITY)}, ${JSON.stringify(collectorNonce)})`,
+    );
     return { page, result };
   }
 

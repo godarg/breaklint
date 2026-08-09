@@ -19,9 +19,18 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { launchBrowser, resolveBrowser, resolvePackageRoot, type BrowserLike, type PageLike } from "../../src/acquire/browser.ts";
+import {
+  launchBrowser, ownServerLifecycle, resolveBrowser, resolvePackageRoot, type BrowserLike, type PageLike,
+} from "../../src/acquire/browser.ts";
+import {
+  cleanupBrowserProfile, closeBrowserBounded, integritySource, integrityStatusSource,
+  paginationApparatusSource, PAGINATION_PREVIEW_SOURCE, withPagination,
+  type RuntimeIntegrityStatus,
+} from "../../src/acquire/render-run.ts";
 import { FREEZE_COMPONENTS, FREEZE_SOURCE, sampleParts, type FreezeParts } from "../../src/measure/freeze.ts";
-import { PRIMITIVES_CHECK, PRIMITIVES_SOURCE, type PrimitivesStatus } from "../../src/measure/primitives.ts";
+import {
+  PRIMITIVES_CHECK, PRIMITIVES_SOURCE, TEST_PRIMITIVES_CAPABILITY, type PrimitivesStatus,
+} from "../../src/measure/primitives.ts";
 import {
   compareGeometry,
   CROSS_CHECK_MEASURED_MAX_PX,
@@ -59,7 +68,7 @@ function documentSource(pagedjs: string): string {
     { length: 14 },
     (_, i) => `<p id="f${i}">${i + 1}. filler text long enough to force pagination across several pages.</p>`,
   ).join("\n");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+  const author = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
 @page{size:148mm 105mm;margin:12mm; @bottom-center{ content: "page " counter(page); } }
 body{font:10pt/1.45 Georgia,serif;margin:0} p{margin:0 0 8px}
 p.marked::before{ content:"MARK "; padding-left:3px }
@@ -76,14 +85,8 @@ ${filler}
   c.fillStyle = "#c00"; c.fillRect(2, 2, 40, 12);
   window.__preInk = c.getImageData(0, 0, 50, 20).data.some((v) => v !== 0);
 </script>
-<script>${pagedjs}</script>
-<script>
-window.__blPaginated = false;
-class Probe extends Paged.Handler { afterRendered() { window.__blPaginated = true; } }
-Paged.registerHandlers(Probe);
-new Paged.Previewer().preview();
-</script>
 </body></html>`;
+  return withPagination(author, pagedjs, false);
 }
 
 /**
@@ -124,7 +127,9 @@ const HIJACK_SOURCE = `(() => {
 
 describe("the measurement probe, live", () => {
   let browser: BrowserLike | null = null;
+  let browserProfile: string | null = null;
   let server: Server | null = null;
+  let serverLifecycle: ReturnType<typeof ownServerLifecycle> | null = null;
   let origin = "";
   let source = "";
 
@@ -139,17 +144,31 @@ describe("the measurement probe, live", () => {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(source);
     });
+    serverLifecycle = ownServerLifecycle(server);
     await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", () => resolve()));
     const address = server!.address();
     origin = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
     const launched = await launchBrowser(REPO);
     assert.ok(launched.browser, launched.detail);
     browser = launched.browser;
+    browserProfile = launched.userDataDir ?? null;
   });
 
   after(async () => {
-    await browser?.close();
-    server?.close();
+    let browserError: string | null = null;
+    let serverError: string | null = null;
+    let profileError: string | null = null;
+    const serverClose = serverLifecycle?.close() ?? Promise.resolve(null);
+    try {
+      if (browser) browserError = await closeBrowserBounded(browser);
+    } finally {
+      serverError = await serverClose;
+      profileError = cleanupBrowserProfile(browserProfile);
+    }
+    assert.equal(browserError, null);
+    assert.equal(serverError, null);
+    assert.equal(profileError, null);
+    assert.equal(browserProfile ? existsSync(browserProfile) : false, false);
   });
 
   /**
@@ -166,10 +185,17 @@ describe("the measurement probe, live", () => {
     await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(
       PRIMITIVES_SOURCE,
     );
+    await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(
+      integritySource([]),
+    );
     await page.setViewport({ width: 1000, height: 800 });
     await page.emulateMediaType("print");
     await page.goto(`${origin}/doc.html`, { waitUntil: "load", timeout: 30_000 });
-    await page.waitForFunction("window.__blPaginated === true", { timeout: 30_000 });
+    await page.evaluate<void>(paginationApparatusSource(TEST_PRIMITIVES_CAPABILITY));
+    const pagination = await page.evaluate<{ paginationError: string | null }>(PAGINATION_PREVIEW_SOURCE);
+    assert.equal(pagination.paginationError, null);
+    const epoch = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(TEST_PRIMITIVES_CAPABILITY));
+    assert.equal(epoch.paginationPreviewCalls, 1);
     await page.evaluate<void>(FREEZE_SOURCE);
     return page;
   }

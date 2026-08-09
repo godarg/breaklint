@@ -104,9 +104,13 @@ export function silentHooks(hooks: Readonly<Record<string, number>>): string[] {
  * through the captured primitives, so an author script replacing `querySelectorAll` cannot make
  * the collector see a different document from the one being rendered.
  */
-export const COLLECTOR_SOURCE = `(() => {
+const COLLECTOR_CAPABILITY_MARKER = "__BREAKLINT_COLLECTOR_CAPABILITY__";
+const COLLECTOR_NONCE_MARKER = "__BREAKLINT_COLLECTOR_NONCE__";
+
+const COLLECTOR_TEMPLATE = `(() => {
   const P = window.__blPrimitives;
   const A = { before: "data-break-before", prevAfter: "data-previous-break-after", page: "data-page" };
+  const SOURCE_BLOCK_SELECTOR = "[data-bl-sid],address[data-ref],article[data-ref],aside[data-ref],blockquote[data-ref],caption[data-ref],dd[data-ref],details[data-ref],div[data-ref],dl[data-ref],dt[data-ref],fieldset[data-ref],figcaption[data-ref],figure[data-ref],footer[data-ref],form[data-ref],h1[data-ref],h2[data-ref],h3[data-ref],h4[data-ref],h5[data-ref],h6[data-ref],header[data-ref],hgroup[data-ref],hr[data-ref],li[data-ref],main[data-ref],nav[data-ref],ol[data-ref],p[data-ref],pre[data-ref],section[data-ref],summary[data-ref],table[data-ref],tbody[data-ref],td[data-ref],tfoot[data-ref],th[data-ref],thead[data-ref],tr[data-ref],ul[data-ref]";
 
   const state = {
     hooks: { beforePageLayout: 0, layoutNode: 0, renderNode: 0, afterPageLayout: 0, afterRendered: 0 },
@@ -117,8 +121,6 @@ export const COLLECTOR_SOURCE = `(() => {
     epoch: 0,
     discarded: 0,
   };
-  window.__blCollector = state;
-
   const sidOf = (el) => P.attr(el, "data-bl-sid");
 
   /**
@@ -140,9 +142,16 @@ export const COLLECTOR_SOURCE = `(() => {
     return holder ? P.attr(holder, A.page) : null;
   };
 
-  /** First and last nodes on a page that carry a source id, plus their break attributes. */
+  /**
+   * First and last source-bearing nodes on a page, plus their break attributes.
+   *
+   * --no-source-map deliberately injects no data-bl-sid. Paged.js still leaves data-ref
+   * on source clones, so that path can measure boundaries and blocks with sid:null instead of
+   * returning an empty snapshot. The random ref is runtime addressing only and never enters a
+   * finding fingerprint.
+   */
   const edges = (pageEl) => {
-    const nodes = P.all(pageEl, "[data-bl-sid]");
+    const nodes = P.all(pageEl, SOURCE_BLOCK_SELECTOR);
     const first = nodes[0] || null;
     const last = nodes.length ? nodes[nodes.length - 1] : null;
     // Every read below goes through the captured primitives. An audit found this function calling
@@ -156,6 +165,11 @@ export const COLLECTOR_SOURCE = `(() => {
     });
     const content = P.all(pageEl, ".pagedjs_page_content")[0] || pageEl;
     const text = (P.text(content) || "").replace(/\\s+/g, " ").trim();
+    const visual = P.all(content, "img,svg,canvas,video,table").filter((el) => {
+      const style = P.style(el, null);
+      const box = P.rect(el);
+      return style.display !== "none" && style.visibility !== "hidden" && box.width > 0 && box.height > 0;
+    });
     return {
       firstSid: sidOf(first),
       lastSid: sidOf(last),
@@ -166,7 +180,7 @@ export const COLLECTOR_SOURCE = `(() => {
       // OUTSIDE .pagedjs_page_content, so a running header does not make a parity page look
       // occupied — which is intended: the blank page inserted by break-before: recto carries the
       // same running header as every other page.
-      blank: nodes.length === 0 && text.length === 0,
+      blank: nodes.length === 0 && text.length === 0 && visual.length === 0,
     };
   };
 
@@ -197,13 +211,13 @@ export const COLLECTOR_SOURCE = `(() => {
     }
     afterRendered() {
       state.hooks.afterRendered++;
-      window.__blPaginated = true;
+      P.integrityArmLate("${COLLECTOR_CAPABILITY_MARKER}");
     }
   }
   Paged.registerHandlers(BreaklintCollector);
 
   /** Called after pagination. Reconciles against the FINAL page list and re-reads the attributes. */
-  window.__blCollectorResult = () => {
+  const collectorResult = () => {
     const finalPages = P.all(document, ".pagedjs_page");
     const finalSet = new Set(finalPages);
     let discarded = state.discarded;
@@ -258,7 +272,17 @@ export const COLLECTOR_SOURCE = `(() => {
       epochCount: state.epoch + 1,
     };
   };
+  P.installCollector("${COLLECTOR_CAPABILITY_MARKER}", "${COLLECTOR_NONCE_MARKER}", collectorResult);
 })()`;
+
+export function collectorSource(capability: string, nonce: string): string {
+  return COLLECTOR_TEMPLATE
+    .replaceAll(COLLECTOR_CAPABILITY_MARKER, capability)
+    .replaceAll(COLLECTOR_NONCE_MARKER, nonce);
+}
+
+/** Static source retained for payload-level unit assertions; production uses a fresh nonce. */
+export const COLLECTOR_SOURCE = collectorSource("breaklint-static-test-capability", "breaklint-static-test-nonce");
 
 /**
  * Turn what the collector saw into the boundary facts the classifier consumes.

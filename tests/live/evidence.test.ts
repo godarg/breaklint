@@ -42,7 +42,12 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { launchBrowser, resolveBrowser, resolvePackageRoot, type BrowserLike } from "../../src/acquire/browser.ts";
+import { launchBrowser, resolveBrowser, resolvePackageRoot, type BrowserLike, type PageLike } from "../../src/acquire/browser.ts";
+import {
+  cleanupBrowserProfile, closeBrowserBounded, closeRasterizerBounded, integritySource, integrityStatusSource,
+  paginationApparatusSource, PAGINATION_PREVIEW_SOURCE, withPagination, type RuntimeIntegrityStatus,
+} from "../../src/acquire/render-run.ts";
+import { PRIMITIVES_SOURCE, TEST_PRIMITIVES_CAPABILITY } from "../../src/measure/primitives.ts";
 import { produceEvidence, REFERENCE_CORPUS_MAX_ABS_MM, type EvidenceOutcome } from "../../src/render/evidence.ts";
 import { openRasterizer, readPngHeader, type Rasterizer } from "../../src/render/rasterizer.ts";
 import { comparePng, decodePng, inkPixels } from "../tools/png.ts";
@@ -170,22 +175,27 @@ function document_(kase: Case, pagedjs: string): string {
     { length: PARAGRAPHS },
     (_, i) => `<p data-bl-sid="b${i + 1}">${i + 1}. ${TEXT}</p>`,
   ).join("\n");
-  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>${kase.name}</title><style>
+  const author = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>${kase.name}</title><style>
 @page{size:148mm 105mm;margin:12mm}
 body{font:10pt/1.45 Georgia,serif;margin:0} p{margin:0 0 8px}
 ${kase.css}
 </style></head><body>
 ${kase.body}
 ${paragraphs}
-<script>${pagedjs}</script>
-<script>
-window.__blPaginated = false;
-class BreaklintProbe extends Paged.Handler { afterRendered() { window.__blPaginated = true; } }
-Paged.registerHandlers(BreaklintProbe);
-new Paged.Previewer().preview();
-</script>
 ${kase.script}
 </body></html>`;
+  return withPagination(author, pagedjs, false);
+}
+
+async function installAndPaginate(page: PageLike, html: string): Promise<void> {
+  await page.evaluate<void>(PRIMITIVES_SOURCE);
+  await page.evaluate<void>(integritySource([]));
+  await page.setContent(html, { waitUntil: "load" });
+  await page.evaluate<void>(paginationApparatusSource(TEST_PRIMITIVES_CAPABILITY));
+  const pagination = await page.evaluate<{ paginationError: string | null }>(PAGINATION_PREVIEW_SOURCE);
+  assert.equal(pagination.paginationError, null);
+  const epoch = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(TEST_PRIMITIVES_CAPABILITY));
+  assert.equal(epoch.paginationPreviewCalls, 1);
 }
 
 /** poppler. A measuring instrument here and nothing else — it is never a product dependency. */
@@ -248,6 +258,7 @@ const missing = [
 
 describe("evidence path, live", () => {
   let browser: BrowserLike;
+  let browserProfile: string | null = null;
   let rasterizer: Rasterizer;
   let workDir: string;
   let pagedjs: string;
@@ -280,6 +291,7 @@ describe("evidence path, live", () => {
     const launched = await launchBrowser(REPO);
     assert.ok(launched.browser, `browser did not launch: ${launched.detail}`);
     browser = launched.browser;
+    browserProfile = launched.userDataDir ?? null;
 
     const opened = await openRasterizer(browser, { fromDir: REPO, contentPagesOpen: () => openContentPages });
     assert.ok(opened.rasterizer, `rasteriser did not open: ${opened.detail}`);
@@ -289,8 +301,7 @@ describe("evidence path, live", () => {
       const page = await browser.newPage();
       openContentPages++;
       await page.setViewport({ width: 900, height: 700, deviceScaleFactor: 1 });
-      await page.setContent(document_(kase, pagedjs), { waitUntil: "load" });
-      await page.waitForFunction("window.__blPaginated===true", { timeout: 60_000 });
+      await installAndPaginate(page, document_(kase, pagedjs));
 
       const outcome = await produceEvidence({
         page,
@@ -306,8 +317,7 @@ describe("evidence path, live", () => {
       const referencePage = await browser.newPage();
       openContentPages++;
       await referencePage.setViewport({ width: 900, height: 700, deviceScaleFactor: 1 });
-      await referencePage.setContent(document_(kase, pagedjs), { waitUntil: "load" });
-      await referencePage.waitForFunction("window.__blPaginated===true", { timeout: 60_000 });
+      await installAndPaginate(referencePage, document_(kase, pagedjs));
       const referencePdf = await referencePage.pdf({ printBackground: true, preferCSSPageSize: true });
       await referencePage.close();
       openContentPages--;
@@ -374,9 +384,22 @@ describe("evidence path, live", () => {
     // failed halfway. The file on its own was not evidence of a green run, and it looked like one.
     const target = process.env.BREAKLINT_LIVE_REPORT;
     if (target) writeFileSync(`${target}.partial`, JSON.stringify(measured, null, 2) + "\n");
-    await rasterizer?.close();
-    await browser?.close();
-    if (workDir) rmSync(workDir, { recursive: true, force: true });
+    let rasterizerError: string | null = null;
+    let browserError: string | null = null;
+    let profileError: string | null = null;
+    try {
+      [rasterizerError, browserError] = await Promise.all([
+        rasterizer ? closeRasterizerBounded(rasterizer) : Promise.resolve(null),
+        browser ? closeBrowserBounded(browser) : Promise.resolve(null),
+      ]);
+    } finally {
+      profileError = cleanupBrowserProfile(browserProfile);
+      if (workDir) rmSync(workDir, { recursive: true, force: true });
+    }
+    assert.equal(rasterizerError, null);
+    assert.equal(browserError, null);
+    assert.equal(profileError, null);
+    assert.equal(browserProfile ? existsSync(browserProfile) : false, false);
   });
 
   const live = (): boolean => !(missing.length && optional);
@@ -399,8 +422,7 @@ describe("evidence path, live", () => {
     const pdf = results.get("H0_neutral")!.deliveredPdf;
 
     const page = await browser.newPage();
-    await page.setContent(document_(CASES[0]!, pagedjs), { waitUntil: "load" });
-    await page.waitForFunction("window.__blPaginated===true", { timeout: 60_000 });
+    await installAndPaginate(page, document_(CASES[0]!, pagedjs));
 
     // Three outcomes, kept apart. Mapping a rejection onto an elapsed time — which an earlier
     // version of this test did — makes "it threw immediately" indistinguishable from "it came

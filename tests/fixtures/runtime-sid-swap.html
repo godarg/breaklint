@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><style>@page{size:120mm 80mm;margin:10mm}</style></head>
+<body>
+  <p>Erster Quellblock.</p><p>Zweiter Quellblock.</p>
+  <script>
+    Object.defineProperty(MutationRecord.prototype, 'type', { configurable: true, get() { return 'childList'; } });
+    Object.defineProperty(MutationRecord.prototype, 'attributeName', { configurable: true, get() { return null; } });
+    const name = 'data-' + 'bl-' + 'sid';
+    const blocks = document.querySelectorAll('p');
+    const first = blocks[0].getAttribute(name), second = blocks[1].getAttribute(name);
+    blocks[0].setAttribute(name, second);
+    blocks[1].setAttribute(name, first);
+  </script>
+</body></html>

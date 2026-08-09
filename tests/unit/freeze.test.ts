@@ -18,11 +18,13 @@ import {
   digest,
   driftedComponents,
   FREEZE_COMPONENTS,
+  FREEZE_SOURCE,
   MAX_STABILITY_RETRIES,
   STABILITY_WINDOW_MS,
   type FreezeComponent,
   type FreezeParts,
 } from "../../src/measure/freeze.ts";
+import { PRIMITIVES_SOURCE } from "../../src/measure/primitives.ts";
 
 function parts(overrides: Partial<Record<FreezeComponent, string>> = {}): FreezeParts {
   const base = Object.fromEntries(FREEZE_COMPONENTS.map((c) => [c, `${c}-stable`])) as Record<
@@ -33,6 +35,24 @@ function parts(overrides: Partial<Record<FreezeComponent, string>> = {}): Freeze
 }
 
 describe("the freeze signature", () => {
+  it("routes hostile-script-sensitive freeze APIs through captured primitives", () => {
+    for (const seam of ["P.svgBounds(el)", "P.replaced(el)", "P.canvas(el)", "P.text(el)"]) {
+      assert.ok(FREEZE_SOURCE.includes(seam), `${seam} left the captured primitive boundary`);
+    }
+    for (const direct of ["el.getBBox(", "el.getScreenCTM(", "el.getContext(", "el.textContent"]) {
+      assert.equal(FREEZE_SOURCE.includes(direct), false, `${direct} became author-replaceable again`);
+    }
+  });
+
+  it("keeps captured canvas dimensions when bitmap access is sabotaged", () => {
+    const canvasStart = PRIMITIVES_SOURCE.indexOf("canvas: (el) =>");
+    const canvasEnd = PRIMITIVES_SOURCE.indexOf("styleSheets: () =>", canvasStart);
+    const payload = PRIMITIVES_SOURCE.slice(canvasStart, canvasEnd);
+    assert.ok(canvasStart >= 0 && canvasEnd > canvasStart);
+    assert.ok(payload.indexOf("const width") < payload.indexOf("try {"), "width/height moved into the fallible bitmap arm");
+    assert.ok(payload.includes("return { width, height, data: null }"));
+    assert.ok(FREEZE_SOURCE.includes("canvas.push(dimensions.width + \"x\" + dimensions.height"));
+  });
   /**
    * The seven components, as a LITERAL.
    *

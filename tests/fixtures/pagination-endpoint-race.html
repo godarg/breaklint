@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>pagination endpoint race</title></head>
+<body>
+  <script>
+    let assignedPaged;
+    Object.defineProperty(window, "Paged", {
+      configurable: true,
+      get() { return assignedPaged; },
+      set(value) {
+        assignedPaged = value;
+        queueMicrotask(() => {
+          try {
+            const attempt = new value.Previewer().preview();
+            if (attempt && attempt.catch) attempt.catch(() => undefined);
+          } catch {}
+        });
+      },
+    });
+  </script>
+  <p>The author must not be able to start pagination before the checker barriers.</p>
+</body>
+</html>

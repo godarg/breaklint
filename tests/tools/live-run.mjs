@@ -18,6 +18,11 @@ const child = spawn(
     "--test",
     "--test-timeout",
     "600000",
+    // Each file owns a real browser/profile and some also own a rasterizer loopback. Running the
+    // four files concurrently twice left the already-green Evidence and M2d workers parked in
+    // uv_run after their Chrome processes and profiles were gone; each file terminates cleanly
+    // alone. Serial execution makes process ownership and the ordering assertions deterministic.
+    "--test-concurrency=1",
     "--experimental-strip-types",
     // Named individually rather than globbed. A glob that matched nothing would run zero files,
     // exit 0, and leave no suite to report a missing prerequisite — the same green-over-nothing
@@ -25,6 +30,7 @@ const child = spawn(
     "tests/live/evidence.test.ts",
     "tests/live/measure.test.ts",
     "tests/live/breaks.test.ts",
+    "tests/live/render-run.test.ts",
   ],
   { stdio: "inherit" },
 );
