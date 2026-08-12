@@ -596,6 +596,9 @@ describe("the live path fails closed at its process boundary", () => {
     assert.equal(contextsClosed, 1, "a context produced after abort escaped the real acquisition join");
     assert.equal(result.documents.length, 1);
     assert.equal(result.documents[0]!.snapshot, null);
+    assert.equal(result.documents[0]!.infrastructure.some((event) =>
+      event.measured?.stage === "document-timeout-join"), false,
+    "a successfully joined late context must not be misclassified as an uncertified join");
   });
 
   it("reports a late context close failure at the final timeout-join boundary", async () => {

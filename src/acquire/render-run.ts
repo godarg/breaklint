@@ -1776,7 +1776,7 @@ export async function renderDocuments(
           "timed-out acquisition final join",
         );
         const uncertified = joined.infrastructure.find((event) =>
-          event.kind === "checker-crashed" || /late owned resource join/u.test(event.detail));
+          /late owned resource (?:cleanup failed|join)/u.test(event.detail));
         if (uncertified) {
           for (const document of documents) document.infrastructure.push({
             kind: "checker-crashed",
