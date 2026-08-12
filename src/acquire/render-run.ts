@@ -751,6 +751,8 @@ interface AcquireContext {
   contentPages: Set<PageLike>;
   injectSourceIds: typeof injectSourceIds;
   ownershipFailed: boolean;
+  lateOwnershipCleanupFailed: boolean;
+  lateOwnershipCleanupDetail: string | null;
   runId: string;
 }
 
@@ -1095,14 +1097,18 @@ async function openContentPage(
     try { await withTimeout(latePage.close(), BROWSER_CLOSE_TIMEOUT_MS, "late content page.close"); }
     catch (error) {
       context.ownershipFailed = true;
-      throw new Error(`late owned content page cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+      context.lateOwnershipCleanupFailed = true;
+      context.lateOwnershipCleanupDetail = error instanceof Error ? error.message : String(error);
+      throw new Error(`late owned content page cleanup failed: ${context.lateOwnershipCleanupDetail}`);
     }
   };
   const closeLateContext = async (lateContext: BrowserContextLike): Promise<void> => {
     try { await withTimeout(lateContext.close(), BROWSER_CLOSE_TIMEOUT_MS, "late browser context.close"); }
     catch (error) {
       context.ownershipFailed = true;
-      throw new Error(`late owned browser context cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+      context.lateOwnershipCleanupFailed = true;
+      context.lateOwnershipCleanupDetail = error instanceof Error ? error.message : String(error);
+      throw new Error(`late owned browser context cleanup failed: ${context.lateOwnershipCleanupDetail}`);
     }
   };
   const trackOwnership = <T>(operation: Promise<T>, closeLate: (value: T) => Promise<void>): Promise<T> => {
@@ -1716,6 +1722,8 @@ export async function renderDocuments(
     contentPages,
     injectSourceIds: dependencies.injectSourceIds ?? injectSourceIds,
     ownershipFailed: false,
+    lateOwnershipCleanupFailed: false,
+    lateOwnershipCleanupDetail: null,
     runId: randomBytes(6).toString("hex"),
   };
   const documents: DocumentInput[] = [];
@@ -1775,12 +1783,10 @@ export async function renderDocuments(
           BROWSER_CLOSE_TIMEOUT_MS,
           "timed-out acquisition final join",
         );
-        const uncertified = joined.infrastructure.find((event) =>
-          /late owned resource (?:cleanup failed|join)/u.test(event.detail));
-        if (uncertified) {
+        if (context.lateOwnershipCleanupFailed) {
           for (const document of documents) document.infrastructure.push({
             kind: "checker-crashed",
-            detail: `timed-out acquisition could not certify its resource join: ${uncertified.detail}`,
+            detail: `timed-out acquisition could not certify its late owned-resource cleanup: ${context.lateOwnershipCleanupDetail ?? "unspecified failure"}`,
             measured: { stage: "document-timeout-join" },
           });
         }
