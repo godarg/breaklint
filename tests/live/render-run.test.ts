@@ -420,6 +420,21 @@ describe("the M2d live production chain", () => {
       event.kind === "checker-crashed" && /animation intervention failed/iu.test(event.detail)));
   });
 
+  it("refuses uppercase and CSS-escaped reserved source-id selectors before injection", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    for (const [name, selector] of [
+      ["uppercase", "[DATA-BL-SID]"],
+      ["escaped", String.raw`[data\2d bl\2d sid]`],
+    ]) {
+      const file = join(root, `reserved-prefix-${name}.html`);
+      writeFileSync(file, `<!doctype html><style>p${selector}{break-before:page}</style><p>must not be injected</p>`);
+      const rendered = await renderDocuments([file], options(join(root, `reserved-prefix-${name}-evidence`)));
+      const event = rendered.documents[0]!.infrastructure.find((item) => item.kind === "source-id-namespace-collision");
+      assert.ok(event, `${name} selector altered the source-id namespace without a refusal`);
+      assert.equal(rendered.documents[0]!.snapshot, null);
+    }
+  });
+
   it("refuses an ambiguous sid-less source join instead of inventing author identity", (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     if (!completeChain(t)) return;

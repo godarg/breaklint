@@ -194,7 +194,8 @@ const PRIMITIVES_TEMPLATE = `(() => {
         if (!collector || collector.nonce !== nonce) throw new Error("breaklint collector identity rejected");
         return collector.value();
       },
-      lockPagination: (target, name, value) => {
+      lockPagination: (capability, target, name, value) => {
+        requireCapability(capability);
         if (target !== window.Paged?.Previewer?.prototype || name !== "preview") {
           throw new Error("breaklint pagination lock target rejected");
         }
@@ -202,7 +203,8 @@ const PRIMITIVES_TEMPLATE = `(() => {
           value, writable: false, configurable: false, enumerable: false,
         });
       },
-      lockPreviewer: (target, name, value) => {
+      lockPreviewer: (capability, target, name, value) => {
+        requireCapability(capability);
         if (target !== window.Paged || name !== "Previewer" || value !== window.Paged.Previewer) {
           throw new Error("breaklint Previewer lock target rejected");
         }
@@ -210,12 +212,18 @@ const PRIMITIVES_TEMPLATE = `(() => {
           value, writable: false, configurable: false, enumerable: false,
         });
       },
-      publishFreeze: (value) => call.call(definePropertyFn, Object, window, "__blFreezeParts", {
-        value, writable: false, configurable: false, enumerable: false,
-      }),
-      publishOverlay: (value) => call.call(definePropertyFn, Object, window, "__blOverlayControl", {
-        value, writable: false, configurable: false, enumerable: false,
-      }),
+      publishFreeze: (capability, value) => {
+        requireCapability(capability);
+        return call.call(definePropertyFn, Object, window, "__blFreezeParts", {
+          value, writable: false, configurable: false, enumerable: false,
+        });
+      },
+      publishOverlay: (capability, value) => {
+        requireCapability(capability);
+        return call.call(definePropertyFn, Object, window, "__blOverlayControl", {
+          value, writable: false, configurable: false, enumerable: false,
+        });
+      },
       mutationType: (record) => call.call(mutationTypeGet, record),
       mutationAttributeName: (record) => call.call(mutationAttributeNameGet, record),
       randomToken: () => {

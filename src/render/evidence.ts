@@ -194,6 +194,8 @@ export interface EvidenceOutcome {
 
 export interface ProduceEvidenceInput {
   page: PageLike;
+  /** Node-held page capability for privileged overlay publication. */
+  apparatusCapability?: string;
   /** The only PDF boundary: caller reconciles mutation/SID/freeze/network immediately around it. */
   pdf?: (stage: "baseline" | "marked") => Promise<Uint8Array>;
   /** Closes the paginated document page. Called before any rasterising, never after. */
@@ -249,7 +251,7 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
   let installation, violations, marked: Uint8Array, detached: number;
   let overlayInstalled = false;
   try {
-    installation = await installOverlay(page);
+    installation = await installOverlay(page, input.apparatusCapability);
     overlayInstalled = true;
     violations = await readbackViolations(page);
     marked = await pdf("marked");

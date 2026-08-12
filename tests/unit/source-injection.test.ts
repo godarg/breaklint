@@ -205,6 +205,8 @@ describe("the reserved-prefix collision gate", () => {
       html: `<link rel="stylesheet" href="a.css"><p>x</p>`,
       sheets: { "a.css": `@import "b.css";`, "b.css": `[data-bl-sid] { display: none }` },
     },
+    "an uppercase attribute selector": { html: `<style>p[DATA-BL-SID] { break-before: page }</style><p>x</p>` },
+    "a CSS-escaped attribute selector": { html: `<style>p[data\\2d bl\\2d sid] { break-before: page }</style><p>x</p>` },
   };
 
   for (const [name, { html, sheets }] of Object.entries(collisions)) {

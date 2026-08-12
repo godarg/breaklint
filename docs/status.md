@@ -202,7 +202,7 @@ The components below are now connected rather than isolated pieces:
 
 | | |
 |---|---|
-| Source provenance | ids injected into the source TEXT before parsing, with the map built from the parser's positions; the reserved-prefix collision gate refuses a document that already uses `data-bl-`, and reports what it searched as well as what it structurally cannot reach |
+| Source provenance | ids injected into the source TEXT before parsing, with the map built from the parser's positions; the reserved-prefix collision gate refuses `data-bl-` usage case-insensitively and after conservative CSS-escape decoding, while the paired control runs for every injected document; it reports what it searched as well as what it structurally cannot reach |
 | Freeze signature | all seven components of §11.3, 250 ms window, 3 retries, and a drift report that names WHICH components moved |
 | Untouched primitives | references captured before any author script runs. Measured: a document that replaces `getBoundingClientRect`, `getComputedStyle` and `querySelectorAll` after pagination sees `x:999` and `"HIJACKED"`, and the probe reads values byte-identical to a clean run across all seven components. The positive control is in the same test — a naive collector under the same attack loses its boxes entirely, 5 097 characters to 0 |
 | Geometry cross-check | a sample compared against CDP `DOM.getBoxModel`, which reads the browser's layout tree out of process. The two agree EXACTLY on this corpus, twice; a systematic 0.002 px disagreement fails the suite |

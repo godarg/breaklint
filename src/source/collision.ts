@@ -6,10 +6,11 @@
  * the attribute — each turns the measuring apparatus into part of what is measured. The contract's
  * answer is not to be clever about it. It is to refuse: exit 3, `source-id-namespace-collision`.
  *
- * WHY A STRING SEARCH AND NOT A PARSE. The check is deliberately cruder than the thing it guards.
- * A parser-based check would have to decide which occurrences matter, and every such decision is a
- * place to be wrong; a string search over the raw bytes cannot miss an occurrence it can see. It
- * can produce a false refusal — a document that merely mentions `data-bl-` in prose is turned away
+ * WHY A CONSERVATIVE TEXT SEARCH AND NOT A SELECTOR PARSE. The check is deliberately cruder than
+ * the thing it guards. CSS identifiers can spell the same attribute with ASCII case changes or
+ * escapes (`data\\2d bl\\2d sid`); decoding those escapes before searching catches such semantic
+ * aliases without pretending a small selector parser can decide which occurrences matter. It can
+ * produce a false refusal — a document that merely mentions `data-bl-` in prose is turned away
  * — and that is the direction to fail in. The message says exactly what was found and where, so a
  * false refusal is diagnosable in one line rather than mysterious.
  *
@@ -23,9 +24,9 @@
  *           does not exist until the document runs
  *
  * The third one is a real hole and is reported as one rather than argued away. There is a
- * complementary argument — a document that can construct a stylesheet contains a script, and a
- * document with a script gets the paired control run of §10.5, which compares four quantities
- * including the style signature — but that argument is a claim about the control run, and it is
+ * complementary argument — a document that can construct a stylesheet has its rendered state
+ * checked by the paired control run of §10.5, which runs for every injected document and compares
+ * four quantities including the style signature — but that argument is a claim about the control run, and it is
  * MEASURED there rather than asserted here. Until it is, this function reports its own scope and
  * lets the caller decide what to do with the gap.
  */
@@ -49,21 +50,47 @@ export interface CollisionResult {
   unreachable: string[];
 }
 
+function decodedCssText(text: string): { text: string; offsets: number[] } {
+  let decoded = "";
+  const offsets: number[] = [];
+  for (let index = 0; index < text.length;) {
+    const start = index;
+    if (text[index] === "\\" && index + 1 < text.length) {
+      index += 1;
+      const hex = text.slice(index).match(/^[0-9a-f]{1,6}/iu)?.[0];
+      if (hex) {
+        index += hex.length;
+        if (/\s/u.test(text[index] ?? "")) index += 1;
+        decoded += String.fromCodePoint(Number.parseInt(hex, 16));
+        offsets.push(start);
+        continue;
+      }
+    }
+    decoded += text[index] ?? "";
+    offsets.push(start);
+    index += 1;
+  }
+  return { text: decoded, offsets };
+}
+
 function occurrencesIn(source: CollisionSource): CollisionResult["occurrences"] {
   const found: CollisionResult["occurrences"] = [];
+  const decoded = decodedCssText(source.text);
+  const searched = decoded.text.toLocaleLowerCase("en-US");
   let at = 0;
   for (;;) {
-    at = source.text.indexOf(RESERVED_PREFIX, at);
+    at = searched.indexOf(RESERVED_PREFIX, at);
     if (at === -1) return found;
-    const before = source.text.slice(0, at);
+    const originalAt = decoded.offsets[at]!;
+    const before = source.text.slice(0, originalAt);
     const line = before.split("\n").length;
-    const column = at - (before.lastIndexOf("\n") + 1) + 1;
+    const column = originalAt - (before.lastIndexOf("\n") + 1) + 1;
     // A window rather than the whole line: a minified stylesheet is one line of 40 000 characters.
     found.push({
       origin: source.origin,
       line,
       column,
-      context: source.text.slice(Math.max(0, at - 30), at + 40).replace(/\s+/gu, " ").trim(),
+      context: source.text.slice(Math.max(0, originalAt - 30), originalAt + 52).replace(/\s+/gu, " ").trim(),
     });
     at += RESERVED_PREFIX.length;
   }

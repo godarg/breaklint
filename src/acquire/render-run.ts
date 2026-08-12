@@ -40,7 +40,7 @@ import {
   awaitStableLayout,
   composeSignature,
   DOCUMENT_TIMEOUT_MS,
-  FREEZE_SOURCE,
+  freezeSource,
   MAX_DOM_NODES,
   MAX_MUTATIONS_AFTER_RENDERED,
   MAX_PAGES,
@@ -939,8 +939,8 @@ export function paginationApparatusSource(capability: string): string {
       if (previewCalls !== 1) throw new Error("pagination preview was invoked more than once");
       return P.invoke0(originalPreview, this);
     };
-    P.lockPagination(Previewer.prototype, "preview", guardedPreview);
-    P.lockPreviewer(Paged, "Previewer", Previewer);
+    P.lockPagination(${JSON.stringify(capability)}, Previewer.prototype, "preview", guardedPreview);
+    P.lockPreviewer(${JSON.stringify(capability)}, Paged, "Previewer", Previewer);
   })()`;
 }
 
@@ -1087,6 +1087,37 @@ async function openContentPage(
   let page: PageLike | null = null;
   let ownedPage: PageLike | null = null;
   let closed = false;
+  const pendingOwnership: Promise<void>[] = [];
+  const closeLatePage = async (latePage: PageLike): Promise<void> => {
+    try { await withTimeout(latePage.close(), BROWSER_CLOSE_TIMEOUT_MS, "late content page.close"); }
+    catch (error) {
+      context.ownershipFailed = true;
+      throw new Error(`late owned content page cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+  const closeLateContext = async (lateContext: BrowserContextLike): Promise<void> => {
+    try { await withTimeout(lateContext.close(), BROWSER_CLOSE_TIMEOUT_MS, "late browser context.close"); }
+    catch (error) {
+      context.ownershipFailed = true;
+      throw new Error(`late owned browser context cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+  const trackOwnership = <T>(operation: Promise<T>, closeLate: (value: T) => Promise<void>): Promise<T> => {
+    pendingOwnership.push(operation.then(async (value) => {
+      // `abortable` deliberately stops the caller promptly. This continuation keeps ownership of
+      // a driver result that arrives afterwards, and the catch path below joins it before this
+      // acquisition can settle. A late context/page is never merely forgotten.
+      if (signal.aborted || closed) await closeLate(value);
+    }, () => undefined));
+    return operation;
+  };
+  const joinPendingOwnership = async (): Promise<void> => {
+    const settled = await Promise.allSettled(pendingOwnership);
+    const failures = settled.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (failures.length > 0) {
+      throw new Error(`late owned resource cleanup failed: ${failures.map((result) => String(result.reason)).join("; ")}`);
+    }
+  };
   const close = async (): Promise<void> => {
     if (closed) return;
     const errors: string[] = [];
@@ -1106,9 +1137,17 @@ async function openContentPage(
     if (ownedPage) context.contentPages.delete(ownedPage);
   };
   try {
-    browserContext = await abortable(context.browser.createBrowserContext(), signal, "createBrowserContext");
+    browserContext = await abortable(
+      trackOwnership(context.browser.createBrowserContext(), closeLateContext),
+      signal,
+      "createBrowserContext",
+    );
     try {
-      ownedPage = await abortable(browserContext.newPage(), signal, "browserContext.newPage");
+      ownedPage = await abortable(
+        trackOwnership(browserContext.newPage(), closeLatePage),
+        signal,
+        "browserContext.newPage",
+      );
       page = abortablePage(ownedPage, signal);
     } catch (error) {
       context.ownershipFailed = true;
@@ -1128,7 +1167,7 @@ async function openContentPage(
     if (pageErrors.length > 0) throw new Error(`content page error before apparatus install: ${pageErrors.join(" | ")}`);
     await enforceOperationalLimits(page, network, 0, "pre-pagination");
     if (collectorNonce) await page.evaluate<void>(collectorSource(apparatusCapability, collectorNonce));
-    await page.evaluate<void>(paginationApparatusSource(apparatusCapability));
+  await page.evaluate<void>(paginationApparatusSource(apparatusCapability));
     await page.evaluate<void>(ANIMATION_FREEZE_SOURCE);
     await verifyAnimationIntervention(page, "pre-pagination");
     const prePagination = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(apparatusCapability));
@@ -1181,9 +1220,15 @@ async function openContentPage(
     if (pageErrors.length > 0) throw new Error(`content page error during pagination: ${pageErrors.join(" | ")}`);
     return { page, browserContext, apparatusCapability, collectorNonce, pageErrors, cascadeHints, network, close };
   } catch (error) {
-    try { await close(); } catch (closeError) {
-      throw new Error(`${error instanceof Error ? error.message : String(error)}; ${closeError instanceof Error ? closeError.message : String(closeError)}`);
-    }
+    const cleanupErrors: string[] = [];
+    try { await close(); } catch (closeError) { cleanupErrors.push(closeError instanceof Error ? closeError.message : String(closeError)); }
+    try {
+      // A driver that ignores both abort and browser shutdown is not a condition we may certify
+      // as clean. Bound the wait so the CLI reports that broken boundary rather than hanging
+      // forever, while ordinary late resolutions remain genuinely joined and closed above.
+      await withTimeout(joinPendingOwnership(), BROWSER_CLOSE_TIMEOUT_MS, "late owned resource join");
+    } catch (joinError) { cleanupErrors.push(joinError instanceof Error ? joinError.message : String(joinError)); }
+    if (cleanupErrors.length > 0) throw new Error(`${error instanceof Error ? error.message : String(error)}; ${cleanupErrors.join("; ")}`);
     throw error;
   }
 }
@@ -1268,11 +1313,11 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
   };
   try {
     let controlSignature: ControlSignature | null = null;
-    if (context.options.sourceMapInjection && sourceModel.scriptBearing) {
+    if (context.options.sourceMapInjection) {
       served.select("control");
       const controlOpened = await openContentPage(context, served.origin, [], false, signal);
       try {
-        await controlOpened.page.evaluate<void>(FREEZE_SOURCE);
+        await controlOpened.page.evaluate<void>(freezeSource(controlOpened.apparatusCapability));
         const controlStable = await awaitStableLayout({
           sample: () => sampleParts(controlOpened.page),
           wait: (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -1316,7 +1361,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       });
     }
     opened.network.activityAfterRendered = 0;
-    await page.evaluate<void>(FREEZE_SOURCE);
+    await page.evaluate<void>(freezeSource(opened.apparatusCapability));
     const stable = await awaitStableLayout({ sample: () => sampleParts(page!), wait: (ms) => new Promise((r) => setTimeout(r, ms)) });
     await verifyAnimationIntervention(page, "snapshot");
     if (!stable.stable) {
@@ -1535,6 +1580,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     };
     const evidence = await produceEvidence({
       page,
+      apparatusCapability: opened.apparatusCapability,
       pdf: reconciledPdf,
       closePage,
       rasterizer: context.rasterizer,
@@ -1721,7 +1767,15 @@ export async function renderDocuments(
       try {
         // Abort-aware driver boundaries and owned-resource cleanup make this a real join. Returning
         // while the acquisition is live would let it mutate shared state after profile cleanup.
-        await timedOutAcquisition.then(() => undefined, () => undefined);
+        const joined = await timedOutAcquisition;
+        const uncertified = joined.infrastructure.find((event) => /late owned resource join/u.test(event.detail));
+        if (uncertified) {
+          for (const document of documents) document.infrastructure.push({
+            kind: "checker-crashed",
+            detail: `timed-out acquisition could not certify its resource join: ${uncertified.detail}`,
+            measured: { stage: "document-timeout-join" },
+          });
+        }
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         for (const document of documents) document.infrastructure.push({

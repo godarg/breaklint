@@ -133,14 +133,14 @@ describe("the live path fails closed at its process boundary", () => {
     assert.equal(/\block\s*:/u.test(PRIMITIVES_SOURCE), false, "generic author-callable lock returned");
     assert.equal(COLLECTOR_SOURCE.includes("window.__blCollector ="), false);
     assert.ok(COLLECTOR_SOURCE.includes("P.installCollector("));
-    assert.ok(FREEZE_SOURCE.includes("P.publishFreeze(freezeParts)"));
+    assert.ok(FREEZE_SOURCE.includes("P.publishFreeze(\"breaklint-static-test-capability\", freezeParts)"));
     const rendered = withPagination("<body><p>x</p></body>", "window.Paged = Paged;", true);
     assert.equal(rendered.includes("__blPaginationStatus"), false);
     assert.equal(rendered.includes("__blStartPagination"), false);
     assert.equal(rendered.includes("installCollector"), false);
     assert.equal(rendered.includes("lockPagination"), false);
     const apparatus = paginationApparatusSource(TEST_PRIMITIVES_CAPABILITY);
-    assert.ok(apparatus.includes('P.lockPagination(Previewer.prototype, "preview", guardedPreview)'));
+    assert.ok(apparatus.includes('P.lockPagination("breaklint-static-test-capability", Previewer.prototype, "preview", guardedPreview)'));
     assert.ok(apparatus.includes("P.integrityRecordPreview"));
     const productionCollector = collectorSource(TEST_PRIMITIVES_CAPABILITY, "nonce-test");
     assert.equal(productionCollector.includes("__BREAKLINT_COLLECTOR_CAPABILITY__"), false);
@@ -572,6 +572,77 @@ describe("the live path fails closed at its process boundary", () => {
     assert.equal(existsSync(profile), false);
   });
 
+  it("joins and closes a context that resolves only after the timeout abort", async () => {
+    let resolveContext: ((context: { newPage(): Promise<PageLike>; close(): Promise<void> }) => void) | null = null;
+    const lateContext = new Promise<{ newPage(): Promise<PageLike>; close(): Promise<void> }>((resolveContextPromise) => {
+      resolveContext = resolveContextPromise;
+    });
+    let contextsClosed = 0;
+    setTimeout(() => resolveContext?.({
+      async newPage() { throw new Error("late context must be closed before it creates a page"); },
+      async close() { contextsClosed += 1; },
+    }), 45);
+    const result = await renderDocuments(["README.md"], OPTIONS, {
+      documentTimeoutMs: 20,
+      async launchBrowser() {
+        return { executablePath: "/fake", detail: "", browser: {
+          async newPage() { throw new Error("default context forbidden"); },
+          createBrowserContext: async () => lateContext,
+          async version() { return "Fake/1"; }, async close() {},
+        } };
+      },
+      async openRasterizer() { return { rasterizer: null, detail: "unit" }; },
+    });
+    assert.equal(contextsClosed, 1, "a context produced after abort escaped the real acquisition join");
+    assert.equal(result.documents.length, 1);
+    assert.equal(result.documents[0]!.snapshot, null);
+  });
+
+  it("joins and closes a page that resolves only after the timeout abort", async () => {
+    let resolvePage: ((page: PageLike) => void) | null = null;
+    const latePage = new Promise<PageLike>((resolvePagePromise) => { resolvePage = resolvePagePromise; });
+    let pagesClosed = 0;
+    const page = {
+      async goto() {}, async setContent() {}, async evaluate() { return undefined; }, async waitForFunction() {},
+      async emulateMediaType() {}, async setViewport() {}, async pdf() { return new Uint8Array(); }, on() {},
+      async evaluateOnNewDocument() {}, async setRequestInterception() {}, async close() { pagesClosed += 1; },
+    } as unknown as PageLike;
+    setTimeout(() => resolvePage?.(page), 45);
+    const result = await renderDocuments(["README.md"], OPTIONS, {
+      documentTimeoutMs: 20,
+      async launchBrowser() {
+        return { executablePath: "/fake", detail: "", browser: {
+          async newPage() { throw new Error("default context forbidden"); },
+          async createBrowserContext() { return { newPage: async () => latePage, async close() {} }; },
+          async version() { return "Fake/1"; }, async close() {},
+        } };
+      },
+      async openRasterizer() { return { rasterizer: null, detail: "unit" }; },
+    });
+    assert.equal(pagesClosed, 1, "a page produced after abort escaped the real acquisition join");
+    assert.equal(result.documents.length, 1);
+    assert.equal(result.documents[0]!.snapshot, null);
+  });
+
+  it("bounds a driver that never joins after abort and reports the uncertified cleanup", async () => {
+    const started = Date.now();
+    const result = await renderDocuments(["README.md"], OPTIONS, {
+      documentTimeoutMs: 20,
+      async launchBrowser() {
+        return { executablePath: "/fake", detail: "", browser: {
+          async newPage() { throw new Error("default context forbidden"); },
+          createBrowserContext: async () => new Promise<never>(() => undefined),
+          async version() { return "Fake/1"; }, async close() {},
+        } };
+      },
+      async openRasterizer() { return { rasterizer: null, detail: "unit" }; },
+    });
+    const elapsed = Date.now() - started;
+    assert.ok(elapsed >= 5_000 && elapsed < 7_000, `unbounded late-ownership join: ${elapsed} ms`);
+    assert.ok(result.documents[0]!.infrastructure.some((event) =>
+      event.kind === "checker-crashed" && /late owned resource join/u.test(event.detail)));
+  });
+
   it("closes a newly owned context when newPage rejects and never starts a later document", async () => {
     let contextsCreated = 0;
     let contextsClosed = 0;
@@ -677,7 +748,7 @@ describe("the live path fails closed at its process boundary", () => {
       async close() { throw new Error("page close rejected"); },
     } as unknown as PageLike;
     try {
-      const result = await renderDocuments([fixture, fixture], OPTIONS, {
+      const result = await renderDocuments([fixture, fixture], { ...OPTIONS, sourceMapInjection: false }, {
         async launchBrowser() {
           return { executablePath: "/fake", detail: "", browser: {
             async newPage() { throw new Error("default context forbidden"); },

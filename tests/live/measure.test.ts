@@ -28,6 +28,7 @@ import {
   type RuntimeIntegrityStatus,
 } from "../../src/acquire/render-run.ts";
 import { FREEZE_COMPONENTS, FREEZE_SOURCE, sampleParts, type FreezeParts } from "../../src/measure/freeze.ts";
+import { overlaySource } from "../../src/render/overlay.ts";
 import {
   PRIMITIVES_CHECK, PRIMITIVES_SOURCE, TEST_PRIMITIVES_CAPABILITY, type PrimitivesStatus,
 } from "../../src/measure/primitives.ts";
@@ -180,7 +181,7 @@ describe("the measurement probe, live", () => {
    * fires. Two independent measurements now point at the same loader design: this one, and the
    * `file://` origin measurement in `docs/status.md` that showed `cssRules` unreadable off a file.
    */
-  async function paginated(): Promise<PageLike> {
+  async function loaded(): Promise<PageLike> {
     const page = await browser!.newPage();
     await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(
       PRIMITIVES_SOURCE,
@@ -191,6 +192,11 @@ describe("the measurement probe, live", () => {
     await page.setViewport({ width: 1000, height: 800 });
     await page.emulateMediaType("print");
     await page.goto(`${origin}/doc.html`, { waitUntil: "load", timeout: 30_000 });
+    return page;
+  }
+
+  async function paginated(): Promise<PageLike> {
+    const page = await loaded();
     await page.evaluate<void>(paginationApparatusSource(TEST_PRIMITIVES_CAPABILITY));
     const pagination = await page.evaluate<{ paginationError: string | null }>(PAGINATION_PREVIEW_SOURCE);
     assert.equal(pagination.paginationError, null);
@@ -199,6 +205,47 @@ describe("the measurement probe, live", () => {
     await page.evaluate<void>(FREEZE_SOURCE);
     return page;
   }
+
+  it("rejects author preemption of every privileged apparatus factory before Node installs it", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const page = await loaded();
+    const attempted = await page.evaluate<{ errors: string[]; previewConfigurable: boolean; constructorConfigurable: boolean; freeze: boolean; overlay: boolean }>(`(() => {
+      const P = window.__blPrimitives;
+      const errors = [];
+      for (const action of [
+        () => P.lockPagination("author-forged", Paged.Previewer.prototype, "preview", () => null),
+        () => P.lockPreviewer("author-forged", Paged, "Previewer", Paged.Previewer),
+        () => P.publishFreeze("author-forged", () => null),
+        () => P.publishOverlay("author-forged", () => null),
+      ]) {
+        try { action(); } catch (error) { errors.push(String(error)); }
+      }
+      return {
+        errors,
+        previewConfigurable: Object.getOwnPropertyDescriptor(Paged.Previewer.prototype, "preview").configurable,
+        constructorConfigurable: Object.getOwnPropertyDescriptor(Paged, "Previewer").configurable,
+        freeze: Object.prototype.hasOwnProperty.call(window, "__blFreezeParts"),
+        overlay: Object.prototype.hasOwnProperty.call(window, "__blOverlayControl"),
+      };
+    })()`);
+    assert.equal(attempted.errors.length, 4);
+    assert.ok(attempted.errors.every((error) => /capability rejected/u.test(error)), attempted.errors.join(" | "));
+    assert.equal(attempted.previewConfigurable, true, "author call sealed Previewer.prototype.preview before Node apparatus");
+    assert.equal(attempted.constructorConfigurable, true, "author call sealed Paged.Previewer before Node apparatus");
+    assert.equal(attempted.freeze, false, "author call published a forged freeze collector");
+    assert.equal(attempted.overlay, false, "author call published a forged overlay controller");
+
+    await page.evaluate<void>(paginationApparatusSource(TEST_PRIMITIVES_CAPABILITY));
+    const pagination = await page.evaluate<{ paginationError: string | null }>(PAGINATION_PREVIEW_SOURCE);
+    assert.equal(pagination.paginationError, null, "the real Node apparatus could not install after rejected preemption");
+    await page.evaluate<void>(FREEZE_SOURCE);
+    await page.evaluate<string>(overlaySource(TEST_PRIMITIVES_CAPABILITY));
+    const installed = await page.evaluate<{ freeze: string; overlay: string }>(
+      '({ freeze: typeof window.__blFreezeParts, overlay: typeof window.__blOverlayControl })',
+    );
+    assert.deepEqual(installed, { freeze: "function", overlay: "function" });
+    await page.close();
+  });
 
   it("the primitives are installed and cannot be replaced", async (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);

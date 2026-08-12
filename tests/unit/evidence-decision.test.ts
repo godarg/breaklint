@@ -213,11 +213,11 @@ describe("the overlay's in-page contract", () => {
    */
   it("every name the module calls is a name the injected script defines", () => {
     const missing = Object.entries(OVERLAY_GLOBALS)
-      .filter(([, global]) => global !== "__blOverlayControl" || !OVERLAY_SOURCE.includes("P.publishOverlay(control)"))
+      .filter(([, global]) => global !== "__blOverlayControl" || !OVERLAY_SOURCE.includes("P.publishOverlay(\"breaklint-static-test-capability\", control)"))
       .map(([role, global]) => `${role} -> window.${global}`);
     assert.deepEqual(missing, [], `these are called but never defined in the page:\n${missing.join("\n")}`);
     // And the reverse count, so a global can neither be added without a caller nor silently lost.
-    const defined = OVERLAY_SOURCE.includes("P.publishOverlay(control)") ? ["__blOverlayControl"] : [];
+    const defined = OVERLAY_SOURCE.includes("P.publishOverlay(\"breaklint-static-test-capability\", control)") ? ["__blOverlayControl"] : [];
     const uncalled = defined.filter((g) => !Object.values(OVERLAY_GLOBALS).includes(g as never));
     assert.deepEqual(uncalled, [], `defined in the page but never called: ${uncalled.join(", ")}`);
     assert.equal(defined.length, 1, "overlay exposed more than its single capability-gated controller");

@@ -95,7 +95,9 @@ const STYLE_MARK =
  * TypeScript and this is a string the browser parses, so renaming one side alone produces a call
  * to a function that does not exist, and only the live suite would notice.
  */
-export const OVERLAY_SOURCE = `(() => {
+const OVERLAY_CAPABILITY_MARKER = "__BREAKLINT_NODE_CAPABILITY__";
+
+const OVERLAY_TEMPLATE = `(() => {
   const P = window.__blPrimitives;
   const STYLE_LAYER = ${JSON.stringify(STYLE_LAYER)};
   const STYLE_MARK = ${JSON.stringify(STYLE_MARK)};
@@ -225,9 +227,16 @@ export const OVERLAY_SOURCE = `(() => {
     stage += 1;
     return { value, unauthorizedCalls };
   };
-  P.publishOverlay(control);
+  P.publishOverlay(${OVERLAY_CAPABILITY_MARKER}, control);
   return capability;
 })()`;
+
+export function overlaySource(apparatusCapability: string): string {
+  return OVERLAY_TEMPLATE.replace(OVERLAY_CAPABILITY_MARKER, JSON.stringify(apparatusCapability));
+}
+
+/** Static test surface; production supplies the per-page Node-held capability. */
+export const OVERLAY_SOURCE = overlaySource("breaklint-static-test-capability");
 
 const capabilities = new WeakMap<PageLike, string>();
 
@@ -255,8 +264,11 @@ export const OVERLAY_GLOBALS = {
   control: "__blOverlayControl",
 } as const;
 
-export async function installOverlay(page: PageLike): Promise<OverlayInstallation> {
-  const capability = await page.evaluate<string>(OVERLAY_SOURCE);
+export async function installOverlay(
+  page: PageLike,
+  apparatusCapability = "breaklint-static-test-capability",
+): Promise<OverlayInstallation> {
+  const capability = await page.evaluate<string>(overlaySource(apparatusCapability));
   capabilities.set(page, capability);
   return call<OverlayInstallation>(page, "install");
 }

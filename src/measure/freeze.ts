@@ -193,7 +193,9 @@ export async function awaitStableLayout(deps: StabilityDeps): Promise<StabilityO
  * as far as it goes: the geometry a spot-check can cross-examine is cross-examined out of process
  * against CDP, and the parts that must run in the page say so rather than pretending otherwise.
  */
-export const FREEZE_SOURCE = `(() => {
+const FREEZE_CAPABILITY_MARKER = "__BREAKLINT_NODE_CAPABILITY__";
+
+const FREEZE_TEMPLATE = `(() => {
   const P = window.__blPrimitives;
   const rect = (el) => P.rect(el);
   const style = (el, pseudo) => P.style(el, pseudo);
@@ -298,8 +300,16 @@ export const FREEZE_SOURCE = `(() => {
 
     return parts;
   };
-  P.publishFreeze(freezeParts);
+  P.publishFreeze(${FREEZE_CAPABILITY_MARKER}, freezeParts);
 })()`;
+
+/** Build the privileged collector source with the per-page Node-held capability. */
+export function freezeSource(capability: string): string {
+  return FREEZE_TEMPLATE.replace(FREEZE_CAPABILITY_MARKER, JSON.stringify(capability));
+}
+
+/** Static test surface; production must use `freezeSource` with the page capability. */
+export const FREEZE_SOURCE = freezeSource("breaklint-static-test-capability");
 
 /** Take one sample from a live page. */
 export async function sampleParts(page: PageLike): Promise<FreezeParts> {
