@@ -209,7 +209,7 @@ describe("the measurement probe, live", () => {
   it("rejects author preemption of every privileged apparatus factory before Node installs it", async (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     const page = await loaded();
-    const attempted = await page.evaluate<{ errors: string[]; previewConfigurable: boolean; constructorConfigurable: boolean; freeze: boolean; overlay: boolean }>(`(() => {
+    const attempted = await page.evaluate<{ errors: string[]; previewConfigurable: boolean; constructorConfigurable: boolean; registrationConfigurable: boolean; freeze: boolean; overlay: boolean }>(`(() => {
       const P = window.__blPrimitives;
       const errors = [];
       for (const action of [
@@ -217,6 +217,7 @@ describe("the measurement probe, live", () => {
         () => P.lockPreviewer("author-forged", Paged, "Previewer", Paged.Previewer),
         () => P.publishFreeze("author-forged", () => null),
         () => P.publishOverlay("author-forged", () => null),
+        () => Paged.registerHandlers(class AuthorPreemption extends Paged.Handler {}),
       ]) {
         try { action(); } catch (error) { errors.push(String(error)); }
       }
@@ -224,14 +225,17 @@ describe("the measurement probe, live", () => {
         errors,
         previewConfigurable: Object.getOwnPropertyDescriptor(Paged.Previewer.prototype, "preview").configurable,
         constructorConfigurable: Object.getOwnPropertyDescriptor(Paged, "Previewer").configurable,
+        registrationConfigurable: Object.getOwnPropertyDescriptor(Paged, "registerHandlers").configurable,
         freeze: Object.prototype.hasOwnProperty.call(window, "__blFreezeParts"),
         overlay: Object.prototype.hasOwnProperty.call(window, "__blOverlayControl"),
       };
     })()`);
-    assert.equal(attempted.errors.length, 4);
-    assert.ok(attempted.errors.every((error) => /capability rejected/u.test(error)), attempted.errors.join(" | "));
+    assert.equal(attempted.errors.length, 5);
+    assert.ok(attempted.errors.slice(0, 4).every((error) => /capability rejected/u.test(error)), attempted.errors.join(" | "));
+    assert.match(attempted.errors[4]!, /handler registration rejected/u);
     assert.equal(attempted.previewConfigurable, true, "author call sealed Previewer.prototype.preview before Node apparatus");
     assert.equal(attempted.constructorConfigurable, true, "author call sealed Paged.Previewer before Node apparatus");
+    assert.equal(attempted.registrationConfigurable, false, "author retained a Paged handler registration entry point");
     assert.equal(attempted.freeze, false, "author call published a forged freeze collector");
     assert.equal(attempted.overlay, false, "author call published a forged overlay controller");
 

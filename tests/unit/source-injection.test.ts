@@ -208,6 +208,10 @@ describe("the reserved-prefix collision gate", () => {
     "an uppercase attribute selector": { html: `<style>p[DATA-BL-SID] { break-before: page }</style><p>x</p>` },
     "a CSS-escaped attribute selector": { html: `<style>p[data\\2d bl\\2d sid] { break-before: page }</style><p>x</p>` },
     "a CRLF-terminated CSS hex escape": { html: `<style>p[data\\2d\r\nbl\\2d sid] { break-before: page }</style><p>x</p>` },
+    "an LF CSS line-continuation selector": { html: `<style>p[data-\\
+bl-sid] { opacity: 0 }</style><p>x</p>` },
+    "a CRLF CSS line-continuation selector": { html: `<style>p[data-\\\r
+bl-sid] { opacity: 0 }</style><p>x</p>` },
     "an invalid CSS escape before a later reserved selector": { html: `<style>.x\\ffffff [data-bl-sid] { break-before: page }</style><p>x</p>` },
     "an astral CSS escape before a later reserved selector": { html: `<style>.x\\1f600 [data-bl-sid] { break-before: page }</style><p>x</p>` },
   };

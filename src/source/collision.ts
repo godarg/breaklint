@@ -53,10 +53,25 @@ export interface CollisionResult {
 function decodedCssText(text: string): { text: string; offsets: number[] } {
   let decoded = "";
   const offsets: number[] = [];
+  const append = (value: string, start: number): void => {
+    decoded += value;
+    // String indexes (and the later `indexOf` result) are UTF-16 offsets. An astral decoded
+    // character therefore needs two provenance entries, otherwise every following source span
+    // is reported one column late.
+    for (let unit = 0; unit < value.length; unit += 1) offsets.push(start);
+  };
   for (let index = 0; index < text.length;) {
     const start = index;
     if (text[index] === "\\" && index + 1 < text.length) {
       index += 1;
+      // CSS input preprocessing removes an escaped newline altogether. It is consequently an
+      // identifier continuation: `data-\\\nbl-sid` is the same selector as `data-bl-sid`.
+      if (text[index] === "\n") { index += 1; continue; }
+      if (text[index] === "\r") {
+        index += 1;
+        if (text[index] === "\n") index += 1;
+        continue;
+      }
       const hex = text.slice(index).match(/^[0-9a-f]{1,6}/iu)?.[0];
       if (hex) {
         index += hex.length;
@@ -71,21 +86,18 @@ function decodedCssText(text: string): { text: string; offsets: number[] } {
         // CSS replaces NUL, surrogate and out-of-range escapes by U+FFFD. Never let hostile
         // source turn the collision gate itself into a RangeError; later literal occurrences
         // must still be scanned and the caller must retain a deterministic fail-closed result.
-        decoded += codePoint === 0 || codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)
+        append(codePoint === 0 || codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)
           ? "\uFFFD"
-          : String.fromCodePoint(codePoint);
-        offsets.push(start);
+          : String.fromCodePoint(codePoint), start);
         continue;
       }
       // A non-hex CSS escape consumes its escaped character verbatim. Attribute names such as
       // `data\-bl\-sid` are semantic aliases and must be visible to the same conservative scan.
-      decoded += text[index] ?? "";
-      offsets.push(start);
+      append(text[index] ?? "", start);
       index += 1;
       continue;
     }
-    decoded += text[index] ?? "";
-    offsets.push(start);
+    append(text[index] ?? "", start);
     index += 1;
   }
   return { text: decoded, offsets };
@@ -94,7 +106,9 @@ function decodedCssText(text: string): { text: string; offsets: number[] } {
 function occurrencesIn(source: CollisionSource): CollisionResult["occurrences"] {
   const found: CollisionResult["occurrences"] = [];
   const decoded = decodedCssText(source.text);
-  const searched = decoded.text.toLocaleLowerCase("en-US");
+  // The reserved prefix is ASCII. Folding only ASCII prevents locale/Unicode expansions from
+  // changing string indexes and therefore corrupting the original source-span mapping.
+  const searched = decoded.text.replace(/[A-Z]/gu, (value) => value.toLowerCase());
   let at = 0;
   for (;;) {
     at = searched.indexOf(RESERVED_PREFIX, at);

@@ -214,7 +214,7 @@ const COLLECTOR_TEMPLATE = `(() => {
       P.integrityArmLate("${COLLECTOR_CAPABILITY_MARKER}");
     }
   }
-  Paged.registerHandlers(BreaklintCollector);
+  P.registerPagedHandler("${COLLECTOR_CAPABILITY_MARKER}", BreaklintCollector);
 
   /** Called after pagination. Reconciles against the FINAL page list and re-reads the attributes. */
   const collectorResult = () => {

@@ -248,7 +248,8 @@ const MIME: Readonly<Record<string, string>> = {
 export function withPagination(html: string, pagedjs: string, collector: boolean): string {
   const harness =
     `<script>if ("Paged" in window) throw new Error("Paged was defined before the measured bundle");</script>\n` +
-    `<script>${pagedjs}</script>\n`;
+    `<script>${pagedjs}</script>\n` +
+    `<script>window.__blPrimitives.capturePaged(Paged);</script>\n`;
   void collector; // Collector and Previewer guards are installed over CDP, never in author-readable HTML.
   const document = parse(html, { sourceCodeLocationInfo: true });
   let insertion = -1;
@@ -926,13 +927,15 @@ export function paginationApparatusSource(capability: string): string {
     if (P.all(document, ".pagedjs_page").length > 0) {
       throw new Error("pagination began before the Node-controlled apparatus was installed");
     }
-    const Previewer = Paged.Previewer;
+    const apparatus = P.pagedApparatus(${JSON.stringify(capability)});
+    const Paged = apparatus.value;
+    const Previewer = apparatus.Previewer;
     const originalPreview = Previewer.prototype.preview;
     let previewCalls = 0;
-    class BreaklintReady extends Paged.Handler {
+    class BreaklintReady extends apparatus.Handler {
       afterRendered() { P.integrityArmLate(${JSON.stringify(capability)}); }
     }
-    Paged.registerHandlers(BreaklintReady);
+    P.registerPagedHandler(${JSON.stringify(capability)}, BreaklintReady);
     const guardedPreview = function() {
       previewCalls += 1;
       P.integrityRecordPreview(${JSON.stringify(capability)});
@@ -1772,7 +1775,8 @@ export async function renderDocuments(
           BROWSER_CLOSE_TIMEOUT_MS,
           "timed-out acquisition final join",
         );
-        const uncertified = joined.infrastructure.find((event) => /late owned resource join/u.test(event.detail));
+        const uncertified = joined.infrastructure.find((event) =>
+          event.kind === "checker-crashed" || /late owned resource join/u.test(event.detail));
         if (uncertified) {
           for (const document of documents) document.infrastructure.push({
             kind: "checker-crashed",

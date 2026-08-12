@@ -425,6 +425,7 @@ describe("the M2d live production chain", () => {
     for (const [name, selector] of [
       ["uppercase", "[DATA-BL-SID]"],
       ["escaped", String.raw`[data\2d bl\2d sid]`],
+      ["line-continuation", "[data-\\\nbl-sid]"],
     ]) {
       const file = join(root, `reserved-prefix-${name}.html`);
       writeFileSync(file, `<!doctype html><style>p${selector}{break-before:page}</style><p>must not be injected</p>`);

@@ -144,7 +144,7 @@ describe("the live path fails closed at its process boundary", () => {
     assert.ok(apparatus.includes("P.integrityRecordPreview"));
     const productionCollector = collectorSource(TEST_PRIMITIVES_CAPABILITY, "nonce-test");
     assert.equal(productionCollector.includes("__BREAKLINT_COLLECTOR_CAPABILITY__"), false);
-    assert.equal(productionCollector.match(/breaklint-static-test-capability/gu)?.length, 2);
+    assert.equal(productionCollector.match(/breaklint-static-test-capability/gu)?.length, 3);
   });
 
   it("rejects source-id removal, swaps and duplicate runtime ownership", () => {
@@ -596,6 +596,31 @@ describe("the live path fails closed at its process boundary", () => {
     assert.equal(contextsClosed, 1, "a context produced after abort escaped the real acquisition join");
     assert.equal(result.documents.length, 1);
     assert.equal(result.documents[0]!.snapshot, null);
+  });
+
+  it("reports a late context close failure at the final timeout-join boundary", async () => {
+    let resolveContext: ((context: { newPage(): Promise<PageLike>; close(): Promise<void> }) => void) | null = null;
+    const lateContext = new Promise<{ newPage(): Promise<PageLike>; close(): Promise<void> }>((resolve) => {
+      resolveContext = resolve;
+    });
+    setTimeout(() => resolveContext?.({
+      async newPage() { throw new Error("late context must not create a page"); },
+      async close() { throw new Error("late context close refused"); },
+    }), 45);
+    const result = await renderDocuments(["README.md"], OPTIONS, {
+      documentTimeoutMs: 20,
+      async launchBrowser() {
+        return { executablePath: "/fake", detail: "", browser: {
+          async newPage() { throw new Error("default context forbidden"); },
+          createBrowserContext: async () => lateContext,
+          async version() { return "Fake/1"; }, async close() {},
+        } };
+      },
+      async openRasterizer() { return { rasterizer: null, detail: "unit" }; },
+    });
+    assert.ok(result.documents[0]!.infrastructure.some((event) =>
+      event.kind === "checker-crashed" && event.measured?.stage === "document-timeout-join" &&
+      /late context close refused/u.test(event.detail)));
   });
 
   it("joins and closes a page that resolves only after the timeout abort", async () => {

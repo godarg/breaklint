@@ -146,6 +146,28 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const mutationAttributeNameGet = getter(MutationRecord.prototype, "attributeName");
   let integrity = null;
   let collector = null;
+  let pagedCapture = null;
+  const capturePaged = (value) => {
+      if (pagedCapture !== null || !value || typeof value.Previewer !== "function" ||
+          typeof value.Handler !== "function" || typeof value.registerHandlers !== "function") {
+        throw new Error("breaklint Paged.js apparatus export rejected");
+      }
+      pagedCapture = call.call(freezeFn, Object, {
+        value,
+        Previewer: value.Previewer,
+        Handler: value.Handler,
+        registerHandlers: value.registerHandlers,
+      });
+      // Registration is an apparatus capability too: an author handler installed in the interval
+      // after bundle export but before Node setup can falsify transient Paged hook data. Keep the
+      // captured original for Node-only registration and make the public entry fail closed.
+      definePropertyFn(value, "registerHandlers", {
+        value: () => { throw new Error("breaklint Paged.js handler registration rejected"); },
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+  };
   const requireCapability = (candidate) => {
     if (candidate !== apparatusCapability) throw new Error("breaklint apparatus capability rejected");
   };
@@ -194,9 +216,21 @@ const PRIMITIVES_TEMPLATE = `(() => {
         if (!collector || collector.nonce !== nonce) throw new Error("breaklint collector identity rejected");
         return collector.value();
       },
+      pagedSentinel: () => true,
+      capturePaged: (value) => capturePaged(value),
+      pagedApparatus: (capability) => {
+        requireCapability(capability);
+        if (!pagedCapture) throw new Error("breaklint Paged.js bundle was not captured");
+        return pagedCapture;
+      },
+      registerPagedHandler: (capability, handler) => {
+        requireCapability(capability);
+        if (!pagedCapture || typeof handler !== "function") throw new Error("breaklint Paged.js handler rejected");
+        return call.call(pagedCapture.registerHandlers, pagedCapture.value, handler);
+      },
       lockPagination: (capability, target, name, value) => {
         requireCapability(capability);
-        if (target !== window.Paged?.Previewer?.prototype || name !== "preview") {
+        if (target !== pagedCapture?.Previewer?.prototype || name !== "preview") {
           throw new Error("breaklint pagination lock target rejected");
         }
         return call.call(definePropertyFn, Object, target, name, {
@@ -205,7 +239,7 @@ const PRIMITIVES_TEMPLATE = `(() => {
       },
       lockPreviewer: (capability, target, name, value) => {
         requireCapability(capability);
-        if (target !== window.Paged || name !== "Previewer" || value !== window.Paged.Previewer) {
+        if (target !== pagedCapture?.value || name !== "Previewer" || value !== pagedCapture.Previewer) {
           throw new Error("breaklint Previewer lock target rejected");
         }
         return call.call(definePropertyFn, Object, target, name, {
