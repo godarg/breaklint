@@ -25,11 +25,10 @@ running nothing makes every claim on this page look checked.
 
 There is one way to turn that failure back into a skip, and it is written here rather than only in
 the test file, because a property stated without its exception is a property overstated.
-`BREAKLINT_LIVE_OPTIONAL=1` downgrades the missing prerequisite to a skip — and the run then exits
-**0** with sixteen cases skipped. No measurement report is promoted and the reason is printed, but
-the exit code is what a release gate reads, so the variable belongs to a local run on a machine
-without poppler and nowhere else. Measured both ways: without it, exit 1 and `no measurement report
-was written`; with it, exit 0, one pass, sixteen skipped.
+`BREAKLINT_LIVE_OPTIONAL=1` downgrades missing prerequisites to skips. No measurement report is
+promoted and the reason is printed, but the exit code is what a release gate reads, so the variable
+belongs to a local run on a machine without poppler and nowhere else. Measured both ways: without it,
+exit 1 and `no measurement report was written`; with it, exit 0 with no promoted measurement.
 
 | | |
 |---|---|

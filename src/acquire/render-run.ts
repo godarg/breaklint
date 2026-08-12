@@ -1767,7 +1767,11 @@ export async function renderDocuments(
       try {
         // Abort-aware driver boundaries and owned-resource cleanup make this a real join. Returning
         // while the acquisition is live would let it mutate shared state after profile cleanup.
-        const joined = await timedOutAcquisition;
+        const joined = await withTimeout(
+          timedOutAcquisition,
+          BROWSER_CLOSE_TIMEOUT_MS,
+          "timed-out acquisition final join",
+        );
         const uncertified = joined.infrastructure.find((event) => /late owned resource join/u.test(event.detail));
         if (uncertified) {
           for (const document of documents) document.infrastructure.push({

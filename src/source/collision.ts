@@ -60,11 +60,29 @@ function decodedCssText(text: string): { text: string; offsets: number[] } {
       const hex = text.slice(index).match(/^[0-9a-f]{1,6}/iu)?.[0];
       if (hex) {
         index += hex.length;
-        if (/\s/u.test(text[index] ?? "")) index += 1;
-        decoded += String.fromCodePoint(Number.parseInt(hex, 16));
+        // CSS input preprocessing turns CRLF into one newline. For an escape terminator we must
+        // therefore consume both source code units; consuming CR alone left `\nbl` in the
+        // decoded string and missed a semantic `data-bl-` selector.
+        if (text[index] === "\r") {
+          index += 1;
+          if (text[index] === "\n") index += 1;
+        } else if (/\s/u.test(text[index] ?? "")) index += 1;
+        const codePoint = Number.parseInt(hex, 16);
+        // CSS replaces NUL, surrogate and out-of-range escapes by U+FFFD. Never let hostile
+        // source turn the collision gate itself into a RangeError; later literal occurrences
+        // must still be scanned and the caller must retain a deterministic fail-closed result.
+        decoded += codePoint === 0 || codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)
+          ? "\uFFFD"
+          : String.fromCodePoint(codePoint);
         offsets.push(start);
         continue;
       }
+      // A non-hex CSS escape consumes its escaped character verbatim. Attribute names such as
+      // `data\-bl\-sid` are semantic aliases and must be visible to the same conservative scan.
+      decoded += text[index] ?? "";
+      offsets.push(start);
+      index += 1;
+      continue;
     }
     decoded += text[index] ?? "";
     offsets.push(start);

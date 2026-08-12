@@ -640,7 +640,8 @@ describe("the live path fails closed at its process boundary", () => {
     const elapsed = Date.now() - started;
     assert.ok(elapsed >= 5_000 && elapsed < 7_000, `unbounded late-ownership join: ${elapsed} ms`);
     assert.ok(result.documents[0]!.infrastructure.some((event) =>
-      event.kind === "checker-crashed" && /late owned resource join/u.test(event.detail)));
+      event.kind === "checker-crashed" &&
+      /(?:late owned resource join|timed-out acquisition final join)/u.test(event.detail)));
   });
 
   it("closes a newly owned context when newPage rejects and never starts a later document", async () => {
