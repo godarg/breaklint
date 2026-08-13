@@ -17,6 +17,14 @@
  *
  * The symlink is made in a temp directory rather than in the repository: a link committed here
  * would encode an absolute path from the machine that made it.
+ *
+ * WHAT THIS FILE DOES NOT COVER, stated because an audit found the claim overstated once already:
+ * it links the SOURCE and runs it with `--experimental-strip-types`. A user runs the BUILT
+ * `dist/cli/index.js` with plain node. The mechanism is identical — one file, two names — but the
+ * artefact is not. The artefact is covered by the "the BUILT package runs from a clean install"
+ * step in `.github/workflows/ci.yml`, which packs, installs into a foreign directory and runs
+ * `npx breaklint`. Both are needed: this one fails fast on every `npm test`, that one is the only
+ * check that sees what is actually shipped.
  */
 
 import { strict as assert } from "node:assert";

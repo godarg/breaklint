@@ -41,7 +41,10 @@ body:
       label: The report, if one was produced
       description: >
         `--format json` is the truth; every other format is a lossy projection of it. Please attach
-        the JSON rather than the console output where you can.
+        the JSON rather than the console output where you can. **Read it before you paste it:** a
+        report quotes text from your document and can contain local file URIs. Only your home
+        directory is redacted. If the document is confidential, redact the finding details or
+        reproduce the problem on a document you can share.
       render: json
 
   - type: input

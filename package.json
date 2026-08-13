@@ -46,7 +46,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepack": "npm run build",
+    "prepack": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && npm run build",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-strip-types tests/unit/*.test.ts tests/e2e/*.test.ts",
     "test:live": "node tests/tools/live-run.mjs",

@@ -73,6 +73,32 @@ jobs:
           test "$code" -eq 1 || { echo "--demo exited $code, expected 1"; exit 1; }
           echo "--demo exit 1 as documented"
 
+      - name: the BUILT package runs from a clean install
+        # The step that would have caught the defect that shipped nothing.
+        #
+        # Every other step in this file calls the CLI by its own source path. A user never does
+        # that: npm links `bin` as a SYMLINK, and node then receives the link path while the
+        # module reports the real one. Comparing those two as strings made every installed copy
+        # a silent no-op with exit 0 — which a build gate reads as a clean document.
+        #
+        # The unit test alongside this covers the mechanism on the source. THIS step covers the
+        # artefact: built `dist/`, packed tarball, foreign directory, `npx`. `npm pack` runs
+        # `prepack`, so it also proves dist/ was built from this commit rather than left over.
+        run: |
+          tgz=$(npm pack --silent)
+          mkdir -p /tmp/consumer && cd /tmp/consumer
+          npm init -y > /dev/null
+          npm i "$GITHUB_WORKSPACE/$tgz" --no-audit --no-fund
+          test "$(npx breaklint --version)" = "$(node -p "require('$GITHUB_WORKSPACE/package.json').version")" \
+            || { echo "the installed package printed no version, or the wrong one"; exit 1; }
+          set +e
+          npx breaklint --demo > demo.out
+          code=$?
+          set -e
+          test "$code" -eq 1 || { echo "installed --demo exited $code, expected 1"; cat demo.out; exit 1; }
+          grep -q "uncalibrated" demo.out || { echo "installed --demo printed no findings"; exit 1; }
+          echo "installed package: --version and --demo behave as documented"
+
       - name: a live run with a missing prerequisite ends with exit 3 and a command to fix it
         # The promise is exit 3 plus ONE copyable install command on stderr — not exit 0, not
         # exit 1, not an empty success. Which prerequisite is missing depends on the runner:

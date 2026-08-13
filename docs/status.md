@@ -121,7 +121,7 @@ each measured singly.
 **Four repairs were once green in every suite while being reverted.** An audit turned each of them
 back into its defect — the tolerance-free page verdict, the unread integrity count, the unread
 late errors, the file-access switch — and the whole suite as it stood at the time (104 unit tests
-and 15 live tests, since grown to 317 and 56) plus the mutation guard stayed green through all
+and 15 live tests, since grown to 320 and 56) plus the mutation guard stayed green through all
 four. The repairs were real; the gates were not there. They are now, and
 each was verified by re-applying the mutation and watching it go red. The reason the live corpus
 could not reach them is structural: a real document cannot be made to produce a rasteriser page
