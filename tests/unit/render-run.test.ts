@@ -416,6 +416,30 @@ describe("the live path fails closed at its process boundary", () => {
     assert.equal(result.verified, true);
   });
 
+  it("captures and terminates a root descendant that has left the isolated browser process group", async () => {
+    const root = 42_430, detachedChild = 42_431;
+    const alive = new Set([root, detachedChild]);
+    const table = [
+      { pid: root, ppid: 1, pgid: root },
+      { pid: detachedChild, ppid: root, pgid: detachedChild },
+    ];
+    const ownership = captureProcessTreeOwnership(root, () => table, (pid) => alive.has(pid));
+    assert.deepEqual(ownership?.initialPids, [root, detachedChild]);
+    const signals: number[] = [];
+    const result = await terminateProcessTree(root, () => table, {
+      alive: (pid) => alive.has(pid),
+      signal(pid) {
+        signals.push(pid);
+        if (pid === -root) alive.delete(root);
+        else alive.delete(pid);
+      },
+      async wait() {},
+    }, ownership);
+    assert.ok(signals.includes(-root));
+    assert.ok(signals.includes(detachedChild), "the descendant outside the group was not signalled");
+    assert.equal(result.verified, true);
+  });
+
   it("verifies the PID tree even when browser.close resolves", async () => {
     let verified = 0;
     let captured = 0;

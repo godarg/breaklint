@@ -162,16 +162,22 @@ function groupMembers(table: ProcessRow[], pgid: number | null): number[] {
   return pgid === null ? [] : table.filter((entry) => entry.pgid === pgid).map((entry) => entry.pid).sort((a, b) => a - b);
 }
 
-function ownershipFrom(table: ProcessRow[], rootPid: number): ProcessTreeOwnership | null {
+function ownershipFrom(table: ProcessRow[], rootPid: number, isAlive: (pid: number) => boolean = alive): ProcessTreeOwnership | null {
   const root = table.find((entry) => entry.pid === rootPid);
   if (!root) return null;
   const own = table.find((entry) => entry.pid === process.pid);
   const pgid = root.pgid;
   const groupSafe = process.platform !== "win32" && pgid === rootPid && pgid !== own?.pgid;
+  // A detached Chrome helper is still owned if it remains a descendant of the root even when it
+  // has changed process group.  The isolated group is an efficient signal target, not an identity
+  // boundary that may discard an already-observed descendant.
+  const observed = groupSafe
+    ? [...groupMembers(table, pgid), ...descendantsOf(table, rootPid)]
+    : descendantsOf(table, rootPid);
   return {
     pgid,
     groupSafe,
-    initialPids: (groupSafe ? groupMembers(table, pgid) : descendantsOf(table, rootPid)).filter(alive),
+    initialPids: [...new Set(observed)].filter(isAlive),
   };
 }
 
@@ -184,10 +190,11 @@ function ownershipFrom(table: ProcessRow[], rootPid: number): ProcessTreeOwnersh
 export function captureProcessTreeOwnership(
   rootPid: number,
   readProcessTable: ProcessTableReader = processTable,
+  isAlive: (pid: number) => boolean = alive,
 ): ProcessTreeOwnership | null {
   try {
     const table = readProcessTable();
-    return ownershipFrom(table, rootPid);
+    return ownershipFrom(table, rootPid, isAlive);
   } catch {
     return null;
   }
@@ -282,7 +289,7 @@ export async function terminateProcessTree(
       groupSafe: false, termSent, killSent, verified: false,
     };
   }
-  const ownership = preservedOwnership ?? ownershipFrom(table, rootPid);
+  const ownership = preservedOwnership ?? ownershipFrom(table, rootPid, operations.alive);
   if (!ownership) {
     return {
       rootPid, pgid: null, initialPids: [], survivingPids: [],
@@ -293,13 +300,18 @@ export async function terminateProcessTree(
   // A shared process group is never an ownership oracle. Only descendants of the browser root
   // belong to breaklint in that case; signalling every member could include this process, its
   // shell and unrelated CI siblings. Group membership is used only after isolation is proven.
-  const owned = (): number[] => groupSafe ? groupMembers(table, pgid) : descendantsOf(table, rootPid);
+  const owned = (): number[] => groupSafe
+    ? [...new Set([...groupMembers(table, pgid), ...descendantsOf(table, rootPid)])]
+    : descendantsOf(table, rootPid);
   const initialPids = [...new Set([...ownership.initialPids, ...owned()])].filter(operations.alive);
   let termSent = false;
   let killSent = false;
   try {
-    if (groupSafe) operations.signal(-rootPid, "SIGTERM");
-    else for (const pid of [...initialPids].reverse()) operations.signal(pid, "SIGTERM");
+    if (groupSafe) {
+      operations.signal(-rootPid, "SIGTERM");
+      const inGroup = new Set(groupMembers(table, pgid));
+      for (const pid of [...initialPids].reverse()) if (!inGroup.has(pid)) operations.signal(pid, "SIGTERM");
+    } else for (const pid of [...initialPids].reverse()) operations.signal(pid, "SIGTERM");
     termSent = true;
   } catch { /* the recheck below decides whether this mattered */ }
 
@@ -308,7 +320,9 @@ export async function terminateProcessTree(
     let current: number[] = [];
     try {
       const fresh = readProcessTable();
-      current = (groupSafe ? groupMembers(fresh, pgid) : descendantsOf(fresh, rootPid)).filter(operations.alive);
+      current = (groupSafe
+        ? [...new Set([...groupMembers(fresh, pgid), ...descendantsOf(fresh, rootPid)])]
+        : descendantsOf(fresh, rootPid)).filter(operations.alive);
     } catch {
       processTableVerified = false;
     }
