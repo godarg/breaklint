@@ -1,0 +1,47 @@
+name: Propose a rule
+description: A layout or typography defect that this tool should be able to see.
+title: "[rule] "
+labels: ["rule-proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read [`docs/limitations.md`](../../blob/main/docs/limitations.md) first if you intend to
+        argue that the rule should be able to fail a build. Two rules do that today, and the number
+        is guarded by the registry on purpose.
+
+  - type: textarea
+    id: defect
+    attributes:
+      label: The defect
+      description: What goes wrong on the page, and how a reader notices it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: measurable
+    attributes:
+      label: What could be measured
+      description: >
+        Which two quantities would the rule compare, and where would each come from — the snapshot
+        after pagination, the paginator's own attributes, the rasterised page?
+    validations:
+      required: true
+
+  - type: textarea
+    id: complication
+    attributes:
+      label: The case that breaks the naive implementation
+      description: >
+        Every fixture in this project names its complication, because a fixture without one tests
+        the naive implementation. What is the document that looks like the defect and is not?
+    validations:
+      required: true
+
+  - type: textarea
+    id: severity
+    attributes:
+      label: Warning or error, and why
+      description: >
+        If you think it can gate a build, name the proof class (A, B or C) from
+        `docs/limitations.md` and say why a freely chosen number is not involved.

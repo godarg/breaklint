@@ -1,0 +1,69 @@
+name: A finding is wrong
+description: A rule fired on a page that is fine — or stayed silent on a page that is not.
+title: "[false positive] "
+labels: ["finding-quality"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most useful kind of report this project can get. Every threshold here is
+        uncalibrated, which means a wrong finding is expected to happen and is evidence rather
+        than an embarrassment. Please do not soften it.
+
+  - type: input
+    id: rule
+    attributes:
+      label: Which rule
+      placeholder: layout/half-empty-page
+    validations:
+      required: true
+
+  - type: dropdown
+    id: direction
+    attributes:
+      label: Which way was it wrong
+      options:
+        - It fired and the page is fine (false positive)
+        - It stayed silent and the page is broken (false negative)
+    validations:
+      required: true
+
+  - type: textarea
+    id: report
+    attributes:
+      label: The finding
+      description: >
+        Paste the finding, ideally from `--format json`. The measured value and the threshold are
+        the two numbers this report turns on.
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: html
+    attributes:
+      label: The smallest HTML that reproduces it
+      description: >
+        Reduce it as far as you can. If the document is confidential, a reduction that still shows
+        the geometry is more useful than a description of the original.
+      render: html
+    validations:
+      required: true
+
+  - type: textarea
+    id: judgement
+    attributes:
+      label: Why the page is fine — or is not
+      description: >
+        This is the part no measurement can supply. What does a competent reader see on this page,
+        and why is the tool's verdict the wrong one?
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `npx breaklint --version`, plus your OS and browser version.
+    validations:
+      required: true

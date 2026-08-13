@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security finding
+    url: https://github.com/godarg/breaklint/blob/main/SECURITY.md
+    about: Report privately to security@dargel-solutions.de — not in a public issue.
+  - name: What is measured and what is not
+    url: https://github.com/godarg/breaklint/blob/main/docs/status.md
+    about: Before asking whether something is verified, this page probably says.

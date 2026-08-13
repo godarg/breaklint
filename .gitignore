@@ -10,6 +10,10 @@ breaklint-report/
 *.pdf
 !tests/fixtures/**/expected-*.png
 
+# Published brand assets, deliberately committed. The social preview is uploaded to the
+# repository settings by hand, so the file has to stay in the tree to be re-uploadable.
+!assets/*.png
+
 # Local scratch
 .tmp/
 coverage/
@@ -17,3 +21,6 @@ coverage/
 # Local agent tooling. These are symlinks into a checkout outside this repository; committing
 # them would publish absolute paths from the machine they were made on.
 .claude/
+
+# npm pack output
+*.tgz

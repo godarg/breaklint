@@ -4,15 +4,28 @@
   "description": "Layout checks for documents generated from HTML to PDF: measures every page after pagination and reports the measured value next to the threshold it failed.",
   "keywords": [
     "pagedjs",
+    "paged-media",
     "html-to-pdf",
     "pdf",
+    "print",
     "layout",
     "pagination",
+    "page-break",
+    "widows",
+    "orphans",
     "linter",
     "typography"
   ],
   "license": "MIT",
   "author": "Gottlieb Dargel",
+  "homepage": "https://dargel-solutions.de/en/breaklint/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/godarg/breaklint.git"
+  },
+  "bugs": {
+    "url": "https://github.com/godarg/breaklint/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -26,11 +39,14 @@
   "files": [
     "dist/",
     "examples/",
+    "docs/",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-strip-types tests/unit/*.test.ts tests/e2e/*.test.ts",
     "test:live": "node tests/tools/live-run.mjs",

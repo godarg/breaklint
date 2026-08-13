@@ -1,37 +1,82 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 — 2026-08-13
 
-First working shape. Not published.
+First published version. What it is: a measurement chain that runs end to end and states, in every
+finding, what it measured and against which threshold. What it is not: a calibrated instrument. No
+threshold in this release has been checked against a corpus of real documents with human-labelled
+truth, and `uncalibrated` therefore appears in the type, in every finding and on every rule page.
 
-- Fifteen rules as pure functions over a snapshot, with a mutation guard that kills every
-  mutant on a fixture that actually triggers the rule.
-- Six output formats, each carrying every mandatory counter — including on a clean run.
-- Exit precedence with a 27-row matrix asserting exit code, verdict and gate reason together.
-- `npx breaklint --demo` runs the real rule and reporter chain over a stored snapshot.
-- The live render path resolves the browser and the Paged.js version gate, then stops with
-  exit 3 rather than returning an empty document. See `docs/status.md`.
-- The evidence path: `pdfjs-dist` rasterises the produced PDF on a second page of the same
-  browser instance, served over a loopback origin so that no browser-wide file-access switch is
-  needed. Invisible marks are placed after pagination, and the binding is decided by comparing
-  the marked PDF against a baseline PDF taken BEFORE the overlay existed. Verified against real
-  Chrome, real Paged.js and poppler as an independent rasteriser; `npm run test:live` fails
-  rather than skips when any of them is missing.
+### The check itself
+
+- Fifteen rules as pure functions over a snapshot, with a mutation guard that kills every mutant
+  on a fixture that actually triggers the rule.
+- Two rules can fail a build by default, twelve are advisory under `--fail-on warn`, and
+  `layout/half-empty-page` is experimental and never moves an exit code.
+- Six output formats — json, sarif, console, html, junit, markdown — each carrying every mandatory
+  counter, including on a clean run.
+- Exit precedence with a 28-row matrix over all five exit codes, asserting exit code, verdict and
+  gate reason together.
+- `npx breaklint --demo` runs the real rule and reporter chain over a stored snapshot: exit 1,
+  eight findings across seven rules, no browser required.
+
+### The live path
+
+- A run over real HTML loads each document from an owned loopback origin, enforces the renderer
+  and paginator gates, waits at the resource boundary, paginates, collects and validates the
+  snapshot, runs the rule engine and attaches the evidence outcome to the report.
+- Paged.js is pinned to exactly 0.4.3, because the break cause is read from attributes the
+  paginator writes into the tree and does not guarantee as an interface. Any other resolved
+  version stops the run with exit 3, and no flag overrides that.
+- `checker-crashed` is a real fault path, not a placeholder: driver resets, injected boundary
+  failures, apparatus races and unverified cleanup all produce it and are exercised by the exit
+  matrix.
+- The document is loaded by navigating to a loopback origin rather than via `setContent`, and both
+  reasons were measured rather than assumed.
+
+### Evidence
+
+- `pdfjs-dist` rasterises the produced PDF on a second page of the same browser instance, served
+  over a loopback origin, so no browser-wide file-access switch is needed.
+- Invisible marks are placed after pagination, and the binding is decided by comparing the marked
+  PDF against a baseline PDF taken BEFORE the overlay existed — not by detaching it again, because
+  a document that mutates itself when the layer arrives leaves that change in both PDFs.
+- Verified against real Chrome, real Paged.js, and poppler as an independent rasteriser.
+  `npm run test:live` fails rather than skips when a prerequisite is missing.
 - Not every infrastructure event ends a run. `mark-style-overridden` and `mark-raster-diff` mean
-  the evidence was lost, not that the document could not be measured; `render-unstable` from a
-  page whose own marks all miss does end it.
+  the evidence was lost, not that the document could not be measured; a page whose own marks all
+  miss does end it.
 - The `Δy` reference is bounded, not only the residual around it. A displacement shared by every
   mark on a page was previously invisible by construction — the reference absorbed it, and the page
-  reported a maximum deviation of zero for a displacement of any size. The reference is now
-  reported next to the residual and bounded against a measured corpus maximum.
+  reported a maximum deviation of zero for a displacement of any size.
 - Declaring a page divergent, which ends the run, needs three refound pairs rather than two. At two
   a median is a mean, so one extraction outlier beside one correct mark aborted the run on a sound
   document. A two-pair page that binds nothing is `unverified` instead.
+
+### Gates that were missing and are now there
+
+- **The tool now runs when it is installed.** npm links a `bin` as a symlink, so node is handed
+  the link path while the module reports the path of the real file. The entry guard compared the
+  two with `path.resolve`, which never touches the filesystem — so every installed copy did
+  nothing at all: no output, no findings, exit 0. For a checker that is the worst available
+  failure, because a build gate reads exit 0 as a clean document. Both sides are resolved through
+  the filesystem now, and an end-to-end test invokes the CLI through a symlink, which is the path
+  a user takes and the one no gate had ever taken.
+
 - The reason reported for an exit names the event that caused it. A run without a snapshot used to
   name whichever event arrived first, so a fatal exit could be attributed to a kind that cannot
   cause one.
-- Every infrastructure kind now has its fatality asserted individually, against a list written out
-  in the test rather than derived from the list under test.
-- The unfinished live path has a test. Its only promise is how it fails, and that promise was
-  carried by a comment alone until an audit removed the comment's subject and nothing went red.
-- `package.json` no longer lists files that do not exist, and a test now checks that it cannot.
+- Every infrastructure kind has its fatality asserted individually, against a list written out in
+  the test rather than derived from the list under test.
+- `package.json` no longer lists files that do not exist, and a test checks that it cannot.
+
+### Known limits in this release
+
+- No threshold is calibrated. The implementation is verified, not validated.
+- Windows is not supported; process termination rests on POSIX process groups. The termination and
+  profile-cleanup path is measured on macOS, and an equivalent Linux measurement is still missing.
+- Input identity is bounded: the report records the HTML hash, observed resource status, bytes,
+  hashes and redirects, renderer and platform data and resolved font families, but not
+  platform-stable system font identifiers.
+- SVG ink passes against the real renderer, and the wider corpus work, are unfinished.
+  `docs/status.md` states what has been measured and what has not.

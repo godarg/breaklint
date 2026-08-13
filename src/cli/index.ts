@@ -14,7 +14,7 @@
  * whose design is missing is not a gap, it is a hole.
  */
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -258,7 +258,31 @@ exit codes
 `;
 }
 
-const invokedDirectly = process.argv[1] && resolvePath(process.argv[1]) === resolvePath(fileURLToPath(import.meta.url));
+/**
+ * Same file, two names.
+ *
+ * npm installs a `bin` as a SYMLINK in `node_modules/.bin`, so node is handed the link path
+ * while this module reports the path of the real file. `resolve()` normalises a path but never
+ * touches the filesystem, so the two strings differed for every installed copy of this tool —
+ * and the guard below then did nothing at all: no output, no findings, exit 0. For a checker
+ * that is the worst available failure, because a build gate reads exit 0 as "clean".
+ *
+ * It survived every gate because nothing ever ran the tool the way a user does. CI called the
+ * source file by its own path, and so did the suite. The e2e test alongside this file now goes
+ * through a symlink for exactly that reason.
+ *
+ * `realpathSync` throws on a path that does not exist, which is not a reason to guess: fall
+ * back to the string comparison, which is what this line did before.
+ */
+function isSameFile(a: string, b: string): boolean {
+  try {
+    return realpathSync(a) === realpathSync(b);
+  } catch {
+    return resolvePath(a) === resolvePath(b);
+  }
+}
+
+const invokedDirectly = Boolean(process.argv[1]) && isSameFile(process.argv[1] as string, fileURLToPath(import.meta.url));
 if (invokedDirectly) {
   main(process.argv.slice(2))
     .then((code) => process.exit(code))

@@ -21,7 +21,14 @@ attributes its findings to the wrong id.
 
 ## Severity
 
-A rule may carry `error` only with a named proof source: a geometric invariant between two
-directly measured quantities, or a cited norm together with the cases the norm does not cover.
-`defineRule` rejects anything else, and the registry fails if the count of error rules changes
-without the argument being made in `docs/`.
+A rule may carry `error` only with a named proof source. There are three classes — a geometric
+invariant between two directly measured quantities, a cited norm together with the cases it does
+not cover, and a resolution invariant — and they are defined in
+[`docs/limitations.md`](docs/limitations.md). Both current error rules are class A; no rule claims
+B or C.
+
+`defineRule` rejects `error` without a proof source, and rejects a proof source on anything that is
+not an error. The registry refuses to load if the number of error rules is anything other than two,
+and its message points at `docs/limitations.md`, where the argument for the number belongs. The
+check does not read that file — it only makes the change deliberate, so write the argument before
+you change the literal.

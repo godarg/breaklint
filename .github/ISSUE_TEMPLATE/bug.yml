@@ -1,0 +1,55 @@
+name: Bug report
+description: The tool crashed, hung, exited with the wrong code, or produced a report it should not have.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If a rule fired on a page that is fine, use "A finding is wrong" instead — that is a
+        different report with different evidence.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran, and what it did.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: exit
+    attributes:
+      label: Exit code
+      description: >
+        `echo $?` after the run. 0 checked · 1 findings · 2 invalid invocation · 3 infrastructure ·
+        4 too little was judged.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: report
+    attributes:
+      label: The report, if one was produced
+      description: >
+        `--format json` is the truth; every other format is a lossy projection of it. Please attach
+        the JSON rather than the console output where you can.
+      render: json
+
+  - type: input
+    id: version
+    attributes:
+      label: Version and environment
+      description: >
+        `npx breaklint --version`, Node version, operating system, browser version, and whether
+        `pagedjs` and `pdfjs-dist` are installed.
+    validations:
+      required: true

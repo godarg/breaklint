@@ -1,0 +1,77 @@
+name: release
+
+# Publishing runs from a tag, never from a laptop, so that what reaches npm is what CI checked.
+# The tarball is built by `prepack` inside `npm publish`; `--provenance` needs `id-token: write`
+# and a public repository, and it is what lets anyone verify that this tarball came from this
+# commit in this workflow.
+#
+# Prerequisite, once: an npm automation token in the repository secret NPM_TOKEN.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: "1"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: the tag and the version in package.json agree
+        # A tag that says one thing while the manifest says another publishes a version nobody
+        # asked for, and the mistake is only visible after it is public.
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./package.json').version")
+          test "$tag" = "$pkg" || { echo "tag $GITHUB_REF_NAME does not match package version $pkg"; exit 1; }
+          echo "publishing $pkg"
+
+      - name: the full gate, exactly as on main
+        run: |
+          npm run typecheck
+          npm test
+          npm run test:mutants
+          npm run test:licenses
+          npm run selfcheck
+
+      - name: poppler, as an independent rasteriser for the live suite
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+
+      - name: live evidence path
+        run: npm run test:live
+
+      - name: the packed tarball runs from a clean install
+        # The path a stranger actually takes. `npm pack` runs `prepack`, so this also proves that
+        # dist/ is built from this commit rather than left over from somewhere.
+        run: |
+          tgz=$(npm pack --silent)
+          mkdir -p /tmp/consumer && cd /tmp/consumer
+          npm init -y > /dev/null
+          npm i "$GITHUB_WORKSPACE/$tgz" --no-audit --no-fund
+          npx breaklint --version
+          set +e
+          npx breaklint --demo > /dev/null
+          code=$?
+          set -e
+          test "$code" -eq 1 || { echo "--demo from the installed package exited $code, expected 1"; exit 1; }
+          echo "installed package: --demo exit 1 as documented"
+
+      - name: publish
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

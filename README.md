@@ -1,5 +1,10 @@
 # breaklint
 
+[![npm](https://img.shields.io/npm/v/breaklint.svg)](https://www.npmjs.com/package/breaklint)
+[![ci](https://github.com/godarg/breaklint/actions/workflows/ci.yml/badge.svg)](https://github.com/godarg/breaklint/actions/workflows/ci.yml)
+[![node](https://img.shields.io/node/v/breaklint.svg)](https://nodejs.org)
+[![licence](https://img.shields.io/npm/l/breaklint.svg)](LICENSE)
+
 `breaklint` is a command-line layout check for people who generate PDFs from HTML: it reports
 half-empty pages, widows, orphans and hyphenation across page breaks, each with the measured
 value and the threshold it failed.
@@ -10,7 +15,32 @@ npx breaklint --demo
 
 That command needs no browser and no configuration. It ends with exit 1, because the demo
 fixture contains findings on purpose — a demo that ends 0 never shows you what a finding looks
-like.
+like. This is real output, not a mock-up:
+
+```
+error layout/unbreakable-block-too-tall  page 2
+  measured   848 px; threshold 606 px (uncalibrated)
+  detail     This block asks not to be broken and is 848.00 px tall; the page content box is
+             606.00 px. It cannot fit on any page.
+  source     examples/demo.html:31
+  render     unknown (no evidence produced)
+
+inputs found: 1 · pages analysed: 5 · rules run: 15 · rules that measured something: 13 ·
+not measured: 2 · verdict: findings · mode: demo · fail-on: error · gate triggered by: error
+```
+
+Every finding carries what was measured, what the threshold was, and the word `uncalibrated` —
+because no threshold in this project has been calibrated against real documents, and a number
+that hides that is worse than no number.
+
+## Install
+
+```bash
+npm i -D breaklint
+```
+
+That is enough for `--demo` and for reading the docs. A run over your own HTML additionally
+needs a browser and the paginator; see [Requirements](#requirements).
 
 ## Why this exists
 
@@ -31,9 +61,10 @@ previous version to compare to.
 
 ## What is checked
 
-Fifteen rules. Two of them can fail a build by default; the other thirteen are advisory unless
-you ask for more. That split is not caution, it is the burden of proof: only two rules compare
-directly measured quantities against a structural boundary.
+Fifteen rules. Two of them can fail a build by default; twelve more are advisory unless you ask
+for more, with `--fail-on warn`; and one — `layout/half-empty-page` — is experimental and never
+moves an exit code at all, not even then. That split is not caution, it is the burden of proof:
+only two rules compare directly measured quantities against a structural boundary.
 
 | rule | what it measures | default |
 |---|---|---|
@@ -135,7 +166,9 @@ code from a foreign repository inside CI.
 ## Requirements
 
 Node 20 or newer. A live run additionally needs a Chromium-based browser, `pagedjs@0.4.3` and
-`pdfjs-dist`; `pdftoppm` is detected if present and never shipped.
+`pdfjs-dist`. Poppler's `pdftoppm` is **not** used by the tool at all: the live test suite uses
+it as an independent rasteriser, so that Chrome is not both the producer and the sole judge of
+every PDF. It is never shipped and never called at check time.
 
 ```bash
 npm i -D puppeteer-core pagedjs@0.4.3 pdfjs-dist@6.2.108
@@ -158,11 +191,16 @@ rule that cites the German orthography ruleset was checked against the published
 ruleset, not against a model's summary of it.
 
 `breaklint` itself uses no model at check time. It performs no inference and contains no API
-client — see `package.json` and the offline default in `src/cli/args.ts`.
+client — see `package.json`, whose only runtime dependency is a HTML parser, and the offline
+network default in `src/config/resolve.ts`.
 
 This notice is voluntary.
 
 ## License
 
-MIT. Dependencies are restricted to MIT, ISC, BSD-2/3 and Apache-2.0; the licence check runs in
-CI over `dependencies` and `optionalDependencies`, and a missing licence field fails it.
+MIT — free for commercial use.
+
+Dependencies are restricted to permissive licences: MIT, ISC, BSD-2-Clause, BSD-3-Clause,
+Apache-2.0, 0BSD, Unlicense and CC0-1.0. The check walks the whole installed tree, so runtime
+and development dependencies are both covered, and a package with no licence field fails it.
+It runs in CI on every push.

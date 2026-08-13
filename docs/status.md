@@ -35,7 +35,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 | Rasteriser | `pdfjs-dist`, on a second page of the same browser instance, served over a loopback origin. No native canvas binding, no poppler in the product. |
 | Rasteriser version | read from the library that loaded, and compared against the declared one |
 | Local file access | measured, not declared: a document loaded from disk cannot read a neighbouring file (`BLOCKED: TypeError: Failed to fetch`). The browser-wide switch that used to allow it is gone, and the check is in the suite because removing the *reason* for a switch and leaving the switch is a mistake that was actually made here. |
-| Ordering | measured at this product: with a content page open the rasteriser did not answer within the suite's 15 s window; with every page closed the same PDF came back with its pages, in 124 ms and 120 ms on two runs |
+| Ordering | measured at this product: with a content page open the rasteriser did not answer within the suite's 15 s window; with every page closed the same PDF came back with its pages, in 90 ms and 111 ms on the last measured pair of runs |
 | Baseline | the unmarked PDF is produced BEFORE the overlay has ever existed, not by detaching it again |
 | Binding | marked PDF against baseline PDF, compared on the PDF raster — not on a screenshot |
 | Detach, not hide | the layer leaves the tree, so a presence selector stops matching |
@@ -47,8 +47,8 @@ every scalar and every empty object or array as one leaf, and no path appears in
 the other.
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
-flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (124 ms against
-120 ms). A later pair of runs differed in two, because Chrome updated itself between them and
+flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
+111 ms in the last measured pair — the value moves from run to run, which is the point). A later pair of runs differed in two, because Chrome updated itself between them and
 `browserVersion` is in the report — which is the report doing its job. What the tool actually gates
 is SHAPE: `tests/tools/leaves.mjs` exits non-zero when a path appears in one run and not the other,
 and zero when only values move. A differing value can be a fact about the environment; a missing
@@ -120,8 +120,9 @@ each measured singly.
 
 **Four repairs were once green in every suite while being reverted.** An audit turned each of them
 back into its defect — the tolerance-free page verdict, the unread integrity count, the unread
-late errors, the file-access switch — and 104 unit tests, 15 live tests and the mutation guard
-stayed green through all four. The repairs were real; the gates were not there. They are now, and
+late errors, the file-access switch — and the whole suite as it stood at the time (104 unit tests
+and 15 live tests, since grown to 317 and 56) plus the mutation guard stayed green through all
+four. The repairs were real; the gates were not there. They are now, and
 each was verified by re-applying the mutation and watching it go red. The reason the live corpus
 could not reach them is structural: a real document cannot be made to produce a rasteriser page
 error, a PNG that fails its own header check, or a page whose marks were all refound but sit
@@ -296,7 +297,9 @@ component. Its box would.
 `setContent` does not install the primitives at all — CDP's on-new-document script never fires,
 because `setContent` writes into the existing document; `window.__blPrimitives` came back
 `undefined` and the collector threw. And a `file://` origin cannot read `cssRules`, which is where
-the cascade hint comes from. Both are pinned by tests that fail if either ever changes.
+the cascade hint comes from. The `setContent` half is pinned by a test that fails if it ever
+changes; the `file://` measurement is recorded here and in the table below, but no test guards it —
+saying "both are pinned" was an overstatement and it is corrected rather than quietly dropped.
 
 **Source identity is part of the product path.** The live loader injects `data-bl-sid` into source
 text before parsing and carries the resulting source map through snapshot assembly and evidence
