@@ -86,6 +86,9 @@ jobs:
         # `prepack`, so it also proves dist/ was built from this commit rather than left over.
         run: |
           tgz=$(npm pack --silent)
+          # An empty capture would turn the next line into a directory install, and every
+          # assertion after it would still pass — a gate that silently checks nothing.
+          test -n "$tgz" && test -s "$tgz" || { echo "npm pack produced no tarball"; exit 1; }
           mkdir -p /tmp/consumer && cd /tmp/consumer
           npm init -y > /dev/null
           npm i "$GITHUB_WORKSPACE/$tgz" --no-audit --no-fund
@@ -136,6 +139,9 @@ jobs:
       - name: the packed package installs and runs on the version `engines` advertises
         run: |
           tgz=$(npm pack --silent)
+          # An empty capture would turn the next line into a directory install, and every
+          # assertion after it would still pass — a gate that silently checks nothing.
+          test -n "$tgz" && test -s "$tgz" || { echo "npm pack produced no tarball"; exit 1; }
           mkdir -p /tmp/floor && cd /tmp/floor
           npm init -y > /dev/null
           npm i "$GITHUB_WORKSPACE/$tgz" --no-audit --no-fund

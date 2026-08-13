@@ -1,9 +1,10 @@
 # The burden of proof, and where it stops
 
-Two error messages in this codebase send you here. `defineRule` refuses a rule that carries
-`severity: "error"` without a named proof source, and the registry refuses to load if the number
-of error rules is anything other than two. This page is what those messages want you to read
-first, so that raising the number is an argument rather than an edit.
+Two error messages in this codebase send you here. `defineRule` (`src/core/rule.ts`) refuses a
+rule that carries `severity: "error"` without a named proof source, and the registry
+(`src/rules/index.ts`) refuses to load if the number of error rules is anything other than two.
+This page is what those messages want you to read first, so that raising the number is an
+argument rather than an edit.
 
 It also states, in one place, what this tool does not know.
 
@@ -91,6 +92,12 @@ resolved version stops the run with exit 3, and no flag overrides it.
 
 **Windows is not supported**, and Linux is not yet measured. Process termination rests on POSIX
 process groups; the termination and profile-cleanup path has real evidence on macOS only.
+
+There is deliberately no `os` field in `package.json`, which means npm will install this on
+Windows without complaint. That is not an oversight: `--demo` and the whole rule and reporter
+chain need no browser and no process group, so they work there. What does not work is a run over
+your own HTML. Blocking the install would take away the part that functions in order to prevent
+the part that does not, and the part that does not already fails loudly rather than quietly.
 
 **Foreign HTML is executed.** The run uses a fresh browser profile, keeps the sandbox on, has no
 flag that disables it, and blocks every network request by default. That is protection against
