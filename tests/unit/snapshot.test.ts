@@ -270,4 +270,18 @@ describe("the live snapshot seam", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("refuses a reserved selector imported from an inline style", () => {
+    const root = mkdtempSync(join(tmpdir(), "breaklint-inline-import-"));
+    try {
+      writeFileSync(join(root, "doc.html"), "fixture");
+      writeFileSync(join(root, "theme.css"), "p[data-bl-sid]{color:red}");
+      const html = '<style>@import "theme.css";</style><p>x</p>';
+      const collision = detectCollision(collisionSources(html, join(root, "doc.html")));
+      assert.equal(collision.collided, true, "an inline @import must enter the fail-closed collision scan");
+      assert.ok(collision.occurrences.some((item) => item.origin.endsWith("/theme.css")));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

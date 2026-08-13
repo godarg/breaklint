@@ -158,11 +158,15 @@ const COLLECTOR_TEMPLATE = `(() => {
     // el.getAttribute and el.hasAttribute directly while the header of this file claimed
     // otherwise — and those two decide the break cause, so a replaced getAttribute returning
     // "page" would make every boundary in a document look forced.
-    const attrs = (el) => ({
-      breakBefore: P.hasAttr(el, A.before) ? P.attr(el, A.before) : null,
-      previousBreakAfter: P.hasAttr(el, A.prevAfter) ? P.attr(el, A.prevAfter) : null,
+    const attrs = (el) => {
+      const beforeHolder = el ? P.closest(el, "[" + A.before + "]") : null;
+      const afterHolder = el ? P.closest(el, "[" + A.prevAfter + "]") : null;
+      return {
+      breakBefore: beforeHolder ? P.attr(beforeHolder, A.before) : null,
+      previousBreakAfter: afterHolder ? P.attr(afterHolder, A.prevAfter) : null,
       page: pageNameAt(el),
-    });
+      };
+    };
     const content = P.all(pageEl, ".pagedjs_page_content")[0] || pageEl;
     const text = (P.text(content) || "").replace(/\\s+/g, " ").trim();
     const visual = P.all(content, "img,svg,canvas,video,table").filter((el) => {

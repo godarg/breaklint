@@ -64,9 +64,11 @@ export type InfraEventKind = (typeof INFRA_EVENT_KINDS)[number];
  * The infrastructure kinds that do NOT make a run exit 3.
  *
  * Everything else about the measuring apparatus failing means the report cannot be trusted. These
- * three mean something narrower and the contract says so in as many words: for the two mark
+ * four mean something narrower and the contract says so in as many words: for the two mark
  * kinds, "the document is in order, only the binding is not" (§11.4.1). Losing the evidence for a
- * finding is not the same as being unable to measure the document, and a tool that exits 3
+ * finding is not the same as being unable to measure the document. `break-cause-undetermined`
+ * preserves the visible unknown cause but must not suppress the report (§9: uncertainty costs
+ * nothing). A tool that exits 3
  * because a hostile stylesheet reached its own overlay would be unusable on exactly the documents
  * it exists for. `empty-input` is here because an empty document is a coverage question.
  *
@@ -77,6 +79,7 @@ export const NON_FATAL_INFRA_EVENT_KINDS = [
   "empty-input",
   "mark-style-overridden",
   "mark-raster-diff",
+  "break-cause-undetermined",
 ] as const satisfies readonly InfraEventKind[];
 
 /** Fingerprint key types. */

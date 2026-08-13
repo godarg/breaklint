@@ -558,6 +558,11 @@ export function collisionSources(html: string, file: string, maxBytes = MAX_RESO
         readCss(attrs.href, resolve(file));
       }
     }
+    if (parsedElement(node) && node.tagName.toLowerCase() === "style") {
+      const css = (node as { childNodes?: Array<{ value?: string }> }).childNodes
+        ?.map((child) => child.value ?? "").join("") ?? "";
+      for (const ref of cssImportReferences(css)) readCss(ref, resolve(file));
+    }
     for (const child of (node as { childNodes?: ParsedNode[] }).childNodes ?? []) walk(child);
   };
   walk(document);

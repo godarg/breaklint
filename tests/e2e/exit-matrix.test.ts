@@ -535,7 +535,7 @@ describe("exit matrix", () => {
 
   /**
    * Every infrastructure kind, one row each, asserting the exit it produces on an otherwise clean
-   * document. The three named non-fatal kinds must leave the run at 0; all thirteen others must
+   * document. The four named non-fatal kinds must leave the run at 0; all others must
    * take it to 3.
    *
    * This exists because the enumeration was previously covered only where a hand-written row
@@ -564,7 +564,9 @@ describe("exit matrix", () => {
      * Now a kind can only change fatality if someone edits both this literal and the production
      * list, and the equality assertion below makes the two disagree loudly rather than silently.
      */
-    const EXPECTED_NON_FATAL = ["empty-input", "mark-style-overridden", "mark-raster-diff"];
+    // §9 makes an undetermined break cause visible but explicitly non-gating: uncertainty costs
+    // no complete report. This literal is intentionally independent of the production list.
+    const EXPECTED_NON_FATAL = ["empty-input", "mark-style-overridden", "mark-raster-diff", "break-cause-undetermined"];
 
     it("the production non-fatal list is exactly the list this file expects", () => {
       assert.deepEqual(
