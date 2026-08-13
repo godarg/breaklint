@@ -15,7 +15,7 @@ npx breaklint --demo
 
 That command needs no browser and no configuration. It ends with exit 1, because the demo
 fixture contains findings on purpose — a demo that ends 0 never shows you what a finding looks
-like. This is real output, not a mock-up:
+like. The block below was produced by that command and pasted here unedited:
 
 ```
 error layout/unbreakable-block-too-tall  page 2
@@ -32,6 +32,13 @@ not measured: 2 · verdict: findings · mode: demo · fail-on: error · gate tri
 Every finding carries what was measured, what the threshold was, and the word `uncalibrated` —
 because no threshold in this project has been calibrated against real documents, and a number
 that hides that is worse than no number.
+
+One thing about that output, since the demo invites the assumption: the rule and reporter chain
+running there is the real one, but the page it judges is a **hand-written snapshot**, built so
+that every rule path is reachable in a command that needs no browser. `examples/demo.html` is
+the document that snapshot describes; it is not shipped, and the run says which kind of fixture
+it used in its own `source` field rather than leaving you to guess. Point the tool at your own
+HTML and the same chain measures a real page.
 
 ## Install
 
@@ -217,4 +224,4 @@ MIT — free for commercial use.
 Dependencies are restricted to permissive licences: MIT, ISC, BSD-2-Clause, BSD-3-Clause,
 Apache-2.0, 0BSD, Unlicense and CC0-1.0. The check walks the whole installed tree, so runtime
 and development dependencies are both covered, and a package with no licence field fails it.
-It runs in CI on every push.
+It runs in CI on every push to `main` and on every pull request.

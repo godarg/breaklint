@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Read [`docs/limitations.md`](../../blob/main/docs/limitations.md) first if you intend to
+        Read [`docs/limitations.md`](https://github.com/godarg/breaklint/blob/main/docs/limitations.md) first if you intend to
         argue that the rule should be able to fail a build. Two rules do that today, and the number
         is guarded by the registry on purpose.
 
