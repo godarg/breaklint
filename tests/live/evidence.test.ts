@@ -263,6 +263,8 @@ describe("evidence path, live", () => {
   let workDir: string;
   let pagedjs: string;
   let openContentPages = 0;
+  // Evidence.path is deliberately relative to the declared artefact directory, never CWD.
+  const evidenceFile = (reference: string): string => join(workDir, "out", reference);
   const results = new Map<string, EvidenceOutcome & { foreignDiff: number; referenceDiff: number }>();
   // Every number this file asserts on, written out. A claim of "green" that cannot name the file
   // it was measured from is a claim about a memory.
@@ -371,7 +373,7 @@ describe("evidence path, live", () => {
           foreignRasterDiffPx: r.foreignDiff,
           deliveredVsUnmarkedPx: r.referenceDiff,
           evidencePngs: r.evidence.map((e) => {
-            const decoded = decodePng(readFileSync(e.path));
+            const decoded = decodePng(readFileSync(evidenceFile(e.path)));
             return { page: e.page, width: decoded.width, height: decoded.height, inkPixels: inkPixels(decoded) };
           }),
           infrastructure: r.infrastructure.map((e) => e.kind),
@@ -665,7 +667,7 @@ describe("evidence path, live", () => {
       const r = results.get(kase.name)!;
       assert.ok(r.evidence.length > 0, `${kase.name} produced no evidence pages`);
       for (const e of r.evidence) {
-        const bytes = readFileSync(e.path);
+        const bytes = readFileSync(evidenceFile(e.path));
         const header = readPngHeader(bytes);
         assert.equal(header.signature && header.ihdr, true, `${e.path} is not a PNG`);
         const decoded = decodePng(bytes);
@@ -687,8 +689,8 @@ describe("evidence path, live", () => {
       }
       // Mutation control: two evidence pages of the same document must not be the same image.
       if (r.evidence.length > 1) {
-        const a = decodePng(readFileSync(r.evidence[0]!.path));
-        const b = decodePng(readFileSync(r.evidence[1]!.path));
+        const a = decodePng(readFileSync(evidenceFile(r.evidence[0]!.path)));
+        const b = decodePng(readFileSync(evidenceFile(r.evidence[1]!.path)));
         assert.notEqual(comparePng(a, b), 0, `${kase.name}: pages 1 and 2 are the same image`);
       }
     }
@@ -706,7 +708,7 @@ describe("evidence path, live", () => {
         assert.equal(foreign.length, r.evidence.length, `${kase.name}: page count differs from the foreign rasteriser`);
         for (let i = 0; i < foreign.length; i++) {
           const theirs = decodePng(readFileSync(join(dir, foreign[i]!)));
-          const ours = decodePng(readFileSync(r.evidence[i]!.path));
+          const ours = decodePng(readFileSync(evidenceFile(r.evidence[i]!.path)));
           // Tolerance 1 px: the two rasterisers round the page box differently. Anything larger
           // is a disagreement about the document, not about rounding.
           assert.ok(Math.abs(theirs.width - ours.width) <= 1, `${kase.name} page ${i + 1} width ${ours.width} vs ${theirs.width}`);

@@ -166,7 +166,7 @@ describe("the M2d live production chain", () => {
     assert.ok(finding);
     assert.ok(finding.evidence?.ref);
     assert.equal(finding.evidence.bindsFinding, true);
-    assert.equal(existsSync(finding.evidence.ref), true);
+    assert.equal(existsSync(join(root!, "evidence", finding.evidence.ref)), true);
     assert.ok(outcome.report.evidence.length > 0);
   });
 
@@ -404,7 +404,8 @@ describe("the M2d live production chain", () => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     if (!completeChain(t)) return;
     const document = result!.documents[15]!;
-    assert.ok(document.snapshot);
+    assert.equal(document.snapshot, null, "fatal overlay evidence must withdraw the earlier snapshot");
+    assert.equal(document.evidence?.length ?? 0, 0, "fatal overlay evidence must not be published");
     assert.ok(document.infrastructure.some((event) =>
       event.kind === "checker-crashed" && /overlay.*raced by author code/u.test(event.detail)));
   });
