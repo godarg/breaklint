@@ -958,11 +958,14 @@ describe("the live path fails closed at its process boundary", () => {
       deliveredPdf: new Uint8Array(), deliveredWithOverlay: false, overlayInstalled: false,
       candidates: { marked: null, baseline: new Uint8Array() },
     } satisfies EvidenceOutcome;
-    const infrastructure = [...evidence.infrastructure];
-    const result = finalizeEvidenceAcquisition("doc.html", snapshot, infrastructure, evidence);
+    const result = finalizeEvidenceAcquisition("doc.html", snapshot, [], evidence);
     assert.equal(result.snapshot, null, "fatal evidence must withdraw the measured snapshot");
     assert.deepEqual(result.evidence, [], "fatal evidence must not be published");
     assert.deepEqual(result.boundSids, [], "fatal evidence must not bind future findings");
+    const engine = runDocument(result, {
+      failOn: "error", activeRules: [spacedHyphen], optionsByRule: {}, loweredFloors: {},
+    });
+    assert.equal(engine.report.findings.length, 0, "withdrawn evidence must leave no snapshot for rules to inspect");
     assert.equal(exitCodeFor([result]), 3);
   });
 

@@ -743,14 +743,15 @@ function fatalInfrastructure(events: readonly InfraEvent[]): boolean {
 export function finalizeEvidenceAcquisition(
   path: string,
   snapshot: NonNullable<DocumentInput["snapshot"]>,
-  infrastructure: InfraEvent[],
+  infrastructure: readonly InfraEvent[],
   evidence: EvidenceOutcome,
 ): DocumentInput {
-  if (fatalInfrastructure(infrastructure)) {
+  const allInfrastructure = [...infrastructure, ...evidence.infrastructure];
+  if (fatalInfrastructure(allInfrastructure)) {
     return {
       path,
       snapshot: null,
-      infrastructure,
+      infrastructure: allInfrastructure,
       evidence: [],
       boundSids: [],
       notMeasured: evidence.notMeasured,
@@ -759,7 +760,7 @@ export function finalizeEvidenceAcquisition(
   return {
     path,
     snapshot,
-    infrastructure,
+    infrastructure: allInfrastructure,
     evidence: evidence.evidence,
     boundSids: [...evidence.boundSids],
     notMeasured: evidence.notMeasured,
@@ -1632,7 +1633,6 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     if (evidence.overlayInstalled) {
       snapshot.meta.interventions.push("evidence-overlay");
     }
-    infrastructure.push(...evidence.infrastructure);
     // Evidence production is an acquisition gate too.  A raster/PDF/binding failure discovered
     // only here invalidates the state just as surely as a pre-PDF failure: do not hand callers a
     // snapshot or evidence that could still be rendered as ordinary rule findings.

@@ -268,6 +268,7 @@ describe("the evidence verdict", () => {
     const reference = r.evidence[0]?.path;
     assert.ok(reference);
     assert.equal(isAbsolute(reference), false, "an absolute host path escaped into the evidence report");
+    assert.equal(reference, "case-page-001.png", "the reference must be relative to the evidence artefact root");
     assert.equal(existsSync(join(outDir, reference)), true, "the reference does not resolve from the evidence artefact directory");
   });
 
