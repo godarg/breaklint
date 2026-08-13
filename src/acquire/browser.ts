@@ -162,10 +162,11 @@ function groupMembers(table: ProcessRow[], pgid: number | null): number[] {
   return pgid === null ? [] : table.filter((entry) => entry.pgid === pgid).map((entry) => entry.pid).sort((a, b) => a - b);
 }
 
-function ownershipFrom(table: ProcessRow[], rootPid: number): ProcessTreeOwnership {
+function ownershipFrom(table: ProcessRow[], rootPid: number): ProcessTreeOwnership | null {
   const root = table.find((entry) => entry.pid === rootPid);
+  if (!root) return null;
   const own = table.find((entry) => entry.pid === process.pid);
-  const pgid = root?.pgid ?? null;
+  const pgid = root.pgid;
   const groupSafe = process.platform !== "win32" && pgid === rootPid && pgid !== own?.pgid;
   return {
     pgid,
@@ -186,10 +187,6 @@ export function captureProcessTreeOwnership(
 ): ProcessTreeOwnership | null {
   try {
     const table = readProcessTable();
-    // A structurally valid object with no root row is not ownership evidence.  In particular,
-    // after browser.close() it cannot see a former child that was reparented to PID 1; returning
-    // an empty snapshot would let the later verifier certify that child as gone.
-    if (!table.some((entry) => entry.pid === rootPid)) return null;
     return ownershipFrom(table, rootPid);
   } catch {
     return null;
@@ -286,6 +283,12 @@ export async function terminateProcessTree(
     };
   }
   const ownership = preservedOwnership ?? ownershipFrom(table, rootPid);
+  if (!ownership) {
+    return {
+      rootPid, pgid: null, initialPids: [], survivingPids: [],
+      groupSafe: false, termSent: false, killSent: false, verified: false,
+    };
+  }
   const { pgid, groupSafe } = ownership;
   // A shared process group is never an ownership oracle. Only descendants of the browser root
   // belong to breaklint in that case; signalling every member could include this process, its
