@@ -94,7 +94,8 @@ authoritative.
 - **PDF standard conformity** — use `veraPDF` or `pdfcpu`.
 - **Comparison against a previous build** — use `BackstopJS` or `pdf-visual-diff`. This tool
   judges the first build, where there is nothing to compare to.
-- **Prose and style** — use `vale` or `typopo`.
+- **Grammar, spelling and wording** — use `vale`. The four `type/` rules here judge
+  typographic characters and measured line geometry on the rendered page, not the prose.
 - **Accessibility auditing** — use `pa11y`.
 - **PDF as input.** PDF is produced and rasterised here to make evidence, never read as input.
 
@@ -111,6 +112,11 @@ dynamically loaded resources are not complete. No check compares output file has
 and page breaks, and turns a correct page into a phantom half-empty-page finding. The run waits
 for `document.fonts.ready` and stops with a non-zero exit if a declared font resource fails,
 rather than reporting findings it cannot stand behind.
+
+**The two SVG ink rules run, but their ink measurement is not yet verified against the real
+renderer.** M3 is the milestone that does that. Until then, treat a finding from
+`svg/text-clipped` or `svg/text-ink-collision` as a reason to look at the page rather than as a
+measurement to act on unseen.
 
 **`svg/text-ink-collision` does not detect sub-pixel contact.** A shape can touch a glyph
 optically without sharing a device pixel. The earlier check for this took its truth from the
@@ -155,7 +161,13 @@ breaklint docs/**/*.html                 # the shell does the globbing, not the 
 breaklint --format json --out report.json chapter-*.html
 breaklint --fail-on warn manual.html     # gate on the heuristics too, deliberately
 breaklint --only layout/widow,layout/orphan book.html
+breaklint --disable layout/half-empty-page report.html
 ```
+
+A rule you disagree with can be switched off for the whole run — `--disable <rule,...>`, or
+`{"rules": {"layout/half-empty-page": false}}` in the config file. There is deliberately no way to
+silence a rule at ONE place in a document: an inline suppression comment would be a claim about a
+page that nothing checks, and this tool exists because such claims were wrong.
 
 There is no directory recursion and no glob expansion inside the tool. The shell has done this
 correctly for fifty years, including symlink cycles.
@@ -165,8 +177,10 @@ code from a foreign repository inside CI.
 
 ## Requirements
 
-Node 20 or newer. A live run additionally needs a Chromium-based browser, `pagedjs@0.4.3` and
-`pdfjs-dist`. Poppler's `pdftoppm` is **not** used by the tool at all: the live test suite uses
+Node 20 or newer, on macOS or Linux. A live run additionally needs a Chromium-based browser and
+`pagedjs@0.4.3`. `pdfjs-dist` is what rasterises the produced PDF to bind evidence to findings; a
+run without it still measures and still reports, but the findings carry no evidence and the report
+says so rather than pretending otherwise. Poppler's `pdftoppm` is **not** used by the tool at all: the live test suite uses
 it as an independent rasteriser, so that Chrome is not both the producer and the sole judge of
 every PDF. It is never shipped and never called at check time.
 

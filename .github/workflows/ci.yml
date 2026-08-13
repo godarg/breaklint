@@ -113,3 +113,38 @@ jobs:
           test "$code" -eq 3 || { echo "expected exit 3, got $code"; cat err.txt; exit 1; }
           grep -q "install:" err.txt || { echo "no install command on stderr"; cat err.txt; exit 1; }
           echo "exit 3 with an install command:"; cat err.txt
+
+  # `engines` says Node 20 or newer, and the job above runs 22 — so the lower bound was a claim
+  # nothing checked.
+  #
+  # What this job may NOT do is run the test suite: the suite needs `--experimental-strip-types`,
+  # which does not exist on Node 20, so a "floor" job built that way would fail for a reason that
+  # has nothing to do with the floor. `engines` is a promise to the CONSUMER anyway, and what a
+  # consumer runs is the built `dist/` out of the tarball. That is what this job installs and runs.
+  node-floor:
+    runs-on: ubuntu-latest
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: "1"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: the packed package installs and runs on the version `engines` advertises
+        run: |
+          tgz=$(npm pack --silent)
+          mkdir -p /tmp/floor && cd /tmp/floor
+          npm init -y > /dev/null
+          npm i "$GITHUB_WORKSPACE/$tgz" --no-audit --no-fund
+          test "$(npx breaklint --version)" = "$(node -p "require('$GITHUB_WORKSPACE/package.json').version")" \
+            || { echo "no version, or the wrong one, on Node 20"; exit 1; }
+          set +e
+          npx breaklint --demo > demo.out
+          code=$?
+          set -e
+          test "$code" -eq 1 || { echo "--demo exited $code on Node 20, expected 1"; cat demo.out; exit 1; }
+          grep -q "uncalibrated" demo.out || { echo "--demo printed no findings on Node 20"; exit 1; }
+          echo "Node 20: the installed package behaves as documented"

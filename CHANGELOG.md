@@ -60,8 +60,11 @@ truth, and `uncalibrated` therefore appears in the type, in every finding and on
   two with `path.resolve`, which never touches the filesystem — so every installed copy did
   nothing at all: no output, no findings, exit 0. For a checker that is the worst available
   failure, because a build gate reads exit 0 as a clean document. Both sides are resolved through
-  the filesystem now, and an end-to-end test invokes the CLI through a symlink, which is the path
-  a user takes and the one no gate had ever taken.
+  the filesystem now, and the gap that hid it is closed at two levels: an end-to-end test invokes
+  the CLI through a symlink on the SOURCE, which reproduces the mechanism on every `npm test`, and
+  a CI step packs the tarball, installs it into a foreign directory and runs `npx breaklint` there
+  — which is the artefact and the path a user actually takes. The first alone would not have
+  caught it in the form it shipped; saying otherwise was the same mistake one level up.
 
 - The reason reported for an exit names the event that caused it. A run without a snapshot used to
   name whichever event arrived first, so a fatal exit could be attributed to a kind that cannot

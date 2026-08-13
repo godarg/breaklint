@@ -44,8 +44,17 @@ boundary and therefore travels with the artefact. **No rule claims C.** It is de
 `artifact/local-uri` has a clean route to `error` in a later version, not to leave a back door open
 in this one.
 
-An uncalibrated threshold may never be `error` unless the threshold is semantically compulsory in
-the sense of A or C. A rule that satisfies none of the three is at most a warning.
+A freely chosen threshold may never be `error`. The three classes are three ways for a threshold
+to stop being freely chosen: A and C make it structural — zero, or a limit of the medium — and B
+makes it *given*, by a norm that names the number and whose exceptions the rule has ruled out. A
+rule that satisfies none of the three is at most a warning, however confident its author is.
+
+This distinction matters because the word "uncalibrated" is doing two jobs elsewhere in this
+project. It means: no corpus of human-labelled documents backs this number. That is true of all
+fifteen thresholds, including the two error rules — and it does not disqualify them, because their
+numbers are not up for calibration in the first place. A block taller than the page fits on no
+page; the threshold is the page. What calibration would decide is *where to draw a chosen line*,
+and A, B and C are exactly the cases where no line was chosen.
 
 **One more condition, and it is the one that actually bites.** A rule may carry `error` only if a
 fixture that triggers exactly that error path exists in the corpus. This is what disqualifies the

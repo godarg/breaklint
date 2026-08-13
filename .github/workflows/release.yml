@@ -63,13 +63,17 @@ jobs:
           mkdir -p /tmp/consumer && cd /tmp/consumer
           npm init -y > /dev/null
           npm i "$GITHUB_WORKSPACE/$tgz" --no-audit --no-fund
-          npx breaklint --version
+          # Content, not just the exit code. A silent success is exactly the failure this
+          # product exists to catch, so the publish gate may not accept one from itself.
+          test "$(npx breaklint --version)" = "$(node -p "require('$GITHUB_WORKSPACE/package.json').version")" \
+            || { echo "the installed package printed no version, or the wrong one"; exit 1; }
           set +e
-          npx breaklint --demo > /dev/null
+          npx breaklint --demo > demo.out
           code=$?
           set -e
-          test "$code" -eq 1 || { echo "--demo from the installed package exited $code, expected 1"; exit 1; }
-          echo "installed package: --demo exit 1 as documented"
+          test "$code" -eq 1 || { echo "--demo from the installed package exited $code, expected 1"; cat demo.out; exit 1; }
+          grep -q "uncalibrated" demo.out || { echo "installed --demo printed no findings"; exit 1; }
+          echo "installed package: --version and --demo behave as documented"
 
       - name: publish
         run: npm publish --provenance --access public
