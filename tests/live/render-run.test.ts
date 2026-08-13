@@ -48,7 +48,7 @@ describe("the M2d live production chain", () => {
   let noSource: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
-    if (result?.documents.length === 19 && noSource?.documents.length === 4) return true;
+    if (result?.documents.length === 20 && noSource?.documents.length === 4) return true;
     t.skip(
       `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
       `no-source=${noSource?.documents.length ?? 0}`,
@@ -103,6 +103,7 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "collector-preemption.html"),
         join(FIXTURES, "pdf-beforeprint-mutation.html"),
         join(FIXTURES, "animation-intervention-removal.html"),
+        join(FIXTURES, "layout-drift-chaos.html"),
       ],
       options(join(root, "evidence")),
     );
@@ -130,7 +131,7 @@ describe("the M2d live production chain", () => {
     }));
     assert.equal(
       result?.documents.length,
-      19,
+      20,
       `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
     );
     assert.equal(
@@ -229,6 +230,20 @@ describe("the M2d live production chain", () => {
     assert.ok(animated.snapshot);
     assert.equal(animated.infrastructure.some((item) => item.kind === "document-not-quiescent"), false);
     assert.ok(animated.snapshot.meta.interventions.includes("animations-disabled"));
+  });
+
+  it("exhausts the real freeze retry budget on author-script layout drift without a snapshot", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const drifting = result!.documents[19]!;
+    assert.equal(drifting.snapshot, null, "a continuously moving document produced a snapshot");
+    assert.equal(drifting.evidence?.length ?? 0, 0, "a rejected snapshot wrote evidence");
+    const event = drifting.infrastructure.find((item) =>
+      item.kind === "document-not-quiescent" && /layout did not settle/u.test(item.detail));
+    assert.ok(event, "the real freeze loop did not fail closed");
+    const measured = event.measured as { retries?: number; components?: string[] } | null;
+    assert.equal(measured?.retries, 4, "the three retry budget was not exhausted");
+    assert.ok(measured?.components?.includes("boxes"), `box drift was not named: ${JSON.stringify(measured)}`);
   });
 
   it("detects a runtime-only URI change in the paired resource signature", (t) => {

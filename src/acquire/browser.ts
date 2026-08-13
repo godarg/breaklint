@@ -117,6 +117,13 @@ export interface ProcessTreeTermination {
 type ProcessRow = { pid: number; ppid: number; pgid: number };
 export type ProcessTableReader = () => ProcessRow[];
 
+/** Ownership observed while the browser root still exists, retained across a later CDP close. */
+export interface ProcessTreeOwnership {
+  pgid: number | null;
+  groupSafe: boolean;
+  initialPids: number[];
+}
+
 function processTable(): ProcessRow[] {
   if (process.platform === "win32") throw new Error("POSIX process table unavailable on Windows");
   const output = execFileSync("ps", ["-axo", "pid=,ppid=,pgid="], { encoding: "utf8" }).trim();
@@ -153,6 +160,35 @@ function descendantsOf(table: ProcessRow[], rootPid: number): number[] {
 
 function groupMembers(table: ProcessRow[], pgid: number | null): number[] {
   return pgid === null ? [] : table.filter((entry) => entry.pgid === pgid).map((entry) => entry.pid).sort((a, b) => a - b);
+}
+
+function ownershipFrom(table: ProcessRow[], rootPid: number): ProcessTreeOwnership {
+  const root = table.find((entry) => entry.pid === rootPid);
+  const own = table.find((entry) => entry.pid === process.pid);
+  const pgid = root?.pgid ?? null;
+  const groupSafe = process.platform !== "win32" && pgid === rootPid && pgid !== own?.pgid;
+  return {
+    pgid,
+    groupSafe,
+    initialPids: (groupSafe ? groupMembers(table, pgid) : descendantsOf(table, rootPid)).filter(alive),
+  };
+}
+
+/**
+ * Capture process-group ownership before `browser.close()` can reap the root and reparent a child.
+ *
+ * The later terminator still reads a fresh table to verify absence; this snapshot only preserves
+ * the ownership relation that vanishes when the root exits first.
+ */
+export function captureProcessTreeOwnership(
+  rootPid: number,
+  readProcessTable: ProcessTableReader = processTable,
+): ProcessTreeOwnership | null {
+  try {
+    return ownershipFrom(readProcessTable(), rootPid);
+  } catch {
+    return null;
+  }
 }
 
 const wait = (ms: number): Promise<void> => new Promise((resolveWait) => setTimeout(resolveWait, ms));
@@ -220,6 +256,7 @@ export async function terminateProcessTree(
     signal(pid: number, signal: NodeJS.Signals): void;
     wait(ms: number): Promise<void>;
   } = { alive, signal: (pid, signal) => process.kill(pid, signal), wait },
+  preservedOwnership: ProcessTreeOwnership | null = null,
 ): Promise<ProcessTreeTermination> {
   let table: ProcessRow[];
   try {
@@ -243,15 +280,13 @@ export async function terminateProcessTree(
       groupSafe: false, termSent, killSent, verified: false,
     };
   }
-  const root = table.find((entry) => entry.pid === rootPid);
-  const own = table.find((entry) => entry.pid === process.pid);
-  const pgid = root?.pgid ?? null;
-  const groupSafe = process.platform !== "win32" && pgid === rootPid && pgid !== own?.pgid;
+  const ownership = preservedOwnership ?? ownershipFrom(table, rootPid);
+  const { pgid, groupSafe } = ownership;
   // A shared process group is never an ownership oracle. Only descendants of the browser root
   // belong to breaklint in that case; signalling every member could include this process, its
   // shell and unrelated CI siblings. Group membership is used only after isolation is proven.
   const owned = (): number[] => groupSafe ? groupMembers(table, pgid) : descendantsOf(table, rootPid);
-  const initialPids = owned().filter(operations.alive);
+  const initialPids = [...new Set([...ownership.initialPids, ...owned()])].filter(operations.alive);
   let termSent = false;
   let killSent = false;
   try {

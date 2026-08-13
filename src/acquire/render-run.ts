@@ -19,6 +19,7 @@ import { parse, type DefaultTreeAdapterMap } from "parse5";
 
 import {
   launchBrowser,
+  captureProcessTreeOwnership,
   ownServerLifecycle,
   resolveDocumentUri,
   resolvePackageRoot,
@@ -35,7 +36,7 @@ import { sha256Short } from "../core/fingerprint.ts";
 import type { DocumentInput } from "../core/engine.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InfraEvent, ReportEnvironment, ResourceRecord, SourceRef } from "../core/types.ts";
-import { compareGeometry, crossCheckEvent, type GeometrySample } from "../measure/cross-check.ts";
+import { compareGeometry, crossCheckEvent, CROSS_CHECK_SAMPLE_SIZE, geometrySampleSource, type GeometrySample } from "../measure/cross-check.ts";
 import {
   awaitStableLayout,
   composeSignature,
@@ -123,8 +124,10 @@ export async function closeBrowserBounded(
 ): Promise<string | null> {
   let pid: number | undefined;
   let processHandleError: string | null = null;
+  let ownership = null;
   try {
     pid = browser.process?.()?.pid;
+    if (pid) ownership = captureProcessTreeOwnership(pid);
   } catch (error) {
     processHandleError = error instanceof Error ? error.message : String(error);
   }
@@ -139,7 +142,7 @@ export async function closeBrowserBounded(
   // A resolved CDP close is a request acknowledgement, not process-tree evidence. Always perform
   // the fresh §13.3 process-table verification; terminateProcessTree is a no-op signal-wise when
   // the root and descendants are already gone.
-  const termination = await terminate(pid);
+  const termination = await terminate(pid, undefined, undefined, ownership);
   if (termination.verified) return null;
   return (
     `${closeError ? `${closeError}; ` : ""}process termination FAILED ` +
@@ -691,29 +694,8 @@ async function configureNetwork(
   return tracker;
 }
 
-const GEOMETRY_SAMPLE_SOURCE = `(() => {
-  const P = window.__blPrimitives;
-  const selector = "[data-bl-sid],address[data-ref],article[data-ref],aside[data-ref],blockquote[data-ref],caption[data-ref],dd[data-ref],details[data-ref],div[data-ref],dl[data-ref],dt[data-ref],fieldset[data-ref],figcaption[data-ref],figure[data-ref],footer[data-ref],form[data-ref],h1[data-ref],h2[data-ref],h3[data-ref],h4[data-ref],h5[data-ref],h6[data-ref],header[data-ref],hgroup[data-ref],hr[data-ref],li[data-ref],main[data-ref],nav[data-ref],ol[data-ref],p[data-ref],pre[data-ref],section[data-ref],summary[data-ref],table[data-ref],tbody[data-ref],td[data-ref],tfoot[data-ref],th[data-ref],thead[data-ref],tr[data-ref],ul[data-ref]";
-  const seen = new Set();
-  const out = [];
-  for (const el of P.all(document, ".pagedjs_page " + selector.replaceAll(",", ",.pagedjs_page "))) {
-    const sid = P.attr(el, "data-bl-sid");
-    const ref = P.attr(el, "data-ref");
-    const key = sid ? "sid:" + sid : ref ? "ref:" + ref : null;
-    if (!key || seen.has(key)) continue;
-    const b = P.rect(el);
-    // CDP has no box model for display:none/non-rendered nodes. They cannot cross-check visible
-    // geometry and must not abort the whole document before the sid-less identity gate runs.
-    if (b.width <= 0 || b.height <= 0) continue;
-    seen.add(key);
-    out.push({ key, x: b.x, y: b.y, width: b.width, height: b.height });
-    if (out.length === 8) break;
-  }
-  return out;
-})()`;
-
 async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compareGeometry>> {
-  const inPage = await page.evaluate<GeometrySample[]>(GEOMETRY_SAMPLE_SOURCE);
+  const inPage = await page.evaluate<GeometrySample[]>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
   if (!page.createCDPSession) throw new Error("the browser driver exposes no CDP session for the geometry oracle");
   const session = await page.createCDPSession();
   try {
@@ -721,11 +703,19 @@ async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compare
     const { root } = await session.send<{ root: { nodeId: number } }>("DOM.getDocument", { depth: -1, pierce: false });
     const out: GeometrySample[] = [];
     for (const sample of inPage) {
-      const [kind, value] = sample.key.split(":", 2) as ["sid" | "ref", string];
-      const selector = `.pagedjs_page [${kind === "sid" ? "data-bl-sid" : "data-ref"}="${value}"]`;
-      const { nodeId } = await session.send<{ nodeId: number }>("DOM.querySelector", { nodeId: root.nodeId, selector });
+      if (!sample.selector || sample.occurrence === undefined) continue;
+      const { nodeIds } = await session.send<{ nodeIds: number[] }>("DOM.querySelectorAll", { nodeId: root.nodeId, selector: sample.selector });
+      const nodeId = nodeIds[sample.occurrence];
       if (!nodeId) continue;
-      const { model } = await session.send<{ model: { border: number[] } }>("DOM.getBoxModel", { nodeId });
+      let model: { border: number[] };
+      try {
+        ({ model } = await session.send<{ model: { border: number[] } }>("DOM.getBoxModel", { nodeId }));
+      } catch {
+        // An inaccessible box is a missing oracle answer. Leaving this sample absent lets
+        // compareGeometry produce the fatal, attributable cross-check event instead of a generic
+        // checker crash or a quiet skip.
+        continue;
+      }
       const q = model.border;
       out.push({ key: sample.key, x: q[0]!, y: q[1]!, width: q[2]! - q[0]!, height: q[5]! - q[1]! });
     }

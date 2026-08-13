@@ -391,6 +391,31 @@ describe("the live path fails closed at its process boundary", () => {
     assert.equal(result.verified, true);
   });
 
+  it("kills a reparented child from the pre-close isolated process-group ownership snapshot", async () => {
+    const root = 42_420, child = 42_421;
+    const alive = new Set([child]);
+    const signals: Array<[number, NodeJS.Signals]> = [];
+    // This is the state after browser.close(): the root has gone, and its child was adopted by
+    // launchd/init but retained the former isolated PGID. Without the pre-close ownership record,
+    // the old code saw neither a root nor a descendant and returned verified:true without a signal.
+    const result = await terminateProcessTree(
+      root,
+      () => [{ pid: child, ppid: 1, pgid: root }],
+      {
+        alive: (pid) => alive.has(pid),
+        signal(pid, signal) {
+          signals.push([pid, signal]);
+          if (pid === -root) alive.delete(child);
+        },
+        async wait() {},
+      },
+      { pgid: root, groupSafe: true, initialPids: [root, child] },
+    );
+    assert.deepEqual(signals, [[-root, "SIGTERM"]], "the reparented child was silently certified instead of signalled");
+    assert.deepEqual(result.survivingPids, []);
+    assert.equal(result.verified, true);
+  });
+
   it("verifies the PID tree even when browser.close resolves", async () => {
     let verified = 0;
     const error = await closeBrowserBounded({

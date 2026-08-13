@@ -36,9 +36,11 @@ import {
   compareGeometry,
   CROSS_CHECK_MEASURED_MAX_PX,
   CROSS_CHECK_SAMPLE_SIZE,
-  SAMPLE_SOURCE,
+  geometrySampleSource,
   type GeometrySample,
 } from "../../src/measure/cross-check.ts";
+import { collectorSource } from "../../src/paginate/collector.ts";
+import { injectSourceIds } from "../../src/source/inject.ts";
 
 /** Only the two members this suite calls; the driver's session type is not a published interface. */
 interface CdpSession {
@@ -87,7 +89,10 @@ ${filler}
   window.__preInk = c.getImageData(0, 0, 50, 20).data.some((v) => v !== 0);
 </script>
 </body></html>`;
-  return withPagination(author, pagedjs, false);
+  // The product sampler addresses the source identities injected before parsing, not incidental
+  // author IDs. Keeping that route here prevents the live oracle from certifying a different
+  // sampler than the one render-run.ts uses.
+  return withPagination(injectSourceIds(author, "measure-live.html").html, pagedjs, false);
 }
 
 /**
@@ -197,6 +202,10 @@ describe("the measurement probe, live", () => {
 
   async function paginated(): Promise<PageLike> {
     const page = await loaded();
+    // Production installs the collector before the pagination apparatus.  The rendered Paged
+    // tree receives its runtime `data-ref` identities there, so the live sampler must exercise
+    // the same order rather than certifying source IDs that Paged.js no longer carries.
+    await page.evaluate<void>(collectorSource(TEST_PRIMITIVES_CAPABILITY, "measure-live-collector"));
     await page.evaluate<void>(paginationApparatusSource(TEST_PRIMITIVES_CAPABILITY));
     const pagination = await page.evaluate<{ paginationError: string | null }>(PAGINATION_PREVIEW_SOURCE);
     assert.equal(pagination.paginationError, null);
@@ -342,7 +351,7 @@ describe("the measurement probe, live", () => {
   it("the browser's layout tree agrees with the probe, and the rounded fields are why the quad is used", async (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     const page = await paginated();
-    const inPage = await page.evaluate<GeometrySample[]>(`(${SAMPLE_SOURCE})(${CROSS_CHECK_SAMPLE_SIZE})`);
+    const inPage = await page.evaluate<GeometrySample[]>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
     assert.ok(inPage.length > 0, "the sample is empty — this case would confirm nothing");
 
     const session = await (page as unknown as { createCDPSession(): Promise<CdpSession> }).createCDPSession();
@@ -352,10 +361,11 @@ describe("the measurement probe, live", () => {
     const outOfProcess: GeometrySample[] = [];
     let worstModelDelta = 0;
     for (const sample of inPage) {
-      const { nodeId } = await session.send<{ nodeId: number }>("DOM.querySelector", {
+      const { nodeIds } = await session.send<{ nodeIds: number[] }>("DOM.querySelectorAll", {
         nodeId: root.nodeId,
-        selector: `#${sample.key}`,
+        selector: sample.selector!,
       });
+      const nodeId = nodeIds[sample.occurrence!];
       if (!nodeId) continue;
       const { model } = await session.send<{ model: { border: number[]; width: number; height: number } }>(
         "DOM.getBoxModel",

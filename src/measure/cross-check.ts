@@ -64,6 +64,10 @@ export interface GeometrySample {
   y: number;
   width: number;
   height: number;
+  /** CDP selector for exactly the sampled attribute family; never authored CSS. */
+  selector?: string;
+  /** Zero-based occurrence among the rendered nodes matching `selector`. */
+  occurrence?: number;
 }
 
 export interface Disagreement {
@@ -152,13 +156,44 @@ export function crossCheckEvent(result: CrossCheckResult): InfraEvent {
  *
  * Reads through the captured primitives, like every other measurement — the point of the check is
  * to cross-examine the numbers the report will actually contain, not a second set taken a
- * different way. Sampling elements that carry an `id` keeps the CDP side addressable without
- * inventing a node-mapping scheme.
+ * different way. The selector plus occurrence names the exact rendered fragment, so a source block
+ * split across pages cannot make CDP compare the first fragment while the in-page probe chose a
+ * later visible one.
  */
 export const SAMPLE_SOURCE = `((limit) => {
   const P = window.__blPrimitives;
-  return P.all(document, ".pagedjs_page [id]").slice(0, limit).map((el) => {
+  const selector = "[data-bl-sid],address[data-ref],article[data-ref],aside[data-ref],blockquote[data-ref],caption[data-ref],dd[data-ref],details[data-ref],div[data-ref],dl[data-ref],dt[data-ref],fieldset[data-ref],figcaption[data-ref],figure[data-ref],footer[data-ref],form[data-ref],h1[data-ref],h2[data-ref],h3[data-ref],h4[data-ref],h5[data-ref],h6[data-ref],header[data-ref],hgroup[data-ref],hr[data-ref],li[data-ref],main[data-ref],nav[data-ref],ol[data-ref],p[data-ref],pre[data-ref],section[data-ref],summary[data-ref],table[data-ref],tbody[data-ref],td[data-ref],tfoot[data-ref],th[data-ref],thead[data-ref],tr[data-ref],ul[data-ref],[id]";
+  const rendered = ".pagedjs_page " + selector.replaceAll(",", ",.pagedjs_page ");
+  const all = P.all(document, rendered);
+  const seen = new Set();
+  const out = [];
+  for (const el of all) {
+    const sid = P.attr(el, "data-bl-sid");
+    const ref = P.attr(el, "data-ref");
+    const id = P.attr(el, "id");
+    const attribute = sid ? "data-bl-sid" : ref ? "data-ref" : id ? "id" : null;
+    const value = sid || ref || id;
+    if (!attribute || !value) continue;
     const b = P.rect(el);
-    return { key: el.id, x: b.x, y: b.y, width: b.width, height: b.height };
-  });
+    if (b.width <= 0 || b.height <= 0) continue;
+    // JSON emits a CSS string token and therefore keeps an authored id containing a quote from
+    // widening this selector.  The generated source attributes are preferred; id is the
+    // compatibility fallback Paged.js preserves when it drops both generated attributes.
+    const exactSelector = ".pagedjs_page [" + attribute + "=" + JSON.stringify(value) + "]";
+    const occurrence = P.all(document, exactSelector).indexOf(el);
+    const key = attribute + ":" + value + "#" + occurrence;
+    if (occurrence < 0 || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key, x: b.x, y: b.y, width: b.width, height: b.height, selector: exactSelector, occurrence });
+    if (out.length === limit) break;
+  }
+  return out;
 })`;
+
+/** Bind the sample limit into the browser expression; `PageLike.evaluate(string)` takes no args. */
+export function geometrySampleSource(limit: number): string {
+  // Page.evaluate receives a source string.  Its function-expression form is not invoked by all
+  // drivers, so bind the limit and invoke it here rather than accidentally treating the function
+  // object's arity (zero) as an empty geometry sample.
+  return `${SAMPLE_SOURCE.replace("((limit) => {", `(() => { const limit = ${limit};`)}()`;
+}

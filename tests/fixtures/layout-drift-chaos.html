@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: 120mm 80mm; margin: 10mm; }
+    body { font: 10pt/1.4 serif; }
+  </style>
+</head>
+<body>
+  <p id="moving">Dieser Autoren-Loop verschiebt den paginierten Knoten nach dem Rendern fortlaufend.</p>
+  <script>
+    const drift = () => {
+      const target = document.querySelector(".pagedjs_page #moving");
+      if (!target) return setTimeout(drift, 5);
+      let x = 0;
+      setInterval(() => { x += 1; target.style.transform = `translateX(${x}px)`; }, 40);
+    };
+    drift();
+  </script>
+</body>
+</html>
