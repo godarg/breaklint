@@ -185,7 +185,12 @@ export function captureProcessTreeOwnership(
   readProcessTable: ProcessTableReader = processTable,
 ): ProcessTreeOwnership | null {
   try {
-    return ownershipFrom(readProcessTable(), rootPid);
+    const table = readProcessTable();
+    // A structurally valid object with no root row is not ownership evidence.  In particular,
+    // after browser.close() it cannot see a former child that was reparented to PID 1; returning
+    // an empty snapshot would let the later verifier certify that child as gone.
+    if (!table.some((entry) => entry.pid === rootPid)) return null;
+    return ownershipFrom(table, rootPid);
   } catch {
     return null;
   }

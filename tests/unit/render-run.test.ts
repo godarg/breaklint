@@ -33,7 +33,7 @@ import {
   withPagination,
   type RenderDependencies,
 } from "../../src/acquire/render-run.ts";
-import { ownServerLifecycle, terminateProcessTree, type PageLike } from "../../src/acquire/browser.ts";
+import { captureProcessTreeOwnership, ownServerLifecycle, terminateProcessTree, type PageLike } from "../../src/acquire/browser.ts";
 import { writeEvidencePng, type Rasterizer } from "../../src/render/rasterizer.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
 import { spacedHyphen } from "../../src/rules/type/spaced-hyphen.ts";
@@ -449,6 +449,13 @@ describe("the live path fails closed at its process boundary", () => {
       termSent: false, killSent: false, verified: true,
     }), () => null);
     assert.match(error ?? "", /pre-close process ownership unavailable/u);
+  });
+
+  it("does not mistake an already-gone root for an empty ownership snapshot", () => {
+    const root = 42_420;
+    const child = 42_421;
+    const ownership = captureProcessTreeOwnership(root, () => [{ pid: child, ppid: 1, pgid: root }]);
+    assert.equal(ownership, null, "a reparented child cannot establish ownership after its root vanished");
   });
 
   it("never verifies termination when a fresh ps table is unreadable", async () => {
