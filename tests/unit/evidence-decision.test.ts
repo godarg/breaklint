@@ -19,7 +19,7 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
 import type { PageLike } from "../../src/acquire/browser.ts";
@@ -268,7 +268,7 @@ describe("the evidence verdict", () => {
     const reference = r.evidence[0]?.path;
     assert.ok(reference);
     assert.equal(isAbsolute(reference), false, "an absolute host path escaped into the evidence report");
-    assert.equal(existsSync(resolve(process.cwd(), reference)), true, "the relative reference does not resolve to written evidence");
+    assert.equal(existsSync(join(outDir, reference)), true, "the reference does not resolve from the evidence artefact directory");
   });
 
   it("a target out of tolerance makes the page unverified even though every mark was refound", async () => {

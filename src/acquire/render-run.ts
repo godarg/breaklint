@@ -69,7 +69,7 @@ import {
 } from "../measure/snapshot.ts";
 import { boundaryFactsFrom, collectorSource, silentHooks, type CollectorResult } from "../paginate/collector.ts";
 import { assignPageCauses } from "../paginate/breaks.ts";
-import { produceEvidence } from "../render/evidence.ts";
+import { produceEvidence, type EvidenceOutcome } from "../render/evidence.ts";
 import { openRasterizer, type OpenRasterizerResult } from "../render/rasterizer.ts";
 import { collisionDetail, detectCollision, type CollisionSource } from "../source/collision.ts";
 import { injectSourceIds } from "../source/inject.ts";
@@ -734,6 +734,36 @@ async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compare
 
 function fatalInfrastructure(events: readonly InfraEvent[]): boolean {
   return events.some((event) => !IS.nonFatalInfraEventKind.has(event.kind));
+}
+
+/**
+ * Evidence is part of acquisition, not a reporting adornment.  If it adds a fatal event, the
+ * already assembled snapshot is withdrawn before the rule engine can observe it.
+ */
+export function finalizeEvidenceAcquisition(
+  path: string,
+  snapshot: NonNullable<DocumentInput["snapshot"]>,
+  infrastructure: InfraEvent[],
+  evidence: EvidenceOutcome,
+): DocumentInput {
+  if (fatalInfrastructure(infrastructure)) {
+    return {
+      path,
+      snapshot: null,
+      infrastructure,
+      evidence: [],
+      boundSids: [],
+      notMeasured: evidence.notMeasured,
+    };
+  }
+  return {
+    path,
+    snapshot,
+    infrastructure,
+    evidence: evidence.evidence,
+    boundSids: [...evidence.boundSids],
+    notMeasured: evidence.notMeasured,
+  };
 }
 
 interface AcquireContext {
@@ -1603,14 +1633,11 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       snapshot.meta.interventions.push("evidence-overlay");
     }
     infrastructure.push(...evidence.infrastructure);
-    return {
-      path,
-      snapshot,
-      infrastructure,
-      evidence: evidence.evidence,
-      boundSids: [...evidence.boundSids],
-      notMeasured: evidence.notMeasured,
-    };
+    // Evidence production is an acquisition gate too.  A raster/PDF/binding failure discovered
+    // only here invalidates the state just as surely as a pre-PDF failure: do not hand callers a
+    // snapshot or evidence that could still be rendered as ordinary rule findings.
+    if (fatalInfrastructure(infrastructure)) await closePage();
+    return finalizeEvidenceAcquisition(path, snapshot, infrastructure, evidence);
   } catch (error) {
     let cleanup = "";
     try { await closePage(); }

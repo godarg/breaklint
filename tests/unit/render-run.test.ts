@@ -24,6 +24,7 @@ import {
   collisionSources,
   discoverLocalAssets,
   documentArtifactKey,
+  finalizeEvidenceAcquisition,
   operationalLimitEvents,
   orderedSourceSids,
   paginationApparatusSource,
@@ -34,6 +35,7 @@ import {
   type RenderDependencies,
 } from "../../src/acquire/render-run.ts";
 import { captureProcessTreeOwnership, ownServerLifecycle, terminateProcessTree, type PageLike } from "../../src/acquire/browser.ts";
+import type { EvidenceOutcome } from "../../src/render/evidence.ts";
 import { writeEvidencePng, type Rasterizer } from "../../src/render/rasterizer.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
 import { spacedHyphen } from "../../src/rules/type/spaced-hyphen.ts";
@@ -941,6 +943,27 @@ describe("the live path fails closed at its process boundary", () => {
       bindsFinding: true,
     });
     assert.equal(outcome.report.evidence.length, 1);
+  });
+
+  it("withdraws an otherwise usable snapshot when evidence itself adds a fatal event", () => {
+    const snapshot = loadCorpus().find((entry) => entry.name === "spaced-hyphen-trigger")!.snapshot;
+    const evidence = {
+      evidence: [{
+        key: "doc#1", page: 1, path: "doc-page-001.png", origin: "pdf-raster",
+        pdfConformance: "verified", conformance: null,
+        overlayCheck: { styleViolations: 0, rasterDiffPx: 0, removed: false }, bindsFinding: true,
+      }],
+      infrastructure: [{ kind: "checker-crashed", detail: "PNG encode failed after PDF reconciliation", measured: { stage: "evidence" } }],
+      notMeasured: [], boundSids: new Set([snapshot.blocks[0]!.sid!]), marks: [], ambiguousMarks: 0,
+      deliveredPdf: new Uint8Array(), deliveredWithOverlay: false, overlayInstalled: false,
+      candidates: { marked: null, baseline: new Uint8Array() },
+    } satisfies EvidenceOutcome;
+    const infrastructure = [...evidence.infrastructure];
+    const result = finalizeEvidenceAcquisition("doc.html", snapshot, infrastructure, evidence);
+    assert.equal(result.snapshot, null, "fatal evidence must withdraw the measured snapshot");
+    assert.deepEqual(result.evidence, [], "fatal evidence must not be published");
+    assert.deepEqual(result.boundSids, [], "fatal evidence must not bind future findings");
+    assert.equal(exitCodeFor([result]), 3);
   });
 
   it("projects evidence apparatus declines into the document report independently of rules", () => {

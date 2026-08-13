@@ -744,11 +744,10 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
     try {
       for (let i = 0; i < pages.length; i++) {
         const absolutePath = join(options.outDir, `${options.documentKey}-page-${String(i + 1).padStart(3, "0")}.png`);
-        // Reports are portable artefacts.  The bytes may be written outside the invocation
-        // directory, but an absolute host path (or a redacted home path) is neither portable nor
-        // resolvable by a recipient.  Keep the filesystem write absolute and expose only the
-        // cwd-relative reference that resolves to those same bytes.
-        const path = relative(process.cwd(), absolutePath) || `${options.documentKey}-page-${String(i + 1).padStart(3, "0")}.png`;
+        // Reports are portable artefacts.  Evidence references are resolved from the evidence
+        // artefact directory, never from the caller's CWD: the latter can be on another volume
+        // and turns a portable reference back into an absolute host path on Windows.
+        const path = relative(options.outDir, absolutePath) || `${options.documentKey}-page-${String(i + 1).padStart(3, "0")}.png`;
         const bytes = await rasterizer.encodePng(key, i);
         // Read the header back out of the bytes that are about to be written. A file that claims
         // a size the rasteriser did not report is not the evidence, it is a second image.
