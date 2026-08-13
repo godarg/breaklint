@@ -216,11 +216,8 @@ describe("the M2d live production chain", () => {
     const event = sabotage.infrastructure.find((item) => item.kind === "injection-interference");
     assert.ok(event, "the paired control did not detect the constructed attribute selector");
     assert.deepEqual((event.measured as { changed?: string[] } | null)?.changed, ["style"]);
-    assert.equal(
-      sabotage.snapshot?.meta.interventions.includes("evidence-overlay"),
-      false,
-      "a fatal pre-evidence path claimed an overlay it never ran",
-    );
+    assert.equal(sabotage.snapshot, null, "a fatal paired-control result was still given to the rule engine");
+    assert.equal(sabotage.evidence?.length ?? 0, 0, "a fatal paired-control result wrote evidence");
   });
 
   it("disables animations before measurement and reports that intervention", (t) => {
@@ -301,14 +298,13 @@ describe("the M2d live production chain", () => {
     assert.deepEqual(hiddenPage.fill, { vertical: 0, topGap: 0, net: 0, area: 0 });
   });
 
-  it("measures anonymous and inline-only visible text without inventing a source block", (t) => {
+  it("fails closed when inline-only visible text leaves the geometry oracle without an addressable box", (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     if (!completeChain(t)) return;
-    const snapshot = result!.documents[8]!.snapshot;
-    assert.ok(snapshot);
-    assert.equal(snapshot.pages[0]!.blank, false);
-    assert.ok(snapshot.pages[0]!.fill.net > 0);
-    assert.ok(snapshot.pages[0]!.fill.area > 0);
+    const document = result!.documents[8]!;
+    assert.equal(document.snapshot, null);
+    assert.equal(document.evidence?.length ?? 0, 0);
+    assert.ok(document.infrastructure.some((event) => event.kind === "geometry-cross-check-failed"));
   });
 
   it("keeps sid-less source identity, exclusions and page anchors stable across two renders", (t) => {

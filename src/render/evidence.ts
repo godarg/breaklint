@@ -40,7 +40,7 @@
  * document then gets the PDF that never saw an overlay, and every binding is false.
  */
 
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import type { PageLike } from "../acquire/browser.ts";
 import type { Evidence, InfraEvent, NotMeasured } from "../core/types.ts";
@@ -743,7 +743,12 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
 
     try {
       for (let i = 0; i < pages.length; i++) {
-        const path = join(options.outDir, `${options.documentKey}-page-${String(i + 1).padStart(3, "0")}.png`);
+        const absolutePath = join(options.outDir, `${options.documentKey}-page-${String(i + 1).padStart(3, "0")}.png`);
+        // Reports are portable artefacts.  The bytes may be written outside the invocation
+        // directory, but an absolute host path (or a redacted home path) is neither portable nor
+        // resolvable by a recipient.  Keep the filesystem write absolute and expose only the
+        // cwd-relative reference that resolves to those same bytes.
+        const path = relative(process.cwd(), absolutePath) || `${options.documentKey}-page-${String(i + 1).padStart(3, "0")}.png`;
         const bytes = await rasterizer.encodePng(key, i);
         // Read the header back out of the bytes that are about to be written. A file that claims
         // a size the rasteriser did not report is not the evidence, it is a second image.
@@ -760,7 +765,7 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
           evidenceIncomplete = true;
           continue;
         }
-        writeEvidencePng(path, bytes);
+        writeEvidencePng(absolutePath, bytes);
 
         const perPage = input.conformance?.byPage.get(i + 1) ?? null;
         const pageBound =

@@ -1545,7 +1545,10 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
 
     if (fatalInfrastructure(infrastructure)) {
       await closePage();
-      return { path, snapshot, infrastructure };
+      // A fatal post-assembly gate means the measured state cannot be used as a basis for rule
+      // findings.  Returning it would let callers write a report that mixes an Exit-3 integrity
+      // failure with ordinary findings from a state we have explicitly withdrawn.
+      return { path, snapshot: null, infrastructure };
     }
     mkdirSync(context.options.outDir, { recursive: true });
     const documentKey = documentArtifactKey(path, ordinal, context.runId);

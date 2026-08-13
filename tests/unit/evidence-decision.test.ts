@@ -17,9 +17,9 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
 import type { PageLike } from "../../src/acquire/browser.ts";
@@ -261,6 +261,14 @@ describe("the evidence verdict", () => {
     assert.deepEqual([...r.boundSids].sort(), ["b1", "b2"]);
     assert.equal(r.evidence[0]?.pdfConformance, "verified");
     assert.equal(r.evidence[0]?.bindsFinding, true);
+  });
+
+  it("publishes an artifact-relative evidence reference even when the output directory is absolute", async () => {
+    const r = await run({}, { diff: 0, textItems: MATCHING_TEXT });
+    const reference = r.evidence[0]?.path;
+    assert.ok(reference);
+    assert.equal(isAbsolute(reference), false, "an absolute host path escaped into the evidence report");
+    assert.equal(existsSync(resolve(process.cwd(), reference)), true, "the relative reference does not resolve to written evidence");
   });
 
   it("a target out of tolerance makes the page unverified even though every mark was refound", async () => {
