@@ -367,10 +367,18 @@ describe("the measurement probe, live", () => {
       });
       const nodeId = nodeIds[sample.occurrence!];
       if (!nodeId) continue;
-      const { model } = await session.send<{ model: { border: number[]; width: number; height: number } }>(
-        "DOM.getBoxModel",
-        { nodeId },
-      );
+      let model: { border: number[]; width: number; height: number };
+      try {
+        ({ model } = await session.send<{ model: { border: number[]; width: number; height: number } }>(
+          "DOM.getBoxModel",
+          { nodeId },
+        ));
+      } catch {
+        // Match the production oracle: an inaccessible CDP box is retained as a missing answer,
+        // which compareGeometry turns into an attributable fatal disagreement rather than a test
+        // harness exception.
+        continue;
+      }
       const q = model.border;
       outOfProcess.push({ key: sample.key, x: q[0]!, y: q[1]!, width: q[2]! - q[0]!, height: q[5]! - q[1]! });
       worstModelDelta = Math.max(worstModelDelta, Math.abs(model.width - sample.width));

@@ -16,7 +16,7 @@ import { after, before, describe, it, type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { renderDocuments, type RenderOptions, type RenderResult } from "../../src/acquire/render-run.ts";
-import { runDocument } from "../../src/core/engine.ts";
+import { exitCodeFor, runDocument } from "../../src/core/engine.ts";
 import { resolveBrowser, resolvePackageRoot } from "../../src/acquire/browser.ts";
 import { straightQuotes } from "../../src/rules/type/straight-quotes.ts";
 import { blockKey } from "../../src/core/fingerprint.ts";
@@ -244,6 +244,11 @@ describe("the M2d live production chain", () => {
     const measured = event.measured as { retries?: number; components?: string[] } | null;
     assert.equal(measured?.retries, 4, "the three retry budget was not exhausted");
     assert.ok(measured?.components?.includes("boxes"), `box drift was not named: ${JSON.stringify(measured)}`);
+    const outcome = runDocument(drifting, {
+      failOn: "never", activeRules: [], optionsByRule: {}, loweredFloors: {},
+    });
+    assert.equal(outcome.report.verdict, "infrastructure");
+    assert.equal(exitCodeFor(outcome.report.verdict), 3, "a lone exhausted freeze failure must exit 3");
   });
 
   it("detects a runtime-only URI change in the paired resource signature", (t) => {

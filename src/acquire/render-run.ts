@@ -121,13 +121,14 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
 export async function closeBrowserBounded(
   browser: BrowserLike,
   terminate: typeof terminateProcessTree = terminateProcessTree,
+  captureOwnership: typeof captureProcessTreeOwnership = captureProcessTreeOwnership,
 ): Promise<string | null> {
   let pid: number | undefined;
   let processHandleError: string | null = null;
   let ownership = null;
   try {
     pid = browser.process?.()?.pid;
-    if (pid) ownership = captureProcessTreeOwnership(pid);
+    if (pid) ownership = captureOwnership(pid);
   } catch (error) {
     processHandleError = error instanceof Error ? error.message : String(error);
   }
@@ -143,6 +144,12 @@ export async function closeBrowserBounded(
   // the fresh §13.3 process-table verification; terminateProcessTree is a no-op signal-wise when
   // the root and descendants are already gone.
   const termination = await terminate(pid, undefined, undefined, ownership);
+  // A post-close table cannot prove ownership of a child reparented after the browser root left.
+  // Signal/verify whatever is still observable, but never turn a missing pre-close snapshot into
+  // a clean cleanup result.
+  if (!ownership) {
+    return `${closeError ? `${closeError}; ` : ""}process termination FAILED (pre-close process ownership unavailable)`;
+  }
   if (termination.verified) return null;
   return (
     `${closeError ? `${closeError}; ` : ""}process termination FAILED ` +

@@ -418,18 +418,37 @@ describe("the live path fails closed at its process boundary", () => {
 
   it("verifies the PID tree even when browser.close resolves", async () => {
     let verified = 0;
+    let captured = 0;
+    let forwarded: { pgid: number | null; groupSafe: boolean; initialPids: number[] } | null | undefined;
     const error = await closeBrowserBounded({
       async newPage() { throw new Error("not reached"); }, async version() { return "Fake/1"; },
       process() { return { pid: 71_001 }; }, async close() {},
-    }, async (pid) => {
+    }, async (pid, _readTable, _operations, ownership) => {
       verified += 1;
+      forwarded = ownership;
       return {
         rootPid: pid, pgid: pid, initialPids: [pid], survivingPids: [pid], groupSafe: true,
         termSent: true, killSent: true, verified: false,
       };
+    }, (pid) => {
+      captured += 1;
+      return { pgid: pid, groupSafe: true, initialPids: [pid] };
     });
     assert.equal(verified, 1);
+    assert.equal(captured, 1);
+    assert.deepEqual(forwarded, { pgid: 71_001, groupSafe: true, initialPids: [71_001] });
     assert.match(error ?? "", /survivors=71001/u);
+  });
+
+  it("refuses a resolved browser close when pre-close process ownership could not be observed", async () => {
+    const error = await closeBrowserBounded({
+      async newPage() { throw new Error("not reached"); }, async version() { return "Fake/1"; },
+      process() { return { pid: 71_002 }; }, async close() {},
+    }, async (pid) => ({
+      rootPid: pid, pgid: null, initialPids: [], survivingPids: [], groupSafe: false,
+      termSent: false, killSent: false, verified: true,
+    }), () => null);
+    assert.match(error ?? "", /pre-close process ownership unavailable/u);
   });
 
   it("never verifies termination when a fresh ps table is unreadable", async () => {
