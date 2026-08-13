@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { buildReport } from "../../src/core/build-report.ts";
-import { runDocument } from "../../src/core/engine.ts";
+import { runDocument, type DocumentInput } from "../../src/core/engine.ts";
 import { NON_FATAL_INFRA_EVENT_KINDS } from "../../src/core/enums.ts";
 import {
   closeBrowserBounded,
@@ -25,6 +25,7 @@ import {
   discoverLocalAssets,
   documentArtifactKey,
   finalizeEvidenceAcquisition,
+  withdrawFatalCleanupDocuments,
   operationalLimitEvents,
   orderedSourceSids,
   paginationApparatusSource,
@@ -967,6 +968,28 @@ describe("the live path fails closed at its process boundary", () => {
     });
     assert.equal(engine.report.findings.length, 0, "withdrawn evidence must leave no snapshot for rules to inspect");
     assert.equal(exitCodeFor([result]), 3);
+  });
+
+  it("withdraws completed findings and bindings if browser cleanup later becomes fatal", () => {
+    const snapshot = loadCorpus().find((entry) => entry.name === "spaced-hyphen-trigger")!.snapshot;
+    const sid = snapshot.blocks[0]!.sid!;
+    const document: DocumentInput = {
+      path: "doc.html", snapshot, infrastructure: [{ kind: "renderer-not-terminated", detail: "post-close survivor", measured: null }],
+      evidence: [{
+        key: "doc#1", page: 1, path: "doc-page-001.png", origin: "pdf-raster",
+        pdfConformance: "verified", conformance: null,
+        overlayCheck: { styleViolations: 0, rasterDiffPx: 0, removed: false }, bindsFinding: true,
+      }], boundSids: [sid],
+    };
+    withdrawFatalCleanupDocuments([document]);
+    const outcome = runDocument(document, {
+      failOn: "error", activeRules: [spacedHyphen], optionsByRule: {}, loweredFloors: {},
+    });
+    assert.equal(document.snapshot, null);
+    assert.deepEqual(document.evidence, []);
+    assert.deepEqual(document.boundSids, []);
+    assert.equal(outcome.report.findings.length, 0);
+    assert.equal(exitCodeFor([document]), 3);
   });
 
   it("projects evidence apparatus declines into the document report independently of rules", () => {

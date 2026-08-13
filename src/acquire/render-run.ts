@@ -767,6 +767,16 @@ export function finalizeEvidenceAcquisition(
   };
 }
 
+/** A fatal event discovered during final resource cleanup invalidates every earlier document. */
+export function withdrawFatalCleanupDocuments(documents: readonly DocumentInput[]): void {
+  for (const document of documents) {
+    if (!fatalInfrastructure(document.infrastructure)) continue;
+    document.snapshot = null;
+    document.evidence = [];
+    document.boundSids = [];
+  }
+}
+
 interface AcquireContext {
   browser: BrowserLike;
   browserVersion: string;
@@ -1855,6 +1865,7 @@ export async function renderDocuments(
       });
     }
   }
+  withdrawFatalCleanupDocuments(documents);
   return {
     documents,
     fatal: null,
