@@ -112,6 +112,16 @@ chain need no browser and no process group, so they work there. What does not wo
 your own HTML. Blocking the install would take away the part that functions in order to prevent
 the part that does not, and the part that does not already fails loudly rather than quietly.
 
+**A file that is not HTML gets an unhelpful error.** Point the tool at a Markdown file and the
+run ends with exit 3 and `pagination aborted: TypeError: node.getAttribute is not a function` —
+which is Paged.js throwing on a document that has none of the structure it expects, caught at the
+boundary and reported fail-closed. The behaviour is safe: nothing is measured and nothing is
+claimed. The message is not: it names an internal function rather than the mistake, and the
+mistake is one a first-time user makes. Found by a CI step whose own premise had quietly become
+false. Not fixed in 0.1.0, because a clean answer means deciding whether a non-HTML input is an
+infrastructure fault (exit 3) or an invalid invocation (exit 2), and that decision changes the
+exit matrix rather than a message.
+
 **Foreign HTML is executed.** The run uses a fresh browser profile, keeps the sandbox on, has no
 flag that disables it, and blocks every network request by default. That is protection against
 mistakes and badly built documents, not against a deliberate attack on the browser sandbox. See

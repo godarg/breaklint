@@ -102,15 +102,29 @@ jobs:
           grep -q "uncalibrated" demo.out || { echo "installed --demo printed no findings"; exit 1; }
           echo "installed package: --version and --demo behave as documented"
 
-      - name: a live run with a missing prerequisite ends with exit 3 and a command to fix it
-        # The promise is exit 3 plus ONE copyable install command on stderr — not exit 0, not
-        # exit 1, not an empty success. Which prerequisite is missing depends on the runner:
-        # ubuntu-latest ships Chrome, so the run gets past the browser and stops at paged.js.
-        # Asserting on the specific message would make this step pass or fail for reasons that
-        # have nothing to do with the promise, so it asserts on the promise itself.
+      - name: a missing prerequisite ends with exit 3 and one copyable install command
+        # This step tested nothing for two runs, and the way it failed is the point.
+        #
+        # It used to set BREAKLINT_CHROME=/nonexistent and expect the run to stop for want of a
+        # browser. ubuntu-latest ships Chrome, the resolver found it anyway, and the run went all
+        # the way into pagination — where Paged.js threw on a Markdown file that had been handed
+        # to it as HTML. Exit 3 arrived, so the first assertion passed; the install hint never
+        # did, because nothing was missing. A test whose premise the environment quietly
+        # falsifies reports on the environment, not on the promise.
+        #
+        # The prerequisite is missing for real now, in the situation a user actually reaches:
+        # `npm i breaklint` and nothing else. The peers are optional, so npm installs none of
+        # them, and the first run over real HTML must say which one to install rather than
+        # crashing or — far worse for a checker — passing.
         run: |
+          tgz=$(npm pack --silent)
+          test -n "$tgz" && test -s "$tgz" || { echo "npm pack produced no tarball"; exit 1; }
+          mkdir -p /tmp/bare && cd /tmp/bare
+          npm init -y > /dev/null
+          npm i "$GITHUB_WORKSPACE/$tgz" --no-audit --no-fund
+          printf '<!doctype html><html><body><p>x</p></body></html>' > page.html
           set +e
-          BREAKLINT_CHROME=/nonexistent node --experimental-strip-types src/cli/index.ts README.md 2>err.txt
+          npx breaklint page.html 2>err.txt
           code=$?
           set -e
           test "$code" -eq 3 || { echo "expected exit 3, got $code"; cat err.txt; exit 1; }
