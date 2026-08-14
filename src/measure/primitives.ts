@@ -336,14 +336,49 @@ const PRIMITIVES_TEMPLATE = `(() => {
     configurable: false,
     enumerable: false,
   });
+
+  // The evidence marks are set in a font of their own, and it is registered HERE — before the
+  // document exists, in the same breath as the rest of the apparatus — rather than at overlay
+  // time. Two measured reasons.
+  //
+  // Its job is to keep the marks out of the font subset the document's own text is embedded
+  // with. Sharing that subset made the marked PDF carry a different font program from the
+  // baseline (17 584 bytes against 15 508), which pdfjs rasterises differently: 1116 differing
+  // pixels on the CI runner where poppler, with its own rasteriser, found none. The overlay check
+  // read that as contamination and withheld the evidence for every document on Linux.
+  //
+  // And it goes in early because loading a font is a resource load, even from a data: URI. Added
+  // at overlay time it registered as network activity AFTER the measured state, and the run
+  // refused the document — correctly. The apparatus does not get an exemption from the rule it
+  // enforces; it gets in line before the measurement starts.
+  if (typeof FontFace === "function" && document.fonts && document.fonts.add) {
+    try {
+      const markFont = new FontFace(${JSON.stringify("__MARK_FAMILY__")}, ${JSON.stringify("__MARK_SRC__")});
+      document.fonts.add(markFont);
+      markFont.load();
+    } catch (error) {
+      // Not fatal here. A mark font that failed to arrive shows up as a measurably wrong advance
+      // width in the overlay readback, which drops the binding rather than reporting a number
+      // nobody can stand behind.
+    }
+  }
 })()`;
+
+import { MARK_FONT_FAMILY, MARK_FONT_SRC } from "../render/mark-font.ts";
 
 /** Build the pristine-realm payload with a Node-held capability that never enters served HTML. */
 export function primitivesSource(capability: string): string {
   if (!/^[a-f0-9]{32,128}$/u.test(capability) && capability !== TEST_APPARATUS_CAPABILITY) {
     throw new Error("invalid apparatus capability");
   }
-  return PRIMITIVES_TEMPLATE.replace(APPARATUS_CAPABILITY_MARKER, capability);
+  return (
+    PRIMITIVES_TEMPLATE.replace(APPARATUS_CAPABILITY_MARKER, capability)
+      // Stringified HERE, not before: the src descriptor ends in `format("truetype")`, and
+      // substituting it into an already-quoted literal put those quotes into the source
+      // unescaped. The apparatus then failed to parse and every live case went red at once.
+      .replace('"__MARK_FAMILY__"', JSON.stringify(MARK_FONT_FAMILY))
+      .replace('"__MARK_SRC__"', JSON.stringify(MARK_FONT_SRC))
+  );
 }
 
 /** Static payload for direct primitive tests. Production creates a fresh capability per page. */

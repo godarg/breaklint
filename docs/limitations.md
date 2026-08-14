@@ -90,8 +90,16 @@ reporting findings it cannot stand behind.
 attributes the paginator writes into the tree and does not guarantee as an interface. Any other
 resolved version stops the run with exit 3, and no flag overrides it.
 
-**Windows is not supported**, and Linux is not yet measured. Process termination rests on POSIX
-process groups; the termination and profile-cleanup path has real evidence on macOS only.
+**Windows is not supported.** Process termination rests on POSIX process groups; the termination
+and profile-cleanup path has real evidence on macOS only, and Windows job objects are neither
+designed for nor measured.
+
+**Linux is now measured, and it took a defect to get there.** The full live suite — 56 cases
+including the evidence binding, the hostile corpus and the independent rasteriser cross-check —
+runs green on Linux in CI. It did not on the first public run: the evidence binding failed on
+every document, because the marks shared a font with the document's own text and the resulting
+subset difference registered as contamination. That is fixed and the fix is guarded. What is
+still true is that the process and profile-cleanup path has empirical evidence on macOS only.
 
 There is deliberately no `os` field in `package.json`, which means npm will install this on
 Windows without complaint. That is not an oversight: `--demo` and the whole rule and reporter

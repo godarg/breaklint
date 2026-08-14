@@ -71,6 +71,12 @@ const STYLE_LAYER =
 
 const STYLE_MARK =
   "all:initial!important;position:absolute!important;color:transparent!important;" +
+  // No fallback in this list, deliberately. A fallback would let the marks quietly land in
+  // the document's own font again, which is the whole defect this font exists to remove —
+  // and it would land there silently. With no fallback, a font that failed to load shows up
+  // as a measurably different advance width, and the readback below turns that into a
+  // violation instead of a wrong number.
+  `font-family:"${MARK_FONT_FAMILY}"!important;` +
   "font-size:1px!important;line-height:0!important;pointer-events:none!important;display:inline!important;" +
   "opacity:1!important;visibility:visible!important;transform:none!important;filter:none!important;" +
   "mix-blend-mode:normal!important;background:none!important;border:0!important;outline:0!important;" +
@@ -95,12 +101,15 @@ const STYLE_MARK =
  * TypeScript and this is a string the browser parses, so renaming one side alone produces a call
  * to a function that does not exist, and only the live suite would notice.
  */
+import { MARK_FONT_FAMILY } from "./mark-font.ts";
+
 const OVERLAY_CAPABILITY_MARKER = "__BREAKLINT_NODE_CAPABILITY__";
 
 const OVERLAY_TEMPLATE = `(() => {
   const P = window.__blPrimitives;
   const STYLE_LAYER = ${JSON.stringify(STYLE_LAYER)};
   const STYLE_MARK = ${JSON.stringify(STYLE_MARK)};
+  const FONT_FAMILY = ${JSON.stringify(MARK_FONT_FAMILY)};
   const capability = P.randomToken();
   let stage = 0, unauthorizedCalls = 0;
   let state = { layers: [], marks: [], detached: [] };
@@ -183,6 +192,19 @@ const OVERLAY_TEMPLATE = `(() => {
       const token = P.text(mark);
       const allowed = token.length * parseFloat(cs.fontSize) * 1.2 + 2;
       if (box.width > allowed) why.push("width=" + box.width.toFixed(2) + " > " + allowed.toFixed(2));
+      // Did the mark font actually apply? Two independent answers, because either alone can lie.
+      // The computed family is what the cascade decided; a hostile stylesheet cannot change it
+      // past an inline !important, but a font that failed to LOAD leaves the family standing and
+      // silently paints with the fallback. So the advance width is measured too: every glyph in
+      // this font is one em wide, which at 1px is one pixel per character.
+      if (cs.fontFamily.indexOf(FONT_FAMILY) === -1) why.push("font-family=" + cs.fontFamily);
+      else if (document.fonts && document.fonts.check && !document.fonts.check('1px "' + FONT_FAMILY + '"')) {
+        why.push("mark font did not load");
+      } else if (Math.abs(box.width - token.length * parseFloat(cs.fontSize)) > 1) {
+        // Not a style question: this is the measurement that says the glyphs came from somewhere
+        // else. It is the only signal that catches a font which is installed, reported and wrong.
+        why.push("advance=" + box.width.toFixed(2) + " for " + token.length + " chars at " + cs.fontSize);
+      }
       if (why.length) violations.push({ token, why: why.join(", ") });
     }
     return violations;

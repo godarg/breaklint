@@ -221,6 +221,21 @@ function foreignRasterDiff(a: Uint8Array, b: Uint8Array, dir: string, tag: strin
   return total;
 }
 
+/**
+ * Ink per page of a PDF, measured by poppler rather than by the product. The counterpart to the
+ * blank-page assertion below: it is the only way to tell "the rasteriser produced nothing" from
+ * "this page of the document really is nearly empty", and those two must not share an oracle.
+ */
+function foreignPageInk(bytes: Uint8Array, dir: string, tag: string): number[] {
+  const pdf = join(dir, `${tag}-ink.pdf`);
+  writeFileSync(pdf, bytes);
+  execFileSync("pdftoppm", ["-png", "-r", "96", pdf, join(dir, `${tag}-ink`)]);
+  return readdirSync(dir)
+    .filter((f) => f.startsWith(`${tag}-ink-`) && f.endsWith(".png"))
+    .sort()
+    .map((f) => inkPixels(decodePng(readFileSync(join(dir, f)))));
+}
+
 const hasPoppler = (() => {
   try {
     execFileSync("pdftoppm", ["-v"], { stdio: "pipe" });
@@ -265,7 +280,7 @@ describe("evidence path, live", () => {
   let openContentPages = 0;
   // Evidence.path is deliberately relative to the declared artefact directory, never CWD.
   const evidenceFile = (reference: string): string => join(workDir, "out", reference);
-  const results = new Map<string, EvidenceOutcome & { foreignDiff: number; referenceDiff: number }>();
+  const results = new Map<string, EvidenceOutcome & { foreignDiff: number; referenceDiff: number; foreignInk: number[] }>();
   // Every number this file asserts on, written out. A claim of "green" that cannot name the file
   // it was measured from is a claim about a memory.
   const measured: Record<string, unknown> = { missingPrerequisites: missing };
@@ -335,7 +350,9 @@ describe("evidence path, live", () => {
           ? foreignRasterDiff(outcome.candidates.marked, outcome.candidates.baseline, workDir, kase.name)
           : Number.NaN;
 
-      results.set(kase.name, { ...outcome, foreignDiff, referenceDiff });
+      const foreignInk = hasPoppler ? foreignPageInk(outcome.deliveredPdf, workDir, kase.name) : [];
+
+      results.set(kase.name, { ...outcome, foreignDiff, referenceDiff, foreignInk });
     }
   });
 
@@ -685,7 +702,23 @@ describe("evidence path, live", () => {
           `${kase.name}: the product itself rejected an evidence page`,
         );
         // A blank page passes every structural check ever written. This is the one that fails.
-        assert.ok(inkPixels(decoded) > 500, `${e.path} carries almost no ink (${inkPixels(decoded)} px)`);
+        //
+        // It may NOT fail on a page the document itself left nearly empty, and the difference is
+        // not visible from inside this rasteriser. Measured: on Linux, Liberation Serif is wider
+        // than the macOS serif these fixtures were written against, so A1 paginates to three
+        // pages and the third carries the two words that no longer fit — 169 inked pixels, and a
+        // flat `> 500` called that a broken rasteriser. The threshold was never measuring the
+        // rasteriser; it was encoding one platform's line breaking.
+        //
+        // So the foreign rasteriser decides. A sparse page is allowed exactly when poppler, which
+        // shares no code with the product, finds it sparse too. A page that is blank HERE and
+        // inked THERE still fails, which is the case this assertion exists for.
+        const ink = inkPixels(decoded);
+        const foreign = r.foreignInk[e.page - 1];
+        assert.ok(
+          ink > 500 || (foreign !== undefined && foreign <= 500),
+          `${e.path} carries almost no ink (${ink} px) while poppler found ${foreign ?? "no measurement"} on the same page`,
+        );
       }
       // Mutation control: two evidence pages of the same document must not be the same image.
       if (r.evidence.length > 1) {
