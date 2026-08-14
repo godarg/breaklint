@@ -55,7 +55,10 @@ truth, and `uncalibrated` therefore appears in the type, in every finding and on
 
 ### The apparatus was measuring its own footprint
 
-- **Evidence binding never worked on Linux, and the first public CI run is what said so.** The
+- **Evidence binding never worked on Linux, and the first public CI run is what said so.** (The
+  fix below is measured in a Linux container, not yet on the x86_64 CI runner — the numbers
+  reproduced there within a few pixels of the runner's, which is what identifies the mechanism,
+  not what closes the platform.) The
   marks are text, and text pulls glyphs from a font. Set in the same font as the document's own
   prose, the marks ENLARGED the font subset Chrome embeds — measured on the neutral fixture,
   17 584 bytes of font program against 15 508, different hash, same name. A different font program

@@ -94,12 +94,17 @@ resolved version stops the run with exit 3, and no flag overrides it.
 and profile-cleanup path has real evidence on macOS only, and Windows job objects are neither
 designed for nor measured.
 
-**Linux is now measured, and it took a defect to get there.** The full live suite — 56 cases
-including the evidence binding, the hostile corpus and the independent rasteriser cross-check —
-runs green on Linux in CI. It did not on the first public run: the evidence binding failed on
-every document, because the marks shared a font with the document's own text and the resulting
-subset difference registered as contamination. That is fixed and the fix is guarded. What is
-still true is that the process and profile-cleanup path has empirical evidence on macOS only.
+**Linux was unmeasured, then measured, and what it showed was a defect.** The first public CI run
+failed: the evidence binding broke on every document, because the marks shared a font with the
+document's own text and the resulting font-subset difference registered as contamination. The
+cause is fixed, and the fix is measured — the full live suite, 56 cases including the hostile
+corpus and the independent rasteriser cross-check, is green in a Linux container (arm64, Chromium
+151, poppler 22.12), against 15 red cases with the fix removed.
+
+Two things that claim is NOT: the container is arm64 and the CI runner is x86_64, and this page
+is being written before the fixed commit has run there. Treat Linux as measured for the mechanism
+and pending for the platform until the badge at the top of the README says otherwise. The process
+and profile-cleanup path still has empirical evidence on macOS only.
 
 There is deliberately no `os` field in `package.json`, which means npm will install this on
 Windows without complaint. That is not an oversight: `--demo` and the whole rule and reporter
