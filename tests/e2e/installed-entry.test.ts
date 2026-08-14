@@ -13,7 +13,8 @@
  * Nothing caught it, and the reason is worth stating rather than fixing quietly: every gate ran
  * the tool by its own source path. CI ran `node src/cli/index.ts --demo`, the exit matrix drives
  * `main()` in-process, and `npm pack` only checks what is IN the tarball, never what happens when
- * it is installed. The path under test here is the only path a user ever takes.
+ * it is installed. The MECHANISM under test here — one file reached under two names — is the one
+ * every installed copy runs into, and no gate had exercised it.
  *
  * The symlink is made in a temp directory rather than in the repository: a link committed here
  * would encode an absolute path from the machine that made it.

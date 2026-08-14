@@ -15,7 +15,8 @@ npx breaklint --demo
 
 That command needs no browser and no configuration. It ends with exit 1, because the demo
 fixture contains findings on purpose — a demo that ends 0 never shows you what a finding looks
-like. The block below was produced by that command and pasted here unedited:
+like. Below is the first of its eight findings, plus the closing counters, copied from that
+command's output:
 
 ```
 error layout/unbreakable-block-too-tall  page 2
