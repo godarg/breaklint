@@ -371,7 +371,7 @@ export function primitivesSource(capability: string): string {
   if (!/^[a-f0-9]{32,128}$/u.test(capability) && capability !== TEST_APPARATUS_CAPABILITY) {
     throw new Error("invalid apparatus capability");
   }
-  return (
+  return assertSubstituted(
     PRIMITIVES_TEMPLATE.replace(APPARATUS_CAPABILITY_MARKER, capability)
       // Stringified HERE, not before: the src descriptor ends in `format("truetype")`, and
       // substituting it into an already-quoted literal put those quotes into the source
@@ -379,6 +379,24 @@ export function primitivesSource(capability: string): string {
       .replace('"__MARK_FAMILY__"', JSON.stringify(MARK_FONT_FAMILY))
       .replace('"__MARK_SRC__"', JSON.stringify(MARK_FONT_SRC))
   );
+}
+
+/**
+ * Both placeholders must be gone. A failed substitution does not fail loudly on its own: the
+ * page would call `new FontFace` with the literal string `__MARK_SRC__`, that throws, and the
+ * try/catch around the registration — which is there so a missing font degrades to a dropped
+ * binding rather than a dead run — would swallow it. The marks would then quietly fall back into
+ * the document's font and the whole defect this font exists to remove would be back, visible only
+ * to the live suite. This is a one-line check against a failure mode that already happened once,
+ * when an unescaped quote in the src descriptor turned every live case red at the same moment.
+ */
+function assertSubstituted(source: string): string {
+  for (const placeholder of ["__MARK_FAMILY__", "__MARK_SRC__"]) {
+    if (source.includes(placeholder)) {
+      throw new Error(`apparatus payload still contains ${placeholder} — the mark font was not substituted`);
+    }
+  }
+  return source;
 }
 
 /** Static payload for direct primitive tests. Production creates a fresh capability per page. */

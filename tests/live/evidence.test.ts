@@ -236,6 +236,16 @@ function foreignPageInk(bytes: Uint8Array, dir: string, tag: string): number[] {
     .map((f) => inkPixels(decodePng(readFileSync(join(dir, f)))));
 }
 
+/**
+ * The only direction that can hide a rasteriser fault is product < foreign. A product image
+ * with more ink is caught separately by the raster comparison; it is not a blank-page false
+ * green. Keeping this predicate named and directly tested prevents the historical ODER-form of
+ * two unrelated absolute thresholds from returning.
+ */
+function productInkMatchesForeign(productInk: number, foreignInk: number): boolean {
+  return productInk >= foreignInk * 0.5;
+}
+
 const hasPoppler = (() => {
   try {
     execFileSync("pdftoppm", ["-v"], { stdio: "pipe" });
@@ -284,6 +294,13 @@ describe("evidence path, live", () => {
   // Every number this file asserts on, written out. A claim of "green" that cannot name the file
   // it was measured from is a claim about a memory.
   const measured: Record<string, unknown> = { missingPrerequisites: missing };
+
+  it("the blank-page comparator rejects a blank product page beside foreign ink", () => {
+    // The exact counterexample the former `ink > 500 || foreign <= 500` accepted.
+    assert.equal(productInkMatchesForeign(0, 300), false);
+    // A sparse page is valid when both independent renderings agree it is sparse.
+    assert.equal(productInkMatchesForeign(169, 169), true);
+  });
 
   it("the prerequisites for this suite are present", () => {
     // The first assertion in the file, and the one that stops the suite from proving nothing.
@@ -715,9 +732,24 @@ describe("evidence path, live", () => {
         // inked THERE still fails, which is the case this assertion exists for.
         const ink = inkPixels(decoded);
         const foreign = r.foreignInk[e.page - 1];
+        assert.notEqual(foreign, undefined, `${e.path}: no foreign measurement for this page`);
+        // Two absolute thresholds joined by OR was the wrong shape, and it let through exactly the
+        // failure this assertion exists for: a page rendered BLANK by the product (0 px) beside a
+        // foreign measurement of, say, 300 px satisfied the second clause and passed, while the
+        // comment above it promised the opposite. An oracle has to be a comparison, not two
+        // separate verdicts.
+        //
+        // So the two rasterisers are compared directly, and only in the direction that can hide a
+        // fault: the product finding LESS ink than poppler. More is not a failure mode — it would
+        // mean the product drew something poppler did not, which the raster comparison covers.
+        //
+        // The ratio is chosen, not measured, and it is a tolerance between two renderings of the
+        // SAME page rather than a claim about any document: half. Antialiasing and hinting differ
+        // between two font engines by percents, not by halves, so a page that loses more than half
+        // its ink has not lost it to antialiasing.
         assert.ok(
-          ink > 500 || (foreign !== undefined && foreign <= 500),
-          `${e.path} carries almost no ink (${ink} px) while poppler found ${foreign ?? "no measurement"} on the same page`,
+          productInkMatchesForeign(ink, foreign!),
+          `${e.path}: the product rasteriser found ${ink} px where poppler found ${foreign} px on the same page`,
         );
       }
       // Mutation control: two evidence pages of the same document must not be the same image.

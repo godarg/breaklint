@@ -32,6 +32,15 @@ jobs:
           fi
           echo "no browser cache, no full puppeteer package"
 
+      - name: the mark font is what its generator produces
+        # The font is a binary constant in the source tree. Without this step the header of
+        # src/render/mark-font.ts made a promise nobody kept: a hand-edit, or a generator change
+        # without a regeneration, would travel inside every PDF this tool produces and no test
+        # would notice. fontTools is a dev tool for one file and is installed here only.
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check fonttools
+          node tools/make-mark-font.mjs --check
+
       - name: typecheck
         run: npm run typecheck
 

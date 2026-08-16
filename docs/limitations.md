@@ -101,10 +101,10 @@ cause is fixed, and the fix is measured — the full live suite, 56 cases includ
 corpus and the independent rasteriser cross-check, is green in a Linux container (arm64, Chromium
 151, poppler 22.12), against 15 red cases with the fix removed.
 
-Two things that claim is NOT: the container is arm64 and the CI runner is x86_64, and this page
-is being written before the fixed commit has run there. Treat Linux as measured for the mechanism
-and pending for the platform until the badge at the top of the README says otherwise. The process
-and profile-cleanup path still has empirical evidence on macOS only.
+That is no longer only a container result: the fixed commit has since run on the x86_64 CI
+runner, where the same step that reported the defect now passes. What remains true is narrower —
+the process-termination and profile-cleanup path has empirical evidence on macOS only. Linux is
+measured for the measurement chain, not yet for the process lifecycle.
 
 There is deliberately no `os` field in `package.json`, which means npm will install this on
 Windows without complaint. That is not an oversight: `--demo` and the whole rule and reporter
