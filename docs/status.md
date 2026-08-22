@@ -215,12 +215,15 @@ The components below are now connected rather than isolated pieces:
 provenance, and the packed package is exercised from a clean consumer directory on Node 20 and 22.
 Packaging and the first release are therefore complete, not future milestones.
 
-**Prepared for the release workflow, not yet a registry claim:** `0.2.0` implements Configuration
-Contract v1, the live-gate truth repair, HTML Report Surface v2, the real self-application gate and
-the Node-22.13/Puppeteer-25 security migration. The minor-version change is intentional: unknown or
-formerly inert configuration now fails closed, `excludeSelectors` is corrected to `excludeTags`,
-and report schema moves to 3 while snapshot schema remains 2. This paragraph remains deliberately
-pre-release until the tagged workflow and a fresh registry consumer have both passed.
+**Released on 2026-08-22:** `breaklint@0.2.0` implements Configuration Contract v1, the live-gate
+truth repair, HTML Report Surface v2, the real self-application gate and the
+Node-22.13/Puppeteer-25 security migration. The annotated `v0.2.0` tag resolves to
+`ce7097b99beafcedc71b30ee0ed81451811532a0`. Registry SRI, signed SLSA source binding, npm
+signatures, byte-identical GitHub assets and a fresh registry consumer were independently checked.
+The minor-version change is intentional: unknown or formerly inert configuration now fails closed,
+`excludeSelectors` is corrected to `excludeTags`, and report schema moves to 3 while snapshot schema
+remains 2. This status paragraph is a later documentation commit and is not retroactively part of
+the published tarball.
 
 **Still unfinished:** M3's real-renderer SVG ink passes and calibration of every threshold, plus
 M4's human-labelled production corpus. A green M2/M2d run therefore says that the implemented

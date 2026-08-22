@@ -42,8 +42,10 @@ jobs:
       - name: Git history, worktree and secret-scanner canary
         run: npm run test:secrets
 
-      - name: annotated release-tag contract and lightweight-tag negative control
-        run: npm run test:release-tag
+      - name: release-tag and registry-provenance contracts with negative controls
+        run: |
+          npm run test:release-tag
+          npm run test:release-metadata
 
       - name: published dependency graph and pinned development advisory disposition
         run: npm run test:advisories

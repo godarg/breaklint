@@ -35,6 +35,7 @@ npm ci --no-audit --no-fund
 npm run test:secrets
 npm run test:advisories
 npm run test:release-tag
+npm run test:release-metadata
 npm run typecheck
 npm run schema:check
 npm test
@@ -73,14 +74,22 @@ The release workflow then:
 6. proves the ref is an annotated tag (with a lightweight-tag negative control), then proves
    tag/version, exact `origin/main` SHA and successful main CI;
 7. publishes that tarball with provenance;
-8. waits until npm exposes the version, compares `dist.integrity`, runs npm signature verification
-   where supported and installs the registry version in a final consumer;
+8. waits until npm exposes the version, compares `dist.integrity`, binds the package digest and Git
+   commit through the signed SLSA provenance, runs npm signature verification and installs the
+   registry version in a final consumer;
 9. creates the GitHub Release with the tarball and both identity records attached.
 
 Do not rerun a partially successful publish blindly: npm versions are immutable. Inspect the npm
 version, workflow logs and GitHub Release first. If npm already serves 0.2.0 but a post-publish
 verification failed, repair the release metadata or publish a new patch version; never move the tag
 or overwrite evidence to make the old run look green.
+
+`npm publish <tarball>` does not populate the legacy `gitHead` registry field. The authoritative
+source binding for this release route is therefore the signed SLSA statement: its package subject
+must equal `dist.integrity`, and its resolved Git dependency must equal the annotated tag commit.
+`npm audit signatures` then verifies the registry signature/attestation bundle. An absent
+`gitHead` is acceptable only when all of those stronger checks pass; a present but contradictory
+source identity is never ignored.
 
 ## After the workflow
 

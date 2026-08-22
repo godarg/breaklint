@@ -54,8 +54,10 @@ jobs:
       - name: Git history, tag worktree and secret-scanner canaries
         run: npm run test:secrets
 
-      - name: annotated release-tag contract and lightweight-tag negative control
-        run: npm run test:release-tag
+      - name: release-tag and registry-provenance contracts with negative controls
+        run: |
+          npm run test:release-tag
+          npm run test:release-metadata
 
       - name: production and complete development dependency graphs have no advisories
         run: npm run test:advisories
@@ -294,17 +296,22 @@ jobs:
           RELEASE_COMMIT: ${{ steps.identity.outputs.release_commit }}
         run: |
           set +e
-          npm view "breaklint@0.2.0" dist.integrity gitHead --json > /tmp/existing.json 2> /tmp/existing.err
+          npm view "breaklint@0.2.0" version dist.integrity dist.attestations gitHead --json > /tmp/existing.json 2> /tmp/existing.err
           status=$?
           set -e
           if [ "$status" -eq 0 ]; then
-            EXPECTED_SRI=$(cat "$PACKAGE_FILE.sri") node --input-type=module <<'NODE'
-          import { strict as assert } from "node:assert";
-          import { readFileSync } from "node:fs";
-          const metadata = JSON.parse(readFileSync("/tmp/existing.json", "utf8"));
-          assert.equal(metadata["dist.integrity"], process.env.EXPECTED_SRI, "existing registry bytes differ");
-          assert.equal(metadata.gitHead, process.env.RELEASE_COMMIT, "existing registry gitHead differs");
-          NODE
+            curl -fsSL \
+              "https://registry.npmjs.org/-/npm/v1/attestations/breaklint@0.2.0" \
+              > /tmp/existing-attestations.json
+            EXPECTED_PACKAGE_NAME=breaklint \
+            EXPECTED_VERSION=0.2.0 \
+            EXPECTED_SRI=$(cat "$PACKAGE_FILE.sri") \
+            EXPECTED_COMMIT="$RELEASE_COMMIT" \
+            EXPECTED_REPOSITORY_URL="https://github.com/$GITHUB_REPOSITORY" \
+            EXPECTED_REF="$GITHUB_REF" \
+            EXPECTED_WORKFLOW_PATH=.github/workflows/release.yml \
+              node tests/tools/registry-provenance-contract.mjs \
+                --verify /tmp/existing.json /tmp/existing-attestations.json
             echo "publish_needed=false" >> "$GITHUB_OUTPUT"
             echo "breaklint@0.2.0 already contains these exact bytes; continuing recovery verification"
           else
@@ -322,27 +329,26 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: verify registry integrity, gitHead, attestation and signatures
+      - name: verify registry integrity, provenance-bound Git commit and signatures
         env:
           RELEASE_COMMIT: ${{ steps.identity.outputs.release_commit }}
         run: |
           verified=false
           for attempt in $(seq 1 12); do
-            if npm view breaklint@0.2.0 dist.integrity gitHead dist.attestations --json \
+            if npm view breaklint@0.2.0 version dist.integrity dist.attestations gitHead --json \
                 > /tmp/registry.json 2> /tmp/registry.err && \
-               EXPECTED_SRI=$(cat "$PACKAGE_FILE.sri") node --input-type=module <<'NODE'
-          import { strict as assert } from "node:assert";
-          import { readFileSync } from "node:fs";
-          const metadata = JSON.parse(readFileSync("/tmp/registry.json", "utf8"));
-          assert.equal(metadata["dist.integrity"], process.env.EXPECTED_SRI, "registry SRI differs");
-          assert.equal(metadata.gitHead, process.env.RELEASE_COMMIT, "registry gitHead differs");
-          assert.equal(
-            metadata["dist.attestations"]?.provenance?.predicateType,
-            "https://slsa.dev/provenance/v1",
-            "SLSA provenance attestation is absent",
-          );
-          assert.match(metadata["dist.attestations"]?.url ?? "", /^https:\/\/registry\.npmjs\.org\//u);
-          NODE
+               curl -fsSL \
+                 "https://registry.npmjs.org/-/npm/v1/attestations/breaklint@0.2.0" \
+                 > /tmp/registry-attestations.json && \
+               EXPECTED_PACKAGE_NAME=breaklint \
+               EXPECTED_VERSION=0.2.0 \
+               EXPECTED_SRI=$(cat "$PACKAGE_FILE.sri") \
+               EXPECTED_COMMIT="$RELEASE_COMMIT" \
+               EXPECTED_REPOSITORY_URL="https://github.com/$GITHUB_REPOSITORY" \
+               EXPECTED_REF="$GITHUB_REF" \
+               EXPECTED_WORKFLOW_PATH=.github/workflows/release.yml \
+                 node tests/tools/registry-provenance-contract.mjs \
+                   --verify /tmp/registry.json /tmp/registry-attestations.json
             then
               verified=true
               break

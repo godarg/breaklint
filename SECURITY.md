@@ -57,6 +57,7 @@ uncalibrated and says so; a false positive is a bug, not a vulnerability.
 
 ## Supported versions
 
-The latest published version on npm receives fixes. The 0.2.x line is the supported line after the
-0.2.0 release; 0.1.x receives no separate long-term-support branch. Before the registry workflow
-has completed, the npm package page remains the authority on which line is actually published.
+The latest published version on npm receives fixes. The 0.2.x line is the supported line;
+`breaklint@0.2.0` was published on 2026-08-22 with npm provenance. The 0.1.x line receives no
+separate long-term-support branch. The npm package page remains the authority on which version is
+actually published.
