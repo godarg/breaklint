@@ -57,7 +57,7 @@ jobs:
       - name: release-tag and registry-provenance contracts with negative controls
         run: |
           npm run test:release-tag
-          npm run test:release-metadata
+          node tests/tools/registry-provenance-contract.mjs --self-test
 
       - name: production and complete development dependency graphs have no advisories
         run: npm run test:advisories

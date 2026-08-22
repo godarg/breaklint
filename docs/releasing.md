@@ -35,7 +35,7 @@ npm ci --no-audit --no-fund
 npm run test:secrets
 npm run test:advisories
 npm run test:release-tag
-npm run test:release-metadata
+node tests/tools/registry-provenance-contract.mjs --self-test
 npm run typecheck
 npm run schema:check
 npm test
