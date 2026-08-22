@@ -22,8 +22,7 @@ import { SUPPORTED_PAGEDJS_VERSION } from "../core/enums.ts";
 import { buildReport } from "../core/build-report.ts";
 import { runDocument } from "../core/engine.ts";
 import type { DocumentInput } from "../core/engine.ts";
-import { loweredFloorMap, resolveConfig, UsageError } from "../config/resolve.ts";
-import type { ConfigFile } from "../config/resolve.ts";
+import { coverageFloorMap, resolveConfig, toReportConfig, UsageError } from "../config/resolve.ts";
 import { render } from "../report/index.ts";
 import { parseArgs } from "./args.ts";
 import type { Snapshot } from "../core/types.ts";
@@ -123,7 +122,7 @@ export async function main(argv: string[]): Promise<number> {
       failOn: config.failOn,
       activeRules: config.activeRules,
       optionsByRule: config.optionsByRule,
-      loweredFloors: loweredFloorMap(config),
+      coverageFloors: coverageFloorMap(config),
     }),
   );
 
@@ -149,17 +148,10 @@ export async function main(argv: string[]): Promise<number> {
       fontFamiliesResolved: liveEnvironment?.fontFamiliesResolved ?? inputs[0]?.snapshot?.meta.inputIdentity?.fontFamilies ?? [],
       locale: config.locale,
     },
-    config: {
-      profile: config.profile,
-      failOn: config.failOn,
-      activeRules: config.activeRules.map((r) => r.id),
-      disabledRules: config.disabledRuleIds,
-      loweredFloors: config.loweredFloors,
+    config: toReportConfig(config, {
       interventions: unionSnapshotInterventions(inputs),
-      sourceMapInjection: config.sourceMapInjection,
-      evidenceBinding: config.evidenceBinding,
-      network: { ...config.network, blocked: liveEnvironment?.networkBlocked ?? 0 },
-    },
+      networkBlocked: liveEnvironment?.networkBlocked ?? 0,
+    }),
   });
 
   const rendered = render(report, config.format, { colour: process.stdout.isTTY === true });
@@ -173,14 +165,14 @@ export async function main(argv: string[]): Promise<number> {
   return report.exitCode;
 }
 
-function loadConfigFile(path: string | undefined): ConfigFile | null {
+function loadConfigFile(path: string | undefined): unknown | undefined {
   const candidate = path ?? "breaklint.config.json";
   if (!existsSync(candidate)) {
     if (path) throw new UsageError(`--config ${path}: file not found.`);
-    return null;
+    return undefined;
   }
   try {
-    return JSON.parse(readFileSync(candidate, "utf8")) as ConfigFile;
+    return JSON.parse(readFileSync(candidate, "utf8")) as unknown;
   } catch (error) {
     throw new UsageError(`--config ${candidate}: not valid JSON (${(error as Error).message}).`);
   }
@@ -236,6 +228,7 @@ options
                             error: the two rules with a named proof source gate.
                             warn:  the heuristics gate too — deliberately, on request.
                             never: report only. Coverage still decides exit 4.
+  --profile <name>          default | strict. strict gates warnings and requires full coverage.
   --only <rule,...>         Run only these rules.
   --disable <rule,...>      Run everything except these.
   --config <file>           JSON config (default ./breaklint.config.json).

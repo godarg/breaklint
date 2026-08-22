@@ -143,8 +143,9 @@ yet been established empirically. Windows job objects are neither designed for n
 origin, paginates it, assembles and validates the snapshot, runs the rules, and binds evidence to
 the report. `checker-crashed` remains a real exit-3 path for injected driver failures, apparatus
 interference and process-boundary faults; it is not a placeholder for an unbuilt live path.
-M3's SVG ink passes and threshold calibration, and the M4+ release work, remain unfinished — see
-`docs/status.md`.
+M3's SVG ink passes and threshold calibration, and M4's human-labelled production corpus, remain
+unfinished. Packaging and the first npm release are complete; the post-release trust work and
+remaining validation boundaries are tracked in `docs/status.md`.
 
 ## Exit codes
 
@@ -168,6 +169,7 @@ two runs were identical. Every report therefore carries `inputsFound`, `pagesAna
 breaklint docs/**/*.html                 # the shell does the globbing, not the tool
 breaklint --format json --out report.json chapter-*.html
 breaklint --fail-on warn manual.html     # gate on the heuristics too, deliberately
+breaklint --profile strict manual.html   # warnings gate; every rule requires full coverage
 breaklint --only layout/widow,layout/orphan book.html
 breaklint --disable layout/half-empty-page report.html
 ```
@@ -180,12 +182,25 @@ page that nothing checks, and this tool exists because such claims were wrong.
 There is no directory recursion and no glob expansion inside the tool. The shell has done this
 correctly for fifty years, including symlink cycles.
 
-Configuration is JSON, in `breaklint.config.json`. JavaScript configuration would mean executing
-code from a foreign repository inside CI.
+Configuration is fail-closed JSON in `breaklint.config.json`. Unknown fields, rules and options
+end with exit 2 before the input is opened. Values resolve as defaults < profile < config < CLI;
+the JSON report records the effective value, its origin and a deterministic configuration
+fingerprint. Coverage floors can be raised, never lowered, and the two structural error thresholds
+cannot be overridden. The complete contract, profiles, examples and generated schema are in
+[`docs/configuration.md`](docs/configuration.md). JavaScript configuration would mean executing
+code from a foreign repository inside CI, so it is intentionally unsupported.
+
+The HTML reporter is a self-contained evidence view, not a second source of truth. Its header
+distinguishes clean, findings, checker failure and insufficient coverage in words; findings reflow
+without a horizontal table on mobile; print uses a verified A4 layout. JSON remains canonical.
+The information contract and the reproducible 32-cell screen/print review are documented in
+[`docs/reporting.md`](docs/reporting.md).
 
 ## Requirements
 
-Node 20 or newer, on macOS or Linux. A live run additionally needs a Chromium-based browser and
+Node 22.13 or newer, on macOS or Linux. The floor is exact because `pdfjs-dist@6.2.108` requires
+Node 22.13 or Node 24, and the release gate installs the packed package on both Node 22.13 and 24.
+A live run additionally needs a Chromium-based browser, `puppeteer-core@25.8.x` and
 `pagedjs@0.4.3`. `pdfjs-dist` is what rasterises the produced PDF to bind evidence to findings; a
 run without it still measures and still reports, but the findings carry no evidence and the report
 says so rather than pretending otherwise. Poppler's `pdftoppm` is **not** used by the tool at all: the live test suite uses
@@ -193,7 +208,7 @@ it as an independent rasteriser, so that Chrome is not both the producer and the
 every PDF. It is never shipped and never called at check time.
 
 ```bash
-npm i -D puppeteer-core pagedjs@0.4.3 pdfjs-dist@6.2.108
+npm i -D puppeteer-core@^25.8.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
 ```
 
 ## Running foreign HTML

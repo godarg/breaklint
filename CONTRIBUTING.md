@@ -32,3 +32,22 @@ not an error. The registry refuses to load if the number of error rules is anyth
 and its message points at `docs/limitations.md`, where the argument for the number belongs. The
 check does not read that file — it only makes the change deliberate, so write the argument before
 you change the literal.
+
+## Changing configuration
+
+Configuration has one runtime source: rule ids, option names, option types and defaults come from
+the rule registry. `breaklint.schema.json` is generated from that same registry. Do not add a
+second hand-written option table or edit the generated schema directly.
+
+Every public config field needs all of these in the same change:
+
+1. fail-closed runtime validation, including unknown-key and wrong-type controls;
+2. an observed effect in the engine or acquisition path;
+3. one source entry for every effective report leaf;
+4. deterministic normalisation before fingerprinting where order is not semantic;
+5. a process-boundary exit-2 test and a positive behavior test;
+6. an update to [`docs/configuration.md`](docs/configuration.md) and the changelog.
+
+Run `npm run schema:write` after the registry changes and `npm run schema:check` before review.
+Report and snapshot schema versions are separate: raise only the artifact whose structure changed,
+and add a migration assertion for that artifact.

@@ -69,6 +69,12 @@ demands half, `info` demands none. Falling below the floor produces exit 4, `ins
 which exists because of a measured case: a multi-column document once produced six pages analysed,
 one rule run, five candidates, zero measured — and exit 0, indistinguishable from a clean run.
 
+Configuration Contract v1 can make those floors stricter, but cannot lower them. The `strict`
+profile sets every floor to 1. The two proof-source-A thresholds are not configurable at all:
+turning a structural boundary into a caller preference would invalidate the reason those rules may
+gate by default. The effective floors and their origins appear in report schema 3; stored snapshot
+fixtures remain schema 2 because their structure did not change.
+
 ## What no amount of testing here establishes
 
 **Every threshold is uncalibrated.** There is no corpus of real documents with human-checked truth

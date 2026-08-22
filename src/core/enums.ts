@@ -230,8 +230,9 @@ export const COVERAGE_FLOOR_BY_SEVERITY: Readonly<Record<Severity, number>> = {
 export const SUPPORTED_PAGEDJS_VERSION = "0.4.3";
 export const SUPPORTED_PDFJS_VERSION = "6.2.108";
 
-/** Report and snapshot schema version. Raised on every incompatible change, both together. */
-export const SCHEMA_VERSION = 2;
+/** Report and snapshot evolve independently; a version stamp must not claim an unperformed migration. */
+export const REPORT_SCHEMA_VERSION = 3;
+export const SNAPSHOT_SCHEMA_VERSION = 2;
 
 const asSet = <T extends string>(values: readonly T[]): ReadonlySet<string> => new Set(values);
 

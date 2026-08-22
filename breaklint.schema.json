@@ -1,0 +1,543 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dargel-solutions.de/schemas/breaklint/config-v1.json",
+  "title": "breaklint Configuration Contract v1",
+  "description": "JSON-only, fail-closed configuration for breaklint 0.2.x.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "type": "string",
+      "enum": [
+        "default",
+        "strict"
+      ],
+      "default": "default"
+    },
+    "failOn": {
+      "type": "string",
+      "enum": [
+        "error",
+        "warn",
+        "never"
+      ]
+    },
+    "locale": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z]{4})?(?:-(?:[A-Za-z]{2}|[0-9]{3}))?(?:-(?:[A-Za-z0-9]{5,8}|[0-9][A-Za-z0-9]{3}))*$",
+      "default": "de-DE"
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout/widow": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "extraLines": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0
+                }
+              }
+            }
+          ],
+          "description": "The first fragment of a block on a page has fewer lines than its own widows value."
+        },
+        "layout/orphan": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "extraLines": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0
+                }
+              }
+            }
+          ],
+          "description": "The last fragment of a block on a page has fewer lines than its own orphans value."
+        },
+        "layout/unbreakable-block-too-tall": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {}
+            }
+          ],
+          "description": "Rule enablement only. Proof-source-A options are fixed by Configuration Contract v1."
+        },
+        "layout/heading-at-page-bottom": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "minTrailingLineHeights": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 2
+                }
+              }
+            }
+          ],
+          "description": "A heading is the last thing on a page; what it introduces begins on the next."
+        },
+        "layout/half-empty-page": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "minNetFill": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0.6
+                },
+                "maxTopGap": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0.5
+                }
+              }
+            }
+          ],
+          "description": "A page is filled well below what its content box allows."
+        },
+        "layout/orphaned-continuation-page": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxNetFill": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0.5
+                }
+              }
+            }
+          ],
+          "description": "A page holds nothing but the tail of a block that began earlier."
+        },
+        "layout/hyphen-across-page": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxOccurrences": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0
+                }
+              }
+            }
+          ],
+          "description": "A word is split by a hyphen across a page boundary."
+        },
+        "svg/text-overflows-viewport": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {}
+            }
+          ],
+          "description": "Rule enablement only. Proof-source-A options are fixed by Configuration Contract v1."
+        },
+        "svg/text-clipped": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxMissingInk": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0.05
+                }
+              }
+            }
+          ],
+          "description": "Part of a text's glyph ink is removed by a clip path or mask."
+        },
+        "svg/text-ink-collision": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "minCollisionInk": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 8
+                },
+                "minOccludedInk": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 8
+                }
+              }
+            }
+          ],
+          "description": "A shape crosses or covers the glyphs of a text element."
+        },
+        "type/spaced-hyphen": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mathWindow": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 12
+                },
+                "maxOccurrences": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0
+                },
+                "excludeTags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z][A-Za-z0-9-]*$"
+                  },
+                  "default": []
+                }
+              }
+            }
+          ],
+          "description": "A hyphen stands between spaces where the convention asks for a dash."
+        },
+        "type/straight-quotes": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxOccurrences": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0
+                },
+                "excludeTags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z][A-Za-z0-9-]*$"
+                  },
+                  "default": []
+                }
+              }
+            }
+          ],
+          "description": "A straight quotation mark or apostrophe appears in typeset prose."
+        },
+        "type/short-last-line": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxWidthRatio": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0.15
+                },
+                "maxEms": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 2
+                }
+              }
+            }
+          ],
+          "description": "The closing line of a paragraph is a stub."
+        },
+        "type/excessive-word-spacing": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxSpaceFactor": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 3
+                }
+              }
+            }
+          ],
+          "description": "Word gaps in a justified block are far wider than the natural space."
+        },
+        "artifact/local-uri": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxOccurrences": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 0
+                }
+              }
+            }
+          ],
+          "description": "A file: URI or an absolute build-machine path remains in the artefact."
+        }
+      }
+    },
+    "coverageFloors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout/widow": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "layout/orphan": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "layout/unbreakable-block-too-tall": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "layout/heading-at-page-bottom": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "layout/half-empty-page": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "layout/orphaned-continuation-page": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "layout/hyphen-across-page": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "svg/text-overflows-viewport": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "svg/text-clipped": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "svg/text-ink-collision": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "type/spaced-hyphen": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "type/straight-quotes": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "type/short-last-line": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "type/excessive-word-spacing": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "artifact/local-uri": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "profile": {
+            "const": "strict"
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "then": {
+        "properties": {
+          "coverageFloors": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "layout/widow": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "layout/orphan": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "layout/unbreakable-block-too-tall": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "layout/heading-at-page-bottom": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "layout/half-empty-page": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "layout/orphaned-continuation-page": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "layout/hyphen-across-page": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "svg/text-overflows-viewport": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "svg/text-clipped": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "svg/text-ink-collision": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "type/spaced-hyphen": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "type/straight-quotes": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "type/short-last-line": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "type/excessive-word-spacing": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "artifact/local-uri": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

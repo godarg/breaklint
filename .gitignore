@@ -16,6 +16,7 @@ breaklint-report/
 
 # Local scratch
 .tmp/
+.artifacts/
 coverage/
 
 # Local agent tooling. These are symlinks into a checkout outside this repository; committing

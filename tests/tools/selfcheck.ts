@@ -1,13 +1,13 @@
 /**
- * Self-application.
+ * Static self-application guards.
  *
  * A tool that judges layout quality is measured by the quality of its own output. A widow in
  * the report of a widow checker is a public self-refutation that a stranger finds in seconds.
  *
- * This runs the project's own rules over its own generated HTML report and over its own
- * documentation, and requires that the `error` rules pass. It is a duty, not a feature — the
- * README does not mention it, because a tool that advertises its own strictness has replaced
- * the strictness with the advertisement.
+ * This checks the generated HTML source and project prose. It deliberately makes no layout claim:
+ * `selfcheck:live` separately sends that HTML through the real browser, paginator, evidence and
+ * rule path. Keeping the two names honest prevents a static string scan from impersonating a
+ * successful self-application.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -18,22 +18,24 @@ import { render } from "../../src/report/index.ts";
 import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
+import { resolveConfig, toReportConfig } from "../../src/config/resolve.ts";
 import type { Snapshot } from "../../src/core/types.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const problems: string[] = [];
+const PACKAGE = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string };
 
 // 1. The generated HTML report must be self-contained and must not reach the network.
 const parsed = JSON.parse(readFileSync(join(ROOT, "examples/demo-snapshot.json"), "utf8")) as { snapshot: Snapshot };
 const outcome = runDocument(
   { path: "examples/demo.html", snapshot: parsed.snapshot, infrastructure: [] },
-  { failOn: "error", activeRules: [...ALL_RULES], optionsByRule: {}, loweredFloors: {} },
+  { failOn: "error", activeRules: [...ALL_RULES], optionsByRule: {}, coverageFloors: {} },
 );
 const report = buildReport({
   outcomes: [outcome],
   mode: "demo",
   source: "handwritten snapshot fixture",
-  toolVersion: "0.1.0",
+  toolVersion: PACKAGE.version,
   commit: null,
   startedAt: new Date(0).toISOString(),
   durationMs: 0,
@@ -51,17 +53,9 @@ const report = buildReport({
     fontFamiliesResolved: [],
     locale: "de-DE",
   },
-  config: {
-    profile: "selfcheck",
-    failOn: "error",
-    activeRules: ALL_RULES.map((r) => r.id),
-    disabledRules: [],
-    loweredFloors: [],
-    interventions: [],
-    sourceMapInjection: true,
-    evidenceBinding: true,
-    network: { mode: "offline", allowed: [], blocked: 0 },
-  },
+  config: toReportConfig(resolveConfig({ file: undefined, cli: {} }), {
+    interventions: [], networkBlocked: 0,
+  }),
 });
 const html = render(report, "html");
 for (const [pattern, why] of [
@@ -102,5 +96,5 @@ for (const file of [join(ROOT, "README.md"), join(ROOT, "docs/status.md")]) {
 }
 
 for (const p of problems) console.log(p);
-console.log(problems.length === 0 ? "self-application: clean" : `${problems.length} problem(s)`);
+console.log(problems.length === 0 ? "static self-application guards: clean" : `${problems.length} problem(s)`);
 process.exit(problems.length === 0 ? 0 : 1);

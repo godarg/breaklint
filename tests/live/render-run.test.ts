@@ -160,7 +160,7 @@ describe("the M2d live production chain", () => {
       failOn: "warn",
       activeRules: [straightQuotes],
       optionsByRule: {},
-      loweredFloors: {},
+      coverageFloors: {},
     });
     const finding = outcome.report.findings.find((item) => item.ruleId === "type/straight-quotes");
     assert.ok(finding);
@@ -242,7 +242,7 @@ describe("the M2d live production chain", () => {
     assert.equal(measured?.retries, 4, "the three retry budget was not exhausted");
     assert.ok(measured?.components?.includes("boxes"), `box drift was not named: ${JSON.stringify(measured)}`);
     const outcome = runDocument(drifting, {
-      failOn: "never", activeRules: [], optionsByRule: {}, loweredFloors: {},
+      failOn: "never", activeRules: [], optionsByRule: {}, coverageFloors: {},
     });
     assert.equal(outcome.report.verdict, "infrastructure");
     assert.equal(exitCodeFor(outcome.report.verdict), 3, "a lone exhausted freeze failure must exit 3");
@@ -314,7 +314,7 @@ describe("the M2d live production chain", () => {
       failOn: "warn",
       activeRules: [straightQuotes],
       optionsByRule: {},
-      loweredFloors: {},
+      coverageFloors: {},
     }));
     for (const outcome of outcomes) {
       assert.equal(outcome.report.findings.length, 2, "the quote inside code was not excluded");
@@ -339,7 +339,7 @@ describe("the M2d live production chain", () => {
       outcomes[1]!.report.findings.map((finding) => finding.fingerprint).sort(),
     );
     const mapped = runDocument(result!.documents[6]!, {
-      failOn: "warn", activeRules: [straightQuotes], optionsByRule: {}, loweredFloors: {},
+      failOn: "warn", activeRules: [straightQuotes], optionsByRule: {}, coverageFloors: {},
     });
     assert.equal(mapped.report.findings.length, 2);
   });
@@ -360,7 +360,7 @@ describe("the M2d live production chain", () => {
     assert.ok(document.snapshot);
     assert.equal(document.infrastructure.some((event) => event.kind === "checker-crashed"), false);
     const outcome = runDocument(document, {
-      failOn: "warn", activeRules: [straightQuotes], optionsByRule: {}, loweredFloors: {},
+      failOn: "warn", activeRules: [straightQuotes], optionsByRule: {}, coverageFloors: {},
     });
     assert.equal(outcome.report.findings.length, 1);
     assert.equal(outcome.report.findings[0]!.evidence?.bindsFinding, true);

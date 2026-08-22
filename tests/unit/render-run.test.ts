@@ -18,6 +18,7 @@ import { describe, it } from "node:test";
 
 import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument, type DocumentInput } from "../../src/core/engine.ts";
+import { resolveConfig, toReportConfig } from "../../src/config/resolve.ts";
 import { NON_FATAL_INFRA_EVENT_KINDS } from "../../src/core/enums.ts";
 import {
   closeBrowserBounded,
@@ -41,6 +42,7 @@ import { writeEvidencePng, type Rasterizer } from "../../src/render/rasterizer.t
 import { loadCorpus } from "../fixtures/corpus.ts";
 import { spacedHyphen } from "../../src/rules/type/spaced-hyphen.ts";
 import { injectSourceIds } from "../../src/source/inject.ts";
+import { closeRendererOwnedResourcesBounded } from "../../src/acquire/renderer-cleanup.ts";
 import { COLLECTOR_SOURCE, collectorSource } from "../../src/paginate/collector.ts";
 import { FREEZE_SOURCE, MAX_DOM_NODES, MAX_MUTATIONS_AFTER_RENDERED, MAX_PAGES } from "../../src/measure/freeze.ts";
 import { PRIMITIVES_SOURCE, TEST_PRIMITIVES_CAPABILITY } from "../../src/measure/primitives.ts";
@@ -55,6 +57,46 @@ const OPTIONS = {
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+describe("renderer ownership cleanup order", () => {
+  it("does not start browser cleanup before rasterizer cleanup settles", async () => {
+    let releaseRasterizer!: () => void;
+    const rasterizerSettled = new Promise<void>((resolve) => { releaseRasterizer = resolve; });
+    const events: string[] = [];
+    const cleanup = closeRendererOwnedResourcesBounded(
+      async () => {
+        events.push("rasterizer:start");
+        await rasterizerSettled;
+        events.push("rasterizer:end");
+        return null;
+      },
+      async () => {
+        events.push("browser:start");
+        return null;
+      },
+      10_000,
+    );
+    await Promise.resolve();
+    assert.deepEqual(events, ["rasterizer:start"]);
+    releaseRasterizer();
+    assert.deepEqual(await cleanup, { rasterizerError: null, browserError: null });
+    assert.deepEqual(events, ["rasterizer:start", "rasterizer:end", "browser:start"]);
+  });
+
+  it("still starts bounded browser cleanup after a hung rasterizer head start", async () => {
+    let announceBrowser!: () => void;
+    const browserStarted = new Promise<void>((resolve) => { announceBrowser = resolve; });
+    void closeRendererOwnedResourcesBounded(
+      () => new Promise<string | null>(() => undefined),
+      async () => {
+        announceBrowser();
+        return null;
+      },
+      1,
+    );
+    await browserStarted;
+  });
+});
+
 function detachedNode(source: string) {
   return spawn(process.execPath, ["-e", source], { detached: true, stdio: "ignore" });
 }
@@ -62,7 +104,7 @@ function detachedNode(source: string) {
 /** Run the acquisition result through the engine, exactly as the CLI does. */
 function exitCodeFor(documents: Awaited<ReturnType<typeof renderDocuments>>["documents"]): number {
   const outcomes = documents.map((d) =>
-    runDocument(d, { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} }),
+    runDocument(d, { failOn: "error", activeRules: [], optionsByRule: {}, coverageFloors: {} }),
   );
   return buildReport({
     outcomes,
@@ -86,17 +128,10 @@ function exitCodeFor(documents: Awaited<ReturnType<typeof renderDocuments>>["doc
       fontFamiliesResolved: [],
       locale: "de-DE",
     },
-    config: {
-      profile: "default",
-      failOn: "error",
-      activeRules: [],
-      disabledRules: [],
-      loweredFloors: [],
-      interventions: [],
-      sourceMapInjection: true,
-      evidenceBinding: true,
-      network: { mode: "offline", allowed: [], blocked: 0 },
-    },
+    config: toReportConfig(resolveConfig({
+      file: undefined,
+      cli: { only: ["layout/widow"], disable: ["layout/widow"] },
+    }), { interventions: [], networkBlocked: 0 }),
   }).exitCode;
 }
 
@@ -936,7 +971,7 @@ describe("the live path fails closed at its process boundary", () => {
         }],
         boundSids: [sid],
       },
-      { failOn: "warn", activeRules: [spacedHyphen], optionsByRule: {}, loweredFloors: {} },
+      { failOn: "warn", activeRules: [spacedHyphen], optionsByRule: {}, coverageFloors: {} },
     );
     assert.equal(outcome.report.findings.length, 1);
     assert.deepEqual(outcome.report.findings[0]!.evidence, {
@@ -964,7 +999,7 @@ describe("the live path fails closed at its process boundary", () => {
     assert.deepEqual(result.evidence, [], "fatal evidence must not be published");
     assert.deepEqual(result.boundSids, [], "fatal evidence must not bind future findings");
     const engine = runDocument(result, {
-      failOn: "error", activeRules: [spacedHyphen], optionsByRule: {}, loweredFloors: {},
+      failOn: "error", activeRules: [spacedHyphen], optionsByRule: {}, coverageFloors: {},
     });
     assert.equal(engine.report.findings.length, 0, "withdrawn evidence must leave no snapshot for rules to inspect");
     assert.equal(exitCodeFor([result]), 3);
@@ -983,7 +1018,7 @@ describe("the live path fails closed at its process boundary", () => {
     };
     withdrawFatalCleanupDocuments([document]);
     const outcome = runDocument(document, {
-      failOn: "error", activeRules: [spacedHyphen], optionsByRule: {}, loweredFloors: {},
+      failOn: "error", activeRules: [spacedHyphen], optionsByRule: {}, coverageFloors: {},
     });
     assert.equal(document.snapshot, null);
     assert.deepEqual(document.evidence, []);
@@ -1000,13 +1035,13 @@ describe("the live path fails closed at its process boundary", () => {
     };
     const outcome = runDocument(
       { path: "doc.html", snapshot, infrastructure: [], notMeasured: [decline] },
-      { failOn: "never", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+      { failOn: "never", activeRules: [], optionsByRule: {}, coverageFloors: {} },
     );
     assert.deepEqual(outcome.report.notMeasured, [decline]);
 
     const noSnapshot = runDocument(
       { path: "doc.html", snapshot: null, infrastructure: [], notMeasured: [decline] },
-      { failOn: "never", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+      { failOn: "never", activeRules: [], optionsByRule: {}, coverageFloors: {} },
     );
     assert.deepEqual(noSnapshot.report.notMeasured, [decline]);
   });

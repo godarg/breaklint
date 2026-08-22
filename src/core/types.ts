@@ -27,6 +27,7 @@ import type {
   RunVerdict,
   Severity,
 } from "./enums.ts";
+import type { ConfigSource, EffectiveConfig, ProfileName } from "../config/contract.ts";
 
 /** CSS pixels, rounded to 0.01, in the screen coordinate system of the measuring instance. */
 export interface Box {
@@ -392,11 +393,16 @@ export interface ReportEnvironment {
 }
 
 export interface ReportConfig {
-  profile: string;
+  contractVersion: 1;
+  fingerprint: string;
+  profile: ProfileName;
+  profileSource: ConfigSource;
   failOn: FailOn;
   activeRules: string[];
   disabledRules: string[];
-  loweredFloors: { ruleId: string; default: number; configured: number }[];
+  coverageFloors: { ruleId: string; default: number; effective: number; source: ConfigSource }[];
+  effective: EffectiveConfig;
+  sources: Record<string, ConfigSource>;
   interventions: string[];
   sourceMapInjection: boolean;
   evidenceBinding: boolean;

@@ -1,5 +1,91 @@
 # Changelog
 
+## 0.2.0 — 2026-08-22
+
+### Configuration Contract v1
+
+- Configuration is now fail-closed: unknown top-level fields, profiles, rules and rule options,
+  invalid types or ranges, proof-source-A overrides and lowered coverage floors end with exit 2
+  before any input document is opened.
+- `default` and `strict` are real profiles. Resolution is defaults < profile < config < CLI;
+  `strict` gates warnings and requires full coverage for every active rule. A later
+  `--profile default` cannot weaken a strict config-file floor.
+- Coverage floors may be raised or kept equal, never lowered. The same resolved floor is passed to
+  the engine and recorded in the report.
+- Canonical JSON reports use schema 3 and carry Configuration Contract version 1, every effective
+  value, provenance for every leaf and a deterministic SHA-256 fingerprint. Stored snapshots stay
+  on schema 2 because their format did not change. The selected preset is reported with its source
+  but excluded from the semantic hash, so a fully expanded equivalent config hashes identically.
+- `breaklint.schema.json` is generated from the same rule registry as runtime validation, shipped
+  in the package and guarded against drift during tests and `prepack`.
+- The misleading type-rule option `excludeSelectors` is replaced by `excludeTags`, matching its
+  actual HTML-ancestor-tag semantics. Tag names are validated, lower-cased and deduplicated.
+- A short repository constitution in `AGENTS.md`, the full contract in
+  `docs/configuration.md`, process-boundary CLI tests and independent fingerprint reproduction
+  document and enforce the new trust boundary.
+- The packed-consumer gate now runs the complete config contract on Node 22.13 and Node 24:
+  exported schema, valid report, provenance, independent hash and four fail-closed controls.
+
+### Live-gate truth
+
+- The live runner now consumes structured `node:test` failure events. A suite-level `after`-hook
+  failure can be printed as `not ok` while Node still exits 0 and reports zero scalar failures;
+  that state no longer promotes a measurement report.
+- A failed rerun removes both its partial report and any stale report already present at the
+  explicitly requested output path, so an older green artefact cannot survive under a red run's
+  name.
+- Renderer cleanup now has one shared ownership order for the product path and the live evidence
+  harness: the rasterizer target receives a bounded head start before browser-wide shutdown. This
+  removes the race between `Target.closeTarget` and `Browser.close` without suppressing lifecycle
+  errors.
+- Deterministic regressions cover both the cleanup order and a green test body followed by a red
+  suite hook.
+- The deliberately blocked R6 rasterizer probe now owns a sacrificial browser process and joins
+  its pending CDP operation before exit. The live runner also isolates every live file: it accepts
+  only one structured top-level suite pass, the exact 18/7/7/25 leaf denominators and zero
+  fail/skip/cancel/todo events. A process that lingers after that complete verdict is terminated
+  only after a bounded natural-exit grace; an early exit, wrong denominator or after-hook failure
+  remains red.
+
+### HTML Report Surface v2
+
+- The HTML report now has four status-true states: clean, blocking findings, checker failure and
+  insufficient coverage. Exit 3 and 4 explicitly say that the run is not clean.
+- Findings use semantic vertical articles instead of a wide table. Severity, rule, document,
+  source, measurement, threshold, calibration, proof source, evidence and ambiguity remain
+  available at mobile widths and in A4 print.
+- Light, dark and print consume one token layer. The report remains script-free, self-contained
+  and offline; only tool-shaped relative evidence references become links.
+- A deterministic render gate covers 24 screen surfaces, four A4 PDFs and four independently
+  rasterized PDF page sets. It checks layout invariants, real computed WCAG AA contrast, hashes,
+  dimensions and a 32-cell visual review ledger without using volatile container-byte equality as
+  a portable oracle.
+- The human-review pass is bound to a SHA-256 fingerprint over 47 current inputs, the exact
+  browser/platform/render environment and independently reconstructed stable fingerprints for all
+  32 cells. Exact PNG/PDF hashes remain the audit trail of the 62 files actually reviewed; visible
+  PDF equivalence is bound to all 34 independently rasterized pages. A real temp-copy source
+  mutation invalidates the old pass, and an unreviewed fingerprint fails with all cells pending.
+- Checker-failure reports never call partial measurement trusted coverage. Existing counts remain
+  visible as partial evidence under `Not trustworthy`.
+- breaklint now checks its own final HTML report through the real browser, paginator, evidence and
+  both proof-source-A rules. A deliberately oversized unbreakable finding card is the red control.
+
+### Release integrity and runtime
+
+- The supported runtime starts at Node 22.13 and is tested again on Node 24. The browser peer is
+  `puppeteer-core >=25.8.0 <26`; both the runtime and full development graphs audit to zero known
+  advisories after removal of the vulnerable `extract-zip` chain.
+- Gitleaks 8.30.1 is checksum-pinned. CI and release scan complete history and the worktree, then
+  prove the scanner with generated secret and absolute-home-path canaries.
+- The release workflow creates one tarball, binds it with SHA-256 and SHA-512 SRI, gives those exact
+  bytes to both clean consumers and npm, verifies registry integrity, and attaches the package plus
+  checksums to the GitHub Release. An annotated tag must equal `package.json`, resolve to
+  `origin/main` and have a successful main CI run for the same commit before publishing; a real Git
+  process-boundary canary proves that a lightweight tag is rejected before the ref is peeled.
+- The paginator is installed over the browser-driver boundary after authored loading. This lets
+  breaklint inspect CSP-bearing HTML without disabling the document's CSP and changing author
+  script semantics.
+
 ## 0.1.0 — 2026-08-14
 
 First published version. What it is: a measurement chain that runs end to end and states, in every

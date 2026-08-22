@@ -22,7 +22,7 @@ const STRUCTURAL_EXCLUSIONS = new Set([
   "semantics",
 ]);
 
-export function isExcludedRun(run: TextRun, locale: string, extraSelectors: readonly string[]): boolean {
+export function isExcludedRun(run: TextRun, locale: string, extraTags: readonly string[]): boolean {
   if (run.excluded) return true;
   if (run.ancestorTags.some((t) => STRUCTURAL_EXCLUSIONS.has(t.toLowerCase()))) return true;
   // A nested foreign-language span inside a German paragraph is not German. The `lang`
@@ -30,7 +30,7 @@ export function isExcludedRun(run: TextRun, locale: string, extraSelectors: read
   // itself carries the innermost declaration.
   const language = (run.lang || locale).toLowerCase();
   if (!language.startsWith(locale.slice(0, 2).toLowerCase())) return true;
-  if (extraSelectors.length > 0 && run.ancestorTags.some((t) => extraSelectors.includes(t))) return true;
+  if (extraTags.length > 0 && run.ancestorTags.some((t) => extraTags.includes(t.toLowerCase()))) return true;
   return false;
 }
 

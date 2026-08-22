@@ -18,7 +18,7 @@ export const straightQuotes = defineRule(
     calibrated: false,
     experimental: false,
     unit: "occurrences",
-    defaultOptions: { locale: "de-DE", maxOccurrences: 0, excludeSelectors: [] },
+    defaultOptions: { locale: "de-DE", maxOccurrences: 0, excludeTags: [] },
     summary: "A straight quotation mark or apostrophe appears in typeset prose.",
     declines: [],
   },
@@ -27,7 +27,7 @@ export const straightQuotes = defineRule(
     let candidates = 0;
     let measured = 0;
     const locale = String(ctx.options.locale ?? "de-DE");
-    const extra = (ctx.options.excludeSelectors as readonly string[] | undefined) ?? [];
+    const extra = (ctx.options.excludeTags as readonly string[] | undefined) ?? [];
 
     for (const run of snapshot.textRuns) {
       candidates += 1;

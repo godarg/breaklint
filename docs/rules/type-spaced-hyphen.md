@@ -19,6 +19,10 @@ Permanently a warning. The German orthography ruleset distinguishes hyphen from 
 
 Mathematical use is excluded by a ±12-character neighbourhood test. **That window is chosen and unmeasured**; no corpus of real prose stands behind it. `code`, `pre`, MathML and any run whose `lang` differs from the locale are structurally excluded, on the ancestor chain.
 
+Configuration may add ancestor tag names with `excludeTags`, for example
+`{"rules":{"type/spaced-hyphen":{"excludeTags":["samp"]}}}`. These are HTML tag names, not CSS
+selectors; they are lower-cased and deduplicated before the rule runs.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with

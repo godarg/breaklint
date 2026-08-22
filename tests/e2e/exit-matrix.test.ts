@@ -13,6 +13,7 @@ import {
 } from "../../src/core/enums.ts";
 import type { FailOn } from "../../src/core/enums.ts";
 import { ALL_RULES, RULES_BY_ID } from "../../src/rules/index.ts";
+import { resolveConfig, toReportConfig } from "../../src/config/resolve.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
 
 /**
@@ -39,9 +40,12 @@ function fixture(name: string) {
 function run(input: {
   documents: { name: string; ruleIds?: string[]; infrastructure?: DocumentInput["infrastructure"] }[];
   failOn: FailOn;
-  loweredFloors?: Record<string, number>;
-  raisedFloors?: Record<string, number>;
+  coverageFloors?: Record<string, number>;
 }) {
+  const resolved = resolveConfig({
+    file: input.coverageFloors ? { coverageFloors: input.coverageFloors } : undefined,
+    cli: { failOn: input.failOn },
+  });
   const outcomes = input.documents.map((d) => {
     const entry = d.name === "__empty__" ? null : fixture(d.name);
     const rules = d.ruleIds ? d.ruleIds.map((id) => RULES_BY_ID.get(id)!) : [...ALL_RULES];
@@ -54,8 +58,8 @@ function run(input: {
       {
         failOn: input.failOn,
         activeRules: rules,
-        optionsByRule: {},
-        loweredFloors: { ...input.loweredFloors, ...input.raisedFloors },
+        optionsByRule: resolved.optionsByRule,
+        coverageFloors: resolved.coverageFloorsByRule,
       },
     );
   });
@@ -81,17 +85,9 @@ function run(input: {
       fontFamiliesResolved: [],
       locale: "de-DE",
     },
-    config: {
-      profile: "test",
-      failOn: input.failOn,
-      activeRules: ALL_RULES.map((r) => r.id),
-      disabledRules: [],
-      loweredFloors: [],
-      interventions: [],
-      sourceMapInjection: true,
-      evidenceBinding: true,
-      network: { mode: "offline", allowed: [], blocked: 0 },
-    },
+    config: toReportConfig(resolved, {
+      interventions: [], networkBlocked: 0,
+    }),
   });
 }
 
@@ -177,7 +173,7 @@ const rows: Row[] = [
       run({
         documents: [{ name: "widow-clean-multicolumn", ruleIds: ["layout/widow"] }],
         failOn: "never",
-        raisedFloors: { "layout/widow": 1 },
+        coverageFloors: { "layout/widow": 1 },
       }),
   },
   {
@@ -193,7 +189,7 @@ const rows: Row[] = [
           { name: "widow-clean-multicolumn", ruleIds: ["layout/widow"] },
         ],
         failOn: "error",
-        raisedFloors: { "layout/widow": 1 },
+        coverageFloors: { "layout/widow": 1 },
       }),
   },
 
@@ -332,7 +328,7 @@ const rows: Row[] = [
           { name: "widow-clean-multicolumn", ruleIds: ["layout/widow"] },
         ],
         failOn: "error",
-        raisedFloors: { "layout/widow": 1 },
+        coverageFloors: { "layout/widow": 1 },
       }),
   },
   {
@@ -360,16 +356,14 @@ const rows: Row[] = [
       run({
         documents: [{ name: "widow-clean-multicolumn", ruleIds: ["layout/widow"] }],
         failOn: "error",
-        raisedFloors: { "layout/widow": 1 },
+        coverageFloors: { "layout/widow": 1 },
       }),
   },
   {
     id: "B2",
     what:
-      "lowering the floor to 0 does NOT rescue a document where the rule measured nothing at " +
-      "all. The floor governs the ratio; `measuredRules === 0` is a separate and stronger " +
-      "condition, and neither failOn nor a lowered floor switches it off. This row exists " +
-      "because the naive expectation was exit 0, and that expectation was wrong.",
+      "a document where the only active rule measured nothing ends with insufficient coverage; " +
+      "the ratio floor is not the only condition and failOn cannot switch measurement off",
     exit: 4,
     verdict: "insufficient-coverage",
     gate: null,
@@ -377,14 +371,13 @@ const rows: Row[] = [
       run({
         documents: [{ name: "widow-clean-multicolumn", ruleIds: ["layout/widow"] }],
         failOn: "error",
-        raisedFloors: { "layout/widow": 0 },
       }),
   },
   {
     id: "B3",
     what:
-      "a lowered floor DOES rescue partial coverage: one candidate measured, one declined. " +
-      "The pair partner of B2 — without it, B2 alone would leave the floor untested.",
+      "partial coverage at exactly the default warning floor is sufficient: one candidate " +
+      "measured and one declared as not measured",
     exit: 0,
     verdict: "clean",
     gate: null,
@@ -392,16 +385,19 @@ const rows: Row[] = [
       run({
         documents: [{ name: "widow-partial-coverage", ruleIds: ["layout/widow"] }],
         failOn: "error",
-        raisedFloors: { "layout/widow": 0.4 },
       }),
   },
   {
     id: "B4",
-    what: "the same partial coverage against the default floor of 0.5 — 0.5 exactly is not below it",
+    what: "an explicit floor equal to the default is accepted and remains report-traceable",
     exit: 0,
     verdict: "clean",
     gate: null,
-    build: () => run({ documents: [{ name: "widow-partial-coverage", ruleIds: ["layout/widow"] }], failOn: "error" }),
+    build: () => run({
+      documents: [{ name: "widow-partial-coverage", ruleIds: ["layout/widow"] }],
+      failOn: "error",
+      coverageFloors: { "layout/widow": 0.5 },
+    }),
   },
   {
     id: "B5",
@@ -413,7 +409,7 @@ const rows: Row[] = [
       run({
         documents: [{ name: "widow-partial-coverage", ruleIds: ["layout/widow"] }],
         failOn: "error",
-        raisedFloors: { "layout/widow": 1 },
+        coverageFloors: { "layout/widow": 1 },
       }),
   },
   {
@@ -459,7 +455,7 @@ const rows: Row[] = [
       run({
         documents: [ERROR_DOC, { name: "widow-clean-multicolumn", ruleIds: ["layout/widow"] }],
         failOn: "error",
-        raisedFloors: { "layout/widow": 1 },
+        coverageFloors: { "layout/widow": 1 },
       }),
   },
 ];
@@ -636,5 +632,14 @@ describe("exit matrix", () => {
     const g7 = rows.find((r) => r.id === "G7")!.build();
     assert.equal(g6.summary.experimental, g7.summary.experimental, "same experimental count");
     assert.notEqual(g6.exitCode, g7.exitCode);
+  });
+
+  it("B4 and B5 report the exact floor that the engine used", () => {
+    const equal = rows.find((row) => row.id === "B4")!.build();
+    const raised = rows.find((row) => row.id === "B5")!.build();
+    assert.equal(equal.documents[0]!.coverage["layout/widow"]!.floor, 0.5);
+    assert.equal(equal.config.coverageFloors.find((floor) => floor.ruleId === "layout/widow")!.effective, 0.5);
+    assert.equal(raised.documents[0]!.coverage["layout/widow"]!.floor, 1);
+    assert.equal(raised.config.coverageFloors.find((floor) => floor.ruleId === "layout/widow")!.effective, 1);
   });
 });

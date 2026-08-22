@@ -35,7 +35,7 @@
  */
 
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -47,6 +47,7 @@ import {
   cleanupBrowserProfile, closeBrowserBounded, closeRasterizerBounded, integritySource, integrityStatusSource,
   paginationApparatusSource, PAGINATION_PREVIEW_SOURCE, withPagination, type RuntimeIntegrityStatus,
 } from "../../src/acquire/render-run.ts";
+import { closeRendererOwnedResourcesBounded } from "../../src/acquire/renderer-cleanup.ts";
 import { PRIMITIVES_SOURCE, TEST_PRIMITIVES_CAPABILITY } from "../../src/measure/primitives.ts";
 import { produceEvidence, REFERENCE_CORPUS_MAX_ABS_MM, type EvidenceOutcome } from "../../src/render/evidence.ts";
 import { openRasterizer, readPngHeader, type Rasterizer } from "../../src/render/rasterizer.ts";
@@ -281,6 +282,199 @@ const missing = [
   hasPoppler ? null : "pdftoppm (the independent rasteriser)",
 ].filter((x): x is string => x !== null);
 
+type R6Completion =
+  | { kind: "rastered"; ms: number; pages: number }
+  | { kind: "threw"; ms: number; why: string };
+type R6Observation = R6Completion | { kind: "no answer" };
+
+interface R6ProbeResult {
+  withPageOpen: R6Observation;
+  blockedTerminal: R6Completion;
+  withPageClosed: R6Observation;
+  rasterizerError: string | null;
+  browserError: string | null;
+  profileError: string | null;
+  profileRemoved: boolean;
+}
+
+const R6_CHILD_ENV = "BREAKLINT_R6_SACRIFICIAL_PROBE";
+const R6_RESULT_PREFIX = "BREAKLINT_R6_RESULT ";
+
+function startR6Attempt(probe: Rasterizer, pdf: Uint8Array, label: string): {
+  completion: Promise<R6Completion>;
+  observe: () => Promise<R6Observation>;
+} {
+  const started = Date.now();
+  const completion: Promise<R6Completion> = probe
+    .rasterise(`probe:${label}`, pdf)
+    .then((pages) => ({ kind: "rastered" as const, ms: Date.now() - started, pages: pages.length }))
+    .catch((error: unknown) => ({
+      kind: "threw" as const,
+      ms: Date.now() - started,
+      why: String(error).slice(0, 120),
+    }));
+  return {
+    completion,
+    observe: async () => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const timedOut = new Promise<R6Observation>((resolve) => {
+          timer = setTimeout(() => resolve({ kind: "no answer" }), 15_000);
+          timer.unref();
+        });
+        return await Promise.race([completion, timedOut]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    },
+  };
+}
+
+async function consumeR6CompletionAfterAbort(completion: Promise<R6Completion>): Promise<R6Completion> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const didNotSettle = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () => reject(new Error("the blocked rasterise promise stayed pending after its target closed")),
+        2_000,
+      );
+      timer.unref();
+    });
+    return await Promise.race([completion, didNotSettle]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function runR6SacrificialProbe(): Promise<R6ProbeResult> {
+  const pagedjs = readFileSync(join(pagedjsRoot!, "dist", "paged.js"), "utf8");
+  const launched = await launchBrowser(REPO);
+  assert.ok(launched.browser, `R6 probe browser did not launch: ${launched.detail}`);
+  const probeBrowser = launched.browser;
+  const profile = launched.userDataDir ?? null;
+  let contentPage: PageLike | null = null;
+  let blockedProbe: Rasterizer | null = null;
+  let closedProbe: Rasterizer | null = null;
+  let result: Omit<R6ProbeResult, "rasterizerError" | "browserError" | "profileError" | "profileRemoved"> | null = null;
+  let rasterizerError: string | null = null;
+  let browserError: string | null = null;
+  let profileError: string | null = null;
+
+  try {
+    const blocked = await openRasterizer(probeBrowser, { fromDir: REPO, contentPagesOpen: () => 0 });
+    assert.ok(blocked.rasterizer, "the open-page probe rasteriser did not open");
+    blockedProbe = blocked.rasterizer;
+
+    contentPage = await probeBrowser.newPage();
+    await installAndPaginate(contentPage, document_(CASES[0]!, pagedjs));
+    const pdf = await contentPage.pdf({ printBackground: true, preferCSSPageSize: true });
+    const blockedAttempt = startR6Attempt(blockedProbe, pdf, "open");
+    const withPageOpen = await blockedAttempt.observe();
+    assert.equal(
+      withPageOpen.kind,
+      "no answer",
+      `the rasteriser answered while a content page was open: ${JSON.stringify(withPageOpen)}`,
+    );
+
+    const blockedCloseError = await closeRasterizerBounded(blockedProbe);
+    if (blockedCloseError === null) blockedProbe = null;
+    assert.equal(blockedCloseError, null, `could not abort the blocked probe: ${blockedCloseError}`);
+    const blockedTerminal = await consumeR6CompletionAfterAbort(blockedAttempt.completion);
+    assert.equal(
+      blockedTerminal.kind,
+      "threw",
+      `closing the blocked probe did not abort its pending operation: ${JSON.stringify(blockedTerminal)}`,
+    );
+
+    await contentPage.close();
+    contentPage = null;
+
+    const closed = await openRasterizer(probeBrowser, { fromDir: REPO, contentPagesOpen: () => 0 });
+    assert.ok(closed.rasterizer, "the closed-page probe rasteriser did not open");
+    closedProbe = closed.rasterizer;
+    const closedAttempt = startR6Attempt(closedProbe, pdf, "closed");
+    const withPageClosed = await closedAttempt.observe();
+    assert.equal(
+      withPageClosed.kind,
+      "rastered",
+      `with every page closed the rasteriser still did not deliver pages: ${JSON.stringify(withPageClosed)}`,
+    );
+    assert.ok(
+      withPageClosed.kind === "rastered" && withPageClosed.pages > 0,
+      "the rasteriser returned an empty page list, which is not an answer either",
+    );
+    assert.deepEqual(await closedAttempt.completion, withPageClosed);
+    await closedProbe.release("probe:closed");
+    result = { withPageOpen, blockedTerminal, withPageClosed };
+  } finally {
+    if (contentPage) await contentPage.close().catch(() => undefined);
+    const cleanup = await closeRendererOwnedResourcesBounded(
+      () => closeRasterizerBounded(blockedProbe ?? closedProbe),
+      () => closeBrowserBounded(probeBrowser),
+    );
+    rasterizerError = cleanup.rasterizerError;
+    browserError = cleanup.browserError;
+    profileError = cleanupBrowserProfile(profile);
+  }
+
+  assert.ok(result, "R6 probe produced no result");
+  return {
+    ...result,
+    rasterizerError,
+    browserError,
+    profileError,
+    profileRemoved: profile ? !existsSync(profile) : true,
+  };
+}
+
+async function runR6ProbeChild(): Promise<R6ProbeResult> {
+  const child = spawn(process.execPath, ["--experimental-strip-types", fileURLToPath(import.meta.url)], {
+    cwd: REPO,
+    detached: process.platform !== "win32",
+    env: { ...process.env, [R6_CHILD_ENV]: "1" },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk: string) => { stdout += chunk.slice(0, 20_000 - stdout.length); });
+  child.stderr.on("data", (chunk: string) => { stderr += chunk.slice(0, 20_000 - stderr.length); });
+
+  const outcome = await new Promise<{ code: number | null; signal: NodeJS.Signals | null; timedOut: boolean }>((resolve) => {
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      if (child.pid && process.platform !== "win32") {
+        try { process.kill(-child.pid, "SIGKILL"); } catch { child.kill("SIGKILL"); }
+      } else {
+        child.kill("SIGKILL");
+      }
+    }, 60_000);
+    child.once("close", (code, signal) => {
+      clearTimeout(timer);
+      resolve({ code, signal, timedOut });
+    });
+  });
+  assert.equal(outcome.timedOut, false, `R6 probe child timed out; stderr: ${stderr.slice(-1000)}`);
+  assert.equal(outcome.signal, null, `R6 probe child ended on ${outcome.signal}; stderr: ${stderr.slice(-1000)}`);
+  assert.equal(outcome.code, 0, `R6 probe child exited ${outcome.code}; stderr: ${stderr.slice(-1000)}`);
+  const line = stdout.split(/\r?\n/u).find((candidate) => candidate.startsWith(R6_RESULT_PREFIX));
+  assert.ok(line, `R6 probe child produced no structured result; stdout: ${stdout.slice(-1000)}`);
+  return JSON.parse(line.slice(R6_RESULT_PREFIX.length)) as R6ProbeResult;
+}
+
+if (process.env[R6_CHILD_ENV] === "1") {
+  try {
+    const result = await runR6SacrificialProbe();
+    process.stdout.write(`${R6_RESULT_PREFIX}${JSON.stringify(result)}\n`);
+    process.exit(0);
+  } catch (error) {
+    process.stderr.write(`R6 sacrificial probe failed: ${error instanceof Error ? error.stack : String(error)}\n`);
+    process.exit(1);
+  }
+}
+
 describe("evidence path, live", () => {
   let browser: BrowserLike;
   let browserProfile: string | null = null;
@@ -424,10 +618,12 @@ describe("evidence path, live", () => {
     let browserError: string | null = null;
     let profileError: string | null = null;
     try {
-      [rasterizerError, browserError] = await Promise.all([
-        rasterizer ? closeRasterizerBounded(rasterizer) : Promise.resolve(null),
-        browser ? closeBrowserBounded(browser) : Promise.resolve(null),
-      ]);
+      const cleanup = await closeRendererOwnedResourcesBounded(
+        () => rasterizer ? closeRasterizerBounded(rasterizer) : Promise.resolve(null),
+        () => browser ? closeBrowserBounded(browser) : Promise.resolve(null),
+      );
+      rasterizerError = cleanup.rasterizerError;
+      browserError = cleanup.browserError;
     } finally {
       profileError = cleanupBrowserProfile(browserProfile);
       if (workDir) rmSync(workDir, { recursive: true, force: true });
@@ -448,51 +644,27 @@ describe("evidence path, live", () => {
   });
 
   it("R6 — the ordering rule holds at THIS product, measured in both directions", { skip: live() ? false : "prerequisites absent" }, async () => {
-    // Not the guard: the phenomenon the guard exists for. A second rasteriser is opened with the
-    // guard deliberately disarmed, and the same PDF is asked for twice — once with a content
-    // page open, once without. Asserting on the test's own counter, as an earlier version did,
-    // says nothing about the rasteriser at all.
-    const unguarded = await openRasterizer(browser, { fromDir: REPO, contentPagesOpen: () => 0 });
-    assert.ok(unguarded.rasterizer, "the probe rasteriser did not open");
-    const probe = unguarded.rasterizer;
-    const pdf = results.get("H0_neutral")!.deliveredPdf;
-
-    const page = await browser.newPage();
-    await installAndPaginate(page, document_(CASES[0]!, pagedjs));
-
-    // Three outcomes, kept apart. Mapping a rejection onto an elapsed time — which an earlier
-    // version of this test did — makes "it threw immediately" indistinguishable from "it came
-    // back with the pages", and the closed-page arm would then pass on a broken rasteriser.
-    type Outcome =
-      | { kind: "rastered"; ms: number; pages: number }
-      | { kind: "threw"; ms: number; why: string }
-      | { kind: "no answer" };
-
-    const race = async (label: string): Promise<Outcome> => {
-      const started = Date.now();
-      const answered: Promise<Outcome> = probe
-        .rasterise(`probe:${label}`, pdf)
-        .then((pages) => ({ kind: "rastered" as const, ms: Date.now() - started, pages: pages.length }))
-        .catch((e: unknown) => ({ kind: "threw" as const, ms: Date.now() - started, why: String(e).slice(0, 120) }));
-      const timedOut = new Promise<Outcome>((resolve) =>
-        setTimeout(() => resolve({ kind: "no answer" }), 15_000).unref(),
-      );
-      return Promise.race([answered, timedOut]);
-    };
-
-    const withPageOpen = await race("open");
-    await page.close();
-    const withPageClosed = await race("closed");
-    measured.orderingProbe = { withPageOpen, withPageClosed };
-
-    assert.equal(withPageOpen.kind, "no answer", `the rasteriser answered while a content page was open: ${JSON.stringify(withPageOpen)}`);
-    assert.equal(withPageClosed.kind, "rastered", `with every page closed the rasteriser still did not deliver pages: ${JSON.stringify(withPageClosed)}`);
+    // The open arm necessarily creates an operation whose defining observation is that it does
+    // not settle. It therefore runs behind a real process boundary. The child owns its browser,
+    // aborts and joins the blocked evaluation, proves the closed arm on a fresh target in that
+    // same browser, verifies all cleanup, emits one structured result, and exits explicitly.
+    // No Puppeteer/node:test teardown state from the sacrificial arm can enter this suite.
+    const probe = await runR6ProbeChild();
+    assert.equal(probe.withPageOpen.kind, "no answer");
+    assert.equal(probe.blockedTerminal.kind, "threw");
+    assert.equal(probe.withPageClosed.kind, "rastered");
     assert.ok(
-      withPageClosed.kind === "rastered" && withPageClosed.pages > 0,
+      probe.withPageClosed.kind === "rastered" && probe.withPageClosed.pages > 0,
       "the rasteriser returned an empty page list, which is not an answer either",
     );
+    assert.equal(probe.rasterizerError, null);
+    assert.equal(probe.browserError, null);
+    assert.equal(probe.profileError, null);
+    assert.equal(probe.profileRemoved, true);
+    measured.orderingProbe = probe;
 
-    // And the guard, which turns that silence into a sentence.
+    // And the guard, which turns that silence into a sentence without starting an operation.
+    const pdf = results.get("H0_neutral")!.deliveredPdf;
     await assert.rejects(
       async () => {
         openContentPages++;
@@ -504,7 +676,6 @@ describe("evidence path, live", () => {
       },
       /content page\(s\) are still open/u,
     );
-    await probe.close();
   });
 
   it("R1 — the neutral document keeps its binding", { skip: live() ? false : "prerequisites absent" }, () => {

@@ -14,7 +14,7 @@ function findingsOf(entryName: string, ruleId: string) {
   assert.ok(rule, `no rule ${ruleId}`);
   return runDocument(
     { path: entry.name, snapshot: entry.snapshot, infrastructure: [] },
-    { failOn: "never", activeRules: [rule], optionsByRule: {}, loweredFloors: {} },
+    { failOn: "never", activeRules: [rule], optionsByRule: {}, coverageFloors: {} },
   ).report;
 }
 
@@ -77,7 +77,7 @@ describe("false-alarm corpus", () => {
     for (const entry of corpus) {
       const report = runDocument(
         { path: entry.name, snapshot: entry.snapshot, infrastructure: [] },
-        { failOn: "never", activeRules: [...ALL_RULES], optionsByRule: {}, loweredFloors: {} },
+        { failOn: "never", activeRules: [...ALL_RULES], optionsByRule: {}, coverageFloors: {} },
       ).report;
       for (const finding of report.findings) {
         if (finding.ruleId !== entry.about && !(entry.alsoFires ?? []).includes(finding.ruleId)) {

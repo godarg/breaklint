@@ -34,6 +34,10 @@ intended:
   replaces `getBoundingClientRect` or `getComputedStyle` after pagination cannot forge its own
   measurements. A hostile document is measured correctly or the run fails; it does not produce a
   quietly wrong report.
+- **The document's Content Security Policy remains authoritative.** The measured Paged.js bundle
+  crosses the browser-driver boundary only after authored loading. breaklint does not disable CSP
+  browser-wide merely to install its own apparatus; its own CSP-bearing HTML report is the live
+  regression for that boundary.
 - **No model, no network client, no telemetry.** The only runtime dependency is an HTML parser.
   Nothing is uploaded, and nothing about your documents leaves the machine.
 
@@ -53,5 +57,6 @@ uncalibrated and says so; a false positive is a bug, not a vulnerability.
 
 ## Supported versions
 
-The latest published version on npm receives fixes. This project is at 0.1.0 and has no long-term
-support branches.
+The latest published version on npm receives fixes. The 0.2.x line is the supported line after the
+0.2.0 release; 0.1.x receives no separate long-term-support branch. Before the registry workflow
+has completed, the npm package page remains the authority on which line is actually published.

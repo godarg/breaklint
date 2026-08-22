@@ -1,0 +1,395 @@
+#!/usr/bin/env node
+
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { PNG } from "pngjs";
+
+import {
+  assertCurrentReviewInput,
+  runReviewInputMutationControl,
+} from "./report-surface-contract.mjs";
+
+const output = resolve(
+  process.env.BREAKLINT_SURFACE_DIR ?? fileURLToPath(new URL("../../.artifacts/report-surfaces", import.meta.url)),
+);
+const manifestPath = resolve(output, "manifest.json");
+const ledgerPath = new URL("../golden/report-surfaces/review-ledger.json", import.meta.url);
+const reviewInputRoot = resolve(process.env.BREAKLINT_REVIEW_INPUT_ROOT ?? fileURLToPath(new URL("../..", import.meta.url)));
+const REVIEW_ARTIFACT_CONTRACT_VERSION = 3;
+const SCREEN_PIXEL_CONTRACT_VERSION = 1;
+const REQUIRED_BROWSER_RENDER_ARGS = [
+  "--deterministic-mode",
+  "--disable-gpu",
+  "--disable-lcd-text",
+  "--disable-skia-runtime-opts",
+  "--font-render-hinting=none",
+  "--force-color-profile=srgb",
+  "--hide-scrollbars",
+];
+
+function verificationMode(args) {
+  if (args.length === 0) return "local";
+  if (args.length === 2 && args[0] === "--mode" && ["local", "portable"].includes(args[1])) return args[1];
+  if (args.length === 1 && /^--mode=(?:local|portable)$/u.test(args[0])) return args[0].slice("--mode=".length);
+  throw new Error("usage: verify-report-surfaces.mjs [--mode local|portable]");
+}
+
+const mode = verificationMode(process.argv.slice(2));
+assert.equal(existsSync(manifestPath), true, `render manifest missing: ${manifestPath}`);
+const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const ledger = JSON.parse(readFileSync(ledgerPath, "utf8"));
+
+function hash(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function run(command, args) {
+  const result = spawnSync(command, args, { cwd: reviewInputRoot, encoding: "utf8" });
+  if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed (${result.status}):\n${result.stdout}${result.stderr}`);
+  return result.stdout;
+}
+
+function independentlyLongestDarkHorizontalRun(path, maxY = 120) {
+  const decoded = PNG.sync.read(readFileSync(path), { checkCRC: true });
+  let longest = 0;
+  for (let y = 0; y < Math.min(maxY, decoded.height); y += 1) {
+    let current = 0;
+    for (let x = 0; x < decoded.width; x += 1) {
+      const offset = (y * decoded.width + x) * 4;
+      const dark = decoded.data[offset] < 180 && decoded.data[offset + 1] < 180 && decoded.data[offset + 2] < 180;
+      current = dark ? current + 1 : 0;
+      longest = Math.max(longest, current);
+    }
+  }
+  return { pixels: longest, required: Math.ceil(decoded.width * 0.75) };
+}
+
+function independentlyCheckCoveragePageStarts(pdf, raster) {
+  const pdfPath = resolve(output, pdf.path);
+  return raster.pages.map((pageArtifact, index) => {
+    const page = index + 1;
+    const firstToken = run("pdftotext", ["-f", String(page), "-l", String(page), "-layout", pdfPath, "-"])
+      .trim()
+      .match(/^\S+/u)?.[0] ?? null;
+    const border = independentlyLongestDarkHorizontalRun(resolve(output, pageArtifact.path));
+    const beginsWithCoverageRecord = firstToken === "RULE";
+    const beginsWithCoverageFragment = firstToken !== null && firstToken !== "RULE" && firstToken.includes("/");
+    assert.equal(beginsWithCoverageFragment, false, `${pageArtifact.path}: page begins inside a coverage record at ${firstToken}`);
+    assert.ok(!beginsWithCoverageRecord || border.pixels >= border.required, `${pageArtifact.path}: fragmented coverage record at page start`);
+    return { page, firstToken, beginsWithCoverageRecord, beginsWithCoverageFragment, topHorizontalBorderPx: border.pixels, requiredBorderPx: border.required };
+  });
+}
+
+function independentlyRasterInkBounds(path) {
+  const decoded = PNG.sync.read(readFileSync(path), { checkCRC: true });
+  let topPx = decoded.height;
+  let bottomPx = 0;
+  for (let y = 0; y < decoded.height; y += 1) {
+    for (let x = 0; x < decoded.width; x += 1) {
+      const offset = (y * decoded.width + x) * 4;
+      if (decoded.data[offset] < 248 || decoded.data[offset + 1] < 248 || decoded.data[offset + 2] < 248) {
+        topPx = Math.min(topPx, y);
+        bottomPx = Math.max(bottomPx, y + 1);
+      }
+    }
+  }
+  return { topPx: bottomPx === 0 ? null : topPx, bottomPx, pageHeightPx: decoded.height };
+}
+
+function independentlyCheckTerminalPageContent(pdf, raster) {
+  const pdfPath = resolve(output, pdf.path);
+  const pages = raster.pages.map((pageArtifact, index) => {
+    const page = index + 1;
+    const pageText = run("pdftotext", ["-f", String(page), "-l", String(page), "-layout", pdfPath, "-"]);
+    return {
+      page,
+      firstToken: pageText.trim().match(/^\S+/u)?.[0] ?? null,
+      nonWhitespaceCharacters: pageText.replace(/\s/gu, "").length,
+      coverageRecords: (pageText.match(/^\s*RULE\s*$/gmu) ?? []).length,
+      ink: independentlyRasterInkBounds(resolve(output, pageArtifact.path)),
+    };
+  });
+  const emptyNonCoverPages = pages.filter((page) => page.page > 1 && page.nonWhitespaceCharacters === 0).map((page) => page.page);
+  const terminal = pages.at(-1);
+  const previous = pages.at(-2);
+  const continuesCoverage = Boolean(terminal && previous && terminal.firstToken === "RULE" && previous.coverageRecords > 0);
+  const minimumTerminalCoverageRecords = continuesCoverage ? Math.max(1, Math.ceil(previous.coverageRecords / 2)) : 0;
+  const expectedMinimumInkBottomPx = continuesCoverage
+    ? Math.round(previous.ink.bottomPx * minimumTerminalCoverageRecords / previous.coverageRecords)
+    : 0;
+  const underfilledCoverageContinuation = Boolean(
+    continuesCoverage && terminal &&
+    terminal.coverageRecords < minimumTerminalCoverageRecords &&
+    terminal.ink.bottomPx < expectedMinimumInkBottomPx
+  );
+  assert.deepEqual(emptyNonCoverPages, [], `${pdf.cell}: empty non-cover page`);
+  assert.equal(underfilledCoverageContinuation, false, `${pdf.cell}: underfilled terminal coverage continuation`);
+  return {
+    pages,
+    emptyNonCoverPages,
+    terminalCoverage: {
+      continuesCoverage,
+      previousCoverageRecords: previous?.coverageRecords ?? 0,
+      terminalCoverageRecords: terminal?.coverageRecords ?? 0,
+      minimumTerminalCoverageRecords,
+      terminalInkBottomPx: terminal?.ink.bottomPx ?? 0,
+      expectedMinimumInkBottomPx,
+      underfilledCoverageContinuation,
+    },
+  };
+}
+
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([a], [b]) => a.localeCompare(b, "en"))
+        .map(([key, item]) => [key, canonical(item)]),
+    );
+  }
+  return value;
+}
+
+function independentlyComputeArtifactFingerprint(reviewInputFingerprint, reviewEnvironment, cell, visibleContract) {
+  return createHash("sha256")
+    .update("breaklint-stable-review-artifact-v3\0")
+    .update(JSON.stringify(canonical({ reviewInputFingerprint, reviewEnvironment, cell, visibleContract })))
+    .digest("hex");
+}
+
+/** Independent implementation of the renderer's visible-screen contract. */
+function independentlyNormalizeScreenPixels(bytes) {
+  const decoded = PNG.sync.read(bytes, { checkCRC: true });
+  const rgba = Buffer.from(decoded.data);
+  for (let offset = 0; offset < rgba.length; offset += 4) {
+    if (rgba[offset + 3] === 0) {
+      rgba[offset] = 0;
+      rgba[offset + 1] = 0;
+      rgba[offset + 2] = 0;
+    }
+  }
+  return {
+    contract: {
+      contractVersion: SCREEN_PIXEL_CONTRACT_VERSION,
+      format: "decoded 8-bit straight RGBA; transparent RGB canonicalized to zero",
+      width: decoded.width,
+      height: decoded.height,
+      rgbaBytes: rgba.length,
+      normalizedRgbaSha256: createHash("sha256").update(rgba).digest("hex"),
+    },
+    decoded,
+    rgba,
+  };
+}
+
+function printVisibleContract(state) {
+  const pdf = manifest.artifacts.find((artifact) => artifact.cell === `print/${state}/pdf`);
+  const raster = manifest.artifacts.find((artifact) => artifact.cell === `print/${state}/raster-set`);
+  assert.ok(pdf, `print/${state}: PDF cell missing`);
+  assert.ok(raster, `print/${state}: raster-set cell missing`);
+  assert.equal(pdf.pages, raster.pages.length, `print/${state}: PDF/raster page-count mismatch`);
+  assert.deepEqual(
+    pdf.rasterPageVisualHashes,
+    raster.pages.map((page) => page.sha256),
+    `print/${state}: PDF is not bound to the current independent page rasters`,
+  );
+  assert.equal(pdf.printSemantics.trustLabelLines, 1, `print/${state}: Coverage Trust label split across lines`);
+  assert.equal(pdf.printSemantics.trustValueOverflowPx, 0, `print/${state}: Coverage Trust verdict is not fully visible inside its card`);
+  assert.equal(pdf.printSemantics.trustSiblingOverlapPx, 0, `print/${state}: Coverage Trust verdict overlaps its sibling summary card`);
+  assert.equal(pdf.printSemantics.coverageListDisplay, "block", `print/${state}: coverage list fragmentation context drift`);
+  assert.ok(pdf.printSemantics.coverageRecordDisplay.every((value) => value === "flow-root"), `print/${state}: coverage record uses a fragment-prone layout context`);
+  assert.ok(pdf.printSemantics.coverageMaxCellsPerRow.every((count) => count <= 2), `print/${state}: coverage print columns are compressed`);
+  assert.ok(pdf.printSemantics.coverageRecordBreakInside.every((value) => ["avoid", "avoid-page"].includes(value)), `print/${state}: coverage row may fragment`);
+  assert.deepEqual(pdf.printSemantics.overflowingCoverageCells, [], `print/${state}: coverage cell overflows its column`);
+  assert.deepEqual(pdf.pageStartChecks, independentlyCheckCoveragePageStarts(pdf, raster), `print/${state}: page-start raster invariant drift`);
+  assert.deepEqual(pdf.pageContentChecks, independentlyCheckTerminalPageContent(pdf, raster), `print/${state}: terminal-page content invariant drift`);
+  return {
+    pages: pdf.pages,
+    pageSize: pdf.pageSize,
+    contrast: pdf.contrast,
+    printSemantics: pdf.printSemantics,
+    pageStartChecks: pdf.pageStartChecks,
+    pageContentChecks: pdf.pageContentChecks,
+    rasterPages: raster.pages.map((page) => ({ sha256: page.sha256, dimensions: page.dimensions })),
+  };
+}
+
+function assertUtcTimestamp(value, message) {
+  assert.match(value ?? "", /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u, message);
+  assert.equal(Number.isNaN(Date.parse(value)), false, message);
+}
+
+function assertReviewEnvironment(environment, label) {
+  assert.equal(environment?.reviewArtifactContractVersion, REVIEW_ARTIFACT_CONTRACT_VERSION, `${label}: artifact contract drift`);
+  assert.equal(environment?.screenPixelContractVersion, SCREEN_PIXEL_CONTRACT_VERSION, `${label}: pixel contract drift`);
+  for (const field of ["browser", "platform", "architecture", "platformRelease", "node"]) {
+    assert.ok(typeof environment[field] === "string" && environment[field].length > 0, `${label}: ${field} missing`);
+  }
+  assert.equal(environment.deviceScaleFactor, 1, `${label}: device scale drift`);
+  assert.deepEqual(environment.browserRenderArgs, REQUIRED_BROWSER_RENDER_ARGS, `${label}: deterministic browser arguments drift`);
+  assert.deepEqual(environment.print?.contentViewportCssPx, { width: 703, height: 1123 }, `${label}: A4 content-width layout probe drift`);
+}
+
+function runScreenPixelMutationControl(artifact, currentInput) {
+  const path = resolve(output, artifact.path);
+  const original = independentlyNormalizeScreenPixels(readFileSync(path));
+  const mutatedRgba = Buffer.from(original.rgba);
+  let changedOffset = -1;
+  for (let offset = 0; offset < mutatedRgba.length; offset += 4) {
+    if (mutatedRgba[offset + 3] !== 0) {
+      mutatedRgba[offset] ^= 1;
+      changedOffset = offset;
+      break;
+    }
+  }
+  assert.notEqual(changedOffset, -1, `${artifact.cell}: no visible pixel available for mutation control`);
+  const mutatedPng = new PNG({ width: original.decoded.width, height: original.decoded.height });
+  mutatedPng.data = mutatedRgba;
+  const roundTripped = independentlyNormalizeScreenPixels(PNG.sync.write(mutatedPng, { colorType: 6 }));
+  assert.notEqual(
+    roundTripped.contract.normalizedRgbaSha256,
+    original.contract.normalizedRgbaSha256,
+    `${artifact.cell}: visible RGBA mutation escaped the normalized pixel hash`,
+  );
+  const originalFingerprint = independentlyComputeArtifactFingerprint(
+    currentInput.fingerprint,
+    manifest.reviewEnvironment,
+    artifact.cell,
+    { dimensions: artifact.dimensions, semantics: artifact.semantics, pixels: original.contract },
+  );
+  const mutatedFingerprint = independentlyComputeArtifactFingerprint(
+    currentInput.fingerprint,
+    manifest.reviewEnvironment,
+    artifact.cell,
+    { dimensions: artifact.dimensions, semantics: artifact.semantics, pixels: roundTripped.contract },
+  );
+  assert.equal(originalFingerprint, artifact.reviewArtifactFingerprint, `${artifact.cell}: mutation control baseline drift`);
+  assert.notEqual(mutatedFingerprint, originalFingerprint, `${artifact.cell}: visible pixel mutation left human fingerprint green`);
+  return { cell: artifact.cell, changedOffset, before: original.contract.normalizedRgbaSha256, after: roundTripped.contract.normalizedRgbaSha256 };
+}
+
+assert.equal(manifest.schemaVersion, 4);
+assert.equal(ledger.schemaVersion, 4);
+assertUtcTimestamp(manifest.generatedAt, "render manifest generatedAt is not an exact UTC timestamp");
+assertUtcTimestamp(ledger.renderManifestGeneratedAt, "ledger renderManifestGeneratedAt is not historical UTC audit metadata");
+assertReviewEnvironment(manifest.reviewEnvironment, "current render environment");
+assertReviewEnvironment(ledger.reviewEnvironment, "human review environment");
+const currentReviewInput = assertCurrentReviewInput(manifest.reviewInputFingerprint, reviewInputRoot, "render manifest review input");
+assert.equal(ledger.reviewInputFingerprint, currentReviewInput.fingerprint, "human review ledger is bound to a different source/input revision");
+assert.deepEqual(manifest.reviewInputs, currentReviewInput.files, "render manifest input inventory does not match an independent current-worktree reconstruction");
+if (mode === "local") {
+  assert.deepEqual(ledger.reviewEnvironment, manifest.reviewEnvironment, "strict local human review cannot transfer to a different browser/platform/render environment");
+}
+runReviewInputMutationControl(manifest.reviewInputFingerprint, reviewInputRoot);
+assert.equal(manifest.artifacts.length, 32, "the surface matrix must contain exactly 32 review cells");
+assert.equal(new Set(manifest.artifacts.map((artifact) => artifact.cell)).size, 32, "duplicate render cell");
+assert.deepEqual([...Object.keys(ledger.cells)].sort(), manifest.artifacts.map((artifact) => artifact.cell).sort(), "the human review ledger and current render matrix disagree");
+
+let pixelMutationControl = null;
+for (const artifact of manifest.artifacts) {
+  const state = artifact.cell.split("/")[1];
+  let visibleContract;
+  if (artifact.kind === "screen") {
+    const path = resolve(output, artifact.path);
+    assert.equal(existsSync(path), true, `${artifact.cell}: missing ${artifact.path}`);
+    const independentlyDecoded = independentlyNormalizeScreenPixels(readFileSync(path));
+    assert.deepEqual(artifact.pixels, independentlyDecoded.contract, `${artifact.cell}: decoded RGBA contract drift`);
+    assert.deepEqual(artifact.dimensions, { width: independentlyDecoded.contract.width, height: independentlyDecoded.contract.height }, `${artifact.cell}: PNG dimensions disagree with decoded pixels`);
+    visibleContract = { dimensions: artifact.dimensions, semantics: artifact.semantics, pixels: independentlyDecoded.contract };
+  } else {
+    visibleContract = printVisibleContract(state);
+  }
+  assert.equal(
+    artifact.reviewArtifactFingerprint,
+    independentlyComputeArtifactFingerprint(currentReviewInput.fingerprint, manifest.reviewEnvironment, artifact.cell, visibleContract),
+    `${artifact.cell}: manifest stable review fingerprint failed independent reconstruction`,
+  );
+  if (artifact.kind === "raster-set") {
+    assert.ok(artifact.pages.length > 0, `${artifact.cell}: no rasterized PDF pages`);
+    for (const page of artifact.pages) {
+      const path = resolve(output, page.path);
+      assert.equal(existsSync(path), true, `${artifact.cell}: missing ${page.path}`);
+      assert.ok(page.bytes > 1_000, `${artifact.cell}: implausibly small ${page.path}`);
+      assert.equal(hash(path), page.sha256, `${artifact.cell}: hash drift in ${page.path}`);
+      assert.ok(page.dimensions.width > 500 && page.dimensions.height > 700, `${artifact.cell}: unreadable raster geometry`);
+    }
+    continue;
+  }
+  const path = resolve(output, artifact.path);
+  assert.equal(existsSync(path), true, `${artifact.cell}: missing ${artifact.path}`);
+  assert.ok(artifact.bytes > 1_000, `${artifact.cell}: implausibly small artifact`);
+  assert.equal(hash(path), artifact.sha256, `${artifact.cell}: hash drift`);
+  if (artifact.kind === "screen") {
+    assert.equal(artifact.semantics.mainCount, 1);
+    assert.equal(artifact.semantics.h1Count, 1);
+    assert.ok(artifact.semantics.bodyFontPx >= 16);
+    assert.equal(artifact.semantics.horizontalOverflowPx, 0);
+    assert.deepEqual(artifact.semantics.overflowingFindings, []);
+    assert.deepEqual(artifact.semantics.externalResources, []);
+    assert.ok(artifact.semantics.contrast.minimum >= 4.5, `${artifact.cell}: WCAG AA contrast failed`);
+    assert.ok(artifact.dimensions.width >= 390 && artifact.dimensions.height >= 844);
+    pixelMutationControl ??= runScreenPixelMutationControl(artifact, currentReviewInput);
+  } else {
+    assert.ok(artifact.pages >= 1);
+    assert.match(artifact.pageSize, /A4|594\.9\d* x 841\.9\d* pts/iu);
+    assert.ok(artifact.contrast.minimum >= 4.5, `${artifact.cell}: print contrast failed`);
+  }
+}
+assert.ok(pixelMutationControl, "screen pixel mutation control did not run");
+
+assert.deepEqual(manifest.physicalArtifacts, { screens: 24, pdfs: 4, rasterPages: 34 }, "the final inventory must be exactly 24 screens, 4 PDFs and 34 PDF page rasters");
+
+const pending = [];
+for (const artifact of manifest.artifacts) {
+  const review = ledger.cells[artifact.cell];
+  if (review.status !== "pass") {
+    pending.push(artifact.cell);
+    continue;
+  }
+  assert.match(review.reviewArtifactFingerprint ?? "", /^[a-f0-9]{64}$/u, `${artifact.cell}: stable review fingerprint missing`);
+  if (mode === "local") {
+    assert.equal(review.reviewArtifactFingerprint, artifact.reviewArtifactFingerprint, `${artifact.cell}: strict local human review is bound to a different rendered artifact`);
+  }
+  assert.match(review.reviewer ?? "", /^@(Brand|Neo|Founder)(?:\s*\+\s*@(Brand|Neo|Founder))*$/u, `${artifact.cell}: reviewer is absent or not an actual review role`);
+  assertUtcTimestamp(review.reviewedAt, `${artifact.cell}: reviewedAt is not an exact UTC timestamp`);
+  assert.ok(typeof review.note === "string" && review.note.trim().length >= 12, `${artifact.cell}: review note is missing`);
+  if (artifact.kind === "screen") {
+    assert.match(review.reviewedRawSha256 ?? "", /^[a-f0-9]{64}$/u, `${artifact.cell}: reviewed raw PNG SHA-256 audit trail missing`);
+    assert.match(review.reviewedNormalizedRgbaSha256 ?? "", /^[a-f0-9]{64}$/u, `${artifact.cell}: reviewed RGBA SHA-256 missing`);
+    if (mode === "local") {
+      assert.equal(review.reviewedNormalizedRgbaSha256, artifact.pixels.normalizedRgbaSha256, `${artifact.cell}: strict local human review is bound to different visible screen pixels`);
+    }
+    assert.deepEqual(review.reviewedArtifacts, [artifact.path], `${artifact.cell}: reviewed screen is not named exactly`);
+  } else if (artifact.kind === "pdf") {
+    assert.match(review.reviewedRawSha256 ?? "", /^[a-f0-9]{64}$/u, `${artifact.cell}: reviewed raw PDF SHA-256 audit trail missing`);
+    assert.deepEqual(review.reviewedPages, Array.from({ length: artifact.pages }, (_, index) => index + 1), `${artifact.cell}: PDF page review is incomplete`);
+    assert.deepEqual(review.reviewedArtifacts, [artifact.path], `${artifact.cell}: reviewed PDF is not named exactly`);
+  } else {
+    assert.equal(review.reviewedRawSha256?.length, artifact.pages.length, `${artifact.cell}: reviewed raster SHA-256 audit trail is incomplete`);
+    for (const reviewedHash of review.reviewedRawSha256) assert.match(reviewedHash, /^[a-f0-9]{64}$/u, `${artifact.cell}: invalid reviewed raster SHA-256`);
+    assert.deepEqual(review.reviewedPages, Array.from({ length: artifact.pages.length }, (_, index) => index + 1), `${artifact.cell}: raster page review is incomplete`);
+    assert.deepEqual(review.reviewedArtifacts, artifact.pages.map((page) => page.path), `${artifact.cell}: raster artifacts do not match the matrix contract`);
+  }
+}
+assert.deepEqual(pending, [], `visual review remains pending for ${pending.length}/32 cells: ${pending.join(", ")}`);
+assertUtcTimestamp(ledger.reviewedAt, "ledger reviewedAt is not an exact UTC timestamp");
+assert.match(ledger.reviewer ?? "", /^@(Brand|Neo|Founder)(?:\s*\+\s*@(Brand|Neo|Founder))*$/u, "ledger reviewer is absent or not an actual review role");
+assert.deepEqual(ledger.physicalArtifactsReviewed, manifest.physicalArtifacts, "human ledger does not attest the complete physical artifact inventory");
+
+if (mode === "portable") {
+  process.stdout.write(
+    `report surfaces: portable technical gate passed 32/32 current cells; human-ledger provenance is complete, ` +
+      `but no cross-environment human-render equivalence is claimed (${manifest.reviewInputFingerprint}; pixel mutation rejected)\n`,
+  );
+} else {
+  process.stdout.write(
+    `report surfaces: strict local exact-environment human gate passed 32/32 cells ` +
+      `(${ledger.reviewedAt}; ${manifest.reviewInputFingerprint}; pixel mutation rejected)\n`,
+  );
+}

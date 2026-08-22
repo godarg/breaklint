@@ -16,7 +16,7 @@ import {
   BREAK_CAUSE_CASCADE_HINTS,
   BREAK_CAUSE_DETERMINED_BY,
   BREAK_CAUSE_KINDS,
-  SCHEMA_VERSION,
+  SNAPSHOT_SCHEMA_VERSION,
 } from "../core/enums.ts";
 import type {
   BlockRecord,
@@ -753,7 +753,7 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
   }));
 
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     meta: {
       renderer: input.renderer,
       browserVersion: input.browserVersion,

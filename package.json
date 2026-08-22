@@ -1,6 +1,6 @@
 {
   "name": "breaklint",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Layout checks for documents generated from HTML to PDF: measures every page after pagination and reports the measured value next to the threshold it failed.",
   "keywords": [
     "pagedjs",
@@ -28,37 +28,51 @@
   },
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13.0"
   },
   "bin": {
     "breaklint": "dist/cli/index.js"
   },
   "exports": {
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./config.schema.json": "./breaklint.schema.json"
   },
   "files": [
     "dist/",
+    "breaklint.schema.json",
     "examples/",
     "docs/",
     "README.md",
+    "SECURITY.md",
     "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepack": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && npm run build",
+    "prepack": "npm run schema:check && node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && npm run build",
+    "schema:write": "tsx tools/write-config-schema.ts",
+    "schema:check": "tsx tools/write-config-schema.ts --check",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-strip-types tests/unit/*.test.ts tests/e2e/*.test.ts",
     "test:live": "node tests/tools/live-run.mjs",
     "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "test:mutants": "node --experimental-strip-types tests/tools/mutants.ts",
     "test:licenses": "node --experimental-strip-types tests/tools/licenses.ts",
-    "selfcheck": "node --experimental-strip-types tests/tools/selfcheck.ts"
+    "test:secrets": "node tests/tools/secrets.mjs",
+    "test:advisories": "node tests/tools/dependency-audit.mjs",
+    "test:release-tag": "node tests/tools/release-tag-contract.mjs --self-test",
+    "render:report-surfaces": "node --experimental-strip-types tests/tools/render-report-surfaces.mjs",
+    "test:report-surfaces": "npm run test:report-surfaces:local",
+    "test:report-surfaces:local": "npm run render:report-surfaces && node tests/tools/verify-report-surfaces.mjs --mode local",
+    "test:report-surfaces:portable": "npm run render:report-surfaces && node tests/tools/verify-report-surfaces.mjs --mode portable",
+    "selfcheck:static": "node --experimental-strip-types tests/tools/selfcheck.ts",
+    "selfcheck:live": "node tests/tools/selfcheck-live.mjs",
+    "selfcheck": "npm run selfcheck:static && npm run selfcheck:live"
   },
   "peerDependencies": {
     "pagedjs": "0.4.3",
     "pdfjs-dist": "6.2.108",
-    "puppeteer-core": ">=22"
+    "puppeteer-core": ">=25.8.0 <26"
   },
   "peerDependenciesMeta": {
     "pagedjs": {
@@ -73,9 +87,12 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
+    "ajv": "^8.18.0",
     "pagedjs": "0.4.3",
     "pdfjs-dist": "6.2.108",
-    "puppeteer-core": "^24.10.1",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^25.8.0",
+    "tsx": "^4.20.5",
     "typescript": "5.9.2"
   },
   "dependencies": {

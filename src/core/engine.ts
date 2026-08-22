@@ -50,7 +50,7 @@ export interface EngineConfig {
   failOn: FailOn;
   activeRules: readonly Rule[];
   optionsByRule: Readonly<Record<string, RuleOptions>>;
-  loweredFloors: Readonly<Record<string, number>>;
+  coverageFloors: Readonly<Record<string, number>>;
 }
 
 export interface DocumentOutcome {
@@ -115,7 +115,7 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
 
     const notMeasured = aggregateNotMeasured(result.notMeasured);
     const notMeasuredCount = notMeasured.reduce((sum, n) => sum + n.count, 0);
-    const floor = config.loweredFloors[rule.id] ?? COVERAGE_FLOOR_BY_SEVERITY[rule.severity];
+    const floor = config.coverageFloors[rule.id] ?? COVERAGE_FLOOR_BY_SEVERITY[rule.severity];
     const ratio = result.candidates === 0 ? null : result.measured / result.candidates;
 
     coverage[rule.id] = {

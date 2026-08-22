@@ -1,12 +1,36 @@
-title = "breaklint"
+title = "breaklint secret-scanning contract"
 
 [extend]
 useDefault = true
 
+# A machine account name inside an absolute home path is private build metadata even when it is
+# not a credential. Keep this project-specific rule next to the default secret rules.
 [[rules]]
-  id = "absolute-home-path"
-  description = "Absolute path of a build machine must never reach the public repository."
-  regex = '''/(Users|home)/[a-z][a-z0-9_-]+/'''
-  [rules.allowlist]
-    regexTarget = "line"
-    regexes = ['''file:///…''', '''/Users/…''', '''/home/…''']
+id = "absolute-home-path"
+description = "Absolute macOS/Linux home path"
+regex = '''/(?:Users|home)/([a-z][a-z0-9_-]{1,31})(?:/|\b)'''
+secretGroup = 1
+keywords = ["/Users/", "/home/"]
+
+  # The redaction implementation and its tests deliberately contain synthetic home paths. This
+  # exception requires BOTH an exact source path and one of three placeholder account names. A
+  # real account name, or the same text elsewhere, still fails.
+  [[rules.allowlists]]
+  description = "Synthetic home paths used to test report redaction"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''/(?:Users|home)/(?:name|someone|annabel|annabell|annabelle9x|zqjvaxbel|zqjvaxbelle9x|img|index)(?:/|\b)''']
+  paths = ['''^(?:src/report/redact\.ts|tests/unit/reporters\.test\.ts)$''']
+
+# Generated/dependency trees are not authored or published as repository source. Git history is
+# scanned separately with --all, so this worktree-only exclusion cannot hide a committed secret.
+[[allowlists]]
+description = "Untracked dependency and generated output trees"
+paths = [
+  '''^\.git/''',
+  '''^\.tmp/''',
+  '''^node_modules/''',
+  '''^dist/''',
+  '''^\.artifacts/''',
+  '''^breaklint-report/''',
+]

@@ -25,7 +25,7 @@ export const spacedHyphen = defineRule(
     calibrated: false,
     experimental: false,
     unit: "occurrences",
-    defaultOptions: { locale: "de-DE", mathWindow: 12, maxOccurrences: 0, excludeSelectors: [] },
+    defaultOptions: { locale: "de-DE", mathWindow: 12, maxOccurrences: 0, excludeTags: [] },
     summary: "A hyphen stands between spaces where the convention asks for a dash.",
     declines: [],
   },
@@ -35,7 +35,7 @@ export const spacedHyphen = defineRule(
     let measured = 0;
     const locale = String(ctx.options.locale ?? "de-DE");
     const windowSize = Number(ctx.options.mathWindow ?? 12);
-    const extra = (ctx.options.excludeSelectors as readonly string[] | undefined) ?? [];
+    const extra = (ctx.options.excludeTags as readonly string[] | undefined) ?? [];
 
     for (const run of snapshot.textRuns) {
       candidates += 1;

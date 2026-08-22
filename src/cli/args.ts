@@ -9,6 +9,7 @@ export interface ParsedArgs {
   outFile?: string;
   outDir?: string;
   failOn?: string;
+  profile?: string;
   only?: string[];
   disable?: string[];
   config?: string;
@@ -29,10 +30,12 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
   const out: ParsedArgs = { paths: [], demo: false, help: false, version: false };
   const list = (raw: string | undefined, flag: string): string[] => {
     if (!raw) throw new UsageError(`${flag} needs a value.`);
-    return raw
+    const values = raw
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
+    if (values.length === 0) throw new UsageError(`${flag} needs at least one rule id.`);
+    return values;
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -75,6 +78,13 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
           const value = argv[++i];
           if (!value) throw new UsageError("--fail-on needs a value.");
           out.failOn = value;
+        }
+        break;
+      case "--profile":
+        {
+          const value = argv[++i];
+          if (!value) throw new UsageError("--profile needs a value.");
+          out.profile = value;
         }
         break;
       case "--only":

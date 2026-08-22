@@ -106,6 +106,13 @@ describe("the packaging manifest names only things that exist", () => {
     for (const [name, target] of Object.entries({ ...pkg.bin, ...pkg.exports, ...(pkg.main ? { main: pkg.main } : {}) })) {
       if (target === "./package.json" || target === "package.json") continue;
       const normalised = target.startsWith("./") ? target : `./${target}`;
+      if (normalised.endsWith(".json") && !normalised.startsWith("./dist/")) {
+        assert.ok(
+          existsSync(new URL(`../../${normalised.slice(2)}`, import.meta.url)),
+          `"${name}" points at missing static artifact ${target}`,
+        );
+        continue;
+      }
       assert.ok(
         normalised.startsWith("./dist/"),
         `"${name}" points at ${target}; this package publishes build products only`,
@@ -117,6 +124,17 @@ describe("the packaging manifest names only things that exist", () => {
           `cannot be built, and an installed package would fail with ERR_MODULE_NOT_FOUND`,
       );
     }
+  });
+
+  it("publishes the generated Configuration Contract v1 schema at a stable export", () => {
+    assert.equal(pkg.exports["./config.schema.json"], "./breaklint.schema.json");
+    assert.ok(pkg.files.includes("breaklint.schema.json"), "the exported schema is not in the packed file set");
+    const schema = JSON.parse(readFileSync(new URL("../../breaklint.schema.json", import.meta.url), "utf8")) as {
+      $id?: string;
+      additionalProperties?: boolean;
+    };
+    assert.equal(schema.$id, "https://dargel-solutions.de/schemas/breaklint/config-v1.json");
+    assert.equal(schema.additionalProperties, false);
   });
 
   /**

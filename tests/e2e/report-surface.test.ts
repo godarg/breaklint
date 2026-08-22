@@ -1,0 +1,194 @@
+import { strict as assert } from "node:assert";
+import { describe, it } from "node:test";
+
+import { renderHtml } from "../../src/report/html.ts";
+import { buildHtmlReportModel, safeEvidenceHref } from "../../src/report/html-model.ts";
+import { buildReport } from "../../src/core/build-report.ts";
+import { runDocument } from "../../src/core/engine.ts";
+import { defineRule } from "../../src/core/rule.ts";
+import { loadCorpus } from "../fixtures/corpus.ts";
+import {
+  canonicalReportStates,
+  cleanReportState,
+  findingsReportState,
+  infrastructureReportState,
+  insufficientCoverageReportState,
+} from "../fixtures/report-states.ts";
+
+describe("HTML Report Surface v2", () => {
+  it("renders four status-true verdict families with their gate effect before details", () => {
+    const expected = {
+      clean: ["Clean run", "Coverage met", "Build passes (exit 0)."],
+      findings: ["Findings block this run", "The finding gate was triggered", "Build fails (exit 1)."],
+      infrastructure: ["Checker failed", "This is not a clean run", "Build fails (exit 3)."],
+      "insufficient-coverage": ["Not enough was measured", "This is not a clean run", "Build fails (exit 4)."],
+    } as const;
+    for (const [state, report] of Object.entries(canonicalReportStates())) {
+      const html = renderHtml(report);
+      for (const text of expected[state as keyof typeof expected]) assert.ok(html.includes(text), `${state}: missing ${text}`);
+      assert.ok(html.indexOf("Gate effect") < html.indexOf("Run summary"), `${state}: gate effect is buried below details`);
+      assert.equal((html.match(/<main\b/gu) ?? []).length, 1, `${state}: requires exactly one main landmark`);
+      assert.equal((html.match(/<h1\b/gu) ?? []).length, 1, `${state}: requires exactly one h1`);
+    }
+  });
+
+  it("never lends clean-run wording to infrastructure or insufficient coverage", () => {
+    for (const report of [infrastructureReportState(), insufficientCoverageReportState()]) {
+      const html = renderHtml(report);
+      assert.match(html, /Partial findings only/u);
+      assert.doesNotMatch(html, /Nothing reached the gate/u);
+      assert.doesNotMatch(html, /The requested checks completed without/u);
+      assert.match(html, /Finding gate candidate<\/dt><dd>error/u);
+      assert.match(html, /gate triggered by<\/dt><dd>none/u);
+    }
+  });
+
+  it("never calls partial infrastructure measurement trusted coverage", () => {
+    const report = infrastructureReportState();
+    const model = buildHtmlReportModel(report);
+    assert.equal(model.coverageTrust.label, "Not trustworthy");
+    assert.equal(model.coverageTrust.measured, 24, "partial measured count must remain visible");
+    assert.equal(model.coverageTrust.candidates, 26, "partial candidate count must remain visible");
+    assert.match(model.coverageTrust.detail, /Partial measurement only: 24 of 26 candidates measured/u);
+
+    const html = renderHtml(report);
+    const summary = /<dl class="summary-grid">([\s\S]*?)<\/dl>/u.exec(html)?.[1] ?? "";
+    assert.match(summary, /Not trustworthy/u);
+    assert.match(summary, /24 of 26 candidates measured before the checker failed/u);
+    assert.doesNotMatch(summary, /Coverage met/u, "the primary trust summary contradicts the exit-3 verdict");
+  });
+
+  it("keeps the real engine-to-HTML zero-candidate exit-4 path explicitly unestablished", () => {
+    const snapshot = loadCorpus()[0]?.snapshot;
+    assert.ok(snapshot);
+    const zeroCandidateRule = defineRule({
+      id: "test/zero-candidate",
+      severity: "warn",
+      proofSource: null,
+      calibrated: false,
+      experimental: false,
+      unit: "candidates",
+      defaultOptions: {},
+      summary: "Produces no candidates for the exit-4 report contract control.",
+      declines: [],
+    }, () => ({ findings: [], candidates: 0, measured: 0, notMeasured: [] }));
+    const outcome = runDocument(
+      { path: "zero-candidate.html", snapshot, infrastructure: [] },
+      { failOn: "error", activeRules: [zeroCandidateRule], optionsByRule: {}, coverageFloors: {} },
+    );
+    const base = findingsReportState();
+    const report = buildReport({
+      outcomes: [outcome],
+      mode: "demo",
+      source: "handwritten snapshot fixture",
+      toolVersion: "0.2.0",
+      commit: null,
+      startedAt: "1970-01-01T00:00:00.000Z",
+      durationMs: 0,
+      rulesRun: 1,
+      environment: base.environment,
+      config: base.config,
+      failOn: "error",
+    });
+
+    assert.equal(outcome.report.coverage[zeroCandidateRule.id]?.ok, true, "zero candidates are not a per-rule floor failure");
+    assert.equal(report.runVerdict, "insufficient-coverage");
+    assert.equal(report.exitCode, 4);
+    assert.equal(report.measuredRules, 0);
+    const model = buildHtmlReportModel(report);
+    assert.equal(model.coverageTrust.label, "Not established");
+    assert.match(model.coverageTrust.detail, /no rule measured a candidate/iu);
+    const summary = /<dl class="summary-grid">([\s\S]*?)<\/dl>/u.exec(renderHtml(report))?.[1] ?? "";
+    assert.match(summary, /Not established/u);
+    assert.doesNotMatch(summary, /Coverage met/u, "exit 4 must outrank a per-row zero-candidate ok flag");
+  });
+
+  it("shows Checker only for exit 3 and the coverage alert only for exit 4", () => {
+    const states = canonicalReportStates();
+    for (const [state, report] of Object.entries(states)) {
+      const html = renderHtml(report);
+      assert.equal(html.includes('id="checker-heading"'), state === "infrastructure", `${state}: Checker visibility drift`);
+      assert.equal(html.includes('id="coverage-alert-heading"'), state === "insufficient-coverage", `${state}: alert visibility drift`);
+    }
+  });
+
+  it("renders every finding as a vertical semantic article with the complete evidence grammar", () => {
+    const report = findingsReportState();
+    const html = renderHtml(report);
+    assert.equal((html.match(/<article class="finding /gu) ?? []).length, report.findings.length);
+    for (const field of ["Document", "Source", "Measured", "Threshold", "Calibration", "Proof source", "Evidence:"]) {
+      assert.ok(html.includes(field), `finding grammar is missing ${field}`);
+    }
+    assert.ok(html.includes(report.findings[0]!.message), "the full finding explanation is absent");
+    assert.match(html, /Unknown — no source location was measured/u, "unknown source must stay explicit");
+    assert.match(html, /Bound evidence/u);
+    assert.match(html, /does not bind this finding/u);
+    assert.match(html, /Ambiguity:/u);
+    assert.doesNotMatch(html, /<table\b/u, "findings and coverage must reflow instead of requiring a table scroll");
+  });
+
+  it("uses unique deterministic IDs for every labelled surface", () => {
+    const html = renderHtml(findingsReportState());
+    const ids = [...html.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]);
+    assert.equal(new Set(ids).size, ids.length, "duplicate HTML IDs break label relationships");
+    for (const target of [...html.matchAll(/aria-labelledby="([^"]+)"/gu)].map((match) => match[1]!)) {
+      assert.ok(ids.includes(target), `aria-labelledby points at missing id ${target}`);
+    }
+  });
+
+  it("only activates tool-owned relative evidence paths", () => {
+    for (const unsafe of [
+      "https://attacker.example/evidence.png",
+      "javascript:alert(1)",
+      "file:///etc/passwd",
+      "/tmp/report-page-001.png",
+      "../secret-page-001.png",
+      "evidence/not-a-tool-file.png",
+      "evidence\\report-page-001.png",
+    ]) {
+      assert.equal(safeEvidenceHref(unsafe), null, unsafe);
+    }
+    assert.equal(safeEvidenceHref("evidence/report-page-001.png"), "evidence/report-page-001.png");
+    assert.equal(safeEvidenceHref("report name-page-001.png"), null, "spaces are not minted by the tool key");
+
+    const report = findingsReportState();
+    report.findings[0]!.evidence = { ref: 'javascript:alert("owned")', bindsFinding: true };
+    const html = renderHtml(report);
+    assert.ok(html.includes("javascript:alert(&quot;owned&quot;)"), "unsafe reference should remain visible as text");
+    assert.doesNotMatch(html, /href="javascript:/u, "unsafe reference became navigable");
+  });
+
+  it("escapes hostile report text without breaking the semantic structure", () => {
+    const report = findingsReportState();
+    report.findings[0]!.message = '<script>window.evil = true</script> & "quoted"\u0007';
+    report.findings[0]!.document = 'x" aria-label="forged.html';
+    const html = renderHtml(report);
+    assert.doesNotMatch(html, /<script/iu);
+    assert.match(html, /&lt;script&gt;window\.evil = true&lt;\/script&gt; &amp; &quot;quoted&quot;�/u);
+    assert.doesNotMatch(html, /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u);
+  });
+
+  it("is self-contained, responsive, print-safe and reduced-motion aware", () => {
+    const html = renderHtml(cleanReportState());
+    for (const forbidden of [/<script/iu, /@import/iu, /<link\b/iu, /src\s*=\s*["']https?:/iu]) {
+      assert.doesNotMatch(html, forbidden);
+    }
+    assert.match(html, /Content-Security-Policy/u);
+    assert.match(html, /@media \(max-width: 30rem\)/u);
+    assert.match(html, /@media \(prefers-reduced-motion: reduce\)/u);
+    assert.match(html, /@page \{ size: A4; margin: 12mm; \}/u);
+    assert.match(html, /@media print/u);
+    assert.match(html, /<section class="findings-section findings-empty"/u, "clean findings must remain explicit on screen and targetable in print");
+    assert.match(html, /\.summary-grid \{ grid-template-columns: minmax\(0, 1\.7fr\) repeat\(3, minmax\(0, 1fr\)\); \}/u, "print must reserve enough width for the complete Coverage Trust verdict");
+    assert.match(html, /\.summary-grid > div:first-child dd \{[^}]*white-space: nowrap/su, "Coverage Trust label must stay intact in print");
+    assert.match(html, /\.coverage-list \{ display: block; \}/u, "print coverage must leave the fragment-prone grid context");
+    assert.match(html, /\.coverage-record \{[^}]*display: flow-root;[^}]*break-inside: avoid;[^}]*page-break-inside: avoid;/su, "print coverage rows need a non-grid fragmentation context and both guards");
+    assert.match(html, /\.coverage-record > div \{[^}]*float: left;[^}]*width: 50%/su, "print coverage facts need a readable two-column reflow");
+    assert.match(html, /\.finding \{ break-inside: avoid-page; \}/u, "compact findings should not split across pages");
+    assert.match(html, /section > h2 \{ break-after: avoid; \}/u, "section headings must stay with their first content");
+    assert.match(html, /\.report-footer \{ display: none; \}/u, "the redundant screen footer must not create a print-only page");
+    assert.match(html, /\.report-header\.state-clean ~ \.findings-empty \{ display: none; \}/u, "clean print must omit the redundant empty-findings block");
+    assert.match(html, /overflow-wrap: anywhere/u);
+    assert.match(html, /outline: var\(--ds-focus-width\) solid/u);
+  });
+});

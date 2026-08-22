@@ -1,84 +1,376 @@
 name: release
 
-# Publishing runs from a tag, never from a laptop, so that what reaches npm is what CI checked.
-# The tarball is built by `prepack` inside `npm publish`; `--provenance` needs `id-token: write`
-# and a public repository, and it is what lets anyone verify that this tarball came from this
-# commit in this workflow.
-#
-# Prerequisite, once: an npm automation token in the repository secret NPM_TOKEN.
+# A tag starts validation; it does not confer trust by itself. The publish job proves that the
+# tag resolves to origin/main and that ci.yml already passed for exactly that commit. Validation
+# builds ONE tarball. Both clean consumers, npm and the GitHub Release receive those exact bytes.
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["v0.2.0"]
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PACKAGE_FILE: breaklint-0.2.0.tgz
+  GITLEAKS_VERSION: 8.30.1
 
 jobs:
-  publish:
+  validate-pack:
+    name: validate and pack once (Node 24)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       PUPPETEER_SKIP_DOWNLOAD: "1"
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "1"
     steps:
-      # SHA-gepinnt: dieser Job haelt den npm-Token, und ein Tag ist verschiebbar.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          node-version: 22
+          # The secret gate scans the complete Git history, not a shallow approximation.
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
           cache: npm
-          registry-url: https://registry.npmjs.org
 
-      - run: npm ci --no-audit --no-fund
+      - name: install the locked dependency graph without hiding its later audit
+        run: npm ci --no-audit --no-fund
 
-      - name: the tag and the version in package.json agree
-        # A tag that says one thing while the manifest says another publishes a version nobody
-        # asked for, and the mistake is only visible after it is public.
+      - name: install the pinned secret scanner from a checksum-bound archive
         run: |
-          tag="${GITHUB_REF_NAME#v}"
-          pkg=$(node -p "require('./package.json').version")
-          test "$tag" = "$pkg" || { echo "tag $GITHUB_REF_NAME does not match package version $pkg"; exit 1; }
-          echo "publishing $pkg"
+          curl -fsSLo /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gitleaks.tar.gz" \
+            | sha256sum --check --strict
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+          test "$(gitleaks version)" = "$GITLEAKS_VERSION"
 
-      - name: the full gate, exactly as on main
+      - name: Git history, tag worktree and secret-scanner canaries
+        run: npm run test:secrets
+
+      - name: annotated release-tag contract and lightweight-tag negative control
+        run: npm run test:release-tag
+
+      - name: production and complete development dependency graphs have no advisories
+        run: npm run test:advisories
+
+      - name: install produced neither a browser cache nor the downloading Puppeteer package
+        run: |
+          if [ -d "$HOME/.cache/puppeteer" ] || [ -d node_modules/puppeteer ]; then
+            echo "a browser was downloaded, or full puppeteer entered the locked graph"
+            exit 1
+          fi
+          echo "no browser cache and no full puppeteer package"
+
+      - name: the mark font is exactly what its generator produces
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check fonttools
+          node tools/make-mark-font.mjs --check
+
+      - name: TypeScript and generated configuration schema
         run: |
           npm run typecheck
-          npm test
-          npm run test:mutants
-          npm run test:licenses
-          npm run selfcheck
+          npm run schema:check
 
-      - name: poppler, as an independent rasteriser for the live suite
+      - name: unit and process-boundary E2E tests
+        run: npm test
+
+      - name: mutation guard
+        run: npm run test:mutants
+
+      - name: licence gate
+        run: npm run test:licenses
+
+      - name: install the independent live-suite rasteriser
         run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
 
       - name: live evidence path
         run: npm run test:live
 
-      - name: the packed tarball runs from a clean install
-        # The path a stranger actually takes. `npm pack` runs `prepack`, so this also proves that
-        # dist/ is built from this commit rather than left over from somewhere.
+      - name: rendered report-surface matrix and review ledger
+        # Linux reconstructs the complete technical matrix and checks the human-ledger
+        # provenance. Exact reviewed-pixel equality remains the separate local pre-tag gate.
+        run: npm run test:report-surfaces:portable
+
+      - name: static and real-browser self-application
+        run: npm run selfcheck
+
+      - name: production build
+        run: npm run build
+
+      - name: create the only npm package in this workflow
+        id: package
         run: |
-          tgz=$(npm pack --silent)
-          # An empty capture would turn the next line into a directory install, and every
-          # assertion after it would still pass — a gate that silently checks nothing.
-          test -n "$tgz" && test -s "$tgz" || { echo "npm pack produced no tarball"; exit 1; }
-          mkdir -p /tmp/consumer && cd /tmp/consumer
+          version=$(node -p "require('./package.json').version")
+          test "$version" = "0.2.0" || { echo "release workflow expected 0.2.0, found $version"; exit 1; }
+
+          # npm pack invokes prepack: schema drift is checked again, dist/ is removed, and the
+          # production build is recreated from the same commit. No later job runs npm pack or
+          # publishes the source tree.
+          packed=$(npm pack --silent)
+          test "$packed" = "$PACKAGE_FILE" || {
+            echo "npm pack produced '$packed', expected '$PACKAGE_FILE'"
+            exit 1
+          }
+          test -s "$PACKAGE_FILE" || { echo "$PACKAGE_FILE is absent or empty"; exit 1; }
+
+          # Reject archive paths that could escape a consumer. npm normally prevents these; this
+          # assertion makes that property part of the release evidence rather than an assumption.
+          if tar -tzf "$PACKAGE_FILE" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+            echo "the package contains an absolute or parent-traversing path"
+            exit 1
+          fi
+
+          sha256sum "$PACKAGE_FILE" > "$PACKAGE_FILE.sha256"
+          printf 'sha512-%s\n' "$(openssl dgst -sha512 -binary "$PACKAGE_FILE" | openssl base64 -A)" \
+            > "$PACKAGE_FILE.sri"
+          test "$(wc -l < "$PACKAGE_FILE.sha256" | tr -d ' ')" = "1"
+          grep -Eq '^sha512-[A-Za-z0-9+/]+={0,2}$' "$PACKAGE_FILE.sri"
+          echo "single package: $(cat "$PACKAGE_FILE.sha256")"
+          echo "registry SRI: $(cat "$PACKAGE_FILE.sri")"
+
+      - name: store the one package and both independent identity records
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: breaklint-0.2.0-package
+          path: |
+            breaklint-0.2.0.tgz
+            breaklint-0.2.0.tgz.sha256
+            breaklint-0.2.0.tgz.sri
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  clean-consumer:
+    name: clean consumer (Node ${{ matrix.node }})
+    needs: validate-pack
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22.13.0", "24"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ matrix.node }}
+      - name: download the package created by validate-pack
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: breaklint-0.2.0-package
+          path: release-artifact
+
+      - name: verify artifact identity before installation
+        run: |
+          cd release-artifact
+          sha256sum --check --strict "$PACKAGE_FILE.sha256"
+          expected=$(cat "$PACKAGE_FILE.sri")
+          actual="sha512-$(openssl dgst -sha512 -binary "$PACKAGE_FILE" | openssl base64 -A)"
+          test "$actual" = "$expected" || { echo "SHA-512 SRI mismatch"; exit 1; }
+
+      - name: installed CLI, demo and Configuration Contract v1
+        run: |
+          consumer=$(mktemp -d)
+          cd "$consumer"
           npm init -y > /dev/null
-          npm i "$GITHUB_WORKSPACE/$tgz" --no-audit --no-fund
-          # Content, not just the exit code. A silent success is exactly the failure this
-          # product exists to catch, so the publish gate may not accept one from itself.
-          test "$(npx breaklint --version)" = "$(node -p "require('$GITHUB_WORKSPACE/package.json').version")" \
-            || { echo "the installed package printed no version, or the wrong one"; exit 1; }
+          npm install "$GITHUB_WORKSPACE/release-artifact/$PACKAGE_FILE" --no-audit --no-fund
+          test "$(npx breaklint --version)" = "0.2.0"
           set +e
           npx breaklint --demo > demo.out
           code=$?
           set -e
-          test "$code" -eq 1 || { echo "--demo from the installed package exited $code, expected 1"; cat demo.out; exit 1; }
+          test "$code" -eq 1 || { echo "installed --demo exited $code, expected 1"; cat demo.out; exit 1; }
           grep -q "uncalibrated" demo.out || { echo "installed --demo printed no findings"; exit 1; }
-          echo "installed package: --version and --demo behave as documented"
+          node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
 
-      - name: publish
-        run: npm publish --provenance --access public
+      - name: a bare consumer fails closed with one prerequisite command
+        run: |
+          bare=$(mktemp -d)
+          cd "$bare"
+          npm init -y > /dev/null
+          npm install "$GITHUB_WORKSPACE/release-artifact/$PACKAGE_FILE" --no-audit --no-fund
+          printf '<!doctype html><html><body><p>x</p></body></html>' > page.html
+          set +e
+          npx breaklint page.html > out.txt 2> err.txt
+          code=$?
+          set -e
+          test "$code" -eq 3 || { echo "expected exit 3, got $code"; cat out.txt err.txt; exit 1; }
+          grep -q "install:" err.txt || { echo "no install command on stderr"; cat err.txt; exit 1; }
+
+  publish:
+    name: publish the validated bytes and create the GitHub Release
+    needs: [validate-pack, clean-consumer]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - name: download the bytes accepted by both clean consumers
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: breaklint-0.2.0-package
+          path: .
+
+      - name: verify package, tag, origin/main and the successful CI run for one commit
+        id: identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha256sum --check --strict "$PACKAGE_FILE.sha256"
+          expected_sri=$(cat "$PACKAGE_FILE.sri")
+          actual_sri="sha512-$(openssl dgst -sha512 -binary "$PACKAGE_FILE" | openssl base64 -A)"
+          test "$actual_sri" = "$expected_sri" || { echo "SHA-512 SRI mismatch"; exit 1; }
+
+          tag_version="${GITHUB_REF_NAME#v}"
+          source_version=$(node -p "require('./package.json').version")
+          artifact_version=$(tar -xOf "$PACKAGE_FILE" package/package.json \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).version))')
+          test "$tag_version" = "$source_version" || {
+            echo "tag $GITHUB_REF_NAME does not match source version $source_version"
+            exit 1
+          }
+          test "$artifact_version" = "$source_version" || {
+            echo "artifact version $artifact_version does not match source version $source_version"
+            exit 1
+          }
+          test "$artifact_version" = "0.2.0" || { echo "only 0.2.0 is authorised"; exit 1; }
+
+          # Peeling a ref proves only its commit: lightweight and annotated tags both peel. Require
+          # the tag OBJECT first, through the same guard whose process-boundary canary runs in CI.
+          node tests/tools/release-tag-contract.mjs --assert-ref "$GITHUB_REF_NAME"
+
+          git fetch --no-tags origin main
+          release_commit=$(git rev-parse "${GITHUB_SHA}^{commit}")
+          tag_commit=$(git rev-parse "${GITHUB_REF_NAME}^{commit}")
+          main_commit=$(git rev-parse "origin/main^{commit}")
+          test "$release_commit" = "$tag_commit" || {
+            echo "GITHUB_SHA resolves to $release_commit but $GITHUB_REF_NAME resolves to $tag_commit"
+            exit 1
+          }
+          test "$release_commit" = "$main_commit" || {
+            echo "release commit $release_commit is not the exact origin/main $main_commit"
+            exit 1
+          }
+
+          gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$release_commit&status=completed&per_page=100" \
+            > /tmp/ci-runs.json
+          jq -e --arg sha "$release_commit" '
+            [.workflow_runs[] |
+              select(.head_sha == $sha and .head_branch == "main" and
+                     .event == "push" and .conclusion == "success")] | length > 0
+          ' /tmp/ci-runs.json > /dev/null || {
+            echo "ci.yml has no successful main push run for $release_commit"
+            exit 1
+          }
+
+          echo "release_commit=$release_commit" >> "$GITHUB_OUTPUT"
+          echo "version=$artifact_version" >> "$GITHUB_OUTPUT"
+
+      - name: decide whether this is a first publish or an exact recovery run
+        id: registry
+        env:
+          RELEASE_COMMIT: ${{ steps.identity.outputs.release_commit }}
+        run: |
+          set +e
+          npm view "breaklint@0.2.0" dist.integrity gitHead --json > /tmp/existing.json 2> /tmp/existing.err
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            EXPECTED_SRI=$(cat "$PACKAGE_FILE.sri") node --input-type=module <<'NODE'
+          import { strict as assert } from "node:assert";
+          import { readFileSync } from "node:fs";
+          const metadata = JSON.parse(readFileSync("/tmp/existing.json", "utf8"));
+          assert.equal(metadata["dist.integrity"], process.env.EXPECTED_SRI, "existing registry bytes differ");
+          assert.equal(metadata.gitHead, process.env.RELEASE_COMMIT, "existing registry gitHead differs");
+          NODE
+            echo "publish_needed=false" >> "$GITHUB_OUTPUT"
+            echo "breaklint@0.2.0 already contains these exact bytes; continuing recovery verification"
+          else
+            if ! grep -q "E404" /tmp/existing.err; then
+              echo "registry lookup failed for a reason other than an absent version"
+              cat /tmp/existing.err
+              exit 1
+            fi
+            echo "publish_needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: publish exactly the validated tarball with provenance
+        if: steps.registry.outputs.publish_needed == 'true'
+        run: npm publish ./breaklint-0.2.0.tgz --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: verify registry integrity, gitHead, attestation and signatures
+        env:
+          RELEASE_COMMIT: ${{ steps.identity.outputs.release_commit }}
+        run: |
+          verified=false
+          for attempt in $(seq 1 12); do
+            if npm view breaklint@0.2.0 dist.integrity gitHead dist.attestations --json \
+                > /tmp/registry.json 2> /tmp/registry.err && \
+               EXPECTED_SRI=$(cat "$PACKAGE_FILE.sri") node --input-type=module <<'NODE'
+          import { strict as assert } from "node:assert";
+          import { readFileSync } from "node:fs";
+          const metadata = JSON.parse(readFileSync("/tmp/registry.json", "utf8"));
+          assert.equal(metadata["dist.integrity"], process.env.EXPECTED_SRI, "registry SRI differs");
+          assert.equal(metadata.gitHead, process.env.RELEASE_COMMIT, "registry gitHead differs");
+          assert.equal(
+            metadata["dist.attestations"]?.provenance?.predicateType,
+            "https://slsa.dev/provenance/v1",
+            "SLSA provenance attestation is absent",
+          );
+          assert.match(metadata["dist.attestations"]?.url ?? "", /^https:\/\/registry\.npmjs\.org\//u);
+          NODE
+            then
+              verified=true
+              break
+            fi
+            echo "registry metadata not complete yet (attempt $attempt/12)"
+            sleep 5
+          done
+          test "$verified" = true || { cat /tmp/registry.err /tmp/registry.json 2>/dev/null || true; exit 1; }
+
+          registry_consumer=$(mktemp -d)
+          cd "$registry_consumer"
+          npm init -y > /dev/null
+          npm install breaklint@0.2.0 --ignore-scripts --no-audit --no-fund
+          npm audit signatures --json > signatures.json
+          node --input-type=module <<'NODE'
+          import { strict as assert } from "node:assert";
+          import { readFileSync } from "node:fs";
+          const result = JSON.parse(readFileSync("signatures.json", "utf8"));
+          assert.deepEqual(result.invalid, [], "npm reported an invalid registry signature or attestation");
+          assert.deepEqual(result.missing, [], "npm reported a missing registry signature or attestation");
+          NODE
+
+      - name: create the GitHub Release with the published bytes and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "GitHub Release $GITHUB_REF_NAME already exists; refusing to overwrite assets"
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            "$PACKAGE_FILE" "$PACKAGE_FILE.sha256" "$PACKAGE_FILE.sri" \
+            --verify-tag \
+            --generate-notes \
+            --title "breaklint ${GITHUB_REF_NAME#v}"

@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -15,13 +18,35 @@ jobs:
       PUPPETEER_SKIP_DOWNLOAD: "1"
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          node-version: 22
+          # `test:secrets` scans history, so a shallow clone would turn that promise into theatre.
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
           cache: npm
 
       - run: npm ci --no-audit --no-fund
+
+      - name: install the pinned secret scanner and verify its archive
+        run: |
+          curl -fsSLo /tmp/gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gitleaks.tar.gz" \
+            | sha256sum --check --strict
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+          test "$(gitleaks version)" = "8.30.1"
+
+      - name: Git history, worktree and secret-scanner canary
+        run: npm run test:secrets
+
+      - name: annotated release-tag contract and lightweight-tag negative control
+        run: npm run test:release-tag
+
+      - name: published dependency graph and pinned development advisory disposition
+        run: npm run test:advisories
 
       - name: no browser was downloaded
         # Measured, not assumed. A guard whose effect nobody checks is a claim.
@@ -43,6 +68,9 @@ jobs:
 
       - name: typecheck
         run: npm run typecheck
+
+      - name: generated configuration schema has no drift
+        run: npm run schema:check
 
       - name: unit and e2e tests
         run: npm test
@@ -66,6 +94,13 @@ jobs:
         # running nothing is how a check disappears. ubuntu-latest ships Chrome; paged.js and
         # pdfjs-dist come from `npm ci`.
         run: npm run test:live
+
+      - name: portable technical report-surface matrix
+        # Linux technically verifies all 32 current cells, including decoded-pixel, semantic,
+        # accessibility and print integrity. It requires a complete human ledger for this exact
+        # source fingerprint, but never claims Linux pixels equal the locally human-reviewed
+        # browser/OS render. Exact-environment transfer remains a local-only gate.
+        run: npm run test:report-surfaces:portable
 
       - name: self-application
         # The tool's own HTML report and its own docs pass its own error rules.
@@ -109,6 +144,7 @@ jobs:
           set -e
           test "$code" -eq 1 || { echo "installed --demo exited $code, expected 1"; cat demo.out; exit 1; }
           grep -q "uncalibrated" demo.out || { echo "installed --demo printed no findings"; exit 1; }
+          node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           echo "installed package: --version and --demo behave as documented"
 
       - name: a missing prerequisite ends with exit 3 and one copyable install command
@@ -140,23 +176,21 @@ jobs:
           grep -q "install:" err.txt || { echo "no install command on stderr"; cat err.txt; exit 1; }
           echo "exit 3 with an install command:"; cat err.txt
 
-  # `engines` says Node 20 or newer, and the job above runs 22 — so the lower bound was a claim
-  # nothing checked.
+  # The complete gate runs on Node 24 above. `engines` starts at Node 22.13, so a packed-consumer
+  # job exercises that exact lower bound rather than treating a newer runtime as proof for it.
   #
-  # What this job may NOT do is run the test suite: the suite needs `--experimental-strip-types`,
-  # which does not exist on Node 20, so a "floor" job built that way would fail for a reason that
-  # has nothing to do with the floor. `engines` is a promise to the CONSUMER anyway, and what a
-  # consumer runs is the built `dist/` out of the tarball. That is what this job installs and runs.
+  # `engines` is a consumer promise. What a consumer runs is the built `dist/` from the tarball,
+  # so that is the contract this lower-bound job exercises.
   node-floor:
     runs-on: ubuntu-latest
     env:
       PUPPETEER_SKIP_DOWNLOAD: "1"
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 22.13.0
           cache: npm
       - run: npm ci --no-audit --no-fund
       - name: the packed package installs and runs on the version `engines` advertises
@@ -169,11 +203,12 @@ jobs:
           npm init -y > /dev/null
           npm i "$GITHUB_WORKSPACE/$tgz" --no-audit --no-fund
           test "$(npx breaklint --version)" = "$(node -p "require('$GITHUB_WORKSPACE/package.json').version")" \
-            || { echo "no version, or the wrong one, on Node 20"; exit 1; }
+            || { echo "no version, or the wrong one, on Node 22.13"; exit 1; }
           set +e
           npx breaklint --demo > demo.out
           code=$?
           set -e
-          test "$code" -eq 1 || { echo "--demo exited $code on Node 20, expected 1"; cat demo.out; exit 1; }
-          grep -q "uncalibrated" demo.out || { echo "--demo printed no findings on Node 20"; exit 1; }
-          echo "Node 20: the installed package behaves as documented"
+          test "$code" -eq 1 || { echo "--demo exited $code on Node 22.13, expected 1"; cat demo.out; exit 1; }
+          grep -q "uncalibrated" demo.out || { echo "--demo printed no findings on Node 22.13"; exit 1; }
+          node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
+          echo "Node 22.13: the installed package behaves as documented"

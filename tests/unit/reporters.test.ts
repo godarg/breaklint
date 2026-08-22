@@ -8,6 +8,8 @@ import { OUTPUT_FORMATS } from "../../src/core/enums.ts";
 import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
+import { resolveConfig, toReportConfig } from "../../src/config/resolve.ts";
+import { effectiveConfigFingerprint } from "../../src/config/contract.ts";
 import { render } from "../../src/report/index.ts";
 import { redactPaths, redactReport } from "../../src/report/redact.ts";
 import { infraLines, MAX_DETAIL_CHARS, MAX_VALUE_CHARS } from "../../src/report/infra.ts";
@@ -21,7 +23,7 @@ function demoReport(): Report {
   };
   const outcome = runDocument(
     { path: "examples/demo.html", snapshot: parsed.snapshot, infrastructure: [] },
-    { failOn: "error", activeRules: [...ALL_RULES], optionsByRule: {}, loweredFloors: {} },
+    { failOn: "error", activeRules: [...ALL_RULES], optionsByRule: {}, coverageFloors: {} },
   );
   return buildReport({
     outcomes: [outcome],
@@ -45,17 +47,9 @@ function demoReport(): Report {
       fontFamiliesResolved: [],
       locale: "de-DE",
     },
-    config: {
-      profile: "demo",
-      failOn: "error",
-      activeRules: ALL_RULES.map((r) => r.id),
-      disabledRules: [],
-      loweredFloors: [],
-      interventions: [],
-      sourceMapInjection: true,
-      evidenceBinding: true,
-      network: { mode: "offline", allowed: [], blocked: 0 },
-    },
+    config: toReportConfig(resolveConfig({ file: undefined, cli: {} }), {
+      interventions: [], networkBlocked: 0,
+    }),
   });
 }
 
@@ -122,7 +116,9 @@ describe("output formats", () => {
     const parsed = JSON.parse(render(report, "json")) as Report;
     assert.equal(parsed.runVerdict, report.runVerdict);
     assert.equal(parsed.exitCode, report.exitCode);
-    assert.equal(parsed.schemaVersion, 2);
+    assert.equal(parsed.schemaVersion, 3);
+    assert.match(parsed.config.fingerprint, /^[0-9a-f]{64}$/u);
+    assert.equal(parsed.config.fingerprint, effectiveConfigFingerprint(parsed.config.effective));
   });
 
   /**
@@ -154,7 +150,7 @@ describe("output formats", () => {
           },
         ],
       },
-      { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+      { failOn: "error", activeRules: [], optionsByRule: {}, coverageFloors: {} },
     );
     const broken = buildReport({
       outcomes: [outcome],
@@ -229,7 +225,7 @@ describe("output formats", () => {
           },
         ],
       },
-      { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+      { failOn: "error", activeRules: [], optionsByRule: {}, coverageFloors: {} },
     );
     const leaky = buildReport({
       outcomes: [outcome],
@@ -365,7 +361,7 @@ describe("output formats", () => {
             },
           ],
         },
-        { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+        { failOn: "error", activeRules: [], optionsByRule: {}, coverageFloors: {} },
       );
       const leaky = buildReport({
         outcomes: [outcome], mode: "live", source: "rendered", toolVersion: "0.1.0", commit: null,
@@ -430,7 +426,7 @@ describe("output formats", () => {
             },
           ],
         },
-        { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+        { failOn: "error", activeRules: [], optionsByRule: {}, coverageFloors: {} },
       );
       const leaky = buildReport({
         outcomes: [outcome],
@@ -484,7 +480,7 @@ describe("output formats", () => {
     const lineFor = (detail: string, measured: Record<string, unknown>): { detail: string; measured: string[] } => {
       const outcome = runDocument(
         { path: "doc.html", snapshot: null, infrastructure: [{ kind: "checker-crashed", detail, measured }] },
-        { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+        { failOn: "error", activeRules: [], optionsByRule: {}, coverageFloors: {} },
       );
       const built = buildReport({
         outcomes: [outcome], mode: "live", source: "rendered", toolVersion: "0.1.0", commit: null,
@@ -539,7 +535,7 @@ describe("output formats", () => {
     assert.ok(long.length > MAX_DETAIL_CHARS, "premise: the producer's payload exceeds the cap");
     const outcome = runDocument(
       { path: "doc.html", snapshot: null, infrastructure: [{ kind: "render-unstable", detail: long, measured: null }] },
-      { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+      { failOn: "error", activeRules: [], optionsByRule: {}, coverageFloors: {} },
     );
     const built = buildReport({
       outcomes: [outcome], mode: "live", source: "rendered", toolVersion: "0.1.0", commit: null,
@@ -580,7 +576,7 @@ describe("output formats", () => {
           },
         ],
       },
-      { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+      { failOn: "error", activeRules: [], optionsByRule: {}, coverageFloors: {} },
     );
     const hostile = buildReport({
       outcomes: [outcome], mode: "live", source: "rendered", toolVersion: "0.1.0", commit: null,
@@ -690,7 +686,7 @@ describe("output formats", () => {
           },
         ],
       },
-      { failOn: "error", activeRules: [], optionsByRule: {}, loweredFloors: {} },
+      { failOn: "error", activeRules: [], optionsByRule: {}, coverageFloors: {} },
     );
     const big = buildReport({
       outcomes: [outcome],

@@ -19,6 +19,10 @@ A warning and nothing stronger: the same characters are legitimate as the inch m
 
 A digit immediately before the character exempts it. A program quotation inside `code` is excluded structurally.
 
+Configuration may add ancestor tag names with `excludeTags`, for example
+`{"rules":{"type/straight-quotes":{"excludeTags":["samp"]}}}`. These are HTML tag names, not CSS
+selectors; they are lower-cased and deduplicated before the rule runs.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with

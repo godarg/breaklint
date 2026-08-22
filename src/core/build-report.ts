@@ -11,7 +11,7 @@
 import { aggregateVerdict, exitCodeFor, gateCandidate, gateTriggeredBy } from "./engine.ts";
 import type { DocumentOutcome } from "./engine.ts";
 import type { FailOn, ReportMode, ReportSource } from "./enums.ts";
-import { SCHEMA_VERSION } from "./enums.ts";
+import { REPORT_SCHEMA_VERSION } from "./enums.ts";
 import type { Report, ReportConfig, ReportEnvironment } from "./types.ts";
 
 export function buildReport(input: {
@@ -39,7 +39,7 @@ export function buildReport(input: {
   const ambiguousGroups = new Set(findings.filter((f) => f.ambiguity).map((f) => f.fingerprint)).size;
 
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: REPORT_SCHEMA_VERSION,
     mode: input.mode,
     source: input.source,
     chain: "v1-rule-and-reporter-chain",

@@ -73,6 +73,7 @@ import { produceEvidence, type EvidenceOutcome } from "../render/evidence.ts";
 import { openRasterizer, type OpenRasterizerResult } from "../render/rasterizer.ts";
 import { collisionDetail, detectCollision, type CollisionSource } from "../source/collision.ts";
 import { injectSourceIds } from "../source/inject.ts";
+import { closeRendererOwnedResourcesBounded } from "./renderer-cleanup.ts";
 
 export interface RenderOptions {
   outDir: string;
@@ -272,6 +273,21 @@ export function withPagination(html: string, pagedjs: string, collector: boolean
   };
   walk(document);
   return insertion < 0 ? `${html}${harness}` : `${html.slice(0, insertion)}${harness}${html.slice(insertion)}`;
+}
+
+/**
+ * Installs the measured paginator after the authored document has loaded.
+ *
+ * The old production path appended inline script tags to the authored HTML. A document-level CSP
+ * correctly blocks those tags, which made breaklint unable to check its own script-free report.
+ * Disabling CSP would also execute author scripts the document intentionally blocked and therefore
+ * change the thing being measured. CDP evaluation is the narrower boundary: author loading keeps
+ * its original CSP semantics; only the tool-owned, already-read bundle crosses the driver bridge.
+ */
+export function paginationBundleSource(pagedjs: string): string {
+  return `if ("Paged" in window) throw new Error("Paged was defined before the measured bundle");\n` +
+    `${pagedjs}\n` +
+    `window.__blPrimitives.capturePaged(Paged);`;
 }
 
 async function serveDocument(input: {
@@ -1218,6 +1234,7 @@ async function openContentPage(
     await page.goto(`${origin}/document.html`, { waitUntil: "networkidle0", timeout: PAGINATION_TIMEOUT_MS });
     if (pageErrors.length > 0) throw new Error(`content page error before apparatus install: ${pageErrors.join(" | ")}`);
     await enforceOperationalLimits(page, network, 0, "pre-pagination");
+    await page.evaluate<void>(paginationBundleSource(context.pagedjsSource));
     if (collectorNonce) await page.evaluate<void>(collectorSource(apparatusCapability, collectorNonce));
   await page.evaluate<void>(paginationApparatusSource(apparatusCapability));
     await page.evaluate<void>(ANIMATION_FREEZE_SOURCE);
@@ -1351,8 +1368,10 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     throw error;
   }
   const served = await serveDocument({
-    injectedHtml: withPagination(injected.html, context.pagedjsSource, true),
-    controlHtml: withPagination(original, context.pagedjsSource, false),
+    // The paginator is installed over the browser-driver boundary after navigation. Keep these
+    // bytes identical to the authored/injected documents so their CSP remains authoritative.
+    injectedHtml: injected.html,
+    controlHtml: original,
     assets,
     documentRoot: dirname(resolve(path)),
     blocked: context.blocked,
@@ -1804,18 +1823,12 @@ export async function renderDocuments(
       }
     }
   } finally {
-    const rasterizerClose = closeRasterizerBounded(rasterizerResult.rasterizer);
-    // Give the owned rasterizer target a short orderly-close head start. A hung protocol still
-    // cannot block browser cleanup: after 250 ms both bounded cleanup paths proceed concurrently.
-    // Starting both in the same tick races Browser.close against Target.closeTarget and can create
-    // a false rasterizer-close failure on an otherwise healthy run.
-    const browserClose = (async () => {
-      await Promise.race([rasterizerClose.then(() => undefined), new Promise<void>((resolveWait) => setTimeout(resolveWait, 250))]);
-      return closeBrowserBounded(browser, dependencies.terminateBrowserProcessTree);
-    })();
-    const [rasterizerError, closeError] = await Promise.all([rasterizerClose, browserClose]);
-    rasterizerCloseError = rasterizerError;
-    browserTerminationError = closeError;
+    const cleanup = await closeRendererOwnedResourcesBounded(
+      () => closeRasterizerBounded(rasterizerResult.rasterizer),
+      () => closeBrowserBounded(browser, dependencies.terminateBrowserProcessTree),
+    );
+    rasterizerCloseError = cleanup.rasterizerError;
+    browserTerminationError = cleanup.browserError;
     if (timedOutAcquisition) {
       try {
         // Abort-aware driver boundaries and owned-resource cleanup make this a real join. Returning

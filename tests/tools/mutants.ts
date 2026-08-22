@@ -182,7 +182,7 @@ export function runMutationGuard(): KillReport[] {
     const trigger = corpus.find((c) => {
       const out = runDocument(
         { path: c.name, snapshot: c.snapshot, infrastructure: [] },
-        { failOn: "never", activeRules: [rule], optionsByRule: {}, loweredFloors: {} },
+        { failOn: "never", activeRules: [rule], optionsByRule: {}, coverageFloors: {} },
       );
       return out.report.findings.length > 0;
     });
@@ -195,13 +195,13 @@ export function runMutationGuard(): KillReport[] {
     const baseline = observe(
       runDocument(
         { path: trigger.name, snapshot: trigger.snapshot, infrastructure: [] },
-        { failOn: "never", activeRules: [rule], optionsByRule: {}, loweredFloors: {} },
+        { failOn: "never", activeRules: [rule], optionsByRule: {}, coverageFloors: {} },
       ).report.findings,
     );
 
     const observedValues = runDocument(
       { path: trigger.name, snapshot: trigger.snapshot, infrastructure: [] },
-      { failOn: "never", activeRules: [rule], optionsByRule: {}, loweredFloors: {} },
+      { failOn: "never", activeRules: [rule], optionsByRule: {}, coverageFloors: {} },
     ).report.findings.map((f) => f.measurement.value);
 
     const killed: MutantName[] = [];
@@ -213,7 +213,7 @@ export function runMutationGuard(): KillReport[] {
           const observation = observe(
             runDocument(
               { path: trigger.name, snapshot: trigger.snapshot, infrastructure: [] },
-              { failOn: "never", activeRules: [mutated], optionsByRule: {}, loweredFloors: {} },
+              { failOn: "never", activeRules: [mutated], optionsByRule: {}, coverageFloors: {} },
             ).report.findings,
           );
           return differs(baseline, observation);

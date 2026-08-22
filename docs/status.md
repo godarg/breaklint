@@ -12,7 +12,10 @@ stated here rather than left to be inferred from a passing test suite.
 | Mutation guard | 15/15 rules kill every mutant, each on a fixture that actually triggers it |
 | False-alarm corpus | every clean fixture stays silent, every trigger fixture fires and is attributed correctly |
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
+| Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in report schema 3; generated schema drift and process-boundary exit 2 are tested |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
+| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; 32-cell, input/environment-bound human-review ledger over 47 inputs with computed contrast, stable visual contracts and exact raw audit hashes for all 62 reviewed artifacts (24 screens, 4 PDFs, 34 PDF rasters) |
+| Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
 | `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 8 findings across 7 rules |
 
@@ -121,7 +124,7 @@ each measured singly.
 **Four repairs were once green in every suite while being reverted.** An audit turned each of them
 back into its defect — the tolerance-free page verdict, the unread integrity count, the unread
 late errors, the file-access switch — and the whole suite as it stood at the time (104 unit tests
-and 15 live tests, since grown to 320 and 56) plus the mutation guard stayed green through all
+and 15 live tests, since grown to 364 and 57) plus the mutation guard stayed green through all
 four. The repairs were real; the gates were not there. They are now, and
 each was verified by re-applying the mutation and watching it go red. The reason the live corpus
 could not reach them is structural: a real document cannot be made to produce a rasteriser page
@@ -208,10 +211,21 @@ The components below are now connected rather than isolated pieces:
 | Geometry cross-check | the product and live oracle share one sampler; selector plus rendered-fragment occurrence binds each in-page box to the exact CDP `DOM.getBoxModel` node. The two agree EXACTLY on this corpus, twice; a systematic 0.002 px disagreement fails the suite |
 | Break-cause collector | all five Paged.js hooks registered and each one verified to have fired; boundaries classified from the three attributes the paginator writes, on a document carrying six boundary kinds at once |
 
-**Still unfinished:** M3's real-renderer SVG ink passes and calibration of every threshold; the
-M4+ corpus, packaging and release milestones also remain open. A green M2/M2d run therefore says
-that the implemented measurement chain behaved as specified for that run, not that its rule
-thresholds have been validated against human-labelled production documents.
+**Released:** `breaklint@0.1.0` is published on npm from the versioned release workflow with
+provenance, and the packed package is exercised from a clean consumer directory on Node 20 and 22.
+Packaging and the first release are therefore complete, not future milestones.
+
+**Prepared for the release workflow, not yet a registry claim:** `0.2.0` implements Configuration
+Contract v1, the live-gate truth repair, HTML Report Surface v2, the real self-application gate and
+the Node-22.13/Puppeteer-25 security migration. The minor-version change is intentional: unknown or
+formerly inert configuration now fails closed, `excludeSelectors` is corrected to `excludeTags`,
+and report schema moves to 3 while snapshot schema remains 2. This paragraph remains deliberately
+pre-release until the tagged workflow and a fresh registry consumer have both passed.
+
+**Still unfinished:** M3's real-renderer SVG ink passes and calibration of every threshold, plus
+M4's human-labelled production corpus. A green M2/M2d run therefore says that the implemented
+measurement chain behaved as specified for that run, not that its rule thresholds have been
+validated against human-labelled production documents.
 
 **Input identity remains bounded by L-07.** The report records the HTML hash, observed resource
 status/bytes/hash and redirects, renderer/platform data and resolved font-family names. It does
