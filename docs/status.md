@@ -225,6 +225,18 @@ The minor-version change is intentional: unknown or formerly inert configuration
 remains 2. This status paragraph is a later documentation commit and is not retroactively part of
 the published tarball.
 
+### CI incident reconciliation: failed push at `05fec787`
+
+GitHub Actions run [32591976847](https://github.com/godarg/breaklint/actions/runs/32591976847)
+correctly failed in the portable report-surface gate. The provenance checks had passed; the stop
+occurred because `package.json` and `.github/workflows/ci.yml` were bound human-review inputs and
+their changed bytes produced fingerprint `278f33fb…`, while the reviewed ledger remained bound to
+`58f29719…`. Commit `9caf48d1` restored both inputs byte-for-byte and moved the provenance self-test
+to the non-surface-bound release path instead of relabelling the visual review. The immediately
+following run [32592289178](https://github.com/godarg/breaklint/actions/runs/32592289178) passed both
+jobs on the exact `origin/main` SHA. The older red run is retained as evidence that the gate rejected
+unreviewed input drift; it is resolved and must not be rerun or reclassified as green.
+
 **Still unfinished:** M3's real-renderer SVG ink passes and calibration of every threshold, plus
 M4's human-labelled production corpus. A green M2/M2d run therefore says that the implemented
 measurement chain behaved as specified for that run, not that its rule thresholds have been
