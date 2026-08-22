@@ -254,7 +254,11 @@ jobs:
           test "$artifact_version" = "0.2.0" || { echo "only 0.2.0 is authorised"; exit 1; }
 
           # Peeling a ref proves only its commit: lightweight and annotated tags both peel. Require
-          # the tag OBJECT first, through the same guard whose process-boundary canary runs in CI.
+          # the remote tag OBJECT first, through the same guard whose process-boundary canary runs
+          # in CI. actions/checkout may materialise the triggering tag name as a direct commit ref,
+          # even with complete history, so replace that local ref from the exact remote tag ref.
+          git fetch --force --no-tags origin \
+            "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
           node tests/tools/release-tag-contract.mjs --assert-ref "$GITHUB_REF_NAME"
 
           git fetch --no-tags origin main
