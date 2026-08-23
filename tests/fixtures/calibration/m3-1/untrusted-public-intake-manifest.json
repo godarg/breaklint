@@ -1,0 +1,58 @@
+{
+  "contractVersion": "m3-1-public-intake-manifest-v1",
+  "manifestId": "intake_manifest_untrusted_fixture_001",
+  "createdAt": "2026-08-23T00:00:00Z",
+  "purpose": "m3-1-public-corpus-intake",
+  "documents": [
+    {
+      "documentId": "doc_untrusted_fixture_001",
+      "artifact": {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "byteLength": 128,
+        "mediaType": "image/svg+xml",
+        "relativePath": "m3-1/untrusted-synthetic.svg"
+      },
+      "sourceLocator": "source_untrusted_fixture_001",
+      "sourceCapturedAt": "2026-08-23T00:00:00Z",
+      "sourceCaptureMode": "synthetic-fixture-construction",
+      "firstPartySourceSnapshot": null,
+      "provenanceClass": "synthetic-first-party",
+      "provenanceEvidenceSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "rightsBasis": "first-party-founder-authorized",
+      "rightsEvidenceSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "privacyClass": "synthetic-no-personal-data",
+      "privacyEvidenceSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "founderAuthorizationSha256": null,
+      "groups": {
+        "originGroupId": "origin_group_untrusted_fixture_001",
+        "duplicateGroupId": "duplicate_group_untrusted_fixture_001",
+        "derivationGroupId": "derivation_group_untrusted_fixture_001",
+        "templateGroupId": "template_group_untrusted_fixture_001",
+        "versionGroupId": "version_group_untrusted_fixture_001"
+      },
+      "targets": [
+        {
+          "targetId": "target_untrusted_fixture_001",
+          "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ruleId": "svg/text-clipped",
+          "svgRootLocator": {
+            "mode": "author-id",
+            "authorId": "synthetic_svg_root"
+          },
+          "targetLocator": {
+            "mode": "byte-bound-structural",
+            "structuralPath": "/svg[1]/text[1]",
+            "sourceSignatureSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        }
+      ],
+      "claimEligible": false,
+      "captureAttestorTrustValid": false,
+      "calibrated": false
+    }
+  ],
+  "claimEligible": false,
+  "captureAttestorTrustValid": false,
+  "calibrated": false,
+  "evidenceTrust": "untrusted-intake-only"
+}

@@ -1,0 +1,21 @@
+{
+  "contractVersion": "m3-1-annotation-session-v1",
+  "sessionId": "session_untrusted_fixture_001",
+  "sessionRole": "annotator",
+  "purpose": "blind-ground-truth-annotation",
+  "startedAt": "2026-08-23T00:00:00Z",
+  "completedAt": null,
+  "identityBindingId": "identity_binding_untrusted_fixture_001",
+  "identityBindingSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "packetId": "blind_packet_untrusted_fixture_001",
+  "packetSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "packetOrderSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "guidelineVersion": "svg-text-clipped-v1",
+  "annotationSetSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "resultDisclosureAt": null,
+  "blinded": true,
+  "breaklintResultExposed": false,
+  "humanIdentityEstablishedByJsonAlone": false,
+  "externalIdentityAttestationRequired": true,
+  "evidenceTrust": "untrusted"
+}

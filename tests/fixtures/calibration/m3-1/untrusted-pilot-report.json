@@ -1,0 +1,36 @@
+{
+  "contractVersion": "m3-1-pilot-report-v1",
+  "reportId": "pilot_report_untrusted_fixture_001",
+  "createdAt": "2026-08-23T00:00:00Z",
+  "purpose": "public-corpus-process-feasibility",
+  "executionStatus": "infrastructure-complete-external-execution-blocked",
+  "manifestReference": {
+    "artifactId": "intake_manifest_untrusted_fixture_001",
+    "artifactSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "artifactContractVersion": "m3-1-public-intake-manifest-v1"
+  },
+  "samplingPlanId": "sampling_untrusted_pilot_001",
+  "samplingPlanSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "annotationSessions": [],
+  "identityBindings": [],
+  "holdoutFreezeReceipt": null,
+  "externalAttestationProof": null,
+  "trustPolicy": null,
+  "documentCount": 0,
+  "originGroupCount": 0,
+  "annotatorCount": 0,
+  "adjudicatorCount": 0,
+  "claims": {
+    "realHumanAnnotationVerified": false,
+    "identitySeparationVerified": false,
+    "holdoutFreezeExternalValid": false,
+    "captureAttestorTrustValid": false,
+    "ruleReadyForCalibration": false,
+    "ruleReadyForCalibratedClaim": false,
+    "calibrated": false
+  },
+  "evidenceTrust": "untrusted",
+  "limitations": [
+    "No real human annotation, external receipt, or externally governed trust root is represented."
+  ]
+}

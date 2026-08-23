@@ -1,0 +1,41 @@
+{
+  "contractVersion": "m3-1-holdout-freeze-receipt-v1",
+  "receiptId": "freeze_receipt_untrusted_fixture_001",
+  "purpose": "holdout-freeze",
+  "issuedAt": "2026-08-23T00:00:00Z",
+  "frozenAt": "2026-08-23T00:00:00Z",
+  "serialNumber": "untrusted-freeze-serial-001",
+  "sequence": 1,
+  "previousReceiptSha256": null,
+  "previousCheckpointSha256": null,
+  "subject": {
+    "subjectId": "holdout_untrusted_fixture_001",
+    "subjectSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "subjectContractVersion": "m3-1-holdout-projection-v1",
+    "subjectMediaType": "application/json"
+  },
+  "workflowIdentity": {
+    "issuer": "https://issuer.example.invalid",
+    "subject": "repo:synthetic-org/synthetic-repo:ref:refs/heads/main",
+    "repository": "synthetic-org/synthetic-repo",
+    "workflowPath": ".github/workflows/m3-1-attest.yml",
+    "workflowRef": "synthetic-org/synthetic-repo/.github/workflows/m3-1-attest.yml@refs/heads/main",
+    "commitSha": "4444444444444444444444444444444444444444",
+    "runId": "1000001",
+    "runAttempt": 1
+  },
+  "trustPolicyId": "attestor_policy_untrusted_fixture_001",
+  "trustPolicySha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "externalAttestationProofId": "proof_untrusted_fixture_001",
+  "externalAttestationProofSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "transparencyCheckpoint": {
+    "logId": "untrusted-log-fixture",
+    "entryId": "untrusted-entry-fixture",
+    "integratedAt": "2026-08-23T00:00:01Z",
+    "checkpointSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inclusionProofSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "externalVerificationRequired": true,
+  "holdoutFreezeExternalValid": false,
+  "evidenceTrust": "untrusted"
+}

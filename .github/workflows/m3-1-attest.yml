@@ -1,0 +1,71 @@
+name: M3-1 public evidence attestation
+
+# This workflow attests one fixed, public, Git-tracked evidence subject. It never runs a product
+# build, release, publish, tag or deployment. An attestation alone does not make the M3-1 claims
+# true: the independent verifier must still apply its pinned workflow and trust policy.
+on:
+  workflow_dispatch:
+    inputs:
+      expected_subject_sha256:
+        description: Preregistered SHA-256 of the fixed public holdout-freeze projection
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m3-1-attest-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  attest-public-evidence:
+    name: attest fixed public M3-1 evidence
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Check out the exact main commit without credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Resolve and verify the fixed public subject
+        id: subject
+        env:
+          EXPECTED_SUBJECT_SHA256: ${{ inputs.expected_subject_sha256 }}
+        run: |
+          subject="corpus/public/m3-1-pilot-v1/freeze-projection.json"
+          test -f "$subject" && test ! -L "$subject"
+          git ls-files --error-unmatch "$subject" >/dev/null
+          printf '%s' "$EXPECTED_SUBJECT_SHA256" | grep -Eq '^[a-f0-9]{64}$'
+          actual_subject_sha256=$(sha256sum "$subject" | awk '{print $1}')
+          test "$actual_subject_sha256" = "$EXPECTED_SUBJECT_SHA256"
+          node -e '
+            const fs = require("node:fs");
+            const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(fs.readFileSync(process.argv[1])));
+            if (value.projection?.contractVersion !== "m3-1-freeze-projection-v1") throw new Error("unexpected freeze subject contractVersion");
+            const encoded = JSON.stringify(value);
+            if (/"(?:calibrated|captureAttestorTrustValid|capture_attestor_trust_valid)":true/u.test(encoded)) throw new Error("untrusted subject contains a forbidden true claim");
+          ' "$subject"
+          echo "path=$subject" >> "$GITHUB_OUTPUT"
+          echo "sha256=$actual_subject_sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub OIDC and transparency-backed provenance
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-path: ${{ steps.subject.outputs.path }}
+
+      - name: Record the non-release subject identity
+        env:
+          SUBJECT_PATH: ${{ steps.subject.outputs.path }}
+          SUBJECT_SHA256: ${{ steps.subject.outputs.sha256 }}
+        run: |
+          echo "attested subject: $SUBJECT_PATH"
+          echo "attested sha256: $SUBJECT_SHA256"
+          echo "source commit: $GITHUB_SHA"
+          echo "This workflow created no tag, release, package, publish or deployment."

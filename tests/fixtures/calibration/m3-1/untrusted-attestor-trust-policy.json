@@ -1,0 +1,48 @@
+{
+  "contractVersion": "m3-1-attestor-trust-policy-v1",
+  "policyId": "attestor_policy_untrusted_fixture_001",
+  "policyVersion": 1,
+  "createdAt": "2026-08-23T00:00:00Z",
+  "effectiveFrom": "2026-08-23T00:00:00Z",
+  "expiresAt": "2026-08-24T00:00:00Z",
+  "purpose": ["holdout-freeze", "capture-attestation"],
+  "governanceSource": {
+    "sourceId": "untrusted-policy-source-fixture",
+    "sourceSha256": null,
+    "pinLocation": "repository-local-untrusted-demonstrator",
+    "externallyGoverned": false
+  },
+  "previousPolicySha256": null,
+  "minimumReceiptSequence": 1,
+  "minimumCheckpointSha256": null,
+  "allowedWorkflowIdentities": [
+    {
+      "identityId": "attestor_identity_untrusted_fixture_001",
+      "issuer": "https://issuer.example.invalid",
+      "subject": "repo:synthetic-org/synthetic-repo:ref:refs/heads/main",
+      "repository": "synthetic-org/synthetic-repo",
+      "workflowPath": ".github/workflows/m3-1-attest.yml",
+      "workflowRef": "synthetic-org/synthetic-repo/.github/workflows/m3-1-attest.yml@refs/heads/main",
+      "sourceRef": "refs/heads/main",
+      "oidcAudience": "synthetic-attestation-fixture",
+      "trustRootProvider": "github-cli-built-in-sigstore-public-good",
+      "runnerEnvironment": "github-hosted",
+      "notBefore": "2026-08-23T00:00:00Z",
+      "notAfter": "2026-08-24T00:00:00Z",
+      "allowedPurposes": ["holdout-freeze", "capture-attestation"]
+    }
+  ],
+  "rotations": [],
+  "revocations": [],
+  "unknownIdentityDisposition": "reject",
+  "expiredIdentityDisposition": "reject",
+  "rotatedOutIdentityDisposition": "reject",
+  "revokedIdentityDisposition": "reject",
+  "replayDisposition": "reject",
+  "rollbackDisposition": "reject",
+  "allowSelfProvidedTrustRoot": false,
+  "externalPolicyPinRequired": true,
+  "externalPolicyPinPresent": false,
+  "policyStatus": "untrusted",
+  "evidenceTrust": "untrusted"
+}

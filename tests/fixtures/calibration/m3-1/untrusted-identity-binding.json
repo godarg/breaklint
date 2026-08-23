@@ -1,0 +1,19 @@
+{
+  "contractVersion": "m3-1-identity-binding-v1",
+  "bindingId": "identity_binding_untrusted_fixture_001",
+  "subjectOpaqueId": "person_untrusted_fixture_001",
+  "subjectRole": "annotator",
+  "purpose": "annotation-identity-separation",
+  "issuedAt": "2026-08-23T00:00:00Z",
+  "notBefore": "2026-08-23T00:00:00Z",
+  "notAfter": "2026-08-24T00:00:00Z",
+  "registryPolicyId": "identity_policy_untrusted_fixture_001",
+  "registryPolicySha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "externalAttestationProofId": "proof_untrusted_identity_fixture_001",
+  "externalAttestationProofSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "attestationMode": "external-attestation-only",
+  "humanIdentityEstablishedByJsonAlone": false,
+  "externalAttestationRequired": true,
+  "bindingStatus": "untrusted",
+  "evidenceTrust": "untrusted"
+}

@@ -1,0 +1,24 @@
+{
+  "contractVersion": "m3-1-sampling-plan-v1",
+  "planId": "sampling_untrusted_pilot_001",
+  "planVersion": 1,
+  "createdAt": "2026-08-23T00:00:00Z",
+  "purpose": "feasibility-pilot",
+  "studyMode": "process-feasibility-only",
+  "ruleIds": ["svg/text-clipped", "svg/text-ink-collision"],
+  "samplingUnit": "target-event-clustered-by-origin",
+  "confidenceLevel": 0.95,
+  "targetHalfWidth": 0.1,
+  "conservativeEventRate": 0.5,
+  "designEffect": 1.2,
+  "expectedExclusionRate": 0.15,
+  "plannedAdjudicatedPositiveEventsPerRule": 137,
+  "plannedAdjudicatedNegativeEventsPerRule": 137,
+  "originClusterBootstrapRequired": true,
+  "thresholdOptimizationAuthorized": false,
+  "calibrationClaimAuthorized": false,
+  "evidenceTrust": "untrusted",
+  "limitations": [
+    "This synthetic contract fixture demonstrates schema shape only and supplies no sampling evidence."
+  ]
+}
