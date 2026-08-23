@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/acceptance-report-v1.schema.json",
+  "title": "breaklint external holdout acceptance report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "reportId",
+    "createdAt",
+    "ruleId",
+    "holdoutLineageId",
+    "holdoutId",
+    "holdoutVersion",
+    "holdoutManifestHash",
+    "candidateConfigHash",
+    "rendererFreezeId",
+    "rendererContentHash",
+    "acceptanceGateVersion",
+    "preregisteredPlanId",
+    "planSha256",
+    "preregistrationReceiptSha256",
+    "outcomeSha256",
+    "eligibleHoldoutDocuments",
+    "eligibleHoldoutOriginGroups",
+    "ambiguityExcluded",
+    "evaluatedTargetCount",
+    "includedBinaryTargetCount",
+    "excludedTargetCount",
+    "confusionCounts",
+    "gates"
+  ],
+  "properties": {
+    "contractVersion": { "const": "m3-0-acceptance-report-v1" },
+    "reportId": { "type": "string", "pattern": "^acceptance_[A-Za-z0-9._-]{8,80}$" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "ruleId": { "enum": ["svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport"] },
+    "holdoutLineageId": { "type": "string", "pattern": "^lineage_[A-Za-z0-9._-]{8,80}$" },
+    "holdoutId": { "type": "string", "pattern": "^holdout_[A-Za-z0-9._-]{8,80}$" },
+    "holdoutVersion": { "type": "integer", "minimum": 1 },
+    "holdoutManifestHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "candidateConfigHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "rendererFreezeId": { "type": "string", "pattern": "^renderer_[a-f0-9]{64}$" },
+    "rendererContentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "acceptanceGateVersion": { "type": "string", "minLength": 1 },
+    "preregisteredPlanId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._:-]{7,180}$" },
+    "planSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "preregistrationReceiptSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "outcomeSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "eligibleHoldoutDocuments": { "type": "integer", "minimum": 1 },
+    "eligibleHoldoutOriginGroups": { "type": "integer", "minimum": 1 },
+    "ambiguityExcluded": { "const": true },
+    "evaluatedTargetCount": { "type": "integer", "minimum": 1 },
+    "includedBinaryTargetCount": { "type": "integer", "minimum": 0 },
+    "excludedTargetCount": { "type": "integer", "minimum": 0 },
+    "confusionCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["truePositive", "trueNegative", "falsePositive", "falseNegative", "excludedAmbiguous"],
+      "properties": {
+        "truePositive": { "type": "integer", "minimum": 0 },
+        "trueNegative": { "type": "integer", "minimum": 0 },
+        "falsePositive": { "type": "integer", "minimum": 0 },
+        "falseNegative": { "type": "integer", "minimum": 0 },
+        "excludedAmbiguous": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["metric", "operator", "threshold"],
+        "properties": {
+          "metric": { "enum": ["precision", "recall", "specificity", "false-positive-rate"] },
+          "operator": { "enum": [">=", "<="] },
+          "threshold": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    }
+  }
+}

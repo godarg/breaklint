@@ -29,3 +29,17 @@ A clip that contains the text is not a finding. Unstable ink passes are discarde
 human-checked truth; no such corpus exists for this project. Every finding says so, and the
 report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
 also why this rule ships with the severity it has.
+
+M3-0 adds an independent oracle contract and a real-renderer seven-fixture lab. It reproduces the
+group-selector zero and the shared-mask dilution counterexample, validates target attribution, and
+keeps construction truth separate from the unchanged production decision. This establishes
+calibration infrastructure, not calibration readiness: the checked-in corpus has zero eligible real
+documents and no frozen holdout. See [`../validation/architecture.md`](../validation/architecture.md).
+The mandatory G2 nested-group case uses non-identity `translate(10,0)`; its authored clip boundary
+is checked through the applied text target's real CTM. Future claim evaluation is target-row based,
+with oracle/annotation/adjudication snapshots and a closed measurement receipt bound to the frozen
+holdout. The validator executes the source-pinned unchanged registry `Rule.run`; it does not accept
+an outcome-authored prediction or a parallel clipping formula.
+Contract-simulation receipts remain outside the real-evidentiary denominator. A later claim-grade
+run additionally requires a separately supplied capture bundle and attestation bound to the exact
+real-render receipt rows, plus an owner-approved external trust root that M3-0 does not possess.

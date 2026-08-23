@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/capture-evidence-bundle-v1.schema.json",
+  "title": "breaklint external render-capture evidence bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "bundleId", "capturedAt", "measurementReceiptId", "ruleId", "candidateConfigHash", "rendererFreezeId", "rendererContentHash", "producerSourceIdentitySha256", "productRuleSourceSha256", "rowsSha256", "artifactTargetSetSha256", "rawMeasurementsSha256", "rows"],
+  "properties": {
+    "contractVersion": { "const": "m3-0-capture-evidence-bundle-v1" },
+    "bundleId": { "type": "string", "pattern": "^capture_bundle_[A-Za-z0-9._-]{8,80}$" },
+    "capturedAt": { "type": "string", "format": "date-time" },
+    "measurementReceiptId": { "type": "string", "pattern": "^measurement_[A-Za-z0-9._-]{8,80}$" },
+    "ruleId": { "$ref": "#/$defs/ruleId" },
+    "candidateConfigHash": { "$ref": "#/$defs/sha256" },
+    "rendererFreezeId": { "type": "string", "pattern": "^renderer_[a-f0-9]{64}$" },
+    "rendererContentHash": { "$ref": "#/$defs/sha256" },
+    "producerSourceIdentitySha256": { "$ref": "#/$defs/sha256" },
+    "productRuleSourceSha256": { "$ref": "#/$defs/sha256" },
+    "rowsSha256": { "$ref": "#/$defs/sha256" },
+    "artifactTargetSetSha256": { "$ref": "#/$defs/sha256" },
+    "rawMeasurementsSha256": { "$ref": "#/$defs/sha256" },
+    "rows": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/row" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "ruleId": { "enum": ["svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport"] },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentId", "artifactSha256", "targetId", "ruleId", "rendererFreezeId", "rendererContentHash", "measuredAt", "rawMeasurementSha256"],
+      "properties": {
+        "documentId": { "type": "string", "pattern": "^doc_[A-Za-z0-9._-]{8,80}$" },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "targetId": { "type": "string", "pattern": "^target_[A-Za-z0-9._-]{8,180}$" },
+        "ruleId": { "$ref": "#/$defs/ruleId" },
+        "rendererFreezeId": { "type": "string", "pattern": "^renderer_[a-f0-9]{64}$" },
+        "rendererContentHash": { "$ref": "#/$defs/sha256" },
+        "measuredAt": { "type": "string", "format": "date-time" },
+        "rawMeasurementSha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

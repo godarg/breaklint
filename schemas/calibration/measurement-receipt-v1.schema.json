@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/measurement-receipt-v1.schema.json",
+  "title": "breaklint SVG measurement receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "receiptId", "createdAt", "evidentiaryStatus", "captureAttestationSha256", "producer", "ruleContract", "ruleId", "candidateConfig", "candidateConfigHash", "rendererFreezeId", "rendererContentHash", "rows"],
+  "properties": {
+    "contractVersion": { "const": "m3-0-measurement-receipt-v1" },
+    "receiptId": { "type": "string", "pattern": "^measurement_[A-Za-z0-9._-]{8,80}$" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "evidentiaryStatus": { "enum": ["externally-attested-real-render", "non-evidentiary-contract-simulation"] },
+    "captureAttestationSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+    "producer": { "$ref": "#/$defs/producer" },
+    "ruleContract": { "$ref": "#/$defs/ruleContract" },
+    "ruleId": { "$ref": "#/$defs/ruleId" },
+    "candidateConfig": { "$ref": "#/$defs/candidateConfig" },
+    "candidateConfigHash": { "$ref": "#/$defs/sha256" },
+    "rendererFreezeId": { "type": "string", "pattern": "^renderer_[a-f0-9]{64}$" },
+    "rendererContentHash": { "$ref": "#/$defs/sha256" },
+    "rows": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/row" } }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "evidentiaryStatus": { "const": "externally-attested-real-render" } } },
+      "then": { "properties": { "captureAttestationSha256": { "$ref": "#/$defs/sha256" } } },
+      "else": { "properties": { "captureAttestationSha256": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "gitSha1": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "ruleId": { "enum": ["svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport"] },
+    "sourceIdentity": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["mode", "commit"], "properties": { "mode": { "const": "clean-commit" }, "commit": { "$ref": "#/$defs/gitSha1" } } },
+        { "type": "object", "additionalProperties": false, "required": ["mode", "baseCommit", "gitDiffSha256", "sourceTreeSha256", "sourceBundleSha256", "sourceScope"], "properties": {
+          "mode": { "const": "dirty-source-bundle" }, "baseCommit": { "$ref": "#/$defs/gitSha1" }, "gitDiffSha256": { "$ref": "#/$defs/sha256" }, "sourceTreeSha256": { "$ref": "#/$defs/sha256" }, "sourceBundleSha256": { "$ref": "#/$defs/sha256" },
+          "sourceScope": { "type": "object", "additionalProperties": false, "required": ["inclusion", "exclusion"], "properties": { "inclusion": { "const": "git-tracked-and-untracked-nonignored" }, "exclusion": { "const": "gitignored-and-generated-outputs" } }
+        } } }
+      ]
+    },
+    "producer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contractId", "contractVersion", "sourceIdentity", "sourceIdentitySha256"],
+      "properties": { "contractId": { "const": "breaklint-svg-measurement-producer" }, "contractVersion": { "const": "m3-0-measurement-producer-v1" }, "sourceIdentity": { "$ref": "#/$defs/sourceIdentity" }, "sourceIdentitySha256": { "$ref": "#/$defs/sha256" } }
+    },
+    "ruleContract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ruleId", "moduleRelativePath", "sourceSha256", "executableContractVersion"],
+      "properties": { "ruleId": { "$ref": "#/$defs/ruleId" }, "moduleRelativePath": { "enum": ["src/rules/svg/text-clipped.ts", "src/rules/svg/text-ink-collision.ts", "src/rules/svg/text-overflows-viewport.ts"] }, "sourceSha256": { "$ref": "#/$defs/sha256" }, "executableContractVersion": { "const": "m3-0-real-rule-run-v1" } }
+    },
+    "candidateConfig": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["ruleId", "maxMissingInk"], "properties": { "ruleId": { "const": "svg/text-clipped" }, "maxMissingInk": { "type": "number", "minimum": 0, "maximum": 1 } } },
+        { "type": "object", "additionalProperties": false, "required": ["ruleId", "minCollisionInk", "minOccludedInk"], "properties": { "ruleId": { "const": "svg/text-ink-collision" }, "minCollisionInk": { "type": "integer", "minimum": 0 }, "minOccludedInk": { "type": "integer", "minimum": 0 } } },
+        { "type": "object", "additionalProperties": false, "required": ["ruleId", "maxOvershootPx"], "properties": { "ruleId": { "const": "svg/text-overflows-viewport" }, "maxOvershootPx": { "const": 0 } } }
+      ]
+    },
+    "box": { "type": "object", "additionalProperties": false, "required": ["x", "y", "width", "height"], "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "width": { "type": "number", "minimum": 0 }, "height": { "type": "number", "minimum": 0 } } },
+    "inkPass": { "type": "object", "additionalProperties": false, "required": ["count", "maskHash"], "properties": { "count": { "type": "integer", "minimum": 0 }, "maskHash": { "$ref": "#/$defs/sha256" } } },
+    "targetInk": {
+      "type": "object", "additionalProperties": false, "required": ["T", "T0"],
+      "properties": {
+        "T": { "type": "object", "additionalProperties": false, "required": ["count", "maskHash", "intersectShapes", "missingInFull"], "properties": { "count": { "type": "integer", "minimum": 0 }, "maskHash": { "$ref": "#/$defs/sha256" }, "intersectShapes": { "type": "integer", "minimum": 0 }, "missingInFull": { "type": "integer", "minimum": 0 } } },
+        "T0": { "$ref": "#/$defs/inkPass" }
+      }
+    },
+    "textTarget": {
+      "type": "object", "additionalProperties": false,
+      "required": ["targetKey", "svgTextKey", "boxScreen", "clipState", "ink"],
+      "properties": { "targetKey": { "type": "string", "minLength": 1 }, "svgTextKey": { "type": "string", "minLength": 1 }, "boxScreen": { "$ref": "#/$defs/box" }, "clipState": { "enum": ["none", "clip-path", "mask", "both"] }, "ink": { "$ref": "#/$defs/targetInk" } }
+    },
+    "shape": { "type": "object", "additionalProperties": false, "required": ["boxScreen", "strokeWidth"], "properties": { "boxScreen": { "$ref": "#/$defs/box" }, "strokeWidth": { "type": "number", "minimum": 0 } } },
+    "svgRecord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["nodeKey", "sourceKey", "measurable", "reason", "viewportScreen", "overflow", "textTargetCount", "textTargetsCapped", "texts", "shapes", "paths", "inkPasses", "inkStable"],
+      "properties": {
+        "nodeKey": { "type": "string", "minLength": 1 }, "sourceKey": { "type": ["string", "null"] }, "measurable": { "type": "boolean" },
+        "reason": { "type": ["string", "null"], "enum": [null, "env/svg-not-inline", "env/svg-no-text", "env/pixel-oracle-unavailable"] },
+        "viewportScreen": { "$ref": "#/$defs/box" }, "overflow": { "type": "string" }, "textTargetCount": { "type": "integer", "minimum": 0 }, "textTargetsCapped": { "type": "boolean" },
+        "texts": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/textTarget" } },
+        "shapes": { "type": "array", "items": { "$ref": "#/$defs/shape" } }, "paths": { "type": "array", "items": { "$ref": "#/$defs/shape" } },
+        "inkPasses": { "type": "object", "additionalProperties": false, "required": ["E", "S", "F"], "properties": { "E": { "$ref": "#/$defs/inkPass" }, "S": { "$ref": "#/$defs/inkPass" }, "F": { "$ref": "#/$defs/inkPass" } } },
+        "inkStable": { "type": "boolean" }
+      }
+    },
+    "snapshotProjection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "documentPath", "pageNumber", "svg"],
+      "properties": { "schemaVersion": { "const": 1 }, "documentPath": { "type": "string", "minLength": 1, "maxLength": 240 }, "pageNumber": { "type": "integer", "minimum": 1 }, "svg": { "$ref": "#/$defs/svgRecord" } }
+    },
+    "row": {
+      "type": "object", "additionalProperties": false,
+      "required": ["documentId", "artifactSha256", "targetId", "ruleId", "candidateConfigHash", "rendererFreezeId", "rendererContentHash", "measuredAt", "snapshot"],
+      "properties": {
+        "documentId": { "type": "string", "pattern": "^doc_[A-Za-z0-9._-]{8,80}$" }, "artifactSha256": { "$ref": "#/$defs/sha256" }, "targetId": { "type": "string", "pattern": "^target_[A-Za-z0-9._-]{8,180}$" },
+        "ruleId": { "$ref": "#/$defs/ruleId" }, "candidateConfigHash": { "$ref": "#/$defs/sha256" }, "rendererFreezeId": { "type": "string", "pattern": "^renderer_[a-f0-9]{64}$" }, "rendererContentHash": { "$ref": "#/$defs/sha256" },
+        "measuredAt": { "type": "string", "format": "date-time" }, "snapshot": { "$ref": "#/$defs/snapshotProjection" }
+      }
+    }
+  }
+}

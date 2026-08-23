@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/annotation-v1.schema.json",
+  "title": "breaklint M3 annotation contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "annotationId",
+    "annotatorId",
+    "targetId",
+    "ruleId",
+    "guidelineVersion",
+    "createdAt",
+    "blinded",
+    "breaklintResultExposed",
+    "label",
+    "rationale"
+  ],
+  "properties": {
+    "annotationId": { "type": "string", "pattern": "^ann_[A-Za-z0-9._-]{8,80}$" },
+    "annotatorId": { "type": "string", "pattern": "^annotator_[A-Za-z0-9._-]{4,80}$" },
+    "targetId": { "type": "string", "pattern": "^target_[A-Za-z0-9._:-]{8,180}$" },
+    "ruleId": {
+      "enum": [
+        "svg/text-clipped",
+        "svg/text-ink-collision",
+        "svg/text-overflows-viewport"
+      ]
+    },
+    "guidelineVersion": { "type": "string", "pattern": "^svg-[a-z-]+-v[1-9][0-9]*$" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "blinded": { "const": true },
+    "breaklintResultExposed": { "const": false },
+    "label": {
+      "enum": ["positive", "negative", "ambiguous", "abstain", "invalid_target"]
+    },
+    "rationale": { "type": "string", "minLength": 12, "maxLength": 2000 }
+  }
+}

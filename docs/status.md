@@ -237,10 +237,43 @@ following run [32592289178](https://github.com/godarg/breaklint/actions/runs/325
 jobs on the exact `origin/main` SHA. The older red run is retained as evidence that the gate rejected
 unreviewed input drift; it is resolved and must not be rerun or reclassified as green.
 
-**Still unfinished:** M3's real-renderer SVG ink passes and calibration of every threshold, plus
-M4's human-labelled production corpus. A green M2/M2d run therefore says that the implemented
-measurement chain behaved as specified for that run, not that its rule thresholds have been
+**M3-0 foundation is implemented, calibration is still unfinished.** The versioned independent
+oracle, strict corpus/annotation schemas, real Chrome/Paged.js SVG Validation Lab, semantic readiness
+validator, leakage/holdout checks and negative controls are documented under `docs/validation/`.
+The lab is additive and runs through the existing `npm test` E2E discovery path. Its synthetic
+fixtures validate the apparatus and known boundaries; they do not count as real calibration data.
+Claim readiness now fails closed without a separate trust ledger, previous immutable holdout
+baseline, externally anchored preregistration receipt, hash-bound acceptance plan, complete
+closed measurement receipt, source-pinned real-rule production evaluation, per-target outcome,
+complete external lineage snapshot and acceptance report. The validator executes the unchanged
+registry rule and derives the confusion matrix from frozen target rows; parallel decision formulas
+and aggregates alone cannot pass. Candidate, freeze, measurement, production, outcome, evaluation,
+report and claim must bind the same plan, receipt and holdout lineage.
+Current and embedded historical candidates are evaluated by the same leakage/chronology function
+against the snapshot's own split and known-outcome projection. Contract-simulation receipts remain
+valid seam tests but contribute zero real-evidentiary holdout documents/origins and cannot make a
+calibrated claim ready. External-receipt contract tests now require separately supplied capture
+bundle and attestation bytes; the validator can certify their integrity but reports
+`capture_attestor_trust_valid: false`. M3-0 has no owner-approved externally governed trust root, so
+all calibrated-claim readiness remains false even for byte-valid temporary capture bundles.
+All external calibration artifacts now cross one byte-authoritative decoder: the exact bytes are
+strictly decoded, schema-checked, hashed and then used for semantics. A redundant API value that
+differs from the decoded bytes is rejected; malformed, swapped or schema-invalid bytes cannot be
+rescued by a parallel object.
+Identical artifact bytes cannot
+inflate counts, author-ID targets are bound to the parsed artifact, renderer/source identity is
+content-derived from a closed clean-commit/dirty-source-bundle projection, and the lab measures
+blocked network requests, authored clip boundaries and the exact 7/8 pixel collision boundary.
+G2 now exercises its unchanged nested-group semantics with a real `translate(10,0)` transform, and
+its clip boundary is resolved in the applied target's CTM.
+There is still no eligible real corpus or frozen holdout, so every rule remains
+`calibrated: false`, every `rule_ready_for_calibrated_claim` value is false, and M3-1/M4 remain
+future work. A green M2/M2d or M3-0 run therefore says that the implemented measurement and
+validation apparatus behaved as specified for that run, not that a rule threshold has been
 validated against human-labelled production documents.
+The predecessor work item's three individual historical reviewer reports were not persisted and
+cannot be reconstructed as evidence after the fact; only its contemporaneous archive record and
+the current closure review are available. No replacement reports are inferred or backdated.
 
 **Input identity remains bounded by L-07.** The report records the HTML hash, observed resource
 status/bytes/hash and redirects, renderer/platform data and resolved font-family names. It does

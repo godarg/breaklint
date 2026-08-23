@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/preregistration-receipt-v1.schema.json",
+  "title": "breaklint external preregistration receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "receiptId",
+    "issuedAt",
+    "planSha256",
+    "holdoutLineageId",
+    "holdoutId"
+  ],
+  "properties": {
+    "contractVersion": { "const": "m3-0-preregistration-receipt-v1" },
+    "receiptId": { "type": "string", "pattern": "^receipt_[A-Za-z0-9._-]{8,80}$" },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "planSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "holdoutLineageId": { "type": "string", "pattern": "^lineage_[A-Za-z0-9._-]{8,80}$" },
+    "holdoutId": { "type": "string", "pattern": "^holdout_[A-Za-z0-9._-]{8,80}$" }
+  }
+}

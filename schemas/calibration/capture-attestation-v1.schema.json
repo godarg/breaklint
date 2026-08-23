@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/capture-attestation-v1.schema.json",
+  "title": "breaklint external render-capture attestation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "attestationId", "attestorId", "issuedAt", "measurementReceiptId", "ruleId", "candidateConfigHash", "rendererFreezeId", "rendererContentHash", "producerSourceIdentitySha256", "rowsSha256", "artifactTargetSetSha256", "captureEvidenceSha256"],
+  "properties": {
+    "contractVersion": { "const": "m3-0-capture-attestation-v1" },
+    "attestationId": { "type": "string", "pattern": "^capture_attestation_[A-Za-z0-9._-]{8,80}$" },
+    "attestorId": { "type": "string", "pattern": "^capture_attestor_[A-Za-z0-9._-]{8,80}$" },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "measurementReceiptId": { "type": "string", "pattern": "^measurement_[A-Za-z0-9._-]{8,80}$" },
+    "ruleId": { "enum": ["svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport"] },
+    "candidateConfigHash": { "$ref": "#/$defs/sha256" },
+    "rendererFreezeId": { "type": "string", "pattern": "^renderer_[a-f0-9]{64}$" },
+    "rendererContentHash": { "$ref": "#/$defs/sha256" },
+    "producerSourceIdentitySha256": { "$ref": "#/$defs/sha256" },
+    "rowsSha256": { "$ref": "#/$defs/sha256" },
+    "artifactTargetSetSha256": { "$ref": "#/$defs/sha256" },
+    "captureEvidenceSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

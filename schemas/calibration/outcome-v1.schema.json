@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/outcome-v1.schema.json",
+  "title": "breaklint external target-level holdout outcome v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "outcomeId",
+    "createdAt",
+    "ruleId",
+    "holdoutLineageId",
+    "holdoutId",
+    "holdoutVersion",
+    "holdoutManifestHash",
+    "candidateConfigHash",
+    "rendererFreezeId",
+    "rendererContentHash",
+    "planSha256",
+    "preregistrationReceiptSha256",
+    "productionEvaluationSha256",
+    "rows"
+  ],
+  "properties": {
+    "contractVersion": { "const": "m3-0-outcome-v1" },
+    "outcomeId": { "type": "string", "pattern": "^outcome_[A-Za-z0-9._-]{8,80}$" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "ruleId": { "enum": ["svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport"] },
+    "holdoutLineageId": { "type": "string", "pattern": "^lineage_[A-Za-z0-9._-]{8,80}$" },
+    "holdoutId": { "type": "string", "pattern": "^holdout_[A-Za-z0-9._-]{8,80}$" },
+    "holdoutVersion": { "type": "integer", "minimum": 1 },
+    "holdoutManifestHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "candidateConfigHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "rendererFreezeId": { "type": "string", "pattern": "^renderer_[a-f0-9]{64}$" },
+    "rendererContentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "planSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "preregistrationReceiptSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "productionEvaluationSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/row" }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "ruleId": { "enum": ["svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport"] },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentId",
+        "artifactSha256",
+        "targetId",
+        "ruleId",
+        "oracleSnapshotSha256",
+        "annotationSnapshotSha256",
+        "adjudicationSnapshotSha256",
+        "evaluationDisposition",
+        "groundTruth",
+        "excludedReason",
+        "candidateConfigHash",
+        "rendererFreezeId",
+        "rendererContentHash",
+        "planSha256",
+        "preregistrationReceiptSha256",
+        "productionEvaluationRowSha256",
+        "holdoutLineageId",
+        "holdoutId",
+        "holdoutVersion",
+        "productionDecision"
+      ],
+      "properties": {
+        "documentId": { "type": "string", "pattern": "^doc_[A-Za-z0-9._-]{8,80}$" },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "targetId": { "type": "string", "pattern": "^target_[A-Za-z0-9._:-]{8,180}$" },
+        "ruleId": { "$ref": "#/$defs/ruleId" },
+        "oracleSnapshotSha256": { "$ref": "#/$defs/sha256" },
+        "annotationSnapshotSha256": { "$ref": "#/$defs/sha256" },
+        "adjudicationSnapshotSha256": { "$ref": "#/$defs/sha256" },
+        "evaluationDisposition": { "enum": ["included", "excluded"] },
+        "groundTruth": { "oneOf": [{ "type": "null" }, { "enum": ["positive", "negative"] }] },
+        "excludedReason": { "oneOf": [{ "type": "null" }, { "enum": ["ambiguous", "abstained", "invalid_target", "production-declined"] }] },
+        "candidateConfigHash": { "$ref": "#/$defs/sha256" },
+        "rendererFreezeId": { "type": "string", "pattern": "^renderer_[a-f0-9]{64}$" },
+        "rendererContentHash": { "$ref": "#/$defs/sha256" },
+        "planSha256": { "$ref": "#/$defs/sha256" },
+        "preregistrationReceiptSha256": { "$ref": "#/$defs/sha256" },
+        "productionEvaluationRowSha256": { "$ref": "#/$defs/sha256" },
+        "holdoutLineageId": { "type": "string", "pattern": "^lineage_[A-Za-z0-9._-]{8,80}$" },
+        "holdoutId": { "type": "string", "pattern": "^holdout_[A-Za-z0-9._-]{8,80}$" },
+        "holdoutVersion": { "type": "integer", "minimum": 1 },
+        "productionDecision": { "enum": ["finding", "clean", "declined"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "evaluationDisposition": { "const": "included" } }, "required": ["evaluationDisposition"] },
+          "then": {
+            "properties": {
+              "groundTruth": { "enum": ["positive", "negative"] },
+              "excludedReason": { "type": "null" },
+              "productionDecision": { "enum": ["finding", "clean"] }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "evaluationDisposition": { "const": "excluded" } }, "required": ["evaluationDisposition"] },
+          "then": {
+            "properties": {
+              "groundTruth": { "type": "null" },
+              "excludedReason": { "enum": ["ambiguous", "abstained", "invalid_target", "production-declined"] }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

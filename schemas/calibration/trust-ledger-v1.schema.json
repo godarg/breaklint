@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/trust-ledger-v1.schema.json",
+  "title": "breaklint external corpus trust ledger v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "ledgerId", "createdAt", "attestations"],
+  "properties": {
+    "contractVersion": { "const": "m3-0-trust-ledger-v1" },
+    "ledgerId": { "type": "string", "pattern": "^trust_[A-Za-z0-9._-]{8,80}$" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "attestations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attestationId",
+          "reviewerId",
+          "reviewedAt",
+          "documentId",
+          "artifactSha256",
+          "originGroupId",
+          "provenanceEvidenceSha256",
+          "licenseEvidenceSha256",
+          "privacyEvidenceSha256",
+          "approvedForCalibration"
+        ],
+        "properties": {
+          "attestationId": { "type": "string", "pattern": "^attest_[A-Za-z0-9._-]{8,80}$" },
+          "reviewerId": { "type": "string", "pattern": "^reviewer_[A-Za-z0-9._-]{4,80}$" },
+          "reviewedAt": { "type": "string", "format": "date-time" },
+          "documentId": { "type": "string", "pattern": "^doc_[A-Za-z0-9._-]{8,80}$" },
+          "artifactSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "originGroupId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._:-]{7,180}$" },
+          "provenanceEvidenceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "licenseEvidenceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "privacyEvidenceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "approvedForCalibration": { "const": true }
+        }
+      }
+    }
+  }
+}

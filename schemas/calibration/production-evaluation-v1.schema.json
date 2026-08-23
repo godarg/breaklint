@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/production-evaluation-v1.schema.json",
+  "title": "breaklint production evaluation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "evaluationId", "createdAt", "ruleId", "ruleExecutableContractVersion", "productRuleSourceSha256", "measurementReceiptSha256", "candidateConfig", "candidateConfigHash", "rows"],
+  "properties": {
+    "contractVersion": { "const": "m3-0-production-evaluation-v1" },
+    "evaluationId": { "type": "string", "pattern": "^production_[A-Za-z0-9._-]{8,80}$" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "ruleId": { "$ref": "#/$defs/ruleId" },
+    "ruleExecutableContractVersion": { "const": "m3-0-real-rule-run-v1" },
+    "productRuleSourceSha256": { "$ref": "#/$defs/sha256" },
+    "measurementReceiptSha256": { "$ref": "#/$defs/sha256" },
+    "candidateConfig": { "$ref": "#/$defs/candidateConfig" },
+    "candidateConfigHash": { "$ref": "#/$defs/sha256" },
+    "rows": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/row" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "ruleId": { "enum": ["svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport"] },
+    "candidateConfig": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["ruleId", "maxMissingInk"], "properties": { "ruleId": { "const": "svg/text-clipped" }, "maxMissingInk": { "type": "number", "minimum": 0, "maximum": 1 } } },
+        { "type": "object", "additionalProperties": false, "required": ["ruleId", "minCollisionInk", "minOccludedInk"], "properties": { "ruleId": { "const": "svg/text-ink-collision" }, "minCollisionInk": { "type": "integer", "minimum": 0 }, "minOccludedInk": { "type": "integer", "minimum": 0 } } },
+        { "type": "object", "additionalProperties": false, "required": ["ruleId", "maxOvershootPx"], "properties": { "ruleId": { "const": "svg/text-overflows-viewport" }, "maxOvershootPx": { "const": 0 } } }
+      ]
+    },
+    "notMeasured": {
+      "type": "object", "additionalProperties": false, "required": ["scope", "ruleId", "reason", "count"],
+      "properties": { "scope": { "enum": ["svg", "svgText"] }, "ruleId": { "$ref": "#/$defs/ruleId" }, "reason": { "enum": ["env/svg-not-inline", "env/svg-no-text", "env/pixel-oracle-unavailable", "env/ink-passes-unstable", "env/svg-too-many-text-targets", "env/svg-overflow-visible"] }, "count": { "type": "integer", "minimum": 1 } }
+    },
+    "finding": {
+      "type": "object", "additionalProperties": false, "required": ["ruleId", "targetSvgTextKey", "value", "threshold", "unit"],
+      "properties": { "ruleId": { "$ref": "#/$defs/ruleId" }, "targetSvgTextKey": { "type": "string", "minLength": 1, "maxLength": 240 }, "value": { "type": "number" }, "threshold": { "type": "number" }, "unit": { "type": "string", "minLength": 1, "maxLength": 80 } }
+    },
+    "ruleResult": {
+      "type": "object", "additionalProperties": false, "required": ["findings", "candidates", "measured", "notMeasured"],
+      "properties": { "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }, "candidates": { "type": "integer", "minimum": 0 }, "measured": { "type": "integer", "minimum": 0 }, "notMeasured": { "type": "array", "items": { "$ref": "#/$defs/notMeasured" } } }
+    },
+    "row": {
+      "type": "object", "additionalProperties": false,
+      "required": ["documentId", "artifactSha256", "targetId", "ruleId", "candidateConfigHash", "rendererFreezeId", "rendererContentHash", "measurementReceiptRowSha256", "ruleResult", "productionDecision"],
+      "properties": {
+        "documentId": { "type": "string", "pattern": "^doc_[A-Za-z0-9._-]{8,80}$" }, "artifactSha256": { "$ref": "#/$defs/sha256" }, "targetId": { "type": "string", "pattern": "^target_[A-Za-z0-9._-]{8,180}$" }, "ruleId": { "$ref": "#/$defs/ruleId" },
+        "candidateConfigHash": { "$ref": "#/$defs/sha256" }, "rendererFreezeId": { "type": "string", "pattern": "^renderer_[a-f0-9]{64}$" }, "rendererContentHash": { "$ref": "#/$defs/sha256" }, "measurementReceiptRowSha256": { "$ref": "#/$defs/sha256" },
+        "ruleResult": { "$ref": "#/$defs/ruleResult" }, "productionDecision": { "enum": ["finding", "clean", "declined"] }
+      }
+    }
+  }
+}

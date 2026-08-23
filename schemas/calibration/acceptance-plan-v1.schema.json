@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/acceptance-plan-v1.schema.json",
+  "title": "breaklint external preregistered acceptance plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "planId",
+    "planVersion",
+    "samplingPlanId",
+    "samplingPlanVersion",
+    "acceptanceGateVersion",
+    "createdAt",
+    "ruleId",
+    "candidateSelectionId",
+    "candidateConfigHash",
+    "thresholdCandidateHash",
+    "gates"
+  ],
+  "properties": {
+    "contractVersion": { "const": "m3-0-acceptance-plan-v1" },
+    "planId": { "type": "string", "pattern": "^plan_[A-Za-z0-9._-]{8,80}$" },
+    "planVersion": { "type": "integer", "minimum": 1 },
+    "samplingPlanId": { "type": "string", "pattern": "^sampling_[A-Za-z0-9._-]{8,80}$" },
+    "samplingPlanVersion": { "type": "integer", "minimum": 1 },
+    "acceptanceGateVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "ruleId": { "enum": ["svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport"] },
+    "candidateSelectionId": { "type": "string", "pattern": "^selection_[A-Za-z0-9._-]{8,80}$" },
+    "candidateConfigHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "thresholdCandidateHash": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[a-f0-9]{64}$" }] },
+    "gates": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/minimumGate" },
+          { "$ref": "#/$defs/falsePositiveRateGate" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "minimumGate": {
+      "type": "object", "additionalProperties": false, "required": ["metric", "operator", "threshold"],
+      "properties": { "metric": { "enum": ["precision", "recall", "specificity"] }, "operator": { "const": ">=" }, "threshold": { "type": "number", "minimum": 0, "maximum": 1 } }
+    },
+    "falsePositiveRateGate": {
+      "type": "object", "additionalProperties": false, "required": ["metric", "operator", "threshold"],
+      "properties": { "metric": { "const": "false-positive-rate" }, "operator": { "const": "<=" }, "threshold": { "type": "number", "minimum": 0, "maximum": 1 } }
+    }
+  }
+}

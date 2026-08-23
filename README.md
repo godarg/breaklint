@@ -121,10 +121,14 @@ and page breaks, and turns a correct page into a phantom half-empty-page finding
 for `document.fonts.ready` and stops with a non-zero exit if a declared font resource fails,
 rather than reporting findings it cannot stand behind.
 
-**The two SVG ink rules run, but their ink measurement is not yet verified against the real
-renderer.** M3 is the milestone that does that. Until then, treat a finding from
+**The two SVG ink rules now have a real-renderer validation foundation, but no real-corpus
+calibration.** M3-0 exercises their known construction and boundary cases in Chrome/Paged.js;
+it does not establish population performance or calibrate a threshold. Treat a finding from
 `svg/text-clipped` or `svg/text-ink-collision` as a reason to look at the page rather than as a
 measurement to act on unseen.
+M3-0 can validate the integrity and bindings of separately supplied capture-evidence bytes, but it
+does not ship an externally governed attestor trust root. Therefore no M3-0 path establishes a
+calibrated claim; that trust boundary belongs to later real-corpus work.
 
 **`svg/text-ink-collision` does not detect sub-pixel contact.** A shape can touch a glyph
 optically without sharing a device pixel. The earlier check for this took its truth from the
@@ -143,9 +147,10 @@ yet been established empirically. Windows job objects are neither designed for n
 origin, paginates it, assembles and validates the snapshot, runs the rules, and binds evidence to
 the report. `checker-crashed` remains a real exit-3 path for injected driver failures, apparatus
 interference and process-boundary faults; it is not a placeholder for an unbuilt live path.
-M3's SVG ink passes and threshold calibration, and M4's human-labelled production corpus, remain
-unfinished. Packaging and the first npm release are complete; the post-release trust work and
-remaining validation boundaries are tracked in `docs/status.md`.
+M3-0's SVG validation and calibration foundation exists in the repository, but empirical threshold
+calibration and a human-labelled real corpus remain unfinished. Packaging and the first npm release
+are complete; the post-release trust work and remaining validation boundaries are tracked in
+`docs/status.md`.
 
 ## Exit codes
 
