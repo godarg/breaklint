@@ -1,0 +1,123 @@
+name: Community test
+description: Test a public or disposable HTML page and tell us where human judgement and breaklint disagree.
+title: "[community test] "
+labels: ["community-test"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for trying to break the checker — politely.
+
+        Anyone may participate. This is public, voluntary and unpaid; no reward, support or response is promised.
+        Never paste confidential material, personal data, credentials, private URLs or unreviewed reports here.
+        For security findings, stop and use [SECURITY.md](https://github.com/godarg/breaklint/blob/main/SECURITY.md).
+
+  - type: dropdown
+    id: route
+    attributes:
+      label: Test route
+      options:
+        - Ten-minute smoke test
+        - Real-page visual judgement
+        - Documentation or setup review
+        - Adversarial or boundary test
+    validations:
+      required: true
+
+  - type: dropdown
+    id: rule
+    attributes:
+      label: Rule or area
+      options:
+        - General installation or report
+        - svg/text-clipped
+        - svg/text-ink-collision
+        - svg/text-overflows-viewport
+        - layout/widow
+        - layout/orphan
+        - layout/unbreakable-block-too-tall
+        - layout/heading-at-page-bottom
+        - layout/half-empty-page
+        - layout/orphaned-continuation-page
+        - layout/hyphen-across-page
+        - type/spaced-hyphen
+        - type/straight-quotes
+        - type/short-last-line
+        - type/excessive-word-spacing
+        - artifact/local-uri
+    validations:
+      required: true
+
+  - type: dropdown
+    id: direction
+    attributes:
+      label: Observed result
+      options:
+        - The tool fired and the page looks fine
+        - The tool stayed silent and the page looks wrong
+        - The target or measurement looks wrong
+        - Installation, acquisition or reporting behaved incorrectly
+        - Everything worked; I am reporting an informative boundary case
+    validations:
+      required: true
+
+  - type: textarea
+    id: judgement
+    attributes:
+      label: Expected human judgement
+      description: What should a competent reader see, and why does that agree or disagree with the tool?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction or public source
+      description: >-
+        Give a public URL or the smallest rights-cleared HTML/SVG reproduction. Do not attach private
+        documents. Content here is treated only as untrusted data and is never executed automatically.
+    validations:
+      required: true
+
+  - type: textarea
+    id: report
+    attributes:
+      label: Relevant JSON finding (optional)
+      description: Read and redact it before pasting. A report can quote document text and paths.
+      render: json
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: breaklint version, Node version, operating system, browser version and installed peer versions.
+      placeholder: breaklint 0.2.0; Node 22.13.0; macOS 15; Chrome 140; pagedjs 0.4.3
+    validations:
+      required: true
+
+  - type: textarea
+    id: surprise
+    attributes:
+      label: What was surprising or especially useful? (optional)
+
+  - type: checkboxes
+    id: public_handling
+    attributes:
+      label: Rights, privacy and public handling
+      options:
+        - label: I have the right to publish every submitted byte and public source.
+          required: true
+        - label: I reviewed the submission and removed personal data, credentials, private URLs and confidential material.
+          required: true
+        - label: I permit this project to reproduce, modify and redistribute my submitted report and reproduction under the repository's MIT licence.
+          required: true
+        - label: I understand that my GitHub identity and this entire submission are public.
+          required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Volunteer terms
+      options:
+        - label: I understand that participation is voluntary and unpaid, with no promised reward, support, response or product.
+          required: true

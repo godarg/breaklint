@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
+  - name: Community testing guide
+    url: https://github.com/godarg/breaklint/blob/main/docs/community-testing.md
+    about: Anyone can test a public or disposable page; no application or selection is required.
   - name: Security finding
     url: https://github.com/godarg/breaklint/blob/main/SECURITY.md
     about: Report privately to security@dargel-solutions.de — not in a public issue.

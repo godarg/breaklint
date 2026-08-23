@@ -18,6 +18,15 @@
 - This infrastructure changes no runtime rule, threshold, severity, package version or published
   surface. All fifteen rules remain `calibrated: false`; no calibration claim is authorized.
 
+### Open community QA intake
+
+- Added an open, unpaid community-testing guide and structured GitHub intake for public or
+  disposable reproductions. No application or tester selection is required.
+- Added a data-only intake classifier and dashboard workflow. Submitted content is never executed;
+  reports with missing declarations or sensitive-data patterns fail closed into explicit labels.
+- Community reports remain non-blind product QA. They are not human calibration annotations,
+  external holdout receipts, trust roots or authority to change thresholds, version or release.
+
 ## 0.2.0 — 2026-08-22
 
 ### Configuration Contract v1
