@@ -67,9 +67,22 @@ test("GitHub writes declare JSON while reads do not invent a content type", () =
 });
 
 test("untrusted dashboard text cannot create Markdown structure or control lines", () => {
-  assert.equal(safeInline("route\n\n- [link](https://example.invalid)"), "route - \\[link\\](https://example.invalid)");
+  assert.equal(safeInline("route\n\n- [link](https://example.invalid)"), "route - \\[link\\](https:⁄⁄example.invalid)");
+  assert.equal(safeInline("@reviewer #123"), "＠reviewer ＃123");
   assert.equal(safeInline("\u0000\u0007"), "unknown");
   assert.ok(safeInline("x".repeat(300)).length <= 160);
+});
+
+test("edited route and rule values must remain in the issue-form allowlists", () => {
+  const result = classifyIssue({
+    number: 6, title: "fixture",
+    body: completeBody.replace("Real-page visual judgement", "@someone https://example.invalid").replace("svg/text-clipped", "#123")
+  });
+  assert.equal(result.state, "needs-info");
+  assert.equal(result.route, "unknown");
+  assert.equal(result.rule, "unknown");
+  assert.match(result.missing.join(" "), /canonical Test route/u);
+  assert.match(result.missing.join(" "), /canonical Rule or area/u);
 });
 
 test("five arbitrary checkboxes cannot substitute the five governed declarations", () => {

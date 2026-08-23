@@ -36,6 +36,13 @@ const REQUIRED_DECLARATIONS = [
   "I understand that my GitHub identity and this entire submission are public.",
   "I understand that participation is voluntary and unpaid, with no promised reward, support, response or product."
 ];
+const ROUTES = new Set(["Ten-minute smoke test", "Real-page visual judgement", "Documentation or setup review", "Adversarial or boundary test"]);
+const RULES = new Set([
+  "General installation or report", "svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport",
+  "layout/widow", "layout/orphan", "layout/unbreakable-block-too-tall", "layout/heading-at-page-bottom",
+  "layout/half-empty-page", "layout/orphaned-continuation-page", "layout/hyphen-across-page", "type/spaced-hyphen",
+  "type/straight-quotes", "type/short-last-line", "type/excessive-word-spacing", "artifact/local-uri"
+]);
 
 function labelNames(issue: Issue): string[] {
   return (issue.labels ?? []).map((label) => typeof label === "string" ? label : label.name ?? "").filter(Boolean);
@@ -47,7 +54,10 @@ export function safeInline(value: string | undefined): string {
     .replace(/\s+/gu, " ")
     .trim()
     .slice(0, 160)
-    .replace(/([\\`*_[\]<>])/gu, "\\$1") || "unknown";
+    .replace(/([\\`*_[\]<>])/gu, "\\$1")
+    .replaceAll("@", "＠")
+    .replaceAll("://", ":⁄⁄")
+    .replace(/#(?=\d)/gu, "＃") || "unknown";
 }
 
 export function sections(body: string): Map<string, string> {
@@ -85,10 +95,14 @@ export function classifyIssue(issue: Issue): Classification {
     ["secret-assignment", /\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password)\s*[:=]\s*["'][^"'\n]{12,}["']/iu]
   ];
   const sensitivePatterns = sensitiveChecks.filter(([, pattern]) => pattern.test(body)).map(([name]) => name);
+  const route = values.get("Test route");
+  const rule = values.get("Rule or area");
+  if (route && !ROUTES.has(route)) missing.push("canonical Test route");
+  if (rule && !RULES.has(rule)) missing.push("canonical Rule or area");
   return {
     state: sensitivePatterns.length ? "sensitive-warning" : missing.length ? "needs-info" : "complete",
     missing: [...new Set(missing)], sensitivePatterns,
-    route: safeInline(values.get("Test route")), rule: safeInline(values.get("Rule or area"))
+    route: route && ROUTES.has(route) ? route : "unknown", rule: rule && RULES.has(rule) ? rule : "unknown"
   };
 }
 
