@@ -266,11 +266,20 @@ content-derived from a closed clean-commit/dirty-source-bundle projection, and t
 blocked network requests, authored clip boundaries and the exact 7/8 pixel collision boundary.
 G2 now exercises its unchanged nested-group semantics with a real `translate(10,0)` transform, and
 its clip boundary is resolved in the applied target's CTM.
-There is still no eligible real corpus or frozen holdout, so every rule remains
-`calibrated: false`, every `rule_ready_for_calibrated_claim` value is false, and M3-1/M4 remain
-future work. A green M2/M2d or M3-0 run therefore says that the implemented measurement and
-validation apparatus behaved as specified for that run, not that a rule threshold has been
-validated against human-labelled production documents.
+M3-1 now has a public, rights/privacy-reviewed process-pilot corpus: three immutable documents from
+three origin groups, split origin-strictly across development, tuning and holdout. The stored
+manifest binds 64 SVG text elements to 192 rule-specific target identities, and the holdout
+projection freezes one origin with 45 rule-targets. Four byte-bound, oracle-free SVG contexts make
+the blind packet technically executable, but their browser-native process rendering is not a
+production renderer/font freeze. This is real source and process evidence, not power evidence.
+There are still zero verified human annotators, zero adjudications, no disclosed holdout outcome,
+no externally verified freeze receipt and no trusted render-capture evidence.
+Accordingly the persisted pilot report is `infrastructure-complete-external-execution-blocked`,
+every rule remains `calibrated: false`, and every calibration/claim-readiness value remains false.
+A green M2/M2d, M3-0 or M3-1 infrastructure run therefore says that the implemented apparatus and
+frozen public inputs behaved as specified, not that a rule threshold has been validated against
+independent human labels. The human annotation, external receipt and capture steps remain M3-1
+execution gates; M4 remains future work.
 The predecessor work item's three individual historical reviewer reports were not persisted and
 cannot be reconstructed as evidence after the fact; only its contemporaneous archive record and
 the current closure review are available. No replacement reports are inferred or backdated.

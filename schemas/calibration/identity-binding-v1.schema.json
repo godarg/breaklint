@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/identity-binding-v1.schema.json",
+  "title": "breaklint M3-1 external human identity binding v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "bindingId",
+    "subjectOpaqueId",
+    "subjectRole",
+    "purpose",
+    "issuedAt",
+    "notBefore",
+    "notAfter",
+    "registryPolicyId",
+    "registryPolicySha256",
+    "externalAttestationProofId",
+    "externalAttestationProofSha256",
+    "attestationMode",
+    "humanIdentityEstablishedByJsonAlone",
+    "externalAttestationRequired",
+    "bindingStatus",
+    "evidenceTrust"
+  ],
+  "properties": {
+    "contractVersion": { "const": "m3-1-identity-binding-v1" },
+    "bindingId": { "type": "string", "pattern": "^identity_binding_[A-Za-z0-9._-]{8,80}$" },
+    "subjectOpaqueId": { "type": "string", "pattern": "^person_[A-Za-z0-9._-]{8,80}$" },
+    "subjectRole": { "enum": ["annotator", "adjudicator"] },
+    "purpose": { "const": "annotation-identity-separation" },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "notBefore": { "type": "string", "format": "date-time" },
+    "notAfter": { "type": "string", "format": "date-time" },
+    "registryPolicyId": { "type": "string", "pattern": "^identity_policy_[A-Za-z0-9._-]{8,80}$" },
+    "registryPolicySha256": { "$ref": "#/$defs/sha256" },
+    "externalAttestationProofId": { "type": "string", "pattern": "^proof_[A-Za-z0-9._-]{8,80}$" },
+    "externalAttestationProofSha256": { "$ref": "#/$defs/sha256" },
+    "attestationMode": { "const": "external-attestation-only" },
+    "humanIdentityEstablishedByJsonAlone": { "const": false },
+    "externalAttestationRequired": { "const": true },
+    "bindingStatus": { "enum": ["untrusted", "externally-attested", "expired", "revoked"] },
+    "evidenceTrust": { "enum": ["untrusted", "externally-attested"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "evidenceTrust": { "const": "untrusted" } }, "required": ["evidenceTrust"] },
+      "then": { "properties": { "bindingStatus": { "const": "untrusted" } } }
+    },
+    {
+      "if": { "properties": { "bindingStatus": { "const": "externally-attested" } }, "required": ["bindingStatus"] },
+      "then": { "properties": { "evidenceTrust": { "const": "externally-attested" } } }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

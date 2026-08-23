@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Real-corpus validation infrastructure
+
+- Added a public, rights- and privacy-reviewed process-pilot corpus with immutable document and
+  rule-target hashes, origin-strict development/tuning/holdout assignments, a blind annotation
+  packet, a holdout freeze projection and deterministic verification reports.
+- Added fail-closed contracts and checks for source intake, human identity separation,
+  multi-valued annotation and adjudication, split leakage, external freeze receipts and
+  GitHub-OIDC/Sigstore-backed attestation verification. Local fixtures and caller-supplied trust
+  material cannot create claim readiness.
+- Added a machine-readable bridge to the existing M3-0 readiness vocabulary. It records the
+  verified intake and split facts while keeping every calibration, capture and claim gate false
+  until the missing renderer, oracle, human annotation, external receipt and acceptance evidence
+  actually exist.
+- This infrastructure changes no runtime rule, threshold, severity, package version or published
+  surface. All fifteen rules remain `calibrated: false`; no calibration claim is authorized.
+
 ## 0.2.0 — 2026-08-22
 
 ### Configuration Contract v1

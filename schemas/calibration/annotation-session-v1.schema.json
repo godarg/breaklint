@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/annotation-session-v1.schema.json",
+  "title": "breaklint M3-1 blinded annotation session v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "sessionId",
+    "sessionRole",
+    "purpose",
+    "startedAt",
+    "completedAt",
+    "identityBindingId",
+    "identityBindingSha256",
+    "packetId",
+    "packetSha256",
+    "packetOrderSha256",
+    "guidelineVersion",
+    "annotationSetSha256",
+    "resultDisclosureAt",
+    "blinded",
+    "breaklintResultExposed",
+    "humanIdentityEstablishedByJsonAlone",
+    "externalIdentityAttestationRequired",
+    "evidenceTrust"
+  ],
+  "properties": {
+    "contractVersion": { "const": "m3-1-annotation-session-v1" },
+    "sessionId": { "type": "string", "pattern": "^session_[A-Za-z0-9._-]{8,80}$" },
+    "sessionRole": { "enum": ["annotator", "adjudicator"] },
+    "purpose": { "const": "blind-ground-truth-annotation" },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "oneOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }] },
+    "identityBindingId": { "type": "string", "pattern": "^identity_binding_[A-Za-z0-9._-]{8,80}$" },
+    "identityBindingSha256": { "$ref": "#/$defs/sha256" },
+    "packetId": { "type": "string", "pattern": "^blind_packet_[A-Za-z0-9._-]{8,80}$" },
+    "packetSha256": { "$ref": "#/$defs/sha256" },
+    "packetOrderSha256": { "$ref": "#/$defs/sha256" },
+    "guidelineVersion": { "type": "string", "pattern": "^svg-[a-z-]+-v[1-9][0-9]*$" },
+    "annotationSetSha256": { "$ref": "#/$defs/sha256" },
+    "resultDisclosureAt": { "type": "null" },
+    "blinded": { "const": true },
+    "breaklintResultExposed": { "const": false },
+    "humanIdentityEstablishedByJsonAlone": { "const": false },
+    "externalIdentityAttestationRequired": { "const": true },
+    "evidenceTrust": { "enum": ["untrusted", "externally-attested"] }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

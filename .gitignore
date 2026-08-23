@@ -19,6 +19,12 @@ breaklint-report/
 .artifacts/
 coverage/
 
+# Public corpus artifacts may be committed only under corpus/public/. These names are guards,
+# not approved private storage locations; M3-1 has no approved private corpus store.
+corpus/private/
+corpus/restricted/
+.private-corpus/
+
 # Local agent tooling. These are symlinks into a checkout outside this repository; committing
 # them would publish absolute paths from the machine they were made on.
 .claude/

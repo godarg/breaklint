@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/sampling-plan-v1.schema.json",
+  "title": "breaklint M3-1 sampling plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "planId",
+    "planVersion",
+    "createdAt",
+    "purpose",
+    "studyMode",
+    "ruleIds",
+    "samplingUnit",
+    "confidenceLevel",
+    "targetHalfWidth",
+    "conservativeEventRate",
+    "designEffect",
+    "expectedExclusionRate",
+    "plannedAdjudicatedPositiveEventsPerRule",
+    "plannedAdjudicatedNegativeEventsPerRule",
+    "originClusterBootstrapRequired",
+    "thresholdOptimizationAuthorized",
+    "calibrationClaimAuthorized",
+    "evidenceTrust",
+    "limitations"
+  ],
+  "properties": {
+    "contractVersion": { "const": "m3-1-sampling-plan-v1" },
+    "planId": { "type": "string", "pattern": "^sampling_[A-Za-z0-9._-]{8,80}$" },
+    "planVersion": { "type": "integer", "minimum": 1 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "purpose": { "enum": ["feasibility-pilot", "confirmatory-calibration-study"] },
+    "studyMode": { "enum": ["process-feasibility-only", "preregistered-confirmatory"] },
+    "ruleIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/ruleId" }
+    },
+    "samplingUnit": { "const": "target-event-clustered-by-origin" },
+    "confidenceLevel": { "const": 0.95 },
+    "targetHalfWidth": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.1 },
+    "conservativeEventRate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "designEffect": { "type": "number", "minimum": 1 },
+    "expectedExclusionRate": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+    "plannedAdjudicatedPositiveEventsPerRule": { "type": "integer", "minimum": 1 },
+    "plannedAdjudicatedNegativeEventsPerRule": { "type": "integer", "minimum": 1 },
+    "originClusterBootstrapRequired": { "const": true },
+    "thresholdOptimizationAuthorized": { "const": false },
+    "calibrationClaimAuthorized": { "const": false },
+    "evidenceTrust": { "enum": ["untrusted", "externally-attested"] },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 12, "maxLength": 500 }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "studyMode": { "const": "process-feasibility-only" } }, "required": ["studyMode"] },
+      "then": { "properties": { "purpose": { "const": "feasibility-pilot" }, "evidenceTrust": { "const": "untrusted" } } }
+    }
+  ],
+  "$defs": {
+    "ruleId": {
+      "enum": ["svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport"]
+    }
+  }
+}

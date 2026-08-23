@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/attestor-trust-policy-v1.schema.json",
+  "title": "breaklint M3-1 attestor trust policy demonstrator v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "policyId",
+    "policyVersion",
+    "createdAt",
+    "effectiveFrom",
+    "expiresAt",
+    "purpose",
+    "governanceSource",
+    "previousPolicySha256",
+    "minimumReceiptSequence",
+    "minimumCheckpointSha256",
+    "allowedWorkflowIdentities",
+    "rotations",
+    "revocations",
+    "unknownIdentityDisposition",
+    "expiredIdentityDisposition",
+    "rotatedOutIdentityDisposition",
+    "revokedIdentityDisposition",
+    "replayDisposition",
+    "rollbackDisposition",
+    "allowSelfProvidedTrustRoot",
+    "externalPolicyPinRequired",
+    "externalPolicyPinPresent",
+    "policyStatus",
+    "evidenceTrust"
+  ],
+  "properties": {
+    "contractVersion": { "const": "m3-1-attestor-trust-policy-v1" },
+    "policyId": { "type": "string", "pattern": "^attestor_policy_[A-Za-z0-9._-]{8,80}$" },
+    "policyVersion": { "type": "integer", "minimum": 1 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "effectiveFrom": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "purpose": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "enum": ["holdout-freeze", "capture-attestation", "annotation-identity-separation"] }
+    },
+    "governanceSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "sourceSha256", "pinLocation", "externallyGoverned"],
+      "properties": {
+        "sourceId": { "type": "string", "minLength": 8, "maxLength": 180 },
+        "sourceSha256": { "$ref": "#/$defs/nullableSha256" },
+        "pinLocation": { "enum": ["repository-local-untrusted-demonstrator", "independent-verifier-policy-store"] },
+        "externallyGoverned": { "type": "boolean" }
+      }
+    },
+    "previousPolicySha256": { "$ref": "#/$defs/nullableSha256" },
+    "minimumReceiptSequence": { "type": "integer", "minimum": 1 },
+    "minimumCheckpointSha256": { "$ref": "#/$defs/nullableSha256" },
+    "allowedWorkflowIdentities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/allowedWorkflowIdentity" }
+    },
+    "rotations": { "type": "array", "items": { "$ref": "#/$defs/rotation" } },
+    "revocations": { "type": "array", "items": { "$ref": "#/$defs/revocation" } },
+    "unknownIdentityDisposition": { "const": "reject" },
+    "expiredIdentityDisposition": { "const": "reject" },
+    "rotatedOutIdentityDisposition": { "const": "reject" },
+    "revokedIdentityDisposition": { "const": "reject" },
+    "replayDisposition": { "const": "reject" },
+    "rollbackDisposition": { "const": "reject" },
+    "allowSelfProvidedTrustRoot": { "const": false },
+    "externalPolicyPinRequired": { "const": true },
+    "externalPolicyPinPresent": { "type": "boolean" },
+    "policyStatus": { "enum": ["untrusted", "active", "superseded", "revoked", "expired"] },
+    "evidenceTrust": { "enum": ["untrusted", "externally-pinned"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "evidenceTrust": { "const": "untrusted" } }, "required": ["evidenceTrust"] },
+      "then": { "properties": { "policyStatus": { "const": "untrusted" } } }
+    },
+    {
+      "if": { "properties": { "policyStatus": { "const": "active" } }, "required": ["policyStatus"] },
+      "then": {
+        "properties": {
+          "evidenceTrust": { "const": "externally-pinned" },
+          "externalPolicyPinPresent": { "const": true },
+          "governanceSource": {
+            "type": "object",
+            "properties": {
+              "sourceSha256": { "$ref": "#/$defs/sha256" },
+              "pinLocation": { "const": "independent-verifier-policy-store" },
+              "externallyGoverned": { "const": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "governanceSource": {
+            "type": "object",
+            "properties": { "externallyGoverned": { "const": false } },
+            "required": ["externallyGoverned"]
+          }
+        },
+        "required": ["governanceSource"]
+      },
+      "then": {
+        "properties": {
+          "externalPolicyPinPresent": { "const": false },
+          "policyStatus": { "const": "untrusted" },
+          "evidenceTrust": { "const": "untrusted" },
+          "governanceSource": {
+            "type": "object",
+            "properties": {
+              "sourceSha256": { "type": "null" },
+              "pinLocation": { "const": "repository-local-untrusted-demonstrator" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "policyVersion": { "type": "integer", "minimum": 2 } }, "required": ["policyVersion"] },
+      "then": { "properties": { "previousPolicySha256": { "$ref": "#/$defs/sha256" } } }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nullableSha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }] },
+    "allowedWorkflowIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identityId", "issuer", "subject", "repository", "workflowPath", "workflowRef", "sourceRef", "oidcAudience", "trustRootProvider", "runnerEnvironment", "notBefore", "notAfter", "allowedPurposes"],
+      "properties": {
+        "identityId": { "type": "string", "pattern": "^attestor_identity_[A-Za-z0-9._-]{8,80}$" },
+        "issuer": { "type": "string", "pattern": "^https://[^\\s]+$", "maxLength": 300 },
+        "subject": { "type": "string", "minLength": 12, "maxLength": 500 },
+        "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+        "workflowPath": { "type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9._-]+\\.ya?ml$" },
+        "workflowRef": { "type": "string", "minLength": 12, "maxLength": 500 },
+        "sourceRef": { "type": "string", "pattern": "^refs/heads/[A-Za-z0-9._/-]+$" },
+        "oidcAudience": { "type": "string", "minLength": 3, "maxLength": 200 },
+        "trustRootProvider": { "const": "github-cli-built-in-sigstore-public-good" },
+        "runnerEnvironment": { "const": "github-hosted" },
+        "notBefore": { "type": "string", "format": "date-time" },
+        "notAfter": { "type": "string", "format": "date-time" },
+        "allowedPurposes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["holdout-freeze", "capture-attestation", "annotation-identity-separation"] }
+        }
+      }
+    },
+    "rotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["predecessorIdentityId", "successorIdentityId", "effectiveAt", "authorizationSha256"],
+      "properties": {
+        "predecessorIdentityId": { "type": "string", "pattern": "^attestor_identity_[A-Za-z0-9._-]{8,80}$" },
+        "successorIdentityId": { "type": "string", "pattern": "^attestor_identity_[A-Za-z0-9._-]{8,80}$" },
+        "effectiveAt": { "type": "string", "format": "date-time" },
+        "authorizationSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "revocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identityId", "revokedAt", "reasonCode", "revocationEvidenceSha256"],
+      "properties": {
+        "identityId": { "type": "string", "pattern": "^attestor_identity_[A-Za-z0-9._-]{8,80}$" },
+        "revokedAt": { "type": "string", "format": "date-time" },
+        "reasonCode": { "enum": ["compromise", "loss", "role-ended", "superseded", "policy-violation"] },
+        "revocationEvidenceSha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/external-attestation-proof-v1.schema.json",
+  "title": "breaklint M3-1 external attestation proof v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "proofId",
+    "proofType",
+    "purpose",
+    "issuedAt",
+    "serialNumber",
+    "sequence",
+    "previousProofSha256",
+    "previousCheckpointSha256",
+    "subject",
+    "workflowIdentity",
+    "trustPolicyId",
+    "trustPolicySha256",
+    "verificationMaterial",
+    "transparencyCheckpoint",
+    "signatureCryptographicallyVerified",
+    "subjectBindingVerified",
+    "workflowIdentityVerified",
+    "trustPolicyMatched",
+    "lifecycleValid",
+    "replayCheckPassed",
+    "rollbackCheckPassed",
+    "externalVerificationRequired",
+    "evidenceTrust"
+  ],
+  "properties": {
+    "contractVersion": { "const": "m3-1-external-attestation-proof-v1" },
+    "proofId": { "type": "string", "pattern": "^proof_[A-Za-z0-9._-]{8,80}$" },
+    "proofType": { "const": "github-oidc-transparency-attestation" },
+    "purpose": { "enum": ["holdout-freeze", "capture-attestation", "annotation-identity-separation"] },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "serialNumber": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,120}$" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "previousProofSha256": { "$ref": "#/$defs/nullableSha256" },
+    "previousCheckpointSha256": { "$ref": "#/$defs/nullableSha256" },
+    "subject": { "$ref": "#/$defs/subject" },
+    "workflowIdentity": { "$ref": "#/$defs/workflowIdentity" },
+    "trustPolicyId": { "type": "string", "pattern": "^attestor_policy_[A-Za-z0-9._-]{8,80}$" },
+    "trustPolicySha256": { "$ref": "#/$defs/sha256" },
+    "verificationMaterial": { "$ref": "#/$defs/verificationMaterial" },
+    "transparencyCheckpoint": { "$ref": "#/$defs/transparencyCheckpoint" },
+    "signatureCryptographicallyVerified": { "type": "boolean" },
+    "subjectBindingVerified": { "type": "boolean" },
+    "workflowIdentityVerified": { "type": "boolean" },
+    "trustPolicyMatched": { "type": "boolean" },
+    "lifecycleValid": { "type": "boolean" },
+    "replayCheckPassed": { "type": "boolean" },
+    "rollbackCheckPassed": { "type": "boolean" },
+    "externalVerificationRequired": { "const": true },
+    "evidenceTrust": { "enum": ["untrusted", "externally-verified"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "evidenceTrust": { "const": "untrusted" } }, "required": ["evidenceTrust"] },
+      "then": {
+        "properties": {
+          "signatureCryptographicallyVerified": { "const": false },
+          "subjectBindingVerified": { "const": false },
+          "workflowIdentityVerified": { "const": false },
+          "trustPolicyMatched": { "const": false },
+          "lifecycleValid": { "const": false },
+          "replayCheckPassed": { "const": false },
+          "rollbackCheckPassed": { "const": false }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "evidenceTrust": { "const": "externally-verified" } }, "required": ["evidenceTrust"] },
+      "then": {
+        "properties": {
+          "signatureCryptographicallyVerified": { "const": true },
+          "subjectBindingVerified": { "const": true },
+          "workflowIdentityVerified": { "const": true },
+          "trustPolicyMatched": { "const": true },
+          "lifecycleValid": { "const": true },
+          "replayCheckPassed": { "const": true },
+          "rollbackCheckPassed": { "const": true }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "sequence": { "type": "integer", "minimum": 2 } }, "required": ["sequence"] },
+      "then": {
+        "properties": {
+          "previousProofSha256": { "$ref": "#/$defs/sha256" },
+          "previousCheckpointSha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "purpose": { "const": "holdout-freeze" } }, "required": ["purpose"] },
+      "then": { "properties": { "subject": { "type": "object", "properties": { "subjectPurpose": { "const": "holdout-freeze" } } } } }
+    },
+    {
+      "if": { "properties": { "purpose": { "const": "capture-attestation" } }, "required": ["purpose"] },
+      "then": { "properties": { "subject": { "type": "object", "properties": { "subjectPurpose": { "const": "capture-attestation" } } } } }
+    },
+    {
+      "if": { "properties": { "purpose": { "const": "annotation-identity-separation" } }, "required": ["purpose"] },
+      "then": {
+        "properties": {
+          "subject": {
+            "type": "object",
+            "properties": {
+              "subjectPurpose": { "const": "annotation-identity-separation" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nullableSha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }] },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subjectId", "subjectSha256", "subjectContractVersion", "subjectPurpose", "subjectMediaType"],
+      "properties": {
+        "subjectId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._:-]{7,180}$" },
+        "subjectSha256": { "$ref": "#/$defs/sha256" },
+        "subjectContractVersion": { "type": "string", "pattern": "^m3-[01]-[A-Za-z0-9._-]+-v[1-9][0-9]*$" },
+        "subjectPurpose": { "enum": ["holdout-freeze", "capture-attestation", "annotation-identity-separation"] },
+        "subjectMediaType": { "const": "application/json" }
+      }
+    },
+    "workflowIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issuer", "subject", "repository", "workflowPath", "workflowRef", "oidcAudience", "commitSha", "runId", "runAttempt"],
+      "properties": {
+        "issuer": { "type": "string", "pattern": "^https://[^\\s]+$", "maxLength": 300 },
+        "subject": { "type": "string", "minLength": 12, "maxLength": 500 },
+        "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+        "workflowPath": { "type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9._-]+\\.ya?ml$" },
+        "workflowRef": { "type": "string", "minLength": 12, "maxLength": 500 },
+        "oidcAudience": { "type": "string", "minLength": 3, "maxLength": 200 },
+        "commitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "runId": { "type": "string", "pattern": "^[1-9][0-9]{0,19}$" },
+        "runAttempt": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "verificationMaterial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundleSha256", "certificateSha256", "signatureSha256", "publicKeyFingerprintSha256"],
+      "properties": {
+        "bundleSha256": { "$ref": "#/$defs/sha256" },
+        "certificateSha256": { "$ref": "#/$defs/sha256" },
+        "signatureSha256": { "$ref": "#/$defs/sha256" },
+        "publicKeyFingerprintSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "transparencyCheckpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logId", "entryId", "integratedAt", "checkpointSha256", "inclusionProofSha256"],
+      "properties": {
+        "logId": { "type": "string", "minLength": 8, "maxLength": 160 },
+        "entryId": { "type": "string", "minLength": 8, "maxLength": 200 },
+        "integratedAt": { "type": "string", "format": "date-time" },
+        "checkpointSha256": { "$ref": "#/$defs/sha256" },
+        "inclusionProofSha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

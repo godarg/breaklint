@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/holdout-freeze-receipt-v1.schema.json",
+  "title": "breaklint M3-1 external holdout freeze receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "receiptId",
+    "purpose",
+    "issuedAt",
+    "frozenAt",
+    "serialNumber",
+    "sequence",
+    "previousReceiptSha256",
+    "previousCheckpointSha256",
+    "subject",
+    "workflowIdentity",
+    "trustPolicyId",
+    "trustPolicySha256",
+    "externalAttestationProofId",
+    "externalAttestationProofSha256",
+    "transparencyCheckpoint",
+    "externalVerificationRequired",
+    "holdoutFreezeExternalValid",
+    "evidenceTrust"
+  ],
+  "properties": {
+    "contractVersion": { "const": "m3-1-holdout-freeze-receipt-v1" },
+    "receiptId": { "type": "string", "pattern": "^freeze_receipt_[A-Za-z0-9._-]{8,80}$" },
+    "purpose": { "const": "holdout-freeze" },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "frozenAt": { "type": "string", "format": "date-time" },
+    "serialNumber": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,120}$" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "previousReceiptSha256": { "$ref": "#/$defs/nullableSha256" },
+    "previousCheckpointSha256": { "$ref": "#/$defs/nullableSha256" },
+    "subject": { "$ref": "#/$defs/subject" },
+    "workflowIdentity": { "$ref": "#/$defs/workflowIdentity" },
+    "trustPolicyId": { "type": "string", "pattern": "^attestor_policy_[A-Za-z0-9._-]{8,80}$" },
+    "trustPolicySha256": { "$ref": "#/$defs/sha256" },
+    "externalAttestationProofId": { "type": "string", "pattern": "^proof_[A-Za-z0-9._-]{8,80}$" },
+    "externalAttestationProofSha256": { "$ref": "#/$defs/sha256" },
+    "transparencyCheckpoint": { "$ref": "#/$defs/transparencyCheckpoint" },
+    "externalVerificationRequired": { "const": true },
+    "holdoutFreezeExternalValid": { "type": "boolean" },
+    "evidenceTrust": { "enum": ["untrusted", "externally-verified"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "evidenceTrust": { "const": "untrusted" } }, "required": ["evidenceTrust"] },
+      "then": { "properties": { "holdoutFreezeExternalValid": { "const": false } } }
+    },
+    {
+      "if": { "properties": { "sequence": { "type": "integer", "minimum": 2 } }, "required": ["sequence"] },
+      "then": {
+        "properties": {
+          "previousReceiptSha256": { "$ref": "#/$defs/sha256" },
+          "previousCheckpointSha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nullableSha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }] },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subjectId", "subjectSha256", "subjectContractVersion", "subjectMediaType"],
+      "properties": {
+        "subjectId": { "type": "string", "pattern": "^holdout_[A-Za-z0-9._-]{8,80}$" },
+        "subjectSha256": { "$ref": "#/$defs/sha256" },
+        "subjectContractVersion": { "type": "string", "pattern": "^m3-[01]-[A-Za-z0-9._-]+-v[1-9][0-9]*$" },
+        "subjectMediaType": { "const": "application/json" }
+      }
+    },
+    "workflowIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issuer", "subject", "repository", "workflowPath", "workflowRef", "commitSha", "runId", "runAttempt"],
+      "properties": {
+        "issuer": { "type": "string", "pattern": "^https://[^\\s]+$", "maxLength": 300 },
+        "subject": { "type": "string", "minLength": 12, "maxLength": 500 },
+        "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+        "workflowPath": { "type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9._-]+\\.ya?ml$" },
+        "workflowRef": { "type": "string", "minLength": 12, "maxLength": 500 },
+        "commitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "runId": { "type": "string", "pattern": "^[1-9][0-9]{0,19}$" },
+        "runAttempt": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "transparencyCheckpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logId", "entryId", "integratedAt", "checkpointSha256", "inclusionProofSha256"],
+      "properties": {
+        "logId": { "type": "string", "minLength": 8, "maxLength": 160 },
+        "entryId": { "type": "string", "minLength": 8, "maxLength": 200 },
+        "integratedAt": { "type": "string", "format": "date-time" },
+        "checkpointSha256": { "$ref": "#/$defs/sha256" },
+        "inclusionProofSha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

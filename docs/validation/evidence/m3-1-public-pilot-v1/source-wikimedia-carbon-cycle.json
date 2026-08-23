@@ -1,0 +1,38 @@
+{
+  "contractVersion": "m3-1-source-evidence-v1",
+  "evidenceId": "source_evidence_wikimedia_carbon_cycle_0001",
+  "reviewDate": "2026-08-23",
+  "sourceLocator": "source_wikimedia_carbon_cycle_0001",
+  "descriptionPage": "https://commons.wikimedia.org/wiki/File:Carbon_cycle-simple_diagram.svg",
+  "originalLocator": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Carbon_cycle-simple_diagram.svg",
+  "sourceClass": "public-domain",
+  "rightsBasis": "public-domain-rightsholder-release",
+  "rightsEvidence": {
+    "licenseStatus": "Public domain",
+    "licenseStatement": "The Commons description records a worldwide public-domain release by the author and an unconditional fallback grant for all purposes where such release is not legally possible.",
+    "upstreamSha1": "76ec7ff48bf56812538cb33f0e252000633f40b1",
+    "upstreamByteLength": 60993
+  },
+  "frozenArtifact": {
+    "mediaType": "image/svg+xml",
+    "sha256": "63b74325db67e504c0bfa788cfc54eed6667232364fcdc13c5677a304ed9565a",
+    "byteLength": 60993
+  },
+  "privacyReview": {
+    "class": "reviewed-no-sensitive-personal-data",
+    "decision": "eligible",
+    "findings": [
+      "Public attribution pseudonym appears only in the external rights evidence",
+      "No email address, credential, client material, private path or sensitive personal data observed in the frozen SVG bytes"
+    ]
+  },
+  "targetBindingReview": {
+    "decision": "eligible-with-byte-bound-source-signatures",
+    "limitation": "Authored IDs are incomplete; non-authored targets use byte-bound structural source signatures."
+  },
+  "originGroupId": "origin_group_wikimedia_carbon_cycle_0001",
+  "derivationGroupId": "derivation_group_wikimedia_carbon_cycle_0001",
+  "split": "tuning",
+  "admissionDecision": "eligible-for-public-process-pilot",
+  "calibrationEvidenceEligible": false
+}
