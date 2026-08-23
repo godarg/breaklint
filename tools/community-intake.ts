@@ -29,9 +29,25 @@ const LABELS: Record<string, { color: string; description: string }> = {
 };
 const COMMENT_MARKER = "<!-- breaklint-community-intake-v1 -->";
 const DASHBOARD_MARKER = "<!-- breaklint-community-dashboard-v1 -->";
+const REQUIRED_DECLARATIONS = [
+  "I have the right to publish every submitted byte and public source.",
+  "I reviewed the submission and removed personal data, credentials, private URLs and confidential material.",
+  "I permit this project to reproduce, modify and redistribute my submitted report and reproduction under the repository's MIT licence.",
+  "I understand that my GitHub identity and this entire submission are public.",
+  "I understand that participation is voluntary and unpaid, with no promised reward, support, response or product."
+];
 
 function labelNames(issue: Issue): string[] {
   return (issue.labels ?? []).map((label) => typeof label === "string" ? label : label.name ?? "").filter(Boolean);
+}
+
+export function safeInline(value: string | undefined): string {
+  return (value ?? "unknown")
+    .replace(/[\u0000-\u001f\u007f]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, 160)
+    .replace(/([\\`*_[\]<>])/gu, "\\$1") || "unknown";
 }
 
 export function sections(body: string): Map<string, string> {
@@ -57,7 +73,11 @@ export function classifyIssue(issue: Issue): Classification {
     return !value || value === "_No response_";
   });
   const declarations = `${values.get("Rights, privacy and public handling") ?? ""}\n${values.get("Volunteer terms") ?? ""}`;
-  if ((declarations.match(/- \[[xX]\]/gu) ?? []).length < 5) missing.push("all five public-handling and volunteer declarations");
+  for (const declaration of REQUIRED_DECLARATIONS) {
+    if (!declarations.includes(`- [x] ${declaration}`) && !declarations.includes(`- [X] ${declaration}`)) {
+      missing.push(`declaration: ${declaration}`);
+    }
+  }
   const sensitiveChecks: Array<[string, RegExp]> = [
     ["absolute-user-path", /(?:\/Users\/[^/\s]+\/|[A-Za-z]:\\Users\\[^\\\s]+\\)/u],
     ["private-key", /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/u],
@@ -68,7 +88,7 @@ export function classifyIssue(issue: Issue): Classification {
   return {
     state: sensitivePatterns.length ? "sensitive-warning" : missing.length ? "needs-info" : "complete",
     missing: [...new Set(missing)], sensitivePatterns,
-    route: values.get("Test route") ?? "unknown", rule: values.get("Rule or area") ?? "unknown"
+    route: safeInline(values.get("Test route")), rule: safeInline(values.get("Rule or area"))
   };
 }
 
@@ -111,9 +131,15 @@ function commentFor(classification: Classification): string {
   return `${COMMENT_MARKER}\nAutomated community intake: **${classification.state}**.\n\n${detail}\n\nThis check never executes submitted HTML, commands, links, patches or attachments. Community QA is not blind annotation or calibration evidence.`;
 }
 
+type IssueComment = { id: number; body?: string; user?: { login?: string; type?: string } };
+
+export function managedComment(comments: IssueComment[]): IssueComment | undefined {
+  return comments.find((comment) => comment.user?.login === "github-actions[bot]" && comment.user.type === "Bot" && comment.body?.includes(COMMENT_MARKER));
+}
+
 async function upsertComment(repo: string, token: string, issueNumber: number, body: string) {
-  const comments = await api(repo, token, `/issues/${issueNumber}/comments?per_page=100`) as Array<{ id: number; body?: string }>;
-  const existing = comments.find((comment) => comment.body?.includes(COMMENT_MARKER));
+  const comments = await api(repo, token, `/issues/${issueNumber}/comments?per_page=100`) as IssueComment[];
+  const existing = managedComment(comments);
   if (existing) await api(repo, token, `/issues/comments/${existing.id}`, { method: "PATCH", body: JSON.stringify({ body }) });
   else await api(repo, token, `/issues/${issueNumber}/comments`, { method: "POST", body: JSON.stringify({ body }) });
 }
@@ -156,7 +182,10 @@ function dashboardBody(issues: Array<{ issue: Issue; classification: Classificat
   if (!byRoute.size) lines.push("No submissions yet.");
   else for (const [route, total] of [...byRoute].sort(([a], [b]) => a.localeCompare(b))) lines.push(`- ${route}: ${total}`);
   lines.push("", "## Reports", "");
-  for (const { issue, classification } of issues) lines.push(`- [#${issue.number} ${issue.title}](${issue.html_url}) — ${classification.state}; ${classification.rule}`);
+  for (const { issue, classification } of issues) {
+    const url = issue.html_url?.startsWith("https://github.com/") ? issue.html_url : "#";
+    lines.push(`- [#${issue.number} ${safeInline(issue.title)}](${url}) — ${classification.state}; ${classification.rule}`);
+  }
   lines.push("", "Submitted content is untrusted data and is never executed by this workflow. All breaklint rules remain `calibrated: false`.", "");
   return lines.join("\n");
 }
