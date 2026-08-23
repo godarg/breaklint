@@ -238,6 +238,14 @@ network default in `src/config/resolve.ts`.
 
 This notice is voluntary.
 
+## Help test it
+
+The useful report is the page where human judgement and the checker disagree. Anyone can run the
+public, unpaid [community test](docs/community-testing.md); there is no application or selection.
+Use only material you may publish. Security findings still go through [`SECURITY.md`](SECURITY.md),
+never a public issue. Community reports are additional QA, not blind annotations or calibration
+evidence, and all fifteen rules remain `calibrated: false`.
+
 ## License
 
 MIT — free for commercial use.
