@@ -1,0 +1,184 @@
+{
+  "contractVersion": "m3-0-corpus-contract-v1",
+  "schemaVersion": 1,
+  "manifestId": "manifest_public_synthetic_v1",
+  "createdAt": "2026-08-22T20:30:00Z",
+  "documents": [
+    {
+      "documentId": "doc_synthetic_clean_001",
+      "artifact": {
+        "sha256": "3d11b5581edfedbb7ef63d8cec97cc12d46ba23a43e86187a3b44ceefcd0c582",
+        "storage": "public-repository",
+        "relativePath": "synthetic-clean.svg",
+        "mediaType": "image/svg+xml"
+      },
+      "realDocument": false,
+      "split": "development",
+      "originGroupId": "origin_synthetic_clean_001",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "source_synthetic_clean_001",
+        "sourceEvidence": "First-party synthetic fixture committed next to this manifest."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Created for the MIT-licensed breaklint validation suite."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Contains only the literal text Clean label and no personal data."
+      },
+      "capturedAt": "2026-08-22T20:30:00Z",
+      "rendererFreeze": {
+        "rendererFreezeId": "renderer_e2815e4c31249192921f2685aeb560b2866643769f29119d1d65d2b67caeadb1",
+        "sourceIdentity": {
+          "mode": "clean-commit",
+          "commit": "9247d708e12b2ca847c01369f2da0ede75ddc082"
+        },
+        "breaklintVersion": "0.2.0",
+        "nodeVersion": "v22.22.3",
+        "browserProduct": "Chrome",
+        "browserVersion": "151.0.7922.173",
+        "browserExecutableSha256": "21b789908667614137c0db7dadebf1eff21e60c6bb30f349445aef47bbfdded8",
+        "puppeteerVersion": "25.8.0",
+        "pagedjsVersion": "0.4.3",
+        "pagedjsArtifactSha256": "4cae0c875c89084b353ceee87bcc742388de3133f2bbf48830b63f1d2d357e4f",
+        "rasterizer": "Chrome screenshot",
+        "rasterizerVersion": "Chrome 151.0.7922.173 with pngjs 7.0.0",
+        "headless": true,
+        "deviceScaleFactor": 2,
+        "viewport": { "width": 480, "height": 240, "unit": "css-px" },
+        "pageSize": { "width": 440, "height": 180, "unit": "css-px" },
+        "locale": "en",
+        "timezone": "UTC",
+        "colorScheme": "light",
+        "os": { "platform": "darwin", "version": "25.5.0", "arch": "arm64" },
+        "fonts": [
+          {
+            "family": "Arial",
+            "resolvedId": "Arial.ttf",
+            "sha256": "525979822591a3447cfc49d943d6f7683508e25543407871c0ed8fed05fd2bd9"
+          }
+        ],
+        "customFontHashes": [],
+        "networkMode": "offline",
+        "resourceHashes": [
+          "3d11b5581edfedbb7ef63d8cec97cc12d46ba23a43e86187a3b44ceefcd0c582"
+        ]
+      },
+      "targets": [
+        {
+          "targetId": "target_393c2985e7e4fae6efb6f76c39593d7b",
+          "svgRootKey": "author-id:calibration-root",
+          "sourceIdentity": "author-id:clean-label",
+          "ruleId": "svg/text-clipped",
+          "oracle": {
+            "oracleVersion": "m3-0-oracle-v1",
+            "evidenceKinds": ["artifact-bytes", "authored-svg-semantics", "synthetic-construction", "neutral-counterfactual-render"],
+            "groundTruth": "negative"
+          },
+          "annotations": [],
+          "ambiguityStatus": "unambiguous",
+          "adjudication": null
+        },
+        {
+          "targetId": "target_26e855b5f6ca7ad05a45ebb5fa8f8dca",
+          "svgRootKey": "author-id:calibration-root",
+          "sourceIdentity": "author-id:clean-label",
+          "ruleId": "svg/text-ink-collision",
+          "oracle": {
+            "oracleVersion": "m3-0-oracle-v1",
+            "evidenceKinds": ["artifact-bytes", "authored-svg-semantics", "synthetic-construction", "independent-render-geometry"],
+            "groundTruth": "negative"
+          },
+          "annotations": [],
+          "ambiguityStatus": "unambiguous",
+          "adjudication": null
+        },
+        {
+          "targetId": "target_7cc2da77fe31e4e1878d83e0b1683690",
+          "svgRootKey": "author-id:calibration-root",
+          "sourceIdentity": "author-id:clean-label",
+          "ruleId": "svg/text-overflows-viewport",
+          "oracle": {
+            "oracleVersion": "m3-0-oracle-v1",
+            "evidenceKinds": ["artifact-bytes", "authored-svg-semantics", "authored-viewport-boundary", "independent-render-geometry"],
+            "groundTruth": "negative"
+          },
+          "annotations": [],
+          "ambiguityStatus": "unambiguous",
+          "adjudication": null
+        }
+      ]
+    }
+  ],
+  "preregistrationAnchors": [],
+  "holdoutFreeze": null,
+  "candidateSelections": [],
+  "evaluationLedger": [],
+  "readinessClaims": [
+    {
+      "ruleId": "svg/text-clipped",
+      "calibrationMode": "empirical-threshold",
+      "ruleReadyForCalibration": false,
+      "ruleReadyForCalibratedClaim": false,
+      "calibratedClaim": false,
+      "eligibleRealDocuments": 0,
+      "eligibleOriginGroups": 0,
+      "acceptedSamplingPlan": false,
+      "candidateConfigHash": null,
+      "rendererFreezeId": null,
+      "rendererContentHash": null,
+      "thresholdCandidateHash": null,
+      "acceptanceGateVersion": null,
+      "acceptancePlanSha256": null,
+      "preregistrationReceiptSha256": null,
+      "holdoutLineageId": null,
+      "outcomeSha256": null,
+      "acceptanceReportSha256": null
+    },
+    {
+      "ruleId": "svg/text-ink-collision",
+      "calibrationMode": "empirical-threshold",
+      "ruleReadyForCalibration": false,
+      "ruleReadyForCalibratedClaim": false,
+      "calibratedClaim": false,
+      "eligibleRealDocuments": 0,
+      "eligibleOriginGroups": 0,
+      "acceptedSamplingPlan": false,
+      "candidateConfigHash": null,
+      "rendererFreezeId": null,
+      "rendererContentHash": null,
+      "thresholdCandidateHash": null,
+      "acceptanceGateVersion": null,
+      "acceptancePlanSha256": null,
+      "preregistrationReceiptSha256": null,
+      "holdoutLineageId": null,
+      "outcomeSha256": null,
+      "acceptanceReportSha256": null
+    },
+    {
+      "ruleId": "svg/text-overflows-viewport",
+      "calibrationMode": "structural-validation",
+      "ruleReadyForCalibration": false,
+      "ruleReadyForCalibratedClaim": false,
+      "calibratedClaim": false,
+      "eligibleRealDocuments": 0,
+      "eligibleOriginGroups": 0,
+      "acceptedSamplingPlan": false,
+      "candidateConfigHash": null,
+      "rendererFreezeId": null,
+      "rendererContentHash": null,
+      "thresholdCandidateHash": null,
+      "acceptanceGateVersion": null,
+      "acceptancePlanSha256": null,
+      "preregistrationReceiptSha256": null,
+      "holdoutLineageId": null,
+      "outcomeSha256": null,
+      "acceptanceReportSha256": null
+    }
+  ]
+}
