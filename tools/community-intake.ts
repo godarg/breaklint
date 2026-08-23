@@ -35,6 +35,7 @@ function labelNames(issue: Issue): string[] {
 }
 
 export function sections(body: string): Map<string, string> {
+  body = body.replaceAll("\r\n", "\n");
   const result = new Map<string, string>();
   const matches = [...body.matchAll(/^### ([^\n]+)\n\n/gmu)];
   for (const [index, match] of matches.entries()) {
@@ -71,10 +72,18 @@ export function classifyIssue(issue: Issue): Classification {
   };
 }
 
+export function githubHeaders(token: string, hasBody: boolean): Record<string, string> {
+  return {
+    Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`,
+    "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "breaklint-community-intake-v1",
+    ...(hasBody ? { "Content-Type": "application/json" } : {})
+  };
+}
+
 async function api(repo: string, token: string, path: string, init: RequestInit = {}) {
   const response = await fetch(`https://api.github.com/repos/${repo}${path}`, {
     ...init,
-    headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "breaklint-community-intake-v1", ...(init.headers ?? {}) }
+    headers: { ...githubHeaders(token, init.body !== undefined && init.body !== null), ...(init.headers ?? {}) }
   });
   if (!response.ok) throw new Error(`GitHub API ${init.method ?? "GET"} ${path}: ${response.status} ${await response.text()}`);
   if (response.status === 204) return null;
@@ -168,13 +177,14 @@ async function syncDashboard(repo: string, token: string) {
   else await api(repo, token, "/issues", { method: "POST", body: JSON.stringify({ title: "Community testing dashboard", body, labels: ["community-dashboard"] }) });
 }
 
-function arg(name: string): string | undefined {
-  const index = process.argv.indexOf(`--${name}`);
-  return index >= 0 ? process.argv[index + 1] : undefined;
+export function argument(argv: string[], name: string): string | undefined {
+  const index = argv.indexOf(`--${name}`);
+  const value = index >= 0 ? argv[index + 1] : undefined;
+  return value && !value.startsWith("--") ? value : undefined;
 }
 
 async function main() {
-  const repo = arg("repo") ?? process.env.GITHUB_REPOSITORY;
+  const repo = argument(process.argv, "repo") ?? process.env.GITHUB_REPOSITORY;
   const token = process.env.GITHUB_TOKEN;
   if (!repo) throw new Error("missing --repo or GITHUB_REPOSITORY");
   if (process.argv.includes("--sync")) {
@@ -182,7 +192,7 @@ async function main() {
     await syncDashboard(repo, token);
     return;
   }
-  const eventPath = arg("event");
+  const eventPath = argument(process.argv, "event");
   if (!eventPath) throw new Error("missing --event");
   const event = JSON.parse(readFileSync(eventPath, "utf8")) as { issue?: Issue };
   if (!event.issue || !labelNames(event.issue).includes("community-test")) return;

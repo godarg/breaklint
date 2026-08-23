@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classifyIssue, sections } from "../../tools/community-intake.ts";
+import { argument, classifyIssue, githubHeaders, sections } from "../../tools/community-intake.ts";
 
 const completeBody = `### Test route
 
@@ -48,6 +48,22 @@ test("complete public issue is classified without executing untrusted text", () 
   assert.equal(result.state, "complete");
   assert.deepEqual(result.missing, []);
   assert.equal(sections(body).get("Rule or area"), "svg/text-clipped");
+});
+
+test("CRLF issue bodies retain all headings and declarations", () => {
+  const result = classifyIssue({ number: 4, title: "fixture", body: completeBody.replaceAll("\n", "\r\n") });
+  assert.equal(result.state, "complete");
+  assert.deepEqual(result.missing, []);
+});
+
+test("CLI flags cannot be consumed as missing argument values", () => {
+  assert.equal(argument(["node", "tool", "--event", "--repo", "godarg/breaklint"], "event"), undefined);
+  assert.equal(argument(["node", "tool", "--repo", "godarg/breaklint"], "repo"), "godarg/breaklint");
+});
+
+test("GitHub writes declare JSON while reads do not invent a content type", () => {
+  assert.equal(githubHeaders("redacted", true)["Content-Type"], "application/json");
+  assert.equal(githubHeaders("redacted", false)["Content-Type"], undefined);
 });
 
 test("missing declaration fails closed", () => {
