@@ -342,6 +342,40 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     assert.equal(sanitizeBlindSvgContextV2(kept), kept);
   });
 
+  it("refuses an unterminated url(, which CSS closes at end-of-input and a browser still fetches", () => {
+    // A third independent review defeated the target check with one missing `)`. CSS closes an
+    // unterminated function at EOF, so a browser treats `url(https://host/x` as a complete url(),
+    // while every paren-terminated pattern simply never matches it. Real Chrome fetched from nine
+    // such channels while the verifier reported the produced artifact valid.
+    const channels = ["mask-image", "fill", "background-image", "marker-start", "clip-path", "stroke", "filter"];
+    for (const property of channels) {
+      assert.throws(
+        () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='${property}:url(https://attacker.invalid/x'>Alpha</text></svg>`),
+        /contains unbalanced parentheses/u,
+        property,
+      );
+    }
+    // Spelling variants of the same hole.
+    for (const [label, value] of [["uppercase", "URL(https://attacker.invalid/e1"], ["quoted", 'url("https://attacker.invalid/a4"'], ["trailing newline", "url(https://attacker.invalid/f15\n"]] as const) {
+      assert.throws(
+        () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='fill:${value}'>Alpha</text></svg>`),
+        /contains unbalanced parentheses/u,
+        label,
+      );
+    }
+    // A stray closing paren is equally unbalanced and equally refused.
+    assert.throws(
+      () => sanitizeBlindSvgContextV2('<svg xmlns="http://www.w3.org/2000/svg"><text style="fill:#101010)">Alpha</text></svg>'),
+      /contains unbalanced parentheses/u,
+    );
+    // Positive controls: balanced geometry and same-document references stay accepted, including the
+    // quoted fragment form that the first version of this guard wrongly refused.
+    for (const value of ['url(#g)', "url('#g')", 'url(#g)']) {
+      const kept = sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text fill="${value}">Alpha</text></svg>`);
+      assert.equal(kept.includes("Alpha"), true, value);
+    }
+  });
+
   it("binds packet-v2 target set and order to an independently reconstructed custodial source", () => {
     const source = Buffer.from('<svg id="root"><text id="first">Alpha</text><text id="second">Beta</text></svg>');
     const targets = enumerateSvgTextTargets(source, ["svg/text-clipped"]).map((target) => ({ ...target, documentId: `doc_${"1".repeat(32)}` }));

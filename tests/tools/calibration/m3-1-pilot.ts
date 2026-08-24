@@ -607,7 +607,7 @@ const SVG_ALLOWED_ATTRIBUTE_FUNCTIONS = new Set([
 ]);
 const SVG_ATTRIBUTE_FUNCTION_CALL = /([A-Za-z-][\w-]*)\s*\(/gu;
 const SVG_ATTRIBUTE_URL_CALL = /url\s*\(([^)]*)\)/giu;
-const SVG_SAME_DOCUMENT_FRAGMENT = /^#[A-Za-z_][\w.:-]*$/u;
+const SVG_SAME_DOCUMENT_FRAGMENT = /^(?:"#[A-Za-z_][\w.:-]*"|'#[A-Za-z_][\w.:-]*'|#[A-Za-z_][\w.:-]*)$/u;
 
 const SVG_PRIVATE_PATH_HINT = /(?:\bfile:|\b[A-Za-z]:\\|\/(?:Users|home|private|var\/folders)\/|(?:^|[\s"'])\.\.?\/|\.(?:ai|eps|html?|pdf|svg)\b)/iu;
 
@@ -685,6 +685,19 @@ function validateSvgMarkupLexically(source: string): void {
         if (!SVG_ALLOWED_ATTRIBUTE_FUNCTIONS.has(functionName)) {
           throw new Error(`blind SVG context attribute ${attributeName} calls a non-allowlisted function: ${functionName}`);
         }
+      }
+      // CSS closes an unterminated function at end-of-input ("consume a function": on EOF this is a
+      // parse error, but the function is returned). So `url(https://host/x` with no closing paren is
+      // a COMPLETE url() to a browser, while every paren-terminated pattern — the one below and the
+      // older blindContextHasExternalAssetReference — simply never matches it. An independent review
+      // fetched from nine such channels in real Chrome while the verifier reported the artifact
+      // valid. Requiring balance first makes the target check total instead of merely covering the
+      // syntactically closed cases; measured across all 6242 attribute values in the v1 and v2
+      // corpora, nothing legitimate is unbalanced.
+      const openParens = (attributeValue.match(/\(/gu) ?? []).length;
+      const closeParens = (attributeValue.match(/\)/gu) ?? []).length;
+      if (openParens !== closeParens) {
+        throw new Error(`blind SVG context attribute ${attributeName} contains unbalanced parentheses`);
       }
       for (const call of attributeValue.matchAll(SVG_ATTRIBUTE_URL_CALL)) {
         if (!SVG_SAME_DOCUMENT_FRAGMENT.test(call[1]!.trim())) {
