@@ -251,8 +251,14 @@ describe("M3-1 additive public-pilot infrastructure", () => {
       '<svg><text id="first" ID="second">Neutral</text></svg>',
       '<svg><text>f&#105;nding: positive</text></svg>',
       '<svg><image href="&#35;source-id"/><text id="source-id">Neutral</text></svg>',
+      String.raw`<svg><text style="fill:url(\68 ttps://attacker.invalid/x)">Neutral</text></svg>`,
+      String.raw`<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:u\72 l(https://example.invalid/pixel)"/></svg>`,
+      '<svg><text>result: pass</text></svg>',
+      '<svg><text>result: fail</text></svg>',
+      '<svg><text>verdict: pass</text></svg>',
+      '<svg><text>r&#101;sult: fail</text></svg>',
     ];
-    for (const source of blocked) assert.throws(() => sanitizeBlindSvgContextV2(source), /(?:outcome hint|data URL|processing instruction|unknown namespace|active or independently mutable content|event handler|must be quoted|duplicate attribute|character reference)/u, source);
+    for (const source of blocked) assert.throws(() => sanitizeBlindSvgContextV2(source), /(?:outcome hint|data URL|processing instruction|unknown namespace|active or independently mutable content|event handler|must be quoted|duplicate attribute|character reference|backslash or CSS escape)/u, source);
     const hiddenChannels = sanitizeBlindSvgContextV2(`<svg data-source="${privateSourcePath}"><title>finding: positive</title><desc>source.svg</desc><text class="outcome_fail" aria-label="severity: high" role="status">Neutral</text></svg>`);
     assert.equal(/(?:data-source|<title|<desc|class=|aria-|role=|finding|outcome|severity|source\.svg)/iu.test(hiddenChannels), false);
     const metadataOnly = sanitizeBlindSvgContextV2('<svg><metadata><dc:title>finding: positive</dc:title></metadata><text>Neutral</text></svg>');
@@ -261,6 +267,35 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     assert.equal(idOnly.includes("finding"), false);
     const commentOnly = sanitizeBlindSvgContextV2('<svg><!-- finding: positive --><text>Neutral</text></svg>');
     assert.equal(commentOnly.includes("finding"), false);
+  });
+
+  it("rejects each reported blind-context escape counterexample for its own specific reason", () => {
+    // Exact counterexamples from the independent final review of 54fa14d. A real Chrome resolves
+    // both CSS-escape forms to url("https://…invalid/…") and requests them, so a sanitizer that
+    // returns them unchanged hands the annotator an external, outcome-carrying resource channel.
+    const cssEscape: ReadonlyArray<readonly [string, string]> = [
+      ["reviewer u\\72 l form", String.raw`<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:u\72 l(https://example.invalid/pixel)"/></svg>`],
+      ["reviewer \\68 ttps form", String.raw`<svg><text style="fill:url(\68 ttps://attacker.invalid/x)">Neutral</text></svg>`],
+    ];
+    for (const [label, source] of cssEscape) {
+      assert.throws(() => sanitizeBlindSvgContextV2(source), /blind SVG context attribute style contains a backslash or CSS escape/u, label);
+    }
+
+    // Outcome hints keyed on `result` / `verdict`, including a character-reference spelling.
+    const outcomeHints: ReadonlyArray<readonly [string, string]> = [
+      ["result: pass", '<svg xmlns="http://www.w3.org/2000/svg"><text>result: pass</text></svg>'],
+      ["result: fail", '<svg xmlns="http://www.w3.org/2000/svg"><text>result: fail</text></svg>'],
+      ["verdict: pass", '<svg xmlns="http://www.w3.org/2000/svg"><text>verdict: pass</text></svg>'],
+      ["entity-encoded result: fail", '<svg xmlns="http://www.w3.org/2000/svg"><text>r&#101;sult: fail</text></svg>'],
+    ];
+    for (const [label, source] of outcomeHints) {
+      assert.throws(() => sanitizeBlindSvgContextV2(source), /blind SVG context contains an outcome hint/u, label);
+    }
+
+    // Positive control: the ban is on the escape channel, not on ordinary presentational style.
+    const benign = sanitizeBlindSvgContextV2('<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:#101010"/><text>Neutral</text></svg>');
+    assert.equal(benign.includes("fill:#101010"), true);
+    assert.equal(sanitizeBlindSvgContextV2(benign), benign);
   });
 
   it("binds packet-v2 target set and order to an independently reconstructed custodial source", () => {
