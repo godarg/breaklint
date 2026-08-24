@@ -49,7 +49,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 every scalar and every empty object or array as one leaf, and no path appears in one run and not
 the other.
 
-<!-- breaklint-status-figures-v1 unitTests=330 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=331 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -127,7 +127,7 @@ each measured singly.
 **Four repairs were once green in every suite while being reverted.** An audit turned each of them
 back into its defect — the tolerance-free page verdict, the unread integrity count, the unread
 late errors, the file-access switch — and the whole suite as it stood at the time (104 unit tests
-and 15 live tests, since grown to 330 and 57) plus the mutation guard stayed green through all
+and 15 live tests, since grown to 331 and 57) plus the mutation guard stayed green through all
 four. The repairs were real; the gates were not there. They are now, and
 each was verified by re-applying the mutation and watching it go red. The reason the live corpus
 could not reach them is structural: a real document cannot be made to produce a rasteriser page
