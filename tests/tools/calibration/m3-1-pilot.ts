@@ -592,6 +592,23 @@ const SVG_ALLOWED_NAMESPACE_DECLARATIONS = new Map([
 const SVG_REMOVED_NAMESPACE_PREFIXES = "(?:cc|dc|inkscape|rdf|sodipodi|svg)";
 const SVG_OUTCOME_HINT = /(?:(?:^|[^A-Za-z0-9])break\s*lint\b[\s\S]{0,32}\b(?:finding|result|outcome|pass|fail|severity|score|threshold|calibrat(?:ed|ion)?)\b|(?:^|[^A-Za-z0-9])(?:finding|outcome|result|verdict|severity|calibrated|production[\s_.-]*label|candidate[\s_.-]*config)(?=[\s:_.-])\s*[:=_-]\s*(?:pass|fail|true|false|positive|negative|present|absent|blocker|critical|high|medium|low|[0-9]))/iu;
 const SVG_TOOL_HINT = /\b(?:inkscape|sodipodi|adobe\s+illustrator|created\s+with|exported\s+by)\b/iu;
+// Blind-context attribute values may only call functions that are pure geometry, plus `url()`
+// restricted to a same-document fragment. This is an ALLOWLIST on purpose: the previous guard
+// enumerated the URL syntaxes it knew (`href`/`src`/`@import`/`url(<bare token>)`), and an
+// independent review defeated it twice without a backslash — `url("https://host/x"/*c*/)`, whose
+// trailing comment escapes the bare-token pattern, and `image-set("https://host/x" 1x)`, which
+// never spells `url(` at all. Both produced an annotator context that the fixed-point verifier
+// called valid while real Chrome fetched from it. A denylist of CSS functions cannot be finished;
+// CSS keeps adding fetching functions. Measured against every legitimate byte we hold, the whole
+// corpus needs exactly four names — matrix, scale, translate, url — so an allowlist costs nothing.
+const SVG_ALLOWED_ATTRIBUTE_FUNCTIONS = new Set([
+  "matrix", "translate", "translatex", "translatey",
+  "scale", "scalex", "scaley", "rotate", "skewx", "skewy", "url",
+]);
+const SVG_ATTRIBUTE_FUNCTION_CALL = /([A-Za-z-][\w-]*)\s*\(/gu;
+const SVG_ATTRIBUTE_URL_CALL = /url\s*\(([^)]*)\)/giu;
+const SVG_SAME_DOCUMENT_FRAGMENT = /^#[A-Za-z_][\w.:-]*$/u;
+
 const SVG_PRIVATE_PATH_HINT = /(?:\bfile:|\b[A-Za-z]:\\|\/(?:Users|home|private|var\/folders)\/|(?:^|[\s"'])\.\.?\/|\.(?:ai|eps|html?|pdf|svg)\b)/iu;
 
 function normalizeBlindHintText(value: string): string {
@@ -662,6 +679,18 @@ function validateSvgMarkupLexically(source: string): void {
       if (valueEnd < 0) throw new Error(`blind SVG context attribute ${attributeName} has an unterminated value`);
       const attributeValue = source.slice(valueStart, valueEnd);
       if (attributeValue.includes("\\")) throw new Error(`blind SVG context attribute ${attributeName} contains a backslash or CSS escape`);
+      if (attributeValue.includes("/*") || attributeValue.includes("*/")) throw new Error(`blind SVG context attribute ${attributeName} contains a CSS comment`);
+      for (const call of attributeValue.matchAll(SVG_ATTRIBUTE_FUNCTION_CALL)) {
+        const functionName = call[1]!.toLowerCase();
+        if (!SVG_ALLOWED_ATTRIBUTE_FUNCTIONS.has(functionName)) {
+          throw new Error(`blind SVG context attribute ${attributeName} calls a non-allowlisted function: ${functionName}`);
+        }
+      }
+      for (const call of attributeValue.matchAll(SVG_ATTRIBUTE_URL_CALL)) {
+        if (!SVG_SAME_DOCUMENT_FRAGMENT.test(call[1]!.trim())) {
+          throw new Error(`blind SVG context attribute ${attributeName} references a url() target that is not a same-document fragment`);
+        }
+      }
       if (attributeValue.includes("&")) {
         decodeXmlCharacterReferences(attributeValue);
         throw new Error(`blind SVG context attribute ${attributeName} contains a character reference`);
@@ -676,9 +705,9 @@ export function sanitizeBlindSvgContextV2(svgSource: string): string {
   if (!/<svg\b/iu.test(svgSource)) throw new Error("blind SVG context root is missing");
   if (/<\?(?:xml|[A-Za-z_:])/iu.test(svgSource)) throw new Error("blind SVG context contains a processing instruction");
   if (/<!\s*(?:DOCTYPE|ENTITY|\[CDATA\[)/iu.test(svgSource)) throw new Error("blind SVG context contains a forbidden XML declaration");
-  validateSvgMarkupLexically(svgSource);
   if (/<\/?(?:script|foreignObject|iframe|object|embed|animate|animateMotion|animateTransform|set|discard|style)\b/iu.test(svgSource)) throw new Error("blind SVG context contains active or independently mutable content");
   if (/\son[a-z][\w.-]*\s*=/iu.test(svgSource)) throw new Error("blind SVG context contains an event handler");
+  validateSvgMarkupLexically(svgSource);
   if (/data\s*:/iu.test(svgSource)) throw new Error("blind SVG context contains a data URL");
   if (blindContextHasExternalAssetReference(svgSource)) throw new Error("blind context would require an external asset fetch");
 

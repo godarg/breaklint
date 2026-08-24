@@ -298,6 +298,50 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     assert.equal(sanitizeBlindSvgContextV2(benign), benign);
   });
 
+  it("refuses external attribute references by allowlist, including the backslash-free counterexamples", () => {
+    // A second independent review defeated the backslash ban without any backslash. Both of these
+    // produced an annotator context that the fixed-point verifier called valid and that a real
+    // Chrome fetched from, while the rendering contract still asserted externalAssetsFetched:false.
+    assert.throws(
+      () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='fill:url("https://attacker.invalid/beacon"/*c*/)'>Alpha</text></svg>`),
+      /contains a CSS comment/u,
+      "url() with a trailing CSS comment escaped the bare-token pattern",
+    );
+    assert.throws(
+      () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='mask-image:image-set("https://attacker.invalid/mask" 1x)'>Beta</text></svg>`),
+      /calls a non-allowlisted function: image-set/u,
+      "image-set never spells url(, so no url() pattern can catch it",
+    );
+
+    // The guard must be an allowlist, not a longer denylist: a function nobody enumerated is refused
+    // on the sole ground that it was never permitted.
+    for (const [label, fn] of [["cross-fade", "cross-fade(url(https://a.invalid/x) 50%)"], ["element", "element(#src)"], ["var", "var(--leak)"], ["image", "image(https://a.invalid/x)"]] as const) {
+      assert.throws(
+        () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:${fn}"/><text>Neutral</text></svg>`),
+        /calls a non-allowlisted function|references a url\(\) target that is not a same-document fragment/u,
+        label,
+      );
+    }
+
+    // A url() that leaves the document is refused however it is spelled or quoted.
+    for (const value of ['url(https://a.invalid/x)', "url('https://a.invalid/x')", 'url( https://a.invalid/x )']) {
+      assert.throws(
+        () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><rect fill="${value}"/><text>Neutral</text></svg>`),
+        /references a url\(\) target that is not a same-document fragment/u,
+        value,
+      );
+    }
+
+    // Positive controls: the geometry and same-document references the real corpus depends on must
+    // survive untouched, otherwise the allowlist would silently invalidate the frozen contexts.
+    const legitimate = '<svg xmlns="http://www.w3.org/2000/svg"><rect transform="matrix(0.8,0,0,0.8,10,0)" fill="url(#blind-id-000001)"/><g transform="translate(-198.42,-232.06) scale(2)"><text>Neutral</text></g></svg>';
+    const kept = sanitizeBlindSvgContextV2(legitimate);
+    assert.equal(kept.includes('matrix(0.8,0,0,0.8,10,0)'), true);
+    assert.equal(kept.includes('url(#blind-id-000001)'), true);
+    assert.equal(kept.includes('translate(-198.42,-232.06) scale(2)'), true);
+    assert.equal(sanitizeBlindSvgContextV2(kept), kept);
+  });
+
   it("binds packet-v2 target set and order to an independently reconstructed custodial source", () => {
     const source = Buffer.from('<svg id="root"><text id="first">Alpha</text><text id="second">Beta</text></svg>');
     const targets = enumerateSvgTextTargets(source, ["svg/text-clipped"]).map((target) => ({ ...target, documentId: `doc_${"1".repeat(32)}` }));
