@@ -19,6 +19,19 @@ type Classification = {
   rule: string;
 };
 
+export type IntakeSection = {
+  level: 3 | 4;
+  heading: string;
+  normalizedHeading: string;
+  value: string;
+};
+
+type SectionDefinition = {
+  id: string;
+  heading: string;
+  responseRequired: boolean;
+};
+
 const MANAGED_LABELS = ["intake-complete", "intake-needs-info", "intake-sensitive-warning"];
 const LABELS: Record<string, { color: string; description: string }> = {
   "community-test": { color: "1d76db", description: "Open voluntary community QA submission" },
@@ -36,6 +49,18 @@ const REQUIRED_DECLARATIONS = [
   "I understand that my GitHub identity and this entire submission are public.",
   "I understand that participation is voluntary and unpaid, with no promised reward, support, response or product."
 ];
+const SECTION_DEFINITIONS: readonly SectionDefinition[] = [
+  { id: "test-route", heading: "Test route", responseRequired: true },
+  { id: "rule-or-area", heading: "Rule or area", responseRequired: true },
+  { id: "observed-result", heading: "Observed result", responseRequired: true },
+  { id: "expected-human-judgement", heading: "Expected human judgement", responseRequired: true },
+  { id: "reproduction-or-public-source", heading: "Reproduction or public source", responseRequired: true },
+  { id: "relevant-json-finding", heading: "Relevant JSON finding (optional)", responseRequired: false },
+  { id: "environment", heading: "Environment", responseRequired: true },
+  { id: "surprising-or-useful", heading: "What was surprising or especially useful? (optional)", responseRequired: false },
+  { id: "rights-privacy-public-handling", heading: "Rights, privacy and public handling", responseRequired: true },
+  { id: "volunteer-terms", heading: "Volunteer terms", responseRequired: true },
+];
 const ROUTES = new Set(["Ten-minute smoke test", "Real-page visual judgement", "Documentation or setup review", "Adversarial or boundary test"]);
 const RULES = new Set([
   "General installation or report", "svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport",
@@ -46,6 +71,90 @@ const RULES = new Set([
 
 function labelNames(issue: Issue): string[] {
   return (issue.labels ?? []).map((label) => typeof label === "string" ? label : label.name ?? "").filter(Boolean);
+}
+
+function withoutDefaultIgnorables(value: string): string {
+  return value.replace(/\p{Default_Ignorable_Code_Point}/gu, "");
+}
+
+function normalizedHeading(value: string): string {
+  return withoutDefaultIgnorables(value.normalize("NFKC"))
+    .replace(/\p{White_Space}+/gu, "")
+    .toLowerCase();
+}
+
+function normalizedSensitiveText(value: string): string {
+  return withoutDefaultIgnorables(value.replaceAll("\r\n", "\n").normalize("NFKC"))
+    .replace(/[^\S\n]+/gu, " ");
+}
+
+function credentialCandidate(value: string | undefined): boolean {
+  if (!value) return false;
+  const candidate = value.trim().replace(/^["']|["']$/gu, "");
+  if (candidate.length < 12 || /\s/u.test(candidate)) return false;
+  if (/^(?:redacted|masked|none|null|undefined|example|sample|dummy|changeme|replace(?:[-_].*)?|your(?:[-_].*)?|<[^>]+>|\$\{[^}]+\})$/iu.test(candidate)) return false;
+  return /^[A-Za-z0-9+/_=.:%-]+$/u.test(candidate);
+}
+
+function hasCredentialMatch(text: string, pattern: RegExp): boolean {
+  for (const match of text.matchAll(pattern)) {
+    if (credentialCandidate(match.groups?.candidate)) return true;
+  }
+  return false;
+}
+
+/**
+ * A deliberately redacted tripwire. It returns stable category identifiers only: neither the
+ * matching bytes nor a substring offset crosses into comments, logs or workflow output.
+ */
+export function detectSensitiveInput(body: string): string[] {
+  const text = normalizedSensitiveText(body);
+  const patterns = new Set<string>();
+  if (/(?:\/Users\/[^/\s]+\/|\/home\/[^/\s]+\/|[A-Za-z]:\\Users\\[^\\\s]+\\)/u.test(text)) {
+    patterns.add("absolute-user-path");
+  }
+  if (/-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/iu.test(text)) {
+    patterns.add("private-key");
+  }
+  if (/(?:\bgh[oprsu]_[A-Za-z0-9_]{20,}\b|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b|\bnpm_[A-Za-z0-9]{20,}\b|\bsk_(?:live|test)_[A-Za-z0-9]{16,}\b|\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b|\bsk-ant-(?:api\d{2}-)?[A-Za-z0-9_-]{20,}\b|\bAIza[0-9A-Za-z_-]{30,}\b|\bxox[baprs]-[A-Za-z0-9-]{20,}\b|\bglpat-[A-Za-z0-9_-]{20,}\b)/iu.test(text)) {
+    patterns.add("provider-token");
+  }
+  if (hasCredentialMatch(
+    text,
+    /\bauthorization\s*:\s*(?:bearer|basic)\s+(?<candidate>[^\s,;]{12,})/giu,
+  )) {
+    patterns.add("authorization-header");
+  }
+  if (hasCredentialMatch(
+    text,
+    /\bhttps?:\/\/[^\s/:@]+:(?<candidate>[^\s/@]{8,})@[^\s/]+/giu,
+  ) || hasCredentialMatch(
+    text,
+    /[?&](?:api[-_ ]?key|access[-_ ]?token|auth[-_ ]?token|client[-_ ]?secret|password|x-amz-(?:credential|signature))=(?<candidate>[^&#\s]{12,})/giu,
+  )) {
+    patterns.add("url-credential");
+  }
+  const secretName = String.raw`(?:api[-_ ]?key|access[-_ ]?token|auth[-_ ]?token|client[-_ ]?secret|(?:aws[-_ ]?)?secret[-_ ]?access[-_ ]?key|(?:aws[-_ ]?)?access[-_ ]?key[-_ ]?id|private[-_ ]?key|password|passwd|credential|id[-_ ]?token|refresh[-_ ]?token)`;
+  const assignment = new RegExp(
+    String.raw`(?:["']?\b${secretName}\b["']?)\s*(?::|=|\bis\b)\s*(?:["'](?<quoted>[^"'\n]{12,})["']|(?<bare>[^\s,;#}\]]{12,}))`,
+    "giu",
+  );
+  for (const match of text.matchAll(assignment)) {
+    if (credentialCandidate(match.groups?.quoted ?? match.groups?.bare)) {
+      patterns.add("secret-assignment");
+      break;
+    }
+  }
+  if (hasCredentialMatch(
+    text,
+    /\b(?:jwt|json[-_ ]?web[-_ ]?token|opaque[-_ ]?locator|opaque[-_ ]?token)\s*(?::|=|\bis\b)\s*(?<candidate>[A-Za-z0-9+/_=.:-]{20,})/giu,
+  ) || hasCredentialMatch(
+    text,
+    /\b(?:urn|opaque):[^\s]{0,80}(?:secret|token|credential)[:/=](?<candidate>[A-Za-z0-9+/_=.:-]{12,})/giu,
+  )) {
+    patterns.add("opaque-credential");
+  }
+  return [...patterns].sort();
 }
 
 export function safeInline(value: string | undefined): string {
@@ -60,41 +169,70 @@ export function safeInline(value: string | undefined): string {
     .replace(/#(?=\d)/gu, "＃") || "unknown";
 }
 
-export function sections(body: string): Map<string, string> {
+export function sections(body: string): IntakeSection[] {
   body = body.replaceAll("\r\n", "\n");
-  const result = new Map<string, string>();
-  const matches = [...body.matchAll(/^### ([^\n]+)\n\n/gmu)];
+  const result: IntakeSection[] = [];
+  const matches = [...body.matchAll(/^(#{3,4})[^\S\n]+([^\n]+?)[^\S\n]*$/gmu)];
   for (const [index, match] of matches.entries()) {
-    const heading = match[1];
-    if (!heading) continue;
+    const marker = match[1];
+    const heading = match[2]?.trim();
+    if (!marker || !heading) continue;
     const start = (match.index ?? 0) + match[0].length;
     const end = matches[index + 1]?.index ?? body.length;
-    result.set(heading.trim(), body.slice(start, end).trim());
+    result.push({
+      level: marker.length as 3 | 4,
+      heading,
+      normalizedHeading: normalizedHeading(heading),
+      value: body.slice(start, end).trim(),
+    });
   }
   return result;
 }
 
 export function classifyIssue(issue: Issue): Classification {
   const body = issue.body ?? "";
-  const values = sections(body);
-  const required = ["Test route", "Rule or area", "Observed result", "Expected human judgement", "Reproduction or public source", "Environment", "Rights, privacy and public handling", "Volunteer terms"];
-  const missing = required.filter((heading) => {
-    const value = values.get(heading);
-    return !value || value === "_No response_";
-  });
+  const parsed = sections(body);
+  const definitions = new Map(SECTION_DEFINITIONS.map((definition) => [normalizedHeading(definition.heading), definition]));
+  const grouped = new Map<string, IntakeSection[]>();
+  const missing: string[] = [];
+  for (const section of parsed) {
+    const definition = definitions.get(section.normalizedHeading);
+    if (section.level !== 3) {
+      missing.push("section-heading-level-invalid");
+      continue;
+    }
+    if (!definition) {
+      missing.push("section-heading-unknown");
+      continue;
+    }
+    const matches = grouped.get(definition.id) ?? [];
+    matches.push(section);
+    grouped.set(definition.id, matches);
+  }
+  const values = new Map<string, string>();
+  for (const definition of SECTION_DEFINITIONS) {
+    const matches = grouped.get(definition.id) ?? [];
+    if (matches.length !== 1) {
+      missing.push(`section-count-invalid:${definition.id}`);
+      continue;
+    }
+    const section = matches[0]!;
+    if (section.heading !== definition.heading) {
+      missing.push(`section-heading-noncanonical:${definition.id}`);
+      continue;
+    }
+    values.set(definition.heading, section.value);
+    if (definition.responseRequired && (!section.value || section.value === "_No response_")) {
+      missing.push(`section-response-missing:${definition.id}`);
+    }
+  }
   const declarations = `${values.get("Rights, privacy and public handling") ?? ""}\n${values.get("Volunteer terms") ?? ""}`;
   for (const declaration of REQUIRED_DECLARATIONS) {
     if (!declarations.includes(`- [x] ${declaration}`) && !declarations.includes(`- [X] ${declaration}`)) {
       missing.push(`declaration: ${declaration}`);
     }
   }
-  const sensitiveChecks: Array<[string, RegExp]> = [
-    ["absolute-user-path", /(?:\/Users\/[^/\s]+\/|[A-Za-z]:\\Users\\[^\\\s]+\\)/u],
-    ["private-key", /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/u],
-    ["github-token", /\bgh[oprsu]_[A-Za-z0-9_]{20,}\b/u],
-    ["secret-assignment", /\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password)\s*[:=]\s*["'][^"'\n]{12,}["']/iu]
-  ];
-  const sensitivePatterns = sensitiveChecks.filter(([, pattern]) => pattern.test(body)).map(([name]) => name);
+  const sensitivePatterns = detectSensitiveInput(body);
   const route = values.get("Test route");
   const rule = values.get("Rule or area");
   if (route && !ROUTES.has(route)) missing.push("canonical Test route");
