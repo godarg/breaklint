@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  argument, classifyIssue, detectSensitiveInput, githubHeaders, managedComment, safeInline, sections,
+  argument, classifyIssue, dashboardBody, detectSensitiveInput, githubHeaders, managedComment, safeInline, sections,
 } from "../../tools/community-intake.ts";
 
 const completeBody = `### Test route
@@ -290,4 +290,19 @@ test("sensitive classifications expose stable categories and never echo matched 
   assert.ok(result.sensitivePatterns.includes("secret-assignment"));
   assert.equal(JSON.stringify(result).includes(value), false);
   assert.ok(result.sensitivePatterns.every((category) => /^[a-z-]+$/u.test(category)));
+});
+
+test("sensitive issue titles are classified and withheld from serialized dashboard output", () => {
+  const value = "A".repeat(28);
+  const title = `access_token=${value}`;
+  const issue = { number: 14, title, body: completeBody, html_url: "https://github.com/godarg/breaklint/issues/14" };
+  const classification = classifyIssue(issue);
+  assert.equal(classification.state, "sensitive-warning");
+  assert.ok(classification.sensitivePatterns.includes("secret-assignment"));
+  assert.equal(JSON.stringify(classification).includes(value), false);
+
+  const dashboard = dashboardBody([{ issue, classification }]);
+  assert.match(dashboard, /#14 Sensitive content withheld/u);
+  assert.equal(JSON.stringify(dashboard).includes(title), false);
+  assert.equal(JSON.stringify(dashboard).includes(value), false);
 });

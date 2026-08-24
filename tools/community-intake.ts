@@ -232,7 +232,10 @@ export function classifyIssue(issue: Issue): Classification {
       missing.push(`declaration: ${declaration}`);
     }
   }
-  const sensitivePatterns = detectSensitiveInput(body);
+  const sensitivePatterns = [...new Set([
+    ...detectSensitiveInput(issue.title),
+    ...detectSensitiveInput(body),
+  ])].sort();
   const route = values.get("Test route");
   const rule = values.get("Rule or area");
   if (route && !ROUTES.has(route)) missing.push("canonical Test route");
@@ -313,7 +316,7 @@ async function listIssues(repo: string, token: string): Promise<Issue[]> {
   return issues;
 }
 
-function dashboardBody(issues: Array<{ issue: Issue; classification: Classification }>): string {
+export function dashboardBody(issues: Array<{ issue: Issue; classification: Classification }>): string {
   const count = (state: Classification["state"]) => issues.filter(({ classification }) => classification.state === state).length;
   const byRoute = new Map<string, number>();
   for (const { classification } of issues) byRoute.set(classification.route, (byRoute.get(classification.route) ?? 0) + 1);
@@ -336,7 +339,10 @@ function dashboardBody(issues: Array<{ issue: Issue; classification: Classificat
   lines.push("", "## Reports", "");
   for (const { issue, classification } of issues) {
     const url = issue.html_url?.startsWith("https://github.com/") ? issue.html_url : "#";
-    lines.push(`- [#${issue.number} ${safeInline(issue.title)}](${url}) — ${classification.state}; ${classification.rule}`);
+    const title = classification.state === "sensitive-warning"
+      ? "Sensitive content withheld"
+      : safeInline(issue.title);
+    lines.push(`- [#${issue.number} ${title}](${url}) — ${classification.state}; ${classification.rule}`);
   }
   lines.push("", "Submitted content is untrusted data and is never executed by this workflow. All breaklint rules remain `calibrated: false`.", "");
   return lines.join("\n");
