@@ -9,20 +9,27 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 
 import {
   buildBlindPacket,
+  buildBlindPacketV2,
   buildBlindContextArtifacts,
+  buildBlindContextArtifactsV2,
   buildFreezeProjection,
   buildPilotReport,
   buildPublicIntakeManifest,
+  canonicalJson,
   deriveStableTargetId,
   enumerateSvgTextTargets,
   ingestPublicArtifact,
   PINNED_M3_1_TRUST_POLICY,
   PINNED_M3_1_TRUST_POLICY_SHA256,
   scanStagedPublicArtifacts,
+  sanitizeBlindSvgContextV2,
   validateAnnotationChronology,
   validateAnnotationWorkflow,
   validateStrictSplits,
   verifyExternalTrust,
+  verifyBlindPacketV2Custodial,
+  verifyBlindPacketV2Public,
+  verifySanitizedBlindSvgContextV2,
   type ExternalAttestationProof,
   type ExternalFreezeReceipt,
 } from "../tools/calibration/m3-1-pilot.ts";
@@ -211,6 +218,78 @@ describe("M3-1 additive public-pilot infrastructure", () => {
       () => buildBlindContextArtifacts(Buffer.from('<svg><style>text{font:url(../font.woff2)}</style><text>Target</text></svg>'), "image/svg+xml", [{ ...enumerateSvgTextTargets(Buffer.from('<svg><style>text{font:url(../font.woff2)}</style><text>Target</text></svg>'), ["svg/text-clipped"])[0]!, documentId: `doc_${"3".repeat(32)}` }]),
       /external asset fetch/u,
     );
+  });
+
+  it("deterministically sanitizes editor metadata, comments and authored IDs", () => {
+    const source = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" inkscape:version="1.2" sodipodi:docname="private-source.svg" data-generator="Private Export Tool 7"><!-- Created with Inkscape --><sodipodi:namedview inkscape:window-x="1912"/><defs><linearGradient id="source-gradient"/></defs><rect id="private-shape-name" fill="url(#source-gradient)"/><text id="private-label">Neutral label</text></svg>';
+    const first = sanitizeBlindSvgContextV2(source);
+    const second = sanitizeBlindSvgContextV2(source);
+    assert.equal(first, second);
+    assert.equal(sanitizeBlindSvgContextV2(first), first);
+    assert.equal(/(?:inkscape|sodipodi|private-source|private-shape|private-label|source-gradient|<!--)/iu.test(first), false);
+    assert.match(first, /id="blind-id-000001"/u);
+    assert.match(first, /fill="url\(#blind-id-000001\)"/u);
+    assert.deepEqual(verifySanitizedBlindSvgContextV2(Buffer.from(first)), { valid: true, issues: [] });
+  });
+
+  it("fails closed on outcome hints, opaque source paths, data URLs, processing instructions and foreign namespaces", () => {
+    const encodedSvgPayload = ["PHN2", "Zz4="].join("");
+    const privateSourcePath = ["/", "Us", "ers", "/fixture-user/private/source.svg"].join("");
+    const blocked = [
+      '<svg><text>breaklint result: finding</text></svg>',
+      `<svg><image href="data:image/svg+xml;base64,${encodedSvgPayload}"/><text>Neutral</text></svg>`,
+      '<?packet finding="positive"?><svg><text>Neutral</text></svg>',
+      '<svg xmlns:vendor="https://vendor.invalid/ns"><vendor:payload>Neutral</vendor:payload><text>Neutral</text></svg>',
+      '<svg><script>throw new Error("active")</script><text>Neutral</text></svg>',
+      '<svg><foreignObject><iframe src="about:blank"></iframe></foreignObject><text>Neutral</text></svg>',
+      '<svg><text onclick="alert(1)">Neutral</text></svg>',
+      '<svg><animate attributeName="x" values="0;1"/><text>Neutral</text></svg>',
+      '<svg><set attributeName="visibility" to="hidden"/><text>Neutral</text></svg>',
+      '<svg><style>#source-id { display: none }</style><text id="source-id">Neutral</text></svg>',
+      '<svg><image href=https://example.test/private.png/><text>Neutral</text></svg>',
+      `<svg data-source=${privateSourcePath}><text>Neutral</text></svg>`,
+      '<svg><text id="first" ID="second">Neutral</text></svg>',
+      '<svg><text>f&#105;nding: positive</text></svg>',
+      '<svg><image href="&#35;source-id"/><text id="source-id">Neutral</text></svg>',
+    ];
+    for (const source of blocked) assert.throws(() => sanitizeBlindSvgContextV2(source), /(?:outcome hint|data URL|processing instruction|unknown namespace|active or independently mutable content|event handler|must be quoted|duplicate attribute|character reference)/u, source);
+    const hiddenChannels = sanitizeBlindSvgContextV2(`<svg data-source="${privateSourcePath}"><title>finding: positive</title><desc>source.svg</desc><text class="outcome_fail" aria-label="severity: high" role="status">Neutral</text></svg>`);
+    assert.equal(/(?:data-source|<title|<desc|class=|aria-|role=|finding|outcome|severity|source\.svg)/iu.test(hiddenChannels), false);
+    const metadataOnly = sanitizeBlindSvgContextV2('<svg><metadata><dc:title>finding: positive</dc:title></metadata><text>Neutral</text></svg>');
+    assert.equal(metadataOnly.includes("finding"), false);
+    const idOnly = sanitizeBlindSvgContextV2('<svg><text id="finding-positive">Neutral</text></svg>');
+    assert.equal(idOnly.includes("finding"), false);
+    const commentOnly = sanitizeBlindSvgContextV2('<svg><!-- finding: positive --><text>Neutral</text></svg>');
+    assert.equal(commentOnly.includes("finding"), false);
+  });
+
+  it("binds packet-v2 target set and order to an independently reconstructed custodial source", () => {
+    const source = Buffer.from('<svg id="root"><text id="first">Alpha</text><text id="second">Beta</text></svg>');
+    const targets = enumerateSvgTextTargets(source, ["svg/text-clipped"]).map((target) => ({ ...target, documentId: `doc_${"1".repeat(32)}` }));
+    const contexts = buildBlindContextArtifactsV2(source, "image/svg+xml", targets);
+    const artifacts = new Map(contexts.artifacts.map((artifact) => [artifact.path, artifact.bytes]));
+    const orderSeed = "order_seed_packet_v2_unit_0001";
+    const packet = buildBlindPacketV2({ packetId: "blind_packet_v2_unit_0001", orderSeed, targets, contextsByTargetId: contexts.contextsByTargetId });
+    assert.throws(() => buildBlindPacketV2({ packetId: "blind_packet_finding_positive_0001", orderSeed, targets, contextsByTargetId: contexts.contextsByTargetId }), /packet ID contains an outcome hint/u);
+    assert.equal(compileSchema("blind-packet-v2")(packet), true);
+    assert.deepEqual(verifyBlindPacketV2Public(packet, artifacts), { valid: true, issues: [] });
+    assert.deepEqual(verifyBlindPacketV2Custodial({ packet, packetId: packet.packetId, orderSeed, targets: [...targets].reverse(), contextsByTargetId: contexts.contextsByTargetId, artifactsByPath: artifacts }), { valid: true, issues: [] });
+
+    const reorderedTargets = [...packet.targets].reverse().map((target, index) => ({ ...target, neutralOrder: index + 1 }));
+    const reorderedWithoutHash = {
+      ...packet,
+      orderContract: { ...packet.orderContract, orderedBlindTargetIdsSha256: createHash("sha256").update(canonicalJson(reorderedTargets.map((target) => target.blindTargetId))).digest("hex") },
+      targets: reorderedTargets,
+    };
+    const { packetSha256: _oldHash, ...reorderedProjection } = reorderedWithoutHash;
+    const coherentReorder = { ...reorderedProjection, packetSha256: createHash("sha256").update(canonicalJson(reorderedProjection)).digest("hex") };
+    assert.deepEqual(verifyBlindPacketV2Public(coherentReorder, artifacts), { valid: true, issues: [] });
+    assert.equal(verifyBlindPacketV2Custodial({ packet: coherentReorder, packetId: packet.packetId, orderSeed, targets, contextsByTargetId: contexts.contextsByTargetId, artifactsByPath: artifacts }).issues.includes("packet-custodial-reconstruction-mismatch"), true);
+
+    const duplicated = structuredClone(packet);
+    duplicated.targets[1] = { ...duplicated.targets[0]!, neutralOrder: 2 };
+    assert.equal(verifyBlindPacketV2Public(duplicated, artifacts).issues.includes("packet-blind-target-duplicate"), true);
+    assert.equal(verifyBlindPacketV2Public({ ...packet, unexpectedGovernedField: true }, artifacts).issues[0]!.startsWith("packet-schema-invalid:"), true);
   });
 
   it("preserves all five labels and requires blind adjudication for every non-binary label", () => {

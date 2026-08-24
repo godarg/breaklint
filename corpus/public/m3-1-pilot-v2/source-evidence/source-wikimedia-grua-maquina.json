@@ -1,0 +1,45 @@
+{
+  "contractVersion": "m3-1-source-evidence-v1",
+  "evidenceId": "source_evidence_wikimedia_grua_maquina_0001",
+  "reviewDate": "2026-08-23",
+  "sourceLocator": "source_wikimedia_grua_maquina_0001",
+  "descriptionPage": "https://commons.wikimedia.org/wiki/File:Grua_maquina.svg",
+  "originalLocator": "https://upload.wikimedia.org/wikipedia/commons/d/dd/Grua_maquina.svg",
+  "sourceClass": "cc0",
+  "rightsBasis": "cc0-1.0-public-domain-dedication-by-identified-author",
+  "rightsEvidence": {
+    "licenseStatus": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "identifiedUploaderAuthor": "Wilfredor",
+    "authorshipStatement": "The Commons record identifies the upload as the uploader's own work.",
+    "historyAuthority": "The reviewed file history is by the same identified author.",
+    "upstreamSha1": "beb56d0513285101a290661fbc2dc915cb274019",
+    "upstreamByteLength": 52354,
+    "embeddedDependencyReview": "No external asset or script was observed in the reviewed SVG bytes.",
+    "scopeLimitation": "The rights decision applies only to the exact frozen artifact identity recorded here and does not generalize to later revisions or derivatives."
+  },
+  "frozenArtifact": {
+    "mediaType": "image/svg+xml",
+    "sha256": "1c872e9de1250fbfa57994f66298e86b7b16f171f7270294aa0877f11e5173b4",
+    "byteLength": 52354,
+    "svgTextElementCount": 15
+  },
+  "privacyReview": {
+    "class": "reviewed-no-sensitive-personal-data",
+    "decision": "eligible",
+    "findings": [
+      "No email address, credential, client material, private path or sensitive personal data was observed in the reviewed SVG bytes",
+      "The public author attribution is retained in external provenance evidence and is not used as an annotator or trust identity"
+    ]
+  },
+  "targetBindingReview": {
+    "decision": "eligible-with-byte-bound-source-signatures",
+    "limitation": "All target identities remain bound to the exact artifact hash, structural source signature and rule ID; the 15 text elements are a mechanics count, not labels or calibration evidence."
+  },
+  "originGroupId": "origin_group_wikimedia_grua_maquina_wilfredor_0001",
+  "derivationGroupId": "derivation_group_wikimedia_grua_maquina_wilfredor_0001",
+  "split": "holdout",
+  "admissionDecision": "eligible-for-public-process-pilot",
+  "pilotPurpose": "process-only",
+  "calibrationEvidenceEligible": false
+}

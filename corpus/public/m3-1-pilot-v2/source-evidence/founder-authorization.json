@@ -1,0 +1,26 @@
+{
+  "contractVersion": "m3-1-founder-public-source-authorization-v1",
+  "authorizationId": "founder-session-2026-08-23-m3-1-public-dargel-corpus-authorization",
+  "authorizationDate": "2026-08-23",
+  "authorizedClasses": [
+    "public-dargel-content",
+    "artifact-specifically-public-domain-content",
+    "artifact-specifically-permissive-content"
+  ],
+  "authorizedPurposes": [
+    "m3-1-public-corpus-intake",
+    "m3-1-blind-annotation-preparation",
+    "m3-1-origin-strict-split-and-freeze-pilot"
+  ],
+  "excludedClasses": [
+    "paid-product-source-bundles",
+    "private-or-client-content",
+    "unclear-license-content",
+    "privacy-unclear-content",
+    "oracle-contaminated-content"
+  ],
+  "publicRedistributionAuthorized": true,
+  "privateStorageAuthorized": false,
+  "calibrationClaimAuthorized": false,
+  "releasePublishWebsiteActionAuthorized": false
+}

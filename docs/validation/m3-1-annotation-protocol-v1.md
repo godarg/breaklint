@@ -1,7 +1,9 @@
 # M3-1 Blind Annotation Protocol v1
 
-Status: executable protocol; no annotation is asserted by this document  
+Status: executable protocol for packet v2; no annotation is asserted by this document
 Ground-truth contract: [oracle-contract-v1.md](./oracle-contract-v1.md)
+
+Packet v1 is retained as immutable historical process-pilot evidence and is not authorized for a real annotation session. Its source-subtree contexts retain editor/source metadata and its order is not independently reconstructable from the deliverable. Any future real session must use packet v2 or a stricter successor and pass the independent controls below before delivery.
 
 ## 1. Independence and roles
 
@@ -15,9 +17,13 @@ The absence of two verified people, or of a third person when adjudication is re
 
 The annotation packet is generated only from rights/privacy-cleared frozen artefact bytes and a frozen target manifest. The custodian's freeze binds the source artefact, contract/guideline versions, target identities, neutral rendering inputs, packet-bundle index, packet hash, and deterministic order hash; the annotator-facing packet exposes only opaque packet-local identities and the neutral context required for judgment.
 
-Annotators receive only the independently indexed `m3-1-annotation-packet-v1` deliverable. They receive no repository access and no source-document, intake-manifest, custodial-mapping, split-report, freeze-projection, or evidence-bundle access. The evidence deliverable `m3-1-pilot-v1` contains no blind-packet or blind-context bytes. Packet delivery and the absence of those additional access paths must be recorded per session; access to either deliverable together invalidates blinding. Public availability of the repository is not treated as permission for an annotator to inspect it during the assignment.
+Annotators receive only the independently indexed `m3-1-annotation-packet-v2` deliverable. They receive no repository access and no source-document, intake-manifest, custodial-mapping, order seed, split-report, freeze-projection, or evidence-bundle access. The evidence deliverable `m3-1-pilot-v2` contains no blind-packet or blind-context bytes. Packet delivery and the absence of those additional access paths must be recorded per session; access to either deliverable together invalidates blinding. Public availability of the repository is not treated as permission for an annotator to inspect it during the assignment.
 
-Each annotator receives equivalent content in an independently randomized or neutralized order. File names, directory names, target order, colors, overlays, metadata, and instructions must not reveal:
+Every v2 SVG context is rebuilt deterministically from the custodial source bytes under `m3-1-svg-blind-sanitizer-v2`. The sanitizer removes comments, RDF/DC/CC metadata, Inkscape/Sodipodi namespaces and attributes, editor named views, source-identifying document names, and authored IDs; IDs and internal references are replaced by neutral sequence-local IDs. It rejects processing instructions, document/entity declarations, `data:` URLs, external assets, private path or filename hints, unknown namespaces, and outcome hints in text or attributes. The independent pre-delivery verifier must reconstruct the expected bytes from the separately bound source artefact and require exact byte equality, content-sanitizer fixed-point equality, context path/hash/length equality, and schema validity. Rehashing attacker-chosen bytes is not a substitute for this reconstruction.
+
+Each annotator receives equivalent content in the v2 deterministic neutral order. The custodial verifier independently reconstructs the order from the committed algorithm `sha256-seed-nul-target-id-v1`, the separately held seed, and the byte-bound source target IDs. It also verifies the source target-set commitment, packet target count, unique blind target IDs, contiguous neutral-order positions, ordered-ID commitment, and exact source-to-blind mapping. Duplicate substitution, omission, insertion, and post-freeze reordering fail the gate even if a producer recomputes every packet-local hash. The seed and source mapping remain custodial inputs and are never delivered to annotators.
+
+File names, directory names, target order, colors, overlays, metadata, and instructions must not reveal:
 
 - whether breaklint emitted a finding;
 - a breaklint score, threshold, severity, rule result, or production label;
@@ -28,6 +34,8 @@ Each annotator receives equivalent content in an independently randomized or neu
 The packet may identify the rule concept and show the visual/contextual information needed for a human judgment. It must not show diagnostic overlays derived from the production result. Packet creation, session start, submission, adjudication, and outcome disclosure are separate timestamped events. Outcome disclosure must occur after both submissions and any required adjudication.
 
 Before work begins, each annotator records that the packet hash and guideline version match and that no prohibited information is visible. Any blinding breach invalidates the affected session; it is not repaired by asking the annotator to ignore what they saw.
+
+The current packet v2 remains process-pilot evidence: its seed is repository-preregistered rather than supplied by an external randomness authority, and its freeze has no externally governed receipt. These limitations block a real session until an independent human-session gate explicitly accepts the custody arrangement; they do not permit silent fallback to packet v1.
 
 ## 3. Common label set
 

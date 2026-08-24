@@ -46,6 +46,7 @@ const FORBIDDEN_BLIND_KEYS = /(?:finding|score|threshold|production.?label|outco
 const PRODUCER_TRUST_KEYS = /^(?:publicKey|privateKey|key|certificate|trustedRoot|trustPolicy|rootCertificate|customTrustedRoot|revocation|revocations|revokedSignerDigests|revokedSourceDigests)$/iu;
 const m31Ajv = new Ajv2020({ allErrors: true, strict: true, formats: { "date-time": RFC3339_DATE_TIME } });
 const validateBlindPacketSchema = m31Ajv.compile(JSON.parse(readFileSync(new URL("../../../schemas/calibration/blind-packet-v1.schema.json", import.meta.url), "utf8")) as object);
+const validateBlindPacketV2Schema = m31Ajv.compile(JSON.parse(readFileSync(new URL("../../../schemas/calibration/blind-packet-v2.schema.json", import.meta.url), "utf8")) as object);
 const validatePinnedTrustPolicySchema = m31Ajv.compile(JSON.parse(readFileSync(new URL("../../../schemas/calibration/attestor-trust-policy-v1.schema.json", import.meta.url), "utf8")) as object);
 
 export const PINNED_M3_1_TRUST_POLICY = Object.freeze({
@@ -478,6 +479,23 @@ export interface BlindTargetContext {
   };
 }
 
+export interface BlindTargetContextV2 {
+  artifactPath: string;
+  artifactSha256: string;
+  byteLength: number;
+  mediaType: "image/svg+xml";
+  targetLocator: { mode: "context-structural-path"; structuralPathWithinContext: string };
+  renderingContract: {
+    mode: "browser-native-isolated-svg";
+    externalAssetsFetched: false;
+    sourceScope: "exact-svg-document" | "embedded-inline-svg-only";
+    sourceByteTreatment: "deterministic-svg-sanitization-v2";
+    sanitizerContractVersion: "m3-1-svg-blind-sanitizer-v2";
+    independentContentVerificationRequired: true;
+    limitations: string[];
+  };
+}
+
 const BLIND_CONTEXT_INERT_COMMENT = "<!-- isolated annotation context; source subtree otherwise byte-exact -->";
 
 function neutralizeBlindSvgContext(svgSource: string): string {
@@ -567,6 +585,233 @@ export function buildBlindContextArtifacts(bytes: Buffer, mediaType: "text/html"
   return { artifacts: [...artifactByRoot.values()].sort((left, right) => left.path.localeCompare(right.path, "en")), contextsByTargetId };
 }
 
+const SVG_ALLOWED_NAMESPACE_DECLARATIONS = new Map([
+  ["xmlns", "http://www.w3.org/2000/svg"],
+  ["xmlns:xlink", "http://www.w3.org/1999/xlink"],
+]);
+const SVG_REMOVED_NAMESPACE_PREFIXES = "(?:cc|dc|inkscape|rdf|sodipodi|svg)";
+const SVG_OUTCOME_HINT = /(?:(?:^|[^A-Za-z0-9])break\s*lint\b[\s\S]{0,32}\b(?:finding|result|outcome|pass|fail|severity|score|threshold|calibrat(?:ed|ion)?)\b|(?:^|[^A-Za-z0-9])(?:finding|outcome|severity|calibrated|production[\s_.-]*label|candidate[\s_.-]*config)(?=[\s:_.-])\s*[:=_-]\s*(?:pass|fail|true|false|positive|negative|present|absent|blocker|critical|high|medium|low|[0-9]))/iu;
+const SVG_TOOL_HINT = /\b(?:inkscape|sodipodi|adobe\s+illustrator|created\s+with|exported\s+by)\b/iu;
+const SVG_PRIVATE_PATH_HINT = /(?:\bfile:|\b[A-Za-z]:\\|\/(?:Users|home|private|var\/folders)\/|(?:^|[\s"'])\.\.?\/|\.(?:ai|eps|html?|pdf|svg)\b)/iu;
+
+function normalizeBlindHintText(value: string): string {
+  return value.normalize("NFKC").replace(/[\u200B-\u200D\u2060\uFEFF]/gu, "").replace(/\s+/gu, " ");
+}
+
+function replaceQuotedAttributes(source: string, replace: (name: string, value: string, quote: "\"" | "'") => string): string {
+  return source.replace(/([:\w.-]+)(\s*=\s*)(["'])([\s\S]*?)\3/gu, (_match, name: string, separator: string, quote: "\"" | "'", value: string) => `${name}${separator}${quote}${replace(name, value, quote)}${quote}`);
+}
+
+function decodeXmlCharacterReferences(value: string): string {
+  if (/&(?!(?:#(?:x[0-9A-Fa-f]+|[0-9]+)|amp|apos|gt|lt|quot);)/gu.test(value)) throw new Error("blind SVG context contains a bare or unknown character reference");
+  return value.replace(/&(#(?:x[0-9A-Fa-f]+|[0-9]+)|amp|apos|gt|lt|quot);/gu, (_match, entity: string) => {
+    if (entity === "amp") return "&";
+    if (entity === "apos") return "'";
+    if (entity === "gt") return ">";
+    if (entity === "lt") return "<";
+    if (entity === "quot") return "\"";
+    const numeric = entity.startsWith("#x") ? Number.parseInt(entity.slice(2), 16) : Number.parseInt(entity.slice(1), 10);
+    if (!Number.isSafeInteger(numeric) || numeric <= 0 || numeric > 0x10FFFF || (numeric >= 0xD800 && numeric <= 0xDFFF)) throw new Error("blind SVG context contains an invalid character reference");
+    return String.fromCodePoint(numeric);
+  });
+}
+
+function validateSvgMarkupLexically(source: string): void {
+  let offset = 0;
+  while (offset < source.length) {
+    const opening = source.indexOf("<", offset);
+    if (opening < 0) break;
+    if (source.startsWith("<!--", opening)) {
+      const end = source.indexOf("-->", opening + 4);
+      if (end < 0) throw new Error("blind SVG context contains an unterminated comment");
+      offset = end + 3;
+      continue;
+    }
+    let cursor = opening + 1;
+    const closing = source[cursor] === "/";
+    if (closing) cursor += 1;
+    const nameMatch = /^[A-Za-z_][A-Za-z0-9_.:-]*/u.exec(source.slice(cursor));
+    if (!nameMatch) throw new Error("blind SVG context contains malformed tag syntax");
+    cursor += nameMatch[0].length;
+    if (closing) {
+      while (/\s/u.test(source[cursor] ?? "")) cursor += 1;
+      if (source[cursor] !== ">") throw new Error("blind SVG context contains malformed closing tag syntax");
+      offset = cursor + 1;
+      continue;
+    }
+    const names = new Set<string>();
+    while (cursor < source.length) {
+      while (/\s/u.test(source[cursor] ?? "")) cursor += 1;
+      if (source[cursor] === ">") { offset = cursor + 1; break; }
+      if (source[cursor] === "/" && source[cursor + 1] === ">") { offset = cursor + 2; break; }
+      const attributeMatch = /^[A-Za-z_][A-Za-z0-9_.:-]*/u.exec(source.slice(cursor));
+      if (!attributeMatch) throw new Error("blind SVG context contains malformed attribute syntax");
+      const attributeName = attributeMatch[0];
+      const normalizedName = attributeName.toLowerCase();
+      if (names.has(normalizedName)) throw new Error(`blind SVG context contains a duplicate attribute: ${attributeName}`);
+      names.add(normalizedName);
+      cursor += attributeName.length;
+      while (/\s/u.test(source[cursor] ?? "")) cursor += 1;
+      if (source[cursor] !== "=") throw new Error(`blind SVG context attribute ${attributeName} must have an explicit value`);
+      cursor += 1;
+      while (/\s/u.test(source[cursor] ?? "")) cursor += 1;
+      const quote = source[cursor];
+      if (quote !== "\"" && quote !== "'") throw new Error(`blind SVG context attribute ${attributeName} must be quoted`);
+      const valueStart = cursor + 1;
+      const valueEnd = source.indexOf(quote, valueStart);
+      if (valueEnd < 0) throw new Error(`blind SVG context attribute ${attributeName} has an unterminated value`);
+      const attributeValue = source.slice(valueStart, valueEnd);
+      if (attributeValue.includes("&")) {
+        decodeXmlCharacterReferences(attributeValue);
+        throw new Error(`blind SVG context attribute ${attributeName} contains a character reference`);
+      }
+      cursor = valueEnd + 1;
+    }
+    if (cursor >= source.length && offset <= opening) throw new Error("blind SVG context contains an unterminated opening tag");
+  }
+}
+
+export function sanitizeBlindSvgContextV2(svgSource: string): string {
+  if (!/<svg\b/iu.test(svgSource)) throw new Error("blind SVG context root is missing");
+  if (/<\?(?:xml|[A-Za-z_:])/iu.test(svgSource)) throw new Error("blind SVG context contains a processing instruction");
+  if (/<!\s*(?:DOCTYPE|ENTITY|\[CDATA\[)/iu.test(svgSource)) throw new Error("blind SVG context contains a forbidden XML declaration");
+  validateSvgMarkupLexically(svgSource);
+  if (/<\/?(?:script|foreignObject|iframe|object|embed|animate|animateMotion|animateTransform|set|discard|style)\b/iu.test(svgSource)) throw new Error("blind SVG context contains active or independently mutable content");
+  if (/\son[a-z][\w.-]*\s*=/iu.test(svgSource)) throw new Error("blind SVG context contains an event handler");
+  if (/data\s*:/iu.test(svgSource)) throw new Error("blind SVG context contains a data URL");
+  if (blindContextHasExternalAssetReference(svgSource)) throw new Error("blind context would require an external asset fetch");
+
+  let sanitized = svgSource;
+  const comments = sanitized.match(/<!--[\s\S]*?-->/gu) ?? [];
+  const commentOpenCount = sanitized.match(/<!--/gu)?.length ?? 0;
+  if (comments.length !== commentOpenCount) throw new Error("blind SVG context contains an unterminated comment");
+  sanitized = sanitized.replace(/<!--[\s\S]*?-->/gu, "");
+  if (sanitized.includes("-->")) throw new Error("blind SVG context contains an unmatched comment terminator");
+  sanitized = sanitized.replace(/<(?:[A-Za-z][\w.-]*:)?metadata\b[^>]*>[\s\S]*?<\/(?:[A-Za-z][\w.-]*:)?metadata\s*>/giu, "");
+  sanitized = sanitized.replace(/<sodipodi:namedview\b[^>]*(?:\/>|>[\s\S]*?<\/sodipodi:namedview\s*>)/giu, "");
+  sanitized = sanitized.replace(/<(?:title|desc)\b[^>]*>[\s\S]*?<\/(?:title|desc)\s*>/giu, "");
+  sanitized = sanitized.replace(new RegExp(`\\s+(?:xmlns:${SVG_REMOVED_NAMESPACE_PREFIXES}|${SVG_REMOVED_NAMESPACE_PREFIXES}:[\\w.-]+)\\s*=\\s*(["'])[\\s\\S]*?\\1`, "giu"), "");
+  sanitized = sanitized.replace(/\s+(?:data-)?(?:editor|export(?:er|tool|version)?|generator)\s*=\s*(["'])[\s\S]*?\1/giu, "");
+  sanitized = sanitized.replace(/\s+(?:aria-[\w.-]+|class|data-[\w.-]+|role)\s*=\s*(["'])[\s\S]*?\1/giu, "");
+  if (/<(?:[A-Za-z][\w.-]*:)?metadata\b/iu.test(sanitized)) throw new Error("blind SVG context contains malformed metadata");
+  if (/<(?:title|desc)\b/iu.test(sanitized)) throw new Error("blind SVG context contains malformed descriptive metadata");
+
+  for (const match of sanitized.matchAll(/\b(xmlns(?::[\w.-]+)?)\s*=\s*(["'])([\s\S]*?)\2/giu)) {
+    const name = match[1]!.toLowerCase();
+    const expected = SVG_ALLOWED_NAMESPACE_DECLARATIONS.get(name);
+    if (expected === undefined || match[3] !== expected) throw new Error(`blind SVG context contains an unknown namespace: ${name}`);
+  }
+  if (new RegExp(`<(?:\\/?)(?:${SVG_REMOVED_NAMESPACE_PREFIXES}):`, "iu").test(sanitized)) throw new Error("blind SVG context contains a foreign editor or metadata element");
+  for (const match of sanitized.matchAll(/<\/?([A-Za-z][\w.-]*):/gu)) {
+    throw new Error(`blind SVG context contains an unknown element namespace: ${match[1]}`);
+  }
+  for (const match of sanitized.matchAll(/\s([A-Za-z][\w.-]*):[\w.-]+\s*=/gu)) {
+    if (!new Set(["xlink", "xml", "xmlns"]).has(match[1]!.toLowerCase())) throw new Error(`blind SVG context contains an unknown attribute namespace: ${match[1]}`);
+  }
+
+  const idMap = new Map<string, string>();
+  for (const match of sanitized.matchAll(/\bid\s*=\s*(["'])([\s\S]*?)\1/giu)) {
+    const original = match[2]!;
+    if (!original || idMap.has(original)) throw new Error("blind SVG context contains an empty or duplicate ID");
+    idMap.set(original, `blind-id-${String(idMap.size + 1).padStart(6, "0")}`);
+  }
+  sanitized = replaceQuotedAttributes(sanitized, (name, value) => {
+    if (name.toLowerCase() === "id") return idMap.get(value) ?? value;
+    let rewritten = value;
+    for (const [original, replacement] of idMap) {
+      rewritten = rewritten.replaceAll(`#${original}`, `#${replacement}`);
+      if (/^(?:aria-labelledby|aria-describedby)$/iu.test(name)) rewritten = rewritten.split(/\s+/u).map((token) => token === original ? replacement : token).join(" ");
+      if (/^(?:begin|end)$/iu.test(name)) rewritten = rewritten.replace(new RegExp(`(^|;)\\s*${original.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\.`, "gu"), `$1${replacement}.`);
+    }
+    if (!/^(?:d|points|transform|viewBox|xmlns(?::xlink)?|xlink:href|href)$/iu.test(name) && SVG_PRIVATE_PATH_HINT.test(rewritten)) throw new Error(`blind SVG context attribute ${name} contains a source path or filename hint`);
+    return rewritten;
+  });
+
+  const decoded = decodeXmlCharacterReferences(sanitized);
+  const normalized = normalizeBlindHintText(decoded);
+  if (SVG_OUTCOME_HINT.test(normalized)) throw new Error("blind SVG context contains an outcome hint");
+  if (SVG_TOOL_HINT.test(normalized)) throw new Error("blind SVG context contains a generator or editor hint");
+  if (SVG_PRIVATE_PATH_HINT.test(normalized)) throw new Error("blind SVG context contains a source path or filename hint");
+  if (/data\s*:/iu.test(normalized)) throw new Error("blind SVG context contains an encoded data URL");
+  if (blindContextHasExternalAssetReference(sanitized)) throw new Error("sanitized blind context would require an external asset fetch");
+  return sanitized.replace(/[\t ]+(?=\r?\n)/gu, "");
+}
+
+export function verifySanitizedBlindSvgContextV2(bytes: Buffer): { valid: boolean; issues: string[] } {
+  const issues: string[] = [];
+  let source: string;
+  try { source = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
+  catch { return { valid: false, issues: ["context-not-valid-utf8"] }; }
+  try {
+    const reconstructed = sanitizeBlindSvgContextV2(source);
+    if (reconstructed !== source) issues.push("context-not-sanitizer-fixed-point");
+  } catch (error) {
+    issues.push(`context-content-invalid:${error instanceof Error ? error.message : String(error)}`);
+  }
+  return { valid: issues.length === 0, issues };
+}
+
+export function buildBlindContextArtifactsV2(bytes: Buffer, mediaType: "text/html" | "image/svg+xml", targets: BlindTarget[]): {
+  artifacts: Array<{ path: string; bytes: Buffer; sha256: string; byteLength: number }>;
+  contextsByTargetId: Record<string, BlindTargetContextV2>;
+} {
+  type LocatedNode = Node & { sourceCodeLocation?: { startOffset?: number; endOffset?: number } };
+  const source = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  const document = parse(source, { sourceCodeLocationInfo: true });
+  const svgSourceByPath = new Map<string, string>();
+  function walk(node: Node, path: string): void {
+    const counters = new Map<string, number>();
+    for (const child of childElements(node)) {
+      const index = counters.get(child.tagName) ?? 0;
+      counters.set(child.tagName, index + 1);
+      const childPath = `${path}/${child.tagName}[${index}]`;
+      if (child.tagName === "svg") {
+        const location = (child as LocatedNode).sourceCodeLocation;
+        if (location?.startOffset === undefined || location.endOffset === undefined) throw new Error("SVG context source offsets are unavailable");
+        svgSourceByPath.set(childPath, source.slice(location.startOffset, location.endOffset));
+      }
+      walk(child, childPath);
+    }
+  }
+  walk(document, "");
+  const artifactByRoot = new Map<string, { path: string; bytes: Buffer; sha256: string; byteLength: number }>();
+  const contextsByTargetId: Record<string, BlindTargetContextV2> = {};
+  for (const target of targets) {
+    const match = /^(.*?\/svg\[\d+\])/u.exec(target.structuralPath);
+    const rootPath = match?.[1];
+    const svgSource = rootPath ? svgSourceByPath.get(rootPath) : undefined;
+    if (!rootPath || !svgSource) throw new Error(`SVG context is missing for target ${target.targetId}`);
+    let artifact = artifactByRoot.get(rootPath);
+    if (!artifact) {
+      const contextBytes = Buffer.from(sanitizeBlindSvgContextV2(svgSource), "utf8");
+      const verification = verifySanitizedBlindSvgContextV2(contextBytes);
+      if (!verification.valid) throw new Error(`sanitized blind context failed independent content verification: ${verification.issues.join(",")}`);
+      const contextSha256 = sha256(contextBytes);
+      artifact = { path: `blind-context/context_${contextSha256.slice(0, 24)}.svg`, bytes: contextBytes, sha256: contextSha256, byteLength: contextBytes.length };
+      artifactByRoot.set(rootPath, artifact);
+    }
+    contextsByTargetId[target.targetId] = {
+      artifactPath: artifact.path,
+      artifactSha256: artifact.sha256,
+      byteLength: artifact.byteLength,
+      mediaType: "image/svg+xml",
+      targetLocator: { mode: "context-structural-path", structuralPathWithinContext: target.structuralPath.slice(rootPath.length) || "/" },
+      renderingContract: {
+        mode: "browser-native-isolated-svg",
+        externalAssetsFetched: false,
+        sourceScope: mediaType === "text/html" ? "embedded-inline-svg-only" : "exact-svg-document",
+        sourceByteTreatment: "deterministic-svg-sanitization-v2",
+        sanitizerContractVersion: "m3-1-svg-blind-sanitizer-v2",
+        independentContentVerificationRequired: true,
+        limitations: mediaType === "text/html"
+          ? ["Only the sanitized embedded inline SVG is presented; the containing HTML page is not included.", "Font identity and production renderer capture are not frozen; annotation remains process-pilot evidence only."]
+          : ["Font identity and production renderer capture are not frozen; annotation remains process-pilot evidence only."],
+      },
+    };
+  }
+  return { artifacts: [...artifactByRoot.values()].sort((left, right) => left.path.localeCompare(right.path, "en")), contextsByTargetId };
+}
+
 function findForbiddenBlindKey(value: unknown): string | null {
   if (Array.isArray(value)) {
     for (const entry of value) {
@@ -635,6 +880,122 @@ export function buildBlindPacket(input: { packetId: string; orderSeed: string; t
   const packet = { ...packetWithoutHash, packetSha256: sha256(canonicalJson(packetWithoutHash)) };
   if (!validateBlindPacketSchema(packet)) throw new Error(`blind packet schema validation failed: ${JSON.stringify(validateBlindPacketSchema.errors)}`);
   return packet;
+}
+
+export interface BlindPacketV2 {
+  contractVersion: "m3-1-blind-packet-v2";
+  packetId: string;
+  blinded: true;
+  custodialMappingRequired: true;
+  humanExecutable: true;
+  executionBlocker: null;
+  deliveryContract: { annotationBundleOnly: true; repositoryAccessPermitted: false; sourceManifestAccessPermitted: false; splitAccessPermitted: false };
+  orderContract: {
+    algorithm: "sha256-seed-nul-target-id-v1";
+    orderSeedSha256: string;
+    orderedBlindTargetIdsSha256: string;
+    independentReconstructionRequired: true;
+  };
+  targetCount: number;
+  targetSetSha256: string;
+  blindTargetSetSha256: string;
+  targets: Array<{ blindTargetId: string; ruleId: RuleId; neutralOrder: number; context: BlindTargetContextV2 }>;
+  packetSha256: string;
+}
+
+function blindTargetOrderDigest(orderSeed: string, targetId: string): string {
+  return sha256(`${orderSeed}\0${targetId}`);
+}
+
+export function buildBlindPacketV2(input: { packetId: string; orderSeed: string; targets: BlindTarget[]; contextsByTargetId: Record<string, BlindTargetContextV2> }): BlindPacketV2 {
+  if (!/^blind_packet_[A-Za-z0-9._-]{8,80}$/u.test(input.packetId)) throw new Error("invalid packet ID");
+  if (SVG_OUTCOME_HINT.test(normalizeBlindHintText(input.packetId))) throw new Error("blind packet ID contains an outcome hint");
+  if (input.orderSeed.length < 16) throw new Error("order seed must be nontrivial");
+  const forbidden = findForbiddenBlindKey(input.targets);
+  if (forbidden) throw new Error(`blind packet contains oracle-leaking field: ${forbidden}`);
+  const unique = new Set<string>();
+  for (const target of input.targets) {
+    if (!TARGET_ID.test(target.targetId) || !DOCUMENT_ID.test(target.documentId)) throw new Error("blind packet target identity is invalid");
+    requireSha256(target.artifactSha256, "artifactSha256");
+    if (deriveStableTargetId(target) !== target.targetId) throw new Error("blind packet target ID does not match byte-bound source identity");
+    if (unique.has(target.targetId)) throw new Error("blind packet contains duplicate target IDs");
+    unique.add(target.targetId);
+    const context = input.contextsByTargetId[target.targetId];
+    if (!context || !SHA256.test(context.artifactSha256) || context.byteLength < 1 || !/^blind-context\/context_[a-f0-9]{24}\.svg$/u.test(context.artifactPath)) throw new Error("blind packet target context is missing or invalid");
+  }
+  if (unique.size === 0) throw new Error("blind packet must contain targets");
+  const ordered = [...input.targets]
+    .sort((left, right) => blindTargetOrderDigest(input.orderSeed, left.targetId).localeCompare(blindTargetOrderDigest(input.orderSeed, right.targetId), "en") || left.targetId.localeCompare(right.targetId, "en"))
+    .map((target, index) => ({
+      blindTargetId: `blind_target_${blindTargetOrderDigest(input.orderSeed, target.targetId).slice(0, 32)}`,
+      ruleId: target.ruleId,
+      neutralOrder: index + 1,
+      context: input.contextsByTargetId[target.targetId]!,
+    }));
+  const orderedBlindTargetIds = ordered.map((target) => target.blindTargetId);
+  const packetWithoutHash = {
+    contractVersion: "m3-1-blind-packet-v2" as const,
+    packetId: input.packetId,
+    blinded: true as const,
+    custodialMappingRequired: true as const,
+    humanExecutable: true as const,
+    executionBlocker: null,
+    deliveryContract: { annotationBundleOnly: true as const, repositoryAccessPermitted: false as const, sourceManifestAccessPermitted: false as const, splitAccessPermitted: false as const },
+    orderContract: {
+      algorithm: "sha256-seed-nul-target-id-v1" as const,
+      orderSeedSha256: sha256(input.orderSeed),
+      orderedBlindTargetIdsSha256: sha256(canonicalJson(orderedBlindTargetIds)),
+      independentReconstructionRequired: true as const,
+    },
+    targetCount: ordered.length,
+    targetSetSha256: sha256(canonicalJson([...unique].sort())),
+    blindTargetSetSha256: sha256(canonicalJson([...orderedBlindTargetIds].sort())),
+    targets: ordered,
+  };
+  const packet: BlindPacketV2 = { ...packetWithoutHash, packetSha256: sha256(canonicalJson(packetWithoutHash)) };
+  if (!validateBlindPacketV2Schema(packet)) throw new Error(`blind packet v2 schema validation failed: ${JSON.stringify(validateBlindPacketV2Schema.errors)}`);
+  return packet;
+}
+
+export function verifyBlindPacketV2Public(packet: unknown, artifactsByPath: ReadonlyMap<string, Buffer>): { valid: boolean; issues: string[] } {
+  const issues: string[] = [];
+  if (!validateBlindPacketV2Schema(packet)) return { valid: false, issues: [`packet-schema-invalid:${JSON.stringify(validateBlindPacketV2Schema.errors)}`] };
+  const typed = packet as BlindPacketV2;
+  const { packetSha256, ...withoutHash } = typed;
+  if (sha256(canonicalJson(withoutHash)) !== packetSha256) issues.push("packet-self-hash-mismatch");
+  if (typed.targetCount !== typed.targets.length) issues.push("packet-target-count-mismatch");
+  const blindIds = typed.targets.map((target) => target.blindTargetId);
+  if (new Set(blindIds).size !== blindIds.length) issues.push("packet-blind-target-duplicate");
+  if (typed.targets.some((target, index) => target.neutralOrder !== index + 1)) issues.push("packet-neutral-order-not-contiguous");
+  if (sha256(canonicalJson(blindIds)) !== typed.orderContract.orderedBlindTargetIdsSha256) issues.push("packet-order-commitment-mismatch");
+  if (sha256(canonicalJson([...blindIds].sort())) !== typed.blindTargetSetSha256) issues.push("packet-blind-target-set-mismatch");
+  for (const target of typed.targets) {
+    const bytes = artifactsByPath.get(target.context.artifactPath);
+    if (!bytes) { issues.push(`packet-context-missing:${target.context.artifactPath}`); continue; }
+    if (bytes.length !== target.context.byteLength || sha256(bytes) !== target.context.artifactSha256 || !target.context.artifactPath.endsWith(`${target.context.artifactSha256.slice(0, 24)}.svg`)) issues.push(`packet-context-binding-mismatch:${target.context.artifactPath}`);
+    const content = verifySanitizedBlindSvgContextV2(bytes);
+    for (const issue of content.issues) issues.push(`${issue}:${target.context.artifactPath}`);
+  }
+  return { valid: issues.length === 0, issues: [...new Set(issues)].sort() };
+}
+
+export function verifyBlindPacketV2Custodial(input: {
+  packet: unknown;
+  packetId: string;
+  orderSeed: string;
+  targets: BlindTarget[];
+  contextsByTargetId: Record<string, BlindTargetContextV2>;
+  artifactsByPath: ReadonlyMap<string, Buffer>;
+}): { valid: boolean; issues: string[] } {
+  const publicVerification = verifyBlindPacketV2Public(input.packet, input.artifactsByPath);
+  const issues = [...publicVerification.issues];
+  try {
+    const expected = buildBlindPacketV2({ packetId: input.packetId, orderSeed: input.orderSeed, targets: input.targets, contextsByTargetId: input.contextsByTargetId });
+    if (canonicalJson(expected) !== canonicalJson(input.packet)) issues.push("packet-custodial-reconstruction-mismatch");
+  } catch (error) {
+    issues.push(`packet-custodial-reconstruction-failed:${error instanceof Error ? error.message : String(error)}`);
+  }
+  return { valid: issues.length === 0, issues: [...new Set(issues)].sort() };
 }
 
 export interface AnnotationSession {

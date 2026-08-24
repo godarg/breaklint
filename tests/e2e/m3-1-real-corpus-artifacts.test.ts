@@ -8,15 +8,24 @@ import { describe, it } from "node:test";
 import { Ajv2020 } from "ajv/dist/2020.js";
 
 import {
+  buildBlindContextArtifactsV2,
+  buildBlindPacketV2,
   buildFreezeProjection,
+  canonicalJson,
   deriveStableTargetId,
+  enumerateSvgTextTargets,
   validateStrictSplits,
+  verifyBlindPacketV2Custodial,
+  verifyBlindPacketV2Public,
+  verifySanitizedBlindSvgContextV2,
   type RuleId,
 } from "../tools/calibration/m3-1-pilot.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const BUNDLE = join(ROOT, "corpus/public/m3-1-pilot-v1");
 const ANNOTATION_BUNDLE = join(ROOT, "corpus/public/m3-1-annotation-packet-v1");
+const BUNDLE_V2 = join(ROOT, "corpus/public/m3-1-pilot-v2");
+const ANNOTATION_BUNDLE_V2 = join(ROOT, "corpus/public/m3-1-annotation-packet-v2");
 const sha256 = (bytes: Buffer | string): string => createHash("sha256").update(bytes).digest("hex");
 const readJson = (path: string): Record<string, unknown> => JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
 
@@ -27,6 +36,84 @@ function validateSchema(schemaName: string, data: unknown): void {
 }
 
 describe("M3-1 frozen real public corpus artifacts", () => {
+  it("independently reconstructs the sanitized packet-v2 target set and neutral order", () => {
+    const evidenceIndex = readJson(join(BUNDLE_V2, "bundle-index.json")) as { contractVersion: string; files: Array<{ path: string; sha256: string; byteLength: number }> };
+    const annotationIndex = readJson(join(ANNOTATION_BUNDLE_V2, "bundle-index.json")) as { contractVersion: string; files: Array<{ path: string; sha256: string; byteLength: number }> };
+    assert.equal(evidenceIndex.contractVersion, "m3-1-public-pipeline-bundle-index-v2");
+    assert.equal(annotationIndex.contractVersion, "m3-1-blind-annotation-bundle-index-v2");
+    for (const [root, index] of [[BUNDLE_V2, evidenceIndex], [ANNOTATION_BUNDLE_V2, annotationIndex]] as const) {
+      for (const entry of index.files) {
+        const bytes = readFileSync(join(root, entry.path));
+        assert.equal(bytes.length, entry.byteLength, entry.path);
+        assert.equal(sha256(bytes), entry.sha256, entry.path);
+      }
+    }
+
+    const manifest = readJson(join(BUNDLE_V2, "intake-manifest.json")) as {
+      documents: Array<{ documentId: string; artifact: { relativePath: string; mediaType: "text/html" | "image/svg+xml" }; targets: Array<{ ruleId: RuleId }> }>;
+      calibrated: boolean;
+    };
+    const targets: Parameters<typeof buildBlindPacketV2>[0]["targets"] = [];
+    const contextsByTargetId: Parameters<typeof buildBlindPacketV2>[0]["contextsByTargetId"] = {};
+    const artifacts = new Map<string, Buffer>();
+    for (const document of manifest.documents) {
+      const source = readFileSync(join(BUNDLE_V2, document.artifact.relativePath));
+      const ruleIds = [...new Set(document.targets.map((target) => target.ruleId))].sort();
+      const documentTargets = enumerateSvgTextTargets(source, ruleIds).map((target) => ({ ...target, documentId: document.documentId }));
+      const contexts = buildBlindContextArtifactsV2(source, document.artifact.mediaType, documentTargets);
+      targets.push(...documentTargets);
+      Object.assign(contextsByTargetId, contexts.contextsByTargetId);
+      for (const artifact of contexts.artifacts) artifacts.set(artifact.path, artifact.bytes);
+    }
+    const packet = readJson(join(ANNOTATION_BUNDLE_V2, "blind-packet.json")) as unknown as ReturnType<typeof buildBlindPacketV2>;
+    validateSchema("blind-packet-v2", packet);
+    assert.deepEqual(verifyBlindPacketV2Custodial({
+      packet,
+      packetId: "blind_packet_m3_1_public_pilot_v2",
+      orderSeed: "order_seed_m3_1_public_pilot_v2_20260824",
+      targets,
+      contextsByTargetId,
+      artifactsByPath: artifacts,
+    }), { valid: true, issues: [] });
+
+    const reorderedTargets = [...packet.targets].reverse().map((target, index) => ({ ...target, neutralOrder: index + 1 }));
+    const { packetSha256: _storedPacketSha256, ...reorderedWithoutHash } = {
+      ...packet,
+      orderContract: { ...packet.orderContract, orderedBlindTargetIdsSha256: sha256(canonicalJson(reorderedTargets.map((target) => target.blindTargetId))) },
+      targets: reorderedTargets,
+    };
+    const coherentlyRehashedReorder = { ...reorderedWithoutHash, packetSha256: sha256(canonicalJson(reorderedWithoutHash)) };
+    assert.deepEqual(verifyBlindPacketV2Public(coherentlyRehashedReorder, artifacts), { valid: true, issues: [] });
+    assert.equal(verifyBlindPacketV2Custodial({ packet: coherentlyRehashedReorder, packetId: packet.packetId, orderSeed: "order_seed_m3_1_public_pilot_v2_20260824", targets, contextsByTargetId, artifactsByPath: artifacts }).issues.includes("packet-custodial-reconstruction-mismatch"), true);
+
+    const firstContext = packet.targets[0]!.context;
+    const injectedBytes = Buffer.from(artifacts.get(firstContext.artifactPath)!.toString("utf8").replace("</svg>", "<text>breaklint result: finding</text></svg>"));
+    const injectedSha256 = sha256(injectedBytes);
+    const injectedPath = `blind-context/context_${injectedSha256.slice(0, 24)}.svg`;
+    const injectedTargets = packet.targets.map((target) => target.context.artifactPath === firstContext.artifactPath ? { ...target, context: { ...target.context, artifactPath: injectedPath, artifactSha256: injectedSha256, byteLength: injectedBytes.length } } : target);
+    const { packetSha256: _originalPacketSha256, ...injectedWithoutHash } = { ...packet, targets: injectedTargets };
+    const injectedPacket = { ...injectedWithoutHash, packetSha256: sha256(canonicalJson(injectedWithoutHash)) };
+    const injectedArtifacts = new Map(artifacts);
+    injectedArtifacts.delete(firstContext.artifactPath);
+    injectedArtifacts.set(injectedPath, injectedBytes);
+    assert.equal(verifyBlindPacketV2Public(injectedPacket, injectedArtifacts).issues.some((issue) => issue.startsWith("context-content-invalid:")), true);
+    assert.equal(targets.length, 192);
+    assert.equal(manifest.calibrated, false);
+    for (const [path, expected] of artifacts) {
+      const stored = readFileSync(join(ANNOTATION_BUNDLE_V2, path));
+      assert.equal(stored.equals(expected), true, path);
+      assert.deepEqual(verifySanitizedBlindSvgContextV2(stored), { valid: true, issues: [] });
+      assert.equal(/(?:sodipodi:docname|<metadata\b|xmlns:(?:cc|dc|inkscape|rdf|sodipodi)|inkscape:|sodipodi:|Created with Inkscape|\/Users\/)/iu.test(stored.toString("utf8")), false, path);
+    }
+
+    const freeze = readJson(join(BUNDLE_V2, "freeze-projection.json")) as ReturnType<typeof buildFreezeProjection>;
+    assert.equal(freeze.projection.sequence, 2);
+    assert.equal(freeze.projection.previousFreezeSha256, "e9f880a8489e835aeeed89f1d387a8ba6d3be184d6b1297f5711138b95b42de9");
+    assert.equal(freeze.projection.blindPacketSha256, (packet as { packetSha256: string }).packetSha256);
+    assert.equal(freeze.projection.blindPacketBundle.bundleIndexSha256, sha256(readFileSync(join(ANNOTATION_BUNDLE_V2, "bundle-index.json"))));
+    assert.deepEqual(buildFreezeProjection(freeze.projection), freeze);
+  });
+
   it("re-hashes every indexed byte and validates the public contracts", () => {
     const index = readJson(join(BUNDLE, "bundle-index.json")) as {
       contractVersion: string;

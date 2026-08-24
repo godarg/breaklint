@@ -91,7 +91,7 @@ describe("M3-1 public corpus pilot infrastructure", () => {
     const sourceRoot = mkdtempSync(join(tmpdir(), "breaklint-m3-1-pipeline-source-"));
     const sourceRelativePath = "synthetic.svg";
     const sourcePath = join(sourceRoot, sourceRelativePath);
-    writeFileSync(sourcePath, '<svg id="root"><text id="label">Pipeline rehearsal</text></svg>');
+    writeFileSync(sourcePath, '<svg id="root" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" inkscape:version="1.2" data-neutral="true"><!-- Created with Inkscape --><metadata><title>source editor metadata</title></metadata><text id="label">Pipeline rehearsal</text></svg>');
     const sourceBytes = readFileSync(sourcePath);
     const sourceSha256 = createHash("sha256").update(sourceBytes).digest("hex");
     const evidenceBytes = Buffer.from('{"contractVersion":"synthetic-source-evidence-v1","status":"untrusted-fixture"}\n');
@@ -165,6 +165,28 @@ describe("M3-1 public corpus pilot infrastructure", () => {
     writeFileSync(specPath, JSON.stringify(spec));
     const cliOutput = execFileSync(process.execPath, ["--experimental-strip-types", "tests/tools/calibration/m3-1-pilot-cli.ts", "pipeline-verify", specPath], { cwd: new URL("../../", import.meta.url), encoding: "utf8" });
     assert.equal((JSON.parse(cliOutput) as { valid: boolean }).valid, true);
+
+    const successorSpec = {
+      ...spec,
+      contractVersion: "m3-1-public-pipeline-spec-v2" as const,
+      pilotId: "public_pipeline_v2_0001",
+      outputRoot: join(approvedOutputRoot, "bundle-v2"),
+      annotationOutputRoot: join(approvedOutputRoot, "annotation-bundle-v2"),
+      previousFreezeSha256: "e9f880a8489e835aeeed89f1d387a8ba6d3be184d6b1297f5711138b95b42de9",
+      sources: spec.sources.map((source) => ({ ...source, ruleIds: [...source.ruleIds] })),
+    };
+    const successorCreated = await createPublicPipelineBundle(successorSpec);
+    assert.deepEqual(verifyPublicPipelineBundle(successorSpec), { valid: true, issues: [], bundleIndexSha256: successorCreated.bundleIndexSha256, annotationBundleIndexSha256: successorCreated.annotationBundleIndexSha256 });
+    const successorFreeze = JSON.parse(readFileSync(join(successorSpec.outputRoot, "freeze-projection.json"), "utf8")) as { projection: { sequence: number; previousFreezeSha256: string }; freezeSha256: string };
+    assert.equal(successorFreeze.projection.sequence, 2);
+    assert.equal(successorFreeze.projection.previousFreezeSha256, successorSpec.previousFreezeSha256);
+    assert.notEqual(successorFreeze.freezeSha256, successorSpec.previousFreezeSha256);
+    const successorPacket = JSON.parse(readFileSync(join(successorSpec.annotationOutputRoot, "blind-packet.json"), "utf8")) as { contractVersion: string; targetCount: number; targets: unknown[] };
+    assert.equal(successorPacket.contractVersion, "m3-1-blind-packet-v2");
+    assert.equal(successorPacket.targetCount, successorPacket.targets.length);
+    const successorContextPath = (JSON.parse(readFileSync(join(successorSpec.annotationOutputRoot, "bundle-index.json"), "utf8")) as { files: Array<{ path: string }> }).files.find((entry) => entry.path.startsWith("blind-context/"))!.path;
+    const successorContext = readFileSync(join(successorSpec.annotationOutputRoot, successorContextPath), "utf8");
+    assert.equal(/(?:inkscape|metadata|Created with|id="label")/iu.test(successorContext), false);
 
     const evidenceBundlePath = join(spec.outputRoot, "source-evidence/synthetic-source-evidence.json");
     const evidenceIndexPath = join(spec.outputRoot, "bundle-index.json");
