@@ -52,6 +52,7 @@ import { PRIMITIVES_SOURCE, TEST_PRIMITIVES_CAPABILITY } from "../../src/measure
 import { produceEvidence, REFERENCE_CORPUS_MAX_ABS_MM, type EvidenceOutcome } from "../../src/render/evidence.ts";
 import { openRasterizer, readPngHeader, type Rasterizer } from "../../src/render/rasterizer.ts";
 import { comparePng, decodePng, inkPixels } from "../tools/png.ts";
+import { writePartialLiveReport } from "../tools/live-report-output.mjs";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 const PARAGRAPHS = 9;
@@ -613,7 +614,7 @@ describe("evidence path, live", () => {
     // after the runner has exited 0, so a measurement report can never be a record of a run that
     // failed halfway. The file on its own was not evidence of a green run, and it looked like one.
     const target = process.env.BREAKLINT_LIVE_REPORT;
-    if (target) writeFileSync(`${target}.partial`, JSON.stringify(measured, null, 2) + "\n");
+    if (target) writePartialLiveReport(target, measured);
     let rasterizerError: string | null = null;
     let browserError: string | null = null;
     let profileError: string | null = null;
