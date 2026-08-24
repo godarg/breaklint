@@ -17,6 +17,9 @@
   actually exist.
 - This infrastructure changes no runtime rule, threshold, severity, package version or published
   surface. All fifteen rules remain `calibrated: false`; no calibration claim is authorized.
+- Community intake now screens the issue TITLE as well as the body for credential patterns; a hit in either field
+  classifies the report `sensitive-warning` and the public dashboard replaces the title with
+  `Sensitive content withheld`. Markdown escaping is not redaction, so the title is withheld rather than escaped.
 - Added blind packet v2 with deterministic SVG metadata sanitization, fail-closed content checks,
   independently reconstructed context bytes, target-set commitments and custodial neutral-order
   verification. Packet v1 and its freeze remain unchanged historical evidence; the linked local

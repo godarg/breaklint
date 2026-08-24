@@ -73,8 +73,13 @@ governed headings are rejected rather than merged or treated as “last value wi
 sensitive-input tripwire covers quoted and unquoted assignments, common provider credentials,
 authorization headers, private-key markers, URL credentials, contextual JWT/Base64-like tokens and
 opaque credential locators. Its public labels and diagnostics never echo the matched payload.
+Your issue TITLE is screened by the same detector as the body. A hit in either field marks the whole
+report `sensitive-warning`, and the public dashboard then shows `Sensitive content withheld` in place
+of your title — the issue number and link stay visible, the title text does not. Markdown escaping is
+not redaction, so a title is withheld rather than escaped.
 This is a last-resort tripwire, not a redaction service: remove secrets and private material before
-submitting, even if a particular string does not match the detector.
+submitting, even if a particular string does not match the detector. Short credentials in particular
+can fall under the detector's length floors.
 
 ## What this can and cannot establish
 
