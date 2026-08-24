@@ -17,6 +17,10 @@
   actually exist.
 - This infrastructure changes no runtime rule, threshold, severity, package version or published
   surface. All fifteen rules remain `calibrated: false`; no calibration claim is authorized.
+- Added blind packet v2 with deterministic SVG metadata sanitization, fail-closed content checks,
+  independently reconstructed context bytes, target-set commitments and custodial neutral-order
+  verification. Packet v1 and its freeze remain unchanged historical evidence; the linked local
+  sequence-2 freeze is not an external receipt or authorization for human annotation.
 
 ### Open community QA intake
 
@@ -24,8 +28,20 @@
   disposable reproductions. No application or tester selection is required.
 - Added a data-only intake classifier and dashboard workflow. Submitted content is never executed;
   reports with missing declarations or sensitive-data patterns fail closed into explicit labels.
+- Governed sections now have exact cardinality and normalization-aware duplicate detection;
+  sensitive-input detection covers unquoted/provider/auth/URL/token forms without echoing payloads.
 - Community reports remain non-blind product QA. They are not human calibration annotations,
   external holdout receipts, trust roots or authority to change thresholds, version or release.
+
+### Reproducibility and dependency disposition
+
+- Live measurement reports now create missing parent directories before their atomic partial-file
+  write, so the documented fresh-checkout command works without pre-created local state.
+- Documentation figures are bound to measured unit TAP, live-report shape and both S1 raster
+  oracles by an executable drift guard.
+- Paged.js 0.4.3 remains pinned after review: the obsolete polyfill chain is not reached by the
+  measured browser-bundle path and no known advisory was found. The risk acceptance expires on
+  2026-11-24 or earlier on an upstream, advisory or integration trigger.
 
 ## 0.2.0 — 2026-08-22
 

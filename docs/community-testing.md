@@ -67,6 +67,15 @@ An automated, data-only intake check labels the issue as complete, needing infor
 a sensitive-data warning. It never runs the submission. A scheduled public dashboard issue counts
 the states and links to the reports; it does not rank people or average away disagreements.
 
+The intake contract is deliberately strict. Each of the ten governed form sections must appear
+exactly once. Duplicate, case-folded, Unicode-confusable, whitespace-normalized, nested or unknown
+governed headings are rejected rather than merged or treated as “last value wins”. The
+sensitive-input tripwire covers quoted and unquoted assignments, common provider credentials,
+authorization headers, private-key markers, URL credentials, contextual JWT/Base64-like tokens and
+opaque credential locators. Its public labels and diagnostics never echo the matched payload.
+This is a last-resort tripwire, not a redaction service: remove secrets and private material before
+submitting, even if a particular string does not match the detector.
+
 ## What this can and cannot establish
 
 Community testing can reveal usability defects, false positives, false negatives, renderer
