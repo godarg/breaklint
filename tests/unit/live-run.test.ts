@@ -24,6 +24,7 @@ function runFixture(
   } = {},
 ) {
   const target = join(scratch, `${name}.json`);
+  const summary = join(scratch, `${name}.summary.json`);
   const childEnv = { ...process.env };
   // The integration child is a fresh runner, not a recursively registered child of this test.
   // Node marks test workers with this private context variable; forwarding it makes run() refuse
@@ -31,6 +32,7 @@ function runFixture(
   delete childEnv.NODE_TEST_CONTEXT;
   return {
     target,
+    summary,
     run: spawnSync(process.execPath, [RUNNER, options.file ?? FIXTURE], {
       cwd: REPO,
       encoding: "utf8",
@@ -38,6 +40,7 @@ function runFixture(
       env: {
         ...childEnv,
         BREAKLINT_LIVE_REPORT: target,
+        BREAKLINT_LIVE_SUMMARY: summary,
         BREAKLINT_LIVE_EXPECTED_LEAVES: String(options.expectedLeaves ?? 1),
         BREAKLINT_LIVE_EXPECTED_SUITE: options.expectedSuite ?? "synthetic live report producer",
         BREAKLINT_FIXTURE_FAIL_AFTER: failAfter ? "1" : "0",
@@ -72,20 +75,27 @@ describe("the live report gate uses structured test truth", () => {
   it("rejects an after-hook failure even when the visible test assertion passed", () => {
     const stale = join(scratch, "red.json");
     writeFileSync(stale, "stale report that must not survive\n");
-    const { target, run } = runFixture("red", true);
+    const { target, summary, run } = runFixture("red", true);
     assert.equal(run.status, 1, `stdout:\n${run.stdout}\nstderr:\n${run.stderr}`);
     assert.match(run.stdout, /not ok/u, "the synthetic hook failure was not visible in TAP");
     assert.match(run.stderr, /structured test verdict is red/u);
     assert.equal(existsSync(target), false, "an old or newly promoted target survived a red run");
     assert.equal(existsSync(`${target}.partial`), false, "a partial report survived a red run");
+    assert.equal(existsSync(summary), false, "a structured summary survived a red run");
+    assert.equal(existsSync(`${summary}.partial`), false, "a partial structured summary survived a red run");
   });
 
   it("promotes a nonempty report after structured success", () => {
-    const { target, run } = runFixture("green", false);
+    const { target, summary, run } = runFixture("green", false);
     assert.equal(run.status, 0, `stdout:\n${run.stdout}\nstderr:\n${run.stderr}`);
     assert.match(run.stdout, /structured live total: suites 1\/1, tests 1\/1/u);
     assert.equal(existsSync(`${target}.partial`), false);
     assert.deepEqual(JSON.parse(readFileSync(target, "utf8")), { cases: { synthetic: {} } });
+    assert.deepEqual(JSON.parse(readFileSync(summary, "utf8")), {
+      contractVersion: "breaklint-live-summary-v1",
+      suites: { passed: 1, expected: 1 },
+      tests: { passed: 1, expected: 1 },
+    });
   });
 
   it("terminates a judged per-file runner only after its complete top-level pass", () => {

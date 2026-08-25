@@ -22,11 +22,6 @@ import {
   type PublicIntakeManifestDocument,
   type SplitDocument,
 } from "./m3-1-pilot.ts";
-import {
-  verifyPublicPipelineBundle,
-  type PublicPipelineSpec,
-} from "./m3-1-public-pipeline.ts";
-
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
 function readJson(path: string): unknown {
@@ -123,18 +118,8 @@ async function main(): Promise<void> {
       break;
     case "pipeline-create":
       throw new Error("legacy-svg-pipeline-create-retired: historical v1/v2 reconstruction is test-only; new human packets require raster v3 and its external gates");
-    case "pipeline-verify": {
-      const result = verifyPublicPipelineBundle(input as unknown as PublicPipelineSpec);
-      output = {
-        ...result,
-        historicalIntegrityValid: result.valid,
-        valid: false,
-        humanDeliveryAuthorized: false,
-        issues: [...new Set([...result.issues, "legacy-svg-source-bundle-not-authorized-for-human-delivery"])].sort(),
-      };
-      gateValid = false;
-      break;
-    }
+    case "pipeline-verify":
+      throw new Error("legacy-svg-pipeline-verify-retired: frozen v1/v2 integrity is checked only by the committed corpus-artifact gate and never authorizes delivery");
     default:
       throw new Error(`unknown mode: ${mode}`);
   }

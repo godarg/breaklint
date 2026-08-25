@@ -10,7 +10,8 @@
  */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { finished } from "node:stream/promises";
 import { run } from "node:test";
 import { tap } from "node:test/reporters";
@@ -247,8 +248,12 @@ async function runParent() {
   const specs = requestedSpecs();
   const target = process.env.BREAKLINT_LIVE_REPORT;
   const partial = target ? `${target}.partial` : null;
+  const summaryTarget = process.env.BREAKLINT_LIVE_SUMMARY;
+  const summaryPartial = summaryTarget ? `${summaryTarget}.partial` : null;
   if (target && existsSync(target)) rmSync(target);
   if (partial && existsSync(partial)) rmSync(partial);
+  if (summaryTarget && existsSync(summaryTarget)) rmSync(summaryTarget);
+  if (summaryPartial && existsSync(summaryPartial)) rmSync(summaryPartial);
 
   let passedLeaves = 0;
   let passedSuites = 0;
@@ -289,14 +294,28 @@ async function runParent() {
     process.stderr.write("breaklint: the live suite produced no partial measurement report; no measurement report was written.\n");
   }
 
+  const expectedLeaves = specs.reduce((sum, spec) => sum + spec.leaves, 0);
   process.stdout.write(
     `# structured live total: suites ${passedSuites}/${specs.length}, tests ${passedLeaves}/` +
-      `${specs.reduce((sum, spec) => sum + spec.leaves, 0)}\n`,
+      `${expectedLeaves}\n`,
   );
   if (!suitePassed) {
     process.stderr.write(`breaklint: structured test verdict is red (${failure}); process exit codes were not the oracle.\n`);
   }
-  process.exitCode = suitePassed && reportPassed ? 0 : 1;
+  const accepted = suitePassed && reportPassed;
+  if (accepted && summaryTarget && summaryPartial) {
+    mkdirSync(dirname(summaryTarget), { recursive: true });
+    writeFileSync(
+      summaryPartial,
+      `${JSON.stringify({
+        contractVersion: "breaklint-live-summary-v1",
+        suites: { passed: passedSuites, expected: specs.length },
+        tests: { passed: passedLeaves, expected: expectedLeaves },
+      }, null, 2)}\n`,
+    );
+    renameSync(summaryPartial, summaryTarget);
+  }
+  process.exitCode = accepted ? 0 : 1;
 }
 
 if (process.argv[2] === CHILD_FLAG) {

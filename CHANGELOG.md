@@ -5,15 +5,16 @@
 ### Verification truth and calibration safety
 
 - Corrected the shipped Unit-test figure from the former 439-test Unit + E2E aggregate to the
-  current measured 336-test Unit-only denominator. `npm test` now preserves the current 443-test
+  current measured 336-test Unit-only denominator. `npm test` now preserves the current 444-test
   aggregate and Unit-only run as separate TAP artefacts, so the
   CI documentation guard measures the field it names instead of accepting the aggregate by mistake.
 - Retired executable SVG-source packets v1/v2 from new human annotation sessions after the
   preregistered repeated-channel stop criterion fired. A raster-only packet-v3 schema now requires
   declared renderer, asset/font, viewport, raster and blocked-fetch-positive-control bindings, while
-  the real annotation CLI retires legacy packet/pipeline creation, keeps historical verification
-  explicitly delivery-unauthorized, and blocks v3 until those declarations have an external verifier;
-  no v3 renderer, packet, calibration or human annotation is claimed yet.
+  the real annotation CLI retires all legacy packet/pipeline creation and verification seams, the
+  generic file-writing legacy pipeline module is removed, and v3 stays blocked until those
+  declarations have an external verifier; no v3 renderer, packet, calibration or human annotation
+  is claimed yet.
 - Repaired historical v2 reconstruction without changing frozen bytes: URL targets are checked before
   the independent parenthesis balance; reference discovery, namespace/ID inspection and rewriting use
   parsed elements with located attributes rather than matching the whole document string; the reported
@@ -61,9 +62,10 @@
 - Live measurement reports now create missing parent directories before their atomic partial-file
   write, so the documented fresh-checkout command works without pre-created local state.
 - Documentation figures in `docs/status.md` carry a machine-readable marker, and a drift guard
-  (`tests/tools/documented-figures.mjs`) can compare it against measured unit TAP, live-report shape
-  and both S1 raster oracles. `npm test` now preserves its real TAP under `.tmp/unit.tap`; the live
-  CI and release steps write the measured browser report and invoke `npm run test:documented-figures`
+  (`tests/tools/documented-figures.mjs`) compares it against separate measured Unit and aggregate
+  TAPs, the accepted structured live-test denominator, live-report shape and both S1 raster oracles.
+  `npm test` preserves `.tmp/unit.tap` and `.tmp/test.tap`; the live CI and release steps atomically
+  write the structured verdict and measured browser report, then invoke `npm run test:documented-figures`
   against the real `docs/status.md`. The synthetic unit test remains the negative-control harness,
   while the release gate now rejects stale published figures from measured evidence.
 - Paged.js 0.4.3 remains pinned after review: the obsolete polyfill chain is not reached by the

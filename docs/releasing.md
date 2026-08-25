@@ -41,7 +41,7 @@ npm run schema:check
 npm test
 npm run test:mutants
 npm run test:licenses
-BREAKLINT_LIVE_REPORT=.tmp/live-report.json npm run test:live
+BREAKLINT_LIVE_REPORT=.tmp/live-report.json BREAKLINT_LIVE_SUMMARY=.tmp/live-summary.json npm run test:live
 npm run test:documented-figures
 npm run test:report-surfaces
 npm run selfcheck

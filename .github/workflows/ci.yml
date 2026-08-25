@@ -94,7 +94,7 @@ jobs:
         # running nothing is how a check disappears. ubuntu-latest ships Chrome; paged.js and
         # pdfjs-dist come from `npm ci`.
         run: |
-          BREAKLINT_LIVE_REPORT=.tmp/live-report.json npm run test:live
+          BREAKLINT_LIVE_REPORT=.tmp/live-report.json BREAKLINT_LIVE_SUMMARY=.tmp/live-summary.json npm run test:live
           npm run test:documented-figures
 
       - name: portable technical report-surface matrix

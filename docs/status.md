@@ -49,7 +49,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 every scalar and every empty object or array as one leaf, and no path appears in one run and not
 the other.
 
-<!-- breaklint-status-figures-v1 unitTests=336 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=336 aggregateTests=444 liveTests=57 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -75,10 +75,11 @@ field is. The live-report writer creates a missing parent directory atomically; 
 was re-run from a fresh checkout without a pre-existing `.tmp` directory.
 
 The release/CI path also binds the documented figures to real evidence rather than synthetic test
-data: `npm test` preserves its 443-test aggregate TAP at `.tmp/test.tap` and independently writes
-the 336-test Unit-only TAP at `.tmp/unit.tap`; the live step writes
-`.tmp/live-report.json`, and `npm run test:documented-figures` rejects any mismatch with the marker
-above. The marker's `unitTests` field counts the Unit-only TAP denominator.
+data: `npm test` preserves its 444-test aggregate TAP at `.tmp/test.tap` and independently writes
+the 336-test Unit-only TAP at `.tmp/unit.tap`; the accepted live step atomically writes both its
+57-test structured verdict to `.tmp/live-summary.json` and its 226-leaf measurement report to
+`.tmp/live-report.json`. `npm run test:documented-figures` rejects any mismatch with the marker
+above. The marker distinguishes the Unit-only, Unit + E2E, and accepted live denominators.
 
 | Case | raster diff | style violations | binding |
 |---|---:|---:|---|
@@ -133,7 +134,7 @@ each measured singly.
 **Four repairs were once green in every suite while being reverted.** An audit turned each of them
 back into its defect — the tolerance-free page verdict, the unread integrity count, the unread
 late errors, the file-access switch — and the whole suite as it stood at the time (104 Unit tests
-and 15 live tests; the current measured denominators are 336 Unit, 443 Unit + E2E, and 57 live)
+and 15 live tests; the current measured denominators are 336 Unit, 444 Unit + E2E, and 57 live)
 plus the mutation guard stayed green through all
 four. The repairs were real; the gates were not there. They are now, and
 each was verified by re-applying the mutation and watching it go red. The reason the live corpus
@@ -304,10 +305,10 @@ raster-only PNG delivery under a pinned, network-denied renderer with bound font
 raster bytes and same-run fetch positive control. Its schema and fail-closed delivery gate exist, but
 that gate deliberately rejects even structurally valid v3 data until the renderer/network-evidence
 verifier and visual-sufficiency oracle exist. No v3 renderer, packet or human annotation is claimed.
-The operational CLI also refuses `blind-packet` and `pipeline-create` for the legacy SVG formats;
-its `pipeline-verify` mode may report historical byte integrity but always returns a failed delivery
-gate with `humanDeliveryAuthorized: false`. Low-level constructors remain only so frozen v1/v2 bytes
-can be independently reconstructed in tests; they are not an annotation delivery interface.
+The operational CLI refuses `blind-packet`, `pipeline-create` and `pipeline-verify` for the legacy
+SVG formats, and the generic file-writing legacy pipeline module has been removed. Frozen v1/v2
+integrity and deterministic reconstruction remain covered by the committed corpus-artifact tests.
+Low-level in-memory test helpers cannot write a deliverable or authorize a human session.
 The local lineage is not an external receipt or trust root.
 This is real source and process evidence, not power evidence.
 There are still zero verified human annotators, zero adjudications, no disclosed holdout outcome,

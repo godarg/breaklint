@@ -61,7 +61,7 @@
     "test:secrets": "node tests/tools/secrets.mjs",
     "test:advisories": "node tests/tools/dependency-audit.mjs",
     "test:release-tag": "node tests/tools/release-tag-contract.mjs --self-test",
-    "test:documented-figures": "node tests/tools/documented-figures.mjs --unit-tap .tmp/unit.tap --live-report .tmp/live-report.json",
+    "test:documented-figures": "node tests/tools/documented-figures.mjs --unit-tap .tmp/unit.tap --aggregate-tap .tmp/test.tap --live-summary .tmp/live-summary.json --live-report .tmp/live-report.json",
     "render:report-surfaces": "node --experimental-strip-types tests/tools/render-report-surfaces.mjs",
     "test:report-surfaces": "npm run test:report-surfaces:local",
     "test:report-surfaces:local": "npm run render:report-surfaces && node tests/tools/verify-report-surfaces.mjs --mode local",

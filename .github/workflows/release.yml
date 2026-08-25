@@ -94,7 +94,7 @@ jobs:
 
       - name: live evidence path
         run: |
-          BREAKLINT_LIVE_REPORT=.tmp/live-report.json npm run test:live
+          BREAKLINT_LIVE_REPORT=.tmp/live-report.json BREAKLINT_LIVE_SUMMARY=.tmp/live-summary.json npm run test:live
           npm run test:documented-figures
 
       - name: rendered report-surface matrix and review ledger

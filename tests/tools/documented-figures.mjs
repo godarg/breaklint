@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const FIGURES_MARKER = /<!-- breaklint-status-figures-v1 unitTests=(\d+) liveReportLeaves=(\d+) s1RasterDiffPx=(\d+) s1ForeignRasterDiffPx=(\d+) -->/u;
+const FIGURES_MARKER = /<!-- breaklint-status-figures-v1 unitTests=(\d+) aggregateTests=(\d+) liveTests=(\d+) liveReportLeaves=(\d+) s1RasterDiffPx=(\d+) s1ForeignRasterDiffPx=(\d+) -->/u;
 
 function leafCount(value) {
   if (value !== null && typeof value === "object") {
@@ -12,10 +12,23 @@ function leafCount(value) {
   return 1;
 }
 
-function lastTapTestCount(tapText) {
+function lastTapTestCount(tapText, label) {
   const matches = [...tapText.matchAll(/^# tests (\d+)$/gmu)];
-  if (!matches.length) throw new Error("unit TAP contains no final test count");
+  if (!matches.length) throw new Error(`${label} contains no final test count`);
   return Number(matches.at(-1)[1]);
+}
+
+function acceptedLiveTestCount(liveSummary) {
+  if (liveSummary?.contractVersion !== "breaklint-live-summary-v1") return undefined;
+  const suites = liveSummary.suites;
+  const tests = liveSummary.tests;
+  if (
+    !Number.isInteger(suites?.passed) || !Number.isInteger(suites?.expected) ||
+    !Number.isInteger(tests?.passed) || !Number.isInteger(tests?.expected) ||
+    suites.passed <= 0 || tests.passed <= 0 ||
+    suites.passed !== suites.expected || tests.passed !== tests.expected
+  ) return undefined;
+  return tests.passed;
 }
 
 function documentedFigures(statusText) {
@@ -24,16 +37,20 @@ function documentedFigures(statusText) {
   if ([...statusText.matchAll(new RegExp(FIGURES_MARKER.source, "gu"))].length !== 1) throw new Error("docs/status.md has more than one figures marker");
   return {
     unitTests: Number(match[1]),
-    liveReportLeaves: Number(match[2]),
-    s1RasterDiffPx: Number(match[3]),
-    s1ForeignRasterDiffPx: Number(match[4]),
+    aggregateTests: Number(match[2]),
+    liveTests: Number(match[3]),
+    liveReportLeaves: Number(match[4]),
+    s1RasterDiffPx: Number(match[5]),
+    s1ForeignRasterDiffPx: Number(match[6]),
   };
 }
 
-export function evaluateDocumentedFigures({ statusText, unitTapText, liveReport }) {
+export function evaluateDocumentedFigures({ statusText, unitTapText, aggregateTapText, liveSummary, liveReport }) {
   const documented = documentedFigures(statusText);
   const measured = {
-    unitTests: lastTapTestCount(unitTapText),
+    unitTests: lastTapTestCount(unitTapText, "unit TAP"),
+    aggregateTests: lastTapTestCount(aggregateTapText, "aggregate TAP"),
+    liveTests: acceptedLiveTestCount(liveSummary),
     liveReportLeaves: leafCount(liveReport),
     s1RasterDiffPx: liveReport?.cases?.S1_scriptRecoloursMarks?.rasterDiffPx,
     s1ForeignRasterDiffPx: liveReport?.cases?.S1_scriptRecoloursMarks?.foreignRasterDiffPx,
@@ -53,15 +70,19 @@ function argument(argv, name) {
 function main() {
   const statusPath = argument(process.argv, "status") ?? "docs/status.md";
   const unitTapPath = argument(process.argv, "unit-tap");
+  const aggregateTapPath = argument(process.argv, "aggregate-tap");
+  const liveSummaryPath = argument(process.argv, "live-summary");
   const liveReportPath = argument(process.argv, "live-report");
-  if (!unitTapPath || !liveReportPath) {
-    process.stderr.write("usage: node tests/tools/documented-figures.mjs --unit-tap <tap> --live-report <json> [--status <md>]\n");
+  if (!unitTapPath || !aggregateTapPath || !liveSummaryPath || !liveReportPath) {
+    process.stderr.write("usage: node tests/tools/documented-figures.mjs --unit-tap <tap> --aggregate-tap <tap> --live-summary <json> --live-report <json> [--status <md>]\n");
     process.exitCode = 2;
     return;
   }
   const result = evaluateDocumentedFigures({
     statusText: readFileSync(statusPath, "utf8"),
     unitTapText: readFileSync(unitTapPath, "utf8"),
+    aggregateTapText: readFileSync(aggregateTapPath, "utf8"),
+    liveSummary: JSON.parse(readFileSync(liveSummaryPath, "utf8")),
     liveReport: JSON.parse(readFileSync(liveReportPath, "utf8")),
   });
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

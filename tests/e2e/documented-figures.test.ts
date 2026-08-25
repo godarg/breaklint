@@ -13,28 +13,47 @@ const report = {
     S1_scriptRecoloursMarks: { rasterDiffPx: 200, foreignRasterDiffPx: 200 },
   },
 };
+const liveSummary = {
+  contractVersion: "breaklint-live-summary-v1",
+  suites: { passed: 4, expected: 4 },
+  tests: { passed: 57, expected: 57 },
+};
 
-test("the documented-figures guard binds unit TAP, report shape, and both raster oracles", () => {
-  const statusText = "<!-- breaklint-status-figures-v1 unitTests=325 liveReportLeaves=3 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->";
-  const result = evaluateDocumentedFigures({ statusText, unitTapText: "TAP version 13\n# tests 325\n", liveReport: report });
+test("the documented-figures guard binds both TAPs, the accepted live run, report shape, and both raster oracles", () => {
+  const statusText = "<!-- breaklint-status-figures-v1 unitTests=325 aggregateTests=431 liveTests=57 liveReportLeaves=3 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->";
+  const result = evaluateDocumentedFigures({ statusText, unitTapText: "TAP version 13\n# tests 325\n", aggregateTapText: "TAP version 13\n# tests 431\n", liveSummary, liveReport: report });
   assert.deepEqual(result, {
     valid: true,
-    documented: { unitTests: 325, liveReportLeaves: 3, s1RasterDiffPx: 200, s1ForeignRasterDiffPx: 200 },
-    measured: { unitTests: 325, liveReportLeaves: 3, s1RasterDiffPx: 200, s1ForeignRasterDiffPx: 200 },
+    documented: { unitTests: 325, aggregateTests: 431, liveTests: 57, liveReportLeaves: 3, s1RasterDiffPx: 200, s1ForeignRasterDiffPx: 200 },
+    measured: { unitTests: 325, aggregateTests: 431, liveTests: 57, liveReportLeaves: 3, s1RasterDiffPx: 200, s1ForeignRasterDiffPx: 200 },
     issues: [],
   });
 });
 
 test("each independently measured figure makes stale prose fail closed", () => {
-  const statusText = "<!-- breaklint-status-figures-v1 unitTests=324 liveReportLeaves=2 s1RasterDiffPx=199 s1ForeignRasterDiffPx=198 -->";
-  const result = evaluateDocumentedFigures({ statusText, unitTapText: "# tests 325\n", liveReport: report });
+  const statusText = "<!-- breaklint-status-figures-v1 unitTests=324 aggregateTests=430 liveTests=56 liveReportLeaves=2 s1RasterDiffPx=199 s1ForeignRasterDiffPx=198 -->";
+  const result = evaluateDocumentedFigures({ statusText, unitTapText: "# tests 325\n", aggregateTapText: "# tests 431\n", liveSummary, liveReport: report });
   assert.equal(result.valid, false);
   assert.deepEqual(result.issues, [
     "unitTests: documented=324, measured=325",
+    "aggregateTests: documented=430, measured=431",
+    "liveTests: documented=56, measured=57",
     "liveReportLeaves: documented=2, measured=3",
     "s1RasterDiffPx: documented=199, measured=200",
     "s1ForeignRasterDiffPx: documented=198, measured=200",
   ]);
+});
+
+test("a partial or failed live summary cannot supply a documented live-test denominator", () => {
+  const statusText = "<!-- breaklint-status-figures-v1 unitTests=325 aggregateTests=431 liveTests=56 liveReportLeaves=3 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->";
+  const result = evaluateDocumentedFigures({
+    statusText,
+    unitTapText: "# tests 325\n",
+    aggregateTapText: "# tests 431\n",
+    liveSummary: { ...liveSummary, tests: { passed: 56, expected: 57 } },
+    liveReport: report,
+  });
+  assert.deepEqual(result.issues, ["liveTests: documented=56, measured=undefined"]);
 });
 
 test("the npm runner writes a distinct real unit TAP instead of relabelling Unit + E2E", async () => {
