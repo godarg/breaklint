@@ -606,7 +606,8 @@ const SVG_ALLOWED_NAMESPACE_DECLARATIONS = new Map([
   ["xmlns", "http://www.w3.org/2000/svg"],
   ["xmlns:xlink", "http://www.w3.org/1999/xlink"],
 ]);
-const SVG_REMOVED_NAMESPACE_PREFIXES = "(?:cc|dc|inkscape|rdf|sodipodi|svg)";
+const SVG_REMOVED_NAMESPACE_PREFIX_NAMES = new Set(["cc", "dc", "inkscape", "rdf", "sodipodi", "svg"]);
+const SVG_REMOVED_NAMESPACE_PREFIXES = `(?:${[...SVG_REMOVED_NAMESPACE_PREFIX_NAMES].join("|")})`;
 const SVG_OUTCOME_HINT = /(?:(?:^|[^A-Za-z0-9])break\s*lint\b[\s\S]{0,32}\b(?:finding|result|outcome|pass|fail|severity|score|threshold|calibrat(?:ed|ion)?)\b|(?:^|[^A-Za-z0-9])(?:finding|outcome|result|verdict|severity|calibrated|production[\s_.-]*label|candidate[\s_.-]*config)(?=[\s:_.-])\s*[:=_-]\s*(?:pass|fail|true|false|positive|negative|present|absent|blocker|critical|high|medium|low|[0-9]))/iu;
 const SVG_TOOL_HINT = /\b(?:inkscape|sodipodi|adobe\s+illustrator|created\s+with|exported\s+by)\b/iu;
 // Blind-context attribute values may only call functions that are pure geometry, plus `url()`
@@ -660,7 +661,7 @@ function qualifiedAttributeName(entry: Element["attrs"][number]): string {
   return entry.prefix ? `${entry.prefix}:${entry.name}` : entry.name;
 }
 
-function replaceParsedAttributes(source: string, replace: (name: string, value: string, quote: "\"" | "'") => string): string {
+function replaceParsedAttributes(source: string, replace: (name: string, value: string, quote: "\"" | "'") => string | null): string {
   const replacements: Array<{ start: number; end: number; text: string }> = [];
   for (const element of parsedElements(source) as LocatedElement[]) {
     const locations = element.sourceCodeLocation?.attrs;
@@ -673,7 +674,16 @@ function replaceParsedAttributes(source: string, replace: (name: string, value: 
       const match = /^([:\w.-]+)(\s*=\s*)(["'])([\s\S]*)\3$/u.exec(raw);
       if (!match) throw new Error(`blind SVG context attribute location is malformed: ${qualified}`);
       const [, name, separator, quote, value] = match as RegExpExecArray & [string, string, string, "\"" | "'", string];
-      replacements.push({ start: location.startOffset, end: location.endOffset, text: `${name}${separator}${quote}${replace(name, value, quote)}${quote}` });
+      const replaced = replace(name, value, quote);
+      let start = location.startOffset;
+      if (replaced === null) {
+        while (start > 0 && /\s/u.test(source[start - 1] ?? "")) start -= 1;
+      }
+      replacements.push({
+        start,
+        end: location.endOffset,
+        text: replaced === null ? "" : `${name}${separator}${quote}${replaced}${quote}`,
+      });
     }
   }
   let rewritten = source;
@@ -713,7 +723,15 @@ function validateSvgMarkupLexically(source: string): void {
     if (closing) cursor += 1;
     const nameMatch = /^[A-Za-z_][A-Za-z0-9_.:-]*/u.exec(source.slice(cursor));
     if (!nameMatch) throw new Error("blind SVG context contains malformed tag syntax");
-    cursor += nameMatch[0].length;
+    const tagName = nameMatch[0];
+    const separator = tagName.indexOf(":");
+    if (separator >= 0) {
+      const prefix = tagName.slice(0, separator).toLowerCase();
+      if (!SVG_REMOVED_NAMESPACE_PREFIX_NAMES.has(prefix)) {
+        throw new Error(`blind SVG context contains an unknown element namespace: ${prefix}`);
+      }
+    }
+    cursor += tagName.length;
     if (closing) {
       while (/\s/u.test(source[cursor] ?? "")) cursor += 1;
       if (source[cursor] !== ">") throw new Error("blind SVG context contains malformed closing tag syntax");
@@ -791,6 +809,10 @@ export function sanitizeBlindSvgContextV2(svgSource: string): string {
   if (/<!\s*(?:DOCTYPE|ENTITY|\[CDATA\[)/iu.test(svgSource)) throw new Error("blind SVG context contains a forbidden XML declaration");
   if (/<\/?(?:script|foreignObject|iframe|object|embed|animate|animateMotion|animateTransform|set|discard|style)\b/iu.test(svgSource)) throw new Error("blind SVG context contains active or independently mutable content");
   if (/\son[a-z][\w.-]*\s*=/iu.test(svgSource)) throw new Error("blind SVG context contains an event handler");
+  // Validate the raw source before stripping metadata-only attributes. This intentionally prefers
+  // a false rejection over accepting ambiguous authored syntax: v1/v2 delivery is retired, so
+  // compatibility cannot justify weakening the historical reconstruction boundary. The corpus
+  // remains accepted byte-for-byte, while any future human-delivery path must use raster v3.
   validateSvgMarkupLexically(svgSource);
   if (/data\s*:/iu.test(svgSource)) throw new Error("blind SVG context contains a data URL");
   if (blindContextHasExternalAssetReference(svgSource)) throw new Error("blind context would require an external asset fetch");
@@ -804,9 +826,14 @@ export function sanitizeBlindSvgContextV2(svgSource: string): string {
   sanitized = sanitized.replace(/<(?:[A-Za-z][\w.-]*:)?metadata\b[^>]*>[\s\S]*?<\/(?:[A-Za-z][\w.-]*:)?metadata\s*>/giu, "");
   sanitized = sanitized.replace(/<sodipodi:namedview\b[^>]*(?:\/>|>[\s\S]*?<\/sodipodi:namedview\s*>)/giu, "");
   sanitized = sanitized.replace(/<(?:title|desc)\b[^>]*>[\s\S]*?<\/(?:title|desc)\s*>/giu, "");
-  sanitized = sanitized.replace(new RegExp(`\\s+(?:xmlns:${SVG_REMOVED_NAMESPACE_PREFIXES}|${SVG_REMOVED_NAMESPACE_PREFIXES}:[\\w.-]+)\\s*=\\s*(["'])[\\s\\S]*?\\1`, "giu"), "");
-  sanitized = sanitized.replace(/\s+(?:data-)?(?:editor|export(?:er|tool|version)?|generator)\s*=\s*(["'])[\s\S]*?\1/giu, "");
-  sanitized = sanitized.replace(/\s+(?:aria-[\w.-]+|class|data-[\w.-]+|role)\s*=\s*(["'])[\s\S]*?\1/giu, "");
+  const removedNamespaceAttribute = new RegExp(`^(?:xmlns:${SVG_REMOVED_NAMESPACE_PREFIXES}|${SVG_REMOVED_NAMESPACE_PREFIXES}:[\\w.-]+)$`, "iu");
+  sanitized = replaceParsedAttributes(sanitized, (name, value) => {
+    const normalizedName = name.toLowerCase();
+    if (removedNamespaceAttribute.test(normalizedName)) return null;
+    if (/^(?:data-)?(?:editor|export(?:er|tool|version)?|generator)$/u.test(normalizedName)) return null;
+    if (/^(?:aria-[\w.-]+|class|data-[\w.-]+|role)$/u.test(normalizedName)) return null;
+    return value;
+  });
   if (/<(?:[A-Za-z][\w.-]*:)?metadata\b/iu.test(sanitized)) throw new Error("blind SVG context contains malformed metadata");
   if (/<(?:title|desc)\b/iu.test(sanitized)) throw new Error("blind SVG context contains malformed descriptive metadata");
 
@@ -837,12 +864,21 @@ export function sanitizeBlindSvgContextV2(svgSource: string): string {
       idMap.set(original, `blind-id-${String(idMap.size + 1).padStart(6, "0")}`);
     }
   }
+  const idReferencePattern = idMap.size === 0
+    ? null
+    : new RegExp(
+      `#(${[...idMap.keys()]
+        .sort((left, right) => right.length - left.length)
+        .map((id) => id.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"))
+        .join("|")})(?![\\p{L}\\p{N}\\p{M}\\p{Pc}_.:\\-\\u00B7\\u203F\\u2040])`,
+      "gu",
+    );
   sanitized = replaceParsedAttributes(sanitized, (name, value) => {
     if (name.toLowerCase() === "id") return idMap.get(value) ?? value;
-    let rewritten = value;
+    let rewritten = idReferencePattern
+      ? value.replace(idReferencePattern, (_match, original: string) => `#${idMap.get(original)}`)
+      : value;
     for (const [original, replacement] of idMap) {
-      const exactFragment = new RegExp(`#${original.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?![A-Za-z0-9_.:-])`, "gu");
-      rewritten = rewritten.replace(exactFragment, `#${replacement}`);
       if (/^(?:aria-labelledby|aria-describedby)$/iu.test(name)) rewritten = rewritten.split(/\s+/u).map((token) => token === original ? replacement : token).join(" ");
       if (/^(?:begin|end)$/iu.test(name)) rewritten = rewritten.replace(new RegExp(`(^|;)\\s*${original.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\.`, "gu"), `$1${replacement}.`);
     }

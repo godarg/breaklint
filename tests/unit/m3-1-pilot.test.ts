@@ -265,7 +265,7 @@ describe("M3-1 additive public-pilot infrastructure", () => {
       '<svg><text>verdict: pass</text></svg>',
       '<svg><text>r&#101;sult: fail</text></svg>',
     ];
-    for (const source of blocked) assert.throws(() => sanitizeBlindSvgContextV2(source), /(?:outcome hint|data URL|processing instruction|unknown namespace|active or independently mutable content|event handler|must be quoted|duplicate attribute|character reference|backslash or CSS escape)/u, source);
+    for (const source of blocked) assert.throws(() => sanitizeBlindSvgContextV2(source), /(?:outcome hint|data URL|processing instruction|unknown (?:element )?namespace|active or independently mutable content|event handler|must be quoted|duplicate attribute|character reference|backslash or CSS escape)/u, source);
     const hiddenChannels = sanitizeBlindSvgContextV2(`<svg data-source="${privateSourcePath}"><title>finding: positive</title><desc>source.svg</desc><text class="outcome_fail" aria-label="severity: high" role="status">Neutral</text></svg>`);
     assert.equal(/(?:data-source|<title|<desc|class=|aria-|role=|finding|outcome|severity|source\.svg)/iu.test(hiddenChannels), false);
     const metadataOnly = sanitizeBlindSvgContextV2('<svg><metadata><dc:title>finding: positive</dc:title></metadata><text>Neutral</text></svg>');
@@ -453,6 +453,11 @@ describe("M3-1 additive public-pilot infrastructure", () => {
       () => sanitizeBlindSvgContextV2(`<svg ${ns}><text foo:bar="x">Alpha</text></svg>`),
       /contains an unknown attribute namespace: foo/u,
     );
+    assert.throws(
+      () => sanitizeBlindSvgContextV2(`<svg ${ns}><text>Alpha</text></acme:layer></svg>`),
+      /contains an unknown element namespace: acme/u,
+      "an unmatched closing tag must not disappear at the parser boundary",
+    );
     // Positive controls: the two qualified names the real corpus needs, plus the namespace
     // declarations themselves, must survive -- otherwise the frozen contexts would be invalidated.
     const kept = sanitizeBlindSvgContextV2(`<svg ${ns}><text xml:space="preserve">Alpha</text><use xlink:href="#a"/><g id="a"/></svg>`);
@@ -462,13 +467,16 @@ describe("M3-1 additive public-pilot infrastructure", () => {
   });
 
   it("rewrites only exact fragment IDs when source IDs share a prefix", () => {
-    const source = '<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="path4018"/><linearGradient id="path40188"/></defs><rect fill="url(#path40188)" stroke="url(#path4018)"/></svg>';
+    const source = '<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="path4018"/><linearGradient id="path40188"/><g id="a"/><g id="aä"/></defs><rect fill="url(#path40188)" stroke="url(#path4018)"/><use href="#aä"/><use href="#a"/></svg>';
     const kept = sanitizeBlindSvgContextV2(source);
     assert.match(kept, /id="blind-id-000001"/u);
     assert.match(kept, /id="blind-id-000002"/u);
     assert.match(kept, /fill="url\(#blind-id-000002\)"/u);
     assert.match(kept, /stroke="url\(#blind-id-000001\)"/u);
     assert.doesNotMatch(kept, /blind-id-0000018/u);
+    assert.match(kept, /href="#blind-id-000004"/u);
+    assert.match(kept, /href="#blind-id-000003"/u);
+    assert.doesNotMatch(kept, /blind-id-000003ä/u);
     assert.equal(sanitizeBlindSvgContextV2(kept), kept);
   });
 
@@ -480,6 +488,13 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     assert.match(kept, />literal id="path4018" xlink:title="ordinary" href="https:\/\/example\.invalid\/not-an-attribute"<\/text>/u);
     assert.doesNotMatch(kept, /data-note=/u);
     assert.equal(sanitizeBlindSvgContextV2(kept), kept);
+
+    const quoteLookalike = `<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g"/></defs><rect d="M0 0 class='b" fill="url(#g)"/><text stroke='c'>Hi</text></svg>`;
+    const stripped = sanitizeBlindSvgContextV2(quoteLookalike);
+    assert.match(stripped, /d="M0 0 class='b"/u);
+    assert.match(stripped, /fill="url\(#blind-id-000001\)"/u);
+    assert.match(stripped, /<text stroke='c'>Hi<\/text>/u);
+    assert.equal(sanitizeBlindSvgContextV2(stripped), stripped);
   });
 
   it("binds packet-v2 target set and order to an independently reconstructed custodial source", () => {

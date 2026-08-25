@@ -19,9 +19,10 @@ Planned patch version: 0.2.2.
   is claimed yet.
 - Repaired historical v2 reconstruction without changing frozen bytes: URL targets are checked before
   the independent parenthesis balance; reference discovery, namespace/ID inspection and rewriting use
-  parsed elements with located attributes rather than matching the whole document string; the reported
-  prefix-equal-ID case no longer suffers substring replacement; and all three same-document `url()`
-  quoting forms are asserted.
+  parsed elements with located attributes rather than matching the whole document string; attribute
+  stripping can no longer cross quoted markup boundaries; unknown namespaces are refused on opening
+  and closing tags; and one-pass, Unicode-aware reference rewriting keeps prefix-equal IDs distinct.
+  All three same-document `url()` quoting forms are asserted.
 
 ## 0.2.1 — 2026-08-25
 
