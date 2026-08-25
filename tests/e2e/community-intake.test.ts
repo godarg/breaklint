@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
-  argument, classifyIssue, dashboardBody, detectSensitiveInput, githubHeaders, managedComment, safeInline, sections,
+  argument, classifyIssue, dashboardBody, detectSensitiveInput, githubHeaders, INTAKE_ROUTES, INTAKE_RULES,
+  managedComment, REQUIRED_DECLARATIONS, safeInline, SECTION_DEFINITIONS, sections,
 } from "../../tools/community-intake.ts";
 
 const completeBody = `### Test route
@@ -89,6 +91,39 @@ test("edited route and rule values must remain in the issue-form allowlists", ()
   assert.equal(result.rule, "unknown");
   assert.match(result.missing.join(" "), /canonical Test route/u);
   assert.match(result.missing.join(" "), /canonical Rule or area/u);
+});
+
+function issueFormField(form: string, id: string): string {
+  const marker = `\n    id: ${id}\n`;
+  const start = form.indexOf(marker);
+  assert.notEqual(start, -1, `issue form field missing: ${id}`);
+  const next = form.indexOf("\n  - type:", start + marker.length);
+  return form.slice(start, next < 0 ? form.length : next);
+}
+
+function fieldOptions(field: string): string[] {
+  return [...field.matchAll(/^        - (?!label: )(.+)$/gmu)].map((match) => match[1]!);
+}
+
+test("the real issue form and intake classifier share one exact public contract", () => {
+  const form = readFileSync(new URL("../../.github/ISSUE_TEMPLATE/community-test.yml", import.meta.url), "utf8");
+  const fields = [...form.matchAll(/^    id: (.+)$/gmu)].map((match) => match[1]);
+  assert.deepEqual(fields, ["route", "rule", "direction", "judgement", "reproduction", "report", "environment", "surprise", "public_handling", "terms"]);
+
+  const labels = [...form.matchAll(/^      label: (.+)$/gmu)].map((match) => match[1]);
+  assert.deepEqual(labels, SECTION_DEFINITIONS.map((definition) => definition.heading));
+  assert.deepEqual(fieldOptions(issueFormField(form, "route")), [...INTAKE_ROUTES]);
+  assert.deepEqual(fieldOptions(issueFormField(form, "rule")), [...INTAKE_RULES]);
+
+  const declarations = [...form.matchAll(/^        - label: (.+)$/gmu)].map((match) => match[1]);
+  assert.deepEqual(declarations, REQUIRED_DECLARATIONS);
+
+  for (const route of INTAKE_ROUTES) {
+    assert.equal(classifyIssue({ number: 20, title: "fixture", body: completeBody.replace("Real-page visual judgement", route) }).state, "complete", route);
+  }
+  for (const rule of INTAKE_RULES) {
+    assert.equal(classifyIssue({ number: 21, title: "fixture", body: completeBody.replace("svg/text-clipped", rule) }).state, "complete", rule);
+  }
 });
 
 test("five arbitrary checkboxes cannot substitute the five governed declarations", () => {

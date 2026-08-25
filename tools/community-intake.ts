@@ -42,14 +42,14 @@ const LABELS: Record<string, { color: string; description: string }> = {
 };
 const COMMENT_MARKER = "<!-- breaklint-community-intake-v1 -->";
 const DASHBOARD_MARKER = "<!-- breaklint-community-dashboard-v1 -->";
-const REQUIRED_DECLARATIONS = [
+export const REQUIRED_DECLARATIONS = [
   "I have the right to publish every submitted byte and public source.",
   "I reviewed the submission and removed personal data, credentials, private URLs and confidential material.",
   "I permit this project to reproduce, modify and redistribute my submitted report and reproduction under the repository's MIT licence.",
   "I understand that my GitHub identity and this entire submission are public.",
   "I understand that participation is voluntary and unpaid, with no promised reward, support, response or product."
 ];
-const SECTION_DEFINITIONS: readonly SectionDefinition[] = [
+export const SECTION_DEFINITIONS: readonly SectionDefinition[] = [
   { id: "test-route", heading: "Test route", responseRequired: true },
   { id: "rule-or-area", heading: "Rule or area", responseRequired: true },
   { id: "observed-result", heading: "Observed result", responseRequired: true },
@@ -61,13 +61,15 @@ const SECTION_DEFINITIONS: readonly SectionDefinition[] = [
   { id: "rights-privacy-public-handling", heading: "Rights, privacy and public handling", responseRequired: true },
   { id: "volunteer-terms", heading: "Volunteer terms", responseRequired: true },
 ];
-const ROUTES = new Set(["Ten-minute smoke test", "Real-page visual judgement", "Documentation or setup review", "Adversarial or boundary test"]);
-const RULES = new Set([
+export const INTAKE_ROUTES = ["Ten-minute smoke test", "Real-page visual judgement", "Documentation or setup review", "Adversarial or boundary test"] as const;
+export const INTAKE_RULES = [
   "General installation or report", "svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport",
   "layout/widow", "layout/orphan", "layout/unbreakable-block-too-tall", "layout/heading-at-page-bottom",
   "layout/half-empty-page", "layout/orphaned-continuation-page", "layout/hyphen-across-page", "type/spaced-hyphen",
   "type/straight-quotes", "type/short-last-line", "type/excessive-word-spacing", "artifact/local-uri"
-]);
+] as const;
+const ROUTES = new Set<string>(INTAKE_ROUTES);
+const RULES = new Set<string>(INTAKE_RULES);
 
 function labelNames(issue: Issue): string[] {
   return (issue.labels ?? []).map((label) => typeof label === "string" ? label : label.name ?? "").filter(Boolean);
