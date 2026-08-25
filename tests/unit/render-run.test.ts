@@ -57,6 +57,17 @@ const OPTIONS = {
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+async function waitForObserved<T>(observe: () => T, accept: (value: T) => boolean, timeoutMs = 5_000): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  let value = observe();
+  while (!accept(value) && Date.now() < deadline) {
+    await wait(5);
+    value = observe();
+  }
+  assert.ok(accept(value), `observable state did not arrive within ${timeoutMs} ms`);
+  return value;
+}
+
 describe("renderer ownership cleanup order", () => {
   it("does not start browser cleanup before rasterizer cleanup settles", async () => {
     let releaseRasterizer!: () => void;
@@ -397,7 +408,10 @@ describe("the live path fails closed at its process boundary", () => {
     `);
     child.unref();
     assert.ok(child.pid);
-    await wait(300);
+    await waitForObserved(
+      () => captureProcessTreeOwnership(child.pid!),
+      (ownership) => (ownership?.initialPids.length ?? 0) >= 2,
+    );
     const termination = await terminateProcessTree(child.pid);
     assert.equal(termination.groupSafe, true);
     assert.ok(termination.initialPids.length >= 2, "the initial process tree was not observed");
