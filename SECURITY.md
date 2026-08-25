@@ -5,8 +5,9 @@
 Report privately, not in a public issue: **security@dargel-solutions.de**.
 
 Please include the version, the operating system, and — if the finding involves a document — the
-smallest HTML that reproduces it. A first response goes out within 72 hours. If a fix is warranted,
-the advisory names the reporter unless the reporter asks otherwise.
+smallest HTML that reproduces it. The maintainer's response target is 72 hours; this is a human
+service target, not an automated or contractual SLA. If a fix is warranted, the advisory names the
+reporter unless the reporter asks otherwise.
 
 There is no bounty programme.
 
@@ -30,10 +31,11 @@ intended:
   test measures that a document loaded this way cannot read a neighbouring file, because removing
   the reason for a switch and leaving the switch in place is a mistake that was actually made here
   once.
-- **The measurement primitives are captured before any author script runs**, so a document that
-  replaces `getBoundingClientRect` or `getComputedStyle` after pagination cannot forge its own
-  measurements. A hostile document is measured correctly or the run fails; it does not produce a
-  quietly wrong report.
+- **The measurement primitives are captured before any author script runs.** The regression suite
+  covers documents that replace `getBoundingClientRect` or `getComputedStyle` after pagination and
+  requires those attempts either to leave the captured measurement intact or to fail the run. This
+  is measured protection for those interference paths, not a claim that every future browser API
+  attack has already been enumerated.
 - **The document's Content Security Policy remains authoritative.** The measured Paged.js bundle
   crosses the browser-driver boundary only after authored loading. breaklint does not disable CSP
   browser-wide merely to install its own apparatus; its own CSP-bearing HTML report is the live

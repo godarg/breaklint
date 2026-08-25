@@ -103,7 +103,7 @@ designed for nor measured.
 **Linux was unmeasured, then measured, and what it showed was a defect.** The first public CI run
 failed: the evidence binding broke on every document, because the marks shared a font with the
 document's own text and the resulting font-subset difference registered as contamination. The
-cause is fixed, and the fix is measured — the full live suite, 56 cases including the hostile
+cause is fixed, and the fix is measured — the full live suite, 57 cases including the hostile
 corpus and the independent rasteriser cross-check, is green in a Linux container (arm64, Chromium
 151, poppler 22.12), against 15 red cases with the fix removed.
 

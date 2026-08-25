@@ -550,7 +550,8 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     writeFileSync(cliInput, JSON.stringify({ packet, sessions, annotations, adjudications: green.statistics ? [{ blindTargetId: packet.targets[0]!.blindTargetId, adjudicatorOpaqueId: "adjudicator_c_0001", sourceSessionIds: [sessions[0]!.sessionId, sessions[1]!.sessionId], finalLabel: "abstain", rationale: "The frozen context remains insufficient.", createdAt: "2026-08-23T10:40:00Z", blinded: true, breaklintResultExposed: false }] : [], ...workflowBindings }));
     const cli = spawnSync(process.execPath, ["--experimental-strip-types", "tests/tools/calibration/m3-1-pilot-cli.ts", "annotation-check", cliInput], { cwd: new URL("../../", import.meta.url), encoding: "utf8" });
     assert.equal(cli.status, 1);
-    const cliReport = JSON.parse(cli.stdout) as { statistics: { confusionTable: Record<string, Record<string, number>> } | null; issues: string[] };
+    const cliReport = JSON.parse(cli.stdout) as { structurallyValid: boolean; statistics: { confusionTable: Record<string, Record<string, number>> } | null; issues: string[] };
+    assert.equal(cliReport.structurallyValid, false);
     assert.equal(cliReport.statistics?.confusionTable.ambiguous?.invalid_target, 1);
     assert.ok(cliReport.issues.includes("external-human-identity-oracle-unavailable"));
     assert.ok(cliReport.issues.includes("legacy-svg-source-packet-not-authorized-for-human-delivery"));

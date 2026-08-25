@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Verification truth and calibration safety
+
+- Corrected the shipped Unit-test figure from the former 439-test Unit + E2E aggregate to the
+  current measured 335-test Unit-only denominator. `npm test` now preserves the current 442-test
+  aggregate and Unit-only run as separate TAP artefacts, so the
+  CI documentation guard measures the field it names instead of accepting the aggregate by mistake.
+- Retired executable SVG-source packets v1/v2 from new human annotation sessions after the
+  preregistered repeated-channel stop criterion fired. A raster-only packet-v3 schema now requires
+  declared renderer, asset/font, viewport, raster and blocked-fetch-positive-control bindings, while
+  the real annotation CLI blocks delivery until those declarations have an external verifier; no v3
+  renderer, packet, calibration or human annotation is claimed yet.
+- Repaired historical v2 reconstruction without changing frozen bytes: URL targets are checked before
+  the independent parenthesis balance, reference discovery walks parsed elements, the reported
+  prefix-equal-ID case no longer suffers substring replacement, and all three same-document `url()`
+  quoting forms are asserted.
+
 ## 0.2.1 — 2026-08-25
 
 ### Real-corpus validation infrastructure
