@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const FIGURES_MARKER = /<!-- breaklint-status-figures-v1 unitTests=(\d+) aggregateTests=(\d+) liveTests=(\d+) liveReportLeaves=(\d+) s1RasterDiffPx=(\d+) s1ForeignRasterDiffPx=(\d+) -->/u;
 
@@ -89,4 +89,8 @@ function main() {
   process.exitCode = result.valid ? 0 : 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
+export function isMainModule(argvPath, modulePath = fileURLToPath(import.meta.url)) {
+  return Boolean(argvPath) && realpathSync(argvPath) === realpathSync(modulePath);
+}
+
+if (isMainModule(process.argv[1])) main();

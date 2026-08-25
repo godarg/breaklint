@@ -4,8 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { evaluateDocumentedFigures } from "../tools/documented-figures.mjs";
-import { buildRunnerPlan, buildSuitePlan, isMainModule, runTapSuite, testFilesIn } from "../tools/test-with-tap.mjs";
+import { evaluateDocumentedFigures, isMainModule as isDocumentedFiguresMain } from "../tools/documented-figures.mjs";
+import {
+  buildRunnerPlan,
+  buildSuitePlan,
+  defaultAggregateOutputTarget,
+  defaultUnitOutputTarget,
+  isMainModule,
+  lastTapTestCount,
+  runTapSuite,
+  testFilesIn,
+} from "../tools/test-with-tap.mjs";
 
 const report = {
   browserVersion: "synthetic",
@@ -71,6 +80,13 @@ test("the npm runner writes a distinct real unit TAP instead of relabelling Unit
     assert.deepEqual(new Set(aggregateFiles), new Set([...unitFiles, ...e2eFiles]));
     assert.equal(unitFiles.some((file) => e2eFiles.includes(file)), false);
     assert.equal(unitFiles.every((file) => file.startsWith("tests/unit/")), true);
+    const defaultPlan = buildRunnerPlan();
+    assert.equal(defaultUnitOutputTarget, ".tmp/unit.tap");
+    assert.equal(defaultAggregateOutputTarget, ".tmp/test.tap");
+    assert.equal(defaultPlan.unit.outputTarget, ".tmp/unit.tap");
+    assert.equal(defaultPlan.aggregate.outputTarget, ".tmp/test.tap");
+    const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+    assert.equal(packageJson.scripts.test, "node tests/tools/test-with-tap.mjs");
     const runnerPlan = buildRunnerPlan({ unitOutputTarget: tap, aggregateOutputTarget: aggregateTap });
     assert.equal(runnerPlan.unit.outputTarget, tap);
     assert.equal(runnerPlan.aggregate.outputTarget, aggregateTap);
@@ -81,6 +97,10 @@ test("the npm runner writes a distinct real unit TAP instead of relabelling Unit
     const runnerSymlink = join(root, "test-with-tap-link.mjs");
     symlinkSync(new URL("../tools/test-with-tap.mjs", import.meta.url), runnerSymlink);
     assert.equal(isMainModule(runnerSymlink), true, "a symlinked npm bin path must not become a zero-test exit-0");
+    const guardSymlink = join(root, "documented-figures-link.mjs");
+    symlinkSync(new URL("../tools/documented-figures.mjs", import.meta.url), guardSymlink);
+    assert.equal(isDocumentedFiguresMain(guardSymlink), true, "a symlinked guard path must not become a zero-check exit-0");
+    assert.equal(lastTapTestCount("# tests 1\n# tests 2\n"), 2, "the runner and guard must consume the same final TAP count");
     const result = await runTapSuite([fixture], tap, false);
     assert.deepEqual(result, { code: 0, testCount: 1 });
     assert.match(readFileSync(tap, "utf8"), /^# tests 1$/mu);

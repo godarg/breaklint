@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.2.2 — 2026-08-25
+## Unreleased
+
+Planned patch version: 0.2.2.
 
 ### Verification truth and calibration safety
 

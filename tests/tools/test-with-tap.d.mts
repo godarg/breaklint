@@ -1,5 +1,8 @@
 export function testFilesIn(directories: string[]): string[];
 
+export const defaultUnitOutputTarget: string;
+export const defaultAggregateOutputTarget: string;
+
 export function buildSuitePlan(): { unitFiles: string[]; aggregateFiles: string[] };
 
 export function buildRunnerPlan(options?: {
@@ -11,6 +14,8 @@ export function buildRunnerPlan(options?: {
 };
 
 export function isMainModule(argvPath: string | undefined, modulePath?: string): boolean;
+
+export function lastTapTestCount(tapText: string): number | null;
 
 export function runTapSuite(
   testFiles: string[],

@@ -21,3 +21,5 @@ export function evaluateDocumentedFigures(input: {
   liveSummary: unknown;
   liveReport: unknown;
 }): DocumentedFiguresEvaluation;
+
+export function isMainModule(argvPath: string | undefined, modulePath?: string): boolean;

@@ -4,8 +4,8 @@ import { mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync } from "nod
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const target = process.env.BREAKLINT_UNIT_TAP ?? ".tmp/unit.tap";
-const aggregateTarget = process.env.BREAKLINT_TEST_TAP ?? ".tmp/test.tap";
+export const defaultUnitOutputTarget = process.env.BREAKLINT_UNIT_TAP ?? ".tmp/unit.tap";
+export const defaultAggregateOutputTarget = process.env.BREAKLINT_TEST_TAP ?? ".tmp/test.tap";
 
 export function testFilesIn(directories) {
   return directories.flatMap((directory) => readdirSync(directory)
@@ -20,7 +20,7 @@ export function buildSuitePlan() {
   return { unitFiles, aggregateFiles: [...unitFiles, ...e2eFiles] };
 }
 
-export function buildRunnerPlan({ unitOutputTarget = target, aggregateOutputTarget = aggregateTarget } = {}) {
+export function buildRunnerPlan({ unitOutputTarget = defaultUnitOutputTarget, aggregateOutputTarget = defaultAggregateOutputTarget } = {}) {
   const { unitFiles, aggregateFiles } = buildSuitePlan();
   return {
     aggregate: { testFiles: aggregateFiles, outputTarget: aggregateOutputTarget, mirrorStdout: true },
@@ -30,6 +30,11 @@ export function buildRunnerPlan({ unitOutputTarget = target, aggregateOutputTarg
 
 export function isMainModule(argvPath, modulePath = fileURLToPath(import.meta.url)) {
   return Boolean(argvPath) && realpathSync(argvPath) === realpathSync(modulePath);
+}
+
+export function lastTapTestCount(tapText) {
+  const matches = [...tapText.matchAll(/^# tests (\d+)$/gmu)];
+  return matches.length ? Number(matches.at(-1)[1]) : null;
 }
 
 export async function runTapSuite(testFiles, outputTarget, mirrorStdout) {
@@ -59,15 +64,15 @@ export async function runTapSuite(testFiles, outputTarget, mirrorStdout) {
 
   const tap = Buffer.concat(chunks);
   writeFileSync(outputTarget, tap);
-  const finalCount = /^# tests (\d+)$/mu.exec(tap.toString("utf8"));
+  const finalCount = lastTapTestCount(tap.toString("utf8"));
   if (outcome.error) process.stderr.write(`breaklint: test runner failed: ${String(outcome.error)}\n`);
   if (outcome.signal) process.stderr.write(`breaklint: test runner ended on ${outcome.signal}\n`);
-  if (!finalCount) process.stderr.write(`breaklint: TAP at ${outputTarget} has no final test count\n`);
-  return { code: finalCount ? outcome.code : 1, testCount: finalCount ? Number(finalCount[1]) : null };
+  if (finalCount === null) process.stderr.write(`breaklint: TAP at ${outputTarget} has no final test count\n`);
+  return { code: finalCount === null ? 1 : outcome.code, testCount: finalCount };
 }
 
 if (isMainModule(process.argv[1])) {
-  rmSync(target, { force: true });
+  rmSync(defaultUnitOutputTarget, { force: true });
   const plan = buildRunnerPlan();
   const aggregate = await runTapSuite(plan.aggregate.testFiles, plan.aggregate.outputTarget, plan.aggregate.mirrorStdout);
   if (aggregate.code !== 0) {
