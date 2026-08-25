@@ -421,6 +421,38 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     }
   });
 
+  it("refuses namespaced attributes outside the two the corpus actually needs", () => {
+    // The prefix allowlist admitted `xlink`/`xml` wholesale. An authored `xml:id` is not rewritten
+    // by the idMap -- that rewrite keys on the local name `id` -- so a source-identifying value
+    // reached the annotator verbatim while every `#reference` to it was rewritten away. And
+    // `xlink:title` carried arbitrary text past the same gate that strips `<title>`/`<desc>`,
+    // including outcome text that the non-exhaustive hint denylist does not catch.
+    const ns = 'xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"';
+    for (const [label, attribute] of [
+      ["xml:id carries an authored source ID", 'xml:id="wikimedia-grua-maquina-layer7"'],
+      ["xlink:title carries outcome text", 'xlink:title="FINDING: rule svg/text-clipped fired"'],
+      ["xml:lang carries a source hint", 'xml:lang="source-doc-42"'],
+      ["xlink:role", 'xlink:role="finding"'],
+    ] as const) {
+      assert.throws(
+        () => sanitizeBlindSvgContextV2(`<svg ${ns}><text ${attribute}>Alpha</text></svg>`),
+        /contains a non-allowlisted namespaced attribute/u,
+        label,
+      );
+    }
+    // An unknown prefix keeps its own, more specific message.
+    assert.throws(
+      () => sanitizeBlindSvgContextV2(`<svg ${ns}><text foo:bar="x">Alpha</text></svg>`),
+      /contains an unknown attribute namespace: foo/u,
+    );
+    // Positive controls: the two qualified names the real corpus needs, plus the namespace
+    // declarations themselves, must survive -- otherwise the frozen contexts would be invalidated.
+    const kept = sanitizeBlindSvgContextV2(`<svg ${ns}><text xml:space="preserve">Alpha</text><use xlink:href="#a"/><g id="a"/></svg>`);
+    assert.equal(kept.includes('xml:space="preserve"'), true);
+    assert.equal(kept.includes("xlink:href"), true);
+    assert.equal(sanitizeBlindSvgContextV2(kept), kept);
+  });
+
   it("binds packet-v2 target set and order to an independently reconstructed custodial source", () => {
     const source = Buffer.from('<svg id="root"><text id="first">Alpha</text><text id="second">Beta</text></svg>');
     const targets = enumerateSvgTextTargets(source, ["svg/text-clipped"]).map((target) => ({ ...target, documentId: `doc_${"1".repeat(32)}` }));

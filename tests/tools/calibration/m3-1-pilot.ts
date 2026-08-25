@@ -608,6 +608,13 @@ const SVG_ALLOWED_ATTRIBUTE_FUNCTIONS = new Set([
 const SVG_ATTRIBUTE_FUNCTION_CALL = /([A-Za-z-][\w-]*)\s*\(/gu;
 const SVG_ATTRIBUTE_URL_OPENING = /url\s*\(/giu;
 const SVG_SAME_DOCUMENT_FRAGMENT = /^(?:"#[A-Za-z_][\w.:-]*"|'#[A-Za-z_][\w.:-]*'|#[A-Za-z_][\w.:-]*)$/u;
+// The prefix allowlist below used to admit `xlink`/`xml` wholesale, so `xml:id`, `xml:lang` and
+// `xlink:title` reached the annotator verbatim: an authored `xml:id` is not rewritten by the idMap
+// (that rewrite keys on the local name `id`), so a source-identifying value survived while every
+// `#reference` to it was rewritten away, and `xlink:title` carried arbitrary text past the same
+// gate that removes `<title>`/`<desc>` for exactly this reason. Measured across the delivered v2
+// contexts, the whole corpus needs exactly two qualified names, so an allowlist costs nothing.
+const SVG_ALLOWED_NAMESPACED_ATTRIBUTES = new Set(["xlink:href", "xml:space"]);
 
 const SVG_PRIVATE_PATH_HINT = /(?:\bfile:|\b[A-Za-z]:\\|\/(?:Users|home|private|var\/folders)\/|(?:^|[\s"'])\.\.?\/|\.(?:ai|eps|html?|pdf|svg)\b)/iu;
 
@@ -755,8 +762,12 @@ export function sanitizeBlindSvgContextV2(svgSource: string): string {
   for (const match of sanitized.matchAll(/<\/?([A-Za-z][\w.-]*):/gu)) {
     throw new Error(`blind SVG context contains an unknown element namespace: ${match[1]}`);
   }
-  for (const match of sanitized.matchAll(/\s([A-Za-z][\w.-]*):[\w.-]+\s*=/gu)) {
-    if (!new Set(["xlink", "xml", "xmlns"]).has(match[1]!.toLowerCase())) throw new Error(`blind SVG context contains an unknown attribute namespace: ${match[1]}`);
+  for (const match of sanitized.matchAll(/\s([A-Za-z][\w.-]*):([\w.-]+)\s*=/gu)) {
+    const prefix = match[1]!.toLowerCase();
+    if (prefix === "xmlns") continue;
+    if (!new Set(["xlink", "xml"]).has(prefix)) throw new Error(`blind SVG context contains an unknown attribute namespace: ${match[1]}`);
+    const qualified = `${prefix}:${match[2]!.toLowerCase()}`;
+    if (!SVG_ALLOWED_NAMESPACED_ATTRIBUTES.has(qualified)) throw new Error(`blind SVG context contains a non-allowlisted namespaced attribute: ${qualified}`);
   }
 
   const idMap = new Map<string, string>();
