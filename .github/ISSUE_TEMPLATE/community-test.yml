@@ -91,7 +91,7 @@ body:
     attributes:
       label: Environment
       description: breaklint version, Node version, operating system, browser version and installed peer versions.
-      placeholder: breaklint 0.2.1; Node 22.13.0; macOS 15; Chrome 140; pagedjs 0.4.3
+      placeholder: breaklint 0.2.2; Node 22.13.0; macOS 15; Chrome 140; pagedjs 0.4.3
     validations:
       required: true
 

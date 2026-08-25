@@ -19,7 +19,7 @@ whether the result is understandable:
 ```bash
 mkdir breaklint-community-test && cd breaklint-community-test
 npm init -y
-npm i -D breaklint@0.2.1 puppeteer-core@^25.8.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
+npm i -D breaklint@0.2.2 puppeteer-core@^25.8.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
 npx breaklint --format json --out breaklint-report.json YOUR-PUBLIC-DOCUMENT.html
 ```
 

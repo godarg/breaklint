@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 import { evaluateDocumentedFigures } from "../tools/documented-figures.mjs";
-import { buildSuitePlan, runTapSuite, testFilesIn } from "../tools/test-with-tap.mjs";
+import { buildRunnerPlan, buildSuitePlan, isMainModule, runTapSuite, testFilesIn } from "../tools/test-with-tap.mjs";
 
 const report = {
   browserVersion: "synthetic",
@@ -53,6 +53,7 @@ test("a partial or failed live summary cannot supply a documented live-test deno
     liveSummary: { ...liveSummary, tests: { passed: 56, expected: 57 } },
     liveReport: report,
   });
+  assert.equal(result.valid, false);
   assert.deepEqual(result.issues, ["liveTests: documented=56, measured=undefined"]);
 });
 
@@ -61,6 +62,7 @@ test("the npm runner writes a distinct real unit TAP instead of relabelling Unit
   try {
     const fixture = join(root, "single.test.mjs");
     const tap = join(root, "unit.tap");
+    const aggregateTap = join(root, "aggregate.tap");
     writeFileSync(fixture, 'import test from "node:test"; test("real child", () => {});\n');
     const { unitFiles, aggregateFiles } = buildSuitePlan();
     const e2eFiles = testFilesIn(["tests/e2e"]);
@@ -69,6 +71,16 @@ test("the npm runner writes a distinct real unit TAP instead of relabelling Unit
     assert.deepEqual(new Set(aggregateFiles), new Set([...unitFiles, ...e2eFiles]));
     assert.equal(unitFiles.some((file) => e2eFiles.includes(file)), false);
     assert.equal(unitFiles.every((file) => file.startsWith("tests/unit/")), true);
+    const runnerPlan = buildRunnerPlan({ unitOutputTarget: tap, aggregateOutputTarget: aggregateTap });
+    assert.equal(runnerPlan.unit.outputTarget, tap);
+    assert.equal(runnerPlan.aggregate.outputTarget, aggregateTap);
+    assert.deepEqual(runnerPlan.unit.testFiles, unitFiles);
+    assert.deepEqual(runnerPlan.aggregate.testFiles, aggregateFiles);
+    assert.equal(runnerPlan.unit.mirrorStdout, false);
+    assert.equal(runnerPlan.aggregate.mirrorStdout, true);
+    const runnerSymlink = join(root, "test-with-tap-link.mjs");
+    symlinkSync(new URL("../tools/test-with-tap.mjs", import.meta.url), runnerSymlink);
+    assert.equal(isMainModule(runnerSymlink), true, "a symlinked npm bin path must not become a zero-test exit-0");
     const result = await runTapSuite([fixture], tap, false);
     assert.deepEqual(result, { code: 0, testCount: 1 });
     assert.match(readFileSync(tap, "utf8"), /^# tests 1$/mu);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const target = process.env.BREAKLINT_UNIT_TAP ?? ".tmp/unit.tap";
@@ -18,6 +18,18 @@ export function buildSuitePlan() {
   const unitFiles = testFilesIn(["tests/unit"]);
   const e2eFiles = testFilesIn(["tests/e2e"]);
   return { unitFiles, aggregateFiles: [...unitFiles, ...e2eFiles] };
+}
+
+export function buildRunnerPlan({ unitOutputTarget = target, aggregateOutputTarget = aggregateTarget } = {}) {
+  const { unitFiles, aggregateFiles } = buildSuitePlan();
+  return {
+    aggregate: { testFiles: aggregateFiles, outputTarget: aggregateOutputTarget, mirrorStdout: true },
+    unit: { testFiles: unitFiles, outputTarget: unitOutputTarget, mirrorStdout: false },
+  };
+}
+
+export function isMainModule(argvPath, modulePath = fileURLToPath(import.meta.url)) {
+  return Boolean(argvPath) && realpathSync(argvPath) === realpathSync(modulePath);
 }
 
 export async function runTapSuite(testFiles, outputTarget, mirrorStdout) {
@@ -54,16 +66,16 @@ export async function runTapSuite(testFiles, outputTarget, mirrorStdout) {
   return { code: finalCount ? outcome.code : 1, testCount: finalCount ? Number(finalCount[1]) : null };
 }
 
-if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
+if (isMainModule(process.argv[1])) {
   rmSync(target, { force: true });
-  const { unitFiles, aggregateFiles } = buildSuitePlan();
-  const aggregate = await runTapSuite(aggregateFiles, aggregateTarget, true);
+  const plan = buildRunnerPlan();
+  const aggregate = await runTapSuite(plan.aggregate.testFiles, plan.aggregate.outputTarget, plan.aggregate.mirrorStdout);
   if (aggregate.code !== 0) {
     process.exitCode = aggregate.code;
   } else {
     // The documented-figures guard consumes a real unit-only TAP. Keeping that measurement
     // separate from the public aggregate output prevents Unit + E2E from masquerading as Unit.
-    const unit = await runTapSuite(unitFiles, target, false);
+    const unit = await runTapSuite(plan.unit.testFiles, plan.unit.outputTarget, plan.unit.mirrorStdout);
     process.exitCode = unit.code;
   }
 }

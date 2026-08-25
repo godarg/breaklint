@@ -45,9 +45,9 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 | Own nodes only | layers and marks are held as references; nothing is found again by class name |
 | Evidence files | one PNG per page; the header is read back out of the bytes and checked against the size the rasteriser reported. A page that fails that check withdraws the bindings of the whole document. |
 
-**Measured over eight documents, two runs.** The measurement report has 226 leaf values, counting
-every scalar and every empty object or array as one leaf, and no path appears in one run and not
-the other.
+**Measured over eight documents, two runs.** The report's current leaf count is recorded only in
+the machine-checked figures marker below; every scalar and every empty object or array counts as
+one leaf, and no path appears in one run and not the other.
 
 <!-- breaklint-status-figures-v1 unitTests=336 aggregateTests=444 liveTests=57 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
@@ -75,11 +75,12 @@ field is. The live-report writer creates a missing parent directory atomically; 
 was re-run from a fresh checkout without a pre-existing `.tmp` directory.
 
 The release/CI path also binds the documented figures to real evidence rather than synthetic test
-data: `npm test` preserves its 444-test aggregate TAP at `.tmp/test.tap` and independently writes
-the 336-test Unit-only TAP at `.tmp/unit.tap`; the accepted live step atomically writes both its
-57-test structured verdict to `.tmp/live-summary.json` and its 226-leaf measurement report to
-`.tmp/live-report.json`. `npm run test:documented-figures` rejects any mismatch with the marker
-above. The marker distinguishes the Unit-only, Unit + E2E, and accepted live denominators.
+data: `npm test` preserves separate aggregate and Unit-only TAPs, and the accepted live step
+atomically writes both its structured verdict and measurement report. `npm run
+test:documented-figures` rejects any mismatch with the marker above. That single marker is the
+canonical numerical record for the Unit-only, Unit + E2E and accepted live denominators, the report
+shape and both S1 raster oracles; this current-state passage deliberately does not duplicate those
+values outside the marker.
 
 | Case | raster diff | style violations | binding |
 |---|---:|---:|---|
@@ -134,7 +135,7 @@ each measured singly.
 **Four repairs were once green in every suite while being reverted.** An audit turned each of them
 back into its defect — the tolerance-free page verdict, the unread integrity count, the unread
 late errors, the file-access switch — and the whole suite as it stood at the time (104 Unit tests
-and 15 live tests; the current measured denominators are 336 Unit, 444 Unit + E2E, and 57 live)
+and 15 live tests; the current measured denominators are bound in the figures marker above)
 plus the mutation guard stayed green through all
 four. The repairs were real; the gates were not there. They are now, and
 each was verified by re-applying the mutation and watching it go red. The reason the live corpus
