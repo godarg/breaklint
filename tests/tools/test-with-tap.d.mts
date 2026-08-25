@@ -1,5 +1,7 @@
 export function testFilesIn(directories: string[]): string[];
 
+export function buildSuitePlan(): { unitFiles: string[]; aggregateFiles: string[] };
+
 export function runTapSuite(
   testFiles: string[],
   outputTarget: string,

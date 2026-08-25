@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { evaluateDocumentedFigures } from "../tools/documented-figures.mjs";
-import { runTapSuite, testFilesIn } from "../tools/test-with-tap.mjs";
+import { buildSuitePlan, runTapSuite, testFilesIn } from "../tools/test-with-tap.mjs";
 
 const report = {
   browserVersion: "synthetic",
@@ -43,8 +43,13 @@ test("the npm runner writes a distinct real unit TAP instead of relabelling Unit
     const fixture = join(root, "single.test.mjs");
     const tap = join(root, "unit.tap");
     writeFileSync(fixture, 'import test from "node:test"; test("real child", () => {});\n');
-    assert.ok(testFilesIn(["tests/unit"]).length > 0);
-    assert.ok(testFilesIn(["tests/e2e"]).length > 0);
+    const { unitFiles, aggregateFiles } = buildSuitePlan();
+    const e2eFiles = testFilesIn(["tests/e2e"]);
+    assert.ok(unitFiles.length > 0);
+    assert.ok(e2eFiles.length > 0);
+    assert.deepEqual(new Set(aggregateFiles), new Set([...unitFiles, ...e2eFiles]));
+    assert.equal(unitFiles.some((file) => e2eFiles.includes(file)), false);
+    assert.equal(unitFiles.every((file) => file.startsWith("tests/unit/")), true);
     const result = await runTapSuite([fixture], tap, false);
     assert.deepEqual(result, { code: 0, testCount: 1 });
     assert.match(readFileSync(tap, "utf8"), /^# tests 1$/mu);

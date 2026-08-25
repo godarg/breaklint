@@ -14,6 +14,12 @@ export function testFilesIn(directories) {
     .map((name) => join(directory, name)));
 }
 
+export function buildSuitePlan() {
+  const unitFiles = testFilesIn(["tests/unit"]);
+  const e2eFiles = testFilesIn(["tests/e2e"]);
+  return { unitFiles, aggregateFiles: [...unitFiles, ...e2eFiles] };
+}
+
 export async function runTapSuite(testFiles, outputTarget, mirrorStdout) {
   mkdirSync(dirname(outputTarget), { recursive: true });
   const { NODE_TEST_CONTEXT: _parentTestContext, ...childEnv } = process.env;
@@ -50,8 +56,8 @@ export async function runTapSuite(testFiles, outputTarget, mirrorStdout) {
 
 if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
   rmSync(target, { force: true });
-  const unitFiles = testFilesIn(["tests/unit"]);
-  const aggregate = await runTapSuite([...unitFiles, ...testFilesIn(["tests/e2e"])], aggregateTarget, true);
+  const { unitFiles, aggregateFiles } = buildSuitePlan();
+  const aggregate = await runTapSuite(aggregateFiles, aggregateTarget, true);
   if (aggregate.code !== 0) {
     process.exitCode = aggregate.code;
   } else {
