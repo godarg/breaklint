@@ -49,7 +49,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 every scalar and every empty object or array as one leaf, and no path appears in one run and not
 the other.
 
-<!-- breaklint-status-figures-v1 unitTests=439 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=335 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -75,10 +75,10 @@ field is. The live-report writer creates a missing parent directory atomically; 
 was re-run from a fresh checkout without a pre-existing `.tmp` directory.
 
 The release/CI path also binds the documented figures to real evidence rather than synthetic test
-data: `npm test` preserves its TAP at `.tmp/unit.tap`, the live step writes
+data: `npm test` preserves its 442-test aggregate TAP at `.tmp/test.tap` and independently writes
+the 335-test Unit-only TAP at `.tmp/unit.tap`; the live step writes
 `.tmp/live-report.json`, and `npm run test:documented-figures` rejects any mismatch with the marker
-above. The marker's `unitTests` field is the historical schema name; it counts the complete Unit +
-E2E TAP denominator.
+above. The marker's `unitTests` field counts the Unit-only TAP denominator.
 
 | Case | raster diff | style violations | binding |
 |---|---:|---:|---|
@@ -132,8 +132,9 @@ each measured singly.
 
 **Four repairs were once green in every suite while being reverted.** An audit turned each of them
 back into its defect — the tolerance-free page verdict, the unread integrity count, the unread
-late errors, the file-access switch — and the whole suite as it stood at the time (104 unit tests
-and 15 live tests, since grown to 439 and 57) plus the mutation guard stayed green through all
+late errors, the file-access switch — and the whole suite as it stood at the time (104 Unit tests
+and 15 live tests; the current measured denominators are 335 Unit, 442 Unit + E2E, and 57 live)
+plus the mutation guard stayed green through all
 four. The repairs were real; the gates were not there. They are now, and
 each was verified by re-applying the mutation and watching it go red. The reason the live corpus
 could not reach them is structural: a real document cannot be made to produce a rasteriser page
@@ -296,9 +297,14 @@ projection freezes one origin with 45 rule-targets. Packet v1 remains byte-immut
 evidence and is not authorized for human delivery. Packet v2 deterministically sanitizes four
 byte-bound, oracle-free SVG contexts, binds their independently reconstructed bytes and target set,
 and binds neutral order to a preregistered public seed plus custodial reconstruction. The seed is committed in this repository and is therefore recoverable, so blinding rests on procedural non-access rather than secrecy; see the annotation protocol. Its sequence-2
-freeze is linked to the unchanged sequence-1 hash. That closes the demonstrated metadata,
-outcome-hint and coherent-reordering paths, but the browser-native process rendering is still not
-a production renderer/font freeze and the local lineage is not an external receipt or trust root.
+freeze is linked to the unchanged sequence-1 hash. Four successive independent reviews nevertheless
+reopened the executable SVG-source delivery channel. Packet v2 is therefore also historical process
+evidence and is no longer authorized for a new human session. The decided successor is packet v3:
+raster-only PNG delivery under a pinned, network-denied renderer with bound fonts/assets, viewport,
+raster bytes and same-run fetch positive control. Its schema and fail-closed delivery gate exist, but
+that gate deliberately rejects even structurally valid v3 data until the renderer/network-evidence
+verifier and visual-sufficiency oracle exist. No v3 renderer, packet or human annotation is claimed.
+The local lineage is not an external receipt or trust root.
 This is real source and process evidence, not power evidence.
 There are still zero verified human annotators, zero adjudications, no disclosed holdout outcome,
 no externally verified freeze receipt and no trusted render-capture evidence.
