@@ -49,7 +49,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 every scalar and every empty object or array as one leaf, and no path appears in one run and not
 the other.
 
-<!-- breaklint-status-figures-v1 unitTests=333 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=438 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -73,6 +73,12 @@ which prints both counts, every leaf that differs, and exits non-zero if the two
 SHAPE rather than merely in a value. A wall-clock difference is not a contract value; a missing
 field is. The live-report writer creates a missing parent directory atomically; the command above
 was re-run from a fresh checkout without a pre-existing `.tmp` directory.
+
+The release/CI path also binds the documented figures to real evidence rather than synthetic test
+data: `npm test` preserves its TAP at `.tmp/unit.tap`, the live step writes
+`.tmp/live-report.json`, and `npm run test:documented-figures` rejects any mismatch with the marker
+above. The marker's `unitTests` field is the historical schema name; it counts the complete Unit +
+E2E TAP denominator.
 
 | Case | raster diff | style violations | binding |
 |---|---:|---:|---|
@@ -127,7 +133,7 @@ each measured singly.
 **Four repairs were once green in every suite while being reverted.** An audit turned each of them
 back into its defect — the tolerance-free page verdict, the unread integrity count, the unread
 late errors, the file-access switch — and the whole suite as it stood at the time (104 unit tests
-and 15 live tests, since grown to 333 and 57) plus the mutation guard stayed green through all
+and 15 live tests, since grown to 438 and 57) plus the mutation guard stayed green through all
 four. The repairs were real; the gates were not there. They are now, and
 each was verified by re-applying the mutation and watching it go red. The reason the live corpus
 could not reach them is structural: a real document cannot be made to produce a rasteriser page
@@ -227,6 +233,11 @@ The minor-version change is intentional: unknown or formerly inert configuration
 `excludeSelectors` is corrected to `excludeTags`, and report schema moves to 3 while snapshot schema
 remains 2. This status paragraph is a later documentation commit and is not retroactively part of
 the published tarball.
+
+**Prepared for 0.2.1:** the patch release packages the open-community-QA documentation and the
+advisory remediation recorded in this repository without changing a production rule, threshold,
+severity or `calibrated` flag. It is not called released here until the annotated `v0.2.1` workflow,
+registry provenance, GitHub assets and a fresh registry consumer have all been verified.
 
 ### CI incident reconciliation: failed push at `05fec787`
 

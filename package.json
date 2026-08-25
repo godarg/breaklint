@@ -1,6 +1,6 @@
 {
   "name": "breaklint",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Layout checks for documents generated from HTML to PDF: measures every page after pagination and reports the measured value next to the threshold it failed.",
   "keywords": [
     "pagedjs",
@@ -53,7 +53,7 @@
     "schema:write": "tsx tools/write-config-schema.ts",
     "schema:check": "tsx tools/write-config-schema.ts --check",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types tests/unit/*.test.ts tests/e2e/*.test.ts",
+    "test": "node tests/tools/test-with-tap.mjs",
     "test:live": "node tests/tools/live-run.mjs",
     "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "test:mutants": "node --experimental-strip-types tests/tools/mutants.ts",
@@ -61,6 +61,7 @@
     "test:secrets": "node tests/tools/secrets.mjs",
     "test:advisories": "node tests/tools/dependency-audit.mjs",
     "test:release-tag": "node tests/tools/release-tag-contract.mjs --self-test",
+    "test:documented-figures": "node tests/tools/documented-figures.mjs --unit-tap .tmp/unit.tap --live-report .tmp/live-report.json",
     "render:report-surfaces": "node --experimental-strip-types tests/tools/render-report-surfaces.mjs",
     "test:report-surfaces": "npm run test:report-surfaces:local",
     "test:report-surfaces:local": "npm run render:report-surfaces && node tests/tools/verify-report-surfaces.mjs --mode local",

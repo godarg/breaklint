@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.1 — 2026-08-25
+
 ### Real-corpus validation infrastructure
 
 - Added a public, rights- and privacy-reviewed process-pilot corpus with immutable document and
@@ -42,10 +44,10 @@
   write, so the documented fresh-checkout command works without pre-created local state.
 - Documentation figures in `docs/status.md` carry a machine-readable marker, and a drift guard
   (`tests/tools/documented-figures.mjs`) can compare it against measured unit TAP, live-report shape
-  and both S1 raster oracles. The guard's logic is unit-tested, but it is **not yet wired into any
-  npm script or CI job**, and the unit test feeds it synthetic fixtures rather than the real
-  `docs/status.md`. Until it is wired up, the documented figures are re-measured by hand and the
-  marker is not automatically enforced.
+  and both S1 raster oracles. `npm test` now preserves its real TAP under `.tmp/unit.tap`; the live
+  CI and release steps write the measured browser report and invoke `npm run test:documented-figures`
+  against the real `docs/status.md`. The synthetic unit test remains the negative-control harness,
+  while the release gate now rejects stale published figures from measured evidence.
 - Paged.js 0.4.3 remains pinned after review: the obsolete polyfill chain is not reached by the
   measured browser-bundle path and no known advisory was found. The risk acceptance expires on
   2026-11-24 or earlier on an upstream, advisory or integration trigger.

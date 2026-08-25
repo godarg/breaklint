@@ -30,7 +30,7 @@ function findingsBase(): Report {
     outcomes: [outcome],
     mode: "demo",
     source: "handwritten snapshot fixture",
-    toolVersion: "0.2.0",
+    toolVersion: "0.2.1",
     commit: "8e8491e",
     startedAt: "2026-08-22T12:00:00.000Z",
     durationMs: 184,

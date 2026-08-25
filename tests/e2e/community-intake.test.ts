@@ -30,7 +30,7 @@ _No response_
 
 ### Environment
 
-breaklint 0.2.0; Node 22.13.0; macOS; Chrome 140
+breaklint 0.2.1; Node 22.13.0; macOS; Chrome 140
 
 ### What was surprising or especially useful? (optional)
 
