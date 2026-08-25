@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -138,6 +138,15 @@ describe("M3-1 public corpus pilot infrastructure", () => {
       }],
       evidence: [{ evidenceRoot: sourceRoot, evidenceRelativePath: "source-evidence.json", outputRelativePath: "source-evidence/synthetic-source-evidence.json", expectedSha256: evidenceSha256, expectedByteLength: evidenceBytes.length }],
     };
+    const specPath = join(approvedOutputRoot, "pipeline-spec.json");
+    writeFileSync(specPath, JSON.stringify(spec));
+    const blockedCreate = spawnSync(process.execPath, ["--experimental-strip-types", "tests/tools/calibration/m3-1-pilot-cli.ts", "pipeline-create", specPath], { cwd: new URL("../../", import.meta.url), encoding: "utf8" });
+    assert.equal(blockedCreate.status, 2);
+    assert.match(blockedCreate.stderr, /legacy-svg-pipeline-create-retired/u);
+    assert.equal(existsSync(spec.outputRoot), false);
+    assert.equal(existsSync(spec.annotationOutputRoot), false);
+
+    // Direct construction remains available only to reproduce and verify frozen historical bytes.
     const created = await createPublicPipelineBundle(spec as never);
     assert.equal(created.reportStatus, "infrastructure-complete-external-execution-blocked");
     const verified = verifyPublicPipelineBundle(spec as never);
@@ -161,10 +170,13 @@ describe("M3-1 public corpus pilot infrastructure", () => {
       templateGroupId: "template_group_synthetic_pipeline_0001",
       versionGroupId: "version_group_synthetic_pipeline_0001",
     }]);
-    const specPath = join(approvedOutputRoot, "pipeline-spec.json");
-    writeFileSync(specPath, JSON.stringify(spec));
-    const cliOutput = execFileSync(process.execPath, ["--experimental-strip-types", "tests/tools/calibration/m3-1-pilot-cli.ts", "pipeline-verify", specPath], { cwd: new URL("../../", import.meta.url), encoding: "utf8" });
-    assert.equal((JSON.parse(cliOutput) as { valid: boolean }).valid, true);
+    const blockedVerify = spawnSync(process.execPath, ["--experimental-strip-types", "tests/tools/calibration/m3-1-pilot-cli.ts", "pipeline-verify", specPath], { cwd: new URL("../../", import.meta.url), encoding: "utf8" });
+    assert.equal(blockedVerify.status, 1);
+    const cliVerification = JSON.parse(blockedVerify.stdout) as { valid: boolean; historicalIntegrityValid: boolean; humanDeliveryAuthorized: boolean; issues: string[] };
+    assert.equal(cliVerification.valid, false);
+    assert.equal(cliVerification.historicalIntegrityValid, true);
+    assert.equal(cliVerification.humanDeliveryAuthorized, false);
+    assert.ok(cliVerification.issues.includes("legacy-svg-source-bundle-not-authorized-for-human-delivery"));
 
     const successorSpec = {
       ...spec,
@@ -177,6 +189,11 @@ describe("M3-1 public corpus pilot infrastructure", () => {
     };
     const successorCreated = await createPublicPipelineBundle(successorSpec);
     assert.deepEqual(verifyPublicPipelineBundle(successorSpec), { valid: true, issues: [], bundleIndexSha256: successorCreated.bundleIndexSha256, annotationBundleIndexSha256: successorCreated.annotationBundleIndexSha256 });
+    const successorSpecPath = join(approvedOutputRoot, "pipeline-spec-v2.json");
+    writeFileSync(successorSpecPath, JSON.stringify(successorSpec));
+    const blockedSuccessorVerify = spawnSync(process.execPath, ["--experimental-strip-types", "tests/tools/calibration/m3-1-pilot-cli.ts", "pipeline-verify", successorSpecPath], { cwd: new URL("../../", import.meta.url), encoding: "utf8" });
+    assert.equal(blockedSuccessorVerify.status, 1);
+    assert.equal((JSON.parse(blockedSuccessorVerify.stdout) as { humanDeliveryAuthorized: boolean }).humanDeliveryAuthorized, false);
     const successorFreeze = JSON.parse(readFileSync(join(successorSpec.outputRoot, "freeze-projection.json"), "utf8")) as { projection: { sequence: number; previousFreezeSha256: string }; freezeSha256: string };
     assert.equal(successorFreeze.projection.sequence, 2);
     assert.equal(successorFreeze.projection.previousFreezeSha256, successorSpec.previousFreezeSha256);

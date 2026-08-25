@@ -304,6 +304,10 @@ raster-only PNG delivery under a pinned, network-denied renderer with bound font
 raster bytes and same-run fetch positive control. Its schema and fail-closed delivery gate exist, but
 that gate deliberately rejects even structurally valid v3 data until the renderer/network-evidence
 verifier and visual-sufficiency oracle exist. No v3 renderer, packet or human annotation is claimed.
+The operational CLI also refuses `blind-packet` and `pipeline-create` for the legacy SVG formats;
+its `pipeline-verify` mode may report historical byte integrity but always returns a failed delivery
+gate with `humanDeliveryAuthorized: false`. Low-level constructors remain only so frozen v1/v2 bytes
+can be independently reconstructed in tests; they are not an annotation delivery interface.
 The local lineage is not an external receipt or trust root.
 This is real source and process evidence, not power evidence.
 There are still zero verified human annotators, zero adjudications, no disclosed holdout outcome,

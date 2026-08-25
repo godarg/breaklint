@@ -191,6 +191,12 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     assert.equal(JSON.stringify(first).includes("threshold"), false);
     const validate = compileSchema("blind-packet-v1");
     assert.equal(validate(first), true, JSON.stringify(validate.errors));
+    const cliRoot = mkdtempSync(join(tmpdir(), "breaklint-retired-blind-packet-cli-"));
+    const cliInput = join(cliRoot, "input.json");
+    writeFileSync(cliInput, JSON.stringify({ packetId: "blind_packet_public_pilot_0001", orderSeed: "order_seed_public_pilot_0001", targets: boundTargets, contextsByTargetId }));
+    const blockedCreate = spawnSync(process.execPath, ["--experimental-strip-types", "tests/tools/calibration/m3-1-pilot-cli.ts", "blind-packet", cliInput], { cwd: new URL("../../", import.meta.url), encoding: "utf8" });
+    assert.equal(blockedCreate.status, 2);
+    assert.match(blockedCreate.stderr, /legacy-svg-blind-packet-create-retired/u);
     assert.throws(
       () => buildBlindPacket({ packetId: "blind_packet_public_pilot_0001", orderSeed: "order_seed_public_pilot_0001", targets: [{ ...boundTargets[0]!, finding: true } as never], contextsByTargetId }),
       /oracle-leaking field/u,

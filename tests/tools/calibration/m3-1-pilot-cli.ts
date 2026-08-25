@@ -5,7 +5,6 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  buildBlindPacket,
   buildFreezeProjection,
   buildPilotReport,
   buildPublicIntakeManifest,
@@ -17,16 +16,13 @@ import {
   validateAnnotationWorkflow,
   validateStrictSplits,
   verifyExternalTrust,
-  type BlindTarget,
   type FreezeProjectionInput,
-  type IdentityBinding,
   type PilotReportInput,
   type PublicArtifactIntakeRequest,
   type PublicIntakeManifestDocument,
   type SplitDocument,
 } from "./m3-1-pilot.ts";
 import {
-  createPublicPipelineBundle,
   verifyPublicPipelineBundle,
   type PublicPipelineSpec,
 } from "./m3-1-public-pipeline.ts";
@@ -77,13 +73,7 @@ async function main(): Promise<void> {
       });
       break;
     case "blind-packet":
-      output = buildBlindPacket({
-        packetId: string(input.packetId, "packetId"),
-        orderSeed: string(input.orderSeed, "orderSeed"),
-        targets: input.targets as BlindTarget[],
-        contextsByTargetId: record(input.contextsByTargetId, "contextsByTargetId") as never,
-      });
-      break;
+      throw new Error("legacy-svg-blind-packet-create-retired: new human packets require raster v3 and its external renderer/network/visual-sufficiency gates");
     case "annotation-check": {
       const result = validateAnnotationWorkflow(input as never);
       const delivery = validateHumanPacketDelivery(input.packet);
@@ -132,12 +122,17 @@ async function main(): Promise<void> {
       output = buildPilotReport(input as unknown as PilotReportInput);
       break;
     case "pipeline-create":
-      output = await createPublicPipelineBundle(input as unknown as PublicPipelineSpec);
-      break;
+      throw new Error("legacy-svg-pipeline-create-retired: historical v1/v2 reconstruction is test-only; new human packets require raster v3 and its external gates");
     case "pipeline-verify": {
       const result = verifyPublicPipelineBundle(input as unknown as PublicPipelineSpec);
-      output = result;
-      gateValid = result.valid;
+      output = {
+        ...result,
+        historicalIntegrityValid: result.valid,
+        valid: false,
+        humanDeliveryAuthorized: false,
+        issues: [...new Set([...result.issues, "legacy-svg-source-bundle-not-authorized-for-human-delivery"])].sort(),
+      };
+      gateValid = false;
       break;
     }
     default:

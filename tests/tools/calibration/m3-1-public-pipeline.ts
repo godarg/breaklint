@@ -194,6 +194,7 @@ function bundleFiles(root: string, prefix = ""): string[] {
   }).sort();
 }
 
+/** Historical v1/v2 reconstruction API for frozen-evidence tests. The operational CLI refuses creation. */
 export async function createPublicPipelineBundle(spec: PublicPipelineSpec | PublicPipelineSuccessorSpec): Promise<{ outputRoot: string; annotationOutputRoot: string; bundleIndexSha256: string; annotationBundleIndexSha256: string; reportStatus: string }> {
   if (spec.contractVersion !== "m3-1-public-pipeline-spec-v1" && spec.contractVersion !== "m3-1-public-pipeline-spec-v2") throw new Error("unsupported public pipeline spec");
   const successor = spec.contractVersion === "m3-1-public-pipeline-spec-v2";
@@ -278,6 +279,7 @@ function readJson(path: string): unknown {
   return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(path))) as unknown;
 }
 
+/** Verifies historical bundle integrity only; it is not human-delivery authorization. */
 export function verifyPublicPipelineBundle(spec: PublicPipelineSpec | PublicPipelineSuccessorSpec): { valid: boolean; issues: string[]; bundleIndexSha256: string; annotationBundleIndexSha256: string } {
   const successor = spec.contractVersion === "m3-1-public-pipeline-spec-v2";
   if (successor && (!SHA256.test(spec.previousFreezeSha256) || spec.previousFreezeSha256 !== "e9f880a8489e835aeeed89f1d387a8ba6d3be184d6b1297f5711138b95b42de9")) throw new Error("successor pipeline must bind the immutable v1 freeze hash");

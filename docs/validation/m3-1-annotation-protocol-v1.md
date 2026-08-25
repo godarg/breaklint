@@ -72,7 +72,10 @@ annotation CLI rejects v1/v2 at its delivery boundary, and the v3 schema is the 
 eligible for consideration for a new human session. The CLI also rejects structurally valid v3 data
 until the renderer/network-evidence verifier and visual-sufficiency gate exist. No v3 renderer or
 human packet exists yet, so execution remains blocked rather than silently falling back to either
-SVG-source format.
+SVG-source format. This applies to every operational CLI seam: legacy `blind-packet` and
+`pipeline-create` creation are retired, and `pipeline-verify` distinguishes historical integrity
+from delivery authorization and exits non-zero with `humanDeliveryAuthorized: false`. Direct
+constructors under `tests/tools/` exist solely for immutable historical reconstruction tests.
 
 ## 3. Common label set
 

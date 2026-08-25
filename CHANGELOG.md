@@ -11,8 +11,9 @@
 - Retired executable SVG-source packets v1/v2 from new human annotation sessions after the
   preregistered repeated-channel stop criterion fired. A raster-only packet-v3 schema now requires
   declared renderer, asset/font, viewport, raster and blocked-fetch-positive-control bindings, while
-  the real annotation CLI blocks delivery until those declarations have an external verifier; no v3
-  renderer, packet, calibration or human annotation is claimed yet.
+  the real annotation CLI retires legacy packet/pipeline creation, keeps historical verification
+  explicitly delivery-unauthorized, and blocks v3 until those declarations have an external verifier;
+  no v3 renderer, packet, calibration or human annotation is claimed yet.
 - Repaired historical v2 reconstruction without changing frozen bytes: URL targets are checked before
   the independent parenthesis balance; reference discovery, namespace/ID inspection and rewriting use
   parsed elements with located attributes rather than matching the whole document string; the reported
