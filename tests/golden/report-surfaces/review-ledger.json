@@ -1,11 +1,11 @@
 {
   "schemaVersion": 4,
-  "reviewInputFingerprint": "58f29719c2ab459bcb486a256428ff208f929ac38319f75484c3e712e8975e62",
-  "renderManifestGeneratedAt": "2026-08-22T17:10:25.193Z",
+  "reviewInputFingerprint": "85d3be5e671a7eba328d2c2429da4ad6d1f9ee7e619171129400466e5b4d0868",
+  "renderManifestGeneratedAt": "2026-08-25T18:28:20.582Z",
   "reviewEnvironment": {
     "reviewArtifactContractVersion": 3,
     "screenPixelContractVersion": 1,
-    "browser": "Google Chrome 151.0.7922.173",
+    "browser": "Google Chrome 151.0.7922.174",
     "platform": "darwin",
     "architecture": "arm64",
     "platformRelease": "25.5.0",
@@ -49,94 +49,96 @@
       }
     }
   },
-  "reviewedAt": "2026-08-22T17:22:00.000Z",
-  "reviewer": "@Neo + @Brand",
+  "reviewedAt": "2026-08-25T18:36:39.000Z",
+  "reviewer": "@Brand",
   "physicalArtifactsReviewed": {
     "screens": 24,
     "pdfs": 4,
     "rasterPages": 34
   },
-  "basis": "PASS: @Neo and @Brand reviewed all 24 original screen PNGs, all 4 A4 PDFs and all 34 original PDF page rasters for the exact local render environment and review-input fingerprint. Brand score 0.95; BLOCKER/HIGH/MEDIUM/LOW = 0/0/0/0. The review covers the bound A4 print artifacts and does not claim a separate Letter visual approval.",
-  "acceptedFollowUps": [],
+  "basis": "PASS: @Brand visually reviewed all 24 original screen PNGs, all 4 A4 PDFs and all 34 original PDF page rasters for the exact local render environment and review-input fingerprint. Brand score 0.94; BLOCKER/HIGH/MEDIUM = 0/0/0, LOW = 1. The non-blocking LOW is that 9–10 page PDFs have no running page number or repeated report ID; card integrity, pagination and orientation remain acceptable.",
+  "acceptedFollowUps": [
+    "LOW: consider running page numbers or a repeated report ID for long printed reports; accepted as non-blocking for 0.2.1."
+  ],
   "cells": {
     "screen/clean/light/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "b7d89b59b0a975702148078c98e819cd23d8bbb420075395b7510a990f7050ea",
-      "reviewedRawSha256": "2d9e731fd70307996d444b6c554b578776111e3625e4296e01e75c17892df760",
-      "reviewedNormalizedRgbaSha256": "45b34c02831691ab1293e2f99a03c988ec00d5caa57eeb55f886aa87c1339eb4",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "b1b82e92eac5fbe467d03a5ed27dd3c68f080f1388c3ce6fccae5a767a0efe79",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "b3e88d22805e2b7eb2832b1dab24539d52928580949aea073f7fcdddcb083598",
+      "reviewedNormalizedRgbaSha256": "1168b5d0e77a56e872b06435bfd2ea7acc8c72c7b88b644983cebdbae8b7c407",
       "reviewedArtifacts": [
         "clean--light--desktop.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/clean/light/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "4c5a7183de91e68e4caf66a5070761387818604e4b5961c88b21ccfbaae78730",
-      "reviewedRawSha256": "e998d8836fc40e224b36b4a650c34c4d4778f9c8891fe413067707b1a2efba76",
-      "reviewedNormalizedRgbaSha256": "cb2021d7fda0d9bd5f49c8a7074e3db3232986056cf3962988d06a7ee963c817",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "c3be28ab6e72b744fb55af357e338ab38400e1d7cba39731f457468c67cfd68a",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "de35dae27c84f8e6d89de54cb13038105d76e92edec7b8ac0d80b972ec524eff",
+      "reviewedNormalizedRgbaSha256": "cd38054bc003bf13a8d4dd8a7638e1adc0a2c666c09ea0d7725931e03810a74b",
       "reviewedArtifacts": [
         "clean--light--tablet.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/clean/light/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "e3953681fe4a70bc77445ad1a4fed9ebb88c67855fab4397f6d607254db4528f",
-      "reviewedRawSha256": "9efeea4b2fa5576c9dacff00744c5a7905e783c802f257d7ad352945e6704562",
-      "reviewedNormalizedRgbaSha256": "b12eef510bcc0c41182f36d9681a9f8ca865887c74c0d22d95e88496ad60a42e",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "2e96db83c6df54de593b3954bd9377a6a0010e4ddba0607b42eb9f81a05e1f13",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "1e12485ef4fc6f9df32cb16eef439b017314c391eb8a11124f843f2f3b475513",
+      "reviewedNormalizedRgbaSha256": "3d52fd95d2ca6fced360228adfe70fd8c34e14bcee2a49a6ea8ef79c57dadbb9",
       "reviewedArtifacts": [
         "clean--light--mobile.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/clean/dark/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "013a9bac6a02a495c395dd28f1fe5e1f35d3b80292b6b0ad2a7bd4979c111768",
-      "reviewedRawSha256": "9ec14020080587f58e8d2306e0d16d33b15742742bd33934e9b158749a5d8f34",
-      "reviewedNormalizedRgbaSha256": "16ffa9e7101b84a2532a20546a5e03a84ce92f40e575f5764fcd9532602776fe",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "006edc3f71a5ac5a38a19acb8a51d8f13653a0bd7172ae69c60ccc2613ed8c34",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "deecd6186b423d22db8ec88a0d0358de5f6a9acb54b76cc9c2e1b34795129eee",
+      "reviewedNormalizedRgbaSha256": "ba62c7c9b24604becfada5861b9f58d33d9dc0bd72862696f67075b038dbafdb",
       "reviewedArtifacts": [
         "clean--dark--desktop.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/clean/dark/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "4e1d84b1b74440037efddc811e11546419c9ed821afc36597b1f7db7bbe7bf01",
-      "reviewedRawSha256": "a9207ed31cc381de312ffee35d0652adf04538295eb9540d890c14e578b880c9",
-      "reviewedNormalizedRgbaSha256": "b693abeebbfb59c7f06ca0839c5505b0751b13e481f999755afbd4f1c1fe8ce2",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "558b2c451c45a6f5559b82498af054cc2a565263ba934ecf67643fc4b592db4e",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "ec6c15e2659fa9963dc4ad0faab749f7fe5708b8fbdfb91cb3b6b3557de22075",
+      "reviewedNormalizedRgbaSha256": "b4b60142232150fed98770956b9c88e5731a6f3d85db3fd51061de98e2fa62a0",
       "reviewedArtifacts": [
         "clean--dark--tablet.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/clean/dark/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "d8a1f9d907b82d10553fd786452efb8e5858dccaed69d02fb061d5d7666f1a2f",
-      "reviewedRawSha256": "38f7a087aaf8fcf00ea1536ef58d3b07423f58818680d645011be9b6e17cc80b",
-      "reviewedNormalizedRgbaSha256": "7e19903d5e1687d5f14bc93037ddaa31cf918db922d88d8409a00a987468902b",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "02768c24d216d693e28ed2d3b94401281c109c03b8975e8d1b499ca5a0f5671c",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "fcf64fedb100da3d536dd2b5fb21bf974f7af2565992fd58d3abcb783ad28233",
+      "reviewedNormalizedRgbaSha256": "ab59859fb525c8753950e6456bdbb144fe26859c2b0008f61fa6e3a1b460e642",
       "reviewedArtifacts": [
         "clean--dark--mobile.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "print/clean/pdf": {
       "status": "pass",
-      "reviewArtifactFingerprint": "0a901afa36fb261edf9deaf69db9101e2c394b040ddcc5e5cccb8dd4b37da21e",
-      "reviewedRawSha256": "1bcf0608d488af9b3800b15456d16b3bef1e6babe681935a4695be858cb16bd1",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "5ad87028b4bbafa6e4ac0cb2b290eba12f258cb3928d6b257dd60e202026f0d0",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "362cc9ef7974234f985217cc6ec6183ad28392ca3e24ac7d81c8c71b6752e4be",
       "reviewedPages": [
         1,
         2,
@@ -147,20 +149,20 @@
       "reviewedArtifacts": [
         "clean--a4.pdf"
       ],
-      "note": "PASS: complete original A4 PDF reviewed page by page; text extraction/tagging, pagination, atomic cards, hierarchy and whitespace are acceptable."
+      "note": "PASS: complete original A4 PDF reviewed page by page; pagination, card integrity, hierarchy, whitespace and trust semantics are acceptable."
     },
     "print/clean/raster-set": {
       "status": "pass",
-      "reviewArtifactFingerprint": "dd7469c2aba05b3f7dc922aa5d3768945c072632b290644be13adbc4eb9ad7ec",
+      "reviewArtifactFingerprint": "d264af472dd0cc07fbcd6e259acee155d9d76cfcd1fd08372f1ed7450481a1bc",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
       "reviewedRawSha256": [
-        "fe403a8842dbac76d370fd358acf43ad34ae135387aa223b809dea21422c0340",
+        "66128b56606ce50bf81f63817246eb687ae9f3945303ce86e6d81319c7a758d7",
         "fae5b583b3be69ddf1e338264e7a53fc4ce986c379558970e7795890471ede1a",
         "f3285e68d064140b6bb70702e19a370b8a500e3813f8033da3a8b927e7b131e9",
         "5c46162650d3e6eba9171d4bfabf2f42270094e38b73c4bfec77742eea731940",
         "8d5a7ce3abffe0a99d517c1fe452551206821bba7588d755fdd9448c04667d1d"
       ],
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
       "reviewedPages": [
         1,
         2,
@@ -175,86 +177,86 @@
         "clean--a4-page-4.png",
         "clean--a4-page-5.png"
       ],
-      "note": "PASS: every original A4 page raster reviewed; no fragmented coverage starts, empty pages, underfilled continuation pages, overflow or sibling overlap."
+      "note": "PASS: every original A4 page raster reviewed separately; cards, borders and labels are complete with no fragment starts, clipping, overlap or overflow."
     },
     "screen/findings/light/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "631246976f284fd149c94a568c4d70af6dc51fb5e2c65ad50580a9fac990f5a0",
-      "reviewedRawSha256": "8ef9265f7bfd68be92f8dfdc38b658d856c7824bd38bcc417c8e5c2748a4475d",
-      "reviewedNormalizedRgbaSha256": "007192c524768cbd7b1a7a8d2443d00572a1bb3ad04d9a89d0d60fd1bb9e3768",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "ae83524c1b2501fdd511282828570fe1044cb70f56ea678b0603bd026f715118",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "2d83cebc5f38d382aa6a1930903e65baa6566e0528b22e85f7dcb50e6771a5d8",
+      "reviewedNormalizedRgbaSha256": "be0ef2991bebfb11a0a1679f7fe1bcdd4aac87cf9f6d5b36fb69aaae2cb0ce6a",
       "reviewedArtifacts": [
         "findings--light--desktop.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/findings/light/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "9258a97033e16fd00bdab73d2b17ad6ce23d25a6443f9d52e463e19cb7be2da0",
-      "reviewedRawSha256": "0bed4fdf158c4d7be00ef6f6011ac66b8c6f17d91a00444084dfe93a647c8513",
-      "reviewedNormalizedRgbaSha256": "9d59e6f197494e72866cf8c4c80ecafb6430d5a32e3f17fe39fab40127f2c290",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "56daaac34d1cd22524d3c1f513659b5d0c0da7acd29eac051e6b20a601885942",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "76970408ccd2684e43e922d7f6b61792d7e7f0fbb4839b1f8f5984548c6e52a0",
+      "reviewedNormalizedRgbaSha256": "f6a09c58eb02564d6d994d9ad3d256779bf85a23ee2120a5a731b3792d3d0a93",
       "reviewedArtifacts": [
         "findings--light--tablet.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/findings/light/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "831b1feba54d49153ab18ee2e466696679e5ccbaa3e878d6e2c2ffab155bb04d",
-      "reviewedRawSha256": "b2dc5c2f8322ee2ba4e273432920e27575316f8a9743c37f143cbcc151384c2d",
-      "reviewedNormalizedRgbaSha256": "2eaf82ed2022c9868c255807083e39d934eef5acc8d1956df94757dce00a71a6",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "c171a0356c0c2551f34fcd032afd688a30feb358fe840eda34055c636033d5a8",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "c7a8200b9b5727438b99c138f1e6444e7edf70299e8c3f80602125524dab5721",
+      "reviewedNormalizedRgbaSha256": "9f78c96837d79b5bc093dc3081a6bcca1684503e2b495d4076a4282c0605b2e9",
       "reviewedArtifacts": [
         "findings--light--mobile.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/findings/dark/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "1894669679c3cf0fa4e3c17442eea914f34e3bd7c7c339e7eb80654f30d3b412",
-      "reviewedRawSha256": "72e54bb1f44f649e02332f5ce128ad80acbc8c2f8526ab35b9c070e6e75cc50d",
-      "reviewedNormalizedRgbaSha256": "0697d744444ef4ad7ebfc9cd0d7275dd3914730831c930cd07a2711319709477",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "5cdf423adb9244cd46fd702c444b22f615c2692bf81e8ac9faf9438b2e8b6b85",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "36db53555a52e109c1fc529125913e062bd4429dd836a478b12e16d43b522dfc",
+      "reviewedNormalizedRgbaSha256": "d9a7b9bd742c992e0db73e6c881dd7c2e8b9a5e029f3b95d42b56c0193f3c7a9",
       "reviewedArtifacts": [
         "findings--dark--desktop.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/findings/dark/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "73cd0f5616663a7f02030e1a2d8455ea577e0495164f169ab73f825d1d178ada",
-      "reviewedRawSha256": "d31baeb1fd33e129ec540bee41074ca1fbdfe185f79bf90e236aeaaec509787d",
-      "reviewedNormalizedRgbaSha256": "07fe168784f8930e43695a2fa83151852323078187d4037955b21d9e1a41521f",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "d303d4ff887a53e5a0c43132f0d3a754da0a5a2acb4a423babb316a04934c706",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "c658148327791fff24c586c4d6f148b8dd9248ece57a8bc58a34257ef57bd32d",
+      "reviewedNormalizedRgbaSha256": "ab4344164ad5c469b94484d6700a9ba82477200309c1efc8d5cea4ef3f4d1a64",
       "reviewedArtifacts": [
         "findings--dark--tablet.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/findings/dark/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "f4a604199779d690c29fbfe5b8a2ca262190b6d84c5e1eab281e3ecc11a2af85",
-      "reviewedRawSha256": "38b4dc07fc833f80335050590de28811daa6a8bd762527e5901c8ec483b9e83a",
-      "reviewedNormalizedRgbaSha256": "811dbc01c135445a2e94380335fb7e392754d2ecb60ae0b97964ef629684c2ee",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "3d360ca5141f9b12e9a019aeea0b8ad8de770ffcdb51973230ca48c214ede060",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "0fee1055a28bcff2cfa11b9da55f03dd9d8fe16429cd1ae669e217a7400e774c",
+      "reviewedNormalizedRgbaSha256": "44811840eb5c42ed8d3557349355380c0a8b759e2f495cf4703167c99d660a07",
       "reviewedArtifacts": [
         "findings--dark--mobile.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "print/findings/pdf": {
       "status": "pass",
-      "reviewArtifactFingerprint": "5a07973b865baa6ad8fd0881d4a9410940801f5cbc95ad035856bd26b0a5980d",
-      "reviewedRawSha256": "00ee1b050ad1e6f692d6b51377907aff23d5f6c0b1253f616963ef5de0654901",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "d979deafd260a07004733ab83fa79e638f56169b75df3d044d439aadd5b4b4b3",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "e1e095eeeb4a2d8ee977acc167f7c72b898d8db40978f53e264df5ba943f3381",
       "reviewedPages": [
         1,
         2,
@@ -269,13 +271,15 @@
       "reviewedArtifacts": [
         "findings--a4.pdf"
       ],
-      "note": "PASS: complete original A4 PDF reviewed page by page; text extraction/tagging, pagination, atomic cards, hierarchy and whitespace are acceptable."
+      "note": "PASS: complete original A4 PDF reviewed page by page; pagination, card integrity, hierarchy, whitespace and trust semantics are acceptable."
     },
     "print/findings/raster-set": {
       "status": "pass",
-      "reviewArtifactFingerprint": "f72fe4848b231dfd9c642915140ceb805f533acbc2bb6208f585e677d328038d",
+      "reviewArtifactFingerprint": "7f0815646e2228723133563bab1fb82e67b1a187fd99ff02b918b31f98f0a86e",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
       "reviewedRawSha256": [
-        "ea0625800cb55dddccfc1be3a0781820b69121f8c65a2ab7802dd1c66c9796af",
+        "39d65687255bbf2eb32f2e1883966fba860d4e9213db2a1bd808462383c8bcbc",
         "f6a22ef16182ee0ade69d816c7a48670e3ed94c746bfafdc3d8d467cee951bde",
         "233530f2eea2d13018af0b0c770bec9e0ff746c35d04682ab7d8df64d760f36d",
         "13258a3e43127a4fbc206f7cded7f9bf711231ab7e0fad1e86da66d7fda3b8ff",
@@ -285,8 +289,6 @@
         "5c46162650d3e6eba9171d4bfabf2f42270094e38b73c4bfec77742eea731940",
         "8d5a7ce3abffe0a99d517c1fe452551206821bba7588d755fdd9448c04667d1d"
       ],
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
       "reviewedPages": [
         1,
         2,
@@ -309,86 +311,86 @@
         "findings--a4-page-8.png",
         "findings--a4-page-9.png"
       ],
-      "note": "PASS: every original A4 page raster reviewed; no fragmented coverage starts, empty pages, underfilled continuation pages, overflow or sibling overlap."
+      "note": "PASS: every original A4 page raster reviewed separately; cards, borders and labels are complete with no fragment starts, clipping, overlap or overflow."
     },
     "screen/infrastructure/light/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "ded0b1ef0833f0517e0a261a95779bbf3466736bea33cf3f6895968d446b1b6f",
-      "reviewedRawSha256": "e0a687f3276dae4e1cc91989ab4e121a350abd626da01c6b52aa8c42566720fb",
-      "reviewedNormalizedRgbaSha256": "0b0bbf9ea6e8a9d0d4a723978d844fc961bcc425dbde14339744b5150d3348d0",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "f8c4d72471a6841eb113f3091afe614e159e195865a69b1e0dc1cafc7b563634",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "6b0f86bb26be45efeed6968a8a556d2da81c1da9af8ccb371bb8567696b0d089",
+      "reviewedNormalizedRgbaSha256": "a5d483691ee8897612087e9739861b3b1cbb4bdea0b53113332352fefd764273",
       "reviewedArtifacts": [
         "infrastructure--light--desktop.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/infrastructure/light/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "f5ef741522a333ac0cc203c653700d5f6d788416e298ecea5f64b1ac55e63f98",
-      "reviewedRawSha256": "5046af71442a4f8adf5b34349c52e736140980c6425100426693df7daa0f41af",
-      "reviewedNormalizedRgbaSha256": "a6a31f1eec68a0b49bfc79648684a23d17ae20faf6b3059d508b93816d61fd63",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "b624aab72454db8a78908ed997b013a2cc66bc28351603e6cfcd61aa09cadd46",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "a32771c0a87c7fc822f693c1c0f97b869bbf8332b5cc76eb29bf63148496fc52",
+      "reviewedNormalizedRgbaSha256": "a9788fac692f8239e21c5f30098c0a264bf9e20c108ddf887431d735971c6a5a",
       "reviewedArtifacts": [
         "infrastructure--light--tablet.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/infrastructure/light/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "ef4c2659dcf4ccaf49f77c4c1a4ef509493b5582d63ba7f11acd3b24e4bf7b7e",
-      "reviewedRawSha256": "3cecbd6199011770b3548799dd8eba0db2d1aebd70a5f56ed54a649a1fe11088",
-      "reviewedNormalizedRgbaSha256": "1c3e7baa247344c064a4637aa094404d7e44eeb6a5800bd5fe3ce3456b1db5b8",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "8598cc4a6d95c5b53b028f12c8caa58995589de97c78e413a1cea6423f19fd38",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "9c47b1c8544a86af2187b5bc13e2b37aa0f971cd95fd008dea5e5cc178ee63b3",
+      "reviewedNormalizedRgbaSha256": "4337a2dfefd69cff34306194f96c27462e68c05944ffcaf426ef570015011f55",
       "reviewedArtifacts": [
         "infrastructure--light--mobile.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/infrastructure/dark/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "924b71cfdc31eeb4e97067cd8e5a8ef0f42a2e540a3376a3b3d5db022dcc4506",
-      "reviewedRawSha256": "8e502099431ab2a6372422ab2a853ec1d4d36be6e367596b79443bc35ff4f47e",
-      "reviewedNormalizedRgbaSha256": "ac89eec1365ecb3d1286e0b6af547e768e95fba1ab93712282d03a2b679c99ba",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "082f3cddd7a324a58351ed633849239fd4aae26e6433d9636362a52de9c77c0f",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "3b163f06e83b93a30eb5e437df4ba60559df8d28aafa9a3400cfcd61c6812812",
+      "reviewedNormalizedRgbaSha256": "a26c9e13d173f7d75831825c4f10d2019d27be9b3fcfd253ffbbe350f7430f27",
       "reviewedArtifacts": [
         "infrastructure--dark--desktop.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/infrastructure/dark/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "2bc1a2879f7060c3979c872032b8b0c97baa46bbd08f04e7e8f3dec93df21dc9",
-      "reviewedRawSha256": "00effd6492f2b82e036070d69d521f435c2657c8eae5301927252b36c24ecf32",
-      "reviewedNormalizedRgbaSha256": "ad11dd804fb470d6397b93c99e711c079dfeffad38ce679ead39c1b49b274a18",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "35d35d3ff0452fcd016addf48a17a132df5a6feb05b433acdbf838cf24c84abf",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "cb91f9472ea28350073f7fbb55341c2ac84d902acb6f85961752d58c555feb0b",
+      "reviewedNormalizedRgbaSha256": "bdfe49888fe1c92caaaf008f8155238d24f54303681267ff0aeb1dcf1ea6e3b5",
       "reviewedArtifacts": [
         "infrastructure--dark--tablet.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/infrastructure/dark/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "bf39bbb3ca08ed113bcb799856437d50769cd677e7f0a993740dd7b91f1d03d2",
-      "reviewedRawSha256": "998a70dc7f0723e139491c2c4552ab348ff44b2be78d1857876b4d938b00f0fa",
-      "reviewedNormalizedRgbaSha256": "c8ee136a917b31c79cab6cf6abbea1f1e81149c08946618179dda2a631032813",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "73bfb3a2ed1abed536bf48b205d8b5aa21b1783fb0dc9b26983d9a1625f1c58b",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "cf3c99697382bd1bcbffc599b9dfc00bed48fb5a11f2f38f253c98a1be2d952c",
+      "reviewedNormalizedRgbaSha256": "36f5a77bea5401829fceda88001ca77d239bdebabead9b94041a1e23d5fca6ad",
       "reviewedArtifacts": [
         "infrastructure--dark--mobile.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "print/infrastructure/pdf": {
       "status": "pass",
-      "reviewArtifactFingerprint": "b9fe8861beecbf76edd1e7e91afc6787112b145faac50c82635b5e45aa087575",
-      "reviewedRawSha256": "69afa05567e0db72841970ea4aeb9324227ad2cc9e4e957ade39e80c68472315",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "c51ddfecbf9e63125a7c85d947fb2d69e4bc8af753ed3e963631f72cefd5706b",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "4d4de8083fbf0db22e62632739b7219e61499cd1837669c4138d96129cd77aba",
       "reviewedPages": [
         1,
         2,
@@ -404,13 +406,15 @@
       "reviewedArtifacts": [
         "infrastructure--a4.pdf"
       ],
-      "note": "PASS: complete original A4 PDF reviewed page by page; text extraction/tagging, pagination, atomic cards, hierarchy and whitespace are acceptable."
+      "note": "PASS: complete original A4 PDF reviewed page by page; pagination, card integrity, hierarchy, whitespace and trust semantics are acceptable."
     },
     "print/infrastructure/raster-set": {
       "status": "pass",
-      "reviewArtifactFingerprint": "220cb4b696f47c86bb8aca788a66ac906725eb0ef564474bc2d629c9624ed58c",
+      "reviewArtifactFingerprint": "0be7bf21ac3a9778ec5ca36ff0b7a37dd644966345b54b8045901b4bb00624a4",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
       "reviewedRawSha256": [
-        "01161e9209eadd0a56bd543e6d88f9c8e4ece456ad029e80de0a22bfab7d4c79",
+        "40edf172738550f7f0ec09e6385e8cb6c66834fcb5214d68ab9d9468719c6e74",
         "1b8b9559a153da69fe8d580657540ef76e90163c41edda02cc971d08df8a3309",
         "229fb7804baf5ff1755ed9130b7d9b2e914ea1e29c911d64399b89df1d3a0dc0",
         "93d9c10c3d63a9f7b9a6f367f79e94cf2a6fe0357d1a1cb55b93092d41bb55dd",
@@ -421,8 +425,6 @@
         "56bf3130f4da32b99be1f182fa8a94908bae9209d47a1c1835b5f6b2cecaab83",
         "fc87182c1e46f40433f8f942dd6d1718368721c97ea7f6a9891a5f8ff6e6d542"
       ],
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
       "reviewedPages": [
         1,
         2,
@@ -447,86 +449,86 @@
         "infrastructure--a4-page-09.png",
         "infrastructure--a4-page-10.png"
       ],
-      "note": "PASS: every original A4 page raster reviewed; no fragmented coverage starts, empty pages, underfilled continuation pages, overflow or sibling overlap."
+      "note": "PASS: every original A4 page raster reviewed separately; cards, borders and labels are complete with no fragment starts, clipping, overlap or overflow."
     },
     "screen/insufficient-coverage/light/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "d9edb71162206d61c6b7d671712b28bdd237341fed5c563c3e6fa5fa9cb2b461",
-      "reviewedRawSha256": "fdeb0895602edd798060ecbf12aa9ffe31fc6f195839c572ebb4842247507e53",
-      "reviewedNormalizedRgbaSha256": "ea40c33f2a491d9b46e43e909ac44084126809ad3f91537410f7a018f7dd756c",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "b55005ec15b150153d7108e8f138719187359bafa89084fdab5a3b6e05b8c0cd",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "5fe8a4c97b6596c6804815c21e5341dfe1a28e94f6db3ddd2c3a7534a4553a41",
+      "reviewedNormalizedRgbaSha256": "6da824175b0561c0f52daf69382fbe4f64b4b4914713533e65b849bad7898fb2",
       "reviewedArtifacts": [
         "insufficient-coverage--light--desktop.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/insufficient-coverage/light/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "97ac3227b3c884bbaf0ae27b6f0a163597cdb47163c00180f3bfb31522e1a883",
-      "reviewedRawSha256": "9f6037592b5a8d4e6ca45e23f1a6bbae4efb198b13868f136becc132fe8921fd",
-      "reviewedNormalizedRgbaSha256": "d6053d779dae4156ca623d8593f3adc3c9e8eb6668503ddecbc5423a57fd8ad3",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "45f76faab4152fb0042f99beab9b619a963041c0c881512ff2366581bb5f0470",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "d2a5d3dab2b9c6137aa5cf737f139c33f44ed78a260a8eb3b55c52312c870982",
+      "reviewedNormalizedRgbaSha256": "649b8dae9362aa2fba9ba0295fff85fa6bcb80a00fd53923097992383ef26003",
       "reviewedArtifacts": [
         "insufficient-coverage--light--tablet.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/insufficient-coverage/light/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "b8dd0b7d12cab0e246c58679dd570852d1f2941bc4f673404a2da523e493fd7e",
-      "reviewedRawSha256": "4a4733beffbad41870d102ff9dd1dff27de83f16675e584ef514400a9804f6ae",
-      "reviewedNormalizedRgbaSha256": "d56961471b54234f6a79a21f991bfe850e48e4e3906f14af6d180d1f256e4598",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "320d40ddb86191a6ad862459da350a57b51512e69f9f90877e24167bab087a1d",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "8dc9029ea678315657dea110013e045332c0056422fdb0f71ebf98835635073b",
+      "reviewedNormalizedRgbaSha256": "f7290e5c170352fdd36346ffc8a962e3a76d0799bd2c45c05a9e8766bc6ba5dc",
       "reviewedArtifacts": [
         "insufficient-coverage--light--mobile.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/insufficient-coverage/dark/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "9e21ac2a01ae36358d86c3a9f00eb8e9e31cd773dfa360ed3756e20e34daa075",
-      "reviewedRawSha256": "622700a67147d2352625ff1e75ca0991a786285709fb4472a02f74ce11408598",
-      "reviewedNormalizedRgbaSha256": "be18aff01c302cf87df9a96d71287f6dc0c6b19f89eda9a86eee8e00a866d97e",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "386cdcc6b5a86fe2a7bda825f48ab411d77299bdfd8326805f0de1b8f6bbdd01",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "b0f3167baf20aac8a6af5b3fb661f0b675c35099653f209069970712a40681f6",
+      "reviewedNormalizedRgbaSha256": "a00bafe016e804ade796bd4b2f50ca74684235f8a785e4ad500b7cd1c0180a76",
       "reviewedArtifacts": [
         "insufficient-coverage--dark--desktop.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/insufficient-coverage/dark/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "034ee7daa3604c6ee6e6945753600dd272a24a45a6b9b3056775c4b4df60fe3a",
-      "reviewedRawSha256": "b2588285a4bfedeb36084a07006988935591bf3ef9b4b1df0dfe42fea920e278",
-      "reviewedNormalizedRgbaSha256": "7eb6fe6c666ac7347cfecdb2eaf7708692f23b1a4892d62ecf3812be361d866d",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "cada767f63b1c45fd9c1f5e1c3d9de12523eba2c0f7e22248ec995a01812b273",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "5f653218cd8188dc5843733273cc8d8ab80da605947267de93231bb25466f58d",
+      "reviewedNormalizedRgbaSha256": "cf93c95f2c5aab7c3fdcd6ad73389c8a5139ee78b4251a7cbd10dbb027f7191b",
       "reviewedArtifacts": [
         "insufficient-coverage--dark--tablet.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "screen/insufficient-coverage/dark/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "9275ebfec65df7331fb23cf150ac229e2e51f857ff6849e8679ac199c0aa99a2",
-      "reviewedRawSha256": "86fd93f32021f76533dc1c8052e78f5053a6c43e6d36ee60ba805953d9a12875",
-      "reviewedNormalizedRgbaSha256": "796049b409dcfbf1f6570efddbb09f88321c983aedfc49e3bfd2aa00a261ab79",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "eccd4ef3be4019634f029feda9f6ab440ac52af52709e7dd7b4b58760fc89d85",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "fc83a65c08996aa977cdf5a2a8dde8b34687529aad856227ea83bf82650e80cf",
+      "reviewedNormalizedRgbaSha256": "bf6d64960855d4d11dc35fb7e7adaa16d78452956eff179783281b7141e78f1a",
       "reviewedArtifacts": [
         "insufficient-coverage--dark--mobile.png"
       ],
-      "note": "PASS: exact original screen PNG reviewed for hierarchy, responsive layout, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
+      "note": "PASS: original screen PNG reviewed for hierarchy, responsive reflow, light/dark contrast, overflow, scanability, trust semantics and anti-slop."
     },
     "print/insufficient-coverage/pdf": {
       "status": "pass",
-      "reviewArtifactFingerprint": "dd8d59e4c5c5ab312d908c6da6673f73d18971d8c65bcb2b52bb9202c887f95f",
-      "reviewedRawSha256": "abf897479c4d44cf9db5c62bc4141a6532e8ee6db5080d2e8f737570a73cf30e",
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
+      "reviewArtifactFingerprint": "1786727461394effbaa6dfc20cc292761338f27edeab5d7632f903e973caff22",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
+      "reviewedRawSha256": "85cd39012d8cfcd4c3274f05316c7a6bb066bb89ba0c7f95d302b6644e0524ea",
       "reviewedPages": [
         1,
         2,
@@ -542,13 +544,15 @@
       "reviewedArtifacts": [
         "insufficient-coverage--a4.pdf"
       ],
-      "note": "PASS: complete original A4 PDF reviewed page by page; text extraction/tagging, pagination, atomic cards, hierarchy and whitespace are acceptable."
+      "note": "PASS: complete original A4 PDF reviewed page by page; pagination, card integrity, hierarchy, whitespace and trust semantics are acceptable."
     },
     "print/insufficient-coverage/raster-set": {
       "status": "pass",
-      "reviewArtifactFingerprint": "c26f0e633f223ec3c73dc63545ac290f5cd66139f16702945159b64fb22de871",
+      "reviewArtifactFingerprint": "ef2565900d66600b6d37d47d386dcda0b315745123f8fe78c4a7cab63f1206cf",
+      "reviewer": "@Brand",
+      "reviewedAt": "2026-08-25T18:36:39.000Z",
       "reviewedRawSha256": [
-        "733591cd591ec62fa76abb88a298fceef9d8b2817f9947602ffcceff3bc8d8b5",
+        "e0f89e6b8c5d555e35e8da6d4a8c9ef54ac3af4a0646ba839156e15133784026",
         "7ad9e2dd6fc8f0e1f18563fa0249529a647ec2ad6bd53681268e8aa6c01a8bf1",
         "229fb7804baf5ff1755ed9130b7d9b2e914ea1e29c911d64399b89df1d3a0dc0",
         "93d9c10c3d63a9f7b9a6f367f79e94cf2a6fe0357d1a1cb55b93092d41bb55dd",
@@ -559,8 +563,6 @@
         "56bf3130f4da32b99be1f182fa8a94908bae9209d47a1c1835b5f6b2cecaab83",
         "fc87182c1e46f40433f8f942dd6d1718368721c97ea7f6a9891a5f8ff6e6d542"
       ],
-      "reviewer": "@Neo + @Brand",
-      "reviewedAt": "2026-08-22T17:22:00.000Z",
       "reviewedPages": [
         1,
         2,
@@ -585,7 +587,7 @@
         "insufficient-coverage--a4-page-09.png",
         "insufficient-coverage--a4-page-10.png"
       ],
-      "note": "PASS: every original A4 page raster reviewed; no fragmented coverage starts, empty pages, underfilled continuation pages, overflow or sibling overlap."
+      "note": "PASS: every original A4 page raster reviewed separately; cards, borders and labels are complete with no fragment starts, clipping, overlap or overflow."
     }
   }
 }

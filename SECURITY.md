@@ -45,6 +45,21 @@ intended:
 sandbox itself. For untrusted third-party HTML, run this in a container, the same way you would run
 any other tool that executes code you did not write.
 
+## Dependency-hygiene exception: Paged.js 0.4.3
+
+The stable Paged.js package still declares `@babel/polyfill`, which in turn retains the obsolete
+core-js 2 line. The current dependency audit reports no known vulnerability, and breaklint's
+measured integration loads Paged.js's browser bundle rather than importing those polyfill modules
+as application code. The available 0.5.0 beta retains the same polyfill dependency, while a larger
+unmeasured upgrade would cross the paginator trust boundary and invalidate the current live,
+visual, consumer and supply-chain evidence.
+
+This is a time-bounded dependency-hygiene risk acceptance, not a claim that obsolete transitive
+packages are desirable. Re-review is due by **2026-11-24**, or earlier if Paged.js publishes a
+compatible stable release without the chain, an advisory reaches the installed runtime path, the
+bundle/import surface changes, or Node/browser support changes. Any replacement must pass the full
+live, visual, consumer, licence, advisory and release-integrity gates before the pin moves.
+
 ## Scope
 
 In scope: anything that lets a checked document escape the sandbox, read files outside the run,
@@ -57,7 +72,7 @@ uncalibrated and says so; a false positive is a bug, not a vulnerability.
 
 ## Supported versions
 
-The latest published version on npm receives fixes. The 0.2.x line is the supported line;
-`breaklint@0.2.0` was published on 2026-08-22 with npm provenance. The 0.1.x line receives no
-separate long-term-support branch. The npm package page remains the authority on which version is
-actually published.
+The latest published version on npm receives fixes. The 0.2.x line is the supported line, and each
+published patch supersedes earlier 0.2.x packages. `breaklint@0.2.0` opened that line on 2026-08-22
+with npm provenance; the 0.1.x line receives no separate long-term-support branch. The npm package
+page remains the authority on which patch is actually published.

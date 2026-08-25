@@ -187,9 +187,11 @@ The real lab mutation suite is explicit because it launches four full browser ru
 node --experimental-strip-types tests/tools/calibration/lab-mutation-controls.ts
 ```
 
-These schemas, tools and documents are repository-only development/audit assets. The current
-`0.2.0` npm tarball was not changed and does not include `tests/`, `schemas/` or these validation
-documents. M3-0 validation therefore runs from a repository checkout, not from the published tarball.
+These schemas, tools and corpus artifacts are repository-only development/audit assets. The
+historical `0.2.0` npm tarball was not changed and predates these validation documents. The `0.2.1`
+package carries the public documentation but still excludes `tests/`, `schemas/`, `tools/` and
+`corpus/`; M3-0 and M3-1 validation therefore run from a repository checkout, not from the
+published tarball.
 
 ## M3-1 entry criteria
 

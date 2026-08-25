@@ -93,7 +93,9 @@ jobs:
         # on a missing prerequisite rather than skipping, because a suite that goes green by
         # running nothing is how a check disappears. ubuntu-latest ships Chrome; paged.js and
         # pdfjs-dist come from `npm ci`.
-        run: npm run test:live
+        run: |
+          BREAKLINT_LIVE_REPORT=.tmp/live-report.json npm run test:live
+          npm run test:documented-figures
 
       - name: portable technical report-surface matrix
         # Linux technically verifies all 32 current cells, including decoded-pixel, semantic,

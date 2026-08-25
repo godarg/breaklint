@@ -45,9 +45,11 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 | Own nodes only | layers and marks are held as references; nothing is found again by class name |
 | Evidence files | one PNG per page; the header is read back out of the bytes and checked against the size the rasteriser reported. A page that fails that check withdraws the bindings of the whole document. |
 
-**Measured over eight documents, two runs.** The measurement report has 219 leaf values, counting
+**Measured over eight documents, two runs.** The measurement report has 226 leaf values, counting
 every scalar and every empty object or array as one leaf, and no path appears in one run and not
 the other.
+
+<!-- breaklint-status-figures-v1 unitTests=439 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -69,7 +71,14 @@ node tests/tools/leaves.mjs .tmp/a.json .tmp/b.json
 
 which prints both counts, every leaf that differs, and exits non-zero if the two runs disagree in
 SHAPE rather than merely in a value. A wall-clock difference is not a contract value; a missing
-field is.
+field is. The live-report writer creates a missing parent directory atomically; the command above
+was re-run from a fresh checkout without a pre-existing `.tmp` directory.
+
+The release/CI path also binds the documented figures to real evidence rather than synthetic test
+data: `npm test` preserves its TAP at `.tmp/unit.tap`, the live step writes
+`.tmp/live-report.json`, and `npm run test:documented-figures` rejects any mismatch with the marker
+above. The marker's `unitTests` field is the historical schema name; it counts the complete Unit +
+E2E TAP denominator.
 
 | Case | raster diff | style violations | binding |
 |---|---:|---:|---|
@@ -80,7 +89,7 @@ field is.
 | `:has()` on the layer's presence | 84 711 | 0 | lost |
 | document mutates itself when the layer arrives | 54 969 | 0 | lost |
 | document deletes our layer as fast as we attach it | 0 | 20 | lost |
-| script rewrites the marks' style | 120 | 20 | lost |
+| script rewrites the marks' style | 200 | 20 | lost |
 
 Marks were refound in the PDF with `max |Δx| = 0.0000 mm` and `max |Δy − reference| = 0.215 mm`
 against a stated tolerance of 0.35 mm; no mark failed to be found exactly once. The delivered PDF
@@ -124,7 +133,7 @@ each measured singly.
 **Four repairs were once green in every suite while being reverted.** An audit turned each of them
 back into its defect — the tolerance-free page verdict, the unread integrity count, the unread
 late errors, the file-access switch — and the whole suite as it stood at the time (104 unit tests
-and 15 live tests, since grown to 364 and 57) plus the mutation guard stayed green through all
+and 15 live tests, since grown to 439 and 57) plus the mutation guard stayed green through all
 four. The repairs were real; the gates were not there. They are now, and
 each was verified by re-applying the mutation and watching it go red. The reason the live corpus
 could not reach them is structural: a real document cannot be made to produce a rasteriser page
@@ -225,6 +234,11 @@ The minor-version change is intentional: unknown or formerly inert configuration
 remains 2. This status paragraph is a later documentation commit and is not retroactively part of
 the published tarball.
 
+**Prepared for 0.2.1:** the patch release packages the open-community-QA documentation and the
+advisory remediation recorded in this repository without changing a production rule, threshold,
+severity or `calibrated` flag. It is not called released here until the annotated `v0.2.1` workflow,
+registry provenance, GitHub assets and a fresh registry consumer have all been verified.
+
 ### CI incident reconciliation: failed push at `05fec787`
 
 GitHub Actions run [32591976847](https://github.com/godarg/breaklint/actions/runs/32591976847)
@@ -269,9 +283,14 @@ its clip boundary is resolved in the applied target's CTM.
 M3-1 now has a public, rights/privacy-reviewed process-pilot corpus: three immutable documents from
 three origin groups, split origin-strictly across development, tuning and holdout. The stored
 manifest binds 64 SVG text elements to 192 rule-specific target identities, and the holdout
-projection freezes one origin with 45 rule-targets. Four byte-bound, oracle-free SVG contexts make
-the blind packet technically executable, but their browser-native process rendering is not a
-production renderer/font freeze. This is real source and process evidence, not power evidence.
+projection freezes one origin with 45 rule-targets. Packet v1 remains byte-immutable historical
+evidence and is not authorized for human delivery. Packet v2 deterministically sanitizes four
+byte-bound, oracle-free SVG contexts, binds their independently reconstructed bytes and target set,
+and binds neutral order to a preregistered public seed plus custodial reconstruction. The seed is committed in this repository and is therefore recoverable, so blinding rests on procedural non-access rather than secrecy; see the annotation protocol. Its sequence-2
+freeze is linked to the unchanged sequence-1 hash. That closes the demonstrated metadata,
+outcome-hint and coherent-reordering paths, but the browser-native process rendering is still not
+a production renderer/font freeze and the local lineage is not an external receipt or trust root.
+This is real source and process evidence, not power evidence.
 There are still zero verified human annotators, zero adjudications, no disclosed holdout outcome,
 no externally verified freeze receipt and no trusted render-capture evidence.
 Accordingly the persisted pilot report is `infrastructure-complete-external-execution-blocked`,

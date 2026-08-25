@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://breaklint.dev/schemas/calibration/blind-packet-v2.schema.json",
+  "title": "breaklint M3-1 opaque executable blind packet v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "packetId",
+    "blinded",
+    "custodialMappingRequired",
+    "humanExecutable",
+    "executionBlocker",
+    "deliveryContract",
+    "orderContract",
+    "targetCount",
+    "targetSetSha256",
+    "blindTargetSetSha256",
+    "targets",
+    "packetSha256"
+  ],
+  "properties": {
+    "contractVersion": { "const": "m3-1-blind-packet-v2" },
+    "packetId": { "type": "string", "pattern": "^blind_packet_[A-Za-z0-9._-]{8,80}$" },
+    "blinded": { "const": true },
+    "custodialMappingRequired": { "const": true },
+    "humanExecutable": { "const": true },
+    "executionBlocker": { "type": "null" },
+    "deliveryContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["annotationBundleOnly", "repositoryAccessPermitted", "sourceManifestAccessPermitted", "splitAccessPermitted"],
+      "properties": {
+        "annotationBundleOnly": { "const": true },
+        "repositoryAccessPermitted": { "const": false },
+        "sourceManifestAccessPermitted": { "const": false },
+        "splitAccessPermitted": { "const": false }
+      }
+    },
+    "orderContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "orderSeedSha256", "orderedBlindTargetIdsSha256", "independentReconstructionRequired"],
+      "properties": {
+        "algorithm": { "const": "sha256-seed-nul-target-id-v1" },
+        "orderSeedSha256": { "$ref": "#/$defs/sha256" },
+        "orderedBlindTargetIdsSha256": { "$ref": "#/$defs/sha256" },
+        "independentReconstructionRequired": { "const": true }
+      }
+    },
+    "targetCount": { "type": "integer", "minimum": 1 },
+    "targetSetSha256": { "$ref": "#/$defs/sha256" },
+    "blindTargetSetSha256": { "$ref": "#/$defs/sha256" },
+    "targets": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/target" } },
+    "packetSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blindTargetId", "ruleId", "neutralOrder", "context"],
+      "properties": {
+        "blindTargetId": { "type": "string", "pattern": "^blind_target_[a-f0-9]{32}$" },
+        "ruleId": { "enum": ["svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport"] },
+        "neutralOrder": { "type": "integer", "minimum": 1 },
+        "context": { "$ref": "#/$defs/context" }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactPath", "artifactSha256", "byteLength", "mediaType", "targetLocator", "renderingContract"],
+      "properties": {
+        "artifactPath": { "type": "string", "pattern": "^blind-context/context_[a-f0-9]{24}\\.svg$" },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "byteLength": { "type": "integer", "minimum": 1 },
+        "mediaType": { "const": "image/svg+xml" },
+        "targetLocator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "structuralPathWithinContext"],
+          "properties": {
+            "mode": { "const": "context-structural-path" },
+            "structuralPathWithinContext": { "type": "string", "minLength": 1, "maxLength": 300 }
+          }
+        },
+        "renderingContract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "externalAssetsFetched", "sourceScope", "sourceByteTreatment", "sanitizerContractVersion", "independentContentVerificationRequired", "limitations"],
+          "properties": {
+            "mode": { "const": "browser-native-isolated-svg" },
+            "externalAssetsFetched": { "const": false },
+            "sourceScope": { "enum": ["exact-svg-document", "embedded-inline-svg-only"] },
+            "sourceByteTreatment": { "const": "deterministic-svg-sanitization-v2" },
+            "sanitizerContractVersion": { "const": "m3-1-svg-blind-sanitizer-v2" },
+            "independentContentVerificationRequired": { "const": true },
+            "limitations": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 12, "maxLength": 500 } }
+          }
+        }
+      }
+    }
+  }
+}

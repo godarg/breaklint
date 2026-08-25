@@ -15,7 +15,9 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 
 import {
   buildBlindPacket,
+  buildBlindPacketV2,
   buildBlindContextArtifacts,
+  buildBlindContextArtifactsV2,
   buildFreezeProjection,
   buildPilotReport,
   buildPublicIntakeManifest,
@@ -24,6 +26,7 @@ import {
   enumerateSvgTextTargets,
   ingestPublicArtifact,
   validateStrictSplits,
+  verifyBlindPacketV2Custodial,
   type PublicArtifactIntakeRequest,
   type PublicIntakeManifestDocument,
   type RuleId,
@@ -126,6 +129,11 @@ export interface PublicPipelineSpec {
   evidence: PublicPipelineEvidenceSpec[];
 }
 
+export interface PublicPipelineSuccessorSpec extends Omit<PublicPipelineSpec, "contractVersion"> {
+  contractVersion: "m3-1-public-pipeline-spec-v2";
+  previousFreezeSha256: string;
+}
+
 function acquireApprovedLocalBytes(root: string, relativePath: string, label: string): Buffer {
   if (!existsSync(root) || lstatSync(root).isSymbolicLink() || !lstatSync(root).isDirectory()) throw new Error(`${label} root must be a real directory`);
   const rootReal = realpathSync(root);
@@ -167,7 +175,9 @@ function verifyExpectedBytes(source: PublicPipelineSourceSpec, bytes: Buffer): v
   if (source.ruleIds.length === 0 || new Set(source.ruleIds).size !== source.ruleIds.length) throw new Error("source ruleIds must be non-empty and unique");
 }
 
-function bundleIndex(root: string, paths: string[], contractVersion: "m3-1-public-pipeline-bundle-index-v1" | "m3-1-blind-annotation-bundle-index-v1"): { contractVersion: "m3-1-public-pipeline-bundle-index-v1" | "m3-1-blind-annotation-bundle-index-v1"; files: Array<{ path: string; sha256: string; byteLength: number }> } {
+type BundleIndexContract = "m3-1-public-pipeline-bundle-index-v1" | "m3-1-blind-annotation-bundle-index-v1" | "m3-1-public-pipeline-bundle-index-v2" | "m3-1-blind-annotation-bundle-index-v2";
+
+function bundleIndex(root: string, paths: string[], contractVersion: BundleIndexContract): { contractVersion: BundleIndexContract; files: Array<{ path: string; sha256: string; byteLength: number }> } {
   return {
     contractVersion,
     files: [...paths].sort().map((path) => {
@@ -184,8 +194,10 @@ function bundleFiles(root: string, prefix = ""): string[] {
   }).sort();
 }
 
-export async function createPublicPipelineBundle(spec: PublicPipelineSpec): Promise<{ outputRoot: string; annotationOutputRoot: string; bundleIndexSha256: string; annotationBundleIndexSha256: string; reportStatus: string }> {
-  if (spec.contractVersion !== "m3-1-public-pipeline-spec-v1") throw new Error("unsupported public pipeline spec");
+export async function createPublicPipelineBundle(spec: PublicPipelineSpec | PublicPipelineSuccessorSpec): Promise<{ outputRoot: string; annotationOutputRoot: string; bundleIndexSha256: string; annotationBundleIndexSha256: string; reportStatus: string }> {
+  if (spec.contractVersion !== "m3-1-public-pipeline-spec-v1" && spec.contractVersion !== "m3-1-public-pipeline-spec-v2") throw new Error("unsupported public pipeline spec");
+  const successor = spec.contractVersion === "m3-1-public-pipeline-spec-v2";
+  if (successor && (!SHA256.test(spec.previousFreezeSha256) || spec.previousFreezeSha256 !== "e9f880a8489e835aeeed89f1d387a8ba6d3be184d6b1297f5711138b95b42de9")) throw new Error("successor pipeline must bind the immutable v1 freeze hash");
   if (!SHA256.test(spec.samplingPlanSha256)) throw new Error("samplingPlanSha256 is invalid");
   assertApprovedOutputRoot(spec.approvedOutputRoot, spec.outputRoot, false);
   assertApprovedOutputRoot(spec.approvedOutputRoot, spec.annotationOutputRoot, false);
@@ -197,6 +209,7 @@ export async function createPublicPipelineBundle(spec: PublicPipelineSpec): Prom
     const splitDocuments: SplitDocument[] = [];
     const allBlindTargets: Parameters<typeof buildBlindPacket>[0]["targets"] = [];
     const contextsByTargetId: Parameters<typeof buildBlindPacket>[0]["contextsByTargetId"] = {};
+    const contextsByTargetIdV2: Parameters<typeof buildBlindPacketV2>[0]["contextsByTargetId"] = {};
     const blindContextArtifacts = new Map<string, Buffer>();
     const evidencePaths: string[] = [];
     const annotationPaths: string[] = [];
@@ -217,8 +230,10 @@ export async function createPublicPipelineBundle(spec: PublicPipelineSpec): Prom
       atomicWrite(evidenceStage, source.outputRelativePath, bytes); evidencePaths.push(source.outputRelativePath);
       const intake = ingestPublicArtifact({ ...source, artifactRoot: evidenceStage, artifactPath: source.outputRelativePath });
       const targets = enumerateSvgTextTargets(bytes, source.ruleIds);
-      const contexts = buildBlindContextArtifacts(bytes, source.mediaType, targets.map((target) => ({ ...target, documentId: intake.documentId })));
-      Object.assign(contextsByTargetId, contexts.contextsByTargetId);
+      const boundTargets = targets.map((target) => ({ ...target, documentId: intake.documentId }));
+      const contexts = successor ? buildBlindContextArtifactsV2(bytes, source.mediaType, boundTargets) : buildBlindContextArtifacts(bytes, source.mediaType, boundTargets);
+      if (successor) Object.assign(contextsByTargetIdV2, contexts.contextsByTargetId);
+      else Object.assign(contextsByTargetId, contexts.contextsByTargetId);
       for (const artifact of contexts.artifacts) {
         const existing = blindContextArtifacts.get(artifact.path);
         if (existing && !existing.equals(artifact.bytes)) throw new Error("blind context path collision");
@@ -230,9 +245,11 @@ export async function createPublicPipelineBundle(spec: PublicPipelineSpec): Prom
     }
     const manifest = buildPublicIntakeManifest({ manifestId: `intake_manifest_${spec.pilotId}`, createdAt: spec.createdAt, documents: manifestDocuments });
     for (const [path, bytes] of [...blindContextArtifacts].sort(([left], [right]) => left.localeCompare(right, "en"))) { atomicWrite(annotationStage, path, bytes); annotationPaths.push(path); }
-    const blindPacket = buildBlindPacket({ packetId: `blind_packet_${spec.pilotId}`, orderSeed: spec.orderSeed, targets: allBlindTargets, contextsByTargetId });
+    const blindPacket = successor
+      ? buildBlindPacketV2({ packetId: `blind_packet_${spec.pilotId}`, orderSeed: spec.orderSeed, targets: allBlindTargets, contextsByTargetId: contextsByTargetIdV2 })
+      : buildBlindPacket({ packetId: `blind_packet_${spec.pilotId}`, orderSeed: spec.orderSeed, targets: allBlindTargets, contextsByTargetId });
     atomicWrite(annotationStage, "blind-packet.json", canonicalJson(blindPacket)); annotationPaths.push("blind-packet.json");
-    const annotationIndex = bundleIndex(annotationStage, annotationPaths, "m3-1-blind-annotation-bundle-index-v1");
+    const annotationIndex = bundleIndex(annotationStage, annotationPaths, successor ? "m3-1-blind-annotation-bundle-index-v2" : "m3-1-blind-annotation-bundle-index-v1");
     atomicWrite(annotationStage, "bundle-index.json", canonicalJson(annotationIndex));
     const annotationBundleIndexSha256 = digest(canonicalJson(annotationIndex));
 
@@ -240,11 +257,11 @@ export async function createPublicPipelineBundle(spec: PublicPipelineSpec): Prom
     if (!splitReport.valid) throw new Error(`origin-strict split validation failed: ${canonicalJson(splitReport.issues)}`);
     const persistedSplitReport = { ...splitReport, assignments: [...splitDocuments].sort((left, right) => left.documentId.localeCompare(right.documentId, "en")).map((document) => ({ documentId: document.documentId, split: document.split, artifactSha256: document.artifactSha256, originGroupId: document.originGroupId, duplicateGroupId: document.duplicateGroupId ?? null, derivationGroupId: document.derivationGroupId ?? null, templateGroupId: document.templateGroupId ?? null, versionGroupId: document.versionGroupId ?? null })) };
     const holdoutDocumentIds = new Set(splitDocuments.filter((document) => document.split === "holdout").map((document) => document.documentId));
-    const freeze = buildFreezeProjection({ contractVersion: "m3-1-freeze-projection-v1", holdoutId: spec.holdoutId, purpose: "holdout-evaluation-preregistration", createdAt: spec.createdAt, frozenAt: spec.createdAt, sequence: 1, previousFreezeSha256: null, blindPacketSha256: blindPacket.packetSha256, blindPacketBundle: { bundleId: `blind_bundle_${spec.pilotId}`, bundleIndexSha256: annotationBundleIndexSha256, indexedFileCount: annotationPaths.length }, samplingPlanSha256: spec.samplingPlanSha256, analysisPlanSha256: spec.analysisPlanSha256, guidelineSha256ByRule: spec.guidelineSha256ByRule, renderer: { status: "blocked-missing-renderer-asset-freeze", rendererFreezeSha256: null, assetManifestSha256: null }, documents: manifestDocuments.filter((document) => holdoutDocumentIds.has(document.documentId)).map((document) => ({ documentId: document.documentId, artifactSha256: document.artifactSha256, split: "holdout", groups: { originGroupId: document.originGroupId, duplicateGroupId: document.duplicateGroupId, derivationGroupId: document.derivationGroupId, templateGroupId: document.templateGroupId, versionGroupId: document.versionGroupId }, source: { sourceLocator: document.sourceLocator, sourceCapturedAt: document.sourceCapturedAt, sourceCaptureMode: document.sourceCaptureMode, firstPartySourceSnapshot: document.firstPartySourceSnapshot, provenanceClass: document.provenanceClass, provenanceEvidenceSha256: document.provenanceEvidenceSha256, rightsBasis: document.rightsBasis, rightsEvidenceSha256: document.rightsEvidenceSha256, privacyClass: document.privacyClass, privacyEvidenceSha256: document.privacyEvidenceSha256, founderAuthorizationSha256: document.founderAuthorizationSha256 }, targets: document.targets.map((target) => ({ targetId: target.targetId, ruleId: target.ruleId })) })) });
+    const freeze = buildFreezeProjection({ contractVersion: "m3-1-freeze-projection-v1", holdoutId: spec.holdoutId, purpose: "holdout-evaluation-preregistration", createdAt: spec.createdAt, frozenAt: spec.createdAt, sequence: successor ? 2 : 1, previousFreezeSha256: successor ? spec.previousFreezeSha256 : null, blindPacketSha256: blindPacket.packetSha256, blindPacketBundle: { bundleId: `blind_bundle_${spec.pilotId}`, bundleIndexSha256: annotationBundleIndexSha256, indexedFileCount: annotationPaths.length }, samplingPlanSha256: spec.samplingPlanSha256, analysisPlanSha256: spec.analysisPlanSha256, guidelineSha256ByRule: spec.guidelineSha256ByRule, renderer: { status: "blocked-missing-renderer-asset-freeze", rendererFreezeSha256: null, assetManifestSha256: null }, documents: manifestDocuments.filter((document) => holdoutDocumentIds.has(document.documentId)).map((document) => ({ documentId: document.documentId, artifactSha256: document.artifactSha256, split: "holdout", groups: { originGroupId: document.originGroupId, duplicateGroupId: document.duplicateGroupId, derivationGroupId: document.derivationGroupId, templateGroupId: document.templateGroupId, versionGroupId: document.versionGroupId }, source: { sourceLocator: document.sourceLocator, sourceCapturedAt: document.sourceCapturedAt, sourceCaptureMode: document.sourceCaptureMode, firstPartySourceSnapshot: document.firstPartySourceSnapshot, provenanceClass: document.provenanceClass, provenanceEvidenceSha256: document.provenanceEvidenceSha256, rightsBasis: document.rightsBasis, rightsEvidenceSha256: document.rightsEvidenceSha256, privacyClass: document.privacyClass, privacyEvidenceSha256: document.privacyEvidenceSha256, founderAuthorizationSha256: document.founderAuthorizationSha256 }, targets: document.targets.map((target) => ({ targetId: target.targetId, ruleId: target.ruleId })) })) });
     const report = buildPilotReport({ pilotId: spec.pilotId, createdAt: spec.createdAt, manifestReference: { artifactId: manifest.manifestId, artifactSha256: digest(canonicalJson(manifest)), artifactContractVersion: manifest.contractVersion }, samplingPlanId: spec.samplingPlanId, samplingPlanSha256: spec.samplingPlanSha256, artifactCount: manifestDocuments.length, realDocumentCount: manifestDocuments.filter((document) => document.realDocumentEligible).length, originGroupCount: new Set(manifestDocuments.map((document) => document.originGroupId)).size, sourceGateValid: true, annotationGateValid: false, splitGateValid: true, externalFreezeValid: false, externalTrustValid: false, captureEvidenceValid: false });
     for (const [path, value] of [["intake-manifest.json", manifest], ["split-report.json", persistedSplitReport], ["freeze-projection.json", freeze], ["pilot-report.json", report]] as const) { atomicWrite(evidenceStage, path, canonicalJson(value)); evidencePaths.push(path); }
     atomicWrite(evidenceStage, "m3-0-readiness-bridge.json", canonicalJson(buildM31ToM30ReadinessBridge(evidenceStage))); evidencePaths.push("m3-0-readiness-bridge.json");
-    const evidenceIndex = bundleIndex(evidenceStage, evidencePaths, "m3-1-public-pipeline-bundle-index-v1");
+    const evidenceIndex = bundleIndex(evidenceStage, evidencePaths, successor ? "m3-1-public-pipeline-bundle-index-v2" : "m3-1-public-pipeline-bundle-index-v1");
     atomicWrite(evidenceStage, "bundle-index.json", canonicalJson(evidenceIndex));
     const bundleIndexSha256 = digest(canonicalJson(evidenceIndex));
     renameSync(annotationStage, spec.annotationOutputRoot);
@@ -261,7 +278,9 @@ function readJson(path: string): unknown {
   return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(path))) as unknown;
 }
 
-export function verifyPublicPipelineBundle(spec: PublicPipelineSpec): { valid: boolean; issues: string[]; bundleIndexSha256: string; annotationBundleIndexSha256: string } {
+export function verifyPublicPipelineBundle(spec: PublicPipelineSpec | PublicPipelineSuccessorSpec): { valid: boolean; issues: string[]; bundleIndexSha256: string; annotationBundleIndexSha256: string } {
+  const successor = spec.contractVersion === "m3-1-public-pipeline-spec-v2";
+  if (successor && (!SHA256.test(spec.previousFreezeSha256) || spec.previousFreezeSha256 !== "e9f880a8489e835aeeed89f1d387a8ba6d3be184d6b1297f5711138b95b42de9")) throw new Error("successor pipeline must bind the immutable v1 freeze hash");
   assertApprovedOutputRoot(spec.approvedOutputRoot, spec.outputRoot, true);
   assertApprovedOutputRoot(spec.approvedOutputRoot, spec.annotationOutputRoot, true);
   const issues: string[] = [];
@@ -269,8 +288,8 @@ export function verifyPublicPipelineBundle(spec: PublicPipelineSpec): { valid: b
   const annotationIndexPath = safeChild(spec.annotationOutputRoot, "bundle-index.json", "annotation bundle index");
   const index = readJson(indexPath) as { contractVersion?: unknown; files?: unknown };
   const annotationIndex = readJson(annotationIndexPath) as { contractVersion?: unknown; files?: unknown };
-  if (index.contractVersion !== "m3-1-public-pipeline-bundle-index-v1" || !Array.isArray(index.files)) throw new Error("evidence bundle index is invalid");
-  if (annotationIndex.contractVersion !== "m3-1-blind-annotation-bundle-index-v1" || !Array.isArray(annotationIndex.files)) throw new Error("annotation bundle index is invalid");
+  if (index.contractVersion !== (successor ? "m3-1-public-pipeline-bundle-index-v2" : "m3-1-public-pipeline-bundle-index-v1") || !Array.isArray(index.files)) throw new Error("evidence bundle index is invalid");
+  if (annotationIndex.contractVersion !== (successor ? "m3-1-blind-annotation-bundle-index-v2" : "m3-1-blind-annotation-bundle-index-v1") || !Array.isArray(annotationIndex.files)) throw new Error("annotation bundle index is invalid");
 
   const expectedEvidencePaths = [...spec.sources.map((source) => source.outputRelativePath), ...spec.evidence.map((evidence) => evidence.outputRelativePath), "freeze-projection.json", "intake-manifest.json", "m3-0-readiness-bridge.json", "pilot-report.json", "split-report.json"].sort();
   const verifyIndexedBundle = (root: string, actual: { files?: unknown }, expectedPaths: string[], prefix: string): void => {
@@ -298,6 +317,7 @@ export function verifyPublicPipelineBundle(spec: PublicPipelineSpec): { valid: b
   const splitDocuments: SplitDocument[] = [];
   const blindTargets: Parameters<typeof buildBlindPacket>[0]["targets"] = [];
   const contextsByTargetId: Parameters<typeof buildBlindPacket>[0]["contextsByTargetId"] = {};
+  const contextsByTargetIdV2: Parameters<typeof buildBlindPacketV2>[0]["contextsByTargetId"] = {};
   const contextArtifacts = new Map<string, Buffer>();
   for (const source of [...spec.sources].sort((left, right) => left.sourceLocator.localeCompare(right.sourceLocator, "en"))) {
     try {
@@ -306,8 +326,11 @@ export function verifyPublicPipelineBundle(spec: PublicPipelineSpec): { valid: b
       verifyExpectedBytes(source, bytes);
       const intake = ingestPublicArtifact({ ...source, artifactRoot: spec.outputRoot, artifactPath: source.outputRelativePath });
       const targets = enumerateSvgTextTargets(bytes, source.ruleIds);
-      const contexts = buildBlindContextArtifacts(bytes, source.mediaType, targets.map((target) => ({ ...target, documentId: intake.documentId })));
-      Object.assign(contextsByTargetId, contexts.contextsByTargetId); for (const artifact of contexts.artifacts) contextArtifacts.set(artifact.path, artifact.bytes);
+      const boundTargets = targets.map((target) => ({ ...target, documentId: intake.documentId }));
+      const contexts = successor ? buildBlindContextArtifactsV2(bytes, source.mediaType, boundTargets) : buildBlindContextArtifacts(bytes, source.mediaType, boundTargets);
+      if (successor) Object.assign(contextsByTargetIdV2, contexts.contextsByTargetId);
+      else Object.assign(contextsByTargetId, contexts.contextsByTargetId);
+      for (const artifact of contexts.artifacts) contextArtifacts.set(artifact.path, artifact.bytes);
       manifestDocuments.push({ ...intake, mediaType: source.mediaType, publicRelativePath: source.outputRelativePath, targets });
       splitDocuments.push({ documentId: intake.documentId, split: source.split, artifactSha256: intake.artifactSha256, originGroupId: intake.originGroupId, duplicateGroupId: intake.duplicateGroupId, derivationGroupId: intake.derivationGroupId, templateGroupId: intake.templateGroupId, versionGroupId: intake.versionGroupId });
       blindTargets.push(...targets.map((target) => ({ ...target, documentId: intake.documentId })));
@@ -319,19 +342,26 @@ export function verifyPublicPipelineBundle(spec: PublicPipelineSpec): { valid: b
   verifyIndexedBundle(spec.annotationOutputRoot, annotationIndex, expectedAnnotationPaths, "annotation-bundle");
   if (manifestDocuments.length === spec.sources.length) {
     const expectedManifest = buildPublicIntakeManifest({ manifestId: `intake_manifest_${spec.pilotId}`, createdAt: spec.createdAt, documents: manifestDocuments });
-    const expectedBlindPacket = buildBlindPacket({ packetId: `blind_packet_${spec.pilotId}`, orderSeed: spec.orderSeed, targets: blindTargets, contextsByTargetId });
+    const expectedBlindPacket = successor
+      ? buildBlindPacketV2({ packetId: `blind_packet_${spec.pilotId}`, orderSeed: spec.orderSeed, targets: blindTargets, contextsByTargetId: contextsByTargetIdV2 })
+      : buildBlindPacket({ packetId: `blind_packet_${spec.pilotId}`, orderSeed: spec.orderSeed, targets: blindTargets, contextsByTargetId });
     const expectedAnnotationFiles = new Map<string, Buffer>([["blind-packet.json", Buffer.from(canonicalJson(expectedBlindPacket))], ...[...contextArtifacts].map(([path, bytes]) => [path, bytes] as [string, Buffer])]);
-    const expectedAnnotationIndex = { contractVersion: "m3-1-blind-annotation-bundle-index-v1" as const, files: [...expectedAnnotationFiles].sort(([left], [right]) => left.localeCompare(right, "en")).map(([path, bytes]) => ({ path, sha256: digest(bytes), byteLength: bytes.length })) };
+    const expectedAnnotationIndex = { contractVersion: successor ? "m3-1-blind-annotation-bundle-index-v2" as const : "m3-1-blind-annotation-bundle-index-v1" as const, files: [...expectedAnnotationFiles].sort(([left], [right]) => left.localeCompare(right, "en")).map(([path, bytes]) => ({ path, sha256: digest(bytes), byteLength: bytes.length })) };
     if (canonicalJson(annotationIndex) !== canonicalJson(expectedAnnotationIndex)) issues.push("annotation-bundle-index-independent-recompute-mismatch");
     for (const [path, bytes] of expectedAnnotationFiles) { try { if (!readFileSync(safeChild(spec.annotationOutputRoot, path, "annotation deliverable")).equals(bytes)) issues.push(`spec-derived-annotation-drift:${path}`); } catch { issues.push(`spec-derived-annotation-missing:${path}`); } }
+    if (successor) {
+      const actualPacket = readJson(safeChild(spec.annotationOutputRoot, "blind-packet.json", "blind packet v2"));
+      const custodial = verifyBlindPacketV2Custodial({ packet: actualPacket, packetId: `blind_packet_${spec.pilotId}`, orderSeed: spec.orderSeed, targets: blindTargets, contextsByTargetId: contextsByTargetIdV2, artifactsByPath: contextArtifacts });
+      for (const issue of custodial.issues) issues.push(`blind-packet-v2:${issue}`);
+    }
     const splitValidation = validateStrictSplits(splitDocuments);
     const expectedSplitReport = { ...splitValidation, assignments: [...splitDocuments].sort((left, right) => left.documentId.localeCompare(right.documentId, "en")).map((document) => ({ documentId: document.documentId, split: document.split, artifactSha256: document.artifactSha256, originGroupId: document.originGroupId, duplicateGroupId: document.duplicateGroupId ?? null, derivationGroupId: document.derivationGroupId ?? null, templateGroupId: document.templateGroupId ?? null, versionGroupId: document.versionGroupId ?? null })) };
     const holdoutIds = new Set(splitDocuments.filter((document) => document.split === "holdout").map((document) => document.documentId));
-    const expectedFreeze = buildFreezeProjection({ contractVersion: "m3-1-freeze-projection-v1", holdoutId: spec.holdoutId, purpose: "holdout-evaluation-preregistration", createdAt: spec.createdAt, frozenAt: spec.createdAt, sequence: 1, previousFreezeSha256: null, blindPacketSha256: expectedBlindPacket.packetSha256, blindPacketBundle: { bundleId: `blind_bundle_${spec.pilotId}`, bundleIndexSha256: digest(canonicalJson(expectedAnnotationIndex)), indexedFileCount: expectedAnnotationPaths.length }, samplingPlanSha256: spec.samplingPlanSha256, analysisPlanSha256: spec.analysisPlanSha256, guidelineSha256ByRule: spec.guidelineSha256ByRule, renderer: { status: "blocked-missing-renderer-asset-freeze", rendererFreezeSha256: null, assetManifestSha256: null }, documents: manifestDocuments.filter((document) => holdoutIds.has(document.documentId)).map((document) => ({ documentId: document.documentId, artifactSha256: document.artifactSha256, split: "holdout", groups: { originGroupId: document.originGroupId, duplicateGroupId: document.duplicateGroupId, derivationGroupId: document.derivationGroupId, templateGroupId: document.templateGroupId, versionGroupId: document.versionGroupId }, source: { sourceLocator: document.sourceLocator, sourceCapturedAt: document.sourceCapturedAt, sourceCaptureMode: document.sourceCaptureMode, firstPartySourceSnapshot: document.firstPartySourceSnapshot, provenanceClass: document.provenanceClass, provenanceEvidenceSha256: document.provenanceEvidenceSha256, rightsBasis: document.rightsBasis, rightsEvidenceSha256: document.rightsEvidenceSha256, privacyClass: document.privacyClass, privacyEvidenceSha256: document.privacyEvidenceSha256, founderAuthorizationSha256: document.founderAuthorizationSha256 }, targets: document.targets.map((target) => ({ targetId: target.targetId, ruleId: target.ruleId })) })) });
+    const expectedFreeze = buildFreezeProjection({ contractVersion: "m3-1-freeze-projection-v1", holdoutId: spec.holdoutId, purpose: "holdout-evaluation-preregistration", createdAt: spec.createdAt, frozenAt: spec.createdAt, sequence: successor ? 2 : 1, previousFreezeSha256: successor ? spec.previousFreezeSha256 : null, blindPacketSha256: expectedBlindPacket.packetSha256, blindPacketBundle: { bundleId: `blind_bundle_${spec.pilotId}`, bundleIndexSha256: digest(canonicalJson(expectedAnnotationIndex)), indexedFileCount: expectedAnnotationPaths.length }, samplingPlanSha256: spec.samplingPlanSha256, analysisPlanSha256: spec.analysisPlanSha256, guidelineSha256ByRule: spec.guidelineSha256ByRule, renderer: { status: "blocked-missing-renderer-asset-freeze", rendererFreezeSha256: null, assetManifestSha256: null }, documents: manifestDocuments.filter((document) => holdoutIds.has(document.documentId)).map((document) => ({ documentId: document.documentId, artifactSha256: document.artifactSha256, split: "holdout", groups: { originGroupId: document.originGroupId, duplicateGroupId: document.duplicateGroupId, derivationGroupId: document.derivationGroupId, templateGroupId: document.templateGroupId, versionGroupId: document.versionGroupId }, source: { sourceLocator: document.sourceLocator, sourceCapturedAt: document.sourceCapturedAt, sourceCaptureMode: document.sourceCaptureMode, firstPartySourceSnapshot: document.firstPartySourceSnapshot, provenanceClass: document.provenanceClass, provenanceEvidenceSha256: document.provenanceEvidenceSha256, rightsBasis: document.rightsBasis, rightsEvidenceSha256: document.rightsEvidenceSha256, privacyClass: document.privacyClass, privacyEvidenceSha256: document.privacyEvidenceSha256, founderAuthorizationSha256: document.founderAuthorizationSha256 }, targets: document.targets.map((target) => ({ targetId: target.targetId, ruleId: target.ruleId })) })) });
     const expectedReport = buildPilotReport({ pilotId: spec.pilotId, createdAt: spec.createdAt, manifestReference: { artifactId: expectedManifest.manifestId, artifactSha256: digest(canonicalJson(expectedManifest)), artifactContractVersion: expectedManifest.contractVersion }, samplingPlanId: spec.samplingPlanId, samplingPlanSha256: spec.samplingPlanSha256, artifactCount: manifestDocuments.length, realDocumentCount: manifestDocuments.filter((document) => document.realDocumentEligible).length, originGroupCount: new Set(manifestDocuments.map((document) => document.originGroupId)).size, sourceGateValid: true, annotationGateValid: false, splitGateValid: splitValidation.valid, externalFreezeValid: false, externalTrustValid: false, captureEvidenceValid: false });
     for (const [path, expected] of [["intake-manifest.json", expectedManifest], ["split-report.json", expectedSplitReport], ["freeze-projection.json", expectedFreeze], ["pilot-report.json", expectedReport]] as const) { try { if (canonicalJson(readJson(safeChild(spec.outputRoot, path, path))) !== canonicalJson(expected)) issues.push(`spec-derived-artifact-drift:${path}`); } catch { issues.push(`spec-derived-artifact-missing:${path}`); } }
   }
   try { issues.push(...verifyStoredM31ToM30ReadinessBridge(spec.outputRoot).issues); } catch { issues.push("m3-0-readiness-bridge-missing-or-invalid"); }
-  try { const expectedIndex = bundleIndex(spec.outputRoot, expectedEvidencePaths, "m3-1-public-pipeline-bundle-index-v1"); if (canonicalJson(index) !== canonicalJson(expectedIndex)) issues.push("bundle-index-independent-recompute-mismatch"); } catch { issues.push("bundle-index-independent-recompute-failed"); }
+  try { const expectedIndex = bundleIndex(spec.outputRoot, expectedEvidencePaths, successor ? "m3-1-public-pipeline-bundle-index-v2" : "m3-1-public-pipeline-bundle-index-v1"); if (canonicalJson(index) !== canonicalJson(expectedIndex)) issues.push("bundle-index-independent-recompute-mismatch"); } catch { issues.push("bundle-index-independent-recompute-failed"); }
   return { valid: issues.length === 0, issues: [...new Set(issues)].sort(), bundleIndexSha256: digest(readFileSync(indexPath)), annotationBundleIndexSha256: digest(readFileSync(annotationIndexPath)) };
 }

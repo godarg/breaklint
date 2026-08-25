@@ -1,6 +1,6 @@
 # M3-1 Split and Holdout Method v1
 
-Status: preregistered method; no split, freeze, receipt, or holdout evaluation is asserted here
+Status: preregistered method with a local successor-freeze demonstrator; no external receipt or holdout evaluation is asserted here
 
 ## 1. Principle
 
@@ -59,6 +59,8 @@ The frozen projection includes, at minimum:
 
 The projection is canonicalized and hashed. The freeze becomes externally evidenced only when an independent receipt binds that projection hash, subject, purpose, contract version, time, sequence, and predecessor/checkpoint. A local manifest hash, Git commit, self-signature, or `previousManifest` field alone is not an external freeze.
 
+The additive public v2 demonstrator records sequence `2` and binds `previousFreezeSha256=e9f880a8489e835aeeed89f1d387a8ba6d3be184d6b1297f5711138b95b42de9`, the immutable sequence-1 projection. It binds packet-v2 bytes and the v2 annotation bundle index; sequence 1 and all packet-v1 bytes remain unchanged. This proves local hash lineage and the negative controls only. It does not create an independent receipt, external trust root, human annotation, adjudication, calibration, or release authorization.
+
 ## 6. External receipt boundary
 
 The receipt must be created before holdout evaluation and verified against a trust policy obtained independently of the producer-supplied corpus/result bundle. Capture evidence and the attestor trust root are separate: evidence that a receipt was captured does not prove that its signer is trusted.
@@ -93,6 +95,10 @@ Before evaluation, fail the lineage for any of these conditions:
 - holdout label or result visible to a prohibited role;
 - outcome-dependent target removal or split balancing;
 - coordinated rehashing or ID substitution intended to evade group matching;
+- packet target-set count, uniqueness, or source commitment mismatch;
+- neutral order that cannot be independently reconstructed from the committed seed/target contract;
+- blind context that is not byte-equal to independent deterministic sanitization of the bound source;
+- comments, editor/RDF metadata, authored source IDs, private paths, foreign namespaces, embedded `data:` metadata, or outcome hints in an annotator-visible context;
 - target identity not bound to frozen bytes;
 - freeze change without a new lineage and receipt;
 - receipt created after evaluation;

@@ -9,20 +9,27 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 
 import {
   buildBlindPacket,
+  buildBlindPacketV2,
   buildBlindContextArtifacts,
+  buildBlindContextArtifactsV2,
   buildFreezeProjection,
   buildPilotReport,
   buildPublicIntakeManifest,
+  canonicalJson,
   deriveStableTargetId,
   enumerateSvgTextTargets,
   ingestPublicArtifact,
   PINNED_M3_1_TRUST_POLICY,
   PINNED_M3_1_TRUST_POLICY_SHA256,
   scanStagedPublicArtifacts,
+  sanitizeBlindSvgContextV2,
   validateAnnotationChronology,
   validateAnnotationWorkflow,
   validateStrictSplits,
   verifyExternalTrust,
+  verifyBlindPacketV2Custodial,
+  verifyBlindPacketV2Public,
+  verifySanitizedBlindSvgContextV2,
   type ExternalAttestationProof,
   type ExternalFreezeReceipt,
 } from "../tools/calibration/m3-1-pilot.ts";
@@ -211,6 +218,268 @@ describe("M3-1 additive public-pilot infrastructure", () => {
       () => buildBlindContextArtifacts(Buffer.from('<svg><style>text{font:url(../font.woff2)}</style><text>Target</text></svg>'), "image/svg+xml", [{ ...enumerateSvgTextTargets(Buffer.from('<svg><style>text{font:url(../font.woff2)}</style><text>Target</text></svg>'), ["svg/text-clipped"])[0]!, documentId: `doc_${"3".repeat(32)}` }]),
       /external asset fetch/u,
     );
+  });
+
+  it("deterministically sanitizes editor metadata, comments and authored IDs", () => {
+    const source = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" inkscape:version="1.2" sodipodi:docname="private-source.svg" data-generator="Private Export Tool 7"><!-- Created with Inkscape --><sodipodi:namedview inkscape:window-x="1912"/><defs><linearGradient id="source-gradient"/></defs><rect id="private-shape-name" fill="url(#source-gradient)"/><text id="private-label">Neutral label</text></svg>';
+    const first = sanitizeBlindSvgContextV2(source);
+    const second = sanitizeBlindSvgContextV2(source);
+    assert.equal(first, second);
+    assert.equal(sanitizeBlindSvgContextV2(first), first);
+    assert.equal(/(?:inkscape|sodipodi|private-source|private-shape|private-label|source-gradient|<!--)/iu.test(first), false);
+    assert.match(first, /id="blind-id-000001"/u);
+    assert.match(first, /fill="url\(#blind-id-000001\)"/u);
+    assert.deepEqual(verifySanitizedBlindSvgContextV2(Buffer.from(first)), { valid: true, issues: [] });
+  });
+
+  it("fails closed on outcome hints, opaque source paths, data URLs, processing instructions and foreign namespaces", () => {
+    const encodedSvgPayload = ["PHN2", "Zz4="].join("");
+    const privateSourcePath = ["/", "Us", "ers", "/fixture-user/private/source.svg"].join("");
+    const blocked = [
+      '<svg><text>breaklint result: finding</text></svg>',
+      `<svg><image href="data:image/svg+xml;base64,${encodedSvgPayload}"/><text>Neutral</text></svg>`,
+      '<?packet finding="positive"?><svg><text>Neutral</text></svg>',
+      '<svg xmlns:vendor="https://vendor.invalid/ns"><vendor:payload>Neutral</vendor:payload><text>Neutral</text></svg>',
+      '<svg><script>throw new Error("active")</script><text>Neutral</text></svg>',
+      '<svg><foreignObject><iframe src="about:blank"></iframe></foreignObject><text>Neutral</text></svg>',
+      '<svg><text onclick="alert(1)">Neutral</text></svg>',
+      '<svg><animate attributeName="x" values="0;1"/><text>Neutral</text></svg>',
+      '<svg><set attributeName="visibility" to="hidden"/><text>Neutral</text></svg>',
+      '<svg><style>#source-id { display: none }</style><text id="source-id">Neutral</text></svg>',
+      '<svg><image href=https://example.test/private.png/><text>Neutral</text></svg>',
+      `<svg data-source=${privateSourcePath}><text>Neutral</text></svg>`,
+      '<svg><text id="first" ID="second">Neutral</text></svg>',
+      '<svg><text>f&#105;nding: positive</text></svg>',
+      '<svg><image href="&#35;source-id"/><text id="source-id">Neutral</text></svg>',
+      String.raw`<svg><text style="fill:url(\68 ttps://attacker.invalid/x)">Neutral</text></svg>`,
+      String.raw`<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:u\72 l(https://example.invalid/pixel)"/></svg>`,
+      '<svg><text>result: pass</text></svg>',
+      '<svg><text>result: fail</text></svg>',
+      '<svg><text>verdict: pass</text></svg>',
+      '<svg><text>r&#101;sult: fail</text></svg>',
+    ];
+    for (const source of blocked) assert.throws(() => sanitizeBlindSvgContextV2(source), /(?:outcome hint|data URL|processing instruction|unknown namespace|active or independently mutable content|event handler|must be quoted|duplicate attribute|character reference|backslash or CSS escape)/u, source);
+    const hiddenChannels = sanitizeBlindSvgContextV2(`<svg data-source="${privateSourcePath}"><title>finding: positive</title><desc>source.svg</desc><text class="outcome_fail" aria-label="severity: high" role="status">Neutral</text></svg>`);
+    assert.equal(/(?:data-source|<title|<desc|class=|aria-|role=|finding|outcome|severity|source\.svg)/iu.test(hiddenChannels), false);
+    const metadataOnly = sanitizeBlindSvgContextV2('<svg><metadata><dc:title>finding: positive</dc:title></metadata><text>Neutral</text></svg>');
+    assert.equal(metadataOnly.includes("finding"), false);
+    const idOnly = sanitizeBlindSvgContextV2('<svg><text id="finding-positive">Neutral</text></svg>');
+    assert.equal(idOnly.includes("finding"), false);
+    const commentOnly = sanitizeBlindSvgContextV2('<svg><!-- finding: positive --><text>Neutral</text></svg>');
+    assert.equal(commentOnly.includes("finding"), false);
+  });
+
+  it("rejects each reported blind-context escape counterexample for its own specific reason", () => {
+    // Exact counterexamples from the independent final review of 54fa14d. A real Chrome resolves
+    // both CSS-escape forms to url("https://…invalid/…") and requests them, so a sanitizer that
+    // returns them unchanged hands the annotator an external, outcome-carrying resource channel.
+    const cssEscape: ReadonlyArray<readonly [string, string]> = [
+      ["reviewer u\\72 l form", String.raw`<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:u\72 l(https://example.invalid/pixel)"/></svg>`],
+      ["reviewer \\68 ttps form", String.raw`<svg><text style="fill:url(\68 ttps://attacker.invalid/x)">Neutral</text></svg>`],
+    ];
+    for (const [label, source] of cssEscape) {
+      assert.throws(() => sanitizeBlindSvgContextV2(source), /blind SVG context attribute style contains a backslash or CSS escape/u, label);
+    }
+
+    // Outcome hints keyed on `result` / `verdict`, including a character-reference spelling.
+    const outcomeHints: ReadonlyArray<readonly [string, string]> = [
+      ["result: pass", '<svg xmlns="http://www.w3.org/2000/svg"><text>result: pass</text></svg>'],
+      ["result: fail", '<svg xmlns="http://www.w3.org/2000/svg"><text>result: fail</text></svg>'],
+      ["verdict: pass", '<svg xmlns="http://www.w3.org/2000/svg"><text>verdict: pass</text></svg>'],
+      ["entity-encoded result: fail", '<svg xmlns="http://www.w3.org/2000/svg"><text>r&#101;sult: fail</text></svg>'],
+    ];
+    for (const [label, source] of outcomeHints) {
+      assert.throws(() => sanitizeBlindSvgContextV2(source), /blind SVG context contains an outcome hint/u, label);
+    }
+
+    // Positive control: the ban is on the escape channel, not on ordinary presentational style.
+    const benign = sanitizeBlindSvgContextV2('<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:#101010"/><text>Neutral</text></svg>');
+    assert.equal(benign.includes("fill:#101010"), true);
+    assert.equal(sanitizeBlindSvgContextV2(benign), benign);
+  });
+
+  it("refuses external attribute references by allowlist, including the backslash-free counterexamples", () => {
+    // A second independent review defeated the backslash ban without any backslash. Both of these
+    // produced an annotator context that the fixed-point verifier called valid and that a real
+    // Chrome fetched from, while the rendering contract still asserted externalAssetsFetched:false.
+    assert.throws(
+      () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='fill:url("https://attacker.invalid/beacon"/*c*/)'>Alpha</text></svg>`),
+      /contains a CSS comment/u,
+      "url() with a trailing CSS comment escaped the bare-token pattern",
+    );
+    assert.throws(
+      () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='mask-image:image-set("https://attacker.invalid/mask" 1x)'>Beta</text></svg>`),
+      /calls a non-allowlisted function: image-set/u,
+      "image-set never spells url(, so no url() pattern can catch it",
+    );
+
+    // The guard must be an allowlist, not a longer denylist: a function nobody enumerated is refused
+    // on the sole ground that it was never permitted.
+    for (const [label, fn] of [["cross-fade", "cross-fade(url(https://a.invalid/x) 50%)"], ["element", "element(#src)"], ["var", "var(--leak)"], ["image", "image(https://a.invalid/x)"]] as const) {
+      assert.throws(
+        () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:${fn}"/><text>Neutral</text></svg>`),
+        /calls a non-allowlisted function|references a url\(\) target that is not a same-document fragment/u,
+        label,
+      );
+    }
+
+    // A url() that leaves the document is refused however it is spelled or quoted.
+    for (const value of ['url(https://a.invalid/x)', "url('https://a.invalid/x')", 'url( https://a.invalid/x )']) {
+      assert.throws(
+        () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><rect fill="${value}"/><text>Neutral</text></svg>`),
+        /references a url\(\) target that is not a same-document fragment/u,
+        value,
+      );
+    }
+
+    // Positive controls: the geometry and same-document references the real corpus depends on must
+    // survive untouched, otherwise the allowlist would silently invalidate the frozen contexts.
+    const legitimate = '<svg xmlns="http://www.w3.org/2000/svg"><rect transform="matrix(0.8,0,0,0.8,10,0)" fill="url(#blind-id-000001)"/><g transform="translate(-198.42,-232.06) scale(2)"><text>Neutral</text></g></svg>';
+    const kept = sanitizeBlindSvgContextV2(legitimate);
+    assert.equal(kept.includes('matrix(0.8,0,0,0.8,10,0)'), true);
+    assert.equal(kept.includes('url(#blind-id-000001)'), true);
+    assert.equal(kept.includes('translate(-198.42,-232.06) scale(2)'), true);
+    assert.equal(sanitizeBlindSvgContextV2(kept), kept);
+  });
+
+  it("refuses an unterminated url(, which CSS closes at end-of-input and a browser still fetches", () => {
+    // A third independent review defeated the target check with one missing `)`. CSS closes an
+    // unterminated function at EOF, so a browser treats `url(https://host/x` as a complete url(),
+    // while every paren-terminated pattern simply never matches it. Real Chrome fetched from nine
+    // such channels while the verifier reported the produced artifact valid.
+    const channels = ["mask-image", "fill", "background-image", "marker-start", "clip-path", "stroke", "filter"];
+    for (const property of channels) {
+      assert.throws(
+        () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='${property}:url(https://attacker.invalid/x'>Alpha</text></svg>`),
+        /contains unbalanced parentheses/u,
+        property,
+      );
+    }
+    // Spelling variants of the same hole.
+    for (const [label, value] of [["uppercase", "URL(https://attacker.invalid/e1"], ["quoted", 'url("https://attacker.invalid/a4"'], ["trailing newline", "url(https://attacker.invalid/f15\n"]] as const) {
+      assert.throws(
+        () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='fill:${value}'>Alpha</text></svg>`),
+        /contains unbalanced parentheses/u,
+        label,
+      );
+    }
+    // A stray closing paren is equally unbalanced and equally refused.
+    assert.throws(
+      () => sanitizeBlindSvgContextV2('<svg xmlns="http://www.w3.org/2000/svg"><text style="fill:#101010)">Alpha</text></svg>'),
+      /contains unbalanced parentheses/u,
+    );
+    // Positive controls: balanced geometry and same-document references stay accepted, including the
+    // quoted fragment form that the first version of this guard wrongly refused.
+    for (const value of ['url(#g)', "url('#g')", 'url(#g)']) {
+      const kept = sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text fill="${value}">Alpha</text></svg>`);
+      assert.equal(kept.includes("Alpha"), true, value);
+    }
+  });
+
+  it("refuses an open url() even when a decoy paren rebalances the declaration list", () => {
+    // A fourth independent review defeated the round-4 balance rule. Balance is a COUNT over the
+    // whole attribute value, but a style attribute is a DECLARATION LIST: a stray `)` in one
+    // declaration rebalances the value while a later `url(` stays open. All three round-4
+    // conditions then hold — balanced parens, allowlisted function names, no comment — and real
+    // Chrome still fetched. The target check therefore no longer depends on a closing paren: every
+    // `url(` opening yields a target read to its `)` or to the end of the value.
+    const decoys = [
+      ["translate", "transform:translate(1px));mask-image:url(https://attacker.invalid/b1"],
+      ["scale", "transform:scale(1));background-image:url(https://attacker.invalid/b3"],
+      ["rotate", "transform:rotate(1deg));fill:url(https://attacker.invalid/b4"],
+      ["content", "transform:scale(1));content:url(https://attacker.invalid/b5"],
+      ["shape-outside", "transform:scale(1));shape-outside:url(https://attacker.invalid/b6"],
+      ["list-style-image", "transform:scale(1));list-style-image:url(https://attacker.invalid/b7"],
+      ["border-image-source", "transform:scale(1));border-image-source:url(https://attacker.invalid/b8"],
+      // `.png` rather than `.svg`, so SVG_PRIVATE_PATH_HINT cannot be the thing that catches it.
+      ["filter png", "transform:scale(1));filter:url(https://attacker.invalid/x.png"],
+    ] as const;
+    for (const [label, value] of decoys) {
+      assert.throws(
+        () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='${value}'>Alpha</text></svg>`),
+        /references a url\(\) target that is not a same-document fragment/u,
+        label,
+      );
+    }
+    // The `content:')'` decoy carries a single quote, so it needs a double-quoted attribute.
+    assert.throws(
+      () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style="content:')';mask-image:url(https://attacker.invalid/b2">Alpha</text></svg>`),
+      /references a url\(\) target that is not a same-document fragment/u,
+      "quoted paren",
+    );
+    // A double-quoted external target needs a single-quoted attribute to exist at all.
+    assert.throws(
+      () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='fill:url("https://attacker.invalid/x")'>Alpha</text></svg>`),
+      /references a url\(\) target that is not a same-document fragment/u,
+    );
+    // Positive controls: legitimate declaration lists that mix geometry with same-document
+    // references must survive, including two url() targets in one value.
+    for (const value of ["fill:url(#a);stroke:url(#b)", "mask-image:url(#m);transform:translate(1px)", "transform:matrix(1,0,0,1,0,0);fill:url(#blind-id-000001)"]) {
+      const kept = sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='${value}'>Alpha</text></svg>`);
+      assert.equal(kept.includes("Alpha"), true, value);
+      assert.equal(sanitizeBlindSvgContextV2(kept), kept, value);
+    }
+  });
+
+  it("refuses namespaced attributes outside the two the corpus actually needs", () => {
+    // The prefix allowlist admitted `xlink`/`xml` wholesale. An authored `xml:id` is not rewritten
+    // by the idMap -- that rewrite keys on the local name `id` -- so a source-identifying value
+    // reached the annotator verbatim while every `#reference` to it was rewritten away. And
+    // `xlink:title` carried arbitrary text past the same gate that strips `<title>`/`<desc>`,
+    // including outcome text that the non-exhaustive hint denylist does not catch.
+    const ns = 'xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"';
+    for (const [label, attribute] of [
+      ["xml:id carries an authored source ID", 'xml:id="wikimedia-grua-maquina-layer7"'],
+      ["xlink:title carries outcome text", 'xlink:title="FINDING: rule svg/text-clipped fired"'],
+      ["xml:lang carries a source hint", 'xml:lang="source-doc-42"'],
+      ["xlink:role", 'xlink:role="finding"'],
+    ] as const) {
+      assert.throws(
+        () => sanitizeBlindSvgContextV2(`<svg ${ns}><text ${attribute}>Alpha</text></svg>`),
+        /contains a non-allowlisted namespaced attribute/u,
+        label,
+      );
+    }
+    // An unknown prefix keeps its own, more specific message.
+    assert.throws(
+      () => sanitizeBlindSvgContextV2(`<svg ${ns}><text foo:bar="x">Alpha</text></svg>`),
+      /contains an unknown attribute namespace: foo/u,
+    );
+    // Positive controls: the two qualified names the real corpus needs, plus the namespace
+    // declarations themselves, must survive -- otherwise the frozen contexts would be invalidated.
+    const kept = sanitizeBlindSvgContextV2(`<svg ${ns}><text xml:space="preserve">Alpha</text><use xlink:href="#a"/><g id="a"/></svg>`);
+    assert.equal(kept.includes('xml:space="preserve"'), true);
+    assert.equal(kept.includes("xlink:href"), true);
+    assert.equal(sanitizeBlindSvgContextV2(kept), kept);
+  });
+
+  it("binds packet-v2 target set and order to an independently reconstructed custodial source", () => {
+    const source = Buffer.from('<svg id="root"><text id="first">Alpha</text><text id="second">Beta</text></svg>');
+    const targets = enumerateSvgTextTargets(source, ["svg/text-clipped"]).map((target) => ({ ...target, documentId: `doc_${"1".repeat(32)}` }));
+    const contexts = buildBlindContextArtifactsV2(source, "image/svg+xml", targets);
+    const artifacts = new Map(contexts.artifacts.map((artifact) => [artifact.path, artifact.bytes]));
+    const orderSeed = "order_seed_packet_v2_unit_0001";
+    const packet = buildBlindPacketV2({ packetId: "blind_packet_v2_unit_0001", orderSeed, targets, contextsByTargetId: contexts.contextsByTargetId });
+    assert.throws(() => buildBlindPacketV2({ packetId: "blind_packet_finding_positive_0001", orderSeed, targets, contextsByTargetId: contexts.contextsByTargetId }), /packet ID contains an outcome hint/u);
+    assert.equal(compileSchema("blind-packet-v2")(packet), true);
+    assert.deepEqual(verifyBlindPacketV2Public(packet, artifacts), { valid: true, issues: [] });
+    assert.deepEqual(verifyBlindPacketV2Custodial({ packet, packetId: packet.packetId, orderSeed, targets: [...targets].reverse(), contextsByTargetId: contexts.contextsByTargetId, artifactsByPath: artifacts }), { valid: true, issues: [] });
+
+    const reorderedTargets = [...packet.targets].reverse().map((target, index) => ({ ...target, neutralOrder: index + 1 }));
+    const reorderedWithoutHash = {
+      ...packet,
+      orderContract: { ...packet.orderContract, orderedBlindTargetIdsSha256: createHash("sha256").update(canonicalJson(reorderedTargets.map((target) => target.blindTargetId))).digest("hex") },
+      targets: reorderedTargets,
+    };
+    const { packetSha256: _oldHash, ...reorderedProjection } = reorderedWithoutHash;
+    const coherentReorder = { ...reorderedProjection, packetSha256: createHash("sha256").update(canonicalJson(reorderedProjection)).digest("hex") };
+    assert.deepEqual(verifyBlindPacketV2Public(coherentReorder, artifacts), { valid: true, issues: [] });
+    assert.equal(verifyBlindPacketV2Custodial({ packet: coherentReorder, packetId: packet.packetId, orderSeed, targets, contextsByTargetId: contexts.contextsByTargetId, artifactsByPath: artifacts }).issues.includes("packet-custodial-reconstruction-mismatch"), true);
+
+    const duplicated = structuredClone(packet);
+    duplicated.targets[1] = { ...duplicated.targets[0]!, neutralOrder: 2 };
+    assert.equal(verifyBlindPacketV2Public(duplicated, artifacts).issues.includes("packet-blind-target-duplicate"), true);
+    assert.equal(verifyBlindPacketV2Public({ ...packet, unexpectedGovernedField: true }, artifacts).issues[0]!.startsWith("packet-schema-invalid:"), true);
   });
 
   it("preserves all five labels and requires blind adjudication for every non-binary label", () => {

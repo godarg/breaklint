@@ -1,0 +1,18 @@
+<svg viewBox="0 0 720 224">
+                <text x="10" y="30" font-size="13" fill="#4a4f57" font-weight="600">Vorjahr</text>
+                <rect x="10" y="40" width="450" height="26" rx="6" fill="#e8f2ec" stroke="#2f7d5a"/>
+                <rect x="460" y="40" width="250" height="26" rx="6" fill="#f8ebe9" stroke="#b23b32"/>
+                <line x1="460" y1="34" x2="460" y2="72" stroke="#b23b32" stroke-width="2"/>
+                <text x="460" y="30" text-anchor="middle" font-size="12" fill="#b23b32" font-weight="600">25.000 €</text>
+                <text x="235" y="57" text-anchor="middle" font-size="12" fill="#0a3d39">Status bleibt (Folgejahr)</text>
+                <text x="585" y="57" text-anchor="middle" font-size="12" fill="#b23b32">Regelbesteuerung</text>
+                <text x="10" y="120" font-size="13" fill="#4a4f57" font-weight="600">Laufendes Jahr</text>
+                <rect x="10" y="130" width="550" height="26" rx="6" fill="#e8f2ec" stroke="#2f7d5a"/>
+                <rect x="560" y="130" width="150" height="26" rx="6" fill="#f8ebe9" stroke="#b23b32"/>
+                <line x1="560" y1="124" x2="560" y2="162" stroke="#b23b32" stroke-width="2"/>
+                <text x="560" y="120" text-anchor="middle" font-size="12" fill="#b23b32" font-weight="600">100.000 €</text>
+                <text x="285" y="147" text-anchor="middle" font-size="12" fill="#0a3d39">umsatzsteuerfrei</text>
+                <text x="635" y="147" text-anchor="middle" font-size="11" fill="#b23b32" font-weight="600">Statusverlust</text>
+                <text x="10" y="198" font-size="12" fill="#737a83">Überschreiten der 100.000 € wirkt sofort: der überschreitende und jeder folgende Umsatz ist</text>
+                <text x="10" y="214" font-size="12" fill="#737a83">regelbesteuert; frühere Umsätze desselben Jahres bleiben steuerfrei.</text>
+              </svg>

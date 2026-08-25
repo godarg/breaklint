@@ -19,7 +19,7 @@ whether the result is understandable:
 ```bash
 mkdir breaklint-community-test && cd breaklint-community-test
 npm init -y
-npm i -D breaklint@0.2.0 puppeteer-core@^25.8.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
+npm i -D breaklint@0.2.1 puppeteer-core@^25.8.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
 npx breaklint --format json --out breaklint-report.json YOUR-PUBLIC-DOCUMENT.html
 ```
 
@@ -66,6 +66,30 @@ The form asks for:
 An automated, data-only intake check labels the issue as complete, needing information, or carrying
 a sensitive-data warning. It never runs the submission. A scheduled public dashboard issue counts
 the states and links to the reports; it does not rank people or average away disagreements.
+
+The intake contract is deliberately strict. Each of the ten governed form sections must appear
+exactly once. Duplicate, case-folded, Unicode-confusable, whitespace-normalized, nested or unknown
+governed headings are rejected rather than merged or treated as “last value wins”. The
+sensitive-input tripwire covers quoted and unquoted assignments, common provider credentials,
+authorization headers, private-key markers, URL credentials, contextual JWT/Base64-like tokens and
+opaque credential locators. Its public labels and diagnostics never echo the matched payload.
+Your issue TITLE is screened by the same detector as the body. A hit in either field marks the whole
+report `sensitive-warning`, and the public dashboard then shows `Sensitive content withheld` in place
+of your title — the issue number and link stay visible, the title text does not. Markdown escaping is
+not redaction, so a title is withheld rather than escaped.
+This is a last-resort tripwire, not a redaction service: remove secrets and private material before
+submitting, even if a particular string does not match the detector. Two limits are worth naming
+explicitly, because both are easy to trip over:
+
+- **Length.** A candidate shorter than 12 characters is not treated as a credential, so short
+  secrets pass unnoticed.
+- **Character set.** A candidate is only considered if it consists entirely of
+  `A-Z a-z 0-9 + / _ = . : % -`. A secret containing ordinary punctuation — `&`, `!`, `~`, `#`,
+  `{`, `}` and anything else outside that set — does **not** match, no matter how long it is. This
+  is the larger of the two gaps.
+
+Neither limit is an oversight; both keep the false-positive rate low enough that the tripwire stays
+usable. They do mean the detector must not be relied on as a safety net.
 
 ## What this can and cannot establish
 
