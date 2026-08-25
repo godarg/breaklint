@@ -234,10 +234,19 @@ The minor-version change is intentional: unknown or formerly inert configuration
 remains 2. This status paragraph is a later documentation commit and is not retroactively part of
 the published tarball.
 
-**Prepared for 0.2.1:** the patch release packages the open-community-QA documentation and the
+**Released on 2026-08-25:** `breaklint@0.2.1` packages the open-community-QA documentation and the
 advisory remediation recorded in this repository without changing a production rule, threshold,
-severity or `calibrated` flag. It is not called released here until the annotated `v0.2.1` workflow,
-registry provenance, GitHub assets and a fresh registry consumer have all been verified.
+severity or `calibrated` flag. The annotated `v0.2.1` tag resolves to
+`e1746ed9829b9b66cf2311f6d10b58d9f9a646dd`; the tag workflow passed all release gates, then exercised
+one checksum-bound tarball in clean Node 22.13.0 and Node 24 consumers before publishing those exact
+bytes with npm provenance. Independent registry verification found three verified registry
+signatures, two verified attestations, SHA-256
+`5381d4ebf52a294c23215010b9b74d7b51c56ce0dfc39cac92a4da896f823c9f` and SRI
+`sha512-DjSN0Y2JByE/5vEDrhABl2mQCnjjYgx4a1SIVHhftwtBVxtz7Ia5P8kvje8JdA0IBSGo1rONIaKDnMGxSOuIFQ==`.
+The npm tarball is byte-identical to the GitHub Release asset; a fresh registry install reported
+version 0.2.1, imported Configuration Contract v1 and produced the expected finding-bearing demo
+with exit 1. This status paragraph is a later documentation commit and is not retroactively part of
+the published tarball.
 
 ### CI incident reconciliation: failed push at `05fec787`
 
