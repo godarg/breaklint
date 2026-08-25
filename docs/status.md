@@ -275,7 +275,7 @@ manifest binds 64 SVG text elements to 192 rule-specific target identities, and 
 projection freezes one origin with 45 rule-targets. Packet v1 remains byte-immutable historical
 evidence and is not authorized for human delivery. Packet v2 deterministically sanitizes four
 byte-bound, oracle-free SVG contexts, binds their independently reconstructed bytes and target set,
-and binds neutral order to a separately held seed plus custodial reconstruction. Its sequence-2
+and binds neutral order to a preregistered public seed plus custodial reconstruction. The seed is committed in this repository and is therefore recoverable, so blinding rests on procedural non-access rather than secrecy; see the annotation protocol. Its sequence-2
 freeze is linked to the unchanged sequence-1 hash. That closes the demonstrated metadata,
 outcome-hint and coherent-reordering paths, but the browser-native process rendering is still not
 a production renderer/font freeze and the local lineage is not an external receipt or trust root.
