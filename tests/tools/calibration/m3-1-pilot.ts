@@ -47,6 +47,7 @@ const PRODUCER_TRUST_KEYS = /^(?:publicKey|privateKey|key|certificate|trustedRoo
 const m31Ajv = new Ajv2020({ allErrors: true, strict: true, formats: { "date-time": RFC3339_DATE_TIME } });
 const validateBlindPacketSchema = m31Ajv.compile(JSON.parse(readFileSync(new URL("../../../schemas/calibration/blind-packet-v1.schema.json", import.meta.url), "utf8")) as object);
 const validateBlindPacketV2Schema = m31Ajv.compile(JSON.parse(readFileSync(new URL("../../../schemas/calibration/blind-packet-v2.schema.json", import.meta.url), "utf8")) as object);
+const validateBlindPacketV3Schema = m31Ajv.compile(JSON.parse(readFileSync(new URL("../../../schemas/calibration/blind-packet-v3.schema.json", import.meta.url), "utf8")) as object);
 const validatePinnedTrustPolicySchema = m31Ajv.compile(JSON.parse(readFileSync(new URL("../../../schemas/calibration/attestor-trust-policy-v1.schema.json", import.meta.url), "utf8")) as object);
 
 export const PINNED_M3_1_TRUST_POLICY = Object.freeze({
@@ -513,15 +514,31 @@ function neutralizeBlindSvgContext(svgSource: string): string {
 }
 
 function blindContextHasExternalAssetReference(svgSource: string): boolean {
-  for (const match of svgSource.matchAll(/(?:href|src)\s*=\s*["']\s*([^"']+?)\s*["']/giu)) {
-    const value = match[1]!;
-    if (!value.startsWith("#") && !value.startsWith("data:")) return true;
-  }
-  if (/@import\b/iu.test(svgSource)) return true;
-  for (const match of svgSource.matchAll(/url\(\s*["']?([^)'"\s]+)["']?\s*\)/giu)) {
-    const value = match[1]!;
-    if (!value.startsWith("#") && !value.startsWith("data:")) return true;
-  }
+  const document = parse(svgSource);
+  const inspectCssValue = (value: string): boolean => {
+    if (/@import\b/iu.test(value)) return true;
+    for (const match of value.matchAll(/url\(\s*["']?([^)'"\s]+)["']?\s*\)/giu)) {
+      const target = match[1]!;
+      if (!target.startsWith("#") && !target.startsWith("data:")) return true;
+    }
+    return false;
+  };
+  const walk = (node: Node): boolean => {
+    if ("tagName" in node) {
+      for (const entry of node.attrs) {
+        const name = entry.name.toLowerCase();
+        if ((name === "href" || name === "src" || name === "xlink:href") &&
+            !entry.value.startsWith("#") && !entry.value.startsWith("data:")) return true;
+        if (inspectCssValue(entry.value)) return true;
+      }
+      if (node.tagName.toLowerCase() === "style" && inspectCssValue(elementText(node))) return true;
+    }
+    return "childNodes" in node && node.childNodes.some(walk);
+  };
+  if (walk(document)) return true;
+  // Parsing is the structural authority. This remaining text check covers a top-level @import
+  // token outside an element, which parse5 may retain as a text node rather than an SVG element.
+  if (/@import\b/iu.test(elementText(document))) return true;
   return false;
 }
 
@@ -705,11 +722,6 @@ function validateSvgMarkupLexically(source: string): void {
       // fragment. The balance rule is kept as an independent, cheap guard — measured across all 6242
       // attribute values in the v1 and v2 SVG corpora nothing legitimate is unbalanced — but no
       // guarantee hangs on it any more.
-      const openParens = (attributeValue.match(/\(/gu) ?? []).length;
-      const closeParens = (attributeValue.match(/\)/gu) ?? []).length;
-      if (openParens !== closeParens) {
-        throw new Error(`blind SVG context attribute ${attributeName} contains unbalanced parentheses`);
-      }
       for (const opening of attributeValue.matchAll(SVG_ATTRIBUTE_URL_OPENING)) {
         const rest = attributeValue.slice(opening.index + opening[0].length);
         const close = rest.indexOf(")");
@@ -717,6 +729,11 @@ function validateSvgMarkupLexically(source: string): void {
         if (!SVG_SAME_DOCUMENT_FRAGMENT.test(target)) {
           throw new Error(`blind SVG context attribute ${attributeName} references a url() target that is not a same-document fragment`);
         }
+      }
+      const openParens = (attributeValue.match(/\(/gu) ?? []).length;
+      const closeParens = (attributeValue.match(/\)/gu) ?? []).length;
+      if (openParens !== closeParens) {
+        throw new Error(`blind SVG context attribute ${attributeName} contains unbalanced parentheses`);
       }
       if (attributeValue.includes("&")) {
         decodeXmlCharacterReferences(attributeValue);
@@ -780,7 +797,8 @@ export function sanitizeBlindSvgContextV2(svgSource: string): string {
     if (name.toLowerCase() === "id") return idMap.get(value) ?? value;
     let rewritten = value;
     for (const [original, replacement] of idMap) {
-      rewritten = rewritten.replaceAll(`#${original}`, `#${replacement}`);
+      const exactFragment = new RegExp(`#${original.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?![A-Za-z0-9_.:-])`, "gu");
+      rewritten = rewritten.replace(exactFragment, `#${replacement}`);
       if (/^(?:aria-labelledby|aria-describedby)$/iu.test(name)) rewritten = rewritten.split(/\s+/u).map((token) => token === original ? replacement : token).join(" ");
       if (/^(?:begin|end)$/iu.test(name)) rewritten = rewritten.replace(new RegExp(`(^|;)\\s*${original.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\.`, "gu"), `$1${replacement}.`);
     }
@@ -1056,6 +1074,37 @@ export function verifyBlindPacketV2Custodial(input: {
   } catch (error) {
     issues.push(`packet-custodial-reconstruction-failed:${error instanceof Error ? error.message : String(error)}`);
   }
+  return { valid: issues.length === 0, issues: [...new Set(issues)].sort() };
+}
+
+/**
+ * The operational delivery gate is intentionally narrower than the historical packet schemas.
+ * Packet v1/v2 remain immutable evidence, including their old `humanExecutable` field, but the
+ * repeated source-channel failures retire both formats from new human sessions. Only a raster-only
+ * v3 is the only format that may eventually cross the annotation CLI boundary. The current gate
+ * still blocks it until the renderer, network-evidence verifier and visual-sufficiency oracle exist.
+ */
+export function validateHumanPacketDelivery(packet: unknown): { valid: boolean; issues: string[] } {
+  if (!validateBlindPacketV3Schema(packet)) {
+    const version = packet !== null && typeof packet === "object" && "contractVersion" in packet
+      ? String((packet as { contractVersion?: unknown }).contractVersion)
+      : "missing";
+    if (version === "m3-1-blind-packet-v1" || version === "m3-1-blind-packet-v2") {
+      return { valid: false, issues: ["legacy-svg-source-packet-not-authorized-for-human-delivery"] };
+    }
+    return { valid: false, issues: [`raster-packet-v3-schema-invalid:${JSON.stringify(validateBlindPacketV3Schema.errors)}`] };
+  }
+  const typed = packet as { packetSha256: string; targets: Array<{ neutralOrder: number; context: { artifactPath: string; artifactSha256: string; width: number; height: number; targetLocator: { x: number; y: number; width: number; height: number } } }> };
+  const { packetSha256, ...withoutHash } = typed;
+  const issues: string[] = [];
+  if (sha256(canonicalJson(withoutHash)) !== packetSha256) issues.push("raster-packet-self-hash-mismatch");
+  if (typed.targets.some((target, index) => target.neutralOrder !== index + 1)) issues.push("raster-packet-neutral-order-not-contiguous");
+  for (const target of typed.targets) {
+    if (!target.context.artifactPath.endsWith(`${target.context.artifactSha256.slice(0, 24)}.png`)) issues.push("raster-context-path-hash-mismatch");
+    const bounds = target.context.targetLocator;
+    if (bounds.x + bounds.width > target.context.width || bounds.y + bounds.height > target.context.height) issues.push("raster-target-bounds-outside-context");
+  }
+  issues.push("raster-v3-renderer-network-and-visual-sufficiency-gate-not-implemented");
   return { valid: issues.length === 0, issues: [...new Set(issues)].sort() };
 }
 

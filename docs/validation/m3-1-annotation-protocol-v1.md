@@ -1,9 +1,13 @@
 # M3-1 Blind Annotation Protocol v1
 
-Status: executable protocol for packet v2; no annotation is asserted by this document
+Status: raster-v3 successor decision; no human packet or annotation is asserted by this document
 Ground-truth contract: [oracle-contract-v1.md](./oracle-contract-v1.md)
 
-Packet v1 is retained as immutable historical process-pilot evidence and is not authorized for a real annotation session. Its source-subtree contexts retain editor/source metadata and its order is not independently reconstructable from the deliverable. Any future real session must use packet v2 or a stricter successor and pass the independent controls below before delivery.
+Packets v1 and v2 are retained as immutable historical process-pilot evidence and are not authorized
+for a real annotation session. Packet v1 retains editor/source metadata and an order that is not
+independently reconstructable from the deliverable. Packet v2 improved both properties, but four
+successive independent reviews reopened the same executable SVG-source channel. Any future real
+session must therefore use the raster-only packet-v3 contract and pass the independent controls below.
 
 ## 1. Independence and roles
 
@@ -17,9 +21,34 @@ The absence of two verified people, or of a third person when adjudication is re
 
 The annotation packet is generated only from rights/privacy-cleared frozen artefact bytes and a frozen target manifest. The custodian's freeze binds the source artefact, contract/guideline versions, target identities, neutral rendering inputs, packet-bundle index, packet hash, and deterministic order hash; the annotator-facing packet exposes only opaque packet-local identities and the neutral context required for judgment.
 
-**A blind context is delivered and opened standalone, as an `image/svg+xml` document, and is never embedded inline in an HTML page.** This is a delivery requirement, not a stylistic preference. The sanitizer's reference checks cover the channels an SVG document can use on its own; a review measured zero fetches from any accepted artefact in that mode, with a positive control fetching in the same run. Several HTML-only reference-bearing attributes — `poster`, `imagesrcset`, `srcset`, `background`, and `meta http-equiv="refresh"` — are **not** screened, because they are inert in a standalone SVG document; if such a context were pasted into an HTML page, they could fetch. The `sourceScope` value `embedded-inline-svg-only` describes where the *source* fragment was found in the original document; it is **not** permission to embed the delivered blind context inline. Anyone changing the delivery mode must re-audit `blindContextHasExternalAssetReference` for the HTML attribute surface first.
+Packet v2 delivered a standalone `image/svg+xml` document and prohibited HTML embedding. A measured
+standalone run observed zero fetches from accepted artefacts while a hostile positive control fetched
+in the same run. That result is real but narrower than the former delivery claim: HTML-only attributes
+such as `poster`, `imagesrcset`, `srcset`, `background`, and meta refresh are inert in the authorized
+standalone mode yet become live if a consumer embeds the source into HTML. A protocol sentence cannot
+enforce how every annotator tool opens a file, and adding those five names would be another denylist
+increment after the preregistered design-failure stop criterion had already fired.
 
-Annotators receive only the independently indexed `m3-1-annotation-packet-v2` deliverable. They receive no repository access and no source-document, intake-manifest, custodial-mapping, order seed, split-report, freeze-projection, or evidence-bundle access. The evidence deliverable `m3-1-pilot-v2` contains no blind-packet or blind-context bytes. Packet delivery and the absence of those additional access paths must be recorded per session; access to either deliverable together invalidates blinding. Public availability of the repository is not treated as permission for an annotator to inspect it during the assignment.
+**The construction decision is therefore raster-only delivery.** A future packet v3 supplies PNG
+bytes, never SVG source. Its contract binds the raster hash and dimensions, target pixel bounds,
+renderer name/version/executable hash, viewport, device scale factor, sRGB color space, asset and font
+manifests, the selected source-subtree hash, a deny-all network policy, and a same-run positive control
+that proves a hostile fetch is blocked. An independent content check and a visual-sufficiency pilot are
+required before human use. If a single raster is insufficient for clipping, collision, or overflow
+judgment, the successor may add bound multiscale rasters or non-executable geometry overlays; it must
+not fall back to browser-openable SVG source.
+
+Annotators may receive only a future independently indexed packet-v3 raster deliverable. They receive
+no repository access and no source-document, intake-manifest, custodial-mapping, order seed,
+split-report, freeze-projection, evidence-bundle, SVG source, or sanitizer output. Packet delivery and
+the absence of those additional access paths must be recorded per session. Public availability of the
+repository is not permission for an annotator to inspect it during the assignment.
+
+The next two paragraphs record how frozen packet v2 is reconstructed and ordered; their present
+tense is historical contract language, not current delivery authorization. The phrase "still
+refused by pattern" describes the frozen 0.2.1 implementation. The
+current reconstruction code instead discovers element-level references by walking parsed elements
+and attributes, while CSS targets inside attribute values remain lexical defence in depth.
 
 Every v2 SVG context is rebuilt deterministically from the custodial source bytes under `m3-1-svg-blind-sanitizer-v2`. The sanitizer removes comments, RDF/DC/CC metadata, Inkscape/Sodipodi namespaces and attributes, editor named views, source-identifying document names, and authored IDs; IDs and internal references are replaced by neutral sequence-local IDs. It rejects processing instructions, document/entity declarations, `data:` URLs, private path or filename hints, unknown namespaces, and outcome hints in text or attributes. **Namespaced attributes are an allowlist of exactly two qualified names — `xlink:href` and `xml:space`.** The prefixes `xlink` and `xml` were previously admitted wholesale, which let `xml:id`, `xml:lang` and `xlink:title` reach the annotator verbatim: an authored `xml:id` is not rewritten by the ID map, because that rewrite keys on the local name `id`, so a source-identifying value survived while every `#reference` to it was rewritten away, and `xlink:title` carried arbitrary text — including outcome text — past the same gate that removes `<title>` and `<desc>` for exactly that reason. External references in attribute values are refused by allowlist: an attribute value may call only pure-geometry transform functions and `url()`, and **every `url()` opening must have a same-document `#fragment` target**, optionally quoted. The target is read to its closing parenthesis **or to the end of the attribute value**, so an unterminated `url(` is checked exactly like a terminated one. CSS escapes, CSS comments and character references in attribute values are refused outright. Parentheses must also balance, but that rule is now an independent cheap guard and **no guarantee depends on it**. The history is worth stating plainly, because it is the reason for the current construction: CSS closes an unterminated function at end-of-input, so `url(https://host/x` without a closing parenthesis is a complete `url()` to a browser and was invisible to every paren-terminated pattern; a review fetched from nine such attribute channels in a real browser. The balance rule was then introduced to make the target check total — and a further independent review defeated it, because balance is a *count* over the whole value while a `style` attribute is a *declaration list*: a stray `)` in one declaration rebalances the value while a later `url(` stays open, and a real browser fetched from four such channels. Decoupling the target check from the closing parenthesis is what actually closes that class. **Element-level and non-attribute reference channels — `href`, `xlink:href`, `src` and `@import` — are still refused by pattern, not by allowlist**, in `blindContextHasExternalAssetReference`; anyone adding a reference-bearing channel must re-audit that function rather than assume the attribute allowlist covers it. This attribute allowlist has now been defeated three times in succession, each time by a spelling its author had not enumerated — `url("https://host/x"/*c*/)`, `image-set("https://host/x" 1x)`, a bare unterminated `url(`, and a balance-compensating decoy paren. It should therefore **not** be read as a load-bearing guarantee. It is a defence in depth whose track record is poor. As with the outcome-hint check below, what actually protects a frozen packet is the independent custodial reconstruction from separately bound source bytes; the attribute checks reduce exposure, they do not establish it. **The outcome-hint check is a denylist and is explicitly NOT exhaustive.** It catches the documented keyword spellings; wordings such as `status: pass`, `conclusion: fail` or a bare `FAIL` are not caught, and no keyword list can be finished. What actually protects a frozen packet against injected outcome text is the independent custodial reconstruction from the separately bound source bytes described below — not this check. The independent pre-delivery verifier must reconstruct the expected bytes from the separately bound source artefact and require exact byte equality, content-sanitizer fixed-point equality, context path/hash/length equality, and schema validity. Rehashing attacker-chosen bytes is not a substitute for this reconstruction.
 
@@ -37,7 +66,13 @@ The packet may identify the rule concept and show the visual/contextual informat
 
 Before work begins, each annotator records that the packet hash and guideline version match and that no prohibited information is visible. Any blinding breach invalidates the affected session; it is not repaired by asking the annotator to ignore what they saw.
 
-The current packet v2 remains process-pilot evidence: its seed is repository-preregistered rather than supplied by an external randomness authority, and its freeze has no externally governed receipt. These limitations block a real session until an independent human-session gate explicitly accepts the custody arrangement; they do not permit silent fallback to packet v1.
+Packet v2 remains process-pilot evidence only. Its old `humanExecutable: true` field records the
+internal state of the frozen historical packet; it is not current operational authorization. The
+annotation CLI rejects v1/v2 at its delivery boundary, and the v3 schema is the only packet contract
+eligible for consideration for a new human session. The CLI also rejects structurally valid v3 data
+until the renderer/network-evidence verifier and visual-sufficiency gate exist. No v3 renderer or
+human packet exists yet, so execution remains blocked rather than silently falling back to either
+SVG-source format.
 
 ## 3. Common label set
 

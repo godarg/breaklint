@@ -160,11 +160,11 @@ export function detectSensitiveInput(body: string): string[] {
 }
 
 export function safeInline(value: string | undefined): string {
-  return (value ?? "unknown")
+  const normalized = (value ?? "unknown")
     .replace(/[\u0000-\u001f\u007f]+/gu, " ")
     .replace(/\s+/gu, " ")
-    .trim()
-    .slice(0, 160)
+    .trim();
+  return Array.from(normalized).slice(0, 160).join("")
     .replace(/([\\`*_[\]<>])/gu, "\\$1")
     .replaceAll("@", "＠")
     .replaceAll("://", ":⁄⁄")

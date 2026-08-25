@@ -79,6 +79,10 @@ test("untrusted dashboard text cannot create Markdown structure or control lines
   assert.equal(safeInline("@reviewer #123"), "＠reviewer ＃123");
   assert.equal(safeInline("\u0000\u0007"), "unknown");
   assert.ok(safeInline("x".repeat(300)).length <= 160);
+  const codePointBoundary = safeInline(`${"x".repeat(159)}😀tail`);
+  assert.equal(Array.from(codePointBoundary).length, 160);
+  assert.equal(codePointBoundary.endsWith("😀"), true);
+  assert.equal(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(codePointBoundary), false);
 });
 
 test("edited route and rule values must remain in the issue-form allowlists", () => {

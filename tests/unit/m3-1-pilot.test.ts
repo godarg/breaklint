@@ -24,6 +24,7 @@ import {
   scanStagedPublicArtifacts,
   sanitizeBlindSvgContextV2,
   validateAnnotationChronology,
+  validateHumanPacketDelivery,
   validateAnnotationWorkflow,
   validateStrictSplits,
   verifyExternalTrust,
@@ -351,7 +352,7 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     for (const property of channels) {
       assert.throws(
         () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='${property}:url(https://attacker.invalid/x'>Alpha</text></svg>`),
-        /contains unbalanced parentheses/u,
+        /references a url\(\) target that is not a same-document fragment/u,
         property,
       );
     }
@@ -359,7 +360,7 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     for (const [label, value] of [["uppercase", "URL(https://attacker.invalid/e1"], ["quoted", 'url("https://attacker.invalid/a4"'], ["trailing newline", "url(https://attacker.invalid/f15\n"]] as const) {
       assert.throws(
         () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='fill:${value}'>Alpha</text></svg>`),
-        /contains unbalanced parentheses/u,
+        /references a url\(\) target that is not a same-document fragment/u,
         label,
       );
     }
@@ -370,8 +371,9 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     );
     // Positive controls: balanced geometry and same-document references stay accepted, including the
     // quoted fragment form that the first version of this guard wrongly refused.
-    for (const value of ['url(#g)', "url('#g')", 'url(#g)']) {
-      const kept = sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text fill="${value}">Alpha</text></svg>`);
+    for (const value of ['url(#g)', "url('#g')", 'url("#g")']) {
+      const attribute = value.includes('"') ? `'${value}'` : `"${value}"`;
+      const kept = sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text fill=${attribute}>Alpha</text></svg>`);
       assert.equal(kept.includes("Alpha"), true, value);
     }
   });
@@ -450,6 +452,17 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     const kept = sanitizeBlindSvgContextV2(`<svg ${ns}><text xml:space="preserve">Alpha</text><use xlink:href="#a"/><g id="a"/></svg>`);
     assert.equal(kept.includes('xml:space="preserve"'), true);
     assert.equal(kept.includes("xlink:href"), true);
+    assert.equal(sanitizeBlindSvgContextV2(kept), kept);
+  });
+
+  it("rewrites only exact fragment IDs when source IDs share a prefix", () => {
+    const source = '<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="path4018"/><linearGradient id="path40188"/></defs><rect fill="url(#path40188)" stroke="url(#path4018)"/></svg>';
+    const kept = sanitizeBlindSvgContextV2(source);
+    assert.match(kept, /id="blind-id-000001"/u);
+    assert.match(kept, /id="blind-id-000002"/u);
+    assert.match(kept, /fill="url\(#blind-id-000002\)"/u);
+    assert.match(kept, /stroke="url\(#blind-id-000001\)"/u);
+    assert.doesNotMatch(kept, /blind-id-0000018/u);
     assert.equal(sanitizeBlindSvgContextV2(kept), kept);
   });
 
@@ -540,6 +553,7 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     const cliReport = JSON.parse(cli.stdout) as { statistics: { confusionTable: Record<string, Record<string, number>> } | null; issues: string[] };
     assert.equal(cliReport.statistics?.confusionTable.ambiguous?.invalid_target, 1);
     assert.ok(cliReport.issues.includes("external-human-identity-oracle-unavailable"));
+    assert.ok(cliReport.issues.includes("legacy-svg-source-packet-not-authorized-for-human-delivery"));
 
     const baseAdjudication = {
       blindTargetId: packet.targets[0]!.blindTargetId,
@@ -627,6 +641,56 @@ describe("M3-1 additive public-pilot infrastructure", () => {
       completionRate: 1,
       finalLabelCounts: { positive: 0, negative: 0, ambiguous: 0, abstain: 1, invalid_target: 0 },
     });
+  });
+
+  it("accepts only raster-v3 structure and still blocks delivery until its external gates exist", () => {
+    const contextSha = "c".repeat(64);
+    const packetWithoutHash = {
+      contractVersion: "m3-1-blind-packet-v3",
+      packetId: "blind_packet_raster_v3_0001",
+      blinded: true,
+      humanExecutable: true,
+      sourceDelivered: false,
+      targets: [{
+        blindTargetId: `blind_target_${"a".repeat(32)}`,
+        ruleId: "svg/text-clipped",
+        neutralOrder: 1,
+        context: {
+          artifactPath: `blind-context/context_${contextSha.slice(0, 24)}.png`,
+          artifactSha256: contextSha,
+          byteLength: 100,
+          mediaType: "image/png",
+          width: 800,
+          height: 600,
+          targetLocator: { mode: "raster-pixel-bounds", x: 10, y: 20, width: 100, height: 30 },
+          renderingContract: {
+            mode: "pinned-network-denied-raster-v1",
+            rendererName: "Pinned Chrome",
+            rendererVersion: "151.0.0.0",
+            rendererExecutableSha256: "d".repeat(64),
+            assetManifestSha256: "e".repeat(64),
+            fontManifestSha256: "f".repeat(64),
+            sourceSubtreeSha256: "1".repeat(64),
+            networkPolicy: "deny-all",
+            networkPositiveControlBlocked: true,
+            viewport: { width: 800, height: 600, deviceScaleFactor: 1, colorSpace: "srgb" },
+            independentContentVerificationRequired: true,
+            limitations: ["Raster labels remain renderer-specific calibration evidence."],
+          },
+        },
+      }],
+    };
+    const packet = { ...packetWithoutHash, packetSha256: createHash("sha256").update(canonicalJson(packetWithoutHash)).digest("hex") };
+    assert.deepEqual(validateHumanPacketDelivery(packet), {
+      valid: false,
+      issues: ["raster-v3-renderer-network-and-visual-sufficiency-gate-not-implemented"],
+    });
+    assert.deepEqual(validateHumanPacketDelivery({ contractVersion: "m3-1-blind-packet-v2" }), { valid: false, issues: ["legacy-svg-source-packet-not-authorized-for-human-delivery"] });
+    const outside = structuredClone(packet);
+    outside.targets[0]!.context.targetLocator.x = 750;
+    const { packetSha256: _old, ...outsideWithoutHash } = outside;
+    outside.packetSha256 = createHash("sha256").update(canonicalJson(outsideWithoutHash)).digest("hex");
+    assert.equal(validateHumanPacketDelivery(outside).issues.includes("raster-target-bounds-outside-context"), true);
   });
 
   it("computes origin bootstrap intervals only when at least two complete origin clusters exist", () => {

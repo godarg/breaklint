@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://breaklint.dev/schemas/calibration/blind-packet-v2.schema.json",
   "title": "breaklint M3-1 opaque executable blind packet v2",
+  "$comment": "Frozen historical schema. The current annotation CLI rejects v2 for new human delivery; use the raster-only v3 contract.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -91,7 +92,10 @@
           "required": ["mode", "externalAssetsFetched", "sourceScope", "sourceByteTreatment", "sanitizerContractVersion", "independentContentVerificationRequired", "limitations"],
           "properties": {
             "mode": { "const": "browser-native-isolated-svg" },
-            "externalAssetsFetched": { "const": false },
+            "externalAssetsFetched": {
+              "const": false,
+              "description": "Historical v2 assertion scoped only to mode=browser-native-isolated-svg. It is not an authorization for HTML embedding or for a new human session."
+            },
             "sourceScope": { "enum": ["exact-svg-document", "embedded-inline-svg-only"] },
             "sourceByteTreatment": { "const": "deterministic-svg-sanitization-v2" },
             "sanitizerContractVersion": { "const": "m3-1-svg-blind-sanitizer-v2" },

@@ -13,6 +13,7 @@ import {
   enumerateSvgTextTargets,
   ingestPublicArtifact,
   scanStagedPublicArtifacts,
+  validateHumanPacketDelivery,
   validateAnnotationWorkflow,
   validateStrictSplits,
   verifyExternalTrust,
@@ -85,8 +86,13 @@ async function main(): Promise<void> {
       break;
     case "annotation-check": {
       const result = validateAnnotationWorkflow(input as never);
-      output = result;
-      gateValid = result.valid;
+      const delivery = validateHumanPacketDelivery(input.packet);
+      output = {
+        ...result,
+        structurallyValid: result.structurallyValid && delivery.valid,
+        issues: [...new Set([...delivery.issues, ...result.issues])].sort(),
+      };
+      gateValid = result.valid && delivery.valid;
       break;
     }
     case "split-check": {
