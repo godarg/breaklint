@@ -639,8 +639,48 @@ function normalizeBlindHintText(value: string): string {
   return value.normalize("NFKC").replace(/[\u200B-\u200D\u2060\uFEFF]/gu, "").replace(/\s+/gu, " ");
 }
 
-function replaceQuotedAttributes(source: string, replace: (name: string, value: string, quote: "\"" | "'") => string): string {
-  return source.replace(/([:\w.-]+)(\s*=\s*)(["'])([\s\S]*?)\3/gu, (_match, name: string, separator: string, quote: "\"" | "'", value: string) => `${name}${separator}${quote}${replace(name, value, quote)}${quote}`);
+type LocatedElement = Element & {
+  sourceCodeLocation?: {
+    attrs?: Record<string, { startOffset: number; endOffset: number }>;
+  } | null;
+};
+
+function parsedElements(source: string): Element[] {
+  const elements: Element[] = [];
+  const document = parse(source, { sourceCodeLocationInfo: true });
+  const walk = (node: Node): void => {
+    if ("tagName" in node) elements.push(node);
+    if ("childNodes" in node) node.childNodes.forEach(walk);
+  };
+  walk(document);
+  return elements;
+}
+
+function qualifiedAttributeName(entry: Element["attrs"][number]): string {
+  return entry.prefix ? `${entry.prefix}:${entry.name}` : entry.name;
+}
+
+function replaceParsedAttributes(source: string, replace: (name: string, value: string, quote: "\"" | "'") => string): string {
+  const replacements: Array<{ start: number; end: number; text: string }> = [];
+  for (const element of parsedElements(source) as LocatedElement[]) {
+    const locations = element.sourceCodeLocation?.attrs;
+    if (!locations) continue;
+    for (const entry of element.attrs) {
+      const qualified = qualifiedAttributeName(entry);
+      const location = locations[qualified] ?? Object.entries(locations).find(([name]) => name.toLowerCase() === qualified.toLowerCase())?.[1];
+      if (!location) throw new Error(`blind SVG context attribute location is unavailable: ${qualified}`);
+      const raw = source.slice(location.startOffset, location.endOffset);
+      const match = /^([:\w.-]+)(\s*=\s*)(["'])([\s\S]*)\3$/u.exec(raw);
+      if (!match) throw new Error(`blind SVG context attribute location is malformed: ${qualified}`);
+      const [, name, separator, quote, value] = match as RegExpExecArray & [string, string, string, "\"" | "'", string];
+      replacements.push({ start: location.startOffset, end: location.endOffset, text: `${name}${separator}${quote}${replace(name, value, quote)}${quote}` });
+    }
+  }
+  let rewritten = source;
+  for (const replacement of replacements.sort((left, right) => right.start - left.start)) {
+    rewritten = `${rewritten.slice(0, replacement.start)}${replacement.text}${rewritten.slice(replacement.end)}`;
+  }
+  return rewritten;
 }
 
 function decodeXmlCharacterReferences(value: string): string {
@@ -770,30 +810,34 @@ export function sanitizeBlindSvgContextV2(svgSource: string): string {
   if (/<(?:[A-Za-z][\w.-]*:)?metadata\b/iu.test(sanitized)) throw new Error("blind SVG context contains malformed metadata");
   if (/<(?:title|desc)\b/iu.test(sanitized)) throw new Error("blind SVG context contains malformed descriptive metadata");
 
-  for (const match of sanitized.matchAll(/\b(xmlns(?::[\w.-]+)?)\s*=\s*(["'])([\s\S]*?)\2/giu)) {
-    const name = match[1]!.toLowerCase();
-    const expected = SVG_ALLOWED_NAMESPACE_DECLARATIONS.get(name);
-    if (expected === undefined || match[3] !== expected) throw new Error(`blind SVG context contains an unknown namespace: ${name}`);
-  }
-  if (new RegExp(`<(?:\\/?)(?:${SVG_REMOVED_NAMESPACE_PREFIXES}):`, "iu").test(sanitized)) throw new Error("blind SVG context contains a foreign editor or metadata element");
-  for (const match of sanitized.matchAll(/<\/?([A-Za-z][\w.-]*):/gu)) {
-    throw new Error(`blind SVG context contains an unknown element namespace: ${match[1]}`);
-  }
-  for (const match of sanitized.matchAll(/\s([A-Za-z][\w.-]*):([\w.-]+)\s*=/gu)) {
-    const prefix = match[1]!.toLowerCase();
-    if (prefix === "xmlns") continue;
-    if (!new Set(["xlink", "xml"]).has(prefix)) throw new Error(`blind SVG context contains an unknown attribute namespace: ${match[1]}`);
-    const qualified = `${prefix}:${match[2]!.toLowerCase()}`;
-    if (!SVG_ALLOWED_NAMESPACED_ATTRIBUTES.has(qualified)) throw new Error(`blind SVG context contains a non-allowlisted namespaced attribute: ${qualified}`);
+  const elements = parsedElements(sanitized);
+  for (const element of elements) {
+    const elementPrefix = element.tagName.includes(":") ? element.tagName.slice(0, element.tagName.indexOf(":")) : null;
+    if (elementPrefix) throw new Error(`blind SVG context contains an unknown element namespace: ${elementPrefix}`);
+    for (const entry of element.attrs) {
+      const qualified = qualifiedAttributeName(entry).toLowerCase();
+      if (qualified === "xmlns" || qualified.startsWith("xmlns:")) {
+        const expected = SVG_ALLOWED_NAMESPACE_DECLARATIONS.get(qualified);
+        if (expected === undefined || entry.value !== expected) throw new Error(`blind SVG context contains an unknown namespace: ${qualified}`);
+        continue;
+      }
+      const prefix = (entry.prefix ?? (qualified.includes(":") ? qualified.slice(0, qualified.indexOf(":")) : "")).toLowerCase();
+      if (!prefix) continue;
+      if (!new Set(["xlink", "xml"]).has(prefix)) throw new Error(`blind SVG context contains an unknown attribute namespace: ${prefix}`);
+      if (!SVG_ALLOWED_NAMESPACED_ATTRIBUTES.has(qualified)) throw new Error(`blind SVG context contains a non-allowlisted namespaced attribute: ${qualified}`);
+    }
   }
 
   const idMap = new Map<string, string>();
-  for (const match of sanitized.matchAll(/\bid\s*=\s*(["'])([\s\S]*?)\1/giu)) {
-    const original = match[2]!;
-    if (!original || idMap.has(original)) throw new Error("blind SVG context contains an empty or duplicate ID");
-    idMap.set(original, `blind-id-${String(idMap.size + 1).padStart(6, "0")}`);
+  for (const element of elements) {
+    for (const entry of element.attrs) {
+      if (qualifiedAttributeName(entry).toLowerCase() !== "id") continue;
+      const original = entry.value;
+      if (!original || idMap.has(original)) throw new Error("blind SVG context contains an empty or duplicate ID");
+      idMap.set(original, `blind-id-${String(idMap.size + 1).padStart(6, "0")}`);
+    }
   }
-  sanitized = replaceQuotedAttributes(sanitized, (name, value) => {
+  sanitized = replaceParsedAttributes(sanitized, (name, value) => {
     if (name.toLowerCase() === "id") return idMap.get(value) ?? value;
     let rewritten = value;
     for (const [original, replacement] of idMap) {

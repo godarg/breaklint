@@ -49,7 +49,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 every scalar and every empty object or array as one leaf, and no path appears in one run and not
 the other.
 
-<!-- breaklint-status-figures-v1 unitTests=335 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=336 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -75,8 +75,8 @@ field is. The live-report writer creates a missing parent directory atomically; 
 was re-run from a fresh checkout without a pre-existing `.tmp` directory.
 
 The release/CI path also binds the documented figures to real evidence rather than synthetic test
-data: `npm test` preserves its 442-test aggregate TAP at `.tmp/test.tap` and independently writes
-the 335-test Unit-only TAP at `.tmp/unit.tap`; the live step writes
+data: `npm test` preserves its 443-test aggregate TAP at `.tmp/test.tap` and independently writes
+the 336-test Unit-only TAP at `.tmp/unit.tap`; the live step writes
 `.tmp/live-report.json`, and `npm run test:documented-figures` rejects any mismatch with the marker
 above. The marker's `unitTests` field counts the Unit-only TAP denominator.
 
@@ -133,7 +133,7 @@ each measured singly.
 **Four repairs were once green in every suite while being reverted.** An audit turned each of them
 back into its defect — the tolerance-free page verdict, the unread integrity count, the unread
 late errors, the file-access switch — and the whole suite as it stood at the time (104 Unit tests
-and 15 live tests; the current measured denominators are 335 Unit, 442 Unit + E2E, and 57 live)
+and 15 live tests; the current measured denominators are 336 Unit, 443 Unit + E2E, and 57 live)
 plus the mutation guard stayed green through all
 four. The repairs were real; the gates were not there. They are now, and
 each was verified by re-applying the mutation and watching it go red. The reason the live corpus

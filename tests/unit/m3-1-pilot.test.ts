@@ -466,6 +466,16 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     assert.equal(sanitizeBlindSvgContextV2(kept), kept);
   });
 
+  it("rewrites parsed attributes without treating attribute-like text as document structure", () => {
+    const source = `<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="path4018"/></defs><text data-note="angle > equals = quote ' stays data-only" fill="url(#path4018)">literal id="path4018" xlink:title="ordinary" href="https://example.invalid/not-an-attribute"</text></svg>`;
+    const kept = sanitizeBlindSvgContextV2(source);
+    assert.match(kept, /id="blind-id-000001"/u);
+    assert.match(kept, /fill="url\(#blind-id-000001\)"/u);
+    assert.match(kept, />literal id="path4018" xlink:title="ordinary" href="https:\/\/example\.invalid\/not-an-attribute"<\/text>/u);
+    assert.doesNotMatch(kept, /data-note=/u);
+    assert.equal(sanitizeBlindSvgContextV2(kept), kept);
+  });
+
   it("binds packet-v2 target set and order to an independently reconstructed custodial source", () => {
     const source = Buffer.from('<svg id="root"><text id="first">Alpha</text><text id="second">Beta</text></svg>');
     const targets = enumerateSvgTextTargets(source, ["svg/text-clipped"]).map((target) => ({ ...target, documentId: `doc_${"1".repeat(32)}` }));
