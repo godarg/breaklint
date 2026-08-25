@@ -376,6 +376,51 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     }
   });
 
+  it("refuses an open url() even when a decoy paren rebalances the declaration list", () => {
+    // A fourth independent review defeated the round-4 balance rule. Balance is a COUNT over the
+    // whole attribute value, but a style attribute is a DECLARATION LIST: a stray `)` in one
+    // declaration rebalances the value while a later `url(` stays open. All three round-4
+    // conditions then hold — balanced parens, allowlisted function names, no comment — and real
+    // Chrome still fetched. The target check therefore no longer depends on a closing paren: every
+    // `url(` opening yields a target read to its `)` or to the end of the value.
+    const decoys = [
+      ["translate", "transform:translate(1px));mask-image:url(https://attacker.invalid/b1"],
+      ["scale", "transform:scale(1));background-image:url(https://attacker.invalid/b3"],
+      ["rotate", "transform:rotate(1deg));fill:url(https://attacker.invalid/b4"],
+      ["content", "transform:scale(1));content:url(https://attacker.invalid/b5"],
+      ["shape-outside", "transform:scale(1));shape-outside:url(https://attacker.invalid/b6"],
+      ["list-style-image", "transform:scale(1));list-style-image:url(https://attacker.invalid/b7"],
+      ["border-image-source", "transform:scale(1));border-image-source:url(https://attacker.invalid/b8"],
+      // `.png` rather than `.svg`, so SVG_PRIVATE_PATH_HINT cannot be the thing that catches it.
+      ["filter png", "transform:scale(1));filter:url(https://attacker.invalid/x.png"],
+    ] as const;
+    for (const [label, value] of decoys) {
+      assert.throws(
+        () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='${value}'>Alpha</text></svg>`),
+        /references a url\(\) target that is not a same-document fragment/u,
+        label,
+      );
+    }
+    // The `content:')'` decoy carries a single quote, so it needs a double-quoted attribute.
+    assert.throws(
+      () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style="content:')';mask-image:url(https://attacker.invalid/b2">Alpha</text></svg>`),
+      /references a url\(\) target that is not a same-document fragment/u,
+      "quoted paren",
+    );
+    // A double-quoted external target needs a single-quoted attribute to exist at all.
+    assert.throws(
+      () => sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='fill:url("https://attacker.invalid/x")'>Alpha</text></svg>`),
+      /references a url\(\) target that is not a same-document fragment/u,
+    );
+    // Positive controls: legitimate declaration lists that mix geometry with same-document
+    // references must survive, including two url() targets in one value.
+    for (const value of ["fill:url(#a);stroke:url(#b)", "mask-image:url(#m);transform:translate(1px)", "transform:matrix(1,0,0,1,0,0);fill:url(#blind-id-000001)"]) {
+      const kept = sanitizeBlindSvgContextV2(`<svg xmlns="http://www.w3.org/2000/svg"><text style='${value}'>Alpha</text></svg>`);
+      assert.equal(kept.includes("Alpha"), true, value);
+      assert.equal(sanitizeBlindSvgContextV2(kept), kept, value);
+    }
+  });
+
   it("binds packet-v2 target set and order to an independently reconstructed custodial source", () => {
     const source = Buffer.from('<svg id="root"><text id="first">Alpha</text><text id="second">Beta</text></svg>');
     const targets = enumerateSvgTextTargets(source, ["svg/text-clipped"]).map((target) => ({ ...target, documentId: `doc_${"1".repeat(32)}` }));

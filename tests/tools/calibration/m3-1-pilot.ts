@@ -606,7 +606,7 @@ const SVG_ALLOWED_ATTRIBUTE_FUNCTIONS = new Set([
   "scale", "scalex", "scaley", "rotate", "skewx", "skewy", "url",
 ]);
 const SVG_ATTRIBUTE_FUNCTION_CALL = /([A-Za-z-][\w-]*)\s*\(/gu;
-const SVG_ATTRIBUTE_URL_CALL = /url\s*\(([^)]*)\)/giu;
+const SVG_ATTRIBUTE_URL_OPENING = /url\s*\(/giu;
 const SVG_SAME_DOCUMENT_FRAGMENT = /^(?:"#[A-Za-z_][\w.:-]*"|'#[A-Za-z_][\w.:-]*'|#[A-Za-z_][\w.:-]*)$/u;
 
 const SVG_PRIVATE_PATH_HINT = /(?:\bfile:|\b[A-Za-z]:\\|\/(?:Users|home|private|var\/folders)\/|(?:^|[\s"'])\.\.?\/|\.(?:ai|eps|html?|pdf|svg)\b)/iu;
@@ -688,19 +688,26 @@ function validateSvgMarkupLexically(source: string): void {
       }
       // CSS closes an unterminated function at end-of-input ("consume a function": on EOF this is a
       // parse error, but the function is returned). So `url(https://host/x` with no closing paren is
-      // a COMPLETE url() to a browser, while every paren-terminated pattern — the one below and the
-      // older blindContextHasExternalAssetReference — simply never matches it. An independent review
-      // fetched from nine such channels in real Chrome while the verifier reported the artifact
-      // valid. Requiring balance first makes the target check total instead of merely covering the
-      // syntactically closed cases; measured across all 6242 attribute values in the v1 and v2
-      // corpora, nothing legitimate is unbalanced.
+      // a COMPLETE url() to a browser. Round 4 tried to make the target check total by requiring the
+      // parentheses to balance — but balance is a COUNT over the whole value, while a style attribute
+      // is a DECLARATION LIST. A stray `)` in a *different* declaration rebalances the value without
+      // closing the open `url(`, and a third independent review fetched from four such channels in
+      // real Chrome, e.g. `transform:translate(1px));mask-image:url(https://host/x`. The target check
+      // must therefore not depend on a closing paren at all: every `url(` opening yields a target that
+      // is read to its `)` OR to the end of the value, and that target must be a same-document
+      // fragment. The balance rule is kept as an independent, cheap guard — measured across all 6242
+      // attribute values in the v1 and v2 SVG corpora nothing legitimate is unbalanced — but no
+      // guarantee hangs on it any more.
       const openParens = (attributeValue.match(/\(/gu) ?? []).length;
       const closeParens = (attributeValue.match(/\)/gu) ?? []).length;
       if (openParens !== closeParens) {
         throw new Error(`blind SVG context attribute ${attributeName} contains unbalanced parentheses`);
       }
-      for (const call of attributeValue.matchAll(SVG_ATTRIBUTE_URL_CALL)) {
-        if (!SVG_SAME_DOCUMENT_FRAGMENT.test(call[1]!.trim())) {
+      for (const opening of attributeValue.matchAll(SVG_ATTRIBUTE_URL_OPENING)) {
+        const rest = attributeValue.slice(opening.index + opening[0].length);
+        const close = rest.indexOf(")");
+        const target = (close < 0 ? rest : rest.slice(0, close)).trim();
+        if (!SVG_SAME_DOCUMENT_FRAGMENT.test(target)) {
           throw new Error(`blind SVG context attribute ${attributeName} references a url() target that is not a same-document fragment`);
         }
       }

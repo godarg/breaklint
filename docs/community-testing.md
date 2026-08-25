@@ -78,8 +78,18 @@ report `sensitive-warning`, and the public dashboard then shows `Sensitive conte
 of your title — the issue number and link stay visible, the title text does not. Markdown escaping is
 not redaction, so a title is withheld rather than escaped.
 This is a last-resort tripwire, not a redaction service: remove secrets and private material before
-submitting, even if a particular string does not match the detector. Short credentials in particular
-can fall under the detector's length floors.
+submitting, even if a particular string does not match the detector. Two limits are worth naming
+explicitly, because both are easy to trip over:
+
+- **Length.** A candidate shorter than 12 characters is not treated as a credential, so short
+  secrets pass unnoticed.
+- **Character set.** A candidate is only considered if it consists entirely of
+  `A-Z a-z 0-9 + / _ = . : % -`. A secret containing ordinary punctuation — `&`, `!`, `~`, `#`,
+  `{`, `}` and anything else outside that set — does **not** match, no matter how long it is. This
+  is the larger of the two gaps.
+
+Neither limit is an oversight; both keep the false-positive rate low enough that the tripwire stays
+usable. They do mean the detector must not be relied on as a safety net.
 
 ## What this can and cannot establish
 

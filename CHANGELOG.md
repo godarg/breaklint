@@ -40,8 +40,12 @@
 
 - Live measurement reports now create missing parent directories before their atomic partial-file
   write, so the documented fresh-checkout command works without pre-created local state.
-- Documentation figures are bound to measured unit TAP, live-report shape and both S1 raster
-  oracles by an executable drift guard.
+- Documentation figures in `docs/status.md` carry a machine-readable marker, and a drift guard
+  (`tests/tools/documented-figures.mjs`) can compare it against measured unit TAP, live-report shape
+  and both S1 raster oracles. The guard's logic is unit-tested, but it is **not yet wired into any
+  npm script or CI job**, and the unit test feeds it synthetic fixtures rather than the real
+  `docs/status.md`. Until it is wired up, the documented figures are re-measured by hand and the
+  marker is not automatically enforced.
 - Paged.js 0.4.3 remains pinned after review: the obsolete polyfill chain is not reached by the
   measured browser-bundle path and no known advisory was found. The risk acceptance expires on
   2026-11-24 or earlier on an upstream, advisory or integration trigger.
