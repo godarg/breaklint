@@ -141,12 +141,16 @@ that starts a page must begin with its complete top border, and a page may not b
 coverage value. Every wide coverage card must also have continuous visible left and right raster
 edges. This is an outcome check rather than a computed-style assertion: Chrome can report a physical
 right border on a paged `flow-root` containing floats while omitting that edge from the PDF. The
-renderer locates complete card frames from raster strokes; the verifier instead locates each
-Coverage card from independent `RULE`/`RESULT` PDF text anchors, derives its full height from the
-physical left edge and samples the projected physical right edge over that complete height. Both
-oracles require at least 98% edge coverage and reject any contiguous gap longer than two raster
-rows. The complete visible contract is bound to the review fingerprint; mutations that remove the
-whole print-only edge or only its lower fifth are both rejected. A
+renderer associates every `RULE`/`RESULT` PDF text pair with its nearest long horizontal raster
+strokes and measures both physical sides between those frame rows. The verifier independently
+projects the A4 content edges, finds the enclosing full-width raster rows around each text pair,
+remeasures both full-height sides and cross-checks the renderer geometry. Neither oracle relies on
+a global count of anonymous card-like rectangles or a fixed card-height band. Both require at least
+98% edge coverage and reject any contiguous gap longer than two raster rows. The inner repair is a
+real child border rather than a background fill, so it remains printable when background graphics
+are disabled. The complete visible contract is bound to the review fingerprint; mutations cover a
+missing whole right edge, a missing whole left edge, a missing lower right fifth and simultaneously
+missing lower fifths on both sides. A
 deliberately fragment-prone print mutation must likewise make the gate fail.
 
 The terminal-page density gate uses report structure rather than a global pixel quota. It rejects

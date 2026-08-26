@@ -185,9 +185,9 @@ export const REPORT_HTML_STYLES = String.raw`
     .coverage-list { display: block; }
     .coverage-record { position: relative; display: flow-root; margin-block-end: var(--ds-space-3); padding: var(--ds-space-3); break-inside: avoid; page-break-inside: avoid; }
     /* Chrome can omit the physical inline-end border of a paged flow-root containing floats even
-       though computed style reports it as 1px. Paint the same tokenized edge inside the box so the
-       raster—not merely the CSS declaration—has a visibly closed card. */
-    .coverage-record::after { content: ""; position: absolute; inset-block: 0; inset-inline-end: 0; width: var(--ds-border-thin); background: var(--ds-color-divider); }
+       though computed style reports it as 1px. Paint the same tokenized edge as a child border
+       inside the box so it survives rasterization without depending on printed backgrounds. */
+    .coverage-record::after { content: ""; position: absolute; inset-block: 0; inset-inline-end: 0; inline-size: 0; border-inline-end: var(--ds-border-thin) solid var(--ds-color-divider); }
     .coverage-record:last-child { margin-block-end: 0; }
     .coverage-record > div { float: left; width: 50%; min-height: var(--ds-space-6); padding-inline-end: var(--ds-space-3); }
     .coverage-record > div:first-child { float: none; width: 100%; margin-block-end: var(--ds-space-3); padding-inline-end: 0; }

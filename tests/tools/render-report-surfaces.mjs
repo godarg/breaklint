@@ -24,6 +24,7 @@ const VIEWPORTS = {
 };
 const THEMES = ["light", "dark"];
 const PRINT_CONTENT_VIEWPORT = { width: 703, height: 1123 };
+const PRINT_RASTER_DPI = 110;
 const REVIEW_ARTIFACT_CONTRACT_VERSION = 3;
 const SCREEN_PIXEL_CONTRACT_VERSION = 1;
 const PRINT_MUTATION_CONTROL = process.env.BREAKLINT_SURFACE_PRINT_CONTROL ?? "none";
@@ -36,7 +37,7 @@ const BROWSER_RENDER_ARGS = [
   "--force-color-profile=srgb",
   "--hide-scrollbars",
 ];
-if (!["none", "broken-coverage", "broken-trust-geometry", "broken-terminal-density", "broken-box-closure", "broken-partial-box-closure"].includes(PRINT_MUTATION_CONTROL)) {
+if (!["none", "broken-coverage", "broken-trust-geometry", "broken-terminal-density", "broken-box-closure", "broken-partial-box-closure", "broken-left-box-closure", "broken-partial-both-box-closure"].includes(PRINT_MUTATION_CONTROL)) {
   throw new Error(`unknown BREAKLINT_SURFACE_PRINT_CONTROL=${PRINT_MUTATION_CONTROL}`);
 }
 
@@ -168,16 +169,21 @@ function coveragePageStartChecks(pdfPath, rasterPages) {
   });
 }
 
-function coverageBoxClosureChecks(rasterPages, expectedRecords) {
+function coverageBoxClosureChecks(pdfPath, rasterPages, expectedRecords) {
   const minimumEdgeCoverage = 0.98;
   const maximumEdgeGapPx = 2;
+  const minimumHorizontalCoverage = 0.95;
   const pages = rasterPages.map((raster, pageIndex) => {
+    const page = pageIndex + 1;
     const decoded = PNG.sync.read(readFileSync(join(OUTPUT, raster.path)), { checkCRC: true });
     const dark = (x, y) => {
       const offset = (y * decoded.width + x) * 4;
       return decoded.data[offset] < 180 && decoded.data[offset + 1] < 180 &&
         decoded.data[offset + 2] < 180 && decoded.data[offset + 3] > 0;
     };
+    const requiredHorizontalPixels = Math.floor(
+      PRINT_CONTENT_VIEWPORT.width * PRINT_RASTER_DPI / 96 * minimumHorizontalCoverage,
+    );
     const rawRuns = [];
     for (let y = 0; y < decoded.height; y += 1) {
       let best = null;
@@ -191,7 +197,7 @@ function coverageBoxClosureChecks(rasterPages, expectedRecords) {
           start = -1;
         }
       }
-      if (best && best.length >= Math.ceil(decoded.width * 0.72)) rawRuns.push(best);
+      if (best && best.length >= requiredHorizontalPixels) rawRuns.push(best);
     }
     const strokes = [];
     for (const run of rawRuns) {
@@ -206,6 +212,21 @@ function coverageBoxClosureChecks(rasterPages, expectedRecords) {
         strokes.push({ top: run.y, bottom: run.y, left: run.left, right: run.right, length: run.length });
       }
     }
+    const xml = run("pdftotext", ["-f", String(page), "-l", String(page), "-bbox-layout", pdfPath, "-"]);
+    const words = [...xml.matchAll(
+      /<word xMin="([0-9.]+)" yMin="([0-9.]+)" xMax="([0-9.]+)" yMax="([0-9.]+)">([^<]+)<\/word>/gu,
+    )].map((match) => ({ yMin: Number(match[2]), yMax: Number(match[4]), text: match[5] }));
+    const rules = words.filter((word) => word.text === "RULE").sort((a, b) => a.yMin - b.yMin);
+    const results = words.filter((word) => word.text === "RESULT").sort((a, b) => a.yMin - b.yMin);
+    const anchors = rules.map((rule, index) => {
+      const nextRuleY = rules[index + 1]?.yMin ?? Number.POSITIVE_INFINITY;
+      const result = results.find((candidate) => candidate.yMin > rule.yMax && candidate.yMin < nextRuleY);
+      if (!result) throw new Error(`${raster.path}: RULE has no RESULT anchor before the next coverage card`);
+      return {
+        ruleY: Math.round((rule.yMin + rule.yMax) / 2 * PRINT_RASTER_DPI / 72),
+        resultY: Math.round((result.yMin + result.yMax) / 2 * PRINT_RASTER_DPI / 72),
+      };
+    });
     const edgeStats = (x, top, bottom) => {
       let rows = 0;
       let hits = 0;
@@ -213,7 +234,7 @@ function coverageBoxClosureChecks(rasterPages, expectedRecords) {
       let maximumGapPx = 0;
       for (let y = top; y <= bottom; y += 1) {
         rows += 1;
-        const hit = [x - 1, x, x + 1]
+        const hit = [x - 2, x - 1, x, x + 1, x + 2]
           .some((candidate) => candidate >= 0 && candidate < decoded.width && dark(candidate, y));
         if (hit) {
           hits += 1;
@@ -225,49 +246,37 @@ function coverageBoxClosureChecks(rasterPages, expectedRecords) {
       }
       return { coverage: hits / rows, maximumGapPx };
     };
-    const boxes = [];
-    for (let index = 0; index < strokes.length;) {
-      const top = strokes[index];
-      let matchIndex = -1;
-      let box = null;
-      for (let candidateIndex = index + 1; candidateIndex < strokes.length; candidateIndex += 1) {
-        const bottom = strokes[candidateIndex];
-        const height = Math.round((bottom.top + bottom.bottom - top.top - top.bottom) / 2);
-        if (height > 320) break;
-        if (
-          height < 180 || Math.abs(top.left - bottom.left) > 2 ||
-          Math.abs(top.right - bottom.right) > 2
-        ) continue;
-        const left = Math.round((top.left + bottom.left) / 2);
-        const right = Math.round((top.right + bottom.right) / 2);
-        const leftStats = edgeStats(left, top.bottom, bottom.top);
-        if (leftStats.coverage < 0.8) continue;
-        const rightStats = edgeStats(right, top.bottom, bottom.top);
-        box = {
-          top: top.top,
-          bottom: bottom.bottom,
-          left,
-          right,
-          leftCoverage: Math.round(leftStats.coverage * 1_000) / 1_000,
-          leftMaximumGapPx: leftStats.maximumGapPx,
-          rightCoverage: Math.round(rightStats.coverage * 1_000) / 1_000,
-          rightMaximumGapPx: rightStats.maximumGapPx,
-        };
-        matchIndex = candidateIndex;
-        break;
+    const boxes = anchors.map((anchor) => {
+      const top = strokes.filter((stroke) => stroke.bottom < anchor.ruleY).at(-1);
+      const bottom = strokes.find((stroke) => stroke.top > anchor.resultY);
+      if (!top || !bottom || top.bottom >= bottom.top) {
+        throw new Error(`${raster.path}: coverage text anchors have no enclosing horizontal frame`);
       }
-      if (box) {
-        boxes.push(box);
-        index = matchIndex + 1;
-      } else {
-        index += 1;
+      if (Math.abs(top.left - bottom.left) > 2 || Math.abs(top.right - bottom.right) > 2) {
+        throw new Error(`${raster.path}: coverage frame sides do not align`);
       }
-    }
-    return { page: pageIndex + 1, path: raster.path, boxes };
+      const left = Math.round((top.left + bottom.left) / 2);
+      const right = Math.round((top.right + bottom.right) / 2);
+      const leftStats = edgeStats(left, top.bottom, bottom.top);
+      const rightStats = edgeStats(right, top.bottom, bottom.top);
+      return {
+        top: top.top,
+        bottom: bottom.bottom,
+        left,
+        right,
+        ruleY: anchor.ruleY,
+        resultY: anchor.resultY,
+        leftCoverage: Math.round(leftStats.coverage * 1_000) / 1_000,
+        leftMaximumGapPx: leftStats.maximumGapPx,
+        rightCoverage: Math.round(rightStats.coverage * 1_000) / 1_000,
+        rightMaximumGapPx: rightStats.maximumGapPx,
+      };
+    });
+    return { page, path: raster.path, boxes };
   });
   const boxes = pages.flatMap((page) => page.boxes.map((box) => ({ page: page.page, path: page.path, ...box })));
   if (boxes.length !== expectedRecords) {
-    throw new Error(`coverage box raster inventory drift: detected ${boxes.length}/${expectedRecords}`);
+    throw new Error(`coverage box PDF-anchor inventory drift: detected ${boxes.length}/${expectedRecords}`);
   }
   const open = boxes.filter((box) =>
     box.leftCoverage < minimumEdgeCoverage || box.leftMaximumGapPx > maximumEdgeGapPx ||
@@ -276,7 +285,14 @@ function coverageBoxClosureChecks(rasterPages, expectedRecords) {
   if (open.length > 0) {
     throw new Error(`coverage boxes have an open physical edge: ${JSON.stringify(open)}`);
   }
-  return { expectedRecords, detectedRecords: boxes.length, minimumEdgeCoverage, maximumEdgeGapPx, pages };
+  return {
+    expectedRecords,
+    detectedRecords: boxes.length,
+    minimumHorizontalCoverage,
+    minimumEdgeCoverage,
+    maximumEdgeGapPx,
+    pages,
+  };
 }
 
 function rasterInkBounds(path) {
@@ -359,7 +375,7 @@ const reviewEnvironment = {
   print: {
     media: "print",
     format: "A4 from CSS @page",
-    rasterDpi: 110,
+    rasterDpi: PRINT_RASTER_DPI,
     rasterizer: (popplerVersionResult.stderr || popplerVersionResult.stdout).trim().split("\n")[0] || "pdftoppm",
     contentViewportCssPx: PRINT_CONTENT_VIEWPORT,
   },
@@ -460,6 +476,18 @@ try {
           .coverage-record::after { inset-block-end: auto !important; block-size: 80% !important; }
         }` });
       }
+      if (PRINT_MUTATION_CONTROL === "broken-left-box-closure") {
+        await page.addStyleTag({ content: `@media print {
+          .coverage-record { border-inline-start-color: transparent !important; }
+        }` });
+      }
+      if (PRINT_MUTATION_CONTROL === "broken-partial-both-box-closure") {
+        await page.addStyleTag({ content: `@media print {
+          .coverage-record::after { inset-block-end: auto !important; block-size: 80% !important; }
+          .coverage-record::before { content: ""; position: absolute; z-index: 1; inset-inline-start: -1px;
+            inset-block-end: 0; inline-size: 4px; block-size: 20%; background: var(--ds-color-paper); }
+        }` });
+      }
       const printContrast = await measuredContrast(page);
       const printSemantics = await page.evaluate(() => {
         const trustValue = document.querySelector(".summary-grid > div:first-child dd");
@@ -531,7 +559,7 @@ try {
         throw new Error(`${state}: unexpected PDF geometry: ${pages} pages, ${pageSize}`);
       }
       const rasterPrefix = join(OUTPUT, `${state}--a4-page`);
-      run("pdftoppm", ["-png", "-r", "110", pdfPath, rasterPrefix]);
+      run("pdftoppm", ["-png", "-r", String(PRINT_RASTER_DPI), pdfPath, rasterPrefix]);
       const rasterPaths = readdirSync(OUTPUT)
         .filter((name) => name.startsWith(`${state}--a4-page-`) && name.endsWith(".png"))
         .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
@@ -547,7 +575,7 @@ try {
       });
       const pageStartChecks = coveragePageStartChecks(pdfPath, rasterPages);
       const pageContentChecks = terminalPageContentChecks(pdfPath, rasterPages);
-      const boxClosureChecks = coverageBoxClosureChecks(rasterPages, printSemantics.coverageRecordCount);
+      const boxClosureChecks = coverageBoxClosureChecks(pdfPath, rasterPages, printSemantics.coverageRecordCount);
       const visiblePrintContract = {
         pages,
         pageSize,

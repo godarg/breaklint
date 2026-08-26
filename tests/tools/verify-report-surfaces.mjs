@@ -91,6 +91,7 @@ function independentlyCheckCoverageBoxClosure(pdf, raster, expectedRecords) {
   const contentWidthCssPx = manifest.reviewEnvironment.print.contentViewportCssPx.width;
   const minimumEdgeCoverage = 0.98;
   const maximumEdgeGapPx = 2;
+  const minimumHorizontalCoverage = 0.95;
   const pages = raster.pages.map((pageArtifact, pageIndex) => {
     const page = pageIndex + 1;
     const xml = run("pdftotext", ["-f", String(page), "-l", String(page), "-bbox-layout", pdfPath, "-"]);
@@ -116,6 +117,13 @@ function independentlyCheckCoverageBoxClosure(pdf, raster, expectedRecords) {
     };
     const edgeRowIsDark = (x, y) => [x - 2, x - 1, x, x + 1, x + 2]
       .some((candidate) => candidate >= 0 && candidate < decoded.width && isDark(candidate, y));
+    const horizontalCoverage = (y) => {
+      let hits = 0;
+      for (let x = projectedLeft; x <= projectedRight; x += 1) {
+        if (isDark(x, y)) hits += 1;
+      }
+      return hits / (projectedRight - projectedLeft + 1);
+    };
     const edgeStats = (x, top, bottom) => {
       let darkRows = 0;
       let currentGapPx = 0;
@@ -138,22 +146,33 @@ function independentlyCheckCoverageBoxClosure(pdf, raster, expectedRecords) {
       assert.ok(result, `${pageArtifact.path}: RULE has no RESULT anchor before the next coverage card`);
       const ruleY = Math.round((rule.yMin + rule.yMax) / 2 * rasterDpi / 72);
       const resultY = Math.round((result.yMin + result.yMax) / 2 * rasterDpi / 72);
-      const seedY = [0, -1, 1, -2, 2, -3, 3, -4, 4]
-        .map((offset) => ruleY + offset)
-        .find((candidate) => candidate >= 0 && candidate < decoded.height && edgeRowIsDark(projectedLeft, candidate));
-      assert.notEqual(seedY, undefined, `${pageArtifact.path}: RULE anchor has no physical left card edge`);
-      let top = seedY;
-      let bottom = seedY;
-      while (top > 0 && edgeRowIsDark(projectedLeft, top - 1)) top -= 1;
-      while (bottom < decoded.height - 1 && edgeRowIsDark(projectedLeft, bottom + 1)) bottom += 1;
-      assert.ok(top <= ruleY && bottom >= resultY, `${pageArtifact.path}: left edge does not contain the complete RULE-to-RESULT card content`);
+      let top = ruleY;
+      while (top >= 0 && horizontalCoverage(top) < minimumHorizontalCoverage) top -= 1;
+      let bottom = resultY;
+      while (bottom < decoded.height && horizontalCoverage(bottom) < minimumHorizontalCoverage) bottom += 1;
+      assert.ok(top >= 0 && bottom < decoded.height && top < ruleY && bottom > resultY,
+        `${pageArtifact.path}: PDF text anchors have no complete enclosing horizontal frame`);
+      const leftStats = edgeStats(projectedLeft, top, bottom);
       const rightStats = edgeStats(projectedRight, top, bottom);
       assert.ok(
+        leftStats.coverage >= minimumEdgeCoverage && leftStats.maximumGapPx <= maximumEdgeGapPx &&
         rightStats.coverage >= minimumEdgeCoverage && rightStats.maximumGapPx <= maximumEdgeGapPx,
-        `${pageArtifact.path}: full-height right edge is open ` +
-          `(coverage ${rightStats.coverage} < ${minimumEdgeCoverage} or gap ${rightStats.maximumGapPx}px > ${maximumEdgeGapPx}px)`,
+        `${pageArtifact.path}: full-height physical edge is open ` +
+          `(left ${leftStats.coverage}/${leftStats.maximumGapPx}px, right ${rightStats.coverage}/${rightStats.maximumGapPx}px; ` +
+          `required ${minimumEdgeCoverage}/${maximumEdgeGapPx}px)`,
       );
-      return { ruleY, resultY, top, bottom, projectedLeft, projectedRight, rightCoverage: rightStats.coverage, rightMaximumGapPx: rightStats.maximumGapPx };
+      return {
+        ruleY,
+        resultY,
+        top,
+        bottom,
+        left: projectedLeft,
+        right: projectedRight,
+        leftCoverage: leftStats.coverage,
+        leftMaximumGapPx: leftStats.maximumGapPx,
+        rightCoverage: rightStats.coverage,
+        rightMaximumGapPx: rightStats.maximumGapPx,
+      };
     });
     return { page, path: pageArtifact.path, anchors };
   });
@@ -162,6 +181,7 @@ function independentlyCheckCoverageBoxClosure(pdf, raster, expectedRecords) {
 
   assert.equal(pdf.boxClosureChecks.expectedRecords, expectedRecords, `${pdf.cell}: reported box inventory input drift`);
   assert.equal(pdf.boxClosureChecks.detectedRecords, expectedRecords, `${pdf.cell}: renderer did not detect every coverage box`);
+  assert.equal(pdf.boxClosureChecks.minimumHorizontalCoverage, minimumHorizontalCoverage, `${pdf.cell}: horizontal frame threshold drift`);
   assert.equal(pdf.boxClosureChecks.minimumEdgeCoverage, minimumEdgeCoverage, `${pdf.cell}: box edge threshold drift`);
   assert.equal(pdf.boxClosureChecks.maximumEdgeGapPx, maximumEdgeGapPx, `${pdf.cell}: box edge gap threshold drift`);
   const reportedBoxes = pdf.boxClosureChecks.pages.flatMap((page) => page.boxes);
@@ -173,7 +193,30 @@ function independentlyCheckCoverageBoxClosure(pdf, raster, expectedRecords) {
     ),
     `${pdf.cell}: renderer reported an open coverage edge`,
   );
-  return { expectedRecords, verifiedAnchors: anchors.length, minimumEdgeCoverage, maximumEdgeGapPx, pages };
+  for (const page of pages) {
+    const reported = pdf.boxClosureChecks.pages.find((candidate) => candidate.page === page.page);
+    assert.ok(reported, `${pdf.cell}: renderer omitted box details for page ${page.page}`);
+    assert.equal(reported.path, page.path, `${pdf.cell}: renderer box page path drift`);
+    assert.equal(reported.boxes.length, page.anchors.length, `${pdf.cell}: renderer/PDF-anchor page inventory drift`);
+    const orderedReported = [...reported.boxes].sort((a, b) => a.top - b.top);
+    for (const [index, anchor] of page.anchors.entries()) {
+      const box = orderedReported[index];
+      for (const coordinate of ["top", "bottom", "left", "right"]) {
+        assert.ok(
+          Math.abs(box[coordinate] - anchor[coordinate]) <= 2,
+          `${pdf.cell}: renderer ${coordinate} geometry disagrees with independent PDF-anchor frame on page ${page.page}`,
+        );
+      }
+    }
+  }
+  return {
+    expectedRecords,
+    verifiedAnchors: anchors.length,
+    minimumHorizontalCoverage,
+    minimumEdgeCoverage,
+    maximumEdgeGapPx,
+    pages,
+  };
 }
 
 function independentlyRasterInkBounds(path) {
