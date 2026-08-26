@@ -138,7 +138,16 @@ layout at the A4 content width, requires the Coverage Trust verdict to remain on
 card and have zero bounding-box overlap with the neighbouring summary card. It limits coverage
 values to two columns and rejects overflow. Each rasterized page is then checked independently: a coverage record
 that starts a page must begin with its complete top border, and a page may not begin with a detached
-coverage value. A deliberately fragment-prone print mutation must make this gate fail.
+coverage value. Every wide coverage card must also have continuous visible left and right raster
+edges. This is an outcome check rather than a computed-style assertion: Chrome can report a physical
+right border on a paged `flow-root` containing floats while omitting that edge from the PDF. The
+renderer locates complete card frames from raster strokes; the verifier instead locates each
+Coverage card from independent `RULE`/`RESULT` PDF text anchors, derives its full height from the
+physical left edge and samples the projected physical right edge over that complete height. Both
+oracles require at least 98% edge coverage and reject any contiguous gap longer than two raster
+rows. The complete visible contract is bound to the review fingerprint; mutations that remove the
+whole print-only edge or only its lower fifth are both rejected. A
+deliberately fragment-prone print mutation must likewise make the gate fail.
 
 The terminal-page density gate uses report structure rather than a global pixel quota. It rejects
 empty non-cover pages. When the final page continues an atomic sequence of coverage cards, it must

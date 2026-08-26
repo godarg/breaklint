@@ -23,6 +23,11 @@ Planned patch version: 0.2.2.
   stripping can no longer cross quoted markup boundaries; unknown namespaces are refused on opening
   and closing tags; and one-pass, Unicode-aware reference rewriting keeps prefix-equal IDs distinct.
   All three same-document `url()` quoting forms are asserted.
+- Closed the physical right edge of every print coverage card. Chrome reported the declared border in
+  computed style but omitted it from paged PDF output around the float-based print layout; a tokenized
+  inner edge now survives rasterization, and independent renderer/verifier passes require all 15 cards
+  in each report state to have complete visible left and right edges. Whole-edge and partial-edge
+  mutations must both fail.
 
 ## 0.2.1 — 2026-08-25
 

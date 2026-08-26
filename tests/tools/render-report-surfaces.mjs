@@ -36,7 +36,7 @@ const BROWSER_RENDER_ARGS = [
   "--force-color-profile=srgb",
   "--hide-scrollbars",
 ];
-if (!["none", "broken-coverage", "broken-trust-geometry", "broken-terminal-density"].includes(PRINT_MUTATION_CONTROL)) {
+if (!["none", "broken-coverage", "broken-trust-geometry", "broken-terminal-density", "broken-box-closure", "broken-partial-box-closure"].includes(PRINT_MUTATION_CONTROL)) {
   throw new Error(`unknown BREAKLINT_SURFACE_PRINT_CONTROL=${PRINT_MUTATION_CONTROL}`);
 }
 
@@ -166,6 +166,117 @@ function coveragePageStartChecks(pdfPath, rasterPages) {
     }
     return { page, firstToken, beginsWithCoverageRecord, beginsWithCoverageFragment, topHorizontalBorderPx: border.pixels, requiredBorderPx: border.required };
   });
+}
+
+function coverageBoxClosureChecks(rasterPages, expectedRecords) {
+  const minimumEdgeCoverage = 0.98;
+  const maximumEdgeGapPx = 2;
+  const pages = rasterPages.map((raster, pageIndex) => {
+    const decoded = PNG.sync.read(readFileSync(join(OUTPUT, raster.path)), { checkCRC: true });
+    const dark = (x, y) => {
+      const offset = (y * decoded.width + x) * 4;
+      return decoded.data[offset] < 180 && decoded.data[offset + 1] < 180 &&
+        decoded.data[offset + 2] < 180 && decoded.data[offset + 3] > 0;
+    };
+    const rawRuns = [];
+    for (let y = 0; y < decoded.height; y += 1) {
+      let best = null;
+      let start = -1;
+      for (let x = 0; x <= decoded.width; x += 1) {
+        const on = x < decoded.width && dark(x, y);
+        if (on && start < 0) start = x;
+        if (!on && start >= 0) {
+          const run = { y, left: start, right: x - 1, length: x - start };
+          if (!best || run.length > best.length) best = run;
+          start = -1;
+        }
+      }
+      if (best && best.length >= Math.ceil(decoded.width * 0.72)) rawRuns.push(best);
+    }
+    const strokes = [];
+    for (const run of rawRuns) {
+      const previous = strokes.at(-1);
+      if (
+        previous && run.y <= previous.bottom + 1 &&
+        Math.abs(run.left - previous.left) <= 2 && Math.abs(run.right - previous.right) <= 2
+      ) {
+        previous.bottom = run.y;
+        if (run.length > previous.length) Object.assign(previous, { left: run.left, right: run.right, length: run.length });
+      } else {
+        strokes.push({ top: run.y, bottom: run.y, left: run.left, right: run.right, length: run.length });
+      }
+    }
+    const edgeStats = (x, top, bottom) => {
+      let rows = 0;
+      let hits = 0;
+      let currentGapPx = 0;
+      let maximumGapPx = 0;
+      for (let y = top; y <= bottom; y += 1) {
+        rows += 1;
+        const hit = [x - 1, x, x + 1]
+          .some((candidate) => candidate >= 0 && candidate < decoded.width && dark(candidate, y));
+        if (hit) {
+          hits += 1;
+          currentGapPx = 0;
+        } else {
+          currentGapPx += 1;
+          maximumGapPx = Math.max(maximumGapPx, currentGapPx);
+        }
+      }
+      return { coverage: hits / rows, maximumGapPx };
+    };
+    const boxes = [];
+    for (let index = 0; index < strokes.length;) {
+      const top = strokes[index];
+      let matchIndex = -1;
+      let box = null;
+      for (let candidateIndex = index + 1; candidateIndex < strokes.length; candidateIndex += 1) {
+        const bottom = strokes[candidateIndex];
+        const height = Math.round((bottom.top + bottom.bottom - top.top - top.bottom) / 2);
+        if (height > 320) break;
+        if (
+          height < 180 || Math.abs(top.left - bottom.left) > 2 ||
+          Math.abs(top.right - bottom.right) > 2
+        ) continue;
+        const left = Math.round((top.left + bottom.left) / 2);
+        const right = Math.round((top.right + bottom.right) / 2);
+        const leftStats = edgeStats(left, top.bottom, bottom.top);
+        if (leftStats.coverage < 0.8) continue;
+        const rightStats = edgeStats(right, top.bottom, bottom.top);
+        box = {
+          top: top.top,
+          bottom: bottom.bottom,
+          left,
+          right,
+          leftCoverage: Math.round(leftStats.coverage * 1_000) / 1_000,
+          leftMaximumGapPx: leftStats.maximumGapPx,
+          rightCoverage: Math.round(rightStats.coverage * 1_000) / 1_000,
+          rightMaximumGapPx: rightStats.maximumGapPx,
+        };
+        matchIndex = candidateIndex;
+        break;
+      }
+      if (box) {
+        boxes.push(box);
+        index = matchIndex + 1;
+      } else {
+        index += 1;
+      }
+    }
+    return { page: pageIndex + 1, path: raster.path, boxes };
+  });
+  const boxes = pages.flatMap((page) => page.boxes.map((box) => ({ page: page.page, path: page.path, ...box })));
+  if (boxes.length !== expectedRecords) {
+    throw new Error(`coverage box raster inventory drift: detected ${boxes.length}/${expectedRecords}`);
+  }
+  const open = boxes.filter((box) =>
+    box.leftCoverage < minimumEdgeCoverage || box.leftMaximumGapPx > maximumEdgeGapPx ||
+    box.rightCoverage < minimumEdgeCoverage || box.rightMaximumGapPx > maximumEdgeGapPx
+  );
+  if (open.length > 0) {
+    throw new Error(`coverage boxes have an open physical edge: ${JSON.stringify(open)}`);
+  }
+  return { expectedRecords, detectedRecords: boxes.length, minimumEdgeCoverage, maximumEdgeGapPx, pages };
 }
 
 function rasterInkBounds(path) {
@@ -339,6 +450,16 @@ try {
           .report-header.state-clean ~ .findings-empty { display: block !important; }
         }` });
       }
+      if (PRINT_MUTATION_CONTROL === "broken-box-closure") {
+        await page.addStyleTag({ content: `@media print {
+          .coverage-record::after { content: none !important; }
+        }` });
+      }
+      if (PRINT_MUTATION_CONTROL === "broken-partial-box-closure") {
+        await page.addStyleTag({ content: `@media print {
+          .coverage-record::after { inset-block-end: auto !important; block-size: 80% !important; }
+        }` });
+      }
       const printContrast = await measuredContrast(page);
       const printSemantics = await page.evaluate(() => {
         const trustValue = document.querySelector(".summary-grid > div:first-child dd");
@@ -382,6 +503,7 @@ try {
             return Math.max(0, ...rows.values());
           }),
           coverageRecordBreakInside: records.map((record) => getComputedStyle(record).breakInside),
+          coverageRecordCount: records.length,
           overflowingCoverageCells: records.flatMap((record) => [...record.children]
             .filter((cell) => cell.scrollWidth > cell.clientWidth + 1)
             .map((cell) => record.id)),
@@ -425,6 +547,7 @@ try {
       });
       const pageStartChecks = coveragePageStartChecks(pdfPath, rasterPages);
       const pageContentChecks = terminalPageContentChecks(pdfPath, rasterPages);
+      const boxClosureChecks = coverageBoxClosureChecks(rasterPages, printSemantics.coverageRecordCount);
       const visiblePrintContract = {
         pages,
         pageSize,
@@ -432,6 +555,7 @@ try {
         printSemantics,
         pageStartChecks,
         pageContentChecks,
+        boxClosureChecks,
         rasterPages: rasterPages.map((page) => ({ sha256: page.sha256, dimensions: page.dimensions })),
       };
       const pdfCell = `print/${state}/pdf`;
@@ -455,6 +579,7 @@ try {
         printSemantics,
         pageStartChecks,
         pageContentChecks,
+        boxClosureChecks,
         rasterPageVisualHashes: rasterPages.map((page) => page.sha256),
       });
       artifacts.push({

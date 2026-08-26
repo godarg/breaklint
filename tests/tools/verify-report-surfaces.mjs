@@ -85,6 +85,97 @@ function independentlyCheckCoveragePageStarts(pdf, raster) {
   });
 }
 
+function independentlyCheckCoverageBoxClosure(pdf, raster, expectedRecords) {
+  const pdfPath = resolve(output, pdf.path);
+  const rasterDpi = manifest.reviewEnvironment.print.rasterDpi;
+  const contentWidthCssPx = manifest.reviewEnvironment.print.contentViewportCssPx.width;
+  const minimumEdgeCoverage = 0.98;
+  const maximumEdgeGapPx = 2;
+  const pages = raster.pages.map((pageArtifact, pageIndex) => {
+    const page = pageIndex + 1;
+    const xml = run("pdftotext", ["-f", String(page), "-l", String(page), "-bbox-layout", pdfPath, "-"]);
+    const words = [...xml.matchAll(
+      /<word xMin="([0-9.]+)" yMin="([0-9.]+)" xMax="([0-9.]+)" yMax="([0-9.]+)">([^<]+)<\/word>/gu,
+    )].map((match) => ({
+      xMin: Number(match[1]),
+      yMin: Number(match[2]),
+      xMax: Number(match[3]),
+      yMax: Number(match[4]),
+      text: match[5],
+    }));
+    const rules = words.filter((word) => word.text === "RULE").sort((a, b) => a.yMin - b.yMin);
+    const results = words.filter((word) => word.text === "RESULT").sort((a, b) => a.yMin - b.yMin);
+    const decoded = PNG.sync.read(readFileSync(resolve(output, pageArtifact.path)), { checkCRC: true });
+    const contentWidthRasterPx = contentWidthCssPx * rasterDpi / 96;
+    const projectedLeft = Math.round((decoded.width - contentWidthRasterPx) / 2);
+    const projectedRight = Math.round(decoded.width - (decoded.width - contentWidthRasterPx) / 2 - 1);
+    const isDark = (x, y) => {
+      const offset = (y * decoded.width + x) * 4;
+      return decoded.data[offset] < 180 && decoded.data[offset + 1] < 180 &&
+        decoded.data[offset + 2] < 180 && decoded.data[offset + 3] > 0;
+    };
+    const edgeRowIsDark = (x, y) => [x - 2, x - 1, x, x + 1, x + 2]
+      .some((candidate) => candidate >= 0 && candidate < decoded.width && isDark(candidate, y));
+    const edgeStats = (x, top, bottom) => {
+      let darkRows = 0;
+      let currentGapPx = 0;
+      let maximumGapPx = 0;
+      for (let y = top; y <= bottom; y += 1) {
+        if (edgeRowIsDark(x, y)) {
+          darkRows += 1;
+          currentGapPx = 0;
+        } else {
+          currentGapPx += 1;
+          maximumGapPx = Math.max(maximumGapPx, currentGapPx);
+        }
+      }
+      const rows = bottom - top + 1;
+      return { coverage: Math.round(darkRows / rows * 1_000) / 1_000, maximumGapPx };
+    };
+    const anchors = rules.map((rule, index) => {
+      const nextRuleY = rules[index + 1]?.yMin ?? Number.POSITIVE_INFINITY;
+      const result = results.find((candidate) => candidate.yMin > rule.yMax && candidate.yMin < nextRuleY);
+      assert.ok(result, `${pageArtifact.path}: RULE has no RESULT anchor before the next coverage card`);
+      const ruleY = Math.round((rule.yMin + rule.yMax) / 2 * rasterDpi / 72);
+      const resultY = Math.round((result.yMin + result.yMax) / 2 * rasterDpi / 72);
+      const seedY = [0, -1, 1, -2, 2, -3, 3, -4, 4]
+        .map((offset) => ruleY + offset)
+        .find((candidate) => candidate >= 0 && candidate < decoded.height && edgeRowIsDark(projectedLeft, candidate));
+      assert.notEqual(seedY, undefined, `${pageArtifact.path}: RULE anchor has no physical left card edge`);
+      let top = seedY;
+      let bottom = seedY;
+      while (top > 0 && edgeRowIsDark(projectedLeft, top - 1)) top -= 1;
+      while (bottom < decoded.height - 1 && edgeRowIsDark(projectedLeft, bottom + 1)) bottom += 1;
+      assert.ok(top <= ruleY && bottom >= resultY, `${pageArtifact.path}: left edge does not contain the complete RULE-to-RESULT card content`);
+      const rightStats = edgeStats(projectedRight, top, bottom);
+      assert.ok(
+        rightStats.coverage >= minimumEdgeCoverage && rightStats.maximumGapPx <= maximumEdgeGapPx,
+        `${pageArtifact.path}: full-height right edge is open ` +
+          `(coverage ${rightStats.coverage} < ${minimumEdgeCoverage} or gap ${rightStats.maximumGapPx}px > ${maximumEdgeGapPx}px)`,
+      );
+      return { ruleY, resultY, top, bottom, projectedLeft, projectedRight, rightCoverage: rightStats.coverage, rightMaximumGapPx: rightStats.maximumGapPx };
+    });
+    return { page, path: pageArtifact.path, anchors };
+  });
+  const anchors = pages.flatMap((page) => page.anchors);
+  assert.equal(anchors.length, expectedRecords, `coverage text-anchor inventory drift: detected ${anchors.length}/${expectedRecords}`);
+
+  assert.equal(pdf.boxClosureChecks.expectedRecords, expectedRecords, `${pdf.cell}: reported box inventory input drift`);
+  assert.equal(pdf.boxClosureChecks.detectedRecords, expectedRecords, `${pdf.cell}: renderer did not detect every coverage box`);
+  assert.equal(pdf.boxClosureChecks.minimumEdgeCoverage, minimumEdgeCoverage, `${pdf.cell}: box edge threshold drift`);
+  assert.equal(pdf.boxClosureChecks.maximumEdgeGapPx, maximumEdgeGapPx, `${pdf.cell}: box edge gap threshold drift`);
+  const reportedBoxes = pdf.boxClosureChecks.pages.flatMap((page) => page.boxes);
+  assert.equal(reportedBoxes.length, expectedRecords, `${pdf.cell}: reported box detail inventory drift`);
+  assert.ok(
+    reportedBoxes.every((box) =>
+      box.leftCoverage >= minimumEdgeCoverage && box.leftMaximumGapPx <= maximumEdgeGapPx &&
+      box.rightCoverage >= minimumEdgeCoverage && box.rightMaximumGapPx <= maximumEdgeGapPx
+    ),
+    `${pdf.cell}: renderer reported an open coverage edge`,
+  );
+  return { expectedRecords, verifiedAnchors: anchors.length, minimumEdgeCoverage, maximumEdgeGapPx, pages };
+}
+
 function independentlyRasterInkBounds(path) {
   const decoded = PNG.sync.read(readFileSync(path), { checkCRC: true });
   let topPx = decoded.height;
@@ -209,6 +300,7 @@ function printVisibleContract(state) {
   assert.deepEqual(pdf.printSemantics.overflowingCoverageCells, [], `print/${state}: coverage cell overflows its column`);
   assert.deepEqual(pdf.pageStartChecks, independentlyCheckCoveragePageStarts(pdf, raster), `print/${state}: page-start raster invariant drift`);
   assert.deepEqual(pdf.pageContentChecks, independentlyCheckTerminalPageContent(pdf, raster), `print/${state}: terminal-page content invariant drift`);
+  independentlyCheckCoverageBoxClosure(pdf, raster, pdf.printSemantics.coverageRecordCount);
   return {
     pages: pdf.pages,
     pageSize: pdf.pageSize,
@@ -216,6 +308,7 @@ function printVisibleContract(state) {
     printSemantics: pdf.printSemantics,
     pageStartChecks: pdf.pageStartChecks,
     pageContentChecks: pdf.pageContentChecks,
+    boxClosureChecks: pdf.boxClosureChecks,
     rasterPages: raster.pages.map((page) => ({ sha256: page.sha256, dimensions: page.dimensions })),
   };
 }
