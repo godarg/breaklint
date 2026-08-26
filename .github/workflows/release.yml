@@ -102,6 +102,9 @@ jobs:
         # provenance. Exact reviewed-pixel equality remains the separate local pre-tag gate.
         run: npm run test:report-surfaces:portable
 
+      - name: physical report-edge mutation controls
+        run: npm run test:report-surface-mutants
+
       - name: static and real-browser self-application
         run: npm run selfcheck
 

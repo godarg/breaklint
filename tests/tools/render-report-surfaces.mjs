@@ -28,6 +28,8 @@ const PRINT_RASTER_DPI = 110;
 const REVIEW_ARTIFACT_CONTRACT_VERSION = 3;
 const SCREEN_PIXEL_CONTRACT_VERSION = 1;
 const PRINT_MUTATION_CONTROL = process.env.BREAKLINT_SURFACE_PRINT_CONTROL ?? "none";
+const PRINT_STATE_FILTER = process.env.BREAKLINT_SURFACE_STATE ?? null;
+const REPORT_STATES = ["clean", "findings", "infrastructure", "insufficient-coverage"];
 const BROWSER_RENDER_ARGS = [
   "--deterministic-mode",
   "--disable-gpu",
@@ -39,6 +41,12 @@ const BROWSER_RENDER_ARGS = [
 ];
 if (!["none", "broken-coverage", "broken-trust-geometry", "broken-terminal-density", "broken-box-closure", "broken-partial-box-closure", "broken-left-box-closure", "broken-partial-both-box-closure"].includes(PRINT_MUTATION_CONTROL)) {
   throw new Error(`unknown BREAKLINT_SURFACE_PRINT_CONTROL=${PRINT_MUTATION_CONTROL}`);
+}
+if (PRINT_STATE_FILTER !== null && !REPORT_STATES.includes(PRINT_STATE_FILTER)) {
+  throw new Error(`unknown BREAKLINT_SURFACE_STATE=${PRINT_STATE_FILTER}`);
+}
+if (PRINT_STATE_FILTER !== null && PRINT_MUTATION_CONTROL === "none") {
+  throw new Error("BREAKLINT_SURFACE_STATE is reserved for negative mutation controls");
 }
 
 function sha256(path) {
@@ -170,6 +178,7 @@ function coveragePageStartChecks(pdfPath, rasterPages) {
 }
 
 function coverageBoxClosureChecks(pdfPath, rasterPages, expectedRecords) {
+  if (expectedRecords <= 0) throw new Error("coverage box inventory must not be empty");
   const minimumEdgeCoverage = 0.98;
   const maximumEdgeGapPx = 2;
   const minimumHorizontalCoverage = 0.95;
@@ -360,10 +369,17 @@ if (!browserResolution.path) {
 const reviewInput = computeReviewInput(ROOT);
 const browserVersionResult = spawnSync(browserResolution.path, ["--version"], { encoding: "utf8" });
 const popplerVersionResult = spawnSync("pdftoppm", ["-v"], { encoding: "utf8" });
+if (browserVersionResult.status !== 0 || browserVersionResult.stdout.trim().length === 0) {
+  throw new Error(`browser version probe failed (${browserVersionResult.status}): ${browserVersionResult.stderr}`);
+}
+const rasterizerVersion = (popplerVersionResult.stderr || popplerVersionResult.stdout).trim().split("\n")[0];
+if (popplerVersionResult.status !== 0 || !/^pdftoppm version\s+\S+/u.test(rasterizerVersion)) {
+  throw new Error(`pdftoppm version probe failed (${popplerVersionResult.status}): ${popplerVersionResult.stdout}${popplerVersionResult.stderr}`);
+}
 const reviewEnvironment = {
   reviewArtifactContractVersion: REVIEW_ARTIFACT_CONTRACT_VERSION,
   screenPixelContractVersion: SCREEN_PIXEL_CONTRACT_VERSION,
-  browser: browserVersionResult.status === 0 ? browserVersionResult.stdout.trim() : browserResolution.path,
+  browser: browserVersionResult.stdout.trim(),
   platform: platform(),
   architecture: arch(),
   platformRelease: release(),
@@ -376,14 +392,16 @@ const reviewEnvironment = {
     media: "print",
     format: "A4 from CSS @page",
     rasterDpi: PRINT_RASTER_DPI,
-    rasterizer: (popplerVersionResult.stderr || popplerVersionResult.stdout).trim().split("\n")[0] || "pdftoppm",
+    rasterizer: rasterizerVersion,
     contentViewportCssPx: PRINT_CONTENT_VIEWPORT,
   },
 };
 const browser = await puppeteer.launch({ executablePath: browserResolution.path, headless: true, args: BROWSER_RENDER_ARGS });
 const artifacts = [];
+const technicalProbes = [];
 try {
   for (const [state, report] of Object.entries(canonicalReportStates())) {
+    if (PRINT_STATE_FILTER !== null && state !== PRINT_STATE_FILTER) continue;
     const page = await browser.newPage();
     try {
       const html = render(report, "html");
@@ -484,8 +502,8 @@ try {
       if (PRINT_MUTATION_CONTROL === "broken-partial-both-box-closure") {
         await page.addStyleTag({ content: `@media print {
           .coverage-record::after { inset-block-end: auto !important; block-size: 80% !important; }
-          .coverage-record::before { content: ""; position: absolute; z-index: 1; inset-inline-start: -1px;
-            inset-block-end: 0; inline-size: 4px; block-size: 20%; background: var(--ds-color-paper); }
+          .coverage-record::before { content: ""; position: absolute; z-index: 1; inset-inline-start: -4px;
+            inset-block-end: 0; inline-size: 10px; block-size: 20%; background: var(--ds-color-paper); }
         }` });
       }
       const printContrast = await measuredContrast(page);
@@ -576,6 +594,58 @@ try {
       const pageStartChecks = coveragePageStartChecks(pdfPath, rasterPages);
       const pageContentChecks = terminalPageContentChecks(pdfPath, rasterPages);
       const boxClosureChecks = coverageBoxClosureChecks(pdfPath, rasterPages, printSemantics.coverageRecordCount);
+      if (PRINT_MUTATION_CONTROL === "none" && state === "insufficient-coverage") {
+        const technicalDirectory = join(OUTPUT, ".technical");
+        mkdirSync(technicalDirectory, { recursive: true });
+        const technicalPdfName = `${state}--no-background.pdf`;
+        const technicalPdfRelativePath = join(".technical", technicalPdfName);
+        const technicalPdfPath = join(OUTPUT, technicalPdfRelativePath);
+        writeFileSync(technicalPdfPath, await page.pdf({ printBackground: false, preferCSSPageSize: true }));
+        const technicalPdfInfo = run("pdfinfo", [technicalPdfPath]);
+        const technicalPages = Number(/^Pages:\s+(\d+)$/mu.exec(technicalPdfInfo)?.[1] ?? "0");
+        const technicalPageSize = /^Page size:\s+(.+)$/mu.exec(technicalPdfInfo)?.[1] ?? "unknown";
+        if (technicalPages < 1 || !/A4|594\.9\d* x 841\.9\d* pts/iu.test(technicalPageSize)) {
+          throw new Error(`${state}: unexpected no-background PDF geometry: ${technicalPages} pages, ${technicalPageSize}`);
+        }
+        const technicalRasterPrefix = join(technicalDirectory, `${state}--no-background-page`);
+        run("pdftoppm", ["-png", "-r", String(PRINT_RASTER_DPI), technicalPdfPath, technicalRasterPrefix]);
+        const technicalRasterPaths = readdirSync(technicalDirectory)
+          .filter((name) => name.startsWith(`${state}--no-background-page-`) && name.endsWith(".png"))
+          .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+        if (technicalRasterPaths.length !== technicalPages) {
+          throw new Error(`${state}: rasterized ${technicalRasterPaths.length}/${technicalPages} no-background PDF pages`);
+        }
+        const technicalRasterPages = technicalRasterPaths.map((name) => {
+          const relativePath = join(".technical", name);
+          const path = join(OUTPUT, relativePath);
+          return {
+            path: relativePath,
+            bytes: readFileSync(path).length,
+            sha256: sha256(path),
+            dimensions: pngDimensions(path),
+          };
+        });
+        technicalProbes.push({
+          id: "print-background-disabled/insufficient-coverage",
+          state,
+          printBackground: false,
+          pdf: {
+            path: technicalPdfRelativePath,
+            bytes: readFileSync(technicalPdfPath).length,
+            sha256: sha256(technicalPdfPath),
+            pages: technicalPages,
+            pageSize: technicalPageSize,
+          },
+          rasterPages: technicalRasterPages,
+          coverageRecordCount: printSemantics.coverageRecordCount,
+          shortCoverageRecordCount: await page.evaluate(() => document.querySelectorAll(".coverage-record.short").length),
+          boxClosureChecks: coverageBoxClosureChecks(
+            technicalPdfPath,
+            technicalRasterPages,
+            printSemantics.coverageRecordCount,
+          ),
+        });
+      }
       const visiblePrintContract = {
         pages,
         pageSize,
@@ -645,6 +715,7 @@ const manifest = {
       .filter((artifact) => artifact.kind === "raster-set")
       .reduce((sum, artifact) => sum + artifact.pages.length, 0),
   },
+  technicalProbes,
   artifacts,
 };
 writeFileSync(join(OUTPUT, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);

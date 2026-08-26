@@ -33,6 +33,7 @@ export const REVIEW_INPUT_ROOTS = Object.freeze([
   "examples/demo-snapshot.json",
   "tests/fixtures/report-states.ts",
   "tests/tools/render-report-surfaces.mjs",
+  "tests/tools/report-surface-mutations.mjs",
   "tests/tools/verify-report-surfaces.mjs",
   "tests/tools/report-surface-contract.mjs",
   "package.json",

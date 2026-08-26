@@ -146,11 +146,15 @@ strokes and measures both physical sides between those frame rows. The verifier 
 projects the A4 content edges, finds the enclosing full-width raster rows around each text pair,
 remeasures both full-height sides and cross-checks the renderer geometry. Neither oracle relies on
 a global count of anonymous card-like rectangles or a fixed card-height band. Both require at least
-98% edge coverage and reject any contiguous gap longer than two raster rows. The inner repair is a
-real child border rather than a background fill, so it remains printable when background graphics
-are disabled. The complete visible contract is bound to the review fingerprint; mutations cover a
+98% edge coverage and reject any contiguous gap longer than two raster rows. The raster DPI is pinned
+to 110 in both oracles. The inner repair is a real child border rather than a background fill. A
+separate technical A4 probe renders the insufficient-coverage state with `printBackground: false`,
+including its strong-left-border warning card, and both oracles must still measure all 15 cards as
+closed; this probe is not an additional human-review cell. The complete visible contract is bound to
+the review fingerprint. A CI mutation runner executes four genuine failing renderer processes for a
 missing whole right edge, a missing whole left edge, a missing lower right fifth and simultaneously
-missing lower fifths on both sides. A
+missing lower fifths on both sides, and requires the named side or sides to cross both rejection
+thresholds. A
 deliberately fragment-prone print mutation must likewise make the gate fail.
 
 The terminal-page density gate uses report structure rather than a global pixel quota. It rejects

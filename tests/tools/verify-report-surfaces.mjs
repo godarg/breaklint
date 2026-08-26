@@ -86,6 +86,7 @@ function independentlyCheckCoveragePageStarts(pdf, raster) {
 }
 
 function independentlyCheckCoverageBoxClosure(pdf, raster, expectedRecords) {
+  assert.ok(expectedRecords > 0, `${pdf.cell}: coverage box inventory must not be empty`);
   const pdfPath = resolve(output, pdf.path);
   const rasterDpi = manifest.reviewEnvironment.print.rasterDpi;
   const contentWidthCssPx = manifest.reviewEnvironment.print.contentViewportCssPx.width;
@@ -356,6 +357,40 @@ function printVisibleContract(state) {
   };
 }
 
+function verifyBackgroundDisabledProbe() {
+  assert.ok(Array.isArray(manifest.technicalProbes), "technical report-surface probes are missing");
+  assert.equal(manifest.technicalProbes.length, 1, "exactly one background-disabled technical probe is required");
+  const probe = manifest.technicalProbes[0];
+  assert.equal(probe.id, "print-background-disabled/insufficient-coverage");
+  assert.equal(probe.state, "insufficient-coverage");
+  assert.equal(probe.printBackground, false, "background-disabled probe was rendered with background graphics");
+  assert.equal(probe.coverageRecordCount, 15, "background-disabled probe coverage inventory drift");
+  assert.equal(probe.shortCoverageRecordCount, 1, "background-disabled probe must include the strong-border warning variant");
+  const pdfPath = resolve(output, probe.pdf.path);
+  assert.equal(existsSync(pdfPath), true, `background-disabled probe PDF missing: ${probe.pdf.path}`);
+  assert.equal(hash(pdfPath), probe.pdf.sha256, "background-disabled probe PDF hash drift");
+  assert.ok(probe.pdf.bytes > 1_000, "background-disabled probe PDF is implausibly small");
+  assert.equal(probe.pdf.pages, probe.rasterPages.length, "background-disabled probe PDF/raster page-count mismatch");
+  assert.match(probe.pdf.pageSize, /A4|594\.9\d* x 841\.9\d* pts/iu, "background-disabled probe is not A4");
+  for (const page of probe.rasterPages) {
+    const path = resolve(output, page.path);
+    assert.equal(existsSync(path), true, `background-disabled probe raster missing: ${page.path}`);
+    assert.equal(hash(path), page.sha256, `background-disabled probe raster hash drift: ${page.path}`);
+    assert.ok(page.bytes > 1_000, `background-disabled probe raster is implausibly small: ${page.path}`);
+    const decoded = PNG.sync.read(readFileSync(path), { checkCRC: true });
+    assert.deepEqual(page.dimensions, { width: decoded.width, height: decoded.height }, `background-disabled raster dimensions drift: ${page.path}`);
+  }
+  independentlyCheckCoverageBoxClosure(
+    {
+      cell: "technical/print-background-disabled/insufficient-coverage",
+      path: probe.pdf.path,
+      boxClosureChecks: probe.boxClosureChecks,
+    },
+    { pages: probe.rasterPages },
+    probe.coverageRecordCount,
+  );
+}
+
 function assertUtcTimestamp(value, message) {
   assert.match(value ?? "", /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u, message);
   assert.equal(Number.isNaN(Date.parse(value)), false, message);
@@ -370,6 +405,9 @@ function assertReviewEnvironment(environment, label) {
   assert.equal(environment.deviceScaleFactor, 1, `${label}: device scale drift`);
   assert.deepEqual(environment.browserRenderArgs, REQUIRED_BROWSER_RENDER_ARGS, `${label}: deterministic browser arguments drift`);
   assert.deepEqual(environment.print?.contentViewportCssPx, { width: 703, height: 1123 }, `${label}: A4 content-width layout probe drift`);
+  assert.equal(environment.print?.rasterDpi, 110, `${label}: print raster DPI drift`);
+  assert.match(environment.browser, /Chrome[^\n]*\d+\.\d+\.\d+\.\d+/u, `${label}: browser version is not measurable`);
+  assert.match(environment.print?.rasterizer ?? "", /^pdftoppm version\s+\S+/u, `${label}: rasterizer version is not measurable`);
 }
 
 function runScreenPixelMutationControl(artifact, currentInput) {
@@ -417,6 +455,7 @@ assertUtcTimestamp(ledger.renderManifestGeneratedAt, "ledger renderManifestGener
 assertReviewEnvironment(manifest.reviewEnvironment, "current render environment");
 assertReviewEnvironment(ledger.reviewEnvironment, "human review environment");
 const currentReviewInput = assertCurrentReviewInput(manifest.reviewInputFingerprint, reviewInputRoot, "render manifest review input");
+verifyBackgroundDisabledProbe();
 assert.equal(ledger.reviewInputFingerprint, currentReviewInput.fingerprint, "human review ledger is bound to a different source/input revision");
 assert.deepEqual(manifest.reviewInputs, currentReviewInput.files, "render manifest input inventory does not match an independent current-worktree reconstruction");
 if (mode === "local") {

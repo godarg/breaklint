@@ -25,10 +25,12 @@ Planned patch version: 0.2.2.
   All three same-document `url()` quoting forms are asserted.
 - Closed the physical right edge of every print coverage card. Chrome reported the declared border in
   computed style but omitted it from paged PDF output around the float-based print layout; a tokenized
-  child-border edge now survives rasterization without depending on printed backgrounds, and
-  independent renderer/verifier passes require all 15 cards in each report state to have complete
+  child-border edge now survives rasterization without depending on printed backgrounds; a separate
+  background-disabled A4 probe verifies that property on both the ordinary and strong-left-border
+  variants. Independent renderer/verifier passes require all 15 cards in each report state to have complete
   visible left and right edges. Whole-edge, one-sided partial-edge and simultaneous two-sided
-  partial-edge mutations must all fail.
+  partial-edge mutations run as genuine expected-red CI subprocesses and must all fail for the
+  measured side or sides.
 
 ## 0.2.1 — 2026-08-25
 

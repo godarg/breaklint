@@ -104,6 +104,11 @@ jobs:
         # browser/OS render. Exact-environment transfer remains a local-only gate.
         run: npm run test:report-surfaces:portable
 
+      - name: physical report-edge mutation controls
+        # Each mutation must produce a genuine failing renderer run. The targeted warning-state
+        # matrix includes both the ordinary thin border and the strong left-border variant.
+        run: npm run test:report-surface-mutants
+
       - name: self-application
         # The tool's own HTML report and its own docs pass its own error rules.
         run: npm run selfcheck
