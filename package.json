@@ -1,6 +1,6 @@
 {
   "name": "breaklint",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Layout checks for documents generated from HTML to PDF: measures every page after pagination and reports the measured value next to the threshold it failed.",
   "keywords": [
     "pagedjs",

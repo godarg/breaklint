@@ -107,6 +107,7 @@ function snapshotFor(ruleId: SimulationRuleId, target: Target, scenario: (typeof
       }],
       shapes: [], paths: [],
       inkPasses: { E: { count: 0, maskHash: digest(`E-${ruleId}-${slot}`) }, S: { count: collisionInk, maskHash: digest(`S-${ruleId}-${slot}`) }, F: { count: 100, maskHash: digest(`F-${ruleId}-${slot}`) } },
+      inkCollected: true,
       inkStable: !(ruleId === "svg/text-clipped" && declined),
     },
   };

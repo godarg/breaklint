@@ -84,8 +84,8 @@ only two rules compare directly measured quantities against a structural boundar
 | [`layout/orphaned-continuation-page`](docs/rules/layout-orphaned-continuation-page.md) | a page holding only the tail of an earlier block | warn |
 | [`layout/hyphen-across-page`](docs/rules/layout-hyphen-across-page.md) | the paginator's hyphenation class at a page boundary | warn |
 | [`svg/text-overflows-viewport`](docs/rules/svg-text-overflows-viewport.md) | CTM-normalised text box against the viewport | **error** |
-| [`svg/text-clipped`](docs/rules/svg-text-clipped.md) | glyph ink removed by a clip path or mask | warn |
-| [`svg/text-ink-collision`](docs/rules/svg-text-ink-collision.md) | glyph ink shared with, or covered by, a shape | warn |
+| [`svg/text-clipped`](docs/rules/svg-text-clipped.md) | glyph ink removed by a clip path or mask | warn — *not measurable in this build, see below* |
+| [`svg/text-ink-collision`](docs/rules/svg-text-ink-collision.md) | glyph ink shared with, or covered by, a shape | warn — *not measurable in this build, see below* |
 | [`type/spaced-hyphen`](docs/rules/type-spaced-hyphen.md) | a hyphen between spaces where a dash belongs | warn |
 | [`type/straight-quotes`](docs/rules/type-straight-quotes.md) | typewriter quotes in typeset prose | warn |
 | [`type/short-last-line`](docs/rules/type-short-last-line.md) | width of a paragraph's closing line | warn |
@@ -121,14 +121,18 @@ and page breaks, and turns a correct page into a phantom half-empty-page finding
 for `document.fonts.ready` and stops with a non-zero exit if a declared font resource fails,
 rather than reporting findings it cannot stand behind.
 
-**The two SVG ink rules now have a real-renderer validation foundation, but no real-corpus
-calibration.** M3-0 exercises their known construction and boundary cases in Chrome/Paged.js;
-it does not establish population performance or calibrate a threshold. Treat a finding from
-`svg/text-clipped` or `svg/text-ink-collision` as a reason to look at the page rather than as a
-measurement to act on unseen.
-M3-0 can validate the integrity and bindings of separately supplied capture-evidence bytes, but it
-does not ship an externally governed attestor trust root. Therefore no M3-0 path establishes a
-calibrated claim; that trust boundary belongs to later real-corpus work.
+**The two SVG ink rules produce no findings in this build, on any document.** `svg/text-clipped`
+and `svg/text-ink-collision` need the SVG ink passes, which are M3 work and are not implemented in
+the collector. They run, decline every target with `env/pixel-oracle-unavailable`, and say so in
+`notMeasured` — which since 0.2.3 no longer ends the run. `svg/text-overflows-viewport` needs only
+geometry and does measure. Read this before counting fifteen rules.
+
+**Their validation foundation is real-renderer, not real-corpus.** M3-0 exercises the ink rules'
+known construction and boundary cases in Chrome/Paged.js; it does not establish population
+performance or calibrate a threshold. It can validate the integrity and bindings of separately
+supplied capture-evidence bytes, but it does not ship an externally governed attestor trust root.
+No M3-0 path establishes a calibrated claim; that trust boundary belongs to later real-corpus
+work.
 
 **`svg/text-ink-collision` does not detect sub-pixel contact.** A shape can touch a glyph
 optically without sharing a device pixel. The earlier check for this took its truth from the

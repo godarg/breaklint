@@ -17,6 +17,17 @@ Two bands: `collisionInk = |T ∩ S|` and `occludedInk = |T ∧ ¬F|`. The secon
 
 Bounding-box overlap is wrong in 2 of 8 collision fixtures; the clearest case is a line running exactly through the gap between two text lines. A fixed sampling grid misses too: a short thin line grazing a corner is hit 0 times at a 4 px step and, in the recorded reference environment, 51 times at 0.25 px. The portable contract gates `0` versus `> 0`; it does not pin 51 across renderers.
 
+## Availability in this build
+
+**This rule measures nothing today, on any document.** It needs the SVG ink passes, which are M3
+work and are not implemented in the collector: `inkCollected` is false for every SVG, and the rule
+declines each target with `env/pixel-oracle-unavailable`.
+
+Until 0.2.3 that decline was charged to coverage, so a single inline SVG ended the run in exit 4.
+It now leaves the coverage base and stays in `notMeasured`, where it names this rule, the reason
+and the number of targets. The rule is registered and its logic is covered by fixtures carrying
+ink counts — what is missing is the measurement, not the decision.
+
 ## Limits and known false alarms
 
 **What this rule does not find:** the sub-pixel contact case — a shape close enough to touch a glyph optically without sharing a device pixel. The old contact band caught it through `isPointInStroke`, the circular oracle this design forbids. Dropping it was right and it cost recall. That loss is stated in the finding text, here, and in the README.

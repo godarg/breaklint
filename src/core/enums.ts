@@ -19,6 +19,7 @@ export const ENV_IDS = [
   "env/svg-no-text",
   "env/svg-overflow-visible",
   "env/svg-too-many-text-targets",
+  "env/svg-ctm-unavailable",
   "env/canvas-content-lost",
   "env/pixel-oracle-unavailable",
   "env/ink-passes-unstable",
@@ -26,6 +27,46 @@ export const ENV_IDS = [
   "env/evidence-overlay-removed",
 ] as const;
 export type EnvId = (typeof ENV_IDS)[number];
+
+/**
+ * The subset of `ENV_IDS` that describes a missing capability of THIS BUILD rather than a
+ * property of the document under test — and the reason the distinction is drawn in code.
+ *
+ * Exit 4 exists because a rule that could not look at a document must not be indistinguishable
+ * from a rule that looked and found nothing. That argument is about the document: the
+ * multi-column case that produced it had candidates the rule could not reach *in that document*,
+ * and a different document would have been measured. Coverage is the right instrument, and exit
+ * 4 the right signal.
+ *
+ * A capability the tool does not have is a different statement. The SVG ink passes are not
+ * implemented at all, so `svg/text-clipped` and `svg/text-ink-collision` decline on EVERY
+ * document, including a perfect one. Charging that to coverage makes exit 4 a constant of the
+ * build rather than a fact about the input: measured on a two-page document with one harmless
+ * inline SVG, 0.2.2 answered `insufficient-coverage`, which reads as "your document could not be
+ * judged" and means "this tool cannot do that at all". The two need different answers, so a
+ * decline naming a capability of the build leaves the coverage base and stays visible in
+ * `notMeasured`, where it names the rule, the reason and the count.
+ *
+ * The list is deliberately short and enumerated here rather than derived from a naming pattern:
+ * a new `env/` id must be argued into this set, not fall into it because of what it is called.
+ */
+export const TOOL_CAPABILITY_ENV_IDS = ["env/pixel-oracle-unavailable"] as const;
+
+/**
+ * The subset of `ENV_IDS` that says the question does not arise for this target at all.
+ *
+ * `overflow: visible` on an SVG means its text is painted whether or not it leaves the viewport,
+ * so `svg/text-overflows-viewport` has nothing to decide. That is not a measurement it failed to
+ * take; it is a target that was never in its remit, like an SVG holding no text. Charging it to
+ * coverage would make one such figure anywhere in a document drive an error rule below its floor
+ * of 1 and end the run in `insufficient-coverage` — a verdict that reads as "your document could
+ * not be fully judged" and would mean "one figure does not clip".
+ *
+ * Kept apart from `TOOL_CAPABILITY_ENV_IDS` on purpose. Both leave the coverage base and the two
+ * reasons are not the same: one is a limit of this build, the other a property of the target. A
+ * single list would let the first hide inside the second.
+ */
+export const NON_APPLICABLE_ENV_IDS = ["env/svg-overflow-visible"] as const;
 
 /**
  * States of the measuring infrastructure. They appear only in `documents[].infrastructure[]`
@@ -232,13 +273,15 @@ export const SUPPORTED_PDFJS_VERSION = "6.2.108";
 
 /** Report and snapshot evolve independently; a version stamp must not claim an unperformed migration. */
 export const REPORT_SCHEMA_VERSION = 3;
-export const SNAPSHOT_SCHEMA_VERSION = 2;
+export const SNAPSHOT_SCHEMA_VERSION = 3;
 
 const asSet = <T extends string>(values: readonly T[]): ReadonlySet<string> => new Set(values);
 
 /** Membership tests, used by the report validator and by the registry check. */
 export const IS = {
   envId: asSet(ENV_IDS),
+  toolCapabilityEnvId: asSet(TOOL_CAPABILITY_ENV_IDS),
+  nonApplicableEnvId: asSet(NON_APPLICABLE_ENV_IDS),
   infraEventKind: asSet(INFRA_EVENT_KINDS),
   nonFatalInfraEventKind: asSet(NON_FATAL_INFRA_EVENT_KINDS),
   keyType: asSet(KEY_TYPES),

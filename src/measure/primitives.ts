@@ -82,6 +82,10 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const rangeSetEndFn = Range.prototype.setEnd;
   const rangeRectsFn = Range.prototype.getClientRects;
   const imageDecodeFn = HTMLImageElement.prototype.decode;
+  // Read for the SVG root identity, which is a signature over the markup. A document that
+  // replaces outerHTML could otherwise hand the collector a different SVG than the one on the
+  // page, and every finding in it would be attributed to markup nobody rendered.
+  const outerHtmlGet = Object.getOwnPropertyDescriptor(Element.prototype, "outerHTML").get;
   const descriptor = Object.getOwnPropertyDescriptor;
   const getter = (prototype, name) => {
     let at = prototype;
@@ -284,13 +288,35 @@ const PRIMITIVES_TEMPLATE = `(() => {
       },
       fontStatus: (face) => call.call(fontStatusGet, face),
       fontFamily: (face) => call.call(fontFamilyGet, face),
+      // first and last are two opposite corners of the local box, transformed. They are what the
+      // freeze signature compares, and for that they are enough: it asks whether anything moved,
+      // not where the box is.
+      //
+      // corners exists because the second question is not the first. Under a rotation the
+      // axis-aligned screen box is NOT spanned by two opposite corners — for a box rotated 45
+      // degrees the two transformed corners lie on a diagonal and the min/max over them is
+      // smaller than the real extent in both axes. Anything that has to decide whether a box
+      // lies inside another one needs all four.
       svgBounds: (el) => {
         const bb = call.call(svgBBoxFn, el);
         const matrix = call.call(svgScreenCtmFn, el);
         if (!matrix) return null;
         const point = (x, y) => call.call(matrixTransformFn, new DOMPointCtor(x, y), matrix);
-        return { bb, first: point(bb.x, bb.y), last: point(bb.x + bb.width, bb.y + bb.height) };
+        const topLeft = point(bb.x, bb.y);
+        const bottomRight = point(bb.x + bb.width, bb.y + bb.height);
+        return {
+          bb,
+          first: topLeft,
+          last: bottomRight,
+          corners: [
+            topLeft,
+            point(bb.x + bb.width, bb.y),
+            bottomRight,
+            point(bb.x, bb.y + bb.height),
+          ],
+        };
       },
+      outerHtml: (el) => call.call(outerHtmlGet, el),
       replaced: (el) => {
         const tag = el.tagName;
         if (tag === "IMG") return { source: call.call(imageCurrentSrcGet, el) || call.call(imageSrcGet, el) || "",

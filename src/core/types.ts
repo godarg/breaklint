@@ -208,6 +208,13 @@ export interface SvgRecord {
   paths: SvgShape[];
   /** SVG quantities: empty ground, shapes only, full run. */
   inkPasses: { E: InkPass; S: InkPass; F: InkPass };
+  /**
+   * Whether the ink passes were run at all. False and `inkStable: false` are not the same
+   * statement: one says the passes do not exist in this build, the other says they were made and
+   * disagreed with each other. A rule that cannot tell them apart reports the wrong reason, and
+   * this build reports the first — the pixel oracle is M3 work and is not implemented.
+   */
+  inkCollected: boolean;
   inkStable: boolean;
 }
 

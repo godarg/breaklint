@@ -361,6 +361,7 @@ function svgRecord(target: {
       S: { count: 0, maskHash: sha256("shapes") },
       F: { count: 0, maskHash: sha256("full") },
     },
+    inkCollected: true,
     inkStable: true,
   };
 }

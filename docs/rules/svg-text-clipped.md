@@ -19,6 +19,17 @@ Measured as a counterfactual: the same target rasterised as it stands (`T`) and 
 
 Ink is defined against the empty pass, not an assumed background. An earlier version compared against white and missed a pale yellow line entirely; later a renderer's default background turned out to be (18, 18, 18).
 
+## Availability in this build
+
+**This rule measures nothing today, on any document.** It needs the SVG ink passes, which are M3
+work and are not implemented in the collector: `inkCollected` is false for every SVG, and the rule
+declines each target with `env/pixel-oracle-unavailable`.
+
+Until 0.2.3 that decline was charged to coverage, so a single inline SVG ended the run in exit 4.
+It now leaves the coverage base and stays in `notMeasured`, where it names this rule, the reason
+and the number of targets. The rule is registered and its logic is covered by fixtures carrying
+ink counts — what is missing is the measurement, not the decision.
+
 ## Limits and known false alarms
 
 A clip that contains the text is not a finding. Unstable ink passes are discarded, never averaged — an averaged unstable value is an invented one.

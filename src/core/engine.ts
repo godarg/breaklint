@@ -13,6 +13,14 @@
  * do not gate on findings". It does not say "hide that nothing was measured". A tool that
  * stays quiet about its own blindness in reporting mode is the green blind run again, one
  * level up.
+ *
+ * A third decision was added in 0.2.3 and it is the boundary of the first: coverage answers for
+ * the DOCUMENT, and two kinds of decline are not answers about the document. One names a
+ * capability this build does not have (`TOOL_CAPABILITY_ENV_IDS`) — charging it to coverage made
+ * every document with an inline SVG exit 4, which says "your document could not be judged" and
+ * means "this tool cannot do that at all". The other names a target the question does not apply to
+ * (`NON_APPLICABLE_ENV_IDS`). Both leave the coverage base and both stay in `notMeasured`, which
+ * is where a reader looks for what was not judged and why.
  */
 
 import { COVERAGE_FLOOR_BY_SEVERITY, EXIT_CODE_BY_VERDICT, IS, VERDICT_PRECEDENCE } from "./enums.ts";
@@ -116,10 +124,23 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
     const notMeasured = aggregateNotMeasured(result.notMeasured);
     const notMeasuredCount = notMeasured.reduce((sum, n) => sum + n.count, 0);
     const floor = config.coverageFloors[rule.id] ?? COVERAGE_FLOOR_BY_SEVERITY[rule.severity];
-    const ratio = result.candidates === 0 ? null : result.measured / result.candidates;
+    // Two kinds of decline leave the coverage base: one because THIS BUILD cannot take the
+    // measurement (`TOOL_CAPABILITY_ENV_IDS`), one because the question does not arise for that
+    // target at all (`NON_APPLICABLE_ENV_IDS`). Neither is hidden — both stay in `notMeasured`
+    // below with rule, reason and count. What changes is only that coverage stops answering a
+    // question about the document with a fact about the tool, or with a question nobody asked.
+    //
+    // The subtraction is derived here, once, rather than left to each rule to remember, and it
+    // happens AFTER `defineRule` has checked that measured plus declined equals candidates. The
+    // rule's own books stay straight; only the ratio changes.
+    const outsideCoverage = notMeasured
+      .filter((n) => IS.toolCapabilityEnvId.has(n.reason) || IS.nonApplicableEnvId.has(n.reason))
+      .reduce((sum, n) => sum + n.count, 0);
+    const candidates = Math.max(0, result.candidates - outsideCoverage);
+    const ratio = candidates === 0 ? null : result.measured / candidates;
 
     coverage[rule.id] = {
-      candidates: result.candidates,
+      candidates,
       measured: result.measured,
       notMeasured,
       notMeasuredCount,

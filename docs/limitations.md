@@ -73,9 +73,41 @@ Configuration Contract v1 can make those floors stricter, but cannot lower them.
 profile sets every floor to 1. The two proof-source-A thresholds are not configurable at all:
 turning a structural boundary into a caller preference would invalidate the reason those rules may
 gate by default. The effective floors and their origins appear in report schema 3; stored snapshot
-fixtures remain schema 2 because their structure did not change.
+fixtures moved to schema 3 in 0.2.3, when `inkCollected` was added.
+
+### What coverage is a ratio OF, and the two things it is not
+
+Coverage answers a question about the DOCUMENT: of the targets this rule ought to have judged,
+how many did it judge? Two kinds of decline are therefore not in the denominator, and both are
+enumerated in `src/core/enums.ts` rather than inferred from how a reason is spelt.
+
+**A capability this build does not have** (`TOOL_CAPABILITY_ENV_IDS`). The SVG ink passes are not
+implemented, so `svg/text-clipped` and `svg/text-ink-collision` decline on every document,
+including a perfect one. Charging that to coverage made exit 4 a constant of the build: a two-page
+document with one harmless inline SVG answered `insufficient-coverage`, which reads as "your
+document could not be judged" and meant "this tool cannot do that at all".
+
+**A question that does not arise** (`NON_APPLICABLE_ENV_IDS`). With `overflow: visible` an SVG's
+text is painted whether or not it leaves the viewport, so `svg/text-overflows-viewport` has
+nothing to decide about it — as with an SVG holding no text. One such figure would otherwise drive
+an error rule below its floor of 1 and end the whole run in exit 4.
+
+Neither leaves the report. Both keep their rule, reason and count in `notMeasured`, and each rule's
+own books are still checked first: `defineRule` requires measured plus declined to equal
+candidates, and only afterwards does the engine subtract. A decline that names a property of the
+INPUT — `env/multicolumn`, `env/svg-ctm-unavailable`, `env/svg-too-many-text-targets` — stays in
+the denominator, because another document would have been measured. That is what exit 4 is for,
+and `tests/unit/coverage-base.test.ts` holds both halves of the pair so that widening the
+exception to cover the second kind turns a test red.
 
 ## What no amount of testing here establishes
+
+**Two of the fifteen rules cannot measure anything in this build.** `svg/text-clipped` and
+`svg/text-ink-collision` need the SVG ink passes, which are M3 work and are not implemented. They
+are registered, they run, and they decline every target with `env/pixel-oracle-unavailable`. This
+is stated here because it was not stated anywhere until 0.2.3, and a reader counting fifteen rules
+was counting two that answer nothing. `svg/text-overflows-viewport` needs only geometry and does
+measure.
 
 **Every threshold is uncalibrated.** There is no corpus of real documents with human-checked truth
 behind any of the fifteen numbers. The fixtures show that each rule does what it says; they do not

@@ -49,7 +49,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=336 aggregateTests=444 liveTests=57 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=343 aggregateTests=451 liveTests=58 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -250,6 +250,44 @@ The npm tarball is byte-identical to the GitHub Release asset; a fresh registry 
 version 0.2.1, imported Configuration Contract v1 and produced the expected finding-bearing demo
 with exit 1. This status paragraph is a later documentation commit and is not retroactively part of
 the published tarball.
+
+**Released on 2026-08-27:** `breaklint@0.2.3` repairs the defect that made every document
+containing an inline SVG uncheckable, and it is worth stating plainly because it is this project's
+own subject matter: a full unit suite, a full live suite and a 15/15 mutation guard were green
+throughout, and `grep -l "<svg" tests/fixtures/*.html` returned nothing. The most common element
+of the documents this tool exists for was absent from its corpus, so no gate reached the code.
+
+What the defect was, measured on a two-page document holding one harmless `<svg><text>` inside its
+viewport. The snapshot collector declared every SVG unmeasurable with the reason
+`env/pixel-oracle-unavailable`; `svg/text-overflows-viewport` had not declared that reason, and an
+undeclared reason is by design a fatal `checker-crashed` — exit 3. Removing only that produced
+exit 4 instead, because the two ink rules then declined every target and drove their own coverage
+to 0. Both answers describe the tool and were delivered as verdicts on the document.
+
+What changed:
+
+| | |
+|---|---|
+| SVG text geometry is collected | `getBBox()` normalised through `getScreenCTM()`, **all four corners** and not two opposite ones — under a rotation the min/max over one diagonal understates the extent in both axes. `svg/text-overflows-viewport` needs boxes and nothing else, and now measures them |
+| SVG identity is joined in Node | `svgRootKey`/`svgTextKey` existed and were unused; markup is canonicalised and hashed on the Node side, never inside the document under test |
+| Two decline classes leave the coverage base | `TOOL_CAPABILITY_ENV_IDS` (this build cannot take the measurement) and `NON_APPLICABLE_ENV_IDS` (the question does not arise for that target). Both stay in `notMeasured` with rule, reason and count; only the ratio changes, and the subtraction happens after each rule's own books are checked |
+| The ink rules say which of two things is true | `inkCollected` separates "the passes do not exist in this build" from "the passes ran and disagreed". They reported the second while the first was the case |
+| The corpus holds an inline SVG at last | `tests/fixtures/svg-text-geometry.html`, four figures, four different answers, in the live chain |
+| Snapshot schema | 2 → 3, for the added `inkCollected`. Report schema stays 3 |
+
+What did NOT change: no threshold, no severity, no `calibrated` flag, and no rule was added or
+removed. The SVG ink passes remain unimplemented — M3 — so `svg/text-clipped` and
+`svg/text-ink-collision` still measure nothing on any document. The difference is that they now
+say so in `notMeasured` instead of ending the run.
+
+Measured on this repository's own product corpus after the repair: a 175-page book carrying 15
+inline figures and 471 SVG text targets runs to completion with no flags, coverage 1.0 on the
+viewport rule, and 167 findings — where 0.2.2 produced exit 3 and nothing at all.
+
+One honesty note about the demo. `examples/demo-snapshot.json` carries ink counts, so
+`npx breaklint --demo` shows a `svg/text-clipped` finding that a real run cannot currently
+produce. It is a handwritten fixture demonstrating the rule chain, not a claim about what the
+collector measures; `mode` and `source` in every report distinguish the two.
 
 ### CI incident reconciliation: failed push at `05fec787`
 

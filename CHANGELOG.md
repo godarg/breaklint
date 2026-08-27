@@ -2,7 +2,43 @@
 
 ## Unreleased
 
-Planned patch version: 0.2.2.
+## 0.2.3 — 2026-08-27
+
+### Any document with an inline SVG can be checked
+
+- **Fixed: a single inline `<svg>` made a document uncheckable.** The snapshot collector marked
+  every SVG unmeasurable with `env/pixel-oracle-unavailable`; `svg/text-overflows-viewport` had
+  not declared that reason, and an undeclared decline is a fatal `checker-crashed` — exit 3 on a
+  clean two-page document holding one harmless label. Isolated at a minimal fixture: with the SVG,
+  exit 3; without it, exit 0. Nothing in the suite reached the case, because not one live fixture
+  contained an `<svg>`.
+- **`svg/text-overflows-viewport` now measures.** SVG text geometry is collected as `getBBox()`
+  normalised through `getScreenCTM()`, using all four transformed corners — under a rotation the
+  min/max over one diagonal understates the extent in both axes, and this rule compares extents.
+  The primitives are the ones captured before any author script runs. `svgRootKey`/`svgTextKey`
+  existed unused and are now the identity of every target, joined in Node so no hash is computed
+  inside the document under test.
+- **Two decline classes left the coverage base.** `TOOL_CAPABILITY_ENV_IDS` names measurements
+  this build cannot take; `NON_APPLICABLE_ENV_IDS` names questions that do not arise for a target
+  (`overflow: visible`). Both stay in `notMeasured` with rule, reason and count; each rule's own
+  measured-plus-declined-equals-candidates check still runs first. A decline naming a property of
+  the INPUT still counts, which is what exit 4 is for, and `tests/unit/coverage-base.test.ts`
+  holds both halves of that pair.
+- **`inkCollected` separates two states the ink rules were conflating**: passes that do not exist
+  in this build, and passes that ran and disagreed. They reported the second while the first was
+  true. Snapshot schema 2 → 3; report schema unchanged at 3.
+- **The live corpus now holds an inline SVG.** `tests/fixtures/svg-text-geometry.html` carries
+  four figures with four different answers — inside, outside, rotated-out, and painted-anyway —
+  and runs in the M2d live chain.
+- No threshold, severity or `calibrated` flag changed, and no rule was added or removed. The ink
+  passes remain unimplemented (M3), so `svg/text-clipped` and `svg/text-ink-collision` still
+  measure nothing — they now say so instead of ending the run. README, `docs/status.md`,
+  `docs/limitations.md` and all three SVG rule pages state that plainly for the first time.
+
+## 0.2.2 — 2026-08-26
+
+Released as tag `v0.2.2`; this heading replaces an "Unreleased / planned patch version 0.2.2"
+block that was never renamed when the tag went out.
 
 ### Verification truth and calibration safety
 

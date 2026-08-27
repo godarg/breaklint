@@ -10,7 +10,7 @@
 import { parse, type DefaultTreeAdapterMap } from "parse5";
 import { dirname, resolve } from "node:path";
 
-import { blockKey, normaliseSignature, sha256 } from "../core/fingerprint.ts";
+import { blockKey, normaliseSignature, sha256, svgRootKey, svgTextKey } from "../core/fingerprint.ts";
 import { resolveDocumentUri } from "../acquire/browser.ts";
 import {
   BREAK_CAUSE_CASCADE_HINTS,
@@ -24,6 +24,8 @@ import type {
   PageRecord,
   Snapshot,
   SourceRef,
+  SvgRecord,
+  SvgTextTarget,
   TextLine,
   TextRun,
   UriRef,
@@ -355,19 +357,54 @@ interface RawBlock extends Omit<BlockRecord, "authorId" | "blockSignature" | "fr
   plainText: string;
 }
 
+/**
+ * An SVG as the browser hands it over: measurements plus the raw material for identity. The keys
+ * are computed in Node for the same reason block keys are — `svgRootKey` hashes canonicalised
+ * markup, and hashing belongs on this side of the boundary, not in a string evaluated inside the
+ * document under test.
+ */
+interface RawSvgText extends Omit<SvgTextTarget, "targetKey" | "svgTextKey" | "ink"> {
+  /** The `<text>`'s own `id`, or null. */
+  sourceIdentity: string | null;
+  /** Its text content, normalised and hashed in Node when there is no id. */
+  signature: string;
+}
+
+interface RawSvg extends Omit<SvgRecord, "sourceKey" | "texts"> {
+  /** The SVG root's own `id`, or null. */
+  sourceIdentity: string | null;
+  /** Canonicalised and hashed in Node; the paginator's `data-ref` nonce is stripped there. */
+  outerHtml: string;
+  texts: RawSvgText[];
+}
+
 export interface RawSnapshot {
   pages: Omit<PageRecord, "incomingBreakCause" | "outgoingBreakCause" | "firstSemanticBlockKey">[];
   blocks: RawBlock[];
   textLines: TextLine[];
-  svg: Snapshot["svg"];
+  svg: RawSvg[];
   requestedUrls: string[];
   fontFamilies: string[];
   control: ControlSignature;
 }
 
 /**
- * Read the paginated tree through the pristine primitives. SVG ink passes belong to M3; inline
- * SVG roots are represented as explicitly unmeasured, so their absence cannot look like zero SVGs.
+ * The most `<text>` elements one inline SVG may contribute before the whole SVG is declined as
+ * `env/svg-too-many-text-targets`.
+ *
+ * This is a capacity limit, not a judgement: every target costs a `getBBox()` and a
+ * `getScreenCTM()` inside the page, and a generated chart with tens of thousands of labels would
+ * make the collection itself the slowest part of the run. The number is chosen, and it is chosen
+ * far above real documents — the largest figure in the corpus this was measured against carries
+ * 49. Exceeding it produces a decline, never silence.
+ */
+const SVG_TEXT_TARGET_CAP = 500;
+
+/**
+ * Read the paginated tree through the pristine primitives. Inline SVG text targets are measured
+ * geometrically — `getBBox()` normalised through `getScreenCTM()`, all four corners — because
+ * `svg/text-overflows-viewport` needs boxes and nothing else. The SVG ink passes belong to M3 and
+ * are not collected; the two ink rules decline for that reason and say so.
  */
 export const SNAPSHOT_SOURCE = `(() => {
   const P = window.__blPrimitives;
@@ -528,12 +565,52 @@ export const SNAPSHOT_SOURCE = `(() => {
 
   const svg = [];
   pagesEls.forEach((page, pageIndex) => P.all(page, "svg").forEach((el, i) => {
-    const texts = P.all(el, "text");
-    svg.push({ nodeKey: "svg:" + pageIndex + ":" + i, sourceKey: null, measurable: false,
-      reason: "env/pixel-oracle-unavailable", viewportScreen: box(el), overflow: P.style(el, null).overflow || "hidden",
-      textTargetCount: texts.length, textTargetsCapped: false, texts: [], shapes: [], paths: [],
+    const textEls = P.all(el, "text");
+    const capped = textEls.length > ${SVG_TEXT_TARGET_CAP};
+    const texts = [];
+    let ctmUnreadable = 0;
+    if (!capped) {
+      for (const textEl of textEls) {
+        let bounds = null;
+        // getBBox() throws on a <text> with no rendered geometry, and getScreenCTM() returns null
+        // on one that is not being rendered at all. Both answers mean the same thing here — this
+        // target has no screen box — and both have to arrive at the rule as a decline rather than
+        // as a box of zeros, which would sit inside every viewport and never be reported.
+        try { bounds = P.svgBounds(textEl); } catch (e) { bounds = null; }
+        if (!bounds) { ctmUnreadable += 1; continue; }
+        // All four corners, not two opposite ones: under a rotation the min/max over one diagonal
+        // is smaller than the real extent in both axes, and the rule compares extents.
+        let minX = bounds.corners[0].x, maxX = minX, minY = bounds.corners[0].y, maxY = minY;
+        for (const corner of bounds.corners) {
+          if (corner.x < minX) minX = corner.x;
+          if (corner.x > maxX) maxX = corner.x;
+          if (corner.y < minY) minY = corner.y;
+          if (corner.y > maxY) maxY = corner.y;
+        }
+        const textStyle = P.style(textEl, null);
+        const clipped = !!textStyle.clipPath && textStyle.clipPath !== "none";
+        const masked = !!textStyle.mask && textStyle.mask !== "none" && !P.startsWith(textStyle.mask, "none ");
+        texts.push({
+          sourceIdentity: P.attr(textEl, "id"),
+          signature: P.text(textEl) || "",
+          boxScreen: { x: round(minX), y: round(minY), width: round(maxX - minX), height: round(maxY - minY) },
+          clipState: clipped && masked ? "both" : clipped ? "clip-path" : masked ? "mask" : "none",
+        });
+      }
+    }
+    // Geometry is measured here; the ink passes are not implemented in this build. The two are
+    // reported separately so that a rule needing only boxes is not held back by a pass that does
+    // not exist — see TOOL_CAPABILITY_ENV_IDS for what the ink rules do with that.
+    svg.push({ nodeKey: "svg:" + pageIndex + ":" + i,
+      sourceIdentity: P.attr(el, "id"), outerHtml: P.outerHtml(el),
+      measurable: !capped && ctmUnreadable === 0,
+      reason: capped ? "env/svg-too-many-text-targets"
+        : ctmUnreadable > 0 ? "env/svg-ctm-unavailable"
+        : undefined,
+      viewportScreen: box(el), overflow: P.style(el, null).overflow || "hidden",
+      textTargetCount: textEls.length, textTargetsCapped: capped, texts, shapes: [], paths: [],
       inkPasses: { E: { count: 0, maskHash: "" }, S: { count: 0, maskHash: "" }, F: { count: 0, maskHash: "" } },
-      inkStable: false });
+      inkCollected: false, inkStable: false });
   }));
   return { pages, blocks, textLines, svg,
     requestedUrls: performance.getEntriesByType("resource").map((e) => e.name),
@@ -745,6 +822,35 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
     const { sid: _sid, sourceBlockIndex: _sourceBlockIndex, ...textRun } = run;
     return [{ ...textRun, blockKey: blockKeyValue }];
   });
+  // SVG identity is joined here, not in the page: `svgRootKey` hashes the canonicalised markup
+  // after the paginator's `data-ref` nonce is stripped, and a hash computed inside the document
+  // under test would be one more thing that document could answer for itself.
+  //
+  // `targetKey` is run-local addressing and deliberately a counter; `svgTextKey` is the identity
+  // that travels into fingerprints. Keeping them apart is not tidiness — conflating them was a
+  // measured defect, ten mis-attributions against one.
+  let svgTargetCounter = 0;
+  const svg: SvgRecord[] = input.raw.svg.map((raw) => {
+    const { sourceIdentity, outerHtml, texts, ...rest } = raw;
+    const rootKey = svgRootKey({ authorId: sourceIdentity, outerHtml });
+    return {
+      ...rest,
+      sourceKey: rootKey,
+      texts: texts.map((text) => {
+        const { sourceIdentity: textId, signature, ...target } = text;
+        svgTargetCounter += 1;
+        return {
+          ...target,
+          targetKey: `bt${String(svgTargetCounter).padStart(3, "0")}`,
+          svgTextKey: svgTextKey({ svgRootKey: rootKey, authorId: textId, textSignature: signature }),
+          ink: {
+            T: { count: 0, maskHash: "" },
+            T0: { count: 0, maskHash: "" },
+          },
+        };
+      }),
+    };
+  });
   const requested = new Set(input.resources.map((resource) => resource.resolvedUri));
   const uriRefs: UriRef[] = input.sourceModel.uriRefs.map((ref, index) => ({
     ...ref,
@@ -782,7 +888,7 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
     blocks,
     textLines: input.raw.textLines,
     textRuns,
-    svg: input.raw.svg,
+    svg,
     uriRefs,
     resources: input.resources,
     notMeasured: [],

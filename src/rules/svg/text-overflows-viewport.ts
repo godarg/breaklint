@@ -26,7 +26,7 @@ export const textOverflowsViewport = defineRule(
     unit: "px",
     defaultOptions: { maxOvershootPx: 0 },
     summary: "A text element lies outside the viewport of its SVG and is not drawn.",
-    declines: ["env/svg-not-inline", "env/svg-no-text", "env/svg-overflow-visible", "env/svg-too-many-text-targets"],
+    declines: ["env/svg-not-inline", "env/svg-no-text", "env/svg-overflow-visible", "env/svg-too-many-text-targets", "env/svg-ctm-unavailable"],
   },
   (snapshot, ctx) => {
     const findings = [];
@@ -36,15 +36,21 @@ export const textOverflowsViewport = defineRule(
 
     for (const svg of snapshot.svg) {
       const targets = svg.texts.length;
-      candidates += Math.max(targets, svg.measurable ? 0 : 1);
 
+      // An unmeasurable SVG carries no targets, so the count comes from what the collector saw
+      // before it gave up — `textTargetCount` is the number of `<text>` elements on the page, and
+      // reporting 1 for an SVG holding forty of them understates what went unjudged. Candidate
+      // and decline take the same number: `defineRule` requires measured plus declined to equal
+      // candidates, and a rule that cannot account for what it skipped has measured nothing.
       if (!svg.measurable) {
+        const unjudged = Math.max(targets, svg.textTargetCount, 1);
+        candidates += unjudged;
         notMeasured.push(
           declined({
             scope: "svg",
             ruleId: "svg/text-overflows-viewport",
             reason: svg.reason ?? "env/svg-not-inline",
-            count: Math.max(targets, 1),
+            count: unjudged,
           }),
         );
         continue;
@@ -52,7 +58,14 @@ export const textOverflowsViewport = defineRule(
       if (targets === 0) continue;
       // `overflow: visible` means the glyphs are painted after all. Not a defect, and saying
       // "not measured" is the honest form — the rule has no opinion about this document.
+      //
+      // The target is counted here and declined below, which keeps this rule's own books
+      // straight. It leaves the COVERAGE base one level up, in the engine, because a question
+      // that does not arise is not a question left unanswered: see `NON_APPLICABLE_ENV_IDS`.
+      // Without that, one `overflow: visible` figure anywhere in a book would drive the whole
+      // run to exit 4 — bookkeeping dressed as a statement about the document.
       if (/\bvisible\b/u.test(svg.overflow)) {
+        candidates += targets;
         notMeasured.push(
           declined({
             scope: "svg",
@@ -63,6 +76,7 @@ export const textOverflowsViewport = defineRule(
         );
         continue;
       }
+      candidates += targets;
       if (svg.textTargetsCapped) {
         notMeasured.push(
           declined({

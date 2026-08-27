@@ -74,7 +74,7 @@
     "shape": { "type": "object", "additionalProperties": false, "required": ["boxScreen", "strokeWidth"], "properties": { "boxScreen": { "$ref": "#/$defs/box" }, "strokeWidth": { "type": "number", "minimum": 0 } } },
     "svgRecord": {
       "type": "object", "additionalProperties": false,
-      "required": ["nodeKey", "sourceKey", "measurable", "reason", "viewportScreen", "overflow", "textTargetCount", "textTargetsCapped", "texts", "shapes", "paths", "inkPasses", "inkStable"],
+      "required": ["nodeKey", "sourceKey", "measurable", "reason", "viewportScreen", "overflow", "textTargetCount", "textTargetsCapped", "texts", "shapes", "paths", "inkPasses", "inkCollected", "inkStable"],
       "properties": {
         "nodeKey": { "type": "string", "minLength": 1 }, "sourceKey": { "type": ["string", "null"] }, "measurable": { "type": "boolean" },
         "reason": { "type": ["string", "null"], "enum": [null, "env/svg-not-inline", "env/svg-no-text", "env/pixel-oracle-unavailable"] },
@@ -82,7 +82,7 @@
         "texts": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/textTarget" } },
         "shapes": { "type": "array", "items": { "$ref": "#/$defs/shape" } }, "paths": { "type": "array", "items": { "$ref": "#/$defs/shape" } },
         "inkPasses": { "type": "object", "additionalProperties": false, "required": ["E", "S", "F"], "properties": { "E": { "$ref": "#/$defs/inkPass" }, "S": { "$ref": "#/$defs/inkPass" }, "F": { "$ref": "#/$defs/inkPass" } } },
-        "inkStable": { "type": "boolean" }
+        "inkCollected": { "type": "boolean" }, "inkStable": { "type": "boolean" }
       }
     },
     "snapshotProjection": {

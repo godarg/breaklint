@@ -77,6 +77,15 @@ export const textClipped = defineRule(
       }
       // Two identical passes must give the same count. If they do not, the measurement is
       // discarded rather than averaged — an averaged unstable value is an invented value.
+      // The passes are not implemented in this build, which is a fact about the tool and not
+      // about the document. It is reported as such, and it leaves the coverage base — see
+      // TOOL_CAPABILITY_ENV_IDS. Saying "unstable" here would claim a measurement was made.
+      if (!svg.inkCollected) {
+        notMeasured.push(
+          declined({ scope: "svg", ruleId: "svg/text-clipped", reason: "env/pixel-oracle-unavailable", count: targets }),
+        );
+        continue;
+      }
       if (!svg.inkStable) {
         notMeasured.push(
           declined({ scope: "svg", ruleId: "svg/text-clipped", reason: "env/ink-passes-unstable", count: targets },),

@@ -19,6 +19,8 @@ import { renderDocuments, type RenderOptions, type RenderResult } from "../../sr
 import { exitCodeFor, runDocument } from "../../src/core/engine.ts";
 import { resolveBrowser, resolvePackageRoot } from "../../src/acquire/browser.ts";
 import { straightQuotes } from "../../src/rules/type/straight-quotes.ts";
+import { textOverflowsViewport } from "../../src/rules/svg/text-overflows-viewport.ts";
+import { textClipped } from "../../src/rules/svg/text-clipped.ts";
 import { blockKey } from "../../src/core/fingerprint.ts";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
@@ -48,7 +50,7 @@ describe("the M2d live production chain", () => {
   let noSource: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
-    if (result?.documents.length === 20 && noSource?.documents.length === 4) return true;
+    if (result?.documents.length === 21 && noSource?.documents.length === 4) return true;
     t.skip(
       `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
       `no-source=${noSource?.documents.length ?? 0}`,
@@ -104,6 +106,7 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "pdf-beforeprint-mutation.html"),
         join(FIXTURES, "animation-intervention-removal.html"),
         join(FIXTURES, "layout-drift-chaos.html"),
+        join(FIXTURES, "svg-text-geometry.html"),
       ],
       options(join(root, "evidence")),
     );
@@ -131,7 +134,7 @@ describe("the M2d live production chain", () => {
     }));
     assert.equal(
       result?.documents.length,
-      20,
+      21,
       `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
     );
     assert.equal(
@@ -460,6 +463,81 @@ describe("the M2d live production chain", () => {
     assert.equal(document.snapshot, null);
     assert.ok(document.infrastructure.some((event) =>
       event.kind === "checker-crashed" && /sid-less exact source identity join ambiguous/iu.test(event.detail)));
+  });
+
+  /**
+   * The case the corpus did not hold until 0.2.3: an inline SVG.
+   *
+   * Not one live fixture contained an `<svg>`, and the consequence was not a missing report line.
+   * Every document carrying a figure ended in exit 3, because the collector declared each SVG
+   * unmeasurable with a reason the rule had not declared. Unit tests, mutation guard and live
+   * suite were all green throughout, because none of them reached the code.
+   *
+   * Four SVGs in one document, four different answers, and the rotated one is the reason the
+   * comparison is CTM-normalised: its local box is inside the viewport and its screen box is not.
+   */
+  it("measures inline SVG text geometry, and normalises it through the CTM", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[20]!;
+    assert.ok(document.snapshot, "the SVG document produced no snapshot");
+    assert.equal(
+      document.infrastructure.some((event) => event.kind === "checker-crashed"),
+      false,
+      `an inline SVG crashed the checker again: ${JSON.stringify(document.infrastructure)}`,
+    );
+
+    const svg = document.snapshot.svg;
+    assert.equal(svg.length, 4, "the four figures did not all reach the snapshot");
+    assert.equal(svg.every((record) => record.measurable), true, "an SVG came back unmeasurable");
+    assert.equal(svg.every((record) => record.texts.length === 1), true, "a label lost its target");
+    assert.equal(
+      svg.every((record) => record.texts.every((text) => text.boxScreen.width > 0 && text.boxScreen.height > 0)),
+      true,
+      "a target came back with an empty box, which sits inside every viewport",
+    );
+    assert.equal(
+      new Set(svg.flatMap((record) => record.texts.map((text) => text.svgTextKey))).size,
+      4,
+      "the four labels did not get four distinct source identities",
+    );
+    // Ink is a different question from geometry, and this build answers only the second.
+    assert.equal(svg.every((record) => record.inkCollected === false), true);
+
+    const outcome = runDocument(document, {
+      failOn: "error",
+      activeRules: [textOverflowsViewport, textClipped],
+      optionsByRule: {},
+      coverageFloors: {},
+    });
+    const viewport = outcome.report.findings.filter((item) => item.ruleId === "svg/text-overflows-viewport");
+    assert.equal(viewport.length, 2, `expected the outside and the rotated label: ${JSON.stringify(viewport.map((f) => f.message))}`);
+    assert.equal(viewport.every((item) => item.severity === "error"), true);
+    // #outside is the second figure, #rotated the third — in document order, svg:N:M keys.
+    assert.deepEqual(viewport.map((item) => item.target.nodeKey).sort(), ["svg:0:1", "svg:1:0"]);
+    assert.equal(
+      viewport.every((item) => (item.measurement?.value ?? 0) > 0),
+      true,
+      "an overshoot came back as zero, which no finding should be made of",
+    );
+
+    // The fourth figure does not clip, so the rule has no opinion — and that decline must not
+    // count against an error rule whose coverage floor is 1.
+    const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
+    assert.equal(coverage?.candidates, 3);
+    assert.equal(coverage?.measured, 3);
+    assert.equal(coverage?.ok, true);
+    assert.deepEqual(
+      coverage?.notMeasured.map((entry) => ({ reason: entry.reason, count: entry.count })),
+      [{ reason: "env/svg-overflow-visible", count: 1 }],
+    );
+    // And the ink rule says what it cannot do, on every target, without failing the document.
+    assert.deepEqual(
+      outcome.report.coverage["svg/text-clipped"]?.notMeasured.map((entry) => entry.reason),
+      ["env/pixel-oracle-unavailable"],
+    );
+    assert.equal(outcome.report.coverage["svg/text-clipped"]?.candidates, 0);
+    assert.equal(exitCodeFor(outcome.report.verdict), 1, "two error findings must end the run at exit 1");
   });
 
   it("keeps duplicate-input evidence paths disjoint and records loaded redirect provenance", async (t) => {

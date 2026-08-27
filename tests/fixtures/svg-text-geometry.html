@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SVG text geometry</title>
+<!--
+  The case the live corpus did not contain.
+
+  Until 0.2.3 not one live fixture held an inline `<svg>`, and the consequence was not a gap in a
+  report — every document carrying a figure ended in exit 3, because the collector declared each
+  SVG unmeasurable with a reason `svg/text-overflows-viewport` had not declared. A grep over this
+  directory would have found it; 336 unit tests, 57 live tests and a full mutation guard did not,
+  because they only ever reached code the corpus exercised.
+
+  Four SVGs, four different answers, in one document:
+
+    #inside   a label well inside the viewport            -> measured, silent
+    #outside  a label far below the viewport              -> measured, one error finding
+    #rotated  a label INSIDE the local box and outside     -> measured, one error finding, and it is
+              the screen box once the group is rotated       the finding that only a CTM-normalised
+                                                             comparison can produce
+    #visible  a label outside a viewport that does not     -> declined, `env/svg-overflow-visible`,
+              clip                                           and not counted as a candidate
+
+  The overshoots are deliberately in the hundreds of pixels. A fixture whose verdict depends on
+  font metrics measures the font that happened to be installed.
+-->
+<style>
+  @page { size: 320pt 420pt; margin: 24pt; }
+  body { font: 12pt/1.5 serif; margin: 0; }
+  figure { margin: 0 0 18pt; }
+  svg { display: block; width: 260pt; height: 130pt; }
+  /* The default for an outer `svg` is `overflow: hidden`; #visible opts out of it, which is the
+     whole point of that case. */
+  #visible { overflow: visible; }
+  figcaption { font-size: 9pt; }
+</style>
+</head>
+<body>
+<p>Four inline figures, one document. Each one answers the viewport rule differently.</p>
+
+<figure>
+  <svg id="inside" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="400" height="200" fill="#eeeeee"></rect>
+    <text x="40" y="100" font-size="14" font-family="serif">Inside the viewport</text>
+  </svg>
+  <figcaption>Silent: the label sits inside the box.</figcaption>
+</figure>
+
+<figure>
+  <svg id="outside" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="400" height="200" fill="#eeeeee"></rect>
+    <text x="40" y="640" font-size="14" font-family="serif">Below the viewport</text>
+  </svg>
+  <figcaption>One error: the label is not drawn.</figcaption>
+</figure>
+
+<figure>
+  <!--
+    Local geometry puts this label at y=190 in a 200-unit box, which is inside. The rotation about
+    (200,100) moves it to roughly (110, 280) in the viewport's own coordinates, which is outside.
+    A rule reading `getBBox()` alone reports nothing here. That is the mutation this case kills.
+  -->
+  <svg id="rotated" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="400" height="200" fill="#eeeeee"></rect>
+    <g transform="rotate(90 200 100)">
+      <text x="330" y="190" font-size="14" font-family="serif">Rotated out</text>
+    </g>
+  </svg>
+  <figcaption>One error, and only under CTM normalisation.</figcaption>
+</figure>
+
+<figure>
+  <svg id="visible" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="400" height="200" fill="#eeeeee"></rect>
+    <text x="40" y="640" font-size="14" font-family="serif">Outside but painted</text>
+  </svg>
+  <figcaption>Declined: nothing is clipped away, so the rule has no opinion.</figcaption>
+</figure>
+</body>
+</html>

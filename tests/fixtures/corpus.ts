@@ -162,6 +162,7 @@ function svgWith(texts: SvgRecord["texts"], over: Partial<SvgRecord> = {}): SvgR
     shapes: [{ boxScreen: box(60, 60, 200, 120), strokeWidth: 2 }],
     paths: [],
     inkPasses: { E: ink(0), S: ink(9000), F: ink(11100) },
+    inkCollected: true,
     inkStable: true,
     ...over,
   };
