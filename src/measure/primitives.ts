@@ -446,7 +446,7 @@ export const PRIMITIVES_CHECK = `(() => {
     return { ok: false, reason: "the primitive references are replaceable, so they prove nothing" };
   }
   for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
-    "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
+    "outerHtml", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
     "rects", "setAttr", "setText", "parent", "next", "create", "append", "remove", "setCssText",
     "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityRecordPreview",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",

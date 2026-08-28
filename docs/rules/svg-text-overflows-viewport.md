@@ -19,9 +19,20 @@ The second rule carrying `error`. Two directly measured boxes, a structural boun
 
 The collector reads each `<text>`'s `getBBox()` and normalises it through `getScreenCTM()`, taking
 **all four** transformed corners rather than two opposite ones. Under a rotation the min/max over a
-single diagonal is smaller than the real extent in both axes, and this rule compares extents. The
-live fixture `tests/fixtures/svg-text-geometry.html` contains a label whose LOCAL box is inside the
-viewport and whose screen box is not; reading `getBBox()` alone reports nothing there.
+single diagonal is smaller than the real extent in both axes, and this rule compares extents.
+
+Both halves of that are measured in `tests/fixtures/svg-text-geometry.html`. A label at 90 degrees
+has a LOCAL box inside the viewport and a screen box outside it, so `getBBox()` alone reports
+nothing there. A second label at 45 degrees separates four corners from two: its four-corner box
+crosses the viewport edge by 15.82 px while its two-corner box stays 28 px inside. At exactly 90
+degrees the two boxes coincide, which is why the first fixture cannot make that distinction and an
+independent review was right to say the claim was unmeasured until the second one existed.
+
+**A `<text>` the browser never lays out is not a target.** Chrome answers `getBBox()` and
+`getScreenCTM()` for an element inside `<defs>` and yields a box 609.65 px outside the viewport —
+this rule would report an error about something that is never painted. The collector asks
+`getBoundingClientRect` first, and an element with an empty rect is neither a candidate nor a
+decline.
 
 Both primitives are captured before any author script runs, for the same reason the rest of the
 geometry is: a document that replaces them could otherwise decide what this rule sees.

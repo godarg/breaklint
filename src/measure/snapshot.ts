@@ -565,21 +565,40 @@ export const SNAPSHOT_SOURCE = `(() => {
 
   const svg = [];
   pagesEls.forEach((page, pageIndex) => P.all(page, "svg").forEach((el, i) => {
+    // querySelectorAll reaches <text> inside <defs>, <symbol>, <clipPath> and <pattern>, and under
+    // display:none. None of those is drawn, so none of them is a target of a rule about what the
+    // viewport clips — but they are indistinguishable from a real measurement failure until
+    // something is measured. The loop below measures it rather than assuming it from the markup.
     const textEls = P.all(el, "text");
     const capped = textEls.length > ${SVG_TEXT_TARGET_CAP};
     const texts = [];
-    let ctmUnreadable = 0;
+    let unreadableTargets = 0;
+    let notRenderedTargets = 0;
     if (!capped) {
       for (const textEl of textEls) {
+        // Is this element drawn at all? Asked FIRST, and asked of getBoundingClientRect rather
+        // than of getBBox, because the two disagree exactly where it matters. Measured in Chrome
+        // 152: a <text> inside <defs> answers getBBox() and getScreenCTM() perfectly happily and
+        // yields a full screen box — 609.65 px outside its viewport, reported as an error finding
+        // by a gating rule, about an element that is never painted. getBoundingClientRect returns
+        // an empty rect for it, which is the honest answer and the one this loop follows.
+        //
+        // A target the browser does not lay out is not a target: the question "does the viewport
+        // clip it away?" does not arise, as for an SVG holding no text at all.
+        const rect = P.rect(textEl);
+        if (rect.width === 0 && rect.height === 0) { notRenderedTargets += 1; continue; }
+
         let bounds = null;
-        // getBBox() throws on a <text> with no rendered geometry, and getScreenCTM() returns null
-        // on one that is not being rendered at all. Both answers mean the same thing here — this
-        // target has no screen box — and both have to arrive at the rule as a decline rather than
-        // as a box of zeros, which would sit inside every viewport and never be reported.
+        // getBBox() throws on a <text> with no rendered geometry; getScreenCTM() returns null on
+        // one that is not in a rendered tree. For an element the browser DID lay out, either is a
+        // measurement this tool owed and did not deliver — declined, and counted against coverage.
         try { bounds = P.svgBounds(textEl); } catch (e) { bounds = null; }
-        if (!bounds) { ctmUnreadable += 1; continue; }
+        if (!bounds) { unreadableTargets += 1; continue; }
+
         // All four corners, not two opposite ones: under a rotation the min/max over one diagonal
-        // is smaller than the real extent in both axes, and the rule compares extents.
+        // is smaller than the real extent in both axes, and the rules compare extents. Measured on
+        // the 45-degree fixture: four corners put the label 15.82 px outside the viewport, two put
+        // it 28 px inside it.
         let minX = bounds.corners[0].x, maxX = minX, minY = bounds.corners[0].y, maxY = minY;
         for (const corner of bounds.corners) {
           if (corner.x < minX) minX = corner.x;
@@ -598,15 +617,20 @@ export const SNAPSHOT_SOURCE = `(() => {
         });
       }
     }
+    // measurable is a statement about the SVG AS A WHOLE and there is exactly one way it can be
+    // false: more targets than the collector will gather. A single unreadable target used to set
+    // it, which threw away every box already measured on that SVG and took an error rule with a
+    // coverage floor of 1 down to zero — one such element anywhere ended the run in exit 4.
+    // Per-target failures are counted per target and declined per target.
+    //
     // Geometry is measured here; the ink passes are not implemented in this build. The two are
-    // reported separately so that a rule needing only boxes is not held back by a pass that does
-    // not exist — see TOOL_CAPABILITY_ENV_IDS for what the ink rules do with that.
+    // reported separately so a rule needing only boxes is not held back by a pass that does not
+    // exist — see TOOL_CAPABILITY_ENV_IDS for what the ink rules do with that.
     svg.push({ nodeKey: "svg:" + pageIndex + ":" + i,
       sourceIdentity: P.attr(el, "id"), outerHtml: P.outerHtml(el),
-      measurable: !capped && ctmUnreadable === 0,
-      reason: capped ? "env/svg-too-many-text-targets"
-        : ctmUnreadable > 0 ? "env/svg-ctm-unavailable"
-        : undefined,
+      measurable: !capped,
+      reason: capped ? "env/svg-too-many-text-targets" : undefined,
+      unreadableTargets, notRenderedTargets,
       viewportScreen: box(el), overflow: P.style(el, null).overflow || "hidden",
       textTargetCount: textEls.length, textTargetsCapped: capped, texts, shapes: [], paths: [],
       inkPasses: { E: { count: 0, maskHash: "" }, S: { count: 0, maskHash: "" }, F: { count: 0, maskHash: "" } },
@@ -836,19 +860,27 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
     return {
       ...rest,
       sourceKey: rootKey,
-      texts: texts.map((text) => {
-        const { sourceIdentity: textId, signature, ...target } = text;
-        svgTargetCounter += 1;
-        return {
-          ...target,
-          targetKey: `bt${String(svgTargetCounter).padStart(3, "0")}`,
-          svgTextKey: svgTextKey({ svgRootKey: rootKey, authorId: textId, textSignature: signature }),
-          ink: {
-            T: { count: 0, maskHash: "" },
-            T0: { count: 0, maskHash: "" },
-          },
-        };
-      }),
+      texts: (() => {
+        const keys = texts.map((text) =>
+          svgTextKey({ svgRootKey: rootKey, authorId: text.sourceIdentity, textSignature: text.signature }));
+        const groupSize = new Map<string, number>();
+        for (const key of keys) groupSize.set(key, (groupSize.get(key) ?? 0) + 1);
+        return texts.map((text, index) => {
+          const { sourceIdentity: _textId, signature: _signature, ...target } = text;
+          svgTargetCounter += 1;
+          const key = keys[index]!;
+          return {
+            ...target,
+            targetKey: `bt${String(svgTargetCounter).padStart(3, "0")}`,
+            svgTextKey: key,
+            ambiguityGroupSize: groupSize.get(key) ?? 1,
+            ink: {
+              T: { count: 0, maskHash: "" },
+              T0: { count: 0, maskHash: "" },
+            },
+          };
+        });
+      })(),
     };
   });
   const requested = new Set(input.resources.map((resource) => resource.resolvedUri));

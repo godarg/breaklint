@@ -172,6 +172,16 @@ export interface SvgTextTarget {
   boxScreen: Box;
   clipState: "none" | "clip-path" | "mask" | "both";
   /**
+   * How many targets in this SVG share this exact `svgTextKey`.
+   *
+   * Identity is content-derived where a `<text>` has no `id`, so two identical labels — the
+   * repeated axis tick "0" of a generated chart — are one identity. Which of two identical
+   * objects is meant is not a well-formed question; the answer is to key them together and let
+   * the finding say the group is larger than one, the same treatment `svgRootKey` gives two
+   * structurally identical SVGs.
+   */
+  ambiguityGroupSize: number;
+  /**
    * Target quantities. `T` is this target's own glyph ink, `T0` the same with clipping
    * neutralised. The two bands hang off `T` because they are properties of THIS target: `S`
    * and `F` are shared per SVG, `T` is not, and under a shared mask a genuine 0.627 collapses
@@ -203,6 +213,18 @@ export interface SvgRecord {
   overflow: string;
   textTargetCount: number;
   textTargetsCapped: boolean;
+  /**
+   * Targets the browser laid out and this tool could not measure — a `<text>` with client rects
+   * but no CTM. A real measurement failure: it counts against coverage.
+   */
+  unreadableTargets: number;
+  /**
+   * Targets the browser never laid out: `<text>` inside `<defs>`, `<symbol>`, `<clipPath>` or
+   * `<pattern>`, or under `display:none`. Not drawn, therefore not a target of any rule about
+   * what the viewport clips — no candidate, no decline. The distinction is measured through
+   * `getBoundingClientRect`, not assumed from the markup.
+   */
+  notRenderedTargets: number;
   texts: SvgTextTarget[];
   shapes: SvgShape[];
   paths: SvgShape[];

@@ -68,17 +68,18 @@
     },
     "textTarget": {
       "type": "object", "additionalProperties": false,
-      "required": ["targetKey", "svgTextKey", "boxScreen", "clipState", "ink"],
-      "properties": { "targetKey": { "type": "string", "minLength": 1 }, "svgTextKey": { "type": "string", "minLength": 1 }, "boxScreen": { "$ref": "#/$defs/box" }, "clipState": { "enum": ["none", "clip-path", "mask", "both"] }, "ink": { "$ref": "#/$defs/targetInk" } }
+      "required": ["targetKey", "svgTextKey", "boxScreen", "clipState", "ambiguityGroupSize", "ink"],
+      "properties": { "targetKey": { "type": "string", "minLength": 1 }, "svgTextKey": { "type": "string", "minLength": 1 }, "boxScreen": { "$ref": "#/$defs/box" }, "clipState": { "enum": ["none", "clip-path", "mask", "both"] }, "ambiguityGroupSize": { "type": "integer", "minimum": 1 }, "ink": { "$ref": "#/$defs/targetInk" } }
     },
     "shape": { "type": "object", "additionalProperties": false, "required": ["boxScreen", "strokeWidth"], "properties": { "boxScreen": { "$ref": "#/$defs/box" }, "strokeWidth": { "type": "number", "minimum": 0 } } },
     "svgRecord": {
       "type": "object", "additionalProperties": false,
-      "required": ["nodeKey", "sourceKey", "measurable", "reason", "viewportScreen", "overflow", "textTargetCount", "textTargetsCapped", "texts", "shapes", "paths", "inkPasses", "inkCollected", "inkStable"],
+      "required": ["nodeKey", "sourceKey", "measurable", "reason", "viewportScreen", "overflow", "textTargetCount", "textTargetsCapped", "unreadableTargets", "notRenderedTargets", "texts", "shapes", "paths", "inkPasses", "inkCollected", "inkStable"],
       "properties": {
         "nodeKey": { "type": "string", "minLength": 1 }, "sourceKey": { "type": ["string", "null"] }, "measurable": { "type": "boolean" },
-        "reason": { "type": ["string", "null"], "enum": [null, "env/svg-not-inline", "env/svg-no-text", "env/pixel-oracle-unavailable"] },
+        "reason": { "type": ["string", "null"], "enum": [null, "env/svg-not-inline", "env/svg-no-text", "env/svg-too-many-text-targets", "env/svg-ctm-unavailable", "env/pixel-oracle-unavailable"] },
         "viewportScreen": { "$ref": "#/$defs/box" }, "overflow": { "type": "string" }, "textTargetCount": { "type": "integer", "minimum": 0 }, "textTargetsCapped": { "type": "boolean" },
+        "unreadableTargets": { "type": "integer", "minimum": 0 }, "notRenderedTargets": { "type": "integer", "minimum": 0 },
         "texts": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/textTarget" } },
         "shapes": { "type": "array", "items": { "$ref": "#/$defs/shape" } }, "paths": { "type": "array", "items": { "$ref": "#/$defs/shape" } },
         "inkPasses": { "type": "object", "additionalProperties": false, "required": ["E", "S", "F"], "properties": { "E": { "$ref": "#/$defs/inkPass" }, "S": { "$ref": "#/$defs/inkPass" }, "F": { "$ref": "#/$defs/inkPass" } } },

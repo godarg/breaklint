@@ -26,7 +26,18 @@ export const textOverflowsViewport = defineRule(
     unit: "px",
     defaultOptions: { maxOvershootPx: 0 },
     summary: "A text element lies outside the viewport of its SVG and is not drawn.",
-    declines: ["env/svg-not-inline", "env/svg-no-text", "env/svg-overflow-visible", "env/svg-too-many-text-targets", "env/svg-ctm-unavailable"],
+    // The collector emits `env/svg-too-many-text-targets` at SVG level, `env/svg-ctm-unavailable`
+    // per target and `env/svg-overflow-visible` for a viewport that does not clip. The first two
+    // in the list come from externally supplied snapshot projections rather than from a real run
+    // — M3-0 executes this rule over receipt-bound records — and dropping them made that suite
+    // fail with exactly the undeclared-decline crash this list exists to prevent.
+    declines: [
+      "env/svg-not-inline",
+      "env/svg-no-text",
+      "env/svg-overflow-visible",
+      "env/svg-too-many-text-targets",
+      "env/svg-ctm-unavailable",
+    ],
   },
   (snapshot, ctx) => {
     const findings = [];
@@ -37,11 +48,9 @@ export const textOverflowsViewport = defineRule(
     for (const svg of snapshot.svg) {
       const targets = svg.texts.length;
 
-      // An unmeasurable SVG carries no targets, so the count comes from what the collector saw
-      // before it gave up — `textTargetCount` is the number of `<text>` elements on the page, and
-      // reporting 1 for an SVG holding forty of them understates what went unjudged. Candidate
-      // and decline take the same number: `defineRule` requires measured plus declined to equal
-      // candidates, and a rule that cannot account for what it skipped has measured nothing.
+      // The only way a whole SVG is unmeasurable: more targets than the collector will gather.
+      // Everything else is per target, because throwing away thirty-nine measured boxes over one
+      // unmeasured one takes an error rule with a floor of 1 straight to exit 4.
       if (!svg.measurable) {
         const unjudged = Math.max(targets, svg.textTargetCount, 1);
         candidates += unjudged;
@@ -55,6 +64,23 @@ export const textOverflowsViewport = defineRule(
         );
         continue;
       }
+
+      // Laid out but unreadable: a measurement this rule owed and did not deliver. It counts, and
+      // it is the reason exit 4 exists. Targets the browser never laid out are not here at all —
+      // they are `notRenderedTargets`, and a `<text>` in `<defs>` is not a target of a rule about
+      // what the viewport clips away.
+      if (svg.unreadableTargets > 0) {
+        candidates += svg.unreadableTargets;
+        notMeasured.push(
+          declined({
+            scope: "svgText",
+            ruleId: "svg/text-overflows-viewport",
+            reason: "env/svg-ctm-unavailable",
+            count: svg.unreadableTargets,
+          }),
+        );
+      }
+
       if (targets === 0) continue;
       // `overflow: visible` means the glyphs are painted after all. Not a defect, and saying
       // "not measured" is the honest form — the rule has no opinion about this document.
@@ -77,17 +103,6 @@ export const textOverflowsViewport = defineRule(
         continue;
       }
       candidates += targets;
-      if (svg.textTargetsCapped) {
-        notMeasured.push(
-          declined({
-            scope: "svgText",
-            ruleId: "svg/text-overflows-viewport",
-            reason: "env/svg-too-many-text-targets",
-            count: targets,
-          }),
-        );
-        continue;
-      }
       measured += targets;
 
       const vp = svg.viewportScreen;
@@ -121,6 +136,12 @@ export const textOverflowsViewport = defineRule(
             threshold: permitted,
             unit: "px",
             proofSource: "A",
+            // Two identical labels without an `id` share one content-derived identity. Which of
+            // them is meant is not a well-formed question; the finding says the group is larger
+            // than one instead of inventing a distinction from their order.
+            ambiguity: text.ambiguityGroupSize > 1
+              ? { groupSize: text.ambiguityGroupSize, resolvable: false }
+              : null,
           }),
         );
       }

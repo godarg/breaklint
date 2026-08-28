@@ -41,6 +41,10 @@ export const textInkCollision = defineRule(
     unit: "device pixels",
     defaultOptions: { minCollisionInk: 8, minOccludedInk: 8 },
     summary: "A shape crosses or covers the glyphs of a text element.",
+    // The collector emits only `env/svg-too-many-text-targets` at SVG level; the other two are
+    // reachable through externally supplied snapshot projections (M3-0 executes the real rule
+    // over receipt-bound records), so they stay declared. Removing them made the calibration
+    // suite fail with exactly the undeclared-decline crash this list exists to prevent.
     declines: [
       "env/svg-not-inline",
       "env/svg-no-text",

@@ -476,7 +476,20 @@ describe("the M2d live production chain", () => {
    * Four SVGs in one document, four different answers, and the rotated one is the reason the
    * comparison is CTM-normalised: its local box is inside the viewport and its screen box is not.
    */
-  it("measures inline SVG text geometry, and normalises it through the CTM", (t) => {
+  /**
+   * The case the corpus did not hold until 0.2.3: an inline SVG.
+   *
+   * Not one live fixture contained an `<svg>`, and the consequence was not a missing report line.
+   * Every document carrying a figure ended in exit 3, because the collector declared each SVG
+   * unmeasurable with a reason the rule had not declared. Unit tests, mutation guard and live
+   * suite were all green throughout, because none of them reached the code.
+   *
+   * Six SVGs, six different answers, and three of them exist because an independent review found
+   * the first three insufficient: `<defs>` text that Chrome measures happily and never paints, a
+   * 45-degree label that separates four transformed corners from two, and the per-target split
+   * that keeps one unmeasurable element from voiding an entire figure.
+   */
+  it("measures inline SVG text geometry per target, and normalises it through the CTM", (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     if (!completeChain(t)) return;
     const document = result!.documents[20]!;
@@ -488,9 +501,8 @@ describe("the M2d live production chain", () => {
     );
 
     const svg = document.snapshot.svg;
-    assert.equal(svg.length, 4, "the four figures did not all reach the snapshot");
+    assert.equal(svg.length, 6, "the six figures did not all reach the snapshot");
     assert.equal(svg.every((record) => record.measurable), true, "an SVG came back unmeasurable");
-    assert.equal(svg.every((record) => record.texts.length === 1), true, "a label lost its target");
     assert.equal(
       svg.every((record) => record.texts.every((text) => text.boxScreen.width > 0 && text.boxScreen.height > 0)),
       true,
@@ -498,11 +510,22 @@ describe("the M2d live production chain", () => {
     );
     assert.equal(
       new Set(svg.flatMap((record) => record.texts.map((text) => text.svgTextKey))).size,
-      4,
-      "the four labels did not get four distinct source identities",
+      6,
+      "the six measured labels did not get six distinct source identities",
     );
     // Ink is a different question from geometry, and this build answers only the second.
     assert.equal(svg.every((record) => record.inkCollected === false), true);
+
+    // The `<defs>` figure: two `<text>` elements, one of them never painted. Chrome answers
+    // getBBox() and getScreenCTM() for it and reports a box 609.65 px outside the viewport — an
+    // error finding from a gating rule about an element nobody can see. It is excluded because
+    // getBoundingClientRect says it is not laid out, and it is excluded PER TARGET: the label
+    // beside it keeps its measurement.
+    const defs = svg.find((record) => record.textTargetCount === 2);
+    assert.ok(defs, "the defs figure is missing from the snapshot");
+    assert.equal(defs.notRenderedTargets, 1);
+    assert.equal(defs.unreadableTargets, 0);
+    assert.equal(defs.texts.length, 1);
 
     const outcome = runDocument(document, {
       failOn: "error",
@@ -511,21 +534,29 @@ describe("the M2d live production chain", () => {
       coverageFloors: {},
     });
     const viewport = outcome.report.findings.filter((item) => item.ruleId === "svg/text-overflows-viewport");
-    assert.equal(viewport.length, 2, `expected the outside and the rotated label: ${JSON.stringify(viewport.map((f) => f.message))}`);
     assert.equal(viewport.every((item) => item.severity === "error"), true);
-    // #outside is the second figure, #rotated the third — in document order, svg:N:M keys.
-    assert.deepEqual(viewport.map((item) => item.target.nodeKey).sort(), ["svg:0:1", "svg:1:0"]);
-    assert.equal(
-      viewport.every((item) => (item.measurement?.value ?? 0) > 0),
-      true,
-      "an overshoot came back as zero, which no finding should be made of",
+    // #outside, #rotated (90°) and #rotated45. Nothing from #inside, #visible or the `<defs>`
+    // element — each of those is a way this rule has been wrong before.
+    assert.deepEqual(viewport.map((item) => item.target.nodeKey).sort(), ["svg:0:1", "svg:1:0", "svg:2:1"]);
+
+    // The four-corner claim, bound to a number rather than to a comment. At 90 degrees two
+    // opposite corners span the same axis-aligned box as four, so the first rotated figure cannot
+    // tell the two apart. #rotated45 is placed in the gap between them: its four-corner box
+    // crosses the viewport edge by 15.82 px and its two-corner box stays 28 px inside. Rebuilding
+    // the collector on [first, last] drops exactly this finding and leaves the other two.
+    const corners = viewport.find((item) => item.target.nodeKey === "svg:2:1");
+    assert.ok(corners, "the 45-degree label was not reported: two corners would also miss it");
+    assert.ok(
+      corners.measurement.value > 5 && corners.measurement.value < 25,
+      `the 45-degree overshoot moved to ${corners.measurement.value}; the fixture no longer sits in the gap ` +
+      "between the two-corner and four-corner boxes and has stopped testing what it claims",
     );
 
     // The fourth figure does not clip, so the rule has no opinion — and that decline must not
     // count against an error rule whose coverage floor is 1.
     const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
-    assert.equal(coverage?.candidates, 3);
-    assert.equal(coverage?.measured, 3);
+    assert.equal(coverage?.candidates, 5);
+    assert.equal(coverage?.measured, 5);
     assert.equal(coverage?.ok, true);
     assert.deepEqual(
       coverage?.notMeasured.map((entry) => ({ reason: entry.reason, count: entry.count })),
@@ -537,7 +568,7 @@ describe("the M2d live production chain", () => {
       ["env/pixel-oracle-unavailable"],
     );
     assert.equal(outcome.report.coverage["svg/text-clipped"]?.candidates, 0);
-    assert.equal(exitCodeFor(outcome.report.verdict), 1, "two error findings must end the run at exit 1");
+    assert.equal(exitCodeFor(outcome.report.verdict), 1, "three error findings must end the run at exit 1");
   });
 
   it("keeps duplicate-input evidence paths disjoint and records loaded redirect provenance", async (t) => {

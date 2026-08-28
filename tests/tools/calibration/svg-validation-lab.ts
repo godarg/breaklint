@@ -338,12 +338,15 @@ function svgRecord(target: {
     viewportScreen: viewport,
     overflow,
     textTargetCount: 1,
+    unreadableTargets: 0,
+    notRenderedTargets: 0,
     textTargetsCapped: false,
     texts: [{
       targetKey: "bt001",
       svgTextKey: `svg:id:lab-svg|text:id:${target.id}`,
       boxScreen: target.box ?? box(),
       clipState: target.clipState ?? "none",
+      ambiguityGroupSize: 1,
       ink: {
         T: {
           count: target.t.count,

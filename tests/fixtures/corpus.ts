@@ -158,6 +158,8 @@ function svgWith(texts: SvgRecord["texts"], over: Partial<SvgRecord> = {}): SvgR
     overflow: "hidden",
     textTargetCount: texts.length,
     textTargetsCapped: false,
+    unreadableTargets: 0,
+    notRenderedTargets: 0,
     texts,
     shapes: [{ boxScreen: box(60, 60, 200, 120), strokeWidth: 2 }],
     paths: [],
@@ -174,6 +176,7 @@ function svgText(key: string, T: number, T0: number, over: Partial<SvgRecord["te
     svgTextKey: `svg:svgsig:chart|id:${key}`,
     boxScreen: box(60, 120, 80, 12),
     clipState: "clip-path" as const,
+    ambiguityGroupSize: 1,
     ink: { T: { ...ink(T), intersectShapes: 0, missingInFull: 0 }, T0: ink(T0) },
     ...over,
   };

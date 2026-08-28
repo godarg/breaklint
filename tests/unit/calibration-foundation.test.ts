@@ -95,11 +95,14 @@ function snapshotFor(ruleId: SimulationRuleId, target: Target, scenario: (typeof
       overflow: ruleId === "svg/text-overflows-viewport" && declined ? "visible" : "hidden",
       textTargetCount: 1,
       textTargetsCapped: ruleId === "svg/text-ink-collision" && declined,
+      unreadableTargets: 0,
+      notRenderedTargets: 0,
       texts: [{
         targetKey: `receipt-target-${slot}`,
         svgTextKey: target.sourceIdentity,
         boxScreen: box,
         clipState: ruleId === "svg/text-clipped" ? "clip-path" as const : "none" as const,
+        ambiguityGroupSize: 1,
         ink: {
           T: { count: ruleId === "svg/text-clipped" && finding ? 20 : clippedT0, maskHash: digest(`T-${ruleId}-${slot}`), intersectShapes: collisionInk, missingInFull: occludedInk },
           T0: { count: clippedT0, maskHash: digest(`T0-${ruleId}-${slot}`) },

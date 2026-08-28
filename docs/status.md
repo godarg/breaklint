@@ -268,11 +268,14 @@ What changed:
 
 | | |
 |---|---|
-| SVG text geometry is collected | `getBBox()` normalised through `getScreenCTM()`, **all four corners** and not two opposite ones — under a rotation the min/max over one diagonal understates the extent in both axes. `svg/text-overflows-viewport` needs boxes and nothing else, and now measures them |
+| SVG text geometry is collected | `getBBox()` normalised through `getScreenCTM()`, **all four corners** and not two opposite ones. Measured rather than asserted: on the 45-degree fixture four corners put the label 15.82 px outside its viewport and two corners put it 28 px inside, so rebuilding the collector on one diagonal drops exactly that finding |
+| An element that is never painted is not a target | Measured in Chrome 152: a `<text>` inside `<defs>` answers `getBBox()` and `getScreenCTM()` happily and yields a box 609.65 px outside its viewport — an **error finding from a gating rule about something nobody can see**. `getBoundingClientRect` reports it as not laid out, and that is the question now asked first. Found by building the fixture, not by reading the code |
+| Per-target, not per-SVG | One unmeasurable `<text>` used to mark its whole SVG unmeasurable, discarding every box already measured there and taking an error rule with a coverage floor of 1 to exit 4. Failures are now counted and declined per target: `unreadableTargets` (laid out, no CTM — counts against coverage) and `notRenderedTargets` (never laid out — not a target at all) |
+| Identical labels are ambiguous, not identical | Two `<text>` without an `id` and with the same content share one content-derived identity. Findings on them carry `ambiguity.groupSize`, the treatment `svgRootKey` already gave two structurally identical SVGs, instead of two findings quietly claiming to be one |
 | SVG identity is joined in Node | `svgRootKey`/`svgTextKey` existed and were unused; markup is canonicalised and hashed on the Node side, never inside the document under test |
 | Two decline classes leave the coverage base | `TOOL_CAPABILITY_ENV_IDS` (this build cannot take the measurement) and `NON_APPLICABLE_ENV_IDS` (the question does not arise for that target). Both stay in `notMeasured` with rule, reason and count; only the ratio changes, and the subtraction happens after each rule's own books are checked |
 | The ink rules say which of two things is true | `inkCollected` separates "the passes do not exist in this build" from "the passes ran and disagreed". They reported the second while the first was the case |
-| The corpus holds an inline SVG at last | `tests/fixtures/svg-text-geometry.html`, four figures, four different answers, in the live chain |
+| The corpus holds an inline SVG at last | `tests/fixtures/svg-text-geometry.html`, six figures, six different answers, in the live chain. Three of the six exist because an independent review found the first three insufficient |
 | Snapshot schema | 2 → 3, for the added `inkCollected`. Report schema stays 3 |
 
 What did NOT change: no threshold, no severity, no `calibrated` flag, and no rule was added or
@@ -283,6 +286,24 @@ say so in `notMeasured` instead of ending the run.
 Measured on this repository's own product corpus after the repair: a 175-page book carrying 15
 inline figures and 471 SVG text targets runs to completion with no flags, coverage 1.0 on the
 viewport rule, and 167 findings — where 0.2.2 produced exit 3 and nothing at all.
+
+### What an independent review of this repair found, and what it cost
+
+A fresh-context verifier read the first version of this change as a foreign submission and
+returned FAIL with one BLOCKER and two HIGH findings, all three correct:
+
+- The new `env/svg-ctm-unavailable` was undeclared in both ink rules, which reinstated the exact
+  `checker-crashed` this release removes — for any document with a `<text>` in `<defs>`.
+- `measurable` was per SVG, so one unreadable target discarded thirty-nine measured ones and
+  produced exit 4 for the same document class.
+- The only rotated fixture used exactly 90 degrees, where two opposite corners span the same
+  axis-aligned box as four. The four-corner claim was written six times and measured zero times.
+
+Building the fixture that closes the first finding surfaced a fourth: Chrome measures a `<text>`
+inside `<defs>` without complaint, so the repair as first written turned a silent crash into a
+false error finding — the more expensive failure of the two. That is recorded here rather than
+quietly fixed, because the pattern is this project's own subject: the check that looked green was
+green about the wrong thing.
 
 One honesty note about the demo. `examples/demo-snapshot.json` carries ink counts, so
 `npx breaklint --demo` shows a `svg/text-clipped` finding that a real run cannot currently

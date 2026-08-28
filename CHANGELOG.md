@@ -27,9 +27,21 @@
 - **`inkCollected` separates two states the ink rules were conflating**: passes that do not exist
   in this build, and passes that ran and disagreed. They reported the second while the first was
   true. Snapshot schema 2 → 3; report schema unchanged at 3.
+- **Failures are per target, not per SVG.** One unreadable `<text>` used to mark its whole SVG
+  unmeasurable, discarding every box already measured there and taking an error rule with a
+  coverage floor of 1 to exit 4. `unreadableTargets` (laid out, no readable box — counts against
+  coverage) and `notRenderedTargets` (never laid out — not a target at all) replace that.
+- **An element that is never painted is not a target.** Chrome answers `getBBox()` and
+  `getScreenCTM()` for a `<text>` inside `<defs>` and yields a box 609.65 px outside the viewport,
+  which a gating rule reported as an error about something nobody can see. The collector now asks
+  `getBoundingClientRect` first. Found by building the fixture, not by reading the code.
+- **Two identical labels are ambiguous, not identical.** Findings on `<text>` elements sharing one
+  content-derived identity carry `ambiguity.groupSize` instead of quietly claiming to be one.
 - **The live corpus now holds an inline SVG.** `tests/fixtures/svg-text-geometry.html` carries
-  four figures with four different answers — inside, outside, rotated-out, and painted-anyway —
-  and runs in the M2d live chain.
+  six figures with six different answers — inside, outside, rotated-out at 90 and at 45 degrees,
+  painted-anyway, and a `<defs>` element that is not a target — and runs in the M2d live chain.
+  Three of the six exist because an independent review found the first three insufficient; the
+  45-degree case is what binds the four-corner claim to a number.
 - No threshold, severity or `calibrated` flag changed, and no rule was added or removed. The ink
   passes remain unimplemented (M3), so `svg/text-clipped` and `svg/text-ink-collision` still
   measure nothing — they now say so instead of ending the run. README, `docs/status.md`,

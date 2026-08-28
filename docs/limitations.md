@@ -92,8 +92,19 @@ text is painted whether or not it leaves the viewport, so `svg/text-overflows-vi
 nothing to decide about it — as with an SVG holding no text. One such figure would otherwise drive
 an error rule below its floor of 1 and end the whole run in exit 4.
 
-Neither leaves the report. Both keep their rule, reason and count in `notMeasured`, and each rule's
-own books are still checked first: `defineRule` requires measured plus declined to equal
+A third case is not a decline at all: a `<text>` the browser never lays out — inside `<defs>`,
+`<symbol>`, `<clipPath>` or `<pattern>`, or under `display:none`. It is not a target of a rule
+about what the viewport clips away, so it is neither counted nor declined, and the collector
+decides that by asking `getBoundingClientRect` rather than by reading the markup. It has to be
+asked: Chrome answers `getBBox()` and `getScreenCTM()` for such an element and yields a box far
+outside the viewport, which a gating rule will report as an error about something nobody can see.
+
+A `<text>` that IS laid out and still has no readable box declines with `env/svg-ctm-unavailable`
+and DOES count against coverage — that is a measurement this tool owed and did not deliver, per
+target rather than per SVG.
+
+Neither exemption leaves the report. Both keep their rule, reason and count in `notMeasured`, and
+each rule's own books are still checked first: `defineRule` requires measured plus declined to equal
 candidates, and only afterwards does the engine subtract. A decline that names a property of the
 INPUT — `env/multicolumn`, `env/svg-ctm-unavailable`, `env/svg-too-many-text-targets` — stays in
 the denominator, because another document would have been measured. That is what exit 4 is for,

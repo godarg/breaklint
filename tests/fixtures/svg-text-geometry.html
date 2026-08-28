@@ -77,5 +77,39 @@
   </svg>
   <figcaption>Declined: nothing is clipped away, so the rule has no opinion.</figcaption>
 </figure>
+<figure>
+  <!--
+    A <text> the browser never lays out. querySelectorAll finds it, getScreenCTM() returns null for
+    it, and until 0.2.3 that single element marked the whole SVG unmeasurable — throwing away the
+    box of the label beside it and taking an error rule with a coverage floor of 1 to exit 4.
+    It is not a target: nothing clips what is never drawn.
+  -->
+  <svg id="defs-text" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <text id="never-drawn" x="10" y="900" font-size="14" font-family="serif">Inside defs</text>
+    </defs>
+    <rect x="0" y="0" width="400" height="200" fill="#eeeeee"></rect>
+    <text x="40" y="100" font-size="14" font-family="serif">Drawn beside it</text>
+  </svg>
+  <figcaption>Silent: one target measured, one element that is not a target.</figcaption>
+</figure>
+
+<figure>
+  <!--
+    The four-corner case. At exactly 90 degrees two opposite corners span the same axis-aligned box
+    as four, so the figure above cannot tell the two apart. At 45 they differ by the height of the
+    box, and this label is placed in that gap: the box over all four corners crosses the left edge
+    of the viewport, the box over one diagonal does not. textLength fixes the width so the verdict
+    does not depend on which font happened to be installed.
+  -->
+  <svg id="rotated45" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="400" height="200" fill="#eeeeee"></rect>
+    <g transform="translate(-160 0) rotate(45 200 100)">
+      <text x="140" y="112" textLength="120" lengthAdjust="spacingAndGlyphs"
+            font-size="40" font-family="serif">Corner case</text>
+    </g>
+  </svg>
+  <figcaption>One error, and only when all four corners are transformed.</figcaption>
+</figure>
 </body>
 </html>

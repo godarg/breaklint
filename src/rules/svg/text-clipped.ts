@@ -33,6 +33,10 @@ export const textClipped = defineRule(
     unit: "missing ink ratio",
     defaultOptions: { maxMissingInk: 0.05 },
     summary: "Part of a text's glyph ink is removed by a clip path or mask.",
+    // The collector emits only `env/svg-too-many-text-targets` at SVG level; the other two are
+    // reachable through externally supplied snapshot projections (M3-0 executes the real rule
+    // over receipt-bound records), so they stay declared. Removing them made the calibration
+    // suite fail with exactly the undeclared-decline crash this list exists to prevent.
     declines: [
       "env/svg-not-inline",
       "env/svg-no-text",
