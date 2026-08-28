@@ -56,5 +56,49 @@
   </svg>
   <figcaption>Four identical tick labels: one identity, group size four.</figcaption>
 </figure>
+<figure>
+  <!--
+    A second chart, byte-identical in structure to the first. `svgRootKey` hashes canonicalised
+    markup, so both SVGs share one root identity on purpose — which of two identical objects is
+    meant is not a well-formed question. Their tick labels therefore share `svgTextKey` ACROSS
+    records, and the ambiguity group is a property of the document rather than of one record:
+    eight targets, not two groups of four. Counting it inside a record reported 1 for exactly this
+    collision until a second review pointed it out.
+  -->
+  <svg id="chart" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="400" height="200" fill="#eeeeee"></rect>
+    <line x1="60" y1="20" x2="60" y2="170" stroke="#333333" stroke-width="2"></line>
+    <line x1="60" y1="170" x2="380" y2="170" stroke="#333333" stroke-width="2"></line>
+    <rect x="80" y="90" width="40" height="80" fill="#7799aa"></rect>
+    <rect x="150" y="60" width="40" height="110" fill="#7799aa"></rect>
+    <rect x="220" y="110" width="40" height="60" fill="#7799aa"></rect>
+    <rect x="290" y="40" width="40" height="130" fill="#7799aa"></rect>
+    <text x="94" y="188" font-size="12" font-family="serif">0</text>
+    <text x="164" y="188" font-size="12" font-family="serif">0</text>
+    <text x="234" y="188" font-size="12" font-family="serif">0</text>
+    <text x="304" y="188" font-size="12" font-family="serif">0</text>
+    <text x="30" y="174" font-size="12" font-family="serif">y</text>
+  </svg>
+  <figcaption>The same chart again: one identity across two records.</figcaption>
+</figure>
+
+<figure>
+  <!--
+    A nested <svg>. querySelectorAll reaches into it from the outer element, so its label was
+    collected twice — once by the inner record, and once by the outer one, where it was compared
+    against the outer viewport instead of the box that actually clips it. The inner label sits
+    outside the OUTER viewport and inside its own; if the outer record ever claims it again, this
+    sound document starts reporting an error.
+  -->
+  <svg id="outer" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="400" height="200" fill="#eeeeee"></rect>
+    <text x="40" y="40" font-size="14" font-family="serif">Outer label</text>
+    <svg id="inner" x="200" y="120" width="180" height="140" viewBox="0 0 180 140">
+      <rect x="0" y="0" width="180" height="140" fill="#dddddd"></rect>
+      <text x="10" y="120" font-size="12" font-family="serif">Inner label</text>
+    </svg>
+  </svg>
+  <figcaption>Nested viewports: each label belongs to exactly one of them.</figcaption>
+</figure>
 </body>
 </html>

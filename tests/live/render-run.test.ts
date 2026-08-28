@@ -608,21 +608,35 @@ describe("the M2d live production chain", () => {
     assert.equal(outcome.report.verdict, "clean");
     assert.equal(exitCodeFor(outcome.report.verdict), 0, "the case this release exists for must end 0");
     const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
-    assert.equal(coverage?.candidates, 6);
-    assert.equal(coverage?.measured, 6);
+    assert.equal(coverage?.candidates, 13);
+    assert.equal(coverage?.measured, 13);
     assert.equal(coverage?.coverage, 1);
 
-    // Four identical tick labels without an `id` share one content-derived identity. The group
-    // size is a fact about the document, so it is counted across records rather than inside one.
+    // Identical tick labels without an `id` share one content-derived identity, and the two charts
+    // are structurally identical, so they share one `svgRootKey` too. The group is therefore a
+    // fact about the DOCUMENT: eight targets under one key across two records, not two groups of
+    // four. Counted inside a record it came back as 1 — for exactly the collision the field is for.
     const targets = document.snapshot.svg.flatMap((record) => record.texts);
-    const ticks = targets.filter((text) => text.ambiguityGroupSize > 1);
-    assert.equal(ticks.length, 4, "the repeated axis labels were not recognised as one group");
-    assert.equal(new Set(ticks.map((text) => text.svgTextKey)).size, 1);
-    assert.equal(ticks.every((text) => text.ambiguityGroupSize === 4), true);
+    const bySize = new Map<number, number>();
+    for (const text of targets) bySize.set(text.ambiguityGroupSize, (bySize.get(text.ambiguityGroupSize) ?? 0) + 1);
+    assert.deepEqual([...bySize.entries()].sort((a, b) => a[0] - b[0]), [[1, 3], [2, 2], [8, 8]]);
+    const ticks = targets.filter((text) => text.ambiguityGroupSize === 8);
+    assert.equal(new Set(ticks.map((text) => text.svgTextKey)).size, 1, "the eight ticks are one identity");
     assert.equal(
-      targets.filter((text) => text.ambiguityGroupSize === 1).length,
-      2,
-      "the two unique labels must not be dragged into a group",
+      new Set(document.snapshot.svg.filter((r) => r.textTargetCount === 5).map((r) => r.sourceKey)).size,
+      1,
+      "the two identical charts must share one root identity, which is what makes the group cross records",
+    );
+
+    // Nested viewports. The inner label lies OUTSIDE the outer viewport and inside its own; while
+    // the outer record also collected it, it was compared against the wrong box and this sound
+    // document reported an error.
+    const nested = document.snapshot.svg.filter((record) => record.textTargetCount === 1);
+    assert.equal(nested.length, 3, "plain, outer and inner should each hold exactly one target");
+    assert.equal(
+      targets.filter((text) => text.svgTextKey.includes("outer")).length,
+      1,
+      "the outer record claimed the inner label as well",
     );
   });
 
