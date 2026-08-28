@@ -160,6 +160,7 @@ function svgWith(texts: SvgRecord["texts"], over: Partial<SvgRecord> = {}): SvgR
     textTargetCount: texts.length,
     textTargetsCapped: false,
     unreadableTargets: 0,
+    unsupportedTargets: 0,
     notRenderedTargets: 0,
     texts,
     shapes: [{ boxScreen: box(60, 60, 200, 120), strokeWidth: 2 }],

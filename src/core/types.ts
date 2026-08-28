@@ -236,6 +236,13 @@ export interface SvgRecord {
    */
   unreadableTargets: number;
   /**
+   * Laid-out text whose painted bounds cannot be proven by the geometry collector. This covers
+   * instantiated `<use>` text and paint effects that `getBBox()` explicitly omits (stroke,
+   * clipping, masking, filters and paint servers). These remain candidates and therefore make an
+   * error rule fail closed through coverage instead of becoming a clean result or false finding.
+   */
+  unsupportedTargets: number;
+  /**
    * Targets the browser never laid out: `<text>` inside `<defs>`, `<symbol>`, `<clipPath>` or
    * `<pattern>`, or under `display:none`. Not drawn, therefore not a target of any rule about
    * what the viewport clips — no candidate, no decline. The distinction is measured through

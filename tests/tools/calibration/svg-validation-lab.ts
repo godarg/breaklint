@@ -341,6 +341,7 @@ function svgRecord(target: {
     overflow,
     textTargetCount: 1,
     unreadableTargets: 0,
+    unsupportedTargets: 0,
     notRenderedTargets: 0,
     textTargetsCapped: false,
     texts: [{

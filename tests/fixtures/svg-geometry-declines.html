@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SVG geometry that must decline rather than guess</title>
+<style>
+  @page { size: 360pt 520pt; margin: 24pt; }
+  body { font: 11pt/1.35 serif; margin: 0; }
+  svg { display: block; width: 260pt; height: 100pt; margin-bottom: 10pt; }
+</style>
+</head>
+<body>
+<p>Each complex paint case stays visible in coverage instead of producing a guessed verdict.</p>
+
+<svg id="transparent-paints" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <text x="10" y="40" fill="rgba(20, 30, 40, 0)">Alpha zero</text>
+  <text x="10" y="80" style="color: transparent; fill: currentColor">Transparent currentColor</text>
+  <text x="10" y="120">Ordinary fill text</text>
+</svg>
+
+<svg id="complex-paints" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="empty-clip"><rect width="1" height="1"></rect></clipPath>
+    <mask id="black-mask"><rect width="100%" height="100%" fill="black"></rect></mask>
+    <filter id="zero-alpha"><feComponentTransfer><feFuncA type="linear" slope="0"></feFuncA></feComponentTransfer></filter>
+    <text id="used-text" x="360" y="130">Instantiated text</text>
+    <symbol id="used-symbol"><use href="#used-text"></use></symbol>
+  </defs>
+  <text x="10" y="25">Ordinary fill text</text>
+  <text x="360" y="50" clip-path="url(#empty-clip)">Clipped</text>
+  <text x="360" y="75" mask="url(#black-mask)">Masked</text>
+  <text x="360" y="100" filter="url(#zero-alpha)">Filtered</text>
+  <text x="360" y="125" fill="none" stroke="black" stroke-width="20">Stroke</text>
+  <use href="#used-text"></use>
+  <use href="#used-symbol"></use>
+</svg>
+
+<svg id="border-box" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg"
+     style="box-sizing: content-box; border: 8px solid #333; padding: 6px">
+  <text x="10" y="80">The viewport is not this element's border box</text>
+</svg>
+
+<svg id="many-definitions" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <defs id="generated-definitions"></defs>
+  <text x="10" y="80">One painted target</text>
+</svg>
+<script>
+  const definitions = document.getElementById("generated-definitions");
+  for (let index = 0; index < 501; index += 1) {
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("id", `definition-${index}`);
+    text.textContent = "Never instantiated";
+    definitions.appendChild(text);
+  }
+</script>
+</body>
+</html>

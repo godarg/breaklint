@@ -97,6 +97,7 @@ function snapshotFor(ruleId: SimulationRuleId, target: Target, scenario: (typeof
       textTargetCount: 1,
       textTargetsCapped: ruleId === "svg/text-ink-collision" && declined,
       unreadableTargets: 0,
+      unsupportedTargets: 0,
       notRenderedTargets: 0,
       texts: [{
         targetKey: `receipt-target-${slot}`,

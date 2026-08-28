@@ -38,6 +38,8 @@ export const textOverflowsViewport = defineRule(
       "env/svg-overflow-visible",
       "env/svg-too-many-text-targets",
       "env/svg-ctm-unavailable",
+      "env/svg-viewport-geometry-unsupported",
+      "env/svg-painted-bounds-unsupported",
     ],
   },
   (snapshot, ctx) => {
@@ -48,12 +50,36 @@ export const textOverflowsViewport = defineRule(
 
     for (const svg of snapshot.svg) {
       const targets = svg.texts.length;
+      const potentialTargets = Math.max(
+        targets + svg.unreadableTargets + svg.unsupportedTargets,
+        svg.textTargetCount - svg.notRenderedTargets,
+        svg.measurable ? 0 : 1,
+      );
 
-      // The only way a whole SVG is unmeasurable: more targets than the collector will gather.
-      // Everything else is per target, because throwing away thirty-nine measured boxes over one
-      // unmeasured one takes an error rule with a floor of 1 straight to exit 4.
+      // With overflow visible the SVG viewport does not clip its descendants, so this rule's
+      // question does not arise. Decide that before asking whether target paint or viewport
+      // geometry was measurable: neither can change this non-applicability fact.
+      if (/\bvisible\b/u.test(svg.overflow)) {
+        if (potentialTargets > 0) {
+          candidates += potentialTargets;
+          notMeasured.push(
+            declined({
+              scope: "svg",
+              ruleId: "svg/text-overflows-viewport",
+              reason: "env/svg-overflow-visible",
+              count: potentialTargets,
+            }),
+          );
+        }
+        continue;
+      }
+
+      // A whole SVG is unmeasurable when the target limit is exceeded or its viewport cannot be
+      // represented by the collected rectangle. Paint-complex and unreadable targets remain
+      // per-target declines, because throwing away thirty-nine sound boxes over one difficult
+      // target would lose useful evidence without making the run any safer.
       if (!svg.measurable) {
-        const unjudged = Math.max(targets, svg.textTargetCount, 1);
+        const unjudged = potentialTargets;
         candidates += unjudged;
         notMeasured.push(
           declined({
@@ -82,27 +108,23 @@ export const textOverflowsViewport = defineRule(
         );
       }
 
-      if (targets === 0) continue;
-      // `overflow: visible` means the glyphs are painted after all. Not a defect, and saying
-      // "not measured" is the honest form — the rule has no opinion about this document.
-      //
-      // The target is counted here and declined below, which keeps this rule's own books
-      // straight. It leaves the COVERAGE base one level up, in the engine, because a question
-      // that does not arise is not a question left unanswered: see `NON_APPLICABLE_ENV_IDS`.
-      // Without that, one `overflow: visible` figure anywhere in a book would drive the whole
-      // run to exit 4 — bookkeeping dressed as a statement about the document.
-      if (/\bvisible\b/u.test(svg.overflow)) {
-        candidates += targets;
+      // `getBBox()` deliberately excludes several ways SVG changes painted geometry. The
+      // collector counts those targets separately (including text instantiated through `<use>`),
+      // so they cannot disappear from this error rule's coverage or be judged against a box that
+      // describes different ink.
+      if (svg.unsupportedTargets > 0) {
+        candidates += svg.unsupportedTargets;
         notMeasured.push(
           declined({
-            scope: "svg",
+            scope: "svgText",
             ruleId: "svg/text-overflows-viewport",
-            reason: "env/svg-overflow-visible",
-            count: targets,
+            reason: "env/svg-painted-bounds-unsupported",
+            count: svg.unsupportedTargets,
           }),
         );
-        continue;
       }
+
+      if (targets === 0) continue;
       candidates += targets;
       // The collector sets `textTargetsCapped` together with `measurable: false`, so a real run
       // never reaches this branch. It stays because the rule also runs over externally supplied

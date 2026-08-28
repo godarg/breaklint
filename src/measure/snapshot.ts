@@ -389,8 +389,9 @@ export interface RawSnapshot {
 }
 
 /**
- * The most `<text>` elements one inline SVG may contribute before the whole SVG is declined as
- * `env/svg-too-many-text-targets`.
+ * The most potentially painted text targets one inline SVG may contribute before the whole SVG
+ * is declined as `env/svg-too-many-text-targets`. A separate raw-DOM ceiling bounds the cheaper
+ * classification pass without letting uninstantiated definitions consume this limit.
  *
  * This is a capacity limit, not a judgement: every target costs a `getBBox()` and a
  * `getScreenCTM()` inside the page, and a generated chart with tens of thousands of labels would
@@ -399,6 +400,7 @@ export interface RawSnapshot {
  * 49. Exceeding it produces a decline, never silence.
  */
 const SVG_TEXT_TARGET_CAP = 500;
+const SVG_TEXT_RAW_TARGET_CAP = 5_000;
 
 /**
  * Read the paginated tree through the pristine primitives. Inline SVG text targets are measured
@@ -412,6 +414,33 @@ export const SNAPSHOT_SOURCE = `(() => {
   const round = (n) => Math.round(n * 100) / 100;
   const box = (el) => { const b = P.rect(el); return { x: round(b.x), y: round(b.y), width: round(b.width), height: round(b.height) }; };
   const number = (value, fallback) => { const n = parseFloat(value); return Number.isFinite(n) ? n : fallback; };
+  const nonzeroLength = (value) => Math.abs(number(value, 0)) > 0.001;
+  const effect = (value) => !!value && value !== "none" && !P.startsWith(value, "none ");
+  const transparentPaint = (value) => value === "transparent"
+    || /^rgba\\([^)]*,\\s*0(?:\\.0+)?\\s*\\)$/u.test(value)
+    || /\\/\\s*0(?:\\.0+)?%?\\s*\\)$/u.test(value);
+  const visiblePaint = (value, opacity) => value !== "none"
+    && number(opacity, 1) > 0 && !transparentPaint(value);
+  const transformedGeometry = (style) => effect(style.transform)
+    || effect(style.rotate) || effect(style.scale) || effect(style.translate)
+    || effect(style.perspective) || effect(style.offsetPath);
+  const referencedTextTargets = (referenced, seen, depth) => {
+    let count = P.all(referenced, "text").length
+      + (P.closest(referenced, "text") === referenced ? 1 : 0);
+    const nestedUses = P.all(referenced, "use");
+    if (depth >= 16) return count + (nestedUses.length > 0 ? 1 : 0);
+    for (const nestedUse of nestedUses) {
+      const href = P.attr(nestedUse, "href") || P.attr(nestedUse, "xlink:href") || "";
+      if (!P.startsWith(href, "#") || href.length <= 1) { count += 1; continue; }
+      const id = href.slice(1);
+      let repeated = false;
+      for (const prior of seen) if (prior === id) { repeated = true; break; }
+      if (repeated) { count += 1; continue; }
+      const target = P.byId(id);
+      count += target ? referencedTextTargets(target, [...seen, id], depth + 1) : 1;
+    }
+    return count;
+  };
   const pagesEls = P.all(document, ".pagedjs_page");
   const fragments = [];
   const bySidCount = {};
@@ -571,12 +600,69 @@ export const SNAPSHOT_SOURCE = `(() => {
     // own record. Counting it here as well would double every candidate and compare it against
     // the wrong box — the outer viewport instead of the one that actually clips it.
     const textEls = P.all(el, "text").filter((textEl) => P.closest(P.parent(textEl), "svg") === el);
-    const capped = textEls.length > ${SVG_TEXT_TARGET_CAP};
+    const useEls = P.all(el, "use").filter((useEl) => P.closest(P.parent(useEl), "svg") === el);
+    const rawCapped = textEls.length + useEls.length > ${SVG_TEXT_RAW_TARGET_CAP};
+    let useTextTargets = 0;
+    for (const useEl of rawCapped ? [] : useEls) {
+      const useRect = P.rect(useEl);
+      if ((useRect.width === 0 && useRect.height === 0) || P.painted(useEl) === false) continue;
+      const href = P.attr(useEl, "href") || P.attr(useEl, "xlink:href") || "";
+      if (P.startsWith(href, "#") && href.length > 1) {
+        const referenced = P.byId(href.slice(1));
+        if (referenced) {
+          useTextTargets += referencedTextTargets(referenced, [href.slice(1)], 0);
+          continue;
+        }
+      }
+      // An unresolved/external use element with painted geometry may still instantiate text, and its
+      // closed instance tree is not enumerable. One conservative candidate keeps that uncertainty
+      // in coverage instead of silently calling the SVG complete.
+      useTextTargets += 1;
+    }
+    const textTargetCount = textEls.length + useTextTargets;
     const texts = [];
     let unreadableTargets = 0;
+    let unsupportedTargets = useTextTargets;
     let notRenderedTargets = 0;
-    if (!capped) {
+    const candidateTextEls = [];
+    if (!rawCapped) {
       for (const textEl of textEls) {
+        const rect = P.rect(textEl);
+        const style = P.style(textEl, null);
+        const painted = P.painted(textEl);
+        const fillVisible = visiblePaint(style.fill, style.fillOpacity);
+        const strokeVisible = visiblePaint(style.stroke, style.strokeOpacity)
+          && nonzeroLength(style.strokeWidth);
+        const invisible = painted === false || (!fillVisible && !strokeVisible)
+          || (painted === null && (style.visibility === "hidden" || style.visibility === "collapse"
+              || parseFloat(style.opacity) === 0));
+        if ((rect.width === 0 && rect.height === 0) || invisible) notRenderedTargets += 1;
+        else candidateTextEls.push(textEl);
+      }
+    }
+    const capped = rawCapped || candidateTextEls.length + unsupportedTargets > ${SVG_TEXT_TARGET_CAP};
+    const svgStyle = P.style(el, null);
+    // getBoundingClientRect is the border box. It is the viewport only when CSS has not inserted
+    // another box edge or transformed that rectangle. Rounded clipping has the same problem:
+    // containment in the axis-aligned rectangle is not containment in its rounded corners.
+    let viewportUnsupported = [
+      svgStyle.borderTopWidth, svgStyle.borderRightWidth,
+      svgStyle.borderBottomWidth, svgStyle.borderLeftWidth,
+      svgStyle.paddingTop, svgStyle.paddingRight, svgStyle.paddingBottom, svgStyle.paddingLeft,
+      svgStyle.borderTopLeftRadius, svgStyle.borderTopRightRadius,
+      svgStyle.borderBottomRightRadius, svgStyle.borderBottomLeftRadius,
+      svgStyle.overflowClipMargin,
+    ].some(nonzeroLength) || transformedGeometry(svgStyle);
+    // A transform on an HTML/SVG ancestor rotates or skews BOTH the viewport and target into
+    // screen space. Their getBoundingClientRect boxes are then merely axis-aligned envelopes;
+    // containment between those envelopes is not containment in the transformed viewport.
+    let viewportAncestor = P.parent(el);
+    while (!viewportUnsupported && viewportAncestor && P.nodeType(viewportAncestor) === 1) {
+      viewportUnsupported = transformedGeometry(P.style(viewportAncestor, null));
+      viewportAncestor = P.parent(viewportAncestor);
+    }
+    if (!capped && !viewportUnsupported) {
+      for (const textEl of candidateTextEls) {
         // Is this element painted at all? Asked FIRST, because getBBox alone gets it wrong exactly
         // where it matters. Measured in Chrome 152: a <text> inside <defs> answers getBBox() and
         // getScreenCTM() perfectly happily and yields a full screen box — 609.65 px outside its
@@ -596,15 +682,33 @@ export const SNAPSHOT_SOURCE = `(() => {
         const rect = P.rect(textEl);
         const style = P.style(textEl, null);
         const painted = P.painted(textEl);
-        const unpainted = (style.fill === "none" || parseFloat(style.fillOpacity) === 0)
-          && (style.stroke === "none" || parseFloat(style.strokeOpacity) === 0);
+        const fillVisible = visiblePaint(style.fill, style.fillOpacity);
+        const strokeVisible = visiblePaint(style.stroke, style.strokeOpacity)
+          && nonzeroLength(style.strokeWidth);
+        const unpainted = !fillVisible && !strokeVisible;
         // painted === null means this browser has no checkVisibility. Then the two remaining
         // sources decide, and the ancestor-opacity case is not covered — stated here rather than
         // silently assumed, because the pinned browser does have it.
         const invisible = painted === false || unpainted
           || (painted === null && (style.visibility === "hidden" || style.visibility === "collapse"
               || parseFloat(style.opacity) === 0));
-        if ((rect.width === 0 && rect.height === 0) || invisible) { notRenderedTargets += 1; continue; }
+        if ((rect.width === 0 && rect.height === 0) || invisible) continue;
+
+        // SVG getBBox() omits stroke, clipping, masks and filter effects. It also cannot expose
+        // the painted result of a referenced paint server. Text decoration/shadow add ink outside
+        // the glyph box by the same route. Judge none of those with a different box: retain the
+        // target as an explicit coverage failure until the independent ink pass exists.
+        let paintedBoundsUnsupported = strokeVisible
+          || /url\\(/u.test(style.fill) || /url\\(/u.test(style.stroke)
+          || effect(style.textShadow) || effect(style.textDecorationLine);
+        let ancestor = textEl;
+        while (!paintedBoundsUnsupported && ancestor && P.nodeType(ancestor) === 1) {
+          const ancestorStyle = P.style(ancestor, null);
+          paintedBoundsUnsupported = effect(ancestorStyle.clipPath)
+            || effect(ancestorStyle.mask) || effect(ancestorStyle.filter);
+          ancestor = P.parent(ancestor);
+        }
+        if (paintedBoundsUnsupported) { unsupportedTargets += 1; continue; }
 
         let bounds = null;
         // getBBox() throws on a <text> with no rendered geometry; getScreenCTM() returns null on
@@ -635,25 +739,25 @@ export const SNAPSHOT_SOURCE = `(() => {
         });
       }
     }
-    // measurable is a statement about the SVG AS A WHOLE and there is exactly one way it can be
-    // false: more targets than the collector will gather. A single unreadable target used to set
-    // it, which threw away every box already measured on that SVG and took an error rule with a
-    // coverage floor of 1 down to zero — one such element anywhere ended the run in exit 4.
-    // Per-target failures are counted per target and declined per target.
+    // measurable is a statement about the SVG AS A WHOLE. It is false when the candidate cap is
+    // exceeded or when getBoundingClientRect cannot represent the real SVG viewport. A single
+    // unreadable or paint-complex target stays a per-target decline; that preserves every sound
+    // box already measured on the SVG without silently treating the difficult target as covered.
     //
     // Geometry is measured here; the ink passes are not implemented in this build. The two are
     // reported separately so a rule needing only boxes is not held back by a pass that does not
     // exist — see TOOL_CAPABILITY_ENV_IDS for what the ink rules do with that.
     svg.push({ nodeKey: "svg:" + pageIndex + ":" + i, page: pageIndex + 1,
       sourceIdentity: P.attr(el, "id"), outerHtml: P.outerHtml(el),
-      measurable: !capped,
+      measurable: !capped && !viewportUnsupported,
       // null, nicht undefined: undefined verschwindet beim JSON-Roundtrip, und das
       // Receipt-Schema fuehrt reason als required. Ein Feld, das nur manchmal existiert,
       // ist fuer jeden Leser ein Sonderfall mehr.
-      reason: capped ? "env/svg-too-many-text-targets" : null,
-      unreadableTargets, notRenderedTargets,
-      viewportScreen: box(el), overflow: P.style(el, null).overflow || "hidden",
-      textTargetCount: textEls.length, textTargetsCapped: capped, texts, shapes: [], paths: [],
+      reason: capped ? "env/svg-too-many-text-targets"
+        : viewportUnsupported ? "env/svg-viewport-geometry-unsupported" : null,
+      unreadableTargets, unsupportedTargets, notRenderedTargets,
+      viewportScreen: box(el), overflow: svgStyle.overflow || "hidden",
+      textTargetCount, textTargetsCapped: capped, texts, shapes: [], paths: [],
       inkPasses: { E: { count: 0, maskHash: "" }, S: { count: 0, maskHash: "" }, F: { count: 0, maskHash: "" } },
       inkCollected: false, inkStable: false });
   }));

@@ -4,10 +4,11 @@
 
 ## 0.2.3 — prepared 2026-08-28, not released
 
-No tag, no npm publish. The release contract requires an independent verifier with no open
-Blocker/High finding; three rounds ended FAIL on different and correct findings, and the last
-repair came after the final round was spent. The date on this heading becomes a release date when
-the tag exists, and not before.
+No tag, no npm publish. Four independent review passes ended FAIL on different and correct
+findings; the repaired code has since passed a focused independent re-review with no open
+Blocker/High finding. Release still waits for the human report-surface ledger to be rebound to the
+changed pixels and for the final verifier to accept that complete state. The date on this heading
+becomes a release date when the tag exists, and not before.
 
 ### Any document with an inline SVG can be checked
 
@@ -67,10 +68,16 @@ the tag exists, and not before.
   `nodeKey` up among the BLOCK keys, which never match, and fell back to page 1; the other two
   wrote `page: 1` outright. Nobody had noticed, because the gating rule had never produced a
   finding for anyone to read. The page is now a field on the record, set by the collector.
-- **Two blind spots are named rather than left to be discovered:** a `<text>` instantiated through
-  `<use>` lives in a shadow tree `querySelectorAll` does not enter, and the viewport is read from
-  `getBoundingClientRect`, which is the border box rather than the content box. Both are silent
-  false negatives of an error rule and both are in `docs/limitations.md`.
+- **Complex SVG geometry now fails closed instead of guessing.** Text instantiated through
+  `<use>`, paint bounds changed by clip paths, masks, filters, paint servers, text decoration or
+  visible stroke, and SVG roots or transformed ancestors whose box geometry makes
+  `getBoundingClientRect` a different box from the viewport are explicit coverage-relevant
+  declines. They therefore end an error-rule run in exit 4 instead of disappearing as a silent
+  false negative or becoming a false error finding. Solid fill text in an ordinary viewport
+  remains measurable; alpha-zero paint is correctly excluded as not rendered.
+- **The 500-target cap now counts potential paint targets, not definitions.** A separate 5,000
+  element raw-DOM ceiling bounds classification work, while 501 never-instantiated `<defs>` texts
+  beside one visible label no longer make the SVG unmeasurable.
 - No threshold, severity or `calibrated` flag changed, and no rule was added or removed. The ink
   passes remain unimplemented (M3), so `svg/text-clipped` and `svg/text-ink-collision` still
   measure nothing — they now say so instead of ending the run. README, `docs/status.md`,

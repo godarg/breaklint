@@ -125,7 +125,10 @@ rather than reporting findings it cannot stand behind.
 and `svg/text-ink-collision` need the SVG ink passes, which are M3 work and are not implemented in
 the collector. They run, decline every target with `env/pixel-oracle-unavailable`, and say so in
 `notMeasured` — which since 0.2.3 no longer ends the run. `svg/text-overflows-viewport` needs only
-geometry and does measure. Read this before counting fifteen rules.
+geometry and measures ordinary solid-fill text. When `getBBox()` cannot prove painted bounds
+(for example `<use>`, stroke, clip/mask/filter or a paint server), or CSS on the SVG or an ancestor
+makes its axis-aligned border box differ from the clipping viewport, the target declines coverage-relevantly and the error rule
+fails closed with exit 4 rather than guessing. Read this before counting fifteen rules.
 
 **Their validation foundation is real-renderer, not real-corpus.** M3-0 exercises the ink rules'
 known construction and boundary cases in Chrome/Paged.js; it does not establish population

@@ -6,7 +6,7 @@ name: release
 
 on:
   push:
-    tags: ["v0.2.2"]
+    tags: ["v0.2.3"]
 
 permissions:
   contents: read
@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PACKAGE_FILE: breaklint-0.2.2.tgz
+  PACKAGE_FILE: breaklint-0.2.3.tgz
   GITLEAKS_VERSION: 8.30.1
 
 jobs:
@@ -37,6 +37,18 @@ jobs:
         with:
           node-version: 24
           cache: npm
+
+      - name: release manifests declare exactly 0.2.3
+        run: |
+          node --input-type=module <<'NODE'
+          import { strict as assert } from "node:assert";
+          import { readFileSync } from "node:fs";
+          const manifest = JSON.parse(readFileSync("package.json", "utf8"));
+          const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
+          assert.equal(manifest.version, "0.2.3", "package.json is not release version 0.2.3");
+          assert.equal(lock.version, manifest.version, "package-lock.json root version differs");
+          assert.equal(lock.packages?.[""]?.version, manifest.version, "lockfile root package version differs");
+          NODE
 
       - name: install the locked dependency graph without hiding its later audit
         run: npm ci --no-audit --no-fund
@@ -115,7 +127,7 @@ jobs:
         id: package
         run: |
           version=$(node -p "require('./package.json').version")
-          test "$version" = "0.2.2" || { echo "release workflow expected 0.2.2, found $version"; exit 1; }
+          test "$version" = "0.2.3" || { echo "release workflow expected 0.2.3, found $version"; exit 1; }
 
           # npm pack invokes prepack: schema drift is checked again, dist/ is removed, and the
           # production build is recreated from the same commit. No later job runs npm pack or
@@ -145,11 +157,11 @@ jobs:
       - name: store the one package and both independent identity records
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: breaklint-0.2.2-package
+          name: breaklint-0.2.3-package
           path: |
-            breaklint-0.2.2.tgz
-            breaklint-0.2.2.tgz.sha256
-            breaklint-0.2.2.tgz.sri
+            breaklint-0.2.3.tgz
+            breaklint-0.2.3.tgz.sha256
+            breaklint-0.2.3.tgz.sri
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
@@ -173,7 +185,7 @@ jobs:
       - name: download the package created by validate-pack
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: breaklint-0.2.2-package
+          name: breaklint-0.2.3-package
           path: release-artifact
 
       - name: verify artifact identity before installation
@@ -190,7 +202,7 @@ jobs:
           cd "$consumer"
           npm init -y > /dev/null
           npm install "$GITHUB_WORKSPACE/release-artifact/$PACKAGE_FILE" --no-audit --no-fund
-          test "$(npx breaklint --version)" = "0.2.2"
+          test "$(npx breaklint --version)" = "0.2.3"
           set +e
           npx breaklint --demo > demo.out
           code=$?
@@ -233,7 +245,7 @@ jobs:
       - name: download the bytes accepted by both clean consumers
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: breaklint-0.2.2-package
+          name: breaklint-0.2.3-package
           path: .
 
       - name: verify package, tag, origin/main and the successful CI run for one commit
@@ -258,7 +270,7 @@ jobs:
             echo "artifact version $artifact_version does not match source version $source_version"
             exit 1
           }
-          test "$artifact_version" = "0.2.2" || { echo "only 0.2.2 is authorised"; exit 1; }
+          test "$artifact_version" = "0.2.3" || { echo "only 0.2.3 is authorised"; exit 1; }
 
           # Peeling a ref proves only its commit: lightweight and annotated tags both peel. Require
           # the remote tag OBJECT first, through the same guard whose process-boundary canary runs
@@ -301,15 +313,15 @@ jobs:
           RELEASE_COMMIT: ${{ steps.identity.outputs.release_commit }}
         run: |
           set +e
-          npm view "breaklint@0.2.2" version dist.integrity dist.attestations gitHead --json > /tmp/existing.json 2> /tmp/existing.err
+          npm view "breaklint@0.2.3" version dist.integrity dist.attestations gitHead --json > /tmp/existing.json 2> /tmp/existing.err
           status=$?
           set -e
           if [ "$status" -eq 0 ]; then
             curl -fsSL \
-              "https://registry.npmjs.org/-/npm/v1/attestations/breaklint@0.2.2" \
+              "https://registry.npmjs.org/-/npm/v1/attestations/breaklint@0.2.3" \
               > /tmp/existing-attestations.json
             EXPECTED_PACKAGE_NAME=breaklint \
-            EXPECTED_VERSION=0.2.2 \
+            EXPECTED_VERSION=0.2.3 \
             EXPECTED_SRI=$(cat "$PACKAGE_FILE.sri") \
             EXPECTED_COMMIT="$RELEASE_COMMIT" \
             EXPECTED_REPOSITORY_URL="https://github.com/$GITHUB_REPOSITORY" \
@@ -318,7 +330,7 @@ jobs:
               node tests/tools/registry-provenance-contract.mjs \
                 --verify /tmp/existing.json /tmp/existing-attestations.json
             echo "publish_needed=false" >> "$GITHUB_OUTPUT"
-            echo "breaklint@0.2.2 already contains these exact bytes; continuing recovery verification"
+            echo "breaklint@0.2.3 already contains these exact bytes; continuing recovery verification"
           else
             if ! grep -q "E404" /tmp/existing.err; then
               echo "registry lookup failed for a reason other than an absent version"
@@ -330,7 +342,7 @@ jobs:
 
       - name: publish exactly the validated tarball with provenance
         if: steps.registry.outputs.publish_needed == 'true'
-        run: npm publish ./breaklint-0.2.2.tgz --provenance --access public
+        run: npm publish ./breaklint-0.2.3.tgz --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -340,13 +352,13 @@ jobs:
         run: |
           verified=false
           for attempt in $(seq 1 12); do
-            if npm view breaklint@0.2.2 version dist.integrity dist.attestations gitHead --json \
+            if npm view breaklint@0.2.3 version dist.integrity dist.attestations gitHead --json \
                 > /tmp/registry.json 2> /tmp/registry.err && \
                curl -fsSL \
-                 "https://registry.npmjs.org/-/npm/v1/attestations/breaklint@0.2.2" \
+                 "https://registry.npmjs.org/-/npm/v1/attestations/breaklint@0.2.3" \
                  > /tmp/registry-attestations.json && \
                EXPECTED_PACKAGE_NAME=breaklint \
-               EXPECTED_VERSION=0.2.2 \
+               EXPECTED_VERSION=0.2.3 \
                EXPECTED_SRI=$(cat "$PACKAGE_FILE.sri") \
                EXPECTED_COMMIT="$RELEASE_COMMIT" \
                EXPECTED_REPOSITORY_URL="https://github.com/$GITHUB_REPOSITORY" \
@@ -366,7 +378,7 @@ jobs:
           registry_consumer=$(mktemp -d)
           cd "$registry_consumer"
           npm init -y > /dev/null
-          npm install breaklint@0.2.2 --ignore-scripts --no-audit --no-fund
+          npm install breaklint@0.2.3 --ignore-scripts --no-audit --no-fund
           npm audit signatures --json > signatures.json
           node --input-type=module <<'NODE'
           import { strict as assert } from "node:assert";

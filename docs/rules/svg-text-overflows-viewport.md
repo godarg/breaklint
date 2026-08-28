@@ -34,7 +34,8 @@ this rule would report an error about something that is never painted. The colle
 `getBoundingClientRect` first, and an element with an empty rect is neither a candidate nor a
 decline. The same holds for `visibility: hidden`, `opacity: 0` and a `<text>` with neither fill
 nor stroke — those lay out normally and return a full rect, so they are read from the computed
-style instead. Every one of them is the `<defs>` case through another door.
+style instead. Fully transparent computed paint is excluded by the same rule. Every one of them
+is the `<defs>` case through another door; `checkVisibility` is one input, not a paint oracle.
 
 **A nested `<svg>` belongs to its own record.** `querySelectorAll` reaches into it from the outer
 element, which collected the same label twice and compared it against the outer viewport rather
@@ -48,7 +49,7 @@ Until 0.2.3 no geometry was collected at all. Every SVG arrived marked unmeasura
 this rule had not declared, which is a fatal `checker-crashed` by design — so any document holding
 a figure ended in exit 3 rather than being checked.
 
-## Limits and known false alarms
+## Limits and fail-closed cases
 
 With `overflow: visible` the glyphs are painted after all, and the rule declines rather than
 reports. Those targets are not counted against coverage either: the question does not arise for
@@ -59,23 +60,23 @@ A `<text>` whose screen box cannot be read — no CTM, or `getBBox()` throwing o
 rendered geometry — declines with `env/svg-ctm-unavailable` and DOES count against coverage: that
 is a target this rule ought to have judged and could not.
 
+`getBBox()` also omits painted geometry introduced or removed by visible stroke, a paint server,
+text decoration, clip path, mask or filter. Text instantiated through `<use>` is inside a closed
+instance tree. Those cases decline per target with `env/svg-painted-bounds-unsupported`; they stay
+in the denominator, so the rule ends in exit 4 rather than inventing a box or silently losing the
+candidate.
+
+An SVG root with border, padding, rounded clipping or nonzero overflow clip margin does not have a
+clipping viewport proven by its border box. A transform, individual rotate/scale/translate,
+perspective or motion path on the SVG or an ancestor likewise turns the screen rectangle into only
+an axis-aligned envelope. The whole record declines with
+`env/svg-viewport-geometry-unsupported`, also coverage-relevantly.
+
 **A label flush with the edge is not a finding.** The threshold is zero and the boxes are rounded
 to two decimals, so a review asked whether a label ending exactly on the viewport edge produces a
 0.01 px error. Measured, on the sharpest case that can be constructed — `textLength` set to the
 full width of the viewBox, so the box ends on the edge by construction — the rule stays silent.
 The rounding is applied to both boxes from the same source, so it cancels rather than accumulates.
-
-## Two known blind spots
-
-Neither is repaired in 0.2.3 and both would be silent false negatives, so they are named rather
-than left for a reader to discover:
-
-- **`<use>`.** A `<text>` instantiated through `<use>` lives in a shadow tree that
-  `querySelectorAll` does not enter. It is not a candidate and not a decline: invisible in the
-  coverage account.
-- **Padding and border on the `<svg>`.** The viewport is read from `getBoundingClientRect`, which
-  is the border box. An overshoot smaller than padding plus border falls inside that frame and is
-  not reported.
 
 ## Calibration
 

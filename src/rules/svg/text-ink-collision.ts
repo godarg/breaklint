@@ -51,6 +51,7 @@ export const textInkCollision = defineRule(
       "env/pixel-oracle-unavailable",
       "env/ink-passes-unstable",
       "env/svg-too-many-text-targets",
+      "env/svg-viewport-geometry-unsupported",
     ],
   },
   (snapshot, ctx) => {

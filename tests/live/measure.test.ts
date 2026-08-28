@@ -265,6 +265,12 @@ describe("the measurement probe, live", () => {
     const page = await paginated();
     const status = await page.evaluate<PrimitivesStatus>(PRIMITIVES_CHECK);
     assert.equal(status.ok, true, status.reason);
+    const nodeType = await page.evaluate<{ direct: number; captured: number }>(`(() => {
+      const target = document.querySelector("svg");
+      Object.defineProperty(target, "nodeType", { value: 0 });
+      return { direct: target.nodeType, captured: window.__blPrimitives.nodeType(target) };
+    })()`);
+    assert.deepEqual(nodeType, { direct: 0, captured: 1 }, "author state bypassed the captured nodeType getter");
     await page.close();
   });
 

@@ -106,7 +106,9 @@ was found by building the fixture for the previous one.
 
 A `<text>` that IS laid out and still has no readable box declines with `env/svg-ctm-unavailable`
 and DOES count against coverage — that is a measurement this tool owed and did not deliver, per
-target rather than per SVG.
+target rather than per SVG. The same fail-closed rule applies when a box exists but does not prove
+the painted result: `<use>`, visible stroke, paint servers, text decoration, clip paths, masks and
+filters decline with `env/svg-painted-bounds-unsupported`.
 
 Neither exemption leaves the report. Both keep their rule, reason and count in `notMeasured`, and
 each rule's own books are still checked first: `defineRule` requires measured plus declined to equal
@@ -125,15 +127,20 @@ is stated here because it was not stated anywhere until 0.2.3, and a reader coun
 was counting two that answer nothing. `svg/text-overflows-viewport` needs only geometry and does
 measure.
 
-**A `<text>` instantiated through `<use>` is not seen at all.** `querySelectorAll` does not cross
-into the shadow tree that `<use>` builds, so such a target is neither a candidate nor a decline —
-it is invisible in the coverage account rather than reported as unmeasured. For an error rule that
-is a silent false negative, and it is stated here because nothing else states it.
+**Complex SVG paint is detected but not geometrically solved in this build.** `querySelectorAll`
+does not cross the instance tree created by `<use>`, and `getBBox()` does not include stroke,
+clipping, masks or filter effects. The collector now detects those entrances and keeps each as an
+unmeasured candidate. Because the viewport rule is an error rule with a coverage floor of 1, even
+one such target produces `insufficient-coverage` (exit 4), never a silent clean result or a guessed
+error. Full support belongs to the independent ink passes, not to an expansion guessed from style.
 
-**The viewport is the border box, not the content box.** `viewportScreen` comes from
-`getBoundingClientRect`, so an `<svg>` carrying padding or a border is compared against a frame
-larger than the viewport that actually clips. Text overshooting by less than padding plus border
-is therefore not reported. No fixture covers it.
+**Nontrivial viewport boxes are detected but not reconstructed.** `getBoundingClientRect` is the
+border box and becomes only an axis-aligned envelope under rotation or skew. An SVG root with
+border, padding, rounded clipping or a nonzero overflow clip margin therefore declines, as does an
+SVG whose own or ancestor CSS transform geometry is nontrivial (`transform`, the individual
+`rotate`/`scale`/`translate` properties, perspective or motion path). The reason is
+`env/svg-viewport-geometry-unsupported`. Ordinary axis-aligned SVG roots remain measured. A later
+content-quad implementation needs its own transform-aware live proof.
 
 **Every threshold is uncalibrated.** There is no corpus of real documents with human-checked truth
 behind any of the fifteen numbers. The fixtures show that each rule does what it says; they do not

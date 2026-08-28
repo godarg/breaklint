@@ -50,7 +50,7 @@ describe("the M2d live production chain", () => {
   let noSource: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
-    if (result?.documents.length === 22 && noSource?.documents.length === 4) return true;
+    if (result?.documents.length === 23 && noSource?.documents.length === 4) return true;
     t.skip(
       `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
       `no-source=${noSource?.documents.length ?? 0}`,
@@ -108,6 +108,7 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "layout-drift-chaos.html"),
         join(FIXTURES, "svg-text-geometry.html"),
         join(FIXTURES, "svg-in-viewport.html"),
+        join(FIXTURES, "svg-geometry-declines.html"),
       ],
       options(join(root, "evidence")),
     );
@@ -135,7 +136,7 @@ describe("the M2d live production chain", () => {
     }));
     assert.equal(
       result?.documents.length,
-      22,
+      23,
       `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
     );
     assert.equal(
@@ -648,6 +649,61 @@ describe("the M2d live production chain", () => {
       1,
       "the outer record claimed the inner label as well",
     );
+  });
+
+  it("fails closed when SVG paint or viewport geometry is outside the box oracle", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[22]!;
+    assert.ok(document.snapshot, "the SVG decline document produced no snapshot");
+    const byId = new Map(document.snapshot.svg.map((record) => [record.sourceKey, record]));
+    const record = (id: string) => {
+      const found = [...byId.values()].find((item) => item.sourceKey?.includes(id));
+      assert.ok(found, `missing SVG ${id}`);
+      return found;
+    };
+
+    const transparent = record("transparent-paints");
+    assert.equal(transparent.textTargetCount, 3);
+    assert.equal(transparent.notRenderedTargets, 2, "alpha-zero fills are not paint targets");
+    assert.equal(transparent.unsupportedTargets, 0);
+    assert.equal(transparent.texts.length, 1);
+
+    const complex = record("complex-paints");
+    assert.equal(complex.textTargetCount, 8);
+    assert.equal(complex.notRenderedTargets, 1, "the source text in defs is not itself painted");
+    assert.equal(complex.unsupportedTargets, 6, "clip, mask, filter, stroke, direct use and nested use must all decline");
+    assert.equal(complex.texts.length, 1, "the ordinary text in the mixed SVG remains measurable");
+
+    const border = record("border-box");
+    assert.equal(border.measurable, false);
+    assert.equal(border.reason, "env/svg-viewport-geometry-unsupported");
+
+    const definitions = record("many-definitions");
+    assert.equal(definitions.textTargetCount, 502);
+    assert.equal(definitions.notRenderedTargets, 501);
+    assert.equal(definitions.measurable, true, "the target cap must not count definitions that are never painted");
+    assert.equal(definitions.texts.length, 1);
+
+    const outcome = runDocument(document, {
+      failOn: "error",
+      activeRules: [textOverflowsViewport],
+      optionsByRule: {},
+      coverageFloors: {},
+    });
+    assert.deepEqual(outcome.report.findings, [], "unsupported geometry produced a guessed error finding");
+    const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
+    assert.equal(coverage?.candidates, 10);
+    assert.equal(coverage?.measured, 3);
+    assert.deepEqual(
+      coverage?.notMeasured.map((entry) => ({ reason: entry.reason, count: entry.count })),
+      [
+        { reason: "env/svg-painted-bounds-unsupported", count: 6 },
+        { reason: "env/svg-viewport-geometry-unsupported", count: 1 },
+      ],
+    );
+    assert.equal(outcome.report.verdict, "insufficient-coverage");
+    assert.equal(exitCodeFor(outcome.report.verdict), 4);
   });
 
   it("keeps duplicate-input evidence paths disjoint and records loaded redirect provenance", async (t) => {

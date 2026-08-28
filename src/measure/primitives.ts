@@ -49,6 +49,7 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const styleFn = window.getComputedStyle;
   const qsaFn = Element.prototype.querySelectorAll;
   const docQsaFn = Document.prototype.querySelectorAll;
+  const getByIdFn = Document.prototype.getElementById;
   const sliceFn = Array.prototype.slice;
   const startsWithFn = String.prototype.startsWith;
   // Attribute access belongs here for the same reason geometry does. An audit found the break
@@ -62,6 +63,7 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const closestFn = Element.prototype.closest;
   const textOf = Object.getOwnPropertyDescriptor(Node.prototype, "textContent").get;
   const textSet = Object.getOwnPropertyDescriptor(Node.prototype, "textContent").set;
+  const nodeTypeOf = Object.getOwnPropertyDescriptor(Node.prototype, "nodeType").get;
   const parentOf = Object.getOwnPropertyDescriptor(Node.prototype, "parentNode").get;
   const nextOf = Object.getOwnPropertyDescriptor(Node.prototype, "nextSibling").get;
   const childrenOf = Object.getOwnPropertyDescriptor(Node.prototype, "childNodes").get;
@@ -193,6 +195,7 @@ const PRIMITIVES_TEMPLATE = `(() => {
         const fn = root === document ? docQsaFn : qsaFn;
         return call.call(sliceFn, call.call(fn, root, selector));
       },
+      byId: (id) => call.call(getByIdFn, document, id),
       startsWith: (value, prefix) => call.call(startsWithFn, String(value), prefix),
       attr: (el, name) => (el ? call.call(getAttrFn, el, name) : null),
       setAttr: (el, name, value) => call.call(setAttrFn, el, name, value),
@@ -200,6 +203,7 @@ const PRIMITIVES_TEMPLATE = `(() => {
       closest: (el, selector) => (el ? call.call(closestFn, el, selector) : null),
       text: (node) => (node ? call.call(textOf, node) : ""),
       setText: (node, value) => call.call(textSet, node, value),
+      nodeType: (node) => call.call(nodeTypeOf, node),
       parent: (node) => call.call(parentOf, node),
       next: (node) => call.call(nextOf, node),
       children: (node) => (node ? call.call(sliceFn, call.call(childrenOf, node)) : []),
@@ -461,8 +465,8 @@ export const PRIMITIVES_CHECK = `(() => {
     return { ok: false, reason: "the primitive references are replaceable, so they prove nothing" };
   }
   for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
-    "outerHtml", "painted", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
-    "rects", "setAttr", "setText", "parent", "next", "create", "append", "remove", "setCssText",
+    "outerHtml", "painted", "byId", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
+    "rects", "setAttr", "setText", "nodeType", "parent", "next", "create", "append", "remove", "setCssText",
     "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityRecordPreview",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",
     "publishFreeze", "publishOverlay", "mutationType", "mutationAttributeName", "randomToken", "startsWith"]) {

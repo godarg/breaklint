@@ -49,7 +49,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=343 aggregateTests=451 liveTests=59 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=349 aggregateTests=457 liveTests=60 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -253,11 +253,11 @@ the published tarball.
 
 **Prepared, NOT released:** `breaklint@0.2.3` exists as a commit and a version in
 `package.json`; no tag, no npm publish, no GitHub Release. The release contract in
-`docs/releasing.md` requires that an independent verifier hold no open Blocker/High finding, and
-the three review rounds this work had all ended FAIL — each on different and correct findings, the
-last one repaired after the final round was spent. Whether that repaired state is sound is a
-question nobody outside this work has answered yet, and until someone has, this section describes
-a candidate rather than a release.
+`docs/releasing.md` requires that an independent verifier hold no open Blocker/High finding. Four
+review passes had ended FAIL — each on different and correct findings — before the repaired code
+passed a focused independent re-review with no open Blocker/High finding. The human report-surface
+ledger and the final verifier are still outstanding, so this section describes a candidate rather
+than a release.
 
 What it repairs: the defect that made every document
 containing an inline SVG uncheckable, and it is worth stating plainly because it is this project's
@@ -351,8 +351,9 @@ Two of the MEDIUMs were repairs of this release that had not gone far enough:
 
 - **`opacity` is not inherited.** `<g opacity="0"><text>` reports `opacity: 1` on the child, so
   reading the child's computed style missed it — the invisible-target class through a fifth door.
-  Painting is now one question put to the browser, `Element.checkVisibility` with opacity,
-  visibility and content-visibility, which answers for ancestors as well.
+  Ancestor opacity/visibility is now asked through `Element.checkVisibility`; transparent paint
+  is checked separately, and clip/mask/filter/stroke cases decline because that API is not a
+  complete paint oracle.
 - **A tool limit was still booked as a document property.** An SVG with more targets than the
   collector will gather took the two ink rules — which cannot measure anything in this build — to
   coverage 0 and the run to exit 4. They now answer with their own limit first.

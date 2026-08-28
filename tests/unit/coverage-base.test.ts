@@ -22,6 +22,9 @@ import { NON_APPLICABLE_ENV_IDS, TOOL_CAPABILITY_ENV_IDS } from "../../src/core/
 import type { EnvId } from "../../src/core/enums.ts";
 import type { Snapshot } from "../../src/core/types.ts";
 import { declined } from "../../src/rules/shared.ts";
+import { textClipped } from "../../src/rules/svg/text-clipped.ts";
+import { textInkCollision } from "../../src/rules/svg/text-ink-collision.ts";
+import { textOverflowsViewport } from "../../src/rules/svg/text-overflows-viewport.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
 
 /**
@@ -78,7 +81,10 @@ describe("the coverage base", () => {
   // The rules below are test doubles that ignore the snapshot entirely: what is under test is
   // what the ENGINE does with a decline, not what any rule reads. Borrowing a corpus snapshot
   // keeps the fixture honest — it is a real snapshot shape, not a hand-shaped stub.
-  const snapshot = loadCorpus()[0]!.snapshot;
+  const corpus = loadCorpus();
+  const snapshot = corpus[0]!.snapshot;
+  const svgSnapshot = corpus.find((document) => document.snapshot.svg.length > 0)?.snapshot;
+  assert.ok(svgSnapshot, "the corpus has no SVG record for real-rule coverage tests");
 
   it("keeps both exception lists small and disjoint", () => {
     // The lists are the whole of the exception. If a future reason joins one of them, it has to
@@ -89,6 +95,75 @@ describe("the coverage base", () => {
     const overlap = TOOL_CAPABILITY_ENV_IDS.filter((id) => (NON_APPLICABLE_ENV_IDS as readonly string[]).includes(id));
     assert.deepEqual(overlap, [], "a reason in both lists would make the distinction unreadable");
   });
+
+  it("every SVG rule declares the viewport reason admitted by the receipt schema", () => {
+    const projected = structuredClone(svgSnapshot);
+    const svg = structuredClone(projected.svg[0]!);
+    svg.measurable = false;
+    svg.reason = "env/svg-viewport-geometry-unsupported";
+    svg.inkCollected = true;
+    svg.inkStable = true;
+    projected.svg = [svg];
+    const report = runDocument(
+      { path: "receipt-projection.html", snapshot: projected, infrastructure: [] },
+      {
+        failOn: "error",
+        activeRules: [textClipped, textInkCollision, textOverflowsViewport],
+        optionsByRule: {},
+        coverageFloors: {},
+      },
+    ).report;
+    assert.deepEqual(report.infrastructure, [], "a schema-valid record-level decline crashed a real SVG rule");
+    assert.equal(report.verdict, "insufficient-coverage");
+  });
+
+  for (const kind of ["paint-target", "whole-viewport"] as const) {
+    it(`overflow visible stays non-applicable before ${kind} geometry declines`, () => {
+      const projected = structuredClone(svgSnapshot);
+      const svg = structuredClone(projected.svg[0]!);
+      svg.overflow = "visible";
+      svg.texts = [];
+      svg.textTargetCount = 1;
+      svg.notRenderedTargets = 0;
+      svg.unreadableTargets = 0;
+      svg.unsupportedTargets = kind === "paint-target" ? 1 : 0;
+      svg.measurable = kind === "paint-target";
+      svg.reason = kind === "whole-viewport" ? "env/svg-viewport-geometry-unsupported" : null;
+      projected.svg = [svg];
+      const report = runDocument(
+        { path: `overflow-visible-${kind}.html`, snapshot: projected, infrastructure: [] },
+        {
+          failOn: "error",
+          activeRules: [textOverflowsViewport, measuresOne],
+          optionsByRule: {},
+          coverageFloors: {},
+        },
+      ).report;
+      assert.equal(report.coverage["svg/text-overflows-viewport"]?.candidates, 0);
+      assert.equal(report.coverage["svg/text-overflows-viewport"]?.ok, true);
+      assert.deepEqual(
+        report.notMeasured.filter((entry) => entry.ruleId === "svg/text-overflows-viewport")
+          .map((entry) => ({ reason: entry.reason, count: entry.count })),
+        [{ reason: "env/svg-overflow-visible", count: 1 }],
+      );
+      assert.equal(report.verdict, "clean");
+    });
+  }
+
+  for (const reason of [
+    "env/svg-painted-bounds-unsupported",
+    "env/svg-viewport-geometry-unsupported",
+  ] as const) {
+    it(`${reason} remains an input coverage failure`, () => {
+      const report = reportFor(decliningRule(`svg/${reason}`, reason, "error"), snapshot);
+      const coverage = report.coverage[`svg/${reason}`];
+      assert.equal(coverage?.candidates, 4);
+      assert.equal(coverage?.measured, 0);
+      assert.equal(coverage?.coverage, 0);
+      assert.equal(coverage?.ok, false);
+      assert.equal(report.verdict, "insufficient-coverage");
+    });
+  }
 
   it("a capability this build lacks leaves the base rather than failing the document", () => {
     const report = reportFor(decliningRule("svg/capability", "env/pixel-oracle-unavailable", "warn"), snapshot);
