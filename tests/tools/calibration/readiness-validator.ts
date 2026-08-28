@@ -526,7 +526,7 @@ function metricValue(report: AcceptanceReport, metric: AcceptanceReport["gates"]
 export const PRODUCT_RULE_EXECUTABLE_CONTRACTS: Readonly<Record<RuleId, { moduleRelativePath: string; sourceSha256: string; executableContractVersion: "m3-0-real-rule-run-v1" }>> = Object.freeze({
   "svg/text-clipped": { moduleRelativePath: "src/rules/svg/text-clipped.ts", sourceSha256: "09455161fdae74893b420c2b825d37c74bfbc8993456476124fe141b35ecd684", executableContractVersion: "m3-0-real-rule-run-v1" },
   "svg/text-ink-collision": { moduleRelativePath: "src/rules/svg/text-ink-collision.ts", sourceSha256: "172c80403d8ceb05e998d88cb196424bcf3b1e5fdc2e0df620d01ef2e227b3e1", executableContractVersion: "m3-0-real-rule-run-v1" },
-  "svg/text-overflows-viewport": { moduleRelativePath: "src/rules/svg/text-overflows-viewport.ts", sourceSha256: "f35a9dcae53a757499c66561132fdd8288ab249ddaba3405fc643355dc7155b1", executableContractVersion: "m3-0-real-rule-run-v1" },
+  "svg/text-overflows-viewport": { moduleRelativePath: "src/rules/svg/text-overflows-viewport.ts", sourceSha256: "2a243aded89ebb20323ecbfc460f2c4e8f41182c7d36c4d3d8e24d52b3167cb6", executableContractVersion: "m3-0-real-rule-run-v1" },
 });
 
 export function producerSourceIdentitySha256(sourceIdentity: unknown): string { return sha256(canonicalJson(sourceIdentity)); }

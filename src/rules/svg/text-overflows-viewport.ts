@@ -103,6 +103,22 @@ export const textOverflowsViewport = defineRule(
         continue;
       }
       candidates += targets;
+      // The collector sets `textTargetsCapped` together with `measurable: false`, so a real run
+      // never reaches this branch. It stays because the rule also runs over externally supplied
+      // snapshot projections (M3-0), where the two fields can disagree — and a capped SVG that
+      // arrives marked measurable would otherwise be measured silently on whatever subset of its
+      // targets came with it.
+      if (svg.textTargetsCapped) {
+        notMeasured.push(
+          declined({
+            scope: "svgText",
+            ruleId: "svg/text-overflows-viewport",
+            reason: "env/svg-too-many-text-targets",
+            count: targets,
+          }),
+        );
+        continue;
+      }
       measured += targets;
 
       const vp = svg.viewportScreen;

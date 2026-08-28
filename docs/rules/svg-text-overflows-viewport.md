@@ -59,6 +59,12 @@ A `<text>` whose screen box cannot be read — no CTM, or `getBBox()` throwing o
 rendered geometry — declines with `env/svg-ctm-unavailable` and DOES count against coverage: that
 is a target this rule ought to have judged and could not.
 
+**A label flush with the edge is not a finding.** The threshold is zero and the boxes are rounded
+to two decimals, so a review asked whether a label ending exactly on the viewport edge produces a
+0.01 px error. Measured, on the sharpest case that can be constructed — `textLength` set to the
+full width of the viewBox, so the box ends on the edge by construction — the rule stays silent.
+The rounding is applied to both boxes from the same source, so it cancels rather than accumulates.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with
