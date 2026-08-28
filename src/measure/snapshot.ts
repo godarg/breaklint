@@ -644,7 +644,7 @@ export const SNAPSHOT_SOURCE = `(() => {
     // Geometry is measured here; the ink passes are not implemented in this build. The two are
     // reported separately so a rule needing only boxes is not held back by a pass that does not
     // exist — see TOOL_CAPABILITY_ENV_IDS for what the ink rules do with that.
-    svg.push({ nodeKey: "svg:" + pageIndex + ":" + i,
+    svg.push({ nodeKey: "svg:" + pageIndex + ":" + i, page: pageIndex + 1,
       sourceIdentity: P.attr(el, "id"), outerHtml: P.outerHtml(el),
       measurable: !capped,
       // null, nicht undefined: undefined verschwindet beim JSON-Roundtrip, und das

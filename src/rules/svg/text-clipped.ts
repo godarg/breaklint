@@ -101,12 +101,6 @@ export const textClipped = defineRule(
       // The passes are not implemented in this build, which is a fact about the tool and not
       // about the document. It is reported as such, and it leaves the coverage base — see
       // TOOL_CAPABILITY_ENV_IDS. Saying "unstable" here would claim a measurement was made.
-      if (!svg.inkCollected) {
-        notMeasured.push(
-          declined({ scope: "svg", ruleId: "svg/text-clipped", reason: "env/pixel-oracle-unavailable", count: targets }),
-        );
-        continue;
-      }
       if (!svg.inkStable) {
         notMeasured.push(
           declined({ scope: "svg", ruleId: "svg/text-clipped", reason: "env/ink-passes-unstable", count: targets },),
@@ -133,7 +127,7 @@ export const textClipped = defineRule(
               `${(missing * 100).toFixed(2)} % of this text's glyph ink is removed by ` +
               `${text.clipState === "mask" ? "a mask" : "a clip path"}; threshold ` +
               `${(maxMissingInk * 100).toFixed(0)} %. Heuristic: clipping can be deliberate.`,
-            page: 1,
+            page: svg.page,
             keyType: "svg-text",
             key: text.svgTextKey,
             nodeKey: svg.nodeKey,

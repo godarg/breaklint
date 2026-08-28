@@ -74,9 +74,9 @@
     "shape": { "type": "object", "additionalProperties": false, "required": ["boxScreen", "strokeWidth"], "properties": { "boxScreen": { "$ref": "#/$defs/box" }, "strokeWidth": { "type": "number", "minimum": 0 } } },
     "svgRecord": {
       "type": "object", "additionalProperties": false,
-      "required": ["nodeKey", "sourceKey", "measurable", "reason", "viewportScreen", "overflow", "textTargetCount", "textTargetsCapped", "unreadableTargets", "notRenderedTargets", "texts", "shapes", "paths", "inkPasses", "inkCollected", "inkStable"],
+      "required": ["nodeKey", "page", "sourceKey", "measurable", "reason", "viewportScreen", "overflow", "textTargetCount", "textTargetsCapped", "unreadableTargets", "notRenderedTargets", "texts", "shapes", "paths", "inkPasses", "inkCollected", "inkStable"],
       "properties": {
-        "nodeKey": { "type": "string", "minLength": 1 }, "sourceKey": { "type": ["string", "null"] }, "measurable": { "type": "boolean" },
+        "nodeKey": { "type": "string", "minLength": 1 }, "page": { "type": "integer", "minimum": 1 }, "sourceKey": { "type": ["string", "null"] }, "measurable": { "type": "boolean" },
         "reason": { "type": ["string", "null"], "$comment": "Only reasons ALL THREE consuming rules declare. A schema-valid projection carrying a reason one of them has not declared reaches defineRule as an undeclared decline, which is a fatal checker-crashed by design — the very defect 0.2.3 removes, reachable again through the receipt path. env/svg-ctm-unavailable is per target and never appears at SVG level; env/pixel-oracle-unavailable is emitted by the ink rules themselves, not carried on the record.", "enum": [null, "env/svg-not-inline", "env/svg-no-text", "env/svg-too-many-text-targets"] },
         "viewportScreen": { "$ref": "#/$defs/box" }, "overflow": { "type": "string" }, "textTargetCount": { "type": "integer", "minimum": 0 }, "textTargetsCapped": { "type": "boolean" },
         "unreadableTargets": { "type": "integer", "minimum": 0 }, "notRenderedTargets": { "type": "integer", "minimum": 0 },

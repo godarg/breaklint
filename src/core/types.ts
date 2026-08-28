@@ -205,6 +205,17 @@ export interface SvgShape {
 
 export interface SvgRecord {
   nodeKey: string;
+  /**
+   * The page this SVG was laid out on, 1-based.
+   *
+   * Carried on the record because it is a fact of the MEASUREMENT. Three rules used to derive it
+   * instead — one by looking the SVG's nodeKey up among the BLOCK keys, which never match
+   * (`svg:0:1` against `bl:…`), the other two by writing `page: 1` outright. Every finding of the
+   * one gating SVG rule therefore claimed page 1, on a fixture that produces findings on pages 2
+   * and 3. A page number is the first thing a reader uses to go and look, and it was wrong in
+   * every case.
+   */
+  page: number;
   sourceKey: string | null;
   measurable: boolean;
   /**

@@ -552,6 +552,14 @@ describe("the M2d live production chain", () => {
     // #outside, #rotated (90°) and #rotated45. Nothing from #inside, #visible or the `<defs>`
     // element — each of those is a way this rule has been wrong before.
     assert.deepEqual(viewport.map((item) => item.target.nodeKey).sort(), ["svg:0:1", "svg:1:0", "svg:2:1"]);
+    // The page number, which is the first thing a reader uses to go and look. Until 0.2.3 all
+    // three rules derived it and all three got it wrong — one by looking an SVG nodeKey up among
+    // the BLOCK keys, which never match, the other two by writing 1 outright. Every finding
+    // claimed page 1 on a fixture that produces them on three different pages.
+    assert.deepEqual(
+      viewport.map((item) => [item.target.nodeKey, item.page]).sort(),
+      [["svg:0:1", 1], ["svg:1:0", 2], ["svg:2:1", 3]],
+    );
 
     // The four-corner claim, bound to a number rather than to a comment. At 90 degrees two
     // opposite corners span the same axis-aligned box as four, so the first rotated figure cannot

@@ -63,6 +63,14 @@ the tag exists, and not before.
   absent so it survives the JSON round trip the receipt schema requires; every `reviewedAt` in
   the report-surface ledger is the date of the review that actually happened, with the transfer
   in a field of its own.
+- **Findings carry the page they are on.** All three SVG rules got it wrong: one looked the SVG's
+  `nodeKey` up among the BLOCK keys, which never match, and fell back to page 1; the other two
+  wrote `page: 1` outright. Nobody had noticed, because the gating rule had never produced a
+  finding for anyone to read. The page is now a field on the record, set by the collector.
+- **Two blind spots are named rather than left to be discovered:** a `<text>` instantiated through
+  `<use>` lives in a shadow tree `querySelectorAll` does not enter, and the viewport is read from
+  `getBoundingClientRect`, which is the border box rather than the content box. Both are silent
+  false negatives of an error rule and both are in `docs/limitations.md`.
 - No threshold, severity or `calibrated` flag changed, and no rule was added or removed. The ink
   passes remain unimplemented (M3), so `svg/text-clipped` and `svg/text-ink-collision` still
   measure nothing — they now say so instead of ending the run. README, `docs/status.md`,

@@ -125,6 +125,16 @@ is stated here because it was not stated anywhere until 0.2.3, and a reader coun
 was counting two that answer nothing. `svg/text-overflows-viewport` needs only geometry and does
 measure.
 
+**A `<text>` instantiated through `<use>` is not seen at all.** `querySelectorAll` does not cross
+into the shadow tree that `<use>` builds, so such a target is neither a candidate nor a decline —
+it is invisible in the coverage account rather than reported as unmeasured. For an error rule that
+is a silent false negative, and it is stated here because nothing else states it.
+
+**The viewport is the border box, not the content box.** `viewportScreen` comes from
+`getBoundingClientRect`, so an `<svg>` carrying padding or a border is compared against a frame
+larger than the viewport that actually clips. Text overshooting by less than padding plus border
+is therefore not reported. No fixture covers it.
+
 **Every threshold is uncalibrated.** There is no corpus of real documents with human-checked truth
 behind any of the fifteen numbers. The fixtures show that each rule does what it says; they do not
 show that what it says is the right thing to say about your document. That is the difference between

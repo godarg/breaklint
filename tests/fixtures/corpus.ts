@@ -152,6 +152,7 @@ function snapshot(parts: {
 function svgWith(texts: SvgRecord["texts"], over: Partial<SvgRecord> = {}): SvgRecord {
   return {
     nodeKey: "svg1",
+    page: 1,
     sourceKey: "svgsig:chart",
     measurable: true,
     viewportScreen: box(48, 48, 300, 200),

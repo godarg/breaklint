@@ -108,12 +108,6 @@ export const textInkCollision = defineRule(
       // The passes are not implemented in this build, which is a fact about the tool and not
       // about the document. It is reported as such, and it leaves the coverage base — see
       // TOOL_CAPABILITY_ENV_IDS. Saying "unstable" here would claim a measurement was made.
-      if (!svg.inkCollected) {
-        notMeasured.push(
-          declined({ scope: "svg", ruleId: "svg/text-ink-collision", reason: "env/pixel-oracle-unavailable", count: targets }),
-        );
-        continue;
-      }
       if (!svg.inkStable) {
         notMeasured.push(
           declined({ scope: "svg", ruleId: "svg/text-ink-collision", reason: "env/ink-passes-unstable", count: targets }),
@@ -144,7 +138,7 @@ export const textInkCollision = defineRule(
             message:
               `${what}; threshold ${threshold}. Heuristic. Note: this rule does not detect ` +
               `sub-pixel contact — a shape may touch a glyph optically without sharing a pixel.`,
-            page: 1,
+            page: svg.page,
             keyType: "svg-text",
             key: text.svgTextKey,
             nodeKey: svg.nodeKey,

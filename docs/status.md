@@ -370,8 +370,34 @@ rounding, so a difference of 0.01 is not something these numbers can distinguish
 is the resolution of the stored data, read off the collector rather than chosen, and it changes
 no verdict in the corpus.
 
+**Round four — one HIGH, and it was this release's own doing.** `svg/text-overflows-viewport` was
+the only SVG rule that had never produced a finding, so nothing had ever read the page number it
+attaches. It looked the SVG's `nodeKey` up among the BLOCK keys — `svg:0:1` against `bl:…`, never
+a match — and fell back to page 1. The two ink rules wrote `page: 1` outright. Every finding of
+the newly working gating rule therefore pointed at page 1, on a fixture that produces findings on
+pages 1, 2 and 3. A page number is the first thing a reader uses to go and look.
+
+The page is now a field on the SVG record, set by the collector, because it is a fact of the
+measurement rather than something three rules should each derive. Fixing it also exposed that the
+stored demo fixture carried `page: 1` for an SVG that sits on page 5 — a number I had written
+without measuring it, in the same commit that repairs numbers written without measuring them.
+
 All of this is recorded rather than quietly fixed, because the pattern is this project's own
-subject: the check that looked green was green about the wrong thing, three rounds running.
+subject: the check that looked green was green about the wrong thing, four rounds running.
+
+### Where this leaves 0.2.3
+
+Not released, and the report-surface ledger is deliberately RED.
+
+The ledger binds a human review to the exact bytes of the reviewed artifacts. The Founder's
+confirmation on 2026-08-28 was explicit about its own basis: 58 of 62 artifacts byte-identical,
+no visible pixel changed. Correcting the page numbers changed 21 of 58 rendered views — the
+findings now name a different page — so that basis no longer holds and the confirmation does not
+transfer. Rebinding the ledger anyway would put a human's name on a review of artifacts that
+human never saw, which is the one failure this whole apparatus exists to prevent.
+
+So the gate stays red until someone looks. `npm run test:report-surfaces` fails on this commit,
+by design and not by accident.
 
 One honesty note about the demo. `examples/demo-snapshot.json` carries ink counts, so
 `npx breaklint --demo` shows a `svg/text-clipped` finding that a real run cannot currently

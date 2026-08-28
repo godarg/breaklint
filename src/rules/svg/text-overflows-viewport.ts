@@ -153,7 +153,7 @@ export const textOverflowsViewport = defineRule(
             message:
               `This text extends ${overshoot.toFixed(2)} px beyond the SVG viewport and is not ` +
               `drawn. Coordinates are normalised through getScreenCTM().`,
-            page: pageOfSvg(snapshot, svg.nodeKey),
+            page: svg.page,
             keyType: "svg-text",
             key: text.svgTextKey,
             nodeKey: svg.nodeKey,
@@ -177,7 +177,3 @@ export const textOverflowsViewport = defineRule(
     return { findings, candidates, measured, notMeasured };
   },
 );
-
-function pageOfSvg(snapshot: Parameters<typeof textOverflowsViewport.run>[0], nodeKey: string): number {
-  return snapshot.blocks.find((b) => b.nodeKey === nodeKey)?.page ?? 1;
-}

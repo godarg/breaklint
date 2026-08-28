@@ -333,6 +333,7 @@ function svgRecord(target: {
   const t0 = target.t0 ?? target.t;
   return {
     nodeKey: "lab-svg-node",
+    page: 1,
     sourceKey: "lab-svg-source",
     measurable: true,
     reason: null,

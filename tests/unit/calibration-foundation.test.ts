@@ -88,6 +88,7 @@ function snapshotFor(ruleId: SimulationRuleId, target: Target, scenario: (typeof
     pageNumber: 1,
     svg: {
       nodeKey: `receipt-svg-${slot}`,
+      page: 1,
       sourceKey: target.svgRootKey,
       measurable: true,
       reason: null,

@@ -594,6 +594,7 @@
     "svg": [
       {
         "nodeKey": "b5",
+        "page": 5,
         "sourceKey": "svgsig:chart",
         "measurable": true,
         "reason": null,

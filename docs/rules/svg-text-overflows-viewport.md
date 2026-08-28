@@ -65,6 +65,18 @@ to two decimals, so a review asked whether a label ending exactly on the viewpor
 full width of the viewBox, so the box ends on the edge by construction — the rule stays silent.
 The rounding is applied to both boxes from the same source, so it cancels rather than accumulates.
 
+## Two known blind spots
+
+Neither is repaired in 0.2.3 and both would be silent false negatives, so they are named rather
+than left for a reader to discover:
+
+- **`<use>`.** A `<text>` instantiated through `<use>` lives in a shadow tree that
+  `querySelectorAll` does not enter. It is not a candidate and not a decline: invisible in the
+  coverage account.
+- **Padding and border on the `<svg>`.** The viewport is read from `getBoundingClientRect`, which
+  is the border box. An overshoot smaller than padding plus border falls inside that frame and is
+  not reported.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with
