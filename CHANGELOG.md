@@ -2,7 +2,12 @@
 
 ## Unreleased
 
-## 0.2.3 — 2026-08-27
+## 0.2.3 — prepared 2026-08-28, not released
+
+No tag, no npm publish. The release contract requires an independent verifier with no open
+Blocker/High finding; three rounds ended FAIL on different and correct findings, and the last
+repair came after the final round was spent. The date on this heading becomes a release date when
+the tag exists, and not before.
 
 ### Any document with an inline SVG can be checked
 

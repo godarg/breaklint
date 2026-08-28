@@ -251,7 +251,15 @@ version 0.2.1, imported Configuration Contract v1 and produced the expected find
 with exit 1. This status paragraph is a later documentation commit and is not retroactively part of
 the published tarball.
 
-**Released on 2026-08-27:** `breaklint@0.2.3` repairs the defect that made every document
+**Prepared, NOT released:** `breaklint@0.2.3` exists as a commit and a version in
+`package.json`; no tag, no npm publish, no GitHub Release. The release contract in
+`docs/releasing.md` requires that an independent verifier hold no open Blocker/High finding, and
+the three review rounds this work had all ended FAIL — each on different and correct findings, the
+last one repaired after the final round was spent. Whether that repaired state is sound is a
+question nobody outside this work has answered yet, and until someone has, this section describes
+a candidate rather than a release.
+
+What it repairs: the defect that made every document
 containing an inline SVG uncheckable, and it is worth stating plainly because it is this project's
 own subject matter: a full unit suite, a full live suite and a 15/15 mutation guard were green
 throughout, and `grep -l "<svg" tests/fixtures/*.html` returned nothing. The most common element
