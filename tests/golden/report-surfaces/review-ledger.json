@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "reviewInputFingerprint": "e0e2491b174c0800347ac39ddf77e68da1d15e59f9ca490858dd9d501e95ec24",
-  "renderManifestGeneratedAt": "2026-08-28T05:19:19.495Z",
+  "renderManifestGeneratedAt": "2026-08-28T05:28:39.206Z",
   "reviewEnvironment": {
     "reviewArtifactContractVersion": 3,
     "screenPixelContractVersion": 1,
@@ -138,7 +138,7 @@
       "reviewArtifactFingerprint": "e837abb650fe6479aee6652ac837fc4411680bff2f45dc3e458be58975b9fe34",
       "reviewer": "@Founder",
       "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "4eb8b06565a8adf651017d6b7d5bbb33da25a1c94f4f2561c491103f64498471",
+      "reviewedRawSha256": "dacb3e63e342faab86f784e59a5ada5d336b3620e9e3af6dd8844a063ecb7528",
       "reviewedPages": [
         1,
         2,
@@ -256,7 +256,7 @@
       "reviewArtifactFingerprint": "d13e54acd0d9777e086476da9a1d188574285efe96c0191f3f26ef84b1b6f964",
       "reviewer": "@Founder",
       "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "73949e39836106dfea0867025774a28aaaac4ecc6c9a2198ba5b20d0588e66be",
+      "reviewedRawSha256": "075ecd9b269a9cde3d5a138b5db57fe898280fd2fe6cf333278037d6870fbd81",
       "reviewedPages": [
         1,
         2,
@@ -390,7 +390,7 @@
       "reviewArtifactFingerprint": "9d581dff6891b62005254fa6c758067c34cbe27db02c76a2a8e5485524d7ec59",
       "reviewer": "@Founder",
       "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "1fc401295303805643e69f7060251c31abd25280d3dc293306a70a0eb9b7aa22",
+      "reviewedRawSha256": "3f7e3ae8819d6a5070a01ccff184d4a1b0df44ed40f29eb38ddef2cfc2144db5",
       "reviewedPages": [
         1,
         2,
@@ -528,7 +528,7 @@
       "reviewArtifactFingerprint": "22f63dc2125717b7e928424a813744f362cc4468bb42c36aec178e00bcabbbc8",
       "reviewer": "@Founder",
       "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "10151f0334be10bb2c3bc84e2ffa80a12d2559c6f71d55ecb66b513d082bcd17",
+      "reviewedRawSha256": "9783a5b91bb4d73c2a7af81d636cc2a37b6ac1e7d67dededa79013c6d6cab45c",
       "reviewedPages": [
         1,
         2,
@@ -590,5 +590,5 @@
       "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
     }
   },
-  "transferredAt": "2026-08-28T05:19:19.495Z"
+  "transferredAt": "2026-08-28T05:28:39.206Z"
 }

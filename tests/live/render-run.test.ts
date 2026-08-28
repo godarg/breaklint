@@ -485,10 +485,11 @@ describe("the M2d live production chain", () => {
    * unmeasurable with a reason the rule had not declared. Unit tests, mutation guard and live
    * suite were all green throughout, because none of them reached the code.
    *
-   * Six SVGs, six different answers, and three of them exist because an independent review found
-   * the first three insufficient: `<defs>` text that Chrome measures happily and never paints, a
-   * 45-degree label that separates four transformed corners from two, and the per-target split
-   * that keeps one unmeasurable element from voiding an entire figure.
+   * Seven SVGs, seven different answers, and four of them exist because two independent reviews
+   * found the earlier ones insufficient: `<defs>` text that Chrome measures happily and never
+   * paints, a 45-degree label that separates four transformed corners from two, three ways to be
+   * laid out and still invisible, and the per-target split that keeps one unmeasurable element
+   * from voiding an entire figure.
    */
   it("measures inline SVG text geometry per target, and normalises it through the CTM", (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
@@ -502,7 +503,7 @@ describe("the M2d live production chain", () => {
     );
 
     const svg = document.snapshot.svg;
-    assert.equal(svg.length, 6, "the six figures did not all reach the snapshot");
+    assert.equal(svg.length, 7, "the seven figures did not all reach the snapshot");
     assert.equal(svg.every((record) => record.measurable), true, "an SVG came back unmeasurable");
     assert.equal(
       svg.every((record) => record.texts.every((text) => text.boxScreen.width > 0 && text.boxScreen.height > 0)),
@@ -511,8 +512,8 @@ describe("the M2d live production chain", () => {
     );
     assert.equal(
       new Set(svg.flatMap((record) => record.texts.map((text) => text.svgTextKey))).size,
-      6,
-      "the six measured labels did not get six distinct source identities",
+      7,
+      "the seven measured labels did not get seven distinct source identities",
     );
     // Ink is a different question from geometry, and this build answers only the second.
     assert.equal(svg.every((record) => record.inkCollected === false), true);
@@ -527,6 +528,16 @@ describe("the M2d live production chain", () => {
     assert.equal(defs.notRenderedTargets, 1);
     assert.equal(defs.unreadableTargets, 0);
     assert.equal(defs.texts.length, 1);
+
+    // Laid out and still invisible: visibility:hidden, opacity:0, and a <text> with neither fill
+    // nor stroke. All three return a full client rect, so the check that catches the `<defs>`
+    // case does not see them at all — they come from the computed style. Each sits far below its
+    // viewport, so counting one again is an error finding about something nobody can see.
+    const invisible = svg.find((record) => record.textTargetCount === 4);
+    assert.ok(invisible, "the invisible-targets figure is missing from the snapshot");
+    assert.equal(invisible.notRenderedTargets, 3);
+    assert.equal(invisible.unreadableTargets, 0);
+    assert.equal(invisible.texts.length, 1, "an invisible label was collected as a target");
 
     const outcome = runDocument(document, {
       failOn: "error",
@@ -556,8 +567,8 @@ describe("the M2d live production chain", () => {
     // The fourth figure does not clip, so the rule has no opinion — and that decline must not
     // count against an error rule whose coverage floor is 1.
     const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
-    assert.equal(coverage?.candidates, 5);
-    assert.equal(coverage?.measured, 5);
+    assert.equal(coverage?.candidates, 6);
+    assert.equal(coverage?.measured, 6);
     assert.equal(coverage?.ok, true);
     assert.deepEqual(
       coverage?.notMeasured.map((entry) => ({ reason: entry.reason, count: entry.count })),

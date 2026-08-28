@@ -111,5 +111,22 @@
   </svg>
   <figcaption>One error, and only when all four corners are transformed.</figcaption>
 </figure>
+<figure>
+  <!--
+    Three ways to be laid out and still invisible. Each returns a full client rect, so the empty-
+    rect test that catches the <defs> case does not see any of them — they are read from the
+    computed style. All three sit far below the viewport: if the collector ever counts one of
+    them again, it becomes an error finding about an element nobody can see, and this figure
+    turns that regression into a red test rather than a quiet false alarm.
+  -->
+  <svg id="invisible" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="400" height="200" fill="#eeeeee"></rect>
+    <text x="10" y="900" font-size="14" font-family="serif" style="visibility: hidden">Hidden</text>
+    <text x="10" y="940" font-size="14" font-family="serif" style="opacity: 0">Transparent</text>
+    <text x="10" y="980" font-size="14" font-family="serif" fill="none" stroke="none">Unpainted</text>
+    <text x="40" y="100" font-size="14" font-family="serif">The one that is painted</text>
+  </svg>
+  <figcaption>Silent: one target measured, three elements that are not targets.</figcaption>
+</figure>
 </body>
 </html>

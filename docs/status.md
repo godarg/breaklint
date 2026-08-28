@@ -275,7 +275,7 @@ What changed:
 | SVG identity is joined in Node | `svgRootKey`/`svgTextKey` existed and were unused; markup is canonicalised and hashed on the Node side, never inside the document under test |
 | Two decline classes leave the coverage base | `TOOL_CAPABILITY_ENV_IDS` (this build cannot take the measurement) and `NON_APPLICABLE_ENV_IDS` (the question does not arise for that target). Both stay in `notMeasured` with rule, reason and count; only the ratio changes, and the subtraction happens after each rule's own books are checked |
 | The ink rules say which of two things is true | `inkCollected` separates "the passes do not exist in this build" from "the passes ran and disagreed". They reported the second while the first was the case |
-| The corpus holds an inline SVG at last | `tests/fixtures/svg-text-geometry.html`, six figures, six different answers, in the live chain. Three of the six exist because an independent review found the first three insufficient |
+| The corpus holds an inline SVG at last | `tests/fixtures/svg-text-geometry.html`, seven figures, seven different answers, plus `svg-in-viewport.html` — the sound document that must end exit 0 — both in the live chain. Five of those cases exist because two independent reviews found the earlier ones insufficient |
 | Snapshot schema | 2 → 3, for the added `inkCollected`. Report schema stays 3 |
 
 What did NOT change: no threshold, no severity, no `calibrated` flag, and no rule was added or
