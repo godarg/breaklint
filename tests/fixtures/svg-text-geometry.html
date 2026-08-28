@@ -113,7 +113,7 @@
 </figure>
 <figure>
   <!--
-    Three ways to be laid out and still invisible. Each returns a full client rect, so the empty-
+    Four ways to be laid out and still invisible. Each returns a full client rect, so the empty-
     rect test that catches the <defs> case does not see any of them — they are read from the
     computed style. All three sit far below the viewport: if the collector ever counts one of
     them again, it becomes an error finding about an element nobody can see, and this figure
@@ -124,9 +124,10 @@
     <text x="10" y="900" font-size="14" font-family="serif" style="visibility: hidden">Hidden</text>
     <text x="10" y="940" font-size="14" font-family="serif" style="opacity: 0">Transparent</text>
     <text x="10" y="980" font-size="14" font-family="serif" fill="none" stroke="none">Unpainted</text>
+    <g opacity="0"><text x="10" y="1020" font-size="14" font-family="serif">Transparent ancestor</text></g>
     <text x="40" y="100" font-size="14" font-family="serif">The one that is painted</text>
   </svg>
-  <figcaption>Silent: one target measured, three elements that are not targets.</figcaption>
+  <figcaption>Silent: one target measured, four elements that are not targets.</figcaption>
 </figure>
 </body>
 </html>

@@ -529,13 +529,15 @@ describe("the M2d live production chain", () => {
     assert.equal(defs.unreadableTargets, 0);
     assert.equal(defs.texts.length, 1);
 
-    // Laid out and still invisible: visibility:hidden, opacity:0, and a <text> with neither fill
-    // nor stroke. All three return a full client rect, so the check that catches the `<defs>`
-    // case does not see them at all — they come from the computed style. Each sits far below its
-    // viewport, so counting one again is an error finding about something nobody can see.
-    const invisible = svg.find((record) => record.textTargetCount === 4);
+    // Laid out and still invisible, four ways: visibility:hidden, opacity:0, a <text> with
+    // neither fill nor stroke, and opacity inherited from an ancestor `<g>`. All four return a
+    // full client rect, so the check that catches the `<defs>` case does not see any of them —
+    // and the last one also escapes a computed-style read on the element itself, which reports
+    // opacity 1 on the child. Each sits far below its viewport, so counting one again is an error
+    // finding about something nobody can see.
+    const invisible = svg.find((record) => record.textTargetCount === 5);
     assert.ok(invisible, "the invisible-targets figure is missing from the snapshot");
-    assert.equal(invisible.notRenderedTargets, 3);
+    assert.equal(invisible.notRenderedTargets, 4);
     assert.equal(invisible.unreadableTargets, 0);
     assert.equal(invisible.texts.length, 1, "an invisible label was collected as a target");
 

@@ -267,6 +267,16 @@ export const COVERAGE_FLOOR_BY_SEVERITY: Readonly<Record<Severity, number>> = {
   info: 0,
 };
 
+/**
+ * The granularity of every geometry number in the snapshot: the collector stores box coordinates
+ * rounded to two decimals. A single value therefore carries up to 0.005 px of rounding and a
+ * difference of two up to 0.01 — which is what this constant is. It is read off the collector,
+ * not chosen, and it is the resolution of the stored data rather than a tolerance: a rule may
+ * refuse to call 0.01 px an overshoot without weakening a structural threshold, because 0.01 px
+ * is not something these numbers can distinguish from zero.
+ */
+export const SNAPSHOT_ROUNDING_PX = 0.01;
+
 /** The one Paged.js version this release is measured against. Not a range — see `docs/`. */
 export const SUPPORTED_PAGEDJS_VERSION = "0.4.3";
 export const SUPPORTED_PDFJS_VERSION = "6.2.108";

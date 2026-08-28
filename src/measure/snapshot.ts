@@ -577,25 +577,33 @@ export const SNAPSHOT_SOURCE = `(() => {
     let notRenderedTargets = 0;
     if (!capped) {
       for (const textEl of textEls) {
-        // Is this element painted at all? Asked FIRST, and answered from two directions, because
-        // getBBox alone gets it wrong exactly where it matters. Measured in Chrome 152: a <text>
-        // inside <defs> answers getBBox() and getScreenCTM() perfectly happily and yields a full
-        // screen box — 609.65 px outside its viewport, reported as an error finding by a gating
-        // rule, about an element nobody can see.
+        // Is this element painted at all? Asked FIRST, because getBBox alone gets it wrong exactly
+        // where it matters. Measured in Chrome 152: a <text> inside <defs> answers getBBox() and
+        // getScreenCTM() perfectly happily and yields a full screen box — 609.65 px outside its
+        // viewport, reported as an error finding by a gating rule, about an element nobody sees.
         //
-        // An empty client rect covers the not-laid-out cases. It does NOT cover the invisible
-        // ones: visibility:hidden, opacity:0 and fill:none all lay out normally and return a full
-        // rect, so a rule about what the viewport clips away would report them too — the same
-        // class of false alarm through a second door. Those are read from the computed style.
+        // Three sources, and each covers what the others miss:
+        //
+        //   - an empty client rect: the not-laid-out cases (<defs>, <symbol>, display:none);
+        //   - checkVisibility: visibility, content-visibility and opacity INCLUDING opacity
+        //     inherited from an ancestor — <g opacity="0"><text> reports opacity 1 on the child,
+        //     so reading the child's computed style alone does not see it;
+        //   - fill and stroke both absent: painted nothing, which is not a CSS visibility
+        //     question and therefore outside what checkVisibility answers.
         //
         // A target that is not painted is not a target: the question "does the viewport clip it?"
         // does not arise for it, as for an SVG holding no text at all.
         const rect = P.rect(textEl);
         const style = P.style(textEl, null);
-        const invisible = style.visibility === "hidden" || style.visibility === "collapse"
-          || parseFloat(style.opacity) === 0
-          || ((style.fill === "none" || parseFloat(style.fillOpacity) === 0)
-              && (style.stroke === "none" || parseFloat(style.strokeOpacity) === 0));
+        const painted = P.painted(textEl);
+        const unpainted = (style.fill === "none" || parseFloat(style.fillOpacity) === 0)
+          && (style.stroke === "none" || parseFloat(style.strokeOpacity) === 0);
+        // painted === null means this browser has no checkVisibility. Then the two remaining
+        // sources decide, and the ancestor-opacity case is not covered — stated here rather than
+        // silently assumed, because the pinned browser does have it.
+        const invisible = painted === false || unpainted
+          || (painted === null && (style.visibility === "hidden" || style.visibility === "collapse"
+              || parseFloat(style.opacity) === 0));
         if ((rect.width === 0 && rect.height === 0) || invisible) { notRenderedTargets += 1; continue; }
 
         let bounds = null;

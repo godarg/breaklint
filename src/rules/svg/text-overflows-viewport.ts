@@ -1,5 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { declined, makeFinding, num } from "../shared.ts";
+import { SNAPSHOT_ROUNDING_PX } from "../../core/enums.ts";
 
 /**
  * svg/text-overflows-viewport — a `<text>` sits outside the SVG's viewport and is clipped away.
@@ -131,7 +132,18 @@ export const textOverflowsViewport = defineRule(
           b.x + b.width - (vp.x + vp.width),
           b.y + b.height - (vp.y + vp.height),
         );
-        if (overshoot <= permitted) continue;
+        // The two boxes come from different APIs — the viewport from getBoundingClientRect, the
+        // target from CTM-transformed getBBox corners — and the collector stores both rounded to
+        // two decimals. Each value therefore carries up to 0.005 px of rounding, and a difference
+        // of two of them up to 0.01. SNAPSHOT_ROUNDING_PX is that granularity, read off the
+        // collector rather than chosen: it is what the stored numbers cannot resolve, not a
+        // tolerance somebody picked, and it does not make the threshold configurable.
+        //
+        // Measured on the sharpest constructible case — textLength set to the full width of the
+        // viewBox, so the box ends on the edge by construction — the difference came out at
+        // exactly 0, so this guard changes no verdict in the corpus. It is here because "0.01 px
+        // outside" is not a statement this data can support.
+        if (overshoot <= permitted + SNAPSHOT_ROUNDING_PX) continue;
 
         findings.push(
           makeFinding({

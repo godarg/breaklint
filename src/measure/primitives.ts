@@ -82,10 +82,6 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const rangeSetEndFn = Range.prototype.setEnd;
   const rangeRectsFn = Range.prototype.getClientRects;
   const imageDecodeFn = HTMLImageElement.prototype.decode;
-  // Read for the SVG root identity, which is a signature over the markup. A document that
-  // replaces outerHTML could otherwise hand the collector a different SVG than the one on the
-  // page, and every finding in it would be attributed to markup nobody rendered.
-  const outerHtmlGet = Object.getOwnPropertyDescriptor(Element.prototype, "outerHTML").get;
   const descriptor = Object.getOwnPropertyDescriptor;
   const getter = (prototype, name) => {
     let at = prototype;
@@ -96,6 +92,18 @@ const PRIMITIVES_TEMPLATE = `(() => {
     }
     return null;
   };
+  // Read for the SVG root identity, which is a signature over the markup. A document that
+  // replaces outerHTML could otherwise hand the collector a different SVG than the one on the
+  // page, and every finding in it would be attributed to markup nobody rendered. Taken through
+  // the same walker as every other getter: reaching for .get on a descriptor that a document has
+  // turned into a data property throws while the primitives are being installed, and then nothing
+  // is measured at all.
+  const outerHtmlGet = getter(Element.prototype, "outerHTML");
+  // Whether an element is actually painted, answered by the browser rather than reassembled from
+  // individual properties. checkVisibility covers display:none, visibility, content-visibility AND
+  // opacity — including opacity INHERITED from an ancestor, which a computed-style read on the
+  // element itself does not see: <g opacity="0"><text> reports opacity 1 on the child.
+  const checkVisibilityFn = Element.prototype.checkVisibility;
   const rectXGet = getter(DOMRectReadOnly.prototype, "x");
   const rectYGet = getter(DOMRectReadOnly.prototype, "y");
   const rectWidthGet = getter(DOMRectReadOnly.prototype, "width");
@@ -317,6 +325,13 @@ const PRIMITIVES_TEMPLATE = `(() => {
         };
       },
       outerHtml: (el) => call.call(outerHtmlGet, el),
+      painted: (el) => {
+        if (typeof checkVisibilityFn !== "function") return null;
+        return call.call(checkVisibilityFn, el, {
+          checkOpacity: true, checkVisibilityCSS: true,
+          opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true,
+        }) === true;
+      },
       replaced: (el) => {
         const tag = el.tagName;
         if (tag === "IMG") return { source: call.call(imageCurrentSrcGet, el) || call.call(imageSrcGet, el) || "",
@@ -446,7 +461,7 @@ export const PRIMITIVES_CHECK = `(() => {
     return { ok: false, reason: "the primitive references are replaceable, so they prove nothing" };
   }
   for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
-    "outerHtml", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
+    "outerHtml", "painted", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
     "rects", "setAttr", "setText", "parent", "next", "create", "append", "remove", "setCssText",
     "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityRecordPreview",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",

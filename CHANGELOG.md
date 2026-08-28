@@ -38,10 +38,12 @@
 - **Two identical labels are ambiguous, not identical.** Findings on `<text>` elements sharing one
   content-derived identity carry `ambiguity.groupSize` instead of quietly claiming to be one.
 - **The live corpus now holds an inline SVG.** `tests/fixtures/svg-text-geometry.html` carries
-  six figures with six different answers — inside, outside, rotated-out at 90 and at 45 degrees,
-  painted-anyway, and a `<defs>` element that is not a target — and runs in the M2d live chain.
-  Three of the six exist because an independent review found the first three insufficient; the
-  45-degree case is what binds the four-corner claim to a number.
+  seven figures with seven different answers — inside, outside, rotated-out at 90 and at 45
+  degrees, painted-anyway, a `<defs>` element that is not a target, and four ways to be laid out
+  and still invisible — and `svg-in-viewport.html` carries the sound document that must end
+  exit 0. Both run in the M2d live chain. Five of those cases exist because three independent
+  reviews found the earlier ones insufficient; the 45-degree case is what binds the four-corner
+  claim to a number.
 - **A document whose SVGs are all inside their viewports has a fixture at last.**
   `tests/fixtures/svg-in-viewport.html` ends exit 0 — the claim this release is about, which no
   test held until a second independent review pointed out that the only SVG fixture ends exit 1

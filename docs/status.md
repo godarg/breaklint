@@ -333,8 +333,37 @@ place, with the transfer carried in a field of its own. That last one was a LOW 
 sharpest of them: a file whose own basis says no review happened on 2026-08-28 should not carry
 that date in all 32 cells.
 
-Both of these are recorded rather than quietly fixed, because the pattern is this project's own
-subject: the check that looked green was green about the wrong thing.
+**Round three — one HIGH, five MEDIUM, on the twice-repaired version.** The HIGH is the same
+defect a third time, and reached through the only door still open: the receipt schema's `reason`
+enum admitted values that the consuming rules do not declare, so a schema-valid external
+projection could still produce the undeclared decline that ends a run. The enum now lists only
+what all three rules declare.
+
+Two of the MEDIUMs were repairs of this release that had not gone far enough:
+
+- **`opacity` is not inherited.** `<g opacity="0"><text>` reports `opacity: 1` on the child, so
+  reading the child's computed style missed it — the invisible-target class through a fifth door.
+  Painting is now one question put to the browser, `Element.checkVisibility` with opacity,
+  visibility and content-visibility, which answers for ancestors as well.
+- **A tool limit was still booked as a document property.** An SVG with more targets than the
+  collector will gather took the two ink rules — which cannot measure anything in this build — to
+  coverage 0 and the run to exit 4. They now answer with their own limit first.
+
+And two were defects in the fixtures written to prove the earlier repairs: the nested inner
+`<svg>` reached past the outer viewBox, so the positive control was fixing a document whose
+content is clipped; and both identical charts carried `id="chart"`, which meant the shared root
+identity followed from a duplicate id rather than from the markup hash the case exists to
+exercise. Neither would have been visible without someone reading the fixture against its own
+comment.
+
+The `0.01 px` question — a zero threshold on boxes rounded to two decimals — is answered by
+`SNAPSHOT_ROUNDING_PX`: the two boxes come from different APIs and each carries up to 0.005 px of
+rounding, so a difference of 0.01 is not something these numbers can distinguish from zero. That
+is the resolution of the stored data, read off the collector rather than chosen, and it changes
+no verdict in the corpus.
+
+All of this is recorded rather than quietly fixed, because the pattern is this project's own
+subject: the check that looked green was green about the wrong thing, three rounds running.
 
 One honesty note about the demo. `examples/demo-snapshot.json` carries ink counts, so
 `npx breaklint --demo` shows a `svg/text-clipped` finding that a real run cannot currently

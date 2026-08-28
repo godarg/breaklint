@@ -62,16 +62,33 @@ export const textInkCollision = defineRule(
     const minOccluded = num(ctx.options.minOccludedInk, 8);
 
     for (const svg of snapshot.svg) {
+      // What this rule could look at on this record. An unmeasurable SVG contributes the targets
+      // the collector saw before it gave up, so a decline speaks for all of them rather than one.
       const targets = svg.texts.length;
-      candidates += Math.max(targets, svg.measurable ? 0 : 1);
+      const targetsSeen = Math.max(targets, svg.measurable ? 0 : Math.max(svg.textTargetCount, 1));
+      candidates += targetsSeen;
 
+      // This build has no ink passes, so this rule cannot measure ANY target on ANY document.
+      // That is answered first, before the record's own refusals: a document property such as
+      // "too many targets to collect" would otherwise take a rule that was never going to measure
+      // anything down to coverage 0 and end the run in exit 4 — a limit of the tool booked as a
+      // fact about the input. `TOOL_CAPABILITY_ENV_IDS` is what keeps this one out of coverage.
+      if (!svg.inkCollected) {
+        notMeasured.push(
+          declined({ scope: "svg", ruleId: "svg/text-ink-collision", reason: "env/pixel-oracle-unavailable", count: targetsSeen }),
+        );
+        continue;
+      }
       if (!svg.measurable) {
         notMeasured.push(
           declined({
             scope: "svg",
             ruleId: "svg/text-ink-collision",
+            // Reachable only once the ink passes exist, or through an externally supplied
+            // projection that carries inkCollected: true. The fallback names the case the
+            // collector cannot produce at SVG level rather than a reason from elsewhere.
             reason: svg.reason ?? "env/svg-not-inline",
-            count: Math.max(targets, 1),
+            count: targetsSeen,
           }),
         );
         continue;
