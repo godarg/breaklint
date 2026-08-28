@@ -335,6 +335,7 @@ function svgRecord(target: {
     nodeKey: "lab-svg-node",
     sourceKey: "lab-svg-source",
     measurable: true,
+    reason: null,
     viewportScreen: viewport,
     overflow,
     textTargetCount: 1,

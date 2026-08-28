@@ -50,7 +50,7 @@ describe("the M2d live production chain", () => {
   let noSource: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
-    if (result?.documents.length === 21 && noSource?.documents.length === 4) return true;
+    if (result?.documents.length === 22 && noSource?.documents.length === 4) return true;
     t.skip(
       `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
       `no-source=${noSource?.documents.length ?? 0}`,
@@ -107,6 +107,7 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "animation-intervention-removal.html"),
         join(FIXTURES, "layout-drift-chaos.html"),
         join(FIXTURES, "svg-text-geometry.html"),
+        join(FIXTURES, "svg-in-viewport.html"),
       ],
       options(join(root, "evidence")),
     );
@@ -134,7 +135,7 @@ describe("the M2d live production chain", () => {
     }));
     assert.equal(
       result?.documents.length,
-      21,
+      22,
       `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
     );
     assert.equal(
@@ -569,6 +570,49 @@ describe("the M2d live production chain", () => {
     );
     assert.equal(outcome.report.coverage["svg/text-clipped"]?.candidates, 0);
     assert.equal(exitCodeFor(outcome.report.verdict), 1, "three error findings must end the run at exit 1");
+  });
+
+  /**
+   * The positive control, and the document 0.2.2 could not check.
+   *
+   * `svg-text-geometry.html` ends exit 1 by design, so it can never show that a SOUND document
+   * passes — a suite in which no case ends 0 cannot tell "the tool works" from "the tool always
+   * complains". This is the case the release exists for: two ordinary figures, nothing wrong with
+   * either, and 0.2.2 answered exit 3 on it.
+   */
+  it("passes a document whose inline SVGs are entirely inside their viewports", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[21]!;
+    assert.ok(document.snapshot, "the sound SVG document produced no snapshot");
+    assert.deepEqual(document.infrastructure, [], "a sound document produced an infrastructure event");
+
+    const outcome = runDocument(document, {
+      failOn: "error",
+      activeRules: [textOverflowsViewport, textClipped],
+      optionsByRule: {},
+      coverageFloors: {},
+    });
+    assert.deepEqual(outcome.report.findings, [], "a document with nothing wrong produced a finding");
+    assert.equal(outcome.report.verdict, "clean");
+    assert.equal(exitCodeFor(outcome.report.verdict), 0, "the case this release exists for must end 0");
+    const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
+    assert.equal(coverage?.candidates, 6);
+    assert.equal(coverage?.measured, 6);
+    assert.equal(coverage?.coverage, 1);
+
+    // Four identical tick labels without an `id` share one content-derived identity. The group
+    // size is a fact about the document, so it is counted across records rather than inside one.
+    const targets = document.snapshot.svg.flatMap((record) => record.texts);
+    const ticks = targets.filter((text) => text.ambiguityGroupSize > 1);
+    assert.equal(ticks.length, 4, "the repeated axis labels were not recognised as one group");
+    assert.equal(new Set(ticks.map((text) => text.svgTextKey)).size, 1);
+    assert.equal(ticks.every((text) => text.ambiguityGroupSize === 4), true);
+    assert.equal(
+      targets.filter((text) => text.ambiguityGroupSize === 1).length,
+      2,
+      "the two unique labels must not be dragged into a group",
+    );
   });
 
   it("keeps duplicate-input evidence paths disjoint and records loaded redirect provenance", async (t) => {

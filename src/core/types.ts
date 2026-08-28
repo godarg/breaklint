@@ -207,7 +207,13 @@ export interface SvgRecord {
   nodeKey: string;
   sourceKey: string | null;
   measurable: boolean;
-  reason?: EnvId;
+  /**
+   * null when the SVG as a whole was measurable. The collector always sets one or the other, so
+   * the key survives a JSON round trip and the receipt schema can keep it required. It stays
+   * OPTIONAL in the type because the snapshot validator's negative control removes it, to prove
+   * that an unmeasurable SVG without a reason is rejected.
+   */
+  reason?: EnvId | null;
   viewportScreen: Box;
   /** Overflow on the SVG element itself; `visible` means the text is shown after all. */
   overflow: string;

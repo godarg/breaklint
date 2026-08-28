@@ -49,7 +49,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=343 aggregateTests=451 liveTests=58 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=343 aggregateTests=451 liveTests=59 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -287,7 +287,13 @@ Measured on this repository's own product corpus after the repair: a 175-page bo
 inline figures and 471 SVG text targets runs to completion with no flags, coverage 1.0 on the
 viewport rule, and 167 findings — where 0.2.2 produced exit 3 and nothing at all.
 
-### What an independent review of this repair found, and what it cost
+### What two independent reviews of this repair found
+
+A fresh-context verifier read this change as a foreign submission, twice, and returned FAIL both
+times. Every finding below was correct, and two of them are the kind this project exists to talk
+about — a repair that looked complete and was measured to be incomplete.
+
+**Round one — one BLOCKER, two HIGH.**
 
 A fresh-context verifier read the first version of this change as a foreign submission and
 returned FAIL with one BLOCKER and two HIGH findings, all three correct:
@@ -301,9 +307,34 @@ returned FAIL with one BLOCKER and two HIGH findings, all three correct:
 
 Building the fixture that closes the first finding surfaced a fourth: Chrome measures a `<text>`
 inside `<defs>` without complaint, so the repair as first written turned a silent crash into a
-false error finding — the more expensive failure of the two. That is recorded here rather than
-quietly fixed, because the pattern is this project's own subject: the check that looked green was
-green about the wrong thing.
+false error finding — the more expensive failure of the two.
+
+**Round two — one HIGH, six MEDIUM, on the repaired version.** The HIGH is the one worth reading:
+the release's own headline claim — *a document with a harmless inline SVG now ends exit 0* — was
+not held by any test. The fixture that existed ends exit 1 on purpose, so it can demonstrate that
+findings appear and can never demonstrate that a sound document passes. A suite in which no case
+ends 0 cannot tell "the tool works" from "the tool always complains".
+`tests/fixtures/svg-in-viewport.html` is that missing case, and it runs in the live chain.
+
+The MEDIUMs found three further ways to report a defect about something nobody can see, all of
+them the `<defs>` class through a different door, and all now measured rather than assumed:
+
+| | |
+|---|---|
+| `visibility: hidden`, `opacity: 0`, `fill: none` | These lay out normally and return a full client rect, so the empty-rect check did not catch them. Painting is now read from the computed style as well |
+| A nested `<svg>` | Its `<text>` was collected twice — once by the inner record and once by the outer one, where it was compared against the wrong viewport. Each record now takes only the targets whose nearest `<svg>` ancestor is itself |
+| Two structurally identical SVGs | They share one `svgRootKey` by design, so their labels share `svgTextKey` across records. The ambiguity group was counted inside a record and reported 1 for exactly the collision the field exists for. It is a property of the document and is counted across the document |
+
+Also from round two: the stored demo snapshot moved to schema 3 with the new fields, rather than
+leaving `docs/limitations.md` claiming a migration that had not happened; `reason` is `null`
+instead of absent so it survives a JSON round trip that the receipt schema requires; and every
+`reviewedAt` in the report-surface ledger is back to the date of the review that actually took
+place, with the transfer carried in a field of its own. That last one was a LOW finding and the
+sharpest of them: a file whose own basis says no review happened on 2026-08-28 should not carry
+that date in all 32 cells.
+
+Both of these are recorded rather than quietly fixed, because the pattern is this project's own
+subject: the check that looked green was green about the wrong thing.
 
 One honesty note about the demo. `examples/demo-snapshot.json` carries ink counts, so
 `npx breaklint --demo` shows a `svg/text-clipped` finding that a real run cannot currently

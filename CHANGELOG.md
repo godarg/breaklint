@@ -42,6 +42,20 @@
   painted-anyway, and a `<defs>` element that is not a target — and runs in the M2d live chain.
   Three of the six exist because an independent review found the first three insufficient; the
   45-degree case is what binds the four-corner claim to a number.
+- **A document whose SVGs are all inside their viewports has a fixture at last.**
+  `tests/fixtures/svg-in-viewport.html` ends exit 0 — the claim this release is about, which no
+  test held until a second independent review pointed out that the only SVG fixture ends exit 1
+  by design and therefore cannot show that a sound document passes.
+- **Three more ways to report a defect about something nobody can see, all closed.**
+  `visibility: hidden`, `opacity: 0` and `fill: none` lay out normally and return a full client
+  rect, so painting is now read from the computed style as well; a nested `<svg>` had its text
+  collected twice and compared against the outer viewport; and the ambiguity group is counted
+  across the document, because two structurally identical SVGs share one identity by design and
+  the group was reported as 1 for exactly that collision.
+- The stored demo snapshot moved to schema 3 with the new fields; `reason` is `null` rather than
+  absent so it survives the JSON round trip the receipt schema requires; every `reviewedAt` in
+  the report-surface ledger is the date of the review that actually happened, with the transfer
+  in a field of its own.
 - No threshold, severity or `calibrated` flag changed, and no rule was added or removed. The ink
   passes remain unimplemented (M3), so `svg/text-clipped` and `svg/text-ink-collision` still
   measure nothing — they now say so instead of ending the run. README, `docs/status.md`,

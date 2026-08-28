@@ -28,11 +28,18 @@ crosses the viewport edge by 15.82 px while its two-corner box stays 28 px insid
 degrees the two boxes coincide, which is why the first fixture cannot make that distinction and an
 independent review was right to say the claim was unmeasured until the second one existed.
 
-**A `<text>` the browser never lays out is not a target.** Chrome answers `getBBox()` and
+**A `<text>` that is not painted is not a target.** Chrome answers `getBBox()` and
 `getScreenCTM()` for an element inside `<defs>` and yields a box 609.65 px outside the viewport —
 this rule would report an error about something that is never painted. The collector asks
 `getBoundingClientRect` first, and an element with an empty rect is neither a candidate nor a
-decline.
+decline. The same holds for `visibility: hidden`, `opacity: 0` and a `<text>` with neither fill
+nor stroke — those lay out normally and return a full rect, so they are read from the computed
+style instead. Every one of them is the `<defs>` case through another door.
+
+**A nested `<svg>` belongs to its own record.** `querySelectorAll` reaches into it from the outer
+element, which collected the same label twice and compared it against the outer viewport rather
+than the one that actually clips it. Each record takes only the targets whose nearest `<svg>`
+ancestor is itself.
 
 Both primitives are captured before any author script runs, for the same reason the rest of the
 geometry is: a document that replaces them could otherwise decide what this rule sees.

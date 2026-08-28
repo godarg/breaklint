@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
-  "reviewInputFingerprint": "b997475138b12d021efab73205a89cdc00f00b9d1317dd9d8d826d798835aab6",
-  "renderManifestGeneratedAt": "2026-08-28T04:35:04.555Z",
+  "reviewInputFingerprint": "96c80add9b4f10a2fa01bd4cb95a8afc5906be312934966120b397dd1b5bcf87",
+  "renderManifestGeneratedAt": "2026-08-28T05:06:13.648Z",
   "reviewEnvironment": {
     "reviewArtifactContractVersion": 3,
     "screenPixelContractVersion": 1,
@@ -49,23 +49,23 @@
       }
     }
   },
-  "reviewedAt": "2026-08-28T04:35:04.555Z",
+  "reviewedAt": "2026-08-26T10:57:06.000Z",
   "reviewer": "@Founder",
   "physicalArtifactsReviewed": {
     "screens": 24,
     "pdfs": 4,
     "rasterPages": 34
   },
-  "basis": "PASS transferred, not re-reviewed. The Founder reviewed the complete matrix for review fingerprint 6759d3e5df0cba3ca047123c2c0b4bb5a41357621a783bef865a8a4b7499bc7e on 2026-08-26 (24 screen PNGs, 4 A4 PDFs, 34 PDF page rasters, Chrome 152.0.7977.64). The 0.2.3 SVG geometry work changed src/core and src/rules and therefore the source fingerprint. Measured against that review before the transfer was requested: 58 of the 62 reviewed artifacts are byte-identical on the fresh render, and the 4 that differ are the A4 PDF containers, whose raw bytes this procedure excludes from the equivalence decision because browser metadata moves while the visible pages do not. All 24 screen PNGs and all 34 PDF page rasters are byte-identical: no visible pixel changed. On that measurement the Founder confirmed on 2026-08-28 that the 2026-08-26 PASS transfers to this fingerprint. No new visual review of the 62 artifacts took place, and this record does not claim one.",
+  "basis": "PASS transferred, not re-reviewed. The Founder reviewed the complete matrix for review fingerprint 6759d3e5df0cba3ca047123c2c0b4bb5a41357621a783bef865a8a4b7499bc7e on 2026-08-26 (24 screen PNGs, 4 A4 PDFs, 34 PDF page rasters, Chrome 152.0.7977.64). The 0.2.3 SVG geometry work changed src/core and src/rules and therefore the source fingerprint. Measured against that review before the transfer was requested: 58 of the 62 reviewed artifacts are byte-identical on the fresh render, and the 4 that differ are the A4 PDF containers, whose raw bytes this procedure excludes from the equivalence decision because browser metadata moves while the visible pages do not. All 24 screen PNGs and all 34 PDF page rasters are byte-identical: no visible pixel changed. On that measurement the Founder confirmed on 2026-08-28 that the 2026-08-26 PASS transfers to this fingerprint. No new visual review of the 62 artifacts took place, and this record does not claim one: every reviewedAt in this file, on the ledger and in each cell, is the date of the review that actually happened. `transferredAt` carries the date the transfer was confirmed, which is a different event and is named as one.",
   "acceptedFollowUps": [
     "LOW: consider running page numbers or a repeated report ID for long printed reports; accepted as non-blocking for 0.2.2."
   ],
   "cells": {
     "screen/clean/light/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "98c953474ad398ff06fce5fefffc258a46b9555327ea649b92f88dc84ef394f1",
+      "reviewArtifactFingerprint": "530c513bb077a9d6d47e28a1352d54aef2c9657137e055a36784ed5f3cfe31c6",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "b3e88d22805e2b7eb2832b1dab24539d52928580949aea073f7fcdddcb083598",
       "reviewedNormalizedRgbaSha256": "1168b5d0e77a56e872b06435bfd2ea7acc8c72c7b88b644983cebdbae8b7c407",
       "reviewedArtifacts": [
@@ -75,9 +75,9 @@
     },
     "screen/clean/light/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "d0bcd588c8e418d2c2292891bd6a69ab9d89fb05847e8323ac24d7b7177f1c67",
+      "reviewArtifactFingerprint": "d9c4d82eb4d14b009255b5d7f0fb480aa543340034b6c2ac6e2286c35459f55c",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "de35dae27c84f8e6d89de54cb13038105d76e92edec7b8ac0d80b972ec524eff",
       "reviewedNormalizedRgbaSha256": "cd38054bc003bf13a8d4dd8a7638e1adc0a2c666c09ea0d7725931e03810a74b",
       "reviewedArtifacts": [
@@ -87,9 +87,9 @@
     },
     "screen/clean/light/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "570b67a8db29d4d6d01c029662b94d644ccbfcb11d441406a8e2f6828cf53dec",
+      "reviewArtifactFingerprint": "487ea3f54f7a2688d9d1961e451da6e75835be93d592a7767e2dffa93640f6a9",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "1e12485ef4fc6f9df32cb16eef439b017314c391eb8a11124f843f2f3b475513",
       "reviewedNormalizedRgbaSha256": "3d52fd95d2ca6fced360228adfe70fd8c34e14bcee2a49a6ea8ef79c57dadbb9",
       "reviewedArtifacts": [
@@ -99,9 +99,9 @@
     },
     "screen/clean/dark/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "79bdc020b0029126ae7fb69cfc4b9e2ae62e3dedab2584db42b0fa21740fe5ca",
+      "reviewArtifactFingerprint": "52543b41ae84c86e927d627a423c7f548c9e5b4d3e158a4c98f7ac8817ff0f0c",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "deecd6186b423d22db8ec88a0d0358de5f6a9acb54b76cc9c2e1b34795129eee",
       "reviewedNormalizedRgbaSha256": "ba62c7c9b24604becfada5861b9f58d33d9dc0bd72862696f67075b038dbafdb",
       "reviewedArtifacts": [
@@ -111,9 +111,9 @@
     },
     "screen/clean/dark/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "f64a708967596fbabcace2f5cacbd05381b5e53eccb301e4046907663ab74afb",
+      "reviewArtifactFingerprint": "3ad6d352734740a16d4a2c8d0947384dfd06516b6aa7858be99cf2d98016e375",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "ec6c15e2659fa9963dc4ad0faab749f7fe5708b8fbdfb91cb3b6b3557de22075",
       "reviewedNormalizedRgbaSha256": "b4b60142232150fed98770956b9c88e5731a6f3d85db3fd51061de98e2fa62a0",
       "reviewedArtifacts": [
@@ -123,9 +123,9 @@
     },
     "screen/clean/dark/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "dc7368a862b62b02629360f84cd6adfea79743ba5811699a49eefb9bd9a3acf6",
+      "reviewArtifactFingerprint": "36ef3689e38690eefeb6d8d93007697521c5da285992ce5acba532b1c8ca7127",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "fcf64fedb100da3d536dd2b5fb21bf974f7af2565992fd58d3abcb783ad28233",
       "reviewedNormalizedRgbaSha256": "ab59859fb525c8753950e6456bdbb144fe26859c2b0008f61fa6e3a1b460e642",
       "reviewedArtifacts": [
@@ -135,10 +135,10 @@
     },
     "print/clean/pdf": {
       "status": "pass",
-      "reviewArtifactFingerprint": "e1000b02f0c650f39f8607dedd7c24e1a5c4e088ace738f7e3b73080bddea266",
+      "reviewArtifactFingerprint": "cc8faf37796dd4856ec286815d547faa5779fc211903d9cd0aa0a8076ff8421c",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
-      "reviewedRawSha256": "a9dc7a09594c8a7bd7d9cc559c3ad5d47770755623284058b142e77401947a49",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
+      "reviewedRawSha256": "92ae40e53e06a78e897d144fd3c418719c8e08e85b6179c7cb7ad415514c4dbc",
       "reviewedPages": [
         1,
         2,
@@ -153,9 +153,9 @@
     },
     "print/clean/raster-set": {
       "status": "pass",
-      "reviewArtifactFingerprint": "51a410661e1d46cfacdd14ac9f83cb5faf2a442ca55f45560bf643b3c325a3c7",
+      "reviewArtifactFingerprint": "32a34f09f97485fcbeeeb225ad058f0d4c3dfdd69f3dc8eb9c622c0de0103f2c",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": [
         "66128b56606ce50bf81f63817246eb687ae9f3945303ce86e6d81319c7a758d7",
         "fab3cec8aec44b5ca2ea0a3e3376bd9cdd6718032365a09290e15d4edac593ae",
@@ -181,9 +181,9 @@
     },
     "screen/findings/light/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "525c11f0c4fcbf972b8f754c9134ff14700edda90b7cf49298ee4f0499fd734d",
+      "reviewArtifactFingerprint": "023d94275cdc0b4a25cb62e718fe9e0cf051e00380fd9df63654689860ef2e36",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "2d83cebc5f38d382aa6a1930903e65baa6566e0528b22e85f7dcb50e6771a5d8",
       "reviewedNormalizedRgbaSha256": "be0ef2991bebfb11a0a1679f7fe1bcdd4aac87cf9f6d5b36fb69aaae2cb0ce6a",
       "reviewedArtifacts": [
@@ -193,9 +193,9 @@
     },
     "screen/findings/light/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "1a13fc2b5640479f8e0655d8fdbdd31b013d5da546397b041d53fbe430cbbf4f",
+      "reviewArtifactFingerprint": "cbf74b3910abd3d0a806b32269e1b508988560c98a83f382e32f3e4b1ff7beca",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "76970408ccd2684e43e922d7f6b61792d7e7f0fbb4839b1f8f5984548c6e52a0",
       "reviewedNormalizedRgbaSha256": "f6a09c58eb02564d6d994d9ad3d256779bf85a23ee2120a5a731b3792d3d0a93",
       "reviewedArtifacts": [
@@ -205,9 +205,9 @@
     },
     "screen/findings/light/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "01e44ca31c0843f86430c9b112d88e7aef1d7dc6a817d10a109af9a876c17515",
+      "reviewArtifactFingerprint": "75b82059a08378f057d131059ff5d58047447f9932fe7fdaca007f9d5852df95",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "c7a8200b9b5727438b99c138f1e6444e7edf70299e8c3f80602125524dab5721",
       "reviewedNormalizedRgbaSha256": "9f78c96837d79b5bc093dc3081a6bcca1684503e2b495d4076a4282c0605b2e9",
       "reviewedArtifacts": [
@@ -217,9 +217,9 @@
     },
     "screen/findings/dark/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "b3d3c68e009ccfe46b778f9dc444502ca06aa2d8cdd80745023200b8ae4eab12",
+      "reviewArtifactFingerprint": "b9693ae12488df9c64c31cbde3c11ae4ab8a221cf2d2719f3f00c93e09901c85",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "36db53555a52e109c1fc529125913e062bd4429dd836a478b12e16d43b522dfc",
       "reviewedNormalizedRgbaSha256": "d9a7b9bd742c992e0db73e6c881dd7c2e8b9a5e029f3b95d42b56c0193f3c7a9",
       "reviewedArtifacts": [
@@ -229,9 +229,9 @@
     },
     "screen/findings/dark/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "b034c0693d5d2772bdab4de5136dddfbadd8ed8a43a17a15ef694a5cea8c615f",
+      "reviewArtifactFingerprint": "21617b212a999b7b6c6ce778d86a22ece1556be3336e39ef81e4f83eb941f578",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "c658148327791fff24c586c4d6f148b8dd9248ece57a8bc58a34257ef57bd32d",
       "reviewedNormalizedRgbaSha256": "ab4344164ad5c469b94484d6700a9ba82477200309c1efc8d5cea4ef3f4d1a64",
       "reviewedArtifacts": [
@@ -241,9 +241,9 @@
     },
     "screen/findings/dark/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "428d71f35b03a6500ee6173e809ae3005c0f32606d98a253c6db33fe5ea4abf5",
+      "reviewArtifactFingerprint": "7a97e40b3e9b603e8f6607364e69e0808430d67b537a8e8d10ee7b221cca4eb5",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "0fee1055a28bcff2cfa11b9da55f03dd9d8fe16429cd1ae669e217a7400e774c",
       "reviewedNormalizedRgbaSha256": "44811840eb5c42ed8d3557349355380c0a8b759e2f495cf4703167c99d660a07",
       "reviewedArtifacts": [
@@ -253,10 +253,10 @@
     },
     "print/findings/pdf": {
       "status": "pass",
-      "reviewArtifactFingerprint": "79a0a16f7a32a856f2f8907b3d337e17fa55ad566ba46e6f72ab1aa4ff9ee03e",
+      "reviewArtifactFingerprint": "b1ccd6dbc61faf57027c30f2689774a83bff41ba56ee14898240488c4d5d7301",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
-      "reviewedRawSha256": "ad5eb8ac1244c0fdecc68447225424575c97b1365466e28113bd800ecacb489d",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
+      "reviewedRawSha256": "3fab6993a1bb0c14a6a922d8380e6659cdae486bc260f00d9a80d989c2124e11",
       "reviewedPages": [
         1,
         2,
@@ -275,9 +275,9 @@
     },
     "print/findings/raster-set": {
       "status": "pass",
-      "reviewArtifactFingerprint": "64c2267bbfebb2e0f7223e684f58632bacf3373947ba30c84849f415406353d9",
+      "reviewArtifactFingerprint": "3eb6b301a060191979b600f07700966353da7183ea458f41deff080d28bfac1b",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": [
         "39d65687255bbf2eb32f2e1883966fba860d4e9213db2a1bd808462383c8bcbc",
         "f6a22ef16182ee0ade69d816c7a48670e3ed94c746bfafdc3d8d467cee951bde",
@@ -315,9 +315,9 @@
     },
     "screen/infrastructure/light/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "6a441c8ee2caee4d583a350a7f2ae9762f9f4be64c92706dfd718b0c08c8fc32",
+      "reviewArtifactFingerprint": "72462512a4942902d0340f5b7a2820db313e581aaafaa562b2d8e8a86b69f826",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "6b0f86bb26be45efeed6968a8a556d2da81c1da9af8ccb371bb8567696b0d089",
       "reviewedNormalizedRgbaSha256": "a5d483691ee8897612087e9739861b3b1cbb4bdea0b53113332352fefd764273",
       "reviewedArtifacts": [
@@ -327,9 +327,9 @@
     },
     "screen/infrastructure/light/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "f76bc33d93acc869c7108c90f675756f1c0ce031c9817755cbb9dad4ea17666a",
+      "reviewArtifactFingerprint": "877f6ec3856278c346d2edd554bf5098c5a5f77a520b02cb4500a49d1cdde777",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "a32771c0a87c7fc822f693c1c0f97b869bbf8332b5cc76eb29bf63148496fc52",
       "reviewedNormalizedRgbaSha256": "a9788fac692f8239e21c5f30098c0a264bf9e20c108ddf887431d735971c6a5a",
       "reviewedArtifacts": [
@@ -339,9 +339,9 @@
     },
     "screen/infrastructure/light/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "f8037707ccdd099f5b2bff25485e04e5b5296200095acd80fb9c84070fdf760a",
+      "reviewArtifactFingerprint": "1735a0d3e3fa1e652daa49d87be4147f6b528cb13c1c9267cb4f4bf87670f6ea",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "9c47b1c8544a86af2187b5bc13e2b37aa0f971cd95fd008dea5e5cc178ee63b3",
       "reviewedNormalizedRgbaSha256": "4337a2dfefd69cff34306194f96c27462e68c05944ffcaf426ef570015011f55",
       "reviewedArtifacts": [
@@ -351,9 +351,9 @@
     },
     "screen/infrastructure/dark/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "56a7a6c5027c7557581673ebb3e38d0a51df0a7d5150f14bda1389ca6b2a7d16",
+      "reviewArtifactFingerprint": "8ca7840804495e21b216e88365aa783996a1f5171353ac0db7b69a96fd74bc0e",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "3b163f06e83b93a30eb5e437df4ba60559df8d28aafa9a3400cfcd61c6812812",
       "reviewedNormalizedRgbaSha256": "a26c9e13d173f7d75831825c4f10d2019d27be9b3fcfd253ffbbe350f7430f27",
       "reviewedArtifacts": [
@@ -363,9 +363,9 @@
     },
     "screen/infrastructure/dark/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "a5588f4f3b6e27940c275b28445cc63c7b165a72b7b7579c1a5c70aa94f2d275",
+      "reviewArtifactFingerprint": "64886e4484754cf5683ae567013313ced0bd99e3d87a8cb18406345e738b15ac",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "cb91f9472ea28350073f7fbb55341c2ac84d902acb6f85961752d58c555feb0b",
       "reviewedNormalizedRgbaSha256": "bdfe49888fe1c92caaaf008f8155238d24f54303681267ff0aeb1dcf1ea6e3b5",
       "reviewedArtifacts": [
@@ -375,9 +375,9 @@
     },
     "screen/infrastructure/dark/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "98cf01c64ee4ddbf4b2c99a3768399b79a06f1826be4207fba18701b41c41423",
+      "reviewArtifactFingerprint": "6977c5cc3257959167ce42b9a5d154603d80e6541eb713781526f93686142d39",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "cf3c99697382bd1bcbffc599b9dfc00bed48fb5a11f2f38f253c98a1be2d952c",
       "reviewedNormalizedRgbaSha256": "36f5a77bea5401829fceda88001ca77d239bdebabead9b94041a1e23d5fca6ad",
       "reviewedArtifacts": [
@@ -387,10 +387,10 @@
     },
     "print/infrastructure/pdf": {
       "status": "pass",
-      "reviewArtifactFingerprint": "99e5226896e1cad6e5f748eb6c1a05cd140e9277ff5d6a07e7a1ea4e65625a7a",
+      "reviewArtifactFingerprint": "62bfc78bad8ba0d9fde7226203ec1c922ff0494c539ac0fe62c3fb0fa2b0af89",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
-      "reviewedRawSha256": "b991324573d997703ace26e7600ecb3ea529bdf06d555079d838ca50f49eccb1",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
+      "reviewedRawSha256": "a3e052781aa8e15b5e6003b53abe24ae986de48a5a3e449e7685e07ec8cb1247",
       "reviewedPages": [
         1,
         2,
@@ -410,9 +410,9 @@
     },
     "print/infrastructure/raster-set": {
       "status": "pass",
-      "reviewArtifactFingerprint": "fde5b243978bd759bd85e5011dc99f60ba2b1a1b1e990e049eb0d4168fc2421b",
+      "reviewArtifactFingerprint": "42bcda9ae47c1709529145ddda3d8eed8bd4cdb38ff4499636d810d2bd81827a",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": [
         "40edf172738550f7f0ec09e6385e8cb6c66834fcb5214d68ab9d9468719c6e74",
         "1b8b9559a153da69fe8d580657540ef76e90163c41edda02cc971d08df8a3309",
@@ -453,9 +453,9 @@
     },
     "screen/insufficient-coverage/light/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "fbe77914a7b0fa5d03a6c3005712028ad5b636daebf3a7dfef560a46a7e5e06f",
+      "reviewArtifactFingerprint": "ce794723ee240c0ef9e5055475ed7434f8546b68d530a64fa983c69deb9c855e",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "5fe8a4c97b6596c6804815c21e5341dfe1a28e94f6db3ddd2c3a7534a4553a41",
       "reviewedNormalizedRgbaSha256": "6da824175b0561c0f52daf69382fbe4f64b4b4914713533e65b849bad7898fb2",
       "reviewedArtifacts": [
@@ -465,9 +465,9 @@
     },
     "screen/insufficient-coverage/light/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "534fce2cf2d5e60cd76e8ea70325cdf52fd441c12b02f6013523041b5861f713",
+      "reviewArtifactFingerprint": "f98a6cb60fabde1fcd2b06e8c833188e648b98a4bec8959df2b622860323d005",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "d2a5d3dab2b9c6137aa5cf737f139c33f44ed78a260a8eb3b55c52312c870982",
       "reviewedNormalizedRgbaSha256": "649b8dae9362aa2fba9ba0295fff85fa6bcb80a00fd53923097992383ef26003",
       "reviewedArtifacts": [
@@ -477,9 +477,9 @@
     },
     "screen/insufficient-coverage/light/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "b423ab8190bfec8edf8c70d8ba7e8f0ff12d9866efe10f3e946fd9fa28e683fb",
+      "reviewArtifactFingerprint": "dfc8569efce0bef64c58075192054af68123d7569a23e4736e10f61279136cbc",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "8dc9029ea678315657dea110013e045332c0056422fdb0f71ebf98835635073b",
       "reviewedNormalizedRgbaSha256": "f7290e5c170352fdd36346ffc8a962e3a76d0799bd2c45c05a9e8766bc6ba5dc",
       "reviewedArtifacts": [
@@ -489,9 +489,9 @@
     },
     "screen/insufficient-coverage/dark/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "7c8d32a8f8af505444c5e9f127a04586c6faf33429f28c66054f5e662f0cfd68",
+      "reviewArtifactFingerprint": "735ce577a5302c7675d8d7fa0f992bd08bec6a2044a4639061ffdb150168633b",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "b0f3167baf20aac8a6af5b3fb661f0b675c35099653f209069970712a40681f6",
       "reviewedNormalizedRgbaSha256": "a00bafe016e804ade796bd4b2f50ca74684235f8a785e4ad500b7cd1c0180a76",
       "reviewedArtifacts": [
@@ -501,9 +501,9 @@
     },
     "screen/insufficient-coverage/dark/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "ea08264f608642ce65d4cb3d24e90bdc973e7d6d853601dfe298490c2c876257",
+      "reviewArtifactFingerprint": "c4375a48dd533f1b02a02b6042125f08c04beb502c177aa0dec7d788f89356b2",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "5f653218cd8188dc5843733273cc8d8ab80da605947267de93231bb25466f58d",
       "reviewedNormalizedRgbaSha256": "cf93c95f2c5aab7c3fdcd6ad73389c8a5139ee78b4251a7cbd10dbb027f7191b",
       "reviewedArtifacts": [
@@ -513,9 +513,9 @@
     },
     "screen/insufficient-coverage/dark/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "7c0c458b158d1835b0462bd1826d253dc3a9661773b75c2eb8f9730efcaf25f9",
+      "reviewArtifactFingerprint": "dd0890e38dfcd19568979cd78d9843a8c8b3fcbf2e90cc04f240342a07b35173",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "fc83a65c08996aa977cdf5a2a8dde8b34687529aad856227ea83bf82650e80cf",
       "reviewedNormalizedRgbaSha256": "bf6d64960855d4d11dc35fb7e7adaa16d78452956eff179783281b7141e78f1a",
       "reviewedArtifacts": [
@@ -525,10 +525,10 @@
     },
     "print/insufficient-coverage/pdf": {
       "status": "pass",
-      "reviewArtifactFingerprint": "b8f6c53467c0ea298a262c2eda958504320c01e11a86d2acde57a8a719c67b7a",
+      "reviewArtifactFingerprint": "806a88df8fc57b4f1f9cfb1b5c5141e990645cc6be6db5d3c4a2c9965f57ac39",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
-      "reviewedRawSha256": "5e980d6fdb2fe9277c54430841edc2978c7f2a6b3af927262038f0d68987fb82",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
+      "reviewedRawSha256": "3b88f262b72c773185432a5d2c9062a2d470cda7d8b9fe077918f3916d12729a",
       "reviewedPages": [
         1,
         2,
@@ -548,9 +548,9 @@
     },
     "print/insufficient-coverage/raster-set": {
       "status": "pass",
-      "reviewArtifactFingerprint": "39c6467dd8d4a78f67dd6f416e8eced586623c1d5b844bfc47a26a8869f64c92",
+      "reviewArtifactFingerprint": "eb08213e544cf21dfc8c711cf142e38d096be0d72577631126a34487263537e0",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-28T04:35:04.555Z",
+      "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": [
         "e0f89e6b8c5d555e35e8da6d4a8c9ef54ac3af4a0646ba839156e15133784026",
         "7ad9e2dd6fc8f0e1f18563fa0249529a647ec2ad6bd53681268e8aa6c01a8bf1",
@@ -589,5 +589,6 @@
       ],
       "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
     }
-  }
+  },
+  "transferredAt": "2026-08-28T05:06:13.648Z"
 }

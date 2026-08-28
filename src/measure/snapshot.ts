@@ -565,28 +565,38 @@ export const SNAPSHOT_SOURCE = `(() => {
 
   const svg = [];
   pagesEls.forEach((page, pageIndex) => P.all(page, "svg").forEach((el, i) => {
-    // querySelectorAll reaches <text> inside <defs>, <symbol>, <clipPath> and <pattern>, and under
-    // display:none. None of those is drawn, so none of them is a target of a rule about what the
-    // viewport clips — but they are indistinguishable from a real measurement failure until
-    // something is measured. The loop below measures it rather than assuming it from the markup.
-    const textEls = P.all(el, "text");
+    // querySelectorAll reaches <text> inside <defs>, <symbol>, <clipPath> and <pattern>, under
+    // display:none, and inside a NESTED <svg>. None of the first group is drawn; the last group
+    // belongs to a different viewport and is collected with that inner SVG, which appears as its
+    // own record. Counting it here as well would double every candidate and compare it against
+    // the wrong box — the outer viewport instead of the one that actually clips it.
+    const textEls = P.all(el, "text").filter((textEl) => P.closest(P.parent(textEl), "svg") === el);
     const capped = textEls.length > ${SVG_TEXT_TARGET_CAP};
     const texts = [];
     let unreadableTargets = 0;
     let notRenderedTargets = 0;
     if (!capped) {
       for (const textEl of textEls) {
-        // Is this element drawn at all? Asked FIRST, and asked of getBoundingClientRect rather
-        // than of getBBox, because the two disagree exactly where it matters. Measured in Chrome
-        // 152: a <text> inside <defs> answers getBBox() and getScreenCTM() perfectly happily and
-        // yields a full screen box — 609.65 px outside its viewport, reported as an error finding
-        // by a gating rule, about an element that is never painted. getBoundingClientRect returns
-        // an empty rect for it, which is the honest answer and the one this loop follows.
+        // Is this element painted at all? Asked FIRST, and answered from two directions, because
+        // getBBox alone gets it wrong exactly where it matters. Measured in Chrome 152: a <text>
+        // inside <defs> answers getBBox() and getScreenCTM() perfectly happily and yields a full
+        // screen box — 609.65 px outside its viewport, reported as an error finding by a gating
+        // rule, about an element nobody can see.
         //
-        // A target the browser does not lay out is not a target: the question "does the viewport
-        // clip it away?" does not arise, as for an SVG holding no text at all.
+        // An empty client rect covers the not-laid-out cases. It does NOT cover the invisible
+        // ones: visibility:hidden, opacity:0 and fill:none all lay out normally and return a full
+        // rect, so a rule about what the viewport clips away would report them too — the same
+        // class of false alarm through a second door. Those are read from the computed style.
+        //
+        // A target that is not painted is not a target: the question "does the viewport clip it?"
+        // does not arise for it, as for an SVG holding no text at all.
         const rect = P.rect(textEl);
-        if (rect.width === 0 && rect.height === 0) { notRenderedTargets += 1; continue; }
+        const style = P.style(textEl, null);
+        const invisible = style.visibility === "hidden" || style.visibility === "collapse"
+          || parseFloat(style.opacity) === 0
+          || ((style.fill === "none" || parseFloat(style.fillOpacity) === 0)
+              && (style.stroke === "none" || parseFloat(style.strokeOpacity) === 0));
+        if ((rect.width === 0 && rect.height === 0) || invisible) { notRenderedTargets += 1; continue; }
 
         let bounds = null;
         // getBBox() throws on a <text> with no rendered geometry; getScreenCTM() returns null on
@@ -606,7 +616,7 @@ export const SNAPSHOT_SOURCE = `(() => {
           if (corner.y < minY) minY = corner.y;
           if (corner.y > maxY) maxY = corner.y;
         }
-        const textStyle = P.style(textEl, null);
+        const textStyle = style;
         const clipped = !!textStyle.clipPath && textStyle.clipPath !== "none";
         const masked = !!textStyle.mask && textStyle.mask !== "none" && !P.startsWith(textStyle.mask, "none ");
         texts.push({
@@ -629,7 +639,10 @@ export const SNAPSHOT_SOURCE = `(() => {
     svg.push({ nodeKey: "svg:" + pageIndex + ":" + i,
       sourceIdentity: P.attr(el, "id"), outerHtml: P.outerHtml(el),
       measurable: !capped,
-      reason: capped ? "env/svg-too-many-text-targets" : undefined,
+      // null, nicht undefined: undefined verschwindet beim JSON-Roundtrip, und das
+      // Receipt-Schema fuehrt reason als required. Ein Feld, das nur manchmal existiert,
+      // ist fuer jeden Leser ein Sonderfall mehr.
+      reason: capped ? "env/svg-too-many-text-targets" : null,
       unreadableTargets, notRenderedTargets,
       viewportScreen: box(el), overflow: P.style(el, null).overflow || "hidden",
       textTargetCount: textEls.length, textTargetsCapped: capped, texts, shapes: [], paths: [],
@@ -854,33 +867,44 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
   // that travels into fingerprints. Keeping them apart is not tidiness — conflating them was a
   // measured defect, ten mis-attributions against one.
   let svgTargetCounter = 0;
-  const svg: SvgRecord[] = input.raw.svg.map((raw) => {
-    const { sourceIdentity, outerHtml, texts, ...rest } = raw;
-    const rootKey = svgRootKey({ authorId: sourceIdentity, outerHtml });
+  // Two passes, because the group is a property of the DOCUMENT, not of one record. Two
+  // structurally identical inline SVGs get the same `svgRootKey` on purpose — which of two
+  // identical objects is meant is not a well-formed question — and their labels therefore share
+  // `svgTextKey` across records. Counting the group inside one record reported 1 for exactly the
+  // collision the field exists for.
+  const svgKeys = input.raw.svg.map((raw) => {
+    const rootKey = svgRootKey({ authorId: raw.sourceIdentity, outerHtml: raw.outerHtml });
+    return {
+      rootKey,
+      textKeys: raw.texts.map((text) =>
+        svgTextKey({ svgRootKey: rootKey, authorId: text.sourceIdentity, textSignature: text.signature })),
+    };
+  });
+  const svgGroupSize = new Map<string, number>();
+  for (const entry of svgKeys) {
+    for (const key of entry.textKeys) svgGroupSize.set(key, (svgGroupSize.get(key) ?? 0) + 1);
+  }
+  const svg: SvgRecord[] = input.raw.svg.map((raw, svgIndex) => {
+    const { sourceIdentity: _rootId, outerHtml: _outerHtml, texts, ...rest } = raw;
+    const { rootKey, textKeys } = svgKeys[svgIndex]!;
     return {
       ...rest,
       sourceKey: rootKey,
-      texts: (() => {
-        const keys = texts.map((text) =>
-          svgTextKey({ svgRootKey: rootKey, authorId: text.sourceIdentity, textSignature: text.signature }));
-        const groupSize = new Map<string, number>();
-        for (const key of keys) groupSize.set(key, (groupSize.get(key) ?? 0) + 1);
-        return texts.map((text, index) => {
-          const { sourceIdentity: _textId, signature: _signature, ...target } = text;
-          svgTargetCounter += 1;
-          const key = keys[index]!;
-          return {
-            ...target,
-            targetKey: `bt${String(svgTargetCounter).padStart(3, "0")}`,
-            svgTextKey: key,
-            ambiguityGroupSize: groupSize.get(key) ?? 1,
-            ink: {
-              T: { count: 0, maskHash: "" },
-              T0: { count: 0, maskHash: "" },
-            },
-          };
-        });
-      })(),
+      texts: texts.map((text, index) => {
+        const { sourceIdentity: _textId, signature: _signature, ...target } = text;
+        svgTargetCounter += 1;
+        const key = textKeys[index]!;
+        return {
+          ...target,
+          targetKey: `bt${String(svgTargetCounter).padStart(3, "0")}`,
+          svgTextKey: key,
+          ambiguityGroupSize: svgGroupSize.get(key) ?? 1,
+          ink: {
+            T: { count: 0, maskHash: "" },
+            T0: { count: 0, maskHash: "" },
+          },
+        };
+      }),
     };
   });
   const requested = new Set(input.resources.map((resource) => resource.resolvedUri));

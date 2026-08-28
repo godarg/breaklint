@@ -92,12 +92,17 @@ text is painted whether or not it leaves the viewport, so `svg/text-overflows-vi
 nothing to decide about it — as with an SVG holding no text. One such figure would otherwise drive
 an error rule below its floor of 1 and end the whole run in exit 4.
 
-A third case is not a decline at all: a `<text>` the browser never lays out — inside `<defs>`,
-`<symbol>`, `<clipPath>` or `<pattern>`, or under `display:none`. It is not a target of a rule
-about what the viewport clips away, so it is neither counted nor declined, and the collector
-decides that by asking `getBoundingClientRect` rather than by reading the markup. It has to be
-asked: Chrome answers `getBBox()` and `getScreenCTM()` for such an element and yields a box far
-outside the viewport, which a gating rule will report as an error about something nobody can see.
+A third case is not a decline at all: a `<text>` that is not painted. Inside `<defs>`, `<symbol>`,
+`<clipPath>` or `<pattern>`; under `display: none`; or hidden by `visibility: hidden`,
+`opacity: 0` or a missing fill and stroke. None of it is a target of a rule about what the
+viewport clips away, so none of it is counted or declined.
+
+Both halves have to be measured rather than read off the markup. Chrome answers `getBBox()` and
+`getScreenCTM()` for an element in `<defs>` and yields a box far outside the viewport, which a
+gating rule will report as an error about something nobody can see — so the collector asks
+`getBoundingClientRect`. And the invisible cases lay out perfectly normally and return a full
+rect, so the empty-rect check does not see them at all — those come from the computed style. Each
+was found by building the fixture for the previous one.
 
 A `<text>` that IS laid out and still has no readable box declines with `env/svg-ctm-unavailable`
 and DOES count against coverage — that is a measurement this tool owed and did not deliver, per

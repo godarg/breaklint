@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SVG entirely inside its viewport</title>
+<!--
+  The document 0.2.2 could not check, and the one this release exists for.
+
+  Nothing here is wrong. Two figures, every label comfortably inside its viewport, one of them a
+  chart with repeated axis ticks. The expected verdict is `clean` and exit 0 — and that is the
+  whole point: 0.2.2 answered exit 3 on exactly this, because the collector declared every SVG
+  unmeasurable with a reason the gating rule had not declared.
+
+  Kept apart from `svg-text-geometry.html` deliberately. That fixture ends exit 1 by design, so it
+  can never show that a sound document passes; a suite in which no case ends 0 cannot tell "the
+  tool works" from "the tool always complains". This is the positive control.
+
+  The second figure also carries four `<text>` elements with identical content and no `id`. They
+  share one content-derived identity, and a finding on any of them has to say the group is larger
+  than one rather than quietly claim to be a single target. Nothing here triggers a finding, so
+  the assertion is on the snapshot, not on a report.
+-->
+<style>
+  @page { size: 320pt 420pt; margin: 24pt; }
+  body { font: 12pt/1.5 serif; margin: 0; }
+  figure { margin: 0 0 18pt; }
+  svg { display: block; width: 260pt; height: 130pt; }
+  figcaption { font-size: 9pt; }
+</style>
+</head>
+<body>
+<p>Two ordinary figures. Nothing in this document is a defect.</p>
+
+<figure>
+  <svg id="plain" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="400" height="200" fill="#eeeeee"></rect>
+    <text x="40" y="100" font-size="14" font-family="serif">A label, well inside</text>
+  </svg>
+  <figcaption>One label, one viewport, nothing to report.</figcaption>
+</figure>
+
+<figure>
+  <svg id="chart" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="400" height="200" fill="#eeeeee"></rect>
+    <line x1="60" y1="20" x2="60" y2="170" stroke="#333333" stroke-width="2"></line>
+    <line x1="60" y1="170" x2="380" y2="170" stroke="#333333" stroke-width="2"></line>
+    <rect x="80" y="90" width="40" height="80" fill="#7799aa"></rect>
+    <rect x="150" y="60" width="40" height="110" fill="#7799aa"></rect>
+    <rect x="220" y="110" width="40" height="60" fill="#7799aa"></rect>
+    <rect x="290" y="40" width="40" height="130" fill="#7799aa"></rect>
+    <text x="94" y="188" font-size="12" font-family="serif">0</text>
+    <text x="164" y="188" font-size="12" font-family="serif">0</text>
+    <text x="234" y="188" font-size="12" font-family="serif">0</text>
+    <text x="304" y="188" font-size="12" font-family="serif">0</text>
+    <text x="30" y="174" font-size="12" font-family="serif">y</text>
+  </svg>
+  <figcaption>Four identical tick labels: one identity, group size four.</figcaption>
+</figure>
+</body>
+</html>

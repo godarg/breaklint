@@ -5,7 +5,7 @@
     "note": "Hand-written so that every rule path in the demo is reachable. The report says so in its own source field."
   },
   "snapshot": {
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "meta": {
       "renderer": null,
       "browserVersion": "",
@@ -596,6 +596,7 @@
         "nodeKey": "b5",
         "sourceKey": "svgsig:chart",
         "measurable": true,
+        "reason": null,
         "viewportScreen": {
           "x": 48,
           "y": 48,
@@ -605,6 +606,8 @@
         "overflow": "hidden",
         "textTargetCount": 2,
         "textTargetsCapped": false,
+        "unreadableTargets": 0,
+        "notRenderedTargets": 0,
         "texts": [
           {
             "targetKey": "bt001",
@@ -616,6 +619,7 @@
               "height": 12
             },
             "clipState": "clip-path",
+            "ambiguityGroupSize": 1,
             "ink": {
               "T": {
                 "count": 1420,
@@ -639,6 +643,7 @@
               "height": 12
             },
             "clipState": "none",
+            "ambiguityGroupSize": 1,
             "ink": {
               "T": {
                 "count": 2100,
