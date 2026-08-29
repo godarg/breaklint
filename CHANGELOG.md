@@ -6,9 +6,10 @@
 
 No tag, no npm publish. Four independent review passes ended FAIL on different and correct
 findings; the repaired code has since passed a focused independent re-review with no open
-Blocker/High finding. Release still waits for the human report-surface ledger to be rebound to the
-changed pixels and for the final verifier to accept that complete state. The date on this heading
-becomes a release date when the tag exists, and not before.
+Blocker/High finding. On 2026-08-29 the Founder reviewed and accepted the 21 changed rendered views
+and the complete PDF set; the ledger is bound to that review. Release still waits for the final
+verifier to accept the complete state. The date on this heading becomes a release date when the tag
+exists, and not before.
 
 ### Any document with an inline SVG can be checked
 

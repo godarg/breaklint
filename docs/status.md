@@ -255,9 +255,10 @@ the published tarball.
 `package.json`; no tag, no npm publish, no GitHub Release. The release contract in
 `docs/releasing.md` requires that an independent verifier hold no open Blocker/High finding. Four
 review passes had ended FAIL — each on different and correct findings — before the repaired code
-passed a focused independent re-review with no open Blocker/High finding. The human report-surface
-ledger and the final verifier are still outstanding, so this section describes a candidate rather
-than a release.
+passed a focused independent re-review with no open Blocker/High finding. The Founder accepted the
+21 changed rendered views and complete PDF set on 2026-08-29, and the ledger is bound to that
+review. The final verifier is still outstanding, so this section describes a candidate rather than
+a release.
 
 What it repairs: the defect that made every document
 containing an inline SVG uncheckable, and it is worth stating plainly because it is this project's
@@ -388,17 +389,18 @@ subject: the check that looked green was green about the wrong thing, four round
 
 ### Where this leaves 0.2.3
 
-Not released, and the report-surface ledger is deliberately RED.
+Not released. The report-surface ledger is green after a new Founder review.
 
 The ledger binds a human review to the exact bytes of the reviewed artifacts. The Founder's
 confirmation on 2026-08-28 was explicit about its own basis: 58 of 62 artifacts byte-identical,
 no visible pixel changed. Correcting the page numbers changed 21 of 58 rendered views — the
-findings now name a different page — so that basis no longer holds and the confirmation does not
-transfer. Rebinding the ledger anyway would put a human's name on a review of artifacts that
-human never saw, which is the one failure this whole apparatus exists to prevent.
+findings now name a different page — so that basis did not transfer. The 21 deltas were therefore
+presented as an explicit old/difference/new gallery together with all four PDFs. The Founder gave
+an explicit PASS on 2026-08-29. The ledger records that new review for the changed cells while
+retaining the earlier review timestamps only where the visible artifact remained identical.
 
-So the gate stays red until someone looks. `npm run test:report-surfaces` fails on this commit,
-by design and not by accident.
+`npm run test:report-surfaces` now passes against those exact reviewed bytes. A later source or
+pixel change returns it to red rather than silently transferring the new PASS.
 
 One honesty note about the demo. `examples/demo-snapshot.json` carries ink counts, so
 `npx breaklint --demo` shows a `svg/text-clipped` finding that a real run cannot currently

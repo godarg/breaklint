@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
-  "reviewInputFingerprint": "f3316c648bbf1626738598fcf5ba3f8b1cb6442e7602c2fbaf0453ff42226f9f",
-  "renderManifestGeneratedAt": "2026-08-28T06:08:03.814Z",
+  "reviewInputFingerprint": "98c531cafce622a39ce8344429f96fd139811d08f42c49d60b75372cdab92c29",
+  "renderManifestGeneratedAt": "2026-08-29T03:23:44.228Z",
   "reviewEnvironment": {
     "reviewArtifactContractVersion": 3,
     "screenPixelContractVersion": 1,
@@ -49,21 +49,21 @@
       }
     }
   },
-  "reviewedAt": "2026-08-26T10:57:06.000Z",
+  "reviewedAt": "2026-08-29T03:22:30.000Z",
   "reviewer": "@Founder",
   "physicalArtifactsReviewed": {
     "screens": 24,
     "pdfs": 4,
     "rasterPages": 34
   },
-  "basis": "PASS transferred, not re-reviewed. The Founder reviewed the complete matrix for review fingerprint 6759d3e5df0cba3ca047123c2c0b4bb5a41357621a783bef865a8a4b7499bc7e on 2026-08-26 (24 screen PNGs, 4 A4 PDFs, 34 PDF page rasters, Chrome 152.0.7977.64). The 0.2.3 SVG geometry work changed src/core and src/rules and therefore the source fingerprint. Measured against that review before the transfer was requested: 58 of the 62 reviewed artifacts are byte-identical on the fresh render, and the 4 that differ are the A4 PDF containers, whose raw bytes this procedure excludes from the equivalence decision because browser metadata moves while the visible pages do not. All 24 screen PNGs and all 34 PDF page rasters are byte-identical: no visible pixel changed. On that measurement the Founder confirmed on 2026-08-28 that the 2026-08-26 PASS transfers to this fingerprint. No new visual review of the 62 artifacts took place, and this record does not claim one: every reviewedAt in this file, on the ledger and in each cell, is the date of the review that actually happened. `transferredAt` carries the moment the transfer was confirmed, which is a different event and is named as one; `renderManifestGeneratedAt` moves with each re-render and is deliberately not the same field. The equivalence measurement was repeated against the 2026-08-26 review after every commit that touched a bound input, and returned the same result each time: 58 of 62 byte-identical, the 4 PDF containers excluded by this procedure, no visible pixel changed.",
+  "basis": "PASS combines historical pixel-identical transfers with a new Founder review. The complete matrix was first reviewed on 2026-08-26. A 2026-08-28 transfer covered a later render only while all 24 screen PNGs and all 34 page rasters remained byte-identical. The page-number repair then changed exactly 18 screen PNGs and one page raster in each of findings, infrastructure and insufficient-coverage (21 visibly changed views total), so that transfer was not reused for those cells. The Founder reviewed an explicit old/difference/new gallery for all 21 changed views plus the complete four-PDF set and gave the exact PASS on 2026-08-29. Those changed cells and current PDF bytes carry the new reviewedAt. Cells whose current PNG or page-raster bytes remain identical retain their original review timestamp and are labelled as transfers, not new reviews. The stable reviewArtifactFingerprint for every cell is rebound to the current source/input fingerprint and exact review environment; any later source, environment or visible-pixel drift returns the gate to red.",
   "acceptedFollowUps": [
     "LOW: consider running page numbers or a repeated report ID for long printed reports; accepted as non-blocking for 0.2.2."
   ],
   "cells": {
     "screen/clean/light/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "9aa252478a8bf48beadaf86e2493e3e9ab42c9d91020f9cdcf0e06f8cea7c1d1",
+      "reviewArtifactFingerprint": "14341bf9899a50ed0fd43abd1982af79879f121168f9c90651f94e98ef130c25",
       "reviewer": "@Founder",
       "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "b3e88d22805e2b7eb2832b1dab24539d52928580949aea073f7fcdddcb083598",
@@ -71,11 +71,11 @@
       "reviewedArtifacts": [
         "clean--light--desktop.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS transferred from the earlier Founder review: the current PNG and normalized visible pixels are byte-identical. See the ledger basis."
     },
     "screen/clean/light/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "a342b54584901d8aea6336032f8c0a30f1685419939d6e0c8fdcc0263014a7a9",
+      "reviewArtifactFingerprint": "aa1d3abb36c939bf54f0f960366b1154c90200017a622a4489b3c217006d8967",
       "reviewer": "@Founder",
       "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "de35dae27c84f8e6d89de54cb13038105d76e92edec7b8ac0d80b972ec524eff",
@@ -83,11 +83,11 @@
       "reviewedArtifacts": [
         "clean--light--tablet.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS transferred from the earlier Founder review: the current PNG and normalized visible pixels are byte-identical. See the ledger basis."
     },
     "screen/clean/light/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "b217bda01e7d06ad91775b70bfa3164898a64a9bacb711f8a8106251bc5d5d5d",
+      "reviewArtifactFingerprint": "268a2722beadafccd5eabe65932b52a744160bf5152e45c18a63b313c0533ce3",
       "reviewer": "@Founder",
       "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "1e12485ef4fc6f9df32cb16eef439b017314c391eb8a11124f843f2f3b475513",
@@ -95,11 +95,11 @@
       "reviewedArtifacts": [
         "clean--light--mobile.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS transferred from the earlier Founder review: the current PNG and normalized visible pixels are byte-identical. See the ledger basis."
     },
     "screen/clean/dark/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "0d4f4e271aa282d2c9b81726c64c5f5c62792220bb80858e6413c0add6c6f545",
+      "reviewArtifactFingerprint": "4f84ae209fb536da639b8536b4872cf173dee6aaef8c9686e9ddaa47f4c9e9ac",
       "reviewer": "@Founder",
       "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "deecd6186b423d22db8ec88a0d0358de5f6a9acb54b76cc9c2e1b34795129eee",
@@ -107,11 +107,11 @@
       "reviewedArtifacts": [
         "clean--dark--desktop.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS transferred from the earlier Founder review: the current PNG and normalized visible pixels are byte-identical. See the ledger basis."
     },
     "screen/clean/dark/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "fc034d1ad7850f53d78b7d0b6a2196aa1dd3bbe946c162e7a5eb1bef1f35061e",
+      "reviewArtifactFingerprint": "5a97af6f33acd5ef7e77197ec5e816f878f8ae379d60dbb2e6c27bbb4362af34",
       "reviewer": "@Founder",
       "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "ec6c15e2659fa9963dc4ad0faab749f7fe5708b8fbdfb91cb3b6b3557de22075",
@@ -119,11 +119,11 @@
       "reviewedArtifacts": [
         "clean--dark--tablet.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS transferred from the earlier Founder review: the current PNG and normalized visible pixels are byte-identical. See the ledger basis."
     },
     "screen/clean/dark/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "fa1db45b1c5f3bed1d7e55c843f61cd8466da74cbc57a7675d382770dc625556",
+      "reviewArtifactFingerprint": "fb6ece2685ab176c3145cb311e117d6021cb780e1b61abebf6d3118dc8a20b33",
       "reviewer": "@Founder",
       "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": "fcf64fedb100da3d536dd2b5fb21bf974f7af2565992fd58d3abcb783ad28233",
@@ -131,14 +131,14 @@
       "reviewedArtifacts": [
         "clean--dark--mobile.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS transferred from the earlier Founder review: the current PNG and normalized visible pixels are byte-identical. See the ledger basis."
     },
     "print/clean/pdf": {
       "status": "pass",
-      "reviewArtifactFingerprint": "3e484b874e4ff895d35687c1379b12a4b862f80b30735109f1669fe6f96eaef4",
+      "reviewArtifactFingerprint": "3dac2c16fe6db730c6c54c9ce73ef5a5be9da2190b2a4255fdb699e5954c2064",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "7a564d4fc2aeb694636534f34d595b4035e359f646698f09a2334b9f2a6a5cd5",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "e462a53545c1ef89e3d351f4e66b5b7ecd38b0645ee86b17127d151968b5a751",
       "reviewedPages": [
         1,
         2,
@@ -149,11 +149,11 @@
       "reviewedArtifacts": [
         "clean--a4.pdf"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 as part of the complete four-PDF set linked from the delta gallery."
     },
     "print/clean/raster-set": {
       "status": "pass",
-      "reviewArtifactFingerprint": "771b72f74c00f01ccb3e1ed056d38301a3cfc51493e762483ff4648c2e41b19f",
+      "reviewArtifactFingerprint": "cb4dc940c9e357d4ecf6862b68b37c78eb1ca2ba1d1565808c264b14e7b55004",
       "reviewer": "@Founder",
       "reviewedAt": "2026-08-26T10:57:06.000Z",
       "reviewedRawSha256": [
@@ -177,86 +177,86 @@
         "clean--a4-page-4.png",
         "clean--a4-page-5.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS transferred from the earlier Founder review: every current PDF page raster is byte-identical. See the ledger basis."
     },
     "screen/findings/light/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "aab603813f82870dd6c9a89158758525afb0b01910537662b342bfd6b4d28f01",
+      "reviewArtifactFingerprint": "0dad4231c7c5103283e68336bf2ae796f87a0aa8e8d2888805b5c9bf1e2649a2",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "2d83cebc5f38d382aa6a1930903e65baa6566e0528b22e85f7dcb50e6771a5d8",
-      "reviewedNormalizedRgbaSha256": "be0ef2991bebfb11a0a1679f7fe1bcdd4aac87cf9f6d5b36fb69aaae2cb0ce6a",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "9c55c3329752267cabedb515b64ed390e9107cfbfb346b1c1fd17aba714909dc",
+      "reviewedNormalizedRgbaSha256": "3f3a22b24bf3594c5ae65f8d5ed071f414207de60c41605d3ab6061ba01dfce9",
       "reviewedArtifacts": [
         "findings--light--desktop.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/findings/light/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "1a1045885e640c064d0ff8c4e9c5bb5d723eeb5fe60ff1754b0ae5a8b22e89fa",
+      "reviewArtifactFingerprint": "25e4c369f043c1c948ca03732cae329824c8baa2282da55b20aeb6d680d7378c",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "76970408ccd2684e43e922d7f6b61792d7e7f0fbb4839b1f8f5984548c6e52a0",
-      "reviewedNormalizedRgbaSha256": "f6a09c58eb02564d6d994d9ad3d256779bf85a23ee2120a5a731b3792d3d0a93",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "63b0b7fd26916b8f84607d6b985938db441e21fb1dbfbbe1573afbca45858420",
+      "reviewedNormalizedRgbaSha256": "04d0afbb04ccb8be257aca088f7ceccbe0d46841fd3e34ec3a9b90926ea6d236",
       "reviewedArtifacts": [
         "findings--light--tablet.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/findings/light/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "fcd36453e1be5ba7c63841cd86aa108a3bc526f0acdd2bad83654eae5e7af19b",
+      "reviewArtifactFingerprint": "5906a8a8eaf21a78379a546df5fd37f203e17dfec5797cc771face7698abe222",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "c7a8200b9b5727438b99c138f1e6444e7edf70299e8c3f80602125524dab5721",
-      "reviewedNormalizedRgbaSha256": "9f78c96837d79b5bc093dc3081a6bcca1684503e2b495d4076a4282c0605b2e9",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "2934c5756d821b54747e0664e668f592858e02c64af0c8907e53fbe3497bc57a",
+      "reviewedNormalizedRgbaSha256": "ee3ee1982254165449f4395844ba191d253de91cf502b27ab470f2b9b8c6b0cf",
       "reviewedArtifacts": [
         "findings--light--mobile.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/findings/dark/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "858de40202f0a367245ad92e5a98a79eb8fcd185bf77f6f3b33ee6de44992735",
+      "reviewArtifactFingerprint": "73a268b4dc8bb9c224c4055972e34cc7d10f6dfd88f7f8263b5369207ed13d8f",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "36db53555a52e109c1fc529125913e062bd4429dd836a478b12e16d43b522dfc",
-      "reviewedNormalizedRgbaSha256": "d9a7b9bd742c992e0db73e6c881dd7c2e8b9a5e029f3b95d42b56c0193f3c7a9",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "0458db50b7e19f44381bded4c2e9371eb95bb8491d589b59df419fd7f341c11a",
+      "reviewedNormalizedRgbaSha256": "57aa365e7bcc78ae5798c33226d68c256d2d335653b73224291b5c3d14769372",
       "reviewedArtifacts": [
         "findings--dark--desktop.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/findings/dark/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "5985186f47d5f21563fd4f1ea3d4e249cbbc55e08fae527a04a02d60a7a1cfa0",
+      "reviewArtifactFingerprint": "f9a3853cb521cc77c200cc850399220093134d1a615214ef6fa59409b1dde691",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "c658148327791fff24c586c4d6f148b8dd9248ece57a8bc58a34257ef57bd32d",
-      "reviewedNormalizedRgbaSha256": "ab4344164ad5c469b94484d6700a9ba82477200309c1efc8d5cea4ef3f4d1a64",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "982412b67aa4bbe64e09827c9ba98882fb0f03aed6fe721da18a4309ae879391",
+      "reviewedNormalizedRgbaSha256": "24834b4cf10c6db41f82ebf56b3de8066dd790bc1a8f7edacb56a042fa27a42a",
       "reviewedArtifacts": [
         "findings--dark--tablet.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/findings/dark/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "62961aa131cc14fb5fca49de29b55202be2f1fdbb614da0480cb77431fec95cf",
+      "reviewArtifactFingerprint": "7c1552a3896864066f53b41f4ae9bff1861c51b230463ff18184a75766f6db77",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "0fee1055a28bcff2cfa11b9da55f03dd9d8fe16429cd1ae669e217a7400e774c",
-      "reviewedNormalizedRgbaSha256": "44811840eb5c42ed8d3557349355380c0a8b759e2f495cf4703167c99d660a07",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "56bd655cd012bc2035420ec54e9ee3e45f006edc8579ace48d76c25ec08cd6e3",
+      "reviewedNormalizedRgbaSha256": "a95673e23533552924f0de968133ac31e984ace85eccc2feb0abddbf2821366d",
       "reviewedArtifacts": [
         "findings--dark--mobile.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "print/findings/pdf": {
       "status": "pass",
-      "reviewArtifactFingerprint": "72ba67a627b7b6440a1cbc45af41d9d816a2e41906ee5e7cebbf2a8f20bef8ed",
+      "reviewArtifactFingerprint": "27019e9529e5c4e6a8c0bc6b06a7dfc5d6d33f6000c5afaf380421a6110c6bb3",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "3ffa8ecdcc69a43194b2df80cfe66845e5eac98386e4314cc126347316325162",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "c763c45ac790177be02507dd94189d0cbc3724124115f293f10d8404acf2747a",
       "reviewedPages": [
         1,
         2,
@@ -271,18 +271,18 @@
       "reviewedArtifacts": [
         "findings--a4.pdf"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 as part of the complete four-PDF set linked from the delta gallery."
     },
     "print/findings/raster-set": {
       "status": "pass",
-      "reviewArtifactFingerprint": "84ba950af5de490c2db64d6b37a425a6950a317392937751e6a09349eebe8679",
+      "reviewArtifactFingerprint": "208dfb159c692b96dc15b9e8d4aea0a47c05832192d9aae045ac0e4380d3754e",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
       "reviewedRawSha256": [
         "39d65687255bbf2eb32f2e1883966fba860d4e9213db2a1bd808462383c8bcbc",
         "f6a22ef16182ee0ade69d816c7a48670e3ed94c746bfafdc3d8d467cee951bde",
         "233530f2eea2d13018af0b0c770bec9e0ff746c35d04682ab7d8df64d760f36d",
-        "13258a3e43127a4fbc206f7cded7f9bf711231ab7e0fad1e86da66d7fda3b8ff",
+        "d0a4046af65e7d01a12e975f63af93b24d616540adddcc35465f12c1453d089c",
         "dc798980a104d6a688b74186660f1c51f75dd62b98c47b1e516dc68ae48c68ef",
         "bf6522238592162e2ece832694be44b36db2025c5203f59b22aa1a3274ebe439",
         "d03281799e158549ba8162df5a1b1985c0d0e3c8df99c1d4b8b1915bb38204cf",
@@ -311,86 +311,86 @@
         "findings--a4-page-8.png",
         "findings--a4-page-9.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29; changed page raster(s) accepted in the explicit delta gallery: findings--a4-page-4.png."
     },
     "screen/infrastructure/light/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "188c8e8736a2505a4ed450ea61eb8cf77348dee70fd048c0dbc06d7f4cc9695a",
+      "reviewArtifactFingerprint": "e74a9838474aa72972dff37061497be18f3c8bf9e000e1ae801bfd3812262ba9",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "6b0f86bb26be45efeed6968a8a556d2da81c1da9af8ccb371bb8567696b0d089",
-      "reviewedNormalizedRgbaSha256": "a5d483691ee8897612087e9739861b3b1cbb4bdea0b53113332352fefd764273",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "7c8f334f5e32d4491d7fe840d52500d90f3a9f0e757d6bd2e1d0e5c7faeb4112",
+      "reviewedNormalizedRgbaSha256": "924f175a41f195256481212f4996a297f28c690618881dc4b57d8f781a8b8920",
       "reviewedArtifacts": [
         "infrastructure--light--desktop.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/infrastructure/light/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "11d0a2b13cd38add871138e8d038eba00aef20ffe082d09627b02ce62103675a",
+      "reviewArtifactFingerprint": "d2262a0a70adc4043278f20770b6fda73120713544b70909ec7074c6475dad76",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "a32771c0a87c7fc822f693c1c0f97b869bbf8332b5cc76eb29bf63148496fc52",
-      "reviewedNormalizedRgbaSha256": "a9788fac692f8239e21c5f30098c0a264bf9e20c108ddf887431d735971c6a5a",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "862ca18884f4112d7a585ddbab0cf81c130d4514778beac1ff938cdb16d9ef46",
+      "reviewedNormalizedRgbaSha256": "cfbb069113dcbe0d927779e6fc96e8c58ce75cf6b73d34fd0c42be0d7387fd68",
       "reviewedArtifacts": [
         "infrastructure--light--tablet.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/infrastructure/light/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "94b4e6ffb1917988fd83396ce8d26fd0a1d5968c64b4edc17242e2dd4b86761d",
+      "reviewArtifactFingerprint": "b8aec139b8535cce709c47767f5704730331245067198a80d1d7f965f9a24d92",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "9c47b1c8544a86af2187b5bc13e2b37aa0f971cd95fd008dea5e5cc178ee63b3",
-      "reviewedNormalizedRgbaSha256": "4337a2dfefd69cff34306194f96c27462e68c05944ffcaf426ef570015011f55",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "444b63e8428ca170778d2577582eef8946ab27f34eb5809b0980f83c99ac35f6",
+      "reviewedNormalizedRgbaSha256": "1c8d5b4c0e94f91d162fee5c8580e49e917d0ec6c8e8bf8c8a310af2a99628fe",
       "reviewedArtifacts": [
         "infrastructure--light--mobile.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/infrastructure/dark/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "7f98ef616204b6ba383b0d0ba9a749d4c1434feb0a666fb0fa264b6c5db42612",
+      "reviewArtifactFingerprint": "d1d44f85953c41c4f2234afac339de36cd10884dbb103e1c90d9c51700854f82",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "3b163f06e83b93a30eb5e437df4ba60559df8d28aafa9a3400cfcd61c6812812",
-      "reviewedNormalizedRgbaSha256": "a26c9e13d173f7d75831825c4f10d2019d27be9b3fcfd253ffbbe350f7430f27",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "61afc1d219892196c9ea9bf92c2c2ab5c42ab23404cb8927fdfa2f9bc7a1929f",
+      "reviewedNormalizedRgbaSha256": "4d0128154b8879ba6505ac3a74429111f2b1a0bffa6b18d959b3a7e2a43df2a8",
       "reviewedArtifacts": [
         "infrastructure--dark--desktop.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/infrastructure/dark/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "0fbf8bf7c05cf482b686a15d73c5fcf4642dda1bd864686e673b58c12b8ace08",
+      "reviewArtifactFingerprint": "b00b9746dcf0cfb1c16524cb484a2685428120b092876517cb5f5fbf902512d9",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "cb91f9472ea28350073f7fbb55341c2ac84d902acb6f85961752d58c555feb0b",
-      "reviewedNormalizedRgbaSha256": "bdfe49888fe1c92caaaf008f8155238d24f54303681267ff0aeb1dcf1ea6e3b5",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "88db7fb0d77c0517bfa5d4bde55bb36d9d18a035442e7d27f2103171c1ba3c83",
+      "reviewedNormalizedRgbaSha256": "b6c1052cc9d7774abbd51d4006e73c54adb2e37166b70563de22a99ec7414e3c",
       "reviewedArtifacts": [
         "infrastructure--dark--tablet.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/infrastructure/dark/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "1befb1cde5c7048da22c84dee6190dfdc6435533c8fb5c8a68ca2f04ae8d5f79",
+      "reviewArtifactFingerprint": "70486a3f4c73f7014bb33bf46efe49f0e8898e62f0c6d7690579bade7660d3fd",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "cf3c99697382bd1bcbffc599b9dfc00bed48fb5a11f2f38f253c98a1be2d952c",
-      "reviewedNormalizedRgbaSha256": "36f5a77bea5401829fceda88001ca77d239bdebabead9b94041a1e23d5fca6ad",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "f25151324974ee0a04b5a46b37e1568b32e24dc2a9d4504c2ec20809619e01f4",
+      "reviewedNormalizedRgbaSha256": "a662f187b3d296bc3c7bfc1e4a9e02227a8eb394a01612cefbdf42716a321aaf",
       "reviewedArtifacts": [
         "infrastructure--dark--mobile.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "print/infrastructure/pdf": {
       "status": "pass",
-      "reviewArtifactFingerprint": "17f156a15719f068895e5500c3354ac71fce0313e91a297aa0e658bb80deb148",
+      "reviewArtifactFingerprint": "2d3d5dc4b897003ebf00150b1a03414e05da55bf4481d4c5ef27680735fca9f6",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "789e6361435a4a6117c9c68fa064d7ec4ed77102239377cc5c8070d48ee2122d",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "00e298bd00eff62b68f01ad7ec6fefe19f636bd42e5f610d0579818ce388e404",
       "reviewedPages": [
         1,
         2,
@@ -406,19 +406,19 @@
       "reviewedArtifacts": [
         "infrastructure--a4.pdf"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 as part of the complete four-PDF set linked from the delta gallery."
     },
     "print/infrastructure/raster-set": {
       "status": "pass",
-      "reviewArtifactFingerprint": "c9f35f8de513ec0ce4504272ee3cfbecf637386a4c6c9ddcf335ca8780a19ddb",
+      "reviewArtifactFingerprint": "d81eb22236c4806a20794e67c87f24170036fe71a3d5d5464e17a20ab0c74a0e",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
       "reviewedRawSha256": [
         "40edf172738550f7f0ec09e6385e8cb6c66834fcb5214d68ab9d9468719c6e74",
         "1b8b9559a153da69fe8d580657540ef76e90163c41edda02cc971d08df8a3309",
         "229fb7804baf5ff1755ed9130b7d9b2e914ea1e29c911d64399b89df1d3a0dc0",
         "93d9c10c3d63a9f7b9a6f367f79e94cf2a6fe0357d1a1cb55b93092d41bb55dd",
-        "f3b36e993cf367c219a275d4d4dca807961726d6397faf3eaef7fb20bb38c05b",
+        "c03c9dc3389c2b873ee85b4eecc1b427e46ae3950957a9f82bd3edfcfd6f0c36",
         "b94e1ff5e685540112060375dff7d9da7dbba57690e4e7da8a56fd18c3488489",
         "69e5556b443552e2cd6cc7857c8a3f39587fafc52932bf53d13ce9b4a7cfb0f8",
         "e3f351b391495e7aa457b3bf1400683fcd94bd763537f4b39f4e549f7bc539c0",
@@ -449,86 +449,86 @@
         "infrastructure--a4-page-09.png",
         "infrastructure--a4-page-10.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29; changed page raster(s) accepted in the explicit delta gallery: infrastructure--a4-page-05.png."
     },
     "screen/insufficient-coverage/light/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "d811a0c71c4aef72e82cc0542543c66f5f03fef7d6274628c337b1770f6d6e3a",
+      "reviewArtifactFingerprint": "8ed1cfe531878e782cf313ebd7a2f0ebe3933145f0e1c4b5a888713b7ee10981",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "5fe8a4c97b6596c6804815c21e5341dfe1a28e94f6db3ddd2c3a7534a4553a41",
-      "reviewedNormalizedRgbaSha256": "6da824175b0561c0f52daf69382fbe4f64b4b4914713533e65b849bad7898fb2",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "66980255453b43956a916477407d95f1c400951f34b0dab2fba0613ba2a11d3d",
+      "reviewedNormalizedRgbaSha256": "83ccdd297267ba87b1cd76c79e96701eb588d56b1850931cdaea777142f67af2",
       "reviewedArtifacts": [
         "insufficient-coverage--light--desktop.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/insufficient-coverage/light/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "b774070af4b6790f8fab061ec0adb71684894167e0f479aa5067db2922ff351e",
+      "reviewArtifactFingerprint": "8b1828097e2fe26f833e6b1b25f0432d76bc517bce365d683276423f8eed654c",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "d2a5d3dab2b9c6137aa5cf737f139c33f44ed78a260a8eb3b55c52312c870982",
-      "reviewedNormalizedRgbaSha256": "649b8dae9362aa2fba9ba0295fff85fa6bcb80a00fd53923097992383ef26003",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "97e8c026231144cc78b0b68aa4854d68a7e2da11b1f9a5a18f7f6b1901b860e9",
+      "reviewedNormalizedRgbaSha256": "4bdbe5fed1e8dbd209774394ffafc235bed5024db9406f227362cf5b764ee116",
       "reviewedArtifacts": [
         "insufficient-coverage--light--tablet.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/insufficient-coverage/light/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "9006f97991f93af55748bedae49072bb01189b28a9674538e53784c411e599da",
+      "reviewArtifactFingerprint": "590c62041315a9d7f9b7a0ef80e0c4eaeff53725556710a3824f4b3f9d7b4ec3",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "8dc9029ea678315657dea110013e045332c0056422fdb0f71ebf98835635073b",
-      "reviewedNormalizedRgbaSha256": "f7290e5c170352fdd36346ffc8a962e3a76d0799bd2c45c05a9e8766bc6ba5dc",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "cb9d9ea3f2850e867fa7c0c95c6d617851eda46c576d0510c006438f1dea0cfd",
+      "reviewedNormalizedRgbaSha256": "f11320388ac4329ac4f9fd426f3596db273287ed14a909e5e9ff4893367250ac",
       "reviewedArtifacts": [
         "insufficient-coverage--light--mobile.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/insufficient-coverage/dark/desktop": {
       "status": "pass",
-      "reviewArtifactFingerprint": "5b9c30c6159ad3e6ca21512b2277c21ac6098821328c1ef678c5fa377c86e995",
+      "reviewArtifactFingerprint": "cb13fae0a459f365fa14847e11563361cf53b5856608e6b4464dd3f63f1487cb",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "b0f3167baf20aac8a6af5b3fb661f0b675c35099653f209069970712a40681f6",
-      "reviewedNormalizedRgbaSha256": "a00bafe016e804ade796bd4b2f50ca74684235f8a785e4ad500b7cd1c0180a76",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "8646e4729fb7b748ed34b2cec4c6329ee4d7d8402b0e3be5fb722a6e3a6e1936",
+      "reviewedNormalizedRgbaSha256": "1076bca7543f4d9d44ef1880246ad77072d0edd0178761b9231b3c099779b0af",
       "reviewedArtifacts": [
         "insufficient-coverage--dark--desktop.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/insufficient-coverage/dark/tablet": {
       "status": "pass",
-      "reviewArtifactFingerprint": "faf3f474b83c96e1fe741b115ab21ea7a10da5b94d24f3467392a65ff1ca7c6b",
+      "reviewArtifactFingerprint": "5acee7249db94904a12dcedbd4d020c74b89196a40ce5596005feff38cd01340",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "5f653218cd8188dc5843733273cc8d8ab80da605947267de93231bb25466f58d",
-      "reviewedNormalizedRgbaSha256": "cf93c95f2c5aab7c3fdcd6ad73389c8a5139ee78b4251a7cbd10dbb027f7191b",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "153483c69c325cc04d6987d0b683521bcde615a49ee6cb47f2ff6258f2266872",
+      "reviewedNormalizedRgbaSha256": "896603bdf1c764ac4ba6cba48c495db29eaa68b6cbc11d2c72f2d6929b1f1785",
       "reviewedArtifacts": [
         "insufficient-coverage--dark--tablet.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "screen/insufficient-coverage/dark/mobile": {
       "status": "pass",
-      "reviewArtifactFingerprint": "bbdcebea69ea5a37130589158f2b16548914428c27698b7a865be8736d92589e",
+      "reviewArtifactFingerprint": "ae7c6da3fa5f86b488bacbab30ea8c856f1b3997c7527f672f6e5c242bf5da74",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "fc83a65c08996aa977cdf5a2a8dde8b34687529aad856227ea83bf82650e80cf",
-      "reviewedNormalizedRgbaSha256": "bf6d64960855d4d11dc35fb7e7adaa16d78452956eff179783281b7141e78f1a",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "2286f23a2d96095df1174da10768e8a60f7345d7b1506556b7a0e85d02e3aade",
+      "reviewedNormalizedRgbaSha256": "d9c37e0b6746361244ba57b52ec87bea6559fb0747aaeb7f905367e3825062d2",
       "reviewedArtifacts": [
         "insufficient-coverage--dark--mobile.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 in the explicit old/difference/new delta gallery; the corrected page label is accepted."
     },
     "print/insufficient-coverage/pdf": {
       "status": "pass",
-      "reviewArtifactFingerprint": "79c4f312c2b5a780980e66010203f4c7831e35de1d8e8236da7ba4adfbb45e71",
+      "reviewArtifactFingerprint": "4f104fcda3c9c352be4ce8b406600e1b705ee4f4840015625e2426301ef476e1",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
-      "reviewedRawSha256": "fe748cd83c0ac2fbf818f3b31ab1234861b088e8573c4807c4bbadea0a548a87",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
+      "reviewedRawSha256": "651d9a9dd9e6a3849dc51e82750e736a36de00c3311d462f5cf99166c5932ce0",
       "reviewedPages": [
         1,
         2,
@@ -544,19 +544,19 @@
       "reviewedArtifacts": [
         "insufficient-coverage--a4.pdf"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29 as part of the complete four-PDF set linked from the delta gallery."
     },
     "print/insufficient-coverage/raster-set": {
       "status": "pass",
-      "reviewArtifactFingerprint": "7a39ae77becbee47e85918fc6a6bbd1bbed1d1945643be676dd06093d4bea296",
+      "reviewArtifactFingerprint": "52bc33687ff49636ca43261c321b60ec78783fda5c697156b0a54e310647c71d",
       "reviewer": "@Founder",
-      "reviewedAt": "2026-08-26T10:57:06.000Z",
+      "reviewedAt": "2026-08-29T03:22:30.000Z",
       "reviewedRawSha256": [
         "e0f89e6b8c5d555e35e8da6d4a8c9ef54ac3af4a0646ba839156e15133784026",
         "7ad9e2dd6fc8f0e1f18563fa0249529a647ec2ad6bd53681268e8aa6c01a8bf1",
         "229fb7804baf5ff1755ed9130b7d9b2e914ea1e29c911d64399b89df1d3a0dc0",
         "93d9c10c3d63a9f7b9a6f367f79e94cf2a6fe0357d1a1cb55b93092d41bb55dd",
-        "f3b36e993cf367c219a275d4d4dca807961726d6397faf3eaef7fb20bb38c05b",
+        "c03c9dc3389c2b873ee85b4eecc1b427e46ae3950957a9f82bd3edfcfd6f0c36",
         "95a8f7172123a666eeca5ffe62a976b15255aa0c102c65b4adf3b82ee72a1ccb",
         "69e5556b443552e2cd6cc7857c8a3f39587fafc52932bf53d13ce9b4a7cfb0f8",
         "e3f351b391495e7aa457b3bf1400683fcd94bd763537f4b39f4e549f7bc539c0",
@@ -587,7 +587,7 @@
         "insufficient-coverage--a4-page-09.png",
         "insufficient-coverage--a4-page-10.png"
       ],
-      "note": "PASS transferred from the Founder's 2026-08-26 review of this cell; the artifact is byte-identical on the fresh render. See the ledger basis."
+      "note": "PASS re-reviewed by the Founder on 2026-08-29; changed page raster(s) accepted in the explicit delta gallery: insufficient-coverage--a4-page-05.png."
     }
   },
   "transferredAt": "2026-08-28T04:40:00.000Z"
