@@ -2,14 +2,13 @@
 
 ## Unreleased
 
-## 0.2.3 — prepared 2026-08-28, not released
+## 0.2.3 — 2026-08-29
 
-No tag, no npm publish. Four independent review passes ended FAIL on different and correct
-findings; the repaired code has since passed a focused independent re-review with no open
-Blocker/High finding. On 2026-08-29 the Founder reviewed and accepted the 21 changed rendered views
-and the complete PDF set; the ledger is bound to that review. Release still waits for the final
-verifier to accept the complete state. The date on this heading becomes a release date when the tag
-exists, and not before.
+Released from annotated tag `v0.2.3` after the independent verifier passed the complete state with
+no open Blocker/High finding. The Founder reviewed and accepted the 21 changed rendered views and
+the complete PDF set, and the ledger is bound to that review. The tag workflow exercised one
+checksum-bound tarball in clean Node 22.13.0 and Node 24 consumers before publishing those exact
+bytes to npm with signed provenance and attaching them to the GitHub Release.
 
 ### Any document with an inline SVG can be checked
 

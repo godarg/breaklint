@@ -251,14 +251,19 @@ version 0.2.1, imported Configuration Contract v1 and produced the expected find
 with exit 1. This status paragraph is a later documentation commit and is not retroactively part of
 the published tarball.
 
-**Prepared, NOT released:** `breaklint@0.2.3` exists as a commit and a version in
-`package.json`; no tag, no npm publish, no GitHub Release. The release contract in
-`docs/releasing.md` requires that an independent verifier hold no open Blocker/High finding. Four
-review passes had ended FAIL — each on different and correct findings — before the repaired code
-passed a focused independent re-review with no open Blocker/High finding. The Founder accepted the
-21 changed rendered views and complete PDF set on 2026-08-29, and the ledger is bound to that
-review. The final verifier is still outstanding, so this section describes a candidate rather than
-a release.
+**Released on 2026-08-29:** `breaklint@0.2.3` repairs the inline-SVG checking path described below.
+The annotated `v0.2.3` tag resolves to `9f8068bb96334f81ae9d96795e685245f5a0e6d6`.
+The independent verifier passed that complete state with no open Blocker/High finding, after the
+Founder had accepted the 21 changed rendered views and complete PDF set and the review ledger had
+been bound to that review. The tag workflow exercised one checksum-bound tarball in clean Node
+22.13.0 and Node 24 consumers before publishing those exact bytes with npm provenance. Independent
+registry verification found three verified registry signatures, two verified attestations and SRI
+`sha512-VMCnnIGeGcyxVBkZqBx6ieNA5NodXLDx3/mY7IYJMVGY2V0lFd+0+B5LO4mYZxJfpx0mMQCGY2+OR/u7Gmj52w==`.
+The npm tarball is byte-identical to the GitHub Release asset with SHA-256
+`a19be2b87a2d9e725417fbd978623c690fffc2195152d30e269e866c46670abf`; a fresh registry install
+reported version 0.2.3, imported Configuration Contract v1 and produced the expected
+finding-bearing demo with exit 1. This status paragraph is a later documentation commit and is not
+retroactively part of the published tarball.
 
 What it repairs: the defect that made every document
 containing an inline SVG uncheckable, and it is worth stating plainly because it is this project's
