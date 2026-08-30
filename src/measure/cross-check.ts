@@ -92,9 +92,21 @@ export interface Disagreement {
 export interface CrossCheckResult {
   checked: number;
   required: number;
+  candidates: number;
+  eligible: number;
+  excludedSvgDescendants: number;
+  excludedInlineBlockContainers: number;
   maxDelta: number;
   disagreements: Disagreement[];
   ok: boolean;
+}
+
+export interface GeometrySampleBatch {
+  samples: GeometrySample[];
+  candidates: number;
+  eligible: number;
+  excludedSvgDescendants: number;
+  excludedInlineBlockContainers: number;
 }
 
 /** Convert CDP's four-corner quad to the axis-aligned box returned by getBoundingClientRect(). */
@@ -124,6 +136,12 @@ export function compareGeometry(
   outOfProcess: readonly GeometrySample[],
   tolerance: number = CROSS_CHECK_TOLERANCE_PX,
   required: number = inPage.length,
+  stats: Omit<GeometrySampleBatch, "samples"> = {
+    candidates: inPage.length,
+    eligible: inPage.length,
+    excludedSvgDescendants: 0,
+    excludedInlineBlockContainers: 0,
+  },
 ): CrossCheckResult {
   const byKey = new Map(outOfProcess.map((s) => [s.key, s]));
   const disagreements: Disagreement[] = [];
@@ -148,6 +166,7 @@ export function compareGeometry(
   return {
     checked: inPage.length,
     required,
+    ...stats,
     maxDelta,
     disagreements,
     // A cross-check over nothing is not a passed cross-check. Measuring zero elements and
@@ -174,9 +193,34 @@ export function crossCheckEvent(result: CrossCheckResult): InfraEvent {
     measured: {
       checked: result.checked,
       required: result.required,
+      candidates: result.candidates,
+      eligible: result.eligible,
+      excludedSvgDescendants: result.excludedSvgDescendants,
+      excludedInlineBlockContainers: result.excludedInlineBlockContainers,
       maxDeltaPx: Number.isFinite(result.maxDelta) ? Number(result.maxDelta.toFixed(4)) : null,
       tolerancePx: CROSS_CHECK_TOLERANCE_PX,
       worst: worst.map((d) => ({ key: d.key, field: d.field, inPage: d.inPage, outOfProcess: d.outOfProcess })),
+    },
+  };
+}
+
+/** Positive evidence from the independent browser-layout-tree oracle. Non-fatal by contract. */
+export function crossCheckPassedEvent(result: CrossCheckResult): InfraEvent {
+  return {
+    kind: "geometry-cross-check-passed",
+    detail:
+      `the in-page probe matched the browser's layout tree for ${result.checked} of ${result.eligible} ` +
+      `eligible CSS box(es); ${result.excludedSvgDescendants} SVG graphics descendant(s) and ` +
+      `${result.excludedInlineBlockContainers} inline block-container(s) used different box semantics.`,
+    measured: {
+      checked: result.checked,
+      required: result.required,
+      candidates: result.candidates,
+      eligible: result.eligible,
+      excludedSvgDescendants: result.excludedSvgDescendants,
+      excludedInlineBlockContainers: result.excludedInlineBlockContainers,
+      maxDeltaPx: Number(result.maxDelta.toFixed(4)),
+      tolerancePx: CROSS_CHECK_TOLERANCE_PX,
     },
   };
 }
@@ -197,6 +241,10 @@ export const SAMPLE_SOURCE = `((limit) => {
   const all = P.all(document, rendered);
   const seen = new Set();
   const out = [];
+  let candidates = 0;
+  let eligible = 0;
+  let excludedSvgDescendants = 0;
+  let excludedInlineBlockContainers = 0;
   for (const el of all) {
     const sid = P.attr(el, "data-bl-sid");
     const ref = P.attr(el, "data-ref");
@@ -204,19 +252,34 @@ export const SAMPLE_SOURCE = `((limit) => {
     const attribute = sid ? "data-bl-sid" : ref ? "data-ref" : id ? "id" : null;
     const value = sid || ref || id;
     if (!attribute || !value) continue;
+    candidates += 1;
     // CDP's border quad includes stroke/paint extents for SVG graphics descendants while
     // getBoundingClientRect reports SVG geometry. Comparing those would be a disagreement between
     // definitions, not an independent check. Keep the root <svg>, whose CSS replaced-element box
     // is shared by both sources, and leave descendant geometry to the dedicated CTM collector.
     const svgRoot = P.closest(el, "svg");
-    if (svgRoot && svgRoot !== el) continue;
+    if (svgRoot && svgRoot !== el) { excludedSvgDescendants += 1; continue; }
     // A source-level block can become an inline formatting box through authored CSS (all:initial
     // does exactly that). For an inline containing block children, GCR and CDP's border quad cover
     // different unions. The child blocks remain independently eligible, so skipping this one box
     // removes a definition mismatch without creating an unchecked subtree.
-    if (!svgRoot && P.style(el).display === "inline") continue;
+    let containsBlockChild = false;
+    for (const child of P.children(el)) {
+      if (P.nodeType(child) !== 1) continue;
+      const childDisplay = P.style(child).display;
+      if (childDisplay === "block" || childDisplay === "flow-root" || childDisplay === "list-item" ||
+          childDisplay === "table" || childDisplay === "flex" || childDisplay === "grid") {
+        containsBlockChild = true;
+        break;
+      }
+    }
+    if (!svgRoot && P.style(el).display === "inline" && containsBlockChild) {
+      excludedInlineBlockContainers += 1;
+      continue;
+    }
     const b = P.rect(el);
     if (b.width <= 0 || b.height <= 0) continue;
+    eligible += 1;
     // JSON emits a CSS string token and therefore keeps an authored id containing a quote from
     // widening this selector.  The generated source attributes are preferred; id is the
     // compatibility fallback Paged.js preserves when it drops both generated attributes.
@@ -225,10 +288,11 @@ export const SAMPLE_SOURCE = `((limit) => {
     const key = attribute + ":" + value + "#" + occurrence;
     if (occurrence < 0 || seen.has(key)) continue;
     seen.add(key);
-    out.push({ key, x: b.x, y: b.y, width: b.width, height: b.height, selector: exactSelector, occurrence });
-    if (out.length === limit) break;
+    if (out.length < limit) {
+      out.push({ key, x: b.x, y: b.y, width: b.width, height: b.height, selector: exactSelector, occurrence });
+    }
   }
-  return out;
+  return { samples: out, candidates, eligible, excludedSvgDescendants, excludedInlineBlockContainers };
 })`;
 
 /** Bind the sample limit into the browser expression; `PageLike.evaluate(string)` takes no args. */

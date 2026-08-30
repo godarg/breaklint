@@ -39,7 +39,7 @@ import {
   CROSS_CHECK_TOLERANCE_PX,
   geometrySampleSource,
   quadEnvelope,
-  type GeometrySample,
+  type GeometrySample, type GeometrySampleBatch,
 } from "../../src/measure/cross-check.ts";
 import { collectorSource } from "../../src/paginate/collector.ts";
 import { injectSourceIds } from "../../src/source/inject.ts";
@@ -364,21 +364,24 @@ describe("the measurement probe, live", () => {
     await filterPage.evaluate<void>(`(() => {
       document.body.innerHTML = '<div class="pagedjs_page"><svg id="filter-svg-root" data-ref="root" width="60" height="40">' +
         '<g id="filter-svg-group" data-ref="group"><rect id="filter-svg-rect" data-ref="rect" width="10" height="6"></rect></g></svg>' +
-        '<p data-ref="paragraph">control</p></div>';
+        '<p data-ref="paragraph">control <span id="filter-inline" data-ref="inline">ordinary inline</span></p></div>';
     })()`);
-    const filterSamples = await filterPage.evaluate<GeometrySample[]>(geometrySampleSource(100));
+    const filterBatch = await filterPage.evaluate<GeometrySampleBatch>(geometrySampleSource(100));
+    const filterSamples = filterBatch.samples;
     const filterDiagnostics = await filterPage.evaluate<Record<string, unknown>>(`(() => {
       const P = window.__blPrimitives;
       const root = P.all(document, '.pagedjs_page [data-ref="root"]')[0];
       return { found: !!root, closestSelf: P.closest(root, "svg") === root, rect: P.rect(root), display: P.style(root).display };
     })()`);
-    const filterTargetShape = await filterPage.evaluate<{ tag: string; insideSvg: boolean; isSvgRoot: boolean }[]>(`(() => {
+    const filterTargetShape = await filterPage.evaluate<{
+      tag: string; ref: string | null; insideSvg: boolean; isSvgRoot: boolean;
+    }[]>(`(() => {
       const P = window.__blPrimitives;
       const samples = ${JSON.stringify(filterSamples)};
       return samples.map((sample) => {
         const target = P.all(document, sample.selector)[sample.occurrence];
         const root = target ? P.closest(target, "svg") : null;
-        return { tag: target?.tagName || "", insideSvg: !!root, isSvgRoot: root === target };
+        return { tag: target?.tagName || "", ref: target ? P.attr(target, "data-ref") : null, insideSvg: !!root, isSvgRoot: root === target };
       });
     })()`);
     await filterPage.close();
@@ -391,10 +394,16 @@ describe("the measurement probe, live", () => {
       false,
       `an SVG graphics descendant entered the CSS-box oracle: ${JSON.stringify(filterTargetShape)}`,
     );
+    assert.ok(
+      filterTargetShape.some((target) => target.ref === "inline"),
+      `an ordinary inline box was excluded even though it contains no block child: ${JSON.stringify(filterTargetShape)}`,
+    );
 
     const page = await paginated();
-    const inPage = await page.evaluate<GeometrySample[]>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
+    const batch = await page.evaluate<GeometrySampleBatch>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
+    const inPage = batch.samples;
     assert.equal(inPage.length, CROSS_CHECK_SAMPLE_SIZE, "the live oracle did not fill its eight-element sample");
+    assert.ok(batch.eligible >= CROSS_CHECK_SAMPLE_SIZE, "the live oracle's independent eligible count is too small");
 
     const session = await (page as unknown as { createCDPSession(): Promise<CdpSession> }).createCDPSession();
     await session.send("DOM.enable");
@@ -427,7 +436,13 @@ describe("the measurement probe, live", () => {
     }
     await page.close();
 
-    const result = compareGeometry(inPage, outOfProcess, CROSS_CHECK_TOLERANCE_PX, CROSS_CHECK_SAMPLE_SIZE);
+    const result = compareGeometry(
+      inPage,
+      outOfProcess,
+      CROSS_CHECK_TOLERANCE_PX,
+      CROSS_CHECK_SAMPLE_SIZE,
+      batch,
+    );
     assert.equal(result.ok, true, `disagreements: ${JSON.stringify(result.disagreements)}`);
     assert.ok(
       result.maxDelta <= CROSS_CHECK_MEASURED_MAX_PX,

@@ -97,6 +97,8 @@ export const INFRA_EVENT_KINDS = [
    * zero-size geometry or authored CSS that changes the box remain fatal.
    */
   "image-content-unavailable",
+  /** The independent CDP layout-tree oracle matched; measured sample cardinality is retained. */
+  "geometry-cross-check-passed",
   /**
    * The in-page probe and the browser's own layout tree disagree about where something is.
    *
@@ -112,15 +114,17 @@ export type InfraEventKind = (typeof INFRA_EVENT_KINDS)[number];
  * The infrastructure kinds that do NOT make a run exit 3.
  *
  * Everything else about the measuring apparatus failing means the report cannot be trusted. These
- * four mean something narrower and the contract says so in as many words: for the two mark
+ * entries mean something narrower and the contract says so in as many words: for the two mark
  * kinds, "the document is in order, only the binding is not" (§11.4.1). Losing the evidence for a
  * finding is not the same as being unable to measure the document. `break-cause-undetermined`
  * preserves the visible unknown cause but must not suppress the report (§9: uncertainty costs
  * nothing). A tool that exits 3
  * because a hostile stylesheet reached its own overlay would be unusable on exactly the documents
  * it exists for. `empty-input` is here because an empty document is a coverage question. A
- * fixed-size failed image is explicit too: its pixels are unavailable, but its non-zero box was
- * measured and the released rules inspect layout rather than the raster content of `<img>`.
+ * fixed-size failed image is explicit too: its pixels are unavailable, but its box equals the
+ * authored dimensions and the released rules inspect layout rather than the raster content of
+ * `<img>`. The positive geometry event is evidence that a distinct CDP layout-tree oracle agreed;
+ * it cannot make a finding disappear or turn a fatal neighbour non-fatal.
  *
  * The list is deliberately small and deliberately explicit: an infrastructure kind added later is
  * fatal unless someone decides otherwise, which is the safe default direction.
@@ -131,6 +135,7 @@ export const NON_FATAL_INFRA_EVENT_KINDS = [
   "mark-raster-diff",
   "break-cause-undetermined",
   "image-content-unavailable",
+  "geometry-cross-check-passed",
 ] as const satisfies readonly InfraEventKind[];
 
 /** Fingerprint key types. */

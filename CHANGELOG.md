@@ -39,6 +39,9 @@
   ink pass and never wrote `inkCollected: true`; counting both rules was a capability claim over a
   path no document reached. Their modules and 78/78 real-renderer M3 lab remain explicitly
   research-only for a later, separately designed ink milestone.
+- Migration from 0.2.x: a config that names either withdrawn rule ID now fails closed as invalid
+  usage (Exit 2). Remove those keys; there is no replacement rule until a production pixel pass
+  has an independent oracle and real-document coverage.
 - Removed all hand-authored ink counts and `inkCollected: true` from the demo snapshot. `--demo`
   now reports seven real rule-chain findings, 13 rules run and 11 rules measured; it cannot display
   an SVG ink finding that live acquisition cannot create.

@@ -126,6 +126,11 @@ equal to both values. Only that fixed-layout case continues with the non-fatal
 changes the box is not accepted as stable geometry.
 Reports retain a resource index and dimensions, never the failed file URL or remote query string.
 
+A successful live document retains a non-fatal `geometry-cross-check-passed` event with candidate,
+eligible, checked and required box counts, every semantic exclusion and the maximum delta against
+the 0.05 px tolerance. This is positive evidence from Chrome's CDP layout tree, not a second read
+from the in-page collector; a zero or truncated required sample is fatal.
+
 **SVG clipping and ink collision are not released rules.** The research modules
 `svg/text-clipped` and `svg/text-ink-collision` need isolated, stable pixel passes that production
 acquisition does not yet collect. Version 0.3.0 therefore removes them from the CLI registry,

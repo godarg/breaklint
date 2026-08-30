@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   compareGeometry,
   crossCheckEvent,
+  crossCheckPassedEvent,
   CROSS_CHECK_MEASURED_MAX_PX,
   CROSS_CHECK_TOLERANCE_PX,
   quadEnvelope,
@@ -72,6 +73,29 @@ describe("the geometry cross-check", () => {
     assert.equal(result.ok, true, JSON.stringify(result.disagreements));
     assert.equal(result.checked, 2);
     assert.ok(result.maxDelta < CROSS_CHECK_TOLERANCE_PX);
+  });
+
+  it("a passed event preserves independently counted sample cardinality", () => {
+    const probe = [box("a", 10, 20), box("b", 10, 60)];
+    const result = compareGeometry(probe, probe, CROSS_CHECK_TOLERANCE_PX, 2, {
+      candidates: 7,
+      eligible: 5,
+      excludedSvgDescendants: 1,
+      excludedInlineBlockContainers: 1,
+    });
+    assert.equal(result.ok, true);
+    const event = crossCheckPassedEvent(result);
+    assert.equal(event.kind, "geometry-cross-check-passed");
+    assert.deepEqual(event.measured, {
+      checked: 2,
+      required: 2,
+      candidates: 7,
+      eligible: 5,
+      excludedSvgDescendants: 1,
+      excludedInlineBlockContainers: 1,
+      maxDeltaPx: 0,
+      tolerancePx: 0.05,
+    });
   });
 
   /** Each of the four fields is compared, not just position. */

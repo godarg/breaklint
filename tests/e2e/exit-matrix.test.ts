@@ -531,7 +531,7 @@ describe("exit matrix", () => {
 
   /**
    * Every infrastructure kind, one row each, asserting the exit it produces on an otherwise clean
-   * document. The four named non-fatal kinds must leave the run at 0; all others must
+   * document. The six named non-fatal kinds must leave the run at 0; all others must
    * take it to 3.
    *
    * This exists because the enumeration was previously covered only where a hand-written row
@@ -566,7 +566,7 @@ describe("exit matrix", () => {
     // literal is intentionally independent of the production list.
     const EXPECTED_NON_FATAL = [
       "empty-input", "mark-style-overridden", "mark-raster-diff", "break-cause-undetermined",
-      "image-content-unavailable",
+      "image-content-unavailable", "geometry-cross-check-passed",
     ];
 
     it("the production non-fatal list is exactly the list this file expects", () => {
@@ -578,7 +578,7 @@ describe("exit matrix", () => {
     });
 
     it("every declared kind is covered by a row below", () => {
-      assert.equal(INFRA_EVENT_KINDS.length, 18, "a kind was added or removed without deciding its fatality");
+      assert.equal(INFRA_EVENT_KINDS.length, 19, "a kind was added or removed without deciding its fatality");
     });
 
     for (const kind of INFRA_EVENT_KINDS) {

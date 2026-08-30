@@ -4,38 +4,28 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const CASES = [
-  {
-    id: "project-gutenberg-gettysburg-address",
-    document: join(ROOT, "corpus/public/robustness-v1/documents/project-gutenberg-gettysburg-address.html"),
-    evidence: join(
-      ROOT,
-      "corpus/public/robustness-v1/source-evidence/source-project-gutenberg-gettysburg-address.json",
-    ),
-    sha256: "2da09414df2cfbe8f48420abd73067e3e08182d152d3d13bcdd1d26ff30535d9",
-    sourceClass: "public-domain-third-party",
-    rightsBasis: "public-domain-author-death-1865-and-upstream-public-domain-notice",
-    pages: 9,
-    measuredRules: 9,
-    infrastructureKinds: [],
-  },
-  {
-    id: "dargel-kleingewerbe",
-    document: join(ROOT, "corpus/public/m3-1-pilot-v1/documents/dargel-kleingewerbe.html"),
-    evidence: join(ROOT, "corpus/public/m3-1-pilot-v1/source-evidence/source-dargel-kleingewerbe.json"),
-    sha256: "703acb5a78a6d3cd91133192938df218356034308440d9cbdf9764c2f9805df3",
-    sourceClass: "public-first-party",
-    rightsBasis: "first-party-founder-authorized",
-    pages: 6,
-    measuredRules: 11,
-    infrastructureKinds: ["image-content-unavailable"],
-  },
-];
+const MANIFEST_PATH = join(ROOT, "corpus/public/robustness-v1/manifest.json");
+const MANIFEST_ROOT = dirname(MANIFEST_PATH);
+const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+assert.equal(manifest.contractVersion, "robustness-corpus-v1");
+assert.equal(manifest.calibrationEvidenceEligible, false, "robustness evidence is not calibration evidence");
+assert.equal(manifest.externalTrustRootClaimed, false, "the robustness corpus is not an external trust root");
+assert.equal(manifest.documents?.length, 2, "the admitted robustness manifest must bind both corpus documents");
+assert.deepEqual(
+  new Set(manifest.documents.map((item) => item.sourceClass)),
+  new Set(["public-domain-third-party", "public-first-party"]),
+  "the gate needs one third-party breadth artifact and one first-party resource-packaging artifact",
+);
+const CASES = manifest.documents.map((item) => ({
+  ...item,
+  document: resolve(MANIFEST_ROOT, item.artifact),
+  evidence: resolve(MANIFEST_ROOT, item.sourceEvidence),
+}));
 
 function argument(name) {
   const index = process.argv.indexOf(name);
@@ -81,7 +71,7 @@ try {
     assert.equal(run.signal, null, `${corpusCase.id}: process was terminated by ${run.signal}`);
     assert.equal(
       run.status,
-      0,
+      corpusCase.expected.exitCode,
       `${corpusCase.id}: CLI exited ${run.status}, expected an exact clean measurement.\n` +
         `stdout:\n${run.stdout}\nstderr:\n${run.stderr}`,
     );
@@ -91,21 +81,21 @@ try {
     assert.equal(report.mode, "live");
     assert.equal(report.source, "rendered");
     assert.equal(report.inputsFound, 1);
-    assert.equal(report.pagesAnalysed, corpusCase.pages, `${corpusCase.id}: documented page count drifted`);
-    assert.equal(report.rulesRun, 13, "real-document gate and public rule contract diverged");
+    assert.equal(report.pagesAnalysed, corpusCase.expected.pagesAnalysed, `${corpusCase.id}: documented page count drifted`);
+    assert.equal(report.rulesRun, corpusCase.expected.rulesRun, "real-document gate and public rule contract diverged");
     assert.equal(
       report.measuredRules,
-      corpusCase.measuredRules,
+      corpusCase.expected.measuredRules,
       `${corpusCase.id}: documented measured-rule count drifted`,
     );
-    assert.equal(report.exitCode, 0);
+    assert.equal(report.exitCode, corpusCase.expected.exitCode);
     assert.equal(report.documents.length, 1);
     const [document] = report.documents;
     assert.equal(document.inputIdentity.html, corpusCase.sha256);
-    assert.equal(document.pages, corpusCase.pages);
+    assert.equal(document.pages, corpusCase.expected.pagesAnalysed);
     assert.deepEqual(
       document.infrastructure.map((event) => event.kind),
-      corpusCase.infrastructureKinds,
+      corpusCase.expected.infrastructureKinds,
       `${corpusCase.id}: infrastructure contract drifted`,
     );
     assert.equal(document.coverage["svg/text-clipped"], undefined);
@@ -115,8 +105,21 @@ try {
       `${corpusCase.id}: coverage map contains no real measurement`,
     );
 
+    const geometryEvent = document.infrastructure.find((event) => event.kind === "geometry-cross-check-passed");
+    assert.ok(geometryEvent, `${corpusCase.id}: no positive geometry-oracle evidence was reported`);
+    assert.deepEqual(
+      geometryEvent.measured,
+      corpusCase.expected.geometryCrossCheck,
+      `${corpusCase.id}: positive geometry-oracle evidence drifted`,
+    );
+    assert.ok(
+      geometryEvent.measured.eligible >= geometryEvent.measured.required,
+      `${corpusCase.id}: the sampler claims more required boxes than its independently counted eligible population`,
+    );
+
     if (corpusCase.id === "dargel-kleingewerbe") {
-      const [imageEvent] = document.infrastructure;
+      const imageEvent = document.infrastructure.find((event) => event.kind === "image-content-unavailable");
+      assert.ok(imageEvent);
       assert.deepEqual(imageEvent.measured, {
         images: [
           { resourceIndex: 1, widthPx: 36, heightPx: 36, declaredWidthPx: 36, declaredHeightPx: 36 },
@@ -133,7 +136,8 @@ try {
 
     process.stdout.write(
       `real-document gate: ${corpusCase.id}; exit ${run.status}; ${report.pagesAnalysed} page(s); ` +
-        `${report.measuredRules}/${report.rulesRun} rules measured; artifact ${corpusCase.sha256}\n`,
+        `${report.measuredRules}/${report.rulesRun} rules measured; geometry ` +
+        `${geometryEvent.measured.checked}/${geometryEvent.measured.required}; artifact ${corpusCase.sha256}\n`,
     );
   }
 } finally {

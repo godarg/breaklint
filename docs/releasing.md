@@ -40,6 +40,7 @@ npm run typecheck
 npm run schema:check
 npm test
 npm run test:mutants
+npm run test:real-document
 npm run test:licenses
 BREAKLINT_LIVE_REPORT=.tmp/live-report.json BREAKLINT_LIVE_SUMMARY=.tmp/live-summary.json npm run test:live
 npm run test:documented-figures
@@ -52,6 +53,14 @@ The technical surface gate reconstructs and verifies every current cell without 
 look. `npm run test:report-surfaces` is the separate exact-environment human gate. It must stay red
 when the bound inputs changed and no person reviewed the new artifacts; never refresh its ledger as
 release ceremony. A real later review may rebind it with its actual reviewer and timestamp.
+
+The green real-document gate reads the rights/privacy-reviewed corpus manifest and binds exact
+artifact hashes, source evidence, page/rule counts and the positive independent geometry-oracle
+sample. Its one-time red condition is preserved in
+`docs/validation/real-document-red-control-v0.2.3.json`; it was produced by installing the signed
+registry package and running
+`BREAKLINT_023_CLI=<0.2.3-package>/dist/cli/index.js npm run test:real-document:red-control` against
+the exact same third-party bytes. It is historical evidence, not a network-dependent release step.
 
 Then verify:
 

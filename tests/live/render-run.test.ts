@@ -295,7 +295,9 @@ describe("the M2d live production chain", () => {
     const cssOverridden = join(root, "missing-image-css-overridden.html");
     writeFileSync(
       declared,
-      '<!doctype html><img src="missing-image.png" width="36" height="24" alt=""><p>declared image size</p>',
+      '<!doctype html><img src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==" ' +
+        'width="10" height="10" alt=""><img src="missing-image.png" width="36" height="24" alt="">' +
+        '<p>declared image size</p>',
     );
     writeFileSync(
       undeclared,
@@ -317,7 +319,7 @@ describe("the M2d live production chain", () => {
     const imageEvent = declaredDocument.infrastructure.find((event) => event.kind === "image-content-unavailable");
     assert.ok(imageEvent, "the missing content must remain a named diagnostic");
     assert.deepEqual(imageEvent.measured, {
-      images: [{ resourceIndex: 1, widthPx: 36, heightPx: 24, declaredWidthPx: 36, declaredHeightPx: 24 }],
+      images: [{ resourceIndex: 2, widthPx: 36, heightPx: 24, declaredWidthPx: 36, declaredHeightPx: 24 }],
     });
 
     const undeclaredDocument = imageRun.documents[1]!;
@@ -661,7 +663,23 @@ describe("the M2d live production chain", () => {
     if (!completeChain(t)) return;
     const document = result!.documents[21]!;
     assert.ok(document.snapshot, "the sound SVG document produced no snapshot");
-    assert.deepEqual(document.infrastructure, [], "a sound document produced an infrastructure event");
+    assert.deepEqual(
+      document.infrastructure.map((event) => ({ kind: event.kind, measured: event.measured })),
+      [{
+        kind: "geometry-cross-check-passed",
+        measured: {
+          checked: 8,
+          required: 8,
+          candidates: 12,
+          eligible: 12,
+          excludedSvgDescendants: 0,
+          excludedInlineBlockContainers: 0,
+          maxDeltaPx: 0,
+          tolerancePx: 0.05,
+        },
+      }],
+      "the sound document did not retain its complete independent geometry-oracle evidence",
+    );
 
     const outcome = runDocument(document, {
       failOn: "error",

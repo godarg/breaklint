@@ -62,7 +62,17 @@ try {
   assert.equal(cleanReport.findings.filter((finding) => finding.severity === "error").length, 0);
   assert.ok(cleanReport.documents.length > 0, "the selfcheck judged no document");
   for (const document of cleanReport.documents) {
-    assert.deepEqual(document.infrastructure, [], "the selfcheck hid an infrastructure event");
+    assert.deepEqual(
+      document.infrastructure.map((event) => event.kind),
+      ["geometry-cross-check-passed"],
+      "the selfcheck either hid its positive oracle evidence or retained another infrastructure event",
+    );
+    const geometry = document.infrastructure[0].measured;
+    assert.equal(geometry.checked, 8);
+    assert.equal(geometry.required, 8);
+    assert.ok(geometry.candidates >= geometry.eligible && geometry.eligible >= geometry.required);
+    assert.equal(geometry.maxDeltaPx, 0);
+    assert.equal(geometry.tolerancePx, 0.05);
     for (const ruleId of PROOF_A_RULES) {
       const coverage = document.coverage[ruleId];
       assert.ok(coverage, `${ruleId} produced no structured coverage row`);

@@ -4,9 +4,9 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## Current state — 0.3.0 (2026-08-30)
+## Prepared release state — 0.3.0 (2026-08-30)
 
-The released CLI exposes **13 rules**: two structural error rules, ten ordinary warning rules and
+The 0.3.0 release candidate exposes **13 rules**: two structural error rules, ten ordinary warning rules and
 one experimental warning that never gates. All 13 carry `calibrated: false`; there is still no
 human-labelled corpus and no external trust root. The research modules `svg/text-clipped` and
 `svg/text-ink-collision` are retained for the M3 renderer lab but are no longer counted, configured,
@@ -18,7 +18,9 @@ rights- and privacy-reviewed HTML artifacts are a mandatory CI and release gate.
 Project Gutenberg document was not written for this repository; it produces exactly 9 pages,
 measures 9/13 rules and exits 0. The first-party Dargel document separately exercises absent-image
 packaging and produces exactly 6 pages, measures 11/13 rules and exits 0. The published 0.2.3 package
-makes the third-party gate fail with Exit 3; that is the recorded red control.
+makes the third-party gate fail with Exit 3; the exact registry integrity, environment, report hash
+and reproduction command are retained in
+`docs/validation/real-document-red-control-v0.2.3.json` as the recorded red control.
 
 Live input is explicitly `.html`/`.htm`. Standalone SVG, PDF, Markdown and directories are rejected
 as usage with Exit 2 before the browser starts. Inline SVG remains supported for the released
@@ -36,6 +38,10 @@ replacement text and authored CSS overrides do not establish stable image geomet
 with equal declared and rendered dimensions becomes the named non-fatal event
 `image-content-unavailable`. That distinction lets
 the frozen first-party corpus document be measured without claiming its absent pixels were present.
+Every successful live document also carries `geometry-cross-check-passed`: it reports candidates,
+the independently counted eligible population, the checked/required cardinality, exclusions and
+maximum delta against the 0.05 px tolerance. A green report therefore exposes how much of the
+second-opinion sample actually ran instead of hiding that fact behind Exit 0.
 
 M3 is split by dependency: M3-1a (public corpus breadth and acquisition robustness) is active and
 precedes governance; M3-1b (blind human labels, adjudication, external attestation and externally
@@ -95,7 +101,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=352 aggregateTests=464 liveTests=62 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=353 aggregateTests=466 liveTests=62 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against

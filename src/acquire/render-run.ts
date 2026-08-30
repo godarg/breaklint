@@ -37,8 +37,9 @@ import type { DocumentInput } from "../core/engine.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InfraEvent, ReportEnvironment, ResourceRecord, SourceRef } from "../core/types.ts";
 import {
-  compareGeometry, crossCheckEvent, CROSS_CHECK_SAMPLE_SIZE, geometrySampleSource, quadEnvelope,
-  type GeometrySample,
+  compareGeometry, crossCheckEvent, crossCheckPassedEvent, CROSS_CHECK_SAMPLE_SIZE,
+  CROSS_CHECK_TOLERANCE_PX, geometrySampleSource, quadEnvelope,
+  type GeometrySample, type GeometrySampleBatch,
 } from "../measure/cross-check.ts";
 import {
   awaitStableLayout,
@@ -726,7 +727,8 @@ async function configureNetwork(
 }
 
 async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compareGeometry>> {
-  const inPage = await page.evaluate<GeometrySample[]>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
+  const batch = await page.evaluate<GeometrySampleBatch>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
+  const inPage = batch.samples;
   if (!page.createCDPSession) throw new Error("the browser driver exposes no CDP session for the geometry oracle");
   const session = await page.createCDPSession();
   try {
@@ -751,9 +753,10 @@ async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compare
       out.push({ key: sample.key, ...quadEnvelope(q) });
     }
     // Small documents can expose fewer than eight eligible CSS boxes; in that case every eligible
-    // box is checked. The live oracle separately proves that a document with enough eligible
-    // elements fills the complete eight-element budget.
-    return compareGeometry(inPage, out);
+    // box is checked. Returning the independently counted eligible population makes that reduction
+    // visible and turns accidental sampler truncation into a fatal cardinality mismatch.
+    const required = Math.min(CROSS_CHECK_SAMPLE_SIZE, batch.eligible);
+    return compareGeometry(inPage, out, CROSS_CHECK_TOLERANCE_PX, required, batch);
   } finally {
     await session.detach().catch(() => undefined);
   }
@@ -883,6 +886,7 @@ interface ResourceBarrierResult {
 
 interface RawImageDecodeFailure {
   uri: string;
+  resourceIndex: number;
   width: number;
   height: number;
   widthAttribute: string | null;
@@ -891,6 +895,7 @@ interface RawImageDecodeFailure {
 
 interface ImageDecodeFailure {
   uri: string;
+  resourceIndex: number;
   width: number;
   height: number;
   declaredWidth: number;
@@ -1152,6 +1157,7 @@ const RESOURCE_BARRIER_SOURCE = `(async () => {
     const box = P.rect(image);
     return [{
       uri: P.imageUri(image),
+      resourceIndex: index + 1,
       width: box.width,
       height: box.height,
       widthAttribute: P.attr(image, "width"),
@@ -1294,6 +1300,7 @@ async function openContentPage(
     }
     const checkedImages = ready.failedImages.map((image) => ({
       uri: image.uri,
+      resourceIndex: image.resourceIndex,
       width: image.width,
       height: image.height,
       declaredWidth: positiveHtmlDimension(image.widthAttribute),
@@ -1310,6 +1317,7 @@ async function openContentPage(
     }
     const imageFailures: ImageDecodeFailure[] = checkedImages.map((image) => ({
       uri: image.uri,
+      resourceIndex: image.resourceIndex,
       width: image.width,
       height: image.height,
       // The fatal branch above excludes both nulls before this trusted projection.
@@ -1489,11 +1497,11 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
           `${opened.imageFailures.length} image resource(s) could not be decoded; layout measurement ` +
           "continued because every failed image retained a non-zero rendered box and explicit authored dimensions.",
         measured: {
-          images: opened.imageFailures.map((image, index) => ({
+          images: opened.imageFailures.map((image) => ({
             // Do not persist an absolute file URL or a remote query string in a report. The
             // resource order plus measured box is sufficient evidence for this non-fatal event;
             // the input document remains the source of the authored URL.
-            resourceIndex: index + 1,
+            resourceIndex: image.resourceIndex,
             widthPx: Number(image.width.toFixed(4)),
             heightPx: Number(image.height.toFixed(4)),
             declaredWidthPx: image.declaredWidth,
@@ -1593,7 +1601,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     }
     const raw = await page.evaluate<RawSnapshot>(SNAPSHOT_SOURCE);
     const geometry = await crossCheckPage(page);
-    if (!geometry.ok) infrastructure.push(crossCheckEvent(geometry));
+    infrastructure.push(geometry.ok ? crossCheckPassedEvent(geometry) : crossCheckEvent(geometry));
 
     if (controlSignature) {
       const comparison = compareControlSignatures(raw.control, controlSignature);
