@@ -752,9 +752,9 @@ async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compare
       const q = model.border;
       out.push({ key: sample.key, ...quadEnvelope(q) });
     }
-    // Small documents can expose fewer than eight eligible CSS boxes; in that case every eligible
-    // box is checked. Returning the independently counted eligible population makes that reduction
-    // visible and turns accidental sampler truncation into a fatal cardinality mismatch.
+    // Small documents can expose fewer than eight addressable eligible CSS boxes; in that case
+    // every one is checked. Returning the full pre-limit eligible population makes that reduction
+    // visible and turns accidental sample-array truncation into a fatal cardinality mismatch.
     const required = Math.min(CROSS_CHECK_SAMPLE_SIZE, batch.eligible);
     return compareGeometry(inPage, out, CROSS_CHECK_TOLERANCE_PX, required, batch);
   } finally {

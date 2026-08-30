@@ -112,11 +112,6 @@ try {
       corpusCase.expected.geometryCrossCheck,
       `${corpusCase.id}: positive geometry-oracle evidence drifted`,
     );
-    assert.ok(
-      geometryEvent.measured.eligible >= geometryEvent.measured.required,
-      `${corpusCase.id}: the sampler claims more required boxes than its independently counted eligible population`,
-    );
-
     if (corpusCase.id === "dargel-kleingewerbe") {
       const imageEvent = document.infrastructure.find((event) => event.kind === "image-content-unavailable");
       assert.ok(imageEvent);

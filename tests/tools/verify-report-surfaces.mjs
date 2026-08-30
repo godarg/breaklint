@@ -279,6 +279,25 @@ function independentlyCheckTerminalPageContent(pdf, raster) {
   };
 }
 
+/**
+ * The positive apparatus section is one semantic unit in print. Measured red before this gate:
+ * the heading and explanation ended page 1 while the only evidence card started page 2, so the
+ * printed proof was orphaned from the label that explained why it was not a failure.
+ */
+function independentlyCheckPositiveApparatusGrouping(pdf) {
+  const pdfPath = resolve(output, pdf.path);
+  const headingPages = [];
+  const evidencePages = [];
+  for (let page = 1; page <= pdf.pages; page += 1) {
+    const text = run("pdftotext", ["-f", String(page), "-l", String(page), "-layout", pdfPath, "-"]);
+    if (text.includes("Measurement apparatus")) headingPages.push(page);
+    if (text.includes("geometry-cross-check-passed")) evidencePages.push(page);
+  }
+  assert.deepEqual(headingPages, [evidencePages[0]], `${pdf.cell}: positive apparatus heading and evidence split across pages`);
+  assert.deepEqual(evidencePages.length, 1, `${pdf.cell}: expected exactly one positive apparatus evidence card`);
+  return { headingPage: headingPages[0], evidencePage: evidencePages[0], samePage: true };
+}
+
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === "object") {
@@ -345,6 +364,7 @@ function printVisibleContract(state) {
   assert.deepEqual(pdf.pageStartChecks, independentlyCheckCoveragePageStarts(pdf, raster), `print/${state}: page-start raster invariant drift`);
   assert.deepEqual(pdf.pageContentChecks, independentlyCheckTerminalPageContent(pdf, raster), `print/${state}: terminal-page content invariant drift`);
   independentlyCheckCoverageBoxClosure(pdf, raster, pdf.printSemantics.coverageRecordCount);
+  if (state === "clean") independentlyCheckPositiveApparatusGrouping(pdf);
   return {
     pages: pdf.pages,
     pageSize: pdf.pageSize,

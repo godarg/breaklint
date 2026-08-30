@@ -39,7 +39,8 @@ with equal declared and rendered dimensions becomes the named non-fatal event
 `image-content-unavailable`. That distinction lets
 the frozen first-party corpus document be measured without claiming its absent pixels were present.
 Every successful live document also carries `geometry-cross-check-passed`: it reports candidates,
-the independently counted eligible population, the checked/required cardinality, exclusions and
+the full addressable eligible population counted before the eight-box sample limit, the
+checked/required cardinality, named semantic exclusions and
 maximum delta against the 0.05 px tolerance. A green report therefore exposes how much of the
 second-opinion sample actually ran instead of hiding that fact behind Exit 0.
 

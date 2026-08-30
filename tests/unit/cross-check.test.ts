@@ -75,7 +75,7 @@ describe("the geometry cross-check", () => {
     assert.ok(result.maxDelta < CROSS_CHECK_TOLERANCE_PX);
   });
 
-  it("a passed event preserves independently counted sample cardinality", () => {
+  it("a passed event preserves pre-limit eligible sample cardinality", () => {
     const probe = [box("a", 10, 20), box("b", 10, 60)];
     const result = compareGeometry(probe, probe, CROSS_CHECK_TOLERANCE_PX, 2, {
       candidates: 7,

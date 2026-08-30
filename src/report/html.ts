@@ -24,7 +24,7 @@ ${model.infrastructure.map((line) => `<li class="checker-event">
   <p><strong>Measured context:</strong> ${line.measured.length === 0 ? "Not available" : esc(line.measured.join("; "))}</p>
 </li>`).join("\n")}
 </ol>`;
-  return `<section aria-labelledby="apparatus-heading">
+  return `<section class="apparatus-section" aria-labelledby="apparatus-heading">
 <h2 id="apparatus-heading">${fatal ? "Checker failure" : "Measurement apparatus"}</h2>
 ${fatal
     ? `<div class="state-alert">

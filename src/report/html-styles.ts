@@ -182,6 +182,10 @@ export const REPORT_HTML_STYLES = String.raw`
     .finding-list, .coverage-documents { gap: var(--ds-space-4); }
     .finding { padding: var(--ds-space-4); }
     .finding-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* The heading explains why the first/only apparatus card is evidence rather than a failure.
+       Keep the semantic unit together; a measured red control put the heading on page 1 and the
+       positive card alone on page 2 when only the generic h2 break rule was present. */
+    .apparatus-section { break-inside: avoid; page-break-inside: avoid; }
     .coverage-list { display: block; }
     .coverage-record { position: relative; display: flow-root; margin-block-end: var(--ds-space-3); padding: var(--ds-space-3); break-inside: avoid; page-break-inside: avoid; }
     /* Chrome can omit the physical inline-end border of a paged flow-root containing floats even
