@@ -162,7 +162,8 @@ jobs:
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
           node "$GITHUB_WORKSPACE/tests/tools/real-document-gate.mjs" \
-            --cli "$PWD/node_modules/breaklint/dist/cli/index.js"
+            --cli "$PWD/node_modules/breaklint/dist/cli/index.js" \
+            --cwd "$PWD"
           echo "installed package: --version and --demo behave as documented"
 
       - name: a missing prerequisite ends with exit 3 and one copyable install command

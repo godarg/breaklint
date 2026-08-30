@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.3.0 — 2026-08-30
+## 0.3.1 — 2026-08-30
+
+The first `v0.3.0` tag run stopped before publication: both clean consumers installed the optional
+renderer peers correctly, but the real-document gate started their CLI with the repository checkout
+as its working directory. Local and ordinary CI runs inherited the checkout's dev dependencies and
+therefore hid that boundary error. Version 0.3.1 makes the child working directory mandatory and
+passes it explicitly in the source and both installed-package gates; the failed tag is retained
+rather than moved, and no `breaklint@0.3.0` package or GitHub Release was created.
 
 ### Real-document robustness before trust infrastructure
 
@@ -59,7 +66,7 @@
   0/13-calibrated product contract. The coordinated website copy has a separate repository,
   work item and deployment gate; this package does not claim that deploy before it is live.
 - Kept the 0.2.3 human report-surface ledger historical instead of restamping 32 cells without a
-  person. The 0.3.0 release gate reconstructs all 32 current cells and verifies 59 physical
+  person. The 0.3.1 release gate reconstructs all 32 current cells and verifies 59 physical
   artifacts (24 screens, 4 PDFs, 31 page rasters), decoded pixels, contrast, accessibility, print
   fragmentation and a pixel-mutation red control, while making no human-review claim.
 

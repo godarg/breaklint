@@ -83,7 +83,7 @@ function positiveApparatusReport(base: Report): Report {
     outcomes: [outcome],
     mode: "live",
     source: "rendered",
-    toolVersion: "0.3.0",
+    toolVersion: "0.3.1",
     commit: null,
     startedAt: new Date(0).toISOString(),
     durationMs: 0,

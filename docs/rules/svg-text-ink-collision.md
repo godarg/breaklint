@@ -1,6 +1,6 @@
 # `svg/text-ink-collision`
 
-> **Research definition — not a released rule in 0.3.0.** This module is absent from the CLI
+> **Research definition — not a released rule in 0.3.1.** This module is absent from the CLI
 > registry, configuration schema, SARIF catalogue and demo. It remains here with the M3 lab so a
 > future production integration has an explicit decision contract instead of an implied feature.
 
@@ -24,7 +24,7 @@ Bounding-box overlap is wrong in 2 of 8 collision fixtures; the clearest case is
 ## Availability in this build
 
 Production acquisition writes `inkCollected: false` for every SVG and has no isolated pixel pass.
-Version 0.3.0 therefore withdrew this rule from `ALL_RULES` instead of registering a definition
+Version 0.3.1 therefore withdrew this rule from `ALL_RULES` instead of registering a definition
 that no real document can reach. Only the explicit validation registry executes it over controlled
 M3 lab projections; that is research evidence, not a product capability.
 

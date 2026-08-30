@@ -1,7 +1,7 @@
 # M3-0 validation and calibration foundation
 
 M3-0 builds the apparatus needed to evaluate three SVG rules without claiming that any of them is
-calibrated. It does not authorize a production threshold or calibrated claim. In 0.3.0 the two ink
+calibrated. It does not authorize a production threshold or calibrated claim. In 0.3.1 the two ink
 definitions live only in the explicit validation registry; all 13 released rules and both research
 definitions remain `calibrated: false`.
 

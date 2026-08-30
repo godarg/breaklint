@@ -133,7 +133,7 @@ from the in-page collector; a zero or truncated required sample is fatal.
 
 **SVG clipping and ink collision are not released rules.** The research modules
 `svg/text-clipped` and `svg/text-ink-collision` need isolated, stable pixel passes that production
-acquisition does not yet collect. Version 0.3.0 therefore removes them from the CLI registry,
+acquisition does not yet collect. Version 0.3.1 therefore removes them from the CLI registry,
 configuration schema, SARIF catalogue and demo instead of counting two rules that answer nothing.
 Their real-renderer lab remains explicitly research-only. `svg/text-overflows-viewport` needs only
 geometry and measures ordinary solid-fill text. When `getBBox()` cannot prove painted bounds

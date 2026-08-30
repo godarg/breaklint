@@ -82,7 +82,7 @@ how many did it judge? Two kinds of decline are therefore not in the denominator
 enumerated in `src/core/enums.ts` rather than inferred from how a reason is spelt.
 
 **A capability represented only in research code** (`TOOL_CAPABILITY_ENV_IDS`). The SVG ink passes
-are not implemented in production. Version 0.3.0 therefore removes `svg/text-clipped` and
+are not implemented in production. Version 0.3.1 therefore removes `svg/text-clipped` and
 `svg/text-ink-collision` from the public registry instead of making their permanent decline part of
 every user's coverage. The enum and the two modules remain for the frozen M3 validation lab; the
 released CLI, schema and SARIF catalogue never run them.
