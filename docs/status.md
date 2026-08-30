@@ -4,7 +4,7 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## Prepared release state — 0.3.1 (2026-08-30)
+## Current release — 0.3.1 (2026-08-30)
 
 The annotated `v0.3.0` attempt is deliberately not this release. Its workflow stopped before npm or
 a GitHub Release was created because the installed-package real-document gate ran the child CLI in
@@ -13,7 +13,7 @@ the optional renderer peers, which made local and ordinary CI evidence falsely i
 tag remains immutable evidence of the failed attempt; 0.3.1 makes the child CWD mandatory and
 explicit in the source and both installed-tarball gates.
 
-The 0.3.1 release candidate exposes **13 rules**: two structural error rules, ten ordinary warning rules and
+Release 0.3.1 exposes **13 rules**: two structural error rules, ten ordinary warning rules and
 one experimental warning that never gates. All 13 carry `calibrated: false`; there is still no
 human-labelled corpus and no external trust root. The research modules `svg/text-clipped` and
 `svg/text-ink-collision` are retained for the M3 renderer lab but are no longer counted, configured,
@@ -63,6 +63,13 @@ contrast, accessibility, print fragmentation and a real pixel-mutation red contr
 ledger remains bound to the 0.2.3 inputs and 62 artifacts; it has deliberately not been restamped or
 transferred to 0.3.1. `test:report-surfaces:local` therefore remains red until a person reviews the
 current exact environment. No human review of the 0.3.1 surface is claimed.
+
+The annotated `v0.3.1` tag points to merge commit `a662c5639297f88c6d46ef7d15f14f045951d9ad`.
+Release workflow run `33320332110` accepted the once-packed tarball in clean Node 22.13 and Node 24
+consumers, published it to npm with SLSA provenance, and created the GitHub Release from the same
+bytes. A post-release download measured SHA-256
+`c2b5219d93426b7bed7c5db7d0cdb2f1591136e5fd4c37015af7dc127778a51c` for both registry and
+GitHub assets.
 
 ## Finished and verified without a browser
 

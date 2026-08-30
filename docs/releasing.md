@@ -20,7 +20,9 @@ verification is not called a successful release even if npm accepted the upload.
 The public `v0.3.0` tag is a failed pre-publish attempt and must not be moved or reused. Run
 `33317007301` stopped in both clean-consumer jobs before npm publication and before GitHub Release
 creation because their real-document child process inherited the checkout CWD. Version 0.3.1 is the
-first publish candidate from this change set and binds the child CLI to the actual consumer CWD.
+published repair from this change set and binds the child CLI to the actual consumer CWD. Release
+run `33320332110` completed the Node 22.13/24 consumer matrix, npm provenance verification and
+GitHub Release creation on 2026-08-30.
 
 ## One-time repository prerequisites
 
@@ -125,6 +127,5 @@ npx breaklint --demo
 ```
 
 The version must be `0.3.1`; demo must produce real findings and exit 1. Import
-`breaklint/config.schema.json` and rerun the installed Configuration Contract gate. Only then update
-`docs/status.md` from “prepared” to “released” in a later main commit. That later documentation
-commit is not retroactively part of the published tarball and must say so plainly.
+`breaklint/config.schema.json` and rerun the installed Configuration Contract gate. The later status
+commit records the completed release but is not retroactively part of the published tarball.
