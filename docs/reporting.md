@@ -149,7 +149,7 @@ a global count of anonymous card-like rectangles or a fixed card-height band. Bo
 98% edge coverage and reject any contiguous gap longer than two raster rows. The raster DPI is pinned
 to 110 in both oracles. The inner repair is a real child border rather than a background fill. A
 separate technical A4 probe renders the insufficient-coverage state with `printBackground: false`,
-including its strong-left-border warning card, and both oracles must still measure all 15 cards as
+including its strong-left-border warning card, and both oracles must still measure all 13 cards as
 closed; this probe is not an additional human-review cell. The complete visible contract is bound to
 the review fingerprint. A CI mutation runner executes four genuine failing renderer processes for a
 missing whole right edge, a missing whole left edge, a missing lower right fifth and simultaneously

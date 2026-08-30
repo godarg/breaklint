@@ -258,8 +258,9 @@ describe("output formats", () => {
   /**
    * The demo's own numbers, so `docs/status.md` cannot state them wrong again.
    *
-   * That file said "8 findings across 8 rules". Measured from the product's own output: eight
-   * findings across SEVEN rules — `layout/half-empty-page` fires twice. Nothing in the repository
+   * That file once said "8 findings across 8 rules". After the two unreachable ink definitions
+   * left the public registry, the product output is seven findings across SIX rules —
+   * `layout/half-empty-page` fires twice. Nothing in the repository
    * computed either number, which is precisely how the earlier "209 leaf values" survived: a
    * figure in the file designated as the truth source, arrived at by counting once, by hand.
    *
@@ -269,8 +270,8 @@ describe("output formats", () => {
   it("the demo produces the counts docs/status.md states", () => {
     const demo = demoReport();
     const ruleIds = new Set(demo.findings.map((f) => f.ruleId));
-    assert.equal(demo.findings.length, 8, "findings in the demo");
-    assert.equal(ruleIds.size, 7, "distinct rules in the demo");
+    assert.equal(demo.findings.length, 7, "findings in the demo");
+    assert.equal(ruleIds.size, 6, "distinct rules in the demo");
     assert.equal(demo.exitCode, 1, "the demo must end 1 — a demo that ends 0 shows no finding");
     // The doc row itself, matched WHOLE. A substring match is not enough and was measured not
     // enough: an audit replaced the row with "NOT VERIFIED: the demo does not run at all, and never

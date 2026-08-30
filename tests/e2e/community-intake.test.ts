@@ -12,7 +12,7 @@ Real-page visual judgement
 
 ### Rule or area
 
-svg/text-clipped
+svg/text-overflows-viewport
 
 ### Observed result
 
@@ -55,7 +55,7 @@ test("complete public issue is classified without executing untrusted text", () 
   const result = classifyIssue({ number: 1, title: "fixture", body });
   assert.equal(result.state, "complete");
   assert.deepEqual(result.missing, []);
-  assert.equal(sections(body).find((section) => section.heading === "Rule or area")?.value, "svg/text-clipped");
+  assert.equal(sections(body).find((section) => section.heading === "Rule or area")?.value, "svg/text-overflows-viewport");
 });
 
 test("CRLF issue bodies retain all headings and declarations", () => {
@@ -88,7 +88,7 @@ test("untrusted dashboard text cannot create Markdown structure or control lines
 test("edited route and rule values must remain in the issue-form allowlists", () => {
   const result = classifyIssue({
     number: 6, title: "fixture",
-    body: completeBody.replace("Real-page visual judgement", "@someone https://example.invalid").replace("svg/text-clipped", "#123")
+    body: completeBody.replace("Real-page visual judgement", "@someone https://example.invalid").replace("svg/text-overflows-viewport", "#123")
   });
   assert.equal(result.state, "needs-info");
   assert.equal(result.route, "unknown");
@@ -126,7 +126,7 @@ test("the real issue form and intake classifier share one exact public contract"
     assert.equal(classifyIssue({ number: 20, title: "fixture", body: completeBody.replace("Real-page visual judgement", route) }).state, "complete", route);
   }
   for (const rule of INTAKE_RULES) {
-    assert.equal(classifyIssue({ number: 21, title: "fixture", body: completeBody.replace("svg/text-clipped", rule) }).state, "complete", rule);
+    assert.equal(classifyIssue({ number: 21, title: "fixture", body: completeBody.replace("svg/text-overflows-viewport", rule) }).state, "complete", rule);
   }
 });
 
@@ -197,7 +197,7 @@ test("duplicate and semantically equivalent governed headings fail closed withou
 test("empty-first and contradictory duplicate values are rejected independently of position", () => {
   const bodies = [
     completeBody.replace(
-      "### Rule or area\n\nsvg/text-clipped",
+      "### Rule or area\n\nsvg/text-overflows-viewport",
       "### Rule or area\n\n\n\n### Rule or area\n\nlayout/widow",
     ),
     completeBody.replace(

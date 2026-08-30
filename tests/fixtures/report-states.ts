@@ -8,6 +8,10 @@ import { ALL_RULES } from "../../src/rules/index.ts";
 
 export type ReportSurfaceState = "clean" | "findings" | "infrastructure" | "insufficient-coverage";
 
+const PACKAGE_VERSION = (JSON.parse(
+  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+) as { version: string }).version;
+
 function clone(report: Report): Report {
   return JSON.parse(JSON.stringify(report)) as Report;
 }
@@ -30,7 +34,7 @@ function findingsBase(): Report {
     outcomes: [outcome],
     mode: "demo",
     source: "handwritten snapshot fixture",
-    toolVersion: "0.2.1",
+    toolVersion: PACKAGE_VERSION,
     commit: "8e8491e",
     startedAt: "2026-08-22T12:00:00.000Z",
     durationMs: 184,

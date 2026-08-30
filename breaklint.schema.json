@@ -176,49 +176,6 @@
           ],
           "description": "Rule enablement only. Proof-source-A options are fixed by Configuration Contract v1."
         },
-        "svg/text-clipped": {
-          "oneOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "maxMissingInk": {
-                  "type": "number",
-                  "minimum": 0,
-                  "default": 0.05
-                }
-              }
-            }
-          ],
-          "description": "Part of a text's glyph ink is removed by a clip path or mask."
-        },
-        "svg/text-ink-collision": {
-          "oneOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "minCollisionInk": {
-                  "type": "number",
-                  "minimum": 0,
-                  "default": 8
-                },
-                "minOccludedInk": {
-                  "type": "number",
-                  "minimum": 0,
-                  "default": 8
-                }
-              }
-            }
-          ],
-          "description": "A shape crosses or covers the glyphs of a text element."
-        },
         "type/spaced-hyphen": {
           "oneOf": [
             {
@@ -396,18 +353,6 @@
           "maximum": 1,
           "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
         },
-        "svg/text-clipped": {
-          "type": "number",
-          "minimum": 0.5,
-          "maximum": 1,
-          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
-        },
-        "svg/text-ink-collision": {
-          "type": "number",
-          "minimum": 0.5,
-          "maximum": 1,
-          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
-        },
         "type/spaced-hyphen": {
           "type": "number",
           "minimum": 0.5,
@@ -495,16 +440,6 @@
                 "maximum": 1
               },
               "svg/text-overflows-viewport": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 1
-              },
-              "svg/text-clipped": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 1
-              },
-              "svg/text-ink-collision": {
                 "type": "number",
                 "minimum": 1,
                 "maximum": 1

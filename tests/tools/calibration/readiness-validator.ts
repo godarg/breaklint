@@ -9,7 +9,7 @@ import { Ajv2020, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.
 import { parse, type DefaultTreeAdapterMap } from "parse5";
 import type { RuleResult } from "../../../src/core/rule.ts";
 import type { Snapshot, SvgRecord } from "../../../src/core/types.ts";
-import { RULES_BY_ID } from "../../../src/rules/index.ts";
+import { VALIDATION_RULES_BY_ID } from "../../../src/rules/index.ts";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const RULE_IDS = ["svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport"] as const;
@@ -552,7 +552,7 @@ function ruleOptions(config: CandidateConfig): Record<string, number> {
 }
 
 export function executeProductRuleV1(ruleId: RuleId, config: CandidateConfig, projection: SnapshotProjection): { result: RuleResultProjection; decision: "finding" | "clean" | "declined" } {
-  const rule = RULES_BY_ID.get(ruleId);
+  const rule = VALIDATION_RULES_BY_ID.get(ruleId);
   if (!rule || config.ruleId !== ruleId) throw new Error(`no executable product rule for ${ruleId}`);
   const snapshot = snapshotFromProjection(projection);
   const raw: RuleResult = rule.run(snapshot, {
@@ -1311,7 +1311,7 @@ export function validateManifest(value: unknown, options: ValidationOptions = {}
     const readyForClaim = readyForCalibration && documentCount >= MINIMUM_REAL_DOCUMENTS && originCount >= MINIMUM_REAL_DOCUMENTS && holdoutFrozen && acceptanceBound && claimOutcome?.claimEvidentiary === true && captureAttestorTrustValid;
     if (claim.ruleReadyForCalibration !== readyForCalibration) issue(issues, "calibration-readiness-false-claim", `/readinessClaims/${ruleId}/ruleReadyForCalibration`, `validated value ${readyForCalibration}`);
     if (claim.ruleReadyForCalibratedClaim !== readyForClaim) issue(issues, "calibrated-claim-readiness-false-claim", `/readinessClaims/${ruleId}/ruleReadyForCalibratedClaim`, `validated value ${readyForClaim}`);
-    const registryCalibrated = Boolean(RULES_BY_ID.get(ruleId)?.calibrated);
+    const registryCalibrated = Boolean(VALIDATION_RULES_BY_ID.get(ruleId)?.calibrated);
     if (claim.calibratedClaim && (!readyForClaim || !registryCalibrated)) { issue(issues, "calibrated-claim-without-gate", `/readinessClaims/${ruleId}/calibratedClaim`, "calibrated:true requires external gates and authorized registry state"); registryConsistent = false; }
     if (!claim.calibratedClaim && registryCalibrated) { issue(issues, "registry-calibrated-without-claim", `/readinessClaims/${ruleId}`, "registry true lacks validated claim"); registryConsistent = false; }
     rules[ruleId] = { calibration_mode: expectedMode, eligible_real_documents: documentCount, eligible_origin_groups: originCount, eligible_real_evidentiary_holdout_documents: evidentiaryHoldoutDocuments, eligible_real_evidentiary_holdout_origin_groups: evidentiaryHoldoutOrigins, capture_evidence_bytes_valid: captureEvidenceBytesValid, capture_attestor_trust_valid: captureAttestorTrustValid, rule_ready_for_calibration: readyForCalibration, rule_ready_for_calibrated_claim: readyForClaim };

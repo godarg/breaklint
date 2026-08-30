@@ -204,7 +204,7 @@ function documentVerdict(input: {
   findings: Finding[];
   failOn: FailOn;
 }): RunVerdict {
-  // Not every infrastructure event means exit 3. `NON_FATAL_INFRA_EVENT_KINDS` names the three
+  // Not every infrastructure event means exit 3. `NON_FATAL_INFRA_EVENT_KINDS` names the narrow
   // that do not, each for a reason the contract states; everything else does.
   if (input.infrastructure.some((e) => isFatalInfra(e))) return "infrastructure";
   if (input.measuredRuleCount === 0) return "insufficient-coverage";

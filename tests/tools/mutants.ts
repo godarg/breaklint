@@ -58,7 +58,7 @@ export function differs(a: Observation, b: Observation): boolean {
  *
  * A threshold mutation has to CROSS the boundary, not scale it. The first version multiplied
  * every numeric option — and against a threshold of `0` (occurrences permitted, overshoot
- * permitted) multiplication changes nothing at all. Ten of fifteen rules then "survived" a
+ * permitted) multiplication changes nothing at all. Ten of the then-fifteen rules "survived" a
  * mutant that had not mutated anything. That is the failure class of this whole project,
  * inverted: a test that cannot fail because the change under test was never made.
  *
@@ -148,7 +148,7 @@ function swapInkPasses(snapshot: Snapshot): Snapshot {
   };
 }
 
-/** The five that apply to every rule, plus the sixth for the two ink rules. */
+/** The five that apply to every released rule; legacy ink handling remains for lab imports only. */
 export function mutantsFor(rule: Rule): MutantName[] {
   const base: MutantName[] = [
     "emits-nothing",
@@ -256,7 +256,7 @@ if (invokedDirectly) {
   // drift this guard exists to catch, in the guard itself. The scenario was caught elsewhere, by
   // the false-alarm corpus in `npm test` — but a guard whose own summary line cannot notice a
   // missing rule should not be the thing anyone reads to decide the rules are covered.
-  const EXPECTED_RULE_COUNT = 15;
+  const EXPECTED_RULE_COUNT = 13;
   const clean = reports.filter((r) => r.survived.length === 0 && r.triggerFixture).length;
   console.log(`\n${clean}/${EXPECTED_RULE_COUNT} rules killed every mutant on a fixture that actually triggers them.`);
   if (reports.length !== EXPECTED_RULE_COUNT) {

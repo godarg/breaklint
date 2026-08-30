@@ -1,0 +1,20 @@
+{
+  "contractVersion": "robustness-corpus-v1",
+  "purpose": "Acquisition robustness over rights-reviewed third-party HTML; never calibration or external trust evidence.",
+  "documents": [
+    {
+      "artifact": "documents/project-gutenberg-gettysburg-address.html",
+      "sourceEvidence": "source-evidence/source-project-gutenberg-gettysburg-address.json",
+      "sha256": "2da09414df2cfbe8f48420abd73067e3e08182d152d3d13bcdd1d26ff30535d9",
+      "expected": {
+        "exitCode": 0,
+        "pagesAnalysed": 9,
+        "rulesRun": 13,
+        "measuredRules": 9,
+        "infrastructureEvents": 0
+      }
+    }
+  ],
+  "calibrationEvidenceEligible": false,
+  "externalTrustRootClaimed": false
+}

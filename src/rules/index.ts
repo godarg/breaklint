@@ -41,8 +41,6 @@ export const ALL_RULES: readonly Rule[] = Object.freeze([
   orphanedContinuationPage,
   hyphenAcrossPage,
   textOverflowsViewport,
-  textClipped,
-  textInkCollision,
   spacedHyphen,
   straightQuotes,
   shortLastLine,
@@ -78,3 +76,18 @@ export const RULES_BY_ID: ReadonlyMap<string, Rule> = new Map(ALL_RULES.map((r) 
 
 /** The ids, in registration order. Reporters print rules in this order for stable diffs. */
 export const RULE_IDS: readonly string[] = ALL_RULES.map((r) => r.id);
+
+/**
+ * Research-only rules retained for the M3 ink lab and its frozen calibration contracts.
+ *
+ * They are deliberately absent from `ALL_RULES`, `RULES_BY_ID`, the config schema, SARIF and the
+ * CLI. Production acquisition does not collect the pixel passes they need, so registering them as
+ * available rules would turn a future capability into a present product claim. The validation
+ * tooling imports this separate registry explicitly and may not present it as a released surface.
+ */
+export const RESEARCH_RULES: readonly Rule[] = Object.freeze([textClipped, textInkCollision]);
+export const RESEARCH_RULES_BY_ID: ReadonlyMap<string, Rule> = new Map(RESEARCH_RULES.map((rule) => [rule.id, rule]));
+export const VALIDATION_RULES_BY_ID: ReadonlyMap<string, Rule> = new Map([
+  ...RULES_BY_ID,
+  ...RESEARCH_RULES_BY_ID,
+]);

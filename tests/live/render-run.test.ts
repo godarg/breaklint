@@ -288,6 +288,40 @@ describe("the M2d live production chain", () => {
     assert.ok(document.infrastructure.some((event) => event.kind === "font-load-failed"));
   });
 
+  it("continues only when a failed image has authored non-zero dimensions", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const declared = join(root, "missing-image-declared.html");
+    const undeclared = join(root, "missing-image-undeclared.html");
+    writeFileSync(
+      declared,
+      '<!doctype html><img src="missing-image.png" width="36" height="24" alt=""><p>declared image size</p>',
+    );
+    writeFileSync(
+      undeclared,
+      '<!doctype html><img src="missing-image.png" alt="visible replacement text"><p>no declared image size</p>',
+    );
+
+    const imageRun = await renderDocuments(
+      [declared, undeclared],
+      options(join(root, "missing-image-evidence")),
+    );
+    const declaredDocument = imageRun.documents[0]!;
+    assert.ok(declaredDocument.snapshot, "authored width/height should keep the layout measurable");
+    const imageEvent = declaredDocument.infrastructure.find((event) => event.kind === "image-content-unavailable");
+    assert.ok(imageEvent, "the missing content must remain a named diagnostic");
+    assert.deepEqual(imageEvent.measured, {
+      images: [{ resourceIndex: 1, widthPx: 36, heightPx: 24, declaredWidthPx: 36, declaredHeightPx: 24 }],
+    });
+
+    const undeclaredDocument = imageRun.documents[1]!;
+    assert.equal(undeclaredDocument.snapshot, null, "a replacement-text box is not stable image geometry");
+    assert.ok(
+      undeclaredDocument.infrastructure.some((event) =>
+        event.kind === "checker-crashed" && /explicit authored width and height/iu.test(event.detail)),
+      `missing fatal image diagnostic: ${JSON.stringify(undeclaredDocument.infrastructure)}`,
+    );
+  });
+
   it("counts a naked image but excludes hidden descendant text from fill", (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     if (!completeChain(t)) return;

@@ -34,9 +34,9 @@ const REQUIRED_BROWSER_RENDER_ARGS = [
 
 function verificationMode(args) {
   if (args.length === 0) return "local";
-  if (args.length === 2 && args[0] === "--mode" && ["local", "portable"].includes(args[1])) return args[1];
-  if (args.length === 1 && /^--mode=(?:local|portable)$/u.test(args[0])) return args[0].slice("--mode=".length);
-  throw new Error("usage: verify-report-surfaces.mjs [--mode local|portable]");
+  if (args.length === 2 && args[0] === "--mode" && ["local", "portable", "technical"].includes(args[1])) return args[1];
+  if (args.length === 1 && /^--mode=(?:local|portable|technical)$/u.test(args[0])) return args[0].slice("--mode=".length);
+  throw new Error("usage: verify-report-surfaces.mjs [--mode local|portable|technical]");
 }
 
 const mode = verificationMode(process.argv.slice(2));
@@ -364,7 +364,7 @@ function verifyBackgroundDisabledProbe() {
   assert.equal(probe.id, "print-background-disabled/insufficient-coverage");
   assert.equal(probe.state, "insufficient-coverage");
   assert.equal(probe.printBackground, false, "background-disabled probe was rendered with background graphics");
-  assert.equal(probe.coverageRecordCount, 15, "background-disabled probe coverage inventory drift");
+  assert.equal(probe.coverageRecordCount, 13, "background-disabled probe coverage inventory drift");
   assert.equal(probe.shortCoverageRecordCount, 1, "background-disabled probe must include the strong-border warning variant");
   const pdfPath = resolve(output, probe.pdf.path);
   assert.equal(existsSync(pdfPath), true, `background-disabled probe PDF missing: ${probe.pdf.path}`);
@@ -449,22 +449,26 @@ function runScreenPixelMutationControl(artifact, currentInput) {
 }
 
 assert.equal(manifest.schemaVersion, 4);
-assert.equal(ledger.schemaVersion, 4);
 assertUtcTimestamp(manifest.generatedAt, "render manifest generatedAt is not an exact UTC timestamp");
-assertUtcTimestamp(ledger.renderManifestGeneratedAt, "ledger renderManifestGeneratedAt is not historical UTC audit metadata");
 assertReviewEnvironment(manifest.reviewEnvironment, "current render environment");
-assertReviewEnvironment(ledger.reviewEnvironment, "human review environment");
 const currentReviewInput = assertCurrentReviewInput(manifest.reviewInputFingerprint, reviewInputRoot, "render manifest review input");
 verifyBackgroundDisabledProbe();
-assert.equal(ledger.reviewInputFingerprint, currentReviewInput.fingerprint, "human review ledger is bound to a different source/input revision");
 assert.deepEqual(manifest.reviewInputs, currentReviewInput.files, "render manifest input inventory does not match an independent current-worktree reconstruction");
-if (mode === "local") {
-  assert.deepEqual(ledger.reviewEnvironment, manifest.reviewEnvironment, "strict local human review cannot transfer to a different browser/platform/render environment");
+if (mode !== "technical") {
+  assert.equal(ledger.schemaVersion, 4);
+  assertUtcTimestamp(ledger.renderManifestGeneratedAt, "ledger renderManifestGeneratedAt is not historical UTC audit metadata");
+  assertReviewEnvironment(ledger.reviewEnvironment, "human review environment");
+  assert.equal(ledger.reviewInputFingerprint, currentReviewInput.fingerprint, "human review ledger is bound to a different source/input revision");
+  if (mode === "local") {
+    assert.deepEqual(ledger.reviewEnvironment, manifest.reviewEnvironment, "strict local human review cannot transfer to a different browser/platform/render environment");
+  }
 }
 runReviewInputMutationControl(manifest.reviewInputFingerprint, reviewInputRoot);
 assert.equal(manifest.artifacts.length, 32, "the surface matrix must contain exactly 32 review cells");
 assert.equal(new Set(manifest.artifacts.map((artifact) => artifact.cell)).size, 32, "duplicate render cell");
-assert.deepEqual([...Object.keys(ledger.cells)].sort(), manifest.artifacts.map((artifact) => artifact.cell).sort(), "the human review ledger and current render matrix disagree");
+if (mode !== "technical") {
+  assert.deepEqual([...Object.keys(ledger.cells)].sort(), manifest.artifacts.map((artifact) => artifact.cell).sort(), "the human review ledger and current render matrix disagree");
+}
 
 let pixelMutationControl = null;
 for (const artifact of manifest.artifacts) {
@@ -518,46 +522,53 @@ for (const artifact of manifest.artifacts) {
 }
 assert.ok(pixelMutationControl, "screen pixel mutation control did not run");
 
-assert.deepEqual(manifest.physicalArtifacts, { screens: 24, pdfs: 4, rasterPages: 34 }, "the final inventory must be exactly 24 screens, 4 PDFs and 34 PDF page rasters");
+assert.deepEqual(manifest.physicalArtifacts, { screens: 24, pdfs: 4, rasterPages: 31 }, "the final inventory must be exactly 24 screens, 4 PDFs and 31 PDF page rasters");
 
-const pending = [];
-for (const artifact of manifest.artifacts) {
-  const review = ledger.cells[artifact.cell];
-  if (review.status !== "pass") {
-    pending.push(artifact.cell);
-    continue;
-  }
-  assert.match(review.reviewArtifactFingerprint ?? "", /^[a-f0-9]{64}$/u, `${artifact.cell}: stable review fingerprint missing`);
-  if (mode === "local") {
-    assert.equal(review.reviewArtifactFingerprint, artifact.reviewArtifactFingerprint, `${artifact.cell}: strict local human review is bound to a different rendered artifact`);
-  }
-  assert.match(review.reviewer ?? "", /^@(Brand|Neo|Founder)(?:\s*\+\s*@(Brand|Neo|Founder))*$/u, `${artifact.cell}: reviewer is absent or not an actual review role`);
-  assertUtcTimestamp(review.reviewedAt, `${artifact.cell}: reviewedAt is not an exact UTC timestamp`);
-  assert.ok(typeof review.note === "string" && review.note.trim().length >= 12, `${artifact.cell}: review note is missing`);
-  if (artifact.kind === "screen") {
-    assert.match(review.reviewedRawSha256 ?? "", /^[a-f0-9]{64}$/u, `${artifact.cell}: reviewed raw PNG SHA-256 audit trail missing`);
-    assert.match(review.reviewedNormalizedRgbaSha256 ?? "", /^[a-f0-9]{64}$/u, `${artifact.cell}: reviewed RGBA SHA-256 missing`);
-    if (mode === "local") {
-      assert.equal(review.reviewedNormalizedRgbaSha256, artifact.pixels.normalizedRgbaSha256, `${artifact.cell}: strict local human review is bound to different visible screen pixels`);
+if (mode !== "technical") {
+  const pending = [];
+  for (const artifact of manifest.artifacts) {
+    const review = ledger.cells[artifact.cell];
+    if (review.status !== "pass") {
+      pending.push(artifact.cell);
+      continue;
     }
-    assert.deepEqual(review.reviewedArtifacts, [artifact.path], `${artifact.cell}: reviewed screen is not named exactly`);
-  } else if (artifact.kind === "pdf") {
-    assert.match(review.reviewedRawSha256 ?? "", /^[a-f0-9]{64}$/u, `${artifact.cell}: reviewed raw PDF SHA-256 audit trail missing`);
-    assert.deepEqual(review.reviewedPages, Array.from({ length: artifact.pages }, (_, index) => index + 1), `${artifact.cell}: PDF page review is incomplete`);
-    assert.deepEqual(review.reviewedArtifacts, [artifact.path], `${artifact.cell}: reviewed PDF is not named exactly`);
-  } else {
-    assert.equal(review.reviewedRawSha256?.length, artifact.pages.length, `${artifact.cell}: reviewed raster SHA-256 audit trail is incomplete`);
-    for (const reviewedHash of review.reviewedRawSha256) assert.match(reviewedHash, /^[a-f0-9]{64}$/u, `${artifact.cell}: invalid reviewed raster SHA-256`);
-    assert.deepEqual(review.reviewedPages, Array.from({ length: artifact.pages.length }, (_, index) => index + 1), `${artifact.cell}: raster page review is incomplete`);
-    assert.deepEqual(review.reviewedArtifacts, artifact.pages.map((page) => page.path), `${artifact.cell}: raster artifacts do not match the matrix contract`);
+    assert.match(review.reviewArtifactFingerprint ?? "", /^[a-f0-9]{64}$/u, `${artifact.cell}: stable review fingerprint missing`);
+    if (mode === "local") {
+      assert.equal(review.reviewArtifactFingerprint, artifact.reviewArtifactFingerprint, `${artifact.cell}: strict local human review is bound to a different rendered artifact`);
+    }
+    assert.match(review.reviewer ?? "", /^@(Brand|Neo|Founder)(?:\s*\+\s*@(Brand|Neo|Founder))*$/u, `${artifact.cell}: reviewer is absent or not an actual review role`);
+    assertUtcTimestamp(review.reviewedAt, `${artifact.cell}: reviewedAt is not an exact UTC timestamp`);
+    assert.ok(typeof review.note === "string" && review.note.trim().length >= 12, `${artifact.cell}: review note is missing`);
+    if (artifact.kind === "screen") {
+      assert.match(review.reviewedRawSha256 ?? "", /^[a-f0-9]{64}$/u, `${artifact.cell}: reviewed raw PNG SHA-256 audit trail missing`);
+      assert.match(review.reviewedNormalizedRgbaSha256 ?? "", /^[a-f0-9]{64}$/u, `${artifact.cell}: reviewed RGBA SHA-256 missing`);
+      if (mode === "local") {
+        assert.equal(review.reviewedNormalizedRgbaSha256, artifact.pixels.normalizedRgbaSha256, `${artifact.cell}: strict local human review is bound to different visible screen pixels`);
+      }
+      assert.deepEqual(review.reviewedArtifacts, [artifact.path], `${artifact.cell}: reviewed screen is not named exactly`);
+    } else if (artifact.kind === "pdf") {
+      assert.match(review.reviewedRawSha256 ?? "", /^[a-f0-9]{64}$/u, `${artifact.cell}: reviewed raw PDF SHA-256 audit trail missing`);
+      assert.deepEqual(review.reviewedPages, Array.from({ length: artifact.pages }, (_, index) => index + 1), `${artifact.cell}: PDF page review is incomplete`);
+      assert.deepEqual(review.reviewedArtifacts, [artifact.path], `${artifact.cell}: reviewed PDF is not named exactly`);
+    } else {
+      assert.equal(review.reviewedRawSha256?.length, artifact.pages.length, `${artifact.cell}: reviewed raster SHA-256 audit trail is incomplete`);
+      for (const reviewedHash of review.reviewedRawSha256) assert.match(reviewedHash, /^[a-f0-9]{64}$/u, `${artifact.cell}: invalid reviewed raster SHA-256`);
+      assert.deepEqual(review.reviewedPages, Array.from({ length: artifact.pages.length }, (_, index) => index + 1), `${artifact.cell}: raster page review is incomplete`);
+      assert.deepEqual(review.reviewedArtifacts, artifact.pages.map((page) => page.path), `${artifact.cell}: raster artifacts do not match the matrix contract`);
+    }
   }
+  assert.deepEqual(pending, [], `visual review remains pending for ${pending.length}/32 cells: ${pending.join(", ")}`);
+  assertUtcTimestamp(ledger.reviewedAt, "ledger reviewedAt is not an exact UTC timestamp");
+  assert.match(ledger.reviewer ?? "", /^@(Brand|Neo|Founder)(?:\s*\+\s*@(Brand|Neo|Founder))*$/u, "ledger reviewer is absent or not an actual review role");
+  assert.deepEqual(ledger.physicalArtifactsReviewed, manifest.physicalArtifacts, "human ledger does not attest the complete physical artifact inventory");
 }
-assert.deepEqual(pending, [], `visual review remains pending for ${pending.length}/32 cells: ${pending.join(", ")}`);
-assertUtcTimestamp(ledger.reviewedAt, "ledger reviewedAt is not an exact UTC timestamp");
-assert.match(ledger.reviewer ?? "", /^@(Brand|Neo|Founder)(?:\s*\+\s*@(Brand|Neo|Founder))*$/u, "ledger reviewer is absent or not an actual review role");
-assert.deepEqual(ledger.physicalArtifactsReviewed, manifest.physicalArtifacts, "human ledger does not attest the complete physical artifact inventory");
 
-if (mode === "portable") {
+if (mode === "technical") {
+  process.stdout.write(
+    `report surfaces: technical gate passed 32/32 current cells and 59 physical artifacts; ` +
+      `no human-review claim is made (${manifest.reviewInputFingerprint}; pixel mutation rejected)\n`,
+  );
+} else if (mode === "portable") {
   process.stdout.write(
     `report surfaces: portable technical gate passed 32/32 current cells; human-ledger provenance is complete, ` +
       `but no cross-environment human-render equivalence is claimed (${manifest.reviewInputFingerprint}; pixel mutation rejected)\n`,

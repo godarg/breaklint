@@ -28,6 +28,17 @@
  * whole project is about, so the number here is 0 and the live suite asserts exact agreement —
  * which makes that case load-bearing instead of slack.
  *
+ * A later real-document run found two other distinctions that the simple corpus did not expose.
+ * First, a transformed quad is not axis-aligned: its AABB must use all four corners, not the first
+ * corner and two convenient neighbours. A 30-degree HTML block made the shortcut wrong by 23 px.
+ * Second, CDP and `getBoundingClientRect` do not describe the same box for SVG graphics descendants:
+ * strokes enlarged CDP's box by 0.55 px in one Wikimedia SVG and 3.07 px in another. Those nodes are
+ * excluded from this CSS-box oracle; the SVG collector has its own CTM geometry boundary. Third,
+ * an author can reset a block element to `display:inline`: for an inline box that contains block
+ * children, `getBoundingClientRect()` and CDP's border quad intentionally cover different unions.
+ * Those inline formatting boxes are excluded too; their block children remain eligible. None of
+ * these findings justifies spending the tolerance on a comparison of different quantities.
+ *
  * THE TOLERANCE IS THEREFORE NOT A MEASURED DISAGREEMENT AT ALL. There is none to accommodate. It
  * is a guard band for machines this build has never run on — a different device pixel ratio, a
  * different zoom, a browser that rounds one path and not the other — and it is a CHOSEN number,
@@ -83,6 +94,18 @@ export interface CrossCheckResult {
   maxDelta: number;
   disagreements: Disagreement[];
   ok: boolean;
+}
+
+/** Convert CDP's four-corner quad to the axis-aligned box returned by getBoundingClientRect(). */
+export function quadEnvelope(quad: readonly number[]): Omit<GeometrySample, "key"> {
+  if (quad.length !== 8 || quad.some((value) => !Number.isFinite(value))) {
+    throw new Error("CDP box quad must contain four finite x/y corners");
+  }
+  const xs = [quad[0]!, quad[2]!, quad[4]!, quad[6]!];
+  const ys = [quad[1]!, quad[3]!, quad[5]!, quad[7]!];
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
 }
 
 /**
@@ -174,6 +197,17 @@ export const SAMPLE_SOURCE = `((limit) => {
     const attribute = sid ? "data-bl-sid" : ref ? "data-ref" : id ? "id" : null;
     const value = sid || ref || id;
     if (!attribute || !value) continue;
+    // CDP's border quad includes stroke/paint extents for SVG graphics descendants while
+    // getBoundingClientRect reports SVG geometry. Comparing those would be a disagreement between
+    // definitions, not an independent check. Keep the root <svg>, whose CSS replaced-element box
+    // is shared by both sources, and leave descendant geometry to the dedicated CTM collector.
+    const svgRoot = P.closest(el, "svg");
+    if (svgRoot && svgRoot !== el) continue;
+    // A source-level block can become an inline formatting box through authored CSS (all:initial
+    // does exactly that). For an inline containing block children, GCR and CDP's border quad cover
+    // different unions. The child blocks remain independently eligible, so skipping this one box
+    // removes a definition mismatch without creating an unchecked subtree.
+    if (P.style(el).display === "inline") continue;
     const b = P.rect(el);
     if (b.width <= 0 || b.height <= 0) continue;
     // JSON emits a CSS string token and therefore keeps an authored id containing a quote from

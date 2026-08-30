@@ -1,6 +1,6 @@
 {
   "name": "breaklint",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Layout checks for documents generated from HTML to PDF: measures every page after pagination and reports the measured value next to the threshold it failed.",
   "keywords": [
     "pagedjs",
@@ -57,6 +57,7 @@
     "test:live": "node tests/tools/live-run.mjs",
     "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "test:mutants": "node --experimental-strip-types tests/tools/mutants.ts",
+    "test:real-document": "node tests/tools/real-document-gate.mjs",
     "test:licenses": "node --experimental-strip-types tests/tools/licenses.ts",
     "test:secrets": "node tests/tools/secrets.mjs",
     "test:advisories": "node tests/tools/dependency-audit.mjs",
@@ -67,6 +68,7 @@
     "test:report-surfaces": "npm run test:report-surfaces:local",
     "test:report-surfaces:local": "npm run render:report-surfaces && node tests/tools/verify-report-surfaces.mjs --mode local",
     "test:report-surfaces:portable": "npm run render:report-surfaces && node tests/tools/verify-report-surfaces.mjs --mode portable",
+    "test:report-surfaces:technical": "npm run render:report-surfaces && node tests/tools/verify-report-surfaces.mjs --mode technical",
     "selfcheck:static": "node --experimental-strip-types tests/tools/selfcheck.ts",
     "selfcheck:live": "node tests/tools/selfcheck-live.mjs",
     "selfcheck": "npm run selfcheck:static && npm run selfcheck:live"

@@ -15,7 +15,7 @@
  */
 
 import { readFileSync, existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
-import { dirname, relative, resolve as resolvePath } from "node:path";
+import { dirname, extname, relative, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { SUPPORTED_PAGEDJS_VERSION } from "../core/enums.ts";
@@ -92,6 +92,11 @@ export async function main(argv: string[]): Promise<number> {
       return 2;
     }
     for (const p of args.paths) {
+      const extension = extname(p).toLowerCase();
+      if (extension !== ".html" && extension !== ".htm") {
+        err(`breaklint: unsupported input type: ${p} (expected .html or .htm)\n`);
+        return 2;
+      }
       if (!existsSync(p)) {
         // A path that does not exist is a typo in the invocation, not a finding about a
         // document. Exit 2, and the message names the path rather than the count.

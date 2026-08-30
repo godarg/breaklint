@@ -1,6 +1,63 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-08-30
+
+### Real-document robustness before trust infrastructure
+
+- Added a mandatory real-document gate over two frozen, rights- and privacy-reviewed public HTML
+  artifacts. The third-party Project Gutenberg document was not authored for this repository; it
+  produces exactly 9 pages, measures 9/13 rules and exits 0. The first-party Dargel document
+  separately exercises absent-resource packaging: exactly 6 pages, 11/13 rules measured and Exit 0.
+  Both admitted SHA-256 values, exact semantic counts and infrastructure contracts are pinned. The
+  published 0.2.3 package is the recorded red control: the third-party document ends Exit 3 before
+  producing a usable report. CI, the source release gate and both clean installed tarball consumers
+  run both documents.
+- Fixed the geometry oracle without widening its `0.05 px` tolerance. CDP's four-corner quad is now
+  converted to an axis-aligned envelope using all corners; the former shortcut was wrong by 23 px
+  on a rotated HTML block. SVG graphics descendants are excluded from the CSS-box cross-check
+  because CDP includes stroke/paint extents while `getBoundingClientRect()` reports SVG geometry.
+  Authored CSS can likewise reset a source block to an inline formatting box whose child-union has
+  different CDP/GCR semantics; that box is excluded while its block children remain eligible. The
+  two real corpus SVGs differed by up to 0.5477 px and 3.0656 px, and the third-party HTML exposed
+  an 18 px inline-box difference. None was a tolerance problem.
+- Standalone `.svg` and every other non-HTML input now fail deterministically with usage Exit 2
+  before the renderer starts. Inline SVG in `.html`/`.htm` remains supported by the released SVG
+  viewport rule. The previous path parsed arbitrary extensions as `/document.html` and failed late.
+- A failed image decode is no longer an anonymous `checker-crashed` when the source explicitly
+  declares positive `width` and `height` attributes and the browser measures a non-zero box. It
+  becomes the named, non-fatal
+  `image-content-unavailable` event with a non-identifying resource index and measured dimensions.
+  Absolute file URLs and remote query strings are not persisted in the report. Missing authored
+  dimensions or a zero-size rendered box remain fatal because replacement text is not stable image
+  geometry and the absent content can change layout.
+
+### Thirteen released rules, not fifteen advertised definitions
+
+- Withdrew `svg/text-clipped` and `svg/text-ink-collision` from the released registry, CLI config,
+  generated schema, SARIF catalogue, community issue form and demo. Production acquisition has no
+  ink pass and never wrote `inkCollected: true`; counting both rules was a capability claim over a
+  path no document reached. Their modules and 78/78 real-renderer M3 lab remain explicitly
+  research-only for a later, separately designed ink milestone.
+- Removed all hand-authored ink counts and `inkCollected: true` from the demo snapshot. `--demo`
+  now reports seven real rule-chain findings, 13 rules run and 11 rules measured; it cannot display
+  an SVG ink finding that live acquisition cannot create.
+- Kept every released rule `calibrated: false`. No threshold, severity, structural proof-source-A
+  threshold or calibration type changed.
+
+### Plan and public truth
+
+- Split the former parked M3-1 plan: M3-1a covers rights-cleared corpus breadth and acquisition
+  robustness and is active before governance; M3-1b retains blind human labels, adjudication,
+  external attestation and externally controlled freeze and remains parked. The disabled
+  attestation workflow stays disabled.
+- Rewrote the current-state section and marked contradictory pre-release passages as historical.
+  README, rule docs, limitations and generated schema now describe the same 13-rule,
+  0/13-calibrated product contract. The coordinated website copy has a separate repository,
+  work item and deployment gate; this package does not claim that deploy before it is live.
+- Kept the 0.2.3 human report-surface ledger historical instead of restamping 32 cells without a
+  person. The 0.3.0 release gate reconstructs all 32 current cells and verifies 59 physical
+  artifacts (24 screens, 4 PDFs, 31 page rasters), decoded pixels, contrast, accessibility, print
+  fragmentation and a pixel-mutation red control, while making no human-review claim.
 
 ## 0.2.3 — 2026-08-29
 

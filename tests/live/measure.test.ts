@@ -37,6 +37,7 @@ import {
   CROSS_CHECK_MEASURED_MAX_PX,
   CROSS_CHECK_SAMPLE_SIZE,
   geometrySampleSource,
+  quadEnvelope,
   type GeometrySample,
 } from "../../src/measure/cross-check.ts";
 import { collectorSource } from "../../src/paginate/collector.ts";
@@ -76,7 +77,9 @@ function documentSource(pagedjs: string): string {
 body{font:10pt/1.45 Georgia,serif;margin:0} p{margin:0 0 8px}
 p.marked::before{ content:"MARK "; padding-left:3px }
 ul li::marker{ content:"* " }
+.inline-reset{all:initial}.inline-reset p{margin:0 0 8px}
 </style></head><body>
+<div class="inline-reset"><p>block content inside a div whose authored CSS resets its display to inline.</p></div>
 <p class="marked">alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron.</p>
 <ul><li>a list item, for the marker</li></ul>
 <svg width="60" height="40" viewBox="0 0 60 40"><g transform="translate(5,5) scale(2)"><rect x="1" y="2" width="10" height="6"/></g></svg>
@@ -386,7 +389,7 @@ describe("the measurement probe, live", () => {
         continue;
       }
       const q = model.border;
-      outOfProcess.push({ key: sample.key, x: q[0]!, y: q[1]!, width: q[2]! - q[0]!, height: q[5]! - q[1]! });
+      outOfProcess.push({ key: sample.key, ...quadEnvelope(q) });
       worstModelDelta = Math.max(worstModelDelta, Math.abs(model.width - sample.width));
     }
     await page.close();
@@ -402,6 +405,30 @@ describe("the measurement probe, live", () => {
       worstModelDelta > CROSS_CHECK_MEASURED_MAX_PX,
       "model.width is no longer rounded; the reason this code reads the quad instead has expired",
     );
+  });
+
+  it("normalises a rotated HTML border quad from all four CDP corners", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const page = await browser!.newPage();
+    await page.setViewport({ width: 1000, height: 800 });
+    await page.setContent(
+      '<!doctype html><style>#rotated{position:absolute;left:220px;top:120px;width:120px;height:40px;' +
+        'border:3px solid black;transform:rotate(30deg);transform-origin:0 0}</style><div id="rotated"></div>',
+    );
+    const inPage = await page.evaluate<{ x: number; y: number; width: number; height: number }>(
+      `(() => { const b = document.getElementById("rotated").getBoundingClientRect();
+        return { x: b.x, y: b.y, width: b.width, height: b.height }; })()`,
+    );
+    const session = await (page as unknown as { createCDPSession(): Promise<CdpSession> }).createCDPSession();
+    await session.send("DOM.enable");
+    const { root } = await session.send<{ root: { nodeId: number } }>("DOM.getDocument", { depth: -1 });
+    const { nodeId } = await session.send<{ nodeId: number }>("DOM.querySelector", {
+      nodeId: root.nodeId,
+      selector: "#rotated",
+    });
+    const { model } = await session.send<{ model: { border: number[] } }>("DOM.getBoxModel", { nodeId });
+    await page.close();
+    assert.deepEqual(quadEnvelope(model.border), inPage);
   });
 
   /**

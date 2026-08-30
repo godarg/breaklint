@@ -30,7 +30,7 @@
 
 import { strict as assert } from "node:assert";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -40,6 +40,8 @@ const CLI = fileURLToPath(new URL("../../src/cli/index.ts", import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), "breaklint-bin-"));
 const link = join(dir, "breaklint-link.ts");
 symlinkSync(CLI, link);
+const svgInput = join(dir, "standalone.svg");
+writeFileSync(svgInput, '<svg xmlns="http://www.w3.org/2000/svg"><text>not an HTML document</text></svg>');
 
 after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -85,5 +87,13 @@ describe("the CLI runs when it is invoked through a symlink, as npm installs it"
     // where a success would have been indistinguishable from doing nothing.
     const run = runViaLink(["--no-such-option"]);
     assert.equal(run.code, 2, `expected exit 2 for an unknown option, got ${run.code}`);
+  });
+
+  it("rejects an existing standalone SVG as usage before the renderer starts", () => {
+    const run = runViaLink([svgInput]);
+    assert.equal(run.code, 2, `expected exit 2 for unsupported SVG input, got ${run.code}`);
+    assert.match(run.stderr, /unsupported input type/u);
+    assert.match(run.stderr, /\.html or \.htm/u);
+    assert.equal(run.stdout, "", "usage rejection must not print a report");
   });
 });

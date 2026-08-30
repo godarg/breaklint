@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 
 import { runDocument } from "../../src/core/engine.ts";
-import { ALL_RULES, RULES_BY_ID } from "../../src/rules/index.ts";
+import { ALL_RULES, VALIDATION_RULES_BY_ID } from "../../src/rules/index.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
 
 const corpus = loadCorpus();
@@ -10,7 +10,7 @@ const corpus = loadCorpus();
 function findingsOf(entryName: string, ruleId: string) {
   const entry = corpus.find((c) => c.name === entryName);
   assert.ok(entry, `no fixture named ${entryName}`);
-  const rule = RULES_BY_ID.get(ruleId);
+  const rule = VALIDATION_RULES_BY_ID.get(ruleId);
   assert.ok(rule, `no rule ${ruleId}`);
   return runDocument(
     { path: entry.name, snapshot: entry.snapshot, infrastructure: [] },

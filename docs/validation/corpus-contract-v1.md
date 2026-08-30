@@ -119,7 +119,7 @@ producer source identity. It represents measurable/declined state, target count/
 T/T0 (including T0 <= 0), collision/occlusion counts, overflow, viewport and target boxes. A
 separate `m3-0-production-evaluation-v1`, supplied with `--production-evaluation`, binds those exact
 receipt bytes and the independently pinned source hash of the product rule. The validator invokes
-the unchanged `RULES_BY_ID[ruleId].run`; its real `RuleResult` is authoritative and is projected to
+the unchanged `VALIDATION_RULES_BY_ID[ruleId].run`; its real `RuleResult` is authoritative and is projected to
 `finding`, `clean` or `declined` without reading oracle truth. The outcome binds the canonical
 production-row hash. Included rows may use only renderer IDs present in the freeze and on their
 concrete holdout document. The executable contract version and source hash must change together

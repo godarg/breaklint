@@ -1,0 +1,36 @@
+{
+  "contractVersion": "robustness-source-evidence-v1",
+  "evidenceId": "source_evidence_project_gutenberg_gettysburg_address_0001",
+  "reviewDate": "2026-08-30",
+  "sourceLocator": "https://www.gutenberg.org/cache/epub/4/pg4-images.html",
+  "descriptionPage": "https://www.gutenberg.org/ebooks/4",
+  "sourceClass": "public-domain-third-party",
+  "rightsBasis": "public-domain-author-death-1865-and-upstream-public-domain-notice",
+  "rightsEvidence": {
+    "work": "Lincoln's Gettysburg Address",
+    "author": "Abraham Lincoln (1809-1865)",
+    "upstreamNotice": "Project Gutenberg records eBook 4 as public domain in the USA; the complete upstream HTML, including its redistribution terms, is retained byte-for-byte.",
+    "limitation": "This admission is a rights and robustness record, not legal advice and not calibration evidence."
+  },
+  "frozenArtifact": {
+    "relativePath": "documents/project-gutenberg-gettysburg-address.html",
+    "mediaType": "text/html",
+    "sha256": "2da09414df2cfbe8f48420abd73067e3e08182d152d3d13bcdd1d26ff30535d9",
+    "byteLength": 26926,
+    "transformation": "none; exact HTTP response body",
+    "captureDate": "2026-08-30"
+  },
+  "privacyReview": {
+    "class": "reviewed-no-living-person-personal-data",
+    "decision": "eligible",
+    "findings": [
+      "The named author died in 1865.",
+      "The complete upstream wrapper contains only public Project Gutenberg organisational contact information, not a living individual's private data.",
+      "No credential, client material, analytics export, private path or sensitive personal data is present."
+    ]
+  },
+  "split": "robustness-development",
+  "admissionDecision": "eligible-for-real-document-robustness-gate",
+  "calibrationEvidenceEligible": false,
+  "externalTrustRootClaimed": false
+}

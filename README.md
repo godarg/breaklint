@@ -15,7 +15,7 @@ npx breaklint --demo
 
 That command needs no browser and no configuration. It ends with exit 1, because the demo
 fixture contains findings on purpose — a demo that ends 0 never shows you what a finding looks
-like. Below is the first of its eight findings, plus the closing counters, copied from that
+like. Below is the first of its seven findings, plus the closing counters, copied from that
 command's output:
 
 ```
@@ -26,7 +26,7 @@ error layout/unbreakable-block-too-tall  page 2
   source     examples/demo.html:31
   render     unknown (no evidence produced)
 
-inputs found: 1 · pages analysed: 5 · rules run: 15 · rules that measured something: 13 ·
+inputs found: 1 · pages analysed: 5 · rules run: 13 · rules that measured something: 11 ·
 not measured: 2 · verdict: findings · mode: demo · fail-on: error · gate triggered by: error
 ```
 
@@ -69,7 +69,7 @@ previous version to compare to.
 
 ## What is checked
 
-Fifteen rules. Two of them can fail a build by default; twelve more are advisory unless you ask
+Thirteen rules. Two of them can fail a build by default; ten more are advisory unless you ask
 for more, with `--fail-on warn`; and one — `layout/half-empty-page` — is experimental and never
 moves an exit code at all, not even then. That split is not caution, it is the burden of proof:
 only two rules compare directly measured quantities against a structural boundary.
@@ -84,8 +84,6 @@ only two rules compare directly measured quantities against a structural boundar
 | [`layout/orphaned-continuation-page`](docs/rules/layout-orphaned-continuation-page.md) | a page holding only the tail of an earlier block | warn |
 | [`layout/hyphen-across-page`](docs/rules/layout-hyphen-across-page.md) | the paginator's hyphenation class at a page boundary | warn |
 | [`svg/text-overflows-viewport`](docs/rules/svg-text-overflows-viewport.md) | CTM-normalised text box against the viewport | **error** |
-| [`svg/text-clipped`](docs/rules/svg-text-clipped.md) | glyph ink removed by a clip path or mask | warn — *not measurable in this build, see below* |
-| [`svg/text-ink-collision`](docs/rules/svg-text-ink-collision.md) | glyph ink shared with, or covered by, a shape | warn — *not measurable in this build, see below* |
 | [`type/spaced-hyphen`](docs/rules/type-spaced-hyphen.md) | a hyphen between spaces where a dash belongs | warn |
 | [`type/straight-quotes`](docs/rules/type-straight-quotes.md) | typewriter quotes in typeset prose | warn |
 | [`type/short-last-line`](docs/rules/type-short-last-line.md) | width of a paragraph's closing line | warn |
@@ -121,14 +119,21 @@ and page breaks, and turns a correct page into a phantom half-empty-page finding
 for `document.fonts.ready` and stops with a non-zero exit if a declared font resource fails,
 rather than reporting findings it cannot stand behind.
 
-**The two SVG ink rules produce no findings in this build, on any document.** `svg/text-clipped`
-and `svg/text-ink-collision` need the SVG ink passes, which are M3 work and are not implemented in
-the collector. They run, decline every target with `env/pixel-oracle-unavailable`, and say so in
-`notMeasured` — which since 0.2.3 no longer ends the run. `svg/text-overflows-viewport` needs only
+**Missing image content is never treated as present.** A failed image decode remains fatal unless
+the source supplies positive `width` and `height` attributes and Chrome measures a positive box.
+Only that fixed-layout case continues with the non-fatal `image-content-unavailable` diagnostic;
+replacement text or a non-zero box without authored dimensions is not accepted as stable geometry.
+Reports retain a resource index and dimensions, never the failed file URL or remote query string.
+
+**SVG clipping and ink collision are not released rules.** The research modules
+`svg/text-clipped` and `svg/text-ink-collision` need isolated, stable pixel passes that production
+acquisition does not yet collect. Version 0.3.0 therefore removes them from the CLI registry,
+configuration schema, SARIF catalogue and demo instead of counting two rules that answer nothing.
+Their real-renderer lab remains explicitly research-only. `svg/text-overflows-viewport` needs only
 geometry and measures ordinary solid-fill text. When `getBBox()` cannot prove painted bounds
 (for example `<use>`, stroke, clip/mask/filter or a paint server), or CSS on the SVG or an ancestor
 makes its axis-aligned border box differ from the clipping viewport, the target declines coverage-relevantly and the error rule
-fails closed with exit 4 rather than guessing. Read this before counting fifteen rules.
+fails closed with exit 4 rather than guessing.
 
 **Their validation foundation is real-renderer, not real-corpus.** M3-0 exercises the ink rules'
 known construction and boundary cases in Chrome/Paged.js; it does not establish population
@@ -137,9 +142,10 @@ supplied capture-evidence bytes, but it does not ship an externally governed att
 No M3-0 path establishes a calibrated claim; that trust boundary belongs to later real-corpus
 work.
 
-**`svg/text-ink-collision` does not detect sub-pixel contact.** A shape can touch a glyph
-optically without sharing a device pixel. The earlier check for this took its truth from the
-same API it was testing, so it was removed; the removal was right and it cost recall.
+**There is no released SVG pixel-collision or clip/mask-ink check.** A prior implementation took
+its truth from the same API it was testing and was removed. The replacement lab uses independent
+pixel counterfactuals, but production integration still needs an isolated page, a device-scale
+contract, bounded target counts and rule-specific completeness checks before either rule can return.
 
 **Paged.js is pinned to exactly 0.4.3.** The break cause is read from attributes the paginator
 writes into the tree and does not guarantee as an interface. Any other resolved version stops
@@ -165,7 +171,7 @@ are complete; the post-release trust work and remaining validation boundaries ar
 |---|---|
 | 0 | checked, coverage met, nothing reached the threshold |
 | 1 | at least one non-experimental finding reached the threshold |
-| 2 | invalid invocation: unknown option, bad config, input path does not exist |
+| 2 | invalid invocation: unknown option, bad config, input path does not exist, or input is not `.html`/`.htm` |
 | 3 | infrastructure: no renderer, font failed, pagination aborted, checker crashed |
 | 4 | nothing or too little was judged |
 
@@ -193,6 +199,11 @@ page that nothing checks, and this tool exists because such claims were wrong.
 
 There is no directory recursion and no glob expansion inside the tool. The shell has done this
 correctly for fifty years, including symlink cycles.
+
+Input is HTML only (`.html` or `.htm`). A standalone `.svg`, PDF, Markdown file or directory is
+rejected with exit 2 before Chrome starts. Inline SVG inside HTML is supported by the released SVG
+geometry rule; treating a standalone SVG asset as a paged HTML document would require a separate
+MIME, page-size and embedding contract that this version does not claim.
 
 Configuration is fail-closed JSON in `breaklint.config.json`. Unknown fields, rules and options
 end with exit 2 before the input is opened. Values resolve as defaults < profile < config < CLI;
@@ -251,7 +262,7 @@ The useful report is the page where human judgement and the checker disagree. An
 public, unpaid [community test](docs/community-testing.md); there is no application or selection.
 Use only material you may publish. Security findings still go through [`SECURITY.md`](SECURITY.md),
 never a public issue. Community reports are additional QA, not blind annotations or calibration
-evidence, and all fifteen rules remain `calibrated: false`.
+evidence, and all thirteen released rules remain `calibrated: false`.
 
 ## License
 

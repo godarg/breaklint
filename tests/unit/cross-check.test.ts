@@ -6,6 +6,7 @@ import {
   crossCheckEvent,
   CROSS_CHECK_MEASURED_MAX_PX,
   CROSS_CHECK_TOLERANCE_PX,
+  quadEnvelope,
   type GeometrySample,
 } from "../../src/measure/cross-check.ts";
 
@@ -18,6 +19,24 @@ const box = (key: string, x: number, y: number, w = 100, h = 20): GeometrySample
 });
 
 describe("the geometry cross-check", () => {
+  it("uses all four CDP quad corners for a transformed element's axis-aligned box", () => {
+    // 126 x 46 including border, rotated 30 degrees. The first edge is not horizontal, so the
+    // former q[0]/q[1]/q[2]/q[5] shortcut produces x=219.94 and width=109.12 instead of the
+    // getBoundingClientRect envelope below. This exact shape was measured in Chrome 152.
+    const quad = [
+      219.94039916992188, 121.58141326904297,
+      329.0596008300781, 184.58141326904297,
+      306.0596008300781, 224.4185791015625,
+      196.94039916992188, 161.4185791015625,
+    ];
+    assert.deepEqual(quadEnvelope(quad), {
+      x: 196.94039916992188,
+      y: 121.58141326904297,
+      width: 132.11920166015625,
+      height: 102.83716583251953,
+    });
+  });
+
   /**
    * The bound, pinned as a literal AND from both sides.
    *

@@ -4,20 +4,65 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
+## Current state — 0.3.0 (2026-08-30)
+
+The released CLI exposes **13 rules**: two structural error rules, ten ordinary warning rules and
+one experimental warning that never gates. All 13 carry `calibrated: false`; there is still no
+human-labelled corpus and no external trust root. The research modules `svg/text-clipped` and
+`svg/text-ink-collision` are retained for the M3 renderer lab but are no longer counted, configured,
+reported in SARIF or demonstrated by `--demo`, because production acquisition collects no ink pass.
+
+The current demo has seven findings and reports `rules run: 13`, `rules that measured something:
+11`. Its snapshot now says `inkCollected: false` and contains no invented pixel counts. Two frozen,
+rights- and privacy-reviewed HTML artifacts are a mandatory CI and release gate. The third-party
+Project Gutenberg document was not written for this repository; it produces exactly 9 pages,
+measures 9/13 rules and exits 0. The first-party Dargel document separately exercises absent-image
+packaging and produces exactly 6 pages, measures 11/13 rules and exits 0. The published 0.2.3 package
+makes the third-party gate fail with Exit 3; that is the recorded red control.
+
+Live input is explicitly `.html`/`.htm`. Standalone SVG, PDF, Markdown and directories are rejected
+as usage with Exit 2 before the browser starts. Inline SVG remains supported for the released
+viewport-geometry rule. The geometry cross-check keeps its `0.05 px` guard band: CDP quads now use
+the AABB of all four corners, and SVG graphics descendants are excluded because CDP's stroke/paint
+box and `getBoundingClientRect()`'s SVG geometry box are different quantities. A third-party HTML
+document also exposed an authored block reset to an inline formatting box: CDP and GCR intentionally
+covered different child unions, so that inline box is excluded while its block children stay in the
+sample. Raising the tolerance would have hidden differences up to 18 px rather than fixed the
+comparison.
+
+Missing images are not silently ignored. A decode failure without positive authored `width` and
+`height` attributes, or with a zero-size rendered box, is fatal; replacement text alone does not
+establish stable image geometry. Only a failure with both authored dimensions and a measured
+non-zero box becomes the named non-fatal event `image-content-unavailable`. That distinction lets
+the frozen first-party corpus document be measured without claiming its absent pixels were present.
+
+M3 is split by dependency: M3-1a (public corpus breadth and acquisition robustness) is active and
+precedes governance; M3-1b (blind human labels, adjudication, external attestation and externally
+controlled freeze) remains parked. No threshold, severity, proof-source-A contract or `calibrated`
+flag changed. The sections below are a dated build record; statements such as “not released” describe
+their checkpoint, not the current state.
+
+The report surfaces are regenerated as 32 semantic cells and 59 physical artifacts (24 screen PNGs,
+4 PDFs and 31 PDF-page rasters). The technical gate verifies those current bytes, decoded pixels,
+contrast, accessibility, print fragmentation and a real pixel-mutation red control. The prior human
+ledger remains bound to the 0.2.3 inputs and 62 artifacts; it has deliberately not been restamped or
+transferred to 0.3.0. `test:report-surfaces:local` therefore remains red until a person reviews the
+current exact environment. No human review of the 0.3.0 surface is claimed.
+
 ## Finished and verified without a browser
 
 | | |
 |---|---|
-| 15 rules as pure functions over a snapshot | `src/rules/` |
-| Mutation guard | 15/15 rules kill every mutant, each on a fixture that actually triggers it |
+| 13 released rules as pure functions over a snapshot | `src/rules/` |
+| Mutation guard | 13/13 released rules kill every mutant, each on a fixture that actually triggers it |
 | False-alarm corpus | every clean fixture stays silent, every trigger fixture fires and is attributed correctly |
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
 | Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in report schema 3; generated schema drift and process-boundary exit 2 are tested |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
-| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; 32-cell, input/environment-bound human-review ledger over 47 inputs with computed contrast, stable visual contracts and exact raw audit hashes for all 62 reviewed artifacts (24 screens, 4 PDFs, 34 PDF rasters) |
+| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 59 physical artifacts with decoded-pixel, contrast, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.0 |
 | Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
-| `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 8 findings across 7 rules |
+| `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 7 findings across 6 rules |
 
 ## Finished and verified against a real browser
 
@@ -49,7 +94,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=349 aggregateTests=457 liveTests=60 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=350 aggregateTests=462 liveTests=62 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -392,9 +437,10 @@ without measuring it, in the same commit that repairs numbers written without me
 All of this is recorded rather than quietly fixed, because the pattern is this project's own
 subject: the check that looked green was green about the wrong thing, four rounds running.
 
-### Where this leaves 0.2.3
+### Historical pre-release checkpoint: where this left 0.2.3
 
-Not released. The report-surface ledger is green after a new Founder review.
+At this checkpoint it was not released; 0.2.3 was subsequently published on 2026-08-29. The
+report-surface ledger was green after a new Founder review.
 
 The ledger binds a human review to the exact bytes of the reviewed artifacts. The Founder's
 confirmation on 2026-08-28 was explicit about its own basis: 58 of 62 artifacts byte-identical,
@@ -407,10 +453,10 @@ retaining the earlier review timestamps only where the visible artifact remained
 `npm run test:report-surfaces` now passes against those exact reviewed bytes. A later source or
 pixel change returns it to red rather than silently transferring the new PASS.
 
-One honesty note about the demo. `examples/demo-snapshot.json` carries ink counts, so
-`npx breaklint --demo` shows a `svg/text-clipped` finding that a real run cannot currently
-produce. It is a handwritten fixture demonstrating the rule chain, not a claim about what the
-collector measures; `mode` and `source` in every report distinguish the two.
+Historical 0.2.3 honesty note: its `examples/demo-snapshot.json` carried ink counts, so
+`npx breaklint --demo` showed a `svg/text-clipped` finding that a real run could not produce.
+Version 0.3.0 removes those counts and the two research definitions from the released registry;
+the current demo no longer makes that claim.
 
 ### CI incident reconciliation: failed push at `05fec787`
 
@@ -608,13 +654,13 @@ than a wrong layout. Both numbers are written down because the difference betwee
 wrong" and "one non-normative field is null" is exactly the sort of thing that gets remembered as
 the larger of the two.
 
-**What that means for a reader today.** `--demo` still shows the rule and reporter chain over its
+**What that meant at this checkpoint.** `--demo` showed the rule and reporter chain over its
 stored fixture. Passing HTML paths exercises the M2/M2d render path, and the report distinguishes
 those two cases in its own `mode` and `source` fields rather than leaving the reader to infer it.
 
 ## What no amount of testing here establishes
 
 Every threshold is uncalibrated. There is no corpus of real documents with human-checked truth
-behind any of the fifteen numbers, so the fixtures show that each rule *does what it says*, not
+behind any of the then-fifteen numbers, so the fixtures showed that each rule *did what it said*, not
 that what it says is the right thing to say about a real document. That distinction is the
 difference between a verified implementation and a validated one, and only the first is claimed.
