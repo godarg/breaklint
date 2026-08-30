@@ -26,9 +26,7 @@
     "infrastructureKind": "geometry-cross-check-failed",
     "checked": 8,
     "maxDeltaPx": 18,
-    "tolerancePx": 0.05,
-    "deterministicSummarySha256": "f33739cca9b4f80a7472f5072584a1cfc074db85c4ef7b44fa0296a88ce0ff78",
-    "fullReportSha256": "5bdd3305162b637f869f43277a0dca7ddde18b6774a4ce159f286dd51b6b1759"
+    "tolerancePx": 0.05
   },
   "redCondition": "Exit 3 with zero analysed pages and zero measured rules on the exact third-party bytes later used by the green gate.",
   "greenClaimed": false

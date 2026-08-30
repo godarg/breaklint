@@ -85,11 +85,6 @@ try {
     },
     "the executable red control diverged from its recorded deterministic observation",
   );
-  assert.equal(
-    createHash("sha256").update(JSON.stringify(deterministicObserved)).digest("hex"),
-    EVIDENCE.observed.deterministicSummarySha256,
-    "the deterministic red-control summary hash drifted",
-  );
   process.stdout.write(
     `0.2.3 red control: exit ${run.status}; ${report.pagesAnalysed} pages; ` +
       `${report.measuredRules}/${report.rulesRun} rules measured; max delta ${event.measured.maxDeltaPx} px; ` +

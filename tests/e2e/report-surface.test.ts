@@ -116,11 +116,12 @@ describe("HTML Report Surface v2", () => {
     assert.doesNotMatch(summary, /Coverage met/u, "exit 4 must outrank a per-row zero-candidate ok flag");
   });
 
-  it("shows Checker only for exit 3 and the coverage alert only for exit 4", () => {
+  it("shows the apparatus failure section only for exit 3 and the coverage alert only for exit 4", () => {
     const states = canonicalReportStates();
     for (const [state, report] of Object.entries(states)) {
       const html = renderHtml(report);
-      assert.equal(html.includes('id="checker-heading"'), state === "infrastructure", `${state}: Checker visibility drift`);
+      assert.equal(html.includes('id="apparatus-heading"'), state === "infrastructure", `${state}: apparatus visibility drift`);
+      assert.equal(html.includes("Checker failure"), state === "infrastructure", `${state}: failure wording drift`);
       assert.equal(html.includes('id="coverage-alert-heading"'), state === "insufficient-coverage", `${state}: alert visibility drift`);
     }
   });

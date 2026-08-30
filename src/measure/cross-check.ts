@@ -279,7 +279,6 @@ export const SAMPLE_SOURCE = `((limit) => {
     }
     const b = P.rect(el);
     if (b.width <= 0 || b.height <= 0) continue;
-    eligible += 1;
     // JSON emits a CSS string token and therefore keeps an authored id containing a quote from
     // widening this selector.  The generated source attributes are preferred; id is the
     // compatibility fallback Paged.js preserves when it drops both generated attributes.
@@ -288,6 +287,9 @@ export const SAMPLE_SOURCE = `((limit) => {
     const key = attribute + ":" + value + "#" + occurrence;
     if (occurrence < 0 || seen.has(key)) continue;
     seen.add(key);
+    // Count the addressable, de-duplicated population from which required is derived. Counting
+    // before this guard can make a sound small document require more samples than can be queried.
+    eligible += 1;
     if (out.length < limit) {
       out.push({ key, x: b.x, y: b.y, width: b.width, height: b.height, selector: exactSelector, occurrence });
     }

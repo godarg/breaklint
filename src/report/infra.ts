@@ -28,12 +28,19 @@
  */
 
 import type { DocumentReport, InfraEvent, Report } from "../core/types.ts";
+import { IS } from "../core/enums.ts";
+
+export type InfraLineLevel = "error" | "warning" | "note";
 
 /** One event, flattened for projection. `document` is the path the event belongs to. */
 export interface InfraLine {
   document: string;
   kind: string;
   detail: string;
+  /** Fatality is the engine contract, not something each reporter may infer from mere presence. */
+  fatal: boolean;
+  /** Projection level: fatal=error, successful oracle evidence=note, other non-fatal diagnostics=warning. */
+  level: InfraLineLevel;
   /** `measured`, rendered as short `key=value` pairs. Long collections are summarised, not dumped. */
   measured: string[];
 }
@@ -127,10 +134,13 @@ export function infraLines(report: Report): InfraLine[] {
   const lines: InfraLine[] = [];
   for (const doc of report.documents as DocumentReport[]) {
     for (const event of doc.infrastructure as InfraEvent[]) {
+      const fatal = !IS.nonFatalInfraEventKind.has(event.kind);
       lines.push({
         document: doc.path,
         kind: event.kind,
         detail: oneLine(event.detail),
+        fatal,
+        level: fatal ? "error" : event.kind === "geometry-cross-check-passed" ? "note" : "warning",
         measured: event.measured
           ? Object.entries(event.measured).map(([key, value]) => `${key}=${renderValue(value)}`)
           : [],

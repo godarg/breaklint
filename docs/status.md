@@ -18,8 +18,8 @@ rights- and privacy-reviewed HTML artifacts are a mandatory CI and release gate.
 Project Gutenberg document was not written for this repository; it produces exactly 9 pages,
 measures 9/13 rules and exits 0. The first-party Dargel document separately exercises absent-image
 packaging and produces exactly 6 pages, measures 11/13 rules and exits 0. The published 0.2.3 package
-makes the third-party gate fail with Exit 3; the exact registry integrity, environment, report hash
-and reproduction command are retained in
+makes the third-party gate fail with Exit 3; the exact registry integrity, environment,
+deterministic observation and reproduction command are retained in
 `docs/validation/real-document-red-control-v0.2.3.json` as the recorded red control.
 
 Live input is explicitly `.html`/`.htm`. Standalone SVG, PDF, Markdown and directories are rejected
@@ -101,7 +101,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=353 aggregateTests=466 liveTests=62 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=354 aggregateTests=467 liveTests=62 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
