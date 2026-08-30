@@ -198,7 +198,9 @@ describe("Configuration Contract v1", () => {
     assert.deepEqual(ruleSchemas.properties["svg/text-overflows-viewport"]!.oneOf[1]!.properties, {});
     assert.ok(ruleSchemas.properties["type/straight-quotes"]!.oneOf[1]!.properties!.excludeTags);
     assert.equal(ruleSchemas.properties["type/straight-quotes"]!.oneOf[1]!.properties!.excludeSelectors, undefined);
-    assert.equal(ALL_RULES.length, 15, "the independent rule-count literal changed; audit the schema surface");
+    assert.equal(ALL_RULES.length, 13, "the independent rule-count literal changed; audit the schema surface");
+    assert.equal(ruleSchemas.properties["svg/text-clipped"], undefined, "a research-only rule entered the public schema");
+    assert.equal(ruleSchemas.properties["svg/text-ink-collision"], undefined, "a research-only rule entered the public schema");
   });
 
   it("agrees with an independent JSON Schema validator on a shared positive and negative corpus", () => {

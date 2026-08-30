@@ -251,7 +251,9 @@ export function buildHtmlReportModel(report: Report): HtmlReportModel {
         ? "The requested checks completed without a gate-triggering finding."
         : `${report.findings.length} measured finding${report.findings.length === 1 ? "" : "s"}, ordered as produced by the checker.`,
     findings: report.findings.map(findingModel),
-    infrastructure: report.runVerdict === "infrastructure" ? infraLines(report) : [],
+    // Non-fatal apparatus diagnostics and positive second-opinion evidence remain visible too.
+    // Presence is not equivalent to failure; `InfraLine.fatal` carries that engine decision.
+    infrastructure: infraLines(report),
     coverage,
   };
 }

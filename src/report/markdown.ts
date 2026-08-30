@@ -22,11 +22,11 @@ export function renderMarkdown(report: Report): string {
   // run until an audit measured it.
   const infra = infraLines(report);
   if (infra.length > 0) {
-    out.push("## Checker", "");
-    out.push("| kind | document | detail | measured |", "|---|---|---|---|");
+    out.push("## Measurement apparatus", "");
+    out.push("| level | kind | document | detail | measured |", "|---|---|---|---|---|");
     for (const line of infra) {
       out.push(
-        `| \`${line.kind}\` | ${line.document} | ${line.detail.replace(/\|/gu, "\\|")} | ` +
+        `| ${line.level} | \`${line.kind}\` | ${line.document} | ${line.detail.replace(/\|/gu, "\\|")} | ` +
           `${line.measured.join("; ").replace(/\|/gu, "\\|") || "—"} |`,
       );
     }

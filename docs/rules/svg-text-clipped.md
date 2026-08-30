@@ -1,5 +1,9 @@
 # `svg/text-clipped`
 
+> **Research definition — not a released rule in 0.3.0.** This module is absent from the CLI
+> registry, configuration schema, SARIF catalogue and demo. It remains here with the M3 lab so a
+> future production integration has an explicit decision contract instead of an implied feature.
+
 | | |
 |---|---|
 | severity | warn |
@@ -21,14 +25,10 @@ Ink is defined against the empty pass, not an assumed background. An earlier ver
 
 ## Availability in this build
 
-**This rule measures nothing today, on any document.** It needs the SVG ink passes, which are M3
-work and are not implemented in the collector: `inkCollected` is false for every SVG, and the rule
-declines each target with `env/pixel-oracle-unavailable`.
-
-Until 0.2.3 that decline was charged to coverage, so a single inline SVG ended the run in exit 4.
-It now leaves the coverage base and stays in `notMeasured`, where it names this rule, the reason
-and the number of targets. The rule is registered and its logic is covered by fixtures carrying
-ink counts — what is missing is the measurement, not the decision.
+Production acquisition writes `inkCollected: false` for every SVG and has no isolated pixel pass.
+Version 0.3.0 therefore withdrew this rule from `ALL_RULES` instead of registering a definition
+that no real document can reach. Only the explicit validation registry executes it over controlled
+M3 lab projections; that is research evidence, not a product capability.
 
 ## Limits and known false alarms
 
@@ -39,7 +39,7 @@ A clip that contains the text is not a finding. Unstable ink passes are discarde
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with
 human-checked truth; no such corpus exists for this project. Every finding says so, and the
 report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
-also why this rule ships with the severity it has.
+also why any future release must keep it advisory until the calibration boundary changes.
 
 M3-0 adds an independent oracle contract and a real-renderer seven-fixture lab. It reproduces the
 group-selector zero and the shared-mask dilution counterexample, validates target attribution, and

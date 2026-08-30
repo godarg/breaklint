@@ -14,13 +14,14 @@ const escape = (s: string) =>
  */
 export function renderJunit(report: Report): string {
   const f = mandatoryFacts(report);
-  // An infrastructure failure is a FAILURE for a CI reader, and it was not counted here. Measured
+  // A FATAL infrastructure event is a FAILURE for a CI reader, and it was not counted here. Measured
   // before this line existed: an exit-3 run rendered `<testsuites tests="0" failures="0">`, which
   // every CI front-end reads as a green build. A format carries the honesty layer only if it
   // carries it in the field the reader's tool actually looks at — the same argument the header of
   // this file makes about `properties`, applied to the one number CI reads first.
   const infra = infraLines(report);
-  const failures = report.findings.length + infra.length;
+  const fatalInfra = infra.filter((line) => line.fatal);
+  const failures = report.findings.length + fatalInfra.length;
   const out: string[] = ['<?xml version="1.0" encoding="UTF-8"?>'];
   out.push(
     `<testsuites name="breaklint" tests="${report.rulesRun}" failures="${failures}" ` +
@@ -32,15 +33,21 @@ export function renderJunit(report: Report): string {
   }
   out.push(`  </properties>`);
 
-  // The checker's own failures get their own suite, so they are visible even when no rule ran.
+  // Apparatus events get their own suite, so both failures and positive evidence remain visible
+  // even when no rule ran. Only the engine's fatal event kinds increment the CI failure count.
   if (infra.length > 0) {
-    out.push(`  <testsuite name="breaklint checker" tests="${infra.length}" failures="${infra.length}">`);
+    out.push(`  <testsuite name="breaklint apparatus" tests="${infra.length}" failures="${fatalInfra.length}">`);
     for (const line of infra) {
-      out.push(`    <testcase classname="breaklint checker" name="${escape(line.kind)}">`);
-      out.push(
-        `      <failure type="${escape(line.kind)}" message="${escape(line.detail)}">` +
-          `${escape(line.document)}; ${escape(line.measured.join("; "))}</failure>`,
-      );
+      out.push(`    <testcase classname="breaklint apparatus" name="${escape(line.kind)}">`);
+      const context = `${line.document}; ${line.measured.join("; ")}`;
+      if (line.fatal) {
+        out.push(
+          `      <failure type="${escape(line.kind)}" message="${escape(line.detail)}">` +
+            `${escape(context)}</failure>`,
+        );
+      } else {
+        out.push(`      <system-out>${escape(`${line.level}: ${line.detail}; ${context}`)}</system-out>`);
+      }
       out.push(`    </testcase>`);
     }
     out.push(`  </testsuite>`);

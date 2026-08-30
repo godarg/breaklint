@@ -531,7 +531,7 @@ describe("exit matrix", () => {
 
   /**
    * Every infrastructure kind, one row each, asserting the exit it produces on an otherwise clean
-   * document. The four named non-fatal kinds must leave the run at 0; all others must
+   * document. The six named non-fatal kinds must leave the run at 0; all others must
    * take it to 3.
    *
    * This exists because the enumeration was previously covered only where a hand-written row
@@ -561,8 +561,13 @@ describe("exit matrix", () => {
      * list, and the equality assertion below makes the two disagree loudly rather than silently.
      */
     // §9 makes an undetermined break cause visible but explicitly non-gating: uncertainty costs
-    // no complete report. This literal is intentionally independent of the production list.
-    const EXPECTED_NON_FATAL = ["empty-input", "mark-style-overridden", "mark-raster-diff", "break-cause-undetermined"];
+    // no complete report. A failed image joins this list only when the resource barrier measured
+    // a non-zero box, so the unavailable pixels cannot move the released layout quantities. This
+    // literal is intentionally independent of the production list.
+    const EXPECTED_NON_FATAL = [
+      "empty-input", "mark-style-overridden", "mark-raster-diff", "break-cause-undetermined",
+      "image-content-unavailable", "geometry-cross-check-passed",
+    ];
 
     it("the production non-fatal list is exactly the list this file expects", () => {
       assert.deepEqual(
@@ -573,7 +578,7 @@ describe("exit matrix", () => {
     });
 
     it("every declared kind is covered by a row below", () => {
-      assert.equal(INFRA_EVENT_KINDS.length, 17, "a kind was added or removed without deciding its fatality");
+      assert.equal(INFRA_EVENT_KINDS.length, 19, "a kind was added or removed without deciding its fatality");
     });
 
     for (const kind of INFRA_EVENT_KINDS) {

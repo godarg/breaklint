@@ -94,6 +94,17 @@ describe("Configuration Contract v1 at the CLI and engine boundary", () => {
     assert.equal(existsSync(report), false);
   });
 
+  it("rejects both research-only ink definitions as unknown public rules", () => {
+    for (const ruleId of ["svg/text-clipped", "svg/text-ink-collision"]) {
+      const dir = tempDir();
+      const report = join(dir, "report.json");
+      const run = runCli(dir, ["--demo", "--only", ruleId, "--format", "json", "--out", report]);
+      assert.equal(run.status, 2, `${ruleId}: ${run.stderr}`);
+      assert.match(run.stderr, new RegExp(`--only ${ruleId.replace("/", "\\/")}: no such rule`, "u"));
+      assert.equal(existsSync(report), false);
+    }
+  });
+
   it("rejects a CLI profile that would weaken strict coverage from the config file", () => {
     const dir = tempDir();
     const config = join(dir, "strict.json");

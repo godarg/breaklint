@@ -90,10 +90,11 @@ The report-surface gate has two explicit modes over the complete matrix in
   human gate. They require the current source fingerprint, browser, operating system, architecture,
   runtime, render contract, stable artifact fingerprints and visible screen-pixel hashes to match
   the reviewed ledger exactly.
-- `npm run test:report-surfaces:portable` is the Linux-CI technical gate. It renders and validates
-  the current platform's complete matrix and requires a complete human-review ledger for the exact
-  same source fingerprint. It deliberately does not compare Linux artifact or pixel fingerprints
-  to another operating system and therefore makes no cross-environment human-review claim.
+- `npm run test:report-surfaces:technical` is the release/CI technical gate. It renders and
+  validates the current platform's complete matrix, checks that the separately retained human
+  ledger is structurally genuine, and says whether that ledger matches or differs from the current
+  input fingerprint. It never transfers a historical human PASS onto changed inputs and does not
+  require a ceremonial re-review for a technical release gate.
 
 Both modes cover:
 
@@ -129,9 +130,10 @@ pixels and the complete review environment are identical. It also runs two negat
 changing one bound input in a temporary tree must invalidate the source fingerprint, and changing
 one visible RGBA channel must invalidate the screen fingerprint. A new or changed bound source
 therefore returns the ledger to `pending` until the complete local matrix has been rendered and
-reviewed again. Portable CI still fails on changed source, incomplete ledger, malformed historical
-review evidence or any technical defect in its own current matrix; it simply does not mislabel that
-Linux render as the already human-reviewed local render.
+reviewed again. Technical CI still fails on malformed historical review evidence or any technical
+defect in its own current matrix; changed source is reported as different rather than mislabeled as
+already human-reviewed. The strict local gate remains red until a real reviewer binds the new exact
+inputs.
 
 Print verification is outcome-level as well as structural. The renderer measures the actual print
 layout at the A4 content width, requires the Coverage Trust verdict to remain on one line, fit completely inside its own
@@ -149,7 +151,7 @@ a global count of anonymous card-like rectangles or a fixed card-height band. Bo
 98% edge coverage and reject any contiguous gap longer than two raster rows. The raster DPI is pinned
 to 110 in both oracles. The inner repair is a real child border rather than a background fill. A
 separate technical A4 probe renders the insufficient-coverage state with `printBackground: false`,
-including its strong-left-border warning card, and both oracles must still measure all 15 cards as
+including its strong-left-border warning card, and both oracles must still measure all 13 cards as
 closed; this probe is not an additional human-review cell. The complete visible contract is bound to
 the review fingerprint. A CI mutation runner executes four genuine failing renderer processes for a
 missing whole right edge, a missing whole left edge, a missing lower right fifth and simultaneously

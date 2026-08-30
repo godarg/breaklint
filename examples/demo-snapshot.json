@@ -624,14 +624,14 @@
             "ambiguityGroupSize": 1,
             "ink": {
               "T": {
-                "count": 1420,
-                "maskHash": "h1420",
+                "count": 0,
+                "maskHash": "",
                 "intersectShapes": 0,
                 "missingInFull": 0
               },
               "T0": {
-                "count": 3810,
-                "maskHash": "h3810"
+                "count": 0,
+                "maskHash": ""
               }
             }
           },
@@ -648,14 +648,14 @@
             "ambiguityGroupSize": 1,
             "ink": {
               "T": {
-                "count": 2100,
-                "maskHash": "h2100",
+                "count": 0,
+                "maskHash": "",
                 "intersectShapes": 0,
                 "missingInFull": 0
               },
               "T0": {
-                "count": 2100,
-                "maskHash": "h2100"
+                "count": 0,
+                "maskHash": ""
               }
             }
           }
@@ -675,19 +675,19 @@
         "inkPasses": {
           "E": {
             "count": 0,
-            "maskHash": "h0"
+            "maskHash": ""
           },
           "S": {
-            "count": 9000,
-            "maskHash": "h9000"
+            "count": 0,
+            "maskHash": ""
           },
           "F": {
-            "count": 11100,
-            "maskHash": "h11100"
+            "count": 0,
+            "maskHash": ""
           }
         },
-        "inkCollected": true,
-        "inkStable": true
+        "inkCollected": false,
+        "inkStable": false
       }
     ],
     "uriRefs": [

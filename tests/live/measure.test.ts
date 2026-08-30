@@ -36,8 +36,10 @@ import {
   compareGeometry,
   CROSS_CHECK_MEASURED_MAX_PX,
   CROSS_CHECK_SAMPLE_SIZE,
+  CROSS_CHECK_TOLERANCE_PX,
   geometrySampleSource,
-  type GeometrySample,
+  quadEnvelope,
+  type GeometrySample, type GeometrySampleBatch,
 } from "../../src/measure/cross-check.ts";
 import { collectorSource } from "../../src/paginate/collector.ts";
 import { injectSourceIds } from "../../src/source/inject.ts";
@@ -76,10 +78,12 @@ function documentSource(pagedjs: string): string {
 body{font:10pt/1.45 Georgia,serif;margin:0} p{margin:0 0 8px}
 p.marked::before{ content:"MARK "; padding-left:3px }
 ul li::marker{ content:"* " }
+.inline-reset{all:initial}.inline-reset p{margin:0 0 8px}
 </style></head><body>
+<div class="inline-reset"><p>block content inside a div whose authored CSS resets its display to inline.</p></div>
 <p class="marked">alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron.</p>
 <ul><li>a list item, for the marker</li></ul>
-<svg width="60" height="40" viewBox="0 0 60 40"><g transform="translate(5,5) scale(2)"><rect x="1" y="2" width="10" height="6"/></g></svg>
+<svg id="svg-root" data-ref="svg-root" width="60" height="40" viewBox="0 0 60 40"><g id="svg-group" data-ref="svg-group" transform="translate(5,5) scale(2)"><rect id="svg-rect" data-ref="svg-rect" x="1" y="2" width="10" height="6"/></g></svg>
 <img width="40" height="30" src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==">
 <canvas id="cv" width="50" height="20"></canvas>
 ${filler}
@@ -356,9 +360,50 @@ describe("the measurement probe, live", () => {
    */
   it("the browser's layout tree agrees with the probe, and the rounded fields are why the quad is used", async (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const filterPage = await loaded();
+    await filterPage.evaluate<void>(`(() => {
+      document.body.innerHTML = '<div class="pagedjs_page"><svg id="filter-svg-root" data-ref="root" width="60" height="40">' +
+        '<g id="filter-svg-group" data-ref="group"><rect id="filter-svg-rect" data-ref="rect" width="10" height="6"></rect></g></svg>' +
+        '<p data-ref="paragraph">control <span id="filter-inline" data-ref="inline">ordinary inline</span></p></div>';
+    })()`);
+    const filterBatch = await filterPage.evaluate<GeometrySampleBatch>(geometrySampleSource(100));
+    const filterSamples = filterBatch.samples;
+    const filterDiagnostics = await filterPage.evaluate<Record<string, unknown>>(`(() => {
+      const P = window.__blPrimitives;
+      const root = P.all(document, '.pagedjs_page [data-ref="root"]')[0];
+      return { found: !!root, closestSelf: P.closest(root, "svg") === root, rect: P.rect(root), display: P.style(root).display };
+    })()`);
+    const filterTargetShape = await filterPage.evaluate<{
+      tag: string; ref: string | null; insideSvg: boolean; isSvgRoot: boolean;
+    }[]>(`(() => {
+      const P = window.__blPrimitives;
+      const samples = ${JSON.stringify(filterSamples)};
+      return samples.map((sample) => {
+        const target = P.all(document, sample.selector)[sample.occurrence];
+        const root = target ? P.closest(target, "svg") : null;
+        return { tag: target?.tagName || "", ref: target ? P.attr(target, "data-ref") : null, insideSvg: !!root, isSvgRoot: root === target };
+      });
+    })()`);
+    await filterPage.close();
+    assert.ok(
+      filterTargetShape.some((target) => target.isSvgRoot),
+      `the filter control never reached its SVG root: ${JSON.stringify({ filterSamples, filterTargetShape, filterDiagnostics })}`,
+    );
+    assert.equal(
+      filterTargetShape.some((target) => target.insideSvg && !target.isSvgRoot),
+      false,
+      `an SVG graphics descendant entered the CSS-box oracle: ${JSON.stringify(filterTargetShape)}`,
+    );
+    assert.ok(
+      filterTargetShape.some((target) => target.ref === "inline"),
+      `an ordinary inline box was excluded even though it contains no block child: ${JSON.stringify(filterTargetShape)}`,
+    );
+
     const page = await paginated();
-    const inPage = await page.evaluate<GeometrySample[]>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
-    assert.ok(inPage.length > 0, "the sample is empty — this case would confirm nothing");
+    const batch = await page.evaluate<GeometrySampleBatch>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
+    const inPage = batch.samples;
+    assert.equal(inPage.length, CROSS_CHECK_SAMPLE_SIZE, "the live oracle did not fill its eight-element sample");
+    assert.ok(batch.eligible >= CROSS_CHECK_SAMPLE_SIZE, "the live oracle's independent eligible count is too small");
 
     const session = await (page as unknown as { createCDPSession(): Promise<CdpSession> }).createCDPSession();
     await session.send("DOM.enable");
@@ -386,12 +431,18 @@ describe("the measurement probe, live", () => {
         continue;
       }
       const q = model.border;
-      outOfProcess.push({ key: sample.key, x: q[0]!, y: q[1]!, width: q[2]! - q[0]!, height: q[5]! - q[1]! });
+      outOfProcess.push({ key: sample.key, ...quadEnvelope(q) });
       worstModelDelta = Math.max(worstModelDelta, Math.abs(model.width - sample.width));
     }
     await page.close();
 
-    const result = compareGeometry(inPage, outOfProcess);
+    const result = compareGeometry(
+      inPage,
+      outOfProcess,
+      CROSS_CHECK_TOLERANCE_PX,
+      CROSS_CHECK_SAMPLE_SIZE,
+      batch,
+    );
     assert.equal(result.ok, true, `disagreements: ${JSON.stringify(result.disagreements)}`);
     assert.ok(
       result.maxDelta <= CROSS_CHECK_MEASURED_MAX_PX,
@@ -402,6 +453,30 @@ describe("the measurement probe, live", () => {
       worstModelDelta > CROSS_CHECK_MEASURED_MAX_PX,
       "model.width is no longer rounded; the reason this code reads the quad instead has expired",
     );
+  });
+
+  it("normalises a rotated HTML border quad from all four CDP corners", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const page = await browser!.newPage();
+    await page.setViewport({ width: 1000, height: 800 });
+    await page.setContent(
+      '<!doctype html><style>#rotated{position:absolute;left:220px;top:120px;width:120px;height:40px;' +
+        'border:3px solid black;transform:rotate(30deg);transform-origin:0 0}</style><div id="rotated"></div>',
+    );
+    const inPage = await page.evaluate<{ x: number; y: number; width: number; height: number }>(
+      `(() => { const b = document.getElementById("rotated").getBoundingClientRect();
+        return { x: b.x, y: b.y, width: b.width, height: b.height }; })()`,
+    );
+    const session = await (page as unknown as { createCDPSession(): Promise<CdpSession> }).createCDPSession();
+    await session.send("DOM.enable");
+    const { root } = await session.send<{ root: { nodeId: number } }>("DOM.getDocument", { depth: -1 });
+    const { nodeId } = await session.send<{ nodeId: number }>("DOM.querySelector", {
+      nodeId: root.nodeId,
+      selector: "#rotated",
+    });
+    const { model } = await session.send<{ model: { border: number[] } }>("DOM.getBoxModel", { nodeId });
+    await page.close();
+    assert.deepEqual(quadEnvelope(model.border), inPage);
   });
 
   /**

@@ -1,0 +1,33 @@
+{
+  "contractVersion": "real-document-red-control-v1",
+  "observedAt": "2026-08-30T11:22:01Z",
+  "package": {
+    "name": "breaklint",
+    "version": "0.2.3",
+    "registryIntegrity": "sha512-VMCnnIGeGcyxVBkZqBx6ieNA5NodXLDx3/mY7IYJMVGY2V0lFd+0+B5LO4mYZxJfpx0mMQCGY2+OR/u7Gmj52w=="
+  },
+  "environment": {
+    "node": "v22.22.3",
+    "browser": "Google Chrome 152.0.7977.64",
+    "platform": "macOS"
+  },
+  "document": {
+    "relativePath": "corpus/public/robustness-v1/documents/project-gutenberg-gettysburg-address.html",
+    "sha256": "2da09414df2cfbe8f48420abd73067e3e08182d152d3d13bcdd1d26ff30535d9"
+  },
+  "reproduction": "BREAKLINT_023_CLI=<registry-install>/node_modules/breaklint/dist/cli/index.js npm run test:real-document:red-control",
+  "observed": {
+    "exitCode": 3,
+    "inputsFound": 1,
+    "pagesAnalysed": 0,
+    "rulesRun": 15,
+    "measuredRules": 0,
+    "runVerdict": "infrastructure",
+    "infrastructureKind": "geometry-cross-check-failed",
+    "checked": 8,
+    "maxDeltaPx": 18,
+    "tolerancePx": 0.05
+  },
+  "redCondition": "Exit 3 with zero analysed pages and zero measured rules on the exact third-party bytes later used by the green gate.",
+  "greenClaimed": false
+}

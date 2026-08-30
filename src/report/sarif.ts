@@ -44,7 +44,7 @@ export function renderSarif(report: Report): string {
             // format got no kind and no reason at all until an audit measured it; SARIF has a
             // standard place for exactly this, and it is `toolExecutionNotifications`.
             toolExecutionNotifications: infraLines(report).map((line) => ({
-              level: "error",
+              level: line.level,
               message: { text: `${line.kind}: ${line.detail}` },
               properties: { kind: line.kind, document: line.document, measured: line.measured },
             })),

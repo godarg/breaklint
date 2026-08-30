@@ -36,7 +36,11 @@ import { sha256Short } from "../core/fingerprint.ts";
 import type { DocumentInput } from "../core/engine.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InfraEvent, ReportEnvironment, ResourceRecord, SourceRef } from "../core/types.ts";
-import { compareGeometry, crossCheckEvent, CROSS_CHECK_SAMPLE_SIZE, geometrySampleSource, type GeometrySample } from "../measure/cross-check.ts";
+import {
+  compareGeometry, crossCheckEvent, crossCheckPassedEvent, CROSS_CHECK_SAMPLE_SIZE,
+  CROSS_CHECK_TOLERANCE_PX, geometrySampleSource, quadEnvelope,
+  type GeometrySample, type GeometrySampleBatch,
+} from "../measure/cross-check.ts";
 import {
   awaitStableLayout,
   composeSignature,
@@ -723,7 +727,8 @@ async function configureNetwork(
 }
 
 async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compareGeometry>> {
-  const inPage = await page.evaluate<GeometrySample[]>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
+  const batch = await page.evaluate<GeometrySampleBatch>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
+  const inPage = batch.samples;
   if (!page.createCDPSession) throw new Error("the browser driver exposes no CDP session for the geometry oracle");
   const session = await page.createCDPSession();
   try {
@@ -745,9 +750,13 @@ async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compare
         continue;
       }
       const q = model.border;
-      out.push({ key: sample.key, x: q[0]!, y: q[1]!, width: q[2]! - q[0]!, height: q[5]! - q[1]! });
+      out.push({ key: sample.key, ...quadEnvelope(q) });
     }
-    return compareGeometry(inPage, out);
+    // Small documents can expose fewer than eight addressable eligible CSS boxes; in that case
+    // every one is checked. Returning the full pre-limit eligible population makes that reduction
+    // visible and turns accidental sample-array truncation into a fatal cardinality mismatch.
+    const required = Math.min(CROSS_CHECK_SAMPLE_SIZE, batch.eligible);
+    return compareGeometry(inPage, out, CROSS_CHECK_TOLERANCE_PX, required, batch);
   } finally {
     await session.detach().catch(() => undefined);
   }
@@ -822,6 +831,7 @@ interface OpenedContentPage {
   collectorNonce: string | null;
   pageErrors: string[];
   cascadeHints: Record<string, BreakCauseCascadeHint | null>;
+  imageFailures: ImageDecodeFailure[];
   network: NetworkTracker;
   close(): Promise<void>;
 }
@@ -871,7 +881,31 @@ function abortablePage(page: PageLike, signal: AbortSignal): PageLike {
 
 interface ResourceBarrierResult {
   failedFonts: string[];
-  failedImages: string[];
+  failedImages: RawImageDecodeFailure[];
+}
+
+interface RawImageDecodeFailure {
+  uri: string;
+  resourceIndex: number;
+  width: number;
+  height: number;
+  widthAttribute: string | null;
+  heightAttribute: string | null;
+}
+
+interface ImageDecodeFailure {
+  uri: string;
+  resourceIndex: number;
+  width: number;
+  height: number;
+  declaredWidth: number;
+  declaredHeight: number;
+}
+
+function positiveHtmlDimension(raw: string | null): number | null {
+  if (raw === null || !/^\s*\d+\s*$/u.test(raw)) return null;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
 export interface RuntimeIntegrityStatus {
@@ -1117,8 +1151,19 @@ const RESOURCE_BARRIER_SOURCE = `(async () => {
     .map((face) => P.fontFamily(face) + ":" + P.fontStatus(face));
   const images = P.all(document, "img").filter((image) => P.imageUri(image));
   const settled = await Promise.allSettled(images.map((image) => P.decodeImage(image)));
-  const failedImages = settled.flatMap((result, index) => result.status === "rejected"
-    ? [P.imageUri(images[index])] : []);
+  const failedImages = settled.flatMap((result, index) => {
+    if (result.status !== "rejected") return [];
+    const image = images[index];
+    const box = P.rect(image);
+    return [{
+      uri: P.imageUri(image),
+      resourceIndex: index + 1,
+      width: box.width,
+      height: box.height,
+      widthAttribute: P.attr(image, "width"),
+      heightAttribute: P.attr(image, "height"),
+    }];
+  });
   return { failedFonts, failedImages };
 })()`;
 
@@ -1253,9 +1298,32 @@ async function openContentPage(
     if (ready.failedFonts.length > 0) {
       throw new FontLoadFailure(`font resources failed: ${ready.failedFonts.join(", ")}`);
     }
-    if (ready.failedImages.length > 0) {
-      throw new Error(`image decode failed: ${ready.failedImages.join(", ")}`);
+    const checkedImages = ready.failedImages.map((image) => ({
+      uri: image.uri,
+      resourceIndex: image.resourceIndex,
+      width: image.width,
+      height: image.height,
+      declaredWidth: positiveHtmlDimension(image.widthAttribute),
+      declaredHeight: positiveHtmlDimension(image.heightAttribute),
+    }));
+    const unstableImages = checkedImages.filter((image) =>
+      image.width <= 0 || image.height <= 0 || image.declaredWidth === null || image.declaredHeight === null ||
+      image.width !== image.declaredWidth || image.height !== image.declaredHeight);
+    if (unstableImages.length > 0) {
+      throw new Error(
+        `image decode failed without a rendered box equal to explicit authored width and height ` +
+        `for ${unstableImages.length} image(s)`,
+      );
     }
+    const imageFailures: ImageDecodeFailure[] = checkedImages.map((image) => ({
+      uri: image.uri,
+      resourceIndex: image.resourceIndex,
+      width: image.width,
+      height: image.height,
+      // The fatal branch above excludes both nulls before this trusted projection.
+      declaredWidth: image.declaredWidth!,
+      declaredHeight: image.declaredHeight!,
+    }));
     // §11.6a ordering: read the non-normative cascade hint in print media BEFORE Paged.js consumes
     // the declarations, then reset the medium and only then start pagination.
     const cascadeHints = await page.evaluate<Record<string, BreakCauseCascadeHint | null>>(CASCADE_HINT_SOURCE);
@@ -1287,7 +1355,10 @@ async function openContentPage(
     await enforceOperationalLimits(page, network, postPagination.mutationRecordsAfterRendered, "post-pagination");
     network.activityAfterRendered = 0;
     if (pageErrors.length > 0) throw new Error(`content page error during pagination: ${pageErrors.join(" | ")}`);
-    return { page, browserContext, apparatusCapability, collectorNonce, pageErrors, cascadeHints, network, close };
+    return {
+      page, browserContext, apparatusCapability, collectorNonce, pageErrors, cascadeHints,
+      imageFailures, network, close,
+    };
   } catch (error) {
     const cleanupErrors: string[] = [];
     try { await close(); } catch (closeError) { cleanupErrors.push(closeError instanceof Error ? closeError.message : String(closeError)); }
@@ -1419,6 +1490,26 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     );
     openedMain = opened;
     const page = opened.page;
+    if (opened.imageFailures.length > 0) {
+      infrastructure.push({
+        kind: "image-content-unavailable",
+        detail:
+          `${opened.imageFailures.length} image resource(s) could not be decoded; layout measurement ` +
+          "continued because every failed image retained a non-zero rendered box and explicit authored dimensions.",
+        measured: {
+          images: opened.imageFailures.map((image) => ({
+            // Do not persist an absolute file URL or a remote query string in a report. The
+            // resource order plus measured box is sufficient evidence for this non-fatal event;
+            // the input document remains the source of the authored URL.
+            resourceIndex: image.resourceIndex,
+            widthPx: Number(image.width.toFixed(4)),
+            heightPx: Number(image.height.toFixed(4)),
+            declaredWidthPx: image.declaredWidth,
+            declaredHeightPx: image.declaredHeight,
+          })),
+        },
+      });
+    }
     const primitiveStatus = await page.evaluate<PrimitivesStatus>(PRIMITIVES_CHECK);
     if (!primitiveStatus.ok) {
       infrastructure.push({ kind: "checker-crashed", detail: primitiveStatus.reason, measured: { stage: "primitives" } });
@@ -1510,7 +1601,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     }
     const raw = await page.evaluate<RawSnapshot>(SNAPSHOT_SOURCE);
     const geometry = await crossCheckPage(page);
-    if (!geometry.ok) infrastructure.push(crossCheckEvent(geometry));
+    infrastructure.push(geometry.ok ? crossCheckPassedEvent(geometry) : crossCheckEvent(geometry));
 
     if (controlSignature) {
       const comparison = compareControlSignatures(raw.control, controlSignature);

@@ -8,6 +8,10 @@ import { ALL_RULES } from "../../src/rules/index.ts";
 
 export type ReportSurfaceState = "clean" | "findings" | "infrastructure" | "insufficient-coverage";
 
+const PACKAGE_VERSION = (JSON.parse(
+  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+) as { version: string }).version;
+
 function clone(report: Report): Report {
   return JSON.parse(JSON.stringify(report)) as Report;
 }
@@ -30,7 +34,7 @@ function findingsBase(): Report {
     outcomes: [outcome],
     mode: "demo",
     source: "handwritten snapshot fixture",
-    toolVersion: "0.2.1",
+    toolVersion: PACKAGE_VERSION,
     commit: "8e8491e",
     startedAt: "2026-08-22T12:00:00.000Z",
     durationMs: 184,
@@ -72,6 +76,8 @@ export function findingsReportState(): Report {
 
 export function cleanReportState(): Report {
   const report = clone(findingsBase());
+  report.mode = "live";
+  report.source = "rendered";
   report.runVerdict = "clean";
   report.exitCode = 0;
   report.findings = [];
@@ -80,6 +86,27 @@ export function cleanReportState(): Report {
     verdict: "clean",
     exitReason: null,
     findings: [],
+    // A real live success state includes the non-fatal CDP second opinion. Keeping it in the
+    // canonical clean surface makes the newly public reporter branch a rendered review artifact,
+    // not merely a string assertion hidden behind the collector boundary.
+    infrastructure: [
+      {
+        kind: "geometry-cross-check-passed",
+        detail:
+          "the in-page probe matched the browser's layout tree for 8 of 12 eligible CSS box(es); " +
+          "0 SVG graphics descendant(s) and 0 inline block-container(s) used different box semantics.",
+        measured: {
+          checked: 8,
+          required: 8,
+          candidates: 12,
+          eligible: 12,
+          excludedSvgDescendants: 0,
+          excludedInlineBlockContainers: 0,
+          maxDeltaPx: 0,
+          tolerancePx: 0.05,
+        },
+      },
+    ],
   }));
   report.summary = {
     error: 0,

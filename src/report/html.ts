@@ -12,7 +12,8 @@ const esc = (value: unknown): string =>
     .replace(/"/gu, "&quot;");
 
 function renderInfrastructure(model: ReturnType<typeof buildHtmlReportModel>): string {
-  if (model.status.key !== "infrastructure") return "";
+  if (model.infrastructure.length === 0 && model.status.key !== "infrastructure") return "";
+  const fatal = model.status.key === "infrastructure";
   const events = model.infrastructure.length === 0
     ? `<p>The run declared an infrastructure failure without a diagnostic event. Treat the result as untrusted.</p>`
     : `<ol class="checker-list">
@@ -23,11 +24,13 @@ ${model.infrastructure.map((line) => `<li class="checker-event">
   <p><strong>Measured context:</strong> ${line.measured.length === 0 ? "Not available" : esc(line.measured.join("; "))}</p>
 </li>`).join("\n")}
 </ol>`;
-  return `<section aria-labelledby="checker-heading">
-<h2 id="checker-heading">Checker failure</h2>
-<div class="state-alert">
+  return `<section class="apparatus-section" aria-labelledby="apparatus-heading">
+<h2 id="apparatus-heading">${fatal ? "Checker failure" : "Measurement apparatus"}</h2>
+${fatal
+    ? `<div class="state-alert">
   <p><strong>This is not a clean run.</strong> Fix the checker failure and run the same command again.</p>
-</div>
+</div>`
+    : `<p>These non-fatal diagnostics and second-opinion checks did not change the run verdict or exit code.</p>`}
 ${events}
 </section>`;
 }

@@ -10,8 +10,8 @@ It also states, in one place, what this tool does not know.
 
 ## Why exactly two rules may fail a build
 
-Thirteen of the fifteen rules measure something real and compare it against a number that a person
-chose. A chosen number can be wrong for your document without anything being wrong with the
+Eleven of the thirteen released rules compare a chosen threshold against a real measurement. A
+chosen number can be wrong for your document without anything being wrong with the
 measurement, so those rules do not gate by default. Two rules compare a directly measured quantity
 against a boundary that is not chosen at all — and only those two gate.
 
@@ -52,7 +52,7 @@ rule that satisfies none of the three is at most a warning, however confident it
 
 This distinction matters because the word "uncalibrated" is doing two jobs elsewhere in this
 project. It means: no corpus of human-labelled documents backs this number. That is true of all
-fifteen thresholds, including the two error rules — and it does not disqualify them, because their
+thirteen released thresholds, including the two error rules — and it does not disqualify them, because their
 numbers are not up for calibration in the first place. A block taller than the page fits on no
 page; the threshold is the page. What calibration would decide is *where to draw a chosen line*,
 and A, B and C are exactly the cases where no line was chosen.
@@ -81,11 +81,11 @@ Coverage answers a question about the DOCUMENT: of the targets this rule ought t
 how many did it judge? Two kinds of decline are therefore not in the denominator, and both are
 enumerated in `src/core/enums.ts` rather than inferred from how a reason is spelt.
 
-**A capability this build does not have** (`TOOL_CAPABILITY_ENV_IDS`). The SVG ink passes are not
-implemented, so `svg/text-clipped` and `svg/text-ink-collision` decline on every document,
-including a perfect one. Charging that to coverage made exit 4 a constant of the build: a two-page
-document with one harmless inline SVG answered `insufficient-coverage`, which reads as "your
-document could not be judged" and meant "this tool cannot do that at all".
+**A capability represented only in research code** (`TOOL_CAPABILITY_ENV_IDS`). The SVG ink passes
+are not implemented in production. Version 0.3.0 therefore removes `svg/text-clipped` and
+`svg/text-ink-collision` from the public registry instead of making their permanent decline part of
+every user's coverage. The enum and the two modules remain for the frozen M3 validation lab; the
+released CLI, schema and SARIF catalogue never run them.
 
 **A question that does not arise** (`NON_APPLICABLE_ENV_IDS`). With `overflow: visible` an SVG's
 text is painted whether or not it leaves the viewport, so `svg/text-overflows-viewport` has
@@ -120,12 +120,11 @@ exception to cover the second kind turns a test red.
 
 ## What no amount of testing here establishes
 
-**Two of the fifteen rules cannot measure anything in this build.** `svg/text-clipped` and
-`svg/text-ink-collision` need the SVG ink passes, which are M3 work and are not implemented. They
-are registered, they run, and they decline every target with `env/pixel-oracle-unavailable`. This
-is stated here because it was not stated anywhere until 0.2.3, and a reader counting fifteen rules
-was counting two that answer nothing. `svg/text-overflows-viewport` needs only geometry and does
-measure.
+**Two research rules are not product rules in this build.** `svg/text-clipped` and
+`svg/text-ink-collision` need isolated, stable SVG pixel passes, which remain M3 work. Their modules,
+fixtures and renderer lab are retained so the work is not erased, but they are absent from
+`ALL_RULES`, configuration, SARIF and the demo. The released rule count is thirteen.
+`svg/text-overflows-viewport` needs only geometry and does measure.
 
 **Complex SVG paint is detected but not geometrically solved in this build.** `querySelectorAll`
 does not cross the instance tree created by `<use>`, and `getBBox()` does not include stroke,
@@ -143,7 +142,7 @@ SVG whose own or ancestor CSS transform geometry is nontrivial (`transform`, the
 content-quad implementation needs its own transform-aware live proof.
 
 **Every threshold is uncalibrated.** There is no corpus of real documents with human-checked truth
-behind any of the fifteen numbers. The fixtures show that each rule does what it says; they do not
+behind any of the thirteen released numbers. The fixtures show that each rule does what it says; they do not
 show that what it says is the right thing to say about your document. That is the difference between
 a verified implementation and a validated one, and only the first is claimed. `calibrated: false`
 travels in the type, in every finding and on every rule page for that reason.
@@ -156,6 +155,13 @@ comparison basis, and no check compares output file hashes.
 page breaks, and can turn a correct page into a phantom finding. The run waits for
 `document.fonts.ready` and stops with a non-zero exit if a declared font resource fails, rather than
 reporting findings it cannot stand behind.
+
+**Missing image content is a named limitation, not a silent success.** A failed decode is non-fatal
+only when the HTML declares positive `width` and `height` attributes and Chrome measures a box
+exactly equal to both values. The report then carries `image-content-unavailable`, a resource index
+and both declared and rendered dimensions without persisting the URI. Missing dimensions,
+replacement-text geometry, zero-size boxes or authored CSS that changes the box remain fatal
+because the absent pixels can change layout.
 
 **One paginator version.** Paged.js is pinned to exactly 0.4.3, because the break cause is read from
 attributes the paginator writes into the tree and does not guarantee as an interface. Any other

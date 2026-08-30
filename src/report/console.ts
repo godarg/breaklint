@@ -37,8 +37,10 @@ export function renderConsole(report: Report, opts: { colour?: boolean } = {}): 
    * the empty state was guarded and the ERROR state was not.
    */
   for (const line of infraLines(report)) {
+    const label = line.level === "error" ? "checker" : line.level === "warning" ? "diagnostic" : "evidence";
+    const colourCode = line.level === "error" ? "31" : line.level === "warning" ? "33" : "36";
     out.push(
-      `${paint("31", "checker")} ${line.kind}  ${line.document}\n` +
+      `${paint(colourCode, label)} ${line.kind}  ${line.document}\n` +
         `  detail     ${line.detail}` +
         // One `key=value` per line. The first version printed `JSON.stringify(measured)` raw and
         // a divergence over fifty pages produced a single 7 488-character line.

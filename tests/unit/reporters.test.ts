@@ -53,6 +53,47 @@ function demoReport(): Report {
   });
 }
 
+/** A clean live-style report carrying the positive geometry second-opinion event. */
+function positiveApparatusReport(base: Report): Report {
+  const parsed = JSON.parse(readFileSync(new URL("../../examples/demo-snapshot.json", import.meta.url), "utf8")) as {
+    snapshot: Snapshot;
+  };
+  const outcome = runDocument(
+    {
+      path: "third-party.html",
+      snapshot: parsed.snapshot,
+      infrastructure: [
+        {
+          kind: "geometry-cross-check-passed",
+          detail: "Browser layout cross-check passed for 8 of 8 required samples at 0.05 px tolerance.",
+          measured: { candidates: 12, eligible: 8, checked: 8, required: 8, maxDeltaPx: 0, tolerancePx: 0.05 },
+        },
+      ],
+    },
+    {
+      failOn: "error",
+      // This rule has one measured candidate and no finding in the demo snapshot, so the report
+      // is genuinely clean rather than hand-edited into a state the engine cannot produce.
+      activeRules: [ALL_RULES.find((rule) => rule.id === "layout/orphan")!],
+      optionsByRule: {},
+      coverageFloors: {},
+    },
+  );
+  return buildReport({
+    outcomes: [outcome],
+    mode: "live",
+    source: "rendered",
+    toolVersion: "0.3.0",
+    commit: null,
+    startedAt: new Date(0).toISOString(),
+    durationMs: 0,
+    rulesRun: 1,
+    failOn: "error",
+    environment: base.environment,
+    config: base.config,
+  });
+}
+
 /** Every mandatory fact, and the aliases each format is allowed to use for it. */
 const ALIASES: Record<keyof typeof LABELS, string[]> = {
   inputsFound: [LABELS.inputsFound, "inputsFound"],
@@ -68,6 +109,13 @@ const ALIASES: Record<keyof typeof LABELS, string[]> = {
 
 describe("output formats", () => {
   const report = demoReport();
+
+  it("the README demo counter line is the exact console counter line", () => {
+    const documented =
+      "inputs found: 1 · pages analysed: 5 · rules run: 13 · rules that measured something: 11 · " +
+      "not measured: 2 · verdict: findings · mode: demo · fail-on: error · gate triggered by: error";
+    assert.ok(render(report, "console").includes(documented), "README demo counters drifted from actual console output");
+  });
 
   for (const format of OUTPUT_FORMATS) {
     it(`${format} carries every mandatory counter`, () => {
@@ -119,6 +167,46 @@ describe("output formats", () => {
     assert.equal(parsed.schemaVersion, 3);
     assert.match(parsed.config.fingerprint, /^[0-9a-f]{64}$/u);
     assert.equal(parsed.config.fingerprint, effectiveConfigFingerprint(parsed.config.effective));
+  });
+
+  /**
+   * A positive second-opinion event is evidence that the apparatus ran, not a failure merely
+   * because it shares the infrastructure channel with fatal events. The first implementation
+   * projected every event as a JUnit failure, a SARIF error and an HTML checker failure. That made
+   * the new real-document success evidence turn an exit-0 report red in downstream tools.
+   *
+   * Red condition: infer failure from event presence in any projection instead of using the
+   * engine's fatality contract, and one of these surface-specific assertions fails.
+   */
+  it("positive geometry evidence stays visible without becoming a reporter failure", () => {
+    const positive = positiveApparatusReport(report);
+    assert.equal(positive.exitCode, 0, "precondition: the engine treats the event as non-fatal");
+    assert.equal(positive.runVerdict, "clean", "precondition: the run itself is clean");
+
+    for (const format of OUTPUT_FORMATS) {
+      assert.match(render(positive, format), /geometry-cross-check-passed/u, `${format}: positive evidence vanished`);
+    }
+
+    const junit = render(positive, "junit");
+    const root = /<testsuites\b[^>]*>/u.exec(junit)?.[0] ?? "";
+    assert.match(root, /failures="0"/u, "JUnit root must remain green");
+    assert.doesNotMatch(junit, /<failure\b/u, "JUnit must not manufacture a failure element");
+    assert.match(junit, /<system-out>note:/u, "JUnit must retain the diagnostic as non-fatal output");
+
+    const sarif = JSON.parse(render(positive, "sarif")) as {
+      runs: { invocations: { executionSuccessful: boolean; toolExecutionNotifications: { level: string }[] }[] }[];
+    };
+    assert.equal(sarif.runs[0]!.invocations[0]!.executionSuccessful, true);
+    assert.deepEqual(sarif.runs[0]!.invocations[0]!.toolExecutionNotifications.map((n) => n.level), ["note"]);
+
+    const console = render(positive, "console");
+    assert.match(console, /evidence geometry-cross-check-passed/u);
+    assert.doesNotMatch(console, /checker geometry-cross-check-passed/u);
+
+    const html = render(positive, "html");
+    assert.match(html, /Measurement apparatus/u);
+    assert.doesNotMatch(html, /Checker failure/u);
+    assert.match(render(positive, "markdown"), /## Measurement apparatus/u);
   });
 
   /**
@@ -258,8 +346,9 @@ describe("output formats", () => {
   /**
    * The demo's own numbers, so `docs/status.md` cannot state them wrong again.
    *
-   * That file said "8 findings across 8 rules". Measured from the product's own output: eight
-   * findings across SEVEN rules — `layout/half-empty-page` fires twice. Nothing in the repository
+   * That file once said "8 findings across 8 rules". After the two unreachable ink definitions
+   * left the public registry, the product output is seven findings across SIX rules —
+   * `layout/half-empty-page` fires twice. Nothing in the repository
    * computed either number, which is precisely how the earlier "209 leaf values" survived: a
    * figure in the file designated as the truth source, arrived at by counting once, by hand.
    *
@@ -269,8 +358,8 @@ describe("output formats", () => {
   it("the demo produces the counts docs/status.md states", () => {
     const demo = demoReport();
     const ruleIds = new Set(demo.findings.map((f) => f.ruleId));
-    assert.equal(demo.findings.length, 8, "findings in the demo");
-    assert.equal(ruleIds.size, 7, "distinct rules in the demo");
+    assert.equal(demo.findings.length, 7, "findings in the demo");
+    assert.equal(ruleIds.size, 6, "distinct rules in the demo");
     assert.equal(demo.exitCode, 1, "the demo must end 1 — a demo that ends 0 shows no finding");
     // The doc row itself, matched WHOLE. A substring match is not enough and was measured not
     // enough: an audit replaced the row with "NOT VERIFIED: the demo does not run at all, and never
@@ -584,15 +673,16 @@ describe("output formats", () => {
       environment: report.environment, config: report.config,
     });
 
-    // The Checker table keeps one row per event: find it and count its lines.
+    // The Measurement apparatus table keeps one row per event: find it and count its lines.
     const md = render(hostile, "markdown");
-    // Scope to the Checker section only: the slice must stop at the next heading, or it counts
+    // Scope to the apparatus section only: the slice must stop at the next heading, or it counts
     // the Findings table's rows too and the assertion measures the wrong thing.
-    const start = md.indexOf("## Checker");
-    const rest = md.slice(start + "## Checker".length);
+    const heading = "## Measurement apparatus";
+    const start = md.indexOf(heading);
+    const rest = md.slice(start + heading.length);
     const next = rest.indexOf("\n## ");
-    const checker = next === -1 ? md.slice(start) : md.slice(start, start + "## Checker".length + next);
-    const rows = checker.split("\n").filter((l) => l.startsWith("| `checker-crashed`"));
+    const checker = next === -1 ? md.slice(start) : md.slice(start, start + heading.length + next);
+    const rows = checker.split("\n").filter((l) => l.startsWith("| error | `checker-crashed`"));
     assert.equal(rows.length, 1, "one event must be one markdown row");
     // The property is CONTIGUITY, not a count of `|` lines. A spilled row leaves continuation
     // lines that do not start with `|`, so counting `|` lines is blind to exactly this breakage —

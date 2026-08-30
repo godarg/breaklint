@@ -99,5 +99,6 @@ annotation protocol, two independent human annotators, an externally frozen hold
 trust root, population performance or calibration. Public participants can read this repository
 and therefore are not blind to its implementation or existing findings.
 
-All fifteen rules remain `calibrated: false`. No community issue authorizes a threshold change,
-release, publish, deployment or calibrated claim.
+All thirteen released rules remain `calibrated: false`; the two M3 ink definitions are not choices
+in the public issue form because they are not released rules. No community issue authorizes a
+threshold change, release, publish, deployment or calibrated claim.

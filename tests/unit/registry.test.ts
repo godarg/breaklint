@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { existsSync } from "node:fs";
 
-import { ALL_RULES } from "../../src/rules/index.ts";
+import { ALL_RULES, VALIDATION_RULES_BY_ID } from "../../src/rules/index.ts";
 import { IS, SEVERITIES } from "../../src/core/enums.ts";
 
 describe("rule registry", () => {
@@ -16,9 +16,11 @@ describe("rule registry", () => {
 
   it("no rule claims calibration", () => {
     // The corpus of >= 30 real documents with human-checked truth does not exist. Saying so in
-    // the type, in every finding and in the docs is the honest form — and it is why thirteen
-    // of fifteen rules cannot break a build by default.
-    for (const rule of ALL_RULES) assert.equal(rule.calibrated, false, `${rule.id}`);
+    // the type, in every finding and in the docs is the honest form. The two withdrawn ink
+    // definitions remain under this guard too: research-only must not become calibrated by drift.
+    assert.equal(ALL_RULES.length, 13, "released rule count drifted");
+    assert.equal(VALIDATION_RULES_BY_ID.size, 15, "released + research rule inventory drifted");
+    for (const rule of VALIDATION_RULES_BY_ID.values()) assert.equal(rule.calibrated, false, `${rule.id}`);
   });
 
   it("every declined reason is a declared EnvId", () => {

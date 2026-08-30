@@ -63,7 +63,7 @@ export const SECTION_DEFINITIONS: readonly SectionDefinition[] = [
 ];
 export const INTAKE_ROUTES = ["Ten-minute smoke test", "Real-page visual judgement", "Documentation or setup review", "Adversarial or boundary test"] as const;
 export const INTAKE_RULES = [
-  "General installation or report", "svg/text-clipped", "svg/text-ink-collision", "svg/text-overflows-viewport",
+  "General installation or report", "svg/text-overflows-viewport",
   "layout/widow", "layout/orphan", "layout/unbreakable-block-too-tall", "layout/heading-at-page-bottom",
   "layout/half-empty-page", "layout/orphaned-continuation-page", "layout/hyphen-across-page", "type/spaced-hyphen",
   "type/straight-quotes", "type/short-last-line", "type/excessive-word-spacing", "artifact/local-uri"

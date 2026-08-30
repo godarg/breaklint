@@ -1,0 +1,58 @@
+{
+  "contractVersion": "robustness-corpus-v1",
+  "purpose": "Acquisition robustness over rights-reviewed third-party HTML; never calibration or external trust evidence.",
+  "documents": [
+    {
+      "id": "project-gutenberg-gettysburg-address",
+      "artifact": "documents/project-gutenberg-gettysburg-address.html",
+      "sourceEvidence": "source-evidence/source-project-gutenberg-gettysburg-address.json",
+      "sha256": "2da09414df2cfbe8f48420abd73067e3e08182d152d3d13bcdd1d26ff30535d9",
+      "sourceClass": "public-domain-third-party",
+      "rightsBasis": "public-domain-author-death-1865-and-upstream-public-domain-notice",
+      "expected": {
+        "exitCode": 0,
+        "pagesAnalysed": 9,
+        "rulesRun": 13,
+        "measuredRules": 9,
+        "infrastructureKinds": ["geometry-cross-check-passed"],
+        "geometryCrossCheck": {
+          "checked": 8,
+          "required": 8,
+          "candidates": 89,
+          "eligible": 86,
+          "excludedSvgDescendants": 0,
+          "excludedInlineBlockContainers": 1,
+          "maxDeltaPx": 0,
+          "tolerancePx": 0.05
+        }
+      }
+    },
+    {
+      "id": "dargel-kleingewerbe",
+      "artifact": "../m3-1-pilot-v1/documents/dargel-kleingewerbe.html",
+      "sourceEvidence": "../m3-1-pilot-v1/source-evidence/source-dargel-kleingewerbe.json",
+      "sha256": "703acb5a78a6d3cd91133192938df218356034308440d9cbdf9764c2f9805df3",
+      "sourceClass": "public-first-party",
+      "rightsBasis": "first-party-founder-authorized",
+      "expected": {
+        "exitCode": 0,
+        "pagesAnalysed": 6,
+        "rulesRun": 13,
+        "measuredRules": 11,
+        "infrastructureKinds": ["image-content-unavailable", "geometry-cross-check-passed"],
+        "geometryCrossCheck": {
+          "checked": 8,
+          "required": 8,
+          "candidates": 172,
+          "eligible": 168,
+          "excludedSvgDescendants": 1,
+          "excludedInlineBlockContainers": 0,
+          "maxDeltaPx": 0,
+          "tolerancePx": 0.05
+        }
+      }
+    }
+  ],
+  "calibrationEvidenceEligible": false,
+  "externalTrustRootClaimed": false
+}

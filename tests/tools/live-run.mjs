@@ -26,9 +26,9 @@ const TERMINATION_GRACE_MS = 2_000;
 
 const DEFAULT_SPECS = [
   { file: "tests/live/evidence.test.ts", suite: "evidence path, live", leaves: 18 },
-  { file: "tests/live/measure.test.ts", suite: "the measurement probe, live", leaves: 7 },
+  { file: "tests/live/measure.test.ts", suite: "the measurement probe, live", leaves: 8 },
   { file: "tests/live/breaks.test.ts", suite: "the collector, live", leaves: 7 },
-  { file: "tests/live/render-run.test.ts", suite: "the M2d live production chain", leaves: 28 },
+  { file: "tests/live/render-run.test.ts", suite: "the M2d live production chain", leaves: 29 },
 ];
 
 function structuredChildResult(file, terminal, state) {

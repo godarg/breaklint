@@ -4,8 +4,10 @@ import { describe, it } from "node:test";
 import {
   compareGeometry,
   crossCheckEvent,
+  crossCheckPassedEvent,
   CROSS_CHECK_MEASURED_MAX_PX,
   CROSS_CHECK_TOLERANCE_PX,
+  quadEnvelope,
   type GeometrySample,
 } from "../../src/measure/cross-check.ts";
 
@@ -18,6 +20,24 @@ const box = (key: string, x: number, y: number, w = 100, h = 20): GeometrySample
 });
 
 describe("the geometry cross-check", () => {
+  it("uses all four CDP quad corners for a transformed element's axis-aligned box", () => {
+    // 126 x 46 including border, rotated 30 degrees. The first edge is not horizontal, so the
+    // former q[0]/q[1]/q[2]/q[5] shortcut produces x=219.94 and width=109.12 instead of the
+    // getBoundingClientRect envelope below. This exact shape was measured in Chrome 152.
+    const quad = [
+      219.94039916992188, 121.58141326904297,
+      329.0596008300781, 184.58141326904297,
+      306.0596008300781, 224.4185791015625,
+      196.94039916992188, 161.4185791015625,
+    ];
+    assert.deepEqual(quadEnvelope(quad), {
+      x: 196.94039916992188,
+      y: 121.58141326904297,
+      width: 132.11920166015625,
+      height: 102.83716583251953,
+    });
+  });
+
   /**
    * The bound, pinned as a literal AND from both sides.
    *
@@ -55,6 +75,29 @@ describe("the geometry cross-check", () => {
     assert.ok(result.maxDelta < CROSS_CHECK_TOLERANCE_PX);
   });
 
+  it("a passed event preserves pre-limit eligible sample cardinality", () => {
+    const probe = [box("a", 10, 20), box("b", 10, 60)];
+    const result = compareGeometry(probe, probe, CROSS_CHECK_TOLERANCE_PX, 2, {
+      candidates: 7,
+      eligible: 5,
+      excludedSvgDescendants: 1,
+      excludedInlineBlockContainers: 1,
+    });
+    assert.equal(result.ok, true);
+    const event = crossCheckPassedEvent(result);
+    assert.equal(event.kind, "geometry-cross-check-passed");
+    assert.deepEqual(event.measured, {
+      checked: 2,
+      required: 2,
+      candidates: 7,
+      eligible: 5,
+      excludedSvgDescendants: 1,
+      excludedInlineBlockContainers: 1,
+      maxDeltaPx: 0,
+      tolerancePx: 0.05,
+    });
+  });
+
   /** Each of the four fields is compared, not just position. */
   for (const field of ["x", "y", "width", "height"] as const) {
     it(`a disagreement in ${field} alone is caught`, () => {
@@ -78,6 +121,15 @@ describe("the geometry cross-check", () => {
     assert.equal(result.ok, false, "checking nothing must not report ok");
     assert.equal(result.checked, 0);
     assert.match(crossCheckEvent(result).detail, /measured no elements/u);
+  });
+
+  it("a truncated production sample fails even when every returned box agrees", () => {
+    const one = [box("a", 10, 10)];
+    const result = compareGeometry(one, one, CROSS_CHECK_TOLERANCE_PX, 8);
+    assert.equal(result.ok, false, "one agreeing element cannot stand in for the eight-element oracle");
+    assert.equal(result.checked, 1);
+    assert.equal(result.required, 8);
+    assert.match(crossCheckEvent(result).detail, /1 of 8 required elements/u);
   });
 
   /** A key the second source does not have at all is a disagreement, not a quiet skip. */

@@ -97,12 +97,19 @@ jobs:
           BREAKLINT_LIVE_REPORT=.tmp/live-report.json BREAKLINT_LIVE_SUMMARY=.tmp/live-summary.json npm run test:live
           npm run test:documented-figures
 
-      - name: portable technical report-surface matrix
-        # Linux technically verifies all 32 current cells, including decoded-pixel, semantic,
-        # accessibility and print integrity. It requires a complete human ledger for this exact
-        # source fingerprint, but never claims Linux pixels equal the locally human-reviewed
-        # browser/OS render. Exact-environment transfer remains a local-only gate.
-        run: npm run test:report-surfaces:portable
+      - name: admitted real-document acquisition gate
+        # The live suites above use fixtures authored for this repository. This one binds the
+        # rights-reviewed bytes of third-party and first-party published HTML documents and checks
+        # their exact semantic reports, so exit 0 over zero pages cannot pass.
+        run: |
+          npm run build
+          npm run test:real-document
+
+      - name: technical report-surface matrix
+        # Linux verifies all 32 current cells, including decoded-pixel, semantic, accessibility
+        # and print integrity. The historical human ledger is deliberately not restamped by CI;
+        # exact-environment human review remains a separate, explicit local gate.
+        run: npm run test:report-surfaces:technical
 
       - name: physical report-edge mutation controls
         # Each mutation must produce a genuine failing renderer run. The targeted warning-state
@@ -152,6 +159,10 @@ jobs:
           test "$code" -eq 1 || { echo "installed --demo exited $code, expected 1"; cat demo.out; exit 1; }
           grep -q "uncalibrated" demo.out || { echo "installed --demo printed no findings"; exit 1; }
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
+          npm install --no-audit --no-fund --save-exact \
+            pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
+          node "$GITHUB_WORKSPACE/tests/tools/real-document-gate.mjs" \
+            --cli "$PWD/node_modules/breaklint/dist/cli/index.js"
           echo "installed package: --version and --demo behave as documented"
 
       - name: a missing prerequisite ends with exit 3 and one copyable install command

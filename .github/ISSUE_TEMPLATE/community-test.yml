@@ -30,8 +30,6 @@ body:
       label: Rule or area
       options:
         - General installation or report
-        - svg/text-clipped
-        - svg/text-ink-collision
         - svg/text-overflows-viewport
         - layout/widow
         - layout/orphan
