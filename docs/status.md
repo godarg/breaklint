@@ -4,9 +4,16 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## Prepared release state — 0.3.0 (2026-08-30)
+## Prepared release state — 0.3.1 (2026-08-30)
 
-The 0.3.0 release candidate exposes **13 rules**: two structural error rules, ten ordinary warning rules and
+The annotated `v0.3.0` attempt is deliberately not this release. Its workflow stopped before npm or
+a GitHub Release was created because the installed-package real-document gate ran the child CLI in
+the repository checkout instead of the clean consumer directory. That checkout already contained
+the optional renderer peers, which made local and ordinary CI evidence falsely inherit them. The
+tag remains immutable evidence of the failed attempt; 0.3.1 makes the child CWD mandatory and
+explicit in the source and both installed-tarball gates.
+
+The 0.3.1 release candidate exposes **13 rules**: two structural error rules, ten ordinary warning rules and
 one experimental warning that never gates. All 13 carry `calibrated: false`; there is still no
 human-labelled corpus and no external trust root. The research modules `svg/text-clipped` and
 `svg/text-ink-collision` are retained for the M3 renderer lab but are no longer counted, configured,
@@ -54,8 +61,8 @@ The report surfaces are regenerated as 32 semantic cells and 59 physical artifac
 4 PDFs and 31 PDF-page rasters). The technical gate verifies those current bytes, decoded pixels,
 contrast, accessibility, print fragmentation and a real pixel-mutation red control. The prior human
 ledger remains bound to the 0.2.3 inputs and 62 artifacts; it has deliberately not been restamped or
-transferred to 0.3.0. `test:report-surfaces:local` therefore remains red until a person reviews the
-current exact environment. No human review of the 0.3.0 surface is claimed.
+transferred to 0.3.1. `test:report-surfaces:local` therefore remains red until a person reviews the
+current exact environment. No human review of the 0.3.1 surface is claimed.
 
 ## Finished and verified without a browser
 
@@ -67,7 +74,7 @@ current exact environment. No human review of the 0.3.0 surface is claimed.
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
 | Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in report schema 3; generated schema drift and process-boundary exit 2 are tested |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
-| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 59 physical artifacts with decoded-pixel, contrast, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.0 |
+| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 59 physical artifacts with decoded-pixel, contrast, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
 | Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
 | `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 7 findings across 6 rules |
@@ -102,7 +109,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=354 aggregateTests=467 liveTests=62 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=356 aggregateTests=469 liveTests=62 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -463,7 +470,7 @@ pixel change returns it to red rather than silently transferring the new PASS.
 
 Historical 0.2.3 honesty note: its `examples/demo-snapshot.json` carried ink counts, so
 `npx breaklint --demo` showed a `svg/text-clipped` finding that a real run could not produce.
-Version 0.3.0 removes those counts and the two research definitions from the released registry;
+Version 0.3.1 removes those counts and the two research definitions from the released registry;
 the current demo no longer makes that claim.
 
 ### CI incident reconciliation: failed push at `05fec787`

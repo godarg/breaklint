@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -37,6 +37,11 @@ function sha256(path) {
 }
 
 const cli = resolve(argument("--cli") ?? join(ROOT, "dist/cli/index.js"));
+const cwdArgument = argument("--cwd");
+assert.ok(process.argv.includes("--cwd"), "--cwd is required; the CLI must not inherit this gate's checkout");
+assert.ok(cwdArgument && !cwdArgument.startsWith("--"), "--cwd requires an explicit directory");
+const cliCwd = resolve(cwdArgument);
+assert.ok(existsSync(cliCwd) && statSync(cliCwd).isDirectory(), `CLI cwd is not a directory: ${cliCwd}`);
 const temporary = mkdtempSync(join(tmpdir(), "breaklint-real-document-gate-"));
 
 try {
@@ -63,7 +68,10 @@ try {
       reportPath,
       corpusCase.document,
     ], {
-      cwd: ROOT,
+      // A packed consumer resolves optional peers from its own project, not from this checkout.
+      // The v0.3.0 release gate was genuinely red on both supported Node versions because ROOT
+      // silently replaced that consumer boundary here; mandatory --cwd preserves the boundary.
+      cwd: cliCwd,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 120_000,
