@@ -95,7 +95,7 @@
     "pagedjs": "0.4.3",
     "pdfjs-dist": "6.2.108",
     "pngjs": "^7.0.0",
-    "puppeteer-core": "25.8.0",
+    "puppeteer-core": "^25.8.0",
     "tsx": "^4.20.5",
     "typescript": "5.9.2"
   },
