@@ -288,10 +288,11 @@ describe("the M2d live production chain", () => {
     assert.ok(document.infrastructure.some((event) => event.kind === "font-load-failed"));
   });
 
-  it("continues only when a failed image has authored non-zero dimensions", async (t) => {
+  it("continues only when a failed image box equals authored dimensions", async (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     const declared = join(root, "missing-image-declared.html");
     const undeclared = join(root, "missing-image-undeclared.html");
+    const cssOverridden = join(root, "missing-image-css-overridden.html");
     writeFileSync(
       declared,
       '<!doctype html><img src="missing-image.png" width="36" height="24" alt=""><p>declared image size</p>',
@@ -300,9 +301,15 @@ describe("the M2d live production chain", () => {
       undeclared,
       '<!doctype html><img src="missing-image.png" alt="visible replacement text"><p>no declared image size</p>',
     );
+    writeFileSync(
+      cssOverridden,
+      '<!doctype html><style>img{width:auto}</style>' +
+        '<img src="missing-image.png" width="36" height="24" alt="replacement text changes the box">' +
+        '<p>declared attributes overridden by authored CSS</p>',
+    );
 
     const imageRun = await renderDocuments(
-      [declared, undeclared],
+      [declared, undeclared, cssOverridden],
       options(join(root, "missing-image-evidence")),
     );
     const declaredDocument = imageRun.documents[0]!;
@@ -317,8 +324,21 @@ describe("the M2d live production chain", () => {
     assert.equal(undeclaredDocument.snapshot, null, "a replacement-text box is not stable image geometry");
     assert.ok(
       undeclaredDocument.infrastructure.some((event) =>
-        event.kind === "checker-crashed" && /explicit authored width and height/iu.test(event.detail)),
+        event.kind === "checker-crashed" && /equal to explicit authored width and height/iu.test(event.detail)),
       `missing fatal image diagnostic: ${JSON.stringify(undeclaredDocument.infrastructure)}`,
+    );
+    assert.doesNotMatch(
+      JSON.stringify(undeclaredDocument.infrastructure),
+      /(?:file:|missing-image\.png)/u,
+      "the fatal branch persisted the failed resource URI",
+    );
+
+    const cssOverriddenDocument = imageRun.documents[2]!;
+    assert.equal(cssOverriddenDocument.snapshot, null, "authored CSS detached the failed-image box from its attributes");
+    assert.ok(
+      cssOverriddenDocument.infrastructure.some((event) =>
+        event.kind === "checker-crashed" && /equal to explicit authored width and height/iu.test(event.detail)),
+      `missing CSS-drift diagnostic: ${JSON.stringify(cssOverriddenDocument.infrastructure)}`,
     );
   });
 

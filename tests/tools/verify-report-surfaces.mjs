@@ -43,6 +43,7 @@ const mode = verificationMode(process.argv.slice(2));
 assert.equal(existsSync(manifestPath), true, `render manifest missing: ${manifestPath}`);
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const ledger = JSON.parse(readFileSync(ledgerPath, "utf8"));
+const HISTORICAL_REVIEW_INPUT_FINGERPRINT = "98c531cafce622a39ce8344429f96fd139811d08f42c49d60b75372cdab92c29";
 
 function hash(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -410,6 +411,31 @@ function assertReviewEnvironment(environment, label) {
   assert.match(environment.print?.rasterizer ?? "", /^pdftoppm version\s+\S+/u, `${label}: rasterizer version is not measurable`);
 }
 
+function assertHistoricalLedger(currentInput) {
+  assert.equal(ledger.schemaVersion, 4, "historical human ledger schema drift");
+  assertUtcTimestamp(ledger.renderManifestGeneratedAt, "historical ledger render timestamp drift");
+  assertUtcTimestamp(ledger.reviewedAt, "historical ledger review timestamp drift");
+  assertReviewEnvironment(ledger.reviewEnvironment, "historical human review environment");
+  assert.equal(
+    ledger.reviewInputFingerprint,
+    HISTORICAL_REVIEW_INPUT_FINGERPRINT,
+    "the preserved 0.2.3 human ledger was changed instead of receiving a new actual review",
+  );
+  assert.notEqual(
+    ledger.reviewInputFingerprint,
+    currentInput.fingerprint,
+    "technical mode must not present the historical ledger as review of the current inputs",
+  );
+  assert.deepEqual(
+    ledger.physicalArtifactsReviewed,
+    { screens: 24, pdfs: 4, rasterPages: 34 },
+    "historical 0.2.3 reviewed inventory drift",
+  );
+  assert.equal(Object.keys(ledger.cells ?? {}).length, 32, "historical ledger cell inventory drift");
+  assert.ok(Object.values(ledger.cells).every((cell) => cell.status === "pass"), "historical ledger contains a non-pass cell");
+  assert.match(ledger.reviewer ?? "", /^@(Brand|Neo|Founder)(?:\s*\+\s*@(Brand|Neo|Founder))*$/u, "historical ledger reviewer drift");
+}
+
 function runScreenPixelMutationControl(artifact, currentInput) {
   const path = resolve(output, artifact.path);
   const original = independentlyNormalizeScreenPixels(readFileSync(path));
@@ -452,6 +478,7 @@ assert.equal(manifest.schemaVersion, 4);
 assertUtcTimestamp(manifest.generatedAt, "render manifest generatedAt is not an exact UTC timestamp");
 assertReviewEnvironment(manifest.reviewEnvironment, "current render environment");
 const currentReviewInput = assertCurrentReviewInput(manifest.reviewInputFingerprint, reviewInputRoot, "render manifest review input");
+if (mode === "technical") assertHistoricalLedger(currentReviewInput);
 verifyBackgroundDisabledProbe();
 assert.deepEqual(manifest.reviewInputs, currentReviewInput.files, "render manifest input inventory does not match an independent current-worktree reconstruction");
 if (mode !== "technical") {

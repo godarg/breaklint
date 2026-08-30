@@ -99,6 +99,15 @@ describe("the geometry cross-check", () => {
     assert.match(crossCheckEvent(result).detail, /measured no elements/u);
   });
 
+  it("a truncated production sample fails even when every returned box agrees", () => {
+    const one = [box("a", 10, 10)];
+    const result = compareGeometry(one, one, CROSS_CHECK_TOLERANCE_PX, 8);
+    assert.equal(result.ok, false, "one agreeing element cannot stand in for the eight-element oracle");
+    assert.equal(result.checked, 1);
+    assert.equal(result.required, 8);
+    assert.match(crossCheckEvent(result).detail, /1 of 8 required elements/u);
+  });
+
   /** A key the second source does not have at all is a disagreement, not a quiet skip. */
   it("an element the layout tree does not know about is a disagreement", () => {
     const result = compareGeometry([box("a", 10, 10)], []);

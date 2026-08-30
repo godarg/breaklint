@@ -69,6 +69,13 @@ const ALIASES: Record<keyof typeof LABELS, string[]> = {
 describe("output formats", () => {
   const report = demoReport();
 
+  it("the README demo counter line is the exact console counter line", () => {
+    const documented =
+      "inputs found: 1 · pages analysed: 5 · rules run: 13 · rules that measured something: 11 · " +
+      "not measured: 2 · verdict: findings · mode: demo · fail-on: error · gate triggered by: error";
+    assert.ok(render(report, "console").includes(documented), "README demo counters drifted from actual console output");
+  });
+
   for (const format of OUTPUT_FORMATS) {
     it(`${format} carries every mandatory counter`, () => {
       // A format that shows only the findings makes the blind run invisible again, and a format

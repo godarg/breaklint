@@ -157,11 +157,11 @@ page breaks, and can turn a correct page into a phantom finding. The run waits f
 reporting findings it cannot stand behind.
 
 **Missing image content is a named limitation, not a silent success.** A failed decode is non-fatal
-only when the HTML declares positive `width` and `height` attributes and Chrome also measures a
-positive box. The report then carries `image-content-unavailable`, a resource index and both
-declared and rendered dimensions without persisting the URI. Missing authored dimensions,
-replacement-text geometry or a zero-size box remain fatal because the absent pixels can change
-layout.
+only when the HTML declares positive `width` and `height` attributes and Chrome measures a box
+exactly equal to both values. The report then carries `image-content-unavailable`, a resource index
+and both declared and rendered dimensions without persisting the URI. Missing dimensions,
+replacement-text geometry, zero-size boxes or authored CSS that changes the box remain fatal
+because the absent pixels can change layout.
 
 **One paginator version.** Paged.js is pinned to exactly 0.4.3, because the break cause is read from
 attributes the paginator writes into the tree and does not guarantee as an interface. Any other

@@ -66,7 +66,7 @@ export const CROSS_CHECK_TOLERANCE_PX = 0.05;
  */
 export const CROSS_CHECK_MEASURED_MAX_PX = 0;
 
-/** How many elements are cross-examined. Every element would double the cost of every run. */
+/** Maximum elements cross-examined. A smaller document contributes every eligible CSS box. */
 export const CROSS_CHECK_SAMPLE_SIZE = 8;
 
 export interface GeometrySample {
@@ -91,6 +91,7 @@ export interface Disagreement {
 
 export interface CrossCheckResult {
   checked: number;
+  required: number;
   maxDelta: number;
   disagreements: Disagreement[];
   ok: boolean;
@@ -122,6 +123,7 @@ export function compareGeometry(
   inPage: readonly GeometrySample[],
   outOfProcess: readonly GeometrySample[],
   tolerance: number = CROSS_CHECK_TOLERANCE_PX,
+  required: number = inPage.length,
 ): CrossCheckResult {
   const byKey = new Map(outOfProcess.map((s) => [s.key, s]));
   const disagreements: Disagreement[] = [];
@@ -145,11 +147,12 @@ export function compareGeometry(
 
   return {
     checked: inPage.length,
+    required,
     maxDelta,
     disagreements,
     // A cross-check over nothing is not a passed cross-check. Measuring zero elements and
     // reporting `ok` would be the green-over-nothing shape one level in from the live suite.
-    ok: disagreements.length === 0 && inPage.length > 0,
+    ok: disagreements.length === 0 && inPage.length > 0 && inPage.length === required,
   };
 }
 
@@ -161,12 +164,16 @@ export function crossCheckEvent(result: CrossCheckResult): InfraEvent {
     detail:
       result.checked === 0
         ? "the geometry cross-check measured no elements, so it confirms nothing about the probe."
+        : result.checked !== result.required
+          ? `the geometry cross-check measured ${result.checked} of ${result.required} required elements, ` +
+            `so the report is not written.`
         : `the in-page probe and the browser's layout tree disagree about ${result.disagreements.length} ` +
           `measurement(s) of ${result.checked} element(s) sampled, by up to ${result.maxDelta.toFixed(4)} px ` +
           `against a tolerance of ${CROSS_CHECK_TOLERANCE_PX} px. Every number in the report comes from ` +
           `the probe, so the report is not written.`,
     measured: {
       checked: result.checked,
+      required: result.required,
       maxDeltaPx: Number.isFinite(result.maxDelta) ? Number(result.maxDelta.toFixed(4)) : null,
       tolerancePx: CROSS_CHECK_TOLERANCE_PX,
       worst: worst.map((d) => ({ key: d.key, field: d.field, inPage: d.inPage, outOfProcess: d.outOfProcess })),
@@ -207,7 +214,7 @@ export const SAMPLE_SOURCE = `((limit) => {
     // does exactly that). For an inline containing block children, GCR and CDP's border quad cover
     // different unions. The child blocks remain independently eligible, so skipping this one box
     // removes a definition mismatch without creating an unchecked subtree.
-    if (P.style(el).display === "inline") continue;
+    if (!svgRoot && P.style(el).display === "inline") continue;
     const b = P.rect(el);
     if (b.width <= 0 || b.height <= 0) continue;
     // JSON emits a CSS string token and therefore keeps an authored id containing a quote from

@@ -750,6 +750,9 @@ async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compare
       const q = model.border;
       out.push({ key: sample.key, ...quadEnvelope(q) });
     }
+    // Small documents can expose fewer than eight eligible CSS boxes; in that case every eligible
+    // box is checked. The live oracle separately proves that a document with enough eligible
+    // elements fills the complete eight-element budget.
     return compareGeometry(inPage, out);
   } finally {
     await session.detach().catch(() => undefined);
@@ -1297,11 +1300,12 @@ async function openContentPage(
       declaredHeight: positiveHtmlDimension(image.heightAttribute),
     }));
     const unstableImages = checkedImages.filter((image) =>
-      image.width <= 0 || image.height <= 0 || image.declaredWidth === null || image.declaredHeight === null);
+      image.width <= 0 || image.height <= 0 || image.declaredWidth === null || image.declaredHeight === null ||
+      image.width !== image.declaredWidth || image.height !== image.declaredHeight);
     if (unstableImages.length > 0) {
       throw new Error(
-        "image decode failed without explicit authored width and height: " +
-        unstableImages.map((image) => image.uri).join(", "),
+        `image decode failed without a rendered box equal to explicit authored width and height ` +
+        `for ${unstableImages.length} image(s)`,
       );
     }
     const imageFailures: ImageDecodeFailure[] = checkedImages.map((image) => ({

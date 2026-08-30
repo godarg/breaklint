@@ -90,11 +90,11 @@ export const INFRA_EVENT_KINDS = [
   "break-cause-undetermined",
   "pagedjs-version-unsupported",
   /**
-   * An image resource could not be decoded, but its authored width/height attributes and rendered
-   * box both have explicit non-zero geometry.
+   * An image resource could not be decoded, but its authored width/height attributes are positive
+   * and exactly equal the rendered box.
    * The missing pixels are named because visual fidelity is reduced; layout measurement can
-   * continue because the absent content cannot change the occupied box. A zero-size failed image
-   * remains fatal and is never classified here.
+   * continue because the absent content cannot change the occupied box. Missing dimensions,
+   * zero-size geometry or authored CSS that changes the box remain fatal.
    */
   "image-content-unavailable",
   /**

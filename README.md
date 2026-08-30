@@ -120,9 +120,10 @@ for `document.fonts.ready` and stops with a non-zero exit if a declared font res
 rather than reporting findings it cannot stand behind.
 
 **Missing image content is never treated as present.** A failed image decode remains fatal unless
-the source supplies positive `width` and `height` attributes and Chrome measures a positive box.
-Only that fixed-layout case continues with the non-fatal `image-content-unavailable` diagnostic;
-replacement text or a non-zero box without authored dimensions is not accepted as stable geometry.
+the source supplies positive `width` and `height` attributes and Chrome measures a box exactly
+equal to both values. Only that fixed-layout case continues with the non-fatal
+`image-content-unavailable` diagnostic; replacement text, missing dimensions or authored CSS that
+changes the box is not accepted as stable geometry.
 Reports retain a resource index and dimensions, never the failed file URL or remote query string.
 
 **SVG clipping and ink collision are not released rules.** The research modules

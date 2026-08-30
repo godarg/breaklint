@@ -24,12 +24,13 @@
   before the renderer starts. Inline SVG in `.html`/`.htm` remains supported by the released SVG
   viewport rule. The previous path parsed arbitrary extensions as `/document.html` and failed late.
 - A failed image decode is no longer an anonymous `checker-crashed` when the source explicitly
-  declares positive `width` and `height` attributes and the browser measures a non-zero box. It
+  declares positive `width` and `height` attributes and the browser measures a box exactly equal
+  to both values. It
   becomes the named, non-fatal
   `image-content-unavailable` event with a non-identifying resource index and measured dimensions.
   Absolute file URLs and remote query strings are not persisted in the report. Missing authored
-  dimensions or a zero-size rendered box remain fatal because replacement text is not stable image
-  geometry and the absent content can change layout.
+  dimensions, a differing or zero-size rendered box, and authored CSS overrides remain fatal because
+  replacement text is not stable image geometry and the absent content can change layout.
 
 ### Thirteen released rules, not fifteen advertised definitions
 

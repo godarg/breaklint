@@ -31,9 +31,10 @@ sample. Raising the tolerance would have hidden differences up to 18 px rather t
 comparison.
 
 Missing images are not silently ignored. A decode failure without positive authored `width` and
-`height` attributes, or with a zero-size rendered box, is fatal; replacement text alone does not
-establish stable image geometry. Only a failure with both authored dimensions and a measured
-non-zero box becomes the named non-fatal event `image-content-unavailable`. That distinction lets
+`height` attributes, or whose rendered box is not exactly equal to both values, is fatal;
+replacement text and authored CSS overrides do not establish stable image geometry. Only a failure
+with equal declared and rendered dimensions becomes the named non-fatal event
+`image-content-unavailable`. That distinction lets
 the frozen first-party corpus document be measured without claiming its absent pixels were present.
 
 M3 is split by dependency: M3-1a (public corpus breadth and acquisition robustness) is active and
@@ -94,7 +95,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=350 aggregateTests=462 liveTests=62 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=352 aggregateTests=464 liveTests=62 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
