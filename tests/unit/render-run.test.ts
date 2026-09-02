@@ -169,7 +169,10 @@ describe("the live path fails closed at its process boundary", () => {
     assert.equal(await lifecycle.close(250), null);
     assert.equal(server.listening, false);
     assert.equal(lifecycle.openSockets(), 0);
-    assert.equal(socket.destroyed, true);
+    // The server destroys its end synchronously (openSockets() === 0 above); the CLIENT socket
+    // learns about it asynchronously. Observed 2 of 5 runs red on the immediate check under
+    // load (2026-09-02) — wait for the observable, bounded by the shared helper.
+    await waitForObserved(() => socket.destroyed, (destroyed) => destroyed === true);
     const refusal = createConnection({ host: "127.0.0.1", port: address.port });
     const [error] = await once(refusal, "error") as [NodeJS.ErrnoException];
     assert.equal(error.code, "ECONNREFUSED", "the supposedly closed loopback port still accepted a connection");
