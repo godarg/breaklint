@@ -153,13 +153,20 @@ describe("the live path fails closed at its process boundary", () => {
     await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
     const address = server.address();
     assert.ok(address && typeof address === "object");
+    // Wait for the server-side "connection" event, not for a fixed 10 ms: under a loaded
+    // scheduler the accept can land after the sleep, and the positive control would fail for
+    // a reason unrelated to the property under test (2026-09-02, Dargel WI parallelbetrieb).
+    const accepted = once(server, "connection");
     const socket = createConnection({ host: "127.0.0.1", port: address.port });
     await once(socket, "connect");
-    await wait(10);
+    await accepted;
     assert.equal(lifecycle.openSockets(), 1, "the positive-control socket never reached the owned server");
-    const started = Date.now();
+    // The property is "close does not wait for the intentionally open socket". It is carried
+    // by the null result: had close() waited for the socket's natural end, the 250 ms race
+    // timer would have resolved first and close() would report the server as unverified
+    // (non-null). A wall-clock bound on top of that measured scheduler latency, not the
+    // property, and could fail in a 469-test parallel run for no defect.
     assert.equal(await lifecycle.close(250), null);
-    assert.ok(Date.now() - started < 500);
     assert.equal(server.listening, false);
     assert.equal(lifecycle.openSockets(), 0);
     assert.equal(socket.destroyed, true);
