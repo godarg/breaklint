@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-09-05
+
+A minor rather than a patch for one reason: on a document whose paginator left unplaceable
+table content in an overflow column, `exitReason` changed from `checker-crashed` to
+`render-unstable`. Exit code 3 in both cases, report schema unchanged.
 
 ### Content a paginator could not place is now named, not reported as a crash
 
