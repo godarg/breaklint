@@ -315,3 +315,62 @@ export const FREEZE_SOURCE = freezeSource("breaklint-static-test-capability");
 export async function sampleParts(page: PageLike): Promise<FreezeParts> {
   return page.evaluate<FreezeParts>("window.__blFreezeParts()");
 }
+
+/**
+ * One index-aligned entry that differs between two samples of the same component.
+ *
+ * WHY THE ENTRIES AND NOT JUST THE COMPONENT NAME. `driftedComponents` answers "which of the
+ * seven moved"; on a real document that is almost always `boxes`, and `boxes` alone sends the
+ * reader to look at every element of every page. The measured corpus that produced this function
+ * had 2 137 box entries of which 22 differed, all of them one table — a fact the component name
+ * cannot carry and the raw sample is far too large to print.
+ *
+ * The alignment is positional and deliberately naive. Both samples enumerate the same DOM in the
+ * same order, so entry `n` is the same element in both whenever the element COUNT is unchanged —
+ * which is the case this function exists for, a layout that moved without the DOM changing. When
+ * the counts differ the alignment is meaningless past the first insertion, so it is not attempted:
+ * the count is reported instead and the caller says so.
+ */
+export interface ComponentDelta {
+  component: FreezeComponent;
+  /** Position in the component's `;`-separated entry list, or -1 when the lists cannot be aligned. */
+  index: number;
+  before: string;
+  after: string;
+}
+
+/**
+ * A bounded, index-aligned diff of the components that moved.
+ *
+ * `limit` caps the TOTAL number of entries returned, not the number per component: a payload that
+ * grows with the document is the defect `report/infra.ts` was written to stop, and a cap applied
+ * per component would still scale with the seven.
+ */
+export function componentDeltas(a: FreezeParts, b: FreezeParts, limit = 6): ComponentDelta[] {
+  // The collector builds each component with `array.join(";")`, so the empty string is ZERO
+  // entries, not one. `"".split(";")` returns `[""]`, which reported a component that went from
+  // nothing to something as "1 entr(ies)" against "40 entr(ies)" — an off-by-one in the only line
+  // a reader has to go on when the alignment is abandoned.
+  const entries = (value: string): string[] => (value === "" ? [] : value.split(";"));
+  const out: ComponentDelta[] = [];
+  for (const component of driftedComponents(a, b)) {
+    if (out.length >= limit) break;
+    const before = entries(a[component]);
+    const after = entries(b[component]);
+    if (before.length !== after.length) {
+      out.push({
+        component,
+        index: -1,
+        before: `${before.length} entr(ies)`,
+        after: `${after.length} entr(ies)`,
+      });
+      continue;
+    }
+    for (let index = 0; index < before.length && out.length < limit; index += 1) {
+      const wasEntry = before[index] ?? "";
+      const isEntry = after[index] ?? "";
+      if (wasEntry !== isEntry) out.push({ component, index, before: wasEntry, after: isEntry });
+    }
+  }
+  return out;
+}

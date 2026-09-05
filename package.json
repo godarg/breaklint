@@ -1,6 +1,6 @@
 {
   "name": "breaklint",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Layout checks for documents generated from HTML to PDF: measures every page after pagination and reports the measured value next to the threshold it failed.",
   "keywords": [
     "pagedjs",
@@ -58,6 +58,8 @@
     "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "test:mutants": "node --experimental-strip-types tests/tools/mutants.ts",
     "test:real-document": "node tests/tools/real-document-gate.mjs --cwd .",
+    "test:pagination-residue": "node tests/tools/pagination-residue-gate.mjs --cwd .",
+    "test:pagination-residue:red-control": "node tests/tools/pagination-residue-red-control.mjs",
     "test:real-document:red-control": "node tests/tools/real-document-red-control.mjs",
     "test:licenses": "node --experimental-strip-types tests/tools/licenses.ts",
     "test:secrets": "node tests/tools/secrets.mjs",

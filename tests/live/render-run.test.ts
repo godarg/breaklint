@@ -50,7 +50,7 @@ describe("the M2d live production chain", () => {
   let noSource: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
-    if (result?.documents.length === 23 && noSource?.documents.length === 4) return true;
+    if (result?.documents.length === 24 && noSource?.documents.length === 4) return true;
     t.skip(
       `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
       `no-source=${noSource?.documents.length ?? 0}`,
@@ -109,6 +109,7 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "svg-text-geometry.html"),
         join(FIXTURES, "svg-in-viewport.html"),
         join(FIXTURES, "svg-geometry-declines.html"),
+        join(FIXTURES, "fragmentainer-residue.html"),
       ],
       options(join(root, "evidence")),
     );
@@ -136,7 +137,7 @@ describe("the M2d live production chain", () => {
     }));
     assert.equal(
       result?.documents.length,
-      23,
+      24,
       `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
     );
     assert.equal(
@@ -485,8 +486,54 @@ describe("the M2d live production chain", () => {
     if (!completeChain(t)) return;
     const document = result!.documents[17]!;
     assert.equal(document.snapshot, null, "a PDF produced across mutation remained reportable");
-    assert.ok(document.infrastructure.some((event) =>
-      event.kind === "checker-crashed" && /PDF changed the measured state|PDF precondition failed/iu.test(event.detail)));
+    // `render-unstable`, not `checker-crashed`: the apparatus did not fail, the PDF disagrees with
+    // the state the rules were run against. The detail has to NAME what moved — a reconciliation
+    // that reports only `freezeChanged: true` sends the reader to look at the whole document, and
+    // that is what this event said for a full release cycle.
+    const unstable = document.infrastructure.find((event) => event.kind === "render-unstable");
+    assert.ok(
+      unstable,
+      `no render-unstable event: ${JSON.stringify(document.infrastructure.map((e) => e.kind))}`,
+    );
+    assert.match(unstable.detail, /freeze component\(s\) boxes/u, unstable.detail);
+    const measured = unstable.measured as Record<string, unknown>;
+    assert.deepEqual(measured.driftedComponents, ["boxes"]);
+    assert.ok(Array.isArray(measured.driftSample) && measured.driftSample.length > 0);
+  });
+
+  /**
+   * The negative control for the class that took six of eighteen real chapters out of measurement.
+   *
+   * RED WITHOUT THE FIX: the event carried `maxDeltaPx: 1816` and a sentence ending "Every number
+   * in the report comes from the probe, so the report is not written" — a 1 816 px disagreement
+   * blamed on this tool's own geometry, with nothing in `measured` that could be acted on. The two
+   * assertions below are exactly what was missing: the cause, named, and the elements it is about.
+   */
+  it("names the unplaced fragmentainer content behind a geometry disagreement", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[23]!;
+    assert.equal(document.snapshot, null, "a document with unplaced content remained reportable");
+    const event = document.infrastructure.find((e) => e.kind === "geometry-cross-check-failed");
+    assert.ok(event, `no cross-check failure: ${JSON.stringify(document.infrastructure.map((e) => e.kind))}`);
+    assert.match(event.detail, /Paged\.js left \d+ element\(s\).*in an overflow column of page\(s\)/u, event.detail);
+    assert.match(event.detail, /unsplittable table box/u, event.detail);
+    const residue = (event.measured as Record<string, unknown>).fragmentainerResidue as {
+      count: number; atomicCount: number; pages: number[]; pitchPx: number;
+      sample: { tag: string; display: string; sourceId: string | null }[];
+    };
+    assert.ok(residue, `the cause is named in the sentence but absent from measured: ${JSON.stringify(event.measured)}`);
+    assert.ok(residue.count > 0 && residue.atomicCount > 0);
+    assert.ok(residue.pages.length > 0);
+    // The pitch is `column-width + column-gap` on `.pagedjs_page_content`, and it is what the two
+    // geometry sources disagree by. Reporting it lets a reader check the arithmetic themselves.
+    assert.equal(residue.pitchPx, 1816);
+    // The TABLE residue must be attributable; other tags carry no injected id and are not required
+    // to. Same boundary, same reason, as tests/tools/pagination-residue-gate.mjs.
+    const tableResidue = residue.sample.filter((r) => r.display.startsWith("table"));
+    assert.ok(tableResidue.length > 0);
+    assert.ok(tableResidue.every((r) => r.sourceId !== null), JSON.stringify(residue.sample));
+    assert.ok(residue.sample.some((r) => r.display === "table-row"));
   });
 
   it("fails closed when author code removes the animation intervention", (t) => {

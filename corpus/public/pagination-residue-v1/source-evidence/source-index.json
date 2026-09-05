@@ -1,0 +1,36 @@
+{
+  "contractVersion": "pagination-residue-source-evidence-v2",
+  "evidenceId": "source_evidence_index_0001",
+  "reviewDate": "2026-09-05",
+  "sourceLocator": "Dargel Solutions product 08, HTML bundle Nobody-Opens-a-Passing-Check-2026.zip",
+  "sourceClass": "private-first-party-nonredistributable",
+  "rightsBasis": "first-party-founder-authorized-evaluation-only",
+  "rightsEvidence": {
+    "work": "Nobody Opens a Passing Check (2026), HTML edition",
+    "author": "Dargel Solutions",
+    "note": "First-party material, admitted by its own author for acquisition robustness and NOT redistributed. The bytes are a chapter of a paid product; only their SHA-256 and this review are public. Not calibration evidence and not an external trust root.",
+    "limitation": "This admission is a rights and robustness record, not legal advice.",
+    "redistribution": "not granted; this record publishes no bytes"
+  },
+  "frozenArtifact": {
+    "repositoryPath": null,
+    "externalArtifact": "index.html",
+    "artifactRootEnvironmentVariable": "BREAKLINT_RESIDUE_CORPUS_ROOT",
+    "mediaType": "text/html",
+    "sha256": "e98b2e92b060475b749cf5c7e14f931d90bcaa18552f56a1ee739ece1a82d621",
+    "byteLength": 14738,
+    "transformation": "none; the shipped bundle byte-for-byte. The shared stylesheet is read from the same artifact root as styles.css.",
+    "captureDate": "2026-09-05"
+  },
+  "privacyReview": {
+    "class": "reviewed-first-party-no-third-party-personal-data",
+    "decision": "eligible",
+    "findings": [
+      "The material is the admitting party's own published product text.",
+      "No credential, client material, analytics export, private path or third-party personal data is present.",
+      "No bytes of this document are published by this repository; the record is hash-only."
+    ]
+  },
+  "calibrationEvidenceEligible": false,
+  "admissionReason": "Each of these six documents carries at least one page on which a table box sits in an overflow column of the Paged.js fragmentainer. That is the property under test, and it reached a released build because no fixture in this repository had it."
+}

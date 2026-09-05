@@ -48,6 +48,7 @@
  */
 
 import type { InfraEvent } from "../core/types.ts";
+import { residueDetail, type FragmentainerReport } from "./fragmentainer.ts";
 
 /**
  * The largest disagreement between the two sources that is still treated as agreement.
@@ -175,9 +176,20 @@ export function compareGeometry(
   };
 }
 
-/** The infrastructure event a failed cross-check produces. Fatal — see `enums.ts`. */
-export function crossCheckEvent(result: CrossCheckResult): InfraEvent {
+/**
+ * The infrastructure event a failed cross-check produces. Fatal — see `enums.ts`.
+ *
+ * `residue` names a cause this check cannot see on its own. Measured: on a reduced document whose
+ * unplaceable table row sat in the fragmentainer's second column, the two sources disagreed by
+ * EXACTLY one column pitch — 1816.0000 px against a 0.05 px tolerance — and the sentence below
+ * told the reader that this tool's probe could not be trusted. It could; the page had content
+ * Paged.js never placed, and the two sources describe a multi-column overflow differently. A
+ * disagreement of a whole pitch is a document fact, and saying so is the difference between a
+ * report the reader can act on and one that only accuses the apparatus.
+ */
+export function crossCheckEvent(result: CrossCheckResult, residue?: FragmentainerReport): InfraEvent {
   const worst = [...result.disagreements].sort((a, b) => b.delta - a.delta).slice(0, 3);
+  const cause = residue && residue.count > 0 ? ` ${residueDetail(residue)}` : "";
   return {
     kind: "geometry-cross-check-failed",
     detail:
@@ -188,9 +200,10 @@ export function crossCheckEvent(result: CrossCheckResult): InfraEvent {
             `so the report is not written.`
         : `the in-page probe and the browser's layout tree disagree about ${result.disagreements.length} ` +
           `measurement(s) of ${result.checked} element(s) sampled, by up to ${result.maxDelta.toFixed(4)} px ` +
-          `against a tolerance of ${CROSS_CHECK_TOLERANCE_PX} px. Every number in the report comes from ` +
-          `the probe, so the report is not written.`,
+          `against a tolerance of ${CROSS_CHECK_TOLERANCE_PX} px.${cause} Every number in the report comes ` +
+          `from the probe, so the report is not written.`,
     measured: {
+      ...(residue && residue.count > 0 ? { fragmentainerResidue: residue } : {}),
       checked: result.checked,
       required: result.required,
       candidates: result.candidates,

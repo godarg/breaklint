@@ -5,13 +5,13 @@ Releases are published by GitHub Actions from an annotated version tag. A laptop
 
 ## Release contract
 
-For 0.3.1, all of the following must refer to the same commit and the same package bytes:
+For 0.4.0, all of the following must refer to the same commit and the same package bytes:
 
-1. `origin/main` and annotated tag `v0.3.1`;
+1. `origin/main` and annotated tag `v0.4.0`;
 2. the successful `ci.yml` run queried by commit SHA;
 3. the one tarball created by the release workflow;
 4. both clean consumers, on Node 22.13 and Node 24;
-5. npm `breaklint@0.3.1` and its `dist.integrity`;
+5. npm `breaklint@0.4.0` and its `dist.integrity`;
 6. the tarball and checksum files attached to the GitHub Release.
 
 Any mismatch ends the workflow before or immediately after the outward action. A failed registry
@@ -23,6 +23,11 @@ creation because their real-document child process inherited the checkout CWD. V
 published repair from this change set and binds the child CLI to the actual consumer CWD. Release
 run `33320332110` completed the Node 22.13/24 consumer matrix, npm provenance verification and
 GitHub Release creation on 2026-08-30.
+
+0.4.0 is a minor rather than a patch because one observable value changed for callers who parse it:
+a document whose paginator left unplaceable table content in a fragmentainer overflow column used to
+end with `exitReason: "checker-crashed"` and now ends with `exitReason: "render-unstable"`. The exit
+code is 3 in both cases and the report schema is unchanged.
 
 ## One-time repository prerequisites
 
@@ -48,6 +53,7 @@ npm run schema:check
 npm test
 npm run test:mutants
 npm run test:real-document
+npm run test:pagination-residue          # SKIPPED without BREAKLINT_RESIDUE_CORPUS_ROOT; see below
 npm run test:licenses
 BREAKLINT_LIVE_REPORT=.tmp/live-report.json BREAKLINT_LIVE_SUMMARY=.tmp/live-summary.json npm run test:live
 npm run test:documented-figures
@@ -69,6 +75,29 @@ registry package and running
 `BREAKLINT_023_CLI=<0.2.3-package>/dist/cli/index.js npm run test:real-document:red-control` against
 the exact same third-party bytes. It is historical evidence, not a network-dependent release step.
 
+The pagination-residue record is the negative half of the same property: six real documents that
+must NOT measure, and must say why — which elements a paginator left in an overflow column, on which
+pages, and by how far. Their bytes are **not in this repository**: they are chapters of a paid
+product, 27 492 of that bundle's 69 017 words, and this repository is public and MIT. What is public
+is a hash-only record in the shape `docs/validation/corpus-contract-v1.md` defines for
+`private_nonredistributable` material, and the gate says `SKIPPED` rather than claiming a
+verification it did not perform. The class itself is held in CI by the public
+`tests/fixtures/fragmentainer-residue.html`, which carries no product text.
+
+Before a release, run the full gate once against the admitted bundle and read the six lines it
+prints:
+
+```bash
+BREAKLINT_RESIDUE_CORPUS_ROOT=<unpacked-bundle> npm run test:pagination-residue
+BREAKLINT_RESIDUE_CORPUS_ROOT=<unpacked-bundle> npm run test:pagination-residue:red-control
+```
+
+The red condition is not historical but re-derivable: the red control builds the parent of the
+commit that introduced `src/measure/fragmentainer.ts` and asserts that both cases were already fatal
+there and named no cause. Without the artifact root it still proves red-to-green on the public
+fixture and skips the corpus case by name. It is a local gate rather than a CI step because it
+compiles a second tree.
+
 Then verify:
 
 - `package.json`, both root version fields in `package-lock.json` and `CHANGELOG.md` name the same
@@ -83,15 +112,15 @@ Then verify:
 Create and push an annotated tag only after main CI is green:
 
 ```bash
-git tag -a v0.3.1 -m "breaklint 0.3.1"
-git push origin v0.3.1
+git tag -a v0.4.0 -m "breaklint 0.4.0"
+git push origin v0.4.0
 ```
 
 The release workflow then:
 
 1. repeats the complete gate on Node 24;
 2. scans Git history/worktree and proves both scanner rules with runtime canaries;
-3. creates exactly one `breaklint-0.3.1.tgz`;
+3. creates exactly one `breaklint-0.4.0.tgz`;
 4. records its SHA-256 and SHA-512 SRI;
 5. downloads those same bytes into Node 22.13 and Node 24 clean consumers;
 6. proves the ref is an annotated tag (with a lightweight-tag negative control), then proves
@@ -103,7 +132,7 @@ The release workflow then:
 9. creates the GitHub Release with the tarball and both identity records attached.
 
 Do not rerun a partially successful publish blindly: npm versions are immutable. Inspect the npm
-version, workflow logs and GitHub Release first. If npm already serves 0.3.1 but a post-publish
+version, workflow logs and GitHub Release first. If npm already serves 0.4.0 but a post-publish
 verification failed, repair the release metadata or publish a new patch version; never move the tag
 or overwrite evidence to make the old run look green.
 
@@ -119,13 +148,13 @@ source identity is never ignored.
 From a new temporary directory, independently verify the registry route:
 
 ```bash
-npm view breaklint@0.3.1 version dist.integrity
+npm view breaklint@0.4.0 version dist.integrity
 npm init -y
-npm install breaklint@0.3.1 --no-audit --no-fund
+npm install breaklint@0.4.0 --no-audit --no-fund
 npx breaklint --version
 npx breaklint --demo
 ```
 
-The version must be `0.3.1`; demo must produce real findings and exit 1. Import
+The version must be `0.4.0`; demo must produce real findings and exit 1. Import
 `breaklint/config.schema.json` and rerun the installed Configuration Contract gate. The later status
 commit records the completed release but is not retroactively part of the published tarball.
