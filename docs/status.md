@@ -4,7 +4,49 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## Current release — 0.3.1 (2026-08-30)
+## Current release — 0.4.0 (2026-09-05)
+
+0.4.0 is the first release measured against a corpus that was not this repository's own: eighteen
+chapters of a shipped HTML bundle, of which twelve measured and six ended `exit 3`,
+`checker-crashed`, with a payload naming no cause. What the six had that the twelve did not is
+measured, not guessed: at least one page carrying an unsplittable table box in an overflow column
+of the multi-column fragmentainer Paged.js builds out of `.pagedjs_page_content` — 6 of 6 against
+0 of 12. Those documents still cannot be measured, and should not be: `page.pdf()` renders in print
+media with a re-sized fragmentainer, so the PDF does not reproduce the geometry the rules read. What
+changed is that the run now says so by name — `render-unstable`, with the elements, their source
+ids, the pages and the column pitch — instead of reporting a crash.
+
+The version is a minor rather than a patch for one observable reason: `exitReason` for that document
+class changed from `checker-crashed` to `render-unstable`. Exit code 3 in both cases, report schema
+unchanged.
+
+The six documents are recorded, not published. They are chapters of a paid product, so
+`corpus/public/pagination-residue-v1` carries their SHA-256 values, rights and privacy review and
+exact expected residue while the bytes stay outside this repository — the
+`private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. Without
+`BREAKLINT_RESIDUE_CORPUS_ROOT` that gate prints `SKIPPED` and claims nothing. What holds the class
+in CI is the public `tests/fixtures/fragmentainer-residue.html`, reduced from one of the six until
+no product text remained.
+
+Two defects in this repository's own checks were found on the way and fixed in the same release. The
+secret-scanner canary planted a digit-heavy `AKIA` key beside a random secret and asserted only that
+something was found: over 25 draws, `generic-api-key` fired on the random secret 23 times and the
+AWS rule once, so a gate that named one rule was passing on another and went green whenever the
+random secret fell under the generic rule's entropy floor. It is now one fixed letter-only key with
+an assertion on `RuleID`. The `documented-figures` marker below is the other: it is restamped here
+because the test counts changed.
+
+The annotated `v0.4.0` tag points to merge commit
+`27bf0b43c3a56ce0246a37c81610f1a3084a4f19`. Release workflow run `33988132678` accepted the
+once-packed tarball in clean Node 22.13 and Node 24 consumers, published it to npm with SLSA
+provenance, and created the GitHub Release from the same bytes. A post-release download measured
+SHA-256 `55659441736027bfc0637fb53cbc90321066310aaa55b62a16f54cc7e3d0d109` for the GitHub asset, and
+npm serves `dist.integrity`
+`sha512-TDSKUsT2IJ4J6UrhlO4C7O/N0etKp3g72LLnKO1CywqpqDMwWw8S/NdZMXs3tRwdYOeVZ6UYxVOppyQJ1xnmgA==`.
+`test:report-surfaces:local` remains red: its human ledger was already bound to a revision matching
+neither this release nor 0.3.1, and it is never restamped as release ceremony.
+
+## Previous release — 0.3.1 (2026-08-30)
 
 The annotated `v0.3.0` attempt is deliberately not this release. Its workflow stopped before npm or
 a GitHub Release was created because the installed-package real-document gate ran the child CLI in
