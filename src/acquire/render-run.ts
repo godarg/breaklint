@@ -42,8 +42,15 @@ import {
   type GeometrySample, type GeometrySampleBatch,
 } from "../measure/cross-check.ts";
 import {
+  fragmentainerResidue,
+  residueDetail,
+  type FragmentainerReport,
+} from "../measure/fragmentainer.ts";
+import {
   awaitStableLayout,
+  componentDeltas,
   composeSignature,
+  driftedComponents,
   DOCUMENT_TIMEOUT_MS,
   freezeSource,
   MAX_DOM_NODES,
@@ -1078,6 +1085,33 @@ interface AnimationStatus {
   effectViolations: number;
 }
 
+/**
+ * The `render-unstable` sentence for a PDF that did not reproduce the state it was bound to.
+ *
+ * Exported and built here for the reason `divergenceDetail` gives: the test that pins the wording
+ * has to read the producer. The order of the clauses is the order a reader needs them in — WHAT
+ * moved, then WHY it moved, then what that costs. `report/infra.ts` truncates `detail` at 220
+ * characters for five of the six formats, so the cause must not be last.
+ *
+ * When there is no residue the sentence stops after the components. A drift with no residue is a
+ * case this build has not measured, and inventing an explanation for it would be worse than
+ * naming the components and saying nothing else.
+ */
+export function pdfReconciliationDetail(
+  stage: string,
+  drifted: readonly string[],
+  residue: FragmentainerReport,
+): string {
+  const what = drifted.length > 0
+    ? `freeze component(s) ${drifted.join(", ")} changed across ${stage} PDF production`
+    : `the runtime integrity counters changed across ${stage} PDF production`;
+  const why = residue.count > 0
+    ? ` ${residueDetail(residue)} The PDF is rendered in print media, where Paged.js re-sizes the ` +
+      "fragmentainer, so that content is laid out somewhere else than where it was measured."
+    : "";
+  return `the PDF does not reproduce the state the rules measured: ${what}.${why}`;
+}
+
 async function verifyAnimationIntervention(page: PageLike, stage: string): Promise<void> {
   const status = await page.evaluate<AnimationStatus>(ANIMATION_STATUS_SOURCE);
   if (status.count !== 1 || !status.connected || !status.ruleIntact || status.effectViolations > 0) {
@@ -1601,7 +1635,15 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     }
     const raw = await page.evaluate<RawSnapshot>(SNAPSHOT_SOURCE);
     const geometry = await crossCheckPage(page);
-    infrastructure.push(geometry.ok ? crossCheckPassedEvent(geometry) : crossCheckEvent(geometry));
+    // The residue probe runs only on the failing branch. It is a full DOM walk per page, and on a
+    // sound document the answer is always empty — paying for it on every run to say nothing is the
+    // wrong trade. On the failing branch it is the difference between naming a cause and accusing
+    // this tool's own probe.
+    infrastructure.push(
+      geometry.ok
+        ? crossCheckPassedEvent(geometry)
+        : crossCheckEvent(geometry, await fragmentainerResidue(page)),
+    );
 
     if (controlSignature) {
       const comparison = compareControlSignatures(raw.control, controlSignature);
@@ -1721,25 +1763,44 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
           inFlight: opened.network.inFlight.size, pendingBodies: opened.network.pendingBodies.size,
         })}`);
       }
+      // Read BEFORE the PDF, because this describes the state the rules were run against. After
+      // the PDF the print-media reflow has already happened and the residue is gone -- measured:
+      // the same probe run either side of one `page.pdf()` reported 3 elements and then 0.
+      const residueBefore = await fragmentainerResidue(page);
       const pdf = await page.pdf({ printBackground: true, preferCSSPageSize: true });
       const afterParts = await sampleParts(page);
       const afterIntegrity = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(opened.apparatusCapability));
       const afterSidIssues = validateRuntimeSidState(expectedSids, afterIntegrity);
-      const changed = composeSignature(beforeParts) !== composeSignature(afterParts) ||
+      const drifted = driftedComponents(beforeParts, afterParts);
+      const changed = drifted.length > 0 ||
         afterIntegrity.mutationRecordsAfterRendered !== beforeIntegrity.mutationRecordsAfterRendered ||
         afterIntegrity.sidMutations !== beforeIntegrity.sidMutations || afterSidIssues.length > 0 ||
         opened.pageErrors.length > 0 || opened.network.activityAfterRendered > 0 ||
         opened.network.inFlight.size > 0 || opened.network.pendingBodies.size > 0;
       await verifyAnimationIntervention(page, `${stage}-pdf-after`);
       if (changed) {
-        throw new Error(`${stage} PDF changed the measured state: ${JSON.stringify({
-          freezeChanged: composeSignature(beforeParts) !== composeSignature(afterParts),
-          mutationDelta: afterIntegrity.mutationRecordsAfterRendered - beforeIntegrity.mutationRecordsAfterRendered,
-          sidMutationDelta: afterIntegrity.sidMutations - beforeIntegrity.sidMutations,
-          sidIssues: afterSidIssues, pageErrors: opened.pageErrors,
-          networkActivity: opened.network.activityAfterRendered,
-          inFlight: opened.network.inFlight.size, pendingBodies: opened.network.pendingBodies.size,
-        })}`);
+        // `render-unstable`, not `checker-crashed`: nothing crashed. The PDF does not reproduce
+        // the geometry the rules measured, which is the same statement `evidence.ts` makes about a
+        // divergent mark page, and it is fatal for the same reason. Thrown as an
+        // `OperationalBoundaryFailure` so the named event survives the boundary instead of being
+        // re-wrapped as an anonymous crash by the catch in `renderOne`.
+        throw new OperationalBoundaryFailure([{
+          kind: "render-unstable",
+          detail: pdfReconciliationDetail(stage, drifted, residueBefore),
+          measured: {
+            stage,
+            driftedComponents: drifted,
+            // Which ENTRIES moved, not just which component. `boxes` alone is 2 137 entries on the
+            // document this was written for, of which 22 differed -- all of them one table.
+            driftSample: componentDeltas(beforeParts, afterParts),
+            fragmentainerResidue: residueBefore,
+            mutationDelta: afterIntegrity.mutationRecordsAfterRendered - beforeIntegrity.mutationRecordsAfterRendered,
+            sidMutationDelta: afterIntegrity.sidMutations - beforeIntegrity.sidMutations,
+            sidIssues: afterSidIssues, pageErrors: opened.pageErrors,
+            networkActivity: opened.network.activityAfterRendered,
+            inFlight: opened.network.inFlight.size, pendingBodies: opened.network.pendingBodies.size,
+          },
+        }]);
       }
       return pdf;
     };

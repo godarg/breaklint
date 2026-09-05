@@ -14,6 +14,7 @@ import { describe, it } from "node:test";
 
 import {
   awaitStableLayout,
+  componentDeltas,
   composeSignature,
   digest,
   driftedComponents,
@@ -196,6 +197,53 @@ describe("the freeze signature", () => {
       assert.equal(readable.canvasInkReadable, true);
       const notReadable = await awaitStableLayout({ sample: async () => parts(), wait: noWait });
       assert.equal(notReadable.canvasInkReadable, false);
+    });
+  });
+
+  /**
+   * `componentDeltas` is the half of the drift report that the seven component names cannot carry.
+   *
+   * The measured case this exists for: 2 137 box entries of which 22 differed, all of them one
+   * table. `driftedComponents` answers "boxes", which is true and useless — every element of every
+   * page is a box. These cases pin the two properties that make the entries usable instead: the
+   * alignment is positional, and it is ABANDONED rather than guessed when the counts differ.
+   */
+  describe("naming the entries that moved", () => {
+    it("returns the index-aligned entries and no others", () => {
+      const before = parts({ boxes: "P:1,1,1,1;P:2,2,2,2;P:3,3,3,3" });
+      const after = parts({ boxes: "P:1,1,1,1;P:9,9,9,9;P:3,3,3,3" });
+      assert.deepEqual(componentDeltas(before, after), [
+        { component: "boxes", index: 1, before: "P:2,2,2,2", after: "P:9,9,9,9" },
+      ]);
+    });
+
+    it("does not attempt an alignment when the entry counts differ", () => {
+      const before = parts({ boxes: "P:1,1,1,1;P:2,2,2,2" });
+      const after = parts({ boxes: "P:1,1,1,1" });
+      assert.deepEqual(componentDeltas(before, after), [
+        { component: "boxes", index: -1, before: "2 entr(ies)", after: "1 entr(ies)" },
+      ]);
+    });
+
+    /**
+     * The cap is on the TOTAL, not per component.
+     *
+     * A per-component cap still scales with the seven, and the payload it feeds is projected onto
+     * one console line. This is the same defect `report/infra.ts` was written to stop, one level
+     * further upstream.
+     */
+    it("caps the total number of entries across every component that moved", () => {
+      const many = (offset: number) =>
+        Array.from({ length: 20 }, (_, i) => `P:${i + offset},0,0,0`).join(";");
+      const before = parts({ boxes: many(0), pseudo: many(0) });
+      const after = parts({ boxes: many(100), pseudo: many(100) });
+      const deltas = componentDeltas(before, after, 5);
+      assert.equal(deltas.length, 5);
+      assert.deepEqual([...new Set(deltas.map((d) => d.component))], ["boxes"]);
+    });
+
+    it("is empty when nothing moved", () => {
+      assert.deepEqual(componentDeltas(parts(), parts()), []);
     });
   });
 });

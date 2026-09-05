@@ -1,0 +1,70 @@
+<!doctype html>
+<!--
+  Content Paged.js could not place, left in the fragmentainer's overflow column.
+
+  REDUCED FROM A REAL DOCUMENT, not invented. Six of eighteen chapters of a shipped HTML bundle
+  could not be measured at all, and this is what the six had that the twelve did not: a page on
+  which a table row sits one whole COLUMN PITCH to the right of the page, in the second column of
+  the multi-column fragmentainer Paged.js builds out of `.pagedjs_page_content`. It is invisible —
+  `.pagedjs_sheet` is `overflow: hidden` — and it is where the two failures come from.
+
+  Nothing exotic is needed and none of it is here: no `@page`, no print stylesheet, no
+  `break-inside`, no script. A default-letter page, a 68ch measure and a table that crosses a page
+  boundary are enough, which is why this class reached a released build without a fixture.
+
+  WHAT IT MUST MAKE RED. Two gates see this, and before the fix neither named it:
+
+    - the geometry cross-check, because `getBoundingClientRect` reports the union of an element's
+      fragments while CDP's box model reports the page fragment, so they disagree by exactly the
+      pitch (1816 px here) and the message accused this tool's own probe;
+    - the PDF reconciliation, because `page.pdf()` renders in print media, Paged.js re-sizes the
+      fragmentainer there, an unsplittable row moves back into the first column and stays moved.
+
+  The paragraph count and the row count are load-bearing: they place the boundary inside the table
+  rather than before or after it. Changing either can make this fixture measure cleanly.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         font-size: 18px; line-height: 1.65; color: #16181d; background: #faf8f3; }
+  .wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { width: 100%; min-width: 0; max-width: 68ch; padding: 8px 0 96px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e6e2d8; vertical-align: top; }
+</style></head>
+<body>
+  <div class="wrap"><div class="layout"><main>
+<p>Sentence 1 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 2 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 3 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 4 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 5 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 6 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 7 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 8 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 9 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 10 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 11 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 12 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 13 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 14 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 15 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 16 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 17 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 18 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 19 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 20 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 21 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+<p>Sentence 22 of the filler measure. It exists to move the table down the galley by a known number of lines, so that the row at the page boundary is the one under test and not an accident of the prose that happens to precede it.</p>
+    <table>
+      <thead><tr><th>This column</th><th>That column</th></tr></thead>
+      <tbody>
+<tr><td>Row 1, left cell, long enough to wrap onto a second line in the measure</td><td>Row 1, right cell</td></tr>
+<tr><td>Row 2, left cell, long enough to wrap onto a second line in the measure</td><td>Row 2, right cell</td></tr>
+<tr><td>Row 3, left cell, long enough to wrap onto a second line in the measure</td><td>Row 3, right cell</td></tr>
+<tr><td>Row 4, left cell, long enough to wrap onto a second line in the measure</td><td>Row 4, right cell</td></tr>
+<tr><td>Row 5, left cell, long enough to wrap onto a second line in the measure</td><td>Row 5, right cell</td></tr>
+<tr><td>Row 6, left cell, long enough to wrap onto a second line in the measure</td><td>Row 6, right cell</td></tr>
+      </tbody>
+    </table>
+    <p>A closing paragraph after the table.</p>
+  </main></div></div>
+</body></html>
