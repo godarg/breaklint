@@ -84,6 +84,18 @@ describe("the fragmentainer residue report", () => {
     assert.ok(FRAGMENTAINER_RESIDUE_SOURCE.includes("atomicSample.concat(otherSample).slice(0, LIMIT)"));
   });
 
+  /**
+   * The reported column never contradicts its own documented meaning.
+   *
+   * The residue filter allows one pixel of slack for float rounding, so a box at exactly
+   * `origin + pitch - 1` is residue — while `floor((pitch - 1) / pitch)` is 0, and `column` is
+   * documented as 1-based with 0 never appearing. Without the clamp the report could say that
+   * content which IS off the page sits in column 0, which is the page itself.
+   */
+  it("clamps the reported column so it can never contradict the 1-based contract", () => {
+    assert.ok(FRAGMENTAINER_RESIDUE_SOURCE.includes("Math.max(1, Math.floor((box.x - origin) / pitch))"));
+  });
+
   it("names the count, the tags and the pages", () => {
     const detail = residueDetail(report());
     assert.match(detail, /3 element\(s\)/u);

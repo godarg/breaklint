@@ -150,7 +150,12 @@ const RESIDUE_TEMPLATE = `(() => {
       if (into.length < LIMIT) {
         into.push({
           page: index + 1,
-          column: Math.floor((box.x - origin) / pitch),
+          // Clamped, because the two expressions disagree at the boundary. The filter above allows
+          // one pixel of slack for float rounding, so a box at exactly origin + pitch - 1 counts as
+          // residue -- while floor((pitch - 1) / pitch) is 0, and this field is documented as
+          // 1-based with 0 never appearing. Reporting column 0 for content that IS off the page
+          // would contradict the type beside it.
+          column: Math.max(1, Math.floor((box.x - origin) / pitch)),
           tag: el.tagName,
           display: display,
           sourceId: P.attr(el, "data-bl-sid"),

@@ -347,11 +347,16 @@ export interface ComponentDelta {
  * per component would still scale with the seven.
  */
 export function componentDeltas(a: FreezeParts, b: FreezeParts, limit = 6): ComponentDelta[] {
+  // The collector builds each component with `array.join(";")`, so the empty string is ZERO
+  // entries, not one. `"".split(";")` returns `[""]`, which reported a component that went from
+  // nothing to something as "1 entr(ies)" against "40 entr(ies)" — an off-by-one in the only line
+  // a reader has to go on when the alignment is abandoned.
+  const entries = (value: string): string[] => (value === "" ? [] : value.split(";"));
   const out: ComponentDelta[] = [];
   for (const component of driftedComponents(a, b)) {
     if (out.length >= limit) break;
-    const before = a[component].split(";");
-    const after = b[component].split(";");
+    const before = entries(a[component]);
+    const after = entries(b[component]);
     if (before.length !== after.length) {
       out.push({
         component,

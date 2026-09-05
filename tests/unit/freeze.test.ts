@@ -242,6 +242,22 @@ describe("the freeze signature", () => {
       assert.deepEqual([...new Set(deltas.map((d) => d.component))], ["boxes"]);
     });
 
+    /**
+     * An empty component is ZERO entries, not one.
+     *
+     * The collector joins with `;`, so `""` is the empty list — but `"".split(";")` returns `[""]`,
+     * and the first version of this function therefore reported a component that went from nothing
+     * to forty entries as "1 entr(ies)" against "40 entr(ies)". That single line is the whole of
+     * what a reader gets when the alignment is abandoned, so an off-by-one in it is not cosmetic.
+     */
+    it("counts an empty component as zero entries, not one", () => {
+      const before = parts({ svgGeometry: "" });
+      const after = parts({ svgGeometry: "rect:1,1;rect:2,2" });
+      assert.deepEqual(componentDeltas(before, after), [
+        { component: "svgGeometry", index: -1, before: "0 entr(ies)", after: "2 entr(ies)" },
+      ]);
+    });
+
     it("is empty when nothing moved", () => {
       assert.deepEqual(componentDeltas(parts(), parts()), []);
     });

@@ -49,7 +49,12 @@ assert.ok(baselineRef && !baselineRef.startsWith("^"), "no commit adds src/measu
 
 const work = mkdtempSync(join(tmpdir(), "breaklint-residue-red-control-"));
 try {
-  execFileSync("sh", ["-c", `git archive ${baselineRef} | tar -x -C ${work}`], { cwd: ROOT });
+  // No shell. `baselineRef` can come from --baseline-ref, and interpolating it into `sh -c` would
+  // make a review tool a command-injection surface for anyone who can influence that argument. The
+  // archive is produced and consumed as bytes instead; 64 MiB is far above this repository and
+  // makes an unexpectedly large tree an explicit failure rather than a silent truncation.
+  const archive = execFileSync("git", ["archive", baselineRef], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 });
+  execFileSync("tar", ["-x", "-C", work], { input: archive, maxBuffer: 64 * 1024 * 1024 });
   symlinkSync(join(ROOT, "node_modules"), join(work, "node_modules"));
   execFileSync("npx", ["tsc", "-p", "tsconfig.build.json"], { cwd: work, stdio: "inherit" });
   const baselineCli = join(work, "dist/cli/index.js");
