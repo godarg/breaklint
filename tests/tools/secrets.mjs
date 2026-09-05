@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -29,12 +28,25 @@ assert.equal(worktree.status, 0, "gitleaks found a secret in the current worktre
 
 // A green scanner proves little until a secret makes it red. The canary is assembled only in a
 // private temporary directory, so no credential-shaped literal enters source or Git history.
+//
+// THE CANARY IS DETERMINISTIC AND ATTRIBUTED, AND BOTH HALVES OF THAT COST A RELEASE ONCE.
+// It used to plant `AKIA` + `randomBytes(8).toString("hex").toUpperCase()` beside a random base64
+// secret and assert only that SOMETHING was found in `canary.env`. Measured on the pinned 8.30.1
+// over 25 draws of exactly that shape: 24 red, and of those, 23 came from `generic-api-key` firing
+// on the random SECRET while `aws-access-token` fired once. An uppercase-hex body is digit-heavy —
+// ten of its sixteen symbols are digits — and this build of the AWS rule does not flag it. Swept
+// against digits-in-body over six draws each: 0 digits 6/6 caught, 1 digit 3/6, 5 digits 1/6,
+// 6 or more 0/6. So the check was passing on a different rule than the one it named, and failing
+// whenever the random secret happened to fall under the generic rule's own entropy floor — which
+// it did in 1 of 8 local runs and in the CI run that blocked release 0.4.0.
+//
+// Therefore: one letter-only key, fixed, assembled from parts so no complete token appears in this
+// file, and an assertion on the rule id. A canary whose outcome depends on dice measures the dice.
 const scratch = mkdtempSync(join(tmpdir(), "breaklint-gitleaks-canary-"));
 try {
   const reportPath = join(scratch, "findings.json");
-  const accessKey = `AKIA${randomBytes(8).toString("hex").toUpperCase()}`;
-  const secretKey = randomBytes(30).toString("base64").slice(0, 40);
-  writeFileSync(join(scratch, "canary.env"), `AWS_ACCESS_KEY_ID=${accessKey}\nAWS_SECRET_ACCESS_KEY=${secretKey}\n`);
+  const accessKey = ["AK", "IA", "ZBRMTQVLXKFWHNCD"].join("");
+  writeFileSync(join(scratch, "canary.env"), `AWS_ACCESS_KEY_ID=${accessKey}\n`);
   const canary = run(
     [
       "dir",
@@ -50,7 +62,14 @@ try {
   assert.equal(canary.status, 1, `gitleaks canary stayed green: ${canary.stdout}${canary.stderr}`);
   const findings = JSON.parse(readFileSync(reportPath, "utf8"));
   assert.ok(findings.length >= 1, "gitleaks returned red without recording the canary finding");
-  assert.ok(findings.some((finding) => String(finding.File).endsWith("canary.env")));
+  // The RULE, not merely the file. Asserting the file alone is what let a neighbouring rule stand
+  // in for the one this canary is about.
+  assert.ok(
+    findings.some(
+      (finding) => finding.RuleID === "aws-access-token" && String(finding.File).endsWith("canary.env"),
+    ),
+    `gitleaks did not attribute the canary to aws-access-token: ${JSON.stringify(findings.map((f) => f.RuleID))}`,
+  );
 
   // The project rule is independent of the default credential rules. A plausible account name
   // outside the tightly scoped redaction fixtures must therefore be caught by its own canary.
