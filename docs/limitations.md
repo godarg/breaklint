@@ -133,6 +133,34 @@ unmeasured candidate. Because the viewport rule is an error rule with a coverage
 one such target produces `insufficient-coverage` (exit 4), never a silent clean result or a guessed
 error. Full support belongs to the independent ink passes, not to an expansion guessed from style.
 
+*What this costs on a real document, measured.* The entrance that fires in practice is not `<use>`
+or a filter — it is the **halo**: `paint-order="stroke fill"` with the stroke set to the background
+colour, the standard way to keep a diagram label legible where it crosses a line. Over an
+eighteen-document reference set of illustrated chapters:
+
+| document | `<text>` candidates | measured | declined | trigger |
+| --- | --- | --- | --- | --- |
+| 03 | 30 | 30 | 0 | — |
+| 05 | 24 | 24 | 0 | — |
+| 09 | 23 | 20 | 3 | 3 haloed labels |
+| 02 | 45 | 30 | 15 | 15 haloed labels |
+| 07 | 27 | 10 | 17 | 17 haloed labels |
+
+Read the first two rows before the last three: inline SVG text is **not** structurally unmeasurable
+here, and a document whose labels carry no visible stroke measures at coverage 1. What is
+unmeasurable is a `<text>` that paints a stroke, because `getBBox()` returns the fill outline and
+the tool refuses to judge an overflow against a box that describes different ink. Three haloed
+labels are enough to take an error rule with a floor of 1 to exit 4, which is why one such figure
+reads in the report as though the whole class had failed.
+
+The named next step is not the ink pass. A stroke centred on the glyph outline gives a **two-sided
+bound** for nothing but the stroke width: the fill box is a lower bound on the painted box and the
+fill box inflated by `stroke-width / 2` is an upper bound. A target whose lower bound already
+leaves the viewport overflows for certain; one whose upper bound is still inside it does not
+overflow for certain; only the band between them stays undecidable. On the corpus above the halo
+strokes are 2–4 px against overshoots that matter at ten times that, so almost all 35 declined
+targets are decidable without an ink pass at all. This is a named gap, not a design position.
+
 **Nontrivial viewport boxes are detected but not reconstructed.** `getBoundingClientRect` is the
 border box and becomes only an axis-aligned envelope under rotation or skew. An SVG root with
 border, padding, rounded clipping or a nonzero overflow clip margin therefore declines, as does an
@@ -146,6 +174,32 @@ behind any of the thirteen released numbers. The fixtures show that each rule do
 show that what it says is the right thing to say about your document. That is the difference between
 a verified implementation and a validated one, and only the first is claimed. `calibrated: false`
 travels in the type, in every finding and on every rule page for that reason.
+
+**A document whose paginator could not place its content is not measured at all.** Paged.js
+fragments a page by making `.pagedjs_page_content` a multi-column container whose pitch is the
+content width plus a gap of `margins + bleed + 1000px`. What it fails to move onto a new page stays
+in the second column, one pitch to the right, invisible behind an `overflow: hidden` sheet. Where
+that content is a table box, `page.pdf()` — which renders in print media, with a re-sized
+fragmentainer — puts it somewhere else and leaves it there, so the PDF does not reproduce the
+geometry the rules measured. The run ends in exit 3 with `render-unstable`, and the event names the
+elements, their source ids, the pages and the column pitch. It is not a rule finding and cannot
+become one: nothing about the pages that DID lay out is reported, because the state they were
+measured in was withdrawn.
+
+Measured over eighteen chapters of one shipped HTML bundle: 6 of 6 documents with table residue in
+an overflow column could not be measured, 12 of 12 without it could. Two of those twelve carried
+residue of other kinds — one `<p>`, one `<em>` — and measured cleanly, because ordinary block
+content re-fragments to the same boxes. Nothing exotic produces this: no `@page`, no print
+stylesheet, no `break-inside` and no script are needed, only a table that crosses a page boundary.
+
+The six documents are recorded, not published. They are chapters of a paid product, and this
+repository is public and MIT, so `corpus/public/pagination-residue-v1` keeps their SHA-256 values,
+rights and privacy review and exact expected residue while their bytes stay outside it —
+the `private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. Without
+`BREAKLINT_RESIDUE_CORPUS_ROOT` the gate says `SKIPPED` and claims nothing about them. What holds
+this class in CI is the public `tests/fixtures/fragmentainer-residue.html`, reduced from one of the
+six until no product text remained; the reduction is itself the measurement that nothing exotic is
+required.
 
 **Rendering is not reproducible across machines.** Browser rendering varies with the host operating
 system, browser version, settings, hardware and headless mode. PNG output here is evidence, never a

@@ -48,6 +48,7 @@ npm run schema:check
 npm test
 npm run test:mutants
 npm run test:real-document
+npm run test:pagination-residue          # SKIPPED without BREAKLINT_RESIDUE_CORPUS_ROOT; see below
 npm run test:licenses
 BREAKLINT_LIVE_REPORT=.tmp/live-report.json BREAKLINT_LIVE_SUMMARY=.tmp/live-summary.json npm run test:live
 npm run test:documented-figures
@@ -68,6 +69,29 @@ sample. Its one-time red condition is preserved in
 registry package and running
 `BREAKLINT_023_CLI=<0.2.3-package>/dist/cli/index.js npm run test:real-document:red-control` against
 the exact same third-party bytes. It is historical evidence, not a network-dependent release step.
+
+The pagination-residue record is the negative half of the same property: six real documents that
+must NOT measure, and must say why — which elements a paginator left in an overflow column, on which
+pages, and by how far. Their bytes are **not in this repository**: they are chapters of a paid
+product, 27 492 of that bundle's 69 017 words, and this repository is public and MIT. What is public
+is a hash-only record in the shape `docs/validation/corpus-contract-v1.md` defines for
+`private_nonredistributable` material, and the gate says `SKIPPED` rather than claiming a
+verification it did not perform. The class itself is held in CI by the public
+`tests/fixtures/fragmentainer-residue.html`, which carries no product text.
+
+Before a release, run the full gate once against the admitted bundle and read the six lines it
+prints:
+
+```bash
+BREAKLINT_RESIDUE_CORPUS_ROOT=<unpacked-bundle> npm run test:pagination-residue
+BREAKLINT_RESIDUE_CORPUS_ROOT=<unpacked-bundle> npm run test:pagination-residue:red-control
+```
+
+The red condition is not historical but re-derivable: the red control builds the parent of the
+commit that introduced `src/measure/fragmentainer.ts` and asserts that both cases were already fatal
+there and named no cause. Without the artifact root it still proves red-to-green on the public
+fixture and skips the corpus case by name. It is a local gate rather than a CI step because it
+compiles a second tree.
 
 Then verify:
 

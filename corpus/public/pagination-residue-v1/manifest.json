@@ -1,0 +1,189 @@
+{
+  "contractVersion": "pagination-residue-corpus-v2",
+  "purpose": "Documents that a paginator left content in a fragmentainer overflow column. Acquisition robustness only; never calibration and never external trust evidence.",
+  "calibrationEvidenceEligible": false,
+  "externalTrustRootClaimed": false,
+  "artifactsInRepository": false,
+  "artifactRootEnvironmentVariable": "BREAKLINT_RESIDUE_CORPUS_ROOT",
+  "sharedResources": [
+    {
+      "externalArtifact": "styles.css",
+      "sha256": "d4485454b282d4e5235dedf752ed32fa60806ff66441a3e6795a5bf6cea98aff"
+    }
+  ],
+  "whyTheBytesAreNotHere": "The six documents are chapters of a paid product; together they are 27 492 of the bundle's 69 017 words. This repository is public and MIT, and the product's own licence architecture keeps delivered bytes out of its public companion repository. A hash-only record documents that the class was measured on real documents without pretending that an unavailable artifact was verified \u2014 the shape docs/validation/corpus-contract-v1.md defines for private_nonredistributable material.",
+  "whatThisCorpusIsAbout": "Paged.js fragments a page by making .pagedjs_page_content a multi-column container whose column pitch is the content width plus a gap of margins + 1000px. Content it fails to move onto a new page stays in the second column, one pitch to the right, clipped out of sight by an overflow:hidden sheet. Where that content is an unsplittable table box, the print-media layout page.pdf() renders places it somewhere else, permanently \u2014 so the PDF does not reproduce the geometry the rules measured, and the run must end in exit 3 with the cause named. Measured over the eighteen chapters this bundle ships: 6 of 6 documents carrying table-display residue could not be measured, 12 of 12 without it could, and two of those twelve carried residue of other kinds and measured cleanly.",
+  "publicSubstitute": "tests/fixtures/fragmentainer-residue.html, reduced from the index document below. It carries no product text, reproduces the class, and is the gate CI actually runs.",
+  "documents": [
+    {
+      "id": "index",
+      "artifact": null,
+      "externalArtifact": "index.html",
+      "sourceEvidence": "source-evidence/source-index.json",
+      "sha256": "e98b2e92b060475b749cf5c7e14f931d90bcaa18552f56a1ee739ece1a82d621",
+      "byteLength": 14738,
+      "sourceClass": "private-first-party-nonredistributable",
+      "rightsBasis": "first-party-founder-authorized-evaluation-only",
+      "expected": {
+        "exitCode": 3,
+        "runVerdict": "infrastructure",
+        "exitReason": "render-unstable",
+        "infrastructureKinds": [
+          "render-unstable"
+        ],
+        "fragmentainerResidue": {
+          "pages": [
+            2
+          ],
+          "count": 3,
+          "atomicCount": 3,
+          "pitchPx": 1816
+        }
+      }
+    },
+    {
+      "id": "appendix",
+      "artifact": null,
+      "externalArtifact": "appendix.html",
+      "sourceEvidence": "source-evidence/source-appendix.json",
+      "sha256": "d103813373fa0f141bd83a65d74d828a917eccd4543c0696b222a7a2cfd3a00c",
+      "byteLength": 23044,
+      "sourceClass": "private-first-party-nonredistributable",
+      "rightsBasis": "first-party-founder-authorized-evaluation-only",
+      "expected": {
+        "exitCode": 3,
+        "runVerdict": "infrastructure",
+        "exitReason": "render-unstable",
+        "infrastructureKinds": [
+          "render-unstable"
+        ],
+        "fragmentainerResidue": {
+          "pages": [
+            5
+          ],
+          "count": 8,
+          "atomicCount": 4,
+          "pitchPx": 1816
+        }
+      }
+    },
+    {
+      "id": "chapter-04-state-that-survives",
+      "artifact": null,
+      "externalArtifact": "04-state-that-survives.html",
+      "sourceEvidence": "source-evidence/source-chapter-04-state-that-survives.json",
+      "sha256": "980683bd904ed70f1427d19fd5804d036215d9b193a1e72a0359abf029c05a58",
+      "byteLength": 35523,
+      "sourceClass": "private-first-party-nonredistributable",
+      "rightsBasis": "first-party-founder-authorized-evaluation-only",
+      "expected": {
+        "exitCode": 3,
+        "runVerdict": "infrastructure",
+        "exitReason": "render-unstable",
+        "infrastructureKinds": [
+          "render-unstable"
+        ],
+        "fragmentainerResidue": {
+          "pages": [
+            2,
+            7,
+            10
+          ],
+          "count": 13,
+          "atomicCount": 4,
+          "pitchPx": 1816
+        }
+      }
+    },
+    {
+      "id": "chapter-06-the-gate-is-not-the-answer",
+      "artifact": null,
+      "externalArtifact": "06-the-gate-is-not-the-answer.html",
+      "sourceEvidence": "source-evidence/source-chapter-06-the-gate-is-not-the-answer.json",
+      "sha256": "6a1f870091a0ad26c35ce5e4b6bc6760a88e058f5ebaa3e251c2da2b7bc99b54",
+      "byteLength": 98073,
+      "sourceClass": "private-first-party-nonredistributable",
+      "rightsBasis": "first-party-founder-authorized-evaluation-only",
+      "expected": {
+        "exitCode": 3,
+        "runVerdict": "infrastructure",
+        "exitReason": "render-unstable",
+        "infrastructureKinds": [
+          "render-unstable"
+        ],
+        "fragmentainerResidue": {
+          "pages": [
+            3,
+            8,
+            10,
+            19,
+            30,
+            38
+          ],
+          "count": 13,
+          "atomicCount": 5,
+          "pitchPx": 1816
+        }
+      }
+    },
+    {
+      "id": "chapter-10-monitoring-and-steering",
+      "artifact": null,
+      "externalArtifact": "10-monitoring-and-steering.html",
+      "sourceEvidence": "source-evidence/source-chapter-10-monitoring-and-steering.json",
+      "sha256": "23569e1cf8af25c672d11cf102cb25eec55fcc879f99c89628481eaec45a6153",
+      "byteLength": 55881,
+      "sourceClass": "private-first-party-nonredistributable",
+      "rightsBasis": "first-party-founder-authorized-evaluation-only",
+      "expected": {
+        "exitCode": 3,
+        "runVerdict": "infrastructure",
+        "exitReason": "render-unstable",
+        "infrastructureKinds": [
+          "render-unstable"
+        ],
+        "fragmentainerResidue": {
+          "pages": [
+            13,
+            16
+          ],
+          "count": 6,
+          "atomicCount": 6,
+          "pitchPx": 1816
+        }
+      }
+    },
+    {
+      "id": "chapter-11-the-record",
+      "artifact": null,
+      "externalArtifact": "11-the-record.html",
+      "sourceEvidence": "source-evidence/source-chapter-11-the-record.json",
+      "sha256": "1ccbd832c050a85e2afbe37eac054b794ecc8a083ffe1cf5ccfc7b4aff769cb2",
+      "byteLength": 60676,
+      "sourceClass": "private-first-party-nonredistributable",
+      "rightsBasis": "first-party-founder-authorized-evaluation-only",
+      "expected": {
+        "exitCode": 3,
+        "runVerdict": "infrastructure",
+        "exitReason": "render-unstable",
+        "infrastructureKinds": [
+          "render-unstable"
+        ],
+        "fragmentainerResidue": {
+          "pages": [
+            3,
+            8,
+            10,
+            11,
+            17,
+            18,
+            22
+          ],
+          "count": 156,
+          "atomicCount": 82,
+          "pitchPx": 1816
+        }
+      }
+    }
+  ]
+}

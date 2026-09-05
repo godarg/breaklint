@@ -1,0 +1,48 @@
+{
+  "contractVersion": "pagination-residue-red-control-v2",
+  "recordedOn": "2026-09-05",
+  "baseline": "the source tree at c5061aa (released 0.3.1 behaviour), built with the same toolchain",
+  "whatThisRecords": "What the two gates said about content Paged.js could not place, BEFORE the cause was named. Kept as evidence because a fix whose red condition is not written down cannot be shown to have fixed anything: both entries below carry a fatal verdict and no cause a reader could act on. The first case is a public fixture and proves red-to-green on its own; the second is a chapter of a paid product, is not in this repository, and is only re-runnable with BREAKLINT_RESIDUE_CORPUS_ROOT.",
+  "cases": [
+    {
+      "document": "tests/fixtures/fragmentainer-residue.html",
+      "sha256": "e1a54282ec0bd67681815e3aae7dc93e9ef2ebb6fd09a37f9b8dfcecbca59e42",
+      "exitCode": 3,
+      "runVerdict": "infrastructure",
+      "exitReason": "geometry-cross-check-failed",
+      "infrastructureKinds": [
+        "geometry-cross-check-failed"
+      ],
+      "detail": "the in-page probe and the browser's layout tree disagree about 6 measurement(s) of 8 element(s) sampled, by up to 1816.0000 px against a tolerance of 0.05 px. Every number in the report comes from the probe, so the report is not written.",
+      "measuredKeys": [
+        "candidates",
+        "checked",
+        "eligible",
+        "excludedInlineBlockContainers",
+        "excludedSvgDescendants",
+        "maxDeltaPx",
+        "required",
+        "tolerancePx",
+        "worst"
+      ],
+      "namedCause": false,
+      "artifactRoot": "repository"
+    },
+    {
+      "document": "index.html",
+      "sha256": "e98b2e92b060475b749cf5c7e14f931d90bcaa18552f56a1ee739ece1a82d621",
+      "exitCode": 3,
+      "runVerdict": "infrastructure",
+      "exitReason": "checker-crashed",
+      "infrastructureKinds": [
+        "checker-crashed"
+      ],
+      "detail": "live acquisition failed at the browser/driver boundary: baseline PDF changed the measured state: {\"freezeChanged\":true,\"mutationDelta\":0,\"sidMutationDelta\":0,\"sidIssues\":[],\"pageErrors\":[],\"networkActivity\":0,\"inFlight\":0,\"pendingBodies\":0}",
+      "measuredKeys": [
+        "stage"
+      ],
+      "namedCause": false,
+      "artifactRoot": "external"
+    }
+  ]
+}

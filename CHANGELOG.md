@@ -1,5 +1,63 @@
 # Changelog
 
+## Unreleased
+
+### Content a paginator could not place is now named, not reported as a crash
+
+The first run against a corpus that was not this repository's own: eighteen chapters of a shipped
+HTML bundle. Twelve measured. Six ended `exit 3`, `checker-crashed`, with the payload
+`{"freezeChanged":true,"mutationDelta":0,"sidMutationDelta":0,"sidIssues":[],"pageErrors":[],
+"networkActivity":0,"inFlight":0,"pendingBodies":0}` — a fatal verdict with no cause a reader could
+act on, and no fixture in this repository had ever produced it.
+
+- **Measured what the six had that the twelve did not.** Not size, not inline script, not generated
+  content, not duplicate ids, not the number of tables. Paged.js fragments a page by making
+  `.pagedjs_page_content` a multi-column container whose pitch is the content width plus a gap of
+  `margins + bleed + 1000px` — 1816 px on this corpus. Content it fails to move onto a new page
+  stays in the second column, one pitch to the right, clipped out of sight by an `overflow: hidden`
+  sheet. **6 of 6** failing documents had at least one page carrying a TABLE box there; **0 of 12**
+  passing documents did. Two of the twelve carried residue of other kinds — a `<p>`, an `<em>` — and
+  measured cleanly, which is why residue alone is reported and not made fatal on its own.
+- **Why a table.** `page.pdf()` renders in print media, where Paged.js's own stylesheet re-sizes
+  `.pagedjs_page` and `.pagedjs_sheet` to `height: 100%`. The fragmentainer height changes and the
+  overflow column is re-fragmented. Ordinary block content reproduces its boxes; a table row cannot
+  be split, so it moves back into the first column — and it stays moved. Sampled four times at
+  300 ms after the PDF, the layout never returned to its pre-PDF state.
+- The PDF reconciliation now reports `render-unstable` rather than an anonymous `checker-crashed`.
+  Nothing crashed: the PDF does not reproduce the geometry the rules measured, which is the same
+  statement `evidence.ts` already makes about a divergent mark page. The event names the freeze
+  components that moved, the individual box entries with both values, and the residual elements with
+  their source ids, pages and the column pitch.
+- The geometry cross-check names the same cause. Measured on a reduced document: the in-page probe
+  and CDP's layout tree disagreed by exactly one pitch, 1816.0000 px against a 0.05 px tolerance,
+  and the sentence told the reader that this tool's own probe could not be trusted. It could.
+- Added `tests/fixtures/fragmentainer-residue.html`, reduced from one of the six until no product
+  text remained: no `@page`, no print stylesheet, no `break-inside`, no script — a default-letter
+  page, a 68ch measure and a table that crosses a page boundary. That reduction is itself the
+  measurement that nothing exotic is required, and it is what holds this class in CI.
+- Added `corpus/public/pagination-residue-v1` as a **hash-only record**. The six documents are
+  chapters of a paid product — 27 492 of that bundle's 69 017 words — and this repository is public
+  and MIT, so their SHA-256 values, byte lengths, rights and privacy review and exact expected
+  residue are public while their bytes are not. This is the `private_nonredistributable` shape
+  `docs/validation/corpus-contract-v1.md` already defines: *"a hash-only public record documents
+  existence without pretending that an unavailable artifact was verified."* Without
+  `BREAKLINT_RESIDUE_CORPUS_ROOT` the gate prints `SKIPPED`, says how many documents it did not
+  read, and makes no success claim; with it, nothing is softened — every admitted byte is hashed
+  before Chrome starts and the per-document residue pages, counts and pitch are compared exactly.
+
+### Named, with numbers: what a haloed SVG label costs
+
+`env/svg-painted-bounds-unsupported` reads as an environment limit and is not one.
+`docs/limitations.md` now carries the measurement: over the same eighteen documents, two chapters
+measured 30/30 and 24/24 SVG `<text>` targets at coverage 1, while three declined 15, 17 and 3 —
+exactly their count of `<text paint-order="stroke fill" stroke="var(--bg)">`, the ordinary halo that
+keeps a diagram label legible over a line. `getBBox()` returns the fill outline, so the tool refuses
+to judge an overflow against a box that describes different ink. The named next step is written down
+too: the fill box and the fill box inflated by `stroke-width / 2` are a sound two-sided bound, and on
+that corpus the halos are 2–4 px, so almost all 35 declined targets are decidable without an ink
+pass.
+
+
 ## 0.3.1 — 2026-08-30
 
 The first `v0.3.0` tag run stopped before publication: both clean consumers installed the optional

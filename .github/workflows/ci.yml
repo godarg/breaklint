@@ -105,6 +105,16 @@ jobs:
           npm run build
           npm run test:real-document
 
+      - name: pagination-residue corpus record
+        # The negative half of the same property: six real documents that must NOT measure, and
+        # must say why. Their bytes are a paid product and are NOT in this repository, so here this
+        # step only checks that the hash-only record is internally consistent and then reports
+        # SKIPPED. It makes no success claim about the six. What actually holds the class in CI is
+        # tests/fixtures/fragmentainer-residue.html in the live suite above, which is public and
+        # carries no product text. Supplying BREAKLINT_RESIDUE_CORPUS_ROOT on a private runner
+        # turns this step into the full gate without changing anything else.
+        run: npm run test:pagination-residue
+
       - name: technical report-surface matrix
         # Linux verifies all 32 current cells, including decoded-pixel, semantic, accessibility
         # and print integrity. The historical human ledger is deliberately not restamped by CI;
