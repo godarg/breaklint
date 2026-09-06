@@ -1,7 +1,7 @@
 {
   "contractVersion": "pagination-residue-source-evidence-v2",
   "evidenceId": "source_evidence_chapter_06_the_gate_is_not_the_answer_0001",
-  "reviewDate": "2026-09-05",
+  "reviewDate": "2026-09-06",
   "sourceLocator": "Dargel Solutions product 08, HTML bundle Nobody-Opens-a-Passing-Check-2026.zip",
   "sourceClass": "private-first-party-nonredistributable",
   "rightsBasis": "first-party-founder-authorized-evaluation-only",
@@ -17,10 +17,10 @@
     "externalArtifact": "06-the-gate-is-not-the-answer.html",
     "artifactRootEnvironmentVariable": "BREAKLINT_RESIDUE_CORPUS_ROOT",
     "mediaType": "text/html",
-    "sha256": "6a1f870091a0ad26c35ce5e4b6bc6760a88e058f5ebaa3e251c2da2b7bc99b54",
-    "byteLength": 98073,
+    "sha256": "3bf65d3a9edb4104dcb2d6cce06d62d24a25989992998f5cc8ca92d50da933d7",
+    "byteLength": 98063,
     "transformation": "none; the shipped bundle byte-for-byte. The shared stylesheet is read from the same artifact root as styles.css.",
-    "captureDate": "2026-09-05"
+    "captureDate": "2026-09-06"
   },
   "privacyReview": {
     "class": "reviewed-first-party-no-third-party-personal-data",

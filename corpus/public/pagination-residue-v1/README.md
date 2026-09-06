@@ -13,17 +13,31 @@ laid out somewhere else there and stays moved. The PDF then does not reproduce t
 rules measured, so the state is withdrawn and the run ends in exit 3 — `render-unstable`, with the
 elements, their source ids, the pages and the pitch named.
 
-Measured over the eighteen chapters of the bundle these six came from: **6 of 6** documents with
-table residue could not be measured, **0 of 12** without it failed. Two of the twelve carried
-residue of other kinds — one `<p>`, one `<em>` — and measured cleanly, because ordinary block
-content re-fragments to the same boxes.
+Measured over the eighteen chapters of the bundle these six came from, twice — on the 2026-09-05
+bytes and again on the 2026-09-06 rebuild that changed five of the six documents. Both times:
+**6 of 6** documents carrying table residue ended in exit 3 with `render-unstable`, and **0 of the
+remaining 12** did. Two of those twelve carry residue of other kinds — one `<p>` in
+`08-gates-caps-stop-conditions`, one `<span>` and one `<em>` in `12-four-times-wrong` — and
+produced a report, because ordinary block and inline content re-fragments to the same boxes.
+
+Twelve is a small number, and the run behind it is one bundle, one Paged.js build and one Chrome.
+The split is what was measured, not a law that has been shown to hold elsewhere.
+
+**Those two documents also say nothing about their residue.** Residue reaches the report only
+through the fatal event, so a document that carries it and still reconciles ends in exit 0 with no
+mention of the content the paginator left off the page. That is a known gap in this build, not a
+statement that the two documents are clean.
 
 ## Why the bytes are not here
 
-They are chapters of a paid product. Together they are 27 492 of that bundle's 69 017 words, and
-this repository is public and MIT-licensed. The product's own licence architecture deliberately
-keeps delivered bytes out of its public companion repository; copying 39.8 % of its running text
-into an MIT repository would cut straight across that, and a public Git history is not revocable.
+They are chapters of a paid product. Together they are 26 434 of that bundle's 66 336 running
+words — 39.8 % — counted over the `<main>` element of all eighteen shipped HTML documents with
+markup, script and entities removed, on the bytes recorded below. (The 0.4.0 record carried
+27 492 of 69 017 from the product's own count; the share is the same to one decimal, and the pair
+above is the one this repository can re-derive.) This repository is public and MIT-licensed. The
+product's own licence architecture deliberately keeps delivered bytes out of its public companion
+repository; copying 39.8 % of its running text into an MIT repository would cut straight across
+that, and a public Git history is not revocable.
 
 `docs/validation/corpus-contract-v1.md` already defines the shape for this: a redacted public
 record keeps the artifact path null and is therefore ineligible on its own, while an authorised
@@ -52,7 +66,10 @@ BREAKLINT_RESIDUE_CORPUS_ROOT=/path/to/unpacked-bundle npm run test:pagination-r
 
 The directory must contain the six documents named in `manifest.json[].externalArtifact` and the
 shared `styles.css`, at the top level. Every file is checked against its recorded SHA-256 before
-Chrome starts; a byte that drifted is a red gate, not a re-recorded expectation.
+Chrome starts, and **all** mismatches are named in one message; a byte that drifted is a red gate,
+not a re-recorded expectation. (The gate used to stop at the first drifted digest. On the
+2026-09-06 rebuild five of the six had drifted and it reported one, leaving the other four to be
+re-derived by hand.)
 
 The red control works the same way. Without a root it proves red-to-green on the public fixture
 alone, which is sufficient:

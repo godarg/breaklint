@@ -1,7 +1,7 @@
 {
   "contractVersion": "pagination-residue-source-evidence-v2",
   "evidenceId": "source_evidence_chapter_10_monitoring_and_steering_0001",
-  "reviewDate": "2026-09-05",
+  "reviewDate": "2026-09-06",
   "sourceLocator": "Dargel Solutions product 08, HTML bundle Nobody-Opens-a-Passing-Check-2026.zip",
   "sourceClass": "private-first-party-nonredistributable",
   "rightsBasis": "first-party-founder-authorized-evaluation-only",
@@ -20,7 +20,7 @@
     "sha256": "23569e1cf8af25c672d11cf102cb25eec55fcc879f99c89628481eaec45a6153",
     "byteLength": 55881,
     "transformation": "none; the shipped bundle byte-for-byte. The shared stylesheet is read from the same artifact root as styles.css.",
-    "captureDate": "2026-09-05"
+    "captureDate": "2026-09-06"
   },
   "privacyReview": {
     "class": "reviewed-first-party-no-third-party-personal-data",

@@ -94,11 +94,38 @@ if (!artifactRoot) {
 const artifacts = resolve(artifactRoot);
 assert.ok(existsSync(artifacts) && statSync(artifacts).isDirectory(),
   `${manifest.artifactRootEnvironmentVariable} is not a directory: ${artifacts}`);
+// EVERY admitted byte is checked BEFORE any of them is run, and every mismatch is named in one
+// message. The per-document assert this replaces stopped at the first drifted digest: when the
+// product bundle was rebuilt on 2026-09-06, five of the six documents had drifted and the gate
+// reported one, which made the operator re-derive the other four by hand. A gate that knows the
+// answer and prints a sixth of it is a diagnostic defect, not a stricter gate.
+const drift = [];
 for (const resource of manifest.sharedResources) {
   const path = join(artifacts, resource.externalArtifact);
-  assert.ok(existsSync(path), `shared resource missing from the artifact root: ${resource.externalArtifact}`);
-  assert.equal(sha256(path), resource.sha256, `${resource.externalArtifact}: admitted bytes drifted`);
+  if (!existsSync(path)) { drift.push(`${resource.externalArtifact}: missing from the artifact root`); continue; }
+  const actual = sha256(path);
+  if (actual !== resource.sha256) {
+    drift.push(`${resource.externalArtifact}: sha256 ${actual}, recorded ${resource.sha256}`);
+  }
 }
+for (const entry of manifest.documents) {
+  const path = join(artifacts, entry.externalArtifact);
+  if (!existsSync(path)) { drift.push(`${entry.id}: not in the artifact root as ${entry.externalArtifact}`); continue; }
+  const actual = sha256(path);
+  const size = statSync(path).size;
+  if (actual !== entry.sha256) {
+    drift.push(`${entry.id} (${entry.externalArtifact}): sha256 ${actual} (${size} bytes), ` +
+      `recorded ${entry.sha256} (${entry.byteLength} bytes)`);
+  } else if (size !== entry.byteLength) {
+    drift.push(`${entry.id} (${entry.externalArtifact}): size ${size}, recorded ${entry.byteLength}`);
+  }
+}
+assert.equal(
+  drift.length,
+  0,
+  `admitted bytes drifted in ${drift.length} of ${manifest.documents.length + manifest.sharedResources.length} ` +
+  `artifact(s); a byte that drifted is a red gate, not a re-recorded expectation:\n  ${drift.join("\n  ")}`,
+);
 
 assert.ok(process.argv.includes("--cwd"), "--cwd is required; the CLI must not inherit this gate's checkout");
 const cli = resolve(argument("--cli") ?? join(ROOT, "dist/cli/index.js"));
@@ -108,10 +135,8 @@ const temporary = mkdtempSync(join(tmpdir(), "breaklint-pagination-residue-gate-
 
 try {
   for (const entry of manifest.documents) {
+    // Existence, digest and size were all settled by the pre-pass above.
     const document = join(artifacts, entry.externalArtifact);
-    assert.ok(existsSync(document), `${entry.id}: not in the artifact root as ${entry.externalArtifact}`);
-    assert.equal(sha256(document), entry.sha256, `${entry.id}: admitted bytes drifted`);
-    assert.equal(statSync(document).size, entry.byteLength, `${entry.id}: admitted size drifted`);
 
     const reportPath = join(temporary, `${entry.id}.json`);
     const run = spawnSync(process.execPath, [cli, "--format", "json", "--out", reportPath, document], {

@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### The residue corpus record was re-measured on rebuilt product bytes
+
+- The admitted bundle was rebuilt on 2026-09-06. **Five of the six** documents drifted, not the
+  three the operator expected: `index` (14 738 → 14 823 bytes), `appendix` (23 044 → 23 349),
+  `04-state-that-survives` (35 523 → 35 580), `06-the-gate-is-not-the-answer` (98 073 → 98 063) and
+  `11-the-record` (60 676 → 60 698). `10-monitoring-and-steering` and the shared `styles.css` are
+  unchanged.
+- Re-measured expectations: `index` gained a residue page (`[2]` → `[2, 4]`, 3 → 4 elements) and
+  `04-state-that-survives` lost one (`[2, 7, 10]` → `[2, 10]`, 13 → 12). The other four are
+  identical. **No document became clean, so none leaves the corpus**, and the split it records held
+  a second time: 6 of 6 with table residue ended in exit 3 `render-unstable`, 0 of the other 12 did.
+- **The gate now names every drifted artifact at once.** It stopped at the first mismatch, so this
+  rebuild reported one drifted digest out of five and left the other four to be re-derived by hand.
+  All digests and sizes are checked in a pre-pass before Chrome starts.
+- The word figures in the record are now ones this repository can re-derive: 26 434 of 66 336
+  running words, counted over `<main>` of all eighteen shipped documents with markup, script and
+  entities removed. The 0.4.0 record carried 27 492 of 69 017 from the product's own count; the
+  share is 39.8 % either way.
+
 ## 0.4.0 — 2026-09-05
 
 A minor rather than a patch for one reason: on a document whose paginator left unplaceable

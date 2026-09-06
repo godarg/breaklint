@@ -1,7 +1,7 @@
 {
   "contractVersion": "pagination-residue-source-evidence-v2",
   "evidenceId": "source_evidence_index_0001",
-  "reviewDate": "2026-09-05",
+  "reviewDate": "2026-09-06",
   "sourceLocator": "Dargel Solutions product 08, HTML bundle Nobody-Opens-a-Passing-Check-2026.zip",
   "sourceClass": "private-first-party-nonredistributable",
   "rightsBasis": "first-party-founder-authorized-evaluation-only",
@@ -17,10 +17,10 @@
     "externalArtifact": "index.html",
     "artifactRootEnvironmentVariable": "BREAKLINT_RESIDUE_CORPUS_ROOT",
     "mediaType": "text/html",
-    "sha256": "e98b2e92b060475b749cf5c7e14f931d90bcaa18552f56a1ee739ece1a82d621",
-    "byteLength": 14738,
+    "sha256": "8836f96c1be87bb46777afde6c963ed472774b324914d2aa62d43ce08c01eadf",
+    "byteLength": 14823,
     "transformation": "none; the shipped bundle byte-for-byte. The shared stylesheet is read from the same artifact root as styles.css.",
-    "captureDate": "2026-09-05"
+    "captureDate": "2026-09-06"
   },
   "privacyReview": {
     "class": "reviewed-first-party-no-third-party-personal-data",

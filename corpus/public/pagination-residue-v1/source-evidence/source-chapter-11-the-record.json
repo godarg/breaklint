@@ -1,7 +1,7 @@
 {
   "contractVersion": "pagination-residue-source-evidence-v2",
   "evidenceId": "source_evidence_chapter_11_the_record_0001",
-  "reviewDate": "2026-09-05",
+  "reviewDate": "2026-09-06",
   "sourceLocator": "Dargel Solutions product 08, HTML bundle Nobody-Opens-a-Passing-Check-2026.zip",
   "sourceClass": "private-first-party-nonredistributable",
   "rightsBasis": "first-party-founder-authorized-evaluation-only",
@@ -17,10 +17,10 @@
     "externalArtifact": "11-the-record.html",
     "artifactRootEnvironmentVariable": "BREAKLINT_RESIDUE_CORPUS_ROOT",
     "mediaType": "text/html",
-    "sha256": "1ccbd832c050a85e2afbe37eac054b794ecc8a083ffe1cf5ccfc7b4aff769cb2",
-    "byteLength": 60676,
+    "sha256": "00a0b371af26da7a38d7b6ad508bc8b02a259b838d2b4b5a2c95a0fd851251d8",
+    "byteLength": 60698,
     "transformation": "none; the shipped bundle byte-for-byte. The shared stylesheet is read from the same artifact root as styles.css.",
-    "captureDate": "2026-09-05"
+    "captureDate": "2026-09-06"
   },
   "privacyReview": {
     "class": "reviewed-first-party-no-third-party-personal-data",

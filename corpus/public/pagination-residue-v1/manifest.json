@@ -11,8 +11,8 @@
       "sha256": "d4485454b282d4e5235dedf752ed32fa60806ff66441a3e6795a5bf6cea98aff"
     }
   ],
-  "whyTheBytesAreNotHere": "The six documents are chapters of a paid product; together they are 27 492 of the bundle's 69 017 words. This repository is public and MIT, and the product's own licence architecture keeps delivered bytes out of its public companion repository. A hash-only record documents that the class was measured on real documents without pretending that an unavailable artifact was verified \u2014 the shape docs/validation/corpus-contract-v1.md defines for private_nonredistributable material.",
-  "whatThisCorpusIsAbout": "Paged.js fragments a page by making .pagedjs_page_content a multi-column container whose column pitch is the content width plus a gap of margins + 1000px. Content it fails to move onto a new page stays in the second column, one pitch to the right, clipped out of sight by an overflow:hidden sheet. Where that content is an unsplittable table box, the print-media layout page.pdf() renders places it somewhere else, permanently \u2014 so the PDF does not reproduce the geometry the rules measured, and the run must end in exit 3 with the cause named. Measured over the eighteen chapters this bundle ships: 6 of 6 documents carrying table-display residue could not be measured, 12 of 12 without it could, and two of those twelve carried residue of other kinds and measured cleanly.",
+  "whyTheBytesAreNotHere": "The six documents are chapters of a paid product; together they are 26 434 of the bundle's 66 336 running words — 39.8 % — counted over the <main> element of all eighteen shipped HTML documents with markup, script and entities removed, on the bytes recorded here. This repository is public and MIT, and the product's own licence architecture keeps delivered bytes out of its public companion repository. A hash-only record documents that the class was measured on real documents without pretending that an unavailable artifact was verified — the shape docs/validation/corpus-contract-v1.md defines for private_nonredistributable material.",
+  "whatThisCorpusIsAbout": "Paged.js fragments a page by making .pagedjs_page_content a multi-column container whose column pitch is the content width plus a gap of margins + 1000px. Content it fails to move onto a new page stays in the second column, one pitch to the right, clipped out of sight by an overflow:hidden sheet. Where that content is an unsplittable table box, the print-media layout page.pdf() renders places it somewhere else, permanently — so the PDF does not reproduce the geometry the rules measured, and the run must end in exit 3 with the cause named. Measured over the eighteen chapters this bundle ships, twice: on the 2026-09-05 bytes and again on the 2026-09-06 rebuild. Both times, 6 of 6 documents carrying table-display residue ended in exit 3 with render-unstable, and 0 of the remaining 12 did. Two of those twelve carry residue of other kinds — one <p>, one <span> and one <em> — and produced a report; that is why the residue is reported rather than being fatal on its own. Twelve documents is a small number and this is one bundle, one Paged.js build and one Chrome.",
   "publicSubstitute": "tests/fixtures/fragmentainer-residue.html, reduced from the index document below. It carries no product text, reproduces the class, and is the gate CI actually runs.",
   "documents": [
     {
@@ -20,8 +20,8 @@
       "artifact": null,
       "externalArtifact": "index.html",
       "sourceEvidence": "source-evidence/source-index.json",
-      "sha256": "e98b2e92b060475b749cf5c7e14f931d90bcaa18552f56a1ee739ece1a82d621",
-      "byteLength": 14738,
+      "sha256": "8836f96c1be87bb46777afde6c963ed472774b324914d2aa62d43ce08c01eadf",
+      "byteLength": 14823,
       "sourceClass": "private-first-party-nonredistributable",
       "rightsBasis": "first-party-founder-authorized-evaluation-only",
       "expected": {
@@ -33,9 +33,10 @@
         ],
         "fragmentainerResidue": {
           "pages": [
-            2
+            2,
+            4
           ],
-          "count": 3,
+          "count": 4,
           "atomicCount": 3,
           "pitchPx": 1816
         }
@@ -46,8 +47,8 @@
       "artifact": null,
       "externalArtifact": "appendix.html",
       "sourceEvidence": "source-evidence/source-appendix.json",
-      "sha256": "d103813373fa0f141bd83a65d74d828a917eccd4543c0696b222a7a2cfd3a00c",
-      "byteLength": 23044,
+      "sha256": "334560ff5e729a6363935836e640cc87c889d641057ee35b4dcd12107f43c70a",
+      "byteLength": 23349,
       "sourceClass": "private-first-party-nonredistributable",
       "rightsBasis": "first-party-founder-authorized-evaluation-only",
       "expected": {
@@ -72,8 +73,8 @@
       "artifact": null,
       "externalArtifact": "04-state-that-survives.html",
       "sourceEvidence": "source-evidence/source-chapter-04-state-that-survives.json",
-      "sha256": "980683bd904ed70f1427d19fd5804d036215d9b193a1e72a0359abf029c05a58",
-      "byteLength": 35523,
+      "sha256": "9e74289ce1fee9ab59bbf10c1eb22a7d71914b5bc77817728df8363ba3aa8b95",
+      "byteLength": 35580,
       "sourceClass": "private-first-party-nonredistributable",
       "rightsBasis": "first-party-founder-authorized-evaluation-only",
       "expected": {
@@ -86,10 +87,9 @@
         "fragmentainerResidue": {
           "pages": [
             2,
-            7,
             10
           ],
-          "count": 13,
+          "count": 12,
           "atomicCount": 4,
           "pitchPx": 1816
         }
@@ -100,8 +100,8 @@
       "artifact": null,
       "externalArtifact": "06-the-gate-is-not-the-answer.html",
       "sourceEvidence": "source-evidence/source-chapter-06-the-gate-is-not-the-answer.json",
-      "sha256": "6a1f870091a0ad26c35ce5e4b6bc6760a88e058f5ebaa3e251c2da2b7bc99b54",
-      "byteLength": 98073,
+      "sha256": "3bf65d3a9edb4104dcb2d6cce06d62d24a25989992998f5cc8ca92d50da933d7",
+      "byteLength": 98063,
       "sourceClass": "private-first-party-nonredistributable",
       "rightsBasis": "first-party-founder-authorized-evaluation-only",
       "expected": {
@@ -158,8 +158,8 @@
       "artifact": null,
       "externalArtifact": "11-the-record.html",
       "sourceEvidence": "source-evidence/source-chapter-11-the-record.json",
-      "sha256": "1ccbd832c050a85e2afbe37eac054b794ecc8a083ffe1cf5ccfc7b4aff769cb2",
-      "byteLength": 60676,
+      "sha256": "00a0b371af26da7a38d7b6ad508bc8b02a259b838d2b4b5a2c95a0fd851251d8",
+      "byteLength": 60698,
       "sourceClass": "private-first-party-nonredistributable",
       "rightsBasis": "first-party-founder-authorized-evaluation-only",
       "expected": {
