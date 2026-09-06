@@ -152,6 +152,11 @@ describe("the coverage base", () => {
 
   for (const reason of [
     "env/svg-painted-bounds-unsupported",
+    // The bracket's undecidable band. It is a different STATE OF KNOWLEDGE from the one above --
+    // the target was measured twice and the two bounds disagreed -- and it must be charged to
+    // coverage in exactly the same way, or admitting the bracket would quietly convert declines
+    // into clean results.
+    "env/svg-painted-bounds-inconclusive",
     "env/svg-viewport-geometry-unsupported",
   ] as const) {
     it(`${reason} remains an input coverage failure`, () => {

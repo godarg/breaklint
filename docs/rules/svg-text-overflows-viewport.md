@@ -60,11 +60,33 @@ A `<text>` whose screen box cannot be read — no CTM, or `getBBox()` throwing o
 rendered geometry — declines with `env/svg-ctm-unavailable` and DOES count against coverage: that
 is a target this rule ought to have judged and could not.
 
-`getBBox()` also omits painted geometry introduced or removed by visible stroke, a paint server,
-text decoration, clip path, mask or filter. Text instantiated through `<use>` is inside a closed
-instance tree. Those cases decline per target with `env/svg-painted-bounds-unsupported`; they stay
-in the denominator, so the rule ends in exit 4 rather than inventing a box or silently losing the
-candidate.
+`getBBox()` also omits painted geometry introduced or removed by a paint server, text decoration,
+clip path, mask or filter. Text instantiated through `<use>` is inside a closed instance tree. Those
+cases decline per target with `env/svg-painted-bounds-unsupported`; they stay in the denominator, so
+the rule ends in exit 4 rather than inventing a box or silently losing the candidate.
+
+**A visible stroke is the one omission that is bounded on both sides.** `getBBox()` is the fill box,
+so the painted box contains it; a stroke paints at most `stroke-width / 2` outside the path, so the
+fill box grown by that contains the painted box. The collector hands both over — the growth applied
+in user space and carried through the same CTM, so it survives a scale or a rotation — and this rule
+decides only where the bracket is one-sided:
+
+| where the bracket lies | what the rule does |
+| --- | --- |
+| lower bound already outside the viewport | reports, with the LOWER bound's overshoot as the value |
+| upper bound still inside the viewport | measures, and stays silent |
+| lower inside, upper outside | declines with `env/svg-painted-bounds-inconclusive` |
+
+Read the asymmetry as a promise and a gap in one. The rule never reports on the upper bound, so the
+bracket **cannot** produce a finding about a label that is really inside — and it therefore **can**
+stay silent about one that is really clipped, whenever the grown box happens to be inside too. The
+grown box bounds the stroke, not the glyph outlines; settling that needs an ink pass this build does
+not have. `docs/limitations.md` carries the same statement in the same words.
+
+The band has its own reason rather than sharing `env/svg-painted-bounds-unsupported`, because "there
+is no outer bound for this paint" and "I measured both bounds and they disagree" are different
+things to tell a reader. Only the second one is actionable: widen the figure, shorten the label, or
+thin the halo.
 
 An SVG root with border, padding, rounded clipping or nonzero overflow clip margin does not have a
 clipping viewport proven by its border box. A transform, individual rotate/scale/translate,

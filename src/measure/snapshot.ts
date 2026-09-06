@@ -696,10 +696,22 @@ export const SNAPSHOT_SOURCE = `(() => {
 
         // SVG getBBox() omits stroke, clipping, masks and filter effects. It also cannot expose
         // the painted result of a referenced paint server. Text decoration/shadow add ink outside
-        // the glyph box by the same route. Judge none of those with a different box: retain the
-        // target as an explicit coverage failure until the independent ink pass exists.
-        let paintedBoundsUnsupported = strokeVisible
-          || /url\\(/u.test(style.fill) || /url\\(/u.test(style.stroke)
+        // the glyph box by the same route. Judge none of those with a different box.
+        //
+        // A VISIBLE STROKE IS THE ONE EXCEPTION, and it is an exception because it is bounded on
+        // both sides rather than because it is common. getBBox() is the fill box, so the painted
+        // box contains it; a stroke paints at most stroke-width/2 outside the path, so the box
+        // grown by that contains the painted box. The two are handed to the rule as a bracket and
+        // the rule decides only where the bracket is one-sided. Every other effect here stays an
+        // outright decline: for a filter or a paint server there is no computable outer bound at
+        // all, and a guess dressed as a bound is worse than a declared gap.
+        //
+        // The distinction was not free to leave out. Measured over one real eighteen-document
+        // bundle, 35 of 222 laid-out targets declined here, and all 35 were text elements carrying
+        // the halo idiom paint-order="stroke fill" with the stroke set to the background colour --
+        // the thing that keeps a diagram label readable over a line. Three of those documents
+        // therefore ended in exit 4 under this rule's coverage floor of 1.
+        let paintedBoundsUnsupported = /url\\(/u.test(style.fill) || /url\\(/u.test(style.stroke)
           || effect(style.textShadow) || effect(style.textDecorationLine);
         let ancestor = textEl;
         while (!paintedBoundsUnsupported && ancestor && P.nodeType(ancestor) === 1) {
@@ -709,12 +721,16 @@ export const SNAPSHOT_SOURCE = `(() => {
           ancestor = P.parent(ancestor);
         }
         if (paintedBoundsUnsupported) { unsupportedTargets += 1; continue; }
+        // Only meaningful when the stroke is the ONLY thing outside the fill box, which is exactly
+        // where control reaches. parseFloat of a computed length is px; a non-finite or
+        // non-positive width cannot widen anything and yields no pad.
+        const strokePad = strokeVisible ? parseFloat(style.strokeWidth) / 2 : 0;
 
         let bounds = null;
         // getBBox() throws on a <text> with no rendered geometry; getScreenCTM() returns null on
         // one that is not in a rendered tree. For an element the browser DID lay out, either is a
         // measurement this tool owed and did not deliver — declined, and counted against coverage.
-        try { bounds = P.svgBounds(textEl); } catch (e) { bounds = null; }
+        try { bounds = P.svgBounds(textEl, strokePad); } catch (e) { bounds = null; }
         if (!bounds) { unreadableTargets += 1; continue; }
 
         // All four corners, not two opposite ones: under a rotation the min/max over one diagonal
@@ -728,6 +744,17 @@ export const SNAPSHOT_SOURCE = `(() => {
           if (corner.y < minY) minY = corner.y;
           if (corner.y > maxY) maxY = corner.y;
         }
+        let paintedUpper = null;
+        if (bounds.padded) {
+          let pMinX = bounds.padded[0].x, pMaxX = pMinX, pMinY = bounds.padded[0].y, pMaxY = pMinY;
+          for (const corner of bounds.padded) {
+            if (corner.x < pMinX) pMinX = corner.x;
+            if (corner.x > pMaxX) pMaxX = corner.x;
+            if (corner.y < pMinY) pMinY = corner.y;
+            if (corner.y > pMaxY) pMaxY = corner.y;
+          }
+          paintedUpper = { x: round(pMinX), y: round(pMinY), width: round(pMaxX - pMinX), height: round(pMaxY - pMinY) };
+        }
         const textStyle = style;
         const clipped = !!textStyle.clipPath && textStyle.clipPath !== "none";
         const masked = !!textStyle.mask && textStyle.mask !== "none" && !P.startsWith(textStyle.mask, "none ");
@@ -735,6 +762,7 @@ export const SNAPSHOT_SOURCE = `(() => {
           sourceIdentity: P.attr(textEl, "id"),
           signature: P.text(textEl) || "",
           boxScreen: { x: round(minX), y: round(minY), width: round(maxX - minX), height: round(maxY - minY) },
+          paintedBoundsUpper: paintedUpper,
           clipState: clipped && masked ? "both" : clipped ? "clip-path" : masked ? "mask" : "none",
         });
       }

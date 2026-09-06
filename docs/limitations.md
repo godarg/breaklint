@@ -107,13 +107,38 @@ was found by building the fixture for the previous one.
 A `<text>` that IS laid out and still has no readable box declines with `env/svg-ctm-unavailable`
 and DOES count against coverage — that is a measurement this tool owed and did not deliver, per
 target rather than per SVG. The same fail-closed rule applies when a box exists but does not prove
-the painted result: `<use>`, visible stroke, paint servers, text decoration, clip paths, masks and
-filters decline with `env/svg-painted-bounds-unsupported`.
+the painted result: `<use>`, paint servers, text decoration, clip paths, masks and filters decline
+with `env/svg-painted-bounds-unsupported`.
+
+**A visible stroke is bracketed rather than declined, and the bracket is one-sided on purpose.**
+`getBBox()` returns the FILL box. A stroke paints at most `stroke-width / 2` outside the path, so
+the fill box is a lower bound of the painted box and the fill box grown by that amount — in the
+element's own user space, carried through the same CTM — is an upper bound.
+`svg/text-overflows-viewport` therefore reports when the LOWER bound has already left the viewport,
+stays silent when the UPPER bound is still inside it, and declines the band between the two with
+`env/svg-painted-bounds-inconclusive`, which counts against coverage like any other decline.
+
+The asymmetry is the safety property and also the limitation. **The bracket cannot invent a
+finding: it never reports on the upper bound. It can still hide one.** A label whose fill box is
+inside the viewport and whose glyph ink is in fact clipped will be reported as measured and silent
+whenever the grown box is also inside — the grown box is an outer bound of the stroke, not of the
+glyph outlines, and this build has no ink pass to settle it. What the bracket buys is a decision
+where a decision is provable, not a proof that the remaining silence is correct.
+
+Why it exists at all: measured over one real eighteen-document bundle, 35 of 222 laid-out targets
+declined here for a visible stroke and nothing else, and every one of them was the halo idiom
+`paint-order="stroke fill"` with the stroke set to the background colour — the ordinary way to keep
+a diagram label readable where it crosses a line. Three of those documents ended in exit 4 under
+this rule's coverage floor of 1, with nothing wrong in them. All 35 are decided by the bracket, all
+35 come out inside, and the closest is 8.05 px clear of the edge. That measurement is one bundle,
+one Chrome and one Paged.js build; it says the class exists and is common, not how often the band
+is hit elsewhere.
 
 Neither exemption leaves the report. Both keep their rule, reason and count in `notMeasured`, and
 each rule's own books are still checked first: `defineRule` requires measured plus declined to equal
 candidates, and only afterwards does the engine subtract. A decline that names a property of the
-INPUT — `env/multicolumn`, `env/svg-ctm-unavailable`, `env/svg-too-many-text-targets` — stays in
+INPUT — `env/multicolumn`, `env/svg-ctm-unavailable`, `env/svg-too-many-text-targets`,
+`env/svg-painted-bounds-inconclusive` — stays in
 the denominator, because another document would have been measured. That is what exit 4 is for,
 and `tests/unit/coverage-base.test.ts` holds both halves of the pair so that widening the
 exception to cover the second kind turns a test red.

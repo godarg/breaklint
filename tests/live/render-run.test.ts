@@ -50,7 +50,7 @@ describe("the M2d live production chain", () => {
   let noSource: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
-    if (result?.documents.length === 24 && noSource?.documents.length === 4) return true;
+    if (result?.documents.length === 25 && noSource?.documents.length === 4) return true;
     t.skip(
       `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
       `no-source=${noSource?.documents.length ?? 0}`,
@@ -110,6 +110,8 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "svg-in-viewport.html"),
         join(FIXTURES, "svg-geometry-declines.html"),
         join(FIXTURES, "fragmentainer-residue.html"),
+        // APPENDED, never inserted: the documents of this run are addressed by index below.
+        join(FIXTURES, "svg-stroke-bracket.html"),
       ],
       options(join(root, "evidence")),
     );
@@ -137,7 +139,7 @@ describe("the M2d live production chain", () => {
     }));
     assert.equal(
       result?.documents.length,
-      24,
+      25,
       `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
     );
     assert.equal(
@@ -791,8 +793,19 @@ describe("the M2d live production chain", () => {
     const complex = record("complex-paints");
     assert.equal(complex.textTargetCount, 8);
     assert.equal(complex.notRenderedTargets, 1, "the source text in defs is not itself painted");
-    assert.equal(complex.unsupportedTargets, 6, "clip, mask, filter, stroke, direct use and nested use must all decline");
-    assert.equal(complex.texts.length, 1, "the ordinary text in the mixed SVG remains measurable");
+    // Five, not six. The stroked label is no longer an outright decline: its painted box is
+    // bracketed by the fill box and the fill box grown by half the stroke, so it reaches the rule
+    // with two boxes and the rule decides it. Clip, mask, filter and the two `use` instances have
+    // no computable outer bound and still decline here.
+    assert.equal(complex.unsupportedTargets, 5, "clip, mask, filter, direct use and nested use must all decline");
+    assert.equal(complex.texts.length, 2, "the ordinary text and the bracketed stroked text remain measurable");
+    const stroked = complex.texts.find((text) => text.paintedBoundsUpper !== null);
+    assert.ok(stroked, "the stroked label reached the rule without an upper bound");
+    assert.ok(
+      stroked.paintedBoundsUpper!.width > stroked.boxScreen.width
+      && stroked.paintedBoundsUpper!.height > stroked.boxScreen.height,
+      "the upper bound must strictly contain the fill box, or it is not a bound",
+    );
 
     const border = record("border-box");
     assert.equal(border.measurable, false);
@@ -814,15 +827,85 @@ describe("the M2d live production chain", () => {
     const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
     assert.equal(coverage?.candidates, 10);
     assert.equal(coverage?.measured, 3);
+    // Five outright, one inconclusive, and the split is the point. Clip, mask, filter and the two
+    // `use` instances have no computable outer bound at all. The stroked label does: its fill box
+    // ends inside the viewport and its stroke reaches past it, so the bracket is measured, comes
+    // out straddling the edge, and says so under its OWN reason. Merging the two counts would
+    // report six unreachable targets when five were unreachable and one was measured and ambiguous.
     assert.deepEqual(
       coverage?.notMeasured.map((entry) => ({ reason: entry.reason, count: entry.count })),
       [
-        { reason: "env/svg-painted-bounds-unsupported", count: 6 },
+        { reason: "env/svg-painted-bounds-unsupported", count: 5 },
+        { reason: "env/svg-painted-bounds-inconclusive", count: 1 },
         { reason: "env/svg-viewport-geometry-unsupported", count: 1 },
       ],
     );
     assert.equal(outcome.report.verdict, "insufficient-coverage");
     assert.equal(exitCodeFor(outcome.report.verdict), 4);
+  });
+
+  /**
+   * The two-sided bracket, on all three positions it can produce.
+   *
+   * `getBBox()` is the FILL box, so a visible stroke makes it a lower bound of the painted box and
+   * the box grown by half the stroke width an upper bound. The fixture pins one label per case with
+   * `textLength`, so the three cases cannot drift into each other with the font:
+   *
+   *   #stroke-outside  the fill box alone already leaves the viewport  -> REPORT
+   *   #stroke-inside   the grown box is still inside it                -> MEASURED, silent
+   *   #stroke-band     the fill box is inside and the grown box is not -> DECLINE, inconclusive
+   *
+   * The asymmetry is the safety property and is asserted here rather than described: the bracket
+   * never reports on the upper bound, so it cannot manufacture a finding — and it therefore CAN
+   * hide one inside the band, which is why the band counts against coverage.
+   */
+  it("decides a stroked SVG label by its bracket and declares the band it cannot decide", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[24]!;
+    assert.ok(document.snapshot, "the stroke-bracket document produced no snapshot");
+    assert.match(document.path, /svg-stroke-bracket\.html$/u, "documents were reordered; this test addresses by index");
+
+    const records = document.snapshot.svg;
+    assert.equal(records.length, 3, "one record per case");
+    for (const record of records) {
+      assert.equal(record.textTargetCount, 1);
+      assert.equal(record.unsupportedTargets, 0, "a visible stroke alone must no longer decline in the collector");
+      assert.equal(record.texts.length, 1);
+      const [text] = record.texts;
+      assert.ok(text!.paintedBoundsUpper, "a stroked target must reach the rule with both bounds");
+      // A bound that is not strictly larger is not a bound. Both axes, because the pad is applied
+      // in user space and carried through the CTM rather than added to the screen rectangle.
+      assert.ok(text!.paintedBoundsUpper!.width > text!.boxScreen.width);
+      assert.ok(text!.paintedBoundsUpper!.height > text!.boxScreen.height);
+      assert.ok(text!.paintedBoundsUpper!.x < text!.boxScreen.x);
+      assert.ok(text!.paintedBoundsUpper!.y < text!.boxScreen.y);
+    }
+
+    const outcome = runDocument(document, {
+      failOn: "error",
+      activeRules: [textOverflowsViewport],
+      optionsByRule: {},
+      coverageFloors: {},
+    });
+    assert.equal(outcome.report.findings.length, 1, "exactly the label whose FILL box leaves the viewport");
+    const [finding] = outcome.report.findings;
+    assert.equal(finding!.ruleId, "svg/text-overflows-viewport");
+    // The reported number is the LOWER bound's overshoot. Reporting the upper bound's would state
+    // an overshoot larger than anything this build measured.
+    assert.ok(
+      finding!.measurement.value > 0,
+      `the finding must carry the fill box's own overshoot, got ${finding!.measurement.value}`,
+    );
+
+    const bracketCoverage = outcome.report.coverage["svg/text-overflows-viewport"];
+    assert.equal(bracketCoverage?.candidates, 3);
+    assert.equal(bracketCoverage?.measured, 2, "outside and inside are both decided; only the band is not");
+    assert.deepEqual(
+      bracketCoverage?.notMeasured.map((entry) => ({ reason: entry.reason, count: entry.count })),
+      [{ reason: "env/svg-painted-bounds-inconclusive", count: 1 }],
+    );
+    assert.equal(bracketCoverage?.ok, false, "the band must still take an error rule below a floor of 1");
   });
 
   it("keeps duplicate-input evidence paths disjoint and records loaded redirect provenance", async (t) => {

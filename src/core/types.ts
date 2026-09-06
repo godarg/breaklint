@@ -169,7 +169,27 @@ export interface SvgTextTarget {
   targetKey: string;
   /** Source identity of the `<text>`. Stable across runs; this is the fingerprint key. */
   svgTextKey: string;
+  /**
+   * The CTM-normalised `getBBox()` box: the FILL box, and the only box this build measures
+   * exactly. Under a visible stroke it is a LOWER bound of what is actually painted.
+   */
   boxScreen: Box;
+  /**
+   * Upper bound of the painted box, or null when `boxScreen` is already exact.
+   *
+   * Non-null for exactly one case: the target's only unmeasured paint is a visible stroke, so the
+   * painted box is bounded below by `boxScreen` and above by this one — `boxScreen` grown by
+   * `stroke-width / 2` in user space and carried through the same CTM. Every other paint the
+   * geometry collector cannot represent (paint servers, text shadow, decoration, clip path, mask,
+   * filter, `<use>` instantiation) still declines the target outright, because for those the
+   * painted box is not bracketed by anything this collector can compute.
+   *
+   * A bracket decides a target only when both bounds agree. `svg/text-overflows-viewport` reports
+   * when the LOWER bound already leaves the viewport, stays silent when the UPPER bound is still
+   * inside it, and declines the band in between — so the bracket can never invent a finding, and
+   * it can still hide one inside the band.
+   */
+  paintedBoundsUpper: Box | null;
   clipState: "none" | "clip-path" | "mask" | "both";
   /**
    * How many targets in this SVG share this exact `svgTextKey`.

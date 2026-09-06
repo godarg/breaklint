@@ -68,8 +68,8 @@
     },
     "textTarget": {
       "type": "object", "additionalProperties": false,
-      "required": ["targetKey", "svgTextKey", "boxScreen", "clipState", "ambiguityGroupSize", "ink"],
-      "properties": { "targetKey": { "type": "string", "minLength": 1 }, "svgTextKey": { "type": "string", "minLength": 1 }, "boxScreen": { "$ref": "#/$defs/box" }, "clipState": { "enum": ["none", "clip-path", "mask", "both"] }, "ambiguityGroupSize": { "type": "integer", "minimum": 1 }, "ink": { "$ref": "#/$defs/targetInk" } }
+      "required": ["targetKey", "svgTextKey", "boxScreen", "paintedBoundsUpper", "clipState", "ambiguityGroupSize", "ink"],
+      "properties": { "targetKey": { "type": "string", "minLength": 1 }, "svgTextKey": { "type": "string", "minLength": 1 }, "boxScreen": { "$ref": "#/$defs/box" }, "paintedBoundsUpper": { "$comment": "Upper bound of the painted box under a visible stroke; null when boxScreen is already exact. REQUIRED rather than optional, so a receipt that omits it fails the schema instead of quietly losing a target's bracket.", "oneOf": [{ "$ref": "#/$defs/box" }, { "type": "null" }] }, "clipState": { "enum": ["none", "clip-path", "mask", "both"] }, "ambiguityGroupSize": { "type": "integer", "minimum": 1 }, "ink": { "$ref": "#/$defs/targetInk" } }
     },
     "shape": { "type": "object", "additionalProperties": false, "required": ["boxScreen", "strokeWidth"], "properties": { "boxScreen": { "$ref": "#/$defs/box" }, "strokeWidth": { "type": "number", "minimum": 0 } } },
     "svgRecord": {

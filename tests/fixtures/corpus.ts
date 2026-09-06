@@ -177,6 +177,10 @@ function svgText(key: string, T: number, T0: number, over: Partial<SvgRecord["te
     targetKey: `bt-${key}`,
     svgTextKey: `svg:svgsig:chart|id:${key}`,
     boxScreen: box(60, 120, 80, 12),
+    // Projected snapshots carry an exact fill box by construction: null says "boxScreen IS the
+    // painted box", which is what every one of these fixtures means. A fixture that wants the
+    // two-sided stroke bracket sets it explicitly.
+    paintedBoundsUpper: null as SvgRecord["texts"][number]["paintedBoundsUpper"],
     clipState: "clip-path" as const,
     ambiguityGroupSize: 1,
     ink: { T: { ...ink(T), intersectShapes: 0, missingInFull: 0 }, T0: ink(T0) },

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The two-sided bracket for a stroked SVG label</title>
+<style>
+  @page { size: 360pt 520pt; margin: 24pt; }
+  body { font: 11pt/1.35 serif; margin: 0; }
+  svg { display: block; width: 260pt; height: 100pt; margin-bottom: 10pt; }
+  /* Both paints visible, so the target is a paint target at all; the halo idiom this fixture is
+     about is exactly `paint-order: stroke fill` with the stroke set to the page background. */
+  svg text {
+    font: 16px monospace;
+    fill: #111;
+    stroke: #fff;
+    paint-order: stroke fill;
+    stroke-linejoin: round;
+  }
+</style>
+</head>
+<body>
+<p>
+  getBBox() returns the FILL box. Under a visible stroke the painted box is bounded below by it and
+  above by the same box grown by half the stroke width. Each figure below puts a label in one of the
+  three positions that bracket can produce, and the width of every label is pinned with
+  <code>textLength</code> so the case does not move with the font.
+</p>
+
+<!-- LOWER bound already outside: the fill box alone leaves the 400-unit viewport by 20 units, so
+     no stroke width can bring it back. Must REPORT. -->
+<svg id="stroke-outside" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <text x="210" y="60" textLength="210" lengthAdjust="spacingAndGlyphs" stroke-width="6">outside</text>
+</svg>
+
+<!-- UPPER bound still inside: fill box ends at 210, the stroke can add at most 2, and the viewport
+     is 400 wide. Must be MEASURED and stay silent. -->
+<svg id="stroke-inside" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <text x="10" y="60" textLength="200" lengthAdjust="spacingAndGlyphs" stroke-width="4">inside</text>
+</svg>
+
+<!-- The band: the fill box ends 2 units inside the viewport and the stroke reaches 4 units past it.
+     Whether ink is actually clipped depends on the glyph outlines this collector does not measure.
+     Must DECLINE, and count against coverage. -->
+<svg id="stroke-band" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <text x="210" y="60" textLength="188" lengthAdjust="spacingAndGlyphs" stroke-width="12">band</text>
+</svg>
+</body>
+</html>

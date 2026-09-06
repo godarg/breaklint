@@ -103,6 +103,7 @@ function snapshotFor(ruleId: SimulationRuleId, target: Target, scenario: (typeof
         targetKey: `receipt-target-${slot}`,
         svgTextKey: target.sourceIdentity,
         boxScreen: box,
+        paintedBoundsUpper: null,
         clipState: ruleId === "svg/text-clipped" ? "clip-path" as const : "none" as const,
         ambiguityGroupSize: 1,
         ink: {

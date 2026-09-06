@@ -309,13 +309,22 @@ const PRIMITIVES_TEMPLATE = `(() => {
       // degrees the two transformed corners lie on a diagonal and the min/max over them is
       // smaller than the real extent in both axes. Anything that has to decide whether a box
       // lies inside another one needs all four.
-      svgBounds: (el) => {
+      //
+      // padded exists for the two-sided bracket in svg/text-overflows-viewport. getBBox() is the
+      // FILL box, so under a visible stroke it is a lower bound of the painted box and the box
+      // grown by stroke-width/2 is an upper bound. The growth happens in the element's own USER
+      // space and is transformed by the SAME matrix, because a CTM may scale the two axes
+      // differently or rotate: inflating the screen-space rectangle instead would apply the pad in
+      // the wrong space and, under a rotation, in the wrong direction. Four corners again, for the
+      // reason above.
+      svgBounds: (el, pad) => {
         const bb = call.call(svgBBoxFn, el);
         const matrix = call.call(svgScreenCtmFn, el);
         if (!matrix) return null;
         const point = (x, y) => call.call(matrixTransformFn, new DOMPointCtor(x, y), matrix);
         const topLeft = point(bb.x, bb.y);
         const bottomRight = point(bb.x + bb.width, bb.y + bb.height);
+        const grow = typeof pad === "number" && isFinite(pad) && pad > 0 ? pad : 0;
         return {
           bb,
           first: topLeft,
@@ -325,6 +334,12 @@ const PRIMITIVES_TEMPLATE = `(() => {
             point(bb.x + bb.width, bb.y),
             bottomRight,
             point(bb.x, bb.y + bb.height),
+          ],
+          padded: grow === 0 ? null : [
+            point(bb.x - grow, bb.y - grow),
+            point(bb.x + bb.width + grow, bb.y - grow),
+            point(bb.x + bb.width + grow, bb.y + bb.height + grow),
+            point(bb.x - grow, bb.y + bb.height + grow),
           ],
         };
       },

@@ -22,6 +22,7 @@ export const ENV_IDS = [
   "env/svg-ctm-unavailable",
   "env/svg-viewport-geometry-unsupported",
   "env/svg-painted-bounds-unsupported",
+  "env/svg-painted-bounds-inconclusive",
   "env/canvas-content-lost",
   "env/pixel-oracle-unavailable",
   "env/ink-passes-unstable",

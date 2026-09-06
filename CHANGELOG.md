@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+### A stroked SVG label is now decided by a two-sided bound instead of declined
+
+`env/svg-painted-bounds-unsupported` read like a limit of the environment and was not one. Any
+`<text>` with a visible stroke declined outright, because `getBBox()` returns the FILL box and the
+collector would not judge painted ink with a box that describes different ink.
+
+- **Measured first.** Over the eighteen chapters of one shipped HTML bundle, 35 of 222 laid-out
+  targets declined for that reason: 15 in one chapter, 17 in another, 3 in a third, and 0 in the
+  documents whose labels carry no stroke. Every one of the 35 is the halo idiom
+  `paint-order="stroke fill"` with the stroke set to the background colour — the ordinary way to
+  keep a diagram label readable where it crosses a line. Three of those documents ended in exit 4
+  under this rule's coverage floor of 1, with nothing wrong in them.
+- **The bracket.** `getBBox()` is a lower bound of the painted box; the same box grown by
+  `stroke-width / 2` — in the element's own user space, carried through the same CTM, so it survives
+  a scale or a rotation — is an upper bound. `svg/text-overflows-viewport` reports when the LOWER
+  bound has already left the viewport, stays silent when the UPPER bound is still inside it, and
+  declines the band between with the new reason `env/svg-painted-bounds-inconclusive`, which counts
+  against coverage exactly as the old decline did.
+- **What the bracket cannot do.** It never reports on the upper bound, so it cannot manufacture a
+  finding — and it therefore CAN hide one, whenever a label's glyph ink is clipped while both bounds
+  sit inside the viewport. The grown box bounds the stroke, not the glyph outlines. Written down in
+  `docs/limitations.md` and in the rule's own doc, not only here.
+- **Result on the measured corpus:** all 35 are decided, all 35 come out inside, and the closest is
+  8.05 px clear of the edge. One bundle, one Chrome, one Paged.js build.
+- The band has its own reason rather than sharing the old one: "there is no outer bound for this
+  paint" and "I measured both bounds and they disagree" are different things to tell a reader, and
+  only the second is actionable.
+- Added `tests/fixtures/svg-stroke-bracket.html`, one label per band with its width pinned by
+  `textLength` so the three cases cannot drift into each other with the font. Red control: the build
+  before this change declines all three and reports nothing; this build decides two and reports the
+  one whose fill box leaves the viewport.
+- Snapshot records carry a new required `paintedBoundsUpper` on every SVG text target — the upper
+  bound, or `null` when `boxScreen` is already exact. `schemas/calibration/measurement-receipt-v1`
+  requires it, so a receipt that omits it fails the schema rather than silently losing a bracket.
+
 ### The residue corpus record was re-measured on rebuilt product bytes
 
 - The admitted bundle was rebuilt on 2026-09-06. **Five of the six** documents drifted, not the

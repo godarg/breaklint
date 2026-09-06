@@ -16,6 +16,15 @@ import { SNAPSHOT_ROUNDING_PX } from "../../core/enums.ts";
  *
  * The exemption matters as much as the rule: with `overflow: visible` on the SVG, the text *is*
  * drawn, and the rule declines rather than reports.
+ *
+ * A THIRD BOX, ONLY WHERE IT IS BOUNDED. `getBBox()` is the fill box. Where the only paint it
+ * omits is a visible stroke — in practice the halo `paint-order="stroke fill"` with the stroke set
+ * to the background colour, which keeps a diagram label readable over a line — the collector also
+ * hands over the box grown by half that stroke. The painted box lies between the two, so a target
+ * is decided when the LOWER bound is already outside the viewport or the UPPER bound is still
+ * inside it, and declared undecidable in the band between. Measured over one eighteen-document
+ * bundle: 35 of 222 laid-out targets used to decline here for a visible stroke and nothing else,
+ * and all 35 are decided by the bracket — all of them inside, by at least 8.05 px.
  */
 export const textOverflowsViewport = defineRule(
   {
@@ -40,6 +49,7 @@ export const textOverflowsViewport = defineRule(
       "env/svg-ctm-unavailable",
       "env/svg-viewport-geometry-unsupported",
       "env/svg-painted-bounds-unsupported",
+      "env/svg-painted-bounds-inconclusive",
     ],
   },
   (snapshot, ctx) => {
@@ -142,18 +152,43 @@ export const textOverflowsViewport = defineRule(
         );
         continue;
       }
-      measured += targets;
-
       const vp = svg.viewportScreen;
       const permitted = num(ctx.options.maxOvershootPx, 0);
+      const overshootOf = (b: { x: number; y: number; width: number; height: number }): number => Math.max(
+        vp.x - b.x,
+        vp.y - b.y,
+        b.x + b.width - (vp.x + vp.width),
+        b.y + b.height - (vp.y + vp.height),
+      );
+      // Targets whose painted box is bracketed rather than exact, and whose bracket straddles the
+      // viewport edge. They are not measured and not reported; they are declined below, so the
+      // rule's books still balance and the coverage floor still sees them.
+      let undecidable = 0;
       for (const text of svg.texts) {
         const b = text.boxScreen;
-        const overshoot = Math.max(
-          vp.x - b.x,
-          vp.y - b.y,
-          b.x + b.width - (vp.x + vp.width),
-          b.y + b.height - (vp.y + vp.height),
-        );
+        const overshoot = overshootOf(b);
+        // THE BRACKET. `boxScreen` is the fill box and `paintedBoundsUpper` the same box grown by
+        // half the visible stroke, so the painted box lies between them. Three cases, and only the
+        // first two are answers:
+        //   lower bound already outside -> painted box is outside too, whatever the stroke does;
+        //   upper bound still inside    -> painted box is inside, whatever the stroke does;
+        //   otherwise                   -> undecidable, and it stays declared.
+        // The asymmetry is deliberate and is the whole safety property: the bracket can never
+        // manufacture a finding, and it can still hide one inside the band. That is written down
+        // in docs/limitations.md and in this rule's doc, not only here.
+        if (text.paintedBoundsUpper) {
+          if (overshoot > permitted + SNAPSHOT_ROUNDING_PX) {
+            measured += 1;
+          } else if (overshootOf(text.paintedBoundsUpper) <= permitted + SNAPSHOT_ROUNDING_PX) {
+            measured += 1;
+            continue;
+          } else {
+            undecidable += 1;
+            continue;
+          }
+        } else {
+          measured += 1;
+        }
         // The two boxes come from different APIs — the viewport from getBoundingClientRect, the
         // target from CTM-transformed getBBox corners — and the collector stores both rounded to
         // two decimals. Each value therefore carries up to 0.005 px of rounding, and a difference
@@ -192,6 +227,22 @@ export const textOverflowsViewport = defineRule(
             ambiguity: text.ambiguityGroupSize > 1
               ? { groupSize: text.ambiguityGroupSize, resolvable: false }
               : null,
+          }),
+        );
+      }
+      if (undecidable > 0) {
+        notMeasured.push(
+          declined({
+            scope: "svgText",
+            ruleId: "svg/text-overflows-viewport",
+            // A DIFFERENT reason from the outright decline above, on purpose. "No outer bound
+            // exists for this paint" and "the bracket straddles the viewport edge" are two
+            // different states of knowledge, and merging them into one count would tell a reader
+            // that six targets were unreachable when five were unreachable and one was measured
+            // twice and came out ambiguous. The second is actionable — widen the figure, shorten
+            // the label, thin the halo — and the first is not.
+            reason: "env/svg-painted-bounds-inconclusive",
+            count: undecidable,
           }),
         );
       }

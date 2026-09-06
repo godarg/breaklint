@@ -348,6 +348,7 @@ function svgRecord(target: {
       targetKey: "bt001",
       svgTextKey: `svg:id:lab-svg|text:id:${target.id}`,
       boxScreen: target.box ?? box(),
+      paintedBoundsUpper: null,
       clipState: target.clipState ?? "none",
       ambiguityGroupSize: 1,
       ink: {
