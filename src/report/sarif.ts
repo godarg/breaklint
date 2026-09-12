@@ -17,6 +17,7 @@ export function renderSarif(report: Report): string {
     version: "2.1.0",
     runs: [
       {
+        columnKind: "unicodeCodePoints",
         tool: {
           driver: {
             name: "breaklint",
@@ -77,10 +78,13 @@ function sarifLevel(severity: string): "error" | "warning" | "note" {
 }
 
 function toResult(f: Finding) {
+  const original = f.originalSource.status === "verified" && f.originalSource.role === "exact-original-range" ? f.originalSource.location : null;
+  const location = original ?? f.source;
   const base = {
     ruleId: f.ruleId,
     level: sarifLevel(f.severity),
     message: { text: f.message },
+    ...(f.stableIdentity.status === "unique" && f.stableIdentity.value ? { partialFingerprints: { "breaklint/logical-source-value-v1": f.stableIdentity.value } } : {}),
     properties: {
       page: f.page,
       measured: f.measurement.value,
@@ -91,9 +95,13 @@ function toResult(f: Finding) {
       fingerprint: f.fingerprint,
       evidence: f.evidence.ref,
       evidenceBindsFinding: f.evidence.bindsFinding,
+      sourceLocationKind: original ? "verified-original" : location ? "input-artifact" : "unknown",
+      originalSourceStatus: f.originalSource.status,
+      sourceRole: f.originalSource.role,
+      stableIdentityStatus: f.stableIdentity.status,
     },
   };
-  if (!f.source) {
+  if (!location) {
     return {
       ...base,
       locations: [
@@ -108,8 +116,8 @@ function toResult(f: Finding) {
     locations: [
       {
         physicalLocation: {
-          artifactLocation: { uri: f.source.file },
-          region: { startLine: f.source.line, startColumn: f.source.column },
+          artifactLocation: { uri: location.file.split("/").map(encodeURIComponent).join("/") },
+          region: { startLine: location.line, startColumn: location.column, endLine: location.endLine, endColumn: location.endColumn },
         },
       },
     ],

@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, sourceOf } from "../shared.ts";
+import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, sourceOf, targetEvaluation } from "../shared.ts";
 
 /**
  * type/short-last-line — a paragraph ends on a stub of a line.
@@ -24,11 +24,12 @@ export const shortLastLine = defineRule(
     unit: "width ratio",
     defaultOptions: { maxWidthRatio: 0.15, maxEms: 2 },
     summary: "The closing line of a paragraph is a stub.",
-    declines: ["env/multicolumn", "env/vertical-writing"],
+    declines: ["env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],
   },
   (snapshot, ctx) => {
     const findings = [];
     const notMeasured = [];
+    const evaluations = [];
     let candidates = 0;
     let measured = 0;
     const maxRatio = num(ctx.options.maxWidthRatio, 0.15);
@@ -47,15 +48,42 @@ export const shortLastLine = defineRule(
       const outOfScope = layoutOutOfScope(block.effectiveStyle);
       if (outOfScope) {
         notMeasured.push(declined({ scope: "block", ruleId: "type/short-last-line", reason: outOfScope }));
+        evaluations.push(targetEvaluation({ ruleId: "type/short-last-line", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: outOfScope }));
+        continue;
+      }
+      const last = lines[lines.length - 1];
+      const lineWidthValid = last !== undefined && Number.isFinite(last.width) && last.width >= 0;
+      const paragraphWidthValid = Number.isFinite(block.box.width) && block.box.width > 0;
+      const fontSizeValid = Number.isFinite(block.effectiveStyle.fontSize) && block.effectiveStyle.fontSize > 0;
+      if (!lineWidthValid || !paragraphWidthValid || !fontSizeValid) {
+        // A malformed projection is a declined measurement, never a clean numeric decision. In
+        // particular, Infinity would silently become JSON null and could otherwise look safe.
+        notMeasured.push(declined({ scope: "block", ruleId: "type/short-last-line", reason: "env/invalid-measurement" }));
+        evaluations.push(targetEvaluation({
+          ruleId: "type/short-last-line", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+          fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: "env/invalid-measurement",
+          measurements: [
+            { name: "last-line-width-finite", value: lineWidthValid, unit: null, operator: "=", threshold: true },
+            { name: "paragraph-width-finite-positive", value: paragraphWidthValid, unit: null, operator: "=", threshold: true },
+            { name: "font-size-finite-positive", value: fontSizeValid, unit: null, operator: "=", threshold: true },
+          ],
+          connective: "all", violated: null,
+        }));
         continue;
       }
       measured += 1;
-
-      const last = lines[lines.length - 1];
-      if (!last || block.box.width <= 0) continue;
       const ratio = last.width / block.box.width;
-      const ems = block.effectiveStyle.fontSize > 0 ? last.width / block.effectiveStyle.fontSize : Infinity;
-      if (ratio >= maxRatio || ems >= maxEms) continue;
+      const ems = last.width / block.effectiveStyle.fontSize;
+      const violated = ratio < maxRatio && ems < maxEms;
+      evaluations.push(targetEvaluation({
+        ruleId: "type/short-last-line", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+        fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured",
+        measurements: [
+          { name: "last-line-width-ratio", value: ratio, unit: "ratio", operator: "<", threshold: maxRatio },
+          { name: "last-line-width", value: ems, unit: "em", operator: "<", threshold: maxEms },
+        ], connective: "all", violated,
+      }));
+      if (!violated) continue;
 
       findings.push(
         makeFinding({
@@ -80,6 +108,6 @@ export const shortLastLine = defineRule(
         }),
       );
     }
-    return { findings, candidates, measured, notMeasured };
+    return { findings, candidates, measured, notMeasured, evaluations };
   },
 );

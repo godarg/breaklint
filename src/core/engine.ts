@@ -33,16 +33,30 @@ import type { Rule, RuleOptions } from "./rule.ts";
 import { aggregateNotMeasured } from "./rule.ts";
 import type {
   DocumentReport,
+  DocumentRenderArtifact,
+  DocumentEvidenceCoverage,
   Evidence,
   Finding,
   InfraEvent,
+  InputIdentity,
   NotMeasured,
+  ResourceRecord,
   RuleCoverage,
   Snapshot,
+  TargetEvaluation,
+  StableTargetIdentity,
+  TargetInventory,
+  DocumentRevision,
 } from "./types.ts";
 
 export interface DocumentInput {
+  fontIdentity?: DocumentReport["fontIdentity"];
+  sourceIdentity?: { bySid: Record<string, StableTargetIdentity>; inventory: TargetInventory };
+  revision?: DocumentRevision;
+  comparisonScope?: DocumentReport["comparisonScope"];
   path: string;
+  renderArtifact?: DocumentRenderArtifact;
+  evidenceRequirement?: { required: boolean; expectedPages: number };
   snapshot: Snapshot | null;
   /** Infrastructure events collected before or during measurement. Fail-closed: never dropped. */
   infrastructure: InfraEvent[];
@@ -52,6 +66,8 @@ export interface DocumentInput {
   boundSids?: readonly string[];
   /** Document-level measurement declines emitted by acquisition/evidence apparatus. */
   notMeasured?: readonly NotMeasured[];
+  /** Acquisition identity survives withdrawal of an invalid measured snapshot. */
+  acquisition?: { inputIdentity: InputIdentity; resources: readonly ResourceRecord[] };
 }
 
 export interface EngineConfig {
@@ -68,7 +84,9 @@ export interface DocumentOutcome {
 }
 
 export function runDocument(input: DocumentInput, config: EngineConfig): DocumentOutcome {
+  const evidenceCoverage = evidenceCoverageFor(input);
   const findings: Finding[] = [];
+  const evaluations: TargetEvaluation[] = [];
   const coverage: Record<string, RuleCoverage> = {};
   const documentNotMeasured: NotMeasured[] = [...(input.notMeasured ?? [])];
   const infrastructure: InfraEvent[] = [...input.infrastructure];
@@ -81,7 +99,19 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
     return {
       report: {
         path: input.path,
-        inputIdentity: null,
+        ...(input.renderArtifact ? { renderArtifact: input.renderArtifact } : {}),
+        ...(evidenceCoverage ? { evidenceCoverage } : {}),
+        inputIdentity: input.acquisition?.inputIdentity ?? null,
+        ...(input.acquisition ? { resources: [...input.acquisition.resources] } : {}),
+        sourceBinding: {
+          input: { identityStatus: "unknown", rawBytesSha256: null, byteLength: null, encoding: null, complete: false },
+          provenance: {
+            binding: "unavailable", copyIntegrity: "unavailable", sourceRole: "unknown",
+            producerId: null, receiptHash: null,
+            diagnostics: ["snapshot was unavailable because document setup failed"],
+          },
+          files: [],
+        },
         verdict: infrastructure.some((e) => isFatalInfra(e)) ? "infrastructure" : "insufficient-coverage",
         // The reason has to be the event that DECIDED the verdict, not whichever arrived first.
         // Taking `infrastructure[0]` let a run exit 3 while naming a kind this file explicitly
@@ -95,12 +125,16 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
         notMeasured: aggregateNotMeasured(documentNotMeasured),
         infrastructure,
         evidence: input.evidence ?? [],
+        evaluations: [],
       },
       measuredRuleIds: [],
     };
   }
 
   const snapshot = input.snapshot;
+  if (input.sourceIdentity && (!snapshot.source.complete || snapshot.svg.some(svg => svg.textTargetsCapped))) {
+    input.sourceIdentity = { bySid: {}, inventory: { complete: false, omittedCount: snapshot.svg.reduce((n, svg) => n + (svg.textTargetsCapped ? Math.max(1, svg.textTargetCount - svg.texts.length) : 0), 0), reason: "identity/target-enumeration-incomplete" } };
+  }
 
   for (const rule of config.activeRules) {
     let result;
@@ -152,6 +186,7 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
     };
     documentNotMeasured.push(...notMeasured);
     findings.push(...result.findings);
+    evaluations.push(...(result.evaluations ?? []));
     if (result.measured > 0) measuredRuleIds.push(rule.id);
   }
 
@@ -161,6 +196,7 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
     measuredRuleCount: measuredRuleIds.length,
     findings,
     failOn: config.failOn,
+    ...(evidenceCoverage ? { evidenceCoverage } : {}),
   });
 
   // Evidence is produced before rule evaluation because it marks every source block. Rules remain
@@ -168,32 +204,128 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
   // findings they produced. A page finding binds to its page. A block finding additionally needs
   // its exact SID in the conformance set, so one good mark cannot lend evidence to another block.
   const boundSids = new Set(input.boundSids ?? []);
+  for (const evaluation of evaluations) {
+    const sid = evaluation.targetRef.sid;
+    evaluation.stableIdentity = sid ? input.sourceIdentity?.bySid[sid] ?? { status: "unavailable", value: null, candidates: [] } : { status: "unavailable", value: null, candidates: [] };
+    const block = snapshot.blocks.find(b => b.sid === sid && b.fragmentIndex === evaluation.targetRef.fragmentIndex);
+    const svg = snapshot.svg.find(s => s.texts.some(t => t.sourceAddressKey === sid));
+    const page = block?.page ?? svg?.page;
+    evaluation.evidenceBound = sid !== null && boundSids.has(sid) && page !== undefined &&
+      (input.evidence ?? []).some(e => e.page === page && e.bindsFinding);
+  }
   for (const finding of findings) {
-    const pageEvidence = input.evidence?.find((e) => e.page === finding.page) ?? null;
-    if (!pageEvidence) continue;
-    const targetBound =
-      finding.target.keyType === "page" ||
-      (finding.target.sid !== null && boundSids.has(finding.target.sid));
-    finding.evidence = {
-      ref: pageEvidence.path,
-      bindsFinding: pageEvidence.bindsFinding && targetBound,
+    const pageBox = snapshot.pages.find(p => p.pageNumber === finding.page)?.pageBox;
+    const screenBox = finding.target.boxScreen;
+    if (pageBox && screenBox && pageBox.width > 0 && pageBox.height > 0) finding.target.renderBox = {
+      x: screenBox.x - pageBox.x, y: screenBox.y - pageBox.y, width: screenBox.width, height: screenBox.height,
+      pageWidth: pageBox.width, pageHeight: pageBox.height, coordinateSystem: "css-page-top-left",
     };
+    finding.stableIdentity = finding.target.sid ? input.sourceIdentity?.bySid[finding.target.sid] ?? { status: "unavailable", value: null, candidates: [] } : { status: "unavailable", value: null, candidates: [] };
+    finding.recheck = { status: "required", reason: "repair-requires-compatible-positive-measurement", identityContract: "logical-source-value-v1" };
+    const pageEvidence = input.evidence?.find((e) => e.page === finding.page) ?? null;
+    if (pageEvidence) {
+      const targetBound =
+        finding.target.keyType === "page" ||
+        (finding.target.sid !== null && boundSids.has(finding.target.sid));
+      finding.evidence = {
+        ref: pageEvidence.path,
+        bindsFinding: pageEvidence.bindsFinding && targetBound,
+      };
+    }
+    const provenance = snapshot.source.provenance;
+    const sourceAddress = finding.target.sid;
+    const original = sourceAddress ? snapshot.source.originalMap?.[sourceAddress] ?? null : null;
+    const ambiguous = sourceAddress ? snapshot.source.originalAmbiguity?.[sourceAddress] ?? [] : [];
+    const declaredRole = provenance?.sourceRole ?? "unknown";
+    const inventory = original
+      ? snapshot.source.files?.find((entry) => entry.file === original.file) ?? null
+      : null;
+    // An exact range without an inventory-bound original file is a locator, not a verified
+    // original. Do not turn producer metadata into an uncheckable positive assertion.
+    // Producer mappings to dependencies/assets are provenance, not an authoring edit location.
+    // Only an inventory-bound authoring leaf can make a finding source-resolved or actionable.
+    const originalAuthoringLeaf = inventory?.role === "authoring";
+    const verified = provenance?.binding === "producer-bound" &&
+      provenance.copyIntegrity === "verified" && originalAuthoringLeaf;
+    const declared = provenance?.binding === "declared" && originalAuthoringLeaf;
+    const status = original && verified
+      ? "verified"
+      : original && declared
+      ? "declared"
+      : ambiguous.length > 0
+      ? "ambiguous"
+      : "unavailable";
+    const resolved = status === "verified" || status === "declared";
+    finding.originalSource = {
+      status,
+      // A source role describes a resolved original range only. An omitted original leaf must
+      // stay unknown even when another leaf in the same producer record is exact.
+      role: status === "verified" ? "exact-original-range" : resolved ? declaredRole : "unknown",
+      location: resolved ? original : null,
+      integrity: resolved && inventory
+        ? { sha256: inventory.sha256, byteLength: inventory.byteLength, role: inventory.role }
+        : null,
+      candidates: resolved ? [original!] : ambiguous,
+    };
+    finding.actionability = status === "verified" && finding.evidence.bindsFinding
+      ? "actionable"
+      : original || ambiguous.length > 0 || finding.source ? "recheck-required" : "unknown-source";
   }
 
   return {
     report: {
       path: input.path,
+      ...(input.fontIdentity ? { fontIdentity: input.fontIdentity } : {}),
+      ...(input.revision ? { revision: input.revision } : {}),
+      ...(input.comparisonScope ? { comparisonScope: input.comparisonScope } : {}),
+      ...(input.sourceIdentity ? { targetInventory: input.sourceIdentity.inventory } : {}),
+      ...(input.renderArtifact ? { renderArtifact: input.renderArtifact } : {}),
+      ...(evidenceCoverage ? { evidenceCoverage } : {}),
       inputIdentity: snapshot.meta.inputIdentity,
+      sourceBinding: {
+        input: snapshot.source.input ?? {
+          identityStatus: "unknown", rawBytesSha256: null, byteLength: null, encoding: null, complete: false,
+        },
+        provenance: snapshot.source.provenance ?? {
+          binding: "unavailable", copyIntegrity: "unavailable", sourceRole: "unknown",
+          producerId: null, receiptHash: null,
+          diagnostics: ["snapshot did not carry source provenance"],
+        },
+        files: snapshot.source.files ?? [],
+      },
       verdict,
-      exitReason: exitReasonFor(verdict, infrastructure, coverage, measuredRuleIds.length),
+      exitReason: exitReasonFor(verdict, infrastructure, coverage, measuredRuleIds.length, evidenceCoverage),
       pages: snapshot.pages.length,
       coverage,
       findings,
       notMeasured: aggregateNotMeasured(documentNotMeasured),
       infrastructure,
       evidence: input.evidence ?? [],
+      evaluations,
     },
     measuredRuleIds,
+  };
+}
+
+function evidenceCoverageFor(input: DocumentInput): DocumentEvidenceCoverage | undefined {
+  const requirement = input.evidenceRequirement;
+  if (!requirement) return undefined;
+  const expectedPages = requirement.expectedPages;
+  const pages = input.evidence ?? [];
+  const present = new Set<number>();
+  const bound = new Set<number>();
+  for (let page = 1; page <= expectedPages; page++) {
+    const matches = pages.filter(item => item.page === page);
+    if (matches.length === 1) {
+      present.add(page);
+      if (matches[0]!.bindsFinding) bound.add(page);
+    }
+  }
+  const complete = expectedPages > 0 && bound.size === expectedPages;
+  return {
+    required: requirement.required, expectedPages, writtenPages: present.size, boundPages: bound.size,
+    status: !requirement.required ? "not-requested" : complete ? "complete" : bound.size > 0 ? "partial" : "unavailable",
+    reason: requirement.required && !complete ? "evidence/required-page-binding-incomplete" : null,
   };
 }
 
@@ -203,10 +335,12 @@ function documentVerdict(input: {
   measuredRuleCount: number;
   findings: Finding[];
   failOn: FailOn;
+  evidenceCoverage?: DocumentEvidenceCoverage;
 }): RunVerdict {
   // Not every infrastructure event means exit 3. `NON_FATAL_INFRA_EVENT_KINDS` names the narrow
   // that do not, each for a reason the contract states; everything else does.
   if (input.infrastructure.some((e) => isFatalInfra(e))) return "infrastructure";
+  if (input.evidenceCoverage?.required && input.evidenceCoverage.status !== "complete") return "insufficient-coverage";
   if (input.measuredRuleCount === 0) return "insufficient-coverage";
   if (Object.values(input.coverage).some((c) => !c.ok)) return "insufficient-coverage";
   return gateTriggeredBy(input.findings, input.failOn) ? "findings" : "clean";
@@ -217,11 +351,13 @@ function exitReasonFor(
   infrastructure: InfraEvent[],
   coverage: Record<string, RuleCoverage>,
   measuredRuleCount: number,
+  evidenceCoverage?: DocumentEvidenceCoverage,
 ): string | null {
   if (verdict === "infrastructure") {
     return infrastructure.find((e) => isFatalInfra(e))?.kind ?? null;
   }
   if (verdict === "insufficient-coverage") {
+    if (evidenceCoverage?.reason) return evidenceCoverage.reason;
     if (infrastructure.some((e) => e.kind === "empty-input")) return "empty-input";
     if (measuredRuleCount === 0) return "no rule measured a single candidate";
     const short = Object.entries(coverage).find(([, c]) => !c.ok);

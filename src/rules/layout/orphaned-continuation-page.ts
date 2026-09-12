@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { pageKey } from "../../core/fingerprint.ts";
-import { declined, makeFinding, num } from "../shared.ts";
+import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
 
 /**
  * layout/orphaned-continuation-page — a page whose only content is the tail of a block.
@@ -27,6 +27,7 @@ export const orphanedContinuationPage = defineRule(
   (snapshot, ctx) => {
     const findings = [];
     const notMeasured = [];
+    const evaluations = [];
     let candidates = 0;
     let measured = 0;
     const maxNetFill = num(ctx.options.maxNetFill, 0.5);
@@ -37,6 +38,7 @@ export const orphanedContinuationPage = defineRule(
         notMeasured.push(
           declined({ scope: "page", ruleId: "layout/orphaned-continuation-page", reason: "env/parity-blank-page" }),
         );
+        evaluations.push(targetEvaluation({ ruleId: "layout/orphaned-continuation-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "not-measured", reason: "env/parity-blank-page" }));
         continue;
       }
       // A page the author forced open is a decision. Judging its fill reports the intent back.
@@ -44,15 +46,17 @@ export const orphanedContinuationPage = defineRule(
         notMeasured.push(
           declined({ scope: "page", ruleId: "layout/orphaned-continuation-page", reason: "env/forced-break" }),
         );
+        evaluations.push(targetEvaluation({ ruleId: "layout/orphaned-continuation-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "not-measured", reason: "env/forced-break" }));
         continue;
       }
       measured += 1;
 
       const onPage = snapshot.blocks.filter((b) => b.page === page.pageNumber);
-      if (onPage.length === 0) continue;
+      if (onPage.length === 0) { evaluations.push(targetEvaluation({ ruleId: "layout/orphaned-continuation-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "measured", measurements: [{ name: "continuation-only", value: false, unit: null, operator: "=", threshold: true }, { name: "net-fill", value: page.fill.net, unit: "fill ratio", operator: "<", threshold: maxNetFill }], connective: "all", violated: false })); continue; }
       const allAreContinuations = onPage.every((b) => b.fragmentIndex > 0);
-      if (!allAreContinuations) continue;
-      if (page.fill.net >= maxNetFill) continue;
+      const violated = allAreContinuations && page.fill.net < maxNetFill;
+      evaluations.push(targetEvaluation({ ruleId: "layout/orphaned-continuation-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "measured", measurements: [{ name: "continuation-only", value: allAreContinuations, unit: null, operator: "=", threshold: true }, { name: "net-fill", value: page.fill.net, unit: "fill ratio", operator: "<", threshold: maxNetFill }], connective: "all", violated }));
+      if (!violated) continue;
 
       const key = pageKey({
         firstSemanticBlockKey: page.firstSemanticBlockKey,
@@ -81,6 +85,6 @@ export const orphanedContinuationPage = defineRule(
         }),
       );
     }
-    return { findings, candidates, measured, notMeasured };
+    return { findings, candidates, measured, notMeasured, evaluations };
   },
 );

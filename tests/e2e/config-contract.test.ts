@@ -141,7 +141,7 @@ describe("Configuration Contract v1 at the CLI and engine boundary", () => {
     const run = runCli(dir, ["--demo", "--config", config, "--fail-on", "warn", "--format", "json", "--out", reportPath]);
     assert.ok([1, 4].includes(run.status ?? -1), `expected a measured demo verdict, got ${run.status}; ${run.stderr}`);
     const report = JSON.parse(readFileSync(reportPath, "utf8")) as Report;
-    assert.equal(report.schemaVersion, 3);
+    assert.equal(report.schemaVersion, 4);
     assert.equal(report.config.contractVersion, 1);
     assert.equal(report.config.profile, "strict");
     assert.equal(report.config.failOn, "warn");

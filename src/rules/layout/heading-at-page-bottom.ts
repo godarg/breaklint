@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf } from "../shared.ts";
+import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
 
 const HEADINGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
 
@@ -28,6 +28,7 @@ export const headingAtPageBottom = defineRule(
   (snapshot, ctx) => {
     const findings = [];
     const notMeasured = [];
+    const evaluations = [];
     let candidates = 0;
     let measured = 0;
     const minLineHeights = num(ctx.options.minTrailingLineHeights, 2);
@@ -46,6 +47,7 @@ export const headingAtPageBottom = defineRule(
       const outOfScope = layoutOutOfScope(block.effectiveStyle);
       if (outOfScope) {
         notMeasured.push(declined({ scope: "block", ruleId: "layout/heading-at-page-bottom", reason: outOfScope }));
+        evaluations.push(targetEvaluation({ ruleId: "layout/heading-at-page-bottom", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: outOfScope }));
         continue;
       }
       const page = pageByNumber(snapshot, block.page);
@@ -53,6 +55,7 @@ export const headingAtPageBottom = defineRule(
         notMeasured.push(
           declined({ scope: "block", ruleId: "layout/heading-at-page-bottom", reason: "env/multicolumn" }),
         );
+        evaluations.push(targetEvaluation({ ruleId: "layout/heading-at-page-bottom", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: "env/multicolumn" }));
         continue;
       }
       measured += 1;
@@ -61,12 +64,21 @@ export const headingAtPageBottom = defineRule(
       // three lines of text under it is exactly what the author wanted.
       const onPage = byPage.get(block.page) ?? [];
       const below = onPage.filter((b) => b.nodeKey !== block.nodeKey && b.box.y >= block.box.y + block.box.height - 0.5);
-      if (below.length > 0) continue;
-
       const pageBottom = page.contentBox.y + page.contentBox.height;
       const remaining = pageBottom - (block.box.y + block.box.height);
       const lineHeight = block.lineHeight > 0 ? block.lineHeight : block.effectiveStyle.fontSize * 1.2;
       const remainingInLines = lineHeight > 0 ? remaining / lineHeight : 0;
+      const violated = below.length === 0 && remainingInLines < minLineHeights;
+      const measurements = [
+        { name: "following-block-count", value: below.length, unit: "blocks", operator: "=", threshold: 0 },
+        { name: "remaining-line-heights", value: remainingInLines, unit: "line heights", operator: "<", threshold: minLineHeights },
+      ] as const;
+      if (below.length > 0) {
+        evaluations.push(targetEvaluation({ ruleId: "layout/heading-at-page-bottom", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured", measurements: [...measurements], connective: "all", violated }));
+        continue;
+      }
+
+      evaluations.push(targetEvaluation({ ruleId: "layout/heading-at-page-bottom", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured", measurements: [...measurements], connective: "all", violated }));
       if (remainingInLines >= minLineHeights) continue;
 
       findings.push(
@@ -92,6 +104,6 @@ export const headingAtPageBottom = defineRule(
         }),
       );
     }
-    return { findings, candidates, measured, notMeasured };
+    return { findings, candidates, measured, notMeasured, evaluations };
   },
 );

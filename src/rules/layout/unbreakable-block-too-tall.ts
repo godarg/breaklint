@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf } from "../shared.ts";
+import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
 
 /**
  * layout/unbreakable-block-too-tall — a block that promises not to break is taller than a page.
@@ -26,14 +26,37 @@ export const unbreakableBlockTooTall = defineRule(
   (snapshot, ctx) => {
     const findings = [];
     const notMeasured = [];
+    const evaluations = [];
     let candidates = 0;
     let measured = 0;
 
     for (const block of snapshot.blocks) {
       const avoids = /\bavoid(-page)?\b/u.test(block.effectiveStyle.breakInside);
-      if (!avoids) continue;
+      const visible = block.effectiveStyle.visibility === "visible";
+      if (!visible || !avoids) {
+        // The retained DOM target is only an allowable applicability change when it remains
+        // visible. Hiding it is recorded separately and never resembles a positive repair.
+        evaluations.push(targetEvaluation({
+          ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+          fragmentIndex: block.fragmentIndex, boxScreen: block.box,
+          status: visible ? "not-applicable" : "excluded", countsTowardCoverage: false,
+          reason: visible ? "rule/break-inside-not-avoid" : "rule/target-not-visible",
+          measurements: [
+            { name: "break-inside-avoid", value: avoids, unit: null, operator: "=", threshold: true },
+            { name: "target-visible", value: visible, unit: null, operator: "=", threshold: true },
+          ], connective: "all", violated: null,
+        }));
+        continue;
+      }
       // One fragment per block is enough: the block's height is a property of the block.
-      if (block.fragmentIndex !== 0) continue;
+      if (block.fragmentIndex !== 0) {
+        evaluations.push(targetEvaluation({
+          ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+          fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-applicable",
+          countsTowardCoverage: false, reason: "rule/non-initial-fragment",
+        }));
+        continue;
+      }
       candidates += 1;
 
       const outOfScope = layoutOutOfScope(block.effectiveStyle);
@@ -41,6 +64,7 @@ export const unbreakableBlockTooTall = defineRule(
         notMeasured.push(
           declined({ scope: "block", ruleId: "layout/unbreakable-block-too-tall", reason: outOfScope }),
         );
+        evaluations.push(targetEvaluation({ ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: outOfScope }));
         continue;
       }
       const page = pageByNumber(snapshot, block.page);
@@ -50,6 +74,7 @@ export const unbreakableBlockTooTall = defineRule(
         notMeasured.push(
           declined({ scope: "block", ruleId: "layout/unbreakable-block-too-tall", reason: "env/multicolumn" }),
         );
+        evaluations.push(targetEvaluation({ ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: "env/multicolumn" }));
         continue;
       }
       measured += 1;
@@ -58,6 +83,7 @@ export const unbreakableBlockTooTall = defineRule(
       // exposed so the threshold is a value rather than a hidden comparison — at 1.0 it is
       // exactly the arithmetic claim, and nothing else is defensible as an error.
       const limit = page.contentBox.height * num(ctx.options.toleranceRatio, 1.0);
+      evaluations.push(targetEvaluation({ ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured", measurements: [{ name: "block-height", value: block.box.height, unit: "px", operator: ">", threshold: limit }], violated: block.box.height > limit }));
       if (block.box.height <= limit) continue;
 
       findings.push(
@@ -83,6 +109,6 @@ export const unbreakableBlockTooTall = defineRule(
         }),
       );
     }
-    return { findings, candidates, measured, notMeasured };
+    return { findings, candidates, measured, notMeasured, evaluations };
   },
 );

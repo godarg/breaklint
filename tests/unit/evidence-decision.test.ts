@@ -17,7 +17,8 @@
  */
 
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -26,7 +27,7 @@ import type { PageLike } from "../../src/acquire/browser.ts";
 import { IS } from "../../src/core/enums.ts";
 import { produceEvidence } from "../../src/render/evidence.ts";
 import { OVERLAY_GLOBALS, OVERLAY_SOURCE } from "../../src/render/overlay.ts";
-import type { PlacedMark } from "../../src/render/overlay.ts";
+import type { PlacedMark, UnplacedMark } from "../../src/render/overlay.ts";
 import type { PdfTextPage, RasterDiff, RasterPage, Rasterizer } from "../../src/render/rasterizer.ts";
 
 const PX_PER_MM = 96 / 25.4;
@@ -44,6 +45,7 @@ const VALID_PNG = Uint8Array.from([
 
 interface OverlayState {
   marks: PlacedMark[];
+  unplacedMarks?: UnplacedMark[];
   layers: number;
   staticPageAreas: number;
   detached: number;
@@ -82,7 +84,7 @@ class FakePage implements PageLike {
     if (fn === OVERLAY_SOURCE) return "fake-overlay-capability";
     if (fn.includes(OVERLAY_GLOBALS.control) && fn.includes('"install"')) {
       return { value: {
-        marks: this.state.marks, layers: this.state.layers, staticPageAreas: this.state.staticPageAreas,
+        marks: this.state.marks, unplacedMarks: this.state.unplacedMarks ?? [], layers: this.state.layers, staticPageAreas: this.state.staticPageAreas,
       }, unauthorizedCalls: 0 };
     }
     if (fn.includes(OVERLAY_GLOBALS.control) && fn.includes('"readback"')) {
@@ -263,6 +265,24 @@ describe("the evidence verdict", () => {
     assert.equal(r.evidence[0]?.bindsFinding, true);
   });
 
+  for (const diff of [0, 73]) {
+    it(`persists exactly the selected PDF and binds PNG bytes when raster difference is ${diff}`, async () => {
+      const r = await run({}, { diff, textItems: MATCHING_TEXT });
+      assert.ok(r.pdfArtifact, "the checked PDF must remain available to the consumer");
+      const saved = readFileSync(join(outDir, r.pdfArtifact.path));
+      assert.deepEqual(saved, Buffer.from(diff === 0 ? r.candidates.marked! : r.candidates.baseline));
+      assert.equal(r.pdfArtifact.sha256, createHash("sha256").update(saved).digest("hex"));
+      assert.equal(r.pdfArtifact.byteLength, saved.byteLength);
+      const page = r.evidence[0]!;
+      const png = readFileSync(join(outDir, page.path));
+      assert.deepEqual(page.integrity, {
+        sha256: createHash("sha256").update(png).digest("hex"), byteLength: png.byteLength,
+        widthPx: 1, heightPx: 1, coordinateSystem: "raster-pixels-top-left", dpi: 96,
+      });
+      assert.equal(page.bindsFinding, diff === 0, "persisting an artifact cannot restore rejected binding");
+    });
+  }
+
   it("publishes an artifact-relative evidence reference even when the output directory is absolute", async () => {
     const r = await run({}, { diff: 0, textItems: MATCHING_TEXT });
     const reference = r.evidence[0]?.path;
@@ -271,6 +291,16 @@ describe("the evidence verdict", () => {
     assert.equal(reference, "case-page-001.png", "the reference must be relative to the evidence artefact root");
     assert.equal(existsSync(join(outDir, reference)), true, "the reference does not resolve from the evidence artefact directory");
   });
+
+  for (const sid of ["b1", "unplaced-entirely"]) {
+    it(`retains the actual unplaced side for ${sid} without lending another target's binding`, async () => {
+      const r = await run({ unplacedMarks: [{ sid, page: 1, side: "end", reason: "fragment-outside-page" }] },
+        { diff: 0, textItems: MATCHING_TEXT });
+      assert.deepEqual(r.evidence[0]!.unplacedMarks, [{ sid, side: "end", reason: "fragment-outside-page" }]);
+      assert.equal(r.evidence[0]!.bindsFinding, sid === "b1", "a real placed side suffices; a wholly absent target cannot borrow one");
+      assert.ok(r.notMeasured.some(item => item.reason === "env/evidence-fragment-outside-page" && item.target?.sid === sid));
+    });
+  }
 
   it("a target out of tolerance makes the page unverified even though every mark was refound", async () => {
     // The defect an audit found and the live corpus could not reach: asking "were all marks

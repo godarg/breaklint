@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { makeFinding, sourceOf } from "../shared.ts";
+import { makeFinding, sourceOf, targetEvaluation } from "../shared.ts";
 import { isExcludedRun, pageOfBlock } from "./shared-type.ts";
 
 /** Space, U+002D, space. Not an en dash, not an em dash — the character that is wrong here. */
@@ -31,18 +31,20 @@ export const spacedHyphen = defineRule(
   },
   (snapshot, ctx) => {
     const findings = [];
+    const evaluations = [];
     let candidates = 0;
     let measured = 0;
     const locale = String(ctx.options.locale ?? "de-DE");
     const windowSize = Number(ctx.options.mathWindow ?? 12);
     const extra = (ctx.options.excludeTags as readonly string[] | undefined) ?? [];
 
-    for (const run of snapshot.textRuns) {
+    for (const [runIndex, run] of snapshot.textRuns.entries()) {
       candidates += 1;
       // An excluded run is not "not measured" — it is not a candidate for this rule at all.
       // Counting it as declined would make coverage look worse than it is.
       if (isExcludedRun(run, locale, extra)) {
         candidates -= 1;
+        evaluations.push(targetEvaluation({ ruleId: "type/spaced-hyphen", keyType: "block", nodeKey: run.blockKey, sid: null, occurrenceKey: String(runIndex), status: "excluded", reason: "configured-or-semantic-text-exclusion" }));
         continue;
       }
       measured += 1;
@@ -57,9 +59,10 @@ export const spacedHyphen = defineRule(
         if (!firstContext) firstContext = around.trim();
       }
       const permitted = Number(ctx.options.maxOccurrences ?? 0);
+      const block = snapshot.blocks.find((b) => b.nodeKey === run.blockKey);
+      evaluations.push(targetEvaluation({ ruleId: "type/spaced-hyphen", keyType: "block", nodeKey: run.blockKey, sid: block?.sid ?? null, occurrenceKey: String(runIndex), boxScreen: block?.box ?? null, status: "measured", measurements: [{ name: "spaced-hyphen-occurrences", value: hits, unit: "occurrences", operator: ">", threshold: permitted }], violated: hits > permitted }));
       if (hits <= permitted) continue;
 
-      const block = snapshot.blocks.find((b) => b.nodeKey === run.blockKey);
       findings.push(
         makeFinding({
           ctx,
@@ -86,7 +89,7 @@ export const spacedHyphen = defineRule(
         }),
       );
     }
-    return { findings, candidates, measured, notMeasured: [] };
+    return { findings, candidates, measured, notMeasured: [], evaluations };
   },
 );
 

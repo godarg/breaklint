@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, pageByNumber, sourceOf } from "../shared.ts";
+import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
 
 /**
  * layout/orphan — the closing lines of a block on a page are fewer than the author asked for.
@@ -24,6 +24,7 @@ export const orphan = defineRule(
   (snapshot, ctx) => {
     const findings = [];
     const notMeasured = [];
+    const evaluations = [];
     let candidates = 0;
     let measured = 0;
 
@@ -35,21 +36,35 @@ export const orphan = defineRule(
       const outOfScope = layoutOutOfScope(block.effectiveStyle);
       if (outOfScope) {
         notMeasured.push(declined({ scope: "block", ruleId: "layout/orphan", reason: outOfScope }));
+        evaluations.push(targetEvaluation({ ruleId: "layout/orphan", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: outOfScope }));
         continue;
       }
       const page = pageByNumber(snapshot, block.page);
       if (page?.outgoingBreakCause.kind === "forced") {
         notMeasured.push(declined({ scope: "block", ruleId: "layout/orphan", reason: "env/forced-break" }));
+        evaluations.push(targetEvaluation({ ruleId: "layout/orphan", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: "env/forced-break" }));
         continue;
       }
       measured += 1;
 
       const lines = linesOfBlock(snapshot, block.nodeKey).length;
+      const required = block.effectiveStyle.orphans + num(ctx.options.extraLines, 0);
+      const violated = lines > 0 && lines < required && required > 1;
+      evaluations.push(targetEvaluation({
+        ruleId: "layout/orphan", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+        fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured",
+        measurements: [
+          { name: "orphan-applicable-closing-lines", value: lines > 0, unit: null, operator: "=", threshold: true },
+          { name: "closing-fragment-lines", value: lines, unit: "lines", operator: "<", threshold: required },
+          { name: "orphans-requirement-exceeds-one", value: required, unit: "lines", operator: ">", threshold: 1 },
+        ],
+        connective: "all",
+        violated,
+      }));
       // A fragment with no visible text line has no text to strand. Found by the corpus
       // cross-check: without this the rule reports "0 lines" on a fragment carrying only a
       // figure or an image — a false alarm on every document that splits around a picture.
       if (lines === 0) continue;
-      const required = block.effectiveStyle.orphans + num(ctx.options.extraLines, 0);
       if (lines >= required || required <= 1) continue;
 
       findings.push(
@@ -75,6 +90,6 @@ export const orphan = defineRule(
         }),
       );
     }
-    return { findings, candidates, measured, notMeasured };
+    return { findings, candidates, measured, notMeasured, evaluations };
   },
 );

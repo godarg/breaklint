@@ -10,18 +10,17 @@
 
 import { createServer, type Server } from "node:http";
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
-import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
-import { pathToFileURL } from "node:url";
+import { basename, dirname, extname, join, posix, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse, type DefaultTreeAdapterMap } from "parse5";
 
 import {
   launchBrowser,
   captureProcessTreeOwnership,
   ownServerLifecycle,
-  resolveDocumentUri,
   resolvePackageRoot,
   terminateProcessTree,
   type BrowserLike,
@@ -32,6 +31,7 @@ import {
   type ResponseLike,
 } from "./browser.ts";
 import { IS, SUPPORTED_PAGEDJS_VERSION } from "../core/enums.ts";
+import { measureCapturedFontIdentity, prepareCapturedFontIdentity, releaseCapturedFontIdentity } from "../source/font-identity.ts";
 import { sha256Short } from "../core/fingerprint.ts";
 import type { DocumentInput } from "../core/engine.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
@@ -84,6 +84,7 @@ import { produceEvidence, type EvidenceOutcome } from "../render/evidence.ts";
 import { openRasterizer, type OpenRasterizerResult } from "../render/rasterizer.ts";
 import { collisionDetail, detectCollision, type CollisionSource } from "../source/collision.ts";
 import { injectSourceIds } from "../source/inject.ts";
+import { captureBoundedSourceFile, decodeUtf8Strict, StrictUtf8Error } from "../source/bytes.ts";
 import { closeRendererOwnedResourcesBounded } from "./renderer-cleanup.ts";
 
 export interface RenderOptions {
@@ -103,6 +104,26 @@ export interface RenderResult {
   fatal: { message: string; exitCode: 2 | 3 } | null;
   environment: RenderEnvironment | null;
 }
+
+/** Internal virtual input: every byte was captured by the producer before this renderer starts. */
+export interface CapturedRenderInput {
+  path: string;
+  html: Buffer;
+  assets: ReadonlyMap<string, { bytes: Buffer; logicalPath: string }>;
+  sourceRefForOutput?: (start: number, end: number) => SourceRef | null;
+  sourceFiles?: readonly { file: string; sha256: string; byteLength: number; role: "authoring" | "dependency" | "asset" }[];
+  producer?: { id: string; receiptHash: string; codeSha256: string; optionsSha256: string };
+}
+
+export interface CapturedResourceInput {
+  /** Producer-record logical input path, never a host filesystem path. */
+  logicalPath: string;
+  bytes: Buffer;
+  role: "dependency" | "asset";
+}
+
+/** A produced document named a local resource that the current producer did not capture. */
+export class CapturedResourceClosureError extends Error {}
 
 export interface RenderDependencies {
   launchBrowser: typeof launchBrowser;
@@ -249,7 +270,10 @@ export function resolvePagedjs(fromDir: string): {
 interface ServedDocument {
   server: Server;
   origin: string;
+  documentRoute: string;
   resources: ResourceRecord[];
+  /** Actual loopback route, kept separately from the public file/artifact identity. */
+  resourceRoutes: ReadonlyMap<ResourceRecord, string>;
   select(variant: "injected" | "control"): void;
   close(): Promise<void>;
 }
@@ -304,15 +328,39 @@ export function paginationBundleSource(pagedjs: string): string {
 async function serveDocument(input: {
   injectedHtml: string;
   controlHtml: string;
-  assets: ReadonlyMap<string, string>;
+  assets: ReadonlyMap<string, CapturedAsset>;
   documentRoot: string;
   blocked: { count: number };
+  /** Captured producer inputs have logical artifact identities, never fictional host file URIs. */
+  resourceScheme?: "artifact";
+  /** The public virtual route for the selected HTML. It preserves relative URL resolution. */
+  documentRoute?: string;
 }): Promise<ServedDocument> {
   const resources: ResourceRecord[] = [];
+  const resourceRoutes = new Map<ResourceRecord, string>();
+  const record = (pathname: string, resource: ResourceRecord): void => {
+    resources.push(resource);
+    resourceRoutes.set(resource, pathname);
+  };
   let selected: "injected" | "control" | null = null;
   const recordLocal = (pathname: string, candidate: string | null, status: number, body: Buffer | null): void => {
+    if (input.resourceScheme === "artifact") {
+      const requestedUri = `artifact:${pathname}`;
+      const resolvedUri = candidate ? `artifact:${candidate.startsWith("/") ? candidate : `/${candidate}`}` : requestedUri;
+      record(pathname, {
+        requestedUri,
+        resolvedUri,
+        scheme: "artifact",
+        origin: "artifact://",
+        status,
+        bytes: body?.length ?? 0,
+        sha256: body ? createHash("sha256").update(body).digest("hex") : null,
+        outcome: status >= 200 && status < 400 ? "loaded" : status === 403 ? "blocked" : "failed",
+      });
+      return;
+    }
     const lexical = resolve(input.documentRoot, `.${pathname}`);
-    resources.push({
+    record(pathname, {
       requestedUri: pathToFileURL(lexical).href,
       resolvedUri: candidate ? pathToFileURL(candidate).href : pathToFileURL(lexical).href,
       scheme: "file",
@@ -325,7 +373,7 @@ async function serveDocument(input: {
   };
   const server = createServer((req, res) => {
     const raw = req.url?.split("?", 1)[0] ?? "/";
-    if (raw === "/document.html") {
+    if (raw === (input.documentRoute ?? "/document.html")) {
       if (selected === null) { res.writeHead(503).end(); return; }
       const body = selected === "injected" ? input.injectedHtml : input.controlHtml;
       res.writeHead(200, { "content-type": MIME[".html"], "content-length": Buffer.byteLength(body) }).end(body);
@@ -338,28 +386,22 @@ async function serveDocument(input: {
       res.writeHead(400).end();
       return;
     }
-    const candidate = input.assets.get(pathname);
-    if (!candidate) {
+    const asset = input.assets.get(pathname);
+    if (!asset) {
       input.blocked.count += 1;
       recordLocal(pathname, null, 403, null);
       res.writeHead(403).end();
       return;
     }
     try {
-      const bytes = statSync(candidate).size;
-      if (bytes > MAX_RESOURCE_BYTES) {
-        recordLocal(pathname, candidate, 413, null);
-        res.writeHead(413).end();
-        return;
-      }
-      const body = readFileSync(candidate);
-      recordLocal(pathname, candidate, 200, body);
+      const body = asset.bytes;
+      recordLocal(pathname, asset.real, 200, body);
       res.writeHead(200, {
-        "content-type": MIME[extname(candidate).toLowerCase()] ?? "application/octet-stream",
+        "content-type": MIME[extname(asset.real).toLowerCase()] ?? "application/octet-stream",
         "content-length": body.length,
       }).end(body);
     } catch {
-      recordLocal(pathname, candidate, 404, null);
+      recordLocal(pathname, asset?.real ?? null, 404, null);
       res.writeHead(404).end();
     }
   });
@@ -372,7 +414,9 @@ async function serveDocument(input: {
   return {
     server,
     origin: `http://127.0.0.1:${address.port}`,
+    documentRoute: input.documentRoute ?? "/document.html",
     resources,
+    resourceRoutes,
     select(variant) { selected = variant; },
     close: async () => {
       const error = await lifecycle.close();
@@ -386,15 +430,22 @@ function localReference(raw: string): boolean {
     !/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(raw);
 }
 
-function pathInside(realRoot: string, candidate: string): string | null {
-  let real: string;
+/** Bytes captured during discovery. The loopback server never opens a path after this point. */
+interface CapturedAsset {
+  real: string;
+  bytes: Buffer;
+  text: string | null;
+}
+
+function captureRegularFile(root: string, relativePath: string, maxBytes: number): Buffer {
   try {
-    real = realpathSync(candidate);
-  } catch {
-    return null;
+    return captureBoundedSourceFile(root, relativePath, maxBytes, "document resource");
+  } catch (error) {
+    if (error instanceof Error && /exceeds byte limit|bounded regular file/u.test(error.message)) {
+      throw new ResourceLimitError({ maxResourceBytes: maxBytes, resourceBytes: maxBytes + 1, resource: relativePath });
+    }
+    throw error;
   }
-  const rel = relative(realRoot, real);
-  return rel !== "" && !rel.startsWith("..") && !rel.includes(`..${sep}`) ? real : null;
 }
 
 class ResourceLimitError extends Error {
@@ -408,12 +459,15 @@ class ResourceLimitError extends Error {
 function resolveLocalReference(realRoot: string, raw: string, from: string): { real: string; route: string } | null {
   const ref = raw.trim().split(/[?#]/u, 1)[0] ?? "";
   if (!localReference(ref)) return null;
-  const resolved = resolveDocumentUri(ref, from, realRoot);
-  if (!resolved.insideDistributionRoot || !resolved.filePath) return null;
-  const real = pathInside(realRoot, resolved.filePath);
-  if (!real) return null;
-  const lexicalRel = relative(realRoot, real);
-  return { real, route: `/${lexicalRel.split(sep).join("/")}` };
+  // Keep the lexical components until the bounded reader has lstat'ed every one. Calling
+  // realpath here would collapse an in-root symlink before that check and turn it into an
+  // apparently ordinary file.
+  const candidate = ref.startsWith("/")
+    ? resolve(realRoot, `.${ref}`)
+    : resolve(dirname(from), ref);
+  const lexicalRel = relative(realRoot, candidate);
+  if (!lexicalRel || lexicalRel.startsWith("..") || lexicalRel.includes(`..${sep}`)) return null;
+  return { real: candidate, route: `/${lexicalRel.split(sep).join("/")}` };
 }
 
 type ParsedNode = DefaultTreeAdapterMap["node"];
@@ -433,7 +487,8 @@ function parsedText(node: ParsedNode): string {
 function cssReferences(text: string): string[] {
   const refs: string[] = [];
   // @import "x.css" / 'x.css'. @import url(...) is collected by the url loop exactly once.
-  for (const match of text.matchAll(/@import\s+["']([^"']+)["']/giu)) if (match[1]) refs.push(match[1]);
+  // CSS comments are whitespace, including between `@import` and the quoted URL.
+  for (const match of text.matchAll(/@import(?:\s|\/\*[\s\S]*?\*\/)+["']([^"']+)["']/giu)) if (match[1]) refs.push(match[1]);
   for (const match of text.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s)'";]+))\s*\)/giu)) {
     const value = match[1] ?? match[2] ?? match[3];
     if (value) refs.push(value);
@@ -441,15 +496,134 @@ function cssReferences(text: string): string[] {
   return refs;
 }
 
-function cssImportReferences(text: string): string[] {
-  const refs: string[] = [];
-  for (const match of text.matchAll(
-    /@import\s+(?:url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s)'";]+))\s*\)|"([^"]*)"|'([^']*)')/giu,
-  )) {
-    const value = match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5];
-    if (value) refs.push(value);
+/** References which cause a browser resource fetch, deliberately excluding navigation anchors. */
+type HtmlResourceReference = {
+  raw: string;
+  requiredStylesheet: boolean;
+  /** Static root-relative script/style URLs belong to the deployment origin, not necessarily this file tree. */
+  deploymentRequiredRole: "stylesheet" | "script" | null;
+};
+
+function htmlResourceReferences(html: string): HtmlResourceReference[] {
+  const references: HtmlResourceReference[] = [];
+  const add = (raw: string, requiredStylesheet = false, deploymentRequiredRole: "stylesheet" | "script" | null = null): void => {
+    references.push({ raw, requiredStylesheet, deploymentRequiredRole });
+  };
+  const document = parse(html);
+  const walk = (node: ParsedNode): void => {
+    if (parsedElement(node)) {
+      const tag = node.tagName.toLowerCase();
+      const attrs = Object.fromEntries(node.attrs.map((attr) => [attr.name.toLowerCase(), attr.value]));
+      const linkRel = new Set((attrs.rel ?? "").toLowerCase().split(/\s+/u));
+      const hrefIsResource = tag === "link" && ["stylesheet", "preload", "modulepreload", "icon", "manifest"].some((rel) => linkRel.has(rel));
+      if (attrs.href && (hrefIsResource || tag === "image" || tag === "use")) {
+        add(
+          attrs.href,
+          tag === "link" && linkRel.has("stylesheet"),
+          tag === "link" && linkRel.has("stylesheet") ? "stylesheet" :
+            (tag === "link" && linkRel.has("modulepreload") ? "script" : null),
+        );
+      }
+      for (const attribute of ["src", "poster", "data"]) if (attrs[attribute]) {
+        add(attrs[attribute]!, false, tag === "script" && attribute === "src" ? "script" : null);
+      }
+      if (attrs.srcset) {
+        for (const candidate of attrs.srcset.split(",")) {
+          const reference = candidate.trim().split(/\s+/u)[0];
+          if (reference) add(reference);
+        }
+      }
+      if (attrs.style) for (const raw of cssReferences(attrs.style)) add(raw);
+      if (tag === "style") for (const raw of cssReferences(parsedText(node))) add(raw);
+    }
+    for (const child of (node as { childNodes?: ParsedNode[] }).childNodes ?? []) walk(child);
+  };
+  walk(document);
+  return references;
+}
+
+interface LocalAssetDiscovery {
+  assets: Map<string, CapturedAsset>;
+  /**
+   * Root-relative static script/style URLs can name a web deployment root which is deliberately
+   * outside a standalone source artifact. These routes remain blocked and recorded by loopback;
+   * they are not represented as missing document-local filesystem inputs.
+   */
+  externalDeploymentRequiredRoutes: Set<string>;
+}
+
+function virtualLogicalReference(fromLogicalPath: string, raw: string): string | null {
+  const ref = raw.trim().split(/[?#]/u, 1)[0] ?? "";
+  if (!localReference(ref)) return null;
+  const absolute = ref.startsWith("/")
+    ? posix.normalize(ref)
+    : posix.resolve("/", posix.dirname(fromLogicalPath), ref);
+  const logical = absolute.slice(1);
+  return isSafeVirtualLogicalPath(logical) ? logical : null;
+}
+
+function isSafeVirtualLogicalPath(value: string): boolean {
+  return value.length > 0 && !value.includes("\\") && !value.includes("\0") &&
+    value.split("/").every((part) => part.length > 0 && part !== "." && part !== "..");
+}
+
+function virtualHttpRoute(fromRoute: string, raw: string): string | null {
+  const ref = raw.trim().split(/[?#]/u, 1)[0] ?? "";
+  if (!localReference(ref)) return null;
+  try {
+    const pathname = new URL(ref, `http://breaklint.invalid${fromRoute}`).pathname;
+    return pathname.startsWith("/") ? pathname : null;
+  } catch {
+    return null;
   }
-  return refs;
+}
+
+/**
+ * Build the exact loopback allowlist for a captured producer output. It shares the document/CSS
+ * reference grammar with normal acquisition but never reads a filesystem path: every served byte
+ * came from the validated producer record. Authoring leaves cannot become HTTP resources.
+ */
+export function capturedResourceClosure(
+  html: string,
+  outputPath: string,
+  resources: readonly CapturedResourceInput[],
+): Map<string, { bytes: Buffer; logicalPath: string }> {
+  if (!isSafeVirtualLogicalPath(outputPath)) throw new CapturedResourceClosureError(`unsafe produced output path: ${outputPath}`);
+  const candidates = new Map<string, CapturedResourceInput>();
+  for (const resource of resources) {
+    if (!isSafeVirtualLogicalPath(resource.logicalPath) || candidates.has(resource.logicalPath)) {
+      throw new CapturedResourceClosureError(`invalid duplicate captured resource path: ${resource.logicalPath}`);
+    }
+    candidates.set(resource.logicalPath, resource);
+  }
+  const assets = new Map<string, { bytes: Buffer; logicalPath: string }>();
+  const visitedCss = new Set<string>();
+  const add = (raw: string, fromLogicalPath: string, fromRoute: string): void => {
+    const local = raw.trim().split(/[?#]/u, 1)[0] ?? "";
+    if (!localReference(local)) return;
+    const logicalPath = virtualLogicalReference(fromLogicalPath, raw);
+    const route = virtualHttpRoute(fromRoute, raw);
+    if (logicalPath === null || route === null) {
+      throw new CapturedResourceClosureError(`unsafe local resource reference ${raw} from ${fromLogicalPath}`);
+    }
+    const resource = candidates.get(logicalPath);
+    if (!resource) {
+      throw new CapturedResourceClosureError(
+        `produced resource ${logicalPath} referenced from ${fromLogicalPath} was not captured as a dependency or asset`,
+      );
+    }
+    const prior = assets.get(route);
+    if (prior && prior.logicalPath !== logicalPath) {
+      throw new CapturedResourceClosureError(`two captured resources resolve to the same browser route: ${route}`);
+    }
+    assets.set(route, { bytes: Buffer.from(resource.bytes), logicalPath });
+    if (extname(logicalPath).toLowerCase() !== ".css" || visitedCss.has(logicalPath)) return;
+    visitedCss.add(logicalPath);
+    const css = decodeUtf8Strict(resource.bytes, logicalPath);
+    for (const reference of cssReferences(css)) add(reference, logicalPath, route);
+  };
+  for (const reference of htmlResourceReferences(html)) add(reference.raw, outputPath, `/${outputPath}`);
+  return assets;
 }
 
 /**
@@ -457,57 +631,77 @@ function cssImportReferences(text: string): string[] {
  * the document or by a reachable stylesheet are served; symlinks are resolved before the root
  * check, so a sibling link cannot turn an arbitrary outside file into an allowed resource.
  */
-export function discoverLocalAssets(html: string, file: string, maxBytes = MAX_RESOURCE_BYTES): Map<string, string> {
+function discoverLocalAssetClosure(html: string, file: string, maxBytes = MAX_RESOURCE_BYTES): LocalAssetDiscovery {
   const root = realpathSync(dirname(resolve(file)));
-  const assets = new Map<string, string>();
+  const assets = new Map<string, CapturedAsset>();
+  const externalDeploymentRequiredRoutes = new Set<string>();
   const visitedCss = new Set<string>();
   const sized = new Set<string>();
   let totalBytes = 0;
-  const add = (raw: string, from: string): void => {
+  const add = (reference: HtmlResourceReference, from: string): void => {
+    const { raw, requiredStylesheet } = reference;
     const resolved = resolveLocalReference(root, raw, from);
-    if (!resolved) return;
-    if (!sized.has(resolved.real)) {
-      const bytes = statSync(resolved.real).size;
-      totalBytes += bytes;
-      sized.add(resolved.real);
-      if (bytes > maxBytes || totalBytes > maxBytes) {
-        throw new ResourceLimitError({ maxResourceBytes: maxBytes, resourceBytes: totalBytes, resource: resolved.real });
+    if (!resolved) {
+      if (requiredStylesheet && localReference(raw.trim().split(/[?#]/u, 1)[0] ?? "")) {
+        throw new Error(`required local resource is absent or outside the document root: ${raw}`);
       }
-    }
-    assets.set(resolved.route, resolved.real);
-    if (extname(resolved.real).toLowerCase() !== ".css" || visitedCss.has(resolved.real)) return;
-    visitedCss.add(resolved.real);
-    let css: string;
-    try {
-      css = readFileSync(resolved.real, "utf8");
-    } catch {
       return;
     }
-    for (const ref of cssReferences(css)) add(ref, resolved.real);
-  };
-  const document = parse(html);
-  const walk = (node: ParsedNode): void => {
-    if (parsedElement(node)) {
-      const attrs = Object.fromEntries(node.attrs.map((attr) => [attr.name.toLowerCase(), attr.value]));
-      for (const attribute of ["href", "src", "poster", "data"]) {
-        const value = attrs[attribute];
-        if (value) add(value, resolve(file));
-      }
-      if (attrs.srcset) {
-        for (const candidate of attrs.srcset.split(",")) {
-          const ref = candidate.trim().split(/\s+/u)[0];
-          if (ref) add(ref, resolve(file));
+    let captured = [...assets.values()].find((asset) => asset.real === resolved.real);
+    if (!sized.has(resolved.real)) {
+      let bytes: Buffer;
+      try { bytes = captureRegularFile(root, resolved.route.slice(1), maxBytes); }
+      catch (error) {
+        // An absolute path in a static script/style tag is an origin-relative deployment route,
+        // not proof that the standalone document tree owns a same-named leaf. This matters for
+        // reviewed source artifacts that intentionally omit the deployment's asset bundle. Keep
+        // its HTTP 403 in input identity, but do not invent a missing local filesystem input.
+        // Relative stylesheets and any dynamic stylesheet request retain the fail-closed path.
+        if (
+          reference.deploymentRequiredRole !== null && raw.trim().startsWith("/") &&
+          (error as NodeJS.ErrnoException).code === "ENOENT"
+        ) {
+          externalDeploymentRequiredRoutes.add(resolved.route);
+          return;
         }
+        // A local symlink is an explicit denial, not a fallback to its target. It is omitted
+        // from the loopback allowlist and the browser will receive the usual blocked resource.
+        if (error instanceof Error && /symlink/u.test(error.message)) {
+          if (requiredStylesheet) throw new Error(`required local resource is unsafe: ${raw}`);
+          return;
+        }
+        // Missing non-stylesheet leaves must reach the browser as a typed 403: the font and image
+        // barriers decide whether their concrete rendered geometry still permits measurement.
+        // A required stylesheet has no equivalent geometry oracle and remains acquisition-fatal.
+        if (!requiredStylesheet && (error as NodeJS.ErrnoException).code === "ENOENT") return;
+        throw error;
       }
-      if (attrs.style) for (const ref of cssReferences(attrs.style)) add(ref, resolve(file));
-      if (node.tagName.toLowerCase() === "style") {
-        for (const ref of cssReferences(parsedText(node))) add(ref, resolve(file));
+      totalBytes += bytes.length;
+      sized.add(resolved.real);
+      if (totalBytes > maxBytes) {
+        throw new ResourceLimitError({ maxResourceBytes: maxBytes, resourceBytes: totalBytes, resource: resolved.real });
       }
+      const extension = extname(resolved.real).toLowerCase();
+      captured = { real: resolved.real, bytes, text: extension === ".css" ? decodeUtf8Strict(bytes, resolved.real) : null };
     }
-    for (const child of (node as { childNodes?: ParsedNode[] }).childNodes ?? []) walk(child);
+    if (!captured) throw new Error(`captured asset was lost: ${resolved.real}`);
+    assets.set(resolved.route, captured);
+    if (extname(resolved.real).toLowerCase() !== ".css" || visitedCss.has(resolved.real)) return;
+    visitedCss.add(resolved.real);
+    const css = captured.text;
+    if (css === null) return;
+    for (const ref of cssReferences(css)) add({ raw: ref, requiredStylesheet: false, deploymentRequiredRole: null }, resolved.real);
   };
-  walk(document);
-  return assets;
+  // `root` is canonical (macOS commonly exposes both /var and /private/var). Resolve the
+  // document base beneath that same root so an alias does not look like an escape, while asset
+  // components themselves remain lexical until the bounded reader validates them.
+  const documentBase = join(root, basename(resolve(file)));
+  for (const reference of htmlResourceReferences(html)) add(reference, documentBase);
+  return { assets, externalDeploymentRequiredRoutes };
+}
+
+export function discoverLocalAssets(html: string, file: string, maxBytes = MAX_RESOURCE_BYTES): Map<string, CapturedAsset> {
+  return discoverLocalAssetClosure(html, file, maxBytes).assets;
 }
 
 function measuredResources(
@@ -554,45 +748,21 @@ export function documentArtifactKey(path: string, ordinal: number, runId: string
 }
 
 /** Local stylesheets are part of the collision gate, including an @import chain. */
-export function collisionSources(html: string, file: string, maxBytes = MAX_RESOURCE_BYTES): CollisionSource[] {
+export function collisionSources(
+  html: string,
+  assetsOrFile: ReadonlyMap<string, CapturedAsset> | string,
+  maxBytes = MAX_RESOURCE_BYTES,
+): CollisionSource[] {
+  // Compatibility for focused unit callers. Production passes its already-captured map, and is
+  // therefore never permitted to reopen the resource tree between collision and serving.
+  const assets = typeof assetsOrFile === "string" ? discoverLocalAssets(html, assetsOrFile, maxBytes) : assetsOrFile;
   const out: CollisionSource[] = [{ origin: "document", text: html }];
-  const root = realpathSync(dirname(resolve(file)));
-  const visited = new Set<string>();
-  let totalBytes = 0;
-  const readCss = (href: string, from: string): void => {
-    const candidate = resolveLocalReference(root, href, from)?.real ?? null;
-    if (!candidate || visited.has(candidate)) return;
-    visited.add(candidate);
-    const bytes = statSync(candidate).size;
-    totalBytes += bytes;
-    if (bytes > maxBytes || totalBytes > maxBytes) {
-      throw new ResourceLimitError({ maxResourceBytes: maxBytes, resourceBytes: totalBytes, resource: candidate });
-    }
-    let text: string;
-    try {
-      text = readFileSync(candidate, "utf8");
-    } catch {
-      return;
-    }
-    out.push({ origin: candidate, text });
-    for (const ref of cssImportReferences(text)) readCss(ref, candidate);
-  };
-  const document = parse(html);
-  const walk = (node: ParsedNode): void => {
-    if (parsedElement(node) && node.tagName.toLowerCase() === "link") {
-      const attrs = Object.fromEntries(node.attrs.map((attr) => [attr.name.toLowerCase(), attr.value]));
-      if ((attrs.rel ?? "").split(/\s+/u).some((token) => token.toLowerCase() === "stylesheet") && attrs.href) {
-        readCss(attrs.href, resolve(file));
-      }
-    }
-    if (parsedElement(node) && node.tagName.toLowerCase() === "style") {
-      const css = (node as { childNodes?: Array<{ value?: string }> }).childNodes
-        ?.map((child) => child.value ?? "").join("") ?? "";
-      for (const ref of cssImportReferences(css)) readCss(ref, resolve(file));
-    }
-    for (const child of (node as { childNodes?: ParsedNode[] }).childNodes ?? []) walk(child);
-  };
-  walk(document);
+  const seen = new Set<string>();
+  for (const asset of assets.values()) {
+    if (extname(asset.real).toLowerCase() !== ".css" || seen.has(asset.real) || asset.text === null) continue;
+    seen.add(asset.real);
+    out.push({ origin: asset.real, text: asset.text });
+  }
   return out;
 }
 
@@ -610,6 +780,8 @@ function normalisedAllowedOrigins(options: RenderOptions): Set<string> {
 
 interface NetworkTracker {
   resources: ResourceRecord[];
+  /** Browser-observed fetch roles, including local server requests and dynamic stylesheet loads. */
+  localRequestRoles: Map<string, Set<string>>;
   redirects: { from: string; to: string; status: number }[];
   inFlight: Set<RequestLike>;
   pendingBodies: Set<Promise<void>>;
@@ -628,7 +800,7 @@ async function configureNetwork(
 ): Promise<NetworkTracker> {
   const allowed = normalisedAllowedOrigins(options);
   const tracker: NetworkTracker = {
-    resources: [], redirects: [], inFlight: new Set(), pendingBodies: new Set(), afterRendered: false,
+    resources: [], localRequestRoles: new Map(), redirects: [], inFlight: new Set(), pendingBodies: new Set(), afterRendered: false,
     activityAfterRendered: 0, loadedBytes: 0, limitExceeded: null, errors: [],
   };
   const records = new Map<RequestLike, ResourceRecord>();
@@ -641,6 +813,13 @@ async function configureNetwork(
     let permit = false;
     try {
       const url = new URL(request.url());
+      if (url.origin === localOrigin) {
+        const roles = tracker.localRequestRoles.get(url.pathname) ?? new Set<string>();
+        // Puppeteer's resource type records the request role independently of its filename.
+        // Unknown drivers decline the ambient exemption instead of silently accepting a failure.
+        roles.add((request as RequestLike & { resourceType?: () => string }).resourceType?.() ?? "unknown");
+        tracker.localRequestRoles.set(url.pathname, roles);
+      }
       permit =
         url.origin === localOrigin ||
         ["data:", "blob:", "about:"].includes(url.protocol) ||
@@ -782,11 +961,20 @@ export function finalizeEvidenceAcquisition(
   snapshot: NonNullable<DocumentInput["snapshot"]>,
   infrastructure: readonly InfraEvent[],
   evidence: EvidenceOutcome,
+  evidenceRequired?: boolean,
 ): DocumentInput {
   const allInfrastructure = [...infrastructure, ...evidence.infrastructure];
+  const renderArtifact = evidence.pdfArtifact ? {
+    ...evidence.pdfArtifact, kind: "diagnostic-pdf" as const,
+    inputHtmlSha256: snapshot.meta.inputIdentity?.html ?? null,
+    withEvidenceOverlay: evidence.deliveredWithOverlay,
+    relation: "same-acquisition" as const, delivery: "not-asserted" as const,
+  } : undefined;
   if (fatalInfrastructure(allInfrastructure)) {
     return {
       path,
+      ...(renderArtifact ? { renderArtifact } : {}),
+      ...(evidenceRequired !== undefined ? { evidenceRequirement: { required: evidenceRequired, expectedPages: snapshot.pages.length } } : {}),
       snapshot: null,
       infrastructure: allInfrastructure,
       evidence: [],
@@ -796,6 +984,8 @@ export function finalizeEvidenceAcquisition(
   }
   return {
     path,
+    ...(renderArtifact ? { renderArtifact } : {}),
+    ...(evidenceRequired !== undefined ? { evidenceRequirement: { required: evidenceRequired, expectedPages: snapshot.pages.length } } : {}),
     snapshot,
     infrastructure: allInfrastructure,
     evidence: evidence.evidence,
@@ -1219,9 +1409,11 @@ const CASCADE_HINT_SOURCE = `(() => {
 async function openContentPage(
   context: AcquireContext,
   origin: string,
+  documentRoute: string,
   expectedSids: readonly string[],
   installCollector: boolean,
   signal: AbortSignal,
+  observeNetwork?: (network: NetworkTracker) => void,
 ): Promise<OpenedContentPage> {
   if (!context.browser.createBrowserContext) {
     throw new Error("the browser driver exposes no isolated browser-context boundary");
@@ -1268,6 +1460,10 @@ async function openContentPage(
   const close = async (): Promise<void> => {
     if (closed) return;
     const errors: string[] = [];
+    if (page) {
+      try { await withTimeout(releaseCapturedFontIdentity(page), BROWSER_CLOSE_TIMEOUT_MS, "font session.detach"); }
+      catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
+    }
     if (ownedPage) {
       try { await withTimeout(ownedPage.close(), BROWSER_CLOSE_TIMEOUT_MS, "content page.close"); }
       catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
@@ -1309,8 +1505,10 @@ async function openContentPage(
     await page.evaluateOnNewDocument(primitivesSource(apparatusCapability));
     await page.evaluateOnNewDocument(integritySourceWithCapability(expectedSids, apparatusCapability));
     const network = await configureNetwork(page, origin, context.options, context.blocked);
+    observeNetwork?.(network);
+    await prepareCapturedFontIdentity(page);
     await page.setViewport({ width: 1000, height: 800, deviceScaleFactor: 1 });
-    await page.goto(`${origin}/document.html`, { waitUntil: "networkidle0", timeout: PAGINATION_TIMEOUT_MS });
+    await page.goto(`${origin}${documentRoute}`, { waitUntil: "networkidle0", timeout: PAGINATION_TIMEOUT_MS });
     if (pageErrors.length > 0) throw new Error(`content page error before apparatus install: ${pageErrors.join(" | ")}`);
     await enforceOperationalLimits(page, network, 0, "pre-pagination");
     await page.evaluate<void>(paginationBundleSource(context.pagedjsSource));
@@ -1383,7 +1581,16 @@ async function openContentPage(
       throw new OperationalBoundaryFailure([{
         kind: "document-not-quiescent",
         detail: "network activity did not settle after afterRendered",
-        measured: { stage: "post-pagination", inFlight: network.inFlight.size, pendingBodies: network.pendingBodies.size },
+        measured: { stage: "post-pagination", inFlight: network.inFlight.size, pendingBodies: network.pendingBodies.size,
+          inFlightKinds: [...network.inFlight].map(request => {
+            const kind = (request as RequestLike & { resourceType?: () => string }).resourceType?.() ?? "unknown";
+            return ["font", "document", "stylesheet", "image", "script", "other"].includes(kind) ? kind : "unknown";
+          }),
+          inFlightSchemes: [...network.inFlight].map(request => {
+            try { const scheme = new URL(request.url()).protocol; return ["http:", "https:", "blob:", "data:", "about:"].includes(scheme) ? scheme : "unknown"; }
+            catch { return "unknown"; }
+          }),
+        },
       }]);
     }
     await enforceOperationalLimits(page, network, postPagination.mutationRecordsAfterRendered, "post-pagination");
@@ -1407,28 +1614,48 @@ async function openContentPage(
   }
 }
 
-async function acquireOne(path: string, ordinal: number, context: AcquireContext, signal: AbortSignal): Promise<DocumentInput> {
+async function acquireOne(path: string, ordinal: number, context: AcquireContext, signal: AbortSignal, captured?: CapturedRenderInput): Promise<DocumentInput> {
   const infrastructure: InfraEvent[] = [];
-  const inputBytes = statSync(path).size;
-  if (inputBytes > MAX_RESOURCE_BYTES) {
+  let original: string;
+  let originalBytes: Buffer;
+  try {
+    if (!captured && lstatSync(path).isSymbolicLink()) throw new Error("input symlink is not accepted");
+    originalBytes = captured ? Buffer.from(captured.html) : captureRegularFile(dirname(resolve(path)), basename(resolve(path)), MAX_RESOURCE_BYTES);
+    original = decodeUtf8Strict(originalBytes, path);
+  } catch (error) {
     return { path, snapshot: null, infrastructure: [{
-      kind: "limit-exceeded",
-      detail: `input exceeds maxResourceBytes=${MAX_RESOURCE_BYTES}`,
-      measured: { maxResourceBytes: MAX_RESOURCE_BYTES, resourceBytes: inputBytes, resource: resolve(path) },
+      kind: error instanceof StrictUtf8Error ? "source-input-invalid" : "source-acquisition-failed",
+      detail: `input capture failed: ${error instanceof Error ? error.message : String(error)}`,
+      measured: { stage: "input-capture" },
     }] };
   }
-  const original = readFileSync(path, "utf8");
-  let sources: CollisionSource[];
+  let assets: Map<string, CapturedAsset>;
+  let externalDeploymentRequiredRoutes = new Set<string>();
   try {
-    sources = collisionSources(original, path);
+    if (captured) {
+      assets = new Map([...captured.assets.entries()].map(([route, asset]) => [route, {
+        real: `/${asset.logicalPath}`,
+        bytes: Buffer.from(asset.bytes),
+        text: extname(asset.logicalPath).toLowerCase() === ".css" ? decodeUtf8Strict(asset.bytes, asset.logicalPath) : null,
+      }]));
+    } else {
+      const discovery = discoverLocalAssetClosure(original, path);
+      assets = discovery.assets;
+      externalDeploymentRequiredRoutes = discovery.externalDeploymentRequiredRoutes;
+    }
   } catch (error) {
     if (error instanceof ResourceLimitError) {
       return { path, snapshot: null, infrastructure: [{
         kind: "limit-exceeded", detail: error.message, measured: error.measured,
       }] };
     }
-    throw error;
+    return { path, snapshot: null, infrastructure: [{
+      kind: error instanceof StrictUtf8Error ? "source-input-invalid" : "source-acquisition-failed",
+      detail: `resource snapshot failed: ${error instanceof Error ? error.message : String(error)}`,
+      measured: { stage: "resource-capture" },
+    }] };
   }
+  const sources = collisionSources(original, assets);
   const collision = detectCollision(sources);
   if (context.options.sourceMapInjection && collision.collided) {
     return {
@@ -1459,30 +1686,38 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       };
     }
   }
+  const originalMap: Record<string, SourceRef> = {};
+  if (captured?.sourceRefForOutput && context.options.sourceMapInjection) {
+    for (const [key, ref] of Object.entries(injected.map)) {
+      const resolved = captured.sourceRefForOutput(ref.offset, ref.endOffset);
+      if (resolved) originalMap[key] = resolved;
+    }
+  }
   const additionalCss = sources.slice(1).map((source) => ({ origin: source.origin, text: source.text }));
   const sourceModel = buildSourceModel(injected.html, path, additionalCss);
-  let assets: Map<string, string>;
-  try {
-    assets = discoverLocalAssets(original, path);
-  } catch (error) {
-    if (error instanceof ResourceLimitError) {
-      return { path, snapshot: null, infrastructure: [{
-        kind: "limit-exceeded", detail: error.message, measured: error.measured,
-      }] };
-    }
-    throw error;
-  }
   const served = await serveDocument({
     // The paginator is installed over the browser-driver boundary after navigation. Keep these
     // bytes identical to the authored/injected documents so their CSP remains authoritative.
     injectedHtml: injected.html,
     controlHtml: original,
     assets,
-    documentRoot: dirname(resolve(path)),
+    documentRoot: captured ? "/" : dirname(resolve(path)),
+    ...(captured ? { resourceScheme: "artifact" as const } : {}),
+    ...(captured ? { documentRoute: `/${path}` } : {}),
     blocked: context.blocked,
   });
 
   let openedMain: OpenedContentPage | null = null;
+  const observedNetworks: NetworkTracker[] = [];
+  const observeNetwork = (network: NetworkTracker): void => { observedNetworks.push(network); };
+  let acquisition: DocumentInput["acquisition"];
+  const currentAcquisition = (): NonNullable<DocumentInput["acquisition"]> => {
+    const resources = measuredResources([], served.origin, served.resources, observedNetworks.flatMap(network => network.resources));
+    return { resources, inputIdentity: inputIdentity({
+      html: original, browserVersion: context.browserVersion, platform: process.platform,
+      fontFamilies: [], resources, redirects: observedNetworks.flatMap(network => network.redirects),
+    }) };
+  };
   const closePage = async (): Promise<void> => {
     if (!openedMain) return;
     await openedMain.close();
@@ -1491,7 +1726,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     let controlSignature: ControlSignature | null = null;
     if (context.options.sourceMapInjection) {
       served.select("control");
-      const controlOpened = await openContentPage(context, served.origin, [], false, signal);
+      const controlOpened = await openContentPage(context, served.origin, served.documentRoute, [], false, signal, observeNetwork);
       try {
         await controlOpened.page.evaluate<void>(freezeSource(controlOpened.apparatusCapability));
         const controlStable = await awaitStableLayout({
@@ -1513,14 +1748,16 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
 
     served.select("injected");
     const expectedSids = context.options.sourceMapInjection
-      ? orderedSourceSids(injected.map)
+      ? orderedSourceSids(injected.map).filter((key) => key.startsWith("s"))
       : [];
     const opened = await openContentPage(
       context,
       served.origin,
+      served.documentRoute,
       expectedSids,
       true,
       signal,
+      observeNetwork,
     );
     openedMain = opened;
     const page = opened.page;
@@ -1604,7 +1841,9 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     if (opened.network.errors.length > 0) {
       infrastructure.push({
         kind: "checker-crashed",
-        detail: `network provenance could not be completed: ${opened.network.errors.slice(0, 3).join("; ")}`,
+        detail: captured
+          ? "captured document network provenance could not be completed; private driver errors withheld"
+          : `network provenance could not be completed: ${opened.network.errors.slice(0, 3).join("; ")}`,
         measured: { stage: "network-provenance", errors: opened.network.errors.length },
       });
     }
@@ -1684,11 +1923,53 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       resources,
       redirects: opened.network.redirects,
     });
+    acquisition = { inputIdentity: identity, resources };
+    const fontIdentity = captured?.producer && captured.sourceFiles
+      ? await measureCapturedFontIdentity(page, original, resources, captured.sourceFiles)
+      : undefined;
+    // Failed resource-bearing requests veto measurement. A loopback 403 for an authored XHR or
+    // `preload as=fetch` is still observed and recorded in input identity, but it is not a layout
+    // resource and cannot make a completed rendered page unmeasurable. The fixture exercises this
+    // distinction with denied XHR/preload probes. Remote failures remain fatal because they cannot
+    // be tied to a local browser request role under the captured-resource closure.
+    // Fonts and images have dedicated browser barriers below: a failed font is fatal and a failed
+    // image is accepted only after its actual rendered box matches explicit authored dimensions.
+    const requiredLocalRoles = new Set(["stylesheet", "script", "media"]);
+    const failedRequiredResources = resources.filter((resource) => {
+      // Inline data/blob/about resources never cross the local-file or network allowlist. The
+      // existing decode/font gates handle them; synthetic performance-only null-status records
+      // must not invent a load failure when this tracker did not observe one.
+      if (resource.status === null && ["data", "blob", "about"].includes(resource.scheme) &&
+          !opened.network.resources.includes(resource)) return false;
+      if (resource.outcome === "loaded" && (resource.status === null || resource.status < 400)) return false;
+      try {
+        const pathname = served.resourceRoutes.get(resource);
+        if (!pathname) return true;
+        if (externalDeploymentRequiredRoutes.has(pathname)) return false;
+        const roles = opened.network.localRequestRoles.get(pathname);
+        return !!roles && [...roles].some((role) => requiredLocalRoles.has(role));
+      }
+      catch { return true; }
+    });
+    if (failedRequiredResources.length > 0) {
+      await closePage();
+      return {
+        path,
+        snapshot: null,
+        acquisition: { inputIdentity: identity, resources },
+        infrastructure: [{
+          kind: "source-acquisition-failed",
+          detail: `required document resource request failed: ${failedRequiredResources.slice(0, 4).map((resource) => `${resource.resolvedUri} (${resource.status})`).join(", ")}`,
+          measured: { stage: "resource-request", failures: failedRequiredResources.length },
+        }],
+      };
+    }
     const snapshot = assembleSnapshot({
       raw,
       collector,
       sourceModel,
       sourceMap: injected.map,
+      originalSourceMap: originalMap,
       sourceMapInjection: context.options.sourceMapInjection,
       renderer: context.rendererPath,
       browserVersion: context.browserVersion,
@@ -1701,6 +1982,23 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       evidenceOverlayApplied: false,
       cascadeHints: opened.cascadeHints,
       resources,
+      sourceInput: {
+        identityStatus: "verified",
+        rawBytesSha256: createHash("sha256").update(originalBytes).digest("hex"),
+        byteLength: originalBytes.length,
+        encoding: "utf-8",
+        complete: true,
+      },
+      ...(captured?.sourceFiles === undefined ? {} : { sourceFiles: captured.sourceFiles }),
+      sourceProvenance: captured?.producer
+        ? {
+          // Exact editability is per SID in originalSourceMap, never a document-wide claim.
+          binding: "producer-bound", copyIntegrity: "verified",
+          producerId: captured.producer.id, receiptHash: captured.producer.receiptHash,
+          codeSha256: captured.producer.codeSha256, optionsSha256: captured.producer.optionsSha256,
+          diagnostics: [],
+        }
+        : { binding: "unavailable", copyIntegrity: "unavailable", diagnostics: [] },
     });
     const invariantValidation = validateSnapshotInvariants(snapshot, {
       sourceMapInjection: context.options.sourceMapInjection,
@@ -1746,7 +2044,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       // A fatal post-assembly gate means the measured state cannot be used as a basis for rule
       // findings.  Returning it would let callers write a report that mixes an Exit-3 integrity
       // failure with ordinary findings from a state we have explicitly withdrawn.
-      return { path, snapshot: null, infrastructure };
+      return { path, snapshot: null, infrastructure, acquisition };
     }
     mkdirSync(context.options.outDir, { recursive: true });
     const documentKey = documentArtifactKey(path, ordinal, context.runId);
@@ -1823,19 +2121,32 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     // only here invalidates the state just as surely as a pre-PDF failure: do not hand callers a
     // snapshot or evidence that could still be rendered as ordinary rule findings.
     if (fatalInfrastructure(infrastructure)) await closePage();
-    return finalizeEvidenceAcquisition(path, snapshot, infrastructure, evidence);
+    const finalized = finalizeEvidenceAcquisition(path, snapshot, infrastructure, evidence,
+      context.options.evidenceBinding && context.options.sourceMapInjection);
+    return finalized.snapshot ? { ...finalized, ...(fontIdentity ? { fontIdentity } : {}) } : { ...finalized, acquisition };
   } catch (error) {
     let cleanup = "";
     try { await closePage(); }
     catch (closeError) { cleanup = `; owned page cleanup failed: ${closeError instanceof Error ? closeError.message : String(closeError)}`; }
+    const failedAcquisition = acquisition ?? currentAcquisition();
+    const failedRequests = failedAcquisition.resources.filter(resource => resource.outcome !== "loaded");
+    const failureEvents: InfraEvent[] = error instanceof OperationalBoundaryFailure ? error.events : [{
+      kind: error instanceof FontLoadFailure ? "font-load-failed" : "checker-crashed",
+      detail: captured
+        ? `captured document acquisition failed at the browser/driver boundary; private error details withheld${cleanup ? "; owned page cleanup failed" : ""}`
+        : `live acquisition failed at the browser/driver boundary: ${error instanceof Error ? error.message : String(error)}${cleanup}`,
+      measured: { stage: "measure" },
+    }];
+    if (failedRequests.length > 0) failureEvents.push({
+      kind: "source-acquisition-failed",
+      detail: "document resource acquisition did not complete; typed request outcomes are retained",
+      measured: { stage: "resource-request", failures: failedRequests.length },
+    });
     return {
       path,
       snapshot: null,
-      infrastructure: error instanceof OperationalBoundaryFailure ? error.events : [{
-        kind: error instanceof FontLoadFailure ? "font-load-failed" : "checker-crashed",
-        detail: `live acquisition failed at the browser/driver boundary: ${error instanceof Error ? error.message : String(error)}${cleanup}`,
-        measured: { stage: "measure" },
-      }],
+      acquisition: failedAcquisition,
+      infrastructure: failureEvents,
     };
   } finally {
     const cleanupResults = await Promise.allSettled([closePage(), served.close()]);
@@ -1854,8 +2165,10 @@ export async function renderDocuments(
   paths: readonly string[],
   options: RenderOptions,
   dependencies: RenderDependencies = DEFAULT_DEPENDENCIES,
+  capturedByPath?: ReadonlyMap<string, CapturedRenderInput>,
+  peerResolutionDir = process.cwd(),
 ): Promise<RenderResult> {
-  const paged = resolvePagedjs(process.cwd());
+  const paged = resolvePagedjs(peerResolutionDir);
   if (!paged.ok || !paged.path) {
     return { documents: [], fatal: { exitCode: 3, message: paged.detail }, environment: null };
   }
@@ -1876,7 +2189,7 @@ export async function renderDocuments(
   }
   let launched: Awaited<ReturnType<typeof launchBrowser>>;
   try {
-    launched = await dependencies.launchBrowser(process.cwd());
+    launched = await dependencies.launchBrowser(peerResolutionDir);
   } catch (error) {
     return {
       documents: [],
@@ -1900,7 +2213,7 @@ export async function renderDocuments(
     browserVersion = await browser.version();
     startupStage = "openRasterizer";
     rasterizerResult = await dependencies.openRasterizer(browser, {
-      fromDir: process.cwd(),
+      fromDir: peerResolutionDir,
       contentPagesOpen: () => contentPages.size,
     });
     if (!rasterizerResult.rasterizer && rasterizerResult.fatal) {
@@ -1948,7 +2261,7 @@ export async function renderDocuments(
   try {
     for (const [ordinal, path] of paths.entries()) {
       const controller = new AbortController();
-      const acquisition = acquireOne(path, ordinal, context, controller.signal);
+      const acquisition = acquireOne(path, ordinal, context, controller.signal, capturedByPath?.get(path));
       try {
         documents.push(await withTimeout(acquisition, documentTimeoutMs, `document ${path}`));
         if (context.ownershipFailed) break;
@@ -2057,4 +2370,20 @@ export async function renderDocuments(
       networkBlocked: blocked.count,
     },
   };
+}
+
+/** Internal produced-document renderer. It shares the normal browser/rule acquisition path. */
+export async function renderCapturedDocuments(
+  inputs: readonly CapturedRenderInput[],
+  options: RenderOptions,
+  dependencies: RenderDependencies = DEFAULT_DEPENDENCIES,
+): Promise<RenderResult> {
+  const paths = inputs.map((input) => input.path);
+  if (new Set(paths).size !== paths.length) {
+    return { documents: [], fatal: { exitCode: 3, message: "captured producer outputs have duplicate logical paths" }, environment: null };
+  }
+  // A public installed API must resolve optional peers from its own package, not from whichever
+  // project happened to call it. The CLI retains its caller-CWD behavior through renderDocuments.
+  const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+  return renderDocuments(paths, options, dependencies, new Map(inputs.map((input) => [input.path, input])), packageRoot);
 }

@@ -137,6 +137,11 @@ function snapshot(parts: {
       complete: true,
       injectedAttribute: "data-bl-sid",
       collisionChecked: true,
+      input: { identityStatus: "unknown", rawBytesSha256: null, byteLength: null, encoding: null, complete: false },
+      provenance: {
+        binding: "unavailable", copyIntegrity: "unavailable", sourceRole: "unknown",
+        producerId: null, receiptHash: null, diagnostics: ["fixture has no source-bound provenance"],
+      },
     },
     pages: parts.pages ?? [page(1)],
     blocks: parts.blocks ?? [],

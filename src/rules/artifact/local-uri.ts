@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { resourceKey } from "../../core/fingerprint.ts";
-import { makeFinding } from "../shared.ts";
+import { makeFinding, targetEvaluation } from "../shared.ts";
 
 /**
  * artifact/local-uri — a reference that only resolves on the machine that built the document.
@@ -31,23 +31,28 @@ export const localUri = defineRule(
   },
   (snapshot, ctx) => {
     const findings = [];
+    const evaluations = [];
     let candidates = 0;
     let measured = 0;
 
     const permitted = Number(ctx.options.maxOccurrences ?? 0);
     let seen = 0;
-    for (const ref of snapshot.uriRefs) {
+    for (const [refIndex, ref] of snapshot.uriRefs.entries()) {
       candidates += 1;
       measured += 1;
 
       const scheme = ref.scheme.toLowerCase();
       // A data: URI carries its own content; a relative path travels with the document.
-      if (scheme === "data" || scheme === "") continue;
+      if (scheme === "data" || scheme === "") {
+        evaluations.push(targetEvaluation({ ruleId: "artifact/local-uri", keyType: "resource", nodeKey: ref.nodeKey, sid: null, occurrenceKey: String(refIndex), status: "measured", measurements: [{ name: "is-local-uri", value: false, unit: null, operator: "=", threshold: true }, { name: "local-uri-occurrence-index", value: seen, unit: "occurrences", operator: ">", threshold: permitted }], connective: "all", violated: false }));
+        continue;
+      }
       const isFileScheme = scheme === "file";
       const isAbsoluteLocalPath = /^\/(?!\/)/u.test(ref.rawValue) && !/^\/\//u.test(ref.rawValue);
-      if (!isFileScheme && !isAbsoluteLocalPath) continue;
-      seen += 1;
-      if (seen <= permitted) continue;
+      const local = isFileScheme || isAbsoluteLocalPath;
+      if (local) seen += 1;
+      evaluations.push(targetEvaluation({ ruleId: "artifact/local-uri", keyType: "resource", nodeKey: ref.nodeKey, sid: null, occurrenceKey: String(refIndex), status: "measured", measurements: [{ name: "is-local-uri", value: local, unit: null, operator: "=", threshold: true }, { name: "local-uri-occurrence-index", value: seen, unit: "occurrences", operator: ">", threshold: permitted }], connective: "all", violated: local && seen > permitted }));
+      if (!local || seen <= permitted) continue;
 
       findings.push(
         makeFinding({
@@ -71,6 +76,6 @@ export const localUri = defineRule(
         }),
       );
     }
-    return { findings, candidates, measured, notMeasured: [] };
+    return { findings, candidates, measured, notMeasured: [], evaluations };
   },
 );

@@ -81,6 +81,53 @@ redaction layer before HTML rendering.
 The report can therefore be archived or opened offline. Keep the JSON alongside it when the full
 machine-readable record is required.
 
+## Public bounded review bundle
+
+The installed package also exposes three report-only helpers. They accept a canonical document
+Report 4 (and the renderer accepts the distinct screen-report profile); they do not acquire
+documents, run a browser, or turn report strings into commands.
+
+```ts
+import { createContextPack, renderReport, writeReportBundle } from "breaklint";
+
+const context = createContextPack(report, { maxFindings: 40 });
+const html = renderReport(report, { theme: "dark" });
+const bundle = writeReportBundle(report, {
+  outDir: "./breaklint-report",
+  evidenceDir: "./run/evidence",
+});
+```
+
+`context.json` is a bounded AI-facing projection. It names the canonical run, whether its finding
+selection is complete, the number and reason for omitted entries, an untrusted-data notice, and a
+fixed operation vocabulary: `inspect-source`, `inspect-evidence`, and `recheck-after-repair`.
+It also carries at most 30 actual typed infrastructure and nonmeasurement diagnostics (kind,
+reason, and bounded measurement context), plus an omitted count; the full canonical report remains
+the source for all events. Host-local path tokens in those details are withheld.
+It contains no shell commands or document-controlled executable parameters. For every uniquely
+matched target evaluation it retains the canonical status, reason, named measurements, compound
+predicate and violation value rather than reconstructing a repair judgement from prose. A supplied
+compatible `comparison` is retained unchanged in `context.json` and written as `comparison.json`;
+reduced coverage, a missing target, or a disabled rule never becomes `resolved` in the view.
+
+`writeReportBundle` writes `report.json`, `context.json`, and `report.html`. The report JSON is
+copied unchanged and remains canonical. A PNG or diagnostic PDF becomes a link only when it is a
+regular file below the supplied evidence directory and its current byte length and SHA-256 equal
+the integrity record in Report 4. A failed check produces an explicit unavailable-evidence state;
+it does not retain a stale image or link. Page-relative target crops use that same verified full
+page image and retain the declared `css-page-top-left` coordinate system. Legacy Report 3 input is
+shown as legacy: it receives neither a new original-source assertion nor a repair claim.
+Screen reports retain their separate route, viewport, target and CSS-viewport coordinate semantics;
+they never acquire document page or PDF claims in this view.
+
+Each document card names the original-source status and role, exact verified range when available
+(file, line/column and byte interval), integrity digest, coordinate system, and the difference
+between an exact range and a verified container. Repair options are finite rule-specific suggestions
+with expected effect, shown only for an actionable verified source. The report always exposes the
+actual verdict, exit, infrastructure-event count and nonmeasurement count, including an empty
+finding list, and lists the same bounded typed diagnostics when they exist. Print keeps a crop and its caption together below 100 mm; a card containing a larger
+crop may fragment rather than hide or clip evidence.
+
 ## Reproducible render review
 
 The report-surface gate has two explicit modes over the complete matrix in
@@ -164,3 +211,6 @@ empty non-cover pages. When the final page continues an atomic sequence of cover
 carry at least half as many cards as the preceding coverage page, rounded up, unless its visible
 raster ink reaches the corresponding proportional depth. This permits genuinely short reports and
 tall individual cards while blocking the reproducible four-cards-plus-one nearly empty continuation.
+
+
+The portable bundle keeps `report.json` as the historical capture record. `context.json` adds `bundleEvidence` contract version 1 with current per-finding asset availability; `bundle.json` lists every copied PNG/PDF and its SHA-256 and byte length. A missing or tampered local asset remains `missing-or-integrity-failed` in both HTML and AI context. A historical report comparison is not a fresh verification of local bundle assets. Overflow crops show the visible intersection while preserving the original target coordinates.

@@ -1,7 +1,7 @@
 /** Helpers shared by rules. Nothing here reaches outside the snapshot. */
 
 import type { EnvId, KeyType, Severity } from "../core/enums.ts";
-import type { Box, Finding, NotMeasured, PageRecord, Snapshot, SourceRef } from "../core/types.ts";
+import type { Box, Finding, NotMeasured, PageRecord, Snapshot, SourceRef, TargetEvaluation } from "../core/types.ts";
 import type { RuleContext } from "../core/rule.ts";
 
 export function sourceOf(snapshot: Snapshot, sid: string | null): SourceRef | null {
@@ -48,11 +48,18 @@ export function makeFinding(input: {
   ambiguity?: Finding["ambiguity"];
 }): Finding {
   return {
+    runFindingId: `unbound-legacy-run:${input.ctx.documentPath}:${input.ruleId}:${input.nodeKey}:${input.fragmentIndex ?? 0}`,
     fingerprint: input.ctx.fingerprint({
       ruleId: input.ruleId,
       keyType: input.keyType,
       key: input.key,
     }),
+    // The v1 fingerprint key can be content- or author-id-derived and may be shared by two
+    // distinct targets. It is useful for cross-run grouping but is not yet a verified unique
+    // target identity. P3 supplies the stronger identity proof; until then, be explicit.
+    stableIdentity: input.ambiguity
+      ? { status: "ambiguous", value: null, candidates: [] }
+      : { status: "unavailable", value: null, candidates: [] },
     ruleId: input.ruleId,
     severity: input.severity,
     experimental: input.experimental ?? false,
@@ -77,6 +84,51 @@ export function makeFinding(input: {
     ambiguity: input.ambiguity ?? null,
     // Filled in by the evidence stage once the raster exists; a rule never invents a path.
     evidence: { ref: null, bindsFinding: false },
+    originalSource: {
+      status: input.source ? "declared" : "unavailable",
+      role: "unknown",
+      location: input.source,
+      integrity: null,
+      candidates: input.source ? [input.source] : [],
+    },
+    actionability: input.source ? "recheck-required" : "unknown-source",
+  };
+}
+
+export function targetEvaluation(input: {
+  ruleId: string;
+  keyType: KeyType;
+  nodeKey: string;
+  sid: string | null;
+  fragmentIndex?: number;
+  boxScreen?: Box | null;
+  status: TargetEvaluation["status"];
+  /** Required only when one concrete source address has multiple independent decisions. */
+  occurrenceKey?: string;
+  targetCount?: number;
+  countsTowardCoverage?: boolean;
+  reason?: string | null;
+  measurements?: TargetEvaluation["measurements"];
+  connective?: TargetEvaluation["predicate"]["connective"];
+  violated?: boolean | null;
+}): TargetEvaluation {
+  return {
+    ruleId: input.ruleId,
+    semanticsVersion: "rule-decision-v1",
+    targetRef: {
+      keyType: input.keyType,
+      nodeKey: input.nodeKey,
+      sid: input.sid,
+      fragmentIndex: input.fragmentIndex ?? 0,
+      boxScreen: input.boxScreen ?? null,
+    },
+    status: input.status,
+    ...(input.occurrenceKey === undefined ? {} : { occurrenceKey: input.occurrenceKey }),
+    ...(input.targetCount === undefined ? {} : { targetCount: input.targetCount }),
+    ...(input.countsTowardCoverage === undefined ? {} : { countsTowardCoverage: input.countsTowardCoverage }),
+    reason: input.reason ?? null,
+    measurements: input.measurements ?? [],
+    predicate: { connective: input.connective ?? "single", violated: input.violated ?? null },
   };
 }
 

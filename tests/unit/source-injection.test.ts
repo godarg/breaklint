@@ -144,6 +144,27 @@ describe("source id injection", () => {
     }
   });
 
+  it("uses raw UTF-8 byte ranges and Unicode-codepoint columns, including BOM and CRLF", () => {
+    const html = `\uFEFF💡<p>x</p>\r\n<p>y</p>`;
+    const { map } = injectSourceIds(html, "chapter.html");
+    const [first, second] = Object.values(map).sort((a, b) => a.offset - b.offset);
+    assert.deepEqual(
+      { offset: first?.offset, line: first?.line, column: first?.column, coordinateSystem: first?.coordinateSystem },
+      { offset: 7, line: 1, column: 3, coordinateSystem: "utf8-bytes-unicode-codepoints-v1" },
+    );
+    assert.deepEqual(
+      { offset: second?.offset, line: second?.line, column: second?.column },
+      { offset: 17, line: 2, column: 1 },
+    );
+    assert.ok((first?.endOffset ?? 0) > (first?.offset ?? 0), "source range must be non-empty");
+  });
+
+  it("maps SVG source addresses without pretending they are stable identities", () => {
+    const { map } = injectSourceIds(`<svg><text>a</text></svg>`, "chart.html");
+    assert.ok(map.bt000, "the SVG run address needs its own exact source range");
+    assert.equal(map.bt000?.file, "chart.html");
+  });
+
   /**
    * Elements the parser synthesised get no id, and the count says how many there were.
    *

@@ -14,6 +14,7 @@
  * whose design is missing is not a gap, it is a hole.
  */
 
+import { randomUUID } from "node:crypto";
 import { readFileSync, existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, extname, relative, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -132,6 +133,7 @@ export async function main(argv: string[]): Promise<number> {
   );
 
   const report = buildReport({
+    runId: randomUUID(),
     outcomes,
     mode,
     source,

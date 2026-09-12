@@ -228,7 +228,11 @@ describe("the live path fails closed at its process boundary", () => {
   it("orders more than ten thousand source IDs by source offset, not lexical suffix", () => {
     const map = Object.fromEntries(Array.from({ length: 10_001 }, (_, index) => [
       `s${String(index).padStart(4, "0")}`,
-      { file: "large.html", line: index + 1, column: 1, offset: index * 10 },
+      {
+        file: "large.html", line: index + 1, column: 1, offset: index * 10,
+        endLine: index + 1, endColumn: 2, endOffset: index * 10 + 1,
+        coordinateSystem: "utf8-bytes-unicode-codepoints-v1" as const,
+      },
     ]));
     const ordered = orderedSourceSids(map);
     assert.equal(ordered.length, 10_001);
@@ -743,21 +747,37 @@ describe("the live path fails closed at its process boundary", () => {
     const lateContext = new Promise<{ newPage(): Promise<PageLike>; close(): Promise<void> }>((resolve) => {
       resolveContext = resolve;
     });
-    setTimeout(() => resolveContext?.({
-      async newPage() { throw new Error("late context must not create a page"); },
-      async close() { throw new Error("late context close refused"); },
-    }), 45);
-    const result = await renderDocuments(["README.md"], OPTIONS, {
-      documentTimeoutMs: 20,
-      async launchBrowser() {
-        return { executablePath: "/fake", detail: "", browser: {
-          async newPage() { throw new Error("default context forbidden"); },
-          createBrowserContext: async () => lateContext,
-          async version() { return "Fake/1"; }, async close() {},
-        } };
-      },
-      async openRasterizer() { return { rasterizer: null, detail: "unit" }; },
-    });
+    let aborted = 0;
+    const originalAbort = AbortController.prototype.abort;
+    AbortController.prototype.abort = function (this: AbortController, reason?: unknown): void {
+      originalAbort.call(this, reason);
+      const resolve = resolveContext;
+      if (resolve) {
+        resolveContext = null;
+        aborted += 1;
+        resolve({
+          async newPage() { throw new Error("late context must not create a page"); },
+          async close() { throw new Error("late context close refused"); },
+        });
+      }
+    };
+    let result: Awaited<ReturnType<typeof renderDocuments>>;
+    try {
+      result = await renderDocuments(["README.md"], OPTIONS, {
+        documentTimeoutMs: 20,
+        async launchBrowser() {
+          return { executablePath: "/fake", detail: "", browser: {
+            async newPage() { throw new Error("default context forbidden"); },
+            createBrowserContext: async () => lateContext,
+            async version() { return "Fake/1"; }, async close() {},
+          } };
+        },
+        async openRasterizer() { return { rasterizer: null, detail: "unit" }; },
+      });
+    } finally {
+      AbortController.prototype.abort = originalAbort;
+    }
+    assert.equal(aborted, 1, "the fixture must resolve its context from the observed timeout abort");
     assert.ok(result.documents[0]!.infrastructure.some((event) =>
       event.kind === "checker-crashed" && event.measured?.stage === "document-timeout-join" &&
       /late context close refused/u.test(event.detail)));
@@ -962,7 +982,8 @@ describe("the live path fails closed at its process boundary", () => {
     const result = await renderDocuments(["tests/fixtures/live-chain.html"], OPTIONS, dependencies);
     assert.equal(pagesOpened, 0);
     assert.equal(result.documents[0]!.snapshot, null);
-    assert.deepEqual(result.documents[0]!.infrastructure[0]!.measured, { stage: "provenance", issues: 1 });
+    assert.equal(result.documents[0]!.infrastructure[0]!.measured?.stage, "provenance");
+    assert.ok(Number(result.documents[0]!.infrastructure[0]!.measured?.issues) >= 1, "every corrupted source range must remain fatal");
     assert.equal(exitCodeFor(result.documents), 3);
   });
 
@@ -1016,16 +1037,21 @@ describe("the live path fails closed at its process boundary", () => {
       infrastructure: [{ kind: "checker-crashed", detail: "PNG encode failed after PDF reconciliation", measured: { stage: "evidence" } }],
       notMeasured: [], boundSids: new Set([snapshot.blocks[0]!.sid!]), marks: [], ambiguousMarks: 0,
       deliveredPdf: new Uint8Array(), deliveredWithOverlay: false, overlayInstalled: false,
+      pdfArtifact: { path: "doc-checked.pdf", sha256: "a".repeat(64), byteLength: 17 },
       candidates: { marked: null, baseline: new Uint8Array() },
     } satisfies EvidenceOutcome;
     const result = finalizeEvidenceAcquisition("doc.html", snapshot, [], evidence);
     assert.equal(result.snapshot, null, "fatal evidence must withdraw the measured snapshot");
     assert.deepEqual(result.evidence, [], "fatal evidence must not be published");
     assert.deepEqual(result.boundSids, [], "fatal evidence must not bind future findings");
+    assert.equal(result.renderArtifact?.kind, "diagnostic-pdf");
+    assert.equal(result.renderArtifact?.delivery, "not-asserted");
+    assert.equal(result.renderArtifact?.sha256, "a".repeat(64));
     const engine = runDocument(result, {
       failOn: "error", activeRules: [spacedHyphen], optionsByRule: {}, coverageFloors: {},
     });
     assert.equal(engine.report.findings.length, 0, "withdrawn evidence must leave no snapshot for rules to inspect");
+    assert.deepEqual(engine.report.renderArtifact, result.renderArtifact, "the diagnostic PDF survives without claiming valid measurement");
     assert.equal(exitCodeFor([result]), 3);
   });
 

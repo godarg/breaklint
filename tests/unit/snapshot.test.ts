@@ -177,6 +177,30 @@ describe("the live snapshot seam", () => {
     assert.ok(absentIssues.some((issue) => issue.includes("lines absent without reason")));
   });
 
+  it("requires a complete inspected-input map even for producer-bound output", () => {
+    const normal = structuredClone(loadCorpus().find((item) => item.name === "widow-trigger")!.snapshot);
+    const sid = normal.blocks.find((block) => block.sid !== null)!.sid!;
+    delete normal.source.map[sid];
+    assert.ok(
+      validateSnapshotInvariants(normal, { sourceMapInjection: true }).issues.some((issue) => issue.includes(`sid ${sid} has no SourceRef`)),
+      "ordinary injection must remain complete",
+    );
+
+    const producerBound = structuredClone(normal);
+    producerBound.source.provenance = {
+      binding: "producer-bound",
+      copyIntegrity: "verified",
+      sourceRole: "exact-original-range",
+      producerId: "test-producer",
+      receiptHash: null,
+      diagnostics: [],
+    };
+    assert.ok(
+      validateSnapshotInvariants(producerBound, { sourceMapInjection: true }).issues.some((issue) => issue.includes(`sid ${sid} has no SourceRef`)),
+      "producer provenance must not erase the inspected input artefact location",
+    );
+  });
+
   it("serves only referenced local assets and rejects sibling and symlink escapes", () => {
     const root = mkdtempSync(join(tmpdir(), "breaklint-assets-"));
     const outside = mkdtempSync(join(tmpdir(), "breaklint-outside-"));

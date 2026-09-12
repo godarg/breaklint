@@ -54,8 +54,22 @@ export interface PlacedMark {
   yPx: number;
 }
 
+/** A requested anchor that the current Paged.js page cannot place without inventing a coordinate. */
+export interface UnplacedMark {
+  sid: string;
+  page: number;
+  side: "start" | "end";
+  reason: "fragment-outside-page";
+}
+
 export interface OverlayInstallation {
   marks: PlacedMark[];
+  /**
+   * Source fragments reached from a page clone whose requested anchor did not belong to that
+   * page's observed rectangle.  They remain explicitly unbound; coordinates are never clamped
+   * into a page because that would fabricate a PDF location.
+   */
+  unplacedMarks: UnplacedMark[];
   layers: number;
   /** Pages whose content area was `static` — the case §11.4.1 treats as an infrastructure fault. */
   staticPageAreas: number;
@@ -116,6 +130,7 @@ const OVERLAY_TEMPLATE = `(() => {
 
   const install = () => {
     const marks = [];
+    const unplacedMarks = [];
     let staticPageAreas = 0, ordinal = 0;
     state = { layers: [], marks: [], detached: [] };
     const pages = P.all(document, ".pagedjs_page");
@@ -129,28 +144,59 @@ const OVERLAY_TEMPLATE = `(() => {
       P.setAttr(layer, "class", "bl-overlay");
       P.setCssText(layer, STYLE_LAYER);
       for (const el of P.all(pageEl, "[data-bl-sid]")) {
-        const rects = P.rects(el);
-        if (!rects.length) continue;
+        const sid = P.attr(el, "data-bl-sid");
+        // Paged.js may retain the next page's box in a node reached from this page clone.  The
+        // next rect is physically elsewhere in the spread, so using it for this layer expands
+        // the print overflow and lets Chrome shrink the whole PDF.  A rect is this fragment only
+        // when its own anchor is in this page's observed box; do not translate or clamp it.
+        const allRects = P.rects(el);
+        // A hidden/nonrendered author target had no overlay before this repair.  Preserve that
+        // exclusion; it is not a cloned adjacent-page fragment and must not poison bindings.
+        if (!allRects.length) continue;
+        const rects = allRects.filter((rect) =>
+          rect.x >= pageBox.left && rect.x <= pageBox.right &&
+          rect.y >= pageBox.top && rect.y <= pageBox.bottom,
+        );
+        if (!rects.length) {
+          unplacedMarks.push(
+            { sid, page: pageIndex + 1, side: "start", reason: "fragment-outside-page" },
+            { sid, page: pageIndex + 1, side: "end", reason: "fragment-outside-page" },
+          );
+          continue;
+        }
         const ord = ordinal++;
         const digits = String(ord).padStart(3, "0");
         for (const [suffix, side, rect, edge] of [
           ["A", "start", rects[0], "top"],
           ["E", "end", rects[rects.length - 1], "bottom"],
         ]) {
+          const token = "BLSID" + digits + suffix;
+          const x = rect.x, y = edge === "top" ? rect.y : rect.bottom;
+          // Marks use a verified one-pixel glyph font, but before readback we reserve the whole
+          // tolerance envelope that would still be accepted there.  If it cannot fit, a clamp
+          // would create a false location and an overflow can make Chrome shrink every page.
+          const relativeX = x - areaBox.x, relativeY = y - areaBox.y;
+          const maxAdvance = token.length * 1.2 + 2;
+          if (
+            x < pageBox.left || x > pageBox.right || y < pageBox.top || y > pageBox.bottom ||
+            relativeX < 0 || relativeY < 0 || relativeX + maxAdvance > areaBox.width || relativeY + 1 > areaBox.height
+          ) {
+            unplacedMarks.push({ sid, page: pageIndex + 1, side, reason: "fragment-outside-page" });
+            continue;
+          }
           const mark = P.create("span");
           P.setAttr(mark, "class", "bl-mark");
           P.setCssText(mark, STYLE_MARK);
-          const x = rect.x, y = edge === "top" ? rect.y : rect.bottom;
           P.setStyle(mark, "left", (x - areaBox.x) + "px", "important");
           P.setStyle(mark, "top", (y - areaBox.y) + "px", "important");
-          P.setText(mark, "BLSID" + digits + suffix);
+          P.setText(mark, token);
           P.append(layer, mark);
           // The node itself is remembered. Everything downstream walks these references and
           // never a selector, so an author element of the same class is invisible to us.
           state.marks.push(mark);
           marks.push({
             token: P.text(mark),
-            sid: P.attr(el, "data-bl-sid"),
+            sid,
             fragmentOrdinal: ord,
             side,
             page: pageIndex + 1,
@@ -164,7 +210,7 @@ const OVERLAY_TEMPLATE = `(() => {
       P.append(area, layer);
       state.layers.push(layer);
     }
-    return { marks, layers: state.layers.length, staticPageAreas };
+    return { marks, unplacedMarks, layers: state.layers.length, staticPageAreas };
   };
 
   // Stage 1: read the computed style of every mark back. Cheap, specific, and NOT conclusive —

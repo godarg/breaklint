@@ -2,10 +2,10 @@
   "breaklintDemo": {
     "documentPath": "examples/demo.html",
     "source": "handwritten snapshot fixture",
-    "note": "Hand-written so that every rule path in the demo is reachable. The report says so in its own source field."
+    "note": "Hand-written rule fixture, not an acquired document. No original HTML artifact exists for its former illustrative line addresses; source locations are unavailable. The real rule and report chains run, while mode/source identify this demo."
   },
   "snapshot": {
-    "schemaVersion": 3,
+    "schemaVersion": 4,
     "meta": {
       "renderer": null,
       "browserVersion": "",
@@ -21,36 +21,27 @@
       ]
     },
     "source": {
-      "map": {
-        "s1": {
-          "file": "examples/demo.html",
-          "line": 12,
-          "column": 3,
-          "offset": 240
-        },
-        "s2": {
-          "file": "examples/demo.html",
-          "line": 31,
-          "column": 3,
-          "offset": 980
-        },
-        "s3": {
-          "file": "examples/demo.html",
-          "line": 58,
-          "column": 3,
-          "offset": 1720
-        },
-        "s4": {
-          "file": "examples/demo.html",
-          "line": 70,
-          "column": 3,
-          "offset": 2100
-        }
-      },
+      "map": {},
       "parser": "demo",
-      "complete": true,
+      "complete": false,
       "injectedAttribute": "data-bl-sid",
-      "collisionChecked": true
+      "collisionChecked": false,
+      "originalMap": {},
+      "input": {
+        "identityStatus": "unknown",
+        "rawBytesSha256": null,
+        "byteLength": null,
+        "encoding": null,
+        "complete": false
+      },
+      "provenance": {
+        "binding": "unavailable",
+        "copyIntegrity": "unavailable",
+        "sourceRole": "unknown",
+        "diagnostics": [
+          "handwritten demo has no acquired source artifact"
+        ]
+      }
     },
     "pages": [
       {
@@ -217,7 +208,7 @@
     "blocks": [
       {
         "nodeKey": "b1",
-        "sid": "s1",
+        "sid": null,
         "authorId": "intro",
         "blockSignature": "An introduction that runs across the boundary.",
         "fragmentIndex": 0,
@@ -262,7 +253,7 @@
       },
       {
         "nodeKey": "b2",
-        "sid": "s1",
+        "sid": null,
         "authorId": "intro",
         "blockSignature": "An introduction that runs across the boundary.",
         "fragmentIndex": 1,
@@ -300,7 +291,7 @@
       },
       {
         "nodeKey": "b3",
-        "sid": "s2",
+        "sid": null,
         "authorId": null,
         "blockSignature": "A table that promises not to break and is far too tall.",
         "fragmentIndex": 0,
@@ -336,7 +327,7 @@
       },
       {
         "nodeKey": "b4",
-        "sid": "s3",
+        "sid": null,
         "authorId": null,
         "blockSignature": "Der Prüfer - und nur er - entscheidet.",
         "fragmentIndex": 0,
@@ -375,7 +366,7 @@
       },
       {
         "nodeKey": "b5",
-        "sid": "s4",
+        "sid": null,
         "authorId": null,
         "blockSignature": "A chart with a clipped label.",
         "fragmentIndex": 0,
@@ -633,7 +624,8 @@
                 "count": 0,
                 "maskHash": ""
               }
-            }
+            },
+            "sourceAddressKey": null
           },
           {
             "targetKey": "bt002",
@@ -657,7 +649,8 @@
                 "count": 0,
                 "maskHash": ""
               }
-            }
+            },
+            "sourceAddressKey": null
           }
         ],
         "shapes": [

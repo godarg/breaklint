@@ -578,7 +578,7 @@ describe("exit matrix", () => {
     });
 
     it("every declared kind is covered by a row below", () => {
-      assert.equal(INFRA_EVENT_KINDS.length, 19, "a kind was added or removed without deciding its fatality");
+      assert.equal(INFRA_EVENT_KINDS.length, 22, "a kind was added or removed without deciding its fatality");
     });
 
     for (const kind of INFRA_EVENT_KINDS) {

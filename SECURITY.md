@@ -78,3 +78,10 @@ The latest published version on npm receives fixes. The 0.2.x line is the suppor
 published patch supersedes earlier 0.2.x packages. `breaklint@0.2.0` opened that line on 2026-08-22
 with npm provenance; the 0.1.x line receives no separate long-term-support branch. The npm package
 page remains the authority on which patch is actually published.
+
+
+## Host-provided sources and pages
+
+The producer API executes only an explicitly host-controlled executable. A document, imported manifest or report never selects that executable or authorizes a command. Manifest declarations are checked against captured producer bytes and copy records; unknown source locations remain unknown. Host receipts provide integrity and correspondence within a trusted local build process, not producer attestation against a dishonest host.
+
+The screen API operates on a Page already opened by its host. Navigation, login, server access and network policy remain host-owned. This capability is intended for trusted E2E preparation; it does not make an arbitrary hostile browser realm safe. Unsupported visibility/paint, unstable capture and incomplete inventories are reported as nonmeasurement. The report and bounded AI context treat document text as untrusted data and expose a finite repair vocabulary. Portable evidence copies use bounded capture and current hashes; historical capture claims and current bundle availability are distinct.

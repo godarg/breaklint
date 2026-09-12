@@ -1,7 +1,7 @@
 {
   "name": "breaklint",
-  "version": "0.4.0",
-  "description": "Layout checks for documents generated from HTML to PDF: measures every page after pagination and reports the measured value next to the threshold it failed.",
+  "version": "0.5.0",
+  "description": "Source-bound layout diagnostics for paginated HTML documents and existing Playwright pages.",
   "keywords": [
     "pagedjs",
     "paged-media",
@@ -34,6 +34,10 @@
     "breaklint": "dist/cli/index.js"
   },
   "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
     "./package.json": "./package.json",
     "./config.schema.json": "./breaklint.schema.json"
   },
@@ -103,5 +107,6 @@
   },
   "dependencies": {
     "parse5": "8.0.1"
-  }
+  },
+  "types": "./dist/index.d.ts"
 }
