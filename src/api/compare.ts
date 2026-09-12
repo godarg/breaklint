@@ -70,9 +70,14 @@ function environmentCompatible(before: Report, after: Report, a: DocumentReport,
 function complete(doc: DocumentReport): boolean {
   return doc.targetInventory?.complete === true && doc.targetInventory.omittedCount === 0;
 }
+function scopeTuple(document: DocumentReport): readonly [string, string, "document-print"] | null {
+  const scope = document.comparisonScope;
+  if (!scope || !isHash(scope.projectId) || !isHash(scope.documentId) || scope.scenario !== "document-print") return null;
+  return [scope.projectId, scope.documentId, scope.scenario];
+}
 function compatibleScope(a: DocumentReport, b: DocumentReport): boolean {
-  const x = a.comparisonScope; const y = b.comparisonScope;
-  return !!x && !!y && isHash(x.projectId) && isHash(x.documentId) && x.projectId === y.projectId && x.documentId === y.documentId && x.scenario === y.scenario;
+  const x = scopeTuple(a); const y = scopeTuple(b);
+  return x !== null && y !== null && x[0] === y[0] && x[1] === y[1] && x[2] === y[2];
 }
 function admissible(evaluation: TargetEvaluation): boolean {
   if (evaluation.status !== "not-applicable") return false;
@@ -83,9 +88,13 @@ function admissible(evaluation: TargetEvaluation): boolean {
 export async function compareReports(before: Report, after: Report, options: CompareReportsOptions = {}): Promise<ReportComparison> {
   if (Object.keys(options).some(k => k !== "revision") || (options.revision && (Object.keys(options.revision).some(k => k !== "repositoryRoot") || typeof options.revision.repositoryRoot !== "string"))) throw new TypeError("invalid comparison options");
   if ([before, after].some(report => report?.schemaVersion !== 4 || report?.profileKind !== "document" || !Array.isArray(report.documents))) throw new TypeError("compareReports requires document Report schema 4");
-  const scopeKeys = (report: Report) => report.documents.map(doc => JSON.stringify(doc.comparisonScope ?? null)).sort();
+  const scopeKeys = (report: Report) => report.documents.map((doc) => {
+    const scope = scopeTuple(doc);
+    return scope === null ? null : JSON.stringify(scope);
+  }).sort((a, b) => (a ?? "").localeCompare(b ?? "", "en"));
   const beforeScopes = scopeKeys(before), afterScopes = scopeKeys(after);
-  const fullScope = !beforeScopes.includes("null") && new Set(beforeScopes).size === beforeScopes.length && JSON.stringify(beforeScopes) === JSON.stringify(afterScopes);
+  const fullScope = beforeScopes.every((scope): scope is string => scope !== null) && afterScopes.every((scope): scope is string => scope !== null) &&
+    new Set(beforeScopes).size === beforeScopes.length && JSON.stringify(beforeScopes) === JSON.stringify(afterScopes);
   const positiveInfrastructure = (doc: DocumentReport) => doc.infrastructure.some(e => e.kind === "geometry-cross-check-passed") && doc.infrastructure.every(e => e.kind === "geometry-cross-check-passed") && !!doc.evidenceCoverage && (!doc.evidenceCoverage.required || doc.evidenceCoverage.status === "complete");
   const results: ComparisonResult[] = []; const matched = new Set<string>();
   for (const doc of before.documents) {

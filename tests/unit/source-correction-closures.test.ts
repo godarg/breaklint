@@ -122,6 +122,10 @@ describe("source correction closure controls", { concurrency: false }, () => {
         (input: ReturnType<typeof f.input>) => ({ ...input, options: { ...input.options, network: { mode: "unknown", allowed: [] } } }),
         (input: ReturnType<typeof f.input>) => ({ ...input, options: { ...input.options, evidenceBinding: "false" } }),
         (input: ReturnType<typeof f.input>) => ({ ...input, options: { ...input.options, revision: { repositoryRoot: f.root, ignored: true } } }),
+        (input: ReturnType<typeof f.input>) => ({ ...input, options: { ...input.options, outputPaths: new Array(1) } }),
+        (input: ReturnType<typeof f.input>) => ({ ...input, producer: { ...input.producer, producerOptions: new Date(0) } }),
+        (input: ReturnType<typeof f.input>) => ({ ...input, producer: { ...input.producer, producerOptions: { nested: new Array(1) } } }),
+        (input: ReturnType<typeof f.input>) => ({ ...input, producer: { ...input.producer, producerOptions: { n: Infinity } } }),
       ];
       for (const mutate of malformed) {
         const { input, sentinel } = withSentinel();

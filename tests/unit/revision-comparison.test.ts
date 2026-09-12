@@ -69,6 +69,13 @@ it("the real host producer + renderer + Git revisions confirm a preserved target
     writeFileSync(source, body(100)); writeFileSync(css, cssBody("navy")); const after = await check();
     assert.equal(after.findings.length, 0); assert.ok(after.evaluations.some(e => e.stableIdentity?.status === "unique" && e.predicate.violated === false));
     const repaired = await compareReports(before, after); assert.equal(repaired.results[0]!.status, "resolved", JSON.stringify({ repaired, fontBefore: before.documents[0]!.fontIdentity, fontAfter: after.documents[0]!.fontIdentity, resources: after.documents[0]!.inputIdentity, infra: after.documents[0]!.infrastructure, notMeasured: after.documents[0]!.notMeasured, coverage: after.documents[0]!.coverage }));
+    const missingScenarioBefore = structuredClone(before), missingScenarioAfter = structuredClone(after);
+    delete (missingScenarioBefore.documents[0]!.comparisonScope as { scenario?: unknown }).scenario;
+    delete (missingScenarioAfter.documents[0]!.comparisonScope as { scenario?: unknown }).scenario;
+    assert.equal((await compareReports(missingScenarioBefore, missingScenarioAfter)).results[0]!.status, "not-sufficiently-measured", "a missing scenario cannot establish comparison scope");
+    const reorderedScope = structuredClone(after), scope = reorderedScope.documents[0]!.comparisonScope!;
+    reorderedScope.documents[0]!.comparisonScope = { scenario: scope.scenario, documentId: scope.documentId, projectId: scope.projectId };
+    assert.equal((await compareReports(before, reorderedScope)).results[0]!.status, "resolved", "comparison scope equality is independent of object property order");
     const resourceRole = (report: Report, role: unknown): Report => {
       const copy = structuredClone(report);
       const document = copy.documents[0]!;

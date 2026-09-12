@@ -247,12 +247,20 @@ function validateRecord(value: unknown): value is ProducerRecord {
   const code = r.code as Record<string, unknown> | null;
   return exactly(r, ["protocol", "runId", "producerId", "complete", "expected", "reads", "outputs", "options", "code"]) && r.protocol === PRODUCER_RECORD_PROTOCOL && typeof r.runId === "string" && typeof r.producerId === "string" && r.complete === true &&
     Array.isArray(r.expected) && r.expected.every(validInput) && Array.isArray(r.reads) && r.reads.every(validInput) &&
-    Array.isArray(r.outputs) && r.outputs.every(validOutput) && code !== null && typeof code === "object" &&
+    Array.isArray(r.outputs) && r.outputs.every(validOutput) && validJsonValue(r.options) && code !== null && typeof code === "object" &&
     exactly(code, ["sha256", "files", "dependencies"]) && /^[a-f0-9]{64}$/u.test(String(code.sha256)) && Array.isArray(code.files) && code.files.every(isDigest) &&
     Array.isArray(code.dependencies) && code.dependencies.every(isDigest);
 }
 function exactly(value: Record<string, unknown>, fields: readonly string[]): boolean { return Object.keys(value).every((key) => fields.includes(key)) && fields.every((field) => Object.hasOwn(value, field)); }
 function isRecord(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === "object" && !Array.isArray(value); }
+function isPlainJsonObject(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && Object.getPrototypeOf(value) === Object.prototype;
+}
+function denseArray(value: readonly unknown[]): boolean {
+  if (Object.keys(value).length !== value.length) return false;
+  for (let index = 0; index < value.length; index += 1) if (!Object.hasOwn(value, index)) return false;
+  return true;
+}
 function closed(value: unknown, fields: readonly string[], label: string): Record<string, unknown> {
   if (!isRecord(value)) throw new TypeError(`${label} must be an object`);
   const unknown = Object.keys(value).filter((key) => !fields.includes(key)).sort();
@@ -264,7 +272,7 @@ function required(value: Record<string, unknown>, field: string, label: string):
   return value[field];
 }
 function stringArray(value: unknown, label: string): readonly string[] {
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string" || entry.includes("\0"))) {
+  if (!Array.isArray(value) || !denseArray(value) || value.some((entry) => typeof entry !== "string" || entry.includes("\0"))) {
     throw new TypeError(`${label} must be an array of strings without NUL`);
   }
   return value;
@@ -277,14 +285,19 @@ function jsonValue(value: unknown, label: string, depth = 0): asserts value is J
   }
   if (depth >= 64) throw new TypeError(`${label} exceeds the JSON nesting limit`);
   if (Array.isArray(value)) {
+    if (!denseArray(value)) throw new TypeError(`${label} must contain dense JSON arrays`);
     value.forEach((entry, index) => jsonValue(entry, `${label}[${index}]`, depth + 1));
     return;
   }
-  if (isRecord(value)) {
+  if (isPlainJsonObject(value)) {
     for (const [key, entry] of Object.entries(value)) jsonValue(entry, `${label}.${key}`, depth + 1);
     return;
   }
   throw new TypeError(`${label} must be a JSON value`);
+}
+function validJsonValue(value: unknown): value is JsonValue {
+  try { jsonValue(value, "producer record options"); return true; }
+  catch { return false; }
 }
 
 /**

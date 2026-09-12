@@ -55,13 +55,19 @@ describe("host-controlled producer FD3 boundary", () => {
           expected:[{path:'source.txt',sha256:h,bytes:b.length,role:'authoring'}],reads:[{path:'source.txt',sha256:h,bytes:b.length,role:'authoring'}],
           outputs:[{path:'print.html',sha256:h,bytes:b.length,pieces:[{kind:'copy',inputPath:'source.txt',inputStart:0,inputEnd:b.length,outputStart:0,outputEnd:b.length}]}],options:{adapter:'fixture'},
           code:{sha256:codeInventoryHash,files:[{id:'@producer/fixture',sha256:codeFileHash,bytes:${Buffer.byteLength(code)}}],dependencies:[]}};
-        fs.writeSync(3,JSON.stringify(record));`;
+        const payload=JSON.stringify(record);
+        fs.writeSync(3,args[3]==='nonfinite'?payload.replace('"options":{"adapter":"fixture"}','"options":{"n":1e400}'):payload);`;
       const result = await acquireProducedDocuments({ producer: {
         trust: "host-controlled-producer", id: "fixture", executable: process.execPath,
         argv: ["-e", script, codeInventoryDigest, digest], codeFiles: [{ id: "@producer/fixture", path: codeFile }], producerOptions: { adapter: "fixture" },
       }, manifest, options: { runRoot: join(root, "run") } });
       assert.equal(result.ok, true, result.ok ? "" : result.detail);
       if (result.ok) assert.ok(result.capability, `validated ${bodyDigest} output must yield opaque capability`);
+      const nonFiniteOptions = await acquireProducedDocuments({ producer: {
+        trust: "host-controlled-producer", id: "fixture", executable: process.execPath,
+        argv: ["-e", script, codeInventoryDigest, digest, "nonfinite"], codeFiles: [{ id: "@producer/fixture", path: codeFile }], producerOptions: { n: null },
+      }, options: { runRoot: join(root, "run-nonfinite") } });
+      assert.equal(nonFiniteOptions.ok, false, "a non-finite FD3 options value must never canonicalize to a host null option");
       for (const dependency of [
         { id: "changed-id", sha256: "a".repeat(64), bytes: 1 },
         { id: "dependency", sha256: "b".repeat(64), bytes: 1 },
