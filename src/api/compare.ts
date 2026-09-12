@@ -11,6 +11,8 @@ export interface ReportComparison { schemaVersion: 1; identityContract: "logical
 export interface CompareReportsOptions { revision?: { repositoryRoot: string }; }
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 const isHash = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+const resourceWitness = (document: DocumentReport, sha256: string): boolean =>
+  document.sourceBinding.files.some(file => file.sha256 === sha256 && (file.role === "asset" || file.role === "dependency"));
 function unique(identity: StableTargetIdentity | undefined): boolean {
   return identity?.status === "unique" && isHash(identity.value) && identity.identityContract === "logical-source-value-v1" && identity.canonicalization === "canonical-node-v1" && isHash(identity.authorAnchorSha256) && isHash(identity.semanticSha256) && identity.candidates.length === 1 && identity.candidates[0] === identity.value;
 }
@@ -45,8 +47,11 @@ function resourceCompatible(before: DocumentReport, after: DocumentReport): bool
   if (old.length !== next.length || old.some((r, i) => r.uri !== next[i]!.uri)) return false;
   // A captured CSS/template repair may change a required resource. Its new digest must be
   // inventory-bound in both verified revisions; fonts still require identical byte identity.
-  return old.every((r, i) => r.sha256 === next[i]!.sha256 || (!/\.(?:woff2?|ttf|otf)(?:[?#]|$)/iu.test(r.uri) &&
-    before.sourceBinding.files.some(f => f.sha256 === r.sha256 && f.role !== "authoring") && after.sourceBinding.files.some(f => f.sha256 === next[i]!.sha256 && f.role !== "authoring")));
+  return old.every((r, i) => {
+    const nextResource = next[i]!;
+    return r.sha256 === nextResource.sha256 || (isHash(r.sha256) && isHash(nextResource.sha256) &&
+      !/\.(?:woff2?|ttf|otf)(?:[?#]|$)/iu.test(r.uri) && resourceWitness(before, r.sha256) && resourceWitness(after, nextResource.sha256));
+  });
 }
 function environmentCompatible(before: Report, after: Report, a: DocumentReport, b: DocumentReport): boolean {
   const fields = ["browserVersion", "platform", "pagedjsVersion", "locale"] as const;
@@ -54,7 +59,10 @@ function environmentCompatible(before: Report, after: Report, a: DocumentReport,
   if (JSON.stringify(before.environment) !== JSON.stringify(after.environment)) return false;
   const x = a.fontIdentity; const y = b.fontIdentity;
   if (!x || !y || x.status !== "verified" || y.status !== "verified" || !x.complete || !y.complete || x.method !== "captured-css-fonts-and-cdp-custom-glyphs-v1" || y.method !== x.method || x.fonts.length === 0 || !x.actualFamilies?.length || !y.actualFamilies?.length || x.fonts.some(f => !isHash(f.sha256)) || JSON.stringify(x.fonts) !== JSON.stringify(y.fonts) || JSON.stringify(x.actualFamilies) !== JSON.stringify(y.actualFamilies)) return false;
-  for (const [document, identity] of [[a, x], [b, y]] as const) if (identity.fonts.some(font => !document.sourceBinding.files.some(file => file.sha256 === font.sha256 && file.role !== "authoring") || !(font.resource === `inline-font:${font.sha256}` || document.inputIdentity?.resources.some(resource => resource.resolvedUri === font.resource && resource.sha256 === font.sha256 && resource.outcome === "loaded")))) return false;
+  for (const [document, identity] of [[a, x], [b, y]] as const) if (identity.fonts.some(font => {
+    const fontSha256 = font.sha256;
+    return !isHash(fontSha256) || !resourceWitness(document, fontSha256) || !(font.resource === `inline-font:${fontSha256}` || document.inputIdentity?.resources.some(resource => resource.resolvedUri === font.resource && resource.sha256 === fontSha256 && resource.outcome === "loaded"));
+  })) return false;
   return !!a.inputIdentity && !!b.inputIdentity &&
     JSON.stringify([...a.inputIdentity.fontFamilies].sort()) === JSON.stringify([...b.inputIdentity.fontFamilies].sort()) &&
     JSON.stringify([...a.inputIdentity.systemFontIds].sort()) === JSON.stringify([...b.inputIdentity.systemFontIds].sort());
@@ -134,10 +142,21 @@ export async function compareReports(before: Report, after: Report, options: Com
   for (const doc of after.documents) {
     const candidates = before.documents.filter(d => compatibleScope(d, doc));
     const prior = candidates.length === 1 ? candidates[0] : undefined;
-    const compatible = fullScope && prior && await lineage(prior, doc, options) && isHash(before.config.fingerprint) && before.config.fingerprint === after.config.fingerprint && before.tool.version === after.tool.version && JSON.stringify([...before.config.activeRules].sort()) === JSON.stringify([...after.config.activeRules].sort()) && environmentCompatible(before, after, prior, doc) && resourceCompatible(prior, doc) && complete(prior) && complete(doc) && positiveInfrastructure(prior) && positiveInfrastructure(doc);
+    const incompatibilities: ComparisonReason[] = [];
+    if (!fullScope || !prior) incompatibilities.push("scope-incompatible-or-unknown");
+    else {
+      if (!await lineage(prior, doc, options)) incompatibilities.push("revision-unverified");
+      if (!isHash(before.config.fingerprint) || before.config.fingerprint !== after.config.fingerprint) incompatibilities.push("configuration-incompatible");
+      if (before.tool.version !== after.tool.version || JSON.stringify([...before.config.activeRules].sort()) !== JSON.stringify([...after.config.activeRules].sort())) incompatibilities.push("rule-disabled-or-incompatible");
+      if (!environmentCompatible(before, after, prior, doc)) incompatibilities.push("environment-incompatible-or-unknown");
+      if (!resourceCompatible(prior, doc)) incompatibilities.push("resource-identity-incomplete-or-incompatible");
+      if (!complete(prior) || !complete(doc)) incompatibilities.push("inventory-incomplete");
+      if (!positiveInfrastructure(prior) || !positiveInfrastructure(doc)) incompatibilities.push("infrastructure-or-coverage-incomplete");
+    }
+    const compatible = incompatibilities.length === 0;
     for (const finding of doc.findings) if (!matched.has(finding.runFindingId)) {
       const identityUnique = unique(finding.stableIdentity) && doc.findings.filter(f => sameTarget(finding, f)).length === 1;
-      results.push({ status: !identityUnique ? "unmatchable" : compatible ? "new" : "not-sufficiently-measured", beforeRunFindingId: null, afterRunFindingIds: [finding.runFindingId], reasons: [!identityUnique ? finding.stableIdentity.status === "unavailable" ? "identity-unavailable" : "identity-ambiguous" : compatible ? "finding-observed" : "scope-incompatible-or-unknown"] });
+      results.push({ status: !identityUnique ? "unmatchable" : compatible ? "new" : "not-sufficiently-measured", beforeRunFindingId: null, afterRunFindingIds: [finding.runFindingId], reasons: !identityUnique ? [finding.stableIdentity.status === "unavailable" ? "identity-unavailable" : "identity-ambiguous"] : compatible ? ["finding-observed"] : incompatibilities });
     }
   }
   return { schemaVersion: 1, identityContract: "logical-source-value-v1", beforeRunId: before.runId, afterRunId: after.runId, results };

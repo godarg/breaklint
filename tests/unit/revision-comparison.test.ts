@@ -14,15 +14,17 @@ const hash = (value: string) => createHash("sha256").update(value).digest("hex")
 const fixture = `const fs=require('node:fs'),crypto=require('node:crypto');
 const args=process.argv, root=args[args.indexOf('--run-root')+1], runId=args[args.indexOf('--run-id')+1];
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
-const body=fs.readFileSync(args[2]),font=fs.readFileSync(args[3]),code=fs.readFileSync(__filename);
-for(const bytes of [body,font])fs.writeFileSync(root+'/blobs/'+sha(bytes),bytes);
+const body=fs.readFileSync(args[2]),font=fs.readFileSync(args[3]),css=fs.readFileSync(args[4]),code=fs.readFileSync(__filename);
+for(const bytes of [body,font,css])fs.writeFileSync(root+'/blobs/'+sha(bytes),bytes);
 const files=[{id:'@fixture/producer',sha256:sha(code),bytes:code.length}];
 const read={path:'source.html',sha256:sha(body),bytes:body.length,role:'authoring'};
 const fontRead={path:'fixture.ttf',sha256:sha(font),bytes:font.length,role:'asset'};
+const cssRead={path:'styles.css',sha256:sha(css),bytes:css.length,role:'dependency'};
 fs.writeSync(3,JSON.stringify({protocol:'studio-producer-record-v1',runId,producerId:'repair-fixture',complete:true,
-expected:[read,fontRead],reads:[read,fontRead],outputs:[{path:'print.html',sha256:sha(body),bytes:body.length,pieces:[{kind:'copy',inputPath:'source.html',inputStart:0,inputEnd:body.length,outputStart:0,outputEnd:body.length}]}],options:{},code:{sha256:sha(Buffer.from(JSON.stringify(files))),files,dependencies:[]}}));`;
+expected:[read,fontRead,cssRead],reads:[read,fontRead,cssRead],outputs:[{path:'print.html',sha256:sha(body),bytes:body.length,pieces:[{kind:'copy',inputPath:'source.html',inputStart:0,inputEnd:body.length,outputStart:0,outputEnd:body.length}]}],options:{},code:{sha256:sha(Buffer.from(JSON.stringify(files))),files,dependencies:[]}}));`;
 const fontBytes = readFileSync(new URL("../../node_modules/pdfjs-dist/standard_fonts/LiberationSans-Regular.ttf", import.meta.url));
-const body = (height: number, anchor = 'id="repair-target"', text = "Label") => `<!doctype html><html><head><link rel="icon" href="data:,blank"><style>@font-face{font-family:BoundFixture;src:url(data:font/ttf;base64,${fontBytes.toString("base64")})}*{font-family:BoundFixture}@page{size:A4;margin:10mm}body{margin:0}</style></head><body><p>Geometry reference.</p><svg width="200" height="100" style="overflow:hidden"><text ${anchor} x="${height > 1000 ? -20 : 20}" y="50" font-size="20">${text}</text></svg></body></html>`;
+const body = (height: number, anchor = 'id="repair-target"', text = "Label") => `<!doctype html><html><head><link rel="icon" href="data:,blank"><link rel="stylesheet" href="styles.css"><style>@font-face{font-family:BoundFixture;src:url(data:font/ttf;base64,${fontBytes.toString("base64")})}*{font-family:BoundFixture}@page{size:A4;margin:10mm}body{margin:0}</style></head><body><p>Geometry reference.</p><svg width="200" height="100" style="overflow:hidden"><text ${anchor} x="${height > 1000 ? -20 : 20}" y="50" font-size="20">${text}</text></svg></body></html>`;
+const cssBody = (value: string) => `svg { color: ${value}; }\n`;
 
 it("logical identity ignores only the closed layout attributes, retains text and rejects duplicate anchors", () => {
   const identity = (text: string) => identitiesForProducedOutput({ outputPath: "print.html", output: Buffer.from(text), inputs: new Map([["source.html", Buffer.from(text)]]), inputRoles: new Map([["source.html", "authoring"]]), sourceOrigin: (_path, start, end) => ({ status: "exact-original-range", path: "source.html", start, end }) });
@@ -40,7 +42,7 @@ it("the real host producer + renderer + Git revisions confirm a preserved target
   const root = mkdtempSync(join(tmpdir(), "breaklint-repair-git-"));
   try {
     mkdirSync(join(root, "source")); const source = join(root, "source", "source.html"); const program = join(root, "producer.cjs");
-    const font = join(root, "source", "fixture.ttf"); writeFileSync(font, fontBytes);
+    const font = join(root, "source", "fixture.ttf"); const css = join(root, "source", "styles.css"); writeFileSync(font, fontBytes); writeFileSync(css, cssBody("black"));
     writeFileSync(program, fixture); writeFileSync(source, body(1300));
     const git = (...args: string[]) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
     git("init", "-q"); git("add", "source", "producer.cjs"); git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "baseline");
@@ -49,7 +51,7 @@ it("the real host producer + renderer + Git revisions confirm a preserved target
     assert.equal(mismatched.ok, false, "a producer source copied from a different host path must not acquire the local revision");
     let run = 0;
     const check = async (): Promise<Report> => {
-      const result = await checkProducedDocuments({ producer: { trust: "host-controlled-producer", id: "repair-fixture", executable: process.execPath, argv: [program, source, font], codeFiles: [{ id: "@fixture/producer", path: program }], producerOptions: {} },
+      const result = await checkProducedDocuments({ producer: { trust: "host-controlled-producer", id: "repair-fixture", executable: process.execPath, argv: [program, source, font, css], codeFiles: [{ id: "@fixture/producer", path: program }], producerOptions: {} },
         options: { outputPaths: ["print.html"], only: ["svg/text-overflows-viewport"], outDir: join(root, `report-${run++}`), evidenceBinding: false, revision: { repositoryRoot: root, sourcePrefix: "source" } } });
       if (!result.ok) throw new Error(result.detail); return result.report;
     };
@@ -64,13 +66,27 @@ it("the real host producer + renderer + Git revisions confirm a preserved target
     const reducedScope = structuredClone(before); reducedScope.documents = [];
     assert.equal((await compareReports(before, reducedScope)).results[0]!.status, "not-sufficiently-measured");
     await assert.rejects(compareReports({ schemaVersion: 1, profileKind: "screen" } as unknown as Report, before), /requires document Report schema 4/u);
-    writeFileSync(source, body(100)); const after = await check();
+    writeFileSync(source, body(100)); writeFileSync(css, cssBody("navy")); const after = await check();
     assert.equal(after.findings.length, 0); assert.ok(after.evaluations.some(e => e.stableIdentity?.status === "unique" && e.predicate.violated === false));
     const repaired = await compareReports(before, after); assert.equal(repaired.results[0]!.status, "resolved", JSON.stringify({ repaired, fontBefore: before.documents[0]!.fontIdentity, fontAfter: after.documents[0]!.fontIdentity, resources: after.documents[0]!.inputIdentity, infra: after.documents[0]!.infrastructure, notMeasured: after.documents[0]!.notMeasured, coverage: after.documents[0]!.coverage }));
+    const resourceRole = (report: Report, role: unknown): Report => {
+      const copy = structuredClone(report);
+      const document = copy.documents[0]!;
+      document.sourceBinding.files = document.sourceBinding.files.map(file => file.file === "styles.css" ? { ...file, role: role as never } : file);
+      document.revision!.capturedSourcesSha256 = hash(JSON.stringify([...document.sourceBinding.files].sort((a, b) => a.file.localeCompare(b.file, "en"))));
+      return copy;
+    };
+    for (const role of ["authoring", "unknown", undefined]) {
+      const incompatibleResourceRole = await compareReports(before, resourceRole(after, role));
+      assert.equal(incompatibleResourceRole.results[0]!.status, "not-sufficiently-measured", `changed CSS must require an asset/dependency witness, got ${String(role)}`);
+      assert.ok(incompatibleResourceRole.results[0]!.reasons.includes("resource-identity-incomplete-or-incompatible"));
+    }
     const nowNew = await compareReports(after, before);
     assert.equal(nowNew.results.length, 1); assert.equal(nowNew.results[0]!.status, "new");
     const afterOnlyMismatch = structuredClone(before); afterOnlyMismatch.config.fingerprint = hash("incompatible-new");
-    assert.equal((await compareReports(after, afterOnlyMismatch)).results[0]!.status, "not-sufficiently-measured");
+    const afterOnlyIncompatible = await compareReports(after, afterOnlyMismatch);
+    assert.equal(afterOnlyIncompatible.results[0]!.status, "not-sufficiently-measured");
+    assert.ok(afterOnlyIncompatible.results[0]!.reasons.includes("configuration-incompatible"));
     const missing = structuredClone(after); missing.documents[0]!.evaluations = [];
     assert.equal((await compareReports(before, missing)).results[0]!.status, "unmatchable");
     for (const mutation of [
