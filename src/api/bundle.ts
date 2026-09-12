@@ -45,6 +45,12 @@ function writeCapturedAsset(targetRoot: string, name: string, bytes: Buffer): vo
   } finally { closeSync(fd); }
 }
 
+/** Top-level bundle files: like assets, a pre-existing symlink at the leaf is refused, not followed. */
+function writeBundleFile(targetRoot: string, name: string, content: string): void {
+  const fd = openSync(join(targetRoot, name), constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o666);
+  try { writeFileSync(fd, content, "utf8"); } finally { closeSync(fd); }
+}
+
 function evidenceAsset(evidence: Evidence, sourceRoot: string, targetRoot: string): Asset | null {
   if (!evidence.integrity || !safeExtension(evidence.path, [".png"])) return null;
   if (evidence.integrity.byteLength > MAX_ASSET_BYTES) return null;
@@ -169,7 +175,7 @@ export function writeReportBundle(report: Report | PublicScreenReport, options: 
   if (!assetsDirectory.isDirectory() || assetsDirectory.isSymbolicLink()) throw new Error("report asset directory is not a regular directory");
   const assets: AssetMap = new Map();
   const canonical = JSON.stringify(report, null, 2) + "\n";
-  writeFileSync(join(root, "report.json"), canonical, "utf8");
+  writeBundleFile(root, "report.json", canonical);
 
   let html = renderReport(report, options);
   // Render once more with only validated assets. This keeps unsafe evidence strings as text.
@@ -177,10 +183,10 @@ export function writeReportBundle(report: Report | PublicScreenReport, options: 
   const cards = report.profileKind === "screen"
     ? selected.map((item, index) => "id" in item ? screenFindingCard(report, report.findings.find((finding) => finding.id === item.id)!, index, assets, options.evidenceDir, root) : "").join("")
     : selected.map((item, index) => "runFindingId" in item ? findingCard(report, report.findings.find((finding) => finding.runFindingId === item.runFindingId)!, index, assets, options.evidenceDir, root, item) : "").join("");
-  html = html.replace(/<section class="cards">[\s\S]*?<\/section>/u, `<section class="cards"><p class="section-label">Prioritized findings</p><nav id="finding-navigation" aria-label="Finding navigation">${selected.map((item, index) => `<a href="#finding-${index + 1}">${index + 1}. ${esc(item.severity)} ${esc(item.ruleId)}</a>`).join(" · ")}</nav>${cards || "<p>No finding cards were recorded.</p>"}</section>`);
+  html = html.replace(/<section class="cards">[\s\S]*?<\/section>/u, () => `<section class="cards"><p class="section-label">Prioritized findings</p><nav id="finding-navigation" aria-label="Finding navigation">${selected.map((item, index) => `<a href="#finding-${index + 1}">${index + 1}. ${esc(item.severity)} ${esc(item.ruleId)}</a>`).join(" · ")}</nav>${cards || "<p>No finding cards were recorded.</p>"}</section>`);
   if (options.comparison) {
     if (options.comparison.afterRunId !== report.runId) throw new Error("comparison does not refer to this current report");
-    writeFileSync(join(root, "comparison.json"), JSON.stringify(options.comparison, null, 2) + "\n", "utf8");
+    writeBundleFile(root, "comparison.json", JSON.stringify(options.comparison, null, 2) + "\n");
   }
   const bundleEvidence = {
     contractVersion: 1,
@@ -193,11 +199,11 @@ export function writeReportBundle(report: Report | PublicScreenReport, options: 
     }),
     assets: [...new Map([...assets.values()].map(asset => [asset.href, asset])).values()].map(asset => ({ path: asset.href, kind: asset.kind, ...asset.integrity })),
   };
-  writeFileSync(join(root, "bundle.json"), JSON.stringify(bundleEvidence, null, 2) + "\n", "utf8");
-  writeFileSync(join(root, "context.json"), JSON.stringify({ ...createContextPack(report, options), bundleEvidence }, null, 2) + "\n", "utf8");
+  writeBundleFile(root, "bundle.json", JSON.stringify(bundleEvidence, null, 2) + "\n");
+  writeBundleFile(root, "context.json", JSON.stringify({ ...createContextPack(report, options), bundleEvidence }, null, 2) + "\n");
   const availability = `<section class="diagnostics"><h2>Current bundle evidence</h2><p>Canonical JSON describes the historical capture. This bundle separately verifies the copied files. A comparison of historical reports is not a current asset recheck.</p><ul>${bundleEvidence.findings.map(item => `<li>${esc(item.findingId)}: ${esc(item.status)}${item.asset ? ` · <a href="${esc(item.asset.path)}">verified asset</a> · SHA-256 ${item.asset.sha256}` : ""}</li>`).join("")}</ul><p><a href="bundle.json">Complete asset integrity manifest</a></p></section>`;
-  html = html.replace('<section class="cards">', `${availability}<section class="cards">`);
-  writeFileSync(join(root, "report.html"), html, "utf8");
+  html = html.replace('<section class="cards">', () => `${availability}<section class="cards">`);
+  writeBundleFile(root, "report.html", html);
   return { outDir: root, reportPath: join(root, "report.json"), htmlPath: join(root, "report.html"), contextPath: join(root, "context.json"), assets: [...assets.values()].map((asset) => asset.href) };
 }
 

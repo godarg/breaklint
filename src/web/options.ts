@@ -66,9 +66,13 @@ export function validateCheckPageOptions(value: unknown): CheckPageOptions {
   return { trust: "host-controlled-page", networkPolicy: "host-owned", scenario: string(value.scenario, "scenario"), output: output as CheckPageOptions["output"], ...(projectId !== undefined ? { projectId } : {}), ...(documentId !== undefined ? { documentId } : {}), ...(runId !== undefined ? { runId } : {}), ...(geometry !== undefined ? { geometry } : {}), ...(sourceBinding !== undefined ? { sourceBinding } : {}) };
 }
 
+// Mirrors string(): at least one non-whitespace character and no NUL. minLength alone accepted
+// " " and "a\u0000", which validateCheckPageOptions rejects before the first page call.
+const text = (maxLength: number) => ({ type: "string", minLength: 1, maxLength, pattern: "^[^\\u0000]*[^\\s\\u0000][^\\u0000]*$" }) as const;
+
 const EXCEPTION_SCHEMA = {
   type: "object", additionalProperties: false, required: ["selector", "reason"],
-  properties: { selector: { type: "string", minLength: 1, maxLength: 512 }, reason: { type: "string", minLength: 1, maxLength: 512 } },
+  properties: { selector: text(512), reason: text(512) },
 } as const;
 
 /** Static projection of validateCheckPageOptions. Keep it closed: consumers use it preflight. */
@@ -76,10 +80,10 @@ export const SCREEN_OPTIONS_SCHEMA: Readonly<Record<string, unknown>> = Object.f
   type: "object", additionalProperties: false, required: ["trust", "networkPolicy", "scenario", "output"],
   properties: {
     trust: { const: "host-controlled-page" }, networkPolicy: { const: "host-owned" },
-    scenario: { type: "string", minLength: 1, maxLength: 512 }, projectId: { type: "string", minLength: 1, maxLength: 256 },
-    documentId: { type: "string", minLength: 1, maxLength: 256 }, runId: { type: "string", minLength: 1, maxLength: 256 },
-    output: { type: "object", additionalProperties: false, required: ["dir", "screenshot"], properties: { dir: { type: "string", minLength: 1, maxLength: 4096 }, screenshot: { enum: ["viewport", "full-page"] } } },
+    scenario: text(512), projectId: text(256),
+    documentId: text(256), runId: text(256),
+    output: { type: "object", additionalProperties: false, required: ["dir", "screenshot"], properties: { dir: text(4096), screenshot: { enum: ["viewport", "full-page"] } } },
     geometry: { type: "object", additionalProperties: false, properties: { allowedScrollContainers: { type: "array", maxItems: 100, items: EXCEPTION_SCHEMA }, intentionalOverlays: { type: "array", maxItems: 100, items: EXCEPTION_SCHEMA }, maxTargets: { type: "integer", minimum: 1, maximum: MAX_TARGETS }, stabilizationTimeoutMs: { type: "integer", minimum: 0, maximum: MAX_TIMEOUT_MS } } },
-    sourceBinding: { type: "object", additionalProperties: false, required: ["kind", "root", "receiptPath", "compiledBuildSelector", "compiledBuildAttribute", "containers"], properties: { kind: { const: "host-build-container" }, root: { type: "string", minLength: 1, maxLength: 4096 }, receiptPath: { type: "string", minLength: 1, maxLength: 512 }, buildOutputReceiptPath: { type: "string", minLength: 1, maxLength: 512 }, compiledBuildSelector: { type: "string", minLength: 1, maxLength: 512 }, compiledBuildAttribute: { type: "string", minLength: 1, maxLength: 512 }, containers: { type: "array", maxItems: 200, items: { type: "object", additionalProperties: false, required: ["selector", "file"], properties: { selector: { type: "string", minLength: 1, maxLength: 512 }, file: { type: "string", minLength: 1, maxLength: 512 } } } } } },
+    sourceBinding: { type: "object", additionalProperties: false, required: ["kind", "root", "receiptPath", "compiledBuildSelector", "compiledBuildAttribute", "containers"], properties: { kind: { const: "host-build-container" }, root: text(4096), receiptPath: text(512), buildOutputReceiptPath: text(512), compiledBuildSelector: text(512), compiledBuildAttribute: text(512), containers: { type: "array", maxItems: 200, items: { type: "object", additionalProperties: false, required: ["selector", "file"], properties: { selector: text(512), file: text(512) } } } } },
   },
 });

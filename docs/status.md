@@ -12,7 +12,13 @@ Studio uses the installed public producer API and a bounded ZIP join. DS_OS uses
 Playwright states and an actual production build receipt for component-container provenance.
 The release workflow requires registry CLI/API and real-document checks after publication.
 The local final candidate passed 436 unit tests (552 including E2E), 71 live tests and the two
-installed real-document cases. The dedicated DS_OS run measured all 45 registered states at five
+installed real-document cases. A review on 2026-09-13 (Claude and Codex) found five defects before
+publication and added four unit tests for them (now 440, 556 including E2E): host paths after an
+opening bracket reached the AI context, and every withheld path left a literal `$1`; `$$`, `$&` and
+`$'` in document text were expanded as replacement patterns in the written HTML (one `$'` repeated the
+generated footer eight times); bundle files other than evidence assets followed a pre-existing
+symlink; a finding recorded under a failed baseline could be compared as resolved; and the exported
+screen-options schema accepted blank or NUL-bearing strings that `checkPage` rejects. The dedicated DS_OS run measured all 45 registered states at five
 viewports with complete evidence. These are technical/agent measurements on 2026-09-12; they do
 not establish human usability or general corpus calibration.
 
@@ -179,7 +185,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=436 aggregateTests=552 liveTests=71 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=440 aggregateTests=556 liveTests=71 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against

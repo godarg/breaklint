@@ -109,6 +109,17 @@ it("the real host producer + renderer + Git revisions confirm a preserved target
       const copy = structuredClone(after); mutation(copy);
       assert.equal((await compareReports(before, copy)).results[0]!.status, "not-sufficiently-measured");
     }
+    // The baseline is held to the same infrastructure and evidence standard as the recheck.
+    for (const mutation of [
+      (r: Report) => { r.documents[0]!.infrastructure.push({ kind: "geometry-cross-check-failed", detail: "fixture baseline", measured: null } as never); },
+      (r: Report) => { r.documents[0]!.infrastructure = []; },
+      (r: Report) => { delete r.documents[0]!.evidenceCoverage; },
+    ]) {
+      const baseline = structuredClone(before); mutation(baseline);
+      const row = (await compareReports(baseline, after)).results[0]!;
+      assert.equal(row.status, "not-sufficiently-measured", JSON.stringify(row));
+      assert.ok(row.reasons.includes("infrastructure-or-coverage-incomplete"), JSON.stringify(row));
+    }
     // A committed descendant needs an actual ancestry readback; matching opaque labels suffice only on the same measured base.
     git("add", "source"); git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "geometry repair");
     const descendant = await check();
