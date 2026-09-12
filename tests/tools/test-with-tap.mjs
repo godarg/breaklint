@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -81,6 +81,8 @@ if (isMainModule(process.argv[1])) {
     // The documented-figures guard consumes a real unit-only TAP. Keeping that measurement
     // separate from the public aggregate output prevents Unit + E2E from masquerading as Unit.
     const unit = await runTapSuite(plan.unit.testFiles, plan.unit.outputTarget, plan.unit.mirrorStdout);
+    // The normally quiet unit-only measurement must expose its actual failure in CI logs.
+    if (unit.code !== 0) process.stderr.write(readFileSync(plan.unit.outputTarget));
     process.exitCode = unit.code;
   }
 }
