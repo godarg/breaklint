@@ -747,21 +747,37 @@ describe("the live path fails closed at its process boundary", () => {
     const lateContext = new Promise<{ newPage(): Promise<PageLike>; close(): Promise<void> }>((resolve) => {
       resolveContext = resolve;
     });
-    setTimeout(() => resolveContext?.({
-      async newPage() { throw new Error("late context must not create a page"); },
-      async close() { throw new Error("late context close refused"); },
-    }), 45);
-    const result = await renderDocuments(["README.md"], OPTIONS, {
-      documentTimeoutMs: 20,
-      async launchBrowser() {
-        return { executablePath: "/fake", detail: "", browser: {
-          async newPage() { throw new Error("default context forbidden"); },
-          createBrowserContext: async () => lateContext,
-          async version() { return "Fake/1"; }, async close() {},
-        } };
-      },
-      async openRasterizer() { return { rasterizer: null, detail: "unit" }; },
-    });
+    let aborted = 0;
+    const originalAbort = AbortController.prototype.abort;
+    AbortController.prototype.abort = function (this: AbortController, reason?: unknown): void {
+      originalAbort.call(this, reason);
+      const resolve = resolveContext;
+      if (resolve) {
+        resolveContext = null;
+        aborted += 1;
+        resolve({
+          async newPage() { throw new Error("late context must not create a page"); },
+          async close() { throw new Error("late context close refused"); },
+        });
+      }
+    };
+    let result: Awaited<ReturnType<typeof renderDocuments>>;
+    try {
+      result = await renderDocuments(["README.md"], OPTIONS, {
+        documentTimeoutMs: 20,
+        async launchBrowser() {
+          return { executablePath: "/fake", detail: "", browser: {
+            async newPage() { throw new Error("default context forbidden"); },
+            createBrowserContext: async () => lateContext,
+            async version() { return "Fake/1"; }, async close() {},
+          } };
+        },
+        async openRasterizer() { return { rasterizer: null, detail: "unit" }; },
+      });
+    } finally {
+      AbortController.prototype.abort = originalAbort;
+    }
+    assert.equal(aborted, 1, "the fixture must resolve its context from the observed timeout abort");
     assert.ok(result.documents[0]!.infrastructure.some((event) =>
       event.kind === "checker-crashed" && event.measured?.stage === "document-timeout-join" &&
       /late context close refused/u.test(event.detail)));
