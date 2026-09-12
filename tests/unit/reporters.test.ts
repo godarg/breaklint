@@ -164,7 +164,8 @@ describe("output formats", () => {
     const parsed = JSON.parse(render(report, "json")) as Report;
     assert.equal(parsed.runVerdict, report.runVerdict);
     assert.equal(parsed.exitCode, report.exitCode);
-    assert.equal(parsed.schemaVersion, 3);
+    assert.equal(parsed.schemaVersion, 4);
+    assert.equal(parsed.profileKind, "document");
     assert.match(parsed.config.fingerprint, /^[0-9a-f]{64}$/u);
     assert.equal(parsed.config.fingerprint, effectiveConfigFingerprint(parsed.config.effective));
   });
@@ -796,4 +797,21 @@ describe("output formats", () => {
     // and the count a reader needs is still there
     assert.match(render(big, "console"), /50 entries/u);
   });
+});
+
+
+it("SARIF directs verified originals to editable ranges and keeps declarations as input-artifact locations", () => {
+  const report = demoReport(); const finding = report.findings[0]!;
+  finding.source = { file: "generated/input.html", line: 2, column: 1, endLine: 2, endColumn: 8, offset: 10, endOffset: 17, coordinateSystem: "utf8-bytes-unicode-codepoints-v1" };
+  finding.originalSource = { status: "verified", role: "exact-original-range", location: { file: "chapters/a b.html", line: 7, column: 2, endLine: 7, endColumn: 9, offset: 20, endOffset: 27, coordinateSystem: "utf8-bytes-unicode-codepoints-v1" }, integrity: { sha256: "a".repeat(64), byteLength: 40, role: "authoring" }, candidates: [] };
+  finding.stableIdentity = { status: "unique", value: "b".repeat(64), candidates: ["b".repeat(64)] };
+  const parse = () => JSON.parse(render(report, "sarif")).runs[0];
+  const index = report.findings.indexOf(finding); let run = parse();
+  assert.equal(run.columnKind, "unicodeCodePoints");
+  assert.equal(run.results[index].locations[0].physicalLocation.artifactLocation.uri, "chapters/a%20b.html");
+  assert.equal(run.results[index].properties.sourceLocationKind, "verified-original");
+  assert.equal(run.results[index].partialFingerprints["breaklint/logical-source-value-v1"], "b".repeat(64));
+  finding.originalSource.status = "declared"; finding.stableIdentity.status = "ambiguous";
+  run = parse(); assert.equal(run.results[index].properties.sourceLocationKind, "input-artifact");
+  assert.equal(run.results[index].partialFingerprints, undefined);
 });

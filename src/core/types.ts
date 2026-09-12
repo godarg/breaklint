@@ -47,6 +47,10 @@ export interface SourceRef {
   line: number;
   column: number;
   offset: number;
+  endLine: number;
+  endColumn: number;
+  endOffset: number;
+  coordinateSystem: "utf8-bytes-unicode-codepoints-v1";
 }
 
 /**
@@ -143,6 +147,8 @@ export interface PageFill {
 }
 
 export interface PageRecord {
+  /** Actual outer page rectangle in CSS screen coordinates, absent on legacy snapshots. */
+  pageBox?: Box;
   pageNumber: number;
   nodeKey: string;
   epoch: number;
@@ -169,6 +175,8 @@ export interface SvgTextTarget {
   targetKey: string;
   /** Source identity of the `<text>`. Stable across runs; this is the fingerprint key. */
   svgTextKey: string;
+  /** Run-local injected address into source.map; never a fingerprint identity. */
+  sourceAddressKey?: string | null;
   boxScreen: Box;
   clipState: "none" | "clip-path" | "mask" | "both";
   /**
@@ -335,6 +343,38 @@ export interface Snapshot {
     complete: boolean;
     injectedAttribute: "data-bl-sid";
     collisionChecked: boolean;
+    /**
+     * Exact original-source leaves from a verified producer, keyed by the injected input
+     * address. `map` above always remains the inspected input artefact's map.
+     */
+    originalMap?: Record<string, SourceRef>;
+    /** Multiple original leaves for one output address are kept explicit, never selected. */
+    originalAmbiguity?: Record<string, SourceRef[]>;
+    input?: {
+      identityStatus: "verified" | "declared" | "unknown";
+      rawBytesSha256: string | null;
+      byteLength: number | null;
+      encoding: "utf-8" | null;
+      complete: boolean;
+    };
+    /** Digest inventory for original producer inputs. It contains no source bytes. */
+    files?: readonly {
+      file: string;
+      sha256: string;
+      byteLength: number;
+      role: "authoring" | "dependency" | "asset";
+    }[];
+    provenance?: {
+      binding: "producer-bound" | "declared" | "unavailable";
+      copyIntegrity: "verified" | "unavailable";
+      sourceRole?: "exact-original-range" | "verified-container-only" | "declared-matching-bytes" | "unknown";
+      producerId?: string | null;
+      receiptHash?: string | null;
+      /** Bound executable and canonical producer-option digests, never code or options bytes. */
+      codeSha256?: string | null;
+      optionsSha256?: string | null;
+      diagnostics: string[];
+    };
   };
   pages: PageRecord[];
   blocks: BlockRecord[];
@@ -355,8 +395,44 @@ export interface Measurement {
   proofSource: ProofSource | null;
 }
 
+export interface StableTargetIdentity {
+  status: "unique" | "ambiguous" | "unavailable";
+  value: string | null;
+  candidates: string[];
+  identityContract?: "logical-source-value-v1";
+  canonicalization?: "canonical-node-v1";
+  authorAnchorSha256?: string;
+  semanticSha256?: string;
+}
+export interface TargetInventory { complete: boolean; omittedCount: number; reason: string | null; }
+export interface DocumentFontIdentity {
+  diagnostic?: "css-source" | "source-inventory" | "cdp-readback" | "system-or-fallback";
+  status: "verified" | "unavailable";
+  complete: boolean;
+  fonts: { resource: string; sha256: string }[];
+  actualFamilies?: string[];
+  method?: "captured-css-fonts-and-cdp-custom-glyphs-v1";
+  reason: "fonts/actual-byte-identity-unavailable" | null;
+}
+export interface DocumentRevision {
+  status: "verified";
+  adapter: "host-local-git-v1";
+  repositoryId: string;
+  projectId: string;
+  head: string;
+  tree: string;
+  workingTreeSha256: string;
+  capturedSourcesSha256: string;
+  codeSha256: string;
+  optionsSha256: string;
+  observedAt: string;
+}
 export interface Finding {
+  /** Canonical run-local identifier; `fingerprint` remains the cross-run stable projection. */
+  runFindingId: string;
   fingerprint: string;
+  stableIdentity: StableTargetIdentity;
+  recheck?: { status: "required"; reason: "repair-requires-compatible-positive-measurement"; identityContract: "logical-source-value-v1" };
   ruleId: string;
   severity: Severity;
   /** `layout/half-empty-page` only. An experimental threshold never moves an exit code. */
@@ -371,11 +447,49 @@ export interface Finding {
     sid: string | null;
     fragmentIndex: number;
     boxScreen: Box | null;
+    renderBox?: Box & { pageWidth: number; pageHeight: number; coordinateSystem: "css-page-top-left" };
   };
   source: SourceRef | null;
   measurement: Measurement;
   ambiguity: { groupSize: number; resolvable: false } | null;
   evidence: { ref: string | null; bindsFinding: boolean };
+  /** Report4's source/actionability truth; scalar `source` remains the legacy projection. */
+  originalSource: {
+    status: "verified" | "declared" | "ambiguous" | "unavailable";
+    role: "exact-original-range" | "verified-container-only" | "declared-matching-bytes" | "unknown";
+    location: SourceRef | null;
+    /** Digest for `location.file`, present only when the exact original leaf is inventory-bound. */
+    integrity: { sha256: string; byteLength: number; role: "authoring" | "dependency" | "asset" } | null;
+    candidates: SourceRef[];
+  };
+  actionability: "actionable" | "recheck-required" | "unknown-source";
+}
+
+export interface EvaluationMeasurement {
+  name: string;
+  value: number | boolean | string | null;
+  unit: string | null;
+  operator: "<" | "<=" | ">" | ">=" | "=" | null;
+  threshold: number | boolean | string | null;
+}
+
+/** An actual per-target rule decision, including healthy and declined targets. */
+export interface TargetEvaluation {
+  stableIdentity?: StableTargetIdentity;
+  evidenceBound?: boolean;
+  ruleId: string;
+  semanticsVersion: "rule-decision-v1";
+  targetRef: Finding["target"];
+  /** Distinguishes multiple independently judged occurrences at one concrete target address. */
+  occurrenceKey?: string;
+  /** Count carried by one explicitly unaddressable aggregate, otherwise exactly one. */
+  targetCount?: number;
+  status: "measured" | "not-measured" | "excluded" | "not-applicable";
+  /** False for a real target inventory row outside this rule's historic coverage candidates. */
+  countsTowardCoverage?: boolean;
+  reason: string | null;
+  measurements: EvaluationMeasurement[];
+  predicate: { connective: "all" | "any" | "single"; violated: boolean | null };
 }
 
 export interface InfraEvent {
@@ -405,6 +519,57 @@ export interface Evidence {
   } | null;
   overlayCheck: { styleViolations: number; rasterDiffPx: number; removed: boolean };
   bindsFinding: boolean;
+  unplacedMarks?: { sid: string; side: "start" | "end"; reason: "fragment-outside-page" }[];
+  /** Bytes actually written by this run. Absent on legacy/imported evidence. */
+  integrity?: {
+    sha256: string;
+    byteLength: number;
+    widthPx: number;
+    heightPx: number;
+    coordinateSystem: "raster-pixels-top-left";
+    dpi: number;
+  };
+}
+
+/** The selected PDF from the same acquisition; never an address in a separately shipped PDF. */
+export interface DocumentRenderArtifact {
+  kind: "diagnostic-pdf";
+  path: string;
+  sha256: string;
+  byteLength: number;
+  inputHtmlSha256: string | null;
+  withEvidenceOverlay: boolean;
+  relation: "same-acquisition";
+  delivery: "not-asserted";
+}
+
+export interface DocumentEvidenceCoverage {
+  required: boolean;
+  status: "complete" | "partial" | "unavailable" | "not-requested";
+  expectedPages: number;
+  writtenPages: number;
+  boundPages: number;
+  reason: "evidence/required-page-binding-incomplete" | null;
+}
+
+/** Host consumer's measured binding to an archive and, separately, a delivery readback. */
+export interface DocumentDeliveryBinding {
+  schemaVersion: 1;
+  scope: "document-and-loaded-resources";
+  status: "available" | "unavailable";
+  level: "local-package-bound" | "delivery-verified" | null;
+  archive: { sha256: string; bytes: number; memberCount: number } | null;
+  coveredMembers: { logicalPath: string; role: "document" | "resource"; member: string; sha256: string; bytes: number }[];
+  omittedMembers: { member: string; sha256: string; bytes: number }[];
+  reasons: string[];
+  witness: {
+    channel: "gumroad-seller-attachment";
+    productId: string;
+    fileId: string;
+    observedAt: string;
+    archiveSha256: string;
+    kind: "seller-attachment-readback";
+  } | null;
 }
 
 export interface RuleCoverage {
@@ -418,9 +583,29 @@ export interface RuleCoverage {
   ok: boolean;
 }
 
+export interface DocumentSourceBinding {
+  /** Input-artifact identity. Raw source bytes are deliberately never projected. */
+  input: NonNullable<Snapshot["source"]["input"]>;
+  /** Current producer capability and integrity metadata, without the private receipt or source. */
+  provenance: NonNullable<Snapshot["source"]["provenance"]>;
+  /** Digest inventory of original source leaves; only entries here can support verified originals. */
+  files: readonly { file: string; sha256: string; byteLength: number; role: "authoring" | "dependency" | "asset" }[];
+}
+
 export interface DocumentReport {
+  fontIdentity?: DocumentFontIdentity;
   path: string;
+  revision?: DocumentRevision;
+  comparisonScope?: { projectId: string; documentId: string; scenario: "document-print" };
+  targetInventory?: TargetInventory;
+  renderArtifact?: DocumentRenderArtifact;
+  deliveryBinding?: DocumentDeliveryBinding;
+  evidenceCoverage?: DocumentEvidenceCoverage;
   inputIdentity: InputIdentity | null;
+  /** Full typed request outcomes retained when acquisition withdraws an invalid snapshot. */
+  resources?: ResourceRecord[];
+  /** Public canonical source-binding projection for report consumers. */
+  sourceBinding: DocumentSourceBinding;
   verdict: RunVerdict;
   exitReason: string | null;
   pages: number;
@@ -429,6 +614,7 @@ export interface DocumentReport {
   notMeasured: NotMeasured[];
   infrastructure: InfraEvent[];
   evidence: Evidence[];
+  evaluations: TargetEvaluation[];
 }
 
 export interface ReportEnvironment {
@@ -477,6 +663,9 @@ export interface ReportSummary {
 
 export interface Report {
   schemaVersion: number;
+  profileKind: "document";
+  /** Caller-supplied current-run identity; legacy callers receive the explicit unbound sentinel. */
+  runId: string;
   mode: ReportMode;
   source: ReportSource;
   /** Both paths run through one rule module and one reporter module. This says which. */
@@ -494,5 +683,26 @@ export interface Report {
   config: ReportConfig;
   documents: DocumentReport[];
   findings: Finding[];
+  /** Canonical, flattened positive/negative target decisions from documents. */
+  evaluations: TargetEvaluation[];
   summary: ReportSummary;
+}
+
+/**
+ * Reserved P4 contract. It deliberately cannot masquerade as `Report`: a screen capture has a
+ * route, viewport and DOM artifact instead of Paged.js/PDF/page counters. `checkPage` supplies
+ * the concrete producer in P4.
+ */
+export interface ScreenReport {
+  schemaVersion: 4;
+  profileKind: "screen";
+  runId: string;
+  runVerdict: RunVerdict;
+  exitCode: 0 | 1 | 2 | 3 | 4;
+  scope: { projectId: string | null; documentId: string | null; scenario: string; viewport: { width: number; height: number; deviceScaleFactor: number } };
+  artifact: { kind: "dom-capture"; domSha256: string | null; url: string; buildStatus: "bound" | "declared" | "unknown" };
+  targetInventory: { complete: boolean; omittedCount: number; reason: string | null };
+  evaluations: TargetEvaluation[];
+  findings: Finding[];
+  infrastructure: InfraEvent[];
 }

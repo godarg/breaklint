@@ -27,6 +27,9 @@ export const ENV_IDS = [
   "env/ink-passes-unstable",
   "env/page-area-static",
   "env/evidence-overlay-removed",
+  "env/evidence-fragment-outside-page",
+  /** A collector projection supplied unusable geometry; never report it as a clean measurement. */
+  "env/invalid-measurement",
 ] as const;
 export type EnvId = (typeof ENV_IDS)[number];
 
@@ -107,6 +110,9 @@ export const INFRA_EVENT_KINDS = [
    * exist. No partial report is worth writing from that.
    */
   "geometry-cross-check-failed",
+  "source-input-invalid",
+  "source-acquisition-failed",
+  "source-producer-record-mismatch",
 ] as const;
 export type InfraEventKind = (typeof INFRA_EVENT_KINDS)[number];
 
@@ -297,8 +303,8 @@ export const SUPPORTED_PAGEDJS_VERSION = "0.4.3";
 export const SUPPORTED_PDFJS_VERSION = "6.2.108";
 
 /** Report and snapshot evolve independently; a version stamp must not claim an unperformed migration. */
-export const REPORT_SCHEMA_VERSION = 3;
-export const SNAPSHOT_SCHEMA_VERSION = 3;
+export const REPORT_SCHEMA_VERSION = 4;
+export const SNAPSHOT_SCHEMA_VERSION = 4;
 
 const asSet = <T extends string>(values: readonly T[]): ReadonlySet<string> => new Set(values);
 

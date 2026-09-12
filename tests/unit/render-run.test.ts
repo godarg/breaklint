@@ -228,7 +228,11 @@ describe("the live path fails closed at its process boundary", () => {
   it("orders more than ten thousand source IDs by source offset, not lexical suffix", () => {
     const map = Object.fromEntries(Array.from({ length: 10_001 }, (_, index) => [
       `s${String(index).padStart(4, "0")}`,
-      { file: "large.html", line: index + 1, column: 1, offset: index * 10 },
+      {
+        file: "large.html", line: index + 1, column: 1, offset: index * 10,
+        endLine: index + 1, endColumn: 2, endOffset: index * 10 + 1,
+        coordinateSystem: "utf8-bytes-unicode-codepoints-v1" as const,
+      },
     ]));
     const ordered = orderedSourceSids(map);
     assert.equal(ordered.length, 10_001);
@@ -962,7 +966,8 @@ describe("the live path fails closed at its process boundary", () => {
     const result = await renderDocuments(["tests/fixtures/live-chain.html"], OPTIONS, dependencies);
     assert.equal(pagesOpened, 0);
     assert.equal(result.documents[0]!.snapshot, null);
-    assert.deepEqual(result.documents[0]!.infrastructure[0]!.measured, { stage: "provenance", issues: 1 });
+    assert.equal(result.documents[0]!.infrastructure[0]!.measured?.stage, "provenance");
+    assert.ok(Number(result.documents[0]!.infrastructure[0]!.measured?.issues) >= 1, "every corrupted source range must remain fatal");
     assert.equal(exitCodeFor(result.documents), 3);
   });
 
@@ -1016,16 +1021,21 @@ describe("the live path fails closed at its process boundary", () => {
       infrastructure: [{ kind: "checker-crashed", detail: "PNG encode failed after PDF reconciliation", measured: { stage: "evidence" } }],
       notMeasured: [], boundSids: new Set([snapshot.blocks[0]!.sid!]), marks: [], ambiguousMarks: 0,
       deliveredPdf: new Uint8Array(), deliveredWithOverlay: false, overlayInstalled: false,
+      pdfArtifact: { path: "doc-checked.pdf", sha256: "a".repeat(64), byteLength: 17 },
       candidates: { marked: null, baseline: new Uint8Array() },
     } satisfies EvidenceOutcome;
     const result = finalizeEvidenceAcquisition("doc.html", snapshot, [], evidence);
     assert.equal(result.snapshot, null, "fatal evidence must withdraw the measured snapshot");
     assert.deepEqual(result.evidence, [], "fatal evidence must not be published");
     assert.deepEqual(result.boundSids, [], "fatal evidence must not bind future findings");
+    assert.equal(result.renderArtifact?.kind, "diagnostic-pdf");
+    assert.equal(result.renderArtifact?.delivery, "not-asserted");
+    assert.equal(result.renderArtifact?.sha256, "a".repeat(64));
     const engine = runDocument(result, {
       failOn: "error", activeRules: [spacedHyphen], optionsByRule: {}, coverageFloors: {},
     });
     assert.equal(engine.report.findings.length, 0, "withdrawn evidence must leave no snapshot for rules to inspect");
+    assert.deepEqual(engine.report.renderArtifact, result.renderArtifact, "the diagnostic PDF survives without claiming valid measurement");
     assert.equal(exitCodeFor([result]), 3);
   });
 

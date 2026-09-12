@@ -28,6 +28,7 @@
 import { parse, type DefaultTreeAdapterMap } from "parse5";
 
 import type { SourceRef } from "../core/types.ts";
+import { coordinateAtUtf8Byte, utf16OffsetToUtf8Byte } from "./bytes.ts";
 
 type Element = DefaultTreeAdapterMap["element"];
 type Node = DefaultTreeAdapterMap["node"];
@@ -72,6 +73,7 @@ interface Target {
   startOffset: number;
   startLine: number;
   startCol: number;
+  endOffset: number;
   id: string;
 }
 
@@ -112,6 +114,10 @@ function collect(document: Node): { targets: Target[]; synthesised: number } {
             startOffset: loc.startOffset,
             startLine: loc.startLine,
             startCol: loc.startCol,
+            // The source address is the complete authored element range. A producer may call an
+            // original location exact only when this whole range, not merely its opening tag,
+            // lies in one observed copy edge.
+            endOffset: loc.endOffset ?? loc.startTag?.endOffset ?? loc.startOffset + 1 + node.tagName.length,
             id: "",
           });
         }
@@ -151,14 +157,22 @@ export function injectSourceIds(html: string, file: string): InjectionResult {
     const at = target.startOffset + 1 + target.tagName.length;
     const attribute =
       target.kind === "block" ? `data-bl-sid="${target.id}"` : `data-bl-svg-target="${target.id}"`;
-    if (target.kind === "block") {
-      map[target.id] = {
-        file,
-        line: target.startLine,
-        column: target.startCol,
-        offset: target.startOffset,
-      };
-    }
+    // parse5 coordinates are UTF-16. The public source contract is raw UTF-8 bytes and Unicode
+    // codepoints, so derive every representation from the same immutable text.
+    const offset = utf16OffsetToUtf8Byte(html, target.startOffset);
+    const endOffset = utf16OffsetToUtf8Byte(html, target.endOffset);
+    const start = coordinateAtUtf8Byte(html, offset);
+    const end = coordinateAtUtf8Byte(html, endOffset);
+    map[target.id] = {
+      file,
+      line: start.line,
+      column: start.column,
+      offset,
+      endLine: end.line,
+      endColumn: end.column,
+      endOffset,
+      coordinateSystem: "utf8-bytes-unicode-codepoints-v1",
+    };
     out = `${out.slice(0, at)} ${attribute}${out.slice(at)}`;
   }
 

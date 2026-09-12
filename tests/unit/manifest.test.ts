@@ -21,10 +21,29 @@ const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as {
   files: string[];
   bin: Record<string, string>;
-  exports: Record<string, string>;
+  exports: Record<string, string | { types: string; default: string }>;
+  types?: string;
   scripts: Record<string, string>;
   main?: string;
 };
+
+/** Flatten every supported public export condition; no target may evade the package checks. */
+function entryTargets(): [string, string][] {
+  const result: [string, string][] = Object.entries(pkg.bin);
+  for (const [name, target] of Object.entries(pkg.exports)) {
+    if (typeof target === "string") result.push([name, target]);
+    else {
+      assert.deepEqual(Object.keys(target), ["types", "default"], "root exports declare types before the runtime default");
+      for (const [condition, path] of Object.entries(target)) {
+        assert.equal(typeof path, "string");
+        result.push([`${name}:${condition}`, path]);
+      }
+    }
+  }
+  if (pkg.main) result.push(["main", pkg.main]);
+  if (pkg.types) result.push(["types", pkg.types]);
+  return result;
+}
 
 /** Every `.ts` under a directory. Used to derive runtime data dependencies from the source. */
 function walk(dir: URL): URL[] {
@@ -77,7 +96,7 @@ describe("the packaging manifest names only things that exist", () => {
    * `src/cli/index.ts`. That is verifiable without a build and fails for exactly the reason the
    * defect existed.
    */
-  const sourceFor = (target: string): string => target.replace(/^\.\/dist\//u, "src/").replace(/\.js$/u, ".ts");
+  const sourceFor = (target: string): string => target.replace(/^\.\/dist\//u, "src/").replace(/(?:\.d\.ts|\.js)$/u, ".ts");
 
   it("the one documented command points at the CLI and nothing else", () => {
     // Measured: `bin` could be repointed at `dist/report/console.js` with the whole suite green —
@@ -92,7 +111,7 @@ describe("the packaging manifest names only things that exist", () => {
     const published = pkg.files.map((f) => f.replace(/\/$/u, ""));
     // `main` was not iterated at all by the first version: `"main": "./dist/nope.js"` stayed green
     // under a test titled "names only things that exist".
-    for (const [name, target] of Object.entries({ ...pkg.bin, ...pkg.exports, ...(pkg.main ? { main: pkg.main } : {}) })) {
+    for (const [name, target] of entryTargets()) {
       if (target === "./package.json" || target === "package.json") continue;
       const top = target.replace(/^\.?\/?/u, "").split("/")[0]!;
       assert.ok(
@@ -103,7 +122,7 @@ describe("the packaging manifest names only things that exist", () => {
   });
 
   it("every `bin` and `exports` target has a source that produces it", () => {
-    for (const [name, target] of Object.entries({ ...pkg.bin, ...pkg.exports, ...(pkg.main ? { main: pkg.main } : {}) })) {
+    for (const [name, target] of entryTargets()) {
       if (target === "./package.json" || target === "package.json") continue;
       const normalised = target.startsWith("./") ? target : `./${target}`;
       if (normalised.endsWith(".json") && !normalised.startsWith("./dist/")) {

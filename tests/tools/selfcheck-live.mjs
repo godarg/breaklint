@@ -106,10 +106,19 @@ try {
     redJson,
     brokenHtml,
   ]);
-  assert.equal(red.status, 1, `the live selfcheck fault injection stayed green\n${diagnostic(red)}`);
+  // Report4 also requires bound page evidence. The deliberately oversized transformed
+  // box cannot receive an in-page evidence mark, so the stricter coverage verdict wins
+  // while the arithmetic error must remain visible. This is not a finding-free pass.
+  assert.equal(red.status, 4, `the oversized-card control did not preserve the required evidence failure\n${diagnostic(red)}`);
   const redReport = readReport(redJson);
-  assert.equal(redReport.runVerdict, "findings");
-  assert.equal(redReport.exitCode, 1);
+  assert.equal(redReport.runVerdict, "insufficient-coverage");
+  assert.equal(redReport.exitCode, 4);
+  assert.equal(redReport.summary.gateCandidate, "error");
+  assert.equal(redReport.summary.gateTriggeredBy, null);
+  assert.equal(redReport.documents[0].evidenceCoverage.required, true);
+  assert.equal(redReport.documents[0].evidenceCoverage.status, "partial");
+  assert.ok(redReport.documents[0].evidenceCoverage.boundPages < redReport.documents[0].evidenceCoverage.expectedPages);
+  assert.equal(redReport.documents[0].coverage["layout/unbreakable-block-too-tall"].coverage, 1);
   assert.ok(
     redReport.findings.some(
       (finding) => finding.ruleId === "layout/unbreakable-block-too-tall" && finding.severity === "error",

@@ -85,7 +85,7 @@ try {
     );
 
     const report = JSON.parse(readFileSync(reportPath, "utf8"));
-    assert.equal(report.schemaVersion, 3);
+    assert.equal(report.schemaVersion, 4);
     assert.equal(report.mode, "live");
     assert.equal(report.source, "rendered");
     assert.equal(report.inputsFound, 1);

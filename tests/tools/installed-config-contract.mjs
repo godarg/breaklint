@@ -70,7 +70,7 @@ try {
   const validRun = run(["--demo", "--config", valid, "--fail-on", "warn", "--format", "json", "--out", reportPath]);
   assert.equal(validRun.status, 4, `valid strict demo: ${validRun.stderr}`);
   const report = JSON.parse(readFileSync(reportPath, "utf8"));
-  assert.equal(report.schemaVersion, 3);
+  assert.equal(report.schemaVersion, 4);
   assert.equal(report.tool.version, installedManifest.version);
   assert.equal(report.config.contractVersion, 1);
   assert.equal(report.config.profile, "strict");

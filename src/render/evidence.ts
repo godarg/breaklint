@@ -41,10 +41,12 @@
  */
 
 import { join, relative } from "node:path";
+import { createHash } from "node:crypto";
+import { writeFileSync } from "node:fs";
 
 import type { PageLike } from "../acquire/browser.ts";
 import type { Evidence, InfraEvent, NotMeasured } from "../core/types.ts";
-import type { PlacedMark } from "./overlay.ts";
+import type { PlacedMark, UnplacedMark } from "./overlay.ts";
 import { detachOverlay, installOverlay, readbackViolations, removeOverlay } from "./overlay.ts";
 import type { PdfTextPage, RasterPage, Rasterizer } from "./rasterizer.ts";
 import { readPngHeader, writeEvidencePng } from "./rasterizer.ts";
@@ -180,6 +182,8 @@ export interface EvidenceOutcome {
   /** Marks whose token was not found exactly once in the PDF text stream. Read, not just kept. */
   ambiguousMarks: number;
   deliveredPdf: Uint8Array;
+  /** Exact selected bytes persisted for offline use. Legacy test/import seams may omit this. */
+  pdfArtifact?: { path: string; sha256: string; byteLength: number };
   /** True only when the delivered PDF is the one that carried the overlay. */
   deliveredWithOverlay: boolean;
   /** True only when installOverlay completed; option state and attempted installation are insufficient. */
@@ -207,6 +211,8 @@ export interface ProduceEvidenceInput {
 
 export async function produceEvidence(input: ProduceEvidenceInput): Promise<EvidenceOutcome> {
   const { page, closePage, rasterizer, options } = input;
+  // Validate before any PNG/PDF write. Production uses an acquisition-owned unique stem.
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(options.documentKey)) throw new Error("unsafe evidence document key");
   const pdf = input.pdf ?? (() => page.pdf({ printBackground: true, preferCSSPageSize: true }));
   const dpi = options.dpi ?? 96;
   const infrastructure: InfraEvent[] = [];
@@ -253,6 +259,12 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
   try {
     installation = await installOverlay(page, input.apparatusCapability);
     overlayInstalled = true;
+    for (const unplaced of installation.unplacedMarks ?? []) {
+      notMeasured.push({
+        scope: "page", ruleId: null, reason: "env/evidence-fragment-outside-page",
+        target: { keyType: "page", nodeKey: `page:${unplaced.page}`, sid: unplaced.sid }, count: 1,
+      });
+    }
     violations = await readbackViolations(page);
     marked = await pdf("marked");
     detached = await detachOverlay(page);
@@ -318,6 +330,7 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
       withOverlay: false,
       candidates: { marked, baseline },
       marks: installation.marks,
+      unplacedMarks: installation.unplacedMarks ?? [],
       ambiguousMarks: 0,
       styleViolations: violations.length,
       rasterDiffPx: -1,
@@ -366,6 +379,7 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
       withOverlay: false,
       candidates: { marked, baseline },
       marks: installation.marks,
+      unplacedMarks: installation.unplacedMarks ?? [],
       ambiguousMarks: 0,
       styleViolations: violations.length,
       rasterDiffPx: -1,
@@ -452,6 +466,7 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
       withOverlay: clean,
       candidates: { marked, baseline },
       marks: installation.marks,
+      unplacedMarks: installation.unplacedMarks ?? [],
       ambiguousMarks: conformance?.ambiguous ?? 0,
       styleViolations: violations.length,
       rasterDiffPx: diffPixels,
@@ -675,6 +690,7 @@ interface FinishInput {
   withOverlay: boolean;
   candidates: { marked: Uint8Array | null; baseline: Uint8Array };
   marks: PlacedMark[];
+  unplacedMarks?: readonly UnplacedMark[];
   ambiguousMarks: number;
   styleViolations: number;
   rasterDiffPx: number;
@@ -767,8 +783,13 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
         writeEvidencePng(absolutePath, bytes);
 
         const perPage = input.conformance?.byPage.get(i + 1) ?? null;
+        const unplacedHere = (input.unplacedMarks ?? []).filter(mark => mark.page === i + 1);
+        // A SID bound on another page cannot lend its evidence to an entirely unplaced fragment.
+        const hasUnplacedTarget = unplacedHere.some(mark =>
+          !input.marks.some(placed => placed.page === i + 1 && placed.sid === mark.sid));
         const pageBound =
           input.bindingPossible &&
+          !hasUnplacedTarget &&
           perPage !== null &&
           perPage.referenceFrom !== "none" &&
           !perPage.divergent &&
@@ -799,6 +820,15 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
             removed: input.overlayRemoved,
           },
           bindsFinding: pageBound,
+          unplacedMarks: unplacedHere.map(({ sid, side, reason }) => ({ sid, side, reason })),
+          integrity: {
+            sha256: createHash("sha256").update(bytes).digest("hex"),
+            byteLength: bytes.byteLength,
+            widthPx: header.width,
+            heightPx: header.height,
+            coordinateSystem: "raster-pixels-top-left",
+            dpi,
+          },
         });
       }
     } finally {
@@ -844,6 +874,8 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
 }
 
 function outcome(input: FinishInput, evidence: Evidence[], boundSids: Set<string>): EvidenceOutcome {
+  const path = `${input.options.documentKey}-checked.pdf`;
+  writeFileSync(join(input.options.outDir, path), input.pdf, { flag: "wx", mode: 0o600 });
   return {
     evidence,
     infrastructure: input.infrastructure,
@@ -852,6 +884,7 @@ function outcome(input: FinishInput, evidence: Evidence[], boundSids: Set<string
     marks: input.marks,
     ambiguousMarks: input.ambiguousMarks,
     deliveredPdf: input.pdf,
+    pdfArtifact: { path, sha256: createHash("sha256").update(input.pdf).digest("hex"), byteLength: input.pdf.byteLength },
     deliveredWithOverlay: input.withOverlay,
     overlayInstalled: input.overlayInstalled,
     candidates: input.candidates,

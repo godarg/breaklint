@@ -21,7 +21,7 @@ import { defineRule } from "../../src/core/rule.ts";
 import { NON_APPLICABLE_ENV_IDS, TOOL_CAPABILITY_ENV_IDS } from "../../src/core/enums.ts";
 import type { EnvId } from "../../src/core/enums.ts";
 import type { Snapshot } from "../../src/core/types.ts";
-import { declined } from "../../src/rules/shared.ts";
+import { declined, targetEvaluation } from "../../src/rules/shared.ts";
 import { textClipped } from "../../src/rules/svg/text-clipped.ts";
 import { textInkCollision } from "../../src/rules/svg/text-ink-collision.ts";
 import { textOverflowsViewport } from "../../src/rules/svg/text-overflows-viewport.ts";
@@ -49,6 +49,10 @@ function decliningRule(id: string, reason: EnvId, severity: "error" | "warn", co
       candidates: count,
       measured: 0,
       notMeasured: [declined({ scope: "svg", ruleId: id, reason, count })],
+      evaluations: Array.from({ length: count }, (_, index) => targetEvaluation({
+        ruleId: id, keyType: "svg-text", nodeKey: `test-decline-${index}`, sid: null,
+        status: "not-measured", reason,
+      })),
     }),
   );
 }
@@ -67,7 +71,9 @@ const measuresOne = defineRule(
     id: "layout/measures-one", severity: "warn", proofSource: null, calibrated: false,
     experimental: false, unit: "px", defaultOptions: {}, summary: "measures one candidate", declines: [],
   },
-  () => ({ findings: [], candidates: 1, measured: 1, notMeasured: [] }),
+  () => ({ findings: [], candidates: 1, measured: 1, notMeasured: [], evaluations: [
+    targetEvaluation({ ruleId: "layout/measures-one", keyType: "block", nodeKey: "test-measured", sid: null, status: "measured" }),
+  ] }),
 );
 
 function reportFor(rule: ReturnType<typeof defineRule>, snapshot: Snapshot) {
@@ -220,6 +226,9 @@ describe("the coverage base", () => {
         candidates: 4,
         measured: 3,
         notMeasured: [declined({ scope: "svg", ruleId: "svg/partial", reason: "env/svg-ctm-unavailable", count: 1 })],
+        evaluations: [0, 1, 2].map((index) => targetEvaluation({ ruleId: "svg/partial", keyType: "svg-text", nodeKey: `partial-${index}`, sid: null, status: "measured" })).concat([
+          targetEvaluation({ ruleId: "svg/partial", keyType: "svg-text", nodeKey: "partial-3", sid: null, status: "not-measured", reason: "env/svg-ctm-unavailable" }),
+        ]),
       }),
     );
     const report = reportFor(partial, snapshot);
@@ -244,6 +253,10 @@ describe("the coverage base", () => {
           declined({ scope: "svg", ruleId: "svg/mixed", reason: "env/pixel-oracle-unavailable", count: 4 }),
           declined({ scope: "block", ruleId: "svg/mixed", reason: "env/multicolumn", count: 2 }),
         ],
+        evaluations: [0, 1, 2, 3].map((index) => targetEvaluation({ ruleId: "svg/mixed", keyType: "svg-text", nodeKey: `mixed-${index}`, sid: null, status: "measured" })).concat(
+          [0, 1, 2, 3].map((index) => targetEvaluation({ ruleId: "svg/mixed", keyType: "svg-text", nodeKey: `mixed-capability-${index}`, sid: null, status: "not-measured", reason: "env/pixel-oracle-unavailable" })),
+          [0, 1].map((index) => targetEvaluation({ ruleId: "svg/mixed", keyType: "block", nodeKey: `mixed-column-${index}`, sid: null, status: "not-measured", reason: "env/multicolumn" })),
+        ),
       }),
     );
     const report = reportFor(mixed, snapshot);

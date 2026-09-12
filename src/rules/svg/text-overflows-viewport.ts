@@ -1,5 +1,5 @@
 import { defineRule } from "../../core/rule.ts";
-import { declined, makeFinding, num } from "../shared.ts";
+import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
 import { SNAPSHOT_ROUNDING_PX } from "../../core/enums.ts";
 
 /**
@@ -45,6 +45,7 @@ export const textOverflowsViewport = defineRule(
   (snapshot, ctx) => {
     const findings = [];
     const notMeasured = [];
+    const evaluations = [];
     let candidates = 0;
     let measured = 0;
 
@@ -56,10 +57,24 @@ export const textOverflowsViewport = defineRule(
         svg.measurable ? 0 : 1,
       );
 
+      const overflowVisible = /\bvisible\b/u.test(svg.overflow);
+      // Text that did not render is explicitly outside this rule's observable target set. Keep
+      // the unknown count visible so removing/hiding text cannot resemble a visible repair.
+      if (svg.notRenderedTargets > 0) {
+        evaluations.push(targetEvaluation({
+          ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: null,
+          occurrenceKey: "unaddressable-rest:not-rendered", targetCount: svg.notRenderedTargets,
+          status: "excluded", countsTowardCoverage: false, reason: "rule/svg-target-not-rendered",
+          measurements: [
+            { name: "svg-overflow-visible", value: overflowVisible, unit: null, operator: "=", threshold: true },
+            { name: "svg-text-rendered", value: false, unit: null, operator: "=", threshold: true },
+          ], connective: "all", violated: null,
+        }));
+      }
       // With overflow visible the SVG viewport does not clip its descendants, so this rule's
       // question does not arise. Decide that before asking whether target paint or viewport
       // geometry was measurable: neither can change this non-applicability fact.
-      if (/\bvisible\b/u.test(svg.overflow)) {
+      if (overflowVisible) {
         if (potentialTargets > 0) {
           candidates += potentialTargets;
           notMeasured.push(
@@ -70,6 +85,15 @@ export const textOverflowsViewport = defineRule(
               count: potentialTargets,
             }),
           );
+          for (const [textIndex, text] of svg.texts.entries()) evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, status: "not-applicable", reason: "env/svg-overflow-visible", measurements: [
+            { name: "svg-overflow-visible", value: true, unit: null, operator: "=", threshold: true },
+            { name: "svg-text-rendered", value: true, unit: null, operator: "=", threshold: true },
+          ], connective: "all", violated: null }));
+          const unaddressable = potentialTargets - svg.texts.length;
+          if (unaddressable > 0) evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: null, occurrenceKey: "unaddressable-rest:overflow-visible", targetCount: unaddressable, status: "not-applicable", reason: "env/svg-overflow-visible", measurements: [
+            { name: "svg-overflow-visible", value: true, unit: null, operator: "=", threshold: true },
+            { name: "svg-text-rendered", value: true, unit: null, operator: "=", threshold: true },
+          ], connective: "all", violated: null }));
         }
         continue;
       }
@@ -89,6 +113,7 @@ export const textOverflowsViewport = defineRule(
             count: unjudged,
           }),
         );
+        evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: null, occurrenceKey: "unaddressable-rest:whole-svg", targetCount: unjudged, status: "not-measured", reason: svg.reason ?? "env/svg-not-inline" }));
         continue;
       }
 
@@ -106,6 +131,7 @@ export const textOverflowsViewport = defineRule(
             count: svg.unreadableTargets,
           }),
         );
+        evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: null, occurrenceKey: "unaddressable-rest:ctm", targetCount: svg.unreadableTargets, status: "not-measured", reason: "env/svg-ctm-unavailable" }));
       }
 
       // `getBBox()` deliberately excludes several ways SVG changes painted geometry. The
@@ -122,6 +148,7 @@ export const textOverflowsViewport = defineRule(
             count: svg.unsupportedTargets,
           }),
         );
+        evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: null, occurrenceKey: "unaddressable-rest:painted-bounds", targetCount: svg.unsupportedTargets, status: "not-measured", reason: "env/svg-painted-bounds-unsupported" }));
       }
 
       if (targets === 0) continue;
@@ -140,13 +167,14 @@ export const textOverflowsViewport = defineRule(
             count: targets,
           }),
         );
+        for (const [textIndex, text] of svg.texts.entries()) evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, status: "not-measured", reason: "env/svg-too-many-text-targets" }));
         continue;
       }
       measured += targets;
 
       const vp = svg.viewportScreen;
       const permitted = num(ctx.options.maxOvershootPx, 0);
-      for (const text of svg.texts) {
+      for (const [textIndex, text] of svg.texts.entries()) {
         const b = text.boxScreen;
         const overshoot = Math.max(
           vp.x - b.x,
@@ -154,6 +182,8 @@ export const textOverflowsViewport = defineRule(
           b.x + b.width - (vp.x + vp.width),
           b.y + b.height - (vp.y + vp.height),
         );
+        const violated = overshoot > permitted + SNAPSHOT_ROUNDING_PX;
+        evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: b, status: "measured", measurements: [{ name: "viewport-overshoot", value: overshoot, unit: "px", operator: ">", threshold: permitted + SNAPSHOT_ROUNDING_PX }], violated }));
         // The two boxes come from different APIs — the viewport from getBoundingClientRect, the
         // target from CTM-transformed getBBox corners — and the collector stores both rounded to
         // two decimals. Each value therefore carries up to 0.005 px of rounding, and a difference
@@ -165,7 +195,7 @@ export const textOverflowsViewport = defineRule(
         // viewBox, so the box ends on the edge by construction — the difference came out at
         // exactly 0, so this guard changes no verdict in the corpus. It is here because "0.01 px
         // outside" is not a statement this data can support.
-        if (overshoot <= permitted + SNAPSHOT_ROUNDING_PX) continue;
+        if (!violated) continue;
 
         findings.push(
           makeFinding({
@@ -179,9 +209,9 @@ export const textOverflowsViewport = defineRule(
             keyType: "svg-text",
             key: text.svgTextKey,
             nodeKey: svg.nodeKey,
-            sid: null,
+            sid: text.sourceAddressKey ?? null,
             boxScreen: b,
-            source: null,
+            source: text.sourceAddressKey ? snapshot.source.map[text.sourceAddressKey] ?? null : null,
             value: Number(overshoot.toFixed(2)),
             threshold: permitted,
             unit: "px",
@@ -196,6 +226,6 @@ export const textOverflowsViewport = defineRule(
         );
       }
     }
-    return { findings, candidates, measured, notMeasured };
+    return { findings, candidates, measured, notMeasured, evaluations };
   },
 );

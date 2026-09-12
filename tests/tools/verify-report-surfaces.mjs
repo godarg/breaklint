@@ -559,7 +559,7 @@ for (const artifact of manifest.artifacts) {
 }
 assert.ok(pixelMutationControl, "screen pixel mutation control did not run");
 
-assert.deepEqual(manifest.physicalArtifacts, { screens: 24, pdfs: 4, rasterPages: 31 }, "the final inventory must be exactly 24 screens, 4 PDFs and 31 PDF page rasters");
+assert.deepEqual(manifest.physicalArtifacts, { screens: 24, pdfs: 4, rasterPages: 32 }, "the Report4 inventory must be exactly 24 screens, 4 PDFs and 32 PDF page rasters");
 
 if (mode !== "technical") {
   const pending = [];
@@ -602,7 +602,7 @@ if (mode !== "technical") {
 
 if (mode === "technical") {
   process.stdout.write(
-    `report surfaces: technical gate passed 32/32 current cells and 59 physical artifacts; ` +
+    `report surfaces: technical gate passed 32/32 current cells and ${Object.values(manifest.physicalArtifacts).reduce((sum, count) => sum + count, 0)} physical artifacts; ` +
       `no human-review claim is made; the separate human ledger ${technicalLedgerCurrent ? "matches" : "differs from"} ` +
       `current inputs (${manifest.reviewInputFingerprint}; pixel mutation rejected)\n`,
   );

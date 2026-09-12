@@ -26,9 +26,15 @@ export function buildReport(input: {
   environment: ReportEnvironment;
   config: ReportConfig;
   failOn: FailOn;
+  runId?: string;
 }): Report {
   const documents = input.outcomes.map((o) => o.report);
   const findings = documents.flatMap((d) => d.findings);
+  const evaluations = documents.flatMap((d) => d.evaluations);
+  const runId = input.runId ?? "unbound-legacy-run";
+  for (const [index, finding] of findings.entries()) {
+    finding.runFindingId = `${runId}:${index}:${finding.fingerprint}`;
+  }
   const verdict = aggregateVerdict(
     documents.map((d) => d.verdict),
     documents.length,
@@ -40,6 +46,8 @@ export function buildReport(input: {
 
   return {
     schemaVersion: REPORT_SCHEMA_VERSION,
+    profileKind: "document",
+    runId,
     mode: input.mode,
     source: input.source,
     chain: "v1-rule-and-reporter-chain",
@@ -56,6 +64,7 @@ export function buildReport(input: {
     config: input.config,
     documents,
     findings,
+    evaluations,
     summary: {
       error: findings.filter((f) => f.severity === "error").length,
       warn: findings.filter((f) => f.severity === "warn").length,

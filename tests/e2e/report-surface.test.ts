@@ -84,7 +84,7 @@ describe("HTML Report Surface v2", () => {
       defaultOptions: {},
       summary: "Produces no candidates for the exit-4 report contract control.",
       declines: [],
-    }, () => ({ findings: [], candidates: 0, measured: 0, notMeasured: [] }));
+    }, () => ({ findings: [], candidates: 0, measured: 0, notMeasured: [], evaluations: [] }));
     const outcome = runDocument(
       { path: "zero-candidate.html", snapshot, infrastructure: [] },
       { failOn: "error", activeRules: [zeroCandidateRule], optionsByRule: {}, coverageFloors: {} },

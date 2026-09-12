@@ -9,6 +9,44 @@ The default file is `breaklint.config.json`. A different JSON file can be select
 `--config <file>`. JavaScript configuration is intentionally unsupported because loading it would
 execute repository code inside the checking process.
 
+## Screen page adapter
+
+`checkPage(page, options)` is a separate public API for an **already opened** Playwright page. It
+does not import Playwright, navigate, change authentication or network policy, mutate the page, or
+close the page. The caller owns the browser lifecycle and supplies the compulsory boundary:
+
+```ts
+const result = await checkPage(page, {
+  trust: "host-controlled-page",
+  networkPolicy: "host-owned",
+  scenario: "signed-in-dashboard",
+  output: { dir: "artifacts/breaklint", screenshot: "viewport" },
+  geometry: {
+    allowedScrollContainers: [{ selector: "[data-grid]", reason: "wide data grid" }],
+    intentionalOverlays: [{ selector: "[role=dialog]", reason: "open modal" }],
+  },
+});
+```
+
+The option object is closed: unknown fields, unbounded target counts, malformed exception records,
+and any trust/network value other than the two literals above are rejected before the adapter calls
+the page. `SCREEN_OPTIONS_SCHEMA` is the matching exported input schema for tooling.
+
+Screen reports are discriminated by `profileKind: "screen"`; they do not contain Paged.js pages or
+PDF coordinates. They record the sanitized route, current viewport and scroll coordinate system,
+browser version, before/stable/after capture signatures, actual PNG hash and dimensions, target
+evaluations (including healthy, excluded, and not-measured targets), coverage counts, and typed
+events. The first screen profile measures only unexpected horizontal overflow and content visibly
+cut by rectangular `overflow: hidden` or `clip` ancestors. Ordinary vertical scrolling and general
+visual occlusion are outside this measurement contract.
+
+Visible source containers can optionally be verified against a host build receipt. This does not
+accept a caller claim of being bound: breaklint captures the receipt and its declared root-relative
+source/config/lock files before and after the screenshot, checks every digest and inventory digest,
+then checks the rendered build ID meta element. A verified result is only
+`verified-container-only` via `build-bound-component-container`; it is never an exact source-line
+claim. Missing, stale, or changed proof remains declared/unknown with a typed event.
+
 ## Complete example
 
 ```json
@@ -77,7 +115,7 @@ before use and fingerprinting. The older misleading name `excludeSelectors` is n
 
 ## What the JSON report proves
 
-The canonical JSON report uses report schema 3 and records:
+The canonical document JSON report uses report schema 4 and records:
 
 - `config.contractVersion`, currently 1;
 - the selected profile and its `profileSource`, plus the finding gate and rule enablement;
@@ -95,8 +133,7 @@ The fingerprint is computed over canonicalised effective semantics with the doma
 report format, observed runtime counters and absolute machine paths. Reordering object keys or
 set-like values therefore does not change it; changing an effective option does.
 
-Report schema and snapshot schema evolve independently. Configuration Contract v1 changes the
-report to schema 3, while stored snapshots remain schema 2 because their structure did not change.
+Report schema and snapshot schema evolve independently. The current source-bound report is schema 4, stored measurement snapshots are schema 3, and Configuration Contract remains v1. Each changes only when its own structure changes.
 
 ## Failure boundary
 

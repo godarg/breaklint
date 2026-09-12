@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, sourceOf } from "../shared.ts";
+import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, sourceOf, targetEvaluation } from "../shared.ts";
 
 /**
  * type/excessive-word-spacing — justification has pulled the word gaps far apart.
@@ -29,6 +29,7 @@ export const excessiveWordSpacing = defineRule(
   (snapshot, ctx) => {
     const findings = [];
     const notMeasured = [];
+    const evaluations = [];
     let candidates = 0;
     let measured = 0;
     const maxFactor = num(ctx.options.maxSpaceFactor, 3.0);
@@ -45,6 +46,7 @@ export const excessiveWordSpacing = defineRule(
       const outOfScope = layoutOutOfScope(block.effectiveStyle);
       if (outOfScope) {
         notMeasured.push(declined({ scope: "block", ruleId: "type/excessive-word-spacing", reason: outOfScope }));
+        evaluations.push(targetEvaluation({ ruleId: "type/excessive-word-spacing", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: outOfScope }));
         continue;
       }
       measured += 1;
@@ -67,6 +69,7 @@ export const excessiveWordSpacing = defineRule(
           }
         }
       }
+      evaluations.push(targetEvaluation({ ruleId: "type/excessive-word-spacing", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured", measurements: [{ name: "largest-word-gap-factor", value: worst, unit: "× natural space", operator: ">", threshold: maxFactor }], violated: worst > maxFactor }));
       if (worst <= maxFactor) continue;
 
       findings.push(
@@ -92,6 +95,6 @@ export const excessiveWordSpacing = defineRule(
         }),
       );
     }
-    return { findings, candidates, measured, notMeasured };
+    return { findings, candidates, measured, notMeasured, evaluations };
   },
 );

@@ -4,7 +4,28 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## Current release — 0.4.0 (2026-09-05)
+## 0.5.0 candidate — source-bound consumers
+
+The candidate adds Report 4 source provenance and positive target evaluations, public producer and
+existing-page APIs, offline human/AI projections and conservative repair comparison. Digital Product
+Studio uses the installed public producer API and a bounded ZIP join. DS_OS uses existing authenticated
+Playwright states and an actual production build receipt for component-container provenance.
+The release workflow requires registry CLI/API and real-document checks after publication.
+The local final candidate passed 436 unit tests (552 including E2E), 71 live tests and the two
+installed real-document cases. The dedicated DS_OS run measured all 45 registered states at five
+viewports with complete evidence. These are technical/agent measurements on 2026-09-12; they do
+not establish human usability or general corpus calibration.
+
+A measured Studio shipping chapter produced eight diagnostic pages and nine bound findings, one with
+verified original source position, with exact current seller-attachment ZIP binding. The full image-rich
+print pilot produced 204 pages; 202 pages bound, 95 explicitly unplaced marker leaves, zero nonzero
+PDF pixel differences. It remains partial evidence where binding was unavailable. Another chapter
+correctly ended as infrastructure because paginated geometry moved during PDF production.
+
+The previous human surface ledger is historical. New agent-rendered views do not constitute a human
+review. Two-week effectiveness and actual human repair-time savings remain unmeasured.
+
+## Previous release — 0.4.0 (2026-09-05)
 
 0.4.0 is the first release measured against a corpus that was not this repository's own: eighteen
 chapters of a shipped HTML bundle, of which twelve measured and six ended `exit 3`,
@@ -99,8 +120,8 @@ controlled freeze) remains parked. No threshold, severity, proof-source-A contra
 flag changed. The sections below are a dated build record; statements such as “not released” describe
 their checkpoint, not the current state.
 
-The report surfaces are regenerated as 32 semantic cells and 59 physical artifacts (24 screen PNGs,
-4 PDFs and 31 PDF-page rasters). The technical gate verifies those current bytes, decoded pixels,
+The report surfaces are regenerated as 32 semantic cells and 60 physical artifacts (24 screen PNGs,
+4 PDFs and 32 PDF-page rasters). The technical gate verifies those current bytes, decoded pixels,
 contrast, accessibility, print fragmentation and a real pixel-mutation red control. The prior human
 ledger remains bound to the 0.2.3 inputs and 62 artifacts; it has deliberately not been restamped or
 transferred to 0.3.1. `test:report-surfaces:local` therefore remains red until a person reviews the
@@ -123,7 +144,7 @@ GitHub assets.
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
 | Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in report schema 3; generated schema drift and process-boundary exit 2 are tested |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
-| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 59 physical artifacts with decoded-pixel, contrast, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
+| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 60 physical artifacts with decoded-pixel, contrast, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
 | Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
 | `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 7 findings across 6 rules |
@@ -158,7 +179,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=371 aggregateTests=484 liveTests=63 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=436 aggregateTests=552 liveTests=71 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against

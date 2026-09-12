@@ -24,7 +24,7 @@ attributes its findings to the wrong id.
 A rule may carry `error` only with a named proof source. There are three classes — a geometric
 invariant between two directly measured quantities, a cited norm together with the cases it does
 not cover, and a resolution invariant — and they are defined in
-[`docs/limitations.md`](docs/limitations.md). Both current error rules are class A; no rule claims
+[`docs/limitations.md`](docs/limitations.md). Both document-profile error rules are class A; no rule claims
 B or C.
 
 `defineRule` rejects `error` without a proof source, and rejects a proof source on anything that is
@@ -51,3 +51,8 @@ Every public config field needs all of these in the same change:
 Run `npm run schema:write` after the registry changes and `npm run schema:check` before review.
 Report and snapshot schema versions are separate: raise only the artifact whose structure changed,
 and add a migration assertion for that artifact.
+
+
+## Public consumers and source contracts
+
+A public API change needs a packed installation check, including actual Playwright `Page` TypeScript assignability and rendered evidence copied from the installed package. Keep document Report4, measurement Snapshot3, Configuration Contract1, source manifest1 and screen report1 distinct. Source identities are not selectors; a unique author anchor and verified capture history are required for repair comparison. Tests must retain explicit nonmeasurement and genuine counterexamples for source mismatch, missing evidence and reduced coverage.

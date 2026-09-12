@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf } from "../shared.ts";
+import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
 
 /** The class the paginator sets on a block it hyphenated at a page boundary. */
 const PAGEDJS_HYPHEN_CLASS = "pagedjs_hyphen";
@@ -28,6 +28,7 @@ export const hyphenAcrossPage = defineRule(
   (snapshot, ctx) => {
     const findings = [];
     const notMeasured = [];
+    const evaluations = [];
     let candidates = 0;
     let measured = 0;
 
@@ -39,12 +40,14 @@ export const hyphenAcrossPage = defineRule(
       const outOfScope = layoutOutOfScope(block.effectiveStyle);
       if (outOfScope) {
         notMeasured.push(declined({ scope: "block", ruleId: "layout/hyphen-across-page", reason: outOfScope }));
+        evaluations.push(targetEvaluation({ ruleId: "layout/hyphen-across-page", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: outOfScope }));
         continue;
       }
       measured += 1;
 
       const occurrences = block.classList.includes(PAGEDJS_HYPHEN_CLASS) ? 1 : 0;
       const permitted = num(ctx.options.maxOccurrences, 0);
+      evaluations.push(targetEvaluation({ ruleId: "layout/hyphen-across-page", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured", measurements: [{ name: "boundary-hyphens", value: occurrences, unit: "occurrences", operator: ">", threshold: permitted }], violated: occurrences > permitted }));
       if (occurrences <= permitted) continue;
       const page = pageByNumber(snapshot, block.page);
 
@@ -72,6 +75,6 @@ export const hyphenAcrossPage = defineRule(
         }),
       );
     }
-    return { findings, candidates, measured, notMeasured };
+    return { findings, candidates, measured, notMeasured, evaluations };
   },
 );

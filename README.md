@@ -15,7 +15,7 @@ npx breaklint --demo
 
 That command needs no browser and no configuration. It ends with exit 1, because the demo
 fixture contains findings on purpose — a demo that ends 0 never shows you what a finding looks
-like. Below is the first of its seven findings, plus the closing counters, copied from that
+like. Below is one of its seven findings, plus the closing counters, copied from that
 command's output:
 
 ```
@@ -23,7 +23,7 @@ error layout/unbreakable-block-too-tall  page 2
   measured   848 px; threshold 606 px (uncalibrated)
   detail     This block asks not to be broken and is 848.00 px tall; the page content box is
              606.00 px. It cannot fit on any page.
-  source     examples/demo.html:31
+  source     unknown (node produced by the paginator)
   render     unknown (no evidence produced)
 
 inputs found: 1 · pages analysed: 5 · rules run: 13 · rules that measured something: 11 ·
@@ -49,6 +49,34 @@ npm i -D breaklint
 
 That is enough for `--demo` and for reading the docs. A run over your own HTML additionally
 needs a browser and the paginator; see [Requirements](#requirements).
+
+## Source-bound findings and existing web pages
+
+The installed package now exposes `checkProducedDocuments`, `checkPage`, `compareReports`,
+`createContextPack`, `renderReport` and `writeReportBundle`. Live document reports use Report 4;
+the screen profile has a separate contract and checks visible geometry without pagination.
+
+```js
+import { checkPage, writeReportBundle } from 'breaklint';
+
+// `page` is your existing, authenticated Playwright page after scenario setup.
+const { report } = await checkPage(page, {
+  trust: 'host-controlled-page',
+  networkPolicy: 'host-owned',
+  scenario: 'account-overview',
+  output: { dir: './layout-evidence', screenshot: 'viewport' },
+});
+await writeReportBundle(report, {
+  outDir: './layout-report', evidenceDir: './layout-evidence',
+});
+```
+
+The adapter keeps navigation, authentication and page ownership with the caller. It records
+unsupported paint and missing coverage explicitly. Source selectors alone do not prove a component
+position. A host build receipt can verify a component container; producer-bound documents can
+carry exact original byte ranges. Both the offline human view and bounded AI context derive from
+the same canonical JSON. See [the source and consumer contract](docs/source-bound-findings.md),
+[reporting](docs/reporting.md) and [repair comparison](docs/revision-comparison.md).
 
 ## Why this exists
 

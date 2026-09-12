@@ -35,6 +35,7 @@ import { assignPageCauses } from "../paginate/breaks.ts";
 import { boundaryFactsFrom, type CollectorResult } from "../paginate/collector.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InjectionResult } from "../source/inject.ts";
+import { coordinateAtUtf8Byte } from "../source/bytes.ts";
 
 type Node = DefaultTreeAdapterMap["node"];
 type Element = DefaultTreeAdapterMap["element"];
@@ -96,24 +97,26 @@ export function validateInjectedProvenance(
 ): ProvenanceValidation {
   const issues: string[] = [];
   const entries = Object.entries(injected.map);
-  if (entries.length !== injected.blocks) {
-    issues.push(`map has ${entries.length} entries for ${injected.blocks} injected blocks`);
+  if (entries.length !== injected.blocks + injected.svgTargets) {
+    issues.push(`map has ${entries.length} entries for ${injected.blocks} injected blocks and ${injected.svgTargets} SVG targets`);
   }
+  const bytes = Buffer.from(original, "utf8");
   for (const [sid, ref] of entries) {
-    if (!Number.isInteger(ref.offset) || ref.offset < 0 || ref.offset >= original.length || original[ref.offset] !== "<") {
+    if (ref.coordinateSystem !== "utf8-bytes-unicode-codepoints-v1" ||
+      !Number.isInteger(ref.offset) || ref.offset < 0 || ref.offset >= bytes.length || bytes.subarray(ref.offset, ref.offset + 1).toString("utf8") !== "<" ||
+      !Number.isInteger(ref.endOffset) || ref.endOffset <= ref.offset || ref.endOffset > bytes.length) {
       issues.push(`${sid}: offset ${ref.offset} does not point to a source opening tag`);
       continue;
     }
-    const before = original.slice(0, ref.offset);
-    const expectedLine = before.split("\n").length;
-    const expectedColumn = ref.offset - (before.lastIndexOf("\n") + 1) + 1;
-    if (ref.line !== expectedLine || ref.column !== expectedColumn) {
+    const start = coordinateAtUtf8Byte(original, ref.offset);
+    const end = coordinateAtUtf8Byte(original, ref.endOffset);
+    if (ref.line !== start.line || ref.column !== start.column || ref.endLine !== end.line || ref.endColumn !== end.column) {
       issues.push(
         `${sid}: source position ${ref.line}:${ref.column} disagrees with offset ${ref.offset} ` +
-          `(${expectedLine}:${expectedColumn})`,
+          `(${start.line}:${start.column})`,
       );
     }
-    const literal = `data-bl-sid="${sid}"`;
+    const literal = sid.startsWith("bt") ? `data-bl-svg-target="${sid}"` : `data-bl-sid="${sid}"`;
     const first = injected.html.indexOf(literal);
     const second = first === -1 ? -1 : injected.html.indexOf(literal, first + literal.length);
     if (first === -1) issues.push(`${sid}: injected attribute is absent`);
@@ -583,7 +586,7 @@ export const SNAPSHOT_SOURCE = `(() => {
     const last = merged[merged.length - 1] || null;
     return { pageNumber: index + 1, nodeKey: "page:" + (index + 1), epoch: 0,
       blank: measuredRects.length === 0 && pageBlocks.length === 0,
-      isLast: index === pagesEls.length - 1, contentBox: cb,
+      isLast: index === pagesEls.length - 1, contentBox: cb, pageBox: box(page),
       marginBoxes: P.all(page, '[class*="pagedjs_margin"]').map(box),
       fill: { vertical: cb.height > 0 && last ? round((last[1] - cb.y) / cb.height) : 0,
         topGap: cb.height > 0 && first ? round((first[0] - cb.y) / cb.height) : 0,
@@ -733,6 +736,8 @@ export const SNAPSHOT_SOURCE = `(() => {
         const masked = !!textStyle.mask && textStyle.mask !== "none" && !P.startsWith(textStyle.mask, "none ");
         texts.push({
           sourceIdentity: P.attr(textEl, "id"),
+          // Run-local source map address only; SVG fingerprint identity remains source id/content.
+          sourceAddressKey: P.attr(textEl, "data-bl-svg-target"),
           signature: P.text(textEl) || "",
           boxScreen: { x: round(minX), y: round(minY), width: round(maxX - minX), height: round(maxY - minY) },
           clipState: clipped && masked ? "both" : clipped ? "clip-path" : masked ? "mask" : "none",
@@ -785,6 +790,13 @@ export interface AssembleSnapshotInput {
   evidenceOverlayApplied: boolean;
   cascadeHints?: Readonly<Record<string, BreakCauseCascadeHint | null>>;
   resources: ResourceRecord[];
+  sourceInput?: NonNullable<Snapshot["source"]["input"]>;
+  sourceProvenance?: NonNullable<Snapshot["source"]["provenance"]>;
+  /** Validated original-input digest inventory; no source bytes are retained in the snapshot. */
+  sourceFiles?: NonNullable<Snapshot["source"]["files"]>;
+  /** Partial producer-bound original leaves; sourceMap always describes the inspected input. */
+  originalSourceMap?: Record<string, SourceRef>;
+  originalSourceAmbiguity?: Record<string, SourceRef[]>;
 }
 
 export interface SnapshotInvariantValidation {
@@ -838,6 +850,8 @@ export function validateSnapshotInvariants(
   }
   for (const block of snapshot.blocks) {
     if (block.lines === null && !block.notMeasuredReason) issues.push(`${block.nodeKey}: lines absent without reason`);
+    // The inspected input artefact's injection map is always complete. Producer provenance is
+    // deliberately separate in originalMap, where generated/ambiguous output can be omitted.
     if (options.sourceMapInjection && block.sid !== null && !snapshot.source.map[block.sid]) {
       issues.push(`${block.nodeKey}: sid ${block.sid} has no SourceRef`);
     }
@@ -876,6 +890,73 @@ export function validateSnapshotInvariants(
 
 /** Join browser measurements to source identity and classify each page boundary exactly once. */
 export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
+  const sourceInput = input.sourceInput ?? {
+    identityStatus: "unknown" as const,
+    rawBytesSha256: null,
+    byteLength: null,
+    encoding: null,
+    complete: false,
+  };
+  const sourceIdentityPairIsComplete =
+    (sourceInput.rawBytesSha256 === null) === (sourceInput.byteLength === null);
+  if (!sourceIdentityPairIsComplete) {
+    throw new Error("snapshot source input must provide rawBytesSha256 and byteLength together");
+  }
+  if (sourceInput.rawBytesSha256 !== null && !/^[a-f0-9]{64}$/u.test(sourceInput.rawBytesSha256)) {
+    throw new Error("snapshot source input rawBytesSha256 must be a lowercase SHA-256 digest");
+  }
+  if (sourceInput.byteLength !== null && (!Number.isSafeInteger(sourceInput.byteLength) || sourceInput.byteLength < 0)) {
+    throw new Error("snapshot source input byteLength must be a non-negative safe integer");
+  }
+  if (sourceInput.identityStatus === "verified" && sourceInput.rawBytesSha256 === null) {
+    throw new Error("verified snapshot source input requires raw bytes identity");
+  }
+  const sourceProvenance = input.sourceProvenance ?? {
+    binding: "unavailable" as const,
+    copyIntegrity: "unavailable" as const,
+    sourceRole: "unknown" as const,
+    producerId: null,
+    receiptHash: null,
+    diagnostics: ["source provenance was not supplied to the legacy live acquisition path"],
+  };
+  const sourceFiles = input.sourceFiles ?? [];
+  const sourceDigest = (value: string | null | undefined, label: string): void => {
+    if (value !== undefined && value !== null && !/^[a-f0-9]{64}$/u.test(value)) {
+      throw new Error(`snapshot source provenance ${label} must be a lowercase SHA-256 digest`);
+    }
+  };
+  sourceDigest(sourceProvenance.receiptHash, "receiptHash");
+  sourceDigest(sourceProvenance.codeSha256, "codeSha256");
+  sourceDigest(sourceProvenance.optionsSha256, "optionsSha256");
+  if (sourceProvenance.binding === "producer-bound" && (
+    !sourceProvenance.producerId || !sourceProvenance.receiptHash ||
+    !sourceProvenance.codeSha256 || !sourceProvenance.optionsSha256
+  )) {
+    throw new Error("producer-bound snapshot provenance requires producerId, receiptHash, codeSha256, and optionsSha256");
+  }
+  const sourceFileByPath = new Map<string, { sha256: string; byteLength: number; role: "authoring" | "dependency" | "asset" }>();
+  for (const file of sourceFiles) {
+    if (
+      !file.file || !/^[a-f0-9]{64}$/u.test(file.sha256) || !Number.isSafeInteger(file.byteLength) || file.byteLength < 0 ||
+      !["authoring", "dependency", "asset"].includes(file.role)
+    ) {
+      throw new Error("snapshot source files must contain a logical path, lowercase SHA-256, non-negative bytes, and a known role");
+    }
+    if (sourceFileByPath.has(file.file)) throw new Error(`snapshot source files contains duplicate path ${file.file}`);
+    sourceFileByPath.set(file.file, file);
+  }
+  for (const [address, original] of Object.entries(input.originalSourceMap ?? {})) {
+    if (!sourceFileByPath.has(original.file)) {
+      throw new Error(`snapshot original source ${address} is absent from the source file inventory`);
+    }
+  }
+  for (const [address, candidates] of Object.entries(input.originalSourceAmbiguity ?? {})) {
+    for (const candidate of candidates) {
+      if (!sourceFileByPath.has(candidate.file)) {
+        throw new Error(`snapshot ambiguous original source ${address} is absent from the source file inventory`);
+      }
+    }
+  }
   const counts = new Map<string, number>();
   for (const block of input.raw.blocks) counts.set(block.sourceIdentity, (counts.get(block.sourceIdentity) ?? 0) + 1);
   const seen = new Map<string, number>();
@@ -1051,6 +1132,11 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
       complete: input.sourceMapInjection,
       injectedAttribute: "data-bl-sid",
       collisionChecked: input.sourceMapInjection,
+      ...(input.originalSourceMap === undefined ? {} : { originalMap: input.originalSourceMap }),
+      ...(input.originalSourceAmbiguity === undefined ? {} : { originalAmbiguity: input.originalSourceAmbiguity }),
+      input: sourceInput,
+      provenance: sourceProvenance,
+      ...(input.sourceFiles === undefined ? {} : { files: input.sourceFiles }),
     },
     pages,
     blocks,

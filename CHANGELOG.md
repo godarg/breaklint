@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 — 2026-09-12
+
+- Add installed public producer, existing-page, comparison and canonical report-bundle APIs.
+- Version live document Report/Snapshot contracts to 4; preserve separate Configuration Contract 1.
+- Bind generated input bytes and verified original source ranges through bounded producer receipts; preserve unknown and ambiguous provenance.
+- Preserve the exact diagnostic PDF and hash-bound page evidence; fix cross-page overlay marks that could change print scale. Required evidence gaps now prevent a clean claim.
+- Add visible web overflow and clipping diagnostics with named scroll/overlay exceptions, bounded inventory and explicit unsupported paint/stability states.
+- Compare positive target measurements under verified revision, configuration, resource and renderer conditions; reduced coverage is never a repaired finding.
+- Add offline human cards and bounded untrusted AI context from the same JSON, with checked evidence assets and explicit omissions.
+- Extend the Actions one-tarball release route to test ESM, require(ESM), TypeScript and a real Playwright consumer.
+
+
 ## 0.4.0 — 2026-09-05
 
 A minor rather than a patch for one reason: on a document whose paginator left unplaceable

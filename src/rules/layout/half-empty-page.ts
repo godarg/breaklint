@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { pageKey } from "../../core/fingerprint.ts";
-import { declined, makeFinding, num } from "../shared.ts";
+import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
 
 /**
  * layout/half-empty-page — a page carries far less content than it could.
@@ -37,6 +37,7 @@ export const halfEmptyPage = defineRule(
   (snapshot, ctx) => {
     const findings = [];
     const notMeasured = [];
+    const evaluations = [];
     let candidates = 0;
     let measured = 0;
     const minNetFill = num(ctx.options.minNetFill, 0.6);
@@ -52,12 +53,14 @@ export const halfEmptyPage = defineRule(
         notMeasured.push(
           declined({ scope: "page", ruleId: "layout/half-empty-page", reason: "env/parity-blank-page" }),
         );
+        evaluations.push(targetEvaluation({ ruleId: "layout/half-empty-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "not-measured", reason: "env/parity-blank-page" }));
         continue;
       }
       measured += 1;
 
       const tooEmpty = page.fill.net < minNetFill;
       const tooLowOnPage = page.fill.topGap > maxTopGap;
+      evaluations.push(targetEvaluation({ ruleId: "layout/half-empty-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "measured", measurements: [{ name: "net-fill", value: page.fill.net, unit: "fill ratio", operator: "<", threshold: minNetFill }, { name: "top-gap", value: page.fill.topGap, unit: "fill ratio", operator: ">", threshold: maxTopGap }], connective: "any", violated: tooEmpty || tooLowOnPage }));
       if (!tooEmpty && !tooLowOnPage) continue;
 
       // The last page of a document is usually short on purpose. Downgraded, not suppressed —
@@ -105,6 +108,6 @@ export const halfEmptyPage = defineRule(
         }),
       );
     }
-    return { findings, candidates, measured, notMeasured };
+    return { findings, candidates, measured, notMeasured, evaluations };
   },
 );

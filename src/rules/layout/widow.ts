@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, pageByNumber, sourceOf } from "../shared.ts";
+import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
 
 /**
  * layout/widow — the opening fragment of a block carries fewer lines than the author asked for.
@@ -35,6 +35,7 @@ export const widow = defineRule(
   (snapshot, ctx) => {
     const findings = [];
     const notMeasured = [];
+    const evaluations = [];
     let candidates = 0;
     let measured = 0;
 
@@ -47,6 +48,7 @@ export const widow = defineRule(
       const outOfScope = layoutOutOfScope(block.effectiveStyle);
       if (outOfScope) {
         notMeasured.push(declined({ scope: "block", ruleId: "layout/widow", reason: outOfScope }));
+        evaluations.push(targetEvaluation({ ruleId: "layout/widow", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: outOfScope }));
         continue;
       }
       const page = pageByNumber(snapshot, block.page);
@@ -54,11 +56,25 @@ export const widow = defineRule(
       // fragment that starts after a deliberate break would report the author's own intent.
       if (page?.incomingBreakCause.kind === "forced") {
         notMeasured.push(declined({ scope: "block", ruleId: "layout/widow", reason: "env/forced-break" }));
+        evaluations.push(targetEvaluation({ ruleId: "layout/widow", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: "env/forced-break" }));
         continue;
       }
       measured += 1;
 
       const lines = linesOfBlock(snapshot, block.nodeKey).length;
+      const required = block.effectiveStyle.widows + num(ctx.options.extraLines, 0);
+      const violated = lines > 0 && lines < required && required > 1;
+      evaluations.push(targetEvaluation({
+        ruleId: "layout/widow", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+        fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured",
+        measurements: [
+          { name: "widow-applicable-opening-lines", value: lines > 0, unit: null, operator: "=", threshold: true },
+          { name: "opening-fragment-lines", value: lines, unit: "lines", operator: "<", threshold: required },
+          { name: "widows-requirement-exceeds-one", value: required, unit: "lines", operator: ">", threshold: 1 },
+        ],
+        connective: "all",
+        violated,
+      }));
       // A fragment with no visible text line has no text to strand. Found by the corpus
       // cross-check: without this the rule reports "0 lines" on a fragment carrying only a
       // figure or an image — a false alarm on every document that splits around a picture.
@@ -67,7 +83,6 @@ export const widow = defineRule(
       // offset also makes the threshold injectable, which is what lets the mutation guard move
       // it — a threshold buried in a comparison cannot be mutated, and a mutant that changes
       // nothing survives without proving anything.
-      const required = block.effectiveStyle.widows + num(ctx.options.extraLines, 0);
       if (lines >= required || required <= 1) continue;
 
       findings.push(
@@ -93,6 +108,6 @@ export const widow = defineRule(
         }),
       );
     }
-    return { findings, candidates, measured, notMeasured };
+    return { findings, candidates, measured, notMeasured, evaluations };
   },
 );
