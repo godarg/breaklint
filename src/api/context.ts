@@ -92,8 +92,9 @@ function portableEvidenceRef(value: string | null): string | null {
 function portableDetail(value: unknown, maximum = 400): string {
   // Details are report data, but they may include an OS error message or a measured
   // object with a host path.  Preserve the reason while withholding every path token,
-  // including one immediately following JSON punctuation.
-  return bounded(value, maximum).replace(/(?:^|[\s"'=:{,])(?:\/|~\/|[A-Za-z]:[\\/])[^\s"',}\]]*/gu, "$1<local-path-withheld>");
+  // including one immediately following JSON punctuation or an opening bracket ("(/Users/…)").
+  // The delimiter is captured and kept; it was once consumed and replaced by a literal "$1".
+  return bounded(value, maximum).replace(/(^|[\s"'=:{,([<])(?:\/|~\/|[A-Za-z]:[\\/])[^\s"',}\])>]*/gu, "$1<local-path-withheld>");
 }
 
 function measuredContext(value: Record<string, unknown> | null, maximum: number): string | null {

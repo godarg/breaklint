@@ -133,7 +133,7 @@ The fingerprint is computed over canonicalised effective semantics with the doma
 report format, observed runtime counters and absolute machine paths. Reordering object keys or
 set-like values therefore does not change it; changing an effective option does.
 
-Report schema and snapshot schema evolve independently. The current source-bound report is schema 4, stored measurement snapshots are schema 3, and Configuration Contract remains v1. Each changes only when its own structure changes.
+Report schema and snapshot schema evolve independently. The current source-bound report is schema 4, stored measurement snapshots are schema 4, and Configuration Contract remains v1. Each changes only when its own structure changes.
 
 ## Failure boundary
 

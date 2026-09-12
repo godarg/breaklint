@@ -27,6 +27,21 @@ describe("screen checkPage options", () => {
     assert.equal(validate(candidate), true, JSON.stringify(validate.errors));
   });
 
+  it("rejects blank and NUL-bearing strings in the exported schema exactly as at runtime", () => {
+    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(SCREEN_OPTIONS_SCHEMA);
+    for (const scenario of [" ", "\t\n", "a\u0000b"]) {
+      const candidate = { ...base(), scenario };
+      assert.throws(() => validateCheckPageOptions(candidate), /non-empty bounded string/);
+      assert.equal(validate(candidate), false, JSON.stringify(scenario));
+    }
+    const overlay = { ...base(), geometry: { intentionalOverlays: [{ selector: "[role=dialog]", reason: " " }] } };
+    assert.throws(() => validateCheckPageOptions(overlay), /non-empty bounded string/);
+    assert.equal(validate(overlay), false);
+    const padded = { ...base(), scenario: " padded scenario " };
+    assert.doesNotThrow(() => validateCheckPageOptions(padded));
+    assert.equal(validate(padded), true, JSON.stringify(validate.errors));
+  });
+
   it("rejects ignored fields, wrong numeric types, and a forged bound source status", () => {
     assert.throws(() => validateCheckPageOptions({ ...base(), unexpected: true }), /unknown field/);
     assert.throws(() => validateCheckPageOptions({ ...base(), geometry: { maxTargets: "50" } }), /must be a number/);

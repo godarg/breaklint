@@ -101,6 +101,31 @@ describe("bounded public report views", () => {
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
+  it("keeps dollar sequences in document text literal in the written HTML", () => {
+    const root = mkdtempSync(join(tmpdir(), "breaklint-bundle-dollar-"));
+    try {
+      const report = clone();
+      for (const finding of report.findings) finding.message = "math $$x$$ then $& and $' and $` end";
+      const result = writeReportBundle(report, { outDir: join(root, "out") });
+      const html = readFileSync(result.htmlPath, "utf8");
+      assert.match(html, /math \$\$x\$\$ then \$&amp; and \$' and \$` end/u);
+      assert.equal(html.match(/<footer>/gu)?.length, 1, "a replacement pattern must not duplicate generated markup");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it("refuses a pre-existing symlink in place of a bundle file instead of writing through it", () => {
+    const root = mkdtempSync(join(tmpdir(), "breaklint-bundle-link-"));
+    try {
+      const outDir = join(root, "out");
+      const victim = join(root, "victim.txt");
+      mkdirSync(outDir);
+      writeFileSync(victim, "unchanged\n");
+      symlinkSync(victim, join(outDir, "report.json"));
+      assert.throws(() => writeReportBundle(clone(), { outDir }), /ELOOP|symbolic link/u);
+      assert.equal(readFileSync(victim, "utf8"), "unchanged\n");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   it("does not upgrade a legacy report into an actionable repair claim", () => {
     const legacy = { schemaVersion: 3, runId: "old", profileKind: "document", findings: [] };
     const context = createContextPack(legacy);
@@ -134,6 +159,27 @@ describe("bounded public report views", () => {
     assert.match(html, /checker-crashed/u);
     assert.doesNotMatch(JSON.stringify(context), /\/private\//u);
     assert.doesNotMatch(html, /\/private\//u);
+    // The delimiter before a withheld path stays; no literal replacement token leaks.
+    assert.equal(crashed.reason, "paint unavailable at <local-path-withheld>");
+    assert.doesNotMatch(JSON.stringify(context), /\$1/u);
+  });
+
+  it("withholds a host path that follows an opening bracket", () => {
+    const report = clone();
+    report.findings = [];
+    report.runVerdict = "infrastructure";
+    report.exitCode = 3;
+    report.documents[0]!.infrastructure.push({
+      kind: "checker-crashed",
+      detail: "render failed (/private/host/doc.html) near [C:\\Users\\owner\\x.pdf] and </private/tag>",
+      measured: null,
+    });
+    const context = createContextPack(report);
+    const crashed = context.diagnostics.items.find((item) => item.kind === "checker-crashed");
+    assert.ok(crashed);
+    assert.equal(crashed.reason, "render failed (<local-path-withheld>) near [<local-path-withheld>] and <<local-path-withheld>>");
+    assert.doesNotMatch(JSON.stringify(context), /private|owner/u);
+    assert.doesNotMatch(renderReport(report), /\/private\/|owner/u);
   });
 
   it("projects exact origin, canonical predicate data and a supplied compatible comparison", () => {

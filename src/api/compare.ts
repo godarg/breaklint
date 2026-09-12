@@ -141,7 +141,9 @@ export async function compareReports(before: Report, after: Report, options: Com
       if (!isHash(before.config.fingerprint) || before.config.fingerprint !== after.config.fingerprint || doc.revision?.optionsSha256 !== next.revision?.optionsSha256) entry.reasons.push("configuration-incompatible");
       if (!environmentCompatible(before, after, doc, next)) entry.reasons.push("environment-incompatible-or-unknown");
       if (!resourceCompatible(doc, next)) entry.reasons.push("resource-identity-incomplete-or-incompatible");
-      if (!positiveInfrastructure(next) || !next.coverage[finding.ruleId]?.ok || next.notMeasured.some(n => n.ruleId === finding.ruleId && !(n.reason === "env/svg-overflow-visible" && evaluations.every(admissible))) || (next.evidenceCoverage?.required && next.evidenceCoverage.status !== "complete")) entry.reasons.push("infrastructure-or-coverage-incomplete");
+      // Both observations must be positively measured: a finding recorded under a failed or
+      // incomplete baseline cannot be declared repaired by a clean later run.
+      if (!positiveInfrastructure(doc) || !positiveInfrastructure(next) || !next.coverage[finding.ruleId]?.ok || next.notMeasured.some(n => n.ruleId === finding.ruleId && !(n.reason === "env/svg-overflow-visible" && evaluations.every(admissible))) || (next.evidenceCoverage?.required && next.evidenceCoverage.status !== "complete")) entry.reasons.push("infrastructure-or-coverage-incomplete");
       const prior = doc.evaluations.filter(e => sameTarget(finding, e));
       if (prior.length === 0 || evaluations.length < prior.length || evaluations.some(e => (e.targetCount ?? 1) !== 1)) entry.reasons.push("target-parts-reduced");
       if (evaluations.some(e => !(admissible(e) || (e.status === "measured" && e.predicate.violated === false && e.measurements.length > 0)) || (finding.evidence.bindsFinding && e.evidenceBound !== true))) entry.reasons.push("target-not-positively-measured");
