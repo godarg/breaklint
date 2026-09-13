@@ -4,9 +4,9 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## 0.5.0 candidate — source-bound consumers
+## Current release — 0.5.0 (2026-09-13) — source-bound consumers
 
-The candidate adds Report 4 source provenance and positive target evaluations, public producer and
+0.5.0 adds Report 4 source provenance and positive target evaluations, public producer and
 existing-page APIs, offline human/AI projections and conservative repair comparison. Digital Product
 Studio uses the installed public producer API and a bounded ZIP join. DS_OS uses existing authenticated
 Playwright states and an actual production build receipt for component-container provenance.
@@ -30,6 +30,22 @@ correctly ended as infrastructure because paginated geometry moved during PDF pr
 
 The previous human surface ledger is historical. New agent-rendered views do not constitute a human
 review. Two-week effectiveness and actual human repair-time savings remain unmeasured.
+
+The annotated `v0.5.0` tag points to merge commit
+`a8bd6f9fb1b1c60af60565031e352f3bc9ace659` (PR #9, the review corrections above, on top of PR #8).
+CI run `34722808247` passed on exactly that commit before the tag. Release workflow run
+`34737625107` accepted the once-packed tarball in clean Node 22.13 and Node 24 consumers, published it
+to npm with SLSA provenance, and created the GitHub Release from the same bytes on 2026-09-13
+(04:29 UTC). A post-release readback measured SHA-256
+`ebc61239a9dea712279f9cf374f37b9edec16d96eef74e2bf4ec169acf05cdf4` for both the registry tarball and
+the GitHub asset, and npm serves `dist.integrity`
+`sha512-WA2WhSEKlqw/WCO5jk/6QojW+RJnOlce1OjiSTqCPiC9Ga7nzqUbopwRXLiWHaY8DTH33qefyo1aqh3yWdyx3w==`.
+The same readback verified the provenance-bound commit and registry signatures, and a fresh registry
+install passed `--version`, the demo (exit 1), the installed ESM/require/TypeScript/Playwright API
+contract and both admitted real documents. The Studio tool installation and DS_OS now pin exactly this
+registry version. In DS_OS, the first run right after a fresh build failed closed on one of 45 states
+(`source-binding-unavailable`: a standalone font changed while it was captured; cause unknown); the
+next run without a rebuild passed 45 of 45 and the source-change control.
 
 ## Previous release — 0.4.0 (2026-09-05)
 
