@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0 — 2026-09-12
+## 0.5.0 — 2026-09-13
 
 - Add installed public producer, existing-page, comparison and canonical report-bundle APIs.
 - Version live document Report/Snapshot contracts to 4; preserve separate Configuration Contract 1.
@@ -10,6 +10,7 @@
 - Compare positive target measurements under verified revision, configuration, resource and renderer conditions; reduced coverage is never a repaired finding.
 - Add offline human cards and bounded untrusted AI context from the same JSON, with checked evidence assets and explicit omissions.
 - Extend the Actions one-tarball release route to test ESM, require(ESM), TypeScript and a real Playwright consumer.
+- Pre-release review corrections: withhold host paths after brackets in AI-context diagnostics, keep `$` sequences from document text literal in written HTML, refuse symlinked bundle files, require a positively measured baseline before a comparison reports `resolved`, and align the exported screen-options schema with runtime validation.
 
 
 ## 0.4.0 — 2026-09-05
