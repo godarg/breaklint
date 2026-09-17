@@ -20,18 +20,20 @@ Always check the process exit code before inspecting findings. Never interpret m
 
 ### Critical Rule for Exit 4 (`insufficient-coverage`)
 When breaklint exits with code 4, the report may show zero findings (`findings: []`). **This is not a clean pass.**
-It means the engine could not measure enough elements to satisfy proof thresholds (e.g., SVG text inside unsupported transforms, unmeasured RTL runs). Inspect `whatWasNotMeasured` in `context.json` or `coverage` in `report.json` to find the unmeasured rule and environment reason (`reason`).
+It means the engine could not measure enough elements to satisfy proof thresholds (e.g., SVG text inside unsupported transforms, unmeasured RTL runs). Inspect `documents[].coverage` and `documents[].notMeasured` in `report.json` to find the unmeasured rule and its environment reason.
+
+**The CLI does not write a `context.json`.** `--format` offers `json | sarif | console | html | junit | markdown` and nothing else; the context pack exists only through the library call `writeReportBundle(report, {outDir})`, which writes `report.json`, `context.json` and `report.html` together (see `docs/reporting.md`). If you are driving the CLI, `report.json` is your only machine-readable surface, and everything below that names a `context.json` field names a projection you must produce yourself.
 
 ---
 
 ## 2. Stable vs. Ephemeral Contract Fields
 
-Breaklint outputs canonical `report.json` and agent-focused `context.json`. Key on stable fields; never rely on ephemeral ones:
+Breaklint's canonical output is `report.json`. `context.json` is a bounded projection of it, written only by `writeReportBundle` — never by the CLI. Key on stable fields; never rely on ephemeral ones:
 
 | Field | Stability | Purpose & Safe Usage |
 |:---|:---:|:---|
 | `finding.fingerprint` | **Stable** | Deterministic SHA-256 of rule id, key type and target key — and deliberately of *nothing else*. It contains no page number, no ordinal, no fragment index, no node key. That is what makes it survive a repair: if your edit moves a defect without removing it, the fingerprint does not change. See `src/core/fingerprint.ts` for the mutation battery that settled this. |
-| `finding.source` | **Stable**, nullable | Mapped position in the authoring source. `null` whenever the node was produced by the paginator and has no authoring source — page-scoped findings are the common case. `offset`/`endOffset` are UTF-8 byte offsets; `line`/`column` follow `coordinateSystem`. A screen-profile finding carries a different `source` shape (`status`, `file`) and no line numbers. |
+| `finding.source` | **Stable**, nullable | Mapped position in the authoring source. `null` whenever the node was produced by the paginator and has no authoring source. Five rules set it unconditionally — `layout/half-empty-page`, `layout/orphaned-continuation-page`, `artifact/local-uri`, `svg/text-clipped`, `svg/text-ink-collision` — so for those you will never get a line number, and no amount of re-running will produce one. `--no-source-map` sets it null for every finding. `offset`/`endOffset` are UTF-8 byte offsets; `line`/`column` follow `coordinateSystem`. A screen-profile finding carries a different `source` shape (`status`, `file`) and no line numbers. |
 | `finding.remediation` | **Stable** | `advice` is the rule author's guidance. `tested` says whether a trigger/remedied document pair in this repository demonstrates that applying the advice removes the finding and introduces no new one. **Today every rule ships `tested: false`**: no such pair is part of this package and no gate re-runs one. Treat the advice as a starting point, not as a verified repair. |
 | `finding.ruleId` | **Stable** | Canonical rule identifier (e.g., `type/straight-quotes`, `layout/widow`). |
 | `finding.measurement` | **Semi-stable** | Measured value, operator, and threshold. Check `measurement.calibrated`. |
