@@ -701,7 +701,7 @@ try {
 }
 
 const manifest = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   generatedAt: new Date().toISOString(),
   reviewInputContractVersion: 1,
   reviewInputFingerprint: reviewInput.fingerprint,

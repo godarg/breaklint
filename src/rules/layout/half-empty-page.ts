@@ -35,7 +35,7 @@ export const halfEmptyPage = defineRule(
     declines: ["env/parity-blank-page", "env/forced-break"],
     remediation: {
       advice:
-        "A page content area has a net fill ratio below the uncalibrated 60% threshold. If this page naturally concludes a section, chapter, or document, this is expected and may be disregarded. If unintended, check whether a subsequent block forced an early break with 'break-before: page' or an oversized 'break-inside: avoid' container, and adjust preceding margins or spacing.",
+        "This rule fires on either of two quantities: the page's net fill ratio fell below the uncalibrated threshold, or its content starts more than half a page down. Read the finding's measurement to see which. If the page naturally concludes a section, chapter or document, either is expected and may be disregarded. If unintended: for low fill, check whether a following block forced an early break with 'break-before: page' or an oversized 'break-inside: avoid' container; for a late start, look for a leading margin, an empty block or a float above the first line.",
       // No trigger/remedied pair ships with this package and no gate re-runs one, so this
       // advice is untested in the sense the field defines.
       tested: false,

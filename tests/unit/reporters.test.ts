@@ -16,6 +16,7 @@ import { infraLines, MAX_DETAIL_CHARS, MAX_VALUE_CHARS } from "../../src/report/
 import { divergenceDetail } from "../../src/render/evidence.ts";
 import { LABELS } from "../../src/report/mandatory.ts";
 import type { Report, Snapshot } from "../../src/core/types.ts";
+import { REPORT_SCHEMA_VERSION } from "../../src/core/enums.ts";
 
 function demoReport(): Report {
   const parsed = JSON.parse(readFileSync(new URL("../../examples/demo-snapshot.json", import.meta.url), "utf8")) as {
@@ -164,7 +165,7 @@ describe("output formats", () => {
     const parsed = JSON.parse(render(report, "json")) as Report;
     assert.equal(parsed.runVerdict, report.runVerdict);
     assert.equal(parsed.exitCode, report.exitCode);
-    assert.equal(parsed.schemaVersion, 4);
+    assert.equal(parsed.schemaVersion, REPORT_SCHEMA_VERSION);
     assert.equal(parsed.profileKind, "document");
     assert.match(parsed.config.fingerprint, /^[0-9a-f]{64}$/u);
     assert.equal(parsed.config.fingerprint, effectiveConfigFingerprint(parsed.config.effective));

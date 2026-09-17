@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { Report, DocumentReport, DocumentRevision, StableTargetIdentity, Finding, TargetEvaluation } from "../core/types.ts";
 import { verifyGitAncestry } from "../source/revision.ts";
 import { inlineFontDigest } from "../source/font-identity.ts";
+import { READABLE_REPORT_SCHEMA_VERSIONS } from "../core/enums.ts";
 
 export type ComparisonStatus = "new" | "persisting" | "resolved" | "unmatchable" | "not-sufficiently-measured";
 export type ComparisonReason = "identity-unavailable" | "identity-ambiguous" | "target-deleted-or-replaced" | "scope-incompatible-or-unknown" | "revision-unverified" | "rule-disabled-or-incompatible" | "configuration-incompatible" | "environment-incompatible-or-unknown" | "resource-identity-incomplete-or-incompatible" | "inventory-incomplete" | "infrastructure-or-coverage-incomplete" | "target-not-positively-measured" | "target-parts-reduced" | "positive-target-measurement" | "finding-observed";
@@ -87,7 +88,7 @@ function admissible(evaluation: TargetEvaluation): boolean {
 }
 export async function compareReports(before: Report, after: Report, options: CompareReportsOptions = {}): Promise<ReportComparison> {
   if (Object.keys(options).some(k => k !== "revision") || (options.revision && (Object.keys(options.revision).some(k => k !== "repositoryRoot") || typeof options.revision.repositoryRoot !== "string"))) throw new TypeError("invalid comparison options");
-  if ([before, after].some(report => report?.schemaVersion !== 4 || report?.profileKind !== "document" || !Array.isArray(report.documents))) throw new TypeError("compareReports requires document Report schema 4");
+  if ([before, after].some(report => !READABLE_REPORT_SCHEMA_VERSIONS.includes(report?.schemaVersion as number) || report?.profileKind !== "document" || !Array.isArray(report.documents))) throw new TypeError(`compareReports requires a document Report of schema ${READABLE_REPORT_SCHEMA_VERSIONS.join(" or ")}`);
   const scopeKeys = (report: Report) => report.documents.map((doc) => {
     const scope = scopeTuple(doc);
     return scope === null ? null : JSON.stringify(scope);

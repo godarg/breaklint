@@ -60,19 +60,27 @@ describe("rule registry", () => {
     }
   });
 
-  // The guard above reads rule.remediation only. The repair advice an agent actually receives
-  // also comes from the per-rule map in src/api/context.ts, and until 2026-09-17 exactly that
-  // map recommended a "widows setting" and an "orphans setting" — the one advice this project
-  // has measured to be inert. A guard that cannot see the second source is not a guard.
+  /*
+   * The guard above reads rule.remediation only. The repair advice an agent actually receives also
+   * comes from the per-rule map in src/api/context.ts, and until 2026-09-17 exactly that map
+   * recommended a "widows setting" and an "orphans setting" — the one advice this project has
+   * measured to be inert. A guard that cannot see the second source is not a guard.
+   *
+   * This reads the WHOLE file, not a slice between two delimiters: a cross-model audit pointed out
+   * that a slice stops guarding the moment either delimiter moves, is renamed, or first occurs
+   * inside a comment. It also asserts that the map is still reached from `card`, because a guard
+   * over dead code is a guard over nothing.
+   */
   it("the agent-facing repair map proposes no inert widows/orphans CSS either", () => {
     const source = readFileSync(new URL("../../src/api/context.ts", import.meta.url), "utf8");
-    const map = source.slice(source.indexOf("function repairOptions"), source.indexOf("function evaluationFor"));
-    assert.ok(map.length > 200, "repairOptions map not found — this guard has stopped reading its subject");
-    for (const line of map.split("\n")) {
-      if (line.trimStart().startsWith("*") || line.trimStart().startsWith("//")) continue;
+    assert.match(source, /function repairOptions\(/u, "repairOptions is gone — this guard has lost its subject");
+    assert.match(source, /repair:\s*\{[^}]*options:\s*repairOptions\(/u, "repairOptions is no longer reached from the finding card");
+    for (const [index, line] of source.split("\n").entries()) {
+      const code = line.replace(/\/\*.*?\*\//gu, "");
+      if (/^\s*(\*|\/\/)/u.test(code)) continue;
       assert.ok(
-        !/\b(widows|orphans)\s+(setting|property|value)/iu.test(line),
-        `repairOptions proposes an inert widows/orphans CSS property: ${line.trim()}`,
+        !/\b(widows|orphans)\s*:\s*\d/iu.test(code) && !/\b(widows|orphans)\s+(setting|property|value|declaration)/iu.test(code),
+        `src/api/context.ts:${index + 1} proposes an inert widows/orphans CSS property: ${line.trim()}`,
       );
     }
   });

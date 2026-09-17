@@ -5,6 +5,7 @@ import type { PublicScreenReport, ScreenFinding } from "../web/types.ts";
 import type { ReportComparison } from "./compare.ts";
 import { captureBoundedSourceFile, sha256Bytes } from "../source/bytes.ts";
 import { createContextPack, type ContextFinding, type CreateContextPackOptions } from "./context.ts";
+import { READABLE_REPORT_SCHEMA_VERSIONS } from "../core/enums.ts";
 
 export interface RenderReportOptions extends CreateContextPackOptions { title?: string; theme?: "light" | "dark"; comparison?: ReportComparison; }
 export interface WriteReportBundleOptions extends RenderReportOptions { outDir: string; evidenceDir?: string; }
@@ -153,7 +154,7 @@ function findingCard(report: Report, finding: Finding, index: number, assets: As
 export function renderReport(report: Report | unknown, options: RenderReportOptions = {}): string {
   const context = createContextPack(report, options);
   const isScreen = context.canonicalReport.schemaVersion === 1 && context.canonicalReport.profileKind === "screen";
-  const legacy = !isScreen && (context.canonicalReport.schemaVersion !== 4 || context.canonicalReport.profileKind !== "document");
+  const legacy = !isScreen && (!READABLE_REPORT_SCHEMA_VERSIONS.includes(context.canonicalReport.schemaVersion as number) || context.canonicalReport.profileKind !== "document");
   const title = options.title ?? "breaklint report";
   const theme = options.theme ?? "light";
   if (options.comparison && options.comparison.afterRunId !== context.canonicalReport.runId) throw new Error("comparison does not refer to this current report");

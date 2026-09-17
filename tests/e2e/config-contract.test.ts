@@ -13,6 +13,7 @@ import { runDocument } from "../../src/core/engine.ts";
 import { RULES_BY_ID } from "../../src/rules/index.ts";
 import type { Report } from "../../src/core/types.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
+import { REPORT_SCHEMA_VERSION } from "../../src/core/enums.ts";
 
 const CLI = fileURLToPath(new URL("../../src/cli/index.ts", import.meta.url));
 const tempDirs: string[] = [];
@@ -141,7 +142,7 @@ describe("Configuration Contract v1 at the CLI and engine boundary", () => {
     const run = runCli(dir, ["--demo", "--config", config, "--fail-on", "warn", "--format", "json", "--out", reportPath]);
     assert.ok([1, 4].includes(run.status ?? -1), `expected a measured demo verdict, got ${run.status}; ${run.stderr}`);
     const report = JSON.parse(readFileSync(reportPath, "utf8")) as Report;
-    assert.equal(report.schemaVersion, 4);
+    assert.equal(report.schemaVersion, REPORT_SCHEMA_VERSION);
     assert.equal(report.config.contractVersion, 1);
     assert.equal(report.config.profile, "strict");
     assert.equal(report.config.failOn, "warn");

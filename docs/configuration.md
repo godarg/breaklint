@@ -115,7 +115,7 @@ before use and fingerprinting. The older misleading name `excludeSelectors` is n
 
 ## What the JSON report proves
 
-The canonical document JSON report uses report schema 4 and records:
+The canonical document JSON report uses report schema 5 and records:
 
 - `config.contractVersion`, currently 1;
 - the selected profile and its `profileSource`, plus the finding gate and rule enablement;
@@ -133,7 +133,7 @@ The fingerprint is computed over canonicalised effective semantics with the doma
 report format, observed runtime counters and absolute machine paths. Reordering object keys or
 set-like values therefore does not change it; changing an effective option does.
 
-Report schema and snapshot schema evolve independently. The current source-bound report is schema 4, stored measurement snapshots are schema 4, and Configuration Contract remains v1. Each changes only when its own structure changes.
+Report schema and snapshot schema evolve independently. The current source-bound report is schema 5, stored measurement snapshots are schema 4, and Configuration Contract remains v1. Each changes only when its own structure changes — including for an additive, optional field: an optional property does not let a schema-aware consumer tell the two shapes apart, and a strict decoder may reject it. Schema 5 adds the optional `remediation` on a finding. Readers accept 4 and 5; only the emitter moved.
 
 ## Failure boundary
 

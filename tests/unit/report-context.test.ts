@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 
 import { createContextPack, CONTEXT_SCHEMA_VERSION } from "../../src/api/context.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
+import { REPORT_SCHEMA_VERSION, READABLE_REPORT_SCHEMA_VERSIONS } from "../../src/core/enums.ts";
 import { renderReport, writeReportBundle } from "../../src/api/bundle.ts";
 import type { Report } from "../../src/core/types.ts";
 import type { PublicScreenReport } from "../../src/web/types.ts";
@@ -365,5 +366,31 @@ describe("bounded public report views", () => {
     const unreadable = createContextPack({ schemaVersion: 3, profileKind: "document", findings: [] });
     assert.equal(unreadable.whatWasNotMeasured, null);
     assert.ok(Array.isArray(createContextPack(clone()).whatWasNotMeasured));
+  });
+
+  /*
+   * Report 5 adds the optional `Finding.remediation`. The emitter moved; the readers did not get
+   * narrower. A stored schema-4 report — every report this tool wrote before 0.5.x — must still
+   * produce a full context pack, not the legacy stub. Raising a stamp without migrating the
+   * artifact it names is the failure this project has already recorded once.
+   */
+  it("reads a stored schema-4 report as a document report, not as legacy", () => {
+    const four = clone();
+    four.schemaVersion = 4;
+    for (const doc of four.documents) for (const f of doc.findings) delete f.remediation;
+    for (const f of four.findings) delete f.remediation;
+    const context = createContextPack(four);
+    assert.equal(context.canonicalReport.schemaVersion, 4);
+    assert.notEqual(context.selection.reason, "legacy-or-invalid-report-cannot-establish-source-or-repair-claims");
+    assert.ok(context.findings.length > 0, "a schema-4 report must still yield finding cards");
+    assert.ok(context.whatWasNotMeasured, "a schema-4 report must still be able to state what it did not measure");
+    const card = context.findings[0]!;
+    assert.ok("remediation" in card && card.remediation === null, "a schema-4 finding carries no remediation, and the card must say null rather than invent one");
+  });
+
+  it("emits the schema stamp that matches its own structure", () => {
+    assert.equal(REPORT_SCHEMA_VERSION, 5, "Finding.remediation changed the canonical report's structure; the stamp moves with it");
+    assert.ok(READABLE_REPORT_SCHEMA_VERSIONS.includes(4) && READABLE_REPORT_SCHEMA_VERSIONS.includes(5));
+    assert.equal(createContextPack(clone()).canonicalReport.schemaVersion, REPORT_SCHEMA_VERSION);
   });
 });
