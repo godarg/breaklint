@@ -4,6 +4,9 @@ import { mandatoryFacts } from "./mandatory.ts";
 import { infraLines } from "./infra.ts";
 import { VALIDATION_RULES_BY_ID } from "../rules/index.ts";
 
+/** The two rules whose severity is `error`: disabling one removes the only default gate this tool has. */
+const GATING_RULE_IDS = new Set(["svg/text-overflows-viewport", "layout/unbreakable-block-too-tall"]);
+
 export interface HtmlStatus {
   key: RunVerdict;
   marker: string;
@@ -206,7 +209,9 @@ function coverageRow(
     reasons,
     options: [
       "Inspect the document for unsupported constructs or environment limits.",
-      `Disable this check with --disable ${ruleId} if this check is not desired for this document.`,
+      GATING_RULE_IDS.has(ruleId)
+        ? `This rule gates by default. --disable ${ruleId} removes the gate, not the defect — use it only if this document intentionally uses constructs this version cannot measure.`
+        : `If this document intentionally uses constructs this version cannot measure, --disable ${ruleId} stops the check.`,
     ],
   };
 }
