@@ -26,7 +26,7 @@ export const hyphenAcrossPage = defineRule(
     declines: ["env/multicolumn", "env/vertical-writing"],
     remediation: {
       advice:
-        "The last text line on a page ends in a hyphen that breaks a word across the page boundary. Apply 'hyphens: none' or 'hyphens: manual' to the paragraph, reword slightly, or insert non-breaking spaces ('&nbsp;') or soft hyphens ('&shy;') to shift the line break. Note that disabling hyphenation can produce 'type/excessive-word-spacing' findings in justified text; the two rules pull in opposite directions and neither threshold is calibrated.",
+        "The last text line on a page ends in a hyphen that breaks a word across the page boundary. The rule reads the paginator's own hyphenation class, so it only reports a hyphen Paged.js introduced — a hard hyphen you typed is not reported, and turning hyphenation off only helps where the paginator was doing the hyphenating. Apply 'hyphens: none' or 'hyphens: manual' to the paragraph, reword slightly, or insert non-breaking spaces ('&nbsp;') or soft hyphens ('&shy;') to shift the line break. Note that disabling hyphenation can produce 'type/excessive-word-spacing' findings in justified text; the two rules pull in opposite directions and neither threshold is calibrated.",
       // No trigger/remedied pair ships with this package and no gate re-runs one, so this
       // advice is untested in the sense the field defines.
       tested: false,

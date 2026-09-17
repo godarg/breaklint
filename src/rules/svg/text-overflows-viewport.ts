@@ -43,7 +43,7 @@ export const textOverflowsViewport = defineRule(
     ],
     remediation: {
       advice:
-        "Text rendered inside an SVG extends outside the SVG viewport bounds and is clipped. Enlarge the SVG 'viewBox' or width/height attributes to contain the text, adjust the <text> coordinates ('x', 'y', 'text-anchor'), or apply 'overflow: visible' to the SVG container.",
+        "Text rendered inside an SVG extends outside the SVG viewport bounds and is clipped. Enlarge the SVG 'viewBox' or its width/height, or adjust the <text> coordinates ('x', 'y', 'text-anchor'). 'overflow: visible' on the container also clears the finding, but it does not move the text: the viewport then no longer clips, the target becomes non-applicable and this rule stops measuring it. Use that only where the overflow is intended.",
       // No trigger/remedied pair ships with this package and no gate re-runs one, so this
       // advice is untested in the sense the field defines.
       tested: false,

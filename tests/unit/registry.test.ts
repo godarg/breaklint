@@ -1,9 +1,18 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 
 import { ALL_RULES, VALIDATION_RULES_BY_ID } from "../../src/rules/index.ts";
 import { IS, SEVERITIES } from "../../src/core/enums.ts";
+
+/**
+ * The declaration form, and the three prose forms that got past the narrow first version of this
+ * guard (measured: it caught 2 of 5 plausible phrasings). It must NOT match the rules' own
+ * threshold source (`block.effectiveStyle.widows`) or a sentence that warns AGAINST the property,
+ * so it requires an imperative or an explicit value nearby.
+ */
+const INERT_PROPERTY_ADVICE =
+  /\b(widows|orphans)\s*:\s*\d|\b(set|increase|raise|lower|use|apply|add|specify|configure)\b[^.]{0,60}\b(widows|orphans)\b|\b(widows|orphans)\b[^.]{0,40}\b(property|setting|value)\b[^.]{0,40}\b(to|of)\b\s*\S/iu;
 
 describe("rule registry", () => {
   it("every rule declares a valid severity and a consistent proof source", () => {
@@ -54,9 +63,26 @@ describe("rule registry", () => {
       assert.equal(typeof rule.remediation!.tested, "boolean", `${rule.id}: remediation must state whether a proof pair backs it`);
       // Never recommend widows: N or orphans: N as a fix — Paged.js 0.4.3 does not implement them.
       assert.ok(
-        !/\b(widows|orphans)\s*:\s*\d+/iu.test(rule.remediation!.advice),
+        !INERT_PROPERTY_ADVICE.test(rule.remediation!.advice),
         `${rule.id}: proposes inert widows/orphans CSS property in remediation`,
       );
+    }
+  });
+
+  it("no rule documentation page proposes the inert widows/orphans CSS property either", () => {
+    const dir = new URL("../../docs/rules/", import.meta.url);
+    const pages = readdirSync(dir).filter((name) => name.endsWith(".md"));
+    assert.ok(pages.length >= 13, `expected the rule pages to be present, found ${pages.length}`);
+    for (const page of pages) {
+      const text = readFileSync(new URL(page, dir), "utf8");
+      for (const [index, line] of text.split("\n").entries()) {
+        // A sentence that warns AGAINST the property is the point, not a violation.
+        if (/\b(do not|does not|never|absent|not honour|not honor|ignored)\b/iu.test(line)) continue;
+        assert.ok(
+          !INERT_PROPERTY_ADVICE.test(line),
+          `docs/rules/${page}:${index + 1} proposes the inert widows/orphans CSS property: ${line.trim()}`,
+        );
+      }
     }
   });
 

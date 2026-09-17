@@ -30,7 +30,7 @@ export const localUri = defineRule(
     declines: [],
     remediation: {
       advice:
-        "A resource points to a local filesystem URI ('file:') or machine path outside the distribution root. Replace it with a relative path within the distribution directory or embed the asset directly (e.g. data URI for small images).",
+        "A resource points to a local filesystem URI ('file:') or an absolute machine path. The rule has no notion of a distribution root: EVERY absolute path is reported, inside the project or not, because an absolute path resolves only on the machine that wrote it. Replace it with a relative URL or embed the asset directly (e.g. a data URI for a small image).",
       // No trigger/remedied pair ships with this package and no gate re-runs one, so this
       // advice is untested in the sense the field defines.
       tested: false,
