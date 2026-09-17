@@ -28,6 +28,13 @@ export const localUri = defineRule(
     defaultOptions: { maxOccurrences: 0 },
     summary: "A file: URI or an absolute build-machine path remains in the artefact.",
     declines: [],
+    remediation: {
+      advice:
+        "A resource points to a local filesystem URI ('file:') or machine path outside the distribution root. Replace it with a relative path within the distribution directory or embed the asset directly (e.g. data URI for small images).",
+      // No trigger/remedied pair ships with this package and no gate re-runs one, so this
+      // advice is untested in the sense the field defines.
+      tested: false,
+    },
   },
   (snapshot, ctx) => {
     const findings = [];

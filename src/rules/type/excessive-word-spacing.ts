@@ -25,6 +25,13 @@ export const excessiveWordSpacing = defineRule(
     defaultOptions: { maxSpaceFactor: 3.0 },
     summary: "Word gaps in a justified block are far wider than the natural space.",
     declines: ["env/multicolumn", "env/vertical-writing"],
+    remediation: {
+      advice:
+        "Justified text produces word spacing exceeding the uncalibrated threshold ('rivers' of whitespace). Enable hyphenation with 'hyphens: auto;' (specifying an HTML 'lang' attribute), use left alignment ('text-align: left;'), or insert soft hyphens ('&shy;') into long words.",
+      // No trigger/remedied pair ships with this package and no gate re-runs one, so this
+      // advice is untested in the sense the field defines.
+      tested: false,
+    },
   },
   (snapshot, ctx) => {
     const findings = [];

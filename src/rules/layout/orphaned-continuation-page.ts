@@ -23,6 +23,13 @@ export const orphanedContinuationPage = defineRule(
     defaultOptions: { maxNetFill: 0.5 },
     summary: "A page holds nothing but the tail of a block that began earlier.",
     declines: ["env/parity-blank-page", "env/forced-break"],
+    remediation: {
+      advice:
+        "A continuation page holds only a tiny trailing fragment of an earlier block. Tighten preceding vertical margins, padding, or line-height on earlier pages to pull the remaining lines back, or insert 'break-before: page' earlier to balance content across pages.",
+      // No trigger/remedied pair ships with this package and no gate re-runs one, so this
+      // advice is untested in the sense the field defines.
+      tested: false,
+    },
   },
   (snapshot, ctx) => {
     const findings = [];

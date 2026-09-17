@@ -21,6 +21,13 @@ export const straightQuotes = defineRule(
     defaultOptions: { locale: "de-DE", maxOccurrences: 0, excludeTags: [] },
     summary: "A straight quotation mark or apostrophe appears in typeset prose.",
     declines: [],
+    remediation: {
+      advice:
+        "Straight typewriter quotation marks (' or \") appear in running prose. Replace them with the curly pair for the configured locale — '&bdquo;'/'&ldquo;' for 'de-DE' (the default), '&ldquo;'/'&rdquo;' for 'en-*' — or use the <q> tag with a matching CSS 'quotes' value.",
+      // No trigger/remedied pair ships with this package and no gate re-runs one, so this
+      // advice is untested in the sense the field defines.
+      tested: false,
+    },
   },
   (snapshot, ctx) => {
     const findings = [];

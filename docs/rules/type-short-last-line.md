@@ -25,3 +25,27 @@ Single-line paragraphs, centred text, and the non-final fragment of a split bloc
 human-checked truth; no such corpus exists for this project. Every finding says so, and the
 report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
 also why this rule ships with the severity it has.
+
+## Remediation
+
+Rephrase text, adjust tracking/measure, or use `text-wrap: pretty` to avoid a tiny stub (< 15% width and < 2 em) on the final line of a paragraph. Alternatively, combine short trailing words with non-breaking spaces (`&nbsp;`).
+
+## Examples
+
+### Firing case (trigger)
+
+```html
+<p style="width: 500px; font-size: 20px; font-family: serif;">
+  This is the first line of the paragraph which extends across the measure.<br>
+  it.
+</p>
+```
+
+### Non-firing case (remedied)
+
+```html
+<p style="width: 500px; font-size: 20px; font-family: serif;">
+  This is the first line of the paragraph which extends across the measure and concludes with a balanced final sentence.
+</p>
+```
+

@@ -124,6 +124,14 @@ export const REPORT_HTML_STYLES = String.raw`
   .finding-facts > div, .coverage-record > div { min-width: 0; }
   .evidence-state { margin-block: var(--ds-space-4) 0; color: var(--ds-color-fg-muted); font-size: var(--ds-font-size-sm); }
   .evidence-state strong { color: var(--ds-color-fg-primary); }
+  .finding-remediation-untested{margin-top:.35rem;font-size:.85em;opacity:.8}
+.finding-remediation { margin-block: var(--ds-space-4) 0; padding: var(--ds-space-3); border-inline-start: var(--ds-border-strong) solid var(--ds-color-fg-primary); background: var(--ds-color-soft); font-size: var(--ds-font-size-sm); }
+  .finding-remediation p, .finding-frequency-note p { margin: 0; }
+  .finding-frequency-note { margin-block: var(--ds-space-3) 0; padding: var(--ds-space-3); border-inline-start: var(--ds-border-strong) solid var(--ds-color-divider); background: var(--ds-color-soft); font-size: var(--ds-font-size-sm); color: var(--ds-color-fg-muted); }
+  .coverage-shortfall-list { margin: var(--ds-space-3) 0 0; padding-inline-start: var(--ds-space-4); display: grid; gap: var(--ds-space-4); }
+  .coverage-shortfall-item { margin-block-end: var(--ds-space-3); }
+  .coverage-shortfall-item p { margin: 0 0 var(--ds-space-1); }
+  .coverage-shortfall-item ul { margin: var(--ds-space-1) 0 0; padding-inline-start: var(--ds-space-4); }
   .empty-state { max-width: var(--ds-text-width); padding: var(--ds-space-5); border: var(--ds-border-thin) solid var(--ds-color-divider); border-radius: var(--ds-radius-sm); background: var(--ds-color-paper); }
   .coverage-documents { display: grid; gap: var(--ds-space-6); }
   .coverage-document { padding-block-start: var(--ds-space-4); border-block-start: var(--ds-border-strong) solid var(--ds-color-fg-primary); }

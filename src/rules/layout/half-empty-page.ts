@@ -33,6 +33,13 @@ export const halfEmptyPage = defineRule(
     defaultOptions: { minNetFill: 0.6, maxTopGap: 0.5 },
     summary: "A page is filled well below what its content box allows.",
     declines: ["env/parity-blank-page", "env/forced-break"],
+    remediation: {
+      advice:
+        "A page content area has a net fill ratio below the uncalibrated 60% threshold. If this page naturally concludes a section, chapter, or document, this is expected and may be disregarded. If unintended, check whether a subsequent block forced an early break with 'break-before: page' or an oversized 'break-inside: avoid' container, and adjust preceding margins or spacing.",
+      // No trigger/remedied pair ships with this package and no gate re-runs one, so this
+      // advice is untested in the sense the field defines.
+      tested: false,
+    },
   },
   (snapshot, ctx) => {
     const findings = [];

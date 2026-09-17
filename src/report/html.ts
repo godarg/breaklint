@@ -46,7 +46,15 @@ function renderCoverageAlert(model: ReturnType<typeof buildHtmlReportModel>): st
   <p><strong>This is not a clean run.</strong> A rule without enough measurement cannot establish absence of a defect.</p>
   ${shortfalls.length === 0
     ? `<p>The run declared insufficient coverage without a per-rule shortfall. Inspect the canonical JSON report.</p>`
-    : `<ul>${shortfalls.map((row) => `<li><code>${esc(row.ruleId)}</code> in <span class="mono">${esc(row.document)}</span>: ${row.measured} of ${row.candidates} measured; required floor ${esc(row.floor)}.</li>`).join("")}</ul>`}
+    : `<ul class="coverage-shortfall-list">${shortfalls.map((row) => `<li class="coverage-shortfall-item">
+      <p><strong>Rule:</strong> <code>${esc(row.ruleId)}</code> in <span class="mono">${esc(row.document)}</span></p>
+      <p><strong>Measurement:</strong> ${row.measured} of ${row.candidates} candidates measured (${esc(row.ratio)}); required floor ${esc(row.floor)}</p>
+      <p><strong>Reason verbatim:</strong> <code>${esc(row.reasons.join(", ") || "none declared")}</code></p>
+      <p><strong>Options:</strong></p>
+      <ul>
+        ${row.options.map((opt) => `<li>${esc(opt)}</li>`).join("\n        ")}
+      </ul>
+    </li>`).join("\n")}</ul>`}
 </div>
 </section>`;
 }
@@ -85,6 +93,8 @@ ${model.findings.map((finding) => `<li>
     <div><dt>Calibration</dt><dd>${esc(finding.calibration)}</dd></div>
     <div><dt>Proof source</dt><dd>${finding.proofSource ? esc(finding.proofSource) : "None declared"}</dd></div>
   </dl>
+  ${finding.remediation ? `<div class="finding-remediation"><p><strong>Remediation:</strong> ${esc(finding.remediation)}</p>${finding.remediationTested === false ? `<p class="finding-remediation-untested">Untested: no trigger/remedied pair in this package shows this advice removing this finding.</p>` : ""}</div>` : ""}
+  ${finding.frequencyNote ? `<div class="finding-frequency-note"><p><strong>Note:</strong> ${esc(finding.frequencyNote)}</p></div>` : ""}
   ${renderFindingEvidence(finding)}
   ${finding.ambiguity ? `<p class="evidence-state"><strong>Ambiguity:</strong> ${esc(finding.ambiguity)}</p>` : ""}
 </article>

@@ -2,6 +2,7 @@ import type { Finding, Report, RuleCoverage } from "../core/types.ts";
 import type { RunVerdict, Severity } from "../core/enums.ts";
 import { mandatoryFacts } from "./mandatory.ts";
 import { infraLines } from "./infra.ts";
+import { VALIDATION_RULES_BY_ID } from "../rules/index.ts";
 
 export interface HtmlStatus {
   key: RunVerdict;
@@ -33,6 +34,10 @@ export interface HtmlFinding {
     href: string | null;
   };
   ambiguity: string | null;
+  remediation: string | null;
+  /** null when there is no advice at all. false means no proof pair substantiates it. */
+  remediationTested: boolean | null;
+  frequencyNote: string | null;
 }
 
 export interface HtmlCoverageRow {
@@ -44,6 +49,8 @@ export interface HtmlCoverageRow {
   ratio: string;
   floor: string;
   ok: boolean;
+  reasons: string[];
+  options: string[];
 }
 
 export interface HtmlCoverageDocument {
@@ -143,6 +150,12 @@ function findingModel(finding: Finding, index: number): HtmlFinding {
     unbound: "Evidence exists but does not bind this finding",
     none: "No evidence artifact",
   } as const;
+  const ruleMeta = VALIDATION_RULES_BY_ID.get(finding.ruleId);
+  const remediation = ruleMeta?.remediation?.advice ?? null;
+  const remediationTested = ruleMeta?.remediation ? ruleMeta.remediation.tested : null;
+  const frequencyNote = finding.ruleId === "layout/half-empty-page"
+    ? "High-frequency heuristic: this rule fires on most documents because line leading and block margins are not included in net fill."
+    : null;
   return {
     id: `finding-${index + 1}`,
     severity: finding.severity,
@@ -161,10 +174,26 @@ function findingModel(finding: Finding, index: number): HtmlFinding {
     ambiguity: finding.ambiguity
       ? `${finding.ambiguity.groupSize} findings share this unresolved fingerprint.`
       : null,
+    remediation,
+    remediationTested,
+    frequencyNote,
   };
 }
 
-function coverageRow(ruleId: string, coverage: RuleCoverage, documentIndex: number, rowIndex: number): HtmlCoverageRow {
+function coverageRow(
+  ruleId: string,
+  coverage: RuleCoverage,
+  documentIndex: number,
+  rowIndex: number,
+  document: Report["documents"][number],
+): HtmlCoverageRow {
+  const reasons = [
+    ...new Set(
+      document.notMeasured
+        .filter((n) => n.ruleId === ruleId)
+        .map((n) => n.reason),
+    ),
+  ];
   return {
     id: `coverage-${documentIndex + 1}-${rowIndex + 1}`,
     ruleId,
@@ -174,6 +203,11 @@ function coverageRow(ruleId: string, coverage: RuleCoverage, documentIndex: numb
     ratio: coverage.coverage === null ? "Not applicable" : `${formatNumber(coverage.coverage * 100)}%`,
     floor: `${formatNumber(coverage.floor * 100)}%`,
     ok: coverage.ok,
+    reasons,
+    options: [
+      "Inspect the document for unsupported constructs or environment limits.",
+      `Disable this check with --disable ${ruleId} if this check is not desired for this document.`,
+    ],
   };
 }
 
@@ -183,7 +217,7 @@ export function buildHtmlReportModel(report: Report): HtmlReportModel {
     path: document.path,
     verdict: document.verdict,
     rows: Object.entries(document.coverage).map(([ruleId, row], rowIndex) =>
-      coverageRow(ruleId, row, documentIndex, rowIndex),
+      coverageRow(ruleId, row, documentIndex, rowIndex, document),
     ),
   }));
   const flatCoverage = coverage.flatMap((document) => document.rows);

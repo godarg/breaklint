@@ -24,6 +24,13 @@ export const hyphenAcrossPage = defineRule(
     defaultOptions: { maxOccurrences: 0 },
     summary: "A word is split by a hyphen across a page boundary.",
     declines: ["env/multicolumn", "env/vertical-writing"],
+    remediation: {
+      advice:
+        "The last text line on a page ends in a hyphen that breaks a word across the page boundary. Apply 'hyphens: none' or 'hyphens: manual' to the paragraph, reword slightly, or insert non-breaking spaces ('&nbsp;') or soft hyphens ('&shy;') to shift the line break.",
+      // No trigger/remedied pair ships with this package and no gate re-runs one, so this
+      // advice is untested in the sense the field defines.
+      tested: false,
+    },
   },
   (snapshot, ctx) => {
     const findings = [];

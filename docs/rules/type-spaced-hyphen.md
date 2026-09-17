@@ -29,3 +29,22 @@ selectors; they are lower-cased and deduplicated before the rule runs.
 human-checked truth; no such corpus exists for this project. Every finding says so, and the
 report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
 also why this rule ships with the severity it has.
+
+## Remediation
+
+A hyphen surrounded by whitespace (' - ') is used where a typographic dash is customary. Replace ' - ' with an en-dash (' &ndash; ' or ' – ') or an unspaced em-dash ('&mdash;' or '—').
+
+## Examples
+
+### Firing case (trigger)
+
+```html
+<p lang="de">Die Reise von Berlin - Paris dauerte mehrere Stunden.</p>
+```
+
+### Non-firing case (remedied)
+
+```html
+<p lang="de">Die Reise von Berlin &ndash; Paris dauerte mehrere Stunden.</p>
+```
+

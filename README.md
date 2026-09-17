@@ -76,7 +76,9 @@ unsupported paint and missing coverage explicitly. Source selectors alone do not
 position. A host build receipt can verify a component container; producer-bound documents can
 carry exact original byte ranges. Both the offline human view and bounded AI context derive from
 the same canonical JSON. See [the source and consumer contract](docs/source-bound-findings.md),
-[reporting](docs/reporting.md) and [repair comparison](docs/revision-comparison.md).
+[reporting](docs/reporting.md) and [repair comparison](docs/revision-comparison.md). An agent
+reading a report should start at [the agent contract](docs/agent-contract.md): which fields are
+stable, what each exit code obliges it to do, and which advice this package has not verified.
 
 ## Why this exists
 

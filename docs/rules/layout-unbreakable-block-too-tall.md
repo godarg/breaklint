@@ -25,3 +25,28 @@ Multi-column and vertical writing are declined rather than judged.
 human-checked truth; no such corpus exists for this project. Every finding says so, and the
 report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
 also why this rule ships with the severity it has.
+
+## Remediation
+
+An element with 'break-inside: avoid' is physically taller than the page printable area, forcing unavoidable overflow or clipping. Remove 'break-inside: avoid' to allow the block to split across pages, or reduce the element's height, padding, font-size, or contained rows/items so it fits within a single page.
+
+## Examples
+
+### Firing case (trigger)
+
+```html
+<!-- Page content height is ~257mm; 300mm block cannot fit -->
+<div style="break-inside: avoid; height: 300mm; background: #eee;">
+  Content too tall to fit on any single page.
+</div>
+```
+
+### Non-firing case (remedied)
+
+```html
+<!-- Allow the tall block to paginate naturally -->
+<div style="break-inside: auto; height: 300mm; background: #eee;">
+  Content splits across pages cleanly.
+</div>
+```
+

@@ -427,6 +427,11 @@ export interface DocumentRevision {
   optionsSha256: string;
   observedAt: string;
 }
+export interface FindingRemediation {
+  readonly advice: string;
+  readonly tested: boolean;
+}
+
 export interface Finding {
   /** Canonical run-local identifier; `fingerprint` remains the cross-run stable projection. */
   runFindingId: string;
@@ -463,6 +468,8 @@ export interface Finding {
     candidates: SourceRef[];
   };
   actionability: "actionable" | "recheck-required" | "unknown-source";
+  /** Machine-actionable remediation advice with empirical test verification status. */
+  remediation?: FindingRemediation;
 }
 
 export interface EvaluationMeasurement {

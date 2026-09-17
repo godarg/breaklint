@@ -24,6 +24,13 @@ export const headingAtPageBottom = defineRule(
     defaultOptions: { minTrailingLineHeights: 2 },
     summary: "A heading is the last thing on a page; what it introduces begins on the next.",
     declines: ["env/multicolumn", "env/vertical-writing"],
+    remediation: {
+      advice:
+        "A heading sits at the bottom of the page with less room than the uncalibrated threshold following it. Add 'break-after: avoid;' to the heading style rule so it advances with its following content, or insert an explicit 'break-before: page;' before the heading.",
+      // No trigger/remedied pair ships with this package and no gate re-runs one, so this
+      // advice is untested in the sense the field defines.
+      tested: false,
+    },
   },
   (snapshot, ctx) => {
     const findings = [];

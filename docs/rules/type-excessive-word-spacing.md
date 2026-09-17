@@ -25,3 +25,26 @@ Blocks with an explicit `word-spacing` are out: the width is a stated intention.
 human-checked truth; no such corpus exists for this project. Every finding says so, and the
 report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
 also why this rule ships with the severity it has.
+
+## Remediation
+
+Enable CSS hyphenation (`hyphens: auto`), rephrase text, or adjust column width so justification does not stretch word spaces beyond 3.0× the natural font space. If wide spacing is intentional, set an explicit `word-spacing` property on the container.
+
+## Examples
+
+### Firing case (trigger)
+
+```html
+<p style="width: 400px; font-size: 16px; text-align: justify; line-height: 1.4;">
+  One Two PneumonoultramicroscopicsilicovolcanoconiosisIsAnExtremelyLongUnbrokenWordThatForcesALineBreak right after two words so that line one has a massive gap.
+</p>
+```
+
+### Non-firing case (remedied)
+
+```html
+<p style="width: 400px; font-size: 16px; text-align: left; line-height: 1.4;">
+  One Two PneumonoultramicroscopicsilicovolcanoconiosisIsAnExtremelyLongUnbrokenWordThatForcesALineBreak right after two words so that line one has a massive gap.
+</p>
+```
+
