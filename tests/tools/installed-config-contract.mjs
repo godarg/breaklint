@@ -70,7 +70,9 @@ try {
   const validRun = run(["--demo", "--config", valid, "--fail-on", "warn", "--format", "json", "--out", reportPath]);
   assert.equal(validRun.status, 4, `valid strict demo: ${validRun.stderr}`);
   const report = JSON.parse(readFileSync(reportPath, "utf8"));
-  assert.equal(report.schemaVersion, 4);
+  // Literal on purpose: this gate runs against the INSTALLED package and must notice a stamp
+  // change rather than follow it. Source of truth: REPORT_SCHEMA_VERSION in src/core/enums.ts.
+  assert.equal(report.schemaVersion, 5);
   assert.equal(report.tool.version, installedManifest.version);
   assert.equal(report.config.contractVersion, 1);
   assert.equal(report.config.profile, "strict");

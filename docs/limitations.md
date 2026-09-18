@@ -73,8 +73,9 @@ Configuration Contract v1 can make those floors stricter, but cannot lower them.
 profile sets every floor to 1. The two proof-source-A thresholds are not configurable at all:
 turning a structural boundary into a caller preference would invalidate the reason those rules may
 gate by default. The effective floors and their origins appear in the report (schema 3 from 0.2.3,
-schema 4 from 0.5.0); stored snapshot fixtures moved to schema 3 in 0.2.3, when `inkCollected` was
-added, and to schema 4 in 0.5.0.
+schema 4 from 0.5.0, schema 5 when the optional `remediation` was added to a finding); stored
+snapshot fixtures moved to schema 3 in 0.2.3, when `inkCollected` was added, and to schema 4 in
+0.5.0.
 
 ### What coverage is a ratio OF, and the two things it is not
 

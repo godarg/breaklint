@@ -27,3 +27,33 @@ A block with no visible text line is skipped: there is no text to strand. Withou
 human-checked truth; no such corpus exists for this project. Every finding says so, and the
 report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
 also why this rule ships with the severity it has.
+
+## Remediation
+
+A block fragments across a page break leaving fewer trailing lines than the uncalibrated threshold asks for. If this occurs inside a table row, keep the row together with `tr { break-inside: avoid; }`. For paragraphs, prevent the split with `break-inside: avoid`, force an earlier break with `break-before: page`, or reword/re-space the text.
+
+> [!WARNING]
+> Do not propose or set the CSS `widows` property as a fix. `widows` is absent from Paged.js 0.4.3 and Chromium does not honour it under Paged.js.
+
+## Examples
+
+### Firing case (trigger)
+
+```html
+<p style="margin-top: 220mm;">
+  This paragraph begins near the bottom of the page.<br>
+  It continues for another line.<br>
+  And leaves a lone third line on the second page.
+</p>
+```
+
+### Non-firing case (remedied)
+
+```html
+<p style="margin-top: 220mm; break-inside: avoid;">
+  This paragraph begins near the bottom of the page.<br>
+  It continues for another line.<br>
+  And moves entirely to the second page rather than leaving a widow.
+</p>
+```
+

@@ -4,7 +4,42 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## Current release — 0.5.0 (2026-09-13) — source-bound consumers
+## Current work — 0.6.0 (unreleased) — remediation that says when nobody checked
+
+0.6.0 moves the canonical document report to schema 5 (one optional property, `Finding.remediation`)
+and the agent context pack to 2 (one new required key, three new finding-card keys). Snapshot stays
+4, Configuration Contract 1 is untouched, readers accept Report 4 and 5.
+
+Thirteen rules now carry advice on what to change. **All thirteen declare `tested: false`**, and
+the terminal and the HTML report say so at the finding. That flag is a claim about evidence, not
+confidence: no trigger/remedied pair ships with this package and no gate re-runs one. A follow-up
+measurement applied the lever each advice text *names*, alone, to the original trigger document —
+in three of thirteen cases the named lever did not clear the finding and something else in the
+remedied file had done the work. Those three texts were corrected; the flag stays false for all
+thirteen until a gate can set it.
+
+What this release does **not** establish: that the advice repairs anything in a real workflow, that
+an agent given `docs/agent-contract.md` repairs more precisely, or that any threshold is calibrated.
+The agent contract was read back by a model in a playback test, which is not a repair test.
+
+The printed report grew from 32 page rasters to 43 across the four canonical states, and no longer
+ends on a page carrying a single coverage record. Three print mutation controls had been declared
+and never run; two are now wired, one could not go red at all and was removed, and the mutation
+runner now holds the renderer's allowlist against its control list.
+
+**`npm run test:report-surfaces` — the exact-environment human gate — is red, and has been since
+0.3.0.** Its ledger is bound to the 0.2.3 input fingerprint from 2026-08-29; four releases have
+shipped over it because CI runs the technical mode, which skips the ledger comparison by design.
+No human has looked at the current 32 rendered surfaces. `test:report-surfaces:technical`, which
+makes no human-review claim, passes 32 of 32 cells and 71 physical artifacts.
+
+`npm run test:unit` is red on this machine under load and was red on 0.5.0 under the same load:
+measured 2026-09-18 over three full runs at load averages 3.5 / 8.0 / 21.9, 4 / 8 / 7 failures of
+451, all in process- and rasterizer-lifecycle tests. Isolated and serial, the same file gives 1–2
+failures on this branch and 0–1 on `origin/main` at comparable load. The class is pre-existing and
+load-dependent, not introduced here, and it is not measured on a quiet machine.
+
+## Current published release — 0.5.0 (2026-09-13) — source-bound consumers
 
 0.5.0 adds Report 4 source provenance and positive target evaluations, public producer and
 existing-page APIs, offline human/AI projections and conservative repair comparison. Digital Product
@@ -201,7 +236,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=440 aggregateTests=556 liveTests=71 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=451 aggregateTests=567 liveTests=71 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against

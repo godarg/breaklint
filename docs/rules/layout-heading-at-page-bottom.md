@@ -25,3 +25,28 @@ A heading with anything under it on the same page is not stranded and is not rep
 human-checked truth; no such corpus exists for this project. Every finding says so, and the
 report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
 also why this rule ships with the severity it has.
+
+## Remediation
+
+A heading sits stranded at the very bottom of a page without its following section content. Add 'break-after: avoid' (or 'page-break-after: avoid') to the heading selector (e.g. 'h1, h2, h3 { break-after: avoid; }'), or insert an explicit 'break-before: page' to move the heading to the next page.
+
+## Examples
+
+### Firing case (trigger)
+
+```html
+<div style="height: 240mm;">Preceding content filling the page.</div>
+<h2>Section Title Stranded At Bottom</h2>
+<!-- The following paragraph breaks onto page 2 -->
+<p>This body text starts on page 2.</p>
+```
+
+### Non-firing case (remedied)
+
+```html
+<div style="height: 240mm;">Preceding content filling the page.</div>
+<h2 style="break-after: avoid;">Section Title Moved With Text</h2>
+<!-- With break-after: avoid, the heading moves to page 2 with its paragraph -->
+<p>This body text starts on page 2.</p>
+```
+

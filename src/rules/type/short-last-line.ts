@@ -25,6 +25,13 @@ export const shortLastLine = defineRule(
     defaultOptions: { maxWidthRatio: 0.15, maxEms: 2 },
     summary: "The closing line of a paragraph is a stub.",
     declines: ["env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],
+    remediation: {
+      advice:
+        "The final line of a paragraph is shorter than the uncalibrated threshold (a runt). Insert a non-breaking space ('&nbsp;') between the last two words to prevent a single word from standing alone, or reword the paragraph to balance line lengths.",
+      // No trigger/remedied pair ships with this package and no gate re-runs one, so this
+      // advice is untested in the sense the field defines.
+      tested: false,
+    },
   },
   (snapshot, ctx) => {
     const findings = [];

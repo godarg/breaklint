@@ -29,3 +29,22 @@ selectors; they are lower-cased and deduplicated before the rule runs.
 human-checked truth; no such corpus exists for this project. Every finding says so, and the
 report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
 also why this rule ships with the severity it has.
+
+## Remediation
+
+Replace straight quotes or apostrophes with language-appropriate curly quotes (e.g. `&bdquo;`...`&ldquo;` in German, `&ldquo;`...`&rdquo;` in English, or `&rsquo;` for apostrophes). For code or literal markup, mark ancestors with `<code>`, `<pre>`, or configure `excludeTags`.
+
+## Examples
+
+### Firing case (trigger)
+
+```html
+<p lang="de">Der Autor schrieb: "Dies ist ein wichtiger Punkt."</p>
+```
+
+### Non-firing case (remedied)
+
+```html
+<p lang="de">Der Autor schrieb: &bdquo;Dies ist ein wichtiger Punkt.&ldquo;</p>
+```
+

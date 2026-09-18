@@ -31,6 +31,13 @@ export const widow = defineRule(
     defaultOptions: { extraLines: 0 },
     summary: "The first fragment of a block on a page has fewer lines than its own widows value.",
     declines: ["env/multicolumn", "env/vertical-writing", "env/forced-break"],
+    remediation: {
+      advice:
+        "A block fragments across a page break and the fragment OPENING the next page carries fewer lines than the block's own 'widows' value (plus any configured extra lines) asks for. If this occurs inside a table row, keep the row together with 'tr { break-inside: avoid; }'. For paragraphs, prevent the split with 'break-inside: avoid', force an earlier break with 'break-before: page', or reword/re-space the text. (Note: CSS 'widows' is ignored by Paged.js).",
+      // No trigger/remedied pair ships with this package and no gate re-runs one, so this
+      // advice is untested in the sense the field defines.
+      tested: false,
+    },
   },
   (snapshot, ctx) => {
     const findings = [];

@@ -6,6 +6,7 @@ import { runDocument } from "../../src/core/engine.ts";
 import { resolveConfig, toReportConfig } from "../../src/config/resolve.ts";
 import { shortLastLine } from "../../src/rules/type/short-last-line.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
+import { REPORT_SCHEMA_VERSION } from "../../src/core/enums.ts";
 
 const resolved = resolveConfig({ file: undefined, cli: {} });
 
@@ -84,7 +85,7 @@ describe("Report4 target evaluations", () => {
  it("keeps unknown source explicit in the canonical consumer report", () => {
     const report = run(structuredClone(loadCorpus().find((item) => item.name === "short-last-line-trigger")!.snapshot));
     const finding = report.findings.find((item) => item.ruleId === shortLastLine.id)!;
-    assert.equal(report.schemaVersion, 4);
+    assert.equal(report.schemaVersion, REPORT_SCHEMA_VERSION);
     assert.equal(report.profileKind, "document");
     assert.equal(finding.originalSource.status, "unavailable");
     assert.equal(finding.actionability, "unknown-source");

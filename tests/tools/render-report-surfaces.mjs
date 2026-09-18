@@ -39,7 +39,7 @@ const BROWSER_RENDER_ARGS = [
   "--force-color-profile=srgb",
   "--hide-scrollbars",
 ];
-if (!["none", "broken-coverage", "broken-trust-geometry", "broken-terminal-density", "broken-box-closure", "broken-partial-box-closure", "broken-left-box-closure", "broken-partial-both-box-closure"].includes(PRINT_MUTATION_CONTROL)) {
+if (!["none", "broken-coverage", "broken-trust-geometry", "broken-tail-cohesion", "broken-box-closure", "broken-partial-box-closure", "broken-left-box-closure", "broken-partial-both-box-closure"].includes(PRINT_MUTATION_CONTROL)) {
   throw new Error(`unknown BREAKLINT_SURFACE_PRINT_CONTROL=${PRINT_MUTATION_CONTROL}`);
 }
 if (PRINT_STATE_FILTER !== null && !REPORT_STATES.includes(PRINT_STATE_FILTER)) {
@@ -479,9 +479,17 @@ try {
           .report-header.state-insufficient-coverage + section .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
         }` });
       }
-      if (PRINT_MUTATION_CONTROL === "broken-terminal-density") {
+      if (PRINT_MUTATION_CONTROL === "broken-tail-cohesion") {
+        // The terminal-density check only fires when the last page begins with a coverage record,
+        // and which remainder the pack leaves there depends on content far above the section. A
+        // control that relies on today's content would go green the day a finding gains a line, so
+        // this one forces the phase itself: it releases the tail bracket and breaks the page before
+        // records 1, 5, 9 and 13, leaving exactly one record on the terminal page.
         await page.addStyleTag({ content: `@media print {
-          .report-header.state-clean ~ .findings-empty { display: block !important; }
+          .coverage-tail { break-inside: auto !important; page-break-inside: auto !important; }
+          section[aria-labelledby="coverage-heading"] { break-before: page !important; }
+          .coverage-list > .coverage-record:nth-child(4n+1) { break-before: page !important; }
+          .coverage-tail > .coverage-record:last-child { break-before: page !important; }
         }` });
       }
       if (PRINT_MUTATION_CONTROL === "broken-box-closure") {
@@ -701,6 +709,10 @@ try {
 }
 
 const manifest = {
+  // The report-surface render manifest carries its own version, independent of the canonical
+  // report schema. Report 4 -> 5 moved this stamp along with it in error: the manifest's own
+  // structure did not change, and its verifier pins 4. A stamp that moves for someone else's
+  // structure change says nothing about this artifact.
   schemaVersion: 4,
   generatedAt: new Date().toISOString(),
   reviewInputContractVersion: 1,

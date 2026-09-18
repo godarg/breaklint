@@ -1,9 +1,30 @@
 import type { Finding, Report } from "../core/types.ts";
 import { summaryLine } from "./mandatory.ts";
 import { emptyStateSentence, infraLines } from "./infra.ts";
+import { VALIDATION_RULES_BY_ID } from "../rules/index.ts";
 
-const ESC = "[";
+const ESC = "\u001b[";
 const RESET = `${ESC}0m`;
+
+/**
+ * Defensible ordering of findings:
+ * 1. Document path (alphabetical)
+ * 2. Page number (reading order)
+ * 3. Severity (error > warn > info)
+ * 4. Rule ID (alphabetical)
+ * 5. Screen box Y position (top-to-bottom on page)
+ */
+function compareFindings(a: Finding, b: Finding): number {
+  if (a.document !== b.document) return a.document.localeCompare(b.document);
+  if (a.page !== b.page) return a.page - b.page;
+  const rank: Record<string, number> = { error: 0, warn: 1, info: 2 };
+  const rDiff = (rank[a.severity] ?? 3) - (rank[b.severity] ?? 3);
+  if (rDiff !== 0) return rDiff;
+  if (a.ruleId !== b.ruleId) return a.ruleId.localeCompare(b.ruleId);
+  const ay = a.target.boxScreen?.y ?? 0;
+  const by = b.target.boxScreen?.y ?? 0;
+  return ay - by;
+}
 
 /**
  * The terminal format.
@@ -22,8 +43,58 @@ export function renderConsole(report: Report, opts: { colour?: boolean } = {}): 
   const paint = (code: string, text: string) => (colour ? `${ESC}${code}m${text}${RESET}` : text);
   const out: string[] = [];
 
+  // 1. Collect and defensively sort all findings
+  const allFindings: Finding[] = [];
   for (const doc of report.documents) {
-    for (const finding of doc.findings) out.push(renderFinding(finding, paint));
+    for (const finding of doc.findings) allFindings.push(finding);
+  }
+  allFindings.sort(compareFindings);
+
+  // 2. Top 5-line summary banner
+  if (report.runVerdict === "clean") {
+    out.push(`${paint("32", "PASS")} clean run · exit ${report.exitCode}`);
+  } else if (report.runVerdict === "findings") {
+    out.push(`${paint("31", "FAIL")} findings block this run · exit ${report.exitCode}`);
+  } else if (report.runVerdict === "insufficient-coverage") {
+    out.push(`${paint("33", "INCOMPLETE")} coverage did not meet contract · exit ${report.exitCode}`);
+  } else if (report.runVerdict === "infrastructure") {
+    out.push(`${paint("31", "ERROR")} checker failed · exit ${report.exitCode}`);
+  } else {
+    out.push(`${paint("31", "FAIL")} command could not start · exit ${report.exitCode}`);
+  }
+
+  const pCount = report.pagesAnalysed;
+  const dCount = report.inputsFound;
+  out.push(
+    `checked ${pCount} page${pCount === 1 ? "" : "s"} in ${dCount} document${dCount === 1 ? "" : "s"} · ` +
+      `error ${report.summary.error} · warn ${report.summary.warn} · info ${report.summary.info}`,
+  );
+  out.push(
+    `gate: fail-on ${report.config.effective.failOn} · triggered by: ${report.summary.gateTriggeredBy ?? "none"}`,
+  );
+
+  if (report.runVerdict === "clean") {
+    out.push("all requested checks ran and passed");
+  } else if (report.runVerdict === "findings") {
+    const first = allFindings[0];
+    if (first) {
+      out.push(`first issue: ${first.severity} ${first.ruleId} on page ${first.page} (${first.document})`);
+    } else {
+      out.push("findings triggered the gate (see below)");
+    }
+  } else if (report.runVerdict === "insufficient-coverage") {
+    out.push("coverage failure: inspect coverage shortfalls below before treating results as clean");
+  } else if (report.runVerdict === "infrastructure") {
+    const firstInfra = infraLines(report)[0];
+    out.push(`checker stopped: ${firstInfra?.kind ?? "checker failure"} (see diagnostic below)`);
+  } else {
+    out.push("action: check command arguments and configuration");
+  }
+  out.push("");
+
+  // 3. Render findings
+  for (const finding of allFindings) {
+    out.push(renderFinding(finding, paint));
   }
 
   /*
@@ -35,6 +106,10 @@ export function renderConsole(report: Report, opts: { colour?: boolean } = {}): 
    * projected, so the one word explaining the exit — `dom-pdf-divergence` — reached the JSON and
    * never a human. The comment below has warned against exactly this since the file was written:
    * the empty state was guarded and the ERROR state was not.
+   *
+   * The banner above now names the verdict and the first infrastructure kind, so the reason does
+   * reach a human on line 1 and line 4. That does not retire this comment: the banner is a second
+   * projection, and the ordering it depends on is the one recorded here.
    */
   for (const line of infraLines(report)) {
     const label = line.level === "error" ? "checker" : line.level === "warning" ? "diagnostic" : "evidence";
@@ -48,11 +123,46 @@ export function renderConsole(report: Report, opts: { colour?: boolean } = {}): 
     );
   }
 
+  // 5. Coverage shortfall block on exit 4
+  if (report.runVerdict === "insufficient-coverage") {
+    out.push(paint("33", "coverage shortfall (exit 4):"));
+    out.push("  A rule without enough measurement cannot establish absence of a defect.");
+    let shortfallFound = false;
+    for (const doc of report.documents) {
+      for (const [ruleId, cov] of Object.entries(doc.coverage)) {
+        if (!cov.ok) {
+          shortfallFound = true;
+          const reasons = [
+            ...new Set(
+              doc.notMeasured
+                .filter((n) => n.ruleId === ruleId)
+                .map((n) => n.reason),
+            ),
+          ];
+          const reasonStr = reasons.length > 0 ? reasons.join(", ") : "no reason declared";
+          const ratioPct = cov.coverage === null ? "not applicable" : `${(cov.coverage * 100).toFixed(0)}%`;
+          const floorPct = `${(cov.floor * 100).toFixed(0)}%`;
+          out.push(`  rule       ${ruleId} in ${doc.path}`);
+          out.push(`  measured   ${cov.measured} of ${cov.candidates} candidates (${ratioPct}); required floor ${floorPct}`);
+          out.push(`  reason     ${reasonStr}`);
+          out.push(`  options    - Inspect the document for unsupported constructs or environment limits`);
+          out.push(`             - If this document intentionally uses unsupported elements, disable the check with:`);
+          out.push(`               --disable ${ruleId}`);
+          out.push("");
+        }
+      }
+    }
+    if (!shortfallFound) {
+      out.push("  detail     The run declared insufficient coverage without a per-rule shortfall. Inspect the canonical JSON report.");
+      out.push("");
+    }
+  }
+
+  // The empty state has to say what was checked. A tool that prints nothing when it passed
+  // and nothing when it did nothing reports its own idleness as success — and that is a
+  // silent failure wearing the costume of a clean run. `emptyStateSentence` also refuses the
+  // clean-run wording for an infrastructure verdict, identically in all six reporters.
   if (report.findings.length === 0) {
-    // The empty state has to say what was checked. A tool that prints nothing when it passed
-    // and nothing when it did nothing reports its own idleness as success — and that is a
-    // silent failure wearing the costume of a clean run. `emptyStateSentence` also refuses the
-    // clean-run wording for an infrastructure verdict, identically in all six reporters.
     out.push(emptyStateSentence(report));
   }
 
@@ -72,15 +182,29 @@ export function renderConsole(report: Report, opts: { colour?: boolean } = {}): 
 function renderFinding(f: Finding, paint: (code: string, text: string) => string): string {
   const code = f.severity === "error" ? "31" : f.severity === "warn" ? "33" : "36";
   const m = f.measurement;
+  const ruleMeta = VALIDATION_RULES_BY_ID.get(f.ruleId);
   const lines = [
     `${paint(code, f.severity.padEnd(5))} ${f.ruleId}  page ${f.page}`,
     `  measured   ${m.value} ${m.unit}; threshold ${m.threshold} ${m.unit}` +
       `${m.calibrated ? "" : " (uncalibrated)"}`,
     `  detail     ${f.message}`,
-    `  source     ${f.source ? `${f.source.file}:${f.source.line}` : "unknown (node produced by the paginator)"}`,
+  ];
+
+  if (ruleMeta?.remediation) {
+    lines.push(`  remedy     ${ruleMeta.remediation.advice}`);
+    if (!ruleMeta.remediation.tested) lines.push("             untested: no trigger/remedied pair in this package shows this advice removing this finding");
+  }
+
+  if (f.ruleId === "layout/half-empty-page") {
+    lines.push(`  note       heuristic warning: fires on most documents because line leading and block margins are not in net fill`);
+  }
+
+  lines.push(`  source     ${f.source ? `${f.source.file}:${f.source.line}` : "unknown (node produced by the paginator)"}`);
+  lines.push(
     `  render     ${f.evidence.ref ?? "unknown (no evidence produced)"}` +
       `${f.evidence.ref && !f.evidence.bindsFinding ? " — evidence shows the PDF, not this finding" : ""}`,
-  ];
+  );
+
   if (f.ambiguity) {
     lines.push(
       `  ambiguity  ${f.ambiguity.groupSize} findings share this fingerprint and cannot be told apart`,

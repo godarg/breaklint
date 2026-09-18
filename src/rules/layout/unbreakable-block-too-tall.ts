@@ -22,6 +22,13 @@ export const unbreakableBlockTooTall = defineRule(
     defaultOptions: { toleranceRatio: 1.0 },
     summary: "A block with break-inside: avoid is taller than the page content box.",
     declines: ["env/multicolumn", "env/vertical-writing"],
+    remediation: {
+      advice:
+        "A block with 'break-inside: avoid' is taller than the page content area and cannot fit unbroken on any page. Make the block shorter — split it into smaller sections, or reduce container padding, font size or contained rows. Removing 'break-inside: avoid' also clears the finding, but only because the rule then has no candidate: the block is exactly as tall as before, and whether the paginator fragments it is a separate question this rule does not answer.",
+      // No trigger/remedied pair ships with this package and no gate re-runs one, so this
+      // advice is untested in the sense the field defines.
+      tested: false,
+    },
   },
   (snapshot, ctx) => {
     const findings = [];

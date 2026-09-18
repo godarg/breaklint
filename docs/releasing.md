@@ -5,13 +5,13 @@ Releases are published by GitHub Actions from an annotated version tag. A laptop
 
 ## Release contract
 
-For 0.5.0, all of the following must refer to the same commit and the same package bytes:
+For 0.6.0, all of the following must refer to the same commit and the same package bytes:
 
-1. `origin/main` and annotated tag `v0.5.0`;
+1. `origin/main` and annotated tag `v0.6.0`;
 2. the successful `ci.yml` run queried by commit SHA;
 3. the one tarball created by the release workflow;
 4. both clean consumers, on Node 22.13 and Node 24;
-5. npm `breaklint@0.5.0` and its `dist.integrity`;
+5. npm `breaklint@0.6.0` and its `dist.integrity`;
 6. the tarball and checksum files attached to the GitHub Release.
 
 Any mismatch ends the workflow before or immediately after the outward action. A failed registry
@@ -23,6 +23,13 @@ creation because their real-document child process inherited the checkout CWD. V
 published repair from this change set and binds the child CLI to the actual consumer CWD. Release
 run `33320332110` completed the Node 22.13/24 consumer matrix, npm provenance verification and
 GitHub Release creation on 2026-08-30.
+
+0.6.0 is a minor pre-1.0 release by the same test this document applied to 0.5.0: the canonical
+document report changes structure, so its stamp moves. Report 4 becomes Report 5 with the optional
+`Finding.remediation`, and the agent context pack becomes 2 with one new required key and three new
+finding-card keys. Snapshot stays 4 and Configuration Contract 1 is untouched. Readers accept
+Report 4 and 5, so a stored artefact does not have to be migrated — but an optional property does
+not let a schema-aware consumer distinguish the two shapes, and that is what a version is for.
 
 0.5.0 is a minor pre-1.0 release because live document output moves to Report 4 and Snapshot 4,
 and the installed package gains public producer, screen, comparison and report-bundle APIs.
@@ -72,6 +79,12 @@ look. `npm run test:report-surfaces` is the separate exact-environment human gat
 when the bound inputs changed and no person reviewed the new artifacts; never refresh its ledger as
 release ceremony. A real later review may rebind it with its actual reviewer and timestamp.
 
+Measured on 2026-09-18, and stated here rather than left to be inferred: the ledger is still bound
+to the 0.2.3 input fingerprint from 2026-08-29. It has therefore been red for 0.3.0, 0.3.1, 0.4.0
+and 0.5.0, and is red for 0.6.0. Nobody noticed because CI runs the technical mode, which skips the
+comparison by design. That is the contract working, not failing — but a gate nobody reads is a gate
+that rots, so the state belongs in this document until a person reviews the current surfaces.
+
 The green real-document gate reads the rights/privacy-reviewed corpus manifest and binds exact
 artifact hashes, source evidence, page/rule counts and the positive independent geometry-oracle
 sample. Its one-time red condition is preserved in
@@ -117,15 +130,15 @@ Then verify:
 Create and push an annotated tag only after main CI is green:
 
 ```bash
-git tag -a v0.5.0 -m "breaklint 0.5.0"
-git push origin v0.5.0
+git tag -a v0.6.0 -m "breaklint 0.6.0"
+git push origin v0.6.0
 ```
 
 The release workflow then:
 
 1. repeats the complete gate on Node 24;
 2. scans Git history/worktree and proves both scanner rules with runtime canaries;
-3. creates exactly one `breaklint-0.5.0.tgz`;
+3. creates exactly one `breaklint-0.6.0.tgz`;
 4. records its SHA-256 and SHA-512 SRI;
 5. downloads those same bytes into Node 22.13 and Node 24 clean consumers;
 6. proves the ref is an annotated tag (with a lightweight-tag negative control), then proves
@@ -137,7 +150,7 @@ The release workflow then:
 9. creates the GitHub Release with the tarball and both identity records attached.
 
 Do not rerun a partially successful publish blindly: npm versions are immutable. Inspect the npm
-version, workflow logs and GitHub Release first. If npm already serves 0.5.0 but a post-publish
+version, workflow logs and GitHub Release first. If npm already serves 0.6.0 but a post-publish
 verification failed, repair the release metadata or publish a new patch version; never move the tag
 or overwrite evidence to make the old run look green.
 
@@ -153,13 +166,13 @@ source identity is never ignored.
 From a new temporary directory, independently verify the registry route:
 
 ```bash
-npm view breaklint@0.5.0 version dist.integrity
+npm view breaklint@0.6.0 version dist.integrity
 npm init -y
-npm install breaklint@0.5.0 --no-audit --no-fund
+npm install breaklint@0.6.0 --no-audit --no-fund
 npx breaklint --version
 npx breaklint --demo
 ```
 
-The version must be `0.5.0`; demo must produce real findings and exit 1. Import
+The version must be `0.6.0`; demo must produce real findings and exit 1. Import
 `breaklint/config.schema.json` and rerun the installed Configuration Contract gate. The later status
 commit records the completed release but is not retroactively part of the published tarball.

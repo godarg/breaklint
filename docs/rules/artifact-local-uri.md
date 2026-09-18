@@ -27,3 +27,26 @@ Reads `uriRefs`, which holds every URI-bearing attribute and every CSS `url()` f
 human-checked truth; no such corpus exists for this project. Every finding says so, and the
 report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
 also why this rule ships with the severity it has.
+
+## Remediation
+
+Replace absolute filesystem paths with relative URLs, packaged assets, or public production URLs. An absolute path resolves only on the machine that built the file.
+
+## Examples
+
+### Firing case (trigger)
+
+```html
+<p>
+  <a href="file:///example/project/notes.txt">Local document notes</a>
+</p>
+```
+
+### Non-firing case (remedied)
+
+```html
+<p>
+  <a href="notes.txt">Relative document notes</a>
+</p>
+```
+

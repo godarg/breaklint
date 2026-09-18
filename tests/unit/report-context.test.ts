@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { createContextPack } from "../../src/api/context.ts";
+import { createContextPack, CONTEXT_SCHEMA_VERSION } from "../../src/api/context.ts";
+import { ALL_RULES } from "../../src/rules/index.ts";
+import { REPORT_SCHEMA_VERSION, READABLE_REPORT_SCHEMA_VERSIONS } from "../../src/core/enums.ts";
 import { renderReport, writeReportBundle } from "../../src/api/bundle.ts";
 import type { Report } from "../../src/core/types.ts";
 import type { PublicScreenReport } from "../../src/web/types.ts";
@@ -229,8 +231,166 @@ describe("bounded public report views", () => {
     const context = createContextPack(report);
     const html = renderReport(report);
     assert.equal(context.canonicalReport.profileKind, "screen");
+
+    /*
+     * Targets the inventory itself dropped must stay in omittedCount. This term was removed once
+     * and nothing went red: `complete` still read false, so the pack looked honest while the
+     * NUMBER an agent reads to learn how much it is missing had silently shrunk to zero.
+     */
+    const capped: PublicScreenReport = {
+      ...report,
+      targetInventory: { complete: false, omittedCount: 7, reason: "screen/target-enumeration-capped" },
+      evaluations: [{ ...report.evaluations[0]!, status: "not-measured", reason: "env/pixel-oracle-unavailable" }],
+    };
+    const cappedContext = createContextPack(capped);
+    assert.equal(cappedContext.selection.omittedCount, 7, "targets dropped by the inventory must be counted as omitted");
+    assert.equal(cappedContext.selection.complete, false);
+    assert.ok(cappedContext.whatWasNotMeasured, "a screen report must be able to state what it did not measure");
+    assert.equal(cappedContext.whatWasNotMeasured!.length, 1, "a not-measured evaluation must appear, not be summarised into silence");
+    assert.equal(cappedContext.whatWasNotMeasured![0]!.reason, "env/pixel-oracle-unavailable");
+
     assert.match(html, /open-nav · \/cockpit · 390×844/iu);
     assert.match(html, /Back to findings/u);
     assert.doesNotMatch(html, /page 1/u);
+  });
+
+  it("projects fingerprint, source coordinates, remediation, and uncalibrated limitations onto context findings", () => {
+    const report = clone();
+    const finding = report.findings[0]!;
+    assert.ok(finding.remediation, "runDocument must attach rule remediation to findings");
+    // This pin used to read `true`, and the engine wrote `true` unconditionally — so the pin
+    // held while the field asserted a verification that never ran. `tested` must come from the
+    // rule's own declaration and nowhere else.
+    const declaring = ALL_RULES.find((rule) => rule.id === finding.ruleId);
+    assert.ok(declaring?.remediation, `${finding.ruleId} must declare the remediation it ships`);
+    assert.equal(finding.remediation.tested, declaring!.remediation!.tested);
+    assert.equal(finding.remediation.advice, declaring!.remediation!.advice);
+    finding.source = {
+      file: "doc.html",
+      line: 42,
+      column: 5,
+      offset: 400,
+      endLine: 42,
+      endColumn: 20,
+      endOffset: 415,
+      coordinateSystem: "utf8-bytes-unicode-codepoints-v1",
+    };
+    const context = createContextPack(report);
+    const card = context.findings.find((entry) => "runFindingId" in entry && entry.runFindingId === finding.runFindingId);
+    assert.ok(card && "runFindingId" in card);
+    assert.equal(card.fingerprint, finding.fingerprint);
+    assert.equal(card.remediation?.advice, finding.remediation.advice);
+    assert.equal(card.remediation?.tested, declaring!.remediation!.tested);
+    assert.deepEqual(card.source, {
+      file: "doc.html",
+      line: 42,
+      column: 5,
+      offset: 400,
+      endLine: 42,
+      endColumn: 20,
+      endOffset: 415,
+      coordinateSystem: "utf8-bytes-unicode-codepoints-v1",
+    });
+    /*
+     * The generic per-rule advice travels in `remediation`, never in `repair.options`.
+     * `repair.options` is a target-specific instruction and stays empty unless the original
+     * source was VERIFIED — the guard that says so was deleted once, and a probe then produced
+     * a repair command for a finding whose source the tool could not establish at all.
+     */
+    if (finding.originalSource.status !== "verified" || finding.actionability !== "actionable") {
+      assert.deepEqual(card.repair.options, [], "unverified source must not receive a repair instruction");
+    }
+    assert.ok(!card.repair.options.includes(finding.remediation.advice), "generic advice must not masquerade as a verified-target instruction");
+    assert.ok(card.limitations.some((lim) => /Threshold is uncalibrated/u.test(lim)));
+  });
+
+  it("projects whatWasNotMeasured when coverage is incomplete", () => {
+    const report = clone();
+    report.documents[0]!.coverage["layout/widow"] = {
+      measured: 1,
+      candidates: 5,
+      floor: 1,
+      coverage: 0.2,
+      ok: false,
+      notMeasuredCount: 4,
+      notMeasured: [{ ruleId: "layout/widow", scope: "document", reason: "env/pixel-oracle-unavailable", count: 4, target: null }],
+    };
+    const context = createContextPack(report);
+    assert.ok(context.whatWasNotMeasured, "a document report must be able to state what it did not measure");
+    assert.ok(context.whatWasNotMeasured!.length > 0);
+    const unmeasured = context.whatWasNotMeasured!.find((item) => item.ruleId === "layout/widow");
+    assert.ok(unmeasured);
+    assert.equal(unmeasured.declinedCount, 4);
+    assert.equal(unmeasured.candidateCount, 5);
+    assert.equal(unmeasured.reason, "env/pixel-oracle-unavailable");
+  });
+
+  /*
+   * These four pins exist because the guard they protect was silently deleted once, and the whole
+   * unit suite stayed green while `createContextPack({maxFindings: -5})` reported an omittedCount
+   * of 12 for a report carrying 7 findings, 5.5 for a fractional request, and NaN for a NaN one.
+   * A bound that no test can see removed is not a bound.
+   */
+  it("refuses a caller's out-of-range selection bound instead of propagating it", () => {
+    const report = clone();
+    for (const bad of [-5, 0, 1.5, Number.NaN, 10_000] as number[]) {
+      const context = createContextPack(report, { maxFindings: bad });
+      assert.ok(Number.isInteger(context.selection.omittedCount), `maxFindings ${bad}: omittedCount is not an integer`);
+      assert.ok(context.selection.omittedCount >= 0, `maxFindings ${bad}: negative omittedCount`);
+      assert.ok(
+        context.selection.omittedCount <= report.documents.flatMap((d: { findings: unknown[] }) => d.findings).length,
+        `maxFindings ${bad}: omittedCount exceeds the number of findings that exist`,
+      );
+      assert.ok(context.findings.length >= 1 || report.documents.every((d: { findings: unknown[] }) => d.findings.length === 0));
+    }
+  });
+
+  it("refuses a caller's out-of-range text bound instead of propagating it", () => {
+    const report = clone();
+    for (const bad of [0, -10, Number.NaN, 5] as number[]) {
+      const context = createContextPack(report, { maxTextPerField: bad });
+      for (const finding of context.findings) {
+        assert.ok(finding.observation.length >= 1, `maxTextPerField ${bad}: field truncated to nothing`);
+      }
+    }
+  });
+
+  it("states the schema stamp it actually emits", () => {
+    assert.equal(createContextPack(clone()).schemaVersion, CONTEXT_SCHEMA_VERSION);
+    assert.equal(CONTEXT_SCHEMA_VERSION, 2, "the pack gained required keys; a consumer needs a stamp to tell the shapes apart");
+  });
+
+  it("distinguishes 'nothing was left unmeasured' from 'this input cannot say'", () => {
+    // The empty array is a claim. A report this projection cannot read makes no claim at all,
+    // and an agent that reads [] as 'clean' is the defect class the field was added against.
+    const unreadable = createContextPack({ schemaVersion: 3, profileKind: "document", findings: [] });
+    assert.equal(unreadable.whatWasNotMeasured, null);
+    assert.ok(Array.isArray(createContextPack(clone()).whatWasNotMeasured));
+  });
+
+  /*
+   * Report 5 adds the optional `Finding.remediation`. The emitter moved; the readers did not get
+   * narrower. A stored schema-4 report — every report this tool wrote before 0.5.x — must still
+   * produce a full context pack, not the legacy stub. Raising a stamp without migrating the
+   * artifact it names is the failure this project has already recorded once.
+   */
+  it("reads a stored schema-4 report as a document report, not as legacy", () => {
+    const four = clone();
+    four.schemaVersion = 4;
+    for (const doc of four.documents) for (const f of doc.findings) delete f.remediation;
+    for (const f of four.findings) delete f.remediation;
+    const context = createContextPack(four);
+    assert.equal(context.canonicalReport.schemaVersion, 4);
+    assert.notEqual(context.selection.reason, "legacy-or-invalid-report-cannot-establish-source-or-repair-claims");
+    assert.ok(context.findings.length > 0, "a schema-4 report must still yield finding cards");
+    assert.ok(context.whatWasNotMeasured, "a schema-4 report must still be able to state what it did not measure");
+    const card = context.findings[0]!;
+    assert.ok("remediation" in card && card.remediation === null, "a schema-4 finding carries no remediation, and the card must say null rather than invent one");
+  });
+
+  it("emits the schema stamp that matches its own structure", () => {
+    assert.equal(REPORT_SCHEMA_VERSION, 5, "Finding.remediation changed the canonical report's structure; the stamp moves with it");
+    assert.ok(READABLE_REPORT_SCHEMA_VERSIONS.includes(4) && READABLE_REPORT_SCHEMA_VERSIONS.includes(5));
+    assert.equal(createContextPack(clone()).canonicalReport.schemaVersion, REPORT_SCHEMA_VERSION);
   });
 });

@@ -28,6 +28,13 @@ export const spacedHyphen = defineRule(
     defaultOptions: { locale: "de-DE", mathWindow: 12, maxOccurrences: 0, excludeTags: [] },
     summary: "A hyphen stands between spaces where the convention asks for a dash.",
     declines: [],
+    remediation: {
+      advice:
+        "A hyphen surrounded by whitespace (' - ') is used where a typographic dash is customary. Replace ' - ' with an en-dash (' &ndash; ' or ' – ') or an unspaced em-dash ('&mdash;' or '—').",
+      // No trigger/remedied pair ships with this package and no gate re-runs one, so this
+      // advice is untested in the sense the field defines.
+      tested: false,
+    },
   },
   (snapshot, ctx) => {
     const findings = [];

@@ -68,6 +68,16 @@ export interface RuleMeta {
   readonly summary: string;
   /** Reasons this rule can decline to measure. Checked against the registry test. */
   readonly declines: readonly EnvId[];
+  /**
+   * Actionable guidance on what in the source produces this and what concretely to change.
+   *
+   * `tested` is a claim about EVIDENCE, not about confidence: it is true only where a
+   * trigger/remedied document pair in this repository shows the finding appearing, the advice
+   * being applied verbatim, the finding going away, and no new finding arriving. A rule author
+   * cannot set it from conviction — the previous shape let the engine stamp `tested: true` on
+   * every remediation it copied, which is how an untested string reaches an agent as a tested one.
+   */
+  readonly remediation?: { readonly advice: string; readonly tested: boolean };
 }
 
 export interface Rule extends RuleMeta {

@@ -25,3 +25,31 @@ Declined after a forced incoming break. Reading the break reason from the comput
 human-checked truth; no such corpus exists for this project. Every finding says so, and the
 report says so in `measurement.calibrated`. That is the honest state, not a defect — but it is
 also why this rule ships with the severity it has.
+
+## Remediation
+
+A continuation page holds only a tiny trailing fragment of an earlier block. Tighten preceding vertical margins, padding, or line-height on earlier pages to pull the remaining lines back, or insert 'break-before: page' earlier to balance content across pages.
+
+## Examples
+
+### Firing case (trigger)
+
+```html
+<!-- A long paragraph overflows onto page 2 with just 2 trailing lines, and nothing else follows -->
+<p>
+  First line of paragraph...<br>
+  ...many lines on page 1...<br>
+  Line spilling onto page 2.<br>
+  Last line on page 2.
+</p>
+```
+
+### Non-firing case (remedied)
+
+```html
+<!-- By slightly reducing font size or margins, the trailing lines pull onto page 1 -->
+<p style="font-size: 10pt; line-height: 14px;">
+  All lines of the paragraph fit onto a single page cleanly.
+</p>
+```
+

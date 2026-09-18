@@ -302,8 +302,14 @@ export const SNAPSHOT_ROUNDING_PX = 0.01;
 export const SUPPORTED_PAGEDJS_VERSION = "0.4.3";
 export const SUPPORTED_PDFJS_VERSION = "6.2.108";
 
-/** Report and snapshot evolve independently; a version stamp must not claim an unperformed migration. */
-export const REPORT_SCHEMA_VERSION = 4;
+/**
+ * Report and snapshot evolve independently; a version stamp must not claim an unperformed
+ * migration — and, in the other direction, a structure change must not travel under an unchanged
+ * stamp. 5 adds the optional `Finding.remediation`. Readers accept 4 and 5; only the emitter moved.
+ */
+export const REPORT_SCHEMA_VERSION = 5;
+/** Document report shapes this build can read. A 4 simply carries no `remediation`. */
+export const READABLE_REPORT_SCHEMA_VERSIONS: readonly number[] = [4, 5];
 export const SNAPSHOT_SCHEMA_VERSION = 4;
 
 const asSet = <T extends string>(values: readonly T[]): ReadonlySet<string> => new Set(values);

@@ -97,3 +97,28 @@ threshold.
 Contract-simulation rows cannot make the structural claim ready. A claim-grade run still requires
 a separately supplied capture bundle and attestation bound to the exact real-render receipt and
 frozen renderer, plus an owner-approved external trust root that M3-0 does not possess.
+
+## Remediation
+
+SVG text extends outside its viewport boundaries and is visually clipped. Enlarge the SVG `viewBox` (e.g. increase width/height in `viewBox="0 0 W H"`), reposition the `<text>` element within the visible canvas, or apply `overflow: visible` to the `<svg>` container if intentional.
+
+## Examples
+
+### Firing case (trigger)
+
+```html
+<svg viewBox="0 0 100 100" width="100" height="100">
+  <!-- Text x=140 extends well beyond the 100px viewBox width -->
+  <text x="140" y="50" font-size="14">Clipped Text Outside Viewport</text>
+</svg>
+```
+
+### Non-firing case (remedied)
+
+```html
+<!-- Enlarge viewBox or reposition text so it sits within the viewport -->
+<svg viewBox="0 0 300 100" width="300" height="100">
+  <text x="20" y="50" font-size="14">Contained Text Inside Viewport</text>
+</svg>
+```
+

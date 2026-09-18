@@ -20,6 +20,13 @@ export const orphan = defineRule(
     defaultOptions: { extraLines: 0 },
     summary: "The last fragment of a block on a page has fewer lines than its own orphans value.",
     declines: ["env/multicolumn", "env/vertical-writing", "env/forced-break"],
+    remediation: {
+      advice:
+        "A block fragment ENDS at a page break carrying fewer lines than the block's own 'orphans' value (plus any configured extra lines) asks for. If this occurs inside a table row, keep the row together with 'tr { break-inside: avoid; }'. For paragraphs, move the block onto the next page with 'break-inside: avoid' or 'break-before: page', or reword/re-space the text. (Note: CSS 'orphans' is ignored by Paged.js).",
+      // No trigger/remedied pair ships with this package and no gate re-runs one, so this
+      // advice is untested in the sense the field defines.
+      tested: false,
+    },
   },
   (snapshot, ctx) => {
     const findings = [];

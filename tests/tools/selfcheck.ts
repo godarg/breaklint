@@ -68,7 +68,9 @@ for (const [pattern, why] of [
 
 // 2. The project's own prose must pass the typography rules it applies to others. The straight
 //    apostrophe is the one a typography tool cannot afford in its own README.
-const prose = [join(ROOT, "README.md"), ...readdirSync(join(ROOT, "docs/rules")).map((f) => join(ROOT, "docs/rules", f))];
+// docs/agent-contract.md is in this list because it was not: it shipped with three false
+// contract claims, was linked from no file in the repo, and no gate read it.
+const prose = [join(ROOT, "README.md"), join(ROOT, "docs/agent-contract.md"), ...readdirSync(join(ROOT, "docs/rules")).map((f) => join(ROOT, "docs/rules", f))];
 for (const file of prose) {
   const text = readFileSync(file, "utf8");
   // Only outside code spans and fenced blocks: a straight quote in a code sample is correct.

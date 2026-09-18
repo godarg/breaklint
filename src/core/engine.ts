@@ -185,6 +185,13 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
       ok: ratio === null ? true : ratio >= floor,
     };
     documentNotMeasured.push(...notMeasured);
+    if (rule.remediation) {
+      for (const finding of result.findings) {
+        if (!finding.remediation) {
+          finding.remediation = { advice: rule.remediation.advice, tested: rule.remediation.tested };
+        }
+      }
+    }
     findings.push(...result.findings);
     evaluations.push(...(result.evaluations ?? []));
     if (result.measured > 0) measuredRuleIds.push(rule.id);
