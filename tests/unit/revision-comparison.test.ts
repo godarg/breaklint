@@ -65,7 +65,11 @@ it("the real host producer + renderer + Git revisions confirm a preserved target
     assert.equal((await compareReports(before, duplicates)).results[0]!.status, "unmatchable");
     const reducedScope = structuredClone(before); reducedScope.documents = [];
     assert.equal((await compareReports(before, reducedScope)).results[0]!.status, "not-sufficiently-measured");
-    await assert.rejects(compareReports({ schemaVersion: 1, profileKind: "screen" } as unknown as Report, before), /requires document Report schema 4/u);
+    // The accepted set is READABLE_REPORT_SCHEMA_VERSIONS, so the message names it. A schema-4
+    // report must still be accepted here: this rejection is about schema 1 and the screen profile,
+    // not about narrowing the reader.
+    await assert.rejects(compareReports({ schemaVersion: 1, profileKind: "screen" } as unknown as Report, before), /requires a document Report of schema 4 or 5/u);
+    assert.equal((await compareReports({ ...structuredClone(before), schemaVersion: 4 }, before)).results.length >= 0, true, "a stored schema-4 report must still be comparable");
     writeFileSync(source, body(100)); writeFileSync(css, cssBody("navy")); const after = await check();
     assert.equal(after.findings.length, 0); assert.ok(after.evaluations.some(e => e.stableIdentity?.status === "unique" && e.predicate.violated === false));
     const repaired = await compareReports(before, after); assert.equal(repaired.results[0]!.status, "resolved", JSON.stringify({ repaired, fontBefore: before.documents[0]!.fontIdentity, fontAfter: after.documents[0]!.fontIdentity, resources: after.documents[0]!.inputIdentity, infra: after.documents[0]!.infrastructure, notMeasured: after.documents[0]!.notMeasured, coverage: after.documents[0]!.coverage }));
