@@ -74,6 +74,13 @@ npm run selfcheck
 npm run build
 ```
 
+Two of these need the tap and summary files the runs before them write, and are therefore easy to
+skip in a hand-built chain: `test:documented-figures` reads `.tmp/unit.tap`, `.tmp/test.tap` and
+the two `.tmp/live-*.json` files, so it only says anything after `npm test` and `test:live` have
+both run. On 2026-09-18 a local chain omitted it and CI caught the drift instead — the gate worked,
+the chain did not. And when a step in such a chain is piped (`npm test | tail`), `$?` is the exit
+code of `tail`: read every return value directly after its command.
+
 The technical surface gate reconstructs and verifies every current cell without claiming a human
 look. `npm run test:report-surfaces` is the separate exact-environment human gate. It must stay red
 when the bound inputs changed and no person reviewed the new artifacts; never refresh its ledger as
@@ -133,6 +140,14 @@ compiles a second tree.
 
 Then verify:
 
+- `.github/workflows/release.yml` is pinned to this tag and this tarball. The trigger is the
+  literal `tags: ["vX.Y.Z"]`, not a wildcard, and `PACKAGE_FILE` plus every version assertion in
+  the file name the same version. **This step is the one that is easy to forget and silent when
+  forgotten**: a tag pushed while the workflow still names the previous version starts nothing at
+  all — no run, no error, no notification, and the tag sits on the remote looking done. Measured on
+  2026-09-18: `v0.6.0` was pushed against a workflow still pinned to `v0.5.0`, nothing ran, and the
+  tag had to be deleted and recreated. The pinning is deliberate — a wildcard would let any `v*`
+  tag publish — but it belongs in this list.
 - `package.json`, both root version fields in `package-lock.json` and `CHANGELOG.md` name the same
   version;
 - README, security policy, status and limitations make no future-tense success claim;
