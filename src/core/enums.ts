@@ -236,9 +236,9 @@ export const SEVERITIES = ["error", "warn", "info"] as const;
 export type Severity = (typeof SEVERITIES)[number];
 
 /**
- * The gate threshold. `error` is the default: only two rules carry a named proof source, and a
- * tool that breaks a build on thirteen self-declared uncalibrated heuristics contradicts its
- * own burden-of-proof rule.
+ * The gate threshold. `error` is the default: only two of the thirteen registered rules carry a
+ * named proof source, and a tool that breaks a build on the other eleven self-declared
+ * uncalibrated heuristics contradicts its own burden-of-proof rule.
  */
 export const FAIL_ON_VALUES = ["error", "warn", "never"] as const;
 export type FailOn = (typeof FAIL_ON_VALUES)[number];

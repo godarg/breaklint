@@ -100,7 +100,9 @@ frozen renderer, plus an owner-approved external trust root that M3-0 does not p
 
 ## Remediation
 
-SVG text extends outside its viewport boundaries and is visually clipped. Enlarge the SVG `viewBox` (e.g. increase width/height in `viewBox="0 0 W H"`), reposition the `<text>` element within the visible canvas, or apply `overflow: visible` to the `<svg>` container if intentional.
+<!-- begin generated remediation: svg/text-overflows-viewport -->
+Text rendered inside an SVG extends outside the SVG viewport bounds and is clipped. Enlarge the SVG 'viewBox' or its width/height, or adjust the <text> coordinates ('x', 'y', 'text-anchor'). 'overflow: visible' on the container also clears the finding, but it does not move the text: the viewport then no longer clips, the target becomes non-applicable and this rule stops measuring it. Use that only where the overflow is intended.
+<!-- end generated remediation: svg/text-overflows-viewport -->
 
 ## Examples
 

@@ -79,7 +79,26 @@ assert.equal(new Set(digests).size, digests.length, "one artifact is admitted tw
 assert.ok(existsSync(join(ROOT, "tests/fixtures/fragmentainer-residue.html")),
   "the public fixture named by this manifest is missing; nothing would test this class in CI");
 
+assert.ok(manifest.binding, "the record does not say what it is bound to");
+assert.ok(["current", "historical"].includes(manifest.binding.status), "unknown binding status");
+
 const artifactRoot = argument("--artifact-root") ?? process.env[manifest.artifactRootEnvironmentVariable];
+
+// A record bound to bytes that no longer exist cannot be re-verified by anyone, and running the
+// private half against today's bytes would compare measurements taken on different documents. That
+// is not a softer gate: the no-claim path below is the same one an absent root takes, and it says
+// out loud which of the two reasons applies. Re-recording the digests INSTEAD would be the
+// forbidden move — a drifted byte is a red gate, not a re-recorded expectation.
+if (manifest.binding.status === "historical") {
+  console.log(
+    `pagination-residue gate: NO CLAIM — this record is historical, recorded ${manifest.binding.recordedOn}. ` +
+    `${manifest.binding.remeasurementResult} Nothing about the ${manifest.documents.length} documents is ` +
+    `verified here${artifactRoot ? ", and the artifact root supplied was deliberately not read" : ""}. ` +
+    `${manifest.binding.whatStillHolds} Follow-up: ${manifest.binding.followUp}`,
+  );
+  process.exit(0);
+}
+
 if (!artifactRoot) {
   console.log(
     `pagination-residue gate: SKIPPED — no ${manifest.artifactRootEnvironmentVariable}. ` +

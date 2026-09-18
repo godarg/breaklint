@@ -28,7 +28,9 @@ also why this rule ships with the severity it has.
 
 ## Remediation
 
-Enable CSS hyphenation (`hyphens: auto`), rephrase text, or adjust column width so justification does not stretch word spaces beyond 3.0× the natural font space. If wide spacing is intentional, set an explicit `word-spacing` property on the container.
+<!-- begin generated remediation: type/excessive-word-spacing -->
+Justified text produces word spacing exceeding the uncalibrated threshold ('rivers' of whitespace). Enable hyphenation with 'hyphens: auto;' (specifying an HTML 'lang' attribute), use left alignment ('text-align: left;'), or insert soft hyphens ('&shy;') into long words. Note that enabling hyphenation can produce 'layout/hyphen-across-page' findings where a hyphenated word then falls on a page boundary; the two rules pull in opposite directions and neither threshold is calibrated.
+<!-- end generated remediation: type/excessive-word-spacing -->
 
 ## Examples
 

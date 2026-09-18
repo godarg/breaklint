@@ -28,7 +28,9 @@ also why this rule ships with the severity it has.
 
 ## Remediation
 
-A word is hyphenated at the very end of a page with its remainder carrying over to the next page. Disable hyphenation for the paragraph or block with `hyphens: none`, or prevent the block from splitting across pages using `break-inside: avoid`.
+<!-- begin generated remediation: layout/hyphen-across-page -->
+The last text line on a page ends in a hyphen that breaks a word across the page boundary. The rule reads the paginator's own hyphenation class, so it only reports a hyphen Paged.js introduced — a hard hyphen you typed is not reported, and turning hyphenation off only helps where the paginator was doing the hyphenating. Apply 'hyphens: none' or 'hyphens: manual' to the paragraph, reword slightly, or insert non-breaking spaces ('&nbsp;') or soft hyphens ('&shy;') to shift the line break. Note that disabling hyphenation can produce 'type/excessive-word-spacing' findings in justified text; the two rules pull in opposite directions and neither threshold is calibrated.
+<!-- end generated remediation: layout/hyphen-across-page -->
 
 ## Examples
 

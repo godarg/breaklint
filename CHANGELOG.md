@@ -33,6 +33,61 @@ pack 1 → 2**. Snapshot stays 4 and Configuration Contract stays 1.
   two-rule candidate total, so a per-rule denominator does not exist there. `declinedCount` counts
   rule/target decisions in both profiles and stays comparable; `floor` was already null.
 
+### Two default behaviours change, and one of them can newly fail a build
+
+- **`layout/unbreakable-block-too-tall` now measures a split block over its fragments.** Until now
+  it read the FIRST fragment and skipped the rest, on the stated ground that "the block's height is
+  a property of the block" — which holds only while the block is unfragmented. Measured on
+  2026-09-18 with a six-page `break-inside: avoid` section: the paginator split it into six
+  fragments, fragment 0 measured 596.36 px against a 680.31 px page content box, and the document
+  came back `clean` at exit 0. The one rule this tool gates on by default was silent about a block
+  five and a half pages tall that had asked not to be broken. The same document now reports
+  3759.70 px against 680.31 px and exits 1.
+  **This can turn a green build red.** A project whose documents contain oversized
+  `break-inside: avoid` blocks that the paginator was already splitting will see a new `error`.
+  That is the correct outcome — the block never fitted — but it arrives without any change on the
+  consumer's side, so it is named here rather than in a footnote. The change is conservative in the
+  other direction: a block SHORTER than a page that is split only because it began low on one sums
+  to less than a page and stays silent. Fragments are correlated by their authoring-source id; a
+  block whose fragments carry none keeps the old first-fragment behaviour rather than guessing.
+  A four-eyes review of that sum found a false positive before it shipped, and it is worth naming
+  because the mechanism is not obvious: Paged.js implements `position: running(...)` by cloning the
+  element into the margin box of every page, and the clone keeps the source id. Measured: an
+  ordinary twelve-page document with a three-line running header reported thirteen "fragments" of an
+  81.59 px header, 979.08 px against a 619.83 px page, as `severity: error`. A box now only counts
+  towards the flow when it starts inside the content box of its page, which excludes a margin box by
+  construction. The underlying `fragmentIndex`/`fragmentCount` fields of the snapshot still count
+  those clones; repairing the collector is a separate change and is named in `docs/limitations.md`.
+  A second independent review then found the other two ways the sum can lie, and both are closed.
+  **A split block is only reported from the third fragment on.** Paged.js does not fragment
+  natively — it produces separate DOM elements — and its own stylesheet unsets `margin` and
+  `padding` at a split edge but not `border`, and without `!important`. Two fragments can therefore
+  sum above the page for a block that fitted unsplit; from three on they cannot, because an
+  intermediate fragment fills a whole content box and carries content before and after it. A
+  two-fragment block is measured and recorded but not reported, which is what 0.5.0 did with it.
+  **And the boundary is the page the block was laid out on.** The message used to end "It cannot fit
+  on any page", which is an all-pages claim from one sample; comparing against the largest content
+  box in the document was tried instead and is worse — in a document with a named landscape page it
+  raises the bar for every block on the portrait pages and hides real ones. The finding now names
+  the page and its content box and says the block did not fit *there*.
+- **`layout/half-empty-page` is no longer active in the default profile.** Measured on a
+  40-document corpus built to exercise it, it fired on 37 of them. Its quantity saturates —
+  `netFill` sums line-box heights and so counts neither leading nor block margins, capping a fully
+  set text page at about 0.686 against a threshold of 0.60 — so most of those 37 are pages a reader
+  calls full. A warning that appears on nine documents in ten teaches its reader to skip warnings,
+  and that cost is paid by the twelve rules that are right.
+  Nothing is removed: the rule keeps its id, its page, its options and its place in the config
+  schema, it is still `experimental` and still moves no exit code, and three unchanged paths turn
+  it on — `profile: "strict"`, `rules: { "layout/half-empty-page": true }`, or
+  `--only layout/half-empty-page`. The id is unchanged deliberately: it has been public since 0.5.0
+  and lives in configurations, `--disable` invocations, stored reports and fingerprints. The
+  threshold was NOT lowered instead; 0.60 is uncalibrated, and a second uncalibrated number would
+  have moved the noise rather than accounted for it.
+  A profile now decides WHICH rules run, not only how loudly they report. `profile: "strict"` is
+  therefore no longer expressible as `default` plus `failOn: warn` plus full coverage floors — it
+  also asks for the off-by-default rule, and the contract test that asserted the equivalence says
+  so now.
+
 ### Thirteen rules now say what to change, and say when nobody checked
 
 - Every rule carries `remediation.advice`: what in the source produces the finding and what
@@ -82,6 +137,21 @@ pack 1 → 2**. Snapshot stays 4 and Configuration Contract stays 1.
 
 ### Documentation
 
+- **One remediation text per rule, and a gate that keeps it that way.** `remediation.advice` in
+  `src/rules/**` is what the CLI prints and what travels to every consumer as
+  `Finding.remediation`; `docs/rules/<id>.md` is what a person reads. They were written separately,
+  and measured on 2026-09-17, 10 of 13 pairs disagreed — the pages between them named eight levers
+  the rules do not know, including "remove `break-inside: avoid`" for the one rule whose own advice
+  explains why that clears the finding without fixing anything, and "leaving fewer trailing lines"
+  for `layout/widow`, which measures the fragment that OPENS the next page. The rule is now the
+  single source: each page carries the advice verbatim in a generated block, may add context around
+  it, and may not propose a lever the rule does not name. `npm run docs:rules:write` regenerates,
+  `npm run docs:rules:check` verifies, and `tests/unit/registry.test.ts` carries the same assertion
+  so the unit suite fails on drift. Two doc-only levers were promoted into the rules because they
+  are true and checkable from the code — `type/straight-quotes` now names the tags it never
+  measures and its `excludeTags` option, `artifact/local-uri` now names an absolute URL on the
+  publishing host. The rest were dropped rather than promoted, `text-wrap: pretty` among them:
+  nothing in this repository has checked them.
 - New `docs/agent-contract.md`: what an agent driving this tool can rely on. It states that no rule
   ships `calibrated: true`, that the fingerprint deliberately carries no page, ordinal, fragment
   index or node key — with the `ord:<n>` exception that applies to a page carrying no semantic
@@ -104,6 +174,37 @@ pack 1 → 2**. Snapshot stays 4 and Configuration Contract stays 1.
   future rule count that no longer leaves a remainder of one fails loudly instead of going green.
 - The report-surface render manifest carries its own version. Report 4 → 5 briefly moved that stamp
   too; it is back at 4, because the manifest's own structure did not change.
+- **The pagination-residue record says that it is historical, instead of failing forever.** Its
+  private half compares admitted digests against a bundle that is not in this repository. Measured
+  on 2026-09-18: one of the seven admitted artifacts still exists at its recorded digest; the shared
+  stylesheet and five of the six documents have changed since the measurement of 2026-09-06. The
+  digests were not re-recorded — the expectations beside them were measured on the old bytes, and a
+  drifted byte is a red gate, not a re-recorded expectation. The manifest now carries
+  `binding.status: "historical"` with the re-measurement in it, and the gate prints a NO CLAIM line
+  naming that reason, the same no-claim shape it already used for an absent artifact root. The class
+  itself is unaffected: `tests/fixtures/fragmentainer-residue.html` is public and is what CI runs.
+- **A cleanup verification read one errno as a verdict it does not carry.** `acquireProducedDocuments`
+  closes the process group it owns and then proves it is gone with `kill(pgid, 0)`. Every answer
+  except `ESRCH` was treated as "cannot verify" and failed the whole acquisition. Measured on
+  darwin 25.6.0 over 20 acquisitions: 8 probes answered `EPERM` for a group this process had created
+  and owned, and in all 8 the next probe — 0 ms or 10 ms later — answered `ESRCH` with the
+  descendant dead. So 40 % of otherwise successful producer runs on a loaded developer machine
+  reported `source/producer-incomplete`, which is the machine this tool is for. `EPERM` is now read
+  as indeterminate and retried inside the bounded deadline it already had; an indeterminate answer
+  that survives the deadline still fails the acquisition, and a group that is genuinely still there
+  still fails as "survived bounded cleanup". The errno truth table is pinned in a unit test.
+  Measured after: 0 of 24 spurious failures at a higher load than the 8-of-20 run.
+- **Three unit tests bounded a subprocess start-up and reported the result as a product defect.**
+  `source-boundary-regressions` raced a 700 ms and a 2 s acquisition budget against spawning a node
+  process that spawns another, and read the descendant's pid file without checking it existed —
+  under load the answer was `ENOENT`, which reads in the TAP output as a cleanup failure. The
+  descendant now registers synchronously from its parent the moment it is spawned, the budgets are
+  sized for what they wrap rather than for a stopwatch, and a missing registration says so instead
+  of throwing. `render-run`'s cleanup-escalation test bounded a 5 s product wait at 8 s and failed
+  at 8700 ms on a busy machine; the lower bound is the claim and is unchanged, the ceiling now only
+  separates "waited" from "hung". Measured on this machine before the change: three full runs of
+  that file, three red. After: three full runs, three green, the last at a higher load than any of
+  the three that failed.
 - **The `selfcheck:live` red control had an expiry date and reached it.** It multiplied the first
   finding card's own height with `transform: scaleY(20)`, so the injected fault was a multiple of
   the card's content. Once each card gained a remediation box, the same injection produced a card

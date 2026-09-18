@@ -35,6 +35,7 @@ import {
   validateRuntimeSidState,
   withPagination,
   type RenderDependencies,
+  BROWSER_CLOSE_TIMEOUT_MS,
 } from "../../src/acquire/render-run.ts";
 import { captureProcessTreeOwnership, ownServerLifecycle, terminateProcessTree, type PageLike } from "../../src/acquire/browser.ts";
 import type { EvidenceOutcome } from "../../src/render/evidence.ts";
@@ -650,7 +651,15 @@ describe("the live path fails closed at its process boundary", () => {
     });
     const elapsed = Date.now() - started;
     assert.equal(result.fatal, null);
-    assert.ok(elapsed >= 5_000 && elapsed < 8_000, `cleanup escaped its 5 s bounds: ${elapsed} ms`);
+    // Three separate claims, because one number used to carry all three and did none of them well.
+    // (1) The product bound is 5 s — pinned against the constant itself, so raising it is a visible
+    // decision rather than something a widened ceiling would absorb. (2) Cleanup waits that bound
+    // out instead of giving up early. (3) It finishes rather than hanging; the ceiling only has to
+    // separate those two, and at 8 s it left 3 s for scheduling on a machine that starts and reaps
+    // processes meanwhile — measured 8700 ms under load, failing while the product was correct.
+    assert.equal(BROWSER_CLOSE_TIMEOUT_MS, 5_000, "the product's close bound moved; this test is about that bound");
+    assert.ok(elapsed >= BROWSER_CLOSE_TIMEOUT_MS, `cleanup gave up before its bound: ${elapsed} ms`);
+    assert.ok(elapsed < 60_000, `cleanup hung rather than finishing: ${elapsed} ms`);
     assert.throws(() => process.kill(pid, 0), /ESRCH/u, "browser PID still exists after verified escalation");
     assert.equal(existsSync(profile), false, "the escalated browser left its explicit profile behind");
     const infrastructure = result.documents[0]!.infrastructure;

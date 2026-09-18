@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 
 import { ALL_RULES, VALIDATION_RULES_BY_ID } from "../../src/rules/index.ts";
+import { generatedBlock, markerPairCount, pageNameFor } from "../../tools/rule-docs.ts";
 import { IS, SEVERITIES } from "../../src/core/enums.ts";
 
 /**
@@ -82,6 +83,70 @@ describe("rule registry", () => {
           !INERT_PROPERTY_ADVICE.test(line),
           `docs/rules/${page}:${index + 1} proposes the inert widows/orphans CSS property: ${line.trim()}`,
         );
+      }
+    }
+  });
+
+  /**
+   * One remediation text, two readers.
+   *
+   * `remediation.advice` is what the CLI prints and what travels to every consumer as
+   * `Finding.remediation`; `docs/rules/<id>.md` is what a person reads. Until 0.6.0 they were
+   * written separately and 10 of 13 pairs disagreed — the pages named eight levers the rules do
+   * not know, including "remove `break-inside: avoid`" for the one rule whose own advice explains
+   * why that clears the finding without fixing anything. A correction to either source never
+   * reached the other, and the drifting copy was the one a human read.
+   *
+   * The binding is a verbatim block, not a similarity check: a substring or token comparison
+   * cannot say which of two readings is current, and a page is free to add context AROUND the
+   * block. Mutating one word in either source turns this red.
+   */
+  it("every rule page carries its rule's remediation verbatim, and proposes no lever the rule does not", () => {
+    const dir = new URL("../../docs/rules/", import.meta.url);
+    // Actionable levers only. A property named as a MEASUREMENT ("a page of prose at
+    // line-height: 1.5 reaches ...") is not a proposal, so the guard also requires an imperative
+    // nearby — the same shape the inert-property guard above uses, for the same reason.
+    const LEVERS = [
+      "break-inside", "break-before", "break-after", "page-break-before", "page-break-after",
+      "hyphens", "text-align", "text-wrap", "word-spacing", "overflow", "widows", "orphans",
+      "line-height", "font-size", "column-width", "columns", "quotes",
+    ];
+    const IMPERATIVE = /\b(set|use|apply|add|insert|enable|disable|remove|replace|increase|reduce|lower|raise|adjust|specify|configure|prevent|force|keep|try|wrap|mark)\b/iu;
+    const WARNS_AGAINST = /\b(do not|does not|never|absent|not honour|not honor|ignored|inert|reaches at most)\b/iu;
+
+    for (const rule of ALL_RULES) {
+      const page = pageNameFor(rule);
+      const text = readFileSync(new URL(page, dir), "utf8");
+      const block = generatedBlock(rule);
+      assert.ok(
+        text.includes(block),
+        `docs/rules/${page} does not carry the remediation of ${rule.id} verbatim — run npm run docs:rules:write`,
+      );
+      // Exactly one pair. A second marker pair further down would carry a contradicting text that
+      // neither the writer nor a substring check would ever look at.
+      assert.deepEqual(
+        markerPairCount(text, rule),
+        { begins: 1, ends: 1 },
+        `docs/rules/${page} does not carry exactly one generated remediation block for ${rule.id}`,
+      );
+
+      // The rest of the Remediation section may explain; it may not propose a second cure.
+      const sectionStart = text.indexOf("\n## Remediation\n");
+      assert.ok(sectionStart !== -1, `docs/rules/${page}: no ## Remediation section`);
+      let sectionEnd = text.indexOf("\n## ", sectionStart + "\n## Remediation\n".length);
+      if (sectionEnd === -1) sectionEnd = text.length;
+      const section = text.slice(sectionStart, sectionEnd);
+      const outside = section.replace(block, "");
+      const advice = rule.remediation!.advice;
+      for (const [offset, line] of outside.split("\n").entries()) {
+        if (WARNS_AGAINST.test(line) || !IMPERATIVE.test(line)) continue;
+        for (const lever of LEVERS) {
+          if (!new RegExp(`\\b${lever}\\b`, "u").test(line)) continue;
+          assert.ok(
+            advice.includes(lever),
+            `docs/rules/${page} (remediation section, line ${offset + 1}) proposes "${lever}", which ${rule.id} does not: ${line.trim()}`,
+          );
+        }
       }
     }
   });

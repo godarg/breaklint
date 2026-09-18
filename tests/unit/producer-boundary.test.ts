@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { acquireProducedDocuments, resolveProducedSourceOrigin, type ProducerRecord } from "../../src/source/producer.ts";
+import { acquireProducedDocuments, ownedGroupProbeState, resolveProducedSourceOrigin, type ProducerRecord } from "../../src/source/producer.ts";
 import { checkProducedDocuments } from "../../src/index.ts";
 import { CapturedResourceClosureError, capturedResourceClosure } from "../../src/acquire/render-run.ts";
 
@@ -179,6 +179,29 @@ describe("host-controlled producer FD3 boundary", () => {
       process.chdir(originalCwd);
       rmSync(root, { recursive: true, force: true });
       rmSync(consumer, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("owned process group probe", () => {
+  /**
+   * The truth table, pinned. `kill(pgid, 0)` answers with an errno and the whole cleanup decision
+   * hangs off how that errno is read; the previous reading treated everything except ESRCH as
+   * "cannot verify" and failed the acquisition on the first sample.
+   *
+   * The oracle is not this code: it is POSIX plus a measurement. POSIX gives ESRCH exactly one
+   * meaning — no process in the group — so it is the only answer that may end the wait. The EPERM
+   * row comes from 20 measured acquisitions on darwin 25.6.0 on 2026-09-18, in which 8 probes
+   * answered EPERM for a group this process had created and owned, and in every one of the 8 the
+   * next probe (0 ms or 10 ms later) answered ESRCH with the descendant dead. Transient, therefore
+   * indeterminate, therefore retried inside the deadline it already had — not swallowed: an
+   * indeterminate answer that survives the deadline still fails the acquisition.
+   */
+  it("reads only ESRCH as proof that the group is gone", () => {
+    assert.equal(ownedGroupProbeState("ESRCH"), "absent");
+    assert.equal(ownedGroupProbeState("EPERM"), "indeterminate");
+    for (const foreign of ["EACCES", "EINVAL", "EAGAIN", "", undefined]) {
+      assert.equal(ownedGroupProbeState(foreign), "unknown-errno", `${String(foreign)} must not be read as a verdict`);
     }
   });
 });

@@ -32,7 +32,9 @@ also why this rule ships with the severity it has.
 
 ## Remediation
 
-Replace straight quotes or apostrophes with language-appropriate curly quotes (e.g. `&bdquo;`...`&ldquo;` in German, `&ldquo;`...`&rdquo;` in English, or `&rsquo;` for apostrophes). For code or literal markup, mark ancestors with `<code>`, `<pre>`, or configure `excludeTags`.
+<!-- begin generated remediation: type/straight-quotes -->
+Straight typewriter quotation marks (' or ") appear in running prose. Replace them with the curly pair for the configured locale — '&bdquo;'/'&ldquo;' for 'de-DE' (the default), '&ldquo;'/'&rdquo;' for 'en-*' — or use the <q> tag with a matching CSS 'quotes' value. Where the straight mark is deliberate, put it inside <code>, <pre>, <kbd>, <samp> or <var> — this rule never measures those — or name further container tags in its 'excludeTags' option.
+<!-- end generated remediation: type/straight-quotes -->
 
 ## Examples
 

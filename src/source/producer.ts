@@ -498,6 +498,32 @@ export function resolveProducedSourceOrigin(
   if (exact.length > 1 || candidates.some((candidate) => candidate.status === "ambiguous")) return { status: "ambiguous", candidates: exact.length || candidates.length };
   return { status: "generated-or-unknown" };
 }
+/**
+ * What `kill(pgid, 0)` is allowed to mean.
+ *
+ * Only `ESRCH` proves the group is gone: POSIX defines it as "no process in the group". `EPERM`
+ * does not mean "not permitted forever" here — on macOS the kernel answers it while a process
+ * group is being torn down, for a group this process created and owns. Measured on 2026-09-18 on
+ * darwin 25.6.0, 20 acquisitions of a producer that spawns one owned descendant: 8 probes came
+ * back `EPERM`, and in all 8 the very next probe (0 ms or 10 ms later) came back `ESRCH` with the
+ * descendant demonstrably dead. The previous shape turned that transient answer into a failed
+ * acquisition: 8 of those 20 acquisitions — 40 % — reported `source/producer-incomplete` on a
+ * loaded developer machine although nothing had survived.
+ *
+ * Treating it as `indeterminate` keeps the guarantee intact rather than weakening it: an
+ * indeterminate answer that survives the bounded deadline is still a failure, and it is reported
+ * as one. What changes is only that a transient answer is retried inside the deadline it already
+ * had, instead of aborting on the first sample. Exported for the unit test because the mapping is
+ * the whole decision, and a decision this cheap to get wrong deserves a pinned truth table.
+ */
+export type OwnedGroupState = "present" | "absent" | "indeterminate";
+
+export function ownedGroupProbeState(errnoCode: string | undefined): OwnedGroupState | "unknown-errno" {
+  if (errnoCode === "ESRCH") return "absent";
+  if (errnoCode === "EPERM") return "indeterminate";
+  return "unknown-errno";
+}
+
 /** Verifies closure of the process group created for this producer, independently of its leader. */
 async function cleanupOwnedProducer(child: ReturnType<typeof spawn>): Promise<void> {
   if (!child.pid) return; // A process-start failure created no owned process group.
@@ -506,34 +532,45 @@ async function cleanupOwnedProducer(child: ReturnType<typeof spawn>): Promise<vo
     throw new PublicProducerError("producer incomplete: owned process group cleanup is unsupported");
   }
   const group = -child.pid;
-  const exists = (): boolean => {
-    try { process.kill(group, 0); return true; }
+  const probe = (): OwnedGroupState => {
+    try { process.kill(group, 0); return "present"; }
     catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
-      throw new PublicProducerError("producer incomplete: owned process group cleanup could not be verified");
+      const state = ownedGroupProbeState((error as NodeJS.ErrnoException).code);
+      if (state === "unknown-errno") {
+        throw new PublicProducerError("producer incomplete: owned process group cleanup could not be verified");
+      }
+      return state;
     }
   };
   const signal = (value: NodeJS.Signals): void => {
     try { process.kill(group, value); }
     catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw new PublicProducerError("producer incomplete: owned process group termination failed");
+      // Same reasoning as the probe: ESRCH means the group is already gone, EPERM means it is on
+      // its way out. Neither is a termination failure; the settle loop below decides, and it
+      // still fails closed if the group is genuinely there when the deadline expires.
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ESRCH" && code !== "EPERM") {
+        throw new PublicProducerError("producer incomplete: owned process group termination failed");
+      }
     }
   };
-  const waitUntilAbsent = async (duration: number): Promise<boolean> => {
+  const settle = async (duration: number): Promise<OwnedGroupState> => {
     const deadline = Date.now() + duration;
-    while (exists()) {
-      if (Date.now() >= deadline) return false;
+    for (;;) {
+      const state = probe();
+      if (state === "absent") return "absent";
+      if (Date.now() >= deadline) return state;
       await new Promise<void>((resolveWait) => setTimeout(resolveWait, 10));
     }
-    return true;
   };
-  if (!exists()) return;
+  if (probe() === "absent") return;
   signal("SIGTERM");
-  if (await waitUntilAbsent(500)) return;
+  if (await settle(500) === "absent") return;
   signal("SIGKILL");
-  if (!(await waitUntilAbsent(1000))) throw new PublicProducerError("producer incomplete: owned process group survived bounded cleanup");
+  const final = await settle(1000);
+  if (final === "present") throw new PublicProducerError("producer incomplete: owned process group survived bounded cleanup");
+  if (final === "indeterminate") throw new PublicProducerError("producer incomplete: owned process group cleanup could not be verified");
 }
-
 function waitForResult(child: ReturnType<typeof spawn>, timeoutMs: number): Promise<{ exitCode: number | null; recordBytes: Buffer; stderrPresent: boolean }> {
   return new Promise((resolveResult, reject) => {
     const fd = child.stdio[3];

@@ -50,16 +50,42 @@ export interface EffectiveConfig {
 export interface ProfileDefinition {
   failOn: FailOn;
   coverageFloor(rule: Rule): number;
+  /** Whether this profile runs the rule when nothing in config or CLI says otherwise. */
+  enabledByDefault(rule: Rule): boolean;
 }
+
+/**
+ * Rules the default profile does not run.
+ *
+ * Being registered and being on by default are different claims, and until 0.6.0 this project
+ * only had the first. `layout/half-empty-page` is the case that forced the distinction: measured
+ * on a 40-document corpus built for the purpose, it fired on 37 of them. Its quantity saturates —
+ * `netFill` sums line-box heights and so never counts leading or block margins, which caps a fully
+ * set text page at about 0.686 against a threshold of 0.60 — so most of those 37 are pages a
+ * reader calls full. A warning that appears on nine documents out of ten teaches its reader to
+ * skip warnings, and that cost is paid by the twelve rules that are right.
+ *
+ * It is not retired and not renamed: `layout/half-empty-page` has been a public rule id since
+ * 0.5.0 and lives in configurations, `--disable` invocations, stored reports and fingerprints.
+ * It stays measurable, and three unchanged paths turn it back on — `profile: "strict"`,
+ * `rules: { "layout/half-empty-page": true }`, or `--only layout/half-empty-page`.
+ *
+ * The threshold was NOT lowered instead. 0.60 is uncalibrated; replacing it with a second
+ * uncalibrated number would move the noise rather than account for it.
+ */
+export const OFF_BY_DEFAULT_RULE_IDS: ReadonlySet<string> = new Set(["layout/half-empty-page"]);
 
 export const PROFILES: Readonly<Record<ProfileName, ProfileDefinition>> = Object.freeze({
   default: Object.freeze({
     failOn: "error" as const,
     coverageFloor: (rule: Rule) => defaultCoverageFloor(rule),
+    enabledByDefault: (rule: Rule) => !OFF_BY_DEFAULT_RULE_IDS.has(rule.id),
   }),
   strict: Object.freeze({
     failOn: "warn" as const,
     coverageFloor: (_rule: Rule) => 1,
+    // `strict` asks for everything the tool can measure, experimental quantities included.
+    enabledByDefault: (_rule: Rule) => true,
   }),
 });
 

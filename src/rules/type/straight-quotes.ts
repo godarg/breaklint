@@ -23,7 +23,7 @@ export const straightQuotes = defineRule(
     declines: [],
     remediation: {
       advice:
-        "Straight typewriter quotation marks (' or \") appear in running prose. Replace them with the curly pair for the configured locale — '&bdquo;'/'&ldquo;' for 'de-DE' (the default), '&ldquo;'/'&rdquo;' for 'en-*' — or use the <q> tag with a matching CSS 'quotes' value.",
+        "Straight typewriter quotation marks (' or \") appear in running prose. Replace them with the curly pair for the configured locale — '&bdquo;'/'&ldquo;' for 'de-DE' (the default), '&ldquo;'/'&rdquo;' for 'en-*' — or use the <q> tag with a matching CSS 'quotes' value. Where the straight mark is deliberate, put it inside <code>, <pre>, <kbd>, <samp> or <var> — this rule never measures those — or name further container tags in its 'excludeTags' option.",
       // No trigger/remedied pair ships with this package and no gate re-runs one, so this
       // advice is untested in the sense the field defines.
       tested: false,

@@ -28,7 +28,9 @@ also why this rule ships with the severity it has.
 
 ## Remediation
 
-An element with 'break-inside: avoid' is physically taller than the page printable area, forcing unavoidable overflow or clipping. Remove 'break-inside: avoid' to allow the block to split across pages, or reduce the element's height, padding, font-size, or contained rows/items so it fits within a single page.
+<!-- begin generated remediation: layout/unbreakable-block-too-tall -->
+A block with 'break-inside: avoid' is taller than the page content area and cannot fit unbroken on any page. Where the paginator already had to split it, the reported height is the sum of the fragments it was split into, which is the height its content needed. Make the block shorter — split it into smaller sections deliberately, or reduce container padding, font size or contained rows. Removing 'break-inside: avoid' also clears the finding, but only because the rule then has no candidate: the block is exactly as tall as before, and it will still be broken, just without having asked not to be.
+<!-- end generated remediation: layout/unbreakable-block-too-tall -->
 
 ## Examples
 

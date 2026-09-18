@@ -30,7 +30,9 @@ also why this rule ships with the severity it has.
 
 ## Remediation
 
-A block fragments across a page break leaving fewer trailing lines than the uncalibrated threshold asks for. If this occurs inside a table row, keep the row together with `tr { break-inside: avoid; }`. For paragraphs, prevent the split with `break-inside: avoid`, force an earlier break with `break-before: page`, or reword/re-space the text.
+<!-- begin generated remediation: layout/widow -->
+A block fragments across a page break and the fragment OPENING the next page carries fewer lines than the block's own 'widows' value (plus any configured extra lines) asks for. If this occurs inside a table row, keep the row together with 'tr { break-inside: avoid; }'. For paragraphs, prevent the split with 'break-inside: avoid', force an earlier break with 'break-before: page', or reword/re-space the text. (Note: CSS 'widows' is ignored by Paged.js).
+<!-- end generated remediation: layout/widow -->
 
 > [!WARNING]
 > Do not propose or set the CSS `widows` property as a fix. `widows` is absent from Paged.js 0.4.3 and Chromium does not honour it under Paged.js.

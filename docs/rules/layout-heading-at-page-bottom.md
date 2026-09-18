@@ -28,7 +28,9 @@ also why this rule ships with the severity it has.
 
 ## Remediation
 
-A heading sits stranded at the very bottom of a page without its following section content. Add 'break-after: avoid' (or 'page-break-after: avoid') to the heading selector (e.g. 'h1, h2, h3 { break-after: avoid; }'), or insert an explicit 'break-before: page' to move the heading to the next page.
+<!-- begin generated remediation: layout/heading-at-page-bottom -->
+A heading sits at the bottom of the page with less room than the uncalibrated threshold following it. Add 'break-after: avoid;' to the heading style rule so it advances with its following content, or insert an explicit 'break-before: page;' before the heading.
+<!-- end generated remediation: layout/heading-at-page-bottom -->
 
 ## Examples
 

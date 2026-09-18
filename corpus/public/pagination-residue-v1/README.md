@@ -65,3 +65,23 @@ npm run test:pagination-residue:red-control
 
 Not calibration evidence. Not an external trust root. Not a claim that anyone but the admitting
 party has seen these bytes.
+
+## This record is historical (2026-09-18)
+
+Re-measured on 2026-09-18 against the bundle it was taken from: of the seven admitted artifacts,
+**one** still exists at its recorded digest (`chapter-10-monitoring-and-steering`). The shared
+stylesheet and the other five documents have all changed since the measurement of 2026-09-06.
+
+The digests are therefore not reachable anywhere, and the private half of the gate cannot be run by
+anyone. `manifest.binding.status` says `historical`, and the gate says so out loud and makes no
+claim — with or without `BREAKLINT_RESIDUE_CORPUS_ROOT`.
+
+The digests were **not** re-recorded. The expectations in this manifest — residue pages, counts,
+atomic counts, column pitch — were measured on the old bytes; the new bytes have not been measured,
+and whether the changed chapters still carry table-display residue at all is unknown. Re-admitting
+them is a fresh admission with new digests, new measurements and a new per-document privacy and
+rights review, not an edit to this file.
+
+What still holds without qualification: this record's internal consistency, and
+`tests/fixtures/fragmentainer-residue.html`, which is public, carries no product text, reproduces
+the class and is what CI actually runs.

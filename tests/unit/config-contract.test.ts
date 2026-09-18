@@ -5,6 +5,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 
 import {
   CONFIG_CONTRACT_VERSION,
+  OFF_BY_DEFAULT_RULE_IDS,
   canonicalJson,
   configPointer,
   configSchema,
@@ -92,6 +93,43 @@ describe("Configuration Contract v1", () => {
     );
   });
 
+  /**
+   * Registration is not activation.
+   *
+   * `layout/half-empty-page` stays registered, documented, configurable and measurable, and keeps
+   * its public id — it is simply not part of what a default run reports, because it fired on 37 of
+   * 40 documents of a corpus built to exercise it. The three re-entry paths below are the contract
+   * this change has to keep: profile, config file, CLI. The oracle is not the resolver's own
+   * notion of "enabled" but the rule list an engine would actually run (`activeRules`) and its
+   * complement (`disabledRuleIds`), which is what a report prints.
+   */
+  it("keeps the one off-by-default rule off in the default profile and reachable by three paths", () => {
+    const OFF = "layout/half-empty-page";
+
+    const defaults = resolve();
+    assert.equal(defaults.activeRules.some((rule) => rule.id === OFF), false, "default profile still runs it");
+    assert.deepEqual(defaults.disabledRuleIds, [OFF], "exactly one rule is off by default");
+    assert.equal(defaults.activeRules.length, ALL_RULES.length - 1);
+    assert.equal(defaults.sources[configPointer("rules", OFF, "enabled")], "default");
+
+    const strict = resolve({ profile: "strict" });
+    assert.equal(strict.activeRules.some((rule) => rule.id === OFF), true, "strict must run every rule");
+    assert.deepEqual(strict.disabledRuleIds, []);
+    assert.equal(strict.sources[configPointer("rules", OFF, "enabled")], "profile");
+
+    const byConfig = resolve({ rules: { [OFF]: true } });
+    assert.equal(byConfig.activeRules.some((rule) => rule.id === OFF), true, "a config file must be able to ask for it");
+    assert.equal(byConfig.sources[configPointer("rules", OFF, "enabled")], "config");
+
+    const byCli = resolve(undefined, { only: [OFF] });
+    assert.deepEqual(byCli.activeRules.map((rule) => rule.id), [OFF]);
+    assert.equal(byCli.sources[configPointer("rules", OFF, "enabled")], "cli");
+
+    // And the off switch still wins over the profile that turned it on.
+    const strictButDisabled = resolve({ profile: "strict", rules: { [OFF]: false } });
+    assert.equal(strictButDisabled.activeRules.some((rule) => rule.id === OFF), false);
+  });
+
   it("lets CLI rule selection override file enablement", () => {
     const config = resolve(
       { rules: { "layout/widow": false } },
@@ -169,6 +207,11 @@ describe("Configuration Contract v1", () => {
       profile: "default",
       failOn: "warn",
       coverageFloors: Object.fromEntries(ALL_RULES.map((rule) => [rule.id, 1])),
+      // Since 0.6.0 a profile also decides WHICH rules run, not only how loudly they report. The
+      // hand-written equivalent of `strict` therefore has to ask for the one rule the default
+      // profile leaves off; without this line the two configurations genuinely differ, and the
+      // assertion below was right to say so.
+      rules: Object.fromEntries([...OFF_BY_DEFAULT_RULE_IDS].map((id) => [id, true])),
     });
     assert.notEqual(strict.profile, expanded.profile);
     assert.deepEqual(strict.effective, expanded.effective);

@@ -280,3 +280,76 @@ The screen profile measures the **currently visible viewport rectangle**, includ
 Document repair comparison is limited to preserved, unambiguous author anchors, a compatible complete document set, verified local Git continuity and captured actual font identity. Page-only findings remain unmatchable; system/fallback font identity and reduced or absent measurements prevent a repair claim. CSS resources must be captured as dependency/asset inputs; the host's authoring documents are not a resource allowlist.
 
 The real Studio repair attempt was performed by an independent agent. No fresh human usability trial, two-week field trial or measured long-term time saving is claimed. The technical surface gate and visual agent review do not replace the separate human surface ledger.
+
+
+## 0.6.0 limits
+
+**A per-fragment applicability decision can be silent about a property of the whole element.**
+`layout/unbreakable-block-too-tall` skipped every fragment after the first and therefore compared
+the height of a *piece* against the page. Measured on 2026-09-18: a six-page `break-inside: avoid`
+section came back `clean` at exit 0, fragment 0 reading 596.36 px against a 680.31 px page. That
+particular rule now sums its fragments. The **class** is not closed: every rule in this registry
+decides applicability per fragment, and any future rule whose quantity belongs to the element
+rather than to the piece can repeat this. There is no gate that detects the shape; what caught this
+one was a red control that had quietly stopped being red.
+
+**Blocks carrying the same source id are not always fragments of one flow, and the snapshot does
+not distinguish them.** Paged.js implements `position: running(...)` by deep-cloning the element
+into the page margin box of every page, and the clone keeps the injected source id. The collector
+gathers blocks from the whole `.pagedjs_page`, margin boxes included, so `BlockRecord.fragmentIndex`
+and `BlockRecord.fragmentCount` count those clones as fragments. Measured on 2026-09-18: an ordinary
+twelve-page document whose only running header is three lines tall produced thirteen "fragments" of
+an 81.59 px header, and the first version of the summed height above reported 979.08 px against a
+619.83 px page as `severity: error` — a build-breaking finding on a document with nothing too tall
+in it. This rule now only counts a box that STARTS inside the content box of its page, which
+excludes a margin box by construction. **The underlying snapshot fields are still wrong for running
+elements**, and any other consumer of `fragmentIndex`/`fragmentCount` inherits that. Repairing the
+collector is a separate change with a wider blast radius and is not in this release.
+
+**How often oversized `break-inside: avoid` blocks occur in real documents is not measured.** The
+repair is arithmetically correct and conservative, but its frequency in the field is unknown, so
+how much this changes in practice for a given project is unknown too. A project that sees a new
+`error` after upgrading is seeing a block that never fitted; that is all this version claims.
+
+**A two-fragment split is measured but never reported, and that is a proof obligation.** Paged.js
+does not fragment natively — it produces two DOM elements — so `box-decoration-break` does not
+apply here at all. What strips decoration at a split is Paged.js' own stylesheet, and it unsets
+`margin` and `padding` on `[data-split-from]`/`[data-split-to]` but **not** `border`, and without
+`!important`. A bordered block that is split therefore carries its border height once per fragment,
+and an author rule with `!important` padding does the same — so two fragments can sum above the
+page for a block that fitted unsplit. From three fragments on that cannot happen: an intermediate
+fragment fills an entire content box and there is content before and after it, so the block is
+taller than one page by construction. The residual gap is a block split into exactly two fragments
+whose real height does exceed the page; it is not reported, exactly as in 0.5.0. The residual risk
+in the other direction is a block with borders thicker than the content of its own outer fragments,
+which would have to be several tens of pixels per edge.
+
+**The boundary is the content box of the page the block was laid out on.** Comparing against the
+largest content box in the document was tried and is worse: in a document with a named landscape
+page it raises the bar for every block on the portrait pages and hides real ones. What is observed
+is that this block did not fit unbroken on this page, and that is what the finding says — it no
+longer claims anything about pages it did not measure. A block that would have fitted on a
+differently sized page elsewhere in the document is still reported, because it still broke its own
+`break-inside: avoid` where it was.
+
+**Fragments are correlated by authoring-source id.** A block whose fragments carry no `sid` — a
+node the paginator produced with no authoring source — keeps the old first-fragment behaviour. It
+is not guessed at by geometry, and it is not reported as a decline either, because the first
+fragment is still a real measurement of a real box.
+
+**`kill(pgid, 0)` answering `EPERM` is read as indeterminate, not as failure.** Measured on darwin
+25.6.0, macOS answers `EPERM` transiently for a process group this process created and owns while
+that group is being torn down — 8 of 20 acquisitions, every one followed within 10 ms by `ESRCH`
+with the descendant dead. The producer cleanup therefore retries inside its existing bounded
+deadline instead of failing on the first sample. What this does NOT establish is the kernel reason
+for the answer; the behaviour is measured, not explained, and it was measured on one platform and
+one version. An `EPERM` that outlives the deadline still fails the acquisition. The retry itself
+and the deadline-expiry failure have **no test**: both live in closures that only run when the
+environment produces `EPERM`, which is not deterministic. What is pinned is the errno truth table.
+
+**The 40-document corpus behind the `layout/half-empty-page` default is not in this repository.**
+The 37-of-40 figure was measured on a corpus constructed for that purpose during the same work, and
+it is not admitted here, not hashed here and not reproducible from this repository. Every place that
+cites the number says "a corpus constructed for this purpose"; this paragraph says the rest of it.
+The decision it supports is reversible by configuration and moves no exit code either way, which is
+why it was taken on that evidence — the same standard would not have been enough for a gating rule.

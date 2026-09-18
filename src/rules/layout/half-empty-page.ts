@@ -18,7 +18,13 @@ import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
  * is 0.60. Eighty-six thousandths separate "full" from "flagged", and a typeface with more
  * leading can spend that. Shipping this as a gate would be a wager, so it does not gate.
  *
- * Third, the last page. It is not exempted wholesale — that would hide a real defect on the one
+ * Third, since 0.6.0 this rule is not active in the default profile. Measured on a 40-document
+ * corpus built to exercise it, it fired on 37 of them — most of those are pages a reader calls
+ * full, because of the saturation above. Registration is not activation: the id, the options and
+ * the schema entry are unchanged, and `profile: "strict"`, `rules: { "layout/half-empty-page":
+ * true }` or `--only` each turn it back on. See OFF_BY_DEFAULT_RULE_IDS in src/config/contract.ts.
+ *
+ * Fourth, the last page. It is not exempted wholesale — that would hide a real defect on the one
  * page most likely to have one. It is downgraded to `info`, and only when it also carries no
  * continuation fragment and was not reached by a forced break.
  */

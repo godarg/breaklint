@@ -6,8 +6,8 @@
 [![licence](https://img.shields.io/npm/l/breaklint.svg)](LICENSE)
 
 `breaklint` is a command-line layout check for people who generate PDFs from HTML: it reports
-half-empty pages, widows, orphans and hyphenation across page breaks, each with the measured
-value and the threshold it failed.
+widows, orphans, blocks too tall to keep together and hyphenation across page breaks, each with
+the measured value and the threshold it failed.
 
 ```bash
 npx breaklint --demo
@@ -99,10 +99,16 @@ previous version to compare to.
 
 ## What is checked
 
-Thirteen rules. Two of them can fail a build by default; ten more are advisory unless you ask
-for more, with `--fail-on warn`; and one — `layout/half-empty-page` — is experimental and never
-moves an exit code at all, not even then. That split is not caution, it is the burden of proof:
-only two rules compare directly measured quantities against a structural boundary.
+Thirteen rules. Twelve of them run by default: two can fail a build, ten more are advisory unless
+you ask for more, with `--fail-on warn`. The thirteenth — `layout/half-empty-page` — is
+experimental, never moves an exit code at all, and since 0.6.0 is not active in the default
+profile: measured on a 40-document corpus built to exercise it, it fired on 37 of them, because
+its quantity saturates well below a full page. It is still registered, documented and
+configurable, and `--profile strict`, `--only layout/half-empty-page` or
+`{"rules": {"layout/half-empty-page": true}}` each turn it back on.
+
+That split is not caution, it is the burden of proof: only two rules compare directly measured
+quantities against a structural boundary.
 
 | rule | what it measures | default |
 |---|---|---|
@@ -110,7 +116,7 @@ only two rules compare directly measured quantities against a structural boundar
 | [`layout/orphan`](docs/rules/layout-orphan.md) | lines in the closing fragment against its own `orphans` | warn |
 | [`layout/unbreakable-block-too-tall`](docs/rules/layout-unbreakable-block-too-tall.md) | height of a `break-inside: avoid` block against the page | **error** |
 | [`layout/heading-at-page-bottom`](docs/rules/layout-heading-at-page-bottom.md) | space under a heading, in its own line heights | warn |
-| [`layout/half-empty-page`](docs/rules/layout-half-empty-page.md) | summed height of semantic bands over the content box | warn, experimental |
+| [`layout/half-empty-page`](docs/rules/layout-half-empty-page.md) | summed height of semantic bands over the content box | warn, experimental, **off by default** |
 | [`layout/orphaned-continuation-page`](docs/rules/layout-orphaned-continuation-page.md) | a page holding only the tail of an earlier block | warn |
 | [`layout/hyphen-across-page`](docs/rules/layout-hyphen-across-page.md) | the paginator's hyphenation class at a page boundary | warn |
 | [`svg/text-overflows-viewport`](docs/rules/svg-text-overflows-viewport.md) | CTM-normalised text box against the viewport | **error** |
@@ -225,11 +231,13 @@ breaklint --format json --out report.json chapter-*.html
 breaklint --fail-on warn manual.html     # gate on the heuristics too, deliberately
 breaklint --profile strict manual.html   # warnings gate; every rule requires full coverage
 breaklint --only layout/widow,layout/orphan book.html
-breaklint --disable layout/half-empty-page report.html
+breaklint --only layout/half-empty-page report.html   # ask for the one rule that is off by default
+breaklint --disable layout/hyphen-across-page report.html
 ```
 
 A rule you disagree with can be switched off for the whole run — `--disable <rule,...>`, or
-`{"rules": {"layout/half-empty-page": false}}` in the config file. There is deliberately no way to
+`{"rules": {"layout/hyphen-across-page": false}}` in the config file; the same two switches turn
+an off-by-default rule on, with `true`. There is deliberately no way to
 silence a rule at ONE place in a document: an inline suppression comment would be a claim about a
 page that nothing checks, and this tool exists because such claims were wrong.
 

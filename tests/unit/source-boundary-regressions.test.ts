@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -33,9 +33,26 @@ if(kind==='dynamic-css'||kind==='dynamic-favicon-css'){
 }
 const emit=()=>fs.writeSync(3,JSON.stringify(record));
 if(kind==='held-fd'||kind==='descendant'){
- const nestedScript="const fs=require('node:fs');process.on('SIGTERM',()=>{});fs.writeFileSync(process.argv[1],String(process.pid));setInterval(()=>{},1000);";
- const nested=cp.spawn(process.execPath,['-e',nestedScript,path.join(root,'nested.pid')],{stdio:kind==='held-fd'?['ignore','ignore','ignore',3]:'ignore'});nested.unref();
- const ready=()=>{if(fs.existsSync(path.join(root,'nested.pid'))){emit();process.exit(0);}setTimeout(ready,5);};ready();
+ // TWO facts about the descendant, written by two different processes on purpose.
+ // 'nested.pid' comes from the PARENT, synchronously at spawn: the test then always knows which
+ // pid to ask about, even when the child never got to run. 'nested.armed' comes from the CHILD,
+ // after it has installed its SIGTERM handler: without it, a child terminated before that line
+ // looks exactly like a SIGTERM-resistant child that was correctly escalated to SIGKILL, and the
+ // escalation would stop being tested. The producer waits for the armed marker before emitting,
+ // so the host cannot start cleaning up against a descendant that is not yet a descendant.
+ const nestedScript="const fs=require('node:fs');process.on('SIGTERM',()=>{});fs.writeFileSync(process.argv[1],'armed');setInterval(()=>{},1000);";
+ const nested=cp.spawn(process.execPath,['-e',nestedScript,path.join(root,'nested.armed')],{stdio:kind==='held-fd'?['ignore','ignore','ignore',3]:'ignore'});nested.unref();
+ fs.writeFileSync(path.join(root,'nested.pid'),String(nested.pid));
+ // 'descendant' returns a complete record and exits, so the host must clean the survivor on the
+ // SUCCESS path. 'held-fd' stays alive holding FD3, so the host can only end on its timeout —
+ // which is what that case is named for.
+ const ready=()=>{
+  if(!fs.existsSync(path.join(root,'nested.armed'))){setTimeout(ready,5);return;}
+  emit();
+  if(kind==='descendant')process.exit(0);
+  setInterval(()=>{},1000);
+ };
+ ready();
 }else emit();
 `;
 
@@ -52,6 +69,27 @@ function fixture() {
   return { root, program, producer, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 function alive(pid: number): boolean { try { process.kill(pid, 0); return true; } catch { return false; } }
+/**
+ * Reads the descendant pid the producer registered, and says so when it did not.
+ * A bare readFileSync answered a missing file with ENOENT, which reads in the TAP output as a
+ * failure of the cleanup under test. The two states are different findings: "the run never
+ * created the descendant" means the case did not run, "the descendant is alive" means the
+ * guarantee broke.
+ */
+function registeredDescendant(root: string): number {
+  const file = join(root, "nested.pid");
+  assert.ok(existsSync(file), "the producer never registered an owned descendant — this run did not exercise group cleanup");
+  // The armed marker is the positive control: it is written by the descendant itself, after its
+  // SIGTERM handler is installed. Without it, "the pid is dead" proves nothing about escalation —
+  // a child killed before it ever ran is dead too.
+  assert.ok(
+    existsSync(join(root, "nested.armed")),
+    "the owned descendant never armed its SIGTERM handler — a dead pid here would not show SIGKILL escalation",
+  );
+  const pid = Number(readFileSync(file, "utf8"));
+  assert.ok(Number.isSafeInteger(pid) && pid > 1, `registered descendant pid is not a pid: ${pid}`);
+  return pid;
+}
 function killFixtureDescendant(root: string): void {
   try { const pid = Number(readFileSync(join(root, "nested.pid"), "utf8")); if (alive(pid)) process.kill(pid, "SIGKILL"); } catch {}
 }
@@ -98,9 +136,13 @@ describe("independent source boundary regressions", { concurrency: false }, () =
   it("cleans an owned descendant before a successful acquisition returns", async () => {
     const f = fixture();
     try {
-      const result = await acquireProducedDocuments({ producer: f.producer("descendant"), options: { runRoot: join(f.root, "run"), timeoutMs: 2000 } });
+      // 30 s, not 2 s: the budget is not the subject here. What is measured is that a SUCCESSFUL
+      // acquisition still closes the process group it owns. A budget tight enough for machine load
+      // to exhaust it turns this into a test of the host's timeout path instead — which is the
+      // next test — and reports a false defect in the one it claims to check.
+      const result = await acquireProducedDocuments({ producer: f.producer("descendant"), options: { runRoot: join(f.root, "run"), timeoutMs: 30_000 } });
       assert.equal(result.ok, true, result.ok ? "" : result.detail);
-      const pid = Number(readFileSync(join(f.root, "nested.pid"), "utf8"));
+      const pid = registeredDescendant(f.root);
       assert.equal(alive(pid), false, "owned descendant survived accepted producer result");
     } finally { killFixtureDescendant(f.root); f.cleanup(); }
   });
@@ -109,10 +151,13 @@ describe("independent source boundary regressions", { concurrency: false }, () =
     const f = fixture();
     try {
       const moduleUrl = new URL("../../src/source/producer.ts", import.meta.url).href;
-      const consumer = `import {acquireProducedDocuments} from ${JSON.stringify(moduleUrl)}; const r=await acquireProducedDocuments({producer:${JSON.stringify(f.producer("held-fd"))},options:{runRoot:${JSON.stringify(join(f.root, "run"))},timeoutMs:700}});process.stdout.write(JSON.stringify(r));process.exit(r.ok?9:0);`;
-      const child = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", consumer], { encoding: "utf8", timeout: 5000 });
+      const consumer = `import {acquireProducedDocuments} from ${JSON.stringify(moduleUrl)}; const r=await acquireProducedDocuments({producer:${JSON.stringify(f.producer("held-fd"))},options:{runRoot:${JSON.stringify(join(f.root, "run"))},timeoutMs:10_000}});process.stdout.write(JSON.stringify(r));process.exit(r.ok?9:0);`;
+      // The outer budget bounds a node start-up plus type stripping of the producer module, not
+      // any behaviour of the product. At 5 s it was smaller than the load-time cost of what it
+      // wraps and killed the child with status null; the assertion then read as a product failure.
+      const child = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", consumer], { encoding: "utf8", timeout: 60_000 });
       assert.equal(child.status, 0, child.stderr);assert.equal(JSON.parse(child.stdout).code, "source/producer-incomplete");
-      const pid = Number(readFileSync(join(f.root, "nested.pid"), "utf8"));
+      const pid = registeredDescendant(f.root);
       assert.equal(alive(pid), false, "host exited after failure while owned FD3 descendant remained alive");
     } finally { killFixtureDescendant(f.root); f.cleanup(); }
   });
@@ -132,7 +177,8 @@ describe("independent source boundary regressions", { concurrency: false }, () =
       const moduleUrl = new URL("../../src/source/producer.ts", import.meta.url).href;
       const runRoot = join(f.root, "run");
       const consumer = `import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';import {createHash} from 'node:crypto';const originalOpen=fs.openSync,originalClose=fs.closeSync;const captured=new Map();let reads=0;fs.openSync=function(p,...args){const fd=originalOpen(p,...args);if(String(p).startsWith(${JSON.stringify(join(runRoot, "blobs"))}+'/')){reads++;captured.set(fd,String(p));}return fd;};fs.closeSync=function(fd){const p=captured.get(fd);originalClose(fd);if(p){captured.delete(fd);fs.writeFileSync(p,'replacement after authoritative capture');}};syncBuiltinESMExports();const {acquireProducedDocuments,producedBytesForInternalRender}=await import(${JSON.stringify(moduleUrl)});const r=await acquireProducedDocuments({producer:${JSON.stringify(f.producer("valid"))},options:{runRoot:${JSON.stringify(runRoot)}}});if(!r.ok)throw new Error(r.detail);const s=producedBytesForInternalRender(r.capability),b=s.outputs.get('build/print.html');process.stdout.write(JSON.stringify({reads,sha:createHash('sha256').update(b).digest('hex'),body:b.toString()}));`;
-      const child = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", consumer], { encoding: "utf8", timeout: 5000 });
+      // Same reasoning as above: a harness budget, not a product bound. See the note there.
+      const child = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", consumer], { encoding: "utf8", timeout: 60_000 });
       assert.equal(child.status, 0, child.stderr);const observed = JSON.parse(child.stdout);
       const source = readFileSync(join(f.root, "source.html"));
       assert.equal(observed.reads, 1);assert.equal(observed.sha, createHash("sha256").update(source).digest("hex"));assert.equal(observed.body, source.toString());
@@ -148,7 +194,12 @@ describe("independent source boundary regressions", { concurrency: false }, () =
         if (result.ok) {
           const doc = result.report.documents[0]!;
           if (kind === "valid") {
-            assert.equal(doc.verdict, "clean"); assert.equal(result.report.exitCode, 0);
+            // Name what happened instead. A bare "clean !== infrastructure" says nothing about
+            // which event intervened, and this case has failed once under heavy load with no way
+            // to tell a real regression from a renderer hiccup afterwards.
+            const intervened = doc.infrastructure.map((event) => `${event.kind}: ${event.detail}`).join(" | ");
+            assert.equal(doc.verdict, "clean", `verdict ${doc.verdict}; infrastructure: ${intervened || "none"}`);
+            assert.equal(result.report.exitCode, 0, `exit ${result.report.exitCode}; infrastructure: ${intervened || "none"}`);
             assert.equal(doc.findings[0]?.originalSource.status, "verified");
             assert.equal(doc.findings[0]?.originalSource.integrity?.role, "authoring");
           } else {

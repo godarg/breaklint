@@ -28,7 +28,9 @@ also why this rule ships with the severity it has.
 
 ## Remediation
 
-A block begins near the bottom of a page leaving fewer opening lines before a page break than the uncalibrated threshold asks for. Use `break-inside: avoid` on the block or paragraph to keep it intact, insert an explicit `break-before: page` to move it to the top of the next page, or adjust preceding spacing to allow more lines to fit.
+<!-- begin generated remediation: layout/orphan -->
+A block fragment ENDS at a page break carrying fewer lines than the block's own 'orphans' value (plus any configured extra lines) asks for. If this occurs inside a table row, keep the row together with 'tr { break-inside: avoid; }'. For paragraphs, move the block onto the next page with 'break-inside: avoid' or 'break-before: page', or reword/re-space the text. (Note: CSS 'orphans' is ignored by Paged.js).
+<!-- end generated remediation: layout/orphan -->
 
 > [!WARNING]
 > Do not propose or set the CSS `orphans` property as a fix. `orphans` is absent from Paged.js 0.4.3 and Chromium does not honour it under Paged.js.

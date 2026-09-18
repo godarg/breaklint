@@ -79,11 +79,26 @@ look. `npm run test:report-surfaces` is the separate exact-environment human gat
 when the bound inputs changed and no person reviewed the new artifacts; never refresh its ledger as
 release ceremony. A real later review may rebind it with its actual reviewer and timestamp.
 
-Measured on 2026-09-18, and stated here rather than left to be inferred: the ledger is still bound
-to the 0.2.3 input fingerprint from 2026-08-29. It has therefore been red for 0.3.0, 0.3.1, 0.4.0
-and 0.5.0, and is red for 0.6.0. Nobody noticed because CI runs the technical mode, which skips the
-comparison by design. That is the contract working, not failing — but a gate nobody reads is a gate
-that rots, so the state belongs in this document until a person reviews the current surfaces.
+The ledger is bound to the 0.2.3 input fingerprint from 2026-08-29. It was therefore red for
+0.3.0, 0.3.1, 0.4.0 and 0.5.0 without anyone noticing, because CI runs the technical mode, which
+skips the comparison by design. A gate nobody reads is a gate that rots.
+
+**For 0.6.0 the review was actually carried out, on 2026-09-18, and it did not pass.** Two reviewers
+looked at the current surfaces — the rendered screens across four report states, two themes and
+three viewports, and all four A4 PDFs — and returned **FAIL** with one blocker, three high and four
+medium findings. Nothing they found is caused by 0.6.0; it is the first honest inventory of a
+surface that had gone four releases unexamined. The headline items: three of the four PDFs contain
+pages filled to 29–45 %, the printed clean state loses its findings section and its footer
+entirely, printed pages 2 onwards carry no page number or running head, the display and body font
+stacks collapse to the same family on a Linux CI container, and six of the thirty-two cells — the
+mobile screens — are rendered as single 390 x 15 000 px strips that no reviewer can actually judge.
+
+The ledger was therefore **not** rebound. Binding it would have recorded a review outcome that did
+not happen, which is the one thing this gate exists to prevent. `npm run test:report-surfaces`
+stays red for 0.6.0 — but it is now red with a date, two named reviewers, an enumerated finding list
+and an owner, instead of red and unread. The findings and their addressees are carried in the
+release's follow-up register; they are surface work, and they are not repaired in a release that
+already changes what the rules report.
 
 The green real-document gate reads the rights/privacy-reviewed corpus manifest and binds exact
 artifact hashes, source evidence, page/rule counts and the positive independent geometry-oracle

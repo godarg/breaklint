@@ -32,7 +32,9 @@ also why this rule ships with the severity it has.
 
 ## Remediation
 
+<!-- begin generated remediation: type/spaced-hyphen -->
 A hyphen surrounded by whitespace (' - ') is used where a typographic dash is customary. Replace ' - ' with an en-dash (' &ndash; ' or ' – ') or an unspaced em-dash ('&mdash;' or '—').
+<!-- end generated remediation: type/spaced-hyphen -->
 
 ## Examples
 

@@ -28,7 +28,9 @@ also why this rule ships with the severity it has.
 
 ## Remediation
 
-Rephrase text, adjust tracking/measure, or use `text-wrap: pretty` to avoid a tiny stub (< 15% width and < 2 em) on the final line of a paragraph. Alternatively, combine short trailing words with non-breaking spaces (`&nbsp;`).
+<!-- begin generated remediation: type/short-last-line -->
+The final line of a paragraph is shorter than the uncalibrated threshold (a runt). Insert a non-breaking space ('&nbsp;') between the last two words to prevent a single word from standing alone, or reword the paragraph to balance line lengths.
+<!-- end generated remediation: type/short-last-line -->
 
 ## Examples
 

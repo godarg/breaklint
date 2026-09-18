@@ -28,7 +28,9 @@ also why this rule ships with the severity it has.
 
 ## Remediation
 
+<!-- begin generated remediation: layout/orphaned-continuation-page -->
 A continuation page holds only a tiny trailing fragment of an earlier block. Tighten preceding vertical margins, padding, or line-height on earlier pages to pull the remaining lines back, or insert 'break-before: page' earlier to balance content across pages.
+<!-- end generated remediation: layout/orphaned-continuation-page -->
 
 ## Examples
 

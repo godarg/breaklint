@@ -11,8 +11,8 @@
       "sha256": "d4485454b282d4e5235dedf752ed32fa60806ff66441a3e6795a5bf6cea98aff"
     }
   ],
-  "whyTheBytesAreNotHere": "The six documents are chapters of a paid product; together they are 27 492 of the bundle's 69 017 words. This repository is public and MIT, and the product's own licence architecture keeps delivered bytes out of its public companion repository. A hash-only record documents that the class was measured on real documents without pretending that an unavailable artifact was verified \u2014 the shape docs/validation/corpus-contract-v1.md defines for private_nonredistributable material.",
-  "whatThisCorpusIsAbout": "Paged.js fragments a page by making .pagedjs_page_content a multi-column container whose column pitch is the content width plus a gap of margins + 1000px. Content it fails to move onto a new page stays in the second column, one pitch to the right, clipped out of sight by an overflow:hidden sheet. Where that content is an unsplittable table box, the print-media layout page.pdf() renders places it somewhere else, permanently \u2014 so the PDF does not reproduce the geometry the rules measured, and the run must end in exit 3 with the cause named. Measured over the eighteen chapters this bundle ships: 6 of 6 documents carrying table-display residue could not be measured, 12 of 12 without it could, and two of those twelve carried residue of other kinds and measured cleanly.",
+  "whyTheBytesAreNotHere": "The six documents are chapters of a paid product; together they are 27 492 of the bundle's 69 017 words. This repository is public and MIT, and the product's own licence architecture keeps delivered bytes out of its public companion repository. A hash-only record documents that the class was measured on real documents without pretending that an unavailable artifact was verified — the shape docs/validation/corpus-contract-v1.md defines for private_nonredistributable material.",
+  "whatThisCorpusIsAbout": "Paged.js fragments a page by making .pagedjs_page_content a multi-column container whose column pitch is the content width plus a gap of margins + 1000px. Content it fails to move onto a new page stays in the second column, one pitch to the right, clipped out of sight by an overflow:hidden sheet. Where that content is an unsplittable table box, the print-media layout page.pdf() renders places it somewhere else, permanently — so the PDF does not reproduce the geometry the rules measured, and the run must end in exit 3 with the cause named. Measured over the eighteen chapters this bundle ships: 6 of 6 documents carrying table-display residue could not be measured, 12 of 12 without it could, and two of those twelve carried residue of other kinds and measured cleanly.",
   "publicSubstitute": "tests/fixtures/fragmentainer-residue.html, reduced from the index document below. It carries no product text, reproduces the class, and is the gate CI actually runs.",
   "documents": [
     {
@@ -185,5 +185,15 @@
         }
       }
     }
-  ]
+  ],
+  "binding": {
+    "status": "historical",
+    "recordedOn": "2026-09-06",
+    "recordedAgainst": "the build tree of a paid HTML bundle as it stood on 2026-09-06 at 07:10",
+    "remeasuredOn": "2026-09-18",
+    "remeasurementResult": "Of the seven admitted artifacts, one still exists at its recorded digest (chapter-10-monitoring-and-steering). The shared stylesheet and the other five documents have all changed: styles.css was edited three times on 2026-09-06 after the measurement, and the five chapters have drifted since. The digests are therefore no longer reachable anywhere, and the private half of this gate cannot be run by anybody.",
+    "whyItIsNotRerecorded": "Re-recording the digests would turn a measurement into an assertion: the expectations below (residue pages, counts, atomic counts, column pitch) were measured on the OLD bytes, and the new bytes have not been measured. Whether the changed chapters still carry table-display residue at all is unknown. Re-admitting them is a fresh admission — new digests, new measurements, and a new per-document privacy and rights review — not an edit to this file.",
+    "whatStillHolds": "The public half of the gate: this record's internal consistency, and that every expectation it states names a cause rather than merely an exit code. The class itself is carried in CI by tests/fixtures/fragmentainer-residue.html, which is public and unaffected.",
+    "followUp": "Re-admit the corpus against the current bundle, or retire it in favour of the public fixture."
+  }
 }

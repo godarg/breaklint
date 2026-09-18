@@ -30,7 +30,9 @@ also why this rule ships with the severity it has.
 
 ## Remediation
 
-Replace absolute filesystem paths with relative URLs, packaged assets, or public production URLs. An absolute path resolves only on the machine that built the file.
+<!-- begin generated remediation: artifact/local-uri -->
+A resource points to a local filesystem URI ('file:') or an absolute machine path. The rule has no notion of a distribution root: EVERY absolute path is reported, inside the project or not, because an absolute path resolves only on the machine that wrote it. Replace it with a relative URL, an absolute URL on the host the document is published from, or embed the asset directly (e.g. a data URI for a small image).
+<!-- end generated remediation: artifact/local-uri -->
 
 ## Examples
 

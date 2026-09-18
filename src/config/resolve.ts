@@ -12,6 +12,7 @@ import type { ReportConfig } from "../core/types.ts";
 import { ALL_RULES, RULES_BY_ID } from "../rules/index.ts";
 import {
   CONFIG_CONTRACT_VERSION,
+  OFF_BY_DEFAULT_RULE_IDS,
   PROFILES,
   PROFILE_NAMES,
   canonicalLocale,
@@ -116,7 +117,7 @@ function resolveValidated(file: ConfigFile, cli: Parameters<typeof resolveConfig
   if (!IS.failOn.has(failOnRaw)) {
     throw new UsageError(
       `--fail-on ${failOnRaw} is not one of ${FAIL_ON_VALUES.join(", ")}. ` +
-        `The default is "error": two rules carry a named proof source, and the other thirteen ` +
+        `The default is "error": two rules carry a named proof source, and the other eleven ` +
         `are heuristics that should not break a build unless you ask them to.`,
     );
   }
@@ -143,8 +144,13 @@ function resolveValidated(file: ConfigFile, cli: Parameters<typeof resolveConfig
   const localeSource: ConfigSource = cli.locale !== undefined ? "cli" : file.locale !== undefined ? "config" : "default";
   source(configPointer("locale"), localeSource);
 
-  const enabled = new Map(ALL_RULES.map((rule) => [rule.id, true]));
-  const enabledSources = new Map(ALL_RULES.map((rule) => [rule.id, "default" as ConfigSource]));
+  // The profile decides which rules run before config or CLI is consulted. Registration is not
+  // activation: see OFF_BY_DEFAULT_RULE_IDS in the contract for why exactly one rule is off here.
+  const enabled = new Map(ALL_RULES.map((rule) => [rule.id, profileDefinition.enabledByDefault(rule)]));
+  const enabledSources = new Map(ALL_RULES.map((rule): [string, ConfigSource] => [
+    rule.id,
+    OFF_BY_DEFAULT_RULE_IDS.has(rule.id) && profile !== "default" ? "profile" : "default",
+  ]));
   for (const [id, value] of Object.entries(file.rules ?? {})) {
     enabled.set(id, value !== false);
     enabledSources.set(id, "config");

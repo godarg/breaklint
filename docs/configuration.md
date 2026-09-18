@@ -55,7 +55,7 @@ claim. Missing, stale, or changed proof remains declared/unknown with a typed ev
   "failOn": "warn",
   "locale": "de-DE",
   "rules": {
-    "layout/half-empty-page": false,
+    "layout/half-empty-page": true,
     "layout/widow": { "extraLines": 1 },
     "type/straight-quotes": { "excludeTags": ["samp"] }
   },

@@ -12,9 +12,11 @@
       "expected": {
         "exitCode": 0,
         "pagesAnalysed": 9,
-        "rulesRun": 13,
-        "measuredRules": 9,
-        "infrastructureKinds": ["geometry-cross-check-passed"],
+        "rulesRun": 12,
+        "measuredRules": 8,
+        "infrastructureKinds": [
+          "geometry-cross-check-passed"
+        ],
         "geometryCrossCheck": {
           "checked": 8,
           "required": 8,
@@ -37,9 +39,12 @@
       "expected": {
         "exitCode": 0,
         "pagesAnalysed": 6,
-        "rulesRun": 13,
-        "measuredRules": 11,
-        "infrastructureKinds": ["image-content-unavailable", "geometry-cross-check-passed"],
+        "rulesRun": 12,
+        "measuredRules": 10,
+        "infrastructureKinds": [
+          "image-content-unavailable",
+          "geometry-cross-check-passed"
+        ],
         "geometryCrossCheck": {
           "checked": 8,
           "required": 8,
@@ -54,5 +59,23 @@
     }
   ],
   "calibrationEvidenceEligible": false,
-  "externalTrustRootClaimed": false
+  "externalTrustRootClaimed": false,
+  "expectationHistory": [
+    {
+      "recordedOn": "2026-09-18",
+      "release": "0.6.0",
+      "what": "rulesRun 13 -> 12 and measuredRules 9 -> 8 / 11 -> 10 for the two admitted documents",
+      "why": "layout/half-empty-page is no longer active in the default profile, so a default run no longer runs or measures it. The documents, their bytes, their page counts, their findings and their infrastructure events are unchanged; what changed is the size of the default rule set. Re-measured on the admitted bytes, not adjusted to make a gate pass.",
+      "previous": {
+        "project-gutenberg-gettysburg-address": {
+          "rulesRun": 13,
+          "measuredRules": 9
+        },
+        "dargel-kleingewerbe": {
+          "rulesRun": 13,
+          "measuredRules": 11
+        }
+      }
+    }
+  ]
 }

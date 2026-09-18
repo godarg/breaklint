@@ -30,10 +30,12 @@ also why this rule ships with the severity it has.
 
 ## Remediation
 
-A page content area has a net fill ratio below the uncalibrated 60% threshold. If this page naturally concludes a section, chapter, or document, this is expected and may be disregarded. If unintended, check whether a subsequent block forced an early break with `break-before: page` or an oversized `break-inside: avoid` container, and adjust preceding margins or spacing.
+<!-- begin generated remediation: layout/half-empty-page -->
+This rule fires on either of two quantities: the page's net fill ratio fell below the uncalibrated threshold, or its content starts more than half a page down. Read the finding's measurement to see which. If the page naturally concludes a section, chapter or document, either is expected and may be disregarded. If unintended: for low fill, check whether a following block forced an early break with 'break-before: page' or an oversized 'break-inside: avoid' container; for a late start, look for a leading margin, an empty block or a float above the first line.
+<!-- end generated remediation: layout/half-empty-page -->
 
 > [!NOTE]
-> **This rule saturates.** `netFill` merges the client rectangles of a page's text runs and replaced elements and divides the summed band height by the content box height. Half-leading falls between the bands, and no element margin ever enters the rectangles, so the quantity is systematically smaller than the fill a reader perceives: a page of prose at `line-height: 1.5` reaches at most about 0.686, against a threshold of 0.60. Measured on a 40-document corpus constructed for this purpose, it fired on 37 of 40 documents, including pages a reader would call full. No measurement on a corpus of real-world documents exists. It is classified as experimental and never gates CI.
+> **This rule saturates.** `netFill` merges the client rectangles of a page's text runs and replaced elements and divides the summed band height by the content box height. Half-leading falls between the bands, and no element margin ever enters the rectangles, so the quantity is systematically smaller than the fill a reader perceives: a page of prose at `line-height: 1.5` reaches at most about 0.686, against a threshold of 0.60. Measured on a 40-document corpus constructed for this purpose, it fired on 37 of 40 documents, including pages a reader would call full. No measurement on a corpus of real-world documents exists. It is classified as experimental, never gates CI, and since 0.6.0 is no longer active in the default profile — `profile: "strict"` or `rules: { "layout/half-empty-page": true }` turns it back on.
 
 ## Examples
 

@@ -17,73 +17,130 @@ measurement applied the lever each advice text *names*, alone, to the original t
 in three of thirteen cases the named lever did not clear the finding and something else in the
 remedied file had done the work. **Four** advice texts were corrected in total: those three, plus
 one that described the rule's scope wrongly rather than naming an ineffective lever. The flag
-stays false for all thirteen until a gate can set it.
+stays false for all thirteen until a gate can set it, and building that gate is named as a
+follow-up rather than implied to be nearly done.
 
-What this release does **not** establish: that the advice repairs anything in a real workflow, that
-an agent given `docs/agent-contract.md` repairs more precisely, or that any threshold is calibrated.
-The agent contract was read back by a model in a playback test, which is not a repair test.
+There is now **one** advice text per rule instead of two. `docs/rules/<id>.md` carries the rule's
+`remediation.advice` verbatim in a generated block and may add context around it, but may not
+propose a lever the rule does not name. Measured before the change on 2026-09-17: 10 of 13 pairs
+disagreed, and the pages between them named eight levers the rules do not know — including "remove
+`break-inside: avoid`" for the rule whose own advice explains why that clears the finding without
+fixing anything, and "fewer trailing lines" for `layout/widow`, which measures the fragment that
+opens the next page.
 
-The printed report grew from 32 page rasters to 43 across the four canonical states, and no longer
-ends on a page carrying a single coverage record. Three print mutation controls had been declared
-and never run; two are now wired, one could not go red at all and was removed, and the mutation
-runner now holds the renderer's allowlist against its control list.
+### Two default behaviours change, and one of them can newly fail a build
 
-**`npm run test:report-surfaces` — the exact-environment human gate — is red, and has been since
-0.3.0.** Its ledger is bound to the 0.2.3 input fingerprint from 2026-08-29; four releases have
-shipped over it because CI runs the technical mode, which skips the ledger comparison by design.
-No human has looked at the current surfaces. The two counts in this section are different things
-and both are exact: the review matrix is **32 cells** (4 report states x 2 themes x 3 viewports for
-screen, plus the print PDF and raster-set cells), and those cells contain **71 physical artifacts**
-— 24 screen PNGs, 4 PDFs and 43 PDF page rasters. `test:report-surfaces:technical`, which makes no
-human-review claim, passes 32 of 32 cells and all 71 artifacts.
+`layout/unbreakable-block-too-tall` — the only `error` rule with a named proof source — read the
+FIRST fragment of a block and skipped the rest. Measured 2026-09-18 on a six-page
+`break-inside: avoid` section: the paginator split it into six fragments, fragment 0 measured
+596.36 px against a 680.31 px page content box, and the document came back `clean` at exit 0. The
+one rule this tool gates on was silent about a block five and a half pages tall that had asked not
+to be broken. It now sums the fragments a block was split into: the same document reports
+3759.70 px against 680.31 px and exits 1. **This can turn a green consumer build red without any
+change on the consumer's side.** It is conservative in the other direction: a block shorter than a
+page that is split only because it began low sums to less than a page and stays silent.
 
-`npm run test:unit` is red on this development machine and green in CI, and the difference is not
-load at the start of the run. Measured 2026-09-18 over six full runs of 451 tests, with the
-one-minute load average recorded immediately before each:
+The first version of that sum had a false positive, and it was found by an independent second
+review before the tag rather than by a consumer afterwards. Paged.js implements
+`position: running(...)` by cloning the element into the margin box of every page, and the clone
+keeps the injected source id, so summing by id alone adds one copy of a running header per page.
+Measured 2026-09-18: an ordinary twelve-page document whose only running header is three lines tall
+reported 979.08 px against a 619.83 px page as `severity: error` — nothing in it was too tall for
+anything. A box now counts towards the flow only when it starts inside the content box of its page.
+Measured after: the same document reports 81.59 px and no finding, and the six-page case still
+reports 3759.70 px. The snapshot's own `fragmentIndex`/`fragmentCount` still count those clones as
+fragments; that is named in `docs/limitations.md` as an open collector defect, not repaired here.
 
-| start load | failures |
-|---|---|
-| 3.54 | 4 |
-| 3.57 | 4 |
-| 3.60 | 3 |
-| 6.72 | 4 |
-| 8.03 | 8 |
-| 21.93 | 7 |
+A second, independent review found the remaining two. A split block is now only reported from the
+**third** fragment on: Paged.js repeats a block's border at every split edge (its stylesheet unsets
+`margin` and `padding` there, not `border`), so two fragments can sum above the page for a block
+that fitted unsplit — from three on they cannot, because an intermediate fragment fills a whole
+content box and carries content before and after it. And the boundary is the content box of the
+page the block was laid out on, not the largest in the document: taking the largest hides a real
+oversized block in any document that also has a landscape page. The finding names the page it
+measured against and no longer makes an all-pages claim from one sample.
 
-Three of the six started below 4.0 and were still red. Named in full, per run, by the failing
-top-level entry:
+Both reviews ran before the tag and both returned FAIL. Three of the four findings against this
+rule were defects that would have reached consumers as a build-breaking `error`; the fourth was an
+overclaim in the printed message. That is what the two reviews were for.
 
-- **3.54** — `revision-comparison` and `source-boundary-regressions`. The first was not a flake:
-  a test pinned an error message that had moved. It is repaired and has not recurred.
-- **3.60** — `source-boundary-regressions` alone.
-- **3.57** and **6.72** — `source-boundary-regressions`, `rasterizer-lifecycle`,
-  `live-run`.
-- **8.03** and **21.93** — the same three plus `render-run`, and at 21.93 additional
-  `rasterizer-lifecycle` entries.
+`layout/half-empty-page` is no longer active in the default profile. Measured on a 40-document
+corpus built to exercise it, it fired on 37. Its id, page, options and schema entry are unchanged
+and three paths turn it back on. What a default run measures therefore changed, and it was
+re-measured rather than assumed: `test:real-document` now reports 8 of 12 rules over nine pages on
+the Project Gutenberg document and 10 of 12 over six pages on the first-party one — previously 9
+and 11 of 13. Pages, bytes, findings and infrastructure events are unchanged.
 
-`source-boundary-regressions` fails at every load, always the same three subtests: `cleans an
-owned descendant before a successful acquisition returns`, `completes timeout cleanup even when
-the API consumer immediately exits`, `retains one authoritative blob capture even after its
-backing pathname changes`. Everything the higher loads add is process and rasterizer lifecycle.
-Apart from the repaired `revision-comparison` case, nothing that failed in any of the six runs
-lies on a path this release touches. The same file, run isolated and serial with identical
-arguments on both stands, gives 1–2 failures here and 0–1 on `origin/main`.
+### `npm test` on this machine — resolved, and it was two defects, not one
 
-What separates green from red is the machine, not the starting load: the suite spawns its own
-browsers and drives the load up itself, and this host additionally carries a virtualisation guest
-at 92 % CPU, Spotlight indexing and other sessions throughout. CI is a different machine and it is
-green — 566 of 567 on the pull request (that one failure being the `revision-comparison` bug), and
-a green `ci.yml` run on the exact merged `main` SHA after the repair. The honest statement is
-therefore: **this class does not reproduce in CI, and it does reproduce here at every load we
-could reach, including below 4.0.** Why, has not been measured, and it is an open item rather than
-a resolved one.
+The previous version of this section reported a reproducible red unit suite here and green in CI,
+with the cause unmeasured. It has been measured, and it was not machine load as such.
 
-**This is why 0.6.0 carries no tag.** The release procedure for this work pre-registered a stop
-condition: if the unit suite is reproducibly red on a quiet machine, that does not block a merge
-but it does block the release, and the run ends with a submission to the owner rather than with a
-tag. Three runs below load 4.0 were reproducibly red, so the condition is met on its own terms —
-even though the same commit is green in CI and every release gate except the two named below
-passes here. The merge stands; the tag is the owner's call, with this measurement in front of it.
+**A product defect.** `acquireProducedDocuments` proves the process group it owns is gone with
+`kill(pgid, 0)` and treated every answer except `ESRCH` as "cannot verify", failing the whole
+acquisition. Measured on darwin 25.6.0 over 20 acquisitions: 8 probes answered `EPERM` for a group
+this process had created and owned, and in every one of the 8 the next probe — 0 ms or 10 ms later
+— answered `ESRCH` with the descendant dead. So **40 % of otherwise successful producer runs on a
+loaded developer machine reported `source/producer-incomplete`**, on the class of machine this tool
+is written for. `EPERM` is now read as indeterminate and retried inside the bounded deadline it
+already had; an answer that survives the deadline still fails. Measured after the change with the
+same probe and the same arguments: 0 of 24, at a higher load than the run that gave 8 of 20.
+
+**A test defect.** Three subtests raced a 700 ms and a 2 s acquisition budget against spawning a
+node process that itself spawns another, then read the descendant's pid file without checking that
+it existed — under load the answer was `ENOENT`, which reads as a cleanup failure. The descendant
+now registers synchronously from its parent, the budgets are sized for what they wrap, and a
+missing registration says so. A fourth test bounded a 5 s product wait at 8 s and failed at 8700 ms.
+
+Measured on `tests/unit/source-boundary-regressions.ts` before the change, three full runs at start
+loads 6.18, 5.06 and 6.37: **three red**. After, three full runs at 2.92, 4.30 and 8.63: **three
+green**, the last at a higher load than any of the three that failed. No test was excluded and no
+concurrency setting was changed.
+
+### The exact-environment human gate
+
+`npm run test:report-surfaces` (mode `local`) was red for 0.3.0, 0.3.1, 0.4.0 and 0.5.0. Its ledger
+was bound to the 0.2.3 input fingerprint of 2026-08-29; four releases shipped over it because CI
+runs the technical mode, which skips the ledger comparison by design, so the gate had no reader.
+That is stated here as a fact about this project's process, not as a footnote.
+
+**For 0.6.0 the review happened, and it returned FAIL.** Two reviewers went through the rendered
+screens and all four A4 PDFs on 2026-09-18 and recorded one blocker, three high and four medium
+findings. None of them is caused by 0.6.0 — it is the first inventory of a surface nobody had
+examined in four releases. Among them: three of the four PDFs carry pages filled to 29–45 %; the
+printed clean state loses its findings section and its footer; printed pages 2 onwards carry no
+page number or running head; the display and body font stacks resolve to the same family on a Linux
+CI container, so the typographic hierarchy collapses silently on the platform where this report is
+generated most often; and the six mobile cells are rendered as single 390 x 15 000 px strips that
+cannot be judged at all.
+
+The ledger was **not** rebound. Recording `pass` for 32 cells after a review that failed would be
+exactly the false claim this gate exists to prevent. The gate stays red for 0.6.0 — with a date,
+two named reviewers, an enumerated finding list and an owner, which is the difference that mattered.
+What is honestly established about these surfaces is the technical half: `test:report-surfaces:technical`
+passes 32 of 32 cells and all 71 artifacts, and makes no human-review claim.
+
+The review matrix is **32 cells** (4 report states x 2 themes x 3 viewports for screen, plus the
+print PDF and raster-set cells) containing **71 physical artifacts** — 24 screen PNGs, 4 PDFs and
+43 PDF page rasters. `test:report-surfaces:technical`, which makes no human-review claim, passes
+32 of 32 cells and all 71 artifacts.
+
+### Two records that no longer claim what they cannot
+
+`test:pagination-residue` binds six documents of a paid bundle by digest. Re-measured 2026-09-18:
+one of the seven admitted artifacts still exists at its recorded digest; the shared stylesheet and
+five of the six documents have changed since the measurement of 2026-09-06. The digests were not
+re-recorded — the expectations beside them were measured on the old bytes. The manifest carries
+`binding.status: "historical"` with that measurement in it and the gate says so and makes no claim.
+Re-admitting the corpus is a follow-up with its own rights and privacy review.
+
+`test:secrets` is red in the development worktree used for this release and green on the published
+history. Measured 2026-09-18: scanning `origin/main` gives **no leaks over 143 commits**; scanning
+every ref in the shared object store gives **two**, both in one commit reachable only from two
+local branches that hold third-party-model evidence and have never been pushed. Both are the
+project's own `absolute-home-path` rule — an operator username, not a credential. The gate is not
+weakened to make that green, and the branches are not rewritten; the state is recorded here
+instead.
 
 ## Current published release — 0.5.0 (2026-09-13) — source-bound consumers
 

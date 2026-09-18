@@ -137,7 +137,7 @@ export interface RenderDependencies {
 }
 
 const DEFAULT_DEPENDENCIES: RenderDependencies = { launchBrowser, openRasterizer };
-const BROWSER_CLOSE_TIMEOUT_MS = 5_000;
+export const BROWSER_CLOSE_TIMEOUT_MS = 5_000;
 
 class BoundaryTimeoutError extends Error {}
 
