@@ -39,8 +39,10 @@ pack 1 → 2**. Snapshot stays 4 and Configuration Contract stays 1.
   arrived, and deletes its target before each run. No such gate ships yet. The previous shape let
   the engine stamp `tested: true` on every remediation it copied, which is how an unverified string
   reaches an agent as a verified one.
-- Four advice texts name a lever that was measured **not** to work on its own and have been
-  corrected accordingly: `artifact/local-uri` (there is no distribution root; every absolute path
+- Four advice texts were corrected because a measurement applied the lever each one NAMES, alone,
+  to the original trigger document. In **three** of the four the named lever left the finding in
+  place and something else in the remedied file had done the work; the fourth described the rule's
+  scope wrongly rather than naming an ineffective lever. The four: `artifact/local-uri` (there is no distribution root; every absolute path
   is reported), `layout/unbreakable-block-too-tall` (removing `break-inside: avoid` removed the
   candidate, not the height), `svg/text-overflows-viewport` (`overflow: visible` makes the target
   non-applicable and silences the only rule that gates by default), `layout/hyphen-across-page`

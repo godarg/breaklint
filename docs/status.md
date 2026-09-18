@@ -36,18 +36,35 @@ screen, plus the print PDF and raster-set cells), and those cells contain **71 p
 — 24 screen PNGs, 4 PDFs and 43 PDF page rasters. `test:report-surfaces:technical`, which makes no
 human-review claim, passes 32 of 32 cells and all 71 artifacts.
 
-`npm run test:unit` is red on this machine under load and was red on 0.5.0 under the same load.
-Measured 2026-09-18 over three full runs at load averages 3.5 / 8.0 / 21.9: 4 / 8 / 7 failures of
-451, all in `source-boundary-regressions`, `rasterizer-lifecycle`, `render-run` and `live-run` —
-process and rasterizer lifecycle, none of them a path this release touches. Isolated and serial,
-the same file gives 1–2 failures here and 0–1 on `origin/main` at comparable load, measured with
-identical arguments on both.
+`npm run test:unit` is red on this development machine and green in CI, and the difference is not
+load at the start of the run. Measured 2026-09-18 over six full runs of 451 tests, with the
+one-minute load average recorded immediately before each:
 
-A quiet machine was not available: the load came from a virtualisation host at 92 % CPU, Spotlight
-indexing and other sessions, none of which belongs to this work. The measurement that settles it
-is therefore CI, which is quiet: on the pull request, 566 of 567 passed and the single failure was
-deterministic and real — a test pinning an error message that had moved. After that repair, the
-`ci.yml` run on the exact merged `main` SHA is green.
+| start load | failures |
+|---|---|
+| 3.54 | 4 |
+| 3.57 | 4 |
+| 3.60 | 3 |
+| 6.72 | 4 |
+| 8.03 | 8 |
+| 21.93 | 7 |
+
+Three of the six started below 4.0 and were still red. The failing tests are the same set every
+time — `source-boundary-regressions` (`cleans an owned descendant before a successful acquisition
+returns`, `completes timeout cleanup even when the API consumer immediately exits`, `retains one
+authoritative blob capture even after its backing pathname changes`), plus
+`rasterizer-lifecycle` and `live-run` entries at higher load. All of them are process and
+rasterizer lifecycle; none lies on a path this release touches. The same file, run isolated and
+serial with identical arguments on both stands, gives 1–2 failures here and 0–1 on `origin/main`,
+so the class is pre-existing rather than introduced.
+
+What separates green from red is the machine, not the starting load: the suite spawns its own
+browsers and drives the load up itself, and this host additionally carries a virtualisation guest
+at 92 % CPU, Spotlight indexing and other sessions throughout. CI is a different machine and it is
+green — 566 of 567 on the pull request, where the one failure was deterministic and real (a test
+pinning an error message that had moved), and a green `ci.yml` run on the exact merged `main` SHA
+after that repair. The honest statement is therefore: **this class does not reproduce in CI, and
+it does reproduce here at any load we could reach.** Why has not been measured.
 
 ## Current published release — 0.5.0 (2026-09-13) — source-bound consumers
 
