@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.0 — unreleased
+## 0.6.0 — 2026-09-18
 
 A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0: the canonical
 document report changes structure, so its schema stamp moves. **Report 4 → 5** and **agent context

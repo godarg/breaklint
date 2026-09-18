@@ -144,7 +144,7 @@ describe("target evaluation contract", () => {
   it("measures a split block over its fragments and refuses the three ways that sum can lie", () => {
     const run = (snapshot: Snapshot) =>
       unbreakableBlockTooTall.run(snapshot, { ...context, options: unbreakableBlockTooTall.defaultOptions, fingerprint });
-    const fragmented = (boxes: readonly ({ height: number; y?: number })[]): Snapshot => {
+    const fragmented = (boxes: readonly ({ height: number; y?: number; x?: number })[]): Snapshot => {
       const snapshot = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
       const template = snapshot.blocks[0]!;
       snapshot.blocks = boxes.map((shape, index) => {
@@ -152,7 +152,7 @@ describe("target evaluation contract", () => {
         fragment.nodeKey = `t1:${index}`;
         fragment.fragmentIndex = index;
         fragment.fragmentCount = boxes.length;
-        fragment.box = { ...template.box, height: shape.height, ...(shape.y === undefined ? {} : { y: shape.y }) };
+        fragment.box = { ...template.box, height: shape.height, ...(shape.y === undefined ? {} : { y: shape.y }), ...(shape.x === undefined ? {} : { x: shape.x }) };
         return fragment;
       });
       return snapshot;
@@ -204,6 +204,19 @@ describe("target evaluation contract", () => {
       "per-page clones of a running element were summed as if they were fragments of one flow",
     );
     assert.equal(runningHeader.evaluations!.find((row) => row.status === "measured")!.measurements[0]!.value, 90);
+
+    // The same for a SIDE margin box: it starts at a content-box y and sits beside the column, so
+    // a vertical test alone lets it back in. The fixture's content box is x = 48, width = 399.
+    const sideRunner = run(fragmented([
+      { height: 90, x: 8 }, { height: 90, x: 8 }, { height: 90, x: 8 },
+      { height: 90, x: 8 }, { height: 90, x: 8 }, { height: 90, x: 8 },
+      { height: 90, x: 8 }, { height: 90, x: 8 },
+    ]));
+    assert.deepEqual(
+      sideRunner.findings,
+      [],
+      "per-page clones in a SIDE margin box were summed as if they were fragments of one flow",
+    );
 
     // "It cannot fit on any page" is measured against any page. A document with a named landscape
     // page has two content boxes; a 700 px block on the 606 px page fits on the 900 px one, and

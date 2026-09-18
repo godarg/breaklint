@@ -98,9 +98,16 @@ export const unbreakableBlockTooTall = defineRule(
       if (fragment.sid === null) continue;
       const host = pageByNumber(snapshot, fragment.page);
       if (!host) continue;
+      // Both axes. A top or bottom margin box is outside the content box vertically, but a
+      // `@left-middle` or `@right-middle` one is not — it starts at a content-box y and sits
+      // beside the column. Checking only y would let a running element in a side margin box back
+      // in, one copy per page, which is the same defect one axis at a time.
       const top = host.contentBox.y - INSIDE_TOLERANCE_PX;
       const bottom = host.contentBox.y + host.contentBox.height + INSIDE_TOLERANCE_PX;
+      const left = host.contentBox.x - INSIDE_TOLERANCE_PX;
+      const right = host.contentBox.x + host.contentBox.width + INSIDE_TOLERANCE_PX;
       if (fragment.box.y < top || fragment.box.y > bottom) continue;
+      if (fragment.box.x < left || fragment.box.x > right) continue;
       const entry = flowBySid.get(fragment.sid) ?? { height: 0, fragments: 0 };
       entry.height += fragment.box.height;
       entry.fragments += 1;
