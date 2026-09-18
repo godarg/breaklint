@@ -64,7 +64,10 @@ pack 1 → 2**. Snapshot stays 4 and Configuration Contract stays 1.
   `padding` at a split edge but not `border`, and without `!important`. Two fragments can therefore
   sum above the page for a block that fitted unsplit; from three on they cannot, because an
   intermediate fragment fills a whole content box and carries content before and after it. A
-  two-fragment block is measured and recorded but not reported, which is what 0.5.0 did with it.
+  two-fragment block records the FIRST fragment's box and is reported only if that alone exceeds
+  the page, exactly as in 0.5.0 — so a block that really is too tall and happens to split into
+  exactly two pieces is still not reported. `docs/limitations.md` names that gap rather than
+  leaving a reader of the summed-height sentence above to assume the sum applies everywhere.
   **And the boundary is the page the block was laid out on.** The message used to end "It cannot fit
   on any page", which is an all-pages claim from one sample; comparing against the largest content
   box in the document was tried instead and is worse — in a document with a named landscape page it

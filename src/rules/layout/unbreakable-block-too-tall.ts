@@ -49,8 +49,10 @@ import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf, t
  * inflate above the page, while the unsplit block would have fitted. From three fragments on the
  * inflation cannot manufacture the finding: an intermediate fragment fills a whole content box and
  * there is content before and after it, so the block is taller than one page by construction —
- * with or without decoration. A two-fragment block is measured but never reported, which is
- * exactly what 0.5.0 did with it.
+ * with or without decoration. At one or two fragments the rule measures and records the first
+ * fragment's box and reports only if that alone exceeds the page — exactly what 0.5.0 did. The
+ * two-fragment case is therefore a KNOWN gap, not a silent one: a block that really is too tall
+ * and happens to split into exactly two pieces is not reported. `docs/limitations.md` says so.
  *
  * Fragments are correlated by `sid`, the authoring-source identity; a block whose fragments carry
  * no `sid` cannot be correlated and keeps the old first-fragment behaviour rather than guessing.
@@ -68,7 +70,7 @@ export const unbreakableBlockTooTall = defineRule(
     declines: ["env/multicolumn", "env/vertical-writing"],
     remediation: {
       advice:
-        "A block with 'break-inside: avoid' is taller than the page content area and cannot fit unbroken on any page. Where the paginator already had to split it, the reported height is the sum of the fragments it was split into, which is the height its content needed. Make the block shorter — split it into smaller sections deliberately, or reduce container padding, font size or contained rows. Removing 'break-inside: avoid' also clears the finding, but only because the rule then has no candidate: the block is exactly as tall as before, and it will still be broken, just without having asked not to be.",
+        "A block with 'break-inside: avoid' is taller than the content box of the page it was laid out on, so the paginator could not keep it whole there. Where it had already been split into three or more fragments, the reported height is the sum of those fragments, which is the height its content needed. Make the block shorter — split it into smaller sections deliberately, or reduce container padding, font size or contained rows. Removing 'break-inside: avoid' also clears the finding, but only because the rule then has no candidate: the block is exactly as tall as before, and it will still be broken, just without having asked not to be.",
       // No trigger/remedied pair ships with this package and no gate re-runs one, so this
       // advice is untested in the sense the field defines.
       tested: false,
@@ -162,9 +164,10 @@ export const unbreakableBlockTooTall = defineRule(
       const flow = block.sid === null ? undefined : flowBySid.get(block.sid);
       const fragmentCount = flow?.fragments ?? 1;
       // `block-height` keeps its name and its unit: it is still the height of this block. What
-      // changed is that a split block's height is no longer read off one of its pieces. Two
-      // fragments are summed and recorded but not reported — see the header for why the third
-      // fragment is where the sum stops being a guess.
+      // changed is that a split block's height is no longer read off one of its pieces — from the
+      // third fragment on. At one or two fragments the recorded value is the first fragment's box,
+      // exactly as in 0.5.0: the sum is not recorded there either, because a two-fragment sum is
+      // the one this rule cannot tell apart from repeated decoration (see the header).
       const summable = fragmentCount >= 3;
       const blockHeight = summable ? flow!.height : block.box.height;
       evaluations.push(targetEvaluation({ ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured", measurements: [{ name: "block-height", value: blockHeight, unit: "px", operator: ">", threshold: limit }], violated: blockHeight > limit }));

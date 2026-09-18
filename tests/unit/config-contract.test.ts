@@ -128,6 +128,15 @@ describe("Configuration Contract v1", () => {
     // And the off switch still wins over the profile that turned it on.
     const strictButDisabled = resolve({ profile: "strict", rules: { [OFF]: false } });
     assert.equal(strictButDisabled.activeRules.some((rule) => rule.id === OFF), false);
+
+    // Naming the rule with only OPTIONS turns it on too. `rules` reads as "the caller has an
+    // opinion about this rule": false disables, anything else enables. For the twelve rules that
+    // run anyway this is invisible; for the one that does not, tuning it also activates it. That
+    // is the intended reading, and it is pinned here so it stays a decision rather than a surprise.
+    const byOptionsOnly = resolve({ rules: { [OFF]: { minNetFill: 0.4 } } });
+    assert.equal(byOptionsOnly.activeRules.some((rule) => rule.id === OFF), true, "an options object must not leave the rule off");
+    assert.equal(byOptionsOnly.optionsByRule[OFF]!.minNetFill, 0.4);
+    assert.equal(byOptionsOnly.sources[configPointer("rules", OFF, "enabled")], "config");
   });
 
   it("lets CLI rule selection override file enablement", () => {

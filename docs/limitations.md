@@ -319,8 +319,10 @@ apply here at all. What strips decoration at a split is Paged.js' own stylesheet
 and an author rule with `!important` padding does the same — so two fragments can sum above the
 page for a block that fitted unsplit. From three fragments on that cannot happen: an intermediate
 fragment fills an entire content box and there is content before and after it, so the block is
-taller than one page by construction. The residual gap is a block split into exactly two fragments
-whose real height does exceed the page; it is not reported, exactly as in 0.5.0. The residual risk
+taller than one page by construction. **The residual gap is a block split into exactly two
+fragments whose real height does exceed the page: it is not reported, and the value recorded for it
+is the first fragment's box rather than the sum** — exactly as in 0.5.0, and stated here because a
+reader of the summed-height paragraph above would otherwise assume the sum is recorded everywhere. The residual risk
 in the other direction is a block with borders thicker than the content of its own outer fragments,
 which would have to be several tens of pixels per edge.
 
@@ -336,6 +338,13 @@ differently sized page elsewhere in the document is still reported, because it s
 node the paginator produced with no authoring source — keeps the old first-fragment behaviour. It
 is not guessed at by geometry, and it is not reported as a decline either, because the first
 fragment is still a real measurement of a real box.
+
+**Naming an off-by-default rule in a config file turns it on, even with only options.** `rules` is
+read as "the caller has an opinion about this rule": `false` disables, anything else enables, and
+that includes an options object such as `{ "layout/half-empty-page": { "minNetFill": 0.4 } }`. For
+the twelve rules that are on anyway this is invisible; for the one that is not, it means tuning it
+also activates it. That is the intended reading — configuring a rule you do not want is not a
+thing anyone does — but it is not obvious, so it is written down.
 
 **`kill(pgid, 0)` answering `EPERM` is read as indeterminate, not as failure.** Measured on darwin
 25.6.0, macOS answers `EPERM` transiently for a process group this process created and owns while
