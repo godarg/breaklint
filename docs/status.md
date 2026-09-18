@@ -15,8 +15,9 @@ the terminal and the HTML report say so at the finding. That flag is a claim abo
 confidence: no trigger/remedied pair ships with this package and no gate re-runs one. A follow-up
 measurement applied the lever each advice text *names*, alone, to the original trigger document —
 in three of thirteen cases the named lever did not clear the finding and something else in the
-remedied file had done the work. Those three texts were corrected; the flag stays false for all
-thirteen until a gate can set it.
+remedied file had done the work. **Four** advice texts were corrected in total: those three, plus
+one that described the rule's scope wrongly rather than naming an ineffective lever. The flag
+stays false for all thirteen until a gate can set it.
 
 What this release does **not** establish: that the advice repairs anything in a real workflow, that
 an agent given `docs/agent-contract.md` repairs more precisely, or that any threshold is calibrated.
@@ -49,22 +50,40 @@ one-minute load average recorded immediately before each:
 | 8.03 | 8 |
 | 21.93 | 7 |
 
-Three of the six started below 4.0 and were still red. The failing tests are the same set every
-time — `source-boundary-regressions` (`cleans an owned descendant before a successful acquisition
-returns`, `completes timeout cleanup even when the API consumer immediately exits`, `retains one
-authoritative blob capture even after its backing pathname changes`), plus
-`rasterizer-lifecycle` and `live-run` entries at higher load. All of them are process and
-rasterizer lifecycle; none lies on a path this release touches. The same file, run isolated and
-serial with identical arguments on both stands, gives 1–2 failures here and 0–1 on `origin/main`,
-so the class is pre-existing rather than introduced.
+Three of the six started below 4.0 and were still red. Named in full, per run, by the failing
+top-level entry:
+
+- **3.54** — `revision-comparison` and `source-boundary-regressions`. The first was not a flake:
+  a test pinned an error message that had moved. It is repaired and has not recurred.
+- **3.60** — `source-boundary-regressions` alone.
+- **3.57** and **6.72** — `source-boundary-regressions`, `rasterizer-lifecycle`,
+  `live-run`.
+- **8.03** and **21.93** — the same three plus `render-run`, and at 21.93 additional
+  `rasterizer-lifecycle` entries.
+
+`source-boundary-regressions` fails at every load, always the same three subtests: `cleans an
+owned descendant before a successful acquisition returns`, `completes timeout cleanup even when
+the API consumer immediately exits`, `retains one authoritative blob capture even after its
+backing pathname changes`. Everything the higher loads add is process and rasterizer lifecycle.
+Apart from the repaired `revision-comparison` case, nothing that failed in any of the six runs
+lies on a path this release touches. The same file, run isolated and serial with identical
+arguments on both stands, gives 1–2 failures here and 0–1 on `origin/main`.
 
 What separates green from red is the machine, not the starting load: the suite spawns its own
 browsers and drives the load up itself, and this host additionally carries a virtualisation guest
 at 92 % CPU, Spotlight indexing and other sessions throughout. CI is a different machine and it is
-green — 566 of 567 on the pull request, where the one failure was deterministic and real (a test
-pinning an error message that had moved), and a green `ci.yml` run on the exact merged `main` SHA
-after that repair. The honest statement is therefore: **this class does not reproduce in CI, and
-it does reproduce here at any load we could reach.** Why has not been measured.
+green — 566 of 567 on the pull request (that one failure being the `revision-comparison` bug), and
+a green `ci.yml` run on the exact merged `main` SHA after the repair. The honest statement is
+therefore: **this class does not reproduce in CI, and it does reproduce here at every load we
+could reach, including below 4.0.** Why, has not been measured, and it is an open item rather than
+a resolved one.
+
+**This is why 0.6.0 carries no tag.** The release procedure for this work pre-registered a stop
+condition: if the unit suite is reproducibly red on a quiet machine, that does not block a merge
+but it does block the release, and the run ends with a submission to the owner rather than with a
+tag. Three runs below load 4.0 were reproducibly red, so the condition is met on its own terms —
+even though the same commit is green in CI and every release gate except the two named below
+passes here. The merge stands; the tag is the owner's call, with this measurement in front of it.
 
 ## Current published release — 0.5.0 (2026-09-13) — source-bound consumers
 

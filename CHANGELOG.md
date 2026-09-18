@@ -20,11 +20,15 @@ pack 1 → 2**. Snapshot stays 4 and Configuration Contract stays 1.
   `whatWasNotMeasured`; each finding card gains `fingerprint`, `source` and `remediation`. A
   consumer that validates the pack against schema 1 must move to 2; there is no shape in which 1
   and 2 are distinguishable by inspection, which is why the stamp moved.
-- **The context pack's own limits are unchanged**, and that is worth stating because a schema bump
-  invites the opposite assumption: `createContextPack` still defaults to `maxFindings: 40` and
-  `maxTextPerField: 400`, and still clamps a caller's value into range. Measured against the
-  released 0.5.0, not asserted: `git show v0.5.0:src/api/context.ts` and the current file agree on
-  both defaults and on the clamp. Nothing about the selection budget moved in this release.
+- **The context pack's own limits are unchanged, and no 100/1200 default ever shipped.** A schema
+  bump invites the opposite assumption, and a draft of this work did briefly raise the defaults to
+  `maxFindings: 100` / `maxTextPerField: 1200` and drop the input clamp — that draft was never
+  released and is not in this version's history. Against the released 0.5.0, measured rather than
+  asserted: `git show v0.5.0:src/api/context.ts` reads `?? 40` and `?? 400`, the current file reads
+  the same, and both clamp a caller's value into range. For the same reason `repair.options` has
+  nothing removed from it: `RuleMeta.remediation` is new in this release, so there was no generic
+  advice in 0.5.0's `repair.options` to take out. What did change there is named above — the
+  `layout/widow` and `layout/orphan` strings.
 - **`whatWasNotMeasured[].candidateCount` is `null` in the screen profile.** `checkPage` records a
   two-rule candidate total, so a per-rule denominator does not exist there. `declinedCount` counts
   rule/target decisions in both profiles and stays comparable; `floor` was already null.
