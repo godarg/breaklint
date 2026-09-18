@@ -368,8 +368,15 @@ describe("output formats", () => {
     // produced exit 1, 8 findings across 7 rules" and the assertion still passed, because the
     // phrase it looked for was still in there — inside a sentence saying the opposite. Whole-line
     // equality is brittle by design: any rewording of this row is meant to come back here.
+    //
+    // Selected by the row's own shape, not by the first mention anywhere in the file: the release
+    // record above it cites the demo's exit code and counts in prose, and a `includes` selector
+    // picked THAT line and compared it against the canonical row. The finding was correct and the
+    // subject was wrong. Exactly one row may open this way; a second would make "the row" a guess.
     const status = readFileSync(new URL("../../docs/status.md", import.meta.url), "utf8");
-    const row = status.split("\n").find((l) => l.includes("`npx breaklint --demo`"));
+    const rows = status.split("\n").filter((l) => l.startsWith("| `npx breaklint --demo` |"));
+    assert.equal(rows.length, 1, "docs/status.md must carry exactly one --demo contract row");
+    const row = rows[0];
     assert.equal(
       row,
       "| `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, " +
