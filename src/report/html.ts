@@ -131,10 +131,18 @@ function renderCoverageRecord(row: HtmlCoverageRow): string {
  * is not a property of the coverage section at all; it is decided by where the findings section
  * above it happens to end, so any unrelated content change can produce it.
  *
- * The last two records are therefore bracketed in a container that may not break. The bracket is
- * inert for every other remainder and changes no flow height, so it cannot shift pagination
- * elsewhere; when the remainder would be one it moves a single record forward and the terminal page
- * carries two. `break-before: avoid` on the last record would say this more directly, but this
+ * The last two records are therefore bracketed in a container that may not break. It changes no
+ * flow height, so it cannot shift pagination elsewhere, and it only acts when the last two records
+ * would otherwise be split — at every other remainder the pair already shares a page.
+ *
+ * The bracket holds exactly two records, and the gate's minimum is `ceil(perPage / 2)`. At the
+ * measured capacity of four records per A4 page that minimum is two, so a bracket of two is
+ * sufficient and a remainder of one is the only failing phase. It would NOT be sufficient at six
+ * or more records per page, where the minimum rises to three. That is a real limit of this repair,
+ * not a general guarantee: if the record box ever shrinks enough to fit six per page, the bracket
+ * has to grow with `ceil(perPage / 2)`.
+ *
+ * `break-before: avoid` on the last record would say this more directly, but this
  * stylesheet has already measured that Blink does not honour avoid-between-siblings here — see the
  * note above `.apparatus-section` in html-styles.ts, where the same attempt put a heading alone on
  * one page and its card on the next. A non-breaking container is the technique that worked.

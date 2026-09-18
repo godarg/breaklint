@@ -69,7 +69,21 @@ it("the real host producer + renderer + Git revisions confirm a preserved target
     // report must still be accepted here: this rejection is about schema 1 and the screen profile,
     // not about narrowing the reader.
     await assert.rejects(compareReports({ schemaVersion: 1, profileKind: "screen" } as unknown as Report, before), /requires a document Report of schema 4 or 5/u);
-    assert.equal((await compareReports({ ...structuredClone(before), schemaVersion: 4 }, before)).results.length >= 0, true, "a stored schema-4 report must still be comparable");
+    // A stored schema-4 artefact is a schema-5 one without `remediation`; strip it rather than
+    // only restamping the version, or the assertion says nothing about the older shape. The
+    // comparison must produce the SAME rows as the schema-5 original: accepting the old shape is
+    // the claim, not merely not throwing on it.
+    const storedSchema4 = structuredClone(before);
+    storedSchema4.schemaVersion = 4;
+    for (const document of storedSchema4.documents) for (const finding of document.findings) delete (finding as { remediation?: unknown }).remediation;
+    for (const finding of storedSchema4.findings) delete (finding as { remediation?: unknown }).remediation;
+    assert.ok(before.findings.some(finding => finding.remediation), "the schema-5 fixture must carry remediation, or the schema-4 control is vacuous");
+    assert.ok(storedSchema4.findings.every(finding => !("remediation" in finding)), "the schema-4 control still carries a schema-5 property");
+    assert.deepEqual(
+      (await compareReports(storedSchema4, before)).results.map(row => row.status),
+      (await compareReports(before, before)).results.map(row => row.status),
+      "a stored schema-4 report must compare exactly like the schema-5 report it was written from",
+    );
     writeFileSync(source, body(100)); writeFileSync(css, cssBody("navy")); const after = await check();
     assert.equal(after.findings.length, 0); assert.ok(after.evaluations.some(e => e.stableIdentity?.status === "unique" && e.predicate.violated === false));
     const repaired = await compareReports(before, after); assert.equal(repaired.results[0]!.status, "resolved", JSON.stringify({ repaired, fontBefore: before.documents[0]!.fontIdentity, fontAfter: after.documents[0]!.fontIdentity, resources: after.documents[0]!.inputIdentity, infra: after.documents[0]!.infrastructure, notMeasured: after.documents[0]!.notMeasured, coverage: after.documents[0]!.coverage }));

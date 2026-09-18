@@ -20,6 +20,11 @@ pack 1 → 2**. Snapshot stays 4 and Configuration Contract stays 1.
   `whatWasNotMeasured`; each finding card gains `fingerprint`, `source` and `remediation`. A
   consumer that validates the pack against schema 1 must move to 2; there is no shape in which 1
   and 2 are distinguishable by inspection, which is why the stamp moved.
+- **The context pack's own limits are unchanged**, and that is worth stating because a schema bump
+  invites the opposite assumption: `createContextPack` still defaults to `maxFindings: 40` and
+  `maxTextPerField: 400`, and still clamps a caller's value into range. Measured against the
+  released 0.5.0, not asserted: `git show v0.5.0:src/api/context.ts` and the current file agree on
+  both defaults and on the clamp. Nothing about the selection budget moved in this release.
 - **`whatWasNotMeasured[].candidateCount` is `null` in the screen profile.** `checkPage` records a
   two-rule candidate total, so a per-rule denominator does not exist there. `declinedCount` counts
   rule/target decisions in both profiles and stays comparable; `floor` was already null.
