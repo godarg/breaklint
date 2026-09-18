@@ -20,11 +20,15 @@ pack 1 → 2**. Snapshot stays 4 and Configuration Contract stays 1.
   `whatWasNotMeasured`; each finding card gains `fingerprint`, `source` and `remediation`. A
   consumer that validates the pack against schema 1 must move to 2; there is no shape in which 1
   and 2 are distinguishable by inspection, which is why the stamp moved.
-- **The context pack's own limits are unchanged**, and that is worth stating because a schema bump
-  invites the opposite assumption: `createContextPack` still defaults to `maxFindings: 40` and
-  `maxTextPerField: 400`, and still clamps a caller's value into range. Measured against the
-  released 0.5.0, not asserted: `git show v0.5.0:src/api/context.ts` and the current file agree on
-  both defaults and on the clamp. Nothing about the selection budget moved in this release.
+- **The context pack's own limits are unchanged, and no 100/1200 default ever shipped.** A schema
+  bump invites the opposite assumption, and a draft of this work did briefly raise the defaults to
+  `maxFindings: 100` / `maxTextPerField: 1200` and drop the input clamp — that draft was never
+  released and is not in this version's history. Against the released 0.5.0, measured rather than
+  asserted: `git show v0.5.0:src/api/context.ts` reads `?? 40` and `?? 400`, the current file reads
+  the same, and both clamp a caller's value into range. For the same reason `repair.options` has
+  nothing removed from it: `RuleMeta.remediation` is new in this release, so there was no generic
+  advice in 0.5.0's `repair.options` to take out. What did change there is named above — the
+  `layout/widow` and `layout/orphan` strings.
 - **`whatWasNotMeasured[].candidateCount` is `null` in the screen profile.** `checkPage` records a
   two-rule candidate total, so a per-rule denominator does not exist there. `declinedCount` counts
   rule/target decisions in both profiles and stays comparable; `floor` was already null.
@@ -39,8 +43,10 @@ pack 1 → 2**. Snapshot stays 4 and Configuration Contract stays 1.
   arrived, and deletes its target before each run. No such gate ships yet. The previous shape let
   the engine stamp `tested: true` on every remediation it copied, which is how an unverified string
   reaches an agent as a verified one.
-- Four advice texts name a lever that was measured **not** to work on its own and have been
-  corrected accordingly: `artifact/local-uri` (there is no distribution root; every absolute path
+- Four advice texts were corrected because a measurement applied the lever each one NAMES, alone,
+  to the original trigger document. In **three** of the four the named lever left the finding in
+  place and something else in the remedied file had done the work; the fourth described the rule's
+  scope wrongly rather than naming an ineffective lever. The four: `artifact/local-uri` (there is no distribution root; every absolute path
   is reported), `layout/unbreakable-block-too-tall` (removing `break-inside: avoid` removed the
   candidate, not the height), `svg/text-overflows-viewport` (`overflow: visible` makes the target
   non-applicable and silences the only rule that gates by default), `layout/hyphen-across-page`
