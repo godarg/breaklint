@@ -110,6 +110,44 @@ ${list}
 </section>`;
 }
 
+type HtmlCoverageRow = ReturnType<typeof buildHtmlReportModel>["coverage"][number]["rows"][number];
+
+function renderCoverageRecord(row: HtmlCoverageRow): string {
+  return `<dl class="coverage-record${row.ok ? "" : " short"}" id="${esc(row.id)}">
+  <div><dt>Rule</dt><dd><code>${esc(row.ruleId)}</code></dd></div>
+  <div><dt>Candidates</dt><dd class="mono">${row.candidates}</dd></div>
+  <div><dt>Measured</dt><dd class="mono">${row.measured}</dd></div>
+  <div><dt>Not measured</dt><dd class="mono">${row.notMeasured}</dd></div>
+  <div><dt>Coverage / floor</dt><dd class="mono">${esc(row.ratio)} / ${esc(row.floor)}</dd></div>
+  <div><dt>Result</dt><dd class="coverage-result${row.ok ? "" : " short"}">${row.ok ? "Coverage met" : "Below floor"}</dd></div>
+</dl>`;
+}
+
+/**
+ * Coverage records are equal-height boxes that must not fragment, so a printed report packs a whole
+ * number of them per page and the terminal page carries `rows mod perPage`. When that remainder is
+ * one, the report ends on a page holding a single record — measured on the four canonical surface
+ * states: twelve pages, ninety-three non-whitespace characters on the last. Which remainder occurs
+ * is not a property of the coverage section at all; it is decided by where the findings section
+ * above it happens to end, so any unrelated content change can produce it.
+ *
+ * The last two records are therefore bracketed in a container that may not break. The bracket is
+ * inert for every other remainder and changes no flow height, so it cannot shift pagination
+ * elsewhere; when the remainder would be one it moves a single record forward and the terminal page
+ * carries two. `break-before: avoid` on the last record would say this more directly, but this
+ * stylesheet has already measured that Blink does not honour avoid-between-siblings here — see the
+ * note above `.apparatus-section` in html-styles.ts, where the same attempt put a heading alone on
+ * one page and its card on the next. A non-breaking container is the technique that worked.
+ */
+function renderCoverageRows(rows: readonly HtmlCoverageRow[]): string {
+  const records = rows.map(renderCoverageRecord);
+  if (records.length < 3) return records.join("\n");
+  return `${records.slice(0, -2).join("\n")}
+<div class="coverage-tail">
+${records.slice(-2).join("\n")}
+</div>`;
+}
+
 function renderCoverage(model: ReturnType<typeof buildHtmlReportModel>): string {
   const documents = model.coverage.length === 0
     ? `<div class="empty-state"><h3>Coverage unavailable</h3><p>No document coverage was produced by this run.</p></div>`
@@ -121,14 +159,7 @@ ${model.coverage.map((document) => `<li>
   ${document.rows.length === 0
     ? `<p>No rule coverage rows were produced for this document.</p>`
     : `<div class="coverage-list" aria-label="Rule coverage for ${esc(document.path)}">
-${document.rows.map((row) => `<dl class="coverage-record${row.ok ? "" : " short"}" id="${esc(row.id)}">
-  <div><dt>Rule</dt><dd><code>${esc(row.ruleId)}</code></dd></div>
-  <div><dt>Candidates</dt><dd class="mono">${row.candidates}</dd></div>
-  <div><dt>Measured</dt><dd class="mono">${row.measured}</dd></div>
-  <div><dt>Not measured</dt><dd class="mono">${row.notMeasured}</dd></div>
-  <div><dt>Coverage / floor</dt><dd class="mono">${esc(row.ratio)} / ${esc(row.floor)}</dd></div>
-  <div><dt>Result</dt><dd class="coverage-result${row.ok ? "" : " short"}">${row.ok ? "Coverage met" : "Below floor"}</dd></div>
-</dl>`).join("\n")}
+${renderCoverageRows(document.rows)}
 </div>`}
 </article>
 </li>`).join("\n")}

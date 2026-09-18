@@ -1,5 +1,107 @@
 # Changelog
 
+## 0.6.0 — unreleased
+
+A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0: the canonical
+document report changes structure, so its schema stamp moves. **Report 4 → 5** and **agent context
+pack 1 → 2**. Snapshot stays 4 and Configuration Contract stays 1.
+
+### What a consumer has to do
+
+- **Report 5 adds one optional property, `Finding.remediation`** — `{ advice: string, tested:
+  boolean }`. Nothing was removed and nothing changed type. A reader that accepts Report 4 will
+  usually accept Report 5 unchanged; a strict decoder that rejects unknown properties will not,
+  which is the whole reason the stamp moved rather than staying at 4.
+- **Stored Report-4 artefacts remain readable.** `READABLE_REPORT_SCHEMA_VERSIONS` is `[4, 5]`, and
+  `compareReports`, `writeReportBundle` and `createContextPack` all accept both. A saved schema-4
+  report is pinned in the suite to still produce a full context pack rather than the legacy stub.
+  Only the emitter moved.
+- **Context pack 2 gains a required key and three card keys.** The pack itself gains
+  `whatWasNotMeasured`; each finding card gains `fingerprint`, `source` and `remediation`. A
+  consumer that validates the pack against schema 1 must move to 2; there is no shape in which 1
+  and 2 are distinguishable by inspection, which is why the stamp moved.
+- **`whatWasNotMeasured[].candidateCount` is `null` in the screen profile.** `checkPage` records a
+  two-rule candidate total, so a per-rule denominator does not exist there. `declinedCount` counts
+  rule/target decisions in both profiles and stays comparable; `floor` was already null.
+
+### Thirteen rules now say what to change, and say when nobody checked
+
+- Every rule carries `remediation.advice`: what in the source produces the finding and what
+  concretely to change. It reaches the terminal, the HTML report and `Finding.remediation`.
+- **All thirteen declare `tested: false`,** and the terminal and HTML say so at the finding. The
+  flag is a claim about evidence, not confidence: it can only become true once a gate runs a
+  trigger/remedied pair, holds the applied diff against the advice text, checks that no new finding
+  arrived, and deletes its target before each run. No such gate ships yet. The previous shape let
+  the engine stamp `tested: true` on every remediation it copied, which is how an unverified string
+  reaches an agent as a verified one.
+- Four advice texts name a lever that was measured **not** to work on its own and have been
+  corrected accordingly: `artifact/local-uri` (there is no distribution root; every absolute path
+  is reported), `layout/unbreakable-block-too-tall` (removing `break-inside: avoid` removed the
+  candidate, not the height), `svg/text-overflows-viewport` (`overflow: visible` makes the target
+  non-applicable and silences the only rule that gates by default), `layout/hyphen-across-page`
+  (the rule keys on the paginator's own hyphenation class, so `hyphens: none` alone leaves the
+  finding in place).
+- `type/excessive-word-spacing` advises `hyphens: auto` and `layout/hyphen-across-page` advises
+  `hyphens: none`. Both texts now name the other rule and say the two pull in opposite directions
+  and that neither threshold is calibrated. A human loses an evening to that; an agent on a
+  two-attempt budget oscillates.
+- **`repair.options` changed for `layout/widow` and `layout/orphan`.** They recommended adjusting
+  "the widows setting" and "the orphans setting" — the one advice this project has measured to be
+  inert on its own corpus. They now name `break-inside: avoid`, `break-before: page` and rewording,
+  and they say which fragment the rule measures: `widow` the one that opens the next page, `orphan`
+  the one that closes the page. Consumers reading `repair.options` will see different strings.
+- The coverage shortfall block no longer offers `--disable <rule>` in the same words for every
+  rule. For a rule whose `error` severity is the only gate this tool has by default, the line now
+  says what disabling it costs.
+
+### Reports
+
+- The terminal report opens with a verdict banner and an exit code, sorts findings by document,
+  page, severity, rule and position on the page, and prints a coverage block.
+- The HTML report carries a remediation box per finding, the untested sentence where it applies,
+  and an itemised coverage shortfall block that names the verbatim decline reason and the options.
+- **The printed report is longer: 43 page rasters across the four canonical states, up from 32**
+  (clean 5, findings 12, infrastructure 13, insufficient-coverage 13). The remediation surface is
+  what grew.
+- **The printed report no longer ends on a page carrying a single coverage record.** Records do not
+  fragment, so the terminal page receives the remainder of the pack, and which remainder that is
+  depends on where the findings section above happens to end — measured: twelve pages, ninety-three
+  non-whitespace characters on the last. The last two records are now bracketed in a container that
+  may not break. The bracket changes no flow height and is inert for every other remainder.
+
+### Documentation
+
+- New `docs/agent-contract.md`: what an agent driving this tool can rely on. It states that no rule
+  ships `calibrated: true`, that the fingerprint deliberately carries no page, ordinal, fragment
+  index or node key — with the `ord:<n>` exception that applies to a page carrying no semantic
+  block — and which five rules set `finding.source` unconditionally to null. `selfcheck:static`
+  reads it, so its claims are held against the code.
+- `docs/rules/layout-half-empty-page.md` replaces "fires on approximately 90 % of real-world
+  documents" with what was measured: 37 of 40 on a corpus constructed for the purpose, and no
+  real-world corpus measured at all.
+
+### Apparatus
+
+- Three print mutation controls — `broken-coverage`, `broken-trust-geometry` and
+  `broken-terminal-density` — were declared in the renderer and run by nothing, so none of them had
+  ever executed. Measured: the first two produce a genuine failing run and are now wired into
+  `test:report-surface-mutants`; `broken-terminal-density` could not go red at all and is removed.
+  The mutation runner now holds the renderer's allowlist against its own control list, so a control
+  that nobody runs is a failing gate.
+- New control `broken-tail-cohesion` releases the coverage tail bracket and forces four records per
+  page, reproducing the underfilled terminal page exactly. It asserts the phase it reproduces, so a
+  future rule count that no longer leaves a remainder of one fails loudly instead of going green.
+- The report-surface render manifest carries its own version. Report 4 → 5 briefly moved that stamp
+  too; it is back at 4, because the manifest's own structure did not change.
+- **The `selfcheck:live` red control had an expiry date and reached it.** It multiplied the first
+  finding card's own height with `transform: scaleY(20)`, so the injected fault was a multiple of
+  the card's content. Once each card gained a remediation box, the same injection produced a card
+  the paginator fragmented into nineteen pieces; the rule measured fragment 0 at 895.9 px against a
+  1031.8 px page and the whole chain went green on a real fault. The injected height is now
+  absolute, and the control additionally asserts that the block it reported is the one that was
+  injected, at its whole height. Verified to go red on this release and on 0.5.0 alike, and
+  verified to fail loudly when the injected height is put back below the page.
+
 ## 0.5.0 — 2026-09-13
 
 - Add installed public producer, existing-page, comparison and canonical report-bundle APIs.

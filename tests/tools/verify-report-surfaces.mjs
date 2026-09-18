@@ -559,7 +559,12 @@ for (const artifact of manifest.artifacts) {
 }
 assert.ok(pixelMutationControl, "screen pixel mutation control did not run");
 
-assert.deepEqual(manifest.physicalArtifacts, { screens: 24, pdfs: 4, rasterPages: 32 }, "the Report4 inventory must be exactly 24 screens, 4 PDFs and 32 PDF page rasters");
+// The printed inventory grew from 32 page rasters to 43 in this release, and the growth is the
+// release: every finding now carries a remediation box and, where the advice is untested, the
+// sentence that says so. Measured per state: clean 5, findings 12, infrastructure 13,
+// insufficient-coverage 13. The number is pinned rather than derived so that a report which
+// silently doubles in length is a failing gate and not a shrug.
+assert.deepEqual(manifest.physicalArtifacts, { screens: 24, pdfs: 4, rasterPages: 43 }, "the report-surface inventory must be exactly 24 screens, 4 PDFs and 43 PDF page rasters");
 
 if (mode !== "technical") {
   const pending = [];

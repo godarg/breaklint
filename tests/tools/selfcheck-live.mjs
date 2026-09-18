@@ -82,18 +82,29 @@ try {
     }
   }
 
-  // Fault injection: the report's finding cards promise `break-inside: avoid-page`. Scaling the
-  // first card beyond a page makes that promise arithmetically impossible without changing the
-  // rule threshold. If the exact same browser chain stays green, the selfcheck is theatre.
+  // Fault injection: the report's finding cards promise `break-inside: avoid-page`. Giving the
+  // first card a fixed height beyond the page content box makes that promise arithmetically
+  // impossible without touching the rule threshold. If the exact same browser chain stays green,
+  // the selfcheck is theatre.
+  //
+  // The injected height is absolute, and that is the point. This control used to multiply the
+  // card's own height with `transform: scaleY(20)`, which made the fault a MULTIPLE of the card's
+  // content — so it moved whenever the card's content moved. Measured on 2026-09-18: once each
+  // card gained a remediation box, the same injection produced a card the paginator fragmented
+  // into nineteen pieces, the rule measured fragment 0 at 895.9 px against a 1031.8 px page, and
+  // the control went green on a real fault. A control calibrated to today's content is a control
+  // with an expiry date. (That the rule measures a FRAGMENT rather than the block when the
+  // paginator splits it is a separate open question about the rule, not about this control.)
   const source = readFileSync(ownHtml, "utf8");
   const needle = '<article class="finding ';
   assert.ok(source.includes(needle), "the own report contains no finding card for the red control");
+  const INJECTED_CARD_HEIGHT_PX = 1600;
   const brokenHtml = join(scratch, "breaklint-own-report-broken.html");
   writeFileSync(
     brokenHtml,
     source.replace(
       needle,
-      '<article style="transform:scaleY(20);transform-origin:top" class="finding ',
+      `<article style="height:${INJECTED_CARD_HEIGHT_PX}px;overflow:hidden" class="finding `,
     ),
   );
   const redJson = join(scratch, "selfcheck-red.json");
@@ -124,6 +135,17 @@ try {
       (finding) => finding.ruleId === "layout/unbreakable-block-too-tall" && finding.severity === "error",
     ),
     "the red control failed for a reason other than the injected proof-A violation",
+  );
+  // And it must be the INJECTED block that was measured, at its whole height. Without this, a
+  // future change that makes the paginator fragment the injected card would leave the control
+  // exiting 4 for an unrelated reason while the injected fault went unreported.
+  const injected = redReport.findings.find(
+    (finding) => finding.ruleId === "layout/unbreakable-block-too-tall" && finding.severity === "error",
+  );
+  assert.equal(
+    injected?.target?.boxScreen?.height,
+    INJECTED_CARD_HEIGHT_PX,
+    `the red control reported a block other than the injected card; the paginator probably split it\n${JSON.stringify(injected?.target ?? null)}`,
   );
 
   process.stdout.write(

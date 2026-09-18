@@ -124,8 +124,8 @@ export const REPORT_HTML_STYLES = String.raw`
   .finding-facts > div, .coverage-record > div { min-width: 0; }
   .evidence-state { margin-block: var(--ds-space-4) 0; color: var(--ds-color-fg-muted); font-size: var(--ds-font-size-sm); }
   .evidence-state strong { color: var(--ds-color-fg-primary); }
-  .finding-remediation-untested{margin-top:.35rem;font-size:.85em;opacity:.8}
-.finding-remediation { margin-block: var(--ds-space-4) 0; padding: var(--ds-space-3); border-inline-start: var(--ds-border-strong) solid var(--ds-color-fg-primary); background: var(--ds-color-soft); font-size: var(--ds-font-size-sm); }
+  .finding-remediation-untested { margin-block-start: var(--ds-space-2); color: var(--ds-color-fg-muted); font-size: var(--ds-font-size-sm); }
+  .finding-remediation { margin-block: var(--ds-space-4) 0; padding: var(--ds-space-3); border-inline-start: var(--ds-border-strong) solid var(--ds-color-fg-primary); background: var(--ds-color-soft); font-size: var(--ds-font-size-sm); }
   .finding-remediation p, .finding-frequency-note p { margin: 0; }
   .finding-frequency-note { margin-block: var(--ds-space-3) 0; padding: var(--ds-space-3); border-inline-start: var(--ds-border-strong) solid var(--ds-color-divider); background: var(--ds-color-soft); font-size: var(--ds-font-size-sm); color: var(--ds-color-fg-muted); }
   .coverage-shortfall-list { margin: var(--ds-space-3) 0 0; padding-inline-start: var(--ds-space-4); display: grid; gap: var(--ds-space-4); }
@@ -137,6 +137,10 @@ export const REPORT_HTML_STYLES = String.raw`
   .coverage-document { padding-block-start: var(--ds-space-4); border-block-start: var(--ds-border-strong) solid var(--ds-color-fg-primary); }
   .document-verdict { color: var(--ds-color-fg-muted); font-family: var(--ds-font-mono); font-size: var(--ds-font-size-sm); }
   .coverage-list { display: grid; gap: var(--ds-space-3); margin-block-start: var(--ds-space-4); }
+  /* The print-only pagination bracket around the last two records. On screen it must contribute no
+     box at all: as a grid item it would collapse the two records into one cell and swallow the gap
+     between them. */
+  .coverage-tail { display: contents; }
   .coverage-record { display: grid; grid-template-columns: minmax(14rem, 2fr) repeat(5, minmax(5rem, 1fr)); gap: var(--ds-space-3); margin: 0; padding: var(--ds-space-3); border: var(--ds-border-thin) solid var(--ds-color-divider); background: var(--ds-color-paper); }
   .coverage-record.short { border-inline-start: var(--ds-border-strong) solid var(--ds-color-accent-warn); }
   .coverage-result { font-weight: 700; }
@@ -201,6 +205,13 @@ export const REPORT_HTML_STYLES = String.raw`
        inside the box so it survives rasterization without depending on printed backgrounds. */
     .coverage-record::after { content: ""; position: absolute; inset-block: 0; inset-inline-end: 0; inline-size: 0; border-inline-end: var(--ds-border-thin) solid var(--ds-color-divider); }
     .coverage-record:last-child { margin-block-end: 0; }
+    /* Records do not fragment, so the terminal page carries the remainder of the pack, and where
+       the coverage section starts is decided by unrelated content above it. A remainder of one ends
+       the report on a page holding a single record. Bracketing the last two keeps that remainder at
+       two without changing any flow height. A break-before: avoid on the last record is the direct
+       expression and does not hold here — the same measured Blink limitation as the apparatus
+       heading above; a non-breaking container is what worked. */
+    .coverage-tail { display: block; break-inside: avoid; page-break-inside: avoid; }
     .coverage-record > div { float: left; width: 50%; min-height: var(--ds-space-6); padding-inline-end: var(--ds-space-3); }
     .coverage-record > div:first-child { float: none; width: 100%; margin-block-end: var(--ds-space-3); padding-inline-end: 0; }
     .report-header, .summary-grid > div, .checker-event, .state-alert, .empty-state, .coverage-record { break-inside: avoid; }
