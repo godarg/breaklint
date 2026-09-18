@@ -4,7 +4,35 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## Current work — 0.6.0 (unreleased) — remediation that says when nobody checked
+## Current published release — 0.6.0 (2026-09-18) — remediation that says when nobody checked
+
+| | |
+|---|---|
+| tag | `v0.6.0` → `9d53577c0bb010d141d345b2f2e7733f2fc1ecd7` |
+| `ci.yml` on that commit | success, run 35364226568 |
+| `release.yml` | run 35363046581, success after one re-run of its final job |
+| npm | `0.6.0`, `dist-tags.latest` = `0.6.0` |
+| `dist.integrity` | `sha512-nI+0Keef50djbeZSAkFC5CWWzZAanyL07wKs7HmPFVx1ioZqRuye/6AbloAIMYvO/Sv06rNPOUVn1rI9h2t/Zg==` |
+| `dist.shasum` | `7e7dfb09bb3a572712b36864007e6d50c955bd4b` |
+| GitHub Release | `breaklint 0.6.0`, assets `breaklint-0.6.0.tgz`, `.sha256`, `.sri` |
+| registry readback | from an empty directory: `npm install breaklint@0.6.0` → `npx breaklint --version` = `0.6.0`; `npx breaklint --demo` → exit 1, 2 errors, 3 warnings, `rules run: 12`; installed Configuration Contract v1 gate green |
+
+**Two things about this release went wrong before they went right, and both are recorded rather
+than smoothed over.** The first tag started nothing: `release.yml` triggers on a literal tag and
+was still pinned to `v0.5.0`, so `v0.6.0` sat on the remote with no run, no error and no
+notification. Nothing had been published at that point — no npm version, no GitHub Release — so
+the tag was deleted, the workflow pinned, and the tag recreated on the commit that carries the
+pinning. `docs/releasing.md` now names that step first in the pre-tag list.
+
+The second: the publish succeeded and the verification after it failed. npm accepted the tarball
+and printed `+ breaklint@0.6.0` at 15:41:51 UTC; the registry first served the version somewhere
+between 15:46 and 16:01 UTC. The step that waits for it allowed 12 attempts five seconds apart —
+sixty seconds — so it failed and skipped the GitHub Release for a publish that had worked. The tag
+was not moved and no evidence was overwritten: the failed job was re-run against the same
+artifact, its own first-publish-or-recovery branch recognised the published bytes, and the release
+completed. The window is now fifteen minutes.
+
+### What 0.6.0 changed, and what it measured
 
 0.6.0 moves the canonical document report to schema 5 (one optional property, `Finding.remediation`)
 and the agent context pack to 2 (one new required key, three new finding-card keys). Snapshot stays
@@ -142,7 +170,7 @@ project's own `absolute-home-path` rule — an operator username, not a credenti
 weakened to make that green, and the branches are not rewritten; the state is recorded here
 instead.
 
-## Current published release — 0.5.0 (2026-09-13) — source-bound consumers
+## Previous release — 0.5.0 (2026-09-13) — source-bound consumers
 
 0.5.0 adds Report 4 source provenance and positive target evaluations, public producer and
 existing-page APIs, offline human/AI projections and conservative repair comparison. Digital Product

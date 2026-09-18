@@ -365,8 +365,17 @@ jobs:
         env:
           RELEASE_COMMIT: ${{ steps.identity.outputs.release_commit }}
         run: |
+          # 60 attempts, 15 s apart: fifteen minutes, not one.
+          # Measured 2026-09-18 on the 0.6.0 publish: npm accepted the tarball and printed
+          # `+ breaklint@0.6.0` at 15:41:51 UTC, and the registry first served the version
+          # between 15:46 and 16:01 UTC. The old window was 12 x 5 s = 60 s, so this step failed
+          # and skipped the GitHub Release for a publish that had in fact succeeded — the worst
+          # shape a release gate can have, because the next reader sees a red workflow over a
+          # published package and has to work out which half is true. The bound stays finite: a
+          # publish that never appears is still a failure, just not one measured against a
+          # propagation delay nobody controls.
           verified=false
-          for attempt in $(seq 1 12); do
+          for attempt in $(seq 1 60); do
             if npm view breaklint@0.6.0 version dist.integrity dist.attestations gitHead --json \
                 > /tmp/registry.json 2> /tmp/registry.err && \
                curl -fsSL \
@@ -385,8 +394,8 @@ jobs:
               verified=true
               break
             fi
-            echo "registry metadata not complete yet (attempt $attempt/12)"
-            sleep 5
+            echo "registry metadata not complete yet (attempt $attempt/60)"
+            sleep 15
           done
           test "$verified" = true || { cat /tmp/registry.err /tmp/registry.json 2>/dev/null || true; exit 1; }
 
