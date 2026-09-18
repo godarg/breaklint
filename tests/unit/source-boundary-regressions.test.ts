@@ -1,4 +1,27 @@
-/** Independent source-boundary regressions. Every input is synthetic and host-selected. */
+/**
+ * Independent source-boundary regressions. Every input is synthetic and host-selected.
+ *
+ * WHAT THE NUMBERS IN HERE ARE, because three of them moved in 0.6.0 and a budget without a reason
+ * is the next flake. Two kinds of bound appear below and they are not the same thing:
+ *
+ *   - `options.timeoutMs` is a PRODUCT bound: how long the host waits for a producer. Where the
+ *     case under test is the timeout path, the producer never completes by construction, so the
+ *     value only decides when the inevitable happens and is sized to be comfortably clear of a
+ *     node start-up. Where the case is the SUCCESS path, the budget is not the subject at all and
+ *     is sized so machine load cannot turn the test into a different one.
+ *   - `spawnSync(..., { timeout })` is a HARNESS bound: it wraps a node start-up plus type
+ *     stripping of the producer module. It says nothing about the product. At 5 s it was smaller
+ *     than the load-time cost of what it wrapped, killed the child with status `null`, and the
+ *     assertion then read as a product failure. Measured before the change: three full runs of
+ *     this file, three red. After: six full runs, six green, the last at a higher load than any
+ *     that failed.
+ *
+ * And two facts about the owned descendant, written by two different processes on purpose:
+ * `nested.pid` comes from the PARENT at spawn, so the test always knows which pid to ask about;
+ * `nested.armed` comes from the CHILD after it installs its SIGTERM handler, so that "the pid is
+ * dead" proves escalation rather than a child that never ran. A test that cannot tell those two
+ * apart cannot test SIGKILL escalation at all.
+ */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";

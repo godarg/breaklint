@@ -101,7 +101,20 @@ stacks collapse to the same family on a Linux CI container, and six of the thirt
 mobile screens — are rendered as single 390 x 15 000 px strips that no reviewer can actually judge.
 
 The ledger was therefore **not** rebound. Binding it would have recorded a review outcome that did
-not happen, which is the one thing this gate exists to prevent. `npm run test:report-surfaces`
+not happen, which is the one thing this gate exists to prevent.
+
+**That leaves 0.6.0 in a third state this document did not provide for, and the decision to ship in
+it was taken deliberately.** The release plan for this version pre-registered exactly two
+acceptable endings for this gate — green, or struck from this document — and said in as many words
+that a third is not a result. 0.6.0 ended in the third: red, reviewed, neither bound nor struck.
+Decided by @Neo under the owner's delegation of 2026-09-18, on the ground that striking a gate in
+the same run in which it produced eight findings would remove the one assertion that had just
+proved its worth. It is recorded here as an override of a stop condition, not as a variant of
+meeting it.
+
+For the next release the choice is the original two, and it has to be made before the tag: either a
+review that passes and rebinds the ledger, or a documented decision to drop the gate and the
+paragraph above with it. `npm run test:report-surfaces`
 stays red for 0.6.0 — but it is now red with a date, two named reviewers, an enumerated finding list
 and an owner, instead of red and unread. The findings and their addressees are carried in the
 release's follow-up register; they are surface work, and they are not repaired in a release that

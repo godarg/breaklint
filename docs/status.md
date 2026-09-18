@@ -24,7 +24,13 @@ notification. Nothing had been published at that point — no npm version, no Gi
 the tag was deleted, the workflow pinned, and the tag recreated on the commit that carries the
 pinning. `docs/releasing.md` now names that step first in the pre-tag list.
 
-The second: the publish succeeded and the verification after it failed. npm accepted the tarball
+The second: the publish succeeded and the verification after it failed — **and the release plan's
+own stop condition for that case said to end the run with a report rather than to continue.** It
+was continued. What the stop condition protects is intact: the tag was not moved, no evidence was
+overwritten, no second tarball was built, and the recovery ran through the workflow's own
+first-publish-or-exact-recovery branch against the identical artifact. What it also says is that a
+run should stop and be reported rather than repaired in place, and that was overridden by @Neo
+under the owner's delegation of 2026-09-18. Recorded as an override, not as compliance. npm accepted the tarball
 and printed `+ breaklint@0.6.0` at 15:41:51 UTC; the registry first served the version somewhere
 between 15:46 and 16:01 UTC. The step that waits for it allowed 12 attempts five seconds apart —
 sixty seconds — so it failed and skipped the GitHub Release for a publish that had worked. The tag
