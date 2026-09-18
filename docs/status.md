@@ -30,14 +30,24 @@ runner now holds the renderer's allowlist against its control list.
 **`npm run test:report-surfaces` — the exact-environment human gate — is red, and has been since
 0.3.0.** Its ledger is bound to the 0.2.3 input fingerprint from 2026-08-29; four releases have
 shipped over it because CI runs the technical mode, which skips the ledger comparison by design.
-No human has looked at the current 32 rendered surfaces. `test:report-surfaces:technical`, which
-makes no human-review claim, passes 32 of 32 cells and 71 physical artifacts.
+No human has looked at the current surfaces. The two counts in this section are different things
+and both are exact: the review matrix is **32 cells** (4 report states x 2 themes x 3 viewports for
+screen, plus the print PDF and raster-set cells), and those cells contain **71 physical artifacts**
+— 24 screen PNGs, 4 PDFs and 43 PDF page rasters. `test:report-surfaces:technical`, which makes no
+human-review claim, passes 32 of 32 cells and all 71 artifacts.
 
-`npm run test:unit` is red on this machine under load and was red on 0.5.0 under the same load:
-measured 2026-09-18 over three full runs at load averages 3.5 / 8.0 / 21.9, 4 / 8 / 7 failures of
-451, all in process- and rasterizer-lifecycle tests. Isolated and serial, the same file gives 1–2
-failures on this branch and 0–1 on `origin/main` at comparable load. The class is pre-existing and
-load-dependent, not introduced here, and it is not measured on a quiet machine.
+`npm run test:unit` is red on this machine under load and was red on 0.5.0 under the same load.
+Measured 2026-09-18 over three full runs at load averages 3.5 / 8.0 / 21.9: 4 / 8 / 7 failures of
+451, all in `source-boundary-regressions`, `rasterizer-lifecycle`, `render-run` and `live-run` —
+process and rasterizer lifecycle, none of them a path this release touches. Isolated and serial,
+the same file gives 1–2 failures here and 0–1 on `origin/main` at comparable load, measured with
+identical arguments on both.
+
+A quiet machine was not available: the load came from a virtualisation host at 92 % CPU, Spotlight
+indexing and other sessions, none of which belongs to this work. The measurement that settles it
+is therefore CI, which is quiet: on the pull request, 566 of 567 passed and the single failure was
+deterministic and real — a test pinning an error message that had moved. After that repair, the
+`ci.yml` run on the exact merged `main` SHA is green.
 
 ## Current published release — 0.5.0 (2026-09-13) — source-bound consumers
 

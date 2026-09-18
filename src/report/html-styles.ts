@@ -208,7 +208,9 @@ export const REPORT_HTML_STYLES = String.raw`
     /* Records do not fragment, so the terminal page carries the remainder of the pack, and where
        the coverage section starts is decided by unrelated content above it. A remainder of one ends
        the report on a page holding a single record. Bracketing the last two keeps that remainder at
-       two without changing any flow height. A break-before: avoid on the last record is the direct
+       two without changing any flow height. Two is enough at the measured four records per page,
+       where the gate's minimum ceil(perPage/2) is two; at six or more per page the bracket would
+       have to grow with it. A break-before: avoid on the last record is the direct
        expression and does not hold here — the same measured Blink limitation as the apparatus
        heading above; a non-breaking container is what worked. */
     .coverage-tail { display: block; break-inside: avoid; page-break-inside: avoid; }

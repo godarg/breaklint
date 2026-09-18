@@ -142,9 +142,11 @@ try {
   const injected = redReport.findings.find(
     (finding) => finding.ruleId === "layout/unbreakable-block-too-tall" && finding.severity === "error",
   );
-  assert.equal(
-    injected?.target?.boxScreen?.height,
-    INJECTED_CARD_HEIGHT_PX,
+  // Within a pixel rather than exactly: the height is an authored CSS length and measured 1600.00
+  // here, but a box height is a rounded measurement and an exact comparison would make this
+  // control fail for a reason that has nothing to do with what it guards.
+  assert.ok(
+    Math.abs((injected?.target?.boxScreen?.height ?? 0) - INJECTED_CARD_HEIGHT_PX) < 1,
     `the red control reported a block other than the injected card; the paginator probably split it\n${JSON.stringify(injected?.target ?? null)}`,
   );
 
