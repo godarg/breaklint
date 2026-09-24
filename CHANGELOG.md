@@ -85,6 +85,18 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   their namespace slash on narrow screens (they broke at hyphens, `layout/unbreakable-block-too-/tall`)
   and never in print.
 
+- **The report has named landmarks, a skip link and a contents navigation.** Header and footer
+  sat inside `main`, so there was no banner, navigation or content info and no in-page link; on a
+  phone the findings began three screens down and coverage twelve. The verdict header is now the
+  banner, a "Report contents" navigation links every rendered section ("Findings (7)", "Coverage
+  details"), a skip link is the first keyboard stop, and the footer is the content info. Print omits
+  the navigation.
+- **Phone and tablet review cells come as viewport-height tiles plus a gallery.** A 390 × 15 000 px
+  strip cannot be judged; each tablet and mobile cell now also ships tiles cut from the same decoded
+  pixels (148 in the matrix), and `review-gallery.html` presents every screen, tile and printed page.
+  The surface gate checks the accessibility tree per cell (landmarks, link targets, table
+  semantics on the phone grid, first Tab stop and its focus outline) and re-cuts every tile.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as

@@ -40,9 +40,13 @@ const controls = [
   { name: "broken-left-row-rule", state: "insufficient-coverage", expect: /coverage row rule is open/u, sides: ["left"] },
   { name: "broken-both-row-rule", state: "insufficient-coverage", expect: /coverage row rule is open/u, sides: ["left", "right"] },
   { name: "broken-column-alignment", state: "findings", expect: /coverage column 3 misaligned/u },
-  { name: "broken-header-repeat", state: "clean", expect: /long coverage table: continuation page lacks the table header/u },
+  // Whichever table continues first — the canonical clean table when its pagination continues it,
+  // otherwise the long-table probe, which always does — must reject the missing header.
+  { name: "broken-header-repeat", state: "clean", expect: /(?:clean|long coverage table): continuation page lacks the table header/u },
   { name: "broken-flag-wrap", state: "insufficient-coverage", expect: /print\/insufficient-coverage: flag --disable layout\/widow split across [2-9] lines/u },
   { name: "broken-rule-id-wrap", state: "findings", expect: /rule id layout\/[a-z-]+ split across [2-9] lines/u },
+  { name: "broken-landmarks", state: "clean", expect: /accessibility contract failed: navigation landmark missing/u },
+  { name: "broken-skip-link", state: "clean", expect: /accessibility contract failed: first Tab stop is not the skip link/u },
   { name: "broken-untested-repeat", state: "findings", expect: /untested-advice caveat appears 8 times in the PDF/u },
   { name: "broken-untested-marker", state: "findings", expect: /untested marker is not set in body-text colour/u },
   {

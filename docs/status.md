@@ -164,11 +164,11 @@ print PDF and raster-set cells) containing **71 physical artifacts** — 24 scre
 
 **On `main` since 0.6.0 (unreleased), re-measured on Chromium 141 / linux:** the surface work on the
 eight review findings changes these figures. The matrix is still 32 cells; it now contains
-**59 physical artifacts** — 24 screen PNGs, 4 PDFs and 31 PDF page rasters (clean 2, findings 9,
-infrastructure 10, insufficient-coverage 10) — after coverage became one aligned table. The
-technical gate passes 32 of 32 cells and all 59 artifacts; no human review of these surfaces is
-claimed, and the strict local gate stays red on the recorded 2026-09-18 FAIL until a new round
-passes.
+**60 primary artifacts** — 24 screen PNGs, 4 PDFs and 32 PDF page rasters (clean 3, findings 9,
+infrastructure 10, insufficient-coverage 10) — plus **148 viewport-height tiles** cut from the 16
+tablet and mobile screens, 208 files in all, presented in one review gallery. The technical gate
+passes 32 of 32 cells and all 208 files; no human review of these surfaces is claimed, and the
+strict local gate stays red on the recorded 2026-09-18 FAIL until a new round passes.
 
 ### Two records that no longer claim what they cannot
 
@@ -349,7 +349,7 @@ GitHub assets.
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
 | Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in report schema 3; generated schema drift and process-boundary exit 2 are tested |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
-| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 59 physical artifacts (unreleased `main`; 71 in 0.6.0) with decoded-pixel, contrast, font-role, table-alignment, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
+| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 60 primary artifacts and 148 viewport tiles (unreleased `main`; 71 artifacts in 0.6.0) with decoded-pixel, contrast, font-role, table-alignment, accessibility-tree and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
 | Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
 | `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 5 findings across 5 rules |

@@ -226,6 +226,25 @@ describe("HTML Report Surface v2", () => {
     assert.doesNotMatch(REPORT_HTML_STYLES, /\.untested-marker \{[^}]*fg-muted/su, "the marker is not muted small print");
   });
 
+  it("names its landmarks and reaches every section from a skip link and a contents navigation", () => {
+    for (const [state, report] of Object.entries(canonicalReportStates())) {
+      const html = renderHtml(report);
+      const body = /<body>([\s\S]*)<\/body>/u.exec(html)?.[1] ?? "";
+      assert.match(body, /^\s*<a class="skip-link" href="#report">Skip to the report<\/a>/u, `${state}: the skip link is the first element`);
+      const main = /<main id="report">[\s\S]*<\/main>/u.exec(body)?.[0] ?? "";
+      assert.ok(main.length > 0, `${state}: main landmark missing`);
+      assert.doesNotMatch(main, /<header|<footer|<nav/u, `${state}: banner, navigation and contentinfo must not sit inside main`);
+      assert.match(body, /<header class="report-header[^"]*" aria-labelledby="report-title">[\s\S]*<\/header>\s*<nav class="report-contents" aria-label="Report contents">/u, `${state}: contents follow the banner`);
+      assert.match(body, /<\/main>\s*<footer class="report-footer">/u, `${state}: contentinfo follows main`);
+      const ids = new Set([...html.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]));
+      const targets = [...(/<nav class="report-contents"[\s\S]*?<\/nav>/u.exec(html)?.[0] ?? "").matchAll(/href="#([^"]+)"/gu)].map((match) => match[1]!);
+      assert.ok(targets.includes("findings-heading") && targets.includes("coverage-heading"), `${state}: contents must reach findings and coverage`);
+      for (const target of targets) assert.ok(ids.has(target), `${state}: contents link #${target} has no target`);
+      assert.match(html, new RegExp(`href="#findings-heading">Findings \\(${report.findings.length}\\)</a>`, "u"), `${state}: contents carry the finding count`);
+    }
+    assert.match(REPORT_HTML_STYLES, /\.skip-link, \.report-contents \{ display: none; \}/u, "print drops the screen navigation");
+  });
+
   it("uses unique deterministic IDs for every labelled surface", () => {
     const html = renderHtml(findingsReportState());
     const ids = [...html.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]);
@@ -287,7 +306,7 @@ describe("HTML Report Surface v2", () => {
     assert.match(html, /\.finding \{ break-inside: avoid-page; \}/u, "compact findings should not split across pages");
     assert.match(html, /section > h2 \{ break-after: avoid; \}/u, "section headings must stay with their first content");
     assert.match(html, /\.report-footer \{ display: none; \}/u, "the redundant screen footer must not create a print-only page");
-    assert.match(html, /\.report-header\.state-clean ~ \.findings-empty \{ display: none; \}/u, "clean print must omit the redundant empty-findings block");
+    assert.doesNotMatch(html, /findings-empty \{ display: none; \}/u, "clean print keeps its findings statement");
     assert.match(html, /overflow-wrap: anywhere/u);
     assert.match(html, /outline: var\(--bl-focus-width\) solid/u);
   });

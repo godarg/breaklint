@@ -50,7 +50,7 @@ const SURFACE_CONTROLS = {
     .coverage-table .rule { width: 4rem !important; }
   }` },
   "broken-trust-geometry": { print: `@media print {
-    .report-header.state-insufficient-coverage + section .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+    .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
   }` },
   // Replaces the card-era phase control: releases the two-row tail bracket and forces the last row
   // onto a page of its own, whatever the content above it does — a continuation with one row.
@@ -86,6 +86,10 @@ const SURFACE_CONTROLS = {
   }` },
   // Rule ids may break at a hyphen inside the name again.
   "broken-rule-id-wrap": { screen: `.rule-id > span { white-space: normal !important; } .finding h3 { max-inline-size: 12ch !important; }` },
+  // The contents navigation disappears.
+  "broken-landmarks": { screen: `nav[aria-label="Report contents"] { display: none !important; }` },
+  // The skip link leaves the keyboard order.
+  "broken-skip-link": { screen: `.skip-link { display: none !important; }` },
   // The per-finding sentence comes back: seven repetitions of one caveat in small print.
   "broken-untested-repeat": { print: `@media print { .finding-remediation::after { content: "Untested: no trigger/remedied pair in this package shows this advice removing this finding."; display: block; } }` },
   // The marker falls back to muted small print.
@@ -432,6 +436,100 @@ function pdfIdentifierBreaks(pdfPath, flags) {
   };
 }
 
+const LANDMARK_ROLES = ["banner", "navigation", "main", "contentinfo", "complementary", "search", "form", "region"];
+
+/**
+ * The report as assistive technology receives it (CDP accessibility tree) plus the first keyboard
+ * stop, per screen cell. Run after the screenshot: it moves focus, which draws a focus ring.
+ */
+async function accessibilitySemantics(page, cdp, label) {
+  const { nodes } = await cdp.send("Accessibility.getFullAXTree");
+  const live = nodes.filter((node) => !node.ignored);
+  const role = (node) => node.role?.value ?? "";
+  const landmarks = live.filter((node) => LANDMARK_ROLES.includes(role(node))).map((node) => ({ role: role(node), name: node.name?.value ?? "" }));
+  const count = (wanted) => live.filter((node) => role(node) === wanted).length;
+  const tableRoles = { table: count("table"), rowheader: count("rowheader"), columnheader: count("columnheader") };
+  const dom = await page.evaluate(() => ({
+    links: [...document.querySelectorAll('a[href^="#"]')].map((link) => {
+      const target = document.getElementById(link.getAttribute("href").slice(1));
+      return { href: link.getAttribute("href"), target: target ? target.tagName.toLowerCase() : null };
+    }),
+    coverageTables: document.querySelectorAll(".coverage-table").length,
+    coverageRows: document.querySelectorAll(".coverage-table tbody tr").length,
+  }));
+  await page.evaluate(() => { document.activeElement?.blur?.(); window.scrollTo(0, 0); });
+  await page.keyboard.press("Tab");
+  const firstTabStop = await page.evaluate(() => {
+    const element = document.activeElement;
+    const style = getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return {
+      element: `${element.tagName.toLowerCase()}.${element.className}`,
+      href: element.getAttribute("href"),
+      outlineStyle: style.outlineStyle,
+      outlineWidthPx: Number.parseFloat(style.outlineWidth),
+      widthPx: Math.round(rect.width),
+      heightPx: Math.round(rect.height),
+    };
+  });
+  const semantics = { landmarks, tableRoles, links: dom.links, firstTabStop, coverageTables: dom.coverageTables, coverageRows: dom.coverageRows };
+  const roles = (wanted) => landmarks.filter((landmark) => landmark.role === wanted);
+  const problems = [];
+  for (const wanted of ["banner", "main", "contentinfo"]) if (roles(wanted).length !== 1) problems.push(`${roles(wanted).length} ${wanted} landmarks`);
+  if (roles("navigation").length !== 1 || roles("navigation")[0].name !== "Report contents") problems.push("navigation landmark missing or not named \"Report contents\"");
+  const broken = dom.links.filter((link) => !["h1", "h2", "h3", "main", "section"].includes(link.target ?? ""));
+  if (broken.length > 0) problems.push(`in-page links without a heading or section target: ${JSON.stringify(broken)}`);
+  if (tableRoles.table !== dom.coverageTables || tableRoles.rowheader !== dom.coverageRows) problems.push(`coverage table semantics lost: ${JSON.stringify(tableRoles)} for ${dom.coverageTables} tables, ${dom.coverageRows} rows`);
+  if (!firstTabStop.element.includes("skip-link") || firstTabStop.href !== "#report") problems.push(`first Tab stop is not the skip link: ${firstTabStop.element}`);
+  if (firstTabStop.outlineStyle === "none" || firstTabStop.outlineWidthPx < 2) problems.push(`focused skip link has no visible outline: ${JSON.stringify(firstTabStop)}`);
+  if (firstTabStop.widthPx < 40 || firstTabStop.heightPx < 16) problems.push(`focused skip link is not visible: ${JSON.stringify(firstTabStop)}`);
+  if (problems.length > 0) throw new Error(`${label}: accessibility contract failed: ${problems.join("; ")}`);
+  return semantics;
+}
+
+/**
+ * Viewport-height tiles cut from the SAME decoded pixels as the fingerprinted full-page PNG, so a
+ * reviewer can judge a phone or tablet cell screen by screen without any unbound pixel.
+ */
+function writeViewportTiles(fullPagePath, baseName, viewportHeight) {
+  const decoded = PNG.sync.read(readFileSync(fullPagePath), { checkCRC: true });
+  const tiles = [];
+  for (let index = 0, top = 0; top < decoded.height; index += 1, top += viewportHeight) {
+    const height = Math.min(viewportHeight, decoded.height - top);
+    const tile = new PNG({ width: decoded.width, height });
+    decoded.data.copy(tile.data, 0, top * decoded.width * 4, (top + height) * decoded.width * 4);
+    const name = `${baseName}--tile-${String(index + 1).padStart(2, "0")}.png`;
+    const path = join(OUTPUT, name);
+    writeFileSync(path, PNG.sync.write(tile, { colorType: 6 }));
+    tiles.push({ path: name, index: index + 1, top, height, sha256: sha256(path), normalizedRgbaSha256: normalizedScreenPixels(path).normalizedRgbaSha256 });
+  }
+  return tiles;
+}
+
+function writeReviewGallery(artifacts) {
+  const escape = (value) => String(value).replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/"/gu, "&quot;");
+  const sections = REPORT_STATES.filter((state) => artifacts.some((artifact) => artifact.cell.split("/")[1] === state)).map((state) => {
+    const screens = artifacts.filter((artifact) => artifact.kind === "screen" && artifact.cell.split("/")[1] === state);
+    const raster = artifacts.find((artifact) => artifact.cell === `print/${state}/raster-set`);
+    const screenBlocks = screens.map((artifact) => {
+      const images = (artifact.tiles.length > 0 ? artifact.tiles : [{ path: artifact.path, index: "full page" }])
+        .map((tile) => `<figure><a href="${escape(tile.path)}"><img src="${escape(tile.path)}" alt="${escape(artifact.cell)} ${escape(tile.index)}" loading="lazy"></a><figcaption>${escape(tile.index)}</figcaption></figure>`).join("");
+      return `<section class="cell"><h3>${escape(artifact.cell)} <a href="${escape(artifact.path)}">full page</a> <code>${artifact.pixels.normalizedRgbaSha256.slice(0, 12)}</code></h3><div class="strip ${artifact.cell.split("/")[3]}">${images}</div></section>`;
+    }).join("\n");
+    const pages = raster ? raster.pages.map((page, index) => `<figure><a href="${escape(page.path)}"><img src="${escape(page.path)}" alt="${state} page ${index + 1}" loading="lazy"></a><figcaption>page ${index + 1}</figcaption></figure>`).join("") : "";
+    return `<section class="state"><h2>${escape(state)}</h2>${screenBlocks}<section class="cell"><h3>print/${escape(state)} <a href="${escape(`${state}--a4.pdf`)}">PDF</a></h3><div class="strip print">${pages}</div></section></section>`;
+  }).join("\n");
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>breaklint report-surface review gallery</title>
+<style>body{margin:0;padding:1rem 1.5rem;font:14px/1.4 system-ui,sans-serif;background:#ddd;color:#111}h2{margin:2rem 0 .5rem;font-size:1.4rem}h3{font-size:.9rem;margin:1rem 0 .4rem}
+.strip{display:flex;gap:.75rem;overflow-x:auto;align-items:flex-start;padding-bottom:.5rem}figure{margin:0;flex:none}figcaption{font-size:.75rem;color:#444}
+img{display:block;border:1px solid #999;background:#fff}.desktop img{width:720px}.tablet img{width:384px}.mobile img{width:390px}.print img{width:300px}</style></head>
+<body><h1>Report-surface review gallery</h1><p>Every screen cell as viewport-height tiles (tablet and mobile) or its full page (desktop), and every printed page. Tiles are cut from the same decoded pixels as the fingerprinted full-page PNG. Open an image for its natural size; the manifest binds every file.</p>
+${sections}</body></html>
+`;
+  writeFileSync(join(OUTPUT, "review-gallery.html"), html);
+  return "review-gallery.html";
+}
+
 function assertCoverageTableGeometry(tables, label) {
   if (tables.length === 0) throw new Error(`${label}: no coverage table rendered`);
   for (const table of tables) {
@@ -717,8 +815,11 @@ try {
           const name = `${state}--${theme}--${viewport}.png`;
           const path = join(OUTPUT, name);
           await page.screenshot({ path, fullPage: true, type: "png" });
-          // After the screenshot: the probe touches the DOM (a data attribute), never the pixels.
+          // After the screenshot: the probes touch the DOM (a data attribute, keyboard focus), never
+          // the pixels.
           semantics.fonts = await resolvedRoleFonts(page, cdp, `${state}/${theme}/${viewport}`);
+          semantics.accessibility = await accessibilitySemantics(page, cdp, `${state}/${theme}/${viewport}`);
+          const tiles = viewport === "desktop" ? [] : writeViewportTiles(path, `${state}--${theme}--${viewport}`, dimensions.height);
           const artifactSha256 = sha256(path);
           const pixels = normalizedScreenPixels(path);
           const screenshotDimensions = { width: pixels.width, height: pixels.height };
@@ -738,6 +839,7 @@ try {
             dimensions: screenshotDimensions,
             pixels,
             semantics,
+            tiles,
           });
         }
       }
@@ -936,8 +1038,10 @@ const manifest = {
   reviewEnvironment,
   observedEnvironment,
   matrix: "4 states × (2 themes × 3 screen viewports + A4 PDF + A4 raster set) = 32 review cells",
+  reviewGallery: writeReviewGallery(artifacts),
   physicalArtifacts: {
     screens: artifacts.filter((artifact) => artifact.kind === "screen").length,
+    screenTiles: artifacts.filter((artifact) => artifact.kind === "screen").reduce((sum, artifact) => sum + artifact.tiles.length, 0),
     pdfs: artifacts.filter((artifact) => artifact.kind === "pdf").length,
     rasterPages: artifacts
       .filter((artifact) => artifact.kind === "raster-set")

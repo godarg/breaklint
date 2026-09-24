@@ -87,6 +87,11 @@ cell; `broken-untested-repeat` and `broken-untested-marker` are its red controls
   `broken-rule-id-wrap` are its red controls). In 0.6.0 the one printed command broke as
   `--` / `disable layout/widow`.
 - Keyboard focus uses a visible three-pixel-equivalent outline.
+- Landmarks are named and separate: the verdict header is the banner, a contents navigation named
+  "Report contents" follows it, the report body is `main`, and the footer is the content info. The
+  first keyboard stop is a skip link to `main`, visible when focused. The contents navigation links
+  every rendered section, including "Findings (n)" and "Coverage details" — on a phone they start
+  three and twelve screens down. Print omits both.
 - The report follows the operating-system light/dark preference and honours reduced motion.
 - Print forces the light palette, uses an A4 page with 12 mm margins and keeps finding evidence in
   the normal vertical flow. Compact findings stay together; a finding taller than one page may
@@ -95,9 +100,10 @@ cell; `broken-untested-repeat` and `broken-untested-marker` are its red controls
   Printed content never exceeds the 703 CSS px content box: wider content makes Chrome scale the
   whole printed document down to fit, silently.
 - The redundant screen footer is omitted from print so it cannot become an otherwise empty page.
-- The clean-state empty-findings explanation remains available on screen but is omitted from print;
-  the clean verdict already carries the same information and the duplicate block must not push one
-  atomic coverage card onto a nearly empty terminal page.
+- The clean state prints its findings section too. It used to be omitted from print so that the
+  duplicate block could not push one atomic coverage card onto a nearly empty terminal page; with
+  coverage as a table that reason is gone, and a printed clean report without a findings heading
+  reads as if the section was lost.
 
 ## Design tokens
 
@@ -261,7 +267,22 @@ Both modes cover:
 - light and dark at 1440×1000, 768×1024 and 390×844;
 - one real A4 PDF per state and an independently rasterized page set for each PDF.
 
-That is 32 review cells. The generated manifest records raw SHA-256, byte size, raster dimensions,
+That is 32 review cells. Each tablet and mobile screen cell is also written as viewport-height
+tiles (`<cell>--tile-NN.png`, 148 in the canonical matrix) cut from the same decoded pixels as its
+full-page PNG — a 390 × 11 649 px strip cannot be judged at fit-to-window scale, its fourteen
+844 px tiles can. The verifier re-cuts every tile from the independently decoded full page and
+requires the normalized RGBA to match, so tiles add no unbound pixel. `review-gallery.html` in the
+same directory presents every full page, tile and printed page per state; it is what a reviewer
+opens, and the verifier requires it to reference every artifact. A reviewed screen cell names its
+full page and all of its tiles in the ledger.
+
+The renderer also records, per screen cell, the accessibility tree as assistive technology receives
+it (CDP): exactly one banner, main and contentinfo landmark, one navigation named "Report
+contents", every in-page link resolving to a heading or section, the coverage table keeping its
+table and row-header semantics on the phone grid, and the first Tab stop being the skip link with an
+outline of at least 2 px. `broken-landmarks` and `broken-skip-link` are its red controls.
+
+The generated manifest records raw SHA-256, byte size, raster dimensions,
 PDF page geometry, DOM invariants and the declared and observed environment. Every screen
 PNG is also decoded to eight-bit straight RGBA. Fully transparent pixels have their invisible RGB
 channels canonicalized to zero; SHA-256 is then computed over the normalized RGBA bytes. The

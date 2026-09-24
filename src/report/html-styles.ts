@@ -25,7 +25,13 @@ export const REPORT_HTML_STYLES = String.raw`
     font: 400 var(--bl-font-size-base)/var(--bl-line-body) var(--bl-font-body);
     overflow-wrap: anywhere;
   }
-  main { width: min(100%, var(--bl-report-width)); margin-inline: auto; padding: var(--bl-space-5); }
+  /* Banner, contents, main and contentinfo are siblings in one column, so each is a landmark. */
+  .report-shell { width: min(100%, var(--bl-report-width)); margin-inline: auto; padding: var(--bl-space-5); }
+  .skip-link { position: absolute; inset-block-start: var(--bl-space-3); inset-inline-start: var(--bl-space-3); z-index: 1; padding: var(--bl-space-2) var(--bl-space-3); border: var(--bl-border-thin) solid var(--bl-color-fg-primary); background: var(--bl-color-paper); color: var(--bl-color-fg-primary); font-weight: 700; }
+  .skip-link:not(:focus) { overflow: hidden; clip-path: inset(50%); inline-size: 1px; block-size: 1px; padding: 0; border: 0; white-space: nowrap; }
+  .report-contents { margin-block-start: var(--bl-space-5); padding-block: var(--bl-space-3); border-block: var(--bl-border-thin) solid var(--bl-color-divider); font-size: var(--bl-font-size-sm); }
+  .report-contents ol { display: flex; flex-wrap: wrap; gap: var(--bl-space-2) var(--bl-space-5); margin: 0; padding: 0; list-style: none; }
+  .report-contents a { color: var(--bl-color-fg-primary); font-weight: 700; }
   h1, h2, h3, p, dl, ol { margin-block-start: 0; }
   /* Display role: h1 and h2 only. h3 carries identifiers (rule ids, paths) and reads as body. */
   h1, h2 { font-family: var(--bl-font-display); }
@@ -126,7 +132,7 @@ export const REPORT_HTML_STYLES = String.raw`
     .coverage-table thead th { font-size: .6875rem; letter-spacing: .02em; }
   }
   @media (max-width: 30rem) {
-    main { padding: var(--bl-space-3); }
+    .report-shell { padding: var(--bl-space-3); }
     .report-header { min-height: 0; padding: var(--bl-space-4); }
     .tool-line { display: grid; margin-block-end: var(--bl-space-6); }
     .summary-grid, .run-facts, .finding-facts { grid-template-columns: minmax(0, 1fr); }
@@ -159,7 +165,8 @@ export const REPORT_HTML_STYLES = String.raw`
       ${reportTokenDeclarations("print", "\n      ")}
     }
     html, body { background: var(--bl-color-bg-primary); }
-    main { width: 100%; padding: 0; }
+    .report-shell { width: 100%; padding: 0; }
+    .skip-link, .report-contents { display: none; }
     .report-header { min-height: 0; padding: var(--bl-space-4); }
     .tool-line { margin-block-end: var(--bl-space-5); }
     section { margin-block-start: var(--bl-space-6); }
@@ -192,7 +199,6 @@ export const REPORT_HTML_STYLES = String.raw`
     /* Compact findings stay whole. A finding taller than the page still fragments by necessity. */
     .finding { break-inside: avoid-page; }
     .finding h3, .finding-facts > div, .evidence-state { break-inside: avoid; }
-    .report-header.state-clean ~ .findings-empty { display: none; }
     .report-footer { display: none; }
     a { color: var(--bl-color-fg-primary); }
   }

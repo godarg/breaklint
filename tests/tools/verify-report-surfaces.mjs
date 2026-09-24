@@ -328,6 +328,44 @@ function independentlyNormalizeScreenPixels(bytes) {
   };
 }
 
+/**
+ * Tablet and mobile cells ship viewport-height tiles. Each is re-cut here from the independently
+ * decoded full page and must match byte for byte in normalized RGBA: a tile can add no pixel the
+ * fingerprinted full page does not already bind.
+ */
+function independentlyCheckTiles(artifact, decodedFullPage) {
+  const viewport = artifact.cell.split("/")[3];
+  const viewportHeight = manifest.reviewEnvironment.viewports[viewport].height;
+  const expected = viewport === "desktop" ? 0 : Math.ceil(artifact.dimensions.height / viewportHeight);
+  assert.equal(artifact.tiles.length, expected, `${artifact.cell}: expected ${expected} viewport-height tiles`);
+  const width = decodedFullPage.decoded.width;
+  for (const [index, tile] of artifact.tiles.entries()) {
+    const top = index * viewportHeight;
+    const height = Math.min(viewportHeight, artifact.dimensions.height - top);
+    assert.equal(tile.top, top, `${artifact.cell}: tile ${index + 1} offset drift`);
+    assert.equal(tile.height, height, `${artifact.cell}: tile ${index + 1} height drift`);
+    const path = resolve(output, tile.path);
+    assert.equal(existsSync(path), true, `${artifact.cell}: missing tile ${tile.path}`);
+    assert.equal(hash(path), tile.sha256, `${artifact.cell}: tile hash drift ${tile.path}`);
+    const recut = createHash("sha256").update(decodedFullPage.rgba.subarray(top * width * 4, (top + height) * width * 4)).digest("hex");
+    const tilePixels = independentlyNormalizeScreenPixels(readFileSync(path));
+    assert.equal(tilePixels.contract.width, width, `${artifact.cell}: tile ${index + 1} width drift`);
+    assert.equal(tilePixels.contract.normalizedRgbaSha256, recut, `${artifact.cell}: tile ${index + 1} is not a crop of the fingerprinted full page`);
+    assert.equal(tile.normalizedRgbaSha256, recut, `${artifact.cell}: tile ${index + 1} manifest hash drift`);
+  }
+}
+
+/** The recorded accessibility contract of a screen cell. */
+function assertRecordedAccessibility(accessibility, label) {
+  const roles = (wanted) => accessibility.landmarks.filter((landmark) => landmark.role === wanted);
+  for (const wanted of ["banner", "main", "contentinfo"]) assert.equal(roles(wanted).length, 1, `${label}: expected one ${wanted} landmark`);
+  assert.deepEqual(roles("navigation").map((landmark) => landmark.name), ["Report contents"], `${label}: navigation landmark missing`);
+  assert.ok(accessibility.links.length >= 3 && accessibility.links.every((link) => ["h1", "h2", "h3", "main", "section"].includes(link.target ?? "")), `${label}: an in-page link has no target`);
+  assert.equal(accessibility.tableRoles.rowheader, accessibility.coverageRows, `${label}: coverage table row headers lost`);
+  assert.match(accessibility.firstTabStop.element, /skip-link/u, `${label}: first Tab stop is not the skip link`);
+  assert.ok(accessibility.firstTabStop.outlineWidthPx >= 2 && accessibility.firstTabStop.outlineStyle !== "none", `${label}: focus outline below 2 px`);
+}
+
 function printVisibleContract(state) {
   const pdf = manifest.artifacts.find((artifact) => artifact.cell === `print/${state}/pdf`);
   const raster = manifest.artifacts.find((artifact) => artifact.cell === `print/${state}/raster-set`);
@@ -493,6 +531,7 @@ for (const artifact of manifest.artifacts) {
     assert.deepEqual(artifact.pixels, independentlyDecoded.contract, `${artifact.cell}: decoded RGBA contract drift`);
     assert.deepEqual(artifact.dimensions, { width: independentlyDecoded.contract.width, height: independentlyDecoded.contract.height }, `${artifact.cell}: PNG dimensions disagree with decoded pixels`);
     visibleContract = { dimensions: artifact.dimensions, semantics: artifact.semantics, pixels: independentlyDecoded.contract };
+    independentlyCheckTiles(artifact, independentlyDecoded);
   } else {
     visibleContract = printVisibleContract(state);
   }
@@ -526,6 +565,7 @@ for (const artifact of manifest.artifacts) {
     assert.ok(artifact.semantics.contrast.minimum >= 4.5, `${artifact.cell}: WCAG AA contrast failed`);
     assertRecordedFonts(artifact.semantics.fonts, artifact.cell);
     assertRecordedTableGeometry(artifact.semantics.coverageTables, artifact.cell);
+    assertRecordedAccessibility(artifact.semantics.accessibility, artifact.cell);
     assert.ok(artifact.semantics.identifiers.every((identifier) => identifier.lines.length === 1 ||
       (identifier.lines.length === 2 && identifier.lines[0].endsWith("/"))), `${artifact.cell}: an identifier breaks outside its namespace slash`);
     const caveat = artifact.semantics.remediationCaveat;
@@ -540,14 +580,27 @@ for (const artifact of manifest.artifacts) {
   }
 }
 assert.ok(pixelMutationControl, "screen pixel mutation control did not run");
+{
+  // The gallery is what a reviewer opens: it must present every screen, tile and printed page.
+  const galleryPath = resolve(output, manifest.reviewGallery ?? "");
+  assert.equal(existsSync(galleryPath), true, "review gallery missing");
+  const gallery = readFileSync(galleryPath, "utf8");
+  const presented = manifest.artifacts.flatMap((artifact) => artifact.kind === "screen"
+    ? [artifact.path, ...artifact.tiles.map((tile) => tile.path)]
+    : artifact.kind === "raster-set" ? artifact.pages.map((page) => page.path) : [artifact.path]);
+  const missing = presented.filter((path) => !gallery.includes(`"${path}"`));
+  assert.deepEqual(missing, [], "review gallery omits artifacts");
+}
 assert.ok(fontMutationControl, "PDF font mutation control did not run");
 
 // The printed inventory is pinned rather than derived, so that a report which silently doubles in
 // length is a failing gate and not a shrug. History: 32 page rasters; 43 in 0.6.0 when every finding
 // gained a remediation box; 31 when coverage became one aligned table instead of thirteen six-label
 // cards (measured per state: clean 5 -> 2, findings 12 -> 9, infrastructure 13 -> 10,
-// insufficient-coverage 13 -> 10 on Chromium 141 / linux).
-assert.deepEqual(manifest.physicalArtifacts, { screens: 24, pdfs: 4, rasterPages: 31 }, "the report-surface inventory must be exactly 24 screens, 4 PDFs and 31 PDF page rasters");
+// insufficient-coverage 13 -> 10 on Chromium 141 / linux); 32 when the clean print kept its findings
+// section (clean 2 -> 3). Tablet and mobile cells also ship viewport-height tiles, pinned the same way.
+assert.deepEqual(manifest.physicalArtifacts, { screens: 24, screenTiles: 148, pdfs: 4, rasterPages: 32 },
+  "the report-surface inventory must be exactly 24 screens with 148 viewport tiles, 4 PDFs and 32 PDF page rasters");
 
 const latestRound = describeLatestRound(ledger, currentReviewInput.fingerprint);
 // The human gate's state belongs where a release reader looks, not only in a log line.
