@@ -71,6 +71,25 @@ references remain visible as inert text.
   the clean verdict already carries the same information and the duplicate block must not push one
   atomic coverage card onto a nearly empty terminal page.
 
+## Design tokens
+
+Both HTML renderers — the report and the bundle view's `report.html` — take every custom property
+from one token table, `src/report/html-tokens.ts`, under the breaklint prefix `--bl-`. Until 0.6.0
+the report reused the parent brand design system's prefix and the bundle view used unprefixed
+names; the decision recorded here is to fork: the report is a public MIT product surface, not an
+instance of that design system, no code links the two, and a shared or bare prefix invites silent
+cascade collisions when a host page embeds a report. The two renderers keep separate palettes (the
+bundle view has an explicit `theme` option and is outside the reviewed matrix) but share the module,
+the generator and the lint.
+
+A stylesheet lint in `npm test` holds both stylesheets to: one prefix, and no parent-system prefix
+anywhere in `src/`; every declared token consumed and every `var()` declared; no colour literal
+outside the generated token blocks; and dark and print blocks that redefine the complete colour set
+of the light block. Every foreground/background pair the report sets text in — including text on
+the `soft` background of the alert, the remediation box and the frequency note — is measured
+against WCAG AA from the table per theme and, in the surface gate, from computed style in every
+cell. Each lint rule has a red control in the same test.
+
 ## Trust and privacy boundary
 
 The document contains inline CSS only. It has no scripts, external fonts, external stylesheets,

@@ -1,8 +1,16 @@
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { renderHtml } from "../../src/report/html.ts";
+import { REPORT_HTML_STYLES } from "../../src/report/html-styles.ts";
+import {
+  BUNDLE_COLOR_TOKENS,
+  BUNDLE_TEXT_CONTRAST_PAIRS,
+  REPORT_COLOR_TOKENS,
+  REPORT_TEXT_CONTRAST_PAIRS,
+} from "../../src/report/html-tokens.ts";
+import { renderReport } from "../../src/api/bundle.ts";
 import { buildHtmlReportModel, safeEvidenceHref } from "../../src/report/html-model.ts";
 import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument } from "../../src/core/engine.ts";
@@ -221,7 +229,7 @@ describe("HTML Report Surface v2", () => {
     assert.match(html, /\.report-footer \{ display: none; \}/u, "the redundant screen footer must not create a print-only page");
     assert.match(html, /\.report-header\.state-clean ~ \.findings-empty \{ display: none; \}/u, "clean print must omit the redundant empty-findings block");
     assert.match(html, /overflow-wrap: anywhere/u);
-    assert.match(html, /outline: var\(--ds-focus-width\) solid/u);
+    assert.match(html, /outline: var\(--bl-focus-width\) solid/u);
   });
 });
 
@@ -375,5 +383,122 @@ describe("report-surface human review gate", () => {
     failed((ledger) => { (ledger.rounds.at(-1)!.binding!.reviewEnvironment as Record<string, unknown>).platformRelease = "6.18.44"; },
       new RegExp(`binds exactly ${DECLARED_ENVIRONMENT_FIELDS.join(", ")}`, "u"));
     failed((ledger) => { ledger.schemaVersion = 4; }, /human ledger schema drift/u);
+  });
+});
+
+/** The body of the first `{…}` block that follows `marker`, braces balanced. */
+function blockAfter(css: string, marker: string): string {
+  const start = css.indexOf(marker);
+  assert.ok(start >= 0, `stylesheet has no ${marker} block`);
+  const open = css.indexOf("{", start + marker.length - 1);
+  let depth = 0;
+  for (let index = open; index < css.length; index += 1) {
+    if (css[index] === "{") depth += 1;
+    if (css[index] === "}") depth -= 1;
+    if (depth === 0) return css.slice(open + 1, index);
+  }
+  throw new Error(`unbalanced ${marker} block`);
+}
+
+const declaredTokens = (css: string): string[] => [...css.matchAll(/(--[A-Za-z0-9_-]+)\s*:/gu)].map((match) => match[1]!);
+const NAMED_COLOURS = /\b(?:white|black|red|green|blue|gray|grey|silver|yellow|orange|purple|navy|maroon|teal|olive|lime|aqua|fuchsia)\b/iu;
+
+/**
+ * The stylesheet lint both HTML renderers are held to (G-37): one prefix, no foreign namespace,
+ * every declared token consumed, every consumed token declared, no colour outside the token blocks,
+ * and every themed block redefining the complete colour set of the light block.
+ */
+function lintStylesheet(css: string, themes: { colorPrefix: string; blocks: string[] }): string[] {
+  const issues: string[] = [];
+  const declared = declaredTokens(css);
+  const referenced = [...css.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)/gu)].map((match) => match[1]!);
+  for (const name of new Set(declared)) {
+    if (!/^--bl-[a-z0-9-]+$/u.test(name)) issues.push(`foreign or malformed token prefix: ${name}`);
+    if (!referenced.includes(name)) issues.push(`unused token: ${name}`);
+  }
+  for (const name of new Set(referenced)) if (!declared.includes(name)) issues.push(`undefined token reference: ${name}`);
+  if (css.includes("--ds-")) issues.push("the parent design-system prefix appears in the stylesheet");
+  const withoutTokens = css.replace(/--bl-[a-z0-9-]+\s*:[^;{}]*;/gu, "");
+  for (const [, property, value] of withoutTokens.matchAll(/([a-z-]+)\s*:\s*([^;{}]+)/gu)) {
+    if (/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/u.test(value!) || NAMED_COLOURS.test(value!)) {
+      issues.push(`colour literal outside the token blocks: ${property}: ${value!.trim()}`);
+    }
+  }
+  const lightColours = declaredTokens(blockAfter(css, ":root")).filter((name) => name.startsWith(themes.colorPrefix)).sort();
+  for (const marker of themes.blocks) {
+    const themed = declaredTokens(blockAfter(css, marker)).filter((name) => name.startsWith(themes.colorPrefix)).sort();
+    if (JSON.stringify(themed) !== JSON.stringify(lightColours)) issues.push(`partial theme in ${marker}: ${themed.length}/${lightColours.length} colour tokens`);
+  }
+  return issues;
+}
+
+function contrast(first: string, second: string): number {
+  const luminance = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255)
+      .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+  };
+  const [a, b] = [luminance(first), luminance(second)];
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+function bundleStylesheet(): string {
+  const style = /<style>([\s\S]*?)<\/style>/u.exec(renderReport(findingsReportState()))?.[1];
+  assert.ok(style, "the bundle view renders no stylesheet");
+  return style;
+}
+
+const REPORT_THEMES = { colorPrefix: "--bl-color-", blocks: ["@media (prefers-color-scheme: dark)", "@media print"] };
+const BUNDLE_THEMES = { colorPrefix: "--bl-bundle-color-", blocks: ["html[data-theme=dark]", "html[data-theme]{"] };
+
+describe("report stylesheet tokens", () => {
+  it("holds both HTML renderers to one prefix, a closed token set and colour only in token blocks", () => {
+    assert.deepEqual(lintStylesheet(REPORT_HTML_STYLES, REPORT_THEMES), [], "report stylesheet lint");
+    assert.deepEqual(lintStylesheet(bundleStylesheet(), BUNDLE_THEMES), [], "bundle view stylesheet lint");
+    // The rendered report carries the same stylesheet it was linted as.
+    assert.ok(renderHtml(cleanReportState()).includes(REPORT_HTML_STYLES), "renderHtml must embed the linted stylesheet unchanged");
+  });
+
+  it("rejects each drift the lint exists for (red controls)", () => {
+    const controls: [string, (css: string) => string, RegExp][] = [
+      ["colour literal in a component rule", (css) => css.replace("a:hover {", "a:hover { color: #123456;"), /colour literal outside the token blocks: color: #123456/u],
+      ["named colour in a component rule", (css) => css.replace("a:hover {", "a:hover { background: white;"), /colour literal outside the token blocks/u],
+      ["foreign prefix", (css) => css.replace(":root {", ":root { --ds-space-9: 1px; margin: var(--ds-space-9);"), /foreign or malformed token prefix: --ds-space-9/u],
+      ["undefined reference", (css) => css.replace("a:hover {", "a:hover { padding: var(--bl-space-99);"), /undefined token reference: --bl-space-99/u],
+      ["unused token", (css) => css.replace(":root {", ":root { --bl-unused: 0;"), /unused token: --bl-unused/u],
+      ["partial dark theme", (css) => css.replace(/(@media \(prefers-color-scheme: dark\) \{\s*:root \{[^}]*?)--bl-color-soft: [^;]+;/u, "$1"), /partial theme in @media \(prefers-color-scheme: dark\)/u],
+    ];
+    for (const [name, mutate, expected] of controls) {
+      const mutated = mutate(REPORT_HTML_STYLES);
+      assert.notEqual(mutated, REPORT_HTML_STYLES, `${name}: the red control did not change the stylesheet`);
+      assert.match(lintStylesheet(mutated, REPORT_THEMES).join("\n"), expected, `${name}: the lint did not reject it`);
+    }
+  });
+
+  it("keeps the parent design-system prefix out of every source file", () => {
+    const offenders: string[] = [];
+    const walk = (directory: URL): void => {
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const child = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, directory);
+        if (entry.isDirectory()) walk(child);
+        else if (/\.(?:ts|mjs|js|css|html)$/u.test(entry.name) && readFileSync(child, "utf8").includes("--ds-")) offenders.push(child.pathname);
+      }
+    };
+    walk(new URL("../../src/", import.meta.url));
+    assert.deepEqual(offenders, []);
+  });
+
+  it("meets WCAG AA for every text pair in every theme, including text on the soft background", () => {
+    for (const theme of ["light", "dark", "print"] as const) {
+      for (const [foreground, background] of REPORT_TEXT_CONTRAST_PAIRS) {
+        const ratio = contrast(REPORT_COLOR_TOKENS[foreground][theme], REPORT_COLOR_TOKENS[background][theme]);
+        assert.ok(ratio >= 4.5, `report ${theme}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1`);
+      }
+      for (const [foreground, background] of BUNDLE_TEXT_CONTRAST_PAIRS) {
+        const ratio = contrast(BUNDLE_COLOR_TOKENS[foreground][theme], BUNDLE_COLOR_TOKENS[background][theme]);
+        assert.ok(ratio >= 4.5, `bundle ${theme}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1`);
+      }
+    }
+    assert.ok(REPORT_TEXT_CONTRAST_PAIRS.some(([, background]) => background === "soft"), "text on soft must be measured (N7)");
   });
 });

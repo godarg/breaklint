@@ -42,6 +42,13 @@ const controls = [
   { name: "broken-partial-box-closure", state: "insufficient-coverage", expect: /coverage boxes have an open physical edge/u, sides: ["right"] },
   { name: "broken-left-box-closure", state: "insufficient-coverage", expect: /coverage boxes have an open physical edge/u, sides: ["left"] },
   { name: "broken-partial-both-box-closure", state: "insufficient-coverage", expect: /coverage boxes have an open physical edge/u, sides: ["left", "right"] },
+  {
+    name: "broken-soft-contrast",
+    state: "findings",
+    expect: /WCAG AA contrast failed/u,
+    phase: /"fg-muted\/soft":(?:[0-3]\.\d+|4\.[0-4]\d*)[,}]/u,
+    phaseHint: "the control no longer drives muted text on the soft background below 4.5:1",
+  },
 ];
 
 /**

@@ -37,6 +37,19 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   arguments, viewports and the print contract; the kernel release and the exact Node version are
   recorded as observations and no longer unbind a review after an OS or Node patch update.
 
+- **Both HTML renderers take their design tokens from one table under a `--bl-` prefix.** The
+  report reused the parent brand design system's `--ds-` prefix (with two dead tokens) and the
+  bundle view's `report.html` used bare names such as `--ink`; a host stylesheet embedding either
+  could collide with them. A consumer who restyled the report through those custom properties must
+  rename them. No pixel changed: all 24 screens and 43 page rasters of the surface matrix are
+  identical before and after. A stylesheet lint in `npm test` now rejects foreign prefixes, unused
+  or undefined tokens, colour literals outside the token blocks and partial themes, and the surface
+  gate also measures text contrast on the `soft` background.
+- **The bundle view printed with `theme: "dark"` is legible.** Its print rules forced white paper
+  and black ink but kept the dark palette's muted colour, so every label printed at 1.6:1
+  (`#c1ccc4` on white). Print now redefines the complete colour set; light-theme print and both
+  screen themes are pixel-identical to before.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as

@@ -12,6 +12,7 @@ import { PNG } from "pngjs";
 
 import { resolveBrowser } from "../../src/acquire/browser.ts";
 import { render } from "../../src/report/index.ts";
+import { REPORT_TEXT_CONTRAST_PAIRS, TOKEN_PREFIX } from "../../src/report/html-tokens.ts";
 import { canonicalReportStates } from "../fixtures/report-states.ts";
 import {
   REQUIRED_BROWSER_RENDER_ARGS,
@@ -36,7 +37,7 @@ const PRINT_MUTATION_CONTROL = process.env.BREAKLINT_SURFACE_PRINT_CONTROL ?? "n
 const PRINT_STATE_FILTER = process.env.BREAKLINT_SURFACE_STATE ?? null;
 const REPORT_STATES = ["clean", "findings", "infrastructure", "insufficient-coverage"];
 const BROWSER_RENDER_ARGS = [...REQUIRED_BROWSER_RENDER_ARGS];
-if (!["none", "broken-coverage", "broken-trust-geometry", "broken-tail-cohesion", "broken-box-closure", "broken-partial-box-closure", "broken-left-box-closure", "broken-partial-both-box-closure"].includes(PRINT_MUTATION_CONTROL)) {
+if (!["none", "broken-coverage", "broken-trust-geometry", "broken-tail-cohesion", "broken-box-closure", "broken-partial-box-closure", "broken-left-box-closure", "broken-partial-both-box-closure", "broken-soft-contrast"].includes(PRINT_MUTATION_CONTROL)) {
   throw new Error(`unknown BREAKLINT_SURFACE_PRINT_CONTROL=${PRINT_MUTATION_CONTROL}`);
 }
 if (PRINT_STATE_FILTER !== null && !REPORT_STATES.includes(PRINT_STATE_FILTER)) {
@@ -113,20 +114,15 @@ function contrastRatio(first, second) {
 }
 
 async function measuredContrast(page) {
-  const tokens = await page.evaluate(() => {
+  const names = [...new Set(REPORT_TEXT_CONTRAST_PAIRS.flat())];
+  const tokens = await page.evaluate((tokenNames, prefix) => {
     const style = getComputedStyle(document.documentElement);
-    return Object.fromEntries([
-      "bg-primary", "paper", "fg-primary", "fg-muted", "accent-warn", "accent-info",
-    ].map((name) => [name, style.getPropertyValue(`--ds-color-${name}`).trim()]));
-  });
-  const pairs = {
-    "fg-primary/bg-primary": contrastRatio(tokens["fg-primary"], tokens["bg-primary"]),
-    "fg-primary/paper": contrastRatio(tokens["fg-primary"], tokens.paper),
-    "fg-muted/bg-primary": contrastRatio(tokens["fg-muted"], tokens["bg-primary"]),
-    "fg-muted/paper": contrastRatio(tokens["fg-muted"], tokens.paper),
-    "accent-warn/paper": contrastRatio(tokens["accent-warn"], tokens.paper),
-    "accent-info/paper": contrastRatio(tokens["accent-info"], tokens.paper),
-  };
+    return Object.fromEntries(tokenNames.map((name) => [name, style.getPropertyValue(`${prefix}color-${name}`).trim()]));
+  }, names, TOKEN_PREFIX);
+  const pairs = Object.fromEntries(REPORT_TEXT_CONTRAST_PAIRS.map(([foreground, background]) => [
+    `${foreground}/${background}`,
+    contrastRatio(tokens[foreground], tokens[background]),
+  ]));
   const minimum = Math.min(...Object.values(pairs));
   if (minimum < 4.5) throw new Error(`WCAG AA contrast failed: ${JSON.stringify(pairs)}`);
   return { minimum, pairs };
@@ -470,7 +466,7 @@ try {
       await page.emulateMediaType("print");
       if (PRINT_MUTATION_CONTROL === "broken-coverage") {
         await page.addStyleTag({ content: `@media print {
-          .summary-grid > div:first-child dd { overflow-wrap: anywhere !important; font-size: var(--ds-font-size-xl) !important; white-space: normal !important; }
+          .summary-grid > div:first-child dd { overflow-wrap: anywhere !important; font-size: var(--bl-font-size-xl) !important; white-space: normal !important; }
           .coverage-list { display: grid !important; }
           .coverage-record { display: grid !important; grid-template-columns: minmax(11rem, 2fr) repeat(5, minmax(0, 1fr)) !important; break-inside: auto !important; page-break-inside: auto !important; }
           .coverage-record > div:first-child { grid-column: auto !important; }
@@ -513,8 +509,13 @@ try {
         await page.addStyleTag({ content: `@media print {
           .coverage-record::after { inset-block-end: auto !important; block-size: 80% !important; }
           .coverage-record::before { content: ""; position: absolute; z-index: 1; inset-inline-start: -4px;
-            inset-block-end: 0; inline-size: 10px; block-size: 20%; background: var(--ds-color-paper); }
+            inset-block-end: 0; inline-size: 10px; block-size: 20%; background: var(--bl-color-paper); }
         }` });
+      }
+      if (PRINT_MUTATION_CONTROL === "broken-soft-contrast") {
+        // Text on the soft background (alert, remediation box, frequency note) was not measured
+        // before the token table named the pair. Darken only `soft`: every other pair stays AA.
+        await page.addStyleTag({ content: `@media print { :root { --bl-color-soft: #8C8C86 !important; } }` });
       }
       const printContrast = await measuredContrast(page);
       const printSemantics = await page.evaluate(() => {
