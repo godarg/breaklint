@@ -82,8 +82,7 @@ npm run selfcheck
 
 `npm run build` comes before `test:real-document` because that gate runs `dist/cli/index.js`: in
 the other order a clean checkout fails, and a used one tests a stale build. The registry-provenance
-self-test runs in the release workflow rather than in `ci.yml`; `docs:rules:check` repeats an
-assertion `npm test` already makes, and is listed because it is the generator's own check.
+self-test runs in the release workflow rather than in `ci.yml`.
 
 Then check the packed package the way CI does, because none of the commands above sees it:
 
@@ -95,6 +94,7 @@ npm i "$repo/$tgz" --no-audit --no-fund
 npx breaklint --version                                  # prints the package.json version
 npx breaklint --demo > demo.out; echo "exit $?"          # exit 1
 node "$repo/tests/tools/readme-demo-contract.mjs" --consumer .
+node "$repo/tests/tools/docs-truth.mjs" --package node_modules/breaklint --pending "$repo/tests/tools/docs-truth-pending.jsonl"
 node "$repo/tests/tools/installed-config-contract.mjs"
 npm i --no-audit --no-fund --save-exact pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
 node "$repo/tests/tools/real-document-gate.mjs" --cli "$PWD/node_modules/breaklint/dist/cli/index.js" --cwd "$PWD"

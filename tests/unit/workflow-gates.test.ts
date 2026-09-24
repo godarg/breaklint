@@ -96,10 +96,9 @@ describe("workflow gates", () => {
   it("docs/releasing.md runs every ci.yml gate step in CI's order, and names why it runs any other", () => {
     const ci = gateSteps(runLinesOf(".github/workflows/ci.yml"));
     const release = new Set(gateSteps(runLinesOf(".github/workflows/release.yml")));
-    // A step the release checklist runs beyond CI's, and why it is there.
-    const EXTRA: Record<string, string> = {
-      "npm run docs:rules:check": "the generator's own check of the rule pages; npm test repeats it",
-    };
+    // A step the release checklist runs beyond both workflows, and why it is there. Empty: a
+    // gate worth running before a tag is worth running in CI.
+    const EXTRA: Record<string, string> = {};
     const listed = gateSteps(firstBashBlockAfter("docs/releasing.md", "## Before creating the tag"));
     assert.ok(isSubsequence(ci, listed), `docs/releasing.md leaves out or reorders a ci.yml step.\n  ci.yml:    ${ci.join(" | ")}\n  releasing: ${listed.join(" | ")}`);
     const unexplained = listed.filter((step) => !ci.includes(step) && !release.has(step) && !(step in EXTRA));

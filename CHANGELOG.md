@@ -166,7 +166,14 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   README, CONTRIBUTING.md, `docs/source-bound-findings.md`, `docs/status.md` and
   `docs/configuration.md` carried; two lines in `docs/reporting.md` are listed in
   `tests/tools/docs-truth-pending.jsonl` for the change that owns that page, and an entry that no
-  longer matches fails.
+  longer matches fails. The same check runs in `ci.yml`'s packed clean-install step against the
+  installed `node_modules/breaklint` — the README and docs a user installs, and the stamps of the
+  code installed with them.
+- **`npm run docs:rules:check` is a CI step.** `AGENTS.md` says generated artifacts are checked
+  with their generator; the rule-page remediation blocks written by `tools/write-rule-docs.ts`
+  were checked in CI only by a unit test that re-derives the same assertion, and the generator's
+  own `--check` ran in no workflow. The local gate lists in `CONTRIBUTING.md` and
+  `docs/releasing.md` follow, and `tests/unit/workflow-gates.test.ts` keeps them equal to `ci.yml`.
 
 ## 0.6.0 — 2026-09-18
 

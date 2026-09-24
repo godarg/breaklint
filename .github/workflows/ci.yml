@@ -77,6 +77,13 @@ jobs:
       - name: generated configuration schema has no drift
         run: npm run schema:check
 
+      - name: generated rule-page remediation blocks have no drift
+        # AGENTS.md: a generated artifact is checked with its generator. Each docs/rules page
+        # carries its rule's remediation.advice in a block tools/write-rule-docs.ts writes; until
+        # this step only a unit test re-derived that assertion, and the generator's own --check
+        # ran nowhere in CI.
+        run: npm run docs:rules:check
+
       - name: unit and e2e tests
         run: npm test
 
@@ -175,6 +182,11 @@ jobs:
           # THIS installed bin prints, not what the source tree prints: the published 0.6.0 README
           # said "seven findings" while its own --demo printed five.
           node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$PWD"
+          # Every schema stamp the shipped README and docs name is the stamp THIS installed package
+          # carries, read by running it. Mentions another change is still correcting are listed,
+          # and a listed mention that no longer occurs fails too.
+          node "$GITHUB_WORKSPACE/tests/tools/docs-truth.mjs" --package node_modules/breaklint \
+            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl"
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0

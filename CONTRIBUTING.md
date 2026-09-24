@@ -73,6 +73,7 @@ npm run test:advisories
 node tools/make-mark-font.mjs --check
 npm run typecheck
 npm run schema:check
+npm run docs:rules:check
 npm test
 npm run test:mutants
 npm run test:licenses
@@ -88,13 +89,14 @@ npm run selfcheck
 CI then checks the packed package, which no command above sees: it runs `npm pack`, installs the
 tarball into an empty directory, and there requires `npx breaklint --version` to print the
 `package.json` version, `npx breaklint --demo` to end with exit 1,
-`tests/tools/readme-demo-contract.mjs --consumer .` and `tests/tools/installed-config-contract.mjs`
-to pass, and — after installing the three renderer peers — `tests/tools/real-document-gate.mjs`
+`tests/tools/readme-demo-contract.mjs --consumer .`,
+`tests/tools/docs-truth.mjs --package node_modules/breaklint --pending tests/tools/docs-truth-pending.jsonl`
+and `tests/tools/installed-config-contract.mjs` to pass, and — after installing the three renderer peers — `tests/tools/real-document-gate.mjs`
 against the installed `dist/cli/index.js`. A second empty directory without the peers must end a
 real run with exit 3 and an install command. The `node-floor` job repeats the packed checks on Node
 22.13. Read those steps in `ci.yml` rather than a copy here.
 
-`npm run docs:rules:check` is not a CI step because `npm test` carries the same assertion
-(`tests/unit/registry.test.ts`); run `npm run docs:rules:write` after changing any rule's advice.
+Run `npm run docs:rules:write` after changing any rule's advice; `docs:rules:check` is the
+generator's own drift check, and `tests/unit/registry.test.ts` repeats it inside `npm test`.
 Read every exit code directly after its command: in `npm test | tail`, `$?` is the exit code of
 `tail`.
