@@ -32,7 +32,7 @@ import type {
   ResourceRecord,
 } from "../core/types.ts";
 import { assignPageCauses } from "../paginate/breaks.ts";
-import { boundaryFactsFrom, type CollectorResult } from "../paginate/collector.ts";
+import { boundaryFactsFrom, PAGE_AREA_SELECTOR, type CollectorResult } from "../paginate/collector.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InjectionResult } from "../source/inject.ts";
 import { coordinateAtUtf8Byte } from "../source/bytes.ts";
@@ -445,9 +445,36 @@ export const SNAPSHOT_SOURCE = `(() => {
     return count;
   };
   const pagesEls = P.all(document, ".pagedjs_page");
+  // FLOW MEMBERSHIP. A source block is part of the flow if and only if it lies inside its page's
+  // content area, the .pagedjs_area child of the page box: the page content and the footnote
+  // area. Everything else in a page box is a copy. Paged.js implements position: running(...) by
+  // deep-cloning the element into the margin box of EVERY page, and position: fixed by cloning it
+  // into every page box; both clones keep the injected source id and the paginator's data-ref.
+  // Querying the whole page counted each clone as one more fragment of its source block. Measured
+  // on 2026-09-24 (Paged.js 0.4.3) on a six-page document: a one-line running title became seven
+  // "fragments", which produced ten false widow and orphan warnings and anchored every page to
+  // the title. The running element's in-flow original (display: none, no box) stays in the page
+  // content and is kept.
+  //
+  // It is an INCLUSION test on the page structure, not an exclusion test on a class name, and
+  // that direction is chosen: an author element that happens to carry a margin-box class does not
+  // leave the flow, so no document can hide content from measurement by naming it. What the test
+  // cannot prevent is author markup inside a margin box that itself reproduces the page structure;
+  // that only brings back the old whole-page behaviour for that element, never a silent exclusion.
+  const PAGE_AREA_SELECTOR = ${JSON.stringify(PAGE_AREA_SELECTOR)};
+  const inFlow = (el) => P.closest(el, PAGE_AREA_SELECTOR) !== null;
+  // Without an area on a page, every block on it would be excluded and the rules would judge an
+  // empty document: a clean result about nothing. That is refused, never measured.
+  for (let index = 0; index < pagesEls.length; index += 1) {
+    if (P.all(pagesEls[index], PAGE_AREA_SELECTOR).length === 0) {
+      throw new Error("breaklint: page " + (index + 1) + " has no Paged.js content area (" + PAGE_AREA_SELECTOR +
+        "), so its flow content cannot be told apart from margin-box content");
+    }
+  }
   const fragments = [];
   const bySidCount = {};
   for (const page of pagesEls) for (const el of P.all(page, SOURCE_BLOCK_SELECTOR)) {
+    if (!inFlow(el)) continue;
     const sid = P.attr(el, "data-bl-sid");
     const sourceIdentity = sid || ("ref:" + (P.attr(el, "data-ref") || String(fragments.length)));
     bySidCount[sourceIdentity] = (bySidCount[sourceIdentity] || 0) + 1;
@@ -1011,8 +1038,15 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
     boundaryFactsFrom(input.collector.pages, input.cascadeHints),
     input.collector.pages.map((p) => p.blank),
   );
+  // A page is anchored to the first source block a reader can SEE on it. A block with no box at
+  // all — width and height both zero, which is what the browser reports under display: none — is
+  // skipped. The case that forced this is the in-flow original of a running element: Paged.js
+  // leaves it in the page content with an inline display: none while its clones print in the
+  // margin boxes, so it is the first block on its page in document order and would otherwise
+  // anchor that page, whose findings would then change fingerprint whenever the header is edited.
+  const hasBox = (block: BlockRecord): boolean => block.box.width !== 0 || block.box.height !== 0;
   const pages: PageRecord[] = input.raw.pages.map((page, index) => {
-    const first = blocks.find((b) => b.page === page.pageNumber && mappedNodeKeys.has(b.nodeKey));
+    const first = blocks.find((b) => b.page === page.pageNumber && mappedNodeKeys.has(b.nodeKey) && hasBox(b));
     const identity = first ? blockKey({ authorId: first.authorId, blockSignature: first.blockSignature }) : null;
     return {
       ...page,

@@ -293,18 +293,44 @@ decides applicability per fragment, and any future rule whose quantity belongs t
 rather than to the piece can repeat this. There is no gate that detects the shape; what caught this
 one was a red control that had quietly stopped being red.
 
-**Blocks carrying the same source id are not always fragments of one flow, and the snapshot does
-not distinguish them.** Paged.js implements `position: running(...)` by deep-cloning the element
-into the page margin box of every page, and the clone keeps the injected source id. The collector
-gathers blocks from the whole `.pagedjs_page`, margin boxes included, so `BlockRecord.fragmentIndex`
-and `BlockRecord.fragmentCount` count those clones as fragments. Measured on 2026-09-18: an ordinary
-twelve-page document whose only running header is three lines tall produced thirteen "fragments" of
-an 81.59 px header, and the first version of the summed height above reported 979.08 px against a
-619.83 px page as `severity: error` — a build-breaking finding on a document with nothing too tall
-in it. This rule now only counts a box that STARTS inside the content box of its page, which
-excludes a margin box by construction. **The underlying snapshot fields are still wrong for running
-elements**, and any other consumer of `fragmentIndex`/`fragmentCount` inherits that. Repairing the
-collector is a separate change with a wider blast radius and is not in this release.
+**Nothing printed in a page margin box is measured by any block, line or page rule.** Paged.js
+implements `position: running(...)` by deep-cloning the element into the margin box of every page,
+and `position: fixed` by cloning it into every page box; both clones keep the injected source id.
+The collector used to gather blocks from the whole `.pagedjs_page`, so every clone became one more
+"fragment" of its source block. Measured on 2026-09-24 with Paged.js 0.4.3: a six-page document
+with a one-line running title and an eight-line side running element carried seven records per
+element and reported ten widow/orphan warnings, every one about a clone; under a running header,
+the blank page a `break-before: recto` inserts was not blank, both of its boundaries came out
+`overflow`/`forced` instead of `parity`, it drew a `layout/orphaned-continuation-page` finding, and
+every page was anchored to the header, so three `layout/half-empty-page` findings on three pages
+shared one fingerprint. An earlier repair of the one symptom that could fail a build —
+`layout/unbreakable-block-too-tall` summing the clones — decided flow membership in that rule by
+coordinates, and that test also discarded every fragment of a full-bleed block (see below).
+
+The snapshot and the collector now keep only blocks inside a page's content area,
+`.pagedjs_pagebox > .pagedjs_area`. That area holds the page content **and the footnote area**:
+footnotes stay part of the page they are printed on, as before. It is an inclusion test on the page
+structure rather than an exclusion by class name, so author markup that happens to carry a
+`pagedjs_margin` class does not leave the flow, and a page with no content area stops the run
+(exit 3) instead of being measured as empty. What that leaves unmeasured, stated because no rule
+reports it:
+
+- **Margin-box content.** A widow, an oversized block or an unfilled band inside a running header or
+  footer is not judged. Generated margin content (`@top-center { content: "…" }`) never was.
+- **A running element keeps exactly one record**: the in-flow original Paged.js leaves in the page
+  content with an inline `display: none`. It has no box and no lines, so the geometry rules measure
+  it as zero height; the type rules still read its source text once, attributed to that position,
+  where there is no box for evidence to mark. It never anchors a page: a page is anchored to its
+  first block that has a box.
+- **A `position: fixed` element is not measured at all.** Paged.js removes it from the flow, so there
+  is no in-flow original, and its per-page clones are outside the content area.
+- **Inline SVG inside a margin box is still collected once per page, and SVG text there stops the
+  run.** The SVG collector still reads the whole page, so a running element that contains an SVG
+  contributes one SVG record per page, all with one key. When that SVG carries `<text>` and the
+  element repeats on two or more pages, every clone carries the same injected target id,
+  `svg/text-overflows-viewport` sees one target evaluated twice, and its accounting invariant ends
+  the run `checker-crashed` (exit 3). Measured on 2026-09-24 on a three-page document with a
+  running logo; it predates the flow repair above and is not changed by it.
 
 **How often oversized `break-inside: avoid` blocks occur in real documents is not measured.** The
 repair is arithmetically correct and conservative, but its frequency in the field is unknown, so
@@ -334,10 +360,26 @@ longer claims anything about pages it did not measure. A block that would have f
 differently sized page elsewhere in the document is still reported, because it still broke its own
 `break-inside: avoid` where it was.
 
-**Fragments are correlated by authoring-source id.** A block whose fragments carry no `sid` — a
-node the paginator produced with no authoring source — keeps the old first-fragment behaviour. It
-is not guessed at by geometry, and it is not reported as a decline either, because the first
-fragment is still a real measurement of a real box.
+**Flow membership is decided by page structure, never by coordinates, so a fragment that bleeds
+into the margin still counts.** `layout/unbreakable-block-too-tall` sums every record carrying the
+element's source id. A coordinate test ("a real fragment starts inside the content box") cannot tell
+a margin box from a fragment that bleeds into the margin: measured on 2026-09-24, a
+`break-inside: avoid` block with negative side margins had all six fragments at x = 18.91 against a
+content box at x = 56.69, the filter discarded every one of them, the first fragment (335.81 px
+against 340.16 px) was measured instead of the 1865.61 px sum, and the document came back `clean`.
+It is reported again.
+
+**Fragments are correlated by authoring-source id, and a split block that cannot be correlated is
+declined, not measured on one piece.** A split block whose fragments carry no `sid` — every block of
+a `--no-source-map` run, or an element a script created — has nothing to join its fragments by, and
+neither has one whose sid does not account for exactly the fragments the snapshot counted.
+`layout/unbreakable-block-too-tall` used to measure the first fragment of such a block, which
+compares a piece with the page and can call a six-page block clean. It now declines it as
+`env/invalid-measurement`, which counts against the rule's coverage floor: the run ends
+`insufficient-coverage` (exit 4) rather than `clean`. An unsplit block without a sid is the whole
+block and is still measured. In a `--no-source-map` run a split block does not reach the rule today:
+measured on 2026-09-24, the sid-less source join refuses it first (`checker-crashed`, exit 3). The
+decline is what remains once that join can join fragments.
 
 **Naming an off-by-default rule in a config file turns it on, even with only options.** `rules` is
 read as "the caller has an opinion about this rule": `false` disables, anything else enables, and

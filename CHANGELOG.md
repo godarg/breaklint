@@ -7,16 +7,72 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
 ### Rule behaviour
 
 - **`layout/unbreakable-block-too-tall`: a `position: running(...)` element placed in a side
-  margin box (`@left-middle`, `@right-middle`) is no longer summed into a false `error`.** In
-  0.6.0 the filter that keeps per-page margin-box clones out of the fragment sum tested only the
-  vertical axis. A side margin box starts at a content-box `y`, so its clones passed that test and
-  a short running element repeated on three or more pages could be reported as a block taller than
-  the page (e46a1bf). The 0.6.0 section below claimed this exclusion held "by construction"; it
-  held for the top and bottom margin boxes only.
+  margin box (`@left-middle`, `@right-middle`) is no longer summed into a false `error`, and a
+  full-bleed block is no longer judged on one piece.** In 0.6.0 the filter that keeps per-page
+  margin-box clones out of the fragment sum tested only the vertical axis. A side margin box starts
+  at a content-box `y`, so its clones passed that test and a short running element repeated on
+  three or more pages could be reported as a block taller than the page: the 0.6.0 rule reports
+  582.00 px against 340.16 px for a 97 px side element on six pages. The 0.6.0 section below claimed
+  this exclusion held "by construction"; it held for the top and bottom margin boxes only. The first
+  repair (e46a1bf) added the horizontal axis, and that coordinate test was wrong in the other
+  direction: a `break-inside: avoid` block with negative side margins has every fragment left of
+  the content box, so all six fragments of a 1865.61 px block were discarded, its first fragment
+  (335.81 px) was measured against the 340.16 px page, and the document came back `clean` at
+  exit 0 — a regression against 0.6.0, which reported it. **The coordinate filter is gone.** Flow
+  membership is now decided by the page structure, in the snapshot rather than in this rule (see
+  *Fixed* below), and the rule sums every fragment of the element wherever its box lies: the
+  full-bleed block is an `error` again at 1865.61 px, and the side-margin element is silent.
+  Measured on 2026-09-24 with Paged.js 0.4.3, on the live fixtures `fullbleed-avoid.html` and
+  `margin-running-elements.html`.
+- **The same rule declines a split block whose fragments it cannot join, instead of measuring its
+  first fragment.** Fragments are joined by source id. A split block without one — every block of a
+  `--no-source-map` run, or an element a script created — or one whose id does not account for
+  exactly the fragments the snapshot counted used to be judged on its first fragment, which
+  compares a piece with the page and can call a six-page block clean. It is now declined as
+  `env/invalid-measurement` (newly listed in the rule's declared decline reasons). The decline
+  counts against the rule's coverage floor, so such a run ends `insufficient-coverage` at exit 4
+  where it could end `clean` before. An unsplit block without a source id is measured as before.
 - **The same rule's advice no longer claims the block "cannot fit unbroken on any page".** The
   finding message had already stopped making that all-pages claim from one measured page; the
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
   compared advice text will see the new string.
+
+### Fixed
+
+- **Margin-box content is no longer part of the flow: not in the snapshot, not in the collector's
+  page edges, not in page anchors.** Paged.js clones every `position: running(...)` element into a
+  margin box of every page and every `position: fixed` element into every page box, and each clone
+  keeps the source id. Both in-page collectors read the whole `.pagedjs_page`, so every clone was
+  one more fragment of its source block. Measured on 2026-09-24 with Paged.js 0.4.3 before this
+  change: a six-page document with a one-line running title and an eight-line side running
+  element carried seven records per element and reported ten `layout/widow`/`layout/orphan`
+  warnings, all about clones (exit 1 under `--fail-on warn`); under a running header, the blank
+  page a `break-before: recto` inserts was not blank, its two boundaries were classified
+  `overflow` and `forced` instead of `parity`, `layout/orphaned-continuation-page` fired on it, and
+  every page was anchored to the header. Both collectors now keep only blocks inside a page's
+  content area (`.pagedjs_pagebox > .pagedjs_area`, which holds the page content and the footnote
+  area — footnotes stay in the flow). A page is anchored to its first block that has a box, so the
+  running element's in-flow original, which Paged.js hides with `display: none`, no longer anchors
+  page 1 either. A page with no content area stops the run at exit 3 instead of being measured as
+  empty. After the change both documents above have no findings. **What this leaves unmeasured is
+  new and is stated in `docs/limitations.md`**: nothing printed in a margin box is judged by any
+  block, line or page rule, and a `position: fixed` element is not measured at all. Inline SVG in a
+  margin box is not covered by this change. Pure exclusion: no field is added or removed, and the
+  Snapshot stamp stays 4 — but `blocks`, `fragmentIndex`/`fragmentCount`, `blank`, the break causes
+  and `firstSemanticBlockKey` mean something different for every document with running elements.
+- **Page-finding fingerprints change for every document with running elements** (or
+  `position: fixed` elements, or a page whose first block is `display: none`). A page finding's
+  fingerprint is keyed to the page's first semantic block. The margin boxes and page-box clones
+  precede the content area in the page box, so for such a document that was, on EVERY page, that
+  page's clone of the same running element — one source block, one key: three
+  `layout/half-empty-page` findings on three pages carried one fingerprint, a collision the tool
+  manufactured. They are now keyed to each page's first visible in-flow block, and findings about
+  clones are gone. A baseline that keys
+  on `Finding.fingerprint` (or on SARIF `properties.fingerprint`) will show the old page findings as
+  gone and the re-keyed ones as new although the document did not change: take a new baseline
+  after upgrading. `compareReports` does not match by fingerprint and is not misled: page-only
+  findings are unmatchable there, and it never calls a finding `persisting` or `resolved` across
+  two tool versions.
 
 ### Documentation
 

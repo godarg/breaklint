@@ -85,6 +85,29 @@ ${Array.from({ length: 7 }, (_, i) => `<p id="r${i}">R${i} paragraph inside a NA
 </body></html>`;
 
 /**
+ * The same parity mechanism with a running header, which Paged.js clones into the margin box of
+ * EVERY page — the blank verso page included — keeping the header's source id.
+ *
+ * The collector used to read source nodes from the whole page, so on this document the clone made
+ * the blank page look occupied and both of its boundaries lost `parity`. It also became the first
+ * source-bearing node of every page, because the margin boxes precede the content area in the
+ * page box. The header is the first element of the source on purpose: its in-flow original, which
+ * Paged.js hides with `display: none`, then sits on page 1 and is a real edge of the flow there.
+ */
+const RUNNING_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@page{size:120mm 80mm;margin:10mm}
+@page{ @top-center{ content: element(title) } }
+body{font:9pt/1.4 Georgia,serif;margin:0} p,h2{margin:0 0 6px} h2{font-size:11pt}
+.title{ position: running(title) }
+.recto{ break-before: recto }
+</style></head><body>
+<p class="title" id="rtitle">Running title on every page</p>
+<p id="rc1">Chapter one, the only paragraph on the first page.</p>
+<h2 class="recto" id="rch2">Chapter two opens on a recto page</h2>
+<p id="rc2">Chapter two text.</p>
+</body></html>`;
+
+/**
  * The pagination bootstrap breaklint owns: `paged.js`, never the auto-previewing polyfill.
  *
  * The replacement is a FUNCTION, and that is not style. `String.replace` interprets `$&`, `` $` ``,
@@ -101,7 +124,9 @@ describe("the collector, live", () => {
   let serverLifecycle: ReturnType<typeof ownServerLifecycle> | null = null;
   let origin = "";
   let served = "";
+  let servedRunning = "";
   let sidByAuthorId: Record<string, string> = {};
+  const runningSidByAuthorId: Record<string, string> = {};
 
   before(async () => {
     if (missing.length > 0) {
@@ -124,10 +149,17 @@ describe("the collector, live", () => {
     }
     const pagedjs = readFileSync(join(pagedjsRoot!, "dist", "paged.js"), "utf8");
     served = withPagination(injected.html, pagedjs, true);
+    assert.equal(detectCollision([{ origin: "document", text: RUNNING_HTML }]).collided, false);
+    const running = injectSourceIds(RUNNING_HTML, "running.html");
+    for (const [sid, ref] of Object.entries(running.map)) {
+      const id = /\bid="([^"]+)"/u.exec(RUNNING_HTML.slice(ref.offset, ref.offset + 200))?.[1];
+      if (id) runningSidByAuthorId[id] = sid;
+    }
+    servedRunning = withPagination(running.html, pagedjs, true);
 
-    server = createServer((_req, res) => {
+    server = createServer((req, res) => {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(served);
+      res.end(req.url === "/running.html" ? servedRunning : served);
     });
     serverLifecycle = ownServerLifecycle(server);
     await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", () => resolve()));
@@ -156,7 +188,7 @@ describe("the collector, live", () => {
     assert.equal(browserProfile ? existsSync(browserProfile) : false, false);
   });
 
-  async function collect(): Promise<{ page: PageLike; result: CollectorResult }> {
+  async function collect(path = "/doc.html"): Promise<{ page: PageLike; result: CollectorResult }> {
     const collectorNonce = "breaks-live-collector";
     const page = await browser!.newPage();
     await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(
@@ -167,7 +199,7 @@ describe("the collector, live", () => {
     );
     await page.setViewport({ width: 900, height: 700 });
     await page.emulateMediaType("print");
-    await page.goto(`${origin}/doc.html`, { waitUntil: "load", timeout: 30_000 });
+    await page.goto(`${origin}${path}`, { waitUntil: "load", timeout: 30_000 });
     await page.evaluate<void>(collectorSource(TEST_PRIMITIVES_CAPABILITY, collectorNonce));
     await page.evaluate<void>(paginationApparatusSource(TEST_PRIMITIVES_CAPABILITY));
     const pagination = await page.evaluate<{ paginationError: string | null }>(PAGINATION_PREVIEW_SOURCE);
@@ -318,6 +350,35 @@ describe("the collector, live", () => {
     assert.equal(causes[blankIndex]!.incoming.kind, "parity", "the boundary INTO the blank page");
     assert.equal(causes[blankIndex]!.outgoing.kind, "parity", "the boundary OUT of the blank page");
     assert.equal(causes[blankIndex]!.outgoing.determinedBy, "page-blank");
+    await page.close();
+  });
+
+  /**
+   * The recto blank page again, now under a running header. The premise is checked against the
+   * paginated tree itself before the collector is judged: the header must really be cloned into a
+   * margin box of every page, or a collector that still counted clones would pass by accident.
+   */
+  it("a running header cloned into every margin box does not occupy the recto blank page", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    for (const id of ["rtitle", "rc1", "rch2", "rc2"]) {
+      assert.ok(runningSidByAuthorId[id], `no source id was mapped for #${id}; the assertions below would be vacuous`);
+    }
+    const { page, result } = await collect("/running.html");
+    const title = runningSidByAuthorId["rtitle"]!;
+    const clones = await page.evaluate<number[]>(`[...document.querySelectorAll(".pagedjs_page")].map((pageEl) =>
+      pageEl.querySelectorAll(".pagedjs_margin [data-bl-sid='${title}']").length)`);
+    assert.equal(result.pages.length, 3, "chapter one, the inserted verso page, chapter two");
+    assert.deepEqual(clones, [1, 1, 1], "premise: Paged.js cloned the header into a margin box of every page");
+
+    assert.deepEqual(result.pages.map((p) => p.blank), [false, true, false], "a margin-box clone made the blank page look occupied");
+    assert.deepEqual(result.pages.map((p) => p.firstSid), [title, null, runningSidByAuthorId["rch2"]],
+      "a margin-box clone became the first node of a page");
+    assert.deepEqual(result.pages.map((p) => p.lastSid), [runningSidByAuthorId["rc1"], null, runningSidByAuthorId["rc2"]]);
+    const causes = assignPageCauses(result.pages.length, boundaryFactsFrom(result.pages), result.pages.map((p) => p.blank));
+    assert.equal(causes[1]!.incoming.kind, "parity", "the boundary INTO the blank page");
+    assert.equal(causes[1]!.outgoing.kind, "parity", "the boundary OUT of the blank page");
+    assert.equal(causes[1]!.outgoing.determinedBy, "page-blank");
+    assert.deepEqual(result.attributeDrift, []);
     await page.close();
   });
 

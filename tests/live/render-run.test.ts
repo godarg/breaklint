@@ -22,6 +22,9 @@ import { straightQuotes } from "../../src/rules/type/straight-quotes.ts";
 import { textOverflowsViewport } from "../../src/rules/svg/text-overflows-viewport.ts";
 import { textClipped } from "../../src/rules/svg/text-clipped.ts";
 import { blockKey } from "../../src/core/fingerprint.ts";
+import { coverageFloorMap, resolveConfig } from "../../src/config/resolve.ts";
+import type { DocumentInput } from "../../src/core/engine.ts";
+import type { BlockRecord, Finding } from "../../src/core/types.ts";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 const FIXTURES = join(REPO, "tests", "fixtures");
@@ -31,6 +34,33 @@ const missing = [
   resolvePackageRoot("pagedjs", REPO) ? null : "pagedjs",
   resolvePackageRoot("pdfjs-dist", REPO) ? null : "pdfjs-dist",
 ].filter((value): value is string => value !== null);
+
+/** The whole registry under the default profile, optionally with rule overrides, as the CLI runs it. */
+function withProfile(document: DocumentInput, rules: Record<string, unknown> = {}) {
+  const config = resolveConfig({ file: { rules }, cli: {} });
+  return runDocument(document, {
+    failOn: config.failOn, activeRules: config.activeRules, optionsByRule: config.optionsByRule,
+    coverageFloors: coverageFloorMap(config),
+  });
+}
+
+/**
+ * Findings of one rule that share a fingerprint, as `rule on pages a, b share <fp>`. On a document
+ * whose content is distinct by construction, every entry is a collision the tool manufactured —
+ * the v1 key may legitimately be shared by two IDENTICAL source blocks, which is why this is a test
+ * and not an engine assertion.
+ */
+function fingerprintCollisions(findings: readonly Finding[]): string[] {
+  const out: string[] = [];
+  for (const rule of new Set(findings.map((finding) => finding.ruleId))) {
+    const own = findings.filter((finding) => finding.ruleId === rule);
+    for (const fingerprint of new Set(own.map((finding) => finding.fingerprint))) {
+      const pages = own.filter((finding) => finding.fingerprint === fingerprint).map((finding) => finding.page);
+      if (pages.length > 1) out.push(`${rule} on pages ${pages.join(", ")} share ${fingerprint.slice(0, 16)}`);
+    }
+  }
+  return out;
+}
 
 function options(outDir: string, sourceMapInjection = true): RenderOptions {
   return {
@@ -50,7 +80,7 @@ describe("the M2d live production chain", () => {
   let noSource: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
-    if (result?.documents.length === 24 && noSource?.documents.length === 4) return true;
+    if (result?.documents.length === 27 && noSource?.documents.length === 4) return true;
     t.skip(
       `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
       `no-source=${noSource?.documents.length ?? 0}`,
@@ -110,6 +140,9 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "svg-in-viewport.html"),
         join(FIXTURES, "svg-geometry-declines.html"),
         join(FIXTURES, "fragmentainer-residue.html"),
+        join(FIXTURES, "margin-running-elements.html"),
+        join(FIXTURES, "margin-running-parity.html"),
+        join(FIXTURES, "fullbleed-avoid.html"),
       ],
       options(join(root, "evidence")),
     );
@@ -137,7 +170,7 @@ describe("the M2d live production chain", () => {
     }));
     assert.equal(
       result?.documents.length,
-      24,
+      27,
       `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
     );
     assert.equal(
@@ -868,5 +901,119 @@ describe("the M2d live production chain", () => {
     } finally {
       await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
     }
+  });
+
+  /**
+   * `position: running(...)` clones are not part of the flow. Paged.js deep-clones both running
+   * elements into a margin box of every page and each clone keeps the source id; measured before
+   * this was fixed, the snapshot carried seven records per running element on this six-page
+   * document and the default profile reported ten widow/orphan warnings, all about clones.
+   */
+  it("keeps running() margin-box clones out of the snapshot, the page anchors and the findings", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[24]!;
+    const snapshot = document.snapshot;
+    assert.ok(snapshot, `no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    assert.ok(snapshot.pages.length >= 3, `the fixture must span at least three pages, got ${snapshot.pages.length}`);
+    for (const id of ["running-title", "running-side"]) {
+      const records: BlockRecord[] = snapshot.blocks.filter((block) => block.authorId === id);
+      assert.equal(records.length, 1, `${id}: ${records.length} records on ${snapshot.pages.length} pages — margin-box clones counted as fragments`);
+      assert.equal(records[0]!.fragmentCount, 1);
+      assert.deepEqual(records[0]!.box, { x: 0, y: 0, width: 0, height: 0 }, `${id}: the kept record is not the hidden in-flow original`);
+      assert.equal(snapshot.textLines.some((line) => line.blockKey === records[0]!.nodeKey), false, `${id}: a clone contributed text lines`);
+    }
+    // Nothing in this document bleeds: every block with a box lies inside its page's content box,
+    // so a box anywhere else would be margin-box content.
+    for (const block of snapshot.blocks.filter((item) => item.box.width > 0 || item.box.height > 0)) {
+      const box = snapshot.pages[block.page - 1]!.contentBox;
+      assert.ok(
+        block.box.x >= box.x - 0.5 && block.box.y >= box.y - 0.5 &&
+          block.box.x + block.box.width <= box.x + box.width + 0.5 && block.box.y + block.box.height <= box.y + box.height + 0.5,
+        `${block.nodeKey} (${block.authorId}) lies outside the content box of page ${block.page}: ${JSON.stringify(block.box)}`,
+      );
+    }
+    const anchors = snapshot.pages.map((page) => page.firstSemanticBlockKey);
+    assert.equal(new Set(anchors).size, anchors.length, `pages share an anchor: ${JSON.stringify(anchors)}`);
+    assert.equal(anchors.some((anchor) => /running-(title|side)/u.test(anchor ?? "")), false, `a page is anchored to a running element: ${JSON.stringify(anchors)}`);
+
+    const outcome = withProfile(document);
+    assert.deepEqual(
+      outcome.report.findings.map((finding) => `${finding.ruleId}@${finding.page}:${finding.target.nodeKey}`),
+      [],
+      "a document of one-line paragraphs and two running elements has nothing to report",
+    );
+    assert.equal(exitCodeFor(outcome.report.verdict), 0);
+    assert.deepEqual(fingerprintCollisions(withProfile(document, { "layout/half-empty-page": true }).report.findings), []);
+  });
+
+  /**
+   * The parity-blank page stays blank under a running header. Measured before this was fixed: the
+   * header clone made page 2 look occupied, its boundaries came out `overflow` and `forced`, the
+   * default profile reported a widow, an orphan and an orphaned continuation page, and with
+   * `layout/half-empty-page` on, three findings on three pages carried one fingerprint.
+   */
+  it("keeps a running header from occupying a parity-blank page or anchoring its neighbours", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[25]!;
+    const snapshot = document.snapshot;
+    assert.ok(snapshot, `no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    assert.equal(snapshot.pages.length, 3, "chapter one, the inserted verso page, chapter two");
+    // The blank page identified independently of the field under test and of the block records:
+    // by its measured fill, which is read from the text and replaced boxes of the page CONTENT and
+    // has never seen a margin box.
+    assert.deepEqual(
+      snapshot.pages.map((page) => page.fill.net > 0),
+      [true, false, true],
+      "premise: chapter two starts on page 3 after a page 2 with nothing in its content area",
+    );
+    assert.deepEqual(snapshot.pages.map((page) => page.blank), [false, true, false], "a margin-box clone made the blank page look occupied");
+    const blank = snapshot.pages[1]!;
+    assert.equal(blank.incomingBreakCause.kind, "parity");
+    assert.equal(blank.outgoingBreakCause.kind, "parity");
+    assert.equal(blank.outgoingBreakCause.determinedBy, "page-blank");
+    assert.deepEqual(
+      snapshot.pages.map((page) => page.firstSemanticBlockKey),
+      [blockKey({ authorId: "c1p1", blockSignature: "" }), null, blockKey({ authorId: "chapter-two", blockSignature: "" })],
+      "a page is anchored to the running header, its hidden original, or nothing",
+    );
+
+    const outcome = withProfile(document);
+    assert.deepEqual(outcome.report.findings.map((finding) => `${finding.ruleId}@${finding.page}`), []);
+    assert.equal(exitCodeFor(outcome.report.verdict), 0);
+    const halfEmpty = withProfile(document, { "layout/half-empty-page": true }).report.findings;
+    assert.ok(halfEmpty.length > 0, "premise: the sparse chapter pages produce page findings, or the fingerprint guard checks nothing");
+    assert.deepEqual(fingerprintCollisions(halfEmpty), []);
+    assert.equal(halfEmpty.some((finding) => finding.page === 2), false, "a finding on the parity-blank page");
+  });
+
+  /**
+   * A full-bleed `break-inside: avoid` block is still judged on all of its fragments. Its negative
+   * side margins put every fragment left of the content box; the coordinate filter this rule used
+   * to carry discarded all of them, measured the first fragment (335.81 px against 340.16 px) and
+   * the document came back clean at exit 0.
+   */
+  it("reports a full-bleed unbreakable block whose fragments all lie outside the content box", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[26]!;
+    const snapshot = document.snapshot;
+    assert.ok(snapshot, `no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    const fragments = snapshot.blocks.filter((block) => block.authorId === "full-bleed");
+    assert.ok(fragments.length >= 3, `the block must split into three or more fragments, got ${fragments.length}`);
+    for (const fragment of fragments) {
+      const box = snapshot.pages[fragment.page - 1]!.contentBox;
+      assert.ok(fragment.box.x < box.x - 1, `premise: fragment ${fragment.fragmentIndex} starts inside the content box (${fragment.box.x} vs ${box.x})`);
+    }
+    const outcome = withProfile(document);
+    const tooTall = outcome.report.findings.filter((finding) => finding.ruleId === "layout/unbreakable-block-too-tall");
+    assert.equal(tooTall.length, 1, "the full-bleed block was judged on one piece");
+    const sum = fragments.reduce((total, fragment) => total + fragment.box.height, 0);
+    assert.equal(tooTall[0]!.target.sid, fragments[0]!.sid);
+    assert.ok(Math.abs(tooTall[0]!.measurement.value - sum) < 0.01, `value ${tooTall[0]!.measurement.value} is not the sum ${sum}`);
+    assert.ok(tooTall[0]!.measurement.value > 3 * tooTall[0]!.measurement.threshold);
+    assert.equal(tooTall[0]!.severity, "error");
+    assert.equal(exitCodeFor(outcome.report.verdict), 1, "a build-breaking block must end the run at exit 1");
   });
 });

@@ -134,17 +134,20 @@ describe("target evaluation contract", () => {
    *     block's border (and `!important` padding) at every split edge, so a block that fitted
    *     unsplit can sum above the page. From three fragments on that cannot happen — an
    *     intermediate fragment fills a whole content box and carries content before and after it.
-   *   - boxes that start outside the content box: not part of the flow. `position: running(...)`
-   *     is cloned into the margin box of every page and the clone keeps the source id.
+   *   - boxes that start outside the content box: STILL fragments. Flow membership is decided by
+   *     the snapshot, which keeps only blocks inside a page's content area, so a
+   *     `position: running(...)` clone never reaches this rule (tests/unit/margin-boxes.test.ts);
+   *     a coordinate test here would instead discard every fragment of a full-bleed block.
+   *   - fragments that cannot be joined into one element: declined, never measured on one piece.
    *   - a second page geometry: the boundary is the page the block was laid out on, not the
    *     largest page in the document. Taking the largest hides a real oversized block in any
    *     document that also has a landscape page.
    *   - one fragment: exactly the 0.5.0 behaviour, unchanged.
    */
-  it("measures a split block over its fragments and refuses the three ways that sum can lie", () => {
+  it("measures a split block over its fragments and refuses the ways that sum can lie", () => {
     const run = (snapshot: Snapshot) =>
       unbreakableBlockTooTall.run(snapshot, { ...context, options: unbreakableBlockTooTall.defaultOptions, fingerprint });
-    const fragmented = (boxes: readonly ({ height: number; y?: number; x?: number })[]): Snapshot => {
+    const fragmented = (boxes: readonly ({ height: number; y?: number; x?: number; width?: number })[]): Snapshot => {
       const snapshot = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
       const template = snapshot.blocks[0]!;
       snapshot.blocks = boxes.map((shape, index) => {
@@ -152,7 +155,10 @@ describe("target evaluation contract", () => {
         fragment.nodeKey = `t1:${index}`;
         fragment.fragmentIndex = index;
         fragment.fragmentCount = boxes.length;
-        fragment.box = { ...template.box, height: shape.height, ...(shape.y === undefined ? {} : { y: shape.y }), ...(shape.x === undefined ? {} : { x: shape.x }) };
+        fragment.box = {
+          ...template.box, height: shape.height, ...(shape.y === undefined ? {} : { y: shape.y }),
+          ...(shape.x === undefined ? {} : { x: shape.x }), ...(shape.width === undefined ? {} : { width: shape.width }),
+        };
         return fragment;
       });
       return snapshot;
@@ -187,36 +193,61 @@ describe("target evaluation contract", () => {
     assert.equal(whole.findings[0]!.measurement.value, 848);
     assert.doesNotMatch(whole.findings[0]!.message, /fragments/u, "an unsplit block must not mention fragments");
 
-    // A box that starts OUTSIDE the page content box is not a fragment of the flow. Paged.js
-    // implements `position: running(...)` by cloning the element into the margin box of every
-    // page, and the clone keeps the injected source id — measured on 2026-09-18, an ordinary
-    // twelve-page document with a three-line running header reported this `error` rule at
-    // 979.08 px against a 619.83 px page, for a header 81.59 px tall. The content box of this
-    // fixture starts at y = 48; a margin box sits above it.
-    const runningHeader = run(fragmented([
-      { height: 90, y: 8 }, { height: 90, y: 8 }, { height: 90, y: 8 },
-      { height: 90, y: 8 }, { height: 90, y: 8 }, { height: 90, y: 8 },
-      { height: 90, y: 8 }, { height: 90, y: 8 },
-    ]));
-    assert.deepEqual(
-      runningHeader.findings,
-      [],
-      "per-page clones of a running element were summed as if they were fragments of one flow",
-    );
-    assert.equal(runningHeader.evaluations!.find((row) => row.status === "measured")!.measurements[0]!.value, 90);
+    // A full-bleed block: negative side margins put EVERY fragment left of the content box
+    // (x = 8 against a content box at x = 48). Measured on 2026-09-24: a five-and-a-half-page
+    // `break-inside: avoid` block with six fragments at x = 18.91 against a content box at
+    // x = 56.69 was judged on its first fragment by the coordinate filter this rule used to carry,
+    // and the document came back clean. Re-adding any coordinate test turns this red.
+    const fullBleed = run(fragmented([{ height: 320, x: 8 }, { height: 300, x: 8 }, { height: 260, x: 8 }]));
+    assert.equal(fullBleed.findings.length, 1, "a full-bleed split block was judged on one piece");
+    assert.equal(fullBleed.findings[0]!.measurement.value, 880);
+    assert.match(fullBleed.findings[0]!.message, /across the 3 fragments/u);
 
-    // The same for a SIDE margin box: it starts at a content-box y and sits beside the column, so
-    // a vertical test alone lets it back in. The fixture's content box is x = 48, width = 399.
-    const sideRunner = run(fragmented([
-      { height: 90, x: 8 }, { height: 90, x: 8 }, { height: 90, x: 8 },
-      { height: 90, x: 8 }, { height: 90, x: 8 }, { height: 90, x: 8 },
-      { height: 90, x: 8 }, { height: 90, x: 8 },
-    ]));
-    assert.deepEqual(
-      sideRunner.findings,
-      [],
-      "per-page clones in a SIDE margin box were summed as if they were fragments of one flow",
-    );
+    // The vertical axis of the same class: a negative top margin starts the FIRST fragment above
+    // the content box (y = 8 against y = 48). It is still the first third of the block.
+    const pulledUp = run(fragmented([{ height: 320, y: 8 }, { height: 300 }, { height: 260 }]));
+    assert.equal(pulledUp.findings.length, 1, "a split block whose first fragment starts above the content box lost it");
+    assert.equal(pulledUp.findings[0]!.measurement.value, 880);
+
+    // A running element, as the snapshot now carries it. Paged.js clones `position: running(...)`
+    // into the margin box of every page and the clone keeps the injected source id — measured on
+    // 2026-09-18, a twelve-page document with a three-line running header reported this `error`
+    // rule at 979.08 px against a 619.83 px page, for a header 81.59 px tall. The clones are not
+    // in the snapshot any more; what remains is the in-flow original Paged.js leaves in the page
+    // content with `display: none`: one record, no box, nothing to sum.
+    const runningOriginal = run(fragmented([{ height: 0, width: 0, x: 0, y: 0 }]));
+    assert.deepEqual(runningOriginal.findings, []);
+    const originalRow = runningOriginal.evaluations!.find((row) => row.targetRef.fragmentIndex === 0 && row.status !== "not-applicable");
+    assert.equal(originalRow?.status, "measured", "the in-flow original of a running element was not measured");
+    assert.equal(originalRow!.measurements[0]!.value, 0);
+
+    // Fragments with nothing to join them by. Without a sid (a `--no-source-map` run, or an
+    // element a script created) three records of one split block cannot be told from three
+    // blocks, and measuring the first of them compares a piece with the page. Declined, charged
+    // to coverage; never a measured value.
+    const sidless = fragmented(heights(320, 300, 260));
+    for (const fragment of sidless.blocks) fragment.sid = null;
+    const uncorrelated = run(sidless);
+    assert.deepEqual(uncorrelated.findings, []);
+    assert.equal(uncorrelated.candidates, 1);
+    assert.equal(uncorrelated.measured, 0, "an uncorrelated split block was measured on one of its pieces");
+    assert.deepEqual(uncorrelated.notMeasured.map((row) => [row.reason, row.count]), [["env/invalid-measurement", 1]]);
+    const uncorrelatedRow = uncorrelated.evaluations!.find((row) => row.targetRef.fragmentIndex === 0 && row.status !== "not-applicable")!;
+    assert.equal(uncorrelatedRow.status, "not-measured");
+    assert.equal(uncorrelatedRow.reason, "env/invalid-measurement");
+
+    // An UNSPLIT block without a sid is the whole block: measured, as before.
+    const sidlessWhole = fragmented(heights(848));
+    sidlessWhole.blocks[0]!.sid = null;
+    assert.equal(run(sidlessWhole).findings[0]!.measurement.value, 848);
+
+    // A sid that does not account for the fragments the snapshot counted: three fragments
+    // declared, two present. The sum of two would be a piece again.
+    const incomplete = fragmented(heights(320, 300, 260));
+    incomplete.blocks.pop();
+    const partial = run(incomplete);
+    assert.deepEqual(partial.findings, []);
+    assert.deepEqual(partial.notMeasured.map((row) => [row.reason, row.count]), [["env/invalid-measurement", 1]]);
 
     // "It cannot fit on any page" is measured against any page. A document with a named landscape
     // page has two content boxes; a 700 px block on the 606 px page fits on the 900 px one, and
