@@ -43,7 +43,31 @@ export function workflowRunLines(text: string): string[] {
       if (!/^\s*#/u.test(line)) commands.push(line.trim());
     }
   }
-  return commands;
+  // A shell line continued with a trailing backslash is one command.
+  const joined: string[] = [];
+  for (const command of commands) {
+    const previous = joined.at(-1);
+    if (previous !== undefined && previous.endsWith("\\")) joined[joined.length - 1] = `${previous.slice(0, -1).trimEnd()} ${command}`;
+    else joined.push(command);
+  }
+  return joined;
+}
+
+/** The run lines of each job of a workflow, by job name. */
+function jobRunLines(path: string): Map<string, string[]> {
+  const lines = readFileSync(new URL(`../../${path}`, import.meta.url), "utf8").replace(/\r\n/gu, "\n").split("\n");
+  const jobs = new Map<string, string[]>();
+  const start = lines.findIndex((line) => /^jobs:\s*$/u.test(line));
+  let name: string | null = null;
+  let body: string[] = [];
+  const flush = () => { if (name) jobs.set(name, workflowRunLines(body.join("\n"))); };
+  for (const line of lines.slice(start + 1)) {
+    if (/^\S/u.test(line)) break;
+    const key = /^ {2}([A-Za-z0-9_-]+):\s*$/u.exec(line);
+    if (key) { flush(); name = key[1]!; body = []; } else body.push(line);
+  }
+  flush();
+  return jobs;
 }
 
 function runLinesOf(path: string): string[] {
@@ -111,6 +135,40 @@ describe("workflow gates", () => {
     const ci = gateSteps(runLinesOf(".github/workflows/ci.yml"));
     const release = new Set(gateSteps(runLinesOf(".github/workflows/release.yml")));
     assert.deepEqual(ci.filter((step) => !release.has(step)), [], "release.yml does not repeat these ci.yml gate steps");
+  });
+
+  /*
+   * The checks that see the SHIPPED package — the README demo excerpt against the installed bin, and
+   * the docs' schema stamps against the installed code — exist only as workflow lines. Deleting one
+   * leaves every test of the tools themselves green, so the lines are pinned here, job by job. At a
+   * tag the docs check must run with --release, which refuses the pending exceptions a pull request
+   * may still carry.
+   */
+  it("every packed-consumer job runs the README-demo and docs-truth checks against the installed package", () => {
+    const expect: [string, string, RegExp[]][] = [
+      [".github/workflows/ci.yml", "check", [
+        /readme-demo-contract\.mjs" --consumer "\$PWD"/u,
+        /docs-truth\.mjs" --package node_modules\/breaklint --pending "\$GITHUB_WORKSPACE\/tests\/tools\/docs-truth-pending\.jsonl"/u,
+      ]],
+      [".github/workflows/ci.yml", "node-floor", [/readme-demo-contract\.mjs" --consumer "\$PWD"/u]],
+      [".github/workflows/release.yml", "clean-consumer", [
+        /readme-demo-contract\.mjs" --consumer "\$consumer"/u,
+        /docs-truth\.mjs" --package "\$consumer\/node_modules\/breaklint" --pending "[^"]+docs-truth-pending\.jsonl" --release/u,
+      ]],
+      [".github/workflows/release.yml", "publish", [
+        /readme-demo-contract\.mjs" --consumer "\$registry_consumer"/u,
+        /docs-truth\.mjs" --package "\$registry_consumer\/node_modules\/breaklint" --pending "[^"]+docs-truth-pending\.jsonl" --release/u,
+      ]],
+    ];
+    for (const [path, job, patterns] of expect) {
+      const lines = jobRunLines(path).get(job);
+      assert.ok(lines, `${path} has no job ${job}; this guard has lost its subject`);
+      for (const pattern of patterns) {
+        assert.ok(lines.some((line) => pattern.test(line)), `${path} job ${job} no longer runs ${pattern.source}`);
+      }
+    }
+    const releaseDocs = [...jobRunLines(".github/workflows/release.yml").values()].flat().filter((line) => /docs-truth\.mjs/u.test(line));
+    assert.deepEqual(releaseDocs.filter((line) => !/--release\b/u.test(line)), [], "release.yml runs the docs check without --release");
   });
 
   it("the gate-step reader sees npm run, npm test and repository tools, and ignores comments", () => {

@@ -28,6 +28,12 @@
  * The oracle is package.json, never the workflow under test. `--self-test` copies the three real
  * files into a temporary directory, mutates them one at a time and runs `--check` on each copy in
  * a child process: a check whose red state nobody has seen is a claim.
+ *
+ * KNOWN LIMITS, accepted: the workflow is read line by line, not as YAML, and the derive step is
+ * checked for `if:`, `continue-on-error:` and its exact `run:` line only — a step-level `shell:`
+ * or `env:` that changed what that line does (a different interpreter, a redirected GITHUB_ENV)
+ * would pass. So would a job-level `if:` that skips a whole job, which also skips every use of the
+ * identity in it.
  */
 
 import { strict as assert } from "node:assert";

@@ -206,7 +206,9 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   own `--check` ran in no workflow. The release workflow runs it too, and its clean consumers and
   registry readback run the docs-truth check against the installed package; `docs/releasing.md`
   says the release workflow repeats the complete gate, and `tests/unit/workflow-gates.test.ts` now
-  fails when `release.yml` leaves out any `npm run` gate step `ci.yml` runs. The local gate lists
+  fails when `release.yml` leaves out any `npm run` gate step `ci.yml` runs, and when a
+  packed-consumer job of either workflow stops running the README-demo or the docs-truth check
+  (in `release.yml`, with `--release`). The local gate lists
   in `CONTRIBUTING.md` and `docs/releasing.md` follow, and the same test keeps them equal to
   `ci.yml`.
 

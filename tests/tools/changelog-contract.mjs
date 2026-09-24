@@ -30,6 +30,10 @@
  *
  * `--self-test` builds throwaway git repositories for each state, including a shallow clone and
  * the 0.6.0 reproduction, and runs `--check` on each in a child process.
+ *
+ * KNOWN LIMITS, accepted: a changed rule counts as named if its id occurs anywhere in the
+ * `## Unreleased` body as a whole token — the check does not tell an entry about the change from a
+ * sentence that merely mentions the rule. It reads which files changed, not what changed in them.
  */
 
 import { strict as assert } from "node:assert";

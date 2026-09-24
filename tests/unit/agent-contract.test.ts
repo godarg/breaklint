@@ -120,6 +120,10 @@ describe("docs/agent-contract.md", () => {
    * rule declines on A or B" plans for A and B only. Every reason in that rule's `declines` that
    * counts against coverage must be listed, so a rule that gains a reason — as the unbreakable-block
    * and SVG rules do in this release — fails here until the page says so.
+   *
+   * Known limit, accepted: completeness is checked over the UNION of the reasons the page attributes
+   * to a rule anywhere, so two partial lists in different sentences that together are complete pass.
+   * An id is attributed to the nearest rule id before it in the same sentence.
    */
   it("names only env/ reasons a released rule declares, and lists all of a rule's reasons wherever it lists them", () => {
     const declared = new Set<string>(ALL_RULES.flatMap((rule) => [...rule.declines]));
