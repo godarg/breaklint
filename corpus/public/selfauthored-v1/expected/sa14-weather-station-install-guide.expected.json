@@ -1,0 +1,518 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa14-weather-station-install-guide",
+  "artifact": "documents/sa14-weather-station-install-guide.html",
+  "sha256": "c0e181125bb20ae293f2959f172b84bdae2862be330c08adfb091be0061867fc",
+  "byteLength": 15243,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Cinderwick WS-3 Home Weather Station: installation guide",
+  "genre": "installation guide",
+  "language": {
+    "htmlLang": "en",
+    "typeRulesUnderDefaultLocale": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+  },
+  "paper": [
+    {
+      "pageRule": "@page (:left, :right, :first)",
+      "size": "letter",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        816,
+        1056
+      ],
+      "margins": "0.75in",
+      "contentBoxCssPx": [
+        672,
+        912.0
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      5,
+      6
+    ],
+    "measured": 5,
+    "basis": "plain Paged.js measurement (5 pages); the parts band occupies three pages by construction"
+  },
+  "expectedExit": {
+    "set": [
+      1
+    ],
+    "derivation": "Error finding on the full-bleed #parts-band (three fragments).",
+    "byCode": {
+      "1": "error finding on #parts-band"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "Letter",
+    "running element in @top-center",
+    "running element in the side margin boxes: @left-middle on left pages, @right-middle on right pages",
+    "full-bleed SVG banner (negative margins, fits)",
+    "full-bleed break-inside: avoid band split into three fragments (planted)",
+    "SVG assembly drawing",
+    "torque table kept together"
+  ],
+  "runningElements": [
+    {
+      "id": "guidehead",
+      "marginBox": "top-center",
+      "marginBoxCopies": 5,
+      "pages": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "id": "sidetab",
+      "marginBox": "left-middle (left pages) / right-middle (right pages)",
+      "marginBoxCopies": 5,
+      "pages": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ],
+  "constructionFacts": [
+    {
+      "fact": "full-bleed band",
+      "arithmetic": "40 + 64 x 36 = 2344 px = 2.57 x 912; left inset -72 px",
+      "measured": [
+        {
+          "page": 2,
+          "heightPx": 904,
+          "topInContentPx": 0,
+          "startsInsideContentBox": false
+        },
+        {
+          "page": 3,
+          "heightPx": 900,
+          "topInContentPx": 0,
+          "startsInsideContentBox": false
+        },
+        {
+          "page": 4,
+          "heightPx": 540,
+          "topInContentPx": 0,
+          "startsInsideContentBox": false
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "guidehead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "id": "sidetab"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "guide"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "guide"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "guidehead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "id": "sidetab"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "guide"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "guide"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "parts-band"
+          },
+          "why": "a full-bleed band with break-inside: avoid (negative horizontal margins, as wide as the sheet) that is 2.57 content boxes tall",
+          "construction": "margin-left and margin-right -0.75 in on a Letter page with 0.75 in margins: the band is 816 px wide and starts 72 px left of the content box. 40 px title + 64 rows x 36 px (fixed height, nowrap) = 2344 px against 912 px: pushed to a fresh page and split 904 + 900 + 540 px. Every fragment starts left of the content box by design.",
+          "measured": {
+            "naturalPx": 2344,
+            "fragments": [
+              {
+                "page": 2,
+                "heightPx": 904,
+                "topInContentPx": 0,
+                "startsInsideContentBox": false
+              },
+              {
+                "page": 3,
+                "heightPx": 900,
+                "topInContentPx": 0,
+                "startsInsideContentBox": false
+              },
+              {
+                "page": 4,
+                "heightPx": 540,
+                "topInContentPx": 0,
+                "startsInsideContentBox": false
+              }
+            ]
+          },
+          "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md; nothing in the rule documentation exempts a block because it bleeds into the page margin."
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "guidehead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "id": "sidetab"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "ids": [
+              "fig-banner",
+              "caution-height",
+              "fig-mast",
+              "tbl-torque"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (912.0 px) and are laid out in one piece; #fig-banner is the full-bleed control (816 x 150 px)",
+          "measured": {
+            "fig-banner": {
+              "maxFragmentPx": 150,
+              "fragments": 1,
+              "naturalPx": 150
+            },
+            "caution-height": {
+              "maxFragmentPx": 58.59,
+              "fragments": 1,
+              "naturalPx": 58.59
+            },
+            "fig-mast": {
+              "maxFragmentPx": 350.42,
+              "fragments": 1,
+              "naturalPx": 350.42
+            },
+            "tbl-torque": {
+              "maxFragmentPx": 94.81,
+              "fragments": 1,
+              "naturalPx": 94.81
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tbl-torque tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 912.0 px content box"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "guidehead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "id": "sidetab"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2"
+            ]
+          },
+          "why": "every one of these headings carries break-after: avoid (Paged.js moves it with the following block) or opens its page, so content follows it on its own page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "guidehead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "id": "sidetab"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "guide"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "svg": "svg-banner",
+            "texts": [
+              "bn-sub",
+              "bn-title"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "bn-title": 44,
+              "bn-sub": 55
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-mast",
+            "texts": [
+              "ms-b1",
+              "ms-b2",
+              "ms-b3",
+              "ms-clamp",
+              "ms-cups",
+              "ms-fig",
+              "ms-vane"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "ms-b2": 100,
+              "ms-b3": 133.5,
+              "ms-b1": 38,
+              "ms-cups": 30,
+              "ms-vane": 30,
+              "ms-clamp": 81.5,
+              "ms-fig": 14
+            }
+          }
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no straight quotation mark or apostrophe occurs in any text run outside code, pre, kbd, samp and var; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "guide"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no block is justified; docs/rules/type-excessive-word-spacing.md judges word gaps in a justified block only"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no file: URI and no absolute path occurs in any URI-bearing attribute (href, src, srcset, poster, data, xlink:href) or CSS url()"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 5,
+    "pdfPageCount": 5,
+    "contentBoxHeightsPx": [
+      912
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Sans (system, 442 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Sans (system, 31 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Sans (system, 19 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "Liberation Sans (system, 10 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+        "Liberation Sans (system, 36 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": [
+    "On right-hand pages the @right-middle copy of #sidetab starts exactly at the right edge of the content box (x = content right); it is still a margin-box copy, not part of the flow."
+  ]
+}

@@ -1,0 +1,1990 @@
+{
+  "contractVersion": "selfauthored-corpus-v1",
+  "schemaVersion": 1,
+  "manifestId": "selfauthored-v1",
+  "createdAt": "2026-09-24",
+  "purpose": "Closed-world regression truth for the released rule set over self-authored HTML-to-PDF documents with planted, construction-known defects and clean controls. Never calibration data and never external trust evidence.",
+  "provenanceClass": "synthetic_first_party",
+  "realDocuments": 0,
+  "calibrationEvidenceEligible": false,
+  "externalTrustRootClaimed": false,
+  "splitNote": "'regression' is deliberately not one of the calibration splits of docs/validation/corpus-contract-v1.md (development, tuning, holdout); synthetic construction truth never counts as real data.",
+  "expectedFormat": "selfauthored-expected-v1 (README.md, section 'Expected files')",
+  "expectedAuthoredBeforeFirstRun": true,
+  "expectedAuthoredCommit": "the commit that first adds this directory (git log --diff-filter=A -- corpus/public/selfauthored-v1/expected); no breaklint report of any document exists in or before it",
+  "profile": "default",
+  "gate": {
+    "closedWorld": "per document, any finding whose rule and target are not covered by that rule's mustFire or allowed entries fails",
+    "mustFire": "every mustFire entry needs at least one matching finding (or, where the entry says so, the named decline)",
+    "mustNotFire": "any matching finding fails",
+    "declines": "every required expectedDecline must be present; a decline reason outside permittedDeclineReasons fails",
+    "exit": "the document's exit code must be in expectedExit.set",
+    "pages": "pagesAnalysed must lie in pages.range",
+    "bytes": "sha256 of every document and expected file must match this manifest",
+    "empty": "a run that reads zero documents fails; it is never a skip"
+  },
+  "documentCount": 20,
+  "documents": [
+    {
+      "documentId": "doc_sa01-riverbank-survey-handbook",
+      "id": "sa01-riverbank-survey-handbook",
+      "artifact": {
+        "sha256": "e32b36c1a071330f40d268053ce024f8c7facced4f9a7032b24c4a6aa21a437c",
+        "byteLength": 31293,
+        "storage": "public-repository",
+        "relativePath": "documents/sa01-riverbank-survey-handbook.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa01-riverbank-survey-handbook.expected.json",
+        "sha256": "a0663526573df604a4c66f8a4a2de662e46a2f74e997ed922e62465c01ef36e8",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa01",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Lantern Creek Riverbank Survey Handbook",
+      "genre": "long-form volunteer field guide",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "A4",
+          "orientation": "portrait",
+          "margins": "20mm",
+          "contentBoxCssPx": [
+            642.52,
+            971.34
+          ]
+        }
+      ],
+      "pagesRange": [
+        7,
+        9
+      ],
+      "expectedExit": [
+        0
+      ],
+      "features": [
+        "paper:A4",
+        "lang:en",
+        "running-element:top",
+        "string-set",
+        "page-counter",
+        "svg:plain-labels-inside",
+        "avoid:tall-fits",
+        "planted:stranded-heading",
+        "control:break-after-avoid-heading",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa02-pump-service-manual",
+      "id": "sa02-pump-service-manual",
+      "artifact": {
+        "sha256": "f74dbff93bdfd5d27366e263a9aaca3ec17dee2060c2428641642167cc1c015a",
+        "byteLength": 24729,
+        "storage": "public-repository",
+        "relativePath": "documents/sa02-pump-service-manual.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa02-pump-service-manual.expected.json",
+        "sha256": "ce0141ed545812dd6ee73f4f06b45208167b4b8282d9600722c56da4a4251884",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa02",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "K-40 Metering Pump Service Manual, Chapter 6: Diagnostics and fault clearing",
+      "genre": "technical manual chapter",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "letter",
+          "orientation": "portrait",
+          "margins": "0.75in",
+          "contentBoxCssPx": [
+            672,
+            912.0
+          ]
+        }
+      ],
+      "pagesRange": [
+        6,
+        8
+      ],
+      "expectedExit": [
+        1,
+        3
+      ],
+      "features": [
+        "paper:letter",
+        "lang:en",
+        "running-element:side",
+        "string-set",
+        "page-counter",
+        "table:crossing-pages",
+        "planted:avoid-too-tall-3plus-fragments",
+        "svg:plain-labels-inside",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa03-transit-ridership-report",
+      "id": "sa03-transit-ridership-report",
+      "artifact": {
+        "sha256": "8425e95fbaad3aa0d361a2ebc9fd36d3afbed39f862c8e7cc3caeb84a5ce95c0",
+        "byteLength": 24983,
+        "storage": "public-repository",
+        "relativePath": "documents/sa03-transit-ridership-report.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa03-transit-ridership-report.expected.json",
+        "sha256": "c5c1ecc4a64fd02fd9f61dd2a153afa30cc059037b367aec52506200d487894b",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa03",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Harrowfield Transit Authority: Quarterly Ridership Data Report, Q2",
+      "genre": "data report with tables crossing pages and a named landscape page",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "A4",
+          "orientation": "portrait",
+          "margins": "20mm 18mm",
+          "contentBoxCssPx": [
+            657.63,
+            971.34
+          ]
+        },
+        {
+          "pageRule": "@page wide",
+          "size": "A4",
+          "orientation": "landscape",
+          "margins": "15mm",
+          "contentBoxCssPx": [
+            1009.13,
+            680.31
+          ]
+        }
+      ],
+      "pagesRange": [
+        7,
+        8
+      ],
+      "expectedExit": [
+        1,
+        3
+      ],
+      "features": [
+        "paper:A4",
+        "paper:A4-landscape-named-page",
+        "lang:en",
+        "running-element:top",
+        "page-counter",
+        "table:crossing-pages",
+        "svg:plain-labels-inside",
+        "planted:svg-plain-label-outside",
+        "planted:avoid-too-tall-landscape",
+        "planted:orphaned-continuation-tail",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa04-essay-chapter-footnotes",
+      "id": "sa04-essay-chapter-footnotes",
+      "artifact": {
+        "sha256": "5d0aa4e2c6b8cb8730fab04ba52f38171e8df07eeb6eb538598a9dfdf87a0456",
+        "byteLength": 12441,
+        "storage": "public-repository",
+        "relativePath": "documents/sa04-essay-chapter-footnotes.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa04-essay-chapter-footnotes.expected.json",
+        "sha256": "b65f5c6d9aea9191747330f99301f2b19d595e45d662d6188101d89d4039ec80",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa04",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Instruments of the Coast, Chapter Seven: The Weight of Small Weather",
+      "genre": "book chapter (essay) with footnotes",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page (:left, :right, :first)",
+          "size": "letter",
+          "orientation": "portrait",
+          "margins": "1in 1in 1.1in 1in",
+          "contentBoxCssPx": [
+            624,
+            811.2
+          ]
+        }
+      ],
+      "pagesRange": [
+        4,
+        5
+      ],
+      "expectedExit": [
+        0
+      ],
+      "features": [
+        "paper:letter",
+        "lang:en",
+        "left-right-pages",
+        "string-set",
+        "page-counter",
+        "footnotes",
+        "justified-hyphenated",
+        "widows-orphans-declared",
+        "control:clean-document"
+      ]
+    },
+    {
+      "documentId": "doc_sa05-kitchen-notebook",
+      "id": "sa05-kitchen-notebook",
+      "artifact": {
+        "sha256": "a3f14ab4cc87d97c81376ccf7d3fd8e0621f3519daf7c87ab56391c44801933d",
+        "byteLength": 12742,
+        "storage": "public-repository",
+        "relativePath": "documents/sa05-kitchen-notebook.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa05-kitchen-notebook.expected.json",
+        "sha256": "bdfc4b480e9980f7a864349d066b43a96a8d564c2f8ba7abb5928818e43e361b",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa05",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "The Salt and Ember Kitchen Notebook: Autumn pages",
+      "genre": "cookbook page set, one recipe per page",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "letter",
+          "orientation": "portrait",
+          "margins": "0.8in 0.8in 0.9in 0.8in",
+          "contentBoxCssPx": [
+            662.4,
+            892.8
+          ]
+        }
+      ],
+      "pagesRange": [
+        7,
+        7
+      ],
+      "expectedExit": [
+        4
+      ],
+      "features": [
+        "paper:letter",
+        "lang:en",
+        "running-element:top",
+        "multicolumn",
+        "forced-breaks-majority",
+        "decline:multicolumn-avoid",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa06-mobile-work-policy-de",
+      "id": "sa06-mobile-work-policy-de",
+      "artifact": {
+        "sha256": "270f299510835def8e6bb6e1208b186fbb34cc95d3bff72e0f3aa994cea4b844",
+        "byteLength": 10257,
+        "storage": "public-repository",
+        "relativePath": "documents/sa06-mobile-work-policy-de.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa06-mobile-work-policy-de.expected.json",
+        "sha256": "c6532c9abb7426ad4207b6a4aaefa167b4abfe188dbe55bc9bc1bfbb37d25e83",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa06",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Richtlinie zur mobilen Arbeit (Mitarbeiterhandbuch, Teil C)",
+      "genre": "policy handbook (German)",
+      "language": "de",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "A4",
+          "orientation": "portrait",
+          "margins": "25mm 22mm",
+          "contentBoxCssPx": [
+            627.39,
+            933.54
+          ]
+        }
+      ],
+      "pagesRange": [
+        3,
+        4
+      ],
+      "expectedExit": [
+        0
+      ],
+      "features": [
+        "paper:A4",
+        "lang:de",
+        "running-element:top",
+        "page-counter",
+        "justified-hyphenated",
+        "planted:straight-quotes",
+        "planted:spaced-hyphen",
+        "planted:local-uri",
+        "control:type-clean-counterparts",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa07-sensor-datasheet",
+      "id": "sa07-sensor-datasheet",
+      "artifact": {
+        "sha256": "1ebf7286135c1b2dbf7a65236f7847c035e07b1e826b6b0739032945ac9187bb",
+        "byteLength": 14271,
+        "storage": "public-repository",
+        "relativePath": "documents/sa07-sensor-datasheet.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa07-sensor-datasheet.expected.json",
+        "sha256": "911836373d78fb2fd0c202a3213d900c95c43593a96eafb6303cab83e6591a6c",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa07",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "VX-9 Environmental Sensor Module Datasheet, Rev. C",
+      "genre": "product datasheet",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "letter",
+          "orientation": "portrait",
+          "margins": "0.6in 0.65in 0.7in 0.65in",
+          "contentBoxCssPx": [
+            691.2,
+            931.2
+          ]
+        }
+      ],
+      "pagesRange": [
+        3,
+        3
+      ],
+      "expectedExit": [
+        1,
+        4
+      ],
+      "features": [
+        "paper:letter",
+        "lang:en",
+        "running-element:top",
+        "page-counter",
+        "multicolumn",
+        "svg:plain-labels-inside",
+        "planted:svg-plain-label-outside",
+        "svg:halo-inside",
+        "planted:svg-halo-clipped"
+      ]
+    },
+    {
+      "documentId": "doc_sa08-tidewell-newsletter",
+      "id": "sa08-tidewell-newsletter",
+      "artifact": {
+        "sha256": "a55321ddb3b478d6998bac29f8b7992caf6a082e370a113b58b260072d36648c",
+        "byteLength": 14888,
+        "storage": "public-repository",
+        "relativePath": "documents/sa08-tidewell-newsletter.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa08-tidewell-newsletter.expected.json",
+        "sha256": "d320afe17527ffa6ba92f752989ec3be4a52d7a4ded9e5fb7af48d8d2217490e",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa08",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "The Tidewell Commons Quarterly, Spring issue",
+      "genre": "newsletter with multi-column sections",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "A4",
+          "orientation": "portrait",
+          "margins": "16mm 16mm 18mm 16mm",
+          "contentBoxCssPx": [
+            672.75,
+            994.02
+          ]
+        }
+      ],
+      "pagesRange": [
+        3,
+        4
+      ],
+      "expectedExit": [
+        4
+      ],
+      "features": [
+        "paper:A4",
+        "lang:en",
+        "running-element:top",
+        "multicolumn",
+        "multicolumn:crossing-page",
+        "vertical-writing",
+        "justified-hyphenated",
+        "svg:plain-labels-inside",
+        "svg:use",
+        "decline:multicolumn-avoid",
+        "decline:vertical-writing",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa09-queue-worker-tutorial",
+      "id": "sa09-queue-worker-tutorial",
+      "artifact": {
+        "sha256": "5540992465de0587422ce4a929a97024f8705f06ac3a95fd7f229ebf4d7896dd",
+        "byteLength": 22103,
+        "storage": "public-repository",
+        "relativePath": "documents/sa09-queue-worker-tutorial.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa09-queue-worker-tutorial.expected.json",
+        "sha256": "d2d496eecb09a4a84a5673346ba4587ac83331a03de5ebbaa07cea387670c182",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa09",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Building a tiny queue worker in plain JavaScript",
+      "genre": "code tutorial",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "A4",
+          "orientation": "portrait",
+          "margins": "20mm",
+          "contentBoxCssPx": [
+            642.52,
+            971.34
+          ]
+        }
+      ],
+      "pagesRange": [
+        8,
+        9
+      ],
+      "expectedExit": [
+        1
+      ],
+      "features": [
+        "paper:A4",
+        "lang:en",
+        "string-set",
+        "page-counter",
+        "code:pre-over-pages",
+        "code:inline-straight-quotes",
+        "gap:avoid-too-tall-2-fragments",
+        "planted:avoid-too-tall-3plus-fragments",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa10-lagoon-oxygen-report",
+      "id": "sa10-lagoon-oxygen-report",
+      "artifact": {
+        "sha256": "13961838d9cc4c14805e371db1b910428496f2085e8302188bf32dfe79516f8f",
+        "byteLength": 20123,
+        "storage": "public-repository",
+        "relativePath": "documents/sa10-lagoon-oxygen-report.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa10-lagoon-oxygen-report.expected.json",
+        "sha256": "c6676908fb57551e23d77f3a1f210daeac1806bb7e515a70a6ec22e1032288a1",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa10",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Sediment oxygen demand in three shallow lagoons: an interim technical report",
+      "genre": "scientific report with figures and halo labels",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "A4",
+          "orientation": "portrait",
+          "margins": "22mm 20mm",
+          "contentBoxCssPx": [
+            642.52,
+            956.22
+          ]
+        }
+      ],
+      "pagesRange": [
+        5,
+        6
+      ],
+      "expectedExit": [
+        1,
+        4
+      ],
+      "features": [
+        "paper:A4",
+        "lang:en",
+        "running-element:top",
+        "figures-captions",
+        "justified-hyphenated",
+        "svg:plain-labels-inside",
+        "planted:svg-plain-label-outside",
+        "svg:rotated-label",
+        "svg:halo-inside",
+        "planted:svg-halo-clipped",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa11-insect-chorus-survey",
+      "id": "sa11-insect-chorus-survey",
+      "artifact": {
+        "sha256": "dc713476f4c56804b801524bb2f1ecd034b035a96ae992c7162cdb3b13a1c3c5",
+        "byteLength": 16266,
+        "storage": "public-repository",
+        "relativePath": "documents/sa11-insect-chorus-survey.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa11-insect-chorus-survey.expected.json",
+        "sha256": "3412c7cd852d987cbe64642c06318787f11e1f5f5f33cae2790eed5bf57a4352",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa11",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Acoustic survey of nocturnal insect choruses at Fenmoor Reserve",
+      "genre": "scientific survey report (SVG controls)",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "letter",
+          "orientation": "portrait",
+          "margins": "0.9in 1in",
+          "contentBoxCssPx": [
+            624,
+            883.2
+          ]
+        }
+      ],
+      "pagesRange": [
+        3,
+        4
+      ],
+      "expectedExit": [
+        0,
+        4
+      ],
+      "features": [
+        "paper:letter",
+        "lang:en",
+        "running-element:top",
+        "figures-captions",
+        "svg:plain-labels-inside",
+        "svg:halo-inside",
+        "svg:letterbox",
+        "svg:overflow-visible",
+        "svg:not-painted",
+        "svg:rotated-label",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa12-library-annual-report",
+      "id": "sa12-library-annual-report",
+      "artifact": {
+        "sha256": "e70795ef50ba4fa804f747bdc6bccf2bfdfd7ab6ba1fd7e3e6b63c5781e81ee4",
+        "byteLength": 31885,
+        "storage": "public-repository",
+        "relativePath": "documents/sa12-library-annual-report.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa12-library-annual-report.expected.json",
+        "sha256": "b9cb67eb5c22bb469b2e797c41c679cb319e4c8229aca47e503294ff7b8f2662",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa12",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Pellbrook Mutual Library Society: Annual Report and Accounts",
+      "genre": "annual report with long tables and a named landscape page",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "letter",
+          "orientation": "portrait",
+          "margins": "0.75in",
+          "contentBoxCssPx": [
+            672,
+            912.0
+          ]
+        },
+        {
+          "pageRule": "@page budget",
+          "size": "letter",
+          "orientation": "landscape",
+          "margins": "0.6in",
+          "contentBoxCssPx": [
+            940.8,
+            700.8
+          ]
+        }
+      ],
+      "pagesRange": [
+        8,
+        10
+      ],
+      "expectedExit": [
+        1,
+        3
+      ],
+      "features": [
+        "paper:letter",
+        "paper:letter-landscape-named-page",
+        "lang:en",
+        "running-element:top",
+        "page-counter",
+        "table:crossing-pages",
+        "planted:avoid-too-tall-3plus-fragments",
+        "svg:plain-labels-inside",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa13-planning-forum-transcript",
+      "id": "sa13-planning-forum-transcript",
+      "artifact": {
+        "sha256": "10cec73ceb40208af6edb07dd6e11e90c7ba33bcf75c64784058b3c26a438a86",
+        "byteLength": 13390,
+        "storage": "public-repository",
+        "relativePath": "documents/sa13-planning-forum-transcript.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa13-planning-forum-transcript.expected.json",
+        "sha256": "14abf757082be360f39d99285a63473d69b214fc89aee8f36577be416de5c919",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa13",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Oakhollow Parish Planning Forum: verbatim record (review copy)",
+      "genre": "double-spaced verbatim transcript (long-leading document)",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "A4",
+          "orientation": "portrait",
+          "margins": "20mm",
+          "contentBoxCssPx": [
+            642.52,
+            971.34
+          ]
+        }
+      ],
+      "pagesRange": [
+        7,
+        8
+      ],
+      "expectedExit": [
+        0
+      ],
+      "features": [
+        "paper:A4",
+        "lang:en",
+        "running-element:top",
+        "page-counter",
+        "code:pre-over-pages",
+        "long-leading",
+        "control:full-middle-pages",
+        "planted:orphaned-continuation-tail",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa14-weather-station-install-guide",
+      "id": "sa14-weather-station-install-guide",
+      "artifact": {
+        "sha256": "c0e181125bb20ae293f2959f172b84bdae2862be330c08adfb091be0061867fc",
+        "byteLength": 15243,
+        "storage": "public-repository",
+        "relativePath": "documents/sa14-weather-station-install-guide.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa14-weather-station-install-guide.expected.json",
+        "sha256": "5ba1423cf70d2e9dac395cbf17736c84ffa5ad037893439f7205f0a607f2e3c8",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa14",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Cinderwick WS-3 Home Weather Station: installation guide",
+      "genre": "installation guide",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page (:left, :right, :first)",
+          "size": "letter",
+          "orientation": "portrait",
+          "margins": "0.75in",
+          "contentBoxCssPx": [
+            672,
+            912.0
+          ]
+        }
+      ],
+      "pagesRange": [
+        5,
+        6
+      ],
+      "expectedExit": [
+        1
+      ],
+      "features": [
+        "paper:letter",
+        "lang:en",
+        "running-element:top",
+        "running-element:side",
+        "left-right-pages",
+        "full-bleed",
+        "planted:avoid-too-tall-full-bleed",
+        "svg:plain-labels-inside",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa15-hut-trail-guide-de",
+      "id": "sa15-hut-trail-guide-de",
+      "artifact": {
+        "sha256": "a5b62009b767496d9908efc1910d4edd499b2205b9ba4dd100daa0d55b97dc92",
+        "byteLength": 10743,
+        "storage": "public-repository",
+        "relativePath": "documents/sa15-hut-trail-guide-de.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa15-hut-trail-guide-de.expected.json",
+        "sha256": "00a13dcbac51e8d588df77ab640dc832895069dcf38977459c1accaa003f01c0",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa15",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Wanderführer Hohe Gaisplatte: Rundwege und Hütten",
+      "genre": "long-form hiking guide (German)",
+      "language": "de",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "A4",
+          "orientation": "portrait",
+          "margins": "22mm 20mm",
+          "contentBoxCssPx": [
+            642.52,
+            956.22
+          ]
+        }
+      ],
+      "pagesRange": [
+        3,
+        4
+      ],
+      "expectedExit": [
+        1
+      ],
+      "features": [
+        "paper:A4",
+        "lang:de",
+        "running-element:top",
+        "string-set",
+        "page-counter",
+        "justified-hyphenated",
+        "svg:plain-labels-inside",
+        "planted:svg-plain-label-outside",
+        "planted:straight-quotes",
+        "planted:spaced-hyphen",
+        "planted:local-uri",
+        "control:type-clean-counterparts",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa16-lab-safety-manual",
+      "id": "sa16-lab-safety-manual",
+      "artifact": {
+        "sha256": "6a380f44cac1b9f1bbed2f46e28ddf0d82e58ab42b83029351074dd436baf32c",
+        "byteLength": 19049,
+        "storage": "public-repository",
+        "relativePath": "documents/sa16-lab-safety-manual.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa16-lab-safety-manual.expected.json",
+        "sha256": "0949d4250f8eac3cf3f6d617a5750baa8e46162a87ff189769ecb0ae153bbf1f",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa16",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Teaching laboratory 2.14: safety manual, Part 2",
+      "genre": "lab safety manual with checklist tables",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "letter",
+          "orientation": "portrait",
+          "margins": "0.75in",
+          "contentBoxCssPx": [
+            672,
+            912.0
+          ]
+        }
+      ],
+      "pagesRange": [
+        6,
+        7
+      ],
+      "expectedExit": [
+        0,
+        3
+      ],
+      "features": [
+        "paper:letter",
+        "lang:en",
+        "running-element:top",
+        "running-element:side",
+        "page-counter",
+        "table:crossing-pages",
+        "gap:avoid-too-tall-2-fragments",
+        "observed:table-residue",
+        "svg:plain-labels-inside",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa17-seed-bank-grant-proposal",
+      "id": "sa17-seed-bank-grant-proposal",
+      "artifact": {
+        "sha256": "c67b3129846aa675dbb87d0883cb4fbe70ce263f526525f491f1aedafc4015e5",
+        "byteLength": 13515,
+        "storage": "public-repository",
+        "relativePath": "documents/sa17-seed-bank-grant-proposal.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa17-seed-bank-grant-proposal.expected.json",
+        "sha256": "f371185c88770d8b977a473111bc5f1419b9f7bc534fe2fdcaf8c3a3eca1bdb9",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa17",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Restoring the seed banks of the Quennel Moors: full proposal",
+      "genre": "grant proposal with footnotes",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "A4",
+          "orientation": "portrait",
+          "margins": "20mm",
+          "contentBoxCssPx": [
+            642.52,
+            971.34
+          ]
+        }
+      ],
+      "pagesRange": [
+        3,
+        4
+      ],
+      "expectedExit": [
+        1
+      ],
+      "features": [
+        "paper:A4",
+        "lang:en",
+        "string-set",
+        "page-counter",
+        "footnotes",
+        "svg:plain-labels-inside",
+        "planted:svg-plain-label-outside",
+        "svg:nested",
+        "planted:svg-nested-clipped",
+        "planted:stranded-heading",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa18-hand-tools-catalogue",
+      "id": "sa18-hand-tools-catalogue",
+      "artifact": {
+        "sha256": "22f9d1a7e7bfd79dcead9ef884b4ed59e280c8eeff592ceff40bfef8121b8d9d",
+        "byteLength": 12440,
+        "storage": "public-repository",
+        "relativePath": "documents/sa18-hand-tools-catalogue.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa18-hand-tools-catalogue.expected.json",
+        "sha256": "ff34c3a84e890ba7f1d3be95f415f249bc52e13c496efc2aca0f8082a49a4abd",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa18",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Tools of Patience: hand instruments from the Wendlecote Collection",
+      "genre": "exhibition catalogue",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "A4",
+          "orientation": "portrait",
+          "margins": "20mm",
+          "contentBoxCssPx": [
+            642.52,
+            971.34
+          ]
+        }
+      ],
+      "pagesRange": [
+        6,
+        6
+      ],
+      "expectedExit": [
+        0,
+        4
+      ],
+      "features": [
+        "paper:A4",
+        "lang:en",
+        "string-set",
+        "page-counter",
+        "multicolumn",
+        "avoid:tall-fits",
+        "svg:plain-labels-inside",
+        "svg:halo-inside",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa19-release-notes",
+      "id": "sa19-release-notes",
+      "artifact": {
+        "sha256": "5b0331c9198a379e5c5a43db63cbd45a49ebb40aaa81f93c681e19e3a84ab43d",
+        "byteLength": 11637,
+        "storage": "public-repository",
+        "relativePath": "documents/sa19-release-notes.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa19-release-notes.expected.json",
+        "sha256": "99c1c0df4d936ecf699c2c649c414809c21900c35f92d6d778aec5a0caad8ee9",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa19",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Lumenrake 4.2 release notes",
+      "genre": "software release notes",
+      "language": "en",
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "letter",
+          "orientation": "portrait",
+          "margins": "0.8in 0.75in",
+          "contentBoxCssPx": [
+            672,
+            902.4
+          ]
+        }
+      ],
+      "pagesRange": [
+        3,
+        4
+      ],
+      "expectedExit": [
+        0,
+        3
+      ],
+      "features": [
+        "paper:letter",
+        "lang:en",
+        "string-set",
+        "page-counter",
+        "table:crossing-pages",
+        "code:inline-straight-quotes",
+        "planted:local-uri",
+        "control:locale-exclusion",
+        "svg:plain-labels-inside",
+        "widows-orphans-declared"
+      ]
+    },
+    {
+      "documentId": "doc_sa20-wiki-meeting-minutes",
+      "id": "sa20-wiki-meeting-minutes",
+      "artifact": {
+        "sha256": "855ab48e5ae3b263ba1f14a4c5fcd59d7b9755e907c9fabcabd71784be23af51",
+        "byteLength": 6037,
+        "storage": "public-repository",
+        "relativePath": "documents/sa20-wiki-meeting-minutes.html",
+        "mediaType": "text/html"
+      },
+      "expected": {
+        "relativePath": "expected/sa20-wiki-meeting-minutes.expected.json",
+        "sha256": "4488b8e16b017188e6669282654b51c86a63be2831c20a76506c17dad770a361",
+        "schemaVersion": "selfauthored-expected-v1"
+      },
+      "realDocument": false,
+      "split": "regression",
+      "originGroupId": "origin_selfauthored-v1_sa20",
+      "duplicateGroupId": null,
+      "derivationGroupId": null,
+      "parentTemplateGroupId": null,
+      "provenance": {
+        "provenanceClass": "synthetic_first_party",
+        "sourceLocator": "corpus/public/selfauthored-v1/PROVENANCE.md",
+        "sourceEvidence": "Written for this repository on 2026-09-24 by an AI agent in the maintainer's session; original prose, fictional organisations, no third-party text; ground truth written from the construction before any breaklint run."
+      },
+      "license": {
+        "status": "first_party",
+        "evidence": "Released under the repository's MIT licence; see corpus/public/selfauthored-v1/RIGHTS.md."
+      },
+      "privacy": {
+        "status": "synthetic_no_personal_data",
+        "reviewEvidence": "Fictional organisations and places; people appear only by role; no personal data, no real names, no home-directory paths (RIGHTS.md)."
+      },
+      "authoredAt": "2026-09-24",
+      "title": "Operations committee: minutes of the October meeting (wiki export)",
+      "genre": "meeting minutes exported from a wiki, no lang attribute",
+      "language": null,
+      "paper": [
+        {
+          "pageRule": "@page",
+          "size": "A4",
+          "orientation": "portrait",
+          "margins": "18mm 18mm 20mm 18mm",
+          "contentBoxCssPx": [
+            657.64,
+            978.9
+          ]
+        }
+      ],
+      "pagesRange": [
+        2,
+        3
+      ],
+      "expectedExit": [
+        0
+      ],
+      "features": [
+        "paper:A4",
+        "lang:none",
+        "page-counter",
+        "planted:straight-quotes",
+        "planted:spaced-hyphen",
+        "planted:short-last-line",
+        "control:type-clean-counterparts",
+        "widows-orphans-declared"
+      ]
+    }
+  ],
+  "featureCoverage": {
+    "avoid:tall-fits": [
+      "sa01-riverbank-survey-handbook",
+      "sa18-hand-tools-catalogue"
+    ],
+    "code:inline-straight-quotes": [
+      "sa09-queue-worker-tutorial",
+      "sa19-release-notes"
+    ],
+    "code:pre-over-pages": [
+      "sa09-queue-worker-tutorial",
+      "sa13-planning-forum-transcript"
+    ],
+    "control:break-after-avoid-heading": [
+      "sa01-riverbank-survey-handbook"
+    ],
+    "control:clean-document": [
+      "sa04-essay-chapter-footnotes"
+    ],
+    "control:full-middle-pages": [
+      "sa13-planning-forum-transcript"
+    ],
+    "control:locale-exclusion": [
+      "sa19-release-notes"
+    ],
+    "control:type-clean-counterparts": [
+      "sa06-mobile-work-policy-de",
+      "sa15-hut-trail-guide-de",
+      "sa20-wiki-meeting-minutes"
+    ],
+    "decline:multicolumn-avoid": [
+      "sa05-kitchen-notebook",
+      "sa08-tidewell-newsletter"
+    ],
+    "decline:vertical-writing": [
+      "sa08-tidewell-newsletter"
+    ],
+    "figures-captions": [
+      "sa10-lagoon-oxygen-report",
+      "sa11-insect-chorus-survey"
+    ],
+    "footnotes": [
+      "sa04-essay-chapter-footnotes",
+      "sa17-seed-bank-grant-proposal"
+    ],
+    "forced-breaks-majority": [
+      "sa05-kitchen-notebook"
+    ],
+    "full-bleed": [
+      "sa14-weather-station-install-guide"
+    ],
+    "gap:avoid-too-tall-2-fragments": [
+      "sa09-queue-worker-tutorial",
+      "sa16-lab-safety-manual"
+    ],
+    "justified-hyphenated": [
+      "sa04-essay-chapter-footnotes",
+      "sa06-mobile-work-policy-de",
+      "sa08-tidewell-newsletter",
+      "sa10-lagoon-oxygen-report",
+      "sa15-hut-trail-guide-de"
+    ],
+    "lang:de": [
+      "sa06-mobile-work-policy-de",
+      "sa15-hut-trail-guide-de"
+    ],
+    "lang:en": [
+      "sa01-riverbank-survey-handbook",
+      "sa02-pump-service-manual",
+      "sa03-transit-ridership-report",
+      "sa04-essay-chapter-footnotes",
+      "sa05-kitchen-notebook",
+      "sa07-sensor-datasheet",
+      "sa08-tidewell-newsletter",
+      "sa09-queue-worker-tutorial",
+      "sa10-lagoon-oxygen-report",
+      "sa11-insect-chorus-survey",
+      "sa12-library-annual-report",
+      "sa13-planning-forum-transcript",
+      "sa14-weather-station-install-guide",
+      "sa16-lab-safety-manual",
+      "sa17-seed-bank-grant-proposal",
+      "sa18-hand-tools-catalogue",
+      "sa19-release-notes"
+    ],
+    "lang:none": [
+      "sa20-wiki-meeting-minutes"
+    ],
+    "left-right-pages": [
+      "sa04-essay-chapter-footnotes",
+      "sa14-weather-station-install-guide"
+    ],
+    "long-leading": [
+      "sa13-planning-forum-transcript"
+    ],
+    "multicolumn": [
+      "sa05-kitchen-notebook",
+      "sa07-sensor-datasheet",
+      "sa08-tidewell-newsletter",
+      "sa18-hand-tools-catalogue"
+    ],
+    "multicolumn:crossing-page": [
+      "sa08-tidewell-newsletter"
+    ],
+    "observed:table-residue": [
+      "sa16-lab-safety-manual"
+    ],
+    "page-counter": [
+      "sa01-riverbank-survey-handbook",
+      "sa02-pump-service-manual",
+      "sa03-transit-ridership-report",
+      "sa04-essay-chapter-footnotes",
+      "sa06-mobile-work-policy-de",
+      "sa07-sensor-datasheet",
+      "sa09-queue-worker-tutorial",
+      "sa12-library-annual-report",
+      "sa13-planning-forum-transcript",
+      "sa15-hut-trail-guide-de",
+      "sa16-lab-safety-manual",
+      "sa17-seed-bank-grant-proposal",
+      "sa18-hand-tools-catalogue",
+      "sa19-release-notes",
+      "sa20-wiki-meeting-minutes"
+    ],
+    "paper:A4": [
+      "sa01-riverbank-survey-handbook",
+      "sa03-transit-ridership-report",
+      "sa06-mobile-work-policy-de",
+      "sa08-tidewell-newsletter",
+      "sa09-queue-worker-tutorial",
+      "sa10-lagoon-oxygen-report",
+      "sa13-planning-forum-transcript",
+      "sa15-hut-trail-guide-de",
+      "sa17-seed-bank-grant-proposal",
+      "sa18-hand-tools-catalogue",
+      "sa20-wiki-meeting-minutes"
+    ],
+    "paper:A4-landscape-named-page": [
+      "sa03-transit-ridership-report"
+    ],
+    "paper:letter": [
+      "sa02-pump-service-manual",
+      "sa04-essay-chapter-footnotes",
+      "sa05-kitchen-notebook",
+      "sa07-sensor-datasheet",
+      "sa11-insect-chorus-survey",
+      "sa12-library-annual-report",
+      "sa14-weather-station-install-guide",
+      "sa16-lab-safety-manual",
+      "sa19-release-notes"
+    ],
+    "paper:letter-landscape-named-page": [
+      "sa12-library-annual-report"
+    ],
+    "planted:avoid-too-tall-3plus-fragments": [
+      "sa02-pump-service-manual",
+      "sa09-queue-worker-tutorial",
+      "sa12-library-annual-report"
+    ],
+    "planted:avoid-too-tall-full-bleed": [
+      "sa14-weather-station-install-guide"
+    ],
+    "planted:avoid-too-tall-landscape": [
+      "sa03-transit-ridership-report"
+    ],
+    "planted:local-uri": [
+      "sa06-mobile-work-policy-de",
+      "sa15-hut-trail-guide-de",
+      "sa19-release-notes"
+    ],
+    "planted:orphaned-continuation-tail": [
+      "sa03-transit-ridership-report",
+      "sa13-planning-forum-transcript"
+    ],
+    "planted:short-last-line": [
+      "sa20-wiki-meeting-minutes"
+    ],
+    "planted:spaced-hyphen": [
+      "sa06-mobile-work-policy-de",
+      "sa15-hut-trail-guide-de",
+      "sa20-wiki-meeting-minutes"
+    ],
+    "planted:straight-quotes": [
+      "sa06-mobile-work-policy-de",
+      "sa15-hut-trail-guide-de",
+      "sa20-wiki-meeting-minutes"
+    ],
+    "planted:stranded-heading": [
+      "sa01-riverbank-survey-handbook",
+      "sa17-seed-bank-grant-proposal"
+    ],
+    "planted:svg-halo-clipped": [
+      "sa07-sensor-datasheet",
+      "sa10-lagoon-oxygen-report"
+    ],
+    "planted:svg-nested-clipped": [
+      "sa17-seed-bank-grant-proposal"
+    ],
+    "planted:svg-plain-label-outside": [
+      "sa03-transit-ridership-report",
+      "sa07-sensor-datasheet",
+      "sa10-lagoon-oxygen-report",
+      "sa15-hut-trail-guide-de",
+      "sa17-seed-bank-grant-proposal"
+    ],
+    "running-element:side": [
+      "sa02-pump-service-manual",
+      "sa14-weather-station-install-guide",
+      "sa16-lab-safety-manual"
+    ],
+    "running-element:top": [
+      "sa01-riverbank-survey-handbook",
+      "sa03-transit-ridership-report",
+      "sa05-kitchen-notebook",
+      "sa06-mobile-work-policy-de",
+      "sa07-sensor-datasheet",
+      "sa08-tidewell-newsletter",
+      "sa10-lagoon-oxygen-report",
+      "sa11-insect-chorus-survey",
+      "sa12-library-annual-report",
+      "sa13-planning-forum-transcript",
+      "sa14-weather-station-install-guide",
+      "sa15-hut-trail-guide-de",
+      "sa16-lab-safety-manual"
+    ],
+    "string-set": [
+      "sa01-riverbank-survey-handbook",
+      "sa02-pump-service-manual",
+      "sa04-essay-chapter-footnotes",
+      "sa09-queue-worker-tutorial",
+      "sa15-hut-trail-guide-de",
+      "sa17-seed-bank-grant-proposal",
+      "sa18-hand-tools-catalogue",
+      "sa19-release-notes"
+    ],
+    "svg:halo-inside": [
+      "sa07-sensor-datasheet",
+      "sa10-lagoon-oxygen-report",
+      "sa11-insect-chorus-survey",
+      "sa18-hand-tools-catalogue"
+    ],
+    "svg:letterbox": [
+      "sa11-insect-chorus-survey"
+    ],
+    "svg:nested": [
+      "sa17-seed-bank-grant-proposal"
+    ],
+    "svg:not-painted": [
+      "sa11-insect-chorus-survey"
+    ],
+    "svg:overflow-visible": [
+      "sa11-insect-chorus-survey"
+    ],
+    "svg:plain-labels-inside": [
+      "sa01-riverbank-survey-handbook",
+      "sa02-pump-service-manual",
+      "sa03-transit-ridership-report",
+      "sa07-sensor-datasheet",
+      "sa08-tidewell-newsletter",
+      "sa10-lagoon-oxygen-report",
+      "sa11-insect-chorus-survey",
+      "sa12-library-annual-report",
+      "sa14-weather-station-install-guide",
+      "sa15-hut-trail-guide-de",
+      "sa16-lab-safety-manual",
+      "sa17-seed-bank-grant-proposal",
+      "sa18-hand-tools-catalogue",
+      "sa19-release-notes"
+    ],
+    "svg:rotated-label": [
+      "sa10-lagoon-oxygen-report",
+      "sa11-insect-chorus-survey"
+    ],
+    "svg:use": [
+      "sa08-tidewell-newsletter"
+    ],
+    "table:crossing-pages": [
+      "sa02-pump-service-manual",
+      "sa03-transit-ridership-report",
+      "sa12-library-annual-report",
+      "sa16-lab-safety-manual",
+      "sa19-release-notes"
+    ],
+    "vertical-writing": [
+      "sa08-tidewell-newsletter"
+    ],
+    "widows-orphans-declared": [
+      "sa01-riverbank-survey-handbook",
+      "sa02-pump-service-manual",
+      "sa03-transit-ridership-report",
+      "sa04-essay-chapter-footnotes",
+      "sa05-kitchen-notebook",
+      "sa06-mobile-work-policy-de",
+      "sa08-tidewell-newsletter",
+      "sa09-queue-worker-tutorial",
+      "sa10-lagoon-oxygen-report",
+      "sa11-insect-chorus-survey",
+      "sa12-library-annual-report",
+      "sa13-planning-forum-transcript",
+      "sa14-weather-station-install-guide",
+      "sa15-hut-trail-guide-de",
+      "sa16-lab-safety-manual",
+      "sa17-seed-bank-grant-proposal",
+      "sa18-hand-tools-catalogue",
+      "sa19-release-notes",
+      "sa20-wiki-meeting-minutes"
+    ]
+  },
+  "files": [
+    {
+      "path": "documents/sa01-riverbank-survey-handbook.html",
+      "sha256": "e32b36c1a071330f40d268053ce024f8c7facced4f9a7032b24c4a6aa21a437c",
+      "byteLength": 31293
+    },
+    {
+      "path": "documents/sa02-pump-service-manual.html",
+      "sha256": "f74dbff93bdfd5d27366e263a9aaca3ec17dee2060c2428641642167cc1c015a",
+      "byteLength": 24729
+    },
+    {
+      "path": "documents/sa03-transit-ridership-report.html",
+      "sha256": "8425e95fbaad3aa0d361a2ebc9fd36d3afbed39f862c8e7cc3caeb84a5ce95c0",
+      "byteLength": 24983
+    },
+    {
+      "path": "documents/sa04-essay-chapter-footnotes.html",
+      "sha256": "5d0aa4e2c6b8cb8730fab04ba52f38171e8df07eeb6eb538598a9dfdf87a0456",
+      "byteLength": 12441
+    },
+    {
+      "path": "documents/sa05-kitchen-notebook.html",
+      "sha256": "a3f14ab4cc87d97c81376ccf7d3fd8e0621f3519daf7c87ab56391c44801933d",
+      "byteLength": 12742
+    },
+    {
+      "path": "documents/sa06-mobile-work-policy-de.html",
+      "sha256": "270f299510835def8e6bb6e1208b186fbb34cc95d3bff72e0f3aa994cea4b844",
+      "byteLength": 10257
+    },
+    {
+      "path": "documents/sa07-sensor-datasheet.html",
+      "sha256": "1ebf7286135c1b2dbf7a65236f7847c035e07b1e826b6b0739032945ac9187bb",
+      "byteLength": 14271
+    },
+    {
+      "path": "documents/sa08-tidewell-newsletter.html",
+      "sha256": "a55321ddb3b478d6998bac29f8b7992caf6a082e370a113b58b260072d36648c",
+      "byteLength": 14888
+    },
+    {
+      "path": "documents/sa09-queue-worker-tutorial.html",
+      "sha256": "5540992465de0587422ce4a929a97024f8705f06ac3a95fd7f229ebf4d7896dd",
+      "byteLength": 22103
+    },
+    {
+      "path": "documents/sa10-lagoon-oxygen-report.html",
+      "sha256": "13961838d9cc4c14805e371db1b910428496f2085e8302188bf32dfe79516f8f",
+      "byteLength": 20123
+    },
+    {
+      "path": "documents/sa11-insect-chorus-survey.html",
+      "sha256": "dc713476f4c56804b801524bb2f1ecd034b035a96ae992c7162cdb3b13a1c3c5",
+      "byteLength": 16266
+    },
+    {
+      "path": "documents/sa12-library-annual-report.html",
+      "sha256": "e70795ef50ba4fa804f747bdc6bccf2bfdfd7ab6ba1fd7e3e6b63c5781e81ee4",
+      "byteLength": 31885
+    },
+    {
+      "path": "documents/sa13-planning-forum-transcript.html",
+      "sha256": "10cec73ceb40208af6edb07dd6e11e90c7ba33bcf75c64784058b3c26a438a86",
+      "byteLength": 13390
+    },
+    {
+      "path": "documents/sa14-weather-station-install-guide.html",
+      "sha256": "c0e181125bb20ae293f2959f172b84bdae2862be330c08adfb091be0061867fc",
+      "byteLength": 15243
+    },
+    {
+      "path": "documents/sa15-hut-trail-guide-de.html",
+      "sha256": "a5b62009b767496d9908efc1910d4edd499b2205b9ba4dd100daa0d55b97dc92",
+      "byteLength": 10743
+    },
+    {
+      "path": "documents/sa16-lab-safety-manual.html",
+      "sha256": "6a380f44cac1b9f1bbed2f46e28ddf0d82e58ab42b83029351074dd436baf32c",
+      "byteLength": 19049
+    },
+    {
+      "path": "documents/sa17-seed-bank-grant-proposal.html",
+      "sha256": "c67b3129846aa675dbb87d0883cb4fbe70ce263f526525f491f1aedafc4015e5",
+      "byteLength": 13515
+    },
+    {
+      "path": "documents/sa18-hand-tools-catalogue.html",
+      "sha256": "22f9d1a7e7bfd79dcead9ef884b4ed59e280c8eeff592ceff40bfef8121b8d9d",
+      "byteLength": 12440
+    },
+    {
+      "path": "documents/sa19-release-notes.html",
+      "sha256": "5b0331c9198a379e5c5a43db63cbd45a49ebb40aaa81f93c681e19e3a84ab43d",
+      "byteLength": 11637
+    },
+    {
+      "path": "documents/sa20-wiki-meeting-minutes.html",
+      "sha256": "855ab48e5ae3b263ba1f14a4c5fcd59d7b9755e907c9fabcabd71784be23af51",
+      "byteLength": 6037
+    },
+    {
+      "path": "expected/sa01-riverbank-survey-handbook.expected.json",
+      "sha256": "a0663526573df604a4c66f8a4a2de662e46a2f74e997ed922e62465c01ef36e8",
+      "byteLength": 24190
+    },
+    {
+      "path": "expected/sa02-pump-service-manual.expected.json",
+      "sha256": "ce0141ed545812dd6ee73f4f06b45208167b4b8282d9600722c56da4a4251884",
+      "byteLength": 17226
+    },
+    {
+      "path": "expected/sa03-transit-ridership-report.expected.json",
+      "sha256": "c5c1ecc4a64fd02fd9f61dd2a153afa30cc059037b367aec52506200d487894b",
+      "byteLength": 23278
+    },
+    {
+      "path": "expected/sa04-essay-chapter-footnotes.expected.json",
+      "sha256": "b65f5c6d9aea9191747330f99301f2b19d595e45d662d6188101d89d4039ec80",
+      "byteLength": 10362
+    },
+    {
+      "path": "expected/sa05-kitchen-notebook.expected.json",
+      "sha256": "bdfc4b480e9980f7a864349d066b43a96a8d564c2f8ba7abb5928818e43e361b",
+      "byteLength": 15519
+    },
+    {
+      "path": "expected/sa06-mobile-work-policy-de.expected.json",
+      "sha256": "c6532c9abb7426ad4207b6a4aaefa167b4abfe188dbe55bc9bc1bfbb37d25e83",
+      "byteLength": 16280
+    },
+    {
+      "path": "expected/sa07-sensor-datasheet.expected.json",
+      "sha256": "911836373d78fb2fd0c202a3213d900c95c43593a96eafb6303cab83e6591a6c",
+      "byteLength": 24997
+    },
+    {
+      "path": "expected/sa08-tidewell-newsletter.expected.json",
+      "sha256": "d320afe17527ffa6ba92f752989ec3be4a52d7a4ded9e5fb7af48d8d2217490e",
+      "byteLength": 21521
+    },
+    {
+      "path": "expected/sa09-queue-worker-tutorial.expected.json",
+      "sha256": "d2d496eecb09a4a84a5673346ba4587ac83331a03de5ebbaa07cea387670c182",
+      "byteLength": 14462
+    },
+    {
+      "path": "expected/sa10-lagoon-oxygen-report.expected.json",
+      "sha256": "c6676908fb57551e23d77f3a1f210daeac1806bb7e515a70a6ec22e1032288a1",
+      "byteLength": 34262
+    },
+    {
+      "path": "expected/sa11-insect-chorus-survey.expected.json",
+      "sha256": "3412c7cd852d987cbe64642c06318787f11e1f5f5f33cae2790eed5bf57a4352",
+      "byteLength": 25775
+    },
+    {
+      "path": "expected/sa12-library-annual-report.expected.json",
+      "sha256": "b9cb67eb5c22bb469b2e797c41c679cb319e4c8229aca47e503294ff7b8f2662",
+      "byteLength": 16920
+    },
+    {
+      "path": "expected/sa13-planning-forum-transcript.expected.json",
+      "sha256": "14abf757082be360f39d99285a63473d69b214fc89aee8f36577be416de5c919",
+      "byteLength": 16421
+    },
+    {
+      "path": "expected/sa14-weather-station-install-guide.expected.json",
+      "sha256": "5ba1423cf70d2e9dac395cbf17736c84ffa5ad037893439f7205f0a607f2e3c8",
+      "byteLength": 19051
+    },
+    {
+      "path": "expected/sa15-hut-trail-guide-de.expected.json",
+      "sha256": "00a13dcbac51e8d588df77ab640dc832895069dcf38977459c1accaa003f01c0",
+      "byteLength": 18106
+    },
+    {
+      "path": "expected/sa16-lab-safety-manual.expected.json",
+      "sha256": "0949d4250f8eac3cf3f6d617a5750baa8e46162a87ff189769ecb0ae153bbf1f",
+      "byteLength": 21119
+    },
+    {
+      "path": "expected/sa17-seed-bank-grant-proposal.expected.json",
+      "sha256": "f371185c88770d8b977a473111bc5f1419b9f7bc534fe2fdcaf8c3a3eca1bdb9",
+      "byteLength": 18100
+    },
+    {
+      "path": "expected/sa18-hand-tools-catalogue.expected.json",
+      "sha256": "ff34c3a84e890ba7f1d3be95f415f249bc52e13c496efc2aca0f8082a49a4abd",
+      "byteLength": 23000
+    },
+    {
+      "path": "expected/sa19-release-notes.expected.json",
+      "sha256": "99c1c0df4d936ecf699c2c649c414809c21900c35f92d6d778aec5a0caad8ee9",
+      "byteLength": 13762
+    },
+    {
+      "path": "expected/sa20-wiki-meeting-minutes.expected.json",
+      "sha256": "4488b8e16b017188e6669282654b51c86a63be2831c20a76506c17dad770a361",
+      "byteLength": 14087
+    },
+    {
+      "path": "probe/construction-measurements.json",
+      "sha256": "f07784cf30d3bb7aaf68f233020eee839ee5d16e8822d139977c9151e643ef13",
+      "byteLength": 498757
+    },
+    {
+      "path": "probe/construction-probe.mjs",
+      "sha256": "6a31440d3ff227f12e2486f03ee047daba69a11a3c8304c598764ccf15d5e07d",
+      "byteLength": 30918
+    },
+    {
+      "path": "README.md",
+      "sha256": "f098a9e0b532f9f879181c4812b3027e3830ba2c015e8c40f9dc3586fab1a8d6",
+      "byteLength": 10479
+    },
+    {
+      "path": "PROVENANCE.md",
+      "sha256": "22e70fe9ecd098d793a1c1e00b3aa84b8ec1c440e1a8ec268727dd7477ccd7ff",
+      "byteLength": 5753
+    },
+    {
+      "path": "RIGHTS.md",
+      "sha256": "b74c670993c020ed49297cd7e08a16ab003549fe565d32a8605330a9481d0621",
+      "byteLength": 1356
+    }
+  ],
+  "expectationHistory": []
+}

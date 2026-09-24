@@ -1,0 +1,660 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa03-transit-ridership-report",
+  "artifact": "documents/sa03-transit-ridership-report.html",
+  "sha256": "8425e95fbaad3aa0d361a2ebc9fd36d3afbed39f862c8e7cc3caeb84a5ce95c0",
+  "byteLength": 24983,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Harrowfield Transit Authority: Quarterly Ridership Data Report, Q2",
+  "genre": "data report with tables crossing pages and a named landscape page",
+  "language": {
+    "htmlLang": "en",
+    "typeRulesUnderDefaultLocale": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "A4",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        793.7,
+        1122.52
+      ],
+      "margins": "20mm 18mm",
+      "contentBoxCssPx": [
+        657.63,
+        971.34
+      ]
+    },
+    {
+      "pageRule": "@page wide",
+      "size": "A4",
+      "orientation": "landscape",
+      "pageBoxCssPx": [
+        1122.52,
+        793.7
+      ],
+      "margins": "15mm",
+      "contentBoxCssPx": [
+        1009.13,
+        680.31
+      ],
+      "selector": "section.wide",
+      "observed": "Paged.js 0.4.3 on Chromium 141 lays the named page's content box out in landscape but keeps the portrait sheet: pagedjs_page box and PDF pages stay 793.7 x 1122.5 px / 595 x 842 pt, so the landscape content is clipped at the right edge of the PDF page"
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      7,
+      8
+    ],
+    "measured": 7,
+    "basis": "plain Paged.js measurement (7 pages); two named-page switches; the landscape section needs three landscape pages because of the oversized figure (one nearly empty page, the figure page, the caption page)"
+  },
+  "expectedExit": {
+    "set": [
+      1,
+      3
+    ],
+    "derivation": "Two error findings: the clipped value label #rb-val-1 and the oversized #fig-hourly (exit 1). Tables cross page boundaries and the landscape content is drawn on a portrait sheet; docs/limitations.md describes exit 3 render-unstable when the PDF does not reproduce the measured geometry (table residue). Neither was classified as residue by the plain probe, so 3 is admitted as 'declined as unmeasurable'.",
+    "byCode": {
+      "1": "svg error on #rb-val-1 and unbreakable error on #fig-hourly",
+      "3": "render-unstable (table residue or landscape PDF divergence)"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "A4 portrait and a named landscape page (@page wide)",
+    "running element in @top-center",
+    "page counters",
+    "table crossing a page boundary (48 rows)",
+    "wide table on the landscape page",
+    "horizontal bar chart with a value label clipped at the right edge (planted)",
+    "oversized break-inside: avoid figure on the landscape page (planted)",
+    "caption pushed alone onto a page (orphaned continuation, consequence of the planted figure)"
+  ],
+  "runningElements": [
+    {
+      "id": "reporthead",
+      "marginBox": "top-center",
+      "marginBoxCopies": 7,
+      "pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  ],
+  "constructionFacts": [
+    {
+      "fact": "clipped value label",
+      "arithmetic": "longest bar ends at x = 620 of a 642 px viewport; its label starts 6 px later (x = 626) and is about 38 px long at 10.5 px -> about 22 px outside"
+    },
+    {
+      "fact": "oversized landscape figure",
+      "arithmetic": "700 px SVG > 680.31 px landscape content box",
+      "measured": [
+        {
+          "page": 4,
+          "heightPx": 0,
+          "topInContentPx": 11.33,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 5,
+          "heightPx": 700,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 6,
+          "heightPx": 15.47,
+          "topInContentPx": 5.65,
+          "startsInsideContentBox": true
+        }
+      ]
+    },
+    {
+      "fact": "table crossing",
+      "measured": {
+        "tbl-routes": [
+          {
+            "page": 1,
+            "heightPx": 106.02,
+            "topInContentPx": 846.4,
+            "startsInsideContentBox": true
+          },
+          {
+            "page": 2,
+            "heightPx": 932.34,
+            "topInContentPx": 0,
+            "startsInsideContentBox": true
+          }
+        ]
+      }
+    }
+  ],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "reporthead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "report"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "report"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "reporthead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "report"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "report"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "fig-hourly"
+          },
+          "why": "a break-inside: avoid figure on the named landscape page that is taller than that page's content box",
+          "construction": "SVG 1000 x 700 px + caption inside a break-inside: avoid figure on @page wide (A4 landscape, 15 mm margins): content box 1009.13 x 680.31 px. 700 px of SVG alone exceed 680.31 px; the figure does not fit on the page it is laid out on (it would fit a portrait page, which docs/limitations.md says does not matter).",
+          "measured": {
+            "naturalPx": 721.13,
+            "fragments": [
+              {
+                "page": 4,
+                "heightPx": 0,
+                "topInContentPx": 11.33,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 5,
+                "heightPx": 700,
+                "topInContentPx": 0,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 6,
+                "heightPx": 15.47,
+                "topInContentPx": 5.65,
+                "startsInsideContentBox": true
+              }
+            ],
+            "landscapeContentBoxPx": 680.31
+          },
+          "docsBasis": "docs/limitations.md 0.6.0: 'The boundary is the content box of the page the block was laid out on ... A block that would have fitted on a differently sized page elsewhere in the document is still reported'."
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "reporthead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "ids": [
+              "fig-boardings"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (971.34 px) and are laid out in one piece",
+          "measured": {
+            "fig-boardings": {
+              "maxFragmentPx": 351.13,
+              "fragments": 1,
+              "naturalPx": 351.13
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tbl-routes tr, #tbl-stops tr, #tbl-quality tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the portrait 971.34 / landscape 680.31 px content box"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "reporthead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2"
+            ]
+          },
+          "why": "every one of these headings carries break-after: avoid (Paged.js moves it with the following block) or opens its page, so content follows it on its own page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [
+        {
+          "target": {
+            "pageOf": {
+              "id": "cap-hourly"
+            }
+          },
+          "measuredPage": 6,
+          "why": "the caption of #fig-hourly is pushed alone onto a landscape page: the page holds nothing but the tail of a block that began earlier",
+          "construction": "the 700 px SVG fills the previous landscape page (680.31 px content box); the figcaption (one line) overflows onto the next page, which the section then leaves by a named-page break",
+          "measured": {
+            "fragments": [
+              {
+                "page": 4,
+                "heightPx": 0,
+                "topInContentPx": 11.33,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 5,
+                "heightPx": 700,
+                "topInContentPx": 0,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 6,
+                "heightPx": 15.47,
+                "topInContentPx": 5.65,
+                "startsInsideContentBox": true
+              }
+            ]
+          },
+          "dependsOn": "Paged.js placing the caption of an oversized figure on the following page, as measured on Chromium 141",
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md; the incoming break is an overflow, not a forced break."
+        }
+      ],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "reporthead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "report"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "rb-val-1",
+            "svg": "svg-boardings"
+          },
+          "text": "412,300",
+          "why": "label leaves its SVG viewport at the right edge and is not drawn there",
+          "construction": "cell box (getBBox through getScreenCTM) 22.12 px beyond the right edge; pixel ink 22.00 px beyond it (probe window 160 px)",
+          "measured": {
+            "page": 1,
+            "cellInsetsPx": {
+              "left": 626,
+              "top": 44,
+              "right": -22.12,
+              "bottom": 274
+            },
+            "inkInsetsPx": {
+              "left": 626,
+              "top": 46.5,
+              "right": -22,
+              "bottom": 274.5
+            },
+            "viewport": {
+              "x": 68.03,
+              "y": 380.56,
+              "width": 642,
+              "height": 330,
+              "nested": false
+            }
+          },
+          "docsBasis": "docs/rules/svg-text-overflows-viewport.md: overshoot > 0 px of the CTM-normalised text box against the viewport is an error."
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "svg": "svg-boardings",
+            "texts": [
+              "rb-name-1",
+              "rb-name-2",
+              "rb-name-3",
+              "rb-name-4",
+              "rb-name-5",
+              "rb-name-6",
+              "rb-name-7",
+              "rb-name-8",
+              "rb-name-9",
+              "rb-note",
+              "rb-title",
+              "rb-val-2",
+              "rb-val-3",
+              "rb-val-4",
+              "rb-val-5",
+              "rb-val-6",
+              "rb-val-7",
+              "rb-val-8",
+              "rb-val-9"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "rb-title": 13,
+              "rb-name-1": 44,
+              "rb-name-2": 74,
+              "rb-val-2": 36.81,
+              "rb-name-3": 92.09,
+              "rb-val-3": 96.5,
+              "rb-name-4": 104.36,
+              "rb-val-4": 134,
+              "rb-name-5": 99.69,
+              "rb-val-5": 154,
+              "rb-name-6": 118.95,
+              "rb-val-6": 124,
+              "rb-name-7": 93.5,
+              "rb-val-7": 94,
+              "rb-name-8": 63.5,
+              "rb-val-8": 64,
+              "rb-name-9": 33.5,
+              "rb-val-9": 34,
+              "rb-note": 6
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-hourly",
+            "texts": [
+              "hr-am",
+              "hr-pm",
+              "hr-title",
+              "hr-x-00",
+              "hr-x-01",
+              "hr-x-02",
+              "hr-x-03",
+              "hr-x-04",
+              "hr-x-05",
+              "hr-x-06",
+              "hr-x-07",
+              "hr-x-08",
+              "hr-x-09",
+              "hr-x-10",
+              "hr-x-11",
+              "hr-x-12",
+              "hr-x-13",
+              "hr-x-14",
+              "hr-x-15",
+              "hr-x-16",
+              "hr-x-17",
+              "hr-x-18",
+              "hr-x-19",
+              "hr-x-20",
+              "hr-x-21",
+              "hr-x-22",
+              "hr-x-23",
+              "hr-xtitle",
+              "hr-y-0",
+              "hr-y-100",
+              "hr-y-20",
+              "hr-y-40",
+              "hr-y-60",
+              "hr-y-80"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "hr-x-00": 60,
+              "hr-x-01": 60,
+              "hr-x-02": 60,
+              "hr-x-03": 60,
+              "hr-x-04": 60,
+              "hr-x-05": 60,
+              "hr-x-06": 60,
+              "hr-x-07": 60,
+              "hr-x-08": 60,
+              "hr-x-09": 60,
+              "hr-x-10": 60,
+              "hr-x-11": 60,
+              "hr-x-12": 60,
+              "hr-x-13": 60,
+              "hr-x-14": 60,
+              "hr-x-15": 60,
+              "hr-x-16": 60,
+              "hr-x-17": 60,
+              "hr-x-18": 60,
+              "hr-x-19": 60,
+              "hr-x-20": 60,
+              "hr-x-21": 60,
+              "hr-x-22": 60,
+              "hr-x-23": 52.12,
+              "hr-y-0": 74,
+              "hr-y-20": 70.88,
+              "hr-y-40": 70.5,
+              "hr-y-60": 70.88,
+              "hr-y-80": 70.88,
+              "hr-y-100": 65,
+              "hr-title": 22,
+              "hr-xtitle": 42.5,
+              "hr-am": 75,
+              "hr-pm": 58.5
+            }
+          }
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no straight quotation mark or apostrophe occurs in any text run outside code, pre, kbd, samp and var; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "report"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no block is justified; docs/rules/type-excessive-word-spacing.md judges word gaps in a justified block only"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no file: URI and no absolute path occurs in any URI-bearing attribute (href, src, srcset, poster, data, xlink:href) or CSS url()"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 7,
+    "pdfPageCount": 7,
+    "contentBoxHeightsPx": [
+      680.31,
+      971.33
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Sans (system, 37 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Sans (system, 47 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Sans (system, 30 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "Liberation Sans (system, 9 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+        "Liberation Sans (system, 32 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": [
+    "Landscape pages 4 and 6 are nearly empty in the output: page 4 holds only a zero-height first fragment of #fig-hourly, page 6 only its caption. That is how Paged.js 0.4.3 handles the planted oversized figure."
+  ]
+}

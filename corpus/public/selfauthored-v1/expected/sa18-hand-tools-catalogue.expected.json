@@ -1,0 +1,701 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa18-hand-tools-catalogue",
+  "artifact": "documents/sa18-hand-tools-catalogue.html",
+  "sha256": "22f9d1a7e7bfd79dcead9ef884b4ed59e280c8eeff592ceff40bfef8121b8d9d",
+  "byteLength": 12440,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Tools of Patience: hand instruments from the Wendlecote Collection",
+  "genre": "exhibition catalogue",
+  "language": {
+    "htmlLang": "en",
+    "typeRulesUnderDefaultLocale": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "A4",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        793.7,
+        1122.52
+      ],
+      "margins": "20mm",
+      "contentBoxCssPx": [
+        642.52,
+        971.34
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      6,
+      6
+    ],
+    "measured": 6,
+    "basis": "introduction page plus five fixed-height catalogue cards that each need their own page"
+  },
+  "expectedExit": {
+    "set": [
+      0,
+      4
+    ],
+    "derivation": "Today: exit 4, because seven halo labels on the provenance map (all inside) decline with env/svg-painted-bounds-unsupported. Nothing is too tall and no painted label is clipped, so with halo labels decided the run is exit 0.",
+    "byCode": {
+      "4": "insufficient-coverage from 7 halo declines (current capability)",
+      "0": "clean once halos are decided"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "A4",
+    "string-set entry title in @top-right",
+    "@page :first",
+    "tall break-inside: avoid catalogue cards that fit (0.72 to 0.98 of the page)",
+    "map SVG with halo labels, all inside",
+    "SVG line drawings",
+    "three-column index (column-count: 3)"
+  ],
+  "runningElements": [],
+  "constructionFacts": [
+    {
+      "fact": "card heights",
+      "arithmetic": "860 / 930 / 950 / 820 / 700 px < 971.34 px",
+      "measured": {
+        "entry-plane": [
+          {
+            "page": 2,
+            "heightPx": 860,
+            "topInContentPx": 67.16,
+            "startsInsideContentBox": true
+          }
+        ],
+        "entry-gauge": [
+          {
+            "page": 3,
+            "heightPx": 930,
+            "topInContentPx": 0,
+            "startsInsideContentBox": true
+          }
+        ],
+        "entry-drawknife": [
+          {
+            "page": 4,
+            "heightPx": 950,
+            "topInContentPx": 0,
+            "startsInsideContentBox": true
+          }
+        ],
+        "entry-auger": [
+          {
+            "page": 5,
+            "heightPx": 820,
+            "topInContentPx": 0,
+            "startsInsideContentBox": true
+          }
+        ],
+        "entry-spokeshave": [
+          {
+            "page": 6,
+            "heightPx": 700,
+            "topInContentPx": 0,
+            "startsInsideContentBox": true
+          }
+        ]
+      }
+    }
+  ],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "catalogue"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "catalogue"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ],
+      "notes": [
+        "div#index (column-count: 3) is short, not split and carries no break-inside: avoid; no rule has it as a candidate."
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "catalogue"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "catalogue"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "ids": [
+              "entry-plane",
+              "entry-gauge",
+              "entry-drawknife",
+              "entry-auger",
+              "entry-spokeshave",
+              "fig-provenance",
+              "fig-plane",
+              "fig-gauge",
+              "fig-drawknife",
+              "fig-auger",
+              "fig-spokeshave"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (971.34 px) and are laid out in one piece; the entries are the tall controls: fixed 860, 930, 950, 820 and 700 px, the tallest 21.34 px short of the content box, each moved whole to a new page",
+          "measured": {
+            "entry-plane": {
+              "maxFragmentPx": 860,
+              "fragments": 1,
+              "naturalPx": 860
+            },
+            "entry-gauge": {
+              "maxFragmentPx": 930,
+              "fragments": 1,
+              "naturalPx": 930
+            },
+            "entry-drawknife": {
+              "maxFragmentPx": 950,
+              "fragments": 1,
+              "naturalPx": 950
+            },
+            "entry-auger": {
+              "maxFragmentPx": 820,
+              "fragments": 1,
+              "naturalPx": 820
+            },
+            "entry-spokeshave": {
+              "maxFragmentPx": 700,
+              "fragments": 1,
+              "naturalPx": 700
+            },
+            "fig-provenance": {
+              "maxFragmentPx": 404.34,
+              "fragments": 1,
+              "naturalPx": 404.34
+            },
+            "fig-plane": {
+              "maxFragmentPx": 420,
+              "fragments": 1,
+              "naturalPx": 420
+            },
+            "fig-gauge": {
+              "maxFragmentPx": 420,
+              "fragments": 1,
+              "naturalPx": 420
+            },
+            "fig-drawknife": {
+              "maxFragmentPx": 420,
+              "fragments": 1,
+              "naturalPx": 420
+            },
+            "fig-auger": {
+              "maxFragmentPx": 420,
+              "fragments": 1,
+              "naturalPx": 420
+            },
+            "fig-spokeshave": {
+              "maxFragmentPx": 420,
+              "fragments": 1,
+              "naturalPx": 420
+            }
+          }
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2",
+              "article.entry h3"
+            ]
+          },
+          "why": "h1 opens page 1, h2 carry break-after: avoid, and each h3 opens its catalogue card"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "catalogue"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "svg": "svg-provenance",
+            "texts": [
+              "map-title"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "map-title": 15
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-plane",
+            "texts": [
+              "t-plane-cat",
+              "t-plane-scale"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "t-plane-cat": 19,
+              "t-plane-scale": 17.5
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-gauge",
+            "texts": [
+              "t-gauge-cat",
+              "t-gauge-scale"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "t-gauge-cat": 19,
+              "t-gauge-scale": 17.5
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-drawknife",
+            "texts": [
+              "t-drawknife-cat",
+              "t-drawknife-scale"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "t-drawknife-cat": 19,
+              "t-drawknife-scale": 17.5
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-auger",
+            "texts": [
+              "t-auger-cat",
+              "t-auger-scale"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "t-auger-cat": 19,
+              "t-auger-scale": 17.5
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-spokeshave",
+            "texts": [
+              "t-spokeshave-cat",
+              "t-spokeshave-scale"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "t-spokeshave-cat": 19,
+              "t-spokeshave-scale": 17.5
+            }
+          }
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": [
+        {
+          "target": {
+            "svg": "svg-provenance",
+            "texts": [
+              "map-plane",
+              "map-auger",
+              "map-spokeshave",
+              "map-gauge",
+              "map-drawknife",
+              "map-estuary",
+              "map-river"
+            ]
+          },
+          "reason": "env/svg-painted-bounds-unsupported",
+          "required": true,
+          "count": 7,
+          "countsTowardCoverage": true,
+          "docsBasis": "docs/limitations.md ('Complex SVG paint is detected but not geometrically solved'): a <text> that paints a visible stroke (paint-order halo) declines per target with env/svg-painted-bounds-unsupported and stays in the coverage denominator; docs/rules/svg-text-overflows-viewport.md 'Limits and fail-closed cases'.",
+          "future": "docs/limitations.md names the next step: a two-sided bound (fill box as lower bound, fill box inflated by stroke-width/2 as upper bound). Every halo label here is decidable by that bound; ifMeasured is the construction truth a tool that measures it must report.",
+          "perText": [
+            {
+              "id": "map-plane",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (122.50 px); painted ink 122 px inside",
+              "cellInsetsPx": {
+                "left": 158,
+                "top": 244,
+                "right": 408.66,
+                "bottom": 124
+              },
+              "fillInkInsetsPx": {
+                "left": 158,
+                "top": 246,
+                "right": 409,
+                "bottom": 123.5
+              },
+              "paintedInkInsetsPx": {
+                "left": 156.5,
+                "top": 244.5,
+                "right": 407.5,
+                "bottom": 122
+              },
+              "strokeWidthPx": 3
+            },
+            {
+              "id": "map-auger",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (100.50 px); painted ink 102.5 px inside",
+              "cellInsetsPx": {
+                "left": 368,
+                "top": 102,
+                "right": 220.02,
+                "bottom": 266
+              },
+              "fillInkInsetsPx": {
+                "left": 367.5,
+                "top": 104,
+                "right": 220,
+                "bottom": 265.5
+              },
+              "paintedInkInsetsPx": {
+                "left": 366,
+                "top": 102.5,
+                "right": 218.5,
+                "bottom": 264
+              },
+              "strokeWidthPx": 3
+            },
+            {
+              "id": "map-spokeshave",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (73.71 px); painted ink 74 px inside",
+              "cellInsetsPx": {
+                "left": 478,
+                "top": 172,
+                "right": 75.21,
+                "bottom": 196
+              },
+              "fillInkInsetsPx": {
+                "left": 477.5,
+                "top": 174,
+                "right": 75.5,
+                "bottom": 195.5
+              },
+              "paintedInkInsetsPx": {
+                "left": 476,
+                "top": 172.5,
+                "right": 74,
+                "bottom": 194
+              },
+              "strokeWidthPx": 3
+            },
+            {
+              "id": "map-gauge",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (150.50 px); painted ink 152.5 px inside",
+              "cellInsetsPx": {
+                "left": 258,
+                "top": 152,
+                "right": 287.75,
+                "bottom": 216
+              },
+              "fillInkInsetsPx": {
+                "left": 257.5,
+                "top": 154,
+                "right": 287.5,
+                "bottom": 215.5
+              },
+              "paintedInkInsetsPx": {
+                "left": 256,
+                "top": 152.5,
+                "right": 286,
+                "bottom": 214
+              },
+              "strokeWidthPx": 3
+            },
+            {
+              "id": "map-drawknife",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (44.74 px); painted ink 45 px inside",
+              "cellInsetsPx": {
+                "left": 548,
+                "top": 72,
+                "right": 46.24,
+                "bottom": 296
+              },
+              "fillInkInsetsPx": {
+                "left": 548,
+                "top": 74.5,
+                "right": 46.5,
+                "bottom": 295.5
+              },
+              "paintedInkInsetsPx": {
+                "left": 546.5,
+                "top": 73,
+                "right": 45,
+                "bottom": 294
+              },
+              "strokeWidthPx": 3
+            },
+            {
+              "id": "map-estuary",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (38.50 px); painted ink 38.5 px inside",
+              "cellInsetsPx": {
+                "left": 40,
+                "top": 319,
+                "right": 565.34,
+                "bottom": 47
+              },
+              "fillInkInsetsPx": {
+                "left": 40,
+                "top": 322,
+                "right": 565,
+                "bottom": 47
+              },
+              "paintedInkInsetsPx": {
+                "left": 38.5,
+                "top": 320.5,
+                "right": 563.5,
+                "bottom": 45.5
+              },
+              "strokeWidthPx": 3
+            },
+            {
+              "id": "map-river",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (38.50 px); painted ink 40.5 px inside",
+              "cellInsetsPx": {
+                "left": 372,
+                "top": 40,
+                "right": 209.57,
+                "bottom": 328
+              },
+              "fillInkInsetsPx": {
+                "left": 372,
+                "top": 42,
+                "right": 209.5,
+                "bottom": 329.5
+              },
+              "paintedInkInsetsPx": {
+                "left": 370.5,
+                "top": 40.5,
+                "right": 208,
+                "bottom": 328
+              },
+              "strokeWidthPx": 3
+            }
+          ]
+        }
+      ]
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no straight quotation mark or apostrophe occurs in any text run outside code, pre, kbd, samp and var; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "catalogue"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no block is justified; docs/rules/type-excessive-word-spacing.md judges word gaps in a justified block only"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no file: URI and no absolute path occurs in any URI-bearing attribute (href, src, srcset, poster, data, xlink:href) or CSS url()"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break",
+    "env/svg-painted-bounds-unsupported"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 6,
+    "pdfPageCount": 6,
+    "contentBoxHeightsPx": [
+      971.33
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Serif (system, 70 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Serif (system, 17 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Serif (system, 12 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+        "Liberation Serif (system, 16 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": []
+}

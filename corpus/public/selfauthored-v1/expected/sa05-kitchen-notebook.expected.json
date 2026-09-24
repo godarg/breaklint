@@ -1,0 +1,429 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa05-kitchen-notebook",
+  "artifact": "documents/sa05-kitchen-notebook.html",
+  "sha256": "a3f14ab4cc87d97c81376ccf7d3fd8e0621f3519daf7c87ab56391c44801933d",
+  "byteLength": 12742,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "The Salt and Ember Kitchen Notebook: Autumn pages",
+  "genre": "cookbook page set, one recipe per page",
+  "language": {
+    "htmlLang": "en",
+    "typeRulesUnderDefaultLocale": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "letter",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        816,
+        1056
+      ],
+      "margins": "0.8in 0.8in 0.9in 0.8in",
+      "contentBoxCssPx": [
+        662.4,
+        892.8
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      7,
+      7
+    ],
+    "measured": 7,
+    "basis": "a front page plus six recipes, each forced onto its own page and far shorter than a page"
+  },
+  "expectedExit": {
+    "set": [
+      4
+    ],
+    "derivation": "Insufficient coverage for two independent, documented reasons: (1) all six break-inside: avoid candidates of the error rule layout/unbreakable-block-too-tall are multi-column and declined (env/multicolumn), coverage 0 < floor 1; (2) layout/orphaned-continuation-page declines six of seven pages after forced breaks (env/forced-break), coverage 1/7 < warn floor 0.5. Insufficient coverage takes precedence over findings (src/core/enums.ts VERDICT_PRECEDENCE).",
+    "byCode": {
+      "4": "insufficient-coverage: layout/unbreakable-block-too-tall (and layout/orphaned-continuation-page) below their coverage floors"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "Letter",
+    "running element in @top-center",
+    "@page :first",
+    "break-before: page on every recipe",
+    "multi-column ingredient lists (column-count: 2) with break-inside: avoid"
+  ],
+  "runningElements": [
+    {
+      "id": "bookhead",
+      "marginBox": "top-center",
+      "marginBoxCopies": 7,
+      "pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  ],
+  "constructionFacts": [
+    {
+      "fact": "forced pages",
+      "arithmetic": "6 of 7 pages open with break-before: page; 1 measured page / 7 candidate pages = 0.14 < 0.5"
+    }
+  ],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "bookhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "body"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "body"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "bookhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "body"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "body"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "bookhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "ids": [
+              "ing-leek-soup",
+              "ing-barley-salad",
+              "ing-flatbreads",
+              "ing-tomatoes",
+              "ing-crumble-cake",
+              "ing-mackerel-pate"
+            ]
+          },
+          "why": "if measured, none is too tall: at most 142 px against 892.8 px"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": [
+        {
+          "target": {
+            "ids": [
+              "ing-leek-soup",
+              "ing-barley-salad",
+              "ing-flatbreads",
+              "ing-tomatoes",
+              "ing-crumble-cake",
+              "ing-mackerel-pate"
+            ]
+          },
+          "reason": "env/multicolumn",
+          "required": true,
+          "count": 6,
+          "countsTowardCoverage": true,
+          "why": "each ingredient list is a ul with column-count: 2 and break-inside: avoid; all fit their page (at most 142 px), but the rule declines multi-column blocks",
+          "measured": {
+            "ing-leek-soup": [
+              {
+                "page": 2,
+                "heightPx": 141.94,
+                "topInContentPx": 147.28,
+                "startsInsideContentBox": true
+              }
+            ],
+            "ing-barley-salad": [
+              {
+                "page": 3,
+                "heightPx": 141.94,
+                "topInContentPx": 147.28,
+                "startsInsideContentBox": true
+              }
+            ],
+            "ing-flatbreads": [
+              {
+                "page": 4,
+                "heightPx": 91.97,
+                "topInContentPx": 147.28,
+                "startsInsideContentBox": true
+              }
+            ],
+            "ing-tomatoes": [
+              {
+                "page": 5,
+                "heightPx": 91.97,
+                "topInContentPx": 147.28,
+                "startsInsideContentBox": true
+              }
+            ],
+            "ing-crumble-cake": [
+              {
+                "page": 6,
+                "heightPx": 139.28,
+                "topInContentPx": 147.28,
+                "startsInsideContentBox": true
+              }
+            ],
+            "ing-mackerel-pate": [
+              {
+                "page": 7,
+                "heightPx": 94.63,
+                "topInContentPx": 147.28,
+                "startsInsideContentBox": true
+              }
+            ]
+          },
+          "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md 'Limits': 'Multi-column and vertical writing are declined rather than judged.'"
+        }
+      ]
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "bookhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2",
+              "h3"
+            ]
+          },
+          "why": "h2 recipe titles open their pages (break-before: page on the article); h3 carry break-after: avoid"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "pageOf": {
+              "selector": "article.recipe"
+            }
+          },
+          "reason": "env/forced-break",
+          "required": true,
+          "count": 6,
+          "countsTowardCoverage": true,
+          "why": "every recipe starts a new page with break-before: page, so six of the seven pages are forced",
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'; docs/limitations.md: a decline that names a property of the input stays in the coverage denominator (warn floor 0.5)."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "bookhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "body"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "The document contains no SVG; the rule has no candidate."
+      ]
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no straight quotation mark or apostrophe occurs in any text run outside code, pre, kbd, samp and var; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "body"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no block is justified; docs/rules/type-excessive-word-spacing.md judges word gaps in a justified block only"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no file: URI and no absolute path occurs in any URI-bearing attribute (href, src, srcset, poster, data, xlink:href) or CSS url()"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break",
+    "env/multicolumn"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 7,
+    "pdfPageCount": 7,
+    "contentBoxHeightsPx": [
+      892.8
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Serif (system, 118 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Serif (system, 35 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Serif (system, 32 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "Liberation Serif (system, 5 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": []
+}

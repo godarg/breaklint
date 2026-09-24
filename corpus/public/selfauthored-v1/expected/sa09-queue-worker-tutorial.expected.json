@@ -1,0 +1,425 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa09-queue-worker-tutorial",
+  "artifact": "documents/sa09-queue-worker-tutorial.html",
+  "sha256": "5540992465de0587422ce4a929a97024f8705f06ac3a95fd7f229ebf4d7896dd",
+  "byteLength": 22103,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Building a tiny queue worker in plain JavaScript",
+  "genre": "code tutorial",
+  "language": {
+    "htmlLang": "en",
+    "typeRulesUnderDefaultLocale": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "A4",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        793.7,
+        1122.52
+      ],
+      "margins": "20mm",
+      "contentBoxCssPx": [
+        642.52,
+        971.34
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      8,
+      9
+    ],
+    "measured": 8,
+    "basis": "plain Paged.js measurement (8 pages); the two kept listings occupy five pages by construction; prose may add a page"
+  },
+  "expectedExit": {
+    "set": [
+      1
+    ],
+    "derivation": "Error finding on #fig-listing-3 (three fragments). The two-fragment listing is a documented gap and allowed either way.",
+    "byCode": {
+      "1": "error finding on #fig-listing-3"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "A4",
+    "string-set section in @top-right",
+    "code listings over several pages (pre with one block span per line)",
+    "inline code with straight quotes",
+    "break-inside: avoid listing split into exactly two fragments (documented gap)",
+    "break-inside: avoid listing split into three fragments (planted)"
+  ],
+  "runningElements": [],
+  "constructionFacts": [
+    {
+      "fact": "two-fragment listing",
+      "arithmetic": "18 + 4 + 76 x 18 = 1390 px = 1.43 x 971.34",
+      "measured": [
+        {
+          "page": 3,
+          "heightPx": 940,
+          "topInContentPx": 15.11,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 4,
+          "heightPx": 450,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        }
+      ]
+    },
+    {
+      "fact": "three-fragment listing",
+      "arithmetic": "18 + 4 + 130 x 18 = 2362 px = 2.43 x 971.34",
+      "measured": [
+        {
+          "page": 5,
+          "heightPx": 940,
+          "topInContentPx": 15.11,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 6,
+          "heightPx": 954,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 7,
+          "heightPx": 468,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "tutorial"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "tutorial"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "tutorial"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "tutorial"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "fig-listing-3"
+          },
+          "why": "a listing kept in one piece (figure.listing, break-inside: avoid) that is 2.43 content boxes tall",
+          "construction": "18 px caption + 4 px gap + 130 code lines x 18 px (one display: block span per line, fixed pitch, no wrapping) = 2362 px against 971.34 px (A4, 20 mm): pushed to a fresh page and split 940 + 954 + 468 px",
+          "measured": {
+            "naturalPx": 2362,
+            "fragments": [
+              {
+                "page": 5,
+                "heightPx": 940,
+                "topInContentPx": 15.11,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 6,
+                "heightPx": 954,
+                "topInContentPx": 0,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 7,
+                "heightPx": 468,
+                "topInContentPx": 0,
+                "startsInsideContentBox": true
+              }
+            ]
+          },
+          "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md; three or more fragments are summed."
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "ids": [
+              "tip-files",
+              "tbl-states"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (971.34 px) and are laid out in one piece",
+          "measured": {
+            "tip-files": {
+              "maxFragmentPx": 62.19,
+              "fragments": 1,
+              "naturalPx": 62.19
+            },
+            "tbl-states": {
+              "maxFragmentPx": 124.53,
+              "fragments": 1,
+              "naturalPx": 124.53
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tbl-states tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 971.34 px content box"
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "id": "fig-listing-2"
+          },
+          "class": "documented-gap",
+          "constructionTruth": "defect",
+          "why": "the listing is too tall (18 + 4 + 76 x 18 = 1390 px, 1.43 pages) but splits into exactly two fragments; docs/limitations.md 0.6.0: 'The residual gap is a block split into exactly two fragments whose real height does exceed the page: it is not reported'. A tool that closes the gap may report it.",
+          "measured": {
+            "naturalPx": 1390,
+            "fragments": [
+              {
+                "page": 3,
+                "heightPx": 940,
+                "topInContentPx": 15.11,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 4,
+                "heightPx": 450,
+                "topInContentPx": 0,
+                "startsInsideContentBox": true
+              }
+            ]
+          }
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2"
+            ]
+          },
+          "why": "every one of these headings carries break-after: avoid (Paged.js moves it with the following block) or opens its page, so content follows it on its own page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "tutorial"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "The document contains no SVG; the rule has no candidate."
+      ]
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no straight quotation mark or apostrophe occurs in any text run outside code, pre, kbd, samp and var; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Straight quotes occur only inside <pre> and <code> (program text), which the rule excludes structurally."
+      ]
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "tutorial"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no block is justified; docs/rules/type-excessive-word-spacing.md judges word gaps in a justified block only"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no file: URI and no absolute path occurs in any URI-bearing attribute (href, src, srcset, poster, data, xlink:href) or CSS url()"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 8,
+    "pdfPageCount": 8,
+    "contentBoxHeightsPx": [
+      971.33
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Sans (system, 76 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Sans (system, 47 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Sans (system, 21 glyphs)"
+      ],
+      ".pagedjs_page_content pre": [],
+      ".pagedjs_page_content code": [
+        "DejaVu Sans Mono (system, 8 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "DejaVu Sans Mono (system, 7 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": [
+    "An earlier draft set the listings as a single text node with overflow: hidden; Paged.js then left whitespace and a margin-only fragment in the overflow column and produced fragments taller than the page. The committed version uses one block span per line, which breaks cleanly; the draft was never committed."
+  ]
+}

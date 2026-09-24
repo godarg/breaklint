@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VX-9 Environmental Sensor Module Datasheet</title>
+<style>
+@page {
+  size: letter;
+  margin: 0.6in 0.65in 0.7in 0.65in;
+  @bottom-left { content: "VX-9 Datasheet \00B7  Rev. C"; font: 7.5pt sans-serif; color: #666; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 7.5pt sans-serif; color: #666; }
+  @top-right { content: element(dshead); }
+}
+@page :first { @top-right { content: none; } }
+body { margin: 0; font: 9pt/1.4 sans-serif; color: #1b1b1b; }
+.dshead { position: running(dshead); font: bold 7.5pt sans-serif; color: #1f6fb2; }
+.band { background: #1f3b52; color: #fff; padding: 10pt 12pt; margin: 0 0 10pt; }
+.band h1 { font: bold 19pt/1.1 sans-serif; margin: 0 0 3pt; }
+.band p { margin: 0; font-size: 10pt; color: #d6e4ef; }
+h2 { font: bold 11pt/1.2 sans-serif; color: #1f3b52; border-bottom: 1pt solid #1f6fb2; padding-bottom: 2pt; margin: 12pt 0 5pt; break-after: avoid; }
+p { margin: 0 0 4pt; }
+ul.features { column-count: 2; column-gap: 20pt; margin: 0 0 6pt; padding-left: 12pt; }
+ul.features li { margin-bottom: 2pt; }
+table { border-collapse: collapse; width: 100%; font-size: 8.5pt; margin: 4pt 0 8pt; break-inside: avoid; }
+th { background: #e6eef5; text-align: left; padding: 2.5pt 4pt; border-bottom: 0.8pt solid #1f3b52; }
+td { padding: 2pt 4pt; border-bottom: 0.4pt solid #ccc; vertical-align: top; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr { break-inside: avoid; }
+figure { margin: 6pt 0 8pt; break-inside: avoid; }
+figcaption { font-size: 8pt; color: #444; margin-top: 3pt; }
+figure svg { display: block; }
+svg .halo { paint-order: stroke fill; stroke: #ffffff; stroke-width: 3px; stroke-linejoin: round; }
+.notes { font-size: 8pt; color: #333; }
+.imprint { font-size: 7pt; color: #777; margin-top: 10pt; }
+</style>
+</head>
+<body>
+<div class="dshead" id="dshead">BRINDLECOURT INSTRUMENTS &middot; VX-9</div>
+<main id="datasheet">
+<div class="band" id="band">
+<h1 id="title">VX-9 Environmental Sensor Module</h1>
+<p id="band-sub">Temperature, humidity and pressure in one 42 &times; 22 mm module &middot; Datasheet, revision C</p>
+</div>
+<h2 id="h-overview">Overview</h2>
+<p id="p-overview">The VX-9 combines three calibrated sensors behind a single protective membrane and reports all three values over an I&sup2;C interface. It is designed for battery-powered field loggers, greenhouse controllers and building ventilation systems, where low sleep current and a long calibration interval matter more than the last decimal place.</p>
+<ul class="features" id="features">
+<li id="f-1">Factory calibrated, certificate supplied with each batch</li>
+<li id="f-2">Hydrophobic membrane, rated IP67 when mounted</li>
+<li id="f-3">Sleep current below 1 &micro;A</li>
+<li id="f-4">Programmable alarm thresholds on the INT pin</li>
+<li id="f-5">Two selectable I&sup2;C addresses</li>
+<li id="f-6">Auxiliary analogue input for a soil probe</li>
+<li id="f-7">Operating range &minus;40 to 85 &deg;C</li>
+<li id="f-8">Drop-in replacement for the VX-7 footprint</li>
+</ul>
+<h2 id="h-specs">Electrical and sensing characteristics</h2>
+<table id="tbl-specs">
+<thead><tr><th>Parameter</th><th>Min.</th><th>Typ.</th><th>Max.</th><th>Unit</th></tr></thead>
+<tbody>
+<tr id="spec-1"><td>Supply voltage</td><td class="num">2.7</td><td class="num">3.3</td><td class="num">3.6</td><td>V</td></tr>
+<tr id="spec-2"><td>Supply current, measuring</td><td class="num"></td><td class="num">0.9</td><td class="num">1.4</td><td>mA</td></tr>
+<tr id="spec-3"><td>Supply current, sleep</td><td class="num"></td><td class="num">0.4</td><td class="num">1.0</td><td>µA</td></tr>
+<tr id="spec-4"><td>Temperature range</td><td class="num">-40</td><td class="num"></td><td class="num">85</td><td>°C</td></tr>
+<tr id="spec-5"><td>Temperature accuracy, 0 to 60 °C</td><td class="num"></td><td class="num">±0.2</td><td class="num">±0.4</td><td>°C</td></tr>
+<tr id="spec-6"><td>Humidity range</td><td class="num">0</td><td class="num"></td><td class="num">100</td><td>%RH</td></tr>
+<tr id="spec-7"><td>Humidity accuracy, 20 to 80 %RH</td><td class="num"></td><td class="num">±1.5</td><td class="num">±2.5</td><td>%RH</td></tr>
+<tr id="spec-8"><td>Pressure range</td><td class="num">300</td><td class="num"></td><td class="num">1100</td><td>hPa</td></tr>
+<tr id="spec-9"><td>Pressure accuracy</td><td class="num"></td><td class="num">±0.6</td><td class="num">±1.0</td><td>hPa</td></tr>
+<tr id="spec-10"><td>Response time, humidity</td><td class="num"></td><td class="num">6</td><td class="num">10</td><td>s</td></tr>
+<tr id="spec-11"><td>I²C clock frequency</td><td class="num"></td><td class="num"></td><td class="num">400</td><td>kHz</td></tr>
+<tr id="spec-12"><td>Start-up time</td><td class="num"></td><td class="num"></td><td class="num">2</td><td>ms</td></tr>
+</tbody>
+</table>
+<p class="notes" id="spec-notes">Values at 25 &deg;C and 3.3 V unless stated otherwise. Accuracy figures apply after the one-hour settling period that follows first power-up.</p>
+<h2 id="h-pinout">Pin assignment</h2>
+<figure id="fig-pinout">
+<svg id="svg-pinout" xmlns="http://www.w3.org/2000/svg" width="672" height="250" viewBox="0 0 672 250" role="img"><title>VX-9 connector pinout, top view</title>
+  <rect x="0" y="0" width="672" height="250" fill="#fafafa"/>
+  <rect x="236" y="40" width="200" height="170" fill="#2d3b45" stroke="#111" stroke-width="1.5"/>
+  <text id="po-chip" x="336" y="132" font-size="16" text-anchor="middle" font-weight="bold" fill="#ffffff">VX-9</text>
+  <line x1="206" y1="62" x2="236" y2="62" stroke="#b08d3c" stroke-width="4"/>
+  <text id="po-l1" x="198" y="66" font-size="11" text-anchor="end">1  VDD 3.3 V</text>
+  <line x1="206" y1="94" x2="236" y2="94" stroke="#b08d3c" stroke-width="4"/>
+  <text id="po-l2" x="198" y="98" font-size="11" text-anchor="end">2  GND</text>
+  <line x1="206" y1="126" x2="236" y2="126" stroke="#b08d3c" stroke-width="4"/>
+  <text id="po-l3" x="198" y="130" font-size="11" text-anchor="end">3  SDA</text>
+  <line x1="206" y1="158" x2="236" y2="158" stroke="#b08d3c" stroke-width="4"/>
+  <text id="po-l4" x="198" y="162" font-size="11" text-anchor="end">4  SCL</text>
+  <line x1="206" y1="190" x2="236" y2="190" stroke="#b08d3c" stroke-width="4"/>
+  <text id="po-l5" x="198" y="194" font-size="11" text-anchor="end">5  INT</text>
+  <line x1="436" y1="62" x2="466" y2="62" stroke="#b08d3c" stroke-width="4"/>
+  <text id="po-r10" x="474" y="66" font-size="11">10  ADDR</text>
+  <line x1="436" y1="94" x2="466" y2="94" stroke="#b08d3c" stroke-width="4"/>
+  <text id="po-r9" x="474" y="98" font-size="11">9  RESET</text>
+  <line x1="436" y1="126" x2="466" y2="126" stroke="#b08d3c" stroke-width="4"/>
+  <text id="po-r8" x="474" y="130" font-size="11">8  AUX IN</text>
+  <line x1="436" y1="158" x2="466" y2="158" stroke="#b08d3c" stroke-width="4"/>
+  <text id="po-r7" x="474" y="162" font-size="11">7  AUX OUT</text>
+  <line x1="436" y1="190" x2="466" y2="190" stroke="#b08d3c" stroke-width="4"/>
+  <text id="po-r6" x="474" y="194" font-size="11">6  GND</text>
+  <text id="po-title" x="24" y="26" font-size="11" font-weight="bold">Connector J1, top view</text>
+  <text id="po-note" x="336" y="236" font-size="10" text-anchor="middle">Pin 1 is marked with a dot on the housing</text>
+</svg>
+<figcaption id="cap-pinout">Figure 1. Connector J1. Both GND pins must be connected.</figcaption>
+</figure>
+<h2 id="h-response">Humidity error against temperature</h2>
+<figure id="fig-response">
+<svg id="svg-response" xmlns="http://www.w3.org/2000/svg" width="672" height="320" viewBox="0 0 672 320" role="img"><title>Relative humidity error against temperature</title>
+  <rect x="0" y="0" width="672" height="320" fill="#ffffff"/>
+  <line x1="70" y1="40" x2="640" y2="40" stroke="#e2e2e2" stroke-width="1"/>
+  <line x1="70" y1="97.5" x2="640" y2="97.5" stroke="#e2e2e2" stroke-width="1"/>
+  <line x1="70" y1="155" x2="640" y2="155" stroke="#e2e2e2" stroke-width="1"/>
+  <line x1="70" y1="212.5" x2="640" y2="212.5" stroke="#e2e2e2" stroke-width="1"/>
+  <line x1="70" y1="270" x2="640" y2="270" stroke="#e2e2e2" stroke-width="1"/>
+  <line x1="70" y1="270" x2="640" y2="270" stroke="#333" stroke-width="1"/>
+  <line x1="70" y1="40" x2="70" y2="270" stroke="#333" stroke-width="1"/>
+  <line x1="70" y1="270" x2="70" y2="274" stroke="#333" stroke-width="1"/>
+  <text id="rs-x-0" x="70" y="288" font-size="10" text-anchor="middle">-20</text>
+  <line x1="184" y1="270" x2="184" y2="274" stroke="#333" stroke-width="1"/>
+  <text id="rs-x-1" x="184" y="288" font-size="10" text-anchor="middle">0</text>
+  <line x1="298" y1="270" x2="298" y2="274" stroke="#333" stroke-width="1"/>
+  <text id="rs-x-2" x="298" y="288" font-size="10" text-anchor="middle">20</text>
+  <line x1="412" y1="270" x2="412" y2="274" stroke="#333" stroke-width="1"/>
+  <text id="rs-x-3" x="412" y="288" font-size="10" text-anchor="middle">40</text>
+  <line x1="526" y1="270" x2="526" y2="274" stroke="#333" stroke-width="1"/>
+  <text id="rs-x-4" x="526" y="288" font-size="10" text-anchor="middle">60</text>
+  <line x1="640" y1="270" x2="640" y2="274" stroke="#333" stroke-width="1"/>
+  <text id="rs-x-5" x="640" y="288" font-size="10" text-anchor="middle">80</text>
+  <text id="rs-y-4" x="62" y="44" font-size="10" text-anchor="end">4</text>
+  <text id="rs-y-3" x="62" y="101.5" font-size="10" text-anchor="end">3</text>
+  <text id="rs-y-2" x="62" y="159" font-size="10" text-anchor="end">2</text>
+  <text id="rs-y-1" x="62" y="216.5" font-size="10" text-anchor="end">1</text>
+  <text id="rs-y-0" x="62" y="274" font-size="10" text-anchor="end">0</text>
+  <path d="M 70 143.5 L 184 201 L 298 224 L 412 212.5 L 526 172.25 L 640 103.25" fill="none" stroke="#1f6fb2" stroke-width="2"/>
+  <path d="M 70 74.5 L 184 149.25 L 298 183.75 L 412 166.5 L 526 109 L 640 40" fill="none" stroke="#c0392b" stroke-width="2" stroke-dasharray="6 4"/>
+  <text id="rs-halo-typ" x="300" y="208" font-size="11" class="halo" fill="#1f6fb2">Typical</text>
+  <text id="rs-halo-max" x="300" y="170" font-size="11" class="halo" fill="#c0392b">Maximum</text>
+  <text id="rs-halo-band" x="560" y="128" font-size="10" text-anchor="end" class="halo">Guaranteed band</text>
+  <text id="rs-halo-yunit" x="96" y="58" font-size="10" class="halo">Error, %RH</text>
+  <text id="rs-halo-top" x="560" y="1" font-size="10" text-anchor="end" class="halo">Extended range, see note 3</text>
+  <text id="rs-xtitle" x="355" y="306" font-size="10" text-anchor="middle">Temperature, degrees Celsius</text>
+</svg>
+<figcaption id="cap-response">Figure 2. Relative humidity error across the operating temperature range at 50 %RH.</figcaption>
+</figure>
+<p class="notes" id="response-notes">Note 3: above 80 &deg;C the humidity reading is flagged as extended range and the guaranteed band no longer applies. The typical curve is the median of the qualification batch.</p>
+<h2 id="h-mech">Mechanical data</h2>
+<figure id="fig-dimensions">
+<svg id="svg-dimensions" xmlns="http://www.w3.org/2000/svg" width="672" height="300" viewBox="0 0 672 300" role="img"><defs><marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#555"/></marker></defs><title>VX-9 outline dimensions in millimetres</title>
+  <rect x="0" y="0" width="672" height="300" fill="#ffffff"/>
+  <rect x="120" y="70" width="420" height="160" fill="#eef2f5" stroke="#2d3b45" stroke-width="1.5"/>
+  <circle cx="140" cy="90" r="7" fill="#ffffff" stroke="#2d3b45" stroke-width="1.2"/>
+  <circle cx="520" cy="90" r="7" fill="#ffffff" stroke="#2d3b45" stroke-width="1.2"/>
+  <circle cx="140" cy="210" r="7" fill="#ffffff" stroke="#2d3b45" stroke-width="1.2"/>
+  <circle cx="520" cy="210" r="7" fill="#ffffff" stroke="#2d3b45" stroke-width="1.2"/>
+  <line x1="120" y1="44" x2="540" y2="44" stroke="#555" stroke-width="1" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <line x1="120" y1="36" x2="120" y2="70" stroke="#999" stroke-width="1"/>
+  <line x1="540" y1="36" x2="540" y2="70" stroke="#999" stroke-width="1"/>
+  <line x1="566" y1="70" x2="566" y2="230" stroke="#555" stroke-width="1"/>
+  <line x1="560" y1="70" x2="572" y2="70" stroke="#555" stroke-width="1"/>
+  <line x1="560" y1="230" x2="572" y2="230" stroke="#555" stroke-width="1"/>
+  <text id="dim-width" x="330" y="36" font-size="11" text-anchor="middle">42.0</text>
+  <text id="dim-height" x="578" y="154" font-size="11">22.0</text>
+  <text id="dim-window" x="330" y="158" font-size="11" text-anchor="middle">Sensor window</text>
+  <text id="dim-title" x="24" y="26" font-size="11" font-weight="bold">Outline, all dimensions in mm</text>
+  <text id="dim-tol" x="24" y="280" font-size="10">Tolerance of unmarked dimensions 0.2</text>
+  <text id="dim-length" x="610" y="118" font-size="11">Overall length incl. connector 58.0</text>
+  <text id="dim-holes" x="330" y="314" font-size="11" text-anchor="middle">Mounting holes, diameter 3.2, four places</text>
+</svg>
+<figcaption id="cap-dimensions">Figure 3. Outline drawing. The sensor window must not be covered by conformal coating.</figcaption>
+</figure>
+<h2 id="h-order">Ordering information</h2>
+<table id="tbl-order">
+<thead><tr><th>Part number</th><th>Interface</th><th>Membrane</th><th>Packing</th></tr></thead>
+<tbody>
+<tr id="ord-1"><td>VX9-I2C-M</td><td>I&sup2;C</td><td>yes</td><td>tray of 50</td></tr>
+<tr id="ord-2"><td>VX9-I2C-N</td><td>I&sup2;C</td><td>no</td><td>tray of 50</td></tr>
+<tr id="ord-3"><td>VX9-I2C-M-R</td><td>I&sup2;C</td><td>yes</td><td>reel of 1000</td></tr>
+</tbody>
+</table>
+<h2 id="h-rev">Revision history</h2>
+<table id="tbl-rev">
+<thead><tr><th>Revision</th><th>Change</th></tr></thead>
+<tbody>
+<tr id="rev-a"><td>A</td><td>First release.</td></tr>
+<tr id="rev-b"><td>B</td><td>Sleep current limit tightened; pressure accuracy added.</td></tr>
+<tr id="rev-c"><td>C</td><td>Humidity error chart and extended range note added; outline drawing redrawn.</td></tr>
+</tbody>
+</table>
+<p class="imprint" id="imprint">Brindlecourt Instruments and the VX-9 module are fictional. This datasheet is a specimen document written for layout testing and describes no real product.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,571 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa15-hut-trail-guide-de",
+  "artifact": "documents/sa15-hut-trail-guide-de.html",
+  "sha256": "a5b62009b767496d9908efc1910d4edd499b2205b9ba4dd100daa0d55b97dc92",
+  "byteLength": 10743,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Wanderführer Hohe Gaisplatte: Rundwege und Hütten",
+  "genre": "long-form hiking guide (German)",
+  "language": {
+    "htmlLang": "de",
+    "typeRulesUnderDefaultLocale": "measured: lang de matches the default locale de-DE"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "A4",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        793.7,
+        1122.52
+      ],
+      "margins": "22mm 20mm",
+      "contentBoxCssPx": [
+        642.52,
+        956.22
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      3,
+      4
+    ],
+    "measured": 3,
+    "basis": "plain Paged.js measurement (3 pages) of justified, hyphenated German prose"
+  },
+  "expectedExit": {
+    "set": [
+      1
+    ],
+    "derivation": "Error finding on the clipped summit label #pr-gipfel; the type and local-uri defects are warn.",
+    "byCode": {
+      "1": "error finding on #pr-gipfel"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "A4",
+    "German text (lang=de)",
+    "running element in @top-center",
+    "string-set route name in @top-right",
+    "@page :first",
+    "elevation profile SVG with German plain labels, one clipped at the top (planted)",
+    "planted straight quotes and apostrophe",
+    "planted spaced hyphens",
+    "planted absolute path and file: URI in links",
+    "clean counterparts: typographic quotes, arc minutes and seconds after digits, digit range, single-letter pair, lang=en span, path in visible text"
+  ],
+  "runningElements": [
+    {
+      "id": "kopfzeile",
+      "marginBox": "top-center",
+      "marginBoxCopies": 3,
+      "pages": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "constructionFacts": [
+    {
+      "fact": "#pr-gipfel",
+      "arithmetic": "middle-anchored label with its baseline at y = 1 (10.5 px bold): the cell box starts about 8 px above the top edge"
+    }
+  ],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "kopfzeile"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "fuehrer"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "fuehrer"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "kopfzeile"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "fuehrer"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "fuehrer"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "kopfzeile"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "ids": [
+              "tab-runde1",
+              "tab-runde2",
+              "tab-runde3",
+              "hinweis-gpx",
+              "fig-profil"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (956.22 px) and are laid out in one piece",
+          "measured": {
+            "tab-runde1": {
+              "maxFragmentPx": 48.63,
+              "fragments": 1,
+              "naturalPx": 48.63
+            },
+            "tab-runde2": {
+              "maxFragmentPx": 48.63,
+              "fragments": 1,
+              "naturalPx": 48.63
+            },
+            "tab-runde3": {
+              "maxFragmentPx": 72.94,
+              "fragments": 1,
+              "naturalPx": 72.94
+            },
+            "hinweis-gpx": {
+              "maxFragmentPx": 58.84,
+              "fragments": 1,
+              "naturalPx": 58.84
+            },
+            "fig-profil": {
+              "maxFragmentPx": 316.22,
+              "fragments": 1,
+              "naturalPx": 316.22
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tab-runde1 tr, #tab-runde2 tr, #tab-runde3 tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 956.22 px content box"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "kopfzeile"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2",
+              "h3"
+            ]
+          },
+          "why": "every one of these headings carries break-after: avoid (Paged.js moves it with the following block) or opens its page, so content follows it on its own page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "kopfzeile"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "fuehrer"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "pr-gipfel",
+            "svg": "svg-profil"
+          },
+          "text": "Gaisplatte, Gipfelkreuz",
+          "why": "label leaves its SVG viewport at the top edge and is not drawn there",
+          "construction": "cell box (getBBox through getScreenCTM) 8.00 px beyond the top edge; pixel ink 6.50 px beyond it (probe window 160 px)",
+          "measured": {
+            "page": 2,
+            "cellInsetsPx": {
+              "left": 268.92,
+              "top": -8,
+              "right": 267.94,
+              "bottom": 277
+            },
+            "inkInsetsPx": {
+              "left": 269,
+              "top": -6.5,
+              "right": 268,
+              "bottom": 276.5
+            },
+            "viewport": {
+              "x": 75.58,
+              "y": 1490.81,
+              "width": 642,
+              "height": 280,
+              "nested": false
+            }
+          },
+          "docsBasis": "docs/rules/svg-text-overflows-viewport.md: overshoot > 0 px of the CTM-normalised text box against the viewport is an error."
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "svg": "svg-profil",
+            "texts": [
+              "pr-alm",
+              "pr-h-1200",
+              "pr-h-1500",
+              "pr-h-1800",
+              "pr-h-2100",
+              "pr-huette",
+              "pr-km-0",
+              "pr-km-12",
+              "pr-km-15",
+              "pr-km-3",
+              "pr-km-6",
+              "pr-km-9",
+              "pr-start",
+              "pr-titel"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "pr-km-0": 22,
+              "pr-km-3": 22,
+              "pr-km-6": 22,
+              "pr-km-9": 22,
+              "pr-km-12": 22,
+              "pr-km-15": 9.38,
+              "pr-h-1200": 35,
+              "pr-h-1500": 35,
+              "pr-h-1800": 35,
+              "pr-h-2100": 15,
+              "pr-start": 65,
+              "pr-alm": 114.4,
+              "pr-huette": 84.6,
+              "pr-titel": 12
+            }
+          }
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "p-sh-weg"
+          },
+          "occurrences": 2,
+          "text": "Der Weg - gut markiert und breit - führt",
+          "why": "spaced hyphens used as dashes"
+        },
+        {
+          "target": {
+            "id": "td-sh-abschnitt"
+          },
+          "occurrences": 1,
+          "text": "Gipfel - Hütte",
+          "why": "spaced hyphen between two words in a table cell"
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "li-r1-2"
+          },
+          "why": "8 - 18 Uhr: digits next to the hyphen"
+        },
+        {
+          "target": {
+            "id": "p-r2-3"
+          },
+          "why": "N - S: two single letters joined by the hyphen"
+        },
+        {
+          "target": {
+            "id": "span-en"
+          },
+          "why": "spaced hyphen inside a lang=\"en\" span"
+        },
+        {
+          "target": {
+            "id": "p-r1-2"
+          },
+          "why": "Ein- und Ausstieg: no spaces around the hyphen"
+        },
+        {
+          "target": {
+            "document": true
+          },
+          "except": [
+            {
+              "id": "p-sh-weg"
+            },
+            {
+              "id": "td-sh-abschnitt"
+            }
+          ],
+          "why": "no other spaced hyphen outside the exclusions"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "p-sq-huette"
+          },
+          "occurrences": 2,
+          "text": "\"Adlerhorst\"",
+          "why": "straight double quotes in German prose"
+        },
+        {
+          "target": {
+            "id": "li-sq-2"
+          },
+          "occurrences": 1,
+          "text": "geht's",
+          "why": "straight apostrophe in German prose"
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "p-r2-2"
+          },
+          "why": "typographic „die Stiege“ and ‚Nur bei trockenem Fels‘; English quotes inside a lang=\"en\" span are typographic"
+        },
+        {
+          "target": {
+            "id": "p-r2-3"
+          },
+          "why": "47° 12' 30\" N and 11° 04' 10\" O: every mark follows a digit (minutes and seconds of arc)"
+        },
+        {
+          "target": {
+            "document": true
+          },
+          "except": [
+            {
+              "id": "p-sq-huette"
+            },
+            {
+              "id": "li-sq-2"
+            }
+          ],
+          "why": "no other straight quotation mark"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "fuehrer"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "selectors": [
+              "main#fuehrer > p:not(.unterzeile):not(.impressum)"
+            ]
+          },
+          "class": "font-dependent",
+          "why": "justified blocks: word gaps depend on font metrics and on whether hyphenation dictionaries are available"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [
+        {
+          "target": {
+            "uri": {
+              "attribute": "href",
+              "value": "/opt/tourdaten/gpx/runde-2.gpx"
+            },
+            "id": "a-abs-gpx"
+          },
+          "why": "absolute build-machine path in a link"
+        },
+        {
+          "target": {
+            "uri": {
+              "attribute": "href",
+              "value": "file:///mnt/kartenserver/blaetter/grauwald-12.pdf"
+            },
+            "id": "a-file-karte"
+          },
+          "why": "file: URI in a link"
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "hinweis-gpx-p"
+          },
+          "why": "the path /opt/tourdaten/gpx in the visible text is not a URI-bearing attribute"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 3,
+    "pdfPageCount": 3,
+    "contentBoxHeightsPx": [
+      956.22
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Sans (system, 88 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Sans (system, 28 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Sans (system, 7 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "Liberation Serif (system, 6 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+        "Liberation Serif (system, 4 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": []
+}

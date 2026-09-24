@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Restoring the Seed Banks of the Quennel Moors</title>
+<style>
+@page {
+  size: A4;
+  margin: 20mm;
+  @top-right { content: string(section); font: 8pt sans-serif; color: #666; }
+  @bottom-left { content: "Quennel Moors Seed Bank Proposal"; font: 7.5pt sans-serif; color: #888; }
+  @bottom-right { content: counter(page) " / " counter(pages); font: 8pt sans-serif; }
+  @footnote { border-top: 0.5pt solid #999; padding-top: 3pt; }
+}
+body { margin: 0; font: 10.5pt/1.5 serif; color: #1d1d1d; }
+h1 { font: bold 20pt/1.2 sans-serif; margin: 0 0 3mm; color: #3f5f2a; }
+.meta { font: 9.5pt/1.4 sans-serif; color: #555; margin: 0 0 6mm; }
+h2 { font: bold 13pt/1.25 sans-serif; margin: 7mm 0 2.5mm; color: #3f5f2a; string-set: section content(text); break-after: avoid; }
+h3 { font: bold 11pt/1.3 sans-serif; margin: 4mm 0 1.5mm; break-after: avoid; }
+p { margin: 0 0 2.5mm; widows: 2; orphans: 2; }
+.fn { float: footnote; font: 8pt/1.35 serif; }
+::footnote-call { font-size: 0.7em; vertical-align: super; line-height: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 2mm 0 5mm; break-inside: avoid; }
+th, td { padding: 2pt 5pt; border-bottom: 0.4pt solid #ccc; text-align: left; }
+td.n, th.n { text-align: right; }
+th { border-bottom: 1pt solid #3f5f2a; font-family: sans-serif; }
+figure { margin: 3mm 0 4mm; break-inside: avoid; }
+figcaption { font: 8.5pt/1.35 sans-serif; color: #444; margin-top: 1.5mm; }
+figure svg { display: block; }
+/* The work plan section is laid out on a fixed grid: explicit heights and margins only. */
+h2.grid { break-before: page; height: 48px; line-height: 48px; margin: 0 0 16px; white-space: nowrap; }
+figure.plate { margin: 0 0 12px; }
+#plate-gantt { height: 520px; }
+#plate-milestones { height: 316px; }
+#plate-risks { height: 300px; }
+/* Minor headings in the work plan use h4; unlike h2 and h3 they were never given
+   break-after: avoid. */
+h4.grid { font: bold 10.5pt/24px sans-serif; height: 24px; margin: 18px 0 6px; white-space: nowrap; }
+.imprint { font: 7.5pt/1.4 sans-serif; color: #777; margin-top: 8mm; }
+</style>
+</head>
+<body>
+<main id="proposal">
+<h1 id="title">Restoring the seed banks of the Quennel Moors</h1>
+<p class="meta" id="meta">Full proposal to the Harrowdeep Foundation, small grants round &middot; requested amount 48,600 &middot; duration 18 months</p>
+
+<h2 id="h-summary">1&ensp;Summary</h2>
+<p id="sum-p1">The wet heath of the Quennel Moors has lost most of its characteristic plants since the drainage ditches were cut two generations ago. The ditches have now been blocked, and the water table is rising again, but the plants are not returning on their own: their nearest surviving populations are too far away for seed to arrive by wind or water. We propose to find out whether the seeds they once shed are still alive in the soil, and if so, to use that buried seed bank to restore two trial plots.<span class="fn" id="fn-ditches">The ditches were blocked by the landowners under a separate agreement completed last year; this proposal does not seek funding for that work.</span></p>
+<p id="sum-p2">Seed banks of heathland plants can remain viable for decades. If they have survived here, reinstating the old vegetation could be far cheaper and more faithful to the site than sowing seed bought in from elsewhere. If they have not, the project will still produce the first systematic record of the soil seed bank on the moors, which future restoration will need in any case.</p>
+
+<h2 id="h-need">2&ensp;Why this work is needed</h2>
+<p id="need-p1">Restoration projects on comparable sites have usually relied on commercial seed mixes. These establish quickly but often carry the wrong genetic stock and a narrower range of species than the vegetation they replace. A buried seed bank, where it survives, carries the local stock by definition.<span class="fn" id="fn-stock">Local stock matters most for the sedges and the sundews, whose populations on the moors are thought to differ from those in the lowland nurseries.</span> Testing it first is cheap; skipping the test and sowing a commercial mix would make the question impossible to answer later.</p>
+<p id="need-p2">The window for the test is limited. Seeds in the soil lose viability as the rising water table changes the chemistry of the upper layers, and the plots most likely to hold viable seed are the ones that have stayed wet longest. We therefore ask for the work to begin in the autumn following the award.</p>
+
+<h2 id="h-team">3&ensp;Who will do the work</h2>
+<p id="team-p1">The project will be run by the moorland volunteer group, which has surveyed the site every summer for eleven years, with laboratory space for the germination trials provided free of charge by a local horticultural college. A part-time project officer, funded by this grant, will coordinate the volunteers, keep the records and write the reports.</p>
+<table id="tbl-budget">
+<thead><tr><th>Item</th><th class="n">Months</th><th class="n">Cost</th></tr></thead>
+<tbody>
+<tr id="bu-1"><td>Project officer, two days a week</td><td class="n">18</td><td class="n">31,200</td></tr>
+<tr id="bu-2"><td>Soil corer and sample bags</td><td class="n">&ndash;</td><td class="n">2,400</td></tr>
+<tr id="bu-3"><td>Germination trays and compost</td><td class="n">&ndash;</td><td class="n">3,100</td></tr>
+<tr id="bu-4"><td>Volunteer travel and expenses</td><td class="n">18</td><td class="n">5,400</td></tr>
+<tr id="bu-5"><td>Fencing for the trial plots</td><td class="n">&ndash;</td><td class="n">4,300</td></tr>
+<tr id="bu-6"><td>Reporting and publication</td><td class="n">&ndash;</td><td class="n">2,200</td></tr>
+<tr id="bu-7"><td><b>Total</b></td><td class="n">&nbsp;</td><td class="n"><b>48,600</b></td></tr>
+</tbody>
+</table>
+
+<h2 class="grid" id="h-workplan">4&ensp;Work plan</h2>
+<figure class="plate" id="plate-gantt">
+<svg id="svg-gantt" xmlns="http://www.w3.org/2000/svg" width="642" height="470" viewBox="0 0 642 470" role="img"><title>Project timeline by quarter</title>
+  <rect x="0" y="0" width="642" height="470" fill="#ffffff"/>
+  <line x1="230" y1="60" x2="230" y2="406" stroke="#e3e3e3" stroke-width="1"/>
+  <text id="g-q1" x="262.5" y="52" font-size="10" text-anchor="middle">Q1</text>
+  <line x1="295" y1="60" x2="295" y2="406" stroke="#e3e3e3" stroke-width="1"/>
+  <text id="g-q2" x="327.5" y="52" font-size="10" text-anchor="middle">Q2</text>
+  <line x1="360" y1="60" x2="360" y2="406" stroke="#e3e3e3" stroke-width="1"/>
+  <text id="g-q3" x="392.5" y="52" font-size="10" text-anchor="middle">Q3</text>
+  <line x1="425" y1="60" x2="425" y2="406" stroke="#e3e3e3" stroke-width="1"/>
+  <text id="g-q4" x="457.5" y="52" font-size="10" text-anchor="middle">Q4</text>
+  <line x1="490" y1="60" x2="490" y2="406" stroke="#e3e3e3" stroke-width="1"/>
+  <text id="g-q5" x="522.5" y="52" font-size="10" text-anchor="middle">Q5</text>
+  <line x1="555" y1="60" x2="555" y2="406" stroke="#e3e3e3" stroke-width="1"/>
+  <text id="g-q6" x="587.5" y="52" font-size="10" text-anchor="middle">Q6</text>
+  <line x1="620" y1="60" x2="620" y2="406" stroke="#e3e3e3" stroke-width="1"/>
+  <rect x="230" y="78" width="65" height="22" fill="#6a8f4e"/>
+  <text id="g-task-0" x="8" y="94" font-size="11" text-anchor="end">Phase 0: permissions and landowner agreements</text>
+  <rect x="273.33" y="134" width="65" height="22" fill="#6a8f4e"/>
+  <text id="g-task-1" x="220" y="150" font-size="11" text-anchor="end">Soil core survey</text>
+  <rect x="316.67" y="190" width="108.33" height="22" fill="#6a8f4e"/>
+  <text id="g-task-2" x="220" y="206" font-size="11" text-anchor="end">Seed bank germination trials</text>
+  <rect x="381.67" y="246" width="65" height="22" fill="#6a8f4e"/>
+  <text id="g-task-3" x="220" y="262" font-size="11" text-anchor="end">Mapping of viable plots</text>
+  <rect x="425" y="302" width="130" height="22" fill="#6a8f4e"/>
+  <text id="g-task-4" x="220" y="318" font-size="11" text-anchor="end">Trial reinstatement, two plots</text>
+  <rect x="490" y="358" width="130" height="22" fill="#6a8f4e"/>
+  <text id="g-task-5" x="220" y="374" font-size="11" text-anchor="end">Monitoring and reporting</text>
+  <text id="g-title" x="24" y="26" font-size="12" font-weight="bold">Project timeline, 18 months from award</text>
+  <text id="g-note" x="230" y="430" font-size="10">Bars show the months in which each task is active</text>
+</svg>
+<figcaption id="cap-gantt">Figure 1. Timeline of the six tasks over the eighteen months of the grant.</figcaption>
+</figure>
+<figure class="plate" id="plate-milestones">
+<svg id="svg-milestones" xmlns="http://www.w3.org/2000/svg" width="642" height="280" viewBox="0 0 642 280" role="img"><title>Milestones and the two reinstatement plots</title>
+  <rect x="0" y="0" width="642" height="280" fill="#fbfbf7"/>
+  <line x1="30" y1="150" x2="380" y2="150" stroke="#6a8f4e" stroke-width="3"/>
+  <circle cx="88.33" cy="150" r="7" fill="#fbfbf7" stroke="#6a8f4e" stroke-width="3"/>
+  <text id="ms-1" x="88.33" y="130" font-size="10.5" text-anchor="middle">M1 permissions</text>
+  <circle cx="127.22" cy="150" r="7" fill="#fbfbf7" stroke="#6a8f4e" stroke-width="3"/>
+  <text id="ms-2" x="127.22" y="182" font-size="10.5" text-anchor="middle">M2 cores taken</text>
+  <circle cx="224.44" cy="150" r="7" fill="#fbfbf7" stroke="#6a8f4e" stroke-width="3"/>
+  <text id="ms-3" x="224.44" y="130" font-size="10.5" text-anchor="middle">M3 plots chosen</text>
+  <circle cx="321.67" cy="150" r="7" fill="#fbfbf7" stroke="#6a8f4e" stroke-width="3"/>
+  <text id="ms-4" x="321.67" y="182" font-size="10.5" text-anchor="middle">M4 plots sown</text>
+  <text id="ms-title" x="24" y="26" font-size="12" font-weight="bold">Milestones</text>
+  <rect x="419" y="39" width="202" height="122" fill="none" stroke="#999"/>
+  <svg id="svg-inset-map" x="420" y="40" width="200" height="120" viewBox="0 0 200 120"><rect x="0" y="0" width="200" height="120" fill="#e9efe0"/><path d="M 10 90 C 50 60, 90 100, 130 70 S 180 50, 195 60" stroke="#7b95a8" stroke-width="5" fill="none"/><rect x="40" y="30" width="30" height="22" fill="#6a8f4e"/><rect x="120" y="82" width="30" height="22" fill="#6a8f4e"/><text id="inset-plot-a" x="40" y="24" font-size="10">Plot A</text><text id="inset-plot-b" x="160" y="98" font-size="10">Quennel Moor north plot B</text><text id="inset-scale" x="8" y="108" font-size="8">1 km</text></svg>
+  <text id="ms-inset-cap" x="520" y="190" font-size="10" text-anchor="middle">Inset: plot locations</text>
+</svg>
+<figcaption id="cap-milestones">Figure 2. Milestones M1 to M4 and the location of the two reinstatement plots.</figcaption>
+</figure>
+<h4 class="grid" id="h4-risks">Risks and how we will manage them</h4>
+<figure class="plate" id="plate-risks">
+<svg id="svg-risks" xmlns="http://www.w3.org/2000/svg" width="642" height="250" viewBox="0 0 642 250" role="img"><title>Risk matrix</title>
+  <rect x="0" y="0" width="642" height="250" fill="#ffffff"/>
+  <rect x="160" y="20" width="136" height="62" fill="#e7f0dd"/>
+  <rect x="300" y="20" width="136" height="62" fill="#f6e7b8"/>
+  <rect x="440" y="20" width="136" height="62" fill="#f1c7a8"/>
+  <rect x="160" y="86" width="136" height="62" fill="#f6e7b8"/>
+  <rect x="300" y="86" width="136" height="62" fill="#f6e7b8"/>
+  <rect x="440" y="86" width="136" height="62" fill="#f1c7a8"/>
+  <rect x="160" y="152" width="136" height="62" fill="#f1c7a8"/>
+  <rect x="300" y="152" width="136" height="62" fill="#f1c7a8"/>
+  <rect x="440" y="152" width="136" height="62" fill="#f1c7a8"/>
+  <text id="rk-likely" x="150" y="55" font-size="10" text-anchor="end">Likely</text>
+  <text id="rk-possible" x="150" y="121" font-size="10" text-anchor="end">Possible</text>
+  <text id="rk-unlikely" x="150" y="187" font-size="10" text-anchor="end">Unlikely</text>
+  <text id="rk-sev-0" x="228" y="236" font-size="10" text-anchor="middle">Minor</text>
+  <text id="rk-sev-1" x="368" y="236" font-size="10" text-anchor="middle">Moderate</text>
+  <text id="rk-sev-2" x="508" y="236" font-size="10" text-anchor="middle">Severe</text>
+  <text id="rk-1" x="368" y="121" font-size="10" text-anchor="middle">Wet autumn delays coring</text>
+  <text id="rk-2" x="508" y="187" font-size="10" text-anchor="middle">Plot flooded after sowing</text>
+</svg>
+<figcaption id="cap-risks">Figure 3. The two main risks placed on a likelihood and severity matrix.</figcaption>
+</figure>
+<p id="risk-p1">The main risk to the timetable is a wet autumn, which can make the moor impassable for the corer. The plan allows a second coring window in spring. The main risk to the outcome is flooding of a plot soon after sowing; the two plots are therefore placed on slightly different ground, one on a low ridge and one in a hollow, so that at least one should survive a wet winter.</p>
+
+<h2 id="h-outcomes">5&ensp;Outcomes and reporting</h2>
+<p id="out-p1">By the end of the grant we will have a record of the soil seed bank at forty sampling points, germination results for every sample, and two trial plots in their first growing season. A short report will be published at the end of each phase, and a final report, with the full data, at the end of the grant. The data will be released under an open licence so that other groups working on similar sites can use them.</p>
+<p class="imprint" id="imprint">The Quennel Moors, the Harrowdeep Foundation and the volunteer group are fictional. This proposal is a specimen document written for layout testing.</p>
+</main>
+</body>
+</html>

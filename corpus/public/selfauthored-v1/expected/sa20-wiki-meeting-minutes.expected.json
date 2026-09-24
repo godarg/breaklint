@@ -1,0 +1,450 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa20-wiki-meeting-minutes",
+  "artifact": "documents/sa20-wiki-meeting-minutes.html",
+  "sha256": "855ab48e5ae3b263ba1f14a4c5fcd59d7b9755e907c9fabcabd71784be23af51",
+  "byteLength": 6037,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Operations committee: minutes of the October meeting (wiki export)",
+  "genre": "meeting minutes exported from a wiki, no lang attribute",
+  "language": {
+    "htmlLang": null,
+    "typeRulesUnderDefaultLocale": "measured: without a lang attribute every run is judged under the default locale de-DE, although the text is English"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "A4",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        793.7,
+        1122.52
+      ],
+      "margins": "18mm 18mm 20mm 18mm",
+      "contentBoxCssPx": [
+        657.64,
+        978.9
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      2,
+      3
+    ],
+    "measured": 2,
+    "basis": "plain Paged.js measurement (2 pages)"
+  },
+  "expectedExit": {
+    "set": [
+      0
+    ],
+    "derivation": "All planted defects are warn (type rules); no error-rule defect.",
+    "byCode": {
+      "0": "warn-only"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "A4",
+    "no lang attribute on <html>",
+    "static @page margin text and page counters",
+    "wiki-style table kept together",
+    "planted straight quotes and apostrophe",
+    "planted spaced hyphens",
+    "planted short last line after a forced line break",
+    "clean counterparts: marks after digits, code, pre, kbd, digit range, unspaced hyphen",
+    "formula with <var> operands (heuristic boundary, allowed)"
+  ],
+  "runningElements": [],
+  "constructionFacts": [],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "page"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "page"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "page"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "page"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "ids": [
+              "infobox",
+              "pre-config",
+              "tbl-rota"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (978.89 px) and are laid out in one piece",
+          "measured": {
+            "infobox": {
+              "maxFragmentPx": 62.53,
+              "fragments": 1,
+              "naturalPx": 62.53
+            },
+            "pre-config": {
+              "maxFragmentPx": 86.66,
+              "fragments": 1,
+              "naturalPx": 86.66
+            },
+            "tbl-rota": {
+              "maxFragmentPx": 157.56,
+              "fragments": 1,
+              "naturalPx": 157.56
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tbl-rota tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 978.89 px content box"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2"
+            ]
+          },
+          "why": "every one of these headings carries break-after: avoid (Paged.js moves it with the following block) or opens its page, so content follows it on its own page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "page"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "The document contains no SVG; the rule has no candidate."
+      ]
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "p-sh-1"
+          },
+          "occurrences": 2,
+          "text": "The rollout - originally planned for May - moves",
+          "why": "spaced hyphens used as dashes; the document has no lang attribute, so every run is judged under the default locale de-DE"
+        },
+        {
+          "target": {
+            "id": "td-sh-2"
+          },
+          "occurrences": 1,
+          "text": "Ops - on call",
+          "why": "spaced hyphen in a table cell; the document has no lang attribute, so every run is judged under the default locale de-DE"
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "p-rota-2"
+          },
+          "why": "10 - 12: digits next to the hyphen"
+        },
+        {
+          "target": {
+            "id": "p-aob-1"
+          },
+          "why": "Ctrl - Tab is inside <kbd>"
+        },
+        {
+          "target": {
+            "id": "li-act-3"
+          },
+          "why": "Hi-vis: no spaces"
+        },
+        {
+          "target": {
+            "document": true
+          },
+          "except": [
+            {
+              "id": "p-sh-1"
+            },
+            {
+              "id": "td-sh-2"
+            },
+            {
+              "id": "p-aob-3"
+            }
+          ],
+          "why": "no other spaced hyphen outside the exclusions"
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "id": "p-aob-3"
+          },
+          "class": "heuristic-boundary",
+          "why": "<var>x</var> - <var>y</var> is a formula, but the hyphen stands alone in its own text node between two <var> elements; whether the ±12-character mathematical window sees the letters depends on whether the heuristic looks across element boundaries, which docs/rules/type-spaced-hyphen.md calls chosen and unmeasured"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "li-sq-2"
+          },
+          "occurrences": 2,
+          "text": "\"blocked\"",
+          "why": "straight double quotes in prose; the document has no lang attribute, so every run is judged under the default locale de-DE"
+        },
+        {
+          "target": {
+            "id": "p-sq-1"
+          },
+          "occurrences": 3,
+          "text": "'the tablets work, the chargers don't'",
+          "why": "straight single quotes and an apostrophe in prose; the document has no lang attribute, so every run is judged under the default locale de-DE"
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "rota-4"
+          },
+          "why": "6' ladder: the mark follows a digit (feet)"
+        },
+        {
+          "target": {
+            "id": "p-aob-1"
+          },
+          "why": "27\" screens: the mark follows a digit (inches); Ctrl - Tab is inside <kbd>"
+        },
+        {
+          "target": {
+            "id": "p-rollout-3"
+          },
+          "why": "straight quotes only inside <code>"
+        },
+        {
+          "target": {
+            "id": "pre-config"
+          },
+          "why": "<pre> is excluded structurally"
+        },
+        {
+          "target": {
+            "document": true
+          },
+          "except": [
+            {
+              "id": "li-sq-2"
+            },
+            {
+              "id": "p-sq-1"
+            }
+          ],
+          "why": "no other straight quotation mark outside code-like elements"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "p-sll"
+          },
+          "why": "the paragraph ends on a forced line break followed by the single word 'Ok.'",
+          "construction": "two sentences, then <br>, then 'Ok.': the last line is three glyphs, about 1.6 em in any common sans-serif (below 2 em) and about 3 % of the 657.6 px measure (below 15 %)",
+          "measured": {
+            "lines": {
+              "count": 3,
+              "lastLineWidth": 21.78,
+              "fontSizePx": 14
+            },
+            "paragraphWidthPx": 657.63
+          },
+          "docsBasis": "docs/rules/type-short-last-line.md: below 15 % of the measure AND below 2 em."
+        }
+      ],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "page"
+          },
+          "class": "font-dependent",
+          "why": "the width of any other paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no block is justified; docs/rules/type-excessive-word-spacing.md judges word gaps in a justified block only"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no file: URI and no absolute path occurs in any URI-bearing attribute (href, src, srcset, poster, data, xlink:href) or CSS url()"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 2,
+    "pdfPageCount": 2,
+    "contentBoxHeightsPx": [
+      978.89
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Sans (system, 33 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Serif (system, 52 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Serif (system, 34 glyphs)"
+      ],
+      ".pagedjs_page_content pre": [
+        "DejaVu Sans Mono (system, 77 glyphs)"
+      ],
+      ".pagedjs_page_content code": [
+        "DejaVu Sans Mono (system, 32 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "Liberation Sans (system, 14 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": []
+}

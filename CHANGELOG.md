@@ -24,6 +24,18 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `true` does. This was always the behaviour; it is now written down in `docs/limitations.md` and
   pinned by a contract test.
 
+### Validation corpus
+
+- **`corpus/public/selfauthored-v1`: twenty self-authored HTML-to-PDF documents with planted,
+  construction-known defects, clean controls and one ground-truth file each** (A4 and Letter, two
+  named landscape pages, running elements in top and side margin boxes, footnotes, multi-column
+  and vertical-writing sections, tables crossing pages, halo and plain SVG labels, two documents in
+  German). The truth is closed-world (`mustFire`, `mustNotFire`, `allowed`, `expectedDeclines`,
+  expected exit set, page range) and was written from the construction before breaklint was run on
+  any of them; its construction facts were checked with an independent probe that uses Paged.js
+  alone. Provenance class `synthetic_first_party`: regression truth only, never calibration
+  evidence. No gate consumes it yet.
+
 ## 0.6.0 — 2026-09-18
 
 A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0: the canonical

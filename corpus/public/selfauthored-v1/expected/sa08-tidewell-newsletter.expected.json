@@ -1,0 +1,623 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa08-tidewell-newsletter",
+  "artifact": "documents/sa08-tidewell-newsletter.html",
+  "sha256": "a55321ddb3b478d6998bac29f8b7992caf6a082e370a113b58b260072d36648c",
+  "byteLength": 14888,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "The Tidewell Commons Quarterly, Spring issue",
+  "genre": "newsletter with multi-column sections",
+  "language": {
+    "htmlLang": "en",
+    "typeRulesUnderDefaultLocale": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "A4",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        793.7,
+        1122.52
+      ],
+      "margins": "16mm 16mm 18mm 16mm",
+      "contentBoxCssPx": [
+        672.75,
+        994.02
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      3,
+      4
+    ],
+    "measured": 3,
+    "basis": "plain Paged.js measurement (3 pages); the lead story is long enough to cross from page 1 to page 2 for any plausible font"
+  },
+  "expectedExit": {
+    "set": [
+      4
+    ],
+    "derivation": "Insufficient coverage of the error rules, for documented reasons: layout/unbreakable-block-too-tall declines #notices (env/multicolumn) and #spine (env/vertical-writing), and svg/text-overflows-viewport declines the <use> label #en-unit (env/svg-painted-bounds-unsupported); both rules have a coverage floor of 1.",
+    "byCode": {
+      "4": "insufficient-coverage: error rules below their floor of 1 (multi-column, vertical writing, <use>)"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "A4",
+    "running element in @top-right",
+    "@page :first",
+    "two-column justified story crossing a page (column-count: 2)",
+    "two-column notices box with break-inside: avoid",
+    "vertical-writing sidebar (writing-mode: vertical-rl) with break-inside: avoid",
+    "floated figure with a small bar chart",
+    "SVG label drawn through <use>",
+    "pull quote"
+  ],
+  "runningElements": [
+    {
+      "id": "issuehead",
+      "marginBox": "top-right",
+      "marginBoxCopies": 3,
+      "pages": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "constructionFacts": [
+    {
+      "fact": "multi-column story crosses a page",
+      "measured": [
+        {
+          "page": 1,
+          "heightPx": 791.31,
+          "topInContentPx": 188.26,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 2,
+          "heightPx": 215.81,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        }
+      ]
+    },
+    {
+      "fact": "vertical sidebar",
+      "measured": [
+        {
+          "page": 1,
+          "heightPx": 234.33,
+          "topInContentPx": 101.53,
+          "startsInsideContentBox": true
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "issuehead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "issue"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "issue"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        },
+        {
+          "target": {
+            "id": "lead-story"
+          },
+          "reason": "env/multicolumn",
+          "required": true,
+          "why": "div#lead-story (column-count: 2) crosses a page boundary; its fragments are declined, not judged",
+          "measured": [
+            {
+              "page": 1,
+              "heightPx": 791.31,
+              "topInContentPx": 188.26,
+              "startsInsideContentBox": true
+            },
+            {
+              "page": 2,
+              "heightPx": 215.81,
+              "topInContentPx": 0,
+              "startsInsideContentBox": true
+            }
+          ],
+          "docsBasis": "docs/status.md / README exit-code section: the multi-column case is the reason exit 4 exists; the rule registry lists env/multicolumn for this rule."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "issuehead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "issue"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "issue"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        },
+        {
+          "target": {
+            "id": "lead-story"
+          },
+          "reason": "env/multicolumn",
+          "required": true,
+          "why": "div#lead-story (column-count: 2) crosses a page boundary; its fragments are declined, not judged",
+          "measured": [
+            {
+              "page": 1,
+              "heightPx": 791.31,
+              "topInContentPx": 188.26,
+              "startsInsideContentBox": true
+            },
+            {
+              "page": 2,
+              "heightPx": 215.81,
+              "topInContentPx": 0,
+              "startsInsideContentBox": true
+            }
+          ],
+          "docsBasis": "docs/status.md / README exit-code section: the multi-column case is the reason exit 4 exists; the rule registry lists env/multicolumn for this rule."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "issuehead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "ids": [
+              "notices",
+              "spine"
+            ]
+          },
+          "why": "if measured, neither is too tall"
+        },
+        {
+          "target": {
+            "ids": [
+              "pull-1",
+              "fig-energy",
+              "tbl-diary"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (994.02 px) and are laid out in one piece",
+          "measured": {
+            "pull-1": {
+              "maxFragmentPx": 54.31,
+              "fragments": 1,
+              "naturalPx": 54.31
+            },
+            "fig-energy": {
+              "maxFragmentPx": 219.77,
+              "fragments": 1,
+              "naturalPx": 219.77
+            },
+            "tbl-diary": {
+              "maxFragmentPx": 126.47,
+              "fragments": 1,
+              "naturalPx": 126.47
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tbl-diary tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 994.02 px content box"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": [
+        {
+          "target": {
+            "id": "notices"
+          },
+          "reason": "env/multicolumn",
+          "required": true,
+          "count": 1,
+          "countsTowardCoverage": true,
+          "why": "div#notices has column-count: 2 and break-inside: avoid (228 px, fits)",
+          "measured": [
+            {
+              "page": 2,
+              "heightPx": 228.03,
+              "topInContentPx": 635,
+              "startsInsideContentBox": true
+            }
+          ],
+          "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md 'Limits': multi-column and vertical writing are declined."
+        },
+        {
+          "target": {
+            "id": "spine"
+          },
+          "reason": "env/vertical-writing",
+          "required": true,
+          "count": 1,
+          "countsTowardCoverage": true,
+          "why": "aside#spine is set in writing-mode: vertical-rl with break-inside: avoid (62 mm tall, fits)",
+          "measured": [
+            {
+              "page": 1,
+              "heightPx": 234.33,
+              "topInContentPx": 101.53,
+              "startsInsideContentBox": true
+            }
+          ],
+          "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md 'Limits'."
+        }
+      ]
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "issuehead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "id": "spine-h"
+          },
+          "why": "the heading opens a vertical sidebar at the top of page 1"
+        },
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2"
+            ]
+          },
+          "why": "every one of these headings carries break-after: avoid (Paged.js moves it with the following block) or opens its page, so content follows it on its own page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": [
+        {
+          "target": {
+            "id": "spine-h"
+          },
+          "reason": "env/vertical-writing",
+          "required": true,
+          "why": "the h3 inside the vertical sidebar inherits writing-mode: vertical-rl",
+          "docsBasis": "rule registry declines list for layout/heading-at-page-bottom"
+        }
+      ]
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "issuehead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "issue"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "id": "lead-story"
+          },
+          "reason": "env/multicolumn",
+          "required": true,
+          "why": "div#lead-story (column-count: 2) crosses a page boundary; its fragments are declined, not judged",
+          "measured": [
+            {
+              "page": 1,
+              "heightPx": 791.31,
+              "topInContentPx": 188.26,
+              "startsInsideContentBox": true
+            },
+            {
+              "page": 2,
+              "heightPx": 215.81,
+              "topInContentPx": 0,
+              "startsInsideContentBox": true
+            }
+          ],
+          "docsBasis": "docs/status.md / README exit-code section: the multi-column case is the reason exit 4 exists; the rule registry lists env/multicolumn for this rule."
+        }
+      ]
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "en-unit-def"
+          },
+          "why": "the template <text> inside <defs> is never painted itself; it is drawn only through <use id=\"en-unit\">",
+          "docsBasis": "docs/rules/svg-text-overflows-viewport.md: 'A <text> that is not painted is not a target' (defs, visibility hidden)."
+        },
+        {
+          "target": {
+            "svg": "svg-energy",
+            "texts": [
+              "en-leg-last",
+              "en-leg-this",
+              "en-title",
+              "en-x-0",
+              "en-x-1",
+              "en-x-2",
+              "en-x-3",
+              "en-x-4",
+              "en-x-5",
+              "en-y-0",
+              "en-y-100",
+              "en-y-50"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "en-x-0": 24,
+              "en-x-1": 24,
+              "en-x-2": 24,
+              "en-x-3": 24,
+              "en-x-4": 24,
+              "en-x-5": 22,
+              "en-y-0": 29.5,
+              "en-y-50": 25.5,
+              "en-y-100": 21.25,
+              "en-title": 10,
+              "en-leg-last": 8,
+              "en-leg-this": 8
+            }
+          }
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": [
+        {
+          "target": {
+            "svg": "svg-energy",
+            "use": "en-unit"
+          },
+          "reason": "env/svg-painted-bounds-unsupported",
+          "required": true,
+          "count": 1,
+          "countsTowardCoverage": true,
+          "ifMeasured": "mustNotFire",
+          "why": "the <use> instance of the unit label lies well inside the chart viewport",
+          "measured": {
+            "useInsetsPx": {
+              "left": 62,
+              "top": 10,
+              "right": 216.5,
+              "bottom": 170
+            }
+          },
+          "docsBasis": "docs/rules/svg-text-overflows-viewport.md: 'Text instantiated through <use> is inside a closed instance tree. Those cases decline per target with env/svg-painted-bounds-unsupported'."
+        }
+      ]
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no straight quotation mark or apostrophe occurs in any text run outside code, pre, kbd, samp and var; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "issue"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "id": "spine-p"
+          },
+          "reason": "env/vertical-writing",
+          "required": false,
+          "why": "the paragraph inherits writing-mode: vertical-rl; it is only a candidate if the collector counts two or more lines"
+        }
+      ]
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "selectors": [
+              "#lead-story",
+              "#lead-story p"
+            ]
+          },
+          "class": "font-dependent",
+          "why": "justified blocks: word gaps depend on font metrics and on whether hyphenation dictionaries are available"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "id": "lead-story"
+          },
+          "reason": "env/multicolumn",
+          "required": true,
+          "why": "the justified container itself is multi-column",
+          "docsBasis": "rule registry declines list for type/excessive-word-spacing (env/multicolumn)"
+        }
+      ]
+    },
+    "artifact/local-uri": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no file: URI and no absolute path occurs in any URI-bearing attribute (href, src, srcset, poster, data, xlink:href) or CSS url()"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break",
+    "env/multicolumn",
+    "env/svg-painted-bounds-unsupported",
+    "env/vertical-writing"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 3,
+    "pdfPageCount": 3,
+    "contentBoxHeightsPx": [
+      994.02
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Sans (system, 96 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Serif (system, 30 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Serif (system, 37 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "Liberation Serif (system, 22 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+        "Liberation Serif (system, 3 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": []
+}

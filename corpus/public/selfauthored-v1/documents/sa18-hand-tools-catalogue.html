@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tools of Patience: Exhibition Catalogue</title>
+<style>
+@page {
+  size: A4;
+  margin: 20mm;
+  @top-left { content: "Tools of Patience"; font: italic 8.5pt serif; color: #7a6a58; }
+  @top-right { content: string(entry); font: 8pt sans-serif; color: #7a6a58; }
+  @bottom-center { content: counter(page); font: 8.5pt serif; }
+}
+@page :first { @top-left { content: none; } @top-right { content: none; } }
+body { margin: 0; font: 10.5pt/1.5 serif; color: #2b241d; }
+h1 { font: normal 28pt/1.1 serif; margin: 30mm 0 4mm; color: #4d3b2a; }
+.subtitle { font: italic 13pt/1.4 serif; margin: 0 0 14mm; }
+h2 { font: normal 16pt/1.2 serif; margin: 8mm 0 3mm; color: #4d3b2a; break-after: avoid; }
+p { margin: 0 0 3mm; widows: 2; orphans: 2; }
+figure { margin: 3mm 0 4mm; break-inside: avoid; }
+figcaption { font: 9pt/1.4 sans-serif; color: #5a4d40; margin-top: 2mm; }
+figure svg { display: block; }
+svg .halo { paint-order: stroke fill; stroke: #ffffff; stroke-width: 3px; stroke-linejoin: round; }
+/* Every catalogue entry is one unbreakable card with a fixed height, so that the drawing and the
+   text of an object are always seen together. The tallest card is 950 px against the 971.34 px
+   content box of an A4 page with 20 mm margins. */
+article.entry { break-inside: avoid; box-sizing: border-box; border-top: 1.5pt solid #4d3b2a; padding-top: 4mm; margin: 0 0 6mm; }
+article.entry h3 { font: normal 15pt/1.25 serif; margin: 0 0 1mm; string-set: entry content(text); }
+article.entry .object { font: 9pt/1.4 sans-serif; color: #5a4d40; margin: 0 0 3mm; }
+#entry-plane { height: 860px; }
+#entry-gauge { height: 930px; }
+#entry-drawknife { height: 950px; }
+#entry-auger { height: 820px; }
+#entry-spokeshave { height: 700px; }
+#index { column-count: 3; column-gap: 6mm; font: 9pt/1.5 sans-serif; }
+#index p { margin: 0; }
+.imprint { font: 7.5pt/1.4 sans-serif; color: #7a6a58; margin-top: 8mm; }
+</style>
+</head>
+<body>
+<main id="catalogue">
+<h1 id="title">Tools of Patience</h1>
+<p class="subtitle" id="subtitle">Hand instruments from the Wendlecote Collection &middot; exhibition catalogue</p>
+<h2 id="h-intro">Introduction</h2>
+<p id="intro-p1">The Wendlecote Collection holds some four hundred woodworking tools given by the families of craftsmen who worked in the valley and on the estuary. Most were used for decades, some for more than a century, and nearly all of them carry the marks of that use: handles worn to the shape of one hand, irons ground back to a stub, repairs made with whatever was on the bench. This exhibition shows five of them.</p>
+<p id="intro-p2">The objects were chosen not because they are rare but because they are typical. Each one stands for a trade that was once common here and is now almost gone, and each has a story that the donors were able to tell us. The drawings were made for the catalogue by the collection&rsquo;s volunteers; photographs of every object are available in the online catalogue.</p>
+<figure id="fig-provenance">
+<svg id="svg-provenance" xmlns="http://www.w3.org/2000/svg" width="642" height="380" viewBox="0 0 642 380" role="img"><title>Where the tools in this catalogue were used</title>
+  <rect x="0" y="0" width="642" height="380" fill="#eef1ea"/>
+  <path d="M 0 250 C 120 230, 200 300, 330 270 S 520 210, 642 240 L 642 380 L 0 380 Z" fill="#c8d9e3" stroke="#444" stroke-width="1.5"/>
+  <path d="M 330 270 C 350 200, 330 140, 360 60" fill="none" stroke="#9fb8c8" stroke-width="6"/>
+  <circle cx="150" cy="262" r="5" fill="#7a3b2e" stroke="#fff" stroke-width="1.5"/>
+  <text id="map-plane" x="158" y="254" font-size="11" class="halo">Estuary boatyard</text>
+  <circle cx="360" cy="120" r="5" fill="#7a3b2e" stroke="#fff" stroke-width="1.5"/>
+  <text id="map-auger" x="368" y="112" font-size="11" class="halo">Valley forge</text>
+  <circle cx="470" cy="190" r="5" fill="#7a3b2e" stroke="#fff" stroke-width="1.5"/>
+  <text id="map-spokeshave" x="478" y="182" font-size="11" class="halo">Wheelwright’s shop</text>
+  <circle cx="250" cy="170" r="5" fill="#7a3b2e" stroke="#fff" stroke-width="1.5"/>
+  <text id="map-gauge" x="258" y="162" font-size="11" class="halo">Joinery on Mill Street</text>
+  <circle cx="540" cy="90" r="5" fill="#7a3b2e" stroke="#fff" stroke-width="1.5"/>
+  <text id="map-drawknife" x="548" y="82" font-size="11" class="halo">Cooperage</text>
+  <text id="map-estuary" x="40" y="330" font-size="12" class="halo" fill="#305b75">Estuary</text>
+  <text id="map-river" x="372" y="50" font-size="11" class="halo" fill="#305b75">River Wendle</text>
+  <text id="map-title" x="24" y="26" font-size="12" font-weight="bold">Places of use</text>
+</svg>
+<figcaption id="cap-provenance">The workshops where the five objects were used, as far as the donors could tell us.</figcaption>
+</figure>
+<h2 id="h-catalogue">Catalogue</h2>
+<article class="entry" id="entry-plane">
+<h3 id="h-plane">1&ensp;Block plane with rosewood knob</h3>
+<p class="object" id="obj-plane">Cast iron and rosewood, maker unknown, probably late nineteenth century. Length 16 cm.</p>
+<figure id="fig-plane">
+<svg id="svg-plane" xmlns="http://www.w3.org/2000/svg" width="642" height="420" viewBox="0 0 642 420" role="img"><title>Drawing of catalogue object 1</title>
+  <rect x="0" y="0" width="642" height="420" fill="#f7f3ec"/>
+  <path d="M 130 280 L 170 210 L 470 200 L 520 280 Z" fill="#6f5a45" stroke="#3b2f24" stroke-width="2"/>
+  <circle cx="220" cy="190" r="26" fill="#7a3b2e"/>
+  <path d="M 300 205 L 330 150 L 360 150 L 340 205 Z" fill="#9aa0a6" stroke="#555" stroke-width="1.5"/>
+  <text id="t-plane-cat" x="24" y="30" font-size="12" font-weight="bold">Cat. 1</text>
+  <text id="t-plane-scale" x="618" y="400" font-size="10" text-anchor="end">Drawing not to scale</text>
+</svg>
+</figure>
+<p id="text-plane">The block plane is the smallest of the bench planes and the one most often held in one hand. This example has been resharpened so many times that the iron is barely half its original length, and the knob is worn smooth on one side by a right thumb. It came to the collection from a boatbuilder&rsquo;s workshop on the estuary, where it was used to fair the edges of planks before caulking.</p>
+</article>
+<article class="entry" id="entry-gauge">
+<h3 id="h-gauge">2&ensp;Marking gauge in boxwood</h3>
+<p class="object" id="obj-gauge">Boxwood with brass wear plates, stamped with a retailer’s mark. Length 22 cm.</p>
+<figure id="fig-gauge">
+<svg id="svg-gauge" xmlns="http://www.w3.org/2000/svg" width="642" height="420" viewBox="0 0 642 420" role="img"><title>Drawing of catalogue object 2</title>
+  <rect x="0" y="0" width="642" height="420" fill="#f7f3ec"/>
+  <rect x="80" y="190" width="480" height="24" fill="#d9b779" stroke="#8a6d3b" stroke-width="1"/>
+  <rect x="250" y="150" width="60" height="104" fill="#c9a364" stroke="#8a6d3b" stroke-width="1"/>
+  <rect x="250" y="196" width="60" height="12" fill="#c8a24a"/>
+  <text id="t-gauge-cat" x="24" y="30" font-size="12" font-weight="bold">Cat. 2</text>
+  <text id="t-gauge-scale" x="618" y="400" font-size="10" text-anchor="end">Drawing not to scale</text>
+</svg>
+</figure>
+<p id="text-gauge">A marking gauge scribes a line parallel to an edge. The brass plates set into the fence show that its owner used it constantly: they were added later, when the boxwood itself had worn. The stem carries a second pin on the opposite face, filed from a nail, which turned the tool into a mortise gauge without the cost of buying one.</p>
+</article>
+<article class="entry" id="entry-drawknife">
+<h3 id="h-drawknife">3&ensp;Drawknife with folding guards</h3>
+<p class="object" id="obj-drawknife">Forged steel, ash handles, folding sheet-steel edge guards. Width 38 cm.</p>
+<figure id="fig-drawknife">
+<svg id="svg-drawknife" xmlns="http://www.w3.org/2000/svg" width="642" height="420" viewBox="0 0 642 420" role="img"><title>Drawing of catalogue object 3</title>
+  <rect x="0" y="0" width="642" height="420" fill="#f7f3ec"/>
+  <path d="M 150 230 L 500 230 L 480 260 L 170 260 Z" fill="#9aa0a6" stroke="#555" stroke-width="2"/>
+  <rect x="90" y="180" width="30" height="110" fill="#c9a364" stroke="#8a6d3b" stroke-width="1"/>
+  <rect x="530" y="180" width="30" height="110" fill="#c9a364" stroke="#8a6d3b" stroke-width="1"/>
+  <text id="t-drawknife-cat" x="24" y="30" font-size="12" font-weight="bold">Cat. 3</text>
+  <text id="t-drawknife-scale" x="618" y="400" font-size="10" text-anchor="end">Drawing not to scale</text>
+</svg>
+</figure>
+<p id="text-drawknife">Drawknives are pulled towards the body and remove wood faster than any plane. The folding guards on this one are unusual: they swing over the edge when the knife is carried and fold back against the handles in use. The handles are replacements, turned from ash by the donor&rsquo;s father when the originals split.</p>
+</article>
+<article class="entry" id="entry-auger">
+<h3 id="h-auger">4&ensp;Shell auger, set of three</h3>
+<p class="object" id="obj-auger">Forged steel, oak crossbars. Lengths 42, 46 and 51 cm.</p>
+<figure id="fig-auger">
+<svg id="svg-auger" xmlns="http://www.w3.org/2000/svg" width="642" height="420" viewBox="0 0 642 420" role="img"><title>Drawing of catalogue object 4</title>
+  <rect x="0" y="0" width="642" height="420" fill="#f7f3ec"/>
+  <line x1="200" y1="110" x2="200" y2="330" stroke="#6d6d6d" stroke-width="6"/>
+  <rect x="150" y="96" width="100" height="16" fill="#a17c4a"/>
+  <line x1="320" y1="110" x2="320" y2="342" stroke="#6d6d6d" stroke-width="6"/>
+  <rect x="270" y="96" width="100" height="16" fill="#a17c4a"/>
+  <line x1="440" y1="110" x2="440" y2="354" stroke="#6d6d6d" stroke-width="6"/>
+  <rect x="390" y="96" width="100" height="16" fill="#a17c4a"/>
+  <text id="t-auger-cat" x="24" y="30" font-size="12" font-weight="bold">Cat. 4</text>
+  <text id="t-auger-scale" x="618" y="400" font-size="10" text-anchor="end">Drawing not to scale</text>
+</svg>
+</figure>
+<p id="text-auger">Shell augers bore large holes in green timber for pegs and wheel hubs. The three in this set were forged by the same smith and share a crossbar pattern that is found on tools from the valley villages and nowhere else in the collection.</p>
+</article>
+<article class="entry" id="entry-spokeshave">
+<h3 id="h-spokeshave">5&ensp;Pair of spokeshaves</h3>
+<p class="object" id="obj-spokeshave">Beech bodies with steel blades, one flat and one round-bottomed. Length 28 cm each.</p>
+<figure id="fig-spokeshave">
+<svg id="svg-spokeshave" xmlns="http://www.w3.org/2000/svg" width="642" height="420" viewBox="0 0 642 420" role="img"><title>Drawing of catalogue object 5</title>
+  <rect x="0" y="0" width="642" height="420" fill="#f7f3ec"/>
+  <path d="M 120 170 C 200 140, 440 140, 520 170" fill="none" stroke="#8a6d3b" stroke-width="14" stroke-linecap="round"/>
+  <rect x="290" y="140" width="60" height="12" fill="#9aa0a6"/>
+  <path d="M 120 260 C 200 230, 440 230, 520 260" fill="none" stroke="#8a6d3b" stroke-width="14" stroke-linecap="round"/>
+  <rect x="290" y="230" width="60" height="12" fill="#9aa0a6"/>
+  <text id="t-spokeshave-cat" x="24" y="30" font-size="12" font-weight="bold">Cat. 5</text>
+  <text id="t-spokeshave-scale" x="618" y="400" font-size="10" text-anchor="end">Drawing not to scale</text>
+</svg>
+</figure>
+<p id="text-spokeshave">A spokeshave is a short plane with handles on either side, used for curved work such as chair legs and wheel spokes. The pair was bought together and kept together, and the round-bottomed one still has its original blade.</p>
+</article>
+<h2 id="h-index">Index</h2>
+<div id="index">
+<p id="ix-0">ash handles, cat. 3</p>
+<p id="ix-1">auger, cat. 4</p>
+<p id="ix-2">beech, cat. 5</p>
+<p id="ix-3">block plane, cat. 1</p>
+<p id="ix-4">boatbuilding, cat. 1</p>
+<p id="ix-5">boxwood, cat. 2</p>
+<p id="ix-6">brass plates, cat. 2</p>
+<p id="ix-7">chair making, cat. 5</p>
+<p id="ix-8">cooperage, cat. 3</p>
+<p id="ix-9">drawknife, cat. 3</p>
+<p id="ix-10">edge guards, cat. 3</p>
+<p id="ix-11">forge, cat. 4</p>
+<p id="ix-12">marking gauge, cat. 2</p>
+<p id="ix-13">mortise gauge, cat. 2</p>
+<p id="ix-14">rosewood, cat. 1</p>
+<p id="ix-15">spokeshave, cat. 5</p>
+<p id="ix-16">valley villages, cat. 4</p>
+<p id="ix-17">wheelwright, cat. 5</p>
+</div>
+<p class="imprint" id="imprint">The Wendlecote Collection and every object and workshop in this catalogue are fictional. This is a specimen document written for layout testing.</p>
+</main>
+</body>
+</html>

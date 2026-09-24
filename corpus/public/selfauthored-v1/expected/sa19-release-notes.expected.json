@@ -1,0 +1,419 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa19-release-notes",
+  "artifact": "documents/sa19-release-notes.html",
+  "sha256": "5b0331c9198a379e5c5a43db63cbd45a49ebb40aaa81f93c681e19e3a84ab43d",
+  "byteLength": 11637,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Lumenrake 4.2 release notes",
+  "genre": "software release notes",
+  "language": {
+    "htmlLang": "en",
+    "typeRulesUnderDefaultLocale": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "letter",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        816,
+        1056
+      ],
+      "margins": "0.8in 0.75in",
+      "contentBoxCssPx": [
+        672,
+        902.4
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      3,
+      4
+    ],
+    "measured": 3,
+    "basis": "plain Paged.js measurement (3 pages)"
+  },
+  "expectedExit": {
+    "set": [
+      0,
+      3
+    ],
+    "derivation": "Local-uri findings are warn. #tbl-flags crosses a page boundary, so exit 3 render-unstable is admitted as 'declined as unmeasurable' (docs/limitations.md); the probe saw no residue.",
+    "byCode": {
+      "0": "warn-only",
+      "3": "render-unstable, if the crossing table leaves residue"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "Letter",
+    "string-set section in @top-right",
+    "@page :first",
+    "code blocks and inline code with straight quotes",
+    "flag table crossing a page",
+    "planted local-uri: file: URIs in a link and in an SVG xlink:href, a root-relative absolute path",
+    "https, relative, mailto and fragment links (clean)",
+    "straight quotes and a spaced hyphen in lang=en prose (locale controls)",
+    "architecture SVG with plain labels"
+  ],
+  "runningElements": [],
+  "constructionFacts": [],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "notes"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "notes"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "notes"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "notes"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "ids": [
+              "fig-arch",
+              "pre-settings"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (902.39 px) and are laid out in one piece",
+          "measured": {
+            "fig-arch": {
+              "maxFragmentPx": 220.98,
+              "fragments": 1,
+              "naturalPx": 220.98
+            },
+            "pre-settings": {
+              "maxFragmentPx": 130.66,
+              "fragments": 1,
+              "naturalPx": 130.66
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tbl-flags tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 902.39 px content box"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2"
+            ]
+          },
+          "why": "every one of these headings carries break-after: avoid (Paged.js moves it with the following block) or opens its page, so content follows it on its own page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "notes"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "svg": "svg-arch",
+            "texts": [
+              "arch-cache",
+              "arch-cli",
+              "arch-planner",
+              "arch-scheduler",
+              "arch-title",
+              "arch-workers"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "arch-cli": 85.66,
+              "arch-planner": 92,
+              "arch-scheduler": 92,
+              "arch-workers": 74.5,
+              "arch-cache": 28,
+              "arch-title": 15
+            }
+          }
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "up-p2"
+          },
+          "why": "planted locale control: 'wrapper script - for example' is a spaced hyphen in prose, but the run is lang=\"en\" and the default locale is de-DE; docs/rules/type-spaced-hyphen.md excludes it structurally"
+        },
+        {
+          "target": {
+            "document": true
+          },
+          "why": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "outside the ids listed under allowed, no straight quotation mark or apostrophe occurs in any text run outside code-like elements; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')",
+          "except": [
+            {
+              "id": "up-p1"
+            }
+          ]
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "id": "up-p1"
+          },
+          "class": "docs-silent",
+          "why": "straight quotation marks in lang=\"en\" runs: under the default locale de-DE the implementation excludes such runs, but docs/rules/type-straight-quotes.md does not state the lang exclusion for this rule, so a report is neither required nor forbidden here"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "notes"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no block is justified; docs/rules/type-excessive-word-spacing.md judges word gaps in a justified block only"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [
+        {
+          "target": {
+            "uri": {
+              "attribute": "href",
+              "value": "/docs/migration/4.2.html"
+            },
+            "id": "a-rootrel"
+          },
+          "why": "a root-relative link is an absolute path; docs/rules/artifact-local-uri.md remediation: 'EVERY absolute path is reported, inside the project or not'"
+        },
+        {
+          "target": {
+            "uri": {
+              "attribute": "href",
+              "value": "file:///var/build/lumenrake/4.2.0/changelog-full.txt"
+            },
+            "id": "a-file-log"
+          },
+          "why": "file: URI left from the build machine"
+        },
+        {
+          "target": {
+            "uri": {
+              "attribute": "xlink:href",
+              "value": "file:///opt/lumenrake/build/assets/cache-diagram.svg"
+            },
+            "id": "svg-link-local"
+          },
+          "why": "file: URI on an SVG <a xlink:href>"
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "a-rel"
+          },
+          "why": "relative href"
+        },
+        {
+          "target": {
+            "id": "a-https"
+          },
+          "why": "https URL"
+        },
+        {
+          "target": {
+            "id": "a-mailto"
+          },
+          "why": "mailto: URL"
+        },
+        {
+          "target": {
+            "id": "a-frag"
+          },
+          "why": "fragment-only href"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 3,
+    "pdfPageCount": 3,
+    "contentBoxHeightsPx": [
+      902.39
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "DejaVu Sans Mono (system, 43 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Sans (system, 27 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Sans (system, 10 glyphs)"
+      ],
+      ".pagedjs_page_content pre": [
+        "DejaVu Sans Mono (system, 134 glyphs)"
+      ],
+      ".pagedjs_page_content code": [
+        "DejaVu Sans Mono (system, 17 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "DejaVu Sans Mono (system, 15 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+        "Liberation Sans (system, 3 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": []
+}

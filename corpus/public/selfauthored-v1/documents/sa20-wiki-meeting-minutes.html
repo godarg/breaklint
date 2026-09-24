@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Operations committee: minutes of the October meeting</title>
+<style>
+@page {
+  size: A4;
+  margin: 18mm 18mm 20mm 18mm;
+  @top-left { content: "Hollybrook Rail Heritage Trust wiki"; font: 7.5pt sans-serif; color: #777; }
+  @top-right { content: "Exported page"; font: 7.5pt sans-serif; color: #777; }
+  @bottom-center { content: counter(page) " / " counter(pages); font: 7.5pt sans-serif; color: #777; }
+}
+body { margin: 0; font: 10.5pt/1.5 sans-serif; color: #202122; }
+.breadcrumbs { font-size: 8pt; color: #54595d; margin: 0 0 3mm; }
+h1 { font: normal 21pt/1.25 serif; border-bottom: 1px solid #a2a9b1; padding-bottom: 1mm; margin: 0 0 3mm; }
+.pagemeta { font-size: 8.5pt; color: #54595d; margin: 0 0 5mm; }
+h2 { font: normal 15pt/1.3 serif; border-bottom: 1px solid #c8ccd1; margin: 6mm 0 2mm; break-after: avoid; }
+p { margin: 0 0 2.5mm; widows: 2; orphans: 2; }
+ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+li { margin-bottom: 1mm; }
+code, kbd { font: 9pt monospace; background: #f8f9fa; border: 1px solid #eaecf0; padding: 0 2px; }
+pre { font: 9pt/1.45 monospace; background: #f8f9fa; border: 1px solid #eaecf0; padding: 2mm 3mm; margin: 2mm 0 3mm; white-space: pre; break-inside: avoid; }
+table.wikitable { border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9.5pt; break-inside: avoid; }
+table.wikitable th, table.wikitable td { border: 1px solid #a2a9b1; padding: 1.5mm 2mm; text-align: left; }
+table.wikitable th { background: #eaecf0; }
+.infobox { border: 1px solid #a2a9b1; background: #f8f9fa; padding: 2mm 3mm; margin: 0 0 4mm; font-size: 9pt; break-inside: avoid; }
+.footer { font-size: 8pt; color: #54595d; border-top: 1px solid #c8ccd1; margin-top: 6mm; padding-top: 2mm; }
+</style>
+</head>
+<body>
+
+<main id="page">
+<p class="breadcrumbs" id="breadcrumbs">Committees &rsaquo; Operations &rsaquo; Minutes</p>
+<h1 id="title">Operations committee: minutes of the October meeting</h1>
+<p class="pagemeta" id="pagemeta">Last edited by the committee secretary &middot; 14 revisions &middot; page status: approved</p>
+<div class="infobox" id="infobox">
+<p id="info-p">Present: chair, secretary, engineering lead, volunteer coordinator, two station leads. Apologies: treasurer. Meeting held in the carriage shed mess room, 19:00&ndash;21:10.</p>
+</div>
+
+<h2 id="h-previous">1. Minutes of the previous meeting</h2>
+<p id="p-sll">The minutes of the September meeting were read and approved without changes. The secretary will upload the signed copy to the archive section of the wiki.<br>Ok.</p>
+
+<h2 id="h-actions">2. Matters arising</h2>
+<ul id="actions">
+<li id="li-act-1">The replacement coupling for the brake van has arrived and is in the stores cage.</li>
+<li id="li-sq-2">The signal box roof repair is still marked "blocked" on the works board because the scaffolding supplier has not confirmed a date.</li>
+<li id="li-act-3">Hi-vis vests in the new sizes have been ordered; the old ones will go to the recycling bank.</li>
+</ul>
+
+<h2 id="h-rollout">3. Ticketing system</h2>
+<p id="p-sh-1">The new ticketing tablets passed their trial at the booking office. The rollout - originally planned for May - moves to the start of the next season, so that volunteers can be trained over the winter rather than on a busy weekend.</p>
+<p id="p-sq-1">The engineering lead summed up the trial: 'the tablets work, the chargers don't'. Two of the six chargers failed within a week and have been returned under warranty.</p>
+<p id="p-rollout-3">Training sessions will run on three Saturdays in February, each for up to eight people. The volunteer coordinator will send the sign-up link once the dates are fixed. The tablets need a firmware update before the sessions; the command, for reference, is <code>tabctl update --channel "stable"</code>.</p>
+<pre id="pre-config">[booking]
+station = "Hollybrook Road"
+printer = 'receipt-2'
+offline_queue = true</pre>
+
+<h2 id="h-rota">4. Rotas for the winter season</h2>
+<table class="wikitable" id="tbl-rota">
+<thead><tr><th>Team</th><th>Lead</th><th>Weekends</th><th>Notes</th></tr></thead>
+<tbody>
+<tr id="rota-1"><td>Booking office</td><td>Station lead, Hollybrook Road</td><td>all</td><td>two people from 10&ndash;16</td></tr>
+<tr id="rota-2"><td>Platform</td><td>Station lead, Mill Halt</td><td>all</td><td>one person per train</td></tr>
+<tr id="rota-3"><td id="td-sh-2">Ops - on call</td><td>Engineering lead</td><td>alternate</td><td>phone list in the mess room</td></tr>
+<tr id="rota-4"><td>Carriage cleaning</td><td>Volunteer coordinator</td><td>first of the month</td><td>bring the 6' ladder from the shed</td></tr>
+</tbody>
+</table>
+<p id="p-rota-2">The on-call arrangement will be reviewed at the January meeting. Anyone who can offer weekday cover between 10 - 12 in the morning is asked to add their name to the list on the noticeboard.</p>
+
+<h2 id="h-aob">5. Any other business</h2>
+<p id="p-aob-1">The mess room television is to be replaced by a pair of the 27" screens that were donated by a local office. They will show the train running board and the weather radar. To switch the display over, press <kbd>Ctrl - Tab</kbd> on the small keyboard beside it.</p>
+<p id="p-aob-2">The chair thanked the station leads for keeping the Halloween specials running despite the weather, and reminded everyone that the Christmas trains are fully booked.</p>
+<p id="p-aob-3">The committee noted that the formula used for the volunteer hours report, <var>x</var> - <var>y</var> with x the rostered and y the cancelled hours, gives a misleading figure for the months with engineering closures. The treasurer will be asked to suggest a better measure.</p>
+
+<h2 id="h-next">6. Date of next meeting</h2>
+<p id="p-next">Second Tuesday of November, 19:00, carriage shed mess room.</p>
+<p class="footer" id="footer">This page was exported from the trust&rsquo;s internal wiki. The Hollybrook Rail Heritage Trust and its committees are fictional; this is a specimen document written for layout testing.</p>
+</main>
+
+</body>
+</html>

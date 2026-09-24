@@ -1,0 +1,724 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa01-riverbank-survey-handbook",
+  "artifact": "documents/sa01-riverbank-survey-handbook.html",
+  "sha256": "e32b36c1a071330f40d268053ce024f8c7facced4f9a7032b24c4a6aa21a437c",
+  "byteLength": 31293,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Lantern Creek Riverbank Survey Handbook",
+  "genre": "long-form volunteer field guide",
+  "language": {
+    "htmlLang": "en",
+    "typeRulesUnderDefaultLocale": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "A4",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        793.7,
+        1122.52
+      ],
+      "margins": "20mm",
+      "contentBoxCssPx": [
+        642.52,
+        971.34
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      7,
+      9
+    ],
+    "measured": 8,
+    "basis": "plain Paged.js measurement (8 pages); one forced break (h2#h-ch4); the fixed grid of section 4 spans three pages whatever the fonts; flowing prose of sections 1-3 and 5-6 may shift by one page"
+  },
+  "expectedExit": {
+    "set": [
+      0
+    ],
+    "derivation": "No error finding: every break-inside: avoid block fits and every SVG label is clear inside with no stroke, so both error rules measure everything (coverage 1). The planted defect is a warn rule, which does not move the exit under the default fail-on error.",
+    "byCode": {
+      "0": "clean or warn-only; the stranded heading is warn"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "A4",
+    "running element in @top-center (position: running)",
+    "string-set chapter title in @top-right",
+    "page counters",
+    "@page :first",
+    "inline SVG figures with plain labels",
+    "fixed-grid page",
+    "stranded heading (planted)",
+    "break-after: avoid control heading",
+    "tall break-inside: avoid figure that fits (0.94 of the page)"
+  ],
+  "runningElements": [
+    {
+      "id": "runhead",
+      "marginBox": "top-center",
+      "marginBoxCopies": 8,
+      "pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    }
+  ],
+  "constructionFacts": [
+    {
+      "fact": "fixed grid of section 4",
+      "arithmetic": "64 + 560 + 12 + 266 = 902; h3 920..948 (margins collapse to 18 px); remaining 971.34 - 948 = 23.34 px"
+    },
+    {
+      "fact": "control grid on the next page",
+      "arithmetic": "#plate-cover 0..400, #plate-pins 412..892, h3#h-photo-points would be 910..938 (33.33 px left) but break-after: avoid moves it"
+    },
+    {
+      "fact": "tall fitting figure",
+      "arithmetic": "#fig-fieldsheet height 913 px < 971.34 px content box",
+      "measured": [
+        {
+          "page": 7,
+          "heightPx": 913,
+          "topInContentPx": 11.33,
+          "startsInsideContentBox": true
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "runhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "main"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "main"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "runhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "main"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "main"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "runhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "ids": [
+              "fig-profile",
+              "plate-profile-guide",
+              "plate-quadrat",
+              "plate-cover",
+              "plate-pins",
+              "plate-photo",
+              "fig-fieldsheet",
+              "callout-safety"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (971.34 px) and are laid out in one piece; #fig-fieldsheet is the tall control: a fixed 913 px (0.94 of the page) that is moved whole to the next page",
+          "measured": {
+            "fig-profile": {
+              "maxFragmentPx": 509.92,
+              "fragments": 1,
+              "naturalPx": 509.92
+            },
+            "plate-profile-guide": {
+              "maxFragmentPx": 560,
+              "fragments": 1,
+              "naturalPx": 560
+            },
+            "plate-quadrat": {
+              "maxFragmentPx": 266,
+              "fragments": 1,
+              "naturalPx": 266
+            },
+            "plate-cover": {
+              "maxFragmentPx": 400,
+              "fragments": 1,
+              "naturalPx": 400
+            },
+            "plate-pins": {
+              "maxFragmentPx": 480,
+              "fragments": 1,
+              "naturalPx": 480
+            },
+            "plate-photo": {
+              "maxFragmentPx": 300,
+              "fragments": 1,
+              "naturalPx": 300
+            },
+            "fig-fieldsheet": {
+              "maxFragmentPx": 913,
+              "fragments": 1,
+              "naturalPx": 913
+            },
+            "callout-safety": {
+              "maxFragmentPx": 85.05,
+              "fragments": 1,
+              "naturalPx": 85.05
+            }
+          }
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "h-cover-classes"
+          },
+          "why": "the h3 is the last block on its page; the figure it introduces starts on the next page",
+          "construction": "Page opened by h2#h-ch4 (break-before: page): h2 48 px + 16 px margin = 64 px; figure#plate-profile-guide 560 px (64..624) + 12 px margin; figure#plate-quadrat 266 px (636..902); h3#h-cover-classes margin-top 18 px (collapses with 12 px) -> 920..948, 28 px line height, white-space: nowrap, break-after: auto; content box 971.34 px -> 23.34 px = 0.83 line heights remain (threshold 2). figure#plate-cover (400 px) cannot follow it.",
+          "measured": {
+            "page": 4,
+            "remainingPx": 23.34,
+            "remainingLineHeights": 0.83,
+            "blocksBelowOnPage": 0
+          },
+          "docsBasis": "docs/rules/layout-heading-at-page-bottom.md: fewer than 2 of the heading's own line heights remain and nothing follows it on the page."
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "runhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "id": "h-photo-points"
+          },
+          "why": "control: the same grid would leave this h3 at 910..938 (33.33 px = 1.19 line heights) on the next page, but it carries break-after: avoid and moves with figure#plate-photo",
+          "measured": {
+            "page": 6,
+            "topInContentPx": 18,
+            "blocksBelowOnPage": 25
+          }
+        },
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2",
+              "h3:not(#h-cover-classes)"
+            ]
+          },
+          "why": "every one of these headings carries break-after: avoid (Paged.js moves it with the following block) or opens its page, so content follows it on its own page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "runhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "main"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "svg": "svg-bank-profile",
+            "texts": [
+              "bp-banktop",
+              "bp-heading",
+              "bp-note",
+              "bp-riffle",
+              "bp-scour",
+              "bp-tick-0",
+              "bp-tick-10",
+              "bp-tick-12",
+              "bp-tick-2",
+              "bp-tick-4",
+              "bp-tick-6",
+              "bp-tick-8",
+              "bp-upper",
+              "bp-water"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "bp-tick-0": 10,
+              "bp-tick-2": 10,
+              "bp-tick-4": 10,
+              "bp-tick-6": 10,
+              "bp-tick-8": 10,
+              "bp-tick-10": 10,
+              "bp-tick-12": 10,
+              "bp-banktop": 52,
+              "bp-upper": 150,
+              "bp-scour": 224,
+              "bp-water": 51.5,
+              "bp-riffle": 76,
+              "bp-heading": 17,
+              "bp-note": 23.5
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-reading-guide",
+            "texts": [
+              "rg-exposed",
+              "rg-face",
+              "rg-pin",
+              "rg-rule",
+              "rg-rule2",
+              "rg-soil"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "rg-exposed": 133,
+              "rg-pin": 101,
+              "rg-soil": 60,
+              "rg-face": 167,
+              "rg-rule": 23.5,
+              "rg-rule2": 24
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-quadrat",
+            "texts": [
+              "q-caption",
+              "q-cell-1",
+              "q-cell-10",
+              "q-cell-11",
+              "q-cell-12",
+              "q-cell-13",
+              "q-cell-14",
+              "q-cell-15",
+              "q-cell-16",
+              "q-cell-2",
+              "q-cell-3",
+              "q-cell-4",
+              "q-cell-5",
+              "q-cell-6",
+              "q-cell-7",
+              "q-cell-8",
+              "q-cell-9"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "q-cell-1": 35,
+              "q-cell-2": 35,
+              "q-cell-3": 35,
+              "q-cell-4": 35,
+              "q-cell-5": 75,
+              "q-cell-6": 75,
+              "q-cell-7": 75,
+              "q-cell-8": 75,
+              "q-cell-9": 73,
+              "q-cell-10": 73,
+              "q-cell-11": 73,
+              "q-cell-12": 73,
+              "q-cell-13": 33,
+              "q-cell-14": 33,
+              "q-cell-15": 33,
+              "q-cell-16": 33,
+              "q-caption": 7.5
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-cover",
+            "texts": [
+              "cv-cat-0",
+              "cv-cat-1",
+              "cv-cat-2",
+              "cv-cat-3",
+              "cv-cat-4",
+              "cv-cat-5",
+              "cv-title",
+              "cv-val-0",
+              "cv-val-1",
+              "cv-val-2",
+              "cv-val-3",
+              "cv-val-4",
+              "cv-val-5",
+              "cv-xtitle",
+              "cv-y-0",
+              "cv-y-10",
+              "cv-y-20",
+              "cv-y-30",
+              "cv-y-40"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "cv-y-0": 44,
+              "cv-y-10": 39.16,
+              "cv-y-20": 39,
+              "cv-y-30": 39,
+              "cv-y-40": 39,
+              "cv-val-0": 112.58,
+              "cv-cat-0": 40,
+              "cv-val-1": 111.5,
+              "cv-cat-1": 40,
+              "cv-val-2": 86.5,
+              "cv-cat-2": 40,
+              "cv-val-3": 136,
+              "cv-cat-3": 39.5,
+              "cv-val-4": 155.5,
+              "cv-cat-4": 40,
+              "cv-val-5": 81,
+              "cv-cat-5": 40,
+              "cv-xtitle": 9,
+              "cv-title": 14
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-pins",
+            "texts": [
+              "pin-lab-B1",
+              "pin-lab-B2",
+              "pin-lab-B3",
+              "pin-x-0",
+              "pin-x-1",
+              "pin-x-2",
+              "pin-x-3",
+              "pin-x-4",
+              "pin-x-5",
+              "pin-x-6",
+              "pin-xtitle",
+              "pin-y-0",
+              "pin-y-10",
+              "pin-y-20",
+              "pin-y-30",
+              "pin-y-40",
+              "pin-y-50",
+              "pin-y-60",
+              "pin-ytitle"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "pin-x-0": 50,
+              "pin-x-1": 49.5,
+              "pin-x-2": 50,
+              "pin-x-3": 49.5,
+              "pin-x-4": 50,
+              "pin-x-5": 50,
+              "pin-x-6": 33.01,
+              "pin-y-0": 64,
+              "pin-y-10": 62,
+              "pin-y-20": 62,
+              "pin-y-30": 62,
+              "pin-y-40": 61.5,
+              "pin-y-50": 62,
+              "pin-y-60": 45,
+              "pin-lab-B1": 48,
+              "pin-lab-B2": 48,
+              "pin-lab-B3": 48,
+              "pin-ytitle": 16,
+              "pin-xtitle": 15.5
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-photo-points",
+            "texts": [
+              "pp-1",
+              "pp-2",
+              "pp-3",
+              "pp-4",
+              "pp-note"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "pp-1": 40,
+              "pp-2": 40,
+              "pp-3": 40,
+              "pp-4": 40,
+              "pp-note": 19.5
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-fieldsheet",
+            "texts": [
+              "fs-foot",
+              "fs-row-0",
+              "fs-row-1",
+              "fs-row-10",
+              "fs-row-11",
+              "fs-row-12",
+              "fs-row-13",
+              "fs-row-14",
+              "fs-row-2",
+              "fs-row-3",
+              "fs-row-4",
+              "fs-row-5",
+              "fs-row-6",
+              "fs-row-7",
+              "fs-row-8",
+              "fs-row-9",
+              "fs-sub",
+              "fs-title"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "fs-title": 21,
+              "fs-sub": 24,
+              "fs-row-0": 34,
+              "fs-row-1": 34,
+              "fs-row-2": 33.5,
+              "fs-row-3": 33.5,
+              "fs-row-4": 34,
+              "fs-row-5": 34,
+              "fs-row-6": 34,
+              "fs-row-7": 34,
+              "fs-row-8": 34,
+              "fs-row-9": 34,
+              "fs-row-10": 34,
+              "fs-row-11": 34,
+              "fs-row-12": 34,
+              "fs-row-13": 34,
+              "fs-row-14": 34,
+              "fs-foot": 11.5
+            }
+          }
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no straight quotation mark or apostrophe occurs in any text run outside code, pre, kbd, samp and var; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "main"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no block is justified; docs/rules/type-excessive-word-spacing.md judges word gaps in a justified block only"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no file: URI and no absolute path occurs in any URI-bearing attribute (href, src, srcset, poster, data, xlink:href) or CSS url()"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 8,
+    "pdfPageCount": 8,
+    "contentBoxHeightsPx": [
+      971.33
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Sans (system, 76 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Sans (system, 38 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Sans (system, 25 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+        "Liberation Serif (system, 3 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": []
+}

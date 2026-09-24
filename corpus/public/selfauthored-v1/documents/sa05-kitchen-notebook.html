@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Salt and Ember Kitchen Notebook</title>
+<style>
+@page {
+  size: letter;
+  margin: 0.8in 0.8in 0.9in 0.8in;
+  @top-center { content: element(bookhead); }
+  @bottom-center { content: counter(page); font: 9pt serif; color: #7a4b2a; }
+}
+@page :first { @top-center { content: none; } }
+body { margin: 0; font: 10.5pt/1.5 serif; color: #2b2118; }
+.bookhead { position: running(bookhead); font: italic 8.5pt serif; color: #7a4b2a; text-align: center; }
+h1 { font: normal 30pt/1.1 serif; color: #7a4b2a; margin: 1.4in 0 8pt; }
+.lede { font: italic 12pt/1.5 serif; margin: 0 0 18pt; }
+article.recipe { break-before: page; }
+h2 { font: normal 21pt/1.15 serif; color: #7a4b2a; margin: 0 0 4pt; }
+.meta { font: 8.5pt/1.3 sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #8a7a6a; margin: 0 0 12pt; }
+.intro { font-style: italic; margin: 0 0 12pt; }
+h3 { font: bold 9pt/1.2 sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: #7a4b2a; margin: 12pt 0 5pt; break-after: avoid; }
+/* The ingredient list is set in two columns and must stay in one piece. */
+ul.ingredients { column-count: 2; column-gap: 24pt; margin: 0; padding: 0 0 0 14pt; break-inside: avoid; }
+ul.ingredients li { margin: 0 0 2pt; }
+ol.method { margin: 0; padding-left: 18pt; }
+ol.method li { margin: 0 0 6pt; }
+.cooknote { margin-top: 12pt; border-top: 0.5pt dotted #b09070; padding-top: 6pt; font-size: 9.5pt; color: #5a4a3a; }
+p { margin: 0 0 6pt; widows: 2; orphans: 2; }
+.contents { list-style: none; padding: 0; margin: 0; font-size: 11pt; }
+.contents li { border-bottom: 0.5pt dotted #b09070; padding: 3pt 0; }
+.conversions { border-collapse: collapse; margin: 14pt 0; font-size: 9pt; }
+.conversions td, .conversions th { border-bottom: 0.5pt solid #d8c8b8; padding: 2pt 10pt 2pt 0; text-align: left; }
+.imprint { font: 7.5pt/1.4 sans-serif; color: #8a7a6a; margin-top: 24pt; }
+</style>
+</head>
+<body>
+<div class="bookhead" id="bookhead">The Salt and Ember Kitchen Notebook &middot; Autumn pages</div>
+<section id="front">
+<h1 id="title">The Salt and Ember Kitchen Notebook</h1>
+<p class="lede" id="lede">Autumn pages: six recipes from the community kitchen, written down at last so that the volunteers stop asking for them.</p>
+<p id="front-p1">Every recipe here has been cooked for at least forty people at the Thursday supper and for two at home, and the quantities are given for the smaller number. The notebook was started when the kitchen moved into the old chapel hall, and it has grown by one or two pages a season ever since. Oven temperatures are for a conventional oven; reduce them by twenty degrees for a fan oven.</p>
+<ul class="contents" id="contents">
+<li id="toc-leek-soup">Charred leek and white bean soup</li>
+<li id="toc-barley-salad">Barley salad with roasted squash</li>
+<li id="toc-flatbreads">Oat and buttermilk flatbreads</li>
+<li id="toc-tomatoes">Slow-baked tomatoes with thyme</li>
+<li id="toc-crumble-cake">Apple and walnut crumble cake</li>
+<li id="toc-mackerel-pate">Smoked mackerel pâté</li>
+</ul>
+<table class="conversions" id="tbl-conversions">
+<thead><tr><th>Spoon</th><th>Volume</th><th>Oven setting</th><th>Temperature</th></tr></thead>
+<tbody>
+<tr id="conv-1"><td>1 tsp</td><td>5 ml</td><td>Very low</td><td>120 degrees</td></tr>
+<tr id="conv-2"><td>1 dsp</td><td>10 ml</td><td>Moderate</td><td>180 degrees</td></tr>
+<tr id="conv-3"><td>1 tbsp</td><td>15 ml</td><td>Hot</td><td>200 degrees</td></tr>
+</tbody>
+</table>
+<p class="imprint" id="imprint">The Salt and Ember community kitchen is fictional, and this notebook is a specimen document written for layout testing.</p>
+</section>
+<article class="recipe" id="recipe-leek-soup">
+<h2 id="h-leek-soup">Charred leek and white bean soup</h2>
+<p class="meta" id="meta-leek-soup">Serves 4 · 45 minutes · keeps 3 days</p>
+<p class="intro" id="intro-leek-soup">Charring the leeks before they go into the pot gives this plain soup a smoky depth that makes people ask what is in it. Use a heavy pan and resist the urge to stir; the colour only comes if the leeks are left alone.</p>
+<h3 id="h-ing-leek-soup">Ingredients</h3>
+<ul class="ingredients" id="ing-leek-soup">
+<li>3 large leeks</li>
+<li>2 tbsp olive oil</li>
+<li>1 onion, sliced</li>
+<li>2 cloves garlic</li>
+<li>2 tins white beans</li>
+<li>1 litre vegetable stock</li>
+<li>1 bay leaf</li>
+<li>1 tsp thyme leaves</li>
+<li>juice of half a lemon</li>
+<li>salt and pepper</li>
+<li>crème fraîche to serve</li>
+<li>chives to serve</li>
+</ul>
+<h3 id="h-method-leek-soup">Method</h3>
+<ol class="method" id="method-leek-soup">
+<li>Trim the leeks, halve them lengthways and rinse out any grit. Lay them cut side down in a dry, very hot frying pan and leave them for five minutes until blackened in patches.</li>
+<li>Warm the oil in a large saucepan, add the onion and a pinch of salt, and cook gently for ten minutes until soft. Add the garlic for the last minute.</li>
+<li>Slice the charred leeks into rounds and add them to the pan with the drained beans, stock, bay and thyme. Simmer for twenty minutes.</li>
+<li>Remove the bay leaf, blend until smooth, then season with lemon juice, salt and plenty of pepper. Serve with a spoonful of crème fraîche and chopped chives.</li>
+</ol>
+<p class="cooknote" id="note-leek-soup">Freezes well for up to two months. Leave out the crème fraîche until reheated.</p>
+</article>
+<article class="recipe" id="recipe-barley-salad">
+<h2 id="h-barley-salad">Barley salad with roasted squash</h2>
+<p class="meta" id="meta-barley-salad">Serves 6 as a side · 1 hour · best on the day</p>
+<p class="intro" id="intro-barley-salad">Pearl barley holds its shape far better than rice and soaks up a sharp dressing without going soggy. This is the salad we take to the allotment open day every autumn.</p>
+<h3 id="h-ing-barley-salad">Ingredients</h3>
+<ul class="ingredients" id="ing-barley-salad">
+<li>250 g pearl barley</li>
+<li>1 small squash</li>
+<li>2 tbsp oil for roasting</li>
+<li>1 tsp ground cumin</li>
+<li>1 red onion</li>
+<li>2 tbsp red wine vinegar</li>
+<li>1 bunch parsley</li>
+<li>1 bunch mint</li>
+<li>100 g feta</li>
+<li>50 g toasted seeds</li>
+<li>4 tbsp olive oil</li>
+<li>1 tsp honey</li>
+</ul>
+<h3 id="h-method-barley-salad">Method</h3>
+<ol class="method" id="method-barley-salad">
+<li>Heat the oven to 200 degrees. Peel and dice the squash, toss with the roasting oil and cumin, and roast for thirty-five minutes, turning once.</li>
+<li>Meanwhile rinse the barley and simmer it in plenty of salted water for about thirty minutes until tender but still chewy. Drain well.</li>
+<li>Slice the onion very thinly and leave it in the vinegar with a pinch of salt for ten minutes. Whisk in the olive oil and honey.</li>
+<li>Mix the warm barley with the dressing, then fold in the squash, chopped herbs, crumbled feta and seeds. Taste and adjust the salt.</li>
+</ol>
+<p class="cooknote" id="note-barley-salad">If making ahead, keep the herbs and feta separate and add them just before serving.</p>
+</article>
+<article class="recipe" id="recipe-flatbreads">
+<h2 id="h-flatbreads">Oat and buttermilk flatbreads</h2>
+<p class="meta" id="meta-flatbreads">Makes 8 · 30 minutes · no yeast</p>
+<p class="intro" id="intro-flatbreads">These cook in a dry pan in a couple of minutes and are soft enough to fold around anything. The oats give them a nutty flavour and a slightly rough texture that we have come to prefer to the plain version.</p>
+<h3 id="h-ing-flatbreads">Ingredients</h3>
+<ul class="ingredients" id="ing-flatbreads">
+<li>200 g plain flour</li>
+<li>80 g fine oats</li>
+<li>1 tsp baking powder</li>
+<li>half a tsp salt</li>
+<li>200 ml buttermilk</li>
+<li>2 tbsp melted butter</li>
+<li>extra flour for rolling</li>
+</ul>
+<h3 id="h-method-flatbreads">Method</h3>
+<ol class="method" id="method-flatbreads">
+<li>Mix the flour, oats, baking powder and salt in a bowl. Stir in the buttermilk and butter to make a soft dough.</li>
+<li>Knead briefly on a floured surface, then divide into eight pieces and roll each into a thin round about the size of a side plate.</li>
+<li>Heat a heavy frying pan until very hot. Cook each flatbread for about a minute on each side, until puffed and spotted brown.</li>
+<li>Stack the cooked breads under a clean tea towel to keep them soft while you cook the rest.</li>
+</ol>
+<p class="cooknote" id="note-flatbreads">Plain yoghurt thinned with a little milk works in place of the buttermilk.</p>
+</article>
+<article class="recipe" id="recipe-tomatoes">
+<h2 id="h-tomatoes">Slow-baked tomatoes with thyme</h2>
+<p class="meta" id="meta-tomatoes">Makes one jar · 3 hours, mostly waiting</p>
+<p class="intro" id="intro-tomatoes">At the end of the summer, when there are more tomatoes than anyone can eat, a slow oven turns them into something closer to a preserve. Use them on toast, in pasta, or straight from the jar.</p>
+<h3 id="h-ing-tomatoes">Ingredients</h3>
+<ul class="ingredients" id="ing-tomatoes">
+<li>1 kg ripe tomatoes</li>
+<li>4 tbsp olive oil</li>
+<li>1 tsp sugar</li>
+<li>1 tsp flaky salt</li>
+<li>6 sprigs thyme</li>
+<li>3 cloves garlic</li>
+<li>more oil to cover</li>
+</ul>
+<h3 id="h-method-tomatoes">Method</h3>
+<ol class="method" id="method-tomatoes">
+<li>Heat the oven to 120 degrees. Halve the tomatoes and lay them cut side up, close together, on a lined baking tray.</li>
+<li>Drizzle with the oil, sprinkle with sugar and salt, and scatter over the thyme and the garlic cloves, lightly crushed.</li>
+<li>Bake for about three hours, until the tomatoes have shrunk to half their size and the edges are wrinkled but still soft.</li>
+<li>Pack into a clean jar, cover with oil and keep in the fridge. Use within two weeks.</li>
+</ol>
+<p class="cooknote" id="note-tomatoes">Smaller tomatoes cook faster; start checking after two hours.</p>
+</article>
+<article class="recipe" id="recipe-crumble-cake">
+<h2 id="h-crumble-cake">Apple and walnut crumble cake</h2>
+<p class="meta" id="meta-crumble-cake">One 23 cm tin · 1 hour 15 minutes</p>
+<p class="intro" id="intro-crumble-cake">Half cake, half crumble, and entirely forgiving. It is the recipe we give to anyone who says they cannot bake, and it has not failed yet.</p>
+<h3 id="h-ing-crumble-cake">Ingredients</h3>
+<ul class="ingredients" id="ing-crumble-cake">
+<li>175 g soft butter</li>
+<li>175 g light brown sugar</li>
+<li>3 eggs</li>
+<li>200 g self-raising flour</li>
+<li>1 tsp cinnamon</li>
+<li>3 eating apples</li>
+<li>For the crumble:</li>
+<li>75 g plain flour</li>
+<li>50 g cold butter</li>
+<li>50 g demerara sugar</li>
+<li>50 g chopped walnuts</li>
+</ul>
+<h3 id="h-method-crumble-cake">Method</h3>
+<ol class="method" id="method-crumble-cake">
+<li>Heat the oven to 180 degrees and line a 23 cm springform tin. Rub the crumble ingredients together until they look like rough breadcrumbs, then chill.</li>
+<li>Beat the butter and sugar until pale, then beat in the eggs one at a time. Fold in the flour and cinnamon.</li>
+<li>Spread the batter in the tin. Peel, core and slice the apples and arrange them over the top, then scatter over the crumble.</li>
+<li>Bake for fifty to sixty minutes, until a skewer comes out clean. Cool in the tin for twenty minutes before releasing.</li>
+</ol>
+<p class="cooknote" id="note-crumble-cake">Pears work just as well as apples; add a pinch of ground ginger with them.</p>
+</article>
+<article class="recipe" id="recipe-mackerel-pate">
+<h2 id="h-mackerel-pate">Smoked mackerel pâté</h2>
+<p class="meta" id="meta-mackerel-pate">Serves 6 as a starter · 10 minutes</p>
+<p class="intro" id="intro-mackerel-pate">The quickest recipe in the notebook and the one most often requested. Everything goes into one bowl and is mashed with a fork; a food processor makes it too smooth.</p>
+<h3 id="h-ing-mackerel-pate">Ingredients</h3>
+<ul class="ingredients" id="ing-mackerel-pate">
+<li>4 smoked mackerel fillets</li>
+<li>150 g cream cheese</li>
+<li>2 tbsp crème fraîche</li>
+<li>1 tbsp horseradish sauce</li>
+<li>zest and juice of 1 lemon</li>
+<li>black pepper</li>
+<li>dill to serve</li>
+<li>toast or oatcakes</li>
+</ul>
+<h3 id="h-method-mackerel-pate">Method</h3>
+<ol class="method" id="method-mackerel-pate">
+<li>Remove the skin and any bones from the mackerel and flake the flesh into a bowl.</li>
+<li>Add the cream cheese, crème fraîche, horseradish and lemon zest, and mash together with a fork until you have a rough paste.</li>
+<li>Season with lemon juice and a lot of black pepper. The fish is already salty, so taste before adding any salt.</li>
+<li>Spoon into a dish, top with dill and serve with toast or oatcakes.</li>
+</ol>
+<p class="cooknote" id="note-mackerel-pate">Keeps for three days in the fridge, covered.</p>
+</article>
+</body>
+</html>

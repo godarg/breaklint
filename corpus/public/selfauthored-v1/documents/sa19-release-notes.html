@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lumenrake 4.2 Release Notes</title>
+<style>
+@page {
+  size: letter;
+  margin: 0.8in 0.75in;
+  @top-left { content: "Lumenrake 4.2 release notes"; font: 8pt sans-serif; color: #666; }
+  @top-right { content: string(section); font: 8pt sans-serif; color: #666; }
+  @bottom-right { content: counter(page); font: 8pt sans-serif; }
+}
+@page :first { @top-left { content: none; } }
+body { margin: 0; font: 10pt/1.5 sans-serif; color: #1e2329; }
+h1 { font: bold 22pt/1.15 sans-serif; margin: 0 0 2pt; color: #23406e; }
+.version { font: 11pt/1.3 monospace; color: #555; margin: 0 0 12pt; }
+h2 { font: bold 13pt/1.25 sans-serif; color: #23406e; margin: 14pt 0 5pt; string-set: section content(text); break-after: avoid; }
+p { margin: 0 0 5pt; widows: 2; orphans: 2; }
+ul { margin: 0 0 6pt; padding-left: 16pt; }
+li { margin-bottom: 3pt; }
+code { font: 9pt monospace; background: #eef1f5; padding: 0 2px; }
+pre { font: 8.5pt/15px monospace; background: #f4f6f9; border-left: 3px solid #23406e; margin: 4pt 0 8pt; padding: 4pt 8pt; white-space: pre; break-inside: avoid; }
+table { border-collapse: collapse; width: 100%; font-size: 8.5pt; margin: 4pt 0 10pt; }
+th { text-align: left; border-bottom: 1pt solid #23406e; padding: 2pt 4pt; }
+td { border-bottom: 0.4pt solid #d5dbe3; padding: 2pt 4pt; vertical-align: top; }
+td.flag { font-family: monospace; white-space: nowrap; }
+tr { break-inside: avoid; }
+figure { margin: 6pt 0 8pt; break-inside: avoid; }
+figcaption { font-size: 8.5pt; color: #555; margin-top: 3pt; }
+figure svg { display: block; }
+a { color: #23406e; }
+.imprint { font-size: 7pt; color: #888; margin-top: 12pt; }
+</style>
+</head>
+<body>
+<main id="notes">
+<h1 id="title">Lumenrake 4.2 release notes</h1>
+<p class="version" id="version">4.2.0 &middot; minor release &middot; supported until 4.4</p>
+
+<h2 id="h-highlights">Highlights</h2>
+<ul id="highlights">
+<li id="hl-1">A shared remote cache, so that a result built once on the CI server can be reused on every laptop.</li>
+<li id="hl-2">Structured logs with <code>--log-format json</code>, one event per line.</li>
+<li id="hl-3">The planner now skips packages whose inputs have not changed, which makes an unchanged run finish in under a second on most repositories.</li>
+<li id="hl-4">Lint baselines: record today&rsquo;s findings once and see only new ones afterwards.</li>
+</ul>
+<figure id="fig-arch">
+<svg id="svg-arch" xmlns="http://www.w3.org/2000/svg" width="672" height="200" viewBox="0 0 672 200" role="img"><title>Components of a Lumenrake run</title>
+  <rect x="0" y="0" width="672" height="200" fill="#f8f9fb"/>
+  <rect x="30" y="70" width="130" height="60" fill="#e3e9f3" stroke="#3a5a8c" stroke-width="1"/>
+  <text id="arch-cli" x="95" y="105" font-size="12" text-anchor="middle">CLI</text>
+  <rect x="190" y="70" width="130" height="60" fill="#e3e9f3" stroke="#3a5a8c" stroke-width="1"/>
+  <text id="arch-planner" x="255" y="105" font-size="12" text-anchor="middle">Planner</text>
+  <rect x="350" y="70" width="130" height="60" fill="#e3e9f3" stroke="#3a5a8c" stroke-width="1"/>
+  <text id="arch-scheduler" x="415" y="105" font-size="12" text-anchor="middle">Scheduler</text>
+  <rect x="510" y="70" width="130" height="60" fill="#e3e9f3" stroke="#3a5a8c" stroke-width="1"/>
+  <text id="arch-workers" x="575" y="105" font-size="12" text-anchor="middle">Workers</text>
+  <line x1="160" y1="100" x2="190" y2="100" stroke="#3a5a8c" stroke-width="2"/>
+  <line x1="320" y1="100" x2="350" y2="100" stroke="#3a5a8c" stroke-width="2"/>
+  <line x1="480" y1="100" x2="510" y2="100" stroke="#3a5a8c" stroke-width="2"/>
+  <a id="svg-link-local" xlink:href="file:///opt/lumenrake/build/assets/cache-diagram.svg"><rect x="350" y="150" width="130" height="30" fill="#f3e3c3" stroke="#8c6a3a"/></a>
+  <text id="arch-cache" x="415" y="170" font-size="11" text-anchor="middle">Task cache</text>
+  <text id="arch-title" x="24" y="26" font-size="12" font-weight="bold">Components of a run</text>
+</svg>
+<figcaption id="cap-arch">The four components of a run. The task cache is shared between the scheduler and the workers.</figcaption>
+</figure>
+
+<h2 id="h-upgrade">Upgrading from 4.1</h2>
+<p id="up-p1">Most projects can upgrade by changing the version in their tool manifest. Two changes need attention. First, the settings key <code>cache_dir</code> has been renamed to <code>cache.directory</code>; the old name still works but prints a warning. Second, the default log format on CI systems is now "github" rather than "text", which groups the output of each task into a collapsible section.</p>
+<p id="up-p2">If you pinned the old behaviour in a wrapper script - for example to keep log files parseable - add the flag explicitly. The migration guide on the documentation site walks through both changes with examples, and the <a id="a-rootrel" href="/docs/migration/4.2.html">local copy of the guide</a> ships inside the release archive.</p>
+<pre id="pre-settings"><code>[cache]
+directory = ".lumenrake/cache"
+remote = "https://cache.example.org/lumenrake"
+read_only = false
+
+[log]
+format = "json"
+level = 'info'</code></pre>
+<p id="up-p3">The remote cache needs a server that implements a simple HTTP interface for storing and retrieving blobs. Any object store behind a small proxy will do; the documentation lists two tested setups.</p>
+
+<h2 id="h-flags">Command-line flags</h2>
+<p id="flags-p1">The table lists every flag accepted by the three main commands in 4.2. Flags marked with the command column <code>all</code> are accepted everywhere.</p>
+<table id="tbl-flags">
+<thead><tr><th>Flag</th><th>Meaning</th><th>Commands</th></tr></thead>
+<tbody>
+<tr id="flag-01"><td class="flag">--config &lt;path&gt;</td><td>Read settings from the given file instead of lumenrake.toml.</td><td>all</td></tr>
+<tr id="flag-02"><td class="flag">--profile &lt;name&gt;</td><td>Select a named profile from the settings file.</td><td>all</td></tr>
+<tr id="flag-03"><td class="flag">--jobs &lt;n&gt;</td><td>Run at most n tasks at the same time. Defaults to the number of cores.</td><td>build, test</td></tr>
+<tr id="flag-04"><td class="flag">--keep-going</td><td>Continue with independent tasks after a failure.</td><td>build, test</td></tr>
+<tr id="flag-05"><td class="flag">--dry-run</td><td>Print the task graph without running anything.</td><td>build</td></tr>
+<tr id="flag-06"><td class="flag">--since &lt;ref&gt;</td><td>Only consider packages changed since the given revision.</td><td>build, test, lint</td></tr>
+<tr id="flag-07"><td class="flag">--changed-only</td><td>Shorthand for --since with the merge base of the current branch.</td><td>build, test, lint</td></tr>
+<tr id="flag-08"><td class="flag">--output &lt;dir&gt;</td><td>Write build products to the given directory.</td><td>build</td></tr>
+<tr id="flag-09"><td class="flag">--cache &lt;dir&gt;</td><td>Location of the local task cache.</td><td>all</td></tr>
+<tr id="flag-10"><td class="flag">--no-cache</td><td>Ignore the cache for this run; results are still written to it.</td><td>all</td></tr>
+<tr id="flag-11"><td class="flag">--remote-cache &lt;url&gt;</td><td>Read and write cache entries from a shared HTTP cache.</td><td>all</td></tr>
+<tr id="flag-12"><td class="flag">--read-only-cache</td><td>Read from the remote cache but never write to it.</td><td>all</td></tr>
+<tr id="flag-13"><td class="flag">--log-format &lt;fmt&gt;</td><td>One of text, json or github. The json format is new in 4.2.</td><td>all</td></tr>
+<tr id="flag-14"><td class="flag">--log-level &lt;lvl&gt;</td><td>One of error, warn, info, debug or trace.</td><td>all</td></tr>
+<tr id="flag-15"><td class="flag">--quiet</td><td>Only print errors and the final summary.</td><td>all</td></tr>
+<tr id="flag-16"><td class="flag">--color &lt;when&gt;</td><td>One of auto, always or never.</td><td>all</td></tr>
+<tr id="flag-17"><td class="flag">--summary &lt;file&gt;</td><td>Write a machine-readable run summary to the given file.</td><td>build, test</td></tr>
+<tr id="flag-18"><td class="flag">--shard &lt;i/n&gt;</td><td>Run only the i-th of n equal shards of the test suite.</td><td>test</td></tr>
+<tr id="flag-19"><td class="flag">--retries &lt;n&gt;</td><td>Retry failing tests up to n times before reporting them.</td><td>test</td></tr>
+<tr id="flag-20"><td class="flag">--timeout &lt;sec&gt;</td><td>Fail a task that runs longer than the given number of seconds.</td><td>build, test</td></tr>
+<tr id="flag-21"><td class="flag">--coverage</td><td>Collect coverage for the packages that were tested.</td><td>test</td></tr>
+<tr id="flag-22"><td class="flag">--fix</td><td>Apply automatic fixes where the linter offers them.</td><td>lint</td></tr>
+<tr id="flag-23"><td class="flag">--rules &lt;list&gt;</td><td>Run only the named lint rules.</td><td>lint</td></tr>
+<tr id="flag-24"><td class="flag">--baseline &lt;file&gt;</td><td>Suppress findings that are already recorded in the baseline file.</td><td>lint</td></tr>
+<tr id="flag-25"><td class="flag">--format &lt;fmt&gt;</td><td>Output format of the lint report: text, json or sarif.</td><td>lint</td></tr>
+<tr id="flag-26"><td class="flag">--watch</td><td>Re-run affected tasks when files change.</td><td>build, test</td></tr>
+<tr id="flag-27"><td class="flag">--open</td><td>Open the generated report in a browser when finished.</td><td>test, lint</td></tr>
+<tr id="flag-28"><td class="flag">--version</td><td>Print the version and exit.</td><td>all</td></tr>
+<tr id="flag-29"><td class="flag">--help</td><td>Print help for the command and exit.</td><td>all</td></tr>
+<tr id="flag-30"><td class="flag">--env &lt;key=value&gt;</td><td>Set an environment variable for every task.</td><td>build, test</td></tr>
+<tr id="flag-31"><td class="flag">--target &lt;triple&gt;</td><td>Build for the given platform instead of the host.</td><td>build</td></tr>
+<tr id="flag-32"><td class="flag">--release</td><td>Build with release settings.</td><td>build</td></tr>
+<tr id="flag-33"><td class="flag">--strict</td><td>Treat warnings as errors.</td><td>build, lint</td></tr>
+<tr id="flag-34"><td class="flag">--offline</td><td>Never access the network; fail if a dependency is missing.</td><td>all</td></tr>
+<tr id="flag-35"><td class="flag">--lockfile &lt;mode&gt;</td><td>One of update, check or frozen.</td><td>build, test</td></tr>
+<tr id="flag-36"><td class="flag">--trace &lt;file&gt;</td><td>Write a trace of task timings that can be opened in a profiler.</td><td>all</td></tr>
+</tbody>
+</table>
+
+<h2 id="h-fixed">Fixed issues</h2>
+<ul id="fixed">
+<li id="fx-1">The scheduler no longer starts a task twice when two of its inputs change within the same second.</li>
+<li id="fx-2">Paths containing spaces are quoted correctly in the generated shell scripts.</li>
+<li id="fx-3">The <code>--since</code> flag now follows renames instead of treating a moved file as deleted and added.</li>
+<li id="fx-4">Ctrl-C during a remote cache upload no longer leaves a partial entry behind.</li>
+</ul>
+<p id="fixed-p1">The complete list of changes is in the <a id="a-file-log" href="file:///var/build/lumenrake/4.2.0/changelog-full.txt">full changelog</a>. Earlier notes: <a id="a-rel" href="../4.1/release-notes.html">4.1</a>, <a id="a-https" href="https://lumenrake.example.org/releases/4.0">4.0</a>. Report problems to <a id="a-mailto" href="mailto:releases@example.org">releases@example.org</a> or see the <a id="a-frag" href="#h-upgrade">upgrade section</a> above.</p>
+<p class="imprint" id="imprint">Lumenrake is a fictional build tool. These release notes are a specimen document written for layout testing.</p>
+</main>
+</body>
+</html>

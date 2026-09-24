@@ -1,0 +1,721 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa11-insect-chorus-survey",
+  "artifact": "documents/sa11-insect-chorus-survey.html",
+  "sha256": "dc713476f4c56804b801524bb2f1ecd034b035a96ae992c7162cdb3b13a1c3c5",
+  "byteLength": 16266,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Acoustic survey of nocturnal insect choruses at Fenmoor Reserve",
+  "genre": "scientific survey report (SVG controls)",
+  "language": {
+    "htmlLang": "en",
+    "typeRulesUnderDefaultLocale": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "letter",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        816,
+        1056
+      ],
+      "margins": "0.9in 1in",
+      "contentBoxCssPx": [
+        624,
+        883.2
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      3,
+      4
+    ],
+    "measured": 3,
+    "basis": "plain Paged.js measurement (3 pages)"
+  },
+  "expectedExit": {
+    "set": [
+      0,
+      4
+    ],
+    "derivation": "Today: exit 4 because six halo labels (all inside) decline with env/svg-painted-bounds-unsupported. Every label that is painted and clipped by its viewport is absent by construction, so with halo labels decided the run is exit 0.",
+    "byCode": {
+      "4": "insufficient-coverage from 6 halo declines (current capability)",
+      "0": "clean once halos are decided"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "Letter",
+    "running element in @top-center",
+    "@page :first",
+    "letterboxed viewBox with labels outside the viewBox but inside the viewport",
+    "halo labels, all inside",
+    "rotated axis title",
+    "text in <defs> and visibility: hidden text (not painted)",
+    "SVG with overflow: visible (non-applicable)",
+    "table kept together"
+  ],
+  "runningElements": [
+    {
+      "id": "runtitle",
+      "marginBox": "top-center",
+      "marginBoxCopies": 3,
+      "pages": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "constructionFacts": [
+    {
+      "fact": "letterbox",
+      "arithmetic": "viewBox 200 x 100 into 624 x 260: scale min(3.12, 2.6) = 2.6, viewBox drawn at x 52..572; #site-hedge ends at 52 - 3 x 2.6 = 44.2 px and starts about 10 px from the left edge"
+    }
+  ],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "runtitle"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "survey"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "survey"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "runtitle"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "survey"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "survey"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "runtitle"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "ids": [
+              "fig-sites",
+              "fig-chorus",
+              "fig-nightly",
+              "fig-inset",
+              "tbl-recorders"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (883.19 px) and are laid out in one piece",
+          "measured": {
+            "fig-sites": {
+              "maxFragmentPx": 301.14,
+              "fragments": 1,
+              "naturalPx": 301.14
+            },
+            "fig-chorus": {
+              "maxFragmentPx": 304.34,
+              "fragments": 1,
+              "naturalPx": 304.34
+            },
+            "fig-nightly": {
+              "maxFragmentPx": 324.34,
+              "fragments": 1,
+              "naturalPx": 324.34
+            },
+            "fig-inset": {
+              "maxFragmentPx": 161.14,
+              "fragments": 1,
+              "naturalPx": 161.14
+            },
+            "tbl-recorders": {
+              "maxFragmentPx": 145.88,
+              "fragments": 1,
+              "naturalPx": 145.88
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tbl-recorders tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 883.19 px content box"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "runtitle"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2"
+            ]
+          },
+          "why": "every one of these headings carries break-after: avoid (Paged.js moves it with the following block) or opens its page, so content follows it on its own page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "runtitle"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "survey"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "ni-defs-template"
+          },
+          "why": "the <text> sits inside <defs> and is never painted",
+          "docsBasis": "docs/rules/svg-text-overflows-viewport.md: 'A <text> that is not painted is not a target' (defs, visibility hidden)."
+        },
+        {
+          "target": {
+            "id": "ni-hidden-note"
+          },
+          "why": "the <text> has visibility=\"hidden\" and is not painted (its box lies above the viewport on purpose)",
+          "docsBasis": "docs/rules/svg-text-overflows-viewport.md: 'A <text> that is not painted is not a target' (defs, visibility hidden)."
+        },
+        {
+          "target": {
+            "svg": "svg-sites",
+            "texts": [
+              "site-hedge",
+              "site-r1",
+              "site-r2",
+              "site-r3",
+              "site-r4",
+              "site-r5",
+              "site-reed",
+              "site-title",
+              "site-water"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "site-r1": 52,
+              "site-r2": 83.2,
+              "site-r3": 46.8,
+              "site-r4": 91,
+              "site-r5": 39,
+              "site-water": 23,
+              "site-hedge": 10,
+              "site-reed": 20.3,
+              "site-title": 7.8
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-chorus",
+            "texts": [
+              "ch-band-0",
+              "ch-band-1",
+              "ch-band-2",
+              "ch-band-3",
+              "ch-band-4",
+              "ch-hour-0",
+              "ch-hour-1",
+              "ch-hour-2",
+              "ch-hour-3",
+              "ch-hour-4",
+              "ch-hour-5",
+              "ch-hour-6",
+              "ch-hour-7",
+              "ch-hour-8",
+              "ch-title",
+              "ch-xtitle"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "ch-band-0": 39,
+              "ch-band-1": 38.5,
+              "ch-band-2": 39,
+              "ch-band-3": 39,
+              "ch-band-4": 34.3,
+              "ch-hour-0": 33,
+              "ch-hour-1": 33,
+              "ch-hour-2": 33,
+              "ch-hour-3": 33,
+              "ch-hour-4": 33,
+              "ch-hour-5": 33,
+              "ch-hour-6": 33,
+              "ch-hour-7": 33,
+              "ch-hour-8": 33,
+              "ch-title": 12,
+              "ch-xtitle": 8
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-nightly",
+            "texts": [
+              "ni-x-1",
+              "ni-x-15",
+              "ni-x-22",
+              "ni-x-29",
+              "ni-x-8",
+              "ni-xtitle",
+              "ni-y-0",
+              "ni-y-20",
+              "ni-y-40",
+              "ni-y-60",
+              "ni-ytitle"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "ni-x-1": 32,
+              "ni-x-8": 32,
+              "ni-x-15": 32,
+              "ni-x-22": 32,
+              "ni-x-29": 32,
+              "ni-y-0": 44,
+              "ni-y-20": 62.5,
+              "ni-y-40": 62,
+              "ni-y-60": 36,
+              "ni-ytitle": 21,
+              "ni-xtitle": 8
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-inset",
+            "texts": [
+              "in-callout",
+              "in-title"
+            ]
+          },
+          "why": "the SVG has overflow: visible, so its text is painted even beyond the viewport; the question does not arise"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": [
+        {
+          "target": {
+            "svg": "svg-inset",
+            "texts": [
+              "in-callout",
+              "in-title"
+            ]
+          },
+          "reason": "env/svg-overflow-visible",
+          "required": true,
+          "count": 2,
+          "countsTowardCoverage": false,
+          "docsBasis": "docs/rules/svg-text-overflows-viewport.md 'Limits': with overflow: visible the rule declines, and src/core/enums.ts NON_APPLICABLE_ENV_IDS keeps it out of coverage."
+        },
+        {
+          "target": {
+            "svg": "svg-chorus",
+            "texts": [
+              "ch-halo-cricket",
+              "ch-halo-bush",
+              "ch-halo-taper"
+            ]
+          },
+          "reason": "env/svg-painted-bounds-unsupported",
+          "required": true,
+          "count": 3,
+          "countsTowardCoverage": true,
+          "docsBasis": "docs/limitations.md ('Complex SVG paint is detected but not geometrically solved'): a <text> that paints a visible stroke (paint-order halo) declines per target with env/svg-painted-bounds-unsupported and stays in the coverage denominator; docs/rules/svg-text-overflows-viewport.md 'Limits and fail-closed cases'.",
+          "future": "docs/limitations.md names the next step: a two-sided bound (fill box as lower bound, fill box inflated by stroke-width/2 as upper bound). Every halo label here is decidable by that bound; ifMeasured is the construction truth a tool that measures it must report.",
+          "perText": [
+            {
+              "id": "ch-halo-cricket",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (96.50 px); painted ink 96 px inside",
+              "cellInsetsPx": {
+                "left": 306,
+                "top": 171,
+                "right": 242.03,
+                "bottom": 98
+              },
+              "fillInkInsetsPx": {
+                "left": 306,
+                "top": 172.5,
+                "right": 242.5,
+                "bottom": 97.5
+              },
+              "paintedInkInsetsPx": {
+                "left": 304.5,
+                "top": 171,
+                "right": 241,
+                "bottom": 96
+              },
+              "strokeWidthPx": 3
+            },
+            {
+              "id": "ch-halo-bush",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (97.50 px); painted ink 99 px inside",
+              "cellInsetsPx": {
+                "left": 248,
+                "top": 99,
+                "right": 323.14,
+                "bottom": 170
+              },
+              "fillInkInsetsPx": {
+                "left": 248,
+                "top": 100.5,
+                "right": 323,
+                "bottom": 171.5
+              },
+              "paintedInkInsetsPx": {
+                "left": 246.5,
+                "top": 99,
+                "right": 321.5,
+                "bottom": 170
+              },
+              "strokeWidthPx": 3
+            },
+            {
+              "id": "ch-halo-taper",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (60.50 px); painted ink 60 px inside",
+              "cellInsetsPx": {
+                "left": 424,
+                "top": 207,
+                "right": 147.65,
+                "bottom": 62
+              },
+              "fillInkInsetsPx": {
+                "left": 423.5,
+                "top": 208.5,
+                "right": 147.5,
+                "bottom": 61.5
+              },
+              "paintedInkInsetsPx": {
+                "left": 422,
+                "top": 207,
+                "right": 146,
+                "bottom": 60
+              },
+              "strokeWidthPx": 3
+            }
+          ]
+        },
+        {
+          "target": {
+            "svg": "svg-nightly",
+            "texts": [
+              "ni-halo-crickets",
+              "ni-halo-katydids",
+              "ni-halo-cool"
+            ]
+          },
+          "reason": "env/svg-painted-bounds-unsupported",
+          "required": true,
+          "count": 3,
+          "countsTowardCoverage": true,
+          "docsBasis": "docs/limitations.md ('Complex SVG paint is detected but not geometrically solved'): a <text> that paints a visible stroke (paint-order halo) declines per target with env/svg-painted-bounds-unsupported and stays in the coverage denominator; docs/rules/svg-text-overflows-viewport.md 'Limits and fail-closed cases'.",
+          "future": "docs/limitations.md names the next step: a two-sided bound (fill box as lower bound, fill box inflated by stroke-width/2 as upper bound). Every halo label here is decidable by that bound; ifMeasured is the construction truth a tool that measures it must report.",
+          "perText": [
+            {
+              "id": "ni-halo-crickets",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (49.50 px); painted ink 51 px inside",
+              "cellInsetsPx": {
+                "left": 357.17,
+                "top": 51,
+                "right": 231.83,
+                "bottom": 238
+              },
+              "fillInkInsetsPx": {
+                "left": 357,
+                "top": 52.5,
+                "right": 232,
+                "bottom": 239.5
+              },
+              "paintedInkInsetsPx": {
+                "left": 355.5,
+                "top": 51,
+                "right": 230.5,
+                "bottom": 238
+              },
+              "strokeWidthPx": 3
+            },
+            {
+              "id": "ni-halo-katydids",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (122.50 px); painted ink 122 px inside",
+              "cellInsetsPx": {
+                "left": 269.04,
+                "top": 165,
+                "right": 317.04,
+                "bottom": 124
+              },
+              "fillInkInsetsPx": {
+                "left": 269,
+                "top": 166.5,
+                "right": 317,
+                "bottom": 123.5
+              },
+              "paintedInkInsetsPx": {
+                "left": 267.5,
+                "top": 165,
+                "right": 315.5,
+                "bottom": 122
+              },
+              "strokeWidthPx": 3
+            },
+            {
+              "id": "ni-halo-cool",
+              "ifMeasured": "mustNotFire",
+              "why": "halo label inside: fill box inflated by stroke-width/2 (1.5 px) stays >= 3 px inside (87.70 px); painted ink 87.5 px inside",
+              "cellInsetsPx": {
+                "left": 492.07,
+                "top": 122,
+                "right": 89.2,
+                "bottom": 167
+              },
+              "fillInkInsetsPx": {
+                "left": 492,
+                "top": 124,
+                "right": 89,
+                "bottom": 166.5
+              },
+              "paintedInkInsetsPx": {
+                "left": 490.5,
+                "top": 122.5,
+                "right": 87.5,
+                "bottom": 165
+              },
+              "strokeWidthPx": 3
+            }
+          ]
+        }
+      ],
+      "notes": [
+        "#site-hedge and #site-reed lie outside the viewBox (0 0 200 100) but inside the letterboxed viewport (624 x 260 px, scale 2.6, 52 px bands left and right); they are drawn, so they must not fire.",
+        "#svg-inset has overflow: visible; its callout runs 55 px past the drawing box and is painted."
+      ]
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no straight quotation mark or apostrophe occurs in any text run outside code, pre, kbd, samp and var; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "survey"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no block is justified; docs/rules/type-excessive-word-spacing.md judges word gaps in a justified block only"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no file: URI and no absolute path occurs in any URI-bearing attribute (href, src, srcset, poster, data, xlink:href) or CSS url()"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break",
+    "env/svg-overflow-visible",
+    "env/svg-painted-bounds-unsupported"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 3,
+    "pdfPageCount": 3,
+    "contentBoxHeightsPx": [
+      883.19
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Sans (system, 88 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Sans (system, 62 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Sans (system, 7 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "Liberation Serif (system, 2 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+        "Liberation Serif (system, 2 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": []
+}

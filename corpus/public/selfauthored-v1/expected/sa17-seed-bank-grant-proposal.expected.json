@@ -1,0 +1,532 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa17-seed-bank-grant-proposal",
+  "artifact": "documents/sa17-seed-bank-grant-proposal.html",
+  "sha256": "c67b3129846aa675dbb87d0883cb4fbe70ce263f526525f491f1aedafc4015e5",
+  "byteLength": 13515,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Restoring the seed banks of the Quennel Moors: full proposal",
+  "genre": "grant proposal with footnotes",
+  "language": {
+    "htmlLang": "en",
+    "typeRulesUnderDefaultLocale": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "A4",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        793.7,
+        1122.52
+      ],
+      "margins": "20mm",
+      "contentBoxCssPx": [
+        642.52,
+        971.34
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      3,
+      4
+    ],
+    "measured": 3,
+    "basis": "plain Paged.js measurement (3 pages); the work plan grid starts on its own page"
+  },
+  "expectedExit": {
+    "set": [
+      1
+    ],
+    "derivation": "Two error findings: #g-task-0 (a task label end-anchored 8 px from the left edge, so it runs out to the left) and #inset-plot-b (clipped by a nested SVG viewport). The stranded h4 is warn.",
+    "byCode": {
+      "1": "svg error findings #g-task-0 and #inset-plot-b"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "A4",
+    "string-set section in @top-right",
+    "float: footnote (two footnotes)",
+    "budget table kept together",
+    "Gantt chart with a label outside the left edge (planted)",
+    "nested <svg> with its own viewport, one label inside and one clipped by it (planted)",
+    "fixed-grid page with a stranded h4 (planted)"
+  ],
+  "runningElements": [],
+  "constructionFacts": [
+    {
+      "fact": "#g-task-0",
+      "arithmetic": "text-anchor end at x = 8; the label is about 230 px long at 11 px, so it starts about 220 px left of the viewport"
+    },
+    {
+      "fact": "#inset-plot-b",
+      "arithmetic": "start-anchored at x = 160 of a 200 px nested viewport, about 110 px long: about 70 px beyond the inner right edge"
+    },
+    {
+      "fact": "stranded h4",
+      "arithmetic": "64 + 520 + 12 + 316 = 912; h4 930..954; 971.34 - 954 = 17.34 px"
+    }
+  ],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "proposal"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "proposal"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "proposal"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "proposal"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "ids": [
+              "tbl-budget",
+              "plate-gantt",
+              "plate-milestones",
+              "plate-risks"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (971.34 px) and are laid out in one piece",
+          "measured": {
+            "tbl-budget": {
+              "maxFragmentPx": 194.5,
+              "fragments": 1,
+              "naturalPx": 194.5
+            },
+            "plate-gantt": {
+              "maxFragmentPx": 520,
+              "fragments": 1,
+              "naturalPx": 520
+            },
+            "plate-milestones": {
+              "maxFragmentPx": 316,
+              "fragments": 1,
+              "naturalPx": 316
+            },
+            "plate-risks": {
+              "maxFragmentPx": 300,
+              "fragments": 1,
+              "naturalPx": 300
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tbl-budget tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 971.34 px content box"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "h4-risks"
+          },
+          "why": "the h4 is the last block on its page; the risk matrix it introduces starts on the next page",
+          "construction": "Page opened by h2.grid#h-workplan (break-before: page): 48 px + 16 px; figure#plate-gantt 520 px (64..584) + 12 px; figure#plate-milestones 316 px (596..912); h4 margin-top 18 px (collapses with 12) -> 930..954, 24 px line height, white-space: nowrap, no break-after; content box 971.34 px -> 17.34 px = 0.72 line heights remain. figure#plate-risks (300 px) cannot follow.",
+          "measured": {
+            "page": 2,
+            "remainingPx": 17.33,
+            "remainingLineHeights": 0.72,
+            "blocksBelowOnPage": 0
+          },
+          "docsBasis": "docs/rules/layout-heading-at-page-bottom.md"
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2"
+            ]
+          },
+          "why": "every one of these headings carries break-after: avoid (Paged.js moves it with the following block) or opens its page, so content follows it on its own page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "proposal"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "g-task-0",
+            "svg": "svg-gantt"
+          },
+          "text": "Phase 0: permissions and landowner agreements",
+          "why": "label leaves its SVG viewport at the left edge and is not drawn there",
+          "construction": "cell box (getBBox through getScreenCTM) 204.92 px beyond the left edge; pixel ink 160.00 px beyond it (probe window 160 px)",
+          "measured": {
+            "page": 2,
+            "cellInsetsPx": {
+              "left": -204.92,
+              "top": 84,
+              "right": 634,
+              "bottom": 374
+            },
+            "inkInsetsPx": {
+              "left": -160,
+              "top": 86,
+              "right": 634,
+              "bottom": 373.5
+            },
+            "viewport": {
+              "x": 75.58,
+              "y": 1262.09,
+              "width": 642,
+              "height": 470,
+              "nested": false
+            }
+          },
+          "docsBasis": "docs/rules/svg-text-overflows-viewport.md: overshoot > 0 px of the CTM-normalised text box against the viewport is an error."
+        },
+        {
+          "target": {
+            "id": "inset-plot-b",
+            "svg": "svg-inset-map"
+          },
+          "text": "Quennel Moor north plot B",
+          "why": "label leaves its SVG viewport at the right edge and is not drawn there",
+          "construction": "cell box (getBBox through getScreenCTM) 69.76 px beyond the right edge; pixel ink 69.50 px beyond it (probe window 160 px)",
+          "measured": {
+            "page": 2,
+            "cellInsetsPx": {
+              "left": 160,
+              "top": 89,
+              "right": -69.76,
+              "bottom": 20
+            },
+            "inkInsetsPx": {
+              "left": 160,
+              "top": 91,
+              "right": -69.5,
+              "bottom": 19.5
+            },
+            "viewport": {
+              "x": 495.58,
+              "y": 1834.09,
+              "width": 200,
+              "height": 120,
+              "nested": true
+            }
+          },
+          "docsBasis": "docs/rules/svg-text-overflows-viewport.md: overshoot > 0 px of the CTM-normalised text box against the viewport is an error."
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "svg": "svg-gantt",
+            "texts": [
+              "g-note",
+              "g-q1",
+              "g-q2",
+              "g-q3",
+              "g-q4",
+              "g-q5",
+              "g-q6",
+              "g-task-1",
+              "g-task-2",
+              "g-task-3",
+              "g-task-4",
+              "g-task-5",
+              "g-title"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "g-q1": 43,
+              "g-q2": 43,
+              "g-q3": 43,
+              "g-q4": 43,
+              "g-q5": 43,
+              "g-q6": 43,
+              "g-task-1": 140,
+              "g-task-2": 93.83,
+              "g-task-3": 114.5,
+              "g-task-4": 90.5,
+              "g-task-5": 93.5,
+              "g-title": 15,
+              "g-note": 38
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-milestones",
+            "texts": [
+              "ms-1",
+              "ms-2",
+              "ms-3",
+              "ms-4",
+              "ms-inset-cap",
+              "ms-title"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "ms-1": 54.5,
+              "ms-2": 94.85,
+              "ms-3": 121,
+              "ms-4": 95.5,
+              "ms-title": 15,
+              "ms-inset-cap": 82.46
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-inset-map",
+            "texts": [
+              "inset-plot-a",
+              "inset-scale"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "inset-plot-a": 15,
+              "inset-scale": 8
+            }
+          }
+        },
+        {
+          "target": {
+            "svg": "svg-risks",
+            "texts": [
+              "rk-1",
+              "rk-2",
+              "rk-likely",
+              "rk-possible",
+              "rk-sev-0",
+              "rk-sev-1",
+              "rk-sev-2",
+              "rk-unlikely"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "rk-likely": 46,
+              "rk-possible": 112,
+              "rk-unlikely": 60.5,
+              "rk-sev-0": 12,
+              "rk-sev-1": 12,
+              "rk-sev-2": 12,
+              "rk-1": 112,
+              "rk-2": 60.5
+            }
+          }
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "#inset-plot-b belongs to the nested <svg id=\"svg-inset-map\"> (x 420, y 40, 200 x 120) and is clipped by that inner viewport. Measured on Chromium 141: getBoundingClientRect() of the nested <svg> returns the union of its viewport and the overflowing text (269.76 px wide instead of 200 px), so the viewport used here is the element's x/y/width/height mapped through its parent's CTM."
+      ]
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no straight quotation mark or apostrophe occurs in any text run outside code, pre, kbd, samp and var; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "proposal"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no block is justified; docs/rules/type-excessive-word-spacing.md judges word gaps in a justified block only"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no file: URI and no absolute path occurs in any URI-bearing attribute (href, src, srcset, poster, data, xlink:href) or CSS url()"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 3,
+    "pdfPageCount": 3,
+    "contentBoxHeightsPx": [
+      937.33,
+      971.33
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Sans (system, 109 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Sans (system, 45 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Sans (system, 9 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "Liberation Serif (system, 32 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+        "Liberation Serif (system, 2 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": []
+}

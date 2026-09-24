@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>K-40 Metering Pump Service Manual, Chapter 6</title>
+<style>
+@page {
+  size: letter;
+  margin: 0.75in;
+  @top-left { content: "K-40 Metering Pump \2014  Service Manual"; font: 8pt sans-serif; color: #666; }
+  @top-right { content: string(section); font: 8pt sans-serif; color: #666; }
+  @left-middle { content: element(sidetab); }
+  @bottom-center { content: counter(page); font: 8.5pt sans-serif; }
+  @bottom-right { content: "Doc. QH-K40-SM rev. 5"; font: 7.5pt sans-serif; color: #888; }
+}
+@page :first { @top-left { content: none; } @top-right { content: none; } }
+body { margin: 0; font: 10pt/1.42 sans-serif; color: #1d1d1d; }
+.sidetab { position: running(sidetab); width: 0.45in; text-align: center; font: bold 20pt/1 sans-serif; color: #fff; background: #1f4e79; padding: 6pt 0; }
+h1 { font: bold 22pt/1.15 sans-serif; margin: 0 0 4pt; color: #1f4e79; }
+.chapter-sub { font: 11pt/1.3 sans-serif; color: #555; margin: 0 0 14pt; }
+h2 { font: bold 13pt/1.25 sans-serif; margin: 14pt 0 5pt; color: #1f4e79; string-set: section content(text); break-after: avoid; }
+h3 { font: bold 10.5pt/1.3 sans-serif; margin: 10pt 0 3pt; break-after: avoid; }
+p { margin: 0 0 5pt; widows: 3; orphans: 3; }
+ol.steps { margin: 0 0 6pt; padding-left: 18pt; }
+ol.steps li { margin-bottom: 3pt; }
+.warning { border: 1.5pt solid #b03a2e; background: #fdf1ef; padding: 6pt 8pt; margin: 8pt 0; break-inside: avoid; }
+.warning .label { font-weight: bold; color: #b03a2e; letter-spacing: 0.05em; }
+.note { border-left: 3pt solid #1f4e79; background: #eef3f8; padding: 5pt 8pt; margin: 8pt 0; break-inside: avoid; }
+table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 6pt 0 10pt; }
+th { background: #1f4e79; color: #fff; text-align: left; padding: 3pt 5pt; }
+td { border-bottom: 0.5pt solid #bbb; padding: 3pt 5pt; vertical-align: top; }
+tr { break-inside: avoid; }
+td.code { font-family: monospace; font-weight: bold; white-space: nowrap; }
+figure { margin: 8pt 0 10pt; break-inside: avoid; }
+figcaption { font-size: 8.5pt; color: #444; margin-top: 3pt; }
+figure svg { display: block; }
+.imprint { font-size: 7.5pt; color: #777; margin-top: 18pt; }
+
+/* The commissioning checklist was styled as a single card that must not break. It has since
+   grown to 96 items of fixed height: 36 px title + 96 x 24 px = 2340 px, against a content box
+   of 9.5 in = 912 px. */
+#safety-checklist { break-inside: avoid; border-left: 4px solid #b03a2e; background: #fff8f6; margin: 0 0 10pt; padding: 0 0 0 10px; }
+#safety-checklist .card-title { height: 36px; line-height: 36px; margin: 0; font-weight: bold; color: #b03a2e; white-space: nowrap; }
+#safety-checklist ul { list-style: none; margin: 0; padding: 0; }
+#safety-checklist li { height: 24px; line-height: 24px; margin: 0; padding: 0; white-space: nowrap; overflow: hidden; font-size: 9pt; }
+#safety-checklist li .box { display: inline-block; width: 9px; height: 9px; border: 1px solid #555; margin-right: 6px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<div class="sidetab" id="sidetab">6</div>
+<article id="chapter">
+<h1 id="title">Chapter 6&ensp;Diagnostics and fault clearing</h1>
+<p class="chapter-sub" id="chapter-sub">K-40 metering pump, firmware 3.x &middot; Quillfeather Hydraulics service documentation</p>
+
+<h2 id="h-6-1">6.1 Before you start</h2>
+<p id="p-6-1a">This chapter is written for service technicians who have completed the K-40 installation course. It assumes that the pump was commissioned according to chapter 4 and that the settings printout from commissioning is available on site. Most faults can be located with the status display and a multimeter; the few that need the service laptop are marked in the fault table.</p>
+<div class="warning" id="warn-isolate"><p id="warn-isolate-p"><span class="label">WARNING</span>&ensp;The pump head may contain chemical under pressure even when the motor is stopped. Close the suction and discharge isolation valves and open the bleed valve into a suitable container before loosening any fitting on the wet side.</p></div>
+<p id="p-6-1b">Work through a fault in the order the table suggests. The causes are listed from the most to the least likely, and the first action in each row is always the one that needs no spare parts. Record every action in the service log at the end of this chapter, including actions that did not help; the next technician will thank you for it.</p>
+<figure id="fig-schematic">
+<svg id="svg-schematic" xmlns="http://www.w3.org/2000/svg" width="672" height="300" viewBox="0 0 672 300" role="img"><title>Hydraulic schematic of the K-40 installation</title>
+  <rect x="0" y="0" width="672" height="300" fill="#fbfbf8"/>
+  <rect x="40" y="150" width="110" height="120" fill="#dde8f0" stroke="#446" stroke-width="1"/>
+  <text id="sch-tank" x="95" y="290" font-size="10" text-anchor="middle">Day tank</text>
+  <path d="M 95 150 L 95 90 L 250 90" fill="none" stroke="#446" stroke-width="2"/>
+  <rect x="250" y="60" width="120" height="70" fill="#e8e8e8" stroke="#333" stroke-width="1"/>
+  <text id="sch-pump" x="310" y="100" font-size="11" text-anchor="middle" font-weight="bold">K-40 pump</text>
+  <path d="M 370 90 L 470 90" fill="none" stroke="#446" stroke-width="2"/>
+  <circle cx="420" cy="90" r="9" fill="#fff" stroke="#333" stroke-width="1"/>
+  <text id="sch-gauge" x="420" y="70" font-size="10" text-anchor="middle">Pressure gauge</text>
+  <path d="M 470 90 L 600 90 L 600 200" fill="none" stroke="#446" stroke-width="2"/>
+  <rect x="560" y="200" width="80" height="60" fill="#f0e8dd" stroke="#643" stroke-width="1"/>
+  <text id="sch-inject" x="600" y="280" font-size="10" text-anchor="middle">Injection point</text>
+  <text id="sch-suction" x="160" y="80" font-size="10">Suction line</text>
+  <text id="sch-discharge" x="480" y="80" font-size="10">Discharge line</text>
+  <text id="sch-bleed" x="310" y="150" font-size="10" text-anchor="middle">Bleed valve on the head</text>
+  <text id="sch-fig" x="24" y="26" font-size="11" font-weight="bold">Figure 6-1</text>
+</svg>
+<figcaption id="cap-schematic">Figure 6-1. Typical installation. The bleed valve on the pump head is the only point from which trapped air can be released without breaking a joint.</figcaption>
+</figure>
+
+<h2 id="h-6-2">6.2 Reading the status display</h2>
+<p id="p-6-2a">The two-line display shows the operating state on the upper line and the most recent fault code on the lower line. A fault code stays on the display until it is acknowledged, even if the condition that caused it has cleared. The status lamp beside the display repeats the state in colour so that it can be read from across the plant room.</p>
+<table id="tbl-lamp">
+<thead><tr><th>Lamp</th><th>Meaning</th><th>Pump state</th></tr></thead>
+<tbody>
+<tr id="lamp-green"><td>Green, steady</td><td>Running normally</td><td>Dosing</td></tr>
+<tr id="lamp-green-flash"><td>Green, flashing</td><td>Waiting for an external signal</td><td>Ready</td></tr>
+<tr id="lamp-amber"><td>Amber, steady</td><td>Warning active, dosing continues</td><td>Dosing</td></tr>
+<tr id="lamp-red"><td>Red, steady</td><td>Trip, dosing stopped</td><td>Stopped</td></tr>
+<tr id="lamp-red-flash"><td>Red, flashing</td><td>Leak alarm, dosing stopped</td><td>Stopped, isolate</td></tr>
+</tbody>
+</table>
+<div class="note" id="note-ack"><p id="note-ack-p">To acknowledge a fault, press OK once. To acknowledge and restart after a trip, hold STOP for three seconds and then press START. A trip that returns within one minute of a restart indicates that the cause has not been removed.</p></div>
+
+<h2 id="h-6-3">6.3 Fault code reference</h2>
+<p id="p-6-3a">The table lists every fault code that firmware 3.x can raise. Codes E01 to E12 are hardware or process conditions; codes from E13 upwards are raised by the controller&rsquo;s own supervision. Rows are kept together on a page so that a code and its remedy are always read together.</p>
+<table id="tbl-faults">
+<thead><tr><th>Code</th><th>Symptom</th><th>Likely cause</th><th>Action</th></tr></thead>
+<tbody>
+<tr id="fault-e01"><td class="code">E01</td><td>Display shows E01 immediately after power-up</td><td>Supply voltage below 190 V or a loose mains terminal</td><td>Measure the supply at terminal block X1. Tighten L and N. If the voltage is correct, replace the power board.</td></tr>
+<tr id="fault-e02"><td class="code">E02</td><td>Pump runs but no stroke is felt at the head</td><td>Drive coupling slipped on the motor shaft</td><td>Isolate, remove the drive cover and retighten the coupling grub screw to 4 Nm.</td></tr>
+<tr id="fault-e03"><td class="code">E03</td><td>Stroke counter stops while the motor keeps turning</td><td>Stroke sensor dirty or misaligned</td><td>Clean the sensor face with a dry cloth. Set the gap to 1.5 mm with the feeler gauge from the service kit.</td></tr>
+<tr id="fault-e04"><td class="code">E04</td><td>Output falls slowly over several hours</td><td>Suction valve seat worn or fouled</td><td>Flush the head with clean water. Replace the valve cartridge if the output does not recover within ten strokes.</td></tr>
+<tr id="fault-e05"><td class="code">E05</td><td>Output drops suddenly to zero</td><td>Airlock in the pump head</td><td>Open the bleed valve and follow the airlock procedure in section 6.5.</td></tr>
+<tr id="fault-e06"><td class="code">E06</td><td>Diaphragm leak alarm</td><td>Fluid detected in the leak chamber</td><td>Stop the pump at once. Replace the diaphragm and inspect the leak chamber for crystallised residue.</td></tr>
+<tr id="fault-e07"><td class="code">E07</td><td>Pressure high warning</td><td>Discharge valve closed or line blocked</td><td>Check that every valve downstream is open. Inspect the injection fitting for scale.</td></tr>
+<tr id="fault-e08"><td class="code">E08</td><td>Pressure high trip</td><td>Blocked line persisted for more than 30 s</td><td>Clear the blockage, then reset with the STOP key held for three seconds.</td></tr>
+<tr id="fault-e09"><td class="code">E09</td><td>Level low warning</td><td>Tank below the first level contact</td><td>Refill the tank. The warning clears when the contact closes.</td></tr>
+<tr id="fault-e10"><td class="code">E10</td><td>Level empty trip</td><td>Tank below the second level contact</td><td>Refill the tank and prime the suction line before restarting.</td></tr>
+<tr id="fault-e11"><td class="code">E11</td><td>External stop active</td><td>Contact at terminal X4 open</td><td>Check the plant interlock. The pump restarts automatically when the contact closes.</td></tr>
+<tr id="fault-e12"><td class="code">E12</td><td>Analogue input out of range</td><td>4 to 20 mA signal below 3.6 mA or above 21 mA</td><td>Check the transmitter loop. A broken wire reads as 0 mA.</td></tr>
+<tr id="fault-e13"><td class="code">E13</td><td>Pulse input too fast</td><td>More than 100 pulses per second at X5</td><td>Reduce the pulse rate at the flow meter or enable the divider in menu 4.2.</td></tr>
+<tr id="fault-e14"><td class="code">E14</td><td>Motor overtemperature</td><td>Winding temperature above 105 degrees</td><td>Allow the motor to cool. Check the ventilation grille and the ambient temperature.</td></tr>
+<tr id="fault-e15"><td class="code">E15</td><td>Motor overcurrent</td><td>Mechanical binding in the gearbox</td><td>Turn the drive by hand with the power isolated. Stiff rotation means a gearbox overhaul.</td></tr>
+<tr id="fault-e16"><td class="code">E16</td><td>Encoder fault</td><td>Encoder cable damaged or connector loose</td><td>Reseat connector J7. Replace the cable if the fault returns.</td></tr>
+<tr id="fault-e17"><td class="code">E17</td><td>Memory checksum error</td><td>Settings corrupted by a power interruption during saving</td><td>Restore the settings from the last backup file or re-enter them from the commissioning sheet.</td></tr>
+<tr id="fault-e18"><td class="code">E18</td><td>Clock lost</td><td>Backup cell on the controller board exhausted</td><td>Replace the CR2032 cell and set the clock in menu 7.1.</td></tr>
+<tr id="fault-e19"><td class="code">E19</td><td>Communication timeout</td><td>No message from the plant controller for 10 s</td><td>Check the fieldbus cable and termination. Confirm the node address in menu 5.3.</td></tr>
+<tr id="fault-e20"><td class="code">E20</td><td>Calibration out of tolerance</td><td>Measured stroke volume differs from the set value by more than 8 percent</td><td>Repeat the calibration with a graduated cylinder. Replace the valves if the error persists.</td></tr>
+<tr id="fault-e21"><td class="code">E21</td><td>Fan failure</td><td>Cooling fan not turning</td><td>Replace the fan. Do not run the pump above 50 percent speed until the fan is replaced.</td></tr>
+<tr id="fault-e22"><td class="code">E22</td><td>Leak sensor fault</td><td>Sensor open circuit</td><td>Check the sensor cable. A disconnected sensor is treated as a leak for safety.</td></tr>
+<tr id="fault-e23"><td class="code">E23</td><td>Relay output overload</td><td>More than 2 A drawn through the alarm relay</td><td>Fit an interposing relay for loads above 2 A.</td></tr>
+<tr id="fault-e24"><td class="code">E24</td><td>Service interval reached</td><td>Operating hours exceeded the service interval</td><td>Carry out the annual service and reset the counter in menu 8.4.</td></tr>
+</tbody>
+</table>
+
+<h2 id="h-6-4">6.4 Commissioning and restart checklist</h2>
+<p id="p-6-4a">Use the checklist after any repair that involved opening the wet side, replacing the controller or rewiring the inputs. Tick each item as you complete it and file the page with the service log. The checklist is deliberately long: it is the same list that is used at first commissioning, and a restart after a major repair deserves the same care.</p>
+<aside id="safety-checklist">
+<p class="card-title" id="checklist-title">Commissioning and restart checklist&ensp;&middot;&ensp;96 items</p>
+<ul id="checklist-items">
+<li id="chk-01"><span class="box"></span>01&ensp;Mains supply: isolator locked off and tagged</li>
+<li id="chk-02"><span class="box"></span>02&ensp;Mains supply: voltage measured at X1</li>
+<li id="chk-03"><span class="box"></span>03&ensp;Mains supply: protective earth continuity confirmed</li>
+<li id="chk-04"><span class="box"></span>04&ensp;Mains supply: cable gland tight</li>
+<li id="chk-05"><span class="box"></span>05&ensp;Controller: enclosure seal intact</li>
+<li id="chk-06"><span class="box"></span>06&ensp;Controller: settings backed up to file</li>
+<li id="chk-07"><span class="box"></span>07&ensp;Controller: clock set to plant time</li>
+<li id="chk-08"><span class="box"></span>08&ensp;Controller: fieldbus address recorded</li>
+<li id="chk-09"><span class="box"></span>09&ensp;Motor: ventilation grille clear</li>
+<li id="chk-10"><span class="box"></span>10&ensp;Motor: winding insulation measured</li>
+<li id="chk-11"><span class="box"></span>11&ensp;Motor: rotation direction marked</li>
+<li id="chk-12"><span class="box"></span>12&ensp;Motor: terminal box cover fitted</li>
+<li id="chk-13"><span class="box"></span>13&ensp;Gearbox: oil level between marks</li>
+<li id="chk-14"><span class="box"></span>14&ensp;Gearbox: no weeping at the output seal</li>
+<li id="chk-15"><span class="box"></span>15&ensp;Gearbox: breather clear</li>
+<li id="chk-16"><span class="box"></span>16&ensp;Gearbox: drain plug torqued</li>
+<li id="chk-17"><span class="box"></span>17&ensp;Drive coupling: grub screw torqued to 4 Nm</li>
+<li id="chk-18"><span class="box"></span>18&ensp;Drive coupling: guard fitted</li>
+<li id="chk-19"><span class="box"></span>19&ensp;Drive coupling: no play at the key</li>
+<li id="chk-20"><span class="box"></span>20&ensp;Drive coupling: alignment within 0.2 mm</li>
+<li id="chk-21"><span class="box"></span>21&ensp;Pump head: bolts torqued crosswise</li>
+<li id="chk-22"><span class="box"></span>22&ensp;Pump head: bleed valve closed</li>
+<li id="chk-23"><span class="box"></span>23&ensp;Pump head: no crystals at the joints</li>
+<li id="chk-24"><span class="box"></span>24&ensp;Pump head: head orientation arrow upwards</li>
+<li id="chk-25"><span class="box"></span>25&ensp;Diaphragm: replaced at the service interval</li>
+<li id="chk-26"><span class="box"></span>26&ensp;Diaphragm: no bulging visible</li>
+<li id="chk-27"><span class="box"></span>27&ensp;Diaphragm: leak chamber dry</li>
+<li id="chk-28"><span class="box"></span>28&ensp;Diaphragm: leak sensor tested</li>
+<li id="chk-29"><span class="box"></span>29&ensp;Suction valve: cartridge seated</li>
+<li id="chk-30"><span class="box"></span>30&ensp;Suction valve: ball moves freely</li>
+<li id="chk-31"><span class="box"></span>31&ensp;Suction valve: O-ring lubricated</li>
+<li id="chk-32"><span class="box"></span>32&ensp;Suction valve: flow direction arrow correct</li>
+<li id="chk-33"><span class="box"></span>33&ensp;Discharge valve: cartridge seated</li>
+<li id="chk-34"><span class="box"></span>34&ensp;Discharge valve: spring intact</li>
+<li id="chk-35"><span class="box"></span>35&ensp;Discharge valve: O-ring lubricated</li>
+<li id="chk-36"><span class="box"></span>36&ensp;Discharge valve: flow direction arrow correct</li>
+<li id="chk-37"><span class="box"></span>37&ensp;Suction line: no kinks</li>
+<li id="chk-38"><span class="box"></span>38&ensp;Suction line: clamps tight</li>
+<li id="chk-39"><span class="box"></span>39&ensp;Suction line: foot valve free of deposits</li>
+<li id="chk-40"><span class="box"></span>40&ensp;Suction line: line length below 2 m</li>
+<li id="chk-41"><span class="box"></span>41&ensp;Discharge line: rated for the pump pressure</li>
+<li id="chk-42"><span class="box"></span>42&ensp;Discharge line: supported every metre</li>
+<li id="chk-43"><span class="box"></span>43&ensp;Discharge line: no contact with hot pipework</li>
+<li id="chk-44"><span class="box"></span>44&ensp;Discharge line: drain point accessible</li>
+<li id="chk-45"><span class="box"></span>45&ensp;Pressure relief: set 1 bar above working pressure</li>
+<li id="chk-46"><span class="box"></span>46&ensp;Pressure relief: return line to tank</li>
+<li id="chk-47"><span class="box"></span>47&ensp;Pressure relief: seal wire fitted</li>
+<li id="chk-48"><span class="box"></span>48&ensp;Pressure relief: test lift recorded</li>
+<li id="chk-49"><span class="box"></span>49&ensp;Pulsation damper: pre-charge pressure checked</li>
+<li id="chk-50"><span class="box"></span>50&ensp;Pulsation damper: bladder intact</li>
+<li id="chk-51"><span class="box"></span>51&ensp;Pulsation damper: isolation valve open</li>
+<li id="chk-52"><span class="box"></span>52&ensp;Pulsation damper: gauge readable</li>
+<li id="chk-53"><span class="box"></span>53&ensp;Injection point: check valve fitted</li>
+<li id="chk-54"><span class="box"></span>54&ensp;Injection point: quill clear of scale</li>
+<li id="chk-55"><span class="box"></span>55&ensp;Injection point: isolation valve open</li>
+<li id="chk-56"><span class="box"></span>56&ensp;Injection point: insertion depth recorded</li>
+<li id="chk-57"><span class="box"></span>57&ensp;Day tank: level contacts tested</li>
+<li id="chk-58"><span class="box"></span>58&ensp;Day tank: bund clean and dry</li>
+<li id="chk-59"><span class="box"></span>59&ensp;Day tank: lid closed</li>
+<li id="chk-60"><span class="box"></span>60&ensp;Day tank: label matches chemical</li>
+<li id="chk-61"><span class="box"></span>61&ensp;Level sensor: float moves freely</li>
+<li id="chk-62"><span class="box"></span>62&ensp;Level sensor: cable strain relief fitted</li>
+<li id="chk-63"><span class="box"></span>63&ensp;Level sensor: low contact wired to X3</li>
+<li id="chk-64"><span class="box"></span>64&ensp;Level sensor: empty contact wired to X3</li>
+<li id="chk-65"><span class="box"></span>65&ensp;Flow meter: pulse cable screened</li>
+<li id="chk-66"><span class="box"></span>66&ensp;Flow meter: pulse rate within limits</li>
+<li id="chk-67"><span class="box"></span>67&ensp;Flow meter: divider set in menu 4.2</li>
+<li id="chk-68"><span class="box"></span>68&ensp;Flow meter: meter serial number recorded</li>
+<li id="chk-69"><span class="box"></span>69&ensp;Analogue input: loop resistance measured</li>
+<li id="chk-70"><span class="box"></span>70&ensp;Analogue input: scaling entered</li>
+<li id="chk-71"><span class="box"></span>71&ensp;Analogue input: signal at 4 mA reads zero</li>
+<li id="chk-72"><span class="box"></span>72&ensp;Analogue input: signal at 20 mA reads full scale</li>
+<li id="chk-73"><span class="box"></span>73&ensp;Alarm relay: load below 2 A</li>
+<li id="chk-74"><span class="box"></span>74&ensp;Alarm relay: common alarm tested</li>
+<li id="chk-75"><span class="box"></span>75&ensp;Alarm relay: interposing relay fitted if required</li>
+<li id="chk-76"><span class="box"></span>76&ensp;Alarm relay: wiring labelled</li>
+<li id="chk-77"><span class="box"></span>77&ensp;External stop: interlock contact tested</li>
+<li id="chk-78"><span class="box"></span>78&ensp;External stop: restart behaviour agreed</li>
+<li id="chk-79"><span class="box"></span>79&ensp;External stop: terminal X4 labelled</li>
+<li id="chk-80"><span class="box"></span>80&ensp;External stop: loop drawing updated</li>
+<li id="chk-81"><span class="box"></span>81&ensp;Calibration: cylinder graduated in millilitres</li>
+<li id="chk-82"><span class="box"></span>82&ensp;Calibration: ten-stroke test repeated</li>
+<li id="chk-83"><span class="box"></span>83&ensp;Calibration: result within 8 percent</li>
+<li id="chk-84"><span class="box"></span>84&ensp;Calibration: value entered in menu 3.1</li>
+<li id="chk-85"><span class="box"></span>85&ensp;Documentation: commissioning sheet signed</li>
+<li id="chk-86"><span class="box"></span>86&ensp;Documentation: settings printout filed</li>
+<li id="chk-87"><span class="box"></span>87&ensp;Documentation: service counter reset</li>
+<li id="chk-88"><span class="box"></span>88&ensp;Documentation: handover to operator recorded</li>
+<li id="chk-89"><span class="box"></span>89&ensp;Personal protection: face shield available</li>
+<li id="chk-90"><span class="box"></span>90&ensp;Personal protection: chemical gloves available</li>
+<li id="chk-91"><span class="box"></span>91&ensp;Personal protection: eye wash station tested</li>
+<li id="chk-92"><span class="box"></span>92&ensp;Personal protection: safety data sheet posted</li>
+<li id="chk-93"><span class="box"></span>93&ensp;Final checks: all guards fitted</li>
+<li id="chk-94"><span class="box"></span>94&ensp;Final checks: area cleaned</li>
+<li id="chk-95"><span class="box"></span>95&ensp;Final checks: isolator unlocked by the permit holder</li>
+<li id="chk-96"><span class="box"></span>96&ensp;Final checks: first run observed for ten minutes</li>
+</ul>
+</aside>
+
+<h2 id="h-6-5">6.5 Clearing an airlock</h2>
+<p id="p-6-5a">An airlock is the most common cause of a sudden loss of output. Air enters the head when the tank runs dry, when a suction fitting is loosened, or when the chemical degasses at high temperature. The pump keeps stroking, but the diaphragm only compresses the trapped air.</p>
+<ol class="steps" id="steps-airlock">
+<li id="step-1">Set the pump to manual mode at 100 percent stroke rate.</li>
+<li id="step-2">Place a container under the bleed valve outlet and open the valve one full turn.</li>
+<li id="step-3">Run the pump until a steady stream of liquid without bubbles leaves the bleed outlet.</li>
+<li id="step-4">Close the bleed valve while the pump is still running.</li>
+<li id="step-5">Watch the pressure gauge. It should rise to the working pressure within ten strokes.</li>
+<li id="step-6">Return the pump to automatic mode and acknowledge fault E05.</li>
+</ol>
+<div class="warning" id="warn-bleed"><p id="warn-bleed-p"><span class="label">WARNING</span>&ensp;The liquid leaving the bleed outlet is the dosing chemical. Wear the face shield and gloves listed on the safety data sheet, and dispose of the collected liquid as the plant procedure requires.</p></div>
+
+<h2 id="h-6-6">6.6 Service log</h2>
+<table id="tbl-log">
+<thead><tr><th>Date</th><th>Fault code</th><th>Action taken</th><th>Result</th><th>Initials</th></tr></thead>
+<tbody>
+<tr id="log-1"><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr id="log-2"><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr id="log-3"><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr id="log-4"><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+</tbody>
+</table>
+<p class="imprint" id="imprint">Quillfeather Hydraulics and the K-40 pump are fictional; this chapter is a specimen document written for layout testing. No real product, company or person is described.</p>
+</article>
+</body>
+</html>

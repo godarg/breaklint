@@ -1,0 +1,495 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa12-library-annual-report",
+  "artifact": "documents/sa12-library-annual-report.html",
+  "sha256": "e70795ef50ba4fa804f747bdc6bccf2bfdfd7ab6ba1fd7e3e6b63c5781e81ee4",
+  "byteLength": 31885,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Pellbrook Mutual Library Society: Annual Report and Accounts",
+  "genre": "annual report with long tables and a named landscape page",
+  "language": {
+    "htmlLang": "en",
+    "typeRulesUnderDefaultLocale": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "letter",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        816,
+        1056
+      ],
+      "margins": "0.75in",
+      "contentBoxCssPx": [
+        672,
+        912.0
+      ]
+    },
+    {
+      "pageRule": "@page budget",
+      "size": "letter",
+      "orientation": "landscape",
+      "pageBoxCssPx": [
+        1056,
+        816
+      ],
+      "margins": "0.6in",
+      "contentBoxCssPx": [
+        940.8,
+        700.8
+      ],
+      "selector": "section.budget",
+      "observed": "as in sa03, Paged.js 0.4.3 on Chromium 141 keeps the portrait sheet; the landscape content is clipped at the right of the PDF page"
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      8,
+      10
+    ],
+    "measured": 9,
+    "basis": "plain Paged.js measurement (9 pages); forced breaks at h2.newpage and the two named-page switches; the ledger table and prose may shift by one page"
+  },
+  "expectedExit": {
+    "set": [
+      1,
+      3
+    ],
+    "derivation": "Error finding on #members-roll (exit 1). Tables cross page boundaries (#tbl-ledger, #members-roll) and a landscape page is drawn on a portrait sheet, so exit 3 render-unstable is admitted as 'declined as unmeasurable' (docs/limitations.md); the plain probe saw no table residue.",
+    "byCode": {
+      "1": "error finding on #members-roll",
+      "3": "render-unstable (table residue or landscape PDF divergence)"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "Letter portrait and a named landscape page (@page budget)",
+    "running element in @top-center",
+    "cover page and forced page break",
+    "donut chart with plain labels",
+    "long ledger table crossing pages",
+    "break-inside: avoid register table split into three fragments (planted)",
+    "wide budget table on the landscape page"
+  ],
+  "runningElements": [
+    {
+      "id": "annualhead",
+      "marginBox": "top-center",
+      "marginBoxCopies": 9,
+      "pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    }
+  ],
+  "constructionFacts": [
+    {
+      "fact": "register table",
+      "measured": [
+        {
+          "page": 5,
+          "heightPx": 903,
+          "topInContentPx": 5.33,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 6,
+          "heightPx": 903,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 7,
+          "heightPx": 525,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        }
+      ]
+    },
+    {
+      "fact": "ledger table crossing",
+      "measured": [
+        {
+          "page": 2,
+          "heightPx": 243.14,
+          "topInContentPx": 665.56,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 3,
+          "heightPx": 901.36,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 4,
+          "heightPx": 197.86,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "annualhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "annual"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "annual"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "annualhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "annual"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "annual"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "members-roll"
+          },
+          "why": "a register table with break-inside: avoid that is 2.56 content boxes tall",
+          "construction": "header row + 110 body rows of fixed 20 px cells (21 px per row with the collapsed border) = 2331 px measured against 912 px (Letter, 0.75 in): pushed to a fresh page and split 903 + 903 + 525 px",
+          "measured": {
+            "naturalPx": 2331,
+            "fragments": [
+              {
+                "page": 5,
+                "heightPx": 903,
+                "topInContentPx": 5.33,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 6,
+                "heightPx": 903,
+                "topInContentPx": 0,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 7,
+                "heightPx": 525,
+                "topInContentPx": 0,
+                "startsInsideContentBox": true
+              }
+            ]
+          },
+          "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md"
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "annualhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "ids": [
+              "fig-donut"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (912.0 px) and are laid out in one piece",
+          "measured": {
+            "fig-donut": {
+              "maxFragmentPx": 316,
+              "fragments": 1,
+              "naturalPx": 316
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tbl-ledger tr, #members-roll tr, #tbl-budget tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 912 portrait / 700.8 landscape px content box"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "annualhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2"
+            ]
+          },
+          "why": "every one of these headings carries break-after: avoid (Paged.js moves it with the following block) or opens its page, so content follows it on its own page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "annualhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "annual"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "svg": "svg-donut",
+            "texts": [
+              "do-centre",
+              "do-name-0",
+              "do-name-1",
+              "do-name-2",
+              "do-name-3",
+              "do-name-4",
+              "do-pct-0",
+              "do-pct-1",
+              "do-pct-2",
+              "do-pct-3",
+              "do-pct-4",
+              "do-title"
+            ]
+          },
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "measured": {
+            "minInsetPxByText": {
+              "do-name-0": 60,
+              "do-pct-0": 32,
+              "do-name-1": 98,
+              "do-pct-1": 32,
+              "do-name-2": 136,
+              "do-pct-2": 32,
+              "do-name-3": 112,
+              "do-pct-3": 32,
+              "do-name-4": 74,
+              "do-pct-4": 32,
+              "do-centre": 132,
+              "do-title": 15
+            }
+          }
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no straight quotation mark or apostrophe occurs in any text run outside code, pre, kbd, samp and var; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "annual"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no block is justified; docs/rules/type-excessive-word-spacing.md judges word gaps in a justified block only"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no file: URI and no absolute path occurs in any URI-bearing attribute (href, src, srcset, poster, data, xlink:href) or CSS url()"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 9,
+    "pdfPageCount": 9,
+    "contentBoxHeightsPx": [
+      700.8,
+      912
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Serif (system, 63 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Serif (system, 32 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Serif (system, 14 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "Liberation Serif (system, 6 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+        "Liberation Serif (system, 13 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": []
+}

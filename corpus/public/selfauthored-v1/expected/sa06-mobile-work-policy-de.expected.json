@@ -1,0 +1,511 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa06-mobile-work-policy-de",
+  "artifact": "documents/sa06-mobile-work-policy-de.html",
+  "sha256": "270f299510835def8e6bb6e1208b186fbb34cc95d3bff72e0f3aa994cea4b844",
+  "byteLength": 10257,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Richtlinie zur mobilen Arbeit (Mitarbeiterhandbuch, Teil C)",
+  "genre": "policy handbook (German)",
+  "language": {
+    "htmlLang": "de",
+    "typeRulesUnderDefaultLocale": "measured: lang de matches the default locale de-DE"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "A4",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        793.7,
+        1122.52
+      ],
+      "margins": "25mm 22mm",
+      "contentBoxCssPx": [
+        627.39,
+        933.54
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      3,
+      4
+    ],
+    "measured": 3,
+    "basis": "plain Paged.js measurement (3 pages) of justified, hyphenated German prose"
+  },
+  "expectedExit": {
+    "set": [
+      0
+    ],
+    "derivation": "All planted defects are warn rules (type/straight-quotes, type/spaced-hyphen, artifact/local-uri); no error-rule defect; the error rules measure every candidate.",
+    "byCode": {
+      "0": "warn-only findings"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "A4",
+    "German text (lang=de)",
+    "running element in @top-center",
+    "page counters",
+    "justified hyphenated text",
+    "planted straight quotes and apostrophe",
+    "planted spaced hyphens",
+    "planted file: URI and absolute path in links",
+    "clean counterparts: typographic quotes, en dashes, inch mark after a digit, code and kbd, digit ranges, single-letter formula, lang=en span, path in visible text"
+  ],
+  "runningElements": [
+    {
+      "id": "kopf",
+      "marginBox": "top-center",
+      "marginBoxCopies": 3,
+      "pages": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "constructionFacts": [],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "kopf"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "richtlinie"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "richtlinie"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "kopf"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "richtlinie"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "richtlinie"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "kopf"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "ids": [
+              "kasten-hinweis",
+              "tab-ausstattung"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (933.53 px) and are laid out in one piece",
+          "measured": {
+            "kasten-hinweis": {
+              "maxFragmentPx": 74.06,
+              "fragments": 1,
+              "naturalPx": 74.06
+            },
+            "tab-ausstattung": {
+              "maxFragmentPx": 145.88,
+              "fragments": 1,
+              "naturalPx": 145.88
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tab-ausstattung tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 933.53 px content box"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "kopf"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2"
+            ]
+          },
+          "why": "every one of these headings carries break-after: avoid (Paged.js moves it with the following block) or opens its page, so content follows it on its own page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "kopf"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "richtlinie"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "The document contains no SVG; the rule has no candidate."
+      ]
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "p-sh-1"
+          },
+          "occurrences": 2,
+          "text": "Arbeitszeit - nicht der Arbeitsort - ist",
+          "why": "spaced hyphens used as a dash in prose, no digit or operator nearby"
+        },
+        {
+          "target": {
+            "id": "td-sh-2"
+          },
+          "occurrences": 1,
+          "text": "Laptop - Dockingstation",
+          "why": "spaced hyphen between two words in a table cell"
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "p-4-3"
+          },
+          "why": "7 - 18 Uhr: digits next to the hyphen (mathematical neighbourhood exclusion)"
+        },
+        {
+          "target": {
+            "id": "p-4-4"
+          },
+          "why": "a - b: two single letters joined by the hyphen (formula), plus en dashes elsewhere in the run"
+        },
+        {
+          "target": {
+            "id": "p-5-2"
+          },
+          "why": "Win - L is inside <kbd>, excluded structurally"
+        },
+        {
+          "target": {
+            "id": "span-en"
+          },
+          "why": "the spaced hyphen sits in a lang=\"en\" span; runs whose lang differs from the locale are excluded (docs/rules/type-spaced-hyphen.md)"
+        },
+        {
+          "target": {
+            "id": "p-6-3"
+          },
+          "why": "Ein- und Ausschalten: a hyphen without spaces"
+        },
+        {
+          "target": {
+            "document": true
+          },
+          "except": [
+            {
+              "id": "p-sh-1"
+            },
+            {
+              "id": "td-sh-2"
+            }
+          ],
+          "why": "no other spaced hyphen outside the exclusions above"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [
+        {
+          "target": {
+            "id": "p-sq-1"
+          },
+          "occurrences": 2,
+          "text": "\"mobile Arbeit\"",
+          "why": "straight double quotes in German prose; the locale asks for „…“"
+        },
+        {
+          "target": {
+            "id": "li-sq-2"
+          },
+          "occurrences": 1,
+          "text": "geht's",
+          "why": "straight apostrophe in German prose (’ expected)"
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "p-2-2"
+          },
+          "why": "typographic „Präsenztag“ and ‚MA-Tag‘"
+        },
+        {
+          "target": {
+            "id": "tr-a-3"
+          },
+          "why": "24\"-Monitor: a digit immediately before the mark exempts it (inch)"
+        },
+        {
+          "target": {
+            "id": "p-5-2"
+          },
+          "why": "the only straight quotes are inside <code>, which is excluded structurally"
+        },
+        {
+          "target": {
+            "id": "span-en"
+          },
+          "why": "typographic quotes inside a lang=\"en\" span"
+        },
+        {
+          "target": {
+            "document": true
+          },
+          "except": [
+            {
+              "id": "p-sq-1"
+            },
+            {
+              "id": "li-sq-2"
+            }
+          ],
+          "why": "no other straight quotation mark occurs in any text run outside code"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "richtlinie"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "selectors": [
+              "main#richtlinie > p:not(.untertitel):not(.impressum)"
+            ]
+          },
+          "class": "font-dependent",
+          "why": "justified blocks: word gaps depend on font metrics and on whether hyphenation dictionaries are available"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [
+        {
+          "target": {
+            "uri": {
+              "attribute": "href",
+              "value": "file:///srv/intranet/vorlagen/antrag-mobile-arbeit.docx"
+            },
+            "id": "a-file"
+          },
+          "why": "file: URI left in a link"
+        },
+        {
+          "target": {
+            "uri": {
+              "attribute": "href",
+              "value": "/var/share/richtlinien/it-sicherheit.pdf"
+            },
+            "id": "a-abs"
+          },
+          "why": "absolute build-machine path in a link"
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "a-rel"
+          },
+          "why": "relative href"
+        },
+        {
+          "target": {
+            "id": "a-https"
+          },
+          "why": "https URL"
+        },
+        {
+          "target": {
+            "id": "a-mailto"
+          },
+          "why": "mailto: URL"
+        },
+        {
+          "target": {
+            "id": "p-6-2"
+          },
+          "why": "the path /srv/intranet/vorlagen/datenschutz appears only as visible text, not in a URI-bearing attribute (docs/rules/artifact-local-uri.md reads uriRefs)"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 3,
+    "pdfPageCount": 3,
+    "contentBoxHeightsPx": [
+      933.53
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Sans (system, 95 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Sans (system, 29 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Sans (system, 19 glyphs)"
+      ],
+      ".pagedjs_page_content code": [
+        "DejaVu Sans Mono (system, 17 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "Liberation Serif (system, 8 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": []
+}

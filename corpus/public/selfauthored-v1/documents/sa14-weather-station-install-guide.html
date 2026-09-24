@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cinderwick WS-3 Installation Guide</title>
+<style>
+@page {
+  size: letter;
+  margin: 0.75in;
+  @top-center { content: element(guidehead); }
+  @bottom-center { content: counter(page); font: 8.5pt sans-serif; }
+}
+@page :left { @left-middle { content: element(sidetab); } }
+@page :right { @right-middle { content: element(sidetab); } }
+@page :first { @top-center { content: none; } }
+body { margin: 0; font: 10pt/1.45 sans-serif; color: #1c2530; }
+.guidehead { position: running(guidehead); font: 7.5pt sans-serif; color: #5d6b78; text-transform: uppercase; letter-spacing: 0.08em; }
+.sidetab { position: running(sidetab); width: 0.45in; background: #16324f; color: #fff; text-align: center; font: bold 8pt/1.2 sans-serif; padding: 8pt 0; }
+/* Full-bleed elements: the page margins are 0.75 in on both sides, so pulling the box out by the
+   same amount makes it exactly as wide as the sheet (8.5 in = 816 px). */
+.bleed { margin-left: -0.75in; margin-right: -0.75in; }
+figure.bleed { margin-top: 0; margin-bottom: 14pt; }
+figure svg { display: block; }
+h1 { font: bold 20pt/1.2 sans-serif; color: #16324f; margin: 0 0 6pt; }
+h2 { font: bold 13pt/1.25 sans-serif; color: #16324f; margin: 14pt 0 5pt; break-after: avoid; }
+p { margin: 0 0 5pt; widows: 2; orphans: 2; }
+ol.steps { padding-left: 16pt; margin: 0 0 8pt; }
+ol.steps li { margin-bottom: 4pt; }
+.caution { border-left: 4pt solid #d98b1f; background: #fdf4e6; padding: 5pt 8pt; margin: 8pt 0; break-inside: avoid; }
+figure { margin: 8pt 0 10pt; break-inside: avoid; }
+figcaption { font-size: 8.5pt; color: #4a5866; margin-top: 3pt; }
+table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 4pt 0 10pt; break-inside: avoid; }
+th, td { text-align: left; padding: 2pt 5pt; border-bottom: 0.5pt solid #c9d1d8; }
+th { border-bottom: 1pt solid #16324f; }
+/* The parts band runs the full width of the sheet and was meant to stay on one page.
+   40 px title + 64 rows x 36 px = 2344 px, against a 9.5 in = 912 px content box. */
+#parts-band { break-inside: avoid; background: #eef2f5; padding: 0 0.75in; }
+#parts-band .band-title { height: 40px; line-height: 40px; margin: 0; font: bold 12pt/40px sans-serif; color: #16324f; white-space: nowrap; }
+#parts-band ul { list-style: none; margin: 0; padding: 0; }
+#parts-band li { height: 36px; line-height: 36px; margin: 0; padding: 0; white-space: nowrap; overflow: hidden; border-bottom: 1px solid #d6dee5; box-sizing: border-box; }
+#parts-band li b { display: inline-block; width: 44px; color: #16324f; }
+#parts-band li .qty { float: right; }
+.imprint { font-size: 7pt; color: #7a8894; margin-top: 12pt; }
+</style>
+</head>
+<body>
+<div class="guidehead" id="guidehead">Cinderwick WS-3 &middot; installation guide</div>
+<div class="sidetab" id="sidetab">SETUP</div>
+<main id="guide">
+<figure class="bleed" id="fig-banner">
+<svg id="svg-banner" xmlns="http://www.w3.org/2000/svg" width="816" height="150" viewBox="0 0 816 150" role="img"><title>Station overview</title>
+  <rect x="0" y="0" width="816" height="150" fill="#16324f"/>
+  <path d="M 0 120 C 150 95, 300 130, 450 110 S 700 90, 816 105 L 816 150 L 0 150 Z" fill="#23507a" stroke="#444" stroke-width="1.5"/>
+  <line x1="560" y1="20" x2="560" y2="140" stroke="#c7d3de" stroke-width="4"/>
+  <line x1="530" y1="40" x2="590" y2="40" stroke="#c7d3de" stroke-width="3"/>
+  <circle cx="530" cy="40" r="7" fill="#c7d3de"/>
+  <circle cx="590" cy="40" r="7" fill="#c7d3de"/>
+  <rect x="548" y="70" width="24" height="30" fill="#e8eef3"/>
+  <text id="bn-title" x="72" y="64" font-size="22" font-weight="bold" fill="#ffffff">Cinderwick WS-3 Home Weather Station</text>
+  <text id="bn-sub" x="72" y="92" font-size="13" fill="#c7d3de">Installation guide for the outdoor sensor array and the console</text>
+</svg>
+</figure>
+<h1 id="title">Installing your weather station</h1>
+<p id="intro-p1">This guide takes you from the box to the first reading on the console. Most people finish in an afternoon. You will need a drill with a 10 mm masonry bit if you mount the mast on a wall, a 13 mm spanner, and a second person to hold the mast while you tighten the clamps. Read the whole guide once before you start: the order of the steps matters, because the sensor array is much easier to wire and align on the ground than at the top of a mast.</p>
+<div class="caution" id="caution-height"><p id="caution-height-p"><strong>Caution.</strong> Do not work on a roof or ladder in wind, rain or poor light. Keep the mast well away from overhead power lines: at least twice the height of the mast in every direction.</p></div>
+
+<h2 id="h-choose">1&ensp;Choosing the site</h2>
+<p id="choose-p1">The ideal site is open ground with nothing taller than the sensor within a distance of four times the height of the obstruction. In a garden that is rarely possible, so aim for the best compromise: the rain collector must not be sheltered by trees or eaves, the temperature probe should be over grass rather than paving, and the wind sensors should be as high and as clear as you can safely reach.</p>
+<p id="choose-p2">The console receives the sensor signal over a range of about one hundred metres in open air, much less through walls. Try the console in its intended place before you fix the mast, with the sensor array lying on the ground where the mast will stand.</p>
+
+<h2 id="h-unpack">2&ensp;Unpacking and checking the parts</h2>
+<p id="unpack-p1">Lay the parts out on a clean surface and check them against the list below. Fixings are packed in labelled bags; keep them in their bags until the step that needs them. If anything is missing, contact the dealer before you start rather than improvising with other screws: the stainless fixings supplied are chosen so that they do not corrode against the aluminium mast.</p>
+<div class="bleed" id="parts-band">
+<p class="band-title" id="parts-title">Box contents: 64 parts and fixings</p>
+<ul id="parts-list">
+<li id="part-a1"><b>A1</b>Sensor array head with rain collector<span class="qty">&times; 1</span></li>
+<li id="part-a2"><b>A2</b>Wind cups, pre-balanced<span class="qty">&times; 1</span></li>
+<li id="part-a3"><b>A3</b>Wind vane with tail fin<span class="qty">&times; 1</span></li>
+<li id="part-a4"><b>A4</b>Radiation shield, six plates<span class="qty">&times; 1</span></li>
+<li id="part-a5"><b>A5</b>Temperature and humidity probe<span class="qty">&times; 1</span></li>
+<li id="part-a6"><b>A6</b>Solar panel, 2 W<span class="qty">&times; 1</span></li>
+<li id="part-a7"><b>A7</b>Battery pack, rechargeable<span class="qty">&times; 1</span></li>
+<li id="part-a8"><b>A8</b>Console display unit<span class="qty">&times; 1</span></li>
+<li id="part-a9"><b>A9</b>Console mains adapter<span class="qty">&times; 1</span></li>
+<li id="part-b1"><b>B1</b>Mounting mast, lower section<span class="qty">&times; 1</span></li>
+<li id="part-b2"><b>B2</b>Mounting mast, upper section<span class="qty">&times; 1</span></li>
+<li id="part-b3"><b>B3</b>Mast coupling sleeve<span class="qty">&times; 1</span></li>
+<li id="part-b4"><b>B4</b>Wall bracket, stainless<span class="qty">&times; 1</span></li>
+<li id="part-b5"><b>B5</b>Pole clamp, U-bolt type<span class="qty">&times; 2</span></li>
+<li id="part-b6"><b>B6</b>Pole clamp saddle<span class="qty">&times; 2</span></li>
+<li id="part-b7"><b>B7</b>Cross arm for wind sensors<span class="qty">&times; 1</span></li>
+<li id="part-b8"><b>B8</b>Cross arm end cap<span class="qty">&times; 2</span></li>
+<li id="part-b9"><b>B9</b>Guy wire kit, three wires<span class="qty">&times; 1</span></li>
+<li id="part-c1"><b>C1</b>Hex bolt M8 x 60<span class="qty">&times; 4</span></li>
+<li id="part-c2"><b>C2</b>Hex bolt M6 x 40<span class="qty">&times; 6</span></li>
+<li id="part-c3"><b>C3</b>Hex bolt M5 x 25<span class="qty">&times; 8</span></li>
+<li id="part-c4"><b>C4</b>Nyloc nut M8<span class="qty">&times; 4</span></li>
+<li id="part-c5"><b>C5</b>Nyloc nut M6<span class="qty">&times; 6</span></li>
+<li id="part-c6"><b>C6</b>Nyloc nut M5<span class="qty">&times; 8</span></li>
+<li id="part-c7"><b>C7</b>Flat washer M8<span class="qty">&times; 8</span></li>
+<li id="part-c8"><b>C8</b>Flat washer M6<span class="qty">&times; 12</span></li>
+<li id="part-c9"><b>C9</b>Flat washer M5<span class="qty">&times; 16</span></li>
+<li id="part-c10"><b>C10</b>Spring washer M6<span class="qty">&times; 6</span></li>
+<li id="part-c11"><b>C11</b>Wall plug 10 mm<span class="qty">&times; 4</span></li>
+<li id="part-c12"><b>C12</b>Coach screw 8 x 70<span class="qty">&times; 4</span></li>
+<li id="part-c13"><b>C13</b>Grub screw M4, cup point<span class="qty">&times; 2</span></li>
+<li id="part-c14"><b>C14</b>Set screw M3 for wind cups<span class="qty">&times; 1</span></li>
+<li id="part-c15"><b>C15</b>Cable tie, UV stable<span class="qty">&times; 20</span></li>
+<li id="part-c16"><b>C16</b>Cable clip, 6 mm<span class="qty">&times; 10</span></li>
+<li id="part-c17"><b>C17</b>Self-tapping screw 4 x 20<span class="qty">&times; 6</span></li>
+<li id="part-c18"><b>C18</b>Rubber grommet 12 mm<span class="qty">&times; 2</span></li>
+<li id="part-d1"><b>D1</b>Sensor cable, 10 m<span class="qty">&times; 1</span></li>
+<li id="part-d2"><b>D2</b>Extension cable, 5 m<span class="qty">&times; 1</span></li>
+<li id="part-d3"><b>D3</b>Cable joiner, weatherproof<span class="qty">&times; 1</span></li>
+<li id="part-d4"><b>D4</b>Console to computer cable<span class="qty">&times; 1</span></li>
+<li id="part-d5"><b>D5</b>Antenna for the console<span class="qty">&times; 1</span></li>
+<li id="part-d6"><b>D6</b>Spare antenna seal<span class="qty">&times; 1</span></li>
+<li id="part-e1"><b>E1</b>Hex key 2.5 mm<span class="qty">&times; 1</span></li>
+<li id="part-e2"><b>E2</b>Hex key 4 mm<span class="qty">&times; 1</span></li>
+<li id="part-e3"><b>E3</b>Spirit level, small<span class="qty">&times; 1</span></li>
+<li id="part-e4"><b>E4</b>Compass card for north alignment<span class="qty">&times; 1</span></li>
+<li id="part-e5"><b>E5</b>Mounting template, paper<span class="qty">&times; 1</span></li>
+<li id="part-e6"><b>E6</b>Rain gauge calibration funnel<span class="qty">&times; 1</span></li>
+<li id="part-e7"><b>E7</b>Bird deterrent spikes<span class="qty">&times; 1</span></li>
+<li id="part-e8"><b>E8</b>Leveling shims<span class="qty">&times; 4</span></li>
+<li id="part-e9"><b>E9</b>Desiccant sachet<span class="qty">&times; 2</span></li>
+<li id="part-f1"><b>F1</b>Quick start card<span class="qty">&times; 1</span></li>
+<li id="part-f2"><b>F2</b>Warranty card<span class="qty">&times; 1</span></li>
+<li id="part-f3"><b>F3</b>Calibration certificate<span class="qty">&times; 1</span></li>
+<li id="part-f4"><b>F4</b>Parts check sheet<span class="qty">&times; 1</span></li>
+<li id="part-f5"><b>F5</b>Screw bag labels<span class="qty">&times; 1</span></li>
+<li id="part-f6"><b>F6</b>Console wall hook<span class="qty">&times; 1</span></li>
+<li id="part-f7"><b>F7</b>Console desk stand<span class="qty">&times; 1</span></li>
+<li id="part-f8"><b>F8</b>Spare fuse for adapter<span class="qty">&times; 1</span></li>
+<li id="part-f9"><b>F9</b>Reflective mast band<span class="qty">&times; 2</span></li>
+<li id="part-g1"><b>G1</b>Lightning earth strap<span class="qty">&times; 1</span></li>
+<li id="part-g2"><b>G2</b>Earth clamp for mast<span class="qty">&times; 1</span></li>
+<li id="part-g3"><b>G3</b>Surge protector for cable<span class="qty">&times; 1</span></li>
+<li id="part-g4"><b>G4</b>Drip loop former<span class="qty">&times; 1</span></li>
+</ul>
+</div>
+
+<h2 id="h-assemble">3&ensp;Assembling the sensor array</h2>
+<ol class="steps" id="steps-assemble">
+<li id="as-1">Push the wind cups A2 onto the shaft until they stop, then tighten the set screw C14 with the 2.5 mm hex key.</li>
+<li id="as-2">Slide the vane A3 onto the other shaft with the tail fin pointing away from the cross arm. Tighten the grub screw C13.</li>
+<li id="as-3">Fit the radiation shield A4 below the array head and insert the probe A5 until it clicks.</li>
+<li id="as-4">Connect the battery pack A7. The status lamp on the array flashes green three times.</li>
+<li id="as-5">Place the console within five metres and wait for the first reading, which can take up to three minutes.</li>
+</ol>
+<figure id="fig-mast">
+<svg id="svg-mast" xmlns="http://www.w3.org/2000/svg" width="672" height="330" viewBox="0 0 672 330" role="img"><title>Mast assembly</title>
+  <rect x="0" y="0" width="672" height="330" fill="#f7f8f9"/>
+  <rect x="300" y="40" width="16" height="270" fill="#9aa5ae"/>
+  <rect x="296" y="170" width="24" height="40" fill="#6c7780"/>
+  <rect x="250" y="250" width="116" height="14" fill="#6c7780"/>
+  <line x1="200" y1="60" x2="420" y2="60" stroke="#333" stroke-width="5"/>
+  <circle cx="200" cy="60" r="10" fill="#16324f"/>
+  <circle cx="420" cy="60" r="10" fill="#16324f"/>
+  <text id="ms-b2" x="340" y="110" font-size="11">B2 upper section</text>
+  <text id="ms-b3" x="340" y="194" font-size="11">B3 coupling sleeve</text>
+  <text id="ms-b1" x="340" y="290" font-size="11">B1 lower section</text>
+  <text id="ms-cups" x="190" y="40" font-size="11" text-anchor="middle">Wind cups</text>
+  <text id="ms-vane" x="430" y="40" font-size="11" text-anchor="middle">Wind vane</text>
+  <text id="ms-clamp" x="240" y="246" font-size="11" text-anchor="end">B5 clamp to post</text>
+  <text id="ms-fig" x="24" y="24" font-size="11" font-weight="bold">Figure 2</text>
+</svg>
+<figcaption id="cap-mast">Figure 2. Mast assembly with the sensor array in place. The coupling sleeve joins the two mast sections.</figcaption>
+</figure>
+
+<h2 id="h-mount">4&ensp;Mounting and aligning</h2>
+<p id="mount-p1">Fix the wall bracket B4 or the pole clamps B5 first, then lift the assembled mast into place and tighten the clamps just enough to hold it. Use the spirit level on two sides of the mast before tightening fully. Turn the cross arm until the arrow on the array head points north, using the compass card rather than a phone, whose magnetometer is easily upset by the metal mast.</p>
+<table id="tbl-torque">
+<thead><tr><th>Fixing</th><th>Where</th><th>Torque</th></tr></thead>
+<tbody>
+<tr id="tq-1"><td>C1 with C4</td><td>Wall bracket to mast</td><td>18 Nm</td></tr>
+<tr id="tq-2"><td>C2 with C5</td><td>Pole clamps</td><td>9 Nm</td></tr>
+<tr id="tq-3"><td>C3 with C6</td><td>Cross arm to mast head</td><td>5 Nm</td></tr>
+</tbody>
+</table>
+<p id="mount-p2">Route the sensor cable down the mast with a drip loop below the array, so that rain runs off the loop instead of along the cable into the connector. Fix the cable to the mast with the UV-stable ties every thirty centimetres.</p>
+
+<h2 id="h-console">5&ensp;First readings</h2>
+<p id="console-p1">Once the array is on the mast, the console should show the outdoor temperature and humidity within three minutes and the wind within one full turn of the cups. Rainfall reads zero until the first tip of the collector. If a value shows dashes for more than ten minutes, move the console closer to a window facing the mast and press the search key.</p>
+<p class="imprint" id="imprint">Cinderwick and the WS-3 weather station are fictional. This guide is a specimen document written for layout testing and describes no real product.</p>
+</main>
+</body>
+</html>

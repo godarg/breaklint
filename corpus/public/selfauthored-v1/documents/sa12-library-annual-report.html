@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pellbrook Mutual Library Society Annual Report</title>
+<style>
+@page {
+  size: letter;
+  margin: 0.75in;
+  @top-center { content: element(annualhead); }
+  @bottom-center { content: counter(page); font: 9pt serif; color: #6b3e26; }
+}
+@page budget {
+  size: letter landscape;
+  margin: 0.6in;
+  @bottom-center { content: counter(page); font: 9pt serif; color: #6b3e26; }
+}
+@page :first { @top-center { content: none; } }
+body { margin: 0; font: 10pt/1.5 serif; color: #2a211b; }
+.annualhead { position: running(annualhead); font: small-caps 8.5pt serif; letter-spacing: 0.05em; color: #6b3e26; text-align: center; }
+.cover { text-align: center; padding-top: 1.6in; }
+.cover h1 { font: normal 30pt/1.15 serif; color: #6b3e26; margin: 0 0 8pt; }
+.cover p { font: italic 13pt/1.4 serif; margin: 0 0 30pt; }
+h2 { font: normal 17pt/1.2 serif; color: #6b3e26; margin: 16pt 0 6pt; border-bottom: 0.6pt solid #c99a6a; padding-bottom: 3pt; break-after: avoid; }
+h2.newpage { break-before: page; }
+p { margin: 0 0 6pt; widows: 2; orphans: 2; }
+table { border-collapse: collapse; width: 100%; font-size: 8.5pt; margin: 4pt 0 10pt; }
+th { text-align: left; font-weight: bold; border-bottom: 1pt solid #6b3e26; padding: 2pt 4pt; }
+td { padding: 1.5pt 4pt; border-bottom: 0.3pt solid #e0d4c4; }
+td.n { text-align: right; font-variant-numeric: tabular-nums; }
+tr { break-inside: avoid; }
+figure { margin: 8pt 0 10pt; break-inside: avoid; }
+figcaption { font: italic 8.5pt serif; margin-top: 3pt; }
+figure svg { display: block; }
+/* The register of member households is printed as one table that should not be broken.
+   It has 110 rows of fixed height: 24 px header + 110 x 21 px = 2334 px (natural), against a
+   content box of 9.5 in = 912 px. */
+#members-roll { break-inside: avoid; font-size: 8pt; }
+#members-roll th, #members-roll td { height: 20px; padding: 0 4pt; line-height: 20px; white-space: nowrap; }
+.budget { page: budget; }
+.budget table { font-size: 8.5pt; }
+.signoff { margin-top: 18pt; font-style: italic; }
+.imprint { font: 7.5pt/1.4 sans-serif; color: #8a7a6a; margin-top: 16pt; }
+</style>
+</head>
+<body>
+<div class="annualhead" id="annualhead">Pellbrook Mutual Library Society &middot; Annual Report</div>
+<main id="annual">
+<section class="cover" id="cover">
+<h1 id="title">Pellbrook Mutual Library Society</h1>
+<p id="cover-sub">Annual Report and Accounts for the year ended thirty-first July</p>
+</section>
+
+<h2 class="newpage" id="h-foreword">From the chair</h2>
+<p id="fw-p1">This has been the society&rsquo;s busiest year since the reading room reopened. Loans rose for the third year running, the local history collection finally has a catalogue that can be searched from home, and the Thursday reading group outgrew the back room and moved into the main hall. None of it would have been possible without the forty-odd volunteers who staff the desk, mend the books and, on one memorable Saturday in February, bailed out the basement after the gutter gave way.</p>
+<p id="fw-p2">Our finances are sound but not comfortable. Subscriptions still provide almost half of our income, and the committee has decided to hold them at last year&rsquo;s level rather than raise them, in the hope that more households will join. The grant from the county heritage fund, which paid for the cataloguing project, ends next spring, and replacing it is the main task for the coming year.</p>
+<figure id="fig-donut">
+<svg id="svg-donut" xmlns="http://www.w3.org/2000/svg" width="672" height="300" viewBox="0 0 672 300" role="img"><title>Where the library’s income came from</title>
+  <rect x="0" y="0" width="672" height="300" fill="#fffdf8"/>
+  <path d="M 170 40 A 120 120 0 0 1 199.84 276.23 L 187.41 227.8 A 70 70 0 0 0 170 90 Z" fill="#6b3e26" stroke="#fffdf8" stroke-width="2"/>
+  <rect x="360" y="58" width="16" height="16" fill="#6b3e26"/>
+  <text id="do-name-0" x="386" y="71" font-size="12">Subscriptions</text>
+  <text id="do-pct-0" x="640" y="71" font-size="12" text-anchor="end" font-weight="bold">46 %</text>
+  <path d="M 199.84 276.23 A 120 120 0 0 1 61.42 211.09 L 106.66 189.8 A 70 70 0 0 0 187.41 227.8 Z" fill="#a0643c" stroke="#fffdf8" stroke-width="2"/>
+  <rect x="360" y="96" width="16" height="16" fill="#a0643c"/>
+  <text id="do-name-1" x="386" y="109" font-size="12">Grants</text>
+  <text id="do-pct-1" x="640" y="109" font-size="12" text-anchor="end" font-weight="bold">22 %</text>
+  <path d="M 61.42 211.09 A 120 120 0 0 1 55.87 122.92 L 103.43 138.37 A 70 70 0 0 0 106.66 189.8 Z" fill="#c99a6a" stroke="#fffdf8" stroke-width="2"/>
+  <rect x="360" y="134" width="16" height="16" fill="#c99a6a"/>
+  <text id="do-name-2" x="386" y="147" font-size="12">Book sales</text>
+  <text id="do-pct-2" x="640" y="147" font-size="12" text-anchor="end" font-weight="bold">12 %</text>
+  <path d="M 55.87 122.92 A 120 120 0 0 1 105.7 58.68 L 132.49 100.9 A 70 70 0 0 0 103.43 138.37 Z" fill="#e2c29a" stroke="#fffdf8" stroke-width="2"/>
+  <rect x="360" y="172" width="16" height="16" fill="#e2c29a"/>
+  <text id="do-name-3" x="386" y="185" font-size="12">Room hire</text>
+  <text id="do-pct-3" x="640" y="185" font-size="12" text-anchor="end" font-weight="bold">11 %</text>
+  <path d="M 105.7 58.68 A 120 120 0 0 1 170 40 L 170 90 A 70 70 0 0 0 132.49 100.9 Z" fill="#8c8c6a" stroke="#fffdf8" stroke-width="2"/>
+  <rect x="360" y="210" width="16" height="16" fill="#8c8c6a"/>
+  <text id="do-name-4" x="386" y="223" font-size="12">Donations</text>
+  <text id="do-pct-4" x="640" y="223" font-size="12" text-anchor="end" font-weight="bold">9 %</text>
+  <text id="do-centre" x="170" y="165" font-size="13" text-anchor="middle" font-weight="bold">Income</text>
+  <text id="do-title" x="24" y="26" font-size="12" font-weight="bold">Income by source, financial year</text>
+</svg>
+<figcaption id="cap-donut">Income by source. Subscriptions remain the largest single source; room hire has grown since the hall was refurbished.</figcaption>
+</figure>
+
+<h2 id="h-lending">Lending by month and collection</h2>
+<p id="lend-p1">The table records loans, reservations and items reported lost or damaged for each collection and month. Audiobook loans doubled after the players were replaced in October; children&rsquo;s loans follow the school holidays closely.</p>
+<table id="tbl-ledger">
+<thead><tr><th>Month</th><th>Collection</th><th>Loans</th><th>Reservations</th><th>Lost or damaged</th></tr></thead>
+<tbody>
+<tr id="led-1"><td>August</td><td>Adult fiction</td><td class="n">565</td><td class="n">17</td><td class="n">21</td></tr>
+<tr id="led-2"><td>August</td><td>Adult non-fiction</td><td class="n">621</td><td class="n">22</td><td class="n">4</td></tr>
+<tr id="led-3"><td>August</td><td>Children</td><td class="n">470</td><td class="n">0</td><td class="n">11</td></tr>
+<tr id="led-4"><td>August</td><td>Local history</td><td class="n">574</td><td class="n">17</td><td class="n">20</td></tr>
+<tr id="led-5"><td>August</td><td>Audiobooks</td><td class="n">551</td><td class="n">38</td><td class="n">7</td></tr>
+<tr id="led-6"><td>September</td><td>Adult fiction</td><td class="n">651</td><td class="n">0</td><td class="n">21</td></tr>
+<tr id="led-7"><td>September</td><td>Adult non-fiction</td><td class="n">719</td><td class="n">9</td><td class="n">14</td></tr>
+<tr id="led-8"><td>September</td><td>Children</td><td class="n">456</td><td class="n">10</td><td class="n">10</td></tr>
+<tr id="led-9"><td>September</td><td>Local history</td><td class="n">295</td><td class="n">3</td><td class="n">18</td></tr>
+<tr id="led-10"><td>September</td><td>Audiobooks</td><td class="n">284</td><td class="n">4</td><td class="n">16</td></tr>
+<tr id="led-11"><td>October</td><td>Adult fiction</td><td class="n">783</td><td class="n">21</td><td class="n">21</td></tr>
+<tr id="led-12"><td>October</td><td>Adult non-fiction</td><td class="n">494</td><td class="n">5</td><td class="n">0</td></tr>
+<tr id="led-13"><td>October</td><td>Children</td><td class="n">142</td><td class="n">32</td><td class="n">7</td></tr>
+<tr id="led-14"><td>October</td><td>Local history</td><td class="n">173</td><td class="n">27</td><td class="n">14</td></tr>
+<tr id="led-15"><td>October</td><td>Audiobooks</td><td class="n">195</td><td class="n">27</td><td class="n">4</td></tr>
+<tr id="led-16"><td>November</td><td>Adult fiction</td><td class="n">632</td><td class="n">20</td><td class="n">19</td></tr>
+<tr id="led-17"><td>November</td><td>Adult non-fiction</td><td class="n">651</td><td class="n">10</td><td class="n">22</td></tr>
+<tr id="led-18"><td>November</td><td>Children</td><td class="n">132</td><td class="n">35</td><td class="n">5</td></tr>
+<tr id="led-19"><td>November</td><td>Local history</td><td class="n">599</td><td class="n">5</td><td class="n">12</td></tr>
+<tr id="led-20"><td>November</td><td>Audiobooks</td><td class="n">702</td><td class="n">26</td><td class="n">21</td></tr>
+<tr id="led-21"><td>December</td><td>Adult fiction</td><td class="n">690</td><td class="n">30</td><td class="n">15</td></tr>
+<tr id="led-22"><td>December</td><td>Adult non-fiction</td><td class="n">703</td><td class="n">24</td><td class="n">17</td></tr>
+<tr id="led-23"><td>December</td><td>Children</td><td class="n">111</td><td class="n">5</td><td class="n">6</td></tr>
+<tr id="led-24"><td>December</td><td>Local history</td><td class="n">886</td><td class="n">16</td><td class="n">11</td></tr>
+<tr id="led-25"><td>December</td><td>Audiobooks</td><td class="n">451</td><td class="n">24</td><td class="n">21</td></tr>
+<tr id="led-26"><td>January</td><td>Adult fiction</td><td class="n">397</td><td class="n">7</td><td class="n">8</td></tr>
+<tr id="led-27"><td>January</td><td>Adult non-fiction</td><td class="n">320</td><td class="n">21</td><td class="n">11</td></tr>
+<tr id="led-28"><td>January</td><td>Children</td><td class="n">460</td><td class="n">32</td><td class="n">18</td></tr>
+<tr id="led-29"><td>January</td><td>Local history</td><td class="n">863</td><td class="n">32</td><td class="n">5</td></tr>
+<tr id="led-30"><td>January</td><td>Audiobooks</td><td class="n">108</td><td class="n">24</td><td class="n">13</td></tr>
+<tr id="led-31"><td>February</td><td>Adult fiction</td><td class="n">113</td><td class="n">33</td><td class="n">0</td></tr>
+<tr id="led-32"><td>February</td><td>Adult non-fiction</td><td class="n">307</td><td class="n">27</td><td class="n">1</td></tr>
+<tr id="led-33"><td>February</td><td>Children</td><td class="n">477</td><td class="n">13</td><td class="n">24</td></tr>
+<tr id="led-34"><td>February</td><td>Local history</td><td class="n">701</td><td class="n">6</td><td class="n">24</td></tr>
+<tr id="led-35"><td>February</td><td>Audiobooks</td><td class="n">643</td><td class="n">14</td><td class="n">5</td></tr>
+<tr id="led-36"><td>March</td><td>Adult fiction</td><td class="n">159</td><td class="n">17</td><td class="n">1</td></tr>
+<tr id="led-37"><td>March</td><td>Adult non-fiction</td><td class="n">523</td><td class="n">17</td><td class="n">15</td></tr>
+<tr id="led-38"><td>March</td><td>Children</td><td class="n">432</td><td class="n">38</td><td class="n">20</td></tr>
+<tr id="led-39"><td>March</td><td>Local history</td><td class="n">823</td><td class="n">3</td><td class="n">16</td></tr>
+<tr id="led-40"><td>March</td><td>Audiobooks</td><td class="n">550</td><td class="n">23</td><td class="n">6</td></tr>
+<tr id="led-41"><td>April</td><td>Adult fiction</td><td class="n">427</td><td class="n">18</td><td class="n">14</td></tr>
+<tr id="led-42"><td>April</td><td>Adult non-fiction</td><td class="n">567</td><td class="n">30</td><td class="n">7</td></tr>
+<tr id="led-43"><td>April</td><td>Children</td><td class="n">251</td><td class="n">29</td><td class="n">17</td></tr>
+<tr id="led-44"><td>April</td><td>Local history</td><td class="n">452</td><td class="n">11</td><td class="n">6</td></tr>
+<tr id="led-45"><td>April</td><td>Audiobooks</td><td class="n">864</td><td class="n">14</td><td class="n">19</td></tr>
+<tr id="led-46"><td>May</td><td>Adult fiction</td><td class="n">86</td><td class="n">17</td><td class="n">24</td></tr>
+<tr id="led-47"><td>May</td><td>Adult non-fiction</td><td class="n">900</td><td class="n">21</td><td class="n">5</td></tr>
+<tr id="led-48"><td>May</td><td>Children</td><td class="n">327</td><td class="n">0</td><td class="n">16</td></tr>
+<tr id="led-49"><td>May</td><td>Local history</td><td class="n">120</td><td class="n">15</td><td class="n">19</td></tr>
+<tr id="led-50"><td>May</td><td>Audiobooks</td><td class="n">198</td><td class="n">23</td><td class="n">17</td></tr>
+<tr id="led-51"><td>June</td><td>Adult fiction</td><td class="n">595</td><td class="n">9</td><td class="n">0</td></tr>
+<tr id="led-52"><td>June</td><td>Adult non-fiction</td><td class="n">410</td><td class="n">17</td><td class="n">20</td></tr>
+<tr id="led-53"><td>June</td><td>Children</td><td class="n">200</td><td class="n">14</td><td class="n">25</td></tr>
+<tr id="led-54"><td>June</td><td>Local history</td><td class="n">619</td><td class="n">32</td><td class="n">15</td></tr>
+<tr id="led-55"><td>June</td><td>Audiobooks</td><td class="n">581</td><td class="n">40</td><td class="n">11</td></tr>
+<tr id="led-56"><td>July</td><td>Adult fiction</td><td class="n">348</td><td class="n">28</td><td class="n">23</td></tr>
+<tr id="led-57"><td>July</td><td>Adult non-fiction</td><td class="n">246</td><td class="n">28</td><td class="n">9</td></tr>
+<tr id="led-58"><td>July</td><td>Children</td><td class="n">711</td><td class="n">2</td><td class="n">8</td></tr>
+<tr id="led-59"><td>July</td><td>Local history</td><td class="n">417</td><td class="n">32</td><td class="n">20</td></tr>
+<tr id="led-60"><td>July</td><td>Audiobooks</td><td class="n">792</td><td class="n">28</td><td class="n">22</td></tr>
+</tbody>
+</table>
+
+<h2 id="h-roll">Register of member households</h2>
+<p id="roll-p1">As required by the rules, the register of member households is published once a year. Households are identified by membership number only; the branch is the one at which the household first joined.</p>
+<table id="members-roll">
+<thead><tr><th>Number</th><th>Branch</th><th>Category</th><th>Joined</th><th>Loans this year</th><th>Volunteer</th></tr></thead>
+<tbody>
+<tr id="roll-001"><td>PML-01040</td><td>Hill</td><td>Concession</td><td class="n">2001</td><td class="n">65</td><td>yes</td></tr>
+<tr id="roll-002"><td>PML-01047</td><td>Quay</td><td>Household</td><td class="n">1976</td><td class="n">68</td><td>no</td></tr>
+<tr id="roll-003"><td>PML-01054</td><td>Hill</td><td>Single</td><td class="n">1980</td><td class="n">111</td><td>no</td></tr>
+<tr id="roll-004"><td>PML-01061</td><td>Quay</td><td>Life</td><td class="n">2004</td><td class="n">66</td><td>yes</td></tr>
+<tr id="roll-005"><td>PML-01068</td><td>Chapel</td><td>Junior</td><td class="n">2005</td><td class="n">23</td><td>no</td></tr>
+<tr id="roll-006"><td>PML-01075</td><td>Hill</td><td>Life</td><td class="n">2003</td><td class="n">88</td><td>no</td></tr>
+<tr id="roll-007"><td>PML-01082</td><td>Chapel</td><td>Life</td><td class="n">1978</td><td class="n">4</td><td>yes</td></tr>
+<tr id="roll-008"><td>PML-01089</td><td>Quay</td><td>Household</td><td class="n">2025</td><td class="n">18</td><td>no</td></tr>
+<tr id="roll-009"><td>PML-01096</td><td>Hill</td><td>Junior</td><td class="n">2018</td><td class="n">25</td><td>no</td></tr>
+<tr id="roll-010"><td>PML-01103</td><td>Hill</td><td>Concession</td><td class="n">1985</td><td class="n">138</td><td>no</td></tr>
+<tr id="roll-011"><td>PML-01110</td><td>Quay</td><td>Single</td><td class="n">2002</td><td class="n">100</td><td>yes</td></tr>
+<tr id="roll-012"><td>PML-01117</td><td>Quay</td><td>Junior</td><td class="n">1990</td><td class="n">82</td><td>yes</td></tr>
+<tr id="roll-013"><td>PML-01124</td><td>Market</td><td>Single</td><td class="n">2011</td><td class="n">23</td><td>no</td></tr>
+<tr id="roll-014"><td>PML-01131</td><td>Market</td><td>Single</td><td class="n">2016</td><td class="n">111</td><td>no</td></tr>
+<tr id="roll-015"><td>PML-01138</td><td>Hill</td><td>Household</td><td class="n">1981</td><td class="n">124</td><td>no</td></tr>
+<tr id="roll-016"><td>PML-01145</td><td>Chapel</td><td>Single</td><td class="n">1971</td><td class="n">87</td><td>no</td></tr>
+<tr id="roll-017"><td>PML-01152</td><td>Hill</td><td>Concession</td><td class="n">1974</td><td class="n">57</td><td>yes</td></tr>
+<tr id="roll-018"><td>PML-01159</td><td>Market</td><td>Concession</td><td class="n">1985</td><td class="n">51</td><td>no</td></tr>
+<tr id="roll-019"><td>PML-01166</td><td>Market</td><td>Single</td><td class="n">2001</td><td class="n">37</td><td>no</td></tr>
+<tr id="roll-020"><td>PML-01173</td><td>Hill</td><td>Life</td><td class="n">1997</td><td class="n">99</td><td>yes</td></tr>
+<tr id="roll-021"><td>PML-01180</td><td>Chapel</td><td>Junior</td><td class="n">2018</td><td class="n">12</td><td>yes</td></tr>
+<tr id="roll-022"><td>PML-01187</td><td>Chapel</td><td>Life</td><td class="n">2012</td><td class="n">101</td><td>no</td></tr>
+<tr id="roll-023"><td>PML-01194</td><td>Quay</td><td>Household</td><td class="n">2003</td><td class="n">79</td><td>no</td></tr>
+<tr id="roll-024"><td>PML-01201</td><td>Quay</td><td>Concession</td><td class="n">2017</td><td class="n">127</td><td>no</td></tr>
+<tr id="roll-025"><td>PML-01208</td><td>Market</td><td>Single</td><td class="n">1976</td><td class="n">122</td><td>yes</td></tr>
+<tr id="roll-026"><td>PML-01215</td><td>Hill</td><td>Concession</td><td class="n">1999</td><td class="n">11</td><td>no</td></tr>
+<tr id="roll-027"><td>PML-01222</td><td>Market</td><td>Concession</td><td class="n">1994</td><td class="n">72</td><td>no</td></tr>
+<tr id="roll-028"><td>PML-01229</td><td>Market</td><td>Single</td><td class="n">1976</td><td class="n">66</td><td>yes</td></tr>
+<tr id="roll-029"><td>PML-01236</td><td>Chapel</td><td>Junior</td><td class="n">1995</td><td class="n">67</td><td>no</td></tr>
+<tr id="roll-030"><td>PML-01243</td><td>Chapel</td><td>Junior</td><td class="n">1999</td><td class="n">98</td><td>no</td></tr>
+<tr id="roll-031"><td>PML-01250</td><td>Hill</td><td>Single</td><td class="n">2018</td><td class="n">52</td><td>no</td></tr>
+<tr id="roll-032"><td>PML-01257</td><td>Quay</td><td>Concession</td><td class="n">2001</td><td class="n">13</td><td>no</td></tr>
+<tr id="roll-033"><td>PML-01264</td><td>Market</td><td>Single</td><td class="n">2022</td><td class="n">79</td><td>yes</td></tr>
+<tr id="roll-034"><td>PML-01271</td><td>Quay</td><td>Life</td><td class="n">1987</td><td class="n">10</td><td>yes</td></tr>
+<tr id="roll-035"><td>PML-01278</td><td>Hill</td><td>Single</td><td class="n">1978</td><td class="n">50</td><td>no</td></tr>
+<tr id="roll-036"><td>PML-01285</td><td>Hill</td><td>Single</td><td class="n">2017</td><td class="n">79</td><td>yes</td></tr>
+<tr id="roll-037"><td>PML-01292</td><td>Quay</td><td>Concession</td><td class="n">2011</td><td class="n">127</td><td>yes</td></tr>
+<tr id="roll-038"><td>PML-01299</td><td>Chapel</td><td>Household</td><td class="n">2001</td><td class="n">1</td><td>yes</td></tr>
+<tr id="roll-039"><td>PML-01306</td><td>Chapel</td><td>Life</td><td class="n">1999</td><td class="n">75</td><td>no</td></tr>
+<tr id="roll-040"><td>PML-01313</td><td>Market</td><td>Junior</td><td class="n">2022</td><td class="n">106</td><td>yes</td></tr>
+<tr id="roll-041"><td>PML-01320</td><td>Market</td><td>Household</td><td class="n">1977</td><td class="n">125</td><td>no</td></tr>
+<tr id="roll-042"><td>PML-01327</td><td>Quay</td><td>Junior</td><td class="n">2003</td><td class="n">103</td><td>no</td></tr>
+<tr id="roll-043"><td>PML-01334</td><td>Quay</td><td>Single</td><td class="n">1990</td><td class="n">15</td><td>yes</td></tr>
+<tr id="roll-044"><td>PML-01341</td><td>Quay</td><td>Junior</td><td class="n">1973</td><td class="n">14</td><td>yes</td></tr>
+<tr id="roll-045"><td>PML-01348</td><td>Hill</td><td>Household</td><td class="n">1975</td><td class="n">7</td><td>yes</td></tr>
+<tr id="roll-046"><td>PML-01355</td><td>Chapel</td><td>Single</td><td class="n">1997</td><td class="n">86</td><td>no</td></tr>
+<tr id="roll-047"><td>PML-01362</td><td>Market</td><td>Single</td><td class="n">1993</td><td class="n">22</td><td>no</td></tr>
+<tr id="roll-048"><td>PML-01369</td><td>Quay</td><td>Concession</td><td class="n">1977</td><td class="n">76</td><td>yes</td></tr>
+<tr id="roll-049"><td>PML-01376</td><td>Chapel</td><td>Life</td><td class="n">1976</td><td class="n">71</td><td>yes</td></tr>
+<tr id="roll-050"><td>PML-01383</td><td>Hill</td><td>Single</td><td class="n">1975</td><td class="n">123</td><td>no</td></tr>
+<tr id="roll-051"><td>PML-01390</td><td>Market</td><td>Junior</td><td class="n">2016</td><td class="n">81</td><td>no</td></tr>
+<tr id="roll-052"><td>PML-01397</td><td>Chapel</td><td>Junior</td><td class="n">1989</td><td class="n">49</td><td>no</td></tr>
+<tr id="roll-053"><td>PML-01404</td><td>Quay</td><td>Single</td><td class="n">1989</td><td class="n">98</td><td>no</td></tr>
+<tr id="roll-054"><td>PML-01411</td><td>Hill</td><td>Life</td><td class="n">2010</td><td class="n">112</td><td>no</td></tr>
+<tr id="roll-055"><td>PML-01418</td><td>Market</td><td>Concession</td><td class="n">1994</td><td class="n">26</td><td>yes</td></tr>
+<tr id="roll-056"><td>PML-01425</td><td>Chapel</td><td>Single</td><td class="n">1991</td><td class="n">140</td><td>yes</td></tr>
+<tr id="roll-057"><td>PML-01432</td><td>Market</td><td>Junior</td><td class="n">1989</td><td class="n">79</td><td>no</td></tr>
+<tr id="roll-058"><td>PML-01439</td><td>Market</td><td>Concession</td><td class="n">2000</td><td class="n">117</td><td>yes</td></tr>
+<tr id="roll-059"><td>PML-01446</td><td>Hill</td><td>Life</td><td class="n">1993</td><td class="n">52</td><td>no</td></tr>
+<tr id="roll-060"><td>PML-01453</td><td>Market</td><td>Life</td><td class="n">1990</td><td class="n">36</td><td>no</td></tr>
+<tr id="roll-061"><td>PML-01460</td><td>Market</td><td>Concession</td><td class="n">2010</td><td class="n">101</td><td>yes</td></tr>
+<tr id="roll-062"><td>PML-01467</td><td>Market</td><td>Life</td><td class="n">1972</td><td class="n">134</td><td>yes</td></tr>
+<tr id="roll-063"><td>PML-01474</td><td>Market</td><td>Single</td><td class="n">2019</td><td class="n">124</td><td>yes</td></tr>
+<tr id="roll-064"><td>PML-01481</td><td>Market</td><td>Single</td><td class="n">2018</td><td class="n">112</td><td>yes</td></tr>
+<tr id="roll-065"><td>PML-01488</td><td>Market</td><td>Household</td><td class="n">2021</td><td class="n">59</td><td>yes</td></tr>
+<tr id="roll-066"><td>PML-01495</td><td>Hill</td><td>Concession</td><td class="n">2008</td><td class="n">31</td><td>yes</td></tr>
+<tr id="roll-067"><td>PML-01502</td><td>Hill</td><td>Junior</td><td class="n">2015</td><td class="n">79</td><td>no</td></tr>
+<tr id="roll-068"><td>PML-01509</td><td>Hill</td><td>Junior</td><td class="n">1993</td><td class="n">112</td><td>no</td></tr>
+<tr id="roll-069"><td>PML-01516</td><td>Chapel</td><td>Concession</td><td class="n">1985</td><td class="n">50</td><td>yes</td></tr>
+<tr id="roll-070"><td>PML-01523</td><td>Chapel</td><td>Life</td><td class="n">2010</td><td class="n">86</td><td>no</td></tr>
+<tr id="roll-071"><td>PML-01530</td><td>Chapel</td><td>Concession</td><td class="n">1976</td><td class="n">6</td><td>yes</td></tr>
+<tr id="roll-072"><td>PML-01537</td><td>Market</td><td>Junior</td><td class="n">2011</td><td class="n">74</td><td>no</td></tr>
+<tr id="roll-073"><td>PML-01544</td><td>Hill</td><td>Life</td><td class="n">1994</td><td class="n">80</td><td>yes</td></tr>
+<tr id="roll-074"><td>PML-01551</td><td>Market</td><td>Junior</td><td class="n">1994</td><td class="n">13</td><td>yes</td></tr>
+<tr id="roll-075"><td>PML-01558</td><td>Quay</td><td>Junior</td><td class="n">1975</td><td class="n">135</td><td>no</td></tr>
+<tr id="roll-076"><td>PML-01565</td><td>Hill</td><td>Single</td><td class="n">1981</td><td class="n">31</td><td>no</td></tr>
+<tr id="roll-077"><td>PML-01572</td><td>Chapel</td><td>Concession</td><td class="n">2006</td><td class="n">23</td><td>yes</td></tr>
+<tr id="roll-078"><td>PML-01579</td><td>Hill</td><td>Single</td><td class="n">1992</td><td class="n">135</td><td>no</td></tr>
+<tr id="roll-079"><td>PML-01586</td><td>Market</td><td>Single</td><td class="n">1976</td><td class="n">53</td><td>yes</td></tr>
+<tr id="roll-080"><td>PML-01593</td><td>Hill</td><td>Concession</td><td class="n">1970</td><td class="n">136</td><td>no</td></tr>
+<tr id="roll-081"><td>PML-01600</td><td>Quay</td><td>Junior</td><td class="n">2007</td><td class="n">133</td><td>yes</td></tr>
+<tr id="roll-082"><td>PML-01607</td><td>Quay</td><td>Junior</td><td class="n">1987</td><td class="n">5</td><td>no</td></tr>
+<tr id="roll-083"><td>PML-01614</td><td>Chapel</td><td>Concession</td><td class="n">2021</td><td class="n">102</td><td>yes</td></tr>
+<tr id="roll-084"><td>PML-01621</td><td>Quay</td><td>Life</td><td class="n">2001</td><td class="n">116</td><td>no</td></tr>
+<tr id="roll-085"><td>PML-01628</td><td>Quay</td><td>Life</td><td class="n">1991</td><td class="n">106</td><td>yes</td></tr>
+<tr id="roll-086"><td>PML-01635</td><td>Quay</td><td>Concession</td><td class="n">2018</td><td class="n">18</td><td>no</td></tr>
+<tr id="roll-087"><td>PML-01642</td><td>Market</td><td>Single</td><td class="n">1987</td><td class="n">104</td><td>no</td></tr>
+<tr id="roll-088"><td>PML-01649</td><td>Chapel</td><td>Life</td><td class="n">1973</td><td class="n">11</td><td>no</td></tr>
+<tr id="roll-089"><td>PML-01656</td><td>Market</td><td>Concession</td><td class="n">1990</td><td class="n">21</td><td>yes</td></tr>
+<tr id="roll-090"><td>PML-01663</td><td>Quay</td><td>Household</td><td class="n">2019</td><td class="n">36</td><td>yes</td></tr>
+<tr id="roll-091"><td>PML-01670</td><td>Hill</td><td>Single</td><td class="n">2018</td><td class="n">128</td><td>yes</td></tr>
+<tr id="roll-092"><td>PML-01677</td><td>Hill</td><td>Life</td><td class="n">2020</td><td class="n">90</td><td>yes</td></tr>
+<tr id="roll-093"><td>PML-01684</td><td>Chapel</td><td>Household</td><td class="n">2010</td><td class="n">37</td><td>no</td></tr>
+<tr id="roll-094"><td>PML-01691</td><td>Chapel</td><td>Life</td><td class="n">1997</td><td class="n">83</td><td>yes</td></tr>
+<tr id="roll-095"><td>PML-01698</td><td>Market</td><td>Household</td><td class="n">1986</td><td class="n">110</td><td>no</td></tr>
+<tr id="roll-096"><td>PML-01705</td><td>Hill</td><td>Single</td><td class="n">1969</td><td class="n">90</td><td>no</td></tr>
+<tr id="roll-097"><td>PML-01712</td><td>Market</td><td>Household</td><td class="n">2007</td><td class="n">125</td><td>no</td></tr>
+<tr id="roll-098"><td>PML-01719</td><td>Chapel</td><td>Concession</td><td class="n">1988</td><td class="n">10</td><td>no</td></tr>
+<tr id="roll-099"><td>PML-01726</td><td>Quay</td><td>Concession</td><td class="n">2007</td><td class="n">80</td><td>yes</td></tr>
+<tr id="roll-100"><td>PML-01733</td><td>Quay</td><td>Concession</td><td class="n">1983</td><td class="n">139</td><td>yes</td></tr>
+<tr id="roll-101"><td>PML-01740</td><td>Quay</td><td>Household</td><td class="n">1972</td><td class="n">44</td><td>no</td></tr>
+<tr id="roll-102"><td>PML-01747</td><td>Market</td><td>Concession</td><td class="n">2017</td><td class="n">11</td><td>no</td></tr>
+<tr id="roll-103"><td>PML-01754</td><td>Hill</td><td>Concession</td><td class="n">1988</td><td class="n">86</td><td>yes</td></tr>
+<tr id="roll-104"><td>PML-01761</td><td>Market</td><td>Junior</td><td class="n">2025</td><td class="n">52</td><td>yes</td></tr>
+<tr id="roll-105"><td>PML-01768</td><td>Quay</td><td>Household</td><td class="n">2010</td><td class="n">122</td><td>no</td></tr>
+<tr id="roll-106"><td>PML-01775</td><td>Hill</td><td>Life</td><td class="n">1980</td><td class="n">119</td><td>no</td></tr>
+<tr id="roll-107"><td>PML-01782</td><td>Market</td><td>Single</td><td class="n">2022</td><td class="n">34</td><td>yes</td></tr>
+<tr id="roll-108"><td>PML-01789</td><td>Chapel</td><td>Junior</td><td class="n">1977</td><td class="n">29</td><td>yes</td></tr>
+<tr id="roll-109"><td>PML-01796</td><td>Chapel</td><td>Single</td><td class="n">1979</td><td class="n">65</td><td>yes</td></tr>
+<tr id="roll-110"><td>PML-01803</td><td>Market</td><td>Junior</td><td class="n">2011</td><td class="n">115</td><td>yes</td></tr>
+</tbody>
+</table>
+
+<section class="budget" id="budget">
+<h2 id="h-budget">Budget by half-year and branch</h2>
+<p id="bud-p1">Expenditure by heading for each branch, in pounds. The landscape page gives each branch its own column; the totals match the audited accounts.</p>
+<table id="tbl-budget">
+<thead><tr><th>Heading</th><th>Quay</th><th>Hill</th><th>Market</th><th>Chapel</th><th>Central</th><th>Reserve</th><th>Total</th></tr></thead>
+<tbody>
+<tr id="bud-1"><td>Salaries</td><td class="n">28,936</td><td class="n">26,166</td><td class="n">13,632</td><td class="n">11,568</td><td class="n">37,910</td><td class="n">12,240</td><td class="n">130,452</td></tr>
+<tr id="bud-2"><td>Books and media</td><td class="n">38,324</td><td class="n">9,943</td><td class="n">6,014</td><td class="n">35,987</td><td class="n">11,443</td><td class="n">21,753</td><td class="n">123,464</td></tr>
+<tr id="bud-3"><td>Periodicals</td><td class="n">41,533</td><td class="n">38,974</td><td class="n">11,653</td><td class="n">3,339</td><td class="n">15,779</td><td class="n">31,423</td><td class="n">142,701</td></tr>
+<tr id="bud-4"><td>Building</td><td class="n">32,268</td><td class="n">9,665</td><td class="n">10,934</td><td class="n">6,300</td><td class="n">30,670</td><td class="n">40,397</td><td class="n">130,234</td></tr>
+<tr id="bud-5"><td>Utilities</td><td class="n">37,330</td><td class="n">36,958</td><td class="n">15,545</td><td class="n">10,240</td><td class="n">32,973</td><td class="n">10,085</td><td class="n">143,131</td></tr>
+<tr id="bud-6"><td>Insurance</td><td class="n">18,538</td><td class="n">34,353</td><td class="n">36,484</td><td class="n">39,461</td><td class="n">16,725</td><td class="n">34,881</td><td class="n">180,442</td></tr>
+<tr id="bud-7"><td>Events</td><td class="n">41,840</td><td class="n">17,586</td><td class="n">16,893</td><td class="n">5,681</td><td class="n">26,247</td><td class="n">11,181</td><td class="n">119,428</td></tr>
+<tr id="bud-8"><td>IT and catalogue</td><td class="n">36,439</td><td class="n">18,315</td><td class="n">36,212</td><td class="n">38,131</td><td class="n">2,440</td><td class="n">28,451</td><td class="n">159,988</td></tr>
+<tr id="bud-9"><td>Volunteer expenses</td><td class="n">39,840</td><td class="n">3,215</td><td class="n">30,032</td><td class="n">34,607</td><td class="n">8,754</td><td class="n">13,610</td><td class="n">130,058</td></tr>
+<tr id="bud-10"><td>Sundries</td><td class="n">41,802</td><td class="n">29,013</td><td class="n">36,994</td><td class="n">12,484</td><td class="n">4,593</td><td class="n">1,715</td><td class="n">126,601</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="treasurer">
+<h2 id="h-treasurer">Treasurer&rsquo;s notes</h2>
+<p id="tr-p1">The accounts show a small surplus for the year, almost all of it from the sale of duplicate local history volumes to the county archive. Without that one-off sale the society would have run a deficit of a few hundred pounds, mostly because of the basement repairs. The reserve remains above the six months of running costs that the rules require.</p>
+<p id="tr-p2">Next year&rsquo;s budget assumes flat subscriptions, a modest rise in room hire and no heritage grant from the spring onwards. The committee will report on its fundraising plans at the general meeting.</p>
+<p class="signoff" id="signoff">For the committee, the honorary treasurer</p>
+<p class="imprint" id="imprint">The Pellbrook Mutual Library Society is fictional, membership numbers are invented, and no person is identified. This is a specimen document written for layout testing.</p>
+</section>
+</main>
+</body>
+</html>

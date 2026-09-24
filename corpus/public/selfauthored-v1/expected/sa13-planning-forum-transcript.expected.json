@@ -1,0 +1,461 @@
+{
+  "schemaVersion": "selfauthored-expected-v1",
+  "documentId": "sa13-planning-forum-transcript",
+  "artifact": "documents/sa13-planning-forum-transcript.html",
+  "sha256": "10cec73ceb40208af6edb07dd6e11e90c7ba33bcf75c64784058b3c26a438a86",
+  "byteLength": 13390,
+  "authoredOn": "2026-09-24",
+  "provenanceClass": "synthetic_first_party",
+  "calibrationEvidenceEligible": false,
+  "title": "Oakhollow Parish Planning Forum: verbatim record (review copy)",
+  "genre": "double-spaced verbatim transcript (long-leading document)",
+  "language": {
+    "htmlLang": "en",
+    "typeRulesUnderDefaultLocale": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+  },
+  "paper": [
+    {
+      "pageRule": "@page",
+      "size": "A4",
+      "orientation": "portrait",
+      "pageBoxCssPx": [
+        793.7,
+        1122.52
+      ],
+      "margins": "20mm",
+      "contentBoxCssPx": [
+        642.52,
+        971.34
+      ]
+    }
+  ],
+  "profile": "default",
+  "pages": {
+    "range": [
+      7,
+      8
+    ],
+    "measured": 7,
+    "basis": "fixed-pitch record: 22 + 24 + 24 + 24 + 3 lines on five pages by construction, plus the intro page and the forced appendix page; only the intro prose could spill onto an extra page"
+  },
+  "expectedExit": {
+    "set": [
+      0
+    ],
+    "derivation": "The planted defect is warn (layout/orphaned-continuation-page); the error rules have only short candidates and no SVG.",
+    "byCode": {
+      "0": "warn-only"
+    },
+    "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
+  },
+  "fontDependence": "Only generic families (serif, sans-serif, monospace) are used. Line breaks, paragraph heights and therefore the position of flowing text depend on the fonts the renderer resolves; every construction fact below is built from explicit heights, fixed line pitches, forced breaks or SVG coordinates so that it does not depend on them, and every font-dependent outcome is listed as allowed.",
+  "features": [
+    "A4",
+    "running element in @top-center",
+    "@page :first",
+    "pre over five pages on a fixed 40 px line pitch (12 pt, double spacing)",
+    "full middle pages of one block (must not fire)",
+    "three-line tail page before a forced break (planted)"
+  ],
+  "runningElements": [
+    {
+      "id": "recordhead",
+      "marginBox": "top-center",
+      "marginBoxCopies": 7,
+      "pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  ],
+  "constructionFacts": [
+    {
+      "fact": "line counts",
+      "arithmetic": "22 + 24 + 24 + 24 + 3 = 97 lines; 40 px pitch",
+      "measured": [
+        {
+          "page": 2,
+          "heightPx": 880,
+          "topInContentPx": 64,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 3,
+          "heightPx": 960,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 4,
+          "heightPx": 960,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 5,
+          "heightPx": 960,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        },
+        {
+          "page": 6,
+          "heightPx": 120,
+          "topInContentPx": 0,
+          "startsInsideContentBox": true
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "layout/widow": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "recordhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "record"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "record"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/orphan": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "recordhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "record"
+          },
+          "class": "font-dependent",
+          "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "within": "record"
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphan.md 'Skipped after a forced outgoing break'; the widow rule declines after a forced incoming break (declines list in the rule registry)."
+        }
+      ]
+    },
+    "layout/unbreakable-block-too-tall": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "recordhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "ids": [
+              "tbl-actions"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (971.34 px) and are laid out in one piece",
+          "measured": {
+            "tbl-actions": {
+              "maxFragmentPx": 144.92,
+              "fragments": 1,
+              "naturalPx": 144.92
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tbl-actions tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 971.34 px content box"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/heading-at-page-bottom": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "recordhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        },
+        {
+          "target": {
+            "selectors": [
+              "h1",
+              "h2"
+            ]
+          },
+          "why": "h1 opens page 1; both h2 open their pages with break-before: page"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "layout/half-empty-page": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "Not active in the default profile (src/config/contract.ts OFF_BY_DEFAULT_RULE_IDS; docs/rules/layout-half-empty-page.md). Any finding under the default profile fails the gate."
+      ]
+    },
+    "layout/orphaned-continuation-page": {
+      "mustFire": [
+        {
+          "target": {
+            "pageOf": {
+              "id": "verbatim",
+              "fragment": "last"
+            }
+          },
+          "measuredPage": 6,
+          "why": "the page holds only the last three lines of the verbatim record, which began four pages earlier; the next page is forced",
+          "construction": "pre#verbatim: 97 lines on a fixed 40 px pitch (one display: block span per line). Its page opens with h2.record (48 px + 16 px); lines per page: floor((971.34 - 64) / 40) = 22, then floor(971.34 / 40) = 24, 24, 24, leaving 97 - 94 = 3 lines (120 px) for the tail page. The appendix heading after it has break-before: page. Net fill of the tail page is about 3 x 18.6 px / 971 px = 0.06 against 0.5.",
+          "measured": {
+            "fragments": [
+              {
+                "page": 2,
+                "heightPx": 880,
+                "topInContentPx": 64,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 3,
+                "heightPx": 960,
+                "topInContentPx": 0,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 4,
+                "heightPx": 960,
+                "topInContentPx": 0,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 5,
+                "heightPx": 960,
+                "topInContentPx": 0,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 6,
+                "heightPx": 120,
+                "topInContentPx": 0,
+                "startsInsideContentBox": true
+              }
+            ]
+          },
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md; the incoming break of the tail page is an overflow."
+        }
+      ],
+      "mustNotFire": [
+        {
+          "target": {
+            "pageOf": {
+              "id": "verbatim",
+              "fragment": "nonFinal",
+              "excludeFirst": true
+            }
+          },
+          "measuredPages": [
+            3,
+            4,
+            5
+          ],
+          "why": "middle pages of the record: completely full (24 lines each) and the record continues onto the next page, so they hold the middle of a block, not its tail. At 12 pt monospace on a 40 px pitch the glyph bands cover about 0.46 of the page (G-15 class), which is below the 0.5 threshold; a tool that judges them by net fill alone reports a full page.",
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'A page holds nothing but the tail of a block that began earlier.'"
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "pages": "any page not named in mustNotFire"
+          },
+          "class": "font-dependent",
+          "why": "a page can end up holding only the text tail of an earlier block when font metrics push the last lines of a flowing section over a page boundary; that is a legitimate finding the construction does not fix"
+        }
+      ],
+      "expectedDeclines": [
+        {
+          "target": {
+            "document": true
+          },
+          "reason": "env/forced-break",
+          "required": false,
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'Declined after a forced incoming break'."
+        }
+      ]
+    },
+    "layout/hyphen-across-page": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "recordhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+        }
+      ],
+      "allowed": [
+        {
+          "target": {
+            "within": "record"
+          },
+          "class": "font-dependent",
+          "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "svg/text-overflows-viewport": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [],
+      "expectedDeclines": [],
+      "notes": [
+        "The document contains no SVG; the rule has no candidate."
+      ]
+    },
+    "type/spaced-hyphen": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/straight-quotes": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no straight quotation mark or apostrophe occurs in any text run outside code, pre, kbd, samp and var; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "type/short-last-line": {
+      "mustFire": [],
+      "mustNotFire": [],
+      "allowed": [
+        {
+          "target": {
+            "within": "record"
+          },
+          "class": "font-dependent",
+          "why": "the width of a paragraph's last line depends on font metrics"
+        }
+      ],
+      "expectedDeclines": []
+    },
+    "type/excessive-word-spacing": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no block is justified; docs/rules/type-excessive-word-spacing.md judges word gaps in a justified block only"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    },
+    "artifact/local-uri": {
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "document": true
+          },
+          "why": "no file: URI and no absolute path occurs in any URI-bearing attribute (href, src, srcset, poster, data, xlink:href) or CSS url()"
+        }
+      ],
+      "allowed": [],
+      "expectedDeclines": []
+    }
+  },
+  "permittedDeclineReasons": [
+    "env/forced-break"
+  ],
+  "notActiveInDefaultProfile": [
+    "layout/half-empty-page"
+  ],
+  "verification": {
+    "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
+    "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
+    "pagedjs": "0.4.3",
+    "measuredOn": "2026-09-24",
+    "pageCount": 7,
+    "pdfPageCount": 7,
+    "contentBoxHeightsPx": [
+      971.33
+    ],
+    "platformFonts": {
+      ".pagedjs_page_content p": [
+        "Liberation Sans (system, 110 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+        "Liberation Sans (system, 48 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+        "Liberation Sans (system, 15 glyphs)"
+      ],
+      ".pagedjs_page_content pre": [
+        "DejaVu Sans Mono (system, 1001 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+        "Liberation Serif (system, 1 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+    },
+    "overflowColumnResidue": []
+  },
+  "notes": []
+}

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Acoustic Survey of Nocturnal Insect Choruses</title>
+<style>
+@page {
+  size: letter;
+  margin: 0.9in 1in 0.9in 1in;
+  @top-center { content: element(runtitle); }
+  @bottom-right { content: counter(page); font: 9pt sans-serif; }
+}
+@page :first { @top-center { content: none; } }
+body { margin: 0; font: 10.5pt/1.5 serif; color: #222; }
+.runtitle { position: running(runtitle); font: 8pt sans-serif; color: #666; }
+h1 { font: bold 17pt/1.25 sans-serif; margin: 0 0 2mm; color: #3a2406; }
+.byline { font: 9pt sans-serif; color: #555; margin: 0 0 6mm; }
+h2 { font: bold 11.5pt/1.3 sans-serif; color: #3a2406; margin: 6mm 0 2mm; break-after: avoid; }
+p { margin: 0 0 2.5mm; text-align: left; widows: 2; orphans: 2; }
+figure { margin: 4mm 0 5mm; break-inside: avoid; }
+figcaption { font: 9pt/1.4 sans-serif; margin-top: 2mm; color: #333; }
+figure svg { display: block; }
+svg .halo { paint-order: stroke fill; stroke: #ffffff; stroke-width: 3px; stroke-linejoin: round; }
+svg.bleed { overflow: visible; }
+table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 3mm 0 5mm; break-inside: avoid; }
+th, td { padding: 2pt 5pt; border-bottom: 0.5pt solid #ccc; text-align: left; }
+th { border-bottom: 1pt solid #3a2406; }
+.imprint { font: 7.5pt/1.4 sans-serif; color: #777; margin-top: 8mm; }
+</style>
+</head>
+<body>
+<div class="runtitle" id="runtitle">Fenmoor Reserve &middot; acoustic survey of nocturnal insect choruses &middot; July</div>
+<main id="survey">
+<h1 id="title">Acoustic survey of nocturnal insect choruses at Fenmoor Reserve</h1>
+<p class="byline" id="byline">Survey report of the reserve volunteer monitoring group &middot; one month of passive recording</p>
+
+<h2 id="h-summary">Summary</h2>
+<p id="summary-p1">Five passive acoustic recorders were left on the reserve for the thirty-one nights of July and recorded from dusk to dawn. Automated band-energy analysis, checked by listening to a random sample of one minute in fifty, shows two main choruses: field crickets calling near 4 kHz, strongest in the two hours after midnight, and bush crickets calling higher and earlier. Activity fell sharply on the three coolest nights of the month and recovered within a night once temperatures rose again.</p>
+
+<h2 id="h-methods">Recorders and analysis</h2>
+<p id="methods-p1">The recorders were strapped to fence posts at about one metre above the ground, facing away from the prevailing wind, along a line that runs from the hedge on the western boundary to the reed bed on the eastern shore. Each recorder sampled at 48 kHz and stored ten minutes of every quarter hour, which kept the memory cards and batteries sufficient for the whole month.</p>
+<figure id="fig-sites">
+<svg id="svg-sites" xmlns="http://www.w3.org/2000/svg" width="624" height="260" viewBox="0 0 200 100" role="img"><title>Recorder positions across the reserve</title>
+  <rect x="0" y="0" width="200" height="100" fill="#eef3e6"/>
+  <path d="M 0 70 C 40 60, 80 80, 120 65 S 180 55, 200 60 L 200 100 L 0 100 Z" fill="#cfe0ef" stroke="#444" stroke-width="1.5"/>
+  <circle cx="30" cy="30" r="2.2" fill="#5a3d1e"/>
+  <text id="site-r1" x="30" y="25" font-size="5.5" text-anchor="middle" font-weight="bold">R1</text>
+  <circle cx="70" cy="42" r="2.2" fill="#5a3d1e"/>
+  <text id="site-r2" x="70" y="37" font-size="5.5" text-anchor="middle" font-weight="bold">R2</text>
+  <circle cx="110" cy="28" r="2.2" fill="#5a3d1e"/>
+  <text id="site-r3" x="110" y="23" font-size="5.5" text-anchor="middle" font-weight="bold">R3</text>
+  <circle cx="150" cy="45" r="2.2" fill="#5a3d1e"/>
+  <text id="site-r4" x="150" y="40" font-size="5.5" text-anchor="middle" font-weight="bold">R4</text>
+  <circle cx="180" cy="25" r="2.2" fill="#5a3d1e"/>
+  <text id="site-r5" x="180" y="20" font-size="5.5" text-anchor="middle" font-weight="bold">R5</text>
+  <text id="site-water" x="100" y="90" font-size="5.5" text-anchor="middle">Open water</text>
+  <text id="site-hedge" x="-3" y="50" font-size="5" text-anchor="end">Hedge</text>
+  <text id="site-reed" x="212" y="50" font-size="5" text-anchor="end">Reed bed</text>
+  <text id="site-title" x="4" y="8" font-size="5.5" font-weight="bold">Fenmoor reserve, recorder grid</text>
+</svg>
+<figcaption id="cap-sites">Figure 1. Recorder positions R1 to R5 on the survey line. The hedge and the reed bed lie just beyond the mapped strip.</figcaption>
+</figure>
+<p id="methods-p2">For each ten-minute file the analysis computed the energy in five frequency bands and expressed it relative to the quietest ten minutes of the same night at the same recorder. The resulting intensity values run from zero, for silence, to nine, for a chorus loud enough to mask everything else in the band. Birdsong at dawn and the occasional passing car were removed by hand after listening.</p>
+
+<h2 id="h-results">Results</h2>
+<p id="results-p1">The median intensity across all recorders and nights shows the two choruses clearly. The field cricket chorus fills the 4 kHz band from about ten in the evening and peaks between midnight and two. The bush cricket chorus appears in the 8 kHz band an hour earlier and fades sooner.</p>
+<figure id="fig-chorus">
+<svg id="svg-chorus" xmlns="http://www.w3.org/2000/svg" width="624" height="280" viewBox="0 0 624 280" role="img"><title>Chorus intensity by hour and frequency band</title>
+  <rect x="0" y="0" width="624" height="280" fill="#ffffff"/>
+  <rect x="70" y="194" width="56" height="34" fill="#efe3c2"/>
+  <rect x="128" y="194" width="56" height="34" fill="#e3cd8f"/>
+  <rect x="186" y="194" width="56" height="34" fill="#c29233"/>
+  <rect x="244" y="194" width="56" height="34" fill="#8a5a15"/>
+  <rect x="302" y="194" width="56" height="34" fill="#6d450f"/>
+  <rect x="360" y="194" width="56" height="34" fill="#8a5a15"/>
+  <rect x="418" y="194" width="56" height="34" fill="#c29233"/>
+  <rect x="476" y="194" width="56" height="34" fill="#d4b25d"/>
+  <rect x="534" y="194" width="56" height="34" fill="#efe3c2"/>
+  <text id="ch-band-0" x="62" y="215" font-size="9.5" text-anchor="end">2 kHz</text>
+  <rect x="70" y="158" width="56" height="34" fill="#efe3c2"/>
+  <rect x="128" y="158" width="56" height="34" fill="#d4b25d"/>
+  <rect x="186" y="158" width="56" height="34" fill="#8a5a15"/>
+  <rect x="244" y="158" width="56" height="34" fill="#52330a"/>
+  <rect x="302" y="158" width="56" height="34" fill="#3a2406"/>
+  <rect x="360" y="158" width="56" height="34" fill="#52330a"/>
+  <rect x="418" y="158" width="56" height="34" fill="#8a5a15"/>
+  <rect x="476" y="158" width="56" height="34" fill="#d4b25d"/>
+  <rect x="534" y="158" width="56" height="34" fill="#efe3c2"/>
+  <text id="ch-band-1" x="62" y="179" font-size="9.5" text-anchor="end">4 kHz</text>
+  <rect x="70" y="122" width="56" height="34" fill="#f7f4ea"/>
+  <rect x="128" y="122" width="56" height="34" fill="#e3cd8f"/>
+  <rect x="186" y="122" width="56" height="34" fill="#a8741f"/>
+  <rect x="244" y="122" width="56" height="34" fill="#6d450f"/>
+  <rect x="302" y="122" width="56" height="34" fill="#52330a"/>
+  <rect x="360" y="122" width="56" height="34" fill="#6d450f"/>
+  <rect x="418" y="122" width="56" height="34" fill="#a8741f"/>
+  <rect x="476" y="122" width="56" height="34" fill="#e3cd8f"/>
+  <rect x="534" y="122" width="56" height="34" fill="#efe3c2"/>
+  <text id="ch-band-2" x="62" y="143" font-size="9.5" text-anchor="end">6 kHz</text>
+  <rect x="70" y="86" width="56" height="34" fill="#f7f4ea"/>
+  <rect x="128" y="86" width="56" height="34" fill="#efe3c2"/>
+  <rect x="186" y="86" width="56" height="34" fill="#d4b25d"/>
+  <rect x="244" y="86" width="56" height="34" fill="#a8741f"/>
+  <rect x="302" y="86" width="56" height="34" fill="#8a5a15"/>
+  <rect x="360" y="86" width="56" height="34" fill="#a8741f"/>
+  <rect x="418" y="86" width="56" height="34" fill="#d4b25d"/>
+  <rect x="476" y="86" width="56" height="34" fill="#efe3c2"/>
+  <rect x="534" y="86" width="56" height="34" fill="#f7f4ea"/>
+  <text id="ch-band-3" x="62" y="107" font-size="9.5" text-anchor="end">8 kHz</text>
+  <rect x="70" y="50" width="56" height="34" fill="#f7f4ea"/>
+  <rect x="128" y="50" width="56" height="34" fill="#f7f4ea"/>
+  <rect x="186" y="50" width="56" height="34" fill="#efe3c2"/>
+  <rect x="244" y="50" width="56" height="34" fill="#e3cd8f"/>
+  <rect x="302" y="50" width="56" height="34" fill="#d4b25d"/>
+  <rect x="360" y="50" width="56" height="34" fill="#e3cd8f"/>
+  <rect x="418" y="50" width="56" height="34" fill="#efe3c2"/>
+  <rect x="476" y="50" width="56" height="34" fill="#f7f4ea"/>
+  <rect x="534" y="50" width="56" height="34" fill="#f7f4ea"/>
+  <text id="ch-band-4" x="62" y="71" font-size="9.5" text-anchor="end">10 kHz</text>
+  <text id="ch-hour-0" x="98" y="245" font-size="9.5" text-anchor="middle">20</text>
+  <text id="ch-hour-1" x="156" y="245" font-size="9.5" text-anchor="middle">21</text>
+  <text id="ch-hour-2" x="214" y="245" font-size="9.5" text-anchor="middle">22</text>
+  <text id="ch-hour-3" x="272" y="245" font-size="9.5" text-anchor="middle">23</text>
+  <text id="ch-hour-4" x="330" y="245" font-size="9.5" text-anchor="middle">00</text>
+  <text id="ch-hour-5" x="388" y="245" font-size="9.5" text-anchor="middle">01</text>
+  <text id="ch-hour-6" x="446" y="245" font-size="9.5" text-anchor="middle">02</text>
+  <text id="ch-hour-7" x="504" y="245" font-size="9.5" text-anchor="middle">03</text>
+  <text id="ch-hour-8" x="562" y="245" font-size="9.5" text-anchor="middle">04</text>
+  <text id="ch-halo-cricket" x="306" y="180" font-size="10.5" class="halo">Field cricket peak</text>
+  <text id="ch-halo-bush" x="248" y="108" font-size="10.5" class="halo">Bush cricket</text>
+  <text id="ch-halo-taper" x="424" y="216" font-size="10.5" class="halo">Tapering off</text>
+  <text id="ch-title" x="24" y="22" font-size="11" font-weight="bold">Median chorus intensity, all recorders, July nights</text>
+  <text id="ch-xtitle" x="312" y="270" font-size="9.5" text-anchor="middle">Hour of the night</text>
+</svg>
+<figcaption id="cap-chorus">Figure 2. Median chorus intensity by hour and frequency band. Darker cells are louder.</figcaption>
+</figure>
+<p id="results-p2">Nightly totals rise through the first half of the month, peak in the third week and decline towards the end, which matches the seasonal course of adult numbers. The dip in the fourth week coincides with three nights on which the air temperature at midnight fell below twelve degrees.</p>
+<figure id="fig-nightly">
+<svg id="svg-nightly" xmlns="http://www.w3.org/2000/svg" width="624" height="300" viewBox="0 0 624 300" role="img"><title>Calling activity per night</title>
+  <rect x="0" y="0" width="624" height="300" fill="#ffffff"/>
+  <line x1="80" y1="250" x2="600" y2="250" stroke="#333" stroke-width="1"/>
+  <line x1="80" y1="40" x2="80" y2="250" stroke="#333" stroke-width="1"/>
+  <path d="M 80 159 L 97.33 173.82 L 114.67 167.65 L 132 161.47 L 149.33 155.29 L 166.67 128.12 L 184 142.94 L 201.33 136.76 L 218.67 130.59 L 236 124.41 L 253.33 97.24 L 270.67 112.06 L 288 105.88 L 305.33 99.71 L 322.67 93.53 L 340 66.35 L 357.33 81.18 L 374.67 75 L 392 81.18 L 409.33 87.35 L 426.67 72.53 L 444 99.71 L 461.33 105.88 L 478.67 112.06 L 496 118.24 L 513.33 103.41 L 530.67 130.59 L 548 136.76 L 565.33 142.94 L 582.67 149.12 L 600 134.29" fill="none" stroke="#8a5a15" stroke-width="2"/>
+  <path d="M 80 206 L 97.33 201.5 L 114.67 197 L 132 192.5 L 149.33 188 L 166.67 183.5 L 184 179 L 201.33 174.5 L 218.67 170 L 236 165.5 L 253.33 161 L 270.67 156.5 L 288 152 L 305.33 156.5 L 322.67 161 L 340 165.5 L 357.33 170 L 374.67 174.5 L 392 179 L 409.33 183.5 L 426.67 188 L 444 192.5 L 461.33 197 L 478.67 201.5 L 496 206 L 513.33 210.5 L 530.67 215 L 548 219.5 L 565.33 224 L 582.67 228.5 L 600 233" fill="none" stroke="#3b6e8f" stroke-width="2"/>
+  <text id="ni-x-1" x="80" y="266" font-size="9.5" text-anchor="middle">1 Jul</text>
+  <text id="ni-x-8" x="201.33" y="266" font-size="9.5" text-anchor="middle">8 Jul</text>
+  <text id="ni-x-15" x="322.67" y="266" font-size="9.5" text-anchor="middle">15 Jul</text>
+  <text id="ni-x-22" x="444" y="266" font-size="9.5" text-anchor="middle">22 Jul</text>
+  <text id="ni-x-29" x="565.33" y="266" font-size="9.5" text-anchor="middle">29 Jul</text>
+  <text id="ni-y-0" x="72" y="254" font-size="9.5" text-anchor="end">0</text>
+  <text id="ni-y-20" x="72" y="184" font-size="9.5" text-anchor="end">20</text>
+  <text id="ni-y-40" x="72" y="114" font-size="9.5" text-anchor="end">40</text>
+  <text id="ni-y-60" x="72" y="44" font-size="9.5" text-anchor="end">60</text>
+  <text id="ni-ytitle" x="0" y="0" font-size="10" text-anchor="middle" transform="translate(30 145) rotate(-90)">Calls per minute</text>
+  <text id="ni-halo-crickets" x="374.67" y="60" font-size="10.5" text-anchor="middle" class="halo" fill="#8a5a15">Crickets</text>
+  <text id="ni-halo-katydids" x="288" y="174" font-size="10.5" text-anchor="middle" class="halo" fill="#3b6e8f">Katydids</text>
+  <text id="ni-halo-cool" x="513.33" y="131" font-size="10" text-anchor="middle" class="halo">Cool night</text>
+  <text id="ni-xtitle" x="340" y="290" font-size="9.5" text-anchor="middle">Night of recording</text>
+  <defs><text id="ni-defs-template" x="900" y="900" font-size="10">template label</text></defs>
+  <text id="ni-hidden-note" x="700" y="-40" font-size="10" visibility="hidden">draft note, hidden</text>
+</svg>
+<figcaption id="cap-nightly">Figure 3. Calls per minute for crickets and katydids, median of all recorders, for each night of July.</figcaption>
+</figure>
+<p id="results-p3">Listening to the sample files confirmed that almost all of the energy in the 4 kHz band comes from a single cricket species. Its chirp consists of six short pulses, repeated about three times a second on warm nights and more slowly as the air cools.</p>
+<figure id="fig-inset">
+<svg id="svg-inset" class="bleed" xmlns="http://www.w3.org/2000/svg" width="300" height="120" viewBox="0 0 300 120" role="img"><title>Call structure of one chirp</title>
+  <rect x="0" y="0" width="300" height="120" fill="#f7f4ea"/>
+  <rect x="20" y="40" width="18" height="50" fill="#8a5a15"/>
+  <rect x="62" y="40" width="18" height="50" fill="#8a5a15"/>
+  <rect x="104" y="40" width="18" height="50" fill="#8a5a15"/>
+  <rect x="146" y="40" width="18" height="50" fill="#8a5a15"/>
+  <rect x="188" y="40" width="18" height="50" fill="#8a5a15"/>
+  <rect x="230" y="40" width="18" height="50" fill="#8a5a15"/>
+  <text id="in-title" x="20" y="24" font-size="10" font-weight="bold">One chirp, six pulses</text>
+  <text id="in-callout" x="270" y="110" font-size="10">about 180 ms in total</text>
+</svg>
+<figcaption id="cap-inset">Figure 4. Schematic of one chirp. The callout at the lower right runs past the drawing on purpose; the drawing does not clip it.</figcaption>
+</figure>
+<table id="tbl-recorders">
+<thead><tr><th>Recorder</th><th>Habitat</th><th>Nights recorded</th><th>Files kept</th></tr></thead>
+<tbody>
+<tr id="rec-1"><td>R1</td><td>Hedge margin</td><td>31</td><td>2,790</td></tr>
+<tr id="rec-2"><td>R2</td><td>Rough grassland</td><td>31</td><td>2,782</td></tr>
+<tr id="rec-3"><td>R3</td><td>Rough grassland</td><td>29</td><td>2,601</td></tr>
+<tr id="rec-4"><td>R4</td><td>Wet meadow</td><td>31</td><td>2,788</td></tr>
+<tr id="rec-5"><td>R5</td><td>Reed bed edge</td><td>30</td><td>2,695</td></tr>
+</tbody>
+</table>
+
+<h2 id="h-discussion">Discussion</h2>
+<p id="disc-p1">A month of passive recording gave a clear picture of the two main choruses at a fraction of the effort a manual survey would need. The main weakness of the method is identification: band energy tells us that something is calling, not what. The listening sample is therefore essential, and next year it will be doubled for the 8 kHz band, where two species with similar calls may both be present.</p>
+<p id="disc-p2">The recorders survived the month without a single failure, but R3 lost two nights when cattle rubbed against its post and turned the microphone to face the ground. The posts will be fenced off next season.</p>
+<p class="imprint" id="imprint">Fenmoor Reserve, its monitoring group and all measurements in this report are fictional. This is a specimen document written for layout testing.</p>
+</main>
+</body>
+</html>
