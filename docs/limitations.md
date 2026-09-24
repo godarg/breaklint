@@ -256,14 +256,58 @@ on a timer, after 1.02–1.96 s (n = 40); Chromium 141; Node 24. The three proce
 (the browser tree, a producer descendant on the success path, a producer descendant after a
 timeout), 10 isolated runs each under three parents — this VM's PID 1, a subreaper that collects at
 once (what `--init`, tini or systemd do) and a subreaper that never collects: before the change
-30 of 30 red, 30 of 30 green and 30 of 30 red; after it, 30 of 30 green in each of the three. The
-one-minute load average was 1.3–4.4 before and 2.7–9.0 after, because other work shared the
-machine. Under load one of the three tests also exposed a race of its own, a SIGTERM landing
+30 of 30 red, 30 of 30 green and 30 of 30 red; after it, 30 of 30 green in each of the three, and
+again on the committed code. The one-minute load average was 1.3–4.4 before and 1.8–9.7 after,
+because other work shared the machine. Under load one of the three tests also exposed a race of its own, a SIGTERM landing
 before the process under test had installed its handler (3 of 10); the test now arms the handler
 first. What this machine cannot show, and CI has
 to: a real container without `--init` (the never-collecting subreaper reproduces its reparenting,
 not the container itself), and macOS, where no process is marked a zombie and the behaviour is
 unchanged.
+
+**What an interrupted or killed run leaves behind, measured on the same machine.** The real CLI
+over a document whose script blocks for 8 s, signalled 1 s after its browser appeared, three runs
+per signal, each in a private temporary directory. "Live" counts processes in the browser's
+process group that are not zombies, 1 s and 30 s after the CLI ended:
+
+| signal | before: live +1 s / +30 s | before: profile left | before: CLI end | after: live +1 s / +30 s | after: profile left | after: CLI end |
+|---|---|---|---|---|---|---|
+| SIGKILL | 10–12 / 11–13 | 3 of 3 | killed | 0 / 0 | 3 of 3, removed by the next start-up sweep (3 of 3) | killed |
+| SIGINT | 0 / 0 | 3 of 3 | exit 130 | 0 / 0 | 0 of 3 | by SIGINT, 2 of 3; exit 3 once, fixed, then 3 of 3 by SIGINT |
+| SIGTERM | 0 / 0 | 0 of 3 | exit 3, 3 of 3 | 0 / 0 | 0 of 3 | by SIGTERM, 3 of 3 |
+| SIGHUP | 0 / 0 | 1 of 3 | exit 3, **exit 0**, exit 3 | 0 / 0 | 0 of 3 | by SIGHUP, 3 of 3 |
+
+The one-minute load average was 8–21 before and 5–21 after. The one exit 3 after the change was a
+signal that landed while the browser was still starting, at load 10: the failed start reached the
+CLI's exit 3 before the handler had raised the signal again. The start-up path now waits for the
+handler's decision; a unit test pins it (3 of 3 red without the wait), and three further SIGINT
+runs ended by the signal. Before, the browser outlived a
+SIGKILLed breaklint because a headless browser on the websocket transport is never told that its
+client has gone; it now speaks over a pipe and exits on end-of-file. The driver's own signal
+handlers left the profile on Ctrl-C, and on SIGTERM and SIGHUP closed the browser underneath the
+running render, which then could not verify its own cleanup (`renderer-not-terminated` in 10 of
+18 SIGTERM and SIGHUP runs across this table and a second series of six each). The exit 0 is the
+one clean exit in the table and it is the worst entry in it: an interrupted run that printed
+nothing and measured nothing; it appeared once in nine SIGHUP runs, at load 19, and its mechanism
+was not isolated. breaklint now handles the three signals itself: it runs the same bounded,
+verified close and profile removal, then raises the signal again, so the process ends by it. A
+SIGKILL cannot be handled; the next launch's sweep removes that run's profile, and only such a
+profile. It removes a `breaklint-chrome-profile-*` directory only when the owner record written
+into every profile names this host, this boot and this PID namespace, the breaklint process it
+names is gone, and the browser it started is gone (its process group has no live member, or,
+without a recorded browser, Chrome's `SingletonLock` names a dead pid on this host, or, without
+either, the directory has not changed for a minute). A running breaklint's profile is kept by
+the second condition, which a unit test checks against a real running process.
+
+Two things this does not cover. A browser crash writes its dump into `~/.config/chromium/Crash
+Reports`, outside the temporary profile, and nothing here changes that. And the browser start is
+bounded as a whole by `BROWSER_LAUNCH_TIMEOUT_MS`, 30 s: that is a hang guard, not a speed
+budget — measured starts took 0.3–2.4 s even with twelve at once — and a start that fails now
+reports its elapsed time and the last lines of the browser's stderr.
+
+**What is still unmeasured.** A real container without `--init` (the never-collecting subreaper
+reproduces its reparenting, not the container), and every interrupt, kill and sweep path on
+macOS.
 
 There is deliberately no `os` field in `package.json`, which means npm will install this on
 Windows without complaint. That is not an oversight: `--demo` and the whole rule and reporter

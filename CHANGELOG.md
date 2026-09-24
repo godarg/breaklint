@@ -39,6 +39,34 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   closures that ran only when an environment happened to produce `EPERM`. They are one function
   with a seam for the kernel, the clock and the group's members now, pinned on a fake clock with a
   named mutation per case. Internal; no public API changed.
+- **A killed breaklint no longer leaves its browser running.** The browser
+  is now driven over a pipe instead of a DevTools websocket on a loopback port. Over the websocket
+  a headless browser outlived a SIGKILLed breaklint indefinitely — 12–13 browser processes were
+  still alive 30 s later, 3 of 3 runs on Linux — because nothing told it that its client had
+  gone; over a pipe it reads end-of-file and exits (none left after 1 s, measured on Linux; macOS
+  is for a maintainer to measure). The pipe also removes the unauthenticated debugging port that
+  any local process could have connected to while a run was in progress.
+- **SIGINT, SIGTERM and SIGHUP now close the browser, remove the profile and end the process by
+  that signal.** The driver's own handlers were switched off. They left the profile directory
+  behind on Ctrl-C (3 of 3), closed the browser underneath a running render on SIGTERM and SIGHUP
+  so that the run reported `renderer-not-terminated` (10 of 18), and once, at load 19, a SIGHUP run
+  ended with exit 0 and no output at all. breaklint now runs its own bounded, verified cleanup,
+  then re-raises the signal, so a shell sees 130, 143 or 129 and a script loop stops on Ctrl-C.
+  In a host process that listens for the signal itself, breaklint cleans up but does not end the
+  host, and the interrupted render reports exit 3. An interrupted run never ends with exit 0.
+- **A profile left behind by a killed run is removed by the next run.** Every profile now carries
+  an owner record (`breaklint-owner.json`: pid, host, boot id, PID namespace, browser pid). At
+  start-up breaklint removes only profiles in its temporary directory whose owner and browser are
+  provably gone, recorded for this host, boot and namespace; a concurrently running breaklint's
+  profile, a profile from another container sharing the directory and any profile without a
+  record are never touched. The rules are in `docs/limitations.md`.
+- **A browser that fails to start says why, and the whole start is bounded.** Over a pipe the
+  driver reported a browser that died at start as "Target closed", without what the browser had
+  printed, and its `timeout` did not cover the pipe handshake: a browser that never answered was
+  still being waited for after 40 s. The start is now bounded as a whole by
+  `BROWSER_LAUNCH_TIMEOUT_MS`, 30 000 ms — the driver's previous implicit default, kept as a hang
+  guard rather than tightened — and the exit-3 message names the elapsed time and the last lines
+  of the browser's stderr (for example a missing shared library).
 
 ### Documentation
 

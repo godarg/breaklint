@@ -20,6 +20,8 @@ import { parse, type DefaultTreeAdapterMap } from "parse5";
 import {
   launchBrowser,
   captureProcessTreeOwnership,
+  holdForInterrupt,
+  type InterruptHold,
   ownServerLifecycle,
   resolvePackageRoot,
   terminateProcessTree,
@@ -151,10 +153,30 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
   });
 }
 
-export async function closeBrowserBounded(
+const browserCloses = new WeakMap<BrowserLike, Promise<string | null>>();
+
+/**
+ * Close one browser once. An interrupt handler and the render's own cleanup can both reach this
+ * for the same browser; a second close racing the first would find the root already gone, could
+ * not capture the ownership it needs, and report a failed cleanup that did not happen. Every
+ * caller therefore shares the first call's bounded, verified result.
+ */
+export function closeBrowserBounded(
   browser: BrowserLike,
   terminate: typeof terminateProcessTree = terminateProcessTree,
   captureOwnership: typeof captureProcessTreeOwnership = captureProcessTreeOwnership,
+): Promise<string | null> {
+  const pending = browserCloses.get(browser);
+  if (pending) return pending;
+  const close = closeBrowserOnce(browser, terminate, captureOwnership);
+  browserCloses.set(browser, close);
+  return close;
+}
+
+async function closeBrowserOnce(
+  browser: BrowserLike,
+  terminate: typeof terminateProcessTree,
+  captureOwnership: typeof captureProcessTreeOwnership,
 ): Promise<string | null> {
   let pid: number | undefined;
   let processHandleError: string | null = null;
@@ -200,6 +222,34 @@ export async function closeRasterizerBounded(rasterizer: OpenRasterizerResult["r
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
   }
+}
+
+/** Second signal or exhausted bound: no protocol, no wait. SIGKILL the group, remove the profile. */
+function forceBrowserCleanup(browser: BrowserLike, userDataDir: string | null | undefined): void {
+  let pid: number | undefined;
+  try { pid = browser.process?.()?.pid; } catch { pid = undefined; }
+  if (pid && process.platform !== "win32") {
+    try { process.kill(-pid, "SIGKILL"); } catch { /* already gone */ }
+  }
+  cleanupBrowserProfile(userDataDir);
+}
+
+/**
+ * The end of a render that held its browser for interrupts. An interrupted render never returns
+ * its documents: by the time the host could read them the browser was closed underneath it. In a
+ * process that ends by the signal this result is never seen; in a host that handles the signal
+ * itself it is exit 3.
+ */
+async function endInterruptHold(hold: InterruptHold, cleanupOutcome: () => string): Promise<RenderResult | null> {
+  hold.release();
+  const signal = hold.interrupted();
+  if (!signal) return null;
+  await hold.settled();
+  return {
+    documents: [],
+    fatal: { exitCode: 3, message: `breaklint: interrupted by ${signal}; no result is reported. Renderer cleanup: ${cleanupOutcome()}.` },
+    environment: null,
+  };
 }
 
 export function cleanupBrowserProfile(path: string | null | undefined): string | null {
@@ -2205,6 +2255,21 @@ export async function renderDocuments(
     return { documents: [], fatal: { exitCode: 3, message: launched.detail }, environment: null };
   }
   const browser = launched.browser;
+  // From here until the browser is closed and its profile removed, SIGINT/SIGTERM/SIGHUP run that
+  // same cleanup before the process ends (browser.ts, holdForInterrupt).
+  let interruptCleanup = "not completed";
+  const interrupt = holdForInterrupt({
+    async cleanup() {
+      const closeError = await closeBrowserBounded(browser, dependencies.terminateBrowserProcessTree);
+      const profileError = cleanupBrowserProfile(launched.userDataDir);
+      interruptCleanup = [closeError, profileError].filter(Boolean).join("; ") || "browser closed and verified, profile removed";
+    },
+    force() {
+      forceBrowserCleanup(browser, launched.userDataDir);
+      interruptCleanup = "forced (SIGKILL of the browser group, profile removal) without verification";
+    },
+  });
+  const interruptCleanupOutcome = (): string => interruptCleanup;
   const blocked = { count: 0 };
   const contentPages = new Set<PageLike>();
   let startupStage = "browser.version";
@@ -2226,6 +2291,8 @@ export async function renderDocuments(
     if (closeError) cleanup = `; browser cleanup also failed: ${closeError}`;
     const profileError = cleanupBrowserProfile(launched.userDataDir);
     if (profileError) cleanup += `; profile cleanup also failed: ${profileError}`;
+    const interrupted = await endInterruptHold(interrupt, interruptCleanupOutcome);
+    if (interrupted) return interrupted;
     return {
       documents: [],
       fatal: {
@@ -2322,6 +2389,8 @@ export async function renderDocuments(
     }
     profileCleanupError = cleanupBrowserProfile(launched.userDataDir);
   }
+  const interrupted = await endInterruptHold(interrupt, interruptCleanupOutcome);
+  if (interrupted) return interrupted;
   if (browserTerminationError) {
     for (const document of documents) {
       document.infrastructure.push({

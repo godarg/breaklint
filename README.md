@@ -198,13 +198,19 @@ writes into the tree and does not guarantee as an interface. Any other resolved 
 the run with exit 3, and no flag overrides that: a report produced on an unmeasured paginator
 states things nobody measured.
 
-**Windows is not supported.** Process termination here rests on POSIX process groups. The
-termination and profile-cleanup path is measured on macOS, and on Linux on one virtual machine
-whose PID 1 collects exited processes late, which is how a defect was found and fixed: exited
-processes waiting for collection (zombies) were counted as survivors, so in a container without an
-init process every live run ended with exit 3. The numbers, and what CI still has to confirm, are
-in [`docs/limitations.md`](docs/limitations.md). Windows job objects are neither designed for nor
-measured.
+**The browser's process lifecycle is part of the result.** A run that cannot verify that its
+browser's process tree is gone and its profile removed ends with exit 3, never 0. An interrupted
+run (Ctrl-C, SIGTERM, SIGHUP) closes its browser and removes its profile, then ends by that signal;
+a run killed outright takes its browser with it, and the next run removes the profile it left. This
+rests on POSIX process groups. Termination and profile cleanup are measured on macOS; all of it,
+interrupts and kills included, is measured on Linux on one virtual machine whose PID 1 collects
+exited processes late — which is how a defect was found and fixed: exited processes waiting for
+collection (zombies) were counted as survivors, so in a container without an init process every
+live run ended with exit 3. The numbers, and what CI still has to confirm, are in
+[`docs/limitations.md`](docs/limitations.md).
+
+**Windows is not supported.** Process termination here rests on POSIX process groups. Windows job
+objects are neither designed for nor measured.
 
 **The M2/M2d live render path is built.** A live run loads the document through an owned loopback
 origin, paginates it, assembles and validates the snapshot, runs the rules, and binds evidence to

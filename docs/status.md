@@ -817,8 +817,10 @@ loaded resource is not complete. “Same input identity implies the same finding
 still an intended contract, not a guarantee over inputs outside the fields actually captured.
 The process-tree and profile-cleanup behaviour has real macOS evidence and now a measured Linux
 run on one VM whose PID 1 collects exited processes late; that run found zombies counted as
-survivors, which is fixed (`docs/limitations.md`). A real container without `--init` is still
-for CI to show, and Windows remains unsupported.
+survivors, which is fixed (`docs/limitations.md`). An interrupted run now closes its browser and
+removes its profile before it ends by the signal, and a killed run's browser exits with it and
+its profile is swept by the next run. A real container without `--init` is still for CI to show,
+macOS is unmeasured for the interrupt and sweep paths, and Windows remains unsupported.
 
 **The break cause comes from the paginator's own attributes, and the two alternatives are
 measured-refuted rather than merely rejected.** Reading the browser cascade is wrong in 4 of 19

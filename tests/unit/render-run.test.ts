@@ -8,13 +8,14 @@
 
 import { strict as assert } from "node:assert";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { createConnection } from "node:net";
 import { once } from "node:events";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument, type DocumentInput } from "../../src/core/engine.ts";
@@ -38,8 +39,11 @@ import {
   BROWSER_CLOSE_TIMEOUT_MS,
 } from "../../src/acquire/render-run.ts";
 import {
-  captureProcessTreeOwnership, linuxProcessTable, ownServerLifecycle, processIsDefunct, terminateProcessTree,
-  TERMINATION_GRACE_MS, type PageLike, type ProcessRow,
+  alive, captureProcessTreeOwnership, createInterruptRegistry, INTERRUPT_SIGNALS, launchBrowser, linuxProcessTable,
+  ownServerLifecycle, processIsDefunct, profileOwnerIdentity, PROFILE_OWNER_FILE, PROFILE_PREFIX,
+  STALE_PROFILE_MIN_AGE_MS, sweepStaleBrowserProfiles, terminateProcessTree, TERMINATION_GRACE_MS,
+  type InterruptSignal, type PageLike, type ProcessRow, type ProfileOwnerRecord, type ProfileSweepEnvironment,
+  type ProfileSweepResult, type SignalHost,
 } from "../../src/acquire/browser.ts";
 import type { EvidenceOutcome } from "../../src/render/evidence.ts";
 import { writeEvidencePng, type Rasterizer } from "../../src/render/rasterizer.ts";
@@ -588,6 +592,105 @@ describe("the live path fails closed at its process boundary", () => {
     } finally {
       rmSync(proc, { recursive: true, force: true });
     }
+  });
+
+  // Mutation "no memoisation": red, the second caller closes again and captures no ownership.
+  it("closes one browser once however many callers ask, and shares the verified result", async () => {
+    let closes = 0;
+    let captures = 0;
+    const browser = {
+      async newPage() { throw new Error("not reached"); }, async version() { return "Fake/1"; },
+      process() { return { pid: 71_003 }; }, async close() { closes += 1; await new Promise((resolve) => setImmediate(resolve)); },
+    };
+    const terminate = async (pid: number) => ({
+      rootPid: pid, pgid: pid, initialPids: [pid], survivingPids: [], defunctPids: [], groupSafe: true,
+      termSent: true, killSent: false, verified: true,
+    });
+    const capture = (pid: number) => { captures += 1; return { pgid: pid, groupSafe: true, initialPids: [pid] }; };
+    const [first, second] = await Promise.all([closeBrowserBounded(browser, terminate, capture), closeBrowserBounded(browser, terminate, capture)]);
+    assert.equal(first, null);
+    assert.equal(second, null);
+    assert.equal(closes, 1);
+    assert.equal(captures, 1);
+    assert.equal(await closeBrowserBounded(browser, terminate, capture), null);
+    assert.equal(closes, 1, "a later caller closed the browser a second time");
+  });
+
+  /*
+   * The consumer-visible path of an interrupt, without a browser: a separate node process renders
+   * one document through fake driver objects whose calls never settle until the browser is
+   * closed, and the test signals that process once the document is being acquired. Complication:
+   * the render is blocked inside acquisition, so only the interrupt path can end it.
+   */
+  const interruptChild = (hostListens: boolean) => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "breaklint-interrupt-")));
+    const profile = mkdtempSync(join(tmpdir(), "breaklint-chrome-profile-unit-"));
+    writeFileSync(join(profile, "sentinel"), "owned");
+    const doc = join(root, "doc.html");
+    writeFileSync(doc, "<!doctype html><p>interrupted</p>");
+    const renderRun = new URL("../../src/acquire/render-run.ts", import.meta.url).href;
+    const script = `
+      import { writeFileSync } from "node:fs";
+      const { renderDocuments } = await import(${JSON.stringify(renderRun)});
+      if (${hostListens}) process.on("SIGTERM", () => {});
+      let closed = false; const pending = new Set();
+      const never = () => new Promise((_resolve, reject) => { if (closed) reject(new Error("Target closed")); else pending.add(reject); });
+      const page = new Proxy({}, { get: (_target, key) => key === "then" ? undefined : key === "on" ? () => {} : () => never() });
+      const browser = {
+        async newPage() { return page; },
+        async createBrowserContext() { process.stdout.write("acquiring\\n"); return { async newPage() { return page; }, async close() {} }; },
+        async version() { return "Fake/1"; },
+        async close() { closed = true; writeFileSync(${JSON.stringify(join(root, "browser-closed"))}, ""); for (const reject of pending) reject(new Error("Target closed")); },
+      };
+      const result = await renderDocuments([${JSON.stringify(doc)}], {
+        outDir: ${JSON.stringify(join(root, "out"))}, evidenceBinding: false, sourceMapInjection: true,
+        network: { mode: "offline", allowed: [] }, locale: "de-DE",
+      }, {
+        async launchBrowser() { return { executablePath: "/fake", userDataDir: ${JSON.stringify(profile)}, detail: "", browser }; },
+        async openRasterizer() { return { rasterizer: null, detail: "unit" }; },
+      });
+      process.stdout.write(JSON.stringify({ fatal: result.fatal }) + "\\n");
+      process.exit(result.fatal?.exitCode ?? 0);
+    `;
+    const child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", script], { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveExit) => child.once("exit", (code, signal) => resolveExit({ code, signal })));
+    return { root, profile, child, exited, output: () => ({ stdout, stderr }) };
+  };
+
+  // Mutation "no interrupt hold in renderDocuments": red, the child dies by the default SIGTERM
+  // action without closing the browser, and the profile stays.
+  it("an interrupt during acquisition closes the browser, removes the profile and ends by the signal", { timeout: 60_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("POSIX signals");
+    const run = interruptChild(false);
+    try {
+      await waitForObserved(() => run.output().stdout, (stdout) => stdout.includes("acquiring"), 30_000);
+      run.child.kill("SIGTERM");
+      const exit = await run.exited;
+      assert.deepEqual(exit, { code: null, signal: "SIGTERM" }, `stderr: ${run.output().stderr}`);
+      assert.ok(existsSync(join(run.root, "browser-closed")), "the browser was not closed before the process ended");
+      assert.equal(existsSync(run.profile), false, "the interrupted run left its profile");
+    } finally { run.child.kill("SIGKILL"); rmSync(run.root, { recursive: true, force: true }); rmSync(run.profile, { recursive: true, force: true }); }
+  });
+
+  // Mutation "report the interrupted render normally": red, the result is not fatal.
+  it("an interrupt in a host that handles the signal itself cleans up and reports exit 3, never a result", { timeout: 60_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("POSIX signals");
+    const run = interruptChild(true);
+    try {
+      await waitForObserved(() => run.output().stdout, (stdout) => stdout.includes("acquiring"), 30_000);
+      run.child.kill("SIGTERM");
+      const exit = await run.exited;
+      assert.deepEqual(exit, { code: 3, signal: null }, `stderr: ${run.output().stderr}`);
+      const result = JSON.parse(run.output().stdout.trim().split("\n").at(-1)!) as { fatal: { exitCode: number; message: string } | null };
+      assert.equal(result.fatal?.exitCode, 3);
+      assert.match(result.fatal?.message ?? "", /interrupted by SIGTERM/u);
+      assert.ok(existsSync(join(run.root, "browser-closed")));
+      assert.equal(existsSync(run.profile), false);
+    } finally { run.child.kill("SIGKILL"); rmSync(run.root, { recursive: true, force: true }); rmSync(run.profile, { recursive: true, force: true }); }
   });
 
   it("never signals caller or group siblings when the browser process group is shared", async () => {
@@ -1260,5 +1363,305 @@ describe("the live path fails closed at its process boundary", () => {
       { failOn: "never", activeRules: [], optionsByRule: {}, coverageFloors: {} },
     );
     assert.deepEqual(noSnapshot.report.notMeasured, [decline]);
+  });
+});
+
+describe("breaklint's own interrupt handling while it owns a browser", () => {
+  /** A fake `process`: listeners, a listener count that includes foreign ones, and a recorded kill. */
+  function fakeHost(foreign: Partial<Record<InterruptSignal, number>> = {}) {
+    const listeners = new Map<InterruptSignal, Set<(signal: InterruptSignal) => void>>();
+    const events: string[] = [];
+    const host: SignalHost = {
+      pid: 4_242,
+      on(signal, listener) { (listeners.get(signal) ?? listeners.set(signal, new Set()).get(signal)!).add(listener); },
+      off(signal, listener) { listeners.get(signal)?.delete(listener); },
+      listenerCount: (signal) => (listeners.get(signal)?.size ?? 0) + (foreign[signal] ?? 0),
+      kill(pid, signal) { events.push(`kill ${pid} ${signal} listeners=${listeners.get(signal)?.size ?? 0}`); },
+    };
+    const emit = (signal: InterruptSignal) => { for (const listener of [...(listeners.get(signal) ?? [])]) listener(signal); };
+    const installed = () => INTERRUPT_SIGNALS.map((signal) => listeners.get(signal)?.size ?? 0);
+    return { host, emit, events, installed };
+  }
+  const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+  // Mutation "no re-raise" (finish never calls kill): red. Mutation "re-raise before cleanup": red
+  // on the event order. Mutation "listeners left installed": red on listeners=0.
+  it("cleans up first, then removes its listeners and ends the process by the same signal", async () => {
+    const { host, emit, events, installed } = fakeHost();
+    const registry = createInterruptRegistry(host, 1_000);
+    const hold = registry.hold({
+      async cleanup() { events.push("cleanup:start"); await tick(); events.push("cleanup:end"); },
+      force() { events.push("force"); },
+    });
+    assert.deepEqual(installed(), [1, 1, 1], "no listener while a browser is owned");
+    emit("SIGTERM");
+    assert.equal(await hold.settled(), "SIGTERM");
+    assert.equal(hold.interrupted(), "SIGTERM");
+    assert.deepEqual(events, ["cleanup:start", "cleanup:end", "kill 4242 SIGTERM listeners=0"]);
+    assert.deepEqual(installed(), [0, 0, 0]);
+  });
+
+  // Mutation "re-raise regardless of other listeners": red.
+  it("never ends a host that listens for the signal itself; the interrupted hold still settles", async () => {
+    const { host, emit, events, installed } = fakeHost({ SIGINT: 1 });
+    const registry = createInterruptRegistry(host, 1_000);
+    const hold = registry.hold({ async cleanup() { events.push("cleanup"); }, force() { events.push("force"); } });
+    emit("SIGINT");
+    assert.equal(await hold.settled(), "SIGINT");
+    assert.deepEqual(events, ["cleanup"], "the host's own SIGINT decision was overridden");
+    hold.release();
+    assert.deepEqual(installed(), [0, 0, 0], "listeners outlived the last hold");
+  });
+
+  // Mutation "second signal waits like the first": red, force is never called.
+  it("forces the cleanup and ends at once on a second signal", async () => {
+    const { host, emit, events } = fakeHost();
+    const registry = createInterruptRegistry(host, 60_000);
+    const hold = registry.hold({ cleanup: () => new Promise<void>(() => { events.push("cleanup:hangs"); }), force() { events.push("force"); } });
+    emit("SIGINT");
+    await tick();
+    emit("SIGINT");
+    assert.equal(await hold.settled(), "SIGINT");
+    assert.deepEqual(events, ["cleanup:hangs", "force", "kill 4242 SIGINT listeners=0"]);
+  });
+
+  // Mutation "no bound": red, the hold never settles and the test times out.
+  it("forces a cleanup that outlives its bound, then ends", { timeout: 5_000 }, async () => {
+    const { host, emit, events } = fakeHost();
+    const registry = createInterruptRegistry(host, 20);
+    const hold = registry.hold({ cleanup: () => new Promise<void>(() => undefined), force() { events.push("force"); } });
+    emit("SIGHUP");
+    assert.equal(await hold.settled(), "SIGHUP");
+    assert.deepEqual(events, ["force", "kill 4242 SIGHUP listeners=0"]);
+  });
+
+  it("installs nothing without a hold and leaves the default signal behaviour after the last release", () => {
+    const { host, installed } = fakeHost();
+    const registry = createInterruptRegistry(host, 1_000);
+    assert.deepEqual(installed(), [0, 0, 0]);
+    const first = registry.hold({ async cleanup() {}, force() {} });
+    const second = registry.hold({ async cleanup() {}, force() {} });
+    assert.deepEqual(installed(), [1, 1, 1], "one listener per signal, however many holds");
+    first.release();
+    assert.deepEqual(installed(), [1, 1, 1]);
+    second.release();
+    assert.deepEqual(installed(), [0, 0, 0]);
+  });
+});
+
+/*
+ * The browser launch, driven through the real driver against a fake browser binary: a shell
+ * script that records its argv and its open descriptors, says something on stderr, and then
+ * either exits (a browser that cannot load a library) or hangs (a browser that never answers).
+ * No Chrome is involved, so this runs everywhere the suite runs; POSIX shells only.
+ */
+describe("browser launch: pipe transport, one bound for the whole start, a diagnosable failure", { concurrency: false }, () => {
+  function fakeBrowser(mode: "exit" | "hang") {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "breaklint-fake-browser-")));
+    const exe = join(root, "fake-chrome");
+    writeFileSync(exe, [
+      "#!/bin/sh",
+      `printf '%s\\n' "$@" > '${root}/argv'`,
+      `ls /proc/$$/fd > '${root}/fds' 2>/dev/null || true`,
+      mode === "exit"
+        ? "echo 'fake-chrome: error while loading shared libraries: libnss3.so: cannot open shared object file' >&2; exit 127"
+        : `echo 'fake-chrome: starting, then never answering' >&2; echo $$ > '${root}/pid'; exec sleep 300`,
+      "",
+    ].join("\n"));
+    chmodSync(exe, 0o755);
+    return { root, exe };
+  }
+  async function withBrowserEnv<T>(exe: string, tmp: string, run: () => Promise<T>): Promise<T> {
+    const saved = { chrome: process.env.BREAKLINT_CHROME, tmp: process.env.TMPDIR };
+    process.env.BREAKLINT_CHROME = exe;
+    process.env.TMPDIR = tmp;
+    try { return await run(); } finally {
+      if (saved.chrome === undefined) delete process.env.BREAKLINT_CHROME; else process.env.BREAKLINT_CHROME = saved.chrome;
+      if (saved.tmp === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = saved.tmp;
+    }
+  }
+  const REPO = fileURLToPath(new URL("../..", import.meta.url));
+
+  // Mutation "pipe: false": red on --remote-debugging-pipe. Mutation "drop the stderr watch":
+  // red on the library line. Mutation "keep the profile on a failed launch": red on the profile.
+  it("reports a browser that dies at start with what it said on stderr, and removes the profile", { timeout: 20_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("the fake browser is a POSIX shell script");
+    const fake = fakeBrowser("exit");
+    const tmp = join(fake.root, "tmp");
+    mkdirSync(tmp);
+    try {
+      const error = await withBrowserEnv(fake.exe, tmp, () => launchBrowser(REPO).then(() => null, (caught: unknown) => caught as Error));
+      assert.ok(error, "a browser that exits 127 at start was reported as launched");
+      assert.match(error.message, /the browser failed to start/u);
+      assert.match(error.message, /libnss3\.so: cannot open shared object file/u, "the browser's own explanation was lost");
+      assert.match(error.message, /after \d+ ms; launch bound 30000 ms/u);
+      const argv = readFileSync(join(fake.root, "argv"), "utf8").split("\n");
+      assert.ok(argv.includes("--remote-debugging-pipe"), "the browser was not started on the pipe transport");
+      assert.equal(argv.some((arg) => arg.startsWith("--remote-debugging-port")), false, "a DevTools TCP port was opened");
+      assert.deepEqual(readdirSync(tmp).filter((name) => name.startsWith("breaklint-chrome-profile-")), [], "the failed launch left its profile");
+    } finally { rmSync(fake.root, { recursive: true, force: true }); }
+  });
+
+  // Mutation "throw without waiting for the handler" (drop the settled() wait in launchBrowser's
+  // failure path): red, the process ends with the caller's exit 3 instead of by the signal.
+  it("an interrupt during browser start-up kills the browser, removes the profile and ends by the signal", { timeout: 60_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("the fake browser is a POSIX shell script");
+    const fake = fakeBrowser("hang");
+    const tmp = join(fake.root, "tmp");
+    mkdirSync(tmp);
+    const browserTs = new URL("../../src/acquire/browser.ts", import.meta.url).href;
+    // The caller behaves like the CLI: a failed launch becomes exit 3.
+    const script = `const { launchBrowser } = await import(${JSON.stringify(browserTs)});
+      launchBrowser(${JSON.stringify(REPO)}).then(() => process.exit(0), (error) => { process.stderr.write(String(error?.message)); process.exit(3); });`;
+    const child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", script], {
+      stdio: ["ignore", "ignore", "pipe"], env: { ...process.env, BREAKLINT_CHROME: fake.exe, TMPDIR: tmp },
+    });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveExit) => child.once("exit", (code, signal) => resolveExit({ code, signal })));
+    try {
+      await waitForObserved(() => existsSync(join(fake.root, "pid")), (present) => present, 30_000);
+      const pid = Number(readFileSync(join(fake.root, "pid"), "utf8"));
+      child.kill("SIGINT");
+      assert.deepEqual(await exited, { code: null, signal: "SIGINT" }, `stderr: ${stderr}`);
+      assert.equal(canRunCode(pid), false, "the browser outlived the interrupted start-up");
+      assert.deepEqual(readdirSync(tmp).filter((name) => name.startsWith(PROFILE_PREFIX)), [], "the interrupted start-up left its profile");
+    } finally {
+      child.kill("SIGKILL");
+      try { process.kill(Number(readFileSync(join(fake.root, "pid"), "utf8")), "SIGKILL"); } catch { /* gone */ }
+      rmSync(fake.root, { recursive: true, force: true });
+    }
+  });
+
+  // Mutation "rely on the driver's timeout": red, the hang outlives the 1.5 s bound (the driver's
+  // timeout does not cover the pipe handshake). Mutation "handleSIGHUP: true": red on the count.
+  it("bounds a browser that never answers, kills its group, and keeps the driver's signal handlers out", { timeout: 30_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("the fake browser is a POSIX shell script");
+    const fake = fakeBrowser("hang");
+    const tmp = join(fake.root, "tmp");
+    mkdirSync(tmp);
+    const listeners: number[] = [];
+    const records: Array<Partial<ProfileOwnerRecord>> = [];
+    const sampler = setInterval(() => {
+      listeners.push(process.listenerCount("SIGHUP"));
+      for (const name of readdirSync(tmp).filter((entry) => entry.startsWith(PROFILE_PREFIX))) {
+        try { records.push(JSON.parse(readFileSync(join(tmp, name, PROFILE_OWNER_FILE), "utf8"))); } catch { /* not written yet */ }
+      }
+    }, 50);
+    try {
+      const started = Date.now();
+      const error = await withBrowserEnv(fake.exe, tmp, () => launchBrowser(REPO, { launchTimeoutMs: 1_500 }).then(() => null, (caught: unknown) => caught as Error));
+      const elapsed = Date.now() - started;
+      assert.ok(error, "a browser that never answers was reported as launched");
+      assert.match(error.message, /did not finish starting within 1500 ms/u);
+      assert.match(error.message, /fake-chrome: starting, then never answering/u);
+      assert.ok(elapsed < 15_000, `the launch bound did not hold: ${elapsed} ms`);
+      const pid = Number(readFileSync(join(fake.root, "pid"), "utf8"));
+      assert.equal(canRunCode(pid), false, "the hung browser survived its failed launch");
+      // The profile carried an owner record naming this process and, once spawned, the browser.
+      assert.ok(records.some((record) => record.pid === process.pid && record.browserPid === pid), `owner records seen: ${JSON.stringify(records.slice(-2))}`);
+      assert.deepEqual(readdirSync(tmp).filter((name) => name.startsWith("breaklint-chrome-profile-")), []);
+      // While the launch was pending exactly one SIGHUP listener existed: breaklint's own.
+      assert.ok(listeners.length > 0 && listeners.every((count) => count <= 1), `SIGHUP listeners during launch: ${[...new Set(listeners)]}`);
+      assert.ok(listeners.includes(1), "breaklint's own interrupt listener was not installed during launch");
+    } finally {
+      clearInterval(sampler);
+      try { process.kill(Number(readFileSync(join(fake.root, "pid"), "utf8")), "SIGKILL"); } catch { /* gone, as asserted */ }
+      rmSync(fake.root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("start-up sweep of profiles that a killed run left behind", () => {
+  const HOST = "soak-host";
+  function sweepFixture() {
+    const tmp = realpathSync(mkdtempSync(join(tmpdir(), "breaklint-sweep-fixture-")));
+    const livePids = new Set<number>();
+    const liveGroups = new Set<number>();
+    let clock = Date.now();
+    const environment: ProfileSweepEnvironment = {
+      tmp, hostname: HOST, uid: typeof process.getuid === "function" ? process.getuid() : null,
+      bootId: "boot-a", pidNamespace: "pid:[1]",
+      alive: (pid) => livePids.has(pid), groupAlive: (pgid) => liveGroups.has(pgid), now: () => clock,
+    };
+    const profile = (name: string, owner: Partial<ProfileOwnerRecord> | null, lock?: string) => {
+      const path = join(tmp, `${PROFILE_PREFIX}${name}`);
+      mkdirSync(path);
+      writeFileSync(join(path, "Local State"), "{}");
+      if (owner) writeFileSync(join(path, PROFILE_OWNER_FILE), JSON.stringify({
+        tool: "breaklint", pid: 70_001, hostname: HOST, bootId: "boot-a", pidNamespace: "pid:[1]", browserPid: null, ...owner,
+      }));
+      if (lock) symlinkSync(lock, join(path, "SingletonLock"));
+      return path;
+    };
+    return { tmp, environment, livePids, liveGroups, profile, advance: (ms: number) => { clock += ms; }, cleanup: () => rmSync(tmp, { recursive: true, force: true }) };
+  }
+  const reasonFor = (result: ProfileSweepResult, path: string) => result.kept.find((entry) => entry.path === path)?.reason;
+
+  // Mutation "owner liveness not checked": red on the concurrent run. Mutation "browser group not
+  // checked": red on the live browser. Mutation "identity not compared": red on the three foreign
+  // records. Mutation "no age guard without a lock": red on the young lockless profile.
+  it("removes only profiles whose owner and browser are provably gone, and never a running one", () => {
+    const f = sweepFixture();
+    try {
+      const dead = f.profile("dead", { pid: 70_001, browserPid: 70_101 });
+      const concurrent = f.profile("concurrent", { pid: 70_002, browserPid: 70_102 });
+      f.livePids.add(70_002); f.liveGroups.add(70_102);
+      const browserAlive = f.profile("browser-alive", { pid: 70_003, browserPid: 70_103 });
+      f.liveGroups.add(70_103);
+      const otherHost = f.profile("other-host", { hostname: "elsewhere" });
+      const otherNamespace = f.profile("other-namespace", { pidNamespace: "pid:[2]" });
+      const otherBoot = f.profile("other-boot", { bootId: "boot-b" });
+      const noRecord = f.profile("no-record", null);
+      const lockDead = f.profile("lock-dead", { pid: 70_004 }, `${HOST}-70104`);
+      const lockAlive = f.profile("lock-alive", { pid: 70_005 }, `${HOST}-70105`);
+      f.livePids.add(70_105);
+      const lockForeign = f.profile("lock-foreign", { pid: 70_006 }, "elsewhere-70106");
+      const young = f.profile("young", { pid: 70_007 });
+      symlinkSync(dead, join(f.tmp, `${PROFILE_PREFIX}symlink`));
+      const result = sweepStaleBrowserProfiles(f.environment);
+      assert.deepEqual(result.removed.sort(), [dead, lockDead].sort());
+      assert.equal(existsSync(dead) || existsSync(lockDead), false);
+      assert.equal(reasonFor(result, concurrent), "its breaklint process is still running");
+      assert.equal(reasonFor(result, browserAlive), "its browser process group still has a live member");
+      for (const foreign of [otherHost, otherNamespace, otherBoot]) {
+        assert.equal(reasonFor(result, foreign), "owner record names another host, boot or pid namespace");
+      }
+      assert.equal(reasonFor(result, noRecord), "no readable breaklint owner record");
+      assert.equal(reasonFor(result, lockAlive), "its browser is still running");
+      assert.equal(reasonFor(result, lockForeign), "browser lock names another host");
+      assert.equal(reasonFor(result, young), "no browser record and changed too recently");
+      assert.equal(reasonFor(result, join(f.tmp, `${PROFILE_PREFIX}symlink`)), "not a real directory");
+      for (const kept of [concurrent, browserAlive, otherHost, otherNamespace, otherBoot, noRecord, lockAlive, lockForeign, young]) {
+        assert.ok(existsSync(join(kept, "Local State")), `a kept profile was modified: ${kept}`);
+      }
+      // A minute later the lockless profile of a dead owner is stale; the rest still are not.
+      f.advance(STALE_PROFILE_MIN_AGE_MS + 5_000);
+      assert.deepEqual(sweepStaleBrowserProfiles(f.environment).removed, [young]);
+    } finally { f.cleanup(); }
+  });
+
+  it("keeps the profile of a real running process and removes it once that process has gone", async () => {
+    const f = sweepFixture();
+    const owner = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+    try {
+      assert.ok(owner.pid);
+      const path = f.profile("real-owner", { pid: owner.pid, browserPid: null }, `${HOST}-${owner.pid}`);
+      const live = { ...f.environment, alive, groupAlive: () => false };
+      assert.deepEqual(sweepStaleBrowserProfiles(live).removed, [], "the profile of a running owner was swept");
+      owner.kill("SIGKILL");
+      await once(owner, "exit");
+      await waitForObserved(() => sweepStaleBrowserProfiles(live).removed, (removed) => removed.includes(path));
+    } finally { owner.kill("SIGKILL"); f.cleanup(); }
+  });
+
+  it("states the owner identity a sweep compares: host, and on Linux boot and pid namespace", async (t) => {
+    if (process.platform === "win32") return t.skip("the sweep is POSIX only");
+    const record = profileOwnerIdentity();
+    assert.equal(record.hostname, hostname());
+    if (process.platform === "linux") {
+      assert.match(record.bootId ?? "", /^[0-9a-f-]{36}$/u);
+      assert.match(record.pidNamespace ?? "", /^pid:\[\d+\]$/u);
+    }
   });
 });

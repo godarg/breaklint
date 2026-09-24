@@ -9,12 +9,13 @@
  * document.
  */
 
-import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, type ChildProcess } from "node:child_process";
+import { subscribe, unsubscribe } from "node:diagnostics_channel";
 import type { Server } from "node:http";
 import { createRequire } from "node:module";
 import type { Socket } from "node:net";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -512,6 +513,337 @@ export async function terminateProcessTree(
   };
 }
 
+/**
+ * breaklint's own handling of SIGINT, SIGTERM and SIGHUP while it owns a browser.
+ *
+ * Why not the driver's. Puppeteer installs handlers for all three by default. Measured on Linux
+ * with the CLI signalled while its browser was up: SIGINT killed the browser and exited 130 but
+ * left the profile directory behind (3 of 3); SIGTERM and SIGHUP closed the browser underneath the
+ * running render, whose own cleanup then could not capture the process tree it had to verify and
+ * reported `renderer-not-terminated` (10 of 18 runs); and one of nine SIGHUP runs, at load 19,
+ * ended with exit 0 and no output at all — a clean exit for a run that measured nothing.
+ *
+ * What happens instead. While at least one hold is registered, one listener per signal is
+ * installed. The first signal runs every hold's `cleanup()` (for a render: the bounded, verified
+ * browser close and the profile removal) under an overall bound; a hold still busy at the bound,
+ * or at a second signal, is forced (`force()`: SIGKILL of the browser group, profile removal).
+ * Then, if no other listener for that signal exists in the process, the listeners are removed and
+ * the signal is raised again, so the process ends BY that signal exactly as it would have without
+ * breaklint (a shell sees 130, 143 or 129, and a script loop stops on Ctrl-C). If the host process
+ * listens for the signal itself, breaklint does not end the host: it cleans up, every hold's
+ * `settled()` resolves, and the interrupted render reports exit 3. In neither case can an
+ * interrupted run end with exit 0.
+ */
+export type InterruptSignal = "SIGINT" | "SIGTERM" | "SIGHUP";
+export const INTERRUPT_SIGNALS: readonly InterruptSignal[] = ["SIGINT", "SIGTERM", "SIGHUP"];
+/** The longest an interrupted process spends on orderly cleanup before it forces it and ends. */
+export const INTERRUPT_CLEANUP_BOUND_MS = 10_000;
+
+export interface InterruptCleanup {
+  cleanup(): Promise<void>;
+  force(): void;
+}
+
+export interface InterruptHold {
+  /** The signal that interrupted this hold, or null. */
+  interrupted(): InterruptSignal | null;
+  /** Resolves once an interrupt's cleanup of this hold has finished (orderly or forced). */
+  settled(): Promise<InterruptSignal>;
+  release(): void;
+}
+
+/** The part of `process` the registry uses; a test passes a fake. */
+export interface SignalHost {
+  readonly pid: number;
+  on(signal: InterruptSignal, listener: (signal: InterruptSignal) => void): unknown;
+  off(signal: InterruptSignal, listener: (signal: InterruptSignal) => void): unknown;
+  listenerCount(signal: InterruptSignal): number;
+  kill(pid: number, signal: InterruptSignal): unknown;
+}
+
+export function createInterruptRegistry(host: SignalHost = process, boundMs: number = INTERRUPT_CLEANUP_BOUND_MS): {
+  hold(cleanup: InterruptCleanup): InterruptHold;
+} {
+  interface Entry {
+    cleanup: InterruptCleanup;
+    signal: InterruptSignal | null;
+    resolve(signal: InterruptSignal): void;
+    settled: Promise<InterruptSignal>;
+  }
+  /** One interrupt, from its first signal until it ends the process or hands back to the host. */
+  interface Episode {
+    signal: InterruptSignal;
+    entries: Entry[];
+    timer: ReturnType<typeof setTimeout> | null;
+    ended: boolean;
+  }
+  const entries = new Set<Entry>();
+  let installed = false;
+  let current: Episode | null = null;
+  const listener = (signal: InterruptSignal): void => { onSignal(signal); };
+  const install = (): void => {
+    if (installed) return;
+    for (const signal of INTERRUPT_SIGNALS) host.on(signal, listener);
+    installed = true;
+  };
+  const uninstall = (): void => {
+    if (!installed) return;
+    for (const signal of INTERRUPT_SIGNALS) host.off(signal, listener);
+    installed = false;
+  };
+  const force = (list: readonly Entry[]): void => {
+    for (const entry of list) {
+      try { entry.cleanup.force(); } catch { /* best effort; the next run's sweep remains */ }
+    }
+  };
+  /**
+   * Orderly cleanup under the bound. The bound's timer is deliberately NOT unref'd: a cleanup
+   * that waits on something holding no handle would otherwise let the event loop drain, and a
+   * drained loop ends the process with exit 0.
+   */
+  const clean = (episode: Episode, list: readonly Entry[]): Promise<void> => new Promise<void>((resolveClean) => {
+    let done = false;
+    const complete = (forced: boolean): void => {
+      if (done) return;
+      done = true;
+      if (forced) force(list);
+      resolveClean();
+    };
+    episode.timer = setTimeout(() => complete(true), boundMs);
+    void Promise.allSettled(list.map((entry) => Promise.resolve().then(() => entry.cleanup.cleanup())))
+      .then(() => complete(false));
+  });
+  const end = (episode: Episode): void => {
+    if (episode.ended) return;
+    episode.ended = true;
+    if (episode.timer) clearTimeout(episode.timer);
+    for (const entry of episode.entries) entry.resolve(episode.signal);
+    const others = host.listenerCount(episode.signal) - (installed ? 1 : 0);
+    if (others <= 0) {
+      // Nobody else in this process decides what the signal means: end by it, as without breaklint.
+      uninstall();
+      host.kill(host.pid, episode.signal);
+      return;
+    }
+    // The host handles this signal itself. Hand back: the interrupted holds settle, and the next
+    // signal starts a new episode.
+    if (current === episode) current = null;
+    if (entries.size === 0) uninstall();
+  };
+  const onSignal = (signal: InterruptSignal): void => {
+    if (current !== null) {
+      // A second signal while the first is being handled: stop waiting, force, and end.
+      const episode = current;
+      force(episode.entries);
+      end(episode);
+      return;
+    }
+    const episode: Episode = { signal, entries: [...entries], timer: null, ended: false };
+    current = episode;
+    for (const entry of episode.entries) entry.signal = signal;
+    void clean(episode, episode.entries).then(() => end(episode));
+  };
+  return {
+    hold(cleanup: InterruptCleanup): InterruptHold {
+      let resolve!: (signal: InterruptSignal) => void;
+      const settled = new Promise<InterruptSignal>((resolveSettled) => { resolve = resolveSettled; });
+      const entry: Entry = { cleanup, signal: null, resolve, settled };
+      entries.add(entry);
+      install();
+      if (current !== null) {
+        // Registered while an interrupt is being handled: interrupted too, and cleaned at once.
+        const signal = current.signal;
+        entry.signal = signal;
+        void Promise.resolve().then(() => cleanup.cleanup()).catch(() => undefined).then(() => entry.resolve(signal));
+      }
+      return {
+        interrupted: () => entry.signal,
+        settled: () => settled,
+        release(): void {
+          entries.delete(entry);
+          if (entries.size === 0 && current === null) uninstall();
+        },
+      };
+    },
+  };
+}
+
+const PROCESS_INTERRUPTS = createInterruptRegistry();
+
+/** Register owned state that a SIGINT, SIGTERM or SIGHUP must clean up before the process ends. */
+export function holdForInterrupt(cleanup: InterruptCleanup): InterruptHold {
+  return PROCESS_INTERRUPTS.hold(cleanup);
+}
+
+/**
+ * Profiles a killed run left behind, and why a sweep can never take a live run's profile.
+ *
+ * A process killed with SIGKILL (the OOM killer, a CI job cancelled after its grace period,
+ * `docker kill`) runs no cleanup; its `breaklint-chrome-profile-*` directory stays in the
+ * temporary directory. The browser itself goes with it, because it speaks to breaklint over a
+ * pipe and exits on end-of-file. The next launch therefore sweeps the temporary directory — but it
+ * removes a profile only when every one of these holds:
+ *
+ *   - it is a real directory (not a symlink) owned by this user, directly inside the resolved
+ *     temporary directory, named with the breaklint prefix;
+ *   - it carries the owner record breaklint writes into every profile it creates, and that record
+ *     names this host, this boot and this PID namespace (a pid means nothing anywhere else);
+ *   - the breaklint process named in the record is gone (a zombie counts as gone);
+ *   - the browser it started is gone: the recorded browser process group has no live member, or,
+ *     where no browser pid was recorded, Chrome's own `SingletonLock` names this host and a dead
+ *     pid, or, where there is no lock either, the directory has not changed for
+ *     STALE_PROFILE_MIN_AGE_MS.
+ *
+ * A concurrently running breaklint fails the third condition, because its pid is alive; a profile
+ * from another container that shares this temporary directory fails the second; a directory that
+ * predates the owner record, or whose record is unreadable, is never touched. Pid reuse can only
+ * make a dead owner look alive, which keeps a directory; it can never make a live one look dead.
+ */
+export const PROFILE_PREFIX = "breaklint-chrome-profile-";
+export const PROFILE_OWNER_FILE = "breaklint-owner.json";
+/**
+ * A lockless profile of a dead owner may still be written by a browser orphaned during its own
+ * start-up. Such a browser exits on pipe end-of-file (measured: none left 1 s after its parent's
+ * SIGKILL, 3 of 3); a minute is far past that and still short enough to clean on the next run.
+ */
+export const STALE_PROFILE_MIN_AGE_MS = 60_000;
+
+export interface ProfileOwnerRecord {
+  tool: "breaklint";
+  pid: number;
+  hostname: string;
+  bootId: string | null;
+  pidNamespace: string | null;
+  browserPid: number | null;
+}
+
+export interface ProfileSweepEnvironment {
+  tmp: string;
+  hostname: string;
+  uid: number | null;
+  bootId: string | null;
+  pidNamespace: string | null;
+  alive(pid: number): boolean;
+  /** Does process group `pgid` still have a member that can run code? */
+  groupAlive(pgid: number): boolean;
+  now(): number;
+}
+
+export interface ProfileSweepResult {
+  removed: string[];
+  kept: { path: string; reason: string }[];
+}
+
+function readOptional(path: string): string | null {
+  try { return readFileSync(path, "utf8").trim(); } catch { return null; }
+}
+
+function linkOptional(path: string): string | null {
+  try { return readlinkSync(path); } catch { return null; }
+}
+
+/** This process's identity as the owner record states it. */
+export function profileOwnerIdentity(platform: NodeJS.Platform = process.platform): Omit<ProfileOwnerRecord, "tool" | "pid" | "browserPid"> {
+  return {
+    hostname: hostname(),
+    bootId: platform === "linux" ? readOptional(join(PROC_ROOT, "sys/kernel/random/boot_id")) : null,
+    pidNamespace: platform === "linux" ? linkOptional(join(PROC_ROOT, "self/ns/pid")) : null,
+  };
+}
+
+function groupHasLiveMember(pgid: number): boolean {
+  try { process.kill(-pgid, 0); } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH";
+  }
+  const members = processGroupMembers(pgid);
+  return !(members !== null && members.length > 0 && members.every((member) => member.defunct));
+}
+
+function defaultSweepEnvironment(): ProfileSweepEnvironment | null {
+  if (process.platform === "win32") return null;
+  const identity = profileOwnerIdentity();
+  // On Linux a pid is meaningful only inside its PID namespace and its boot. Without both, no
+  // record can be compared, so nothing is swept.
+  if (process.platform === "linux" && (!identity.bootId || !identity.pidNamespace)) return null;
+  let tmp: string;
+  try { tmp = realpathSync(tmpdir()); } catch { return null; }
+  return {
+    tmp, ...identity, uid: typeof process.getuid === "function" ? process.getuid() : null,
+    alive, groupAlive: groupHasLiveMember, now: Date.now,
+  };
+}
+
+function ownerRecord(text: string | null): ProfileOwnerRecord | null {
+  if (text === null) return null;
+  let value: unknown;
+  try { value = JSON.parse(text); } catch { return null; }
+  const record = value as Partial<ProfileOwnerRecord> | null;
+  const pid = (candidate: unknown): candidate is number => Number.isSafeInteger(candidate) && (candidate as number) > 1;
+  const nullableString = (candidate: unknown): candidate is string | null => candidate === null || typeof candidate === "string";
+  if (!record || record.tool !== "breaklint" || !pid(record.pid) || typeof record.hostname !== "string"
+    || !nullableString(record.bootId) || !nullableString(record.pidNamespace)
+    || !(record.browserPid === null || pid(record.browserPid))) return null;
+  return record as ProfileOwnerRecord;
+}
+
+function sweepVerdict(path: string, environment: ProfileSweepEnvironment): string | null {
+  let entry: ReturnType<typeof lstatSync>;
+  try { entry = lstatSync(path); } catch { return "vanished"; }
+  if (!entry.isDirectory() || entry.isSymbolicLink()) return "not a real directory";
+  if (environment.uid !== null && entry.uid !== environment.uid) return "owned by another user";
+  let real: string;
+  try { real = realpathSync(path); } catch { return "vanished"; }
+  if (dirname(real) !== environment.tmp) return "not directly inside the temporary directory";
+  const record = ownerRecord(readOptional(join(real, PROFILE_OWNER_FILE)));
+  if (!record) return "no readable breaklint owner record";
+  if (record.hostname !== environment.hostname || record.bootId !== environment.bootId || record.pidNamespace !== environment.pidNamespace) {
+    return "owner record names another host, boot or pid namespace";
+  }
+  if (environment.alive(record.pid)) return "its breaklint process is still running";
+  if (record.browserPid !== null) {
+    return environment.groupAlive(record.browserPid) ? "its browser process group still has a live member" : null;
+  }
+  const lock = linkOptional(join(real, "SingletonLock"));
+  if (lock !== null) {
+    const match = /^(.*)-([1-9][0-9]*)$/u.exec(lock);
+    if (!match || match[1] !== environment.hostname) return "browser lock names another host";
+    return environment.alive(Number(match[2])) ? "its browser is still running" : null;
+  }
+  return environment.now() - entry.mtimeMs >= STALE_PROFILE_MIN_AGE_MS ? null : "no browser record and changed too recently";
+}
+
+/**
+ * Remove the profiles of runs that ended without cleaning up (see the conditions above). Best
+ * effort by design: it never fails a run, and a directory it cannot prove dead stays.
+ */
+export function sweepStaleBrowserProfiles(environment: ProfileSweepEnvironment | null = defaultSweepEnvironment()): ProfileSweepResult {
+  const result: ProfileSweepResult = { removed: [], kept: [] };
+  if (!environment) return result;
+  let names: string[];
+  try { names = readdirSync(environment.tmp); } catch { return result; }
+  for (const name of names.filter((candidate) => candidate.startsWith(PROFILE_PREFIX)).sort()) {
+    const path = join(environment.tmp, name);
+    const reason = sweepVerdict(path, environment);
+    if (reason !== null) {
+      result.kept.push({ path, reason });
+      continue;
+    }
+    try { rmSync(path, { recursive: true, force: true }); } catch { /* checked below */ }
+    if (existsSync(path)) result.kept.push({ path, reason: "removal failed" });
+    else result.removed.push(path);
+  }
+  return result;
+}
+
+function writeProfileOwner(userDataDir: string, browserPid: number | null): void {
+  const record: ProfileOwnerRecord = { tool: "breaklint", pid: process.pid, ...profileOwnerIdentity(), browserPid };
+  try {
+    writeFileSync(join(userDataDir, PROFILE_OWNER_FILE), `${JSON.stringify(record)}\n`, { mode: 0o600 });
+  } catch {
+    // Without a record the sweep never touches this profile; the run's own cleanup still removes it.
+  }
+}
+
 const CHROME_CANDIDATES_BY_PLATFORM: Readonly<Record<string, readonly string[]>> = {
   darwin: [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -560,6 +892,85 @@ export function resolvePackageRoot(name: string, fromDir: string): string | null
   }
 }
 
+/**
+ * The whole start of the browser, from spawn to its first page target.
+ *
+ * It is a hang guard with a diagnosable message, not a start-up budget: the value is the driver's
+ * previous implicit default, kept rather than tightened, and it is an order of magnitude above a
+ * measured start (0.30–0.76 s alone; at most 2.4 s with twelve concurrent starts at load 20 on
+ * four cores). It now bounds everything, because over a pipe the driver's own `timeout` covers
+ * only the wait for the first page: with a 5 s `timeout`, a fake browser that never answered was
+ * still being waited for when the probe gave up at 40 s; only the 300 s protocol timeout was
+ * left to end it.
+ */
+export const BROWSER_LAUNCH_TIMEOUT_MS = 30_000;
+const STDERR_TAIL_LINES = 20;
+const STDERR_TAIL_BYTES = 4_096;
+
+interface SpawnWatch {
+  pid(): number | null;
+  tail(): string;
+  stop(): void;
+}
+
+/**
+ * Observe the browser process the driver spawns, for its pid and the tail of its stderr.
+ *
+ * Over a pipe, a browser that dies at start is reported by the driver as "Target closed" with
+ * nothing of what the browser said (measured: a binary that cannot load a shared library). The
+ * driver keeps its child to itself until the launch resolves, so the child is picked up from
+ * Node's `child_process` diagnostics channel, matched by executable and by this run's own
+ * `--user-data-dir`. Diagnostics only: if the channel is unavailable the message says so, and
+ * nothing that decides a result depends on it.
+ */
+function watchBrowserSpawn(executablePath: string, userDataDir: string, onPid: (pid: number) => void): SpawnWatch {
+  let child: ChildProcess | null = null;
+  const lines: string[] = [];
+  let partial = "";
+  let bytes = 0;
+  const onData = (chunk: Buffer | string): void => {
+    const text = partial + String(chunk);
+    const parts = text.split(/\r?\n/u);
+    partial = parts.pop() ?? "";
+    for (const line of parts) {
+      if (!line.trim()) continue;
+      lines.push(line);
+      bytes += line.length;
+      while (lines.length > STDERR_TAIL_LINES || bytes > STDERR_TAIL_BYTES) bytes -= lines.shift()!.length;
+    }
+  };
+  const listener = (message: unknown): void => {
+    const candidate = (message as { process?: ChildProcess } | null)?.process;
+    if (!candidate || child) return;
+    // The channel publishes from the ChildProcess constructor, before spawn() has filled in the
+    // file, the arguments, the pid and the pipes; they are all set once the current call returns,
+    // and no stderr byte can be read before then.
+    queueMicrotask(() => {
+      if (child || candidate.spawnfile !== executablePath) return;
+      if (!candidate.spawnargs.includes(`--user-data-dir=${userDataDir}`)) return;
+      child = candidate;
+      candidate.stderr?.on("data", onData);
+      if (candidate.pid) onPid(candidate.pid);
+    });
+  };
+  let subscribed = false;
+  try { subscribe("child_process", listener); subscribed = true; } catch { /* no channel: no tail */ }
+  return {
+    pid: () => child?.pid ?? null,
+    tail(): string {
+      if (!subscribed) return "browser stderr: not observable in this Node version";
+      const all = [...lines, ...(partial.trim() ? [partial] : [])].map((line) =>
+        line.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/gu, "?").slice(0, 300));
+      if (!child) return "browser stderr: the browser process was not observed";
+      return all.length === 0 ? "browser stderr: (empty)" : `browser stderr, last ${all.length} line(s):\n    ${all.join("\n    ")}`;
+    },
+    stop(): void {
+      if (subscribed) unsubscribe("child_process", listener);
+      child?.stderr?.off("data", onData);
+    },
+  };
+}
+
 export interface LaunchResult {
   browser: BrowserLike | null;
   /** Populated when `browser` is null. One copyable command, plus every path that was tried. */
@@ -569,6 +980,11 @@ export interface LaunchResult {
   userDataDir?: string | null;
 }
 
+/** Unit-only seams. Production passes none and keeps BROWSER_LAUNCH_TIMEOUT_MS. */
+export interface LaunchSeams {
+  launchTimeoutMs?: number;
+}
+
 /**
  * Start a browser, or say precisely why not.
  *
@@ -576,7 +992,7 @@ export interface LaunchResult {
  * infrastructure event. A thrown error here would arrive at the top level as a crash, and a
  * crash and a missing renderer are different things for the person reading the output.
  */
-export async function launchBrowser(fromDir: string = process.cwd()): Promise<LaunchResult> {
+export async function launchBrowser(fromDir: string = process.cwd(), seams: LaunchSeams = {}): Promise<LaunchResult> {
   const found = resolveBrowser();
   if (!found.path) {
     return {
@@ -618,11 +1034,34 @@ export async function launchBrowser(fromDir: string = process.cwd()): Promise<La
     };
   }
 
-  const userDataDir = mkdtempSync(join(tmpdir(), "breaklint-chrome-profile-"));
+  // Profiles of earlier runs that were killed before they could clean up; see the sweep's rules.
+  sweepStaleBrowserProfiles();
+  const userDataDir = mkdtempSync(join(tmpdir(), PROFILE_PREFIX));
+  writeProfileOwner(userDataDir, null);
+  const executablePath = found.path;
+  const boundMs = seams.launchTimeoutMs ?? BROWSER_LAUNCH_TIMEOUT_MS;
+  const abort = new AbortController();
+  let timedOut = false;
+  let launchSettled!: () => void;
+  const settled = new Promise<void>((resolveSettled) => { launchSettled = resolveSettled; });
+  const watch = watchBrowserSpawn(executablePath, userDataDir, (pid) => writeProfileOwner(userDataDir, pid));
+  // An interrupt during start-up: stop the launch (the driver then kills the browser group), and
+  // let the failure path below verify the group and remove the profile.
+  const interrupt = holdForInterrupt({
+    async cleanup() { abort.abort(); await settled; },
+    force() {
+      abort.abort();
+      const pid = watch.pid();
+      if (pid !== null) { try { process.kill(-pid, "SIGKILL"); } catch { /* already gone */ } }
+      rmSync(userDataDir, { recursive: true, force: true });
+    },
+  });
+  const started = Date.now();
+  const timer = setTimeout(() => { timedOut = true; abort.abort(); }, boundMs);
   let browser: BrowserLike;
   try {
     browser = await launch({
-      executablePath: found.path,
+      executablePath,
       headless: true,
       userDataDir,
     // No `--allow-file-access-from-files`. It was here so the rasteriser page could import its
@@ -633,14 +1072,59 @@ export async function launchBrowser(fromDir: string = process.cwd()): Promise<La
     // mistake was made here once and caught by an audit, not by a test.
     args: [],
     detached: process.platform !== "win32",
+    // The control connection is a pair of pipes, not a DevTools port on loopback. A browser on
+    // the websocket transport kept running when breaklint was killed (12–13 processes alive 30 s
+    // after SIGKILL, 3 of 3); over a pipe it sees end-of-file and exits (none left after 1 s,
+    // 3 of 3). It also leaves no unauthenticated debugging port for other local processes.
+    pipe: true,
+    // breaklint handles these signals itself (see holdForInterrupt); the driver's handlers
+    // closed the browser underneath a running render and left the profile behind.
+    handleSIGINT: false,
+    handleSIGTERM: false,
+    handleSIGHUP: false,
+    timeout: boundMs,
+    signal: abort.signal,
     // Rasterising a many-page document is one long call over the control bridge. The driver's
     // default cuts it off well before a real book finishes, and the symptom then looks like a
     // renderer fault rather than a timeout.
       protocolTimeout: 300_000,
     });
+    // Aborted while the launch was resolving: the driver has already killed this browser.
+    if (abort.signal.aborted) throw new Error("the launch was stopped");
   } catch (error) {
+    clearTimeout(timer);
+    const elapsed = Date.now() - started;
+    const signal = interrupt.interrupted();
+    const reason = timedOut
+      ? `the browser did not finish starting within ${boundMs} ms`
+      : signal
+        ? `browser start-up interrupted by ${signal}`
+        : `the browser failed to start: ${error instanceof Error ? error.message : String(error)}`;
+    let tree = "";
+    const pid = watch.pid();
+    if (pid !== null && process.platform !== "win32") {
+      // The browser leads its own group; verify that group gone before its profile is removed.
+      const termination = await terminateProcessTree(pid, undefined, undefined, { pgid: pid, groupSafe: true, initialPids: [pid] });
+      if (!termination.verified) {
+        tree = `; its process group could not be verified terminated (survivors=${termination.survivingPids.join(",") || "none"})`;
+      }
+    }
     rmSync(userDataDir, { recursive: true, force: true });
-    throw error;
+    const tail = watch.tail();
+    watch.stop();
+    launchSettled();
+    // Interrupted: let the handler decide first. It ends the process by the signal as soon as this
+    // cleanup has settled, and only a host that handles the signal itself gets the error below.
+    // Without this wait the rejection could reach the CLI's exit(3) before the handler re-raised:
+    // measured 1 of 3 SIGINT runs at load 10 ending with exit 3 instead of by the signal.
+    if (interrupt.interrupted()) await interrupt.settled();
+    interrupt.release();
+    throw new Error(`${reason} (after ${elapsed} ms; launch bound ${boundMs} ms)${tree}\n  ${tail}`);
   }
-  return { browser, executablePath: found.path, userDataDir, detail: "" };
+  clearTimeout(timer);
+  if (watch.pid() === null) writeProfileOwner(userDataDir, browser.process?.()?.pid ?? null);
+  watch.stop();
+  launchSettled();
+  interrupt.release();
+  return { browser, executablePath, userDataDir, detail: "" };
 }
