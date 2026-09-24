@@ -12,7 +12,8 @@
  * nothing at all.
  */
 
-import type { BlockRecord, PageRecord, Snapshot, SvgRecord, TextLine, TextRun } from "../../src/core/types.ts";
+import { SNAPSHOT_SCHEMA_VERSION } from "../../src/core/enums.ts";
+import type { BlockRecord, Box, PageRecord, Snapshot, SvgRecord, SvgTextTarget, TextLine, TextRun } from "../../src/core/types.ts";
 
 export interface CorpusEntry {
   name: string;
@@ -118,7 +119,10 @@ function snapshot(parts: {
   uriRefs?: Snapshot["uriRefs"];
 }): Snapshot {
   return {
-    schemaVersion: 2,
+    // The current stamp, not a literal: these are hand-authored snapshots of the current shape,
+    // and the engine refuses any other stamp. A literal 2 stood here through schemas 3 and 4,
+    // which is the claim-without-migration the stamp exists to prevent.
+    schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     meta: {
       renderer: null,
       browserVersion: "",
@@ -154,30 +158,56 @@ function snapshot(parts: {
   };
 }
 
-function svgWith(texts: SvgRecord["texts"], over: Partial<SvgRecord> = {}): SvgRecord {
+type FixtureSvgText = Omit<SvgTextTarget, "boxLocal" | "bboxUser" | "userToLocal"> &
+  Partial<Pick<SvgTextTarget, "boxLocal" | "bboxUser" | "userToLocal">>;
+
+const IDENTITY = [1, 0, 0, 1, 0, 0] as const;
+
+/**
+ * A hand-authored SVG record. Unless a fixture says otherwise it is the untransformed case: the
+ * local frame's origin sits at the viewport's screen corner, the viewport is its only clip when its
+ * overflow clips, and every target's local box is its screen box moved by that origin. Fixtures
+ * whose point is that the two frames DIFFER pass `viewportLocal` and `boxLocal` explicitly.
+ */
+function svgWith(texts: FixtureSvgText[], over: Partial<SvgRecord> = {}): SvgRecord {
+  const viewportScreen = over.viewportScreen ?? box(48, 48, 300, 200);
+  const clipped = over.clipped ?? !/\bvisible\b/u.test(over.overflow ?? "hidden");
+  const viewport = box(0, 0, viewportScreen.width, viewportScreen.height);
+  const local = (b: Box): Box => box(b.x - viewportScreen.x, b.y - viewportScreen.y, b.width, b.height);
   return {
     nodeKey: "svg1",
     page: 1,
     sourceKey: "svgsig:chart",
     measurable: true,
-    viewportScreen: box(48, 48, 300, 200),
+    viewportScreen,
     overflow: "hidden",
+    clipped,
+    viewportLocal: {
+      viewport,
+      clips: clipped ? [viewport] : [],
+      localToScreen: [1, 0, 0, 1, viewportScreen.x, viewportScreen.y],
+      oracleDeltaPx: null,
+    },
+    viewportDiagnostic: null,
     textTargetCount: texts.length,
     textTargetsCapped: false,
     unreadableTargets: 0,
     unsupportedTargets: 0,
     notRenderedTargets: 0,
-    texts,
     shapes: [{ boxScreen: box(60, 60, 200, 120), strokeWidth: 2 }],
     paths: [],
     inkPasses: { E: ink(0), S: ink(9000), F: ink(11100) },
     inkCollected: true,
     inkStable: true,
     ...over,
+    texts: texts.map((text) => {
+      const boxLocal = text.boxLocal ?? local(text.boxScreen);
+      return { ...text, boxLocal, bboxUser: text.bboxUser ?? boxLocal, userToLocal: text.userToLocal ?? IDENTITY };
+    }),
   };
 }
 
-function svgText(key: string, T: number, T0: number, over: Partial<SvgRecord["texts"][number]> = {}) {
+function svgText(key: string, T: number, T0: number, over: Partial<FixtureSvgText> = {}): FixtureSvgText {
   return {
     targetKey: `bt-${key}`,
     svgTextKey: `svg:svgsig:chart|id:${key}`,
@@ -531,6 +561,108 @@ export function loadCorpus(): CorpusEntry[] {
       snapshot: snapshot({
         blocks: [block("svg1", { tag: "figure" })],
         svg: [svgWith([svgText("in", 100, 100, { boxScreen: box(60, 60, 120, 12), clipState: "none" })])],
+      }),
+    },
+
+    // The four below exist because the screen is not the frame the browser clips in. Each one is
+    // decided differently by a comparison of screen boxes: the first two were false cleans in 0.6.0,
+    // the third a false error, and the fourth a false clean again.
+    {
+      name: "svg-overflow-trigger-rotated-frame",
+      kind: "trigger",
+      about: "svg/text-overflows-viewport",
+      complication:
+        "An ancestor rotates the SVG by 15 degrees. The label's screen envelope lies inside the " +
+        "viewport's screen envelope — which, rotated, is far larger than the viewport — while in the " +
+        "SVG's own frame the label ends 3 px past the right edge. Only the local comparison sees it.",
+      snapshot: snapshot({
+        blocks: [block("svg1", { tag: "figure" })],
+        svg: [
+          svgWith(
+            [svgText("rotated-out", 100, 100, { boxScreen: box(211.02, 100.97, 42.25, 23.87), boxLocal: box(163, 30, 40, 14), clipState: "none" })],
+            {
+              viewportScreen: box(44.24, 29.8, 213.9, 129.04),
+              viewportLocal: {
+                viewport: box(0, 0, 200, 80), clips: [box(0, 0, 200, 80)],
+                localToScreen: [0.965926, 0.258819, -0.258819, 0.965926, 64.95, 29.8], oracleDeltaPx: 0.00002,
+              },
+            },
+          ),
+        ],
+      }),
+    },
+    {
+      name: "svg-overflow-trigger-nested-viewport",
+      kind: "trigger",
+      about: "svg/text-overflows-viewport",
+      complication:
+        "A label in a nested <svg> runs 3 px past the nested viewport's right edge. The nested " +
+        "SVG's client rect is the union of its CONTENT, so against that rectangle the label can " +
+        "never overshoot; its viewport is x/y/width/height, and the outer viewport clips too.",
+      snapshot: snapshot({
+        blocks: [block("svg1", { tag: "figure" })],
+        svg: [
+          svgWith(
+            [svgText("nested-out", 100, 100, { boxScreen: box(150, 130, 23, 14), boxLocal: box(130, 110, 23, 14), clipState: "none" })],
+            {
+              viewportScreen: box(150, 130, 23, 14),
+              viewportLocal: {
+                viewport: box(50, 50, 100, 60), clips: [box(50, 50, 100, 60), box(0, 0, 400, 200)],
+                localToScreen: [1, 0, 0, 1, 20, 20], oracleDeltaPx: 0,
+              },
+            },
+          ),
+        ],
+      }),
+    },
+    {
+      name: "svg-overflow-trigger-visible-nested-clipped-outside",
+      kind: "trigger",
+      about: "svg/text-overflows-viewport",
+      complication:
+        "The nested <svg> has overflow: visible, so its own viewport does not clip — but the SVG " +
+        "around it does, and the label ends 3 px past that one's edge. The record's own overflow " +
+        "string says visible; the clip chain says clipped.",
+      snapshot: snapshot({
+        blocks: [block("svg1", { tag: "figure" })],
+        svg: [
+          svgWith(
+            [svgText("chain-out", 100, 100, { boxScreen: box(340, 90, 83, 14), boxLocal: box(320, 70, 83, 14), clipState: "none" })],
+            {
+              overflow: "visible",
+              clipped: true,
+              viewportScreen: box(340, 90, 83, 14),
+              viewportLocal: {
+                viewport: box(300, 50, 100, 60), clips: [box(0, 0, 400, 200)],
+                localToScreen: [1, 0, 0, 1, 20, 20], oracleDeltaPx: 0,
+              },
+            },
+          ),
+        ],
+      }),
+    },
+    {
+      name: "svg-overflow-clean-clip-margin",
+      kind: "clean",
+      about: "svg/text-overflows-viewport",
+      complication:
+        "overflow-clip-margin: content-box 10px. The label ends 5 px past the content box and is " +
+        "drawn, because the clip edge is 10 px further out. The keyword form defeated parseFloat in " +
+        "0.6.0, which then compared against the content box and reported an error.",
+      snapshot: snapshot({
+        blocks: [block("svg1", { tag: "figure" })],
+        svg: [
+          svgWith(
+            [svgText("in-margin", 100, 100, { boxScreen: box(227, 82, 40, 14), boxLocal: box(165, 20, 40, 14), clipState: "none" })],
+            {
+              viewportScreen: box(62, 62, 200, 80),
+              viewportLocal: {
+                viewport: box(0, 0, 200, 80), clips: [box(-10, -10, 220, 100)],
+                localToScreen: [1, 0, 0, 1, 62, 62], oracleDeltaPx: 0,
+              },
+            },
+          ),
+        ],
       }),
     },
 

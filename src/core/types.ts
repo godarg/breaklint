@@ -26,6 +26,7 @@ import type {
   ReportSource,
   RunVerdict,
   Severity,
+  SvgViewportDiagnostic,
 } from "./enums.ts";
 import type { ConfigSource, EffectiveConfig, ProfileName } from "../config/contract.ts";
 
@@ -170,6 +171,12 @@ export interface InkPass {
   maskHash: string;
 }
 
+/**
+ * A 2D affine map as the six SVGMatrix coefficients `[a, b, c, d, e, f]`:
+ * x' = a·x + c·y + e, y' = b·x + d·y + f. Stored unrounded.
+ */
+export type AffineMatrix = readonly [number, number, number, number, number, number];
+
 export interface SvgTextTarget {
   /** `btNNN`, run-local addressing for the isolation pass. NEVER part of a fingerprint. */
   targetKey: string;
@@ -177,7 +184,25 @@ export interface SvgTextTarget {
   svgTextKey: string;
   /** Run-local injected address into source.map; never a fingerprint identity. */
   sourceAddressKey?: string | null;
+  /**
+   * The four `getBBox()` corners through `getScreenCTM()`, as an axis-aligned envelope in screen
+   * CSS px. Evidence and report position only: containment is decided on `boxLocal`, because
+   * under a CSS rotation of the SVG or of an ancestor this envelope is larger than the text.
+   */
   boxScreen: Box;
+  /**
+   * The same four corners in the record's local frame (see `SvgViewportLocal`), rounded to
+   * 0.01 px. `svg/text-overflows-viewport` compares this box with the clip rectangles.
+   */
+  boxLocal: Box;
+  /** `getBBox()` in the text's own user space, unrounded: the typographic cell, not the ink. */
+  bboxUser: Box;
+  /**
+   * The text's user space → the local frame: the enclosing viewports' composed `getCTM()` chain
+   * times the text's own `getCTM()`. `boxLocal` is the envelope of `bboxUser` through it. A later
+   * bound (stroke, ink) changes `bboxUser` in user space and maps it through the same matrix.
+   */
+  userToLocal: AffineMatrix;
   clipState: "none" | "clip-path" | "mask" | "both";
   /**
    * How many targets in this SVG share this exact `svgTextKey`.
@@ -211,6 +236,41 @@ export interface SvgShape {
   strokeWidth: number;
 }
 
+/**
+ * An SVG's viewport geometry in its LOCAL FRAME: the viewport coordinate system of the OUTERMOST
+ * `<svg>` that contains it, in CSS px, with the origin at that SVG's content-box corner, before
+ * any CSS transform or zoom of the SVG or its ancestors. A nested `<svg>` shares its outermost
+ * SVG's frame.
+ *
+ * Containment is decided here rather than in screen space. The browser clips an SVG's content in
+ * this frame and only then applies the CSS transform and zoom that carry the frame to the screen,
+ * and containment is invariant under that affine map. Comparing screen envelopes instead is what
+ * declined every rotated, zoomed, padded or bordered SVG up to 0.6.0.
+ */
+export interface SvgViewportLocal {
+  /**
+   * This SVG's own viewport rectangle. Outermost: `(0, 0, cw, ch)`, the content box from the
+   * computed width/height minus border and padding where `box-sizing` includes them. Nested: its
+   * `x`/`y`/`width`/`height` mapped into the frame.
+   */
+  viewport: Box;
+  /**
+   * Every rectangle that clips this record's text, innermost first: this SVG's own clip when its
+   * overflow clips (for an outermost SVG the content box grown by `overflow-clip-margin` from its
+   * reference box, for a nested one the viewport), then each enclosing SVG's. Text is drawn in
+   * full only inside all of them.
+   */
+  clips: Box[];
+  /** The frame → screen CSS px: `getScreenCTM() · getCTM()⁻¹` of the outermost SVG. */
+  localToScreen: AffineMatrix;
+  /**
+   * The independent proof of the frame: the largest distance, in frame px, between the
+   * outermost SVG's reconstructed content box and CDP `DOM.getBoxModel().content` mapped back
+   * into the frame. null only on externally supplied projections that carry no oracle.
+   */
+  oracleDeltaPx: number | null;
+}
+
 export interface SvgRecord {
   nodeKey: string;
   /**
@@ -233,9 +293,28 @@ export interface SvgRecord {
    * that an unmeasurable SVG without a reason is rejected.
    */
   reason?: EnvId | null;
+  /** `getBoundingClientRect()` of the SVG element: its border box's screen envelope. Evidence only. */
   viewportScreen: Box;
-  /** Overflow on the SVG element itself; `visible` means the text is shown after all. */
+  /** The computed `overflow` of the SVG element itself, as the browser serialises it. */
   overflow: string;
+  /**
+   * Whether anything clips this record's text: this SVG's own overflow or that of an enclosing
+   * `<svg>`. False means every enclosing viewport has `overflow: visible` on both axes, so the text
+   * is painted wherever it lies and `svg/text-overflows-viewport` has no question to answer.
+   */
+  clipped: boolean;
+  /**
+   * The viewport geometry the rule measures in. null when `measurable` is false, and on a record
+   * with no potential target (all text unrendered, no `<use>`), where an unprovable viewport is not
+   * a decline because the rule has nothing there to judge.
+   */
+  viewportLocal: SvgViewportLocal | null;
+  /**
+   * Why no frame was reconstructed, whenever `viewportLocal` is null for a reason other than the
+   * target cap — always set when `reason` is `env/svg-viewport-geometry-unsupported`. Snapshot
+   * diagnostics only: the report carries the coverage reason, this names which case applied.
+   */
+  viewportDiagnostic: SvgViewportDiagnostic | null;
   textTargetCount: number;
   textTargetsCapped: boolean;
   /**

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A keyword overflow-clip-margin that draws past the content box</title>
+<!--
+  The false error of 0.6.0.
+
+  `overflow-clip-margin: content-box 10px` lets an SVG paint 10 px past its content box. 0.6.0 read
+  the computed value with parseFloat, which is NaN for every form that starts with a keyword, took
+  that as "no margin", and compared the label against the content box: the `*-in` labels below,
+  drawn in full, were reported as "not drawn". There is no padding or border, so nothing else
+  declined the SVG and hid the mistake.
+
+  Both figures carry one label that ends 4 px past the content box (6 px inside the real clip edge)
+  and one that ends 16 px past it (6 px beyond the clip edge). The second figure uses
+  `overflow: clip`, which clips exactly like `hidden` here (measured on Chromium 141). Advances are
+  fixed with textLength; pixel-verified on Chromium 141 when authored.
+-->
+<style>
+  @page { size: 360pt 300pt; margin: 24pt; }
+  body { font: 11pt/1.35 serif; margin: 0; }
+  figure { margin: 0 0 14pt; }
+  /* content-box explicitly: Paged.js makes everything in a page box border-box. */
+  svg.f { display: block; box-sizing: content-box; width: 200px; height: 60px; overflow: hidden; overflow-clip-margin: content-box 10px; }
+  svg.f text { font-size: 16px; font-family: "DejaVu Sans", sans-serif; }
+  figcaption { font-size: 8pt; }
+</style>
+</head>
+<body>
+<p>The clip edge is 10 px outside the content box.</p>
+
+<figure>
+  <svg class="f" id="keyword-hidden" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="60" fill="#eeeeee"></rect>
+    <text id="keyword-hidden-in" x="104" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="keyword-hidden-out" x="116" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>overflow: hidden; overflow-clip-margin: content-box 10px.</figcaption>
+</figure>
+
+<figure>
+  <svg class="f" id="keyword-clip" viewBox="0 0 200 60" style="overflow: clip" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="60" fill="#eeeeee"></rect>
+    <text id="keyword-clip-in" x="104" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="keyword-clip-out" x="116" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>overflow: clip; overflow-clip-margin: content-box 10px.</figcaption>
+</figure>
+</body>
+</html>

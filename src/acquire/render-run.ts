@@ -78,6 +78,7 @@ import {
   type ControlSignature,
   type RawSnapshot,
 } from "../measure/snapshot.ts";
+import type { SvgBoxModel } from "../measure/svg-viewport.ts";
 import { boundaryFactsFrom, collectorSource, silentHooks, type CollectorResult } from "../paginate/collector.ts";
 import { assignPageCauses } from "../paginate/breaks.ts";
 import { produceEvidence, type EvidenceOutcome } from "../render/evidence.ts";
@@ -946,6 +947,48 @@ async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compare
   } finally {
     await session.detach().catch(() => undefined);
   }
+}
+
+/**
+ * The independent half of the SVG frame proof: CDP `DOM.getBoxModel()` — content, padding and
+ * border quads — for every outermost `<svg>` record, by record index (null where there is none).
+ * The comparison itself is pure and lives in `svg-viewport.ts`, so it is testable without a
+ * browser; this only fetches.
+ *
+ * A missing answer is a missing proof, never a crash: the record declines with
+ * `env/svg-viewport-geometry-unsupported` and counts against coverage. Not fatal, unlike the CSS
+ * cross-check above, because a disagreement here is confined to one reconstruction of one SVG's
+ * viewport — the general probe is judged by `crossCheckPage` — and withdrawing every finding of the
+ * document for it would say less, not more. What it cannot become is a clean exit: the error rule's
+ * floor of 1 turns any declined target into exit 4.
+ */
+async function svgBoxModels(page: PageLike, raw: RawSnapshot): Promise<(SvgBoxModel | null)[]> {
+  const out: (SvgBoxModel | null)[] = raw.svg.map(() => null);
+  const wanted = raw.svg.flatMap((record, index) => (record.oracleIndex >= 0 ? [{ index, occurrence: record.oracleIndex }] : []));
+  if (wanted.length === 0 || !page.createCDPSession) return out;
+  const session = await page.createCDPSession();
+  try {
+    await session.send("DOM.enable");
+    const { root } = await session.send<{ root: { nodeId: number } }>("DOM.getDocument", { depth: -1, pierce: false });
+    const { nodeIds } = await session.send<{ nodeIds: number[] }>("DOM.querySelectorAll", { nodeId: root.nodeId, selector: ".pagedjs_page svg" });
+    // The two sources must agree about which SVGs exist before an index means the same element.
+    if (nodeIds.length !== raw.svgRendered) return out;
+    for (const { index, occurrence } of wanted) {
+      const nodeId = nodeIds[occurrence];
+      if (!nodeId) continue;
+      try {
+        const { model } = await session.send<{ model: { content?: number[]; padding?: number[]; border?: number[] } }>("DOM.getBoxModel", { nodeId });
+        out[index] = Array.isArray(model.content) && Array.isArray(model.padding) && Array.isArray(model.border)
+          ? { content: model.content, padding: model.padding, border: model.border }
+          : null;
+      } catch {
+        // No box model: no proof, and the record declines.
+      }
+    }
+  } finally {
+    await session.detach().catch(() => undefined);
+  }
+  return out;
 }
 
 function fatalInfrastructure(events: readonly InfraEvent[]): boolean {
@@ -1874,6 +1917,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     }
     const raw = await page.evaluate<RawSnapshot>(SNAPSHOT_SOURCE);
     const geometry = await crossCheckPage(page);
+    const svgModels = await svgBoxModels(page, raw);
     // The residue probe runs only on the failing branch. It is a full DOM walk per page, and on a
     // sound document the answer is always empty — paying for it on every run to say nothing is the
     // wrong trade. On the failing branch it is the difference between naming a cause and accusing
@@ -1966,6 +2010,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     }
     const snapshot = assembleSnapshot({
       raw,
+      svgBoxModels: svgModels,
       collector,
       sourceModel,
       sourceMap: injected.map,

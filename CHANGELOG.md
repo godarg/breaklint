@@ -18,6 +18,55 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
   compared advice text will see the new string.
 
+- **`svg/text-overflows-viewport` decides containment in the SVG's own coordinate system.** The
+  text box is carried through `getCTM()` into the outermost `<svg>`'s viewport frame (CSS px from
+  its content-box corner, before CSS transforms and zoom) and compared with the rectangles that
+  actually clip it there: the content box, grown by `overflow-clip-margin` from the box that
+  property names, and for a nested `<svg>` its own viewport and every enclosing one. The frame is
+  checked against CDP `DOM.getBoxModel()` of the SVG, read out of process, to 0.005 px; an SVG it
+  does not confirm declines. Consumers see three things:
+  - **SVGs 0.6.0 declined are now measured**: border, padding, every clip-margin form, 2D CSS
+    transforms (`transform`, `rotate`, `scale`, `translate`) and zoom on the SVG or an ancestor.
+    Measured on patched Chromium 141 without evidence binding: a probe document with a padded, a
+    bordered and a rotated-ancestor SVG went from exit 4 (0 of 3 measured) to exit 0 (3 of 3). **A
+    document that ended exit 4 on such figures can now end exit 1**, if one of its labels really is
+    clipped.
+  - **A clipped label in a nested `<svg>` is now reported.** 0.6.0 took a nested SVG's viewport from
+    its client rect, which is the union of its content, so a label running past it could never
+    overshoot: a probe with 43.5 px of a label cut off ended exit 0. It now ends exit 1. **This can
+    turn a green build red.** The positive-control fixture `svg-in-viewport.html` was such a case
+    without knowing it: its page-wide `svg { width; height }` rule also sized the nested SVG, and
+    Chromium drew the inner label 3.9 px past the outer viewport's edge (pixel-checked).
+  - **A keyword `overflow-clip-margin` no longer produces a false error.** `parseFloat("content-box
+    20px")` is NaN and was read as no margin, so text the browser draws inside the margin was
+    reported "not drawn" (a probe ended exit 1, 5.22 px). It is now parsed as `<visual-box>?
+    <length>?`, measured serialisations included (`padding-box` reads `0px`).
+- **The same rule declines some SVGs it used to measure or exempt**, each counted against coverage
+  as `env/svg-viewport-geometry-unsupported`: differing `overflow-x`/`overflow-y` (0.6.0 called any
+  `visible` in the pair non-applicable, although the other axis clips); a nested `<svg>` whose
+  computed `x`/`y`/`width`/`height` disagree with its attributes (CSS sizes nested SVGs); a nested
+  SVG with a transform or clip margin; an `<svg>` inside `<foreignObject>`; a clip margin grown from
+  a padding box CDP does not confirm. Rounded clips, a radius with a clip margin, 3D transforms,
+  perspective and motion paths still decline. An SVG with no potential target at all is never
+  declined for its viewport. A nested SVG with `overflow: visible` inside a clipping SVG is
+  measured against the enclosing clip instead of being exempt.
+- **A finding's value is in the SVG's frame px, and its message says so.** For an SVG with no CSS
+  transform or zoom between it and the page the number is unchanged; under `zoom: 2` it is half the
+  screen distance. The detail now reads "Measured in the SVG's own coordinates, before CSS
+  transforms and zoom." instead of "Coordinates are normalised through getScreenCTM()." The report
+  shape is unchanged.
+
+### Schema
+
+- **Snapshot schema 4 → 5.** Snapshot 5 adds the SVG local frame: `SvgRecord.clipped`,
+  `viewportLocal` (viewport, clip rectangles, frame-to-screen matrix, measured oracle delta) and
+  `viewportDiagnostic`, and per target `boxLocal`, `bboxUser` and `userToLocal`. The engine now
+  checks the stamp on read — nothing did before — and ends the run exit 3 on any snapshot that is
+  not schema 5, because a schema-4 snapshot has no local geometry to convert. The shipped demo
+  snapshot is migrated. The report schema stays 5; Configuration Contract stays 1. Measurement
+  receipt v1 (M3 calibration) is frozen and unchanged: its adapter maps its screen boxes into the
+  new fields explicitly.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as

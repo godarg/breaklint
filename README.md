@@ -25,7 +25,7 @@ command's output:
 ```
 error svg/text-overflows-viewport  page 5
   measured   72 px; threshold 0 px (uncalibrated)
-  detail     This text extends 72.00 px beyond the SVG viewport and is not drawn. Coordinates are normalised through getScreenCTM().
+  detail     This text extends 72.00 px beyond the SVG viewport and is not drawn. Measured in the SVG's own coordinates, before CSS transforms and zoom.
   remedy     Text rendered inside an SVG extends outside the SVG viewport bounds and is clipped. Enlarge the SVG 'viewBox' or its width/height, or adjust the <text> coordinates ('x', 'y', 'text-anchor'). 'overflow: visible' on the container also clears the finding, but it does not move the text: the viewport then no longer clips, the target becomes non-applicable and this rule stops measuring it. Use that only where the overflow is intended.
              untested: no trigger/remedied pair in this package shows this advice removing this finding
   source     unknown (node produced by the paginator)

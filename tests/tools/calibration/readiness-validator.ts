@@ -8,7 +8,7 @@ import { TextDecoder } from "node:util";
 import { Ajv2020, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
 import { parse, type DefaultTreeAdapterMap } from "parse5";
 import type { RuleResult } from "../../../src/core/rule.ts";
-import type { Snapshot, SvgRecord } from "../../../src/core/types.ts";
+import type { Snapshot, SvgRecord, SvgTextTarget } from "../../../src/core/types.ts";
 import { VALIDATION_RULES_BY_ID } from "../../../src/rules/index.ts";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
@@ -132,11 +132,44 @@ export interface OutcomeArtifact {
   productionEvaluationSha256: string;
 }
 export type CandidateConfig = { ruleId: "svg/text-clipped"; maxMissingInk: number } | { ruleId: "svg/text-ink-collision"; minCollisionInk: number; minOccludedInk: number } | { ruleId: "svg/text-overflows-viewport"; maxOvershootPx: 0 };
+/**
+ * The SVG record shape measurement receipt v1 carries. It predates the snapshot's local SVG frame
+ * (snapshot schema 5) and its schema is frozen, so the receipt keeps it; the adapter below states
+ * how it enters a snapshot instead of letting the rule guess.
+ */
+export type ReceiptSvgRecordV1 = Omit<SvgRecord, "reason" | "clipped" | "viewportLocal" | "viewportDiagnostic" | "texts"> & {
+  reason: SvgRecord["reason"] | null;
+  texts: Omit<SvgTextTarget, "boxLocal" | "bboxUser" | "userToLocal">[];
+};
 export interface SnapshotProjection {
   schemaVersion: 1;
   documentPath: string;
   pageNumber: number;
-  svg: Omit<SvgRecord, "reason"> & { reason: SvgRecord["reason"] | null };
+  svg: ReceiptSvgRecordV1;
+}
+
+/**
+ * A receipt-v1 SVG record as a snapshot record. Receipt v1 measures untransformed synthetic
+ * documents in screen space and records only screen boxes, so the adapter makes the one
+ * interpretation those receipts always had explicit: the local frame IS the screen, the clip is
+ * the receipt's viewport exactly when its overflow is not `visible` (the pre-0.7 rule's reading of
+ * the same string), and each target's local box is its screen box. No oracle stands behind that
+ * frame and `oracleDeltaPx` says so with null. Nothing here reaches the live collector.
+ */
+export function snapshotRecordFromReceiptV1(record: ReceiptSvgRecordV1): SvgRecord {
+  const { reason, texts, ...rest } = record;
+  const clipped = !/\bvisible\b/u.test(record.overflow);
+  const identity = [1, 0, 0, 1, 0, 0] as const;
+  return {
+    ...rest,
+    ...(reason === null || reason === undefined ? {} : { reason }),
+    clipped,
+    viewportLocal: record.measurable
+      ? { viewport: record.viewportScreen, clips: clipped ? [record.viewportScreen] : [], localToScreen: identity, oracleDeltaPx: null }
+      : null,
+    viewportDiagnostic: null,
+    texts: texts.map((text) => ({ ...text, boxLocal: text.boxScreen, bboxUser: text.boxScreen, userToLocal: identity })),
+  };
 }
 export interface MeasurementReceiptRow { documentId: string; artifactSha256: string; targetId: string; ruleId: RuleId; candidateConfigHash: string; rendererFreezeId: string; rendererContentHash: string; measuredAt: string; snapshot: SnapshotProjection }
 export interface MeasurementReceipt {
@@ -526,15 +559,14 @@ function metricValue(report: AcceptanceReport, metric: AcceptanceReport["gates"]
 export const PRODUCT_RULE_EXECUTABLE_CONTRACTS: Readonly<Record<RuleId, { moduleRelativePath: string; sourceSha256: string; executableContractVersion: "m3-0-real-rule-run-v1" }>> = Object.freeze({
   "svg/text-clipped": { moduleRelativePath: "src/rules/svg/text-clipped.ts", sourceSha256: "6e55541c82526ec89ee0d5b95574647399111e4a90c43ada849b0385a3c13307", executableContractVersion: "m3-0-real-rule-run-v1" },
   "svg/text-ink-collision": { moduleRelativePath: "src/rules/svg/text-ink-collision.ts", sourceSha256: "e6f3389c7df1ee5d3dd9cfc8dc8f8a218c63ce436c2e5e481e3640a3e560fe61", executableContractVersion: "m3-0-real-rule-run-v1" },
-  "svg/text-overflows-viewport": { moduleRelativePath: "src/rules/svg/text-overflows-viewport.ts", sourceSha256: "3f7288c7a41618f9b29d9c86a42eae82e1baa5f00c3fed007190fd9797312304", executableContractVersion: "m3-0-real-rule-run-v1" },
+  "svg/text-overflows-viewport": { moduleRelativePath: "src/rules/svg/text-overflows-viewport.ts", sourceSha256: "797ae67a5e415fa7e19abf0c93e59ddac9408d7dd2aebdd5c276d17b35936149", executableContractVersion: "m3-0-real-rule-run-v1" },
 });
 
 export function producerSourceIdentitySha256(sourceIdentity: unknown): string { return sha256(canonicalJson(sourceIdentity)); }
 
 function snapshotFromProjection(projection: SnapshotProjection): Snapshot {
   const style = { breakInside: "auto", breakBefore: "auto", breakAfter: "auto", columns: "auto", writingMode: "horizontal-tb", visibility: "visible", widows: 2, orphans: 2, textAlign: "start", wordSpacing: "normal", fontFamily: "sans-serif", fontSize: 16, lineHeight: 20, lang: "en" };
-  const svg = structuredClone(projection.svg) as SvgRecord & { reason?: SvgRecord["reason"] };
-  if (svg.reason === null) delete svg.reason;
+  const svg = snapshotRecordFromReceiptV1(structuredClone(projection.svg));
   return {
     schemaVersion: projection.schemaVersion,
     meta: { renderer: "m3-0-measurement-receipt", browserVersion: "receipt-bound", pagedjsVersion: "0.4.3", platform: "receipt-bound", locale: "en", inputIdentity: null, freezeSignature: "receipt-bound", freezeRetries: 0, epochCount: 1, interventions: [] },

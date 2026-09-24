@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SVG viewports whose clip rectangle is not the border box</title>
+<!--
+  The viewport boxes 0.6.0 declined, each with one label that is drawn and one that is clipped.
+
+  Every <svg> here clips its text somewhere other than at its getBoundingClientRect: inside a
+  padding, inside a border, under a rotated ancestor, under a zoomed ancestor, and at the edge
+  each overflow-clip-margin form names. Up to 0.6.0 every one of them declined the whole record
+  (`env/svg-viewport-geometry-unsupported`), so this document ended exit 4 without a verdict on
+  any label. Measured in the SVG's own coordinate system it has exactly one clipped label per
+  figure — the `*-out` ones — and nothing else to report.
+
+  The complication is the gap between the two edges each case confuses. The padded label ends
+  6 px past the content box and 4 px inside the padding box, so a clip taken from the padding or
+  border box calls it drawn; the clip-margin labels sit 6 px on either side of the edge their
+  form names, so a dropped margin reports the drawn one.
+
+  Geometry, not font metrics, decides: every label's advance is fixed with textLength, so its box
+  ends where the numbers below say to within the glyph cell's own 1-2 px (measured on Chromium
+  141: getBBox() of a 100-unit textLength is 101.1 to 104.4 units wide, depending on the scale the
+  text is set at), and labels sit mid-height so only the right edge is in question. The glyph is
+  U+2588 FULL BLOCK, whose ink fills its advance, so a box past the edge is ink past the edge.
+  `*-in` ends at least 3 px inside the real clip edge, `*-out` at least 3 px outside it.
+  Pixel-verified on Chromium 141 when authored: every `*-in` label has the same red-ink count
+  clipped and unclipped, every `*-out` label loses 6 px or more of ink width to its clip.
+-->
+<style>
+  @page { size: 420pt 640pt; margin: 24pt; }
+  body { font: 11pt/1.35 serif; margin: 0; }
+  figure { margin: 0 0 12pt; }
+  /* Paged.js sets box-sizing: border-box on everything in a page box; the numbers in this file are
+     content-box numbers, so the SVGs say so. The border-box arithmetic has its own unit test. */
+  svg.f { display: block; box-sizing: content-box; width: 200px; height: 60px; overflow: hidden; }
+  svg.f text { font-size: 16px; font-family: "DejaVu Sans", sans-serif; }
+  svg.box { padding: 8px; border: 4px solid #333; }
+  figcaption { font-size: 8pt; }
+</style>
+</head>
+<body>
+<p>Nine figures. In each, the label ending <code>-out</code> runs past the clip edge; the other is drawn in full.</p>
+
+<figure>
+  <svg class="f" id="padded" viewBox="0 0 200 60" style="padding: 10px" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="60" fill="#eeeeee"></rect>
+    <!-- content right edge 200; padding box right edge 210 -->
+    <text id="padded-in" x="94" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="padded-out" x="106" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>padding: 10px — the clip is the content box.</figcaption>
+</figure>
+
+<figure>
+  <svg class="f" id="bordered" viewBox="0 0 200 60" style="border: 5px solid #333" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="60" fill="#eeeeee"></rect>
+    <!-- content right edge 200; border box right edge 205 -->
+    <text id="bordered-in" x="94" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="bordered-out" x="106" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>border: 5px — the clip is the content box.</figcaption>
+</figure>
+
+<figure>
+  <div style="transform: rotate(15deg); transform-origin: 0 0; margin-left: 30px; height: 120px">
+    <svg class="f" id="rotated" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+      <rect width="200" height="60" fill="#eeeeee"></rect>
+      <text id="rotated-in" x="94" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+      <text id="rotated-out" x="106" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    </svg>
+  </div>
+  <figcaption>An ancestor rotated by 15 degrees: screen boxes are envelopes, the frame is not.</figcaption>
+</figure>
+
+<figure>
+  <div style="zoom: 2">
+    <svg class="f" id="zoomed" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+      <rect width="200" height="60" fill="#eeeeee"></rect>
+      <text id="zoomed-in" x="94" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+      <text id="zoomed-out" x="106" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    </svg>
+  </div>
+  <figcaption>An ancestor with zoom: 2 — computed lengths are unzoomed, the screen is not.</figcaption>
+</figure>
+
+<figure>
+  <svg class="f box" id="margin-length" viewBox="0 0 200 60" style="overflow-clip-margin: 10px" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="60" fill="#eeeeee"></rect>
+    <!-- a bare length grows the PADDING box: clip right edge 200 + 8 + 10 = 218 -->
+    <text id="margin-length-in" x="112" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="margin-length-out" x="124" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>overflow-clip-margin: 10px — padding box plus 10.</figcaption>
+</figure>
+
+<figure>
+  <svg class="f box" id="margin-content" viewBox="0 0 200 60" style="overflow-clip-margin: content-box 10px" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="60" fill="#eeeeee"></rect>
+    <!-- clip right edge 200 + 10 = 210 -->
+    <text id="margin-content-in" x="104" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="margin-content-out" x="116" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>overflow-clip-margin: content-box 10px — content box plus 10.</figcaption>
+</figure>
+
+<figure>
+  <svg class="f box" id="margin-padding" viewBox="0 0 200 60" style="overflow-clip-margin: padding-box" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="60" fill="#eeeeee"></rect>
+    <!-- serialises as 0px; clip right edge 200 + 8 = 208 -->
+    <text id="margin-padding-in" x="102" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="margin-padding-out" x="114" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>overflow-clip-margin: padding-box — the padding box.</figcaption>
+</figure>
+
+<figure>
+  <svg class="f box" id="margin-border-plain" viewBox="0 0 200 60" style="overflow-clip-margin: border-box" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="60" fill="#eeeeee"></rect>
+    <!-- clip right edge 200 + 8 + 4 = 212 -->
+    <text id="margin-border-plain-in" x="106" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="margin-border-plain-out" x="118" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>overflow-clip-margin: border-box — the border box.</figcaption>
+</figure>
+
+<figure>
+  <svg class="f box" id="margin-border" viewBox="0 0 200 60" style="overflow-clip-margin: border-box 5px" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="60" fill="#eeeeee"></rect>
+    <!-- clip right edge 200 + 8 + 4 + 5 = 217 -->
+    <text id="margin-border-in" x="111" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="margin-border-out" x="123" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>overflow-clip-margin: border-box 5px — border box plus 5.</figcaption>
+</figure>
+</body>
+</html>

@@ -24,7 +24,14 @@
   @page { size: 320pt 420pt; margin: 24pt; }
   body { font: 12pt/1.5 serif; margin: 0; }
   figure { margin: 0 0 18pt; }
-  svg { display: block; width: 260pt; height: 130pt; }
+  /* Outer figures only. Up to 0.6.0 this rule read `svg { ... }` and sized the nested <svg> too:
+     CSS width/height override a nested SVG's attributes, so the inner viewport became
+     346.667 x 173.333 instead of 180 x 120 and pushed the inner label 3.9 px past the outer
+     viewport's bottom edge (pixel-checked on Chromium 141: its cell box reached 882.16, its ink
+     stopped at the 875.31 edge). 0.6.0 called that clean because it compared the label with the
+     nested SVG's client rect; the collector now refuses attributes the computed style contradicts
+     (`nested-lengths-disagree`). The positive control is meant to be sound, so it is again. */
+  figure > svg { display: block; width: 260pt; height: 130pt; }
   figcaption { font-size: 9pt; }
 </style>
 </head>

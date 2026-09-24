@@ -143,6 +143,34 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const frameSrcGet = getter(HTMLIFrameElement.prototype, "src");
   const svgBBoxFn = SVGGraphicsElement.prototype.getBBox;
   const svgScreenCtmFn = SVGGraphicsElement.prototype.getScreenCTM;
+  // The viewport rule decides containment in the SVG's own coordinate system, so the matrix INTO
+  // that system is a measuring primitive like any other. Its six coefficients and the getBBox()
+  // rectangle are read through captured getters as well: SVGMatrix and SVGRect are their own
+  // interfaces in Chromium (measured on 141: neither is a DOMMatrix/DOMRect instance), and a
+  // document that replaced SVGMatrix.prototype.e would otherwise move every box without moving any
+  // glyph. The walker falls back to the DOM geometry interfaces should a later browser alias them.
+  const svgCtmFn = SVGGraphicsElement.prototype.getCTM;
+  const svgMatrixProto = typeof SVGMatrix === "function" ? SVGMatrix.prototype : DOMMatrixReadOnly.prototype;
+  const svgRectProto = typeof SVGRect === "function" ? SVGRect.prototype : DOMRectReadOnly.prototype;
+  const matrixGets = ["a", "b", "c", "d", "e", "f"].map((name) => getter(svgMatrixProto, name));
+  const svgRectGets = ["x", "y", "width", "height"].map((name) => getter(svgRectProto, name));
+  // A nested <svg>'s viewport rectangle: x/y/width/height as SVGAnimatedLength, resolved to user
+  // units by SVGLength.value (percentages against the enclosing viewport).
+  const svgLengthGets = ["x", "y", "width", "height"].map((name) => getter(SVGSVGElement.prototype, name));
+  const animValGet = getter(SVGAnimatedLength.prototype, "animVal");
+  const lengthValueGet = getter(SVGLength.prototype, "value");
+  const matrixValue = (matrix) => {
+    if (!matrix) return null;
+    const out = [];
+    for (let index = 0; index < 6; index += 1) out[index] = call.call(matrixGets[index], matrix);
+    return out;
+  };
+  const svgMatrixOf = (fn, el) => {
+    // getCTM/getScreenCTM on something that is not an SVGGraphicsElement throws; <defs>, <symbol>
+    // and <mask> parents are exactly that. No matrix is an answer the caller has to handle, not
+    // a crash of the whole collection.
+    try { return matrixValue(call.call(fn, el)); } catch (_) { return null; }
+  };
   const DOMPointCtor = DOMPoint;
   const matrixTransformFn = DOMPoint.prototype.matrixTransform;
   const canvasContextFn = HTMLCanvasElement.prototype.getContext;
@@ -328,6 +356,38 @@ const PRIMITIVES_TEMPLATE = `(() => {
           ],
         };
       },
+      // The raw facts behind a target's box, as plain numbers: the getBBox() rectangle in the
+      // element's user space, getCTM() into its nearest viewport's coordinate system and
+      // getScreenCTM() into the screen. Node composes and compares them; nothing here decides.
+      // getBBox() throws on a target with no rendered geometry; null CTMs mean the element is not
+      // in a rendered tree. Both come back as null, so the caller can count the target instead of
+      // losing the SVG.
+      svgGeometry: (el) => {
+        try {
+          const bb = call.call(svgBBoxFn, el);
+          const ctm = matrixValue(call.call(svgCtmFn, el));
+          const screenCtm = matrixValue(call.call(svgScreenCtmFn, el));
+          if (!ctm || !screenCtm) return null;
+          const bbox = [];
+          for (let index = 0; index < 4; index += 1) bbox[index] = call.call(svgRectGets[index], bb);
+          return { bbox, ctm, screenCtm };
+        } catch (_) {
+          return null;
+        }
+      },
+      svgCtm: (el) => svgMatrixOf(svgCtmFn, el),
+      svgScreenCtm: (el) => svgMatrixOf(svgScreenCtmFn, el),
+      svgViewportLengths: (el) => {
+        try {
+          const out = [];
+          for (let index = 0; index < 4; index += 1) {
+            out[index] = call.call(lengthValueGet, call.call(animValGet, call.call(svgLengthGets[index], el)));
+          }
+          return out;
+        } catch (_) {
+          return null;
+        }
+      },
       outerHtml: (el) => call.call(outerHtmlGet, el),
       painted: (el) => {
         if (typeof checkVisibilityFn !== "function") return null;
@@ -465,7 +525,7 @@ export const PRIMITIVES_CHECK = `(() => {
     return { ok: false, reason: "the primitive references are replaceable, so they prove nothing" };
   }
   for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
-    "outerHtml", "painted", "byId", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
+    "svgGeometry", "svgCtm", "svgScreenCtm", "svgViewportLengths", "outerHtml", "painted", "byId", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
     "rects", "setAttr", "setText", "nodeType", "parent", "next", "create", "append", "remove", "setCssText",
     "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityRecordPreview",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",

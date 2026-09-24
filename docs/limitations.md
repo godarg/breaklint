@@ -18,7 +18,7 @@ against a boundary that is not chosen at all — and only those two gate.
 | rule | what makes the boundary structural |
 |---|---|
 | `layout/unbreakable-block-too-tall` | The block declares `break-inside: avoid` and is taller than the page content box. There is no page it can sit on. The comparison is between two measured lengths and the threshold is the medium itself. |
-| `svg/text-overflows-viewport` | The text box, normalised through `getScreenCTM()`, lies outside the SVG viewport. What is outside the viewport is not drawn. The threshold is zero, not a preference. |
+| `svg/text-overflows-viewport` | The text box, carried through `getCTM()` into the SVG's own viewport coordinates, lies outside a viewport that clips it. What is outside the viewport is not drawn. The threshold is zero, not a preference. |
 
 ## The three proof classes
 
@@ -74,8 +74,10 @@ profile sets every floor to 1. The two proof-source-A thresholds are not configu
 turning a structural boundary into a caller preference would invalidate the reason those rules may
 gate by default. The effective floors and their origins appear in the report (schema 3 from 0.2.3,
 schema 4 from 0.5.0, schema 5 when the optional `remediation` was added to a finding); stored
-snapshot fixtures moved to schema 3 in 0.2.3, when `inkCollected` was added, and to schema 4 in
-0.5.0.
+snapshot fixtures moved to schema 3 in 0.2.3, when `inkCollected` was added, to schema 4 in
+0.5.0, and to schema 5 after 0.6.0 (unreleased), when the SVG local frame was added. The engine
+reads only the current snapshot schema: a stored snapshot of another stamp ends the run exit 3
+rather than being judged on fields it does not carry.
 
 ### What coverage is a ratio OF, and the two things it is not
 
@@ -163,13 +165,24 @@ overflow for certain; only the band between them stays undecidable. On the corpu
 strokes are 2–4 px against overshoots that matter at ten times that, so almost all 35 declined
 targets are decidable without an ink pass at all. This is a named gap, not a design position.
 
-**Nontrivial viewport boxes are detected but not reconstructed.** `getBoundingClientRect` is the
-border box and becomes only an axis-aligned envelope under rotation or skew. An SVG root with
-border, padding, rounded clipping or a nonzero overflow clip margin therefore declines, as does an
-SVG whose own or ancestor CSS transform geometry is nontrivial (`transform`, the individual
-`rotate`/`scale`/`translate` properties, perspective or motion path). The reason is
-`env/svg-viewport-geometry-unsupported`. Ordinary axis-aligned SVG roots remain measured. A later
-content-quad implementation needs its own transform-aware live proof.
+**SVG viewports are reconstructed in the SVG's own coordinate system, and what that cannot prove
+still declines.** Containment is decided in the outermost SVG's viewport frame — CSS px from its
+content-box corner, before CSS transforms and zoom — where the browser applies the clip. Border,
+padding, every `overflow-clip-margin` form, 2D transforms and zoom of the SVG or its ancestors, and
+nested `<svg>` viewports are therefore measured; up to 0.6.0 the first five declined the whole SVG,
+a nested viewport was taken from its client rect (the union of its content, so a clipped label
+could never overshoot it: a false clean), and a keyword clip margin read as none (a false error).
+The frame is checked against CDP's box model of the SVG, read out of process, to 0.005 px. Still
+declined as `env/svg-viewport-geometry-unsupported`, counted against coverage: a rounded clip; a
+corner radius combined with a clip margin; 3D transforms, perspective and motion paths; differing
+`overflow-x`/`overflow-y`; a nested `<svg>` with a transform, a clip margin, a rotated or skewed
+placement, or computed `x`/`y`/`width`/`height` that disagree with its attributes (CSS such as a
+page-wide `svg { width: … }` sizes nested SVGs too); an `<svg>` inside `<foreignObject>`; and any
+SVG whose reconstructed content box — or the padding or border box a clip margin grows — CDP does
+not confirm. Computed padding is the specified length rather than the used one, so a clip margin
+grown from the padding box of an SVG with a fractional padding (`0.5em` at 11pt, say) declines.
+What the rule compares is still the text's typographic cell box rather than its ink, and HTML
+ancestors' own clipping (`overflow: hidden` on a `<div>`) is not part of its question.
 
 **Every threshold is uncalibrated.** There is no corpus of real documents with human-checked truth
 behind any of the thirteen released numbers. The fixtures show that each rule does what it says; they do not

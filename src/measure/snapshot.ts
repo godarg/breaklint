@@ -20,6 +20,7 @@ import {
 } from "../core/enums.ts";
 import type {
   BlockRecord,
+  Box,
   InputIdentity,
   PageRecord,
   Snapshot,
@@ -32,6 +33,9 @@ import type {
   ResourceRecord,
 } from "../core/types.ts";
 import { assignPageCauses } from "../paginate/breaks.ts";
+import {
+  envelope, resolveSvgFrames, resolveSvgText, roundedBox, type RawSvgFrame, type RawSvgTextFrame, type SvgBoxModel,
+} from "./svg-viewport.ts";
 import { boundaryFactsFrom, type CollectorResult } from "../paginate/collector.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InjectionResult } from "../source/inject.ts";
@@ -366,19 +370,25 @@ interface RawBlock extends Omit<BlockRecord, "authorId" | "blockSignature" | "fr
  * markup, and hashing belongs on this side of the boundary, not in a string evaluated inside the
  * document under test.
  */
-interface RawSvgText extends Omit<SvgTextTarget, "targetKey" | "svgTextKey" | "ink"> {
+interface RawSvgText extends Omit<SvgTextTarget, "targetKey" | "svgTextKey" | "ink" | "ambiguityGroupSize" | "boxScreen" | "boxLocal" | "bboxUser" | "userToLocal"> {
   /** The `<text>`'s own `id`, or null. */
   sourceIdentity: string | null;
   /** Its text content, normalised and hashed in Node when there is no id. */
   signature: string;
+  /** getBBox(), getCTM() and getScreenCTM() as numbers; every box is built from them in Node. */
+  geometry: RawSvgTextFrame;
 }
 
-interface RawSvg extends Omit<SvgRecord, "sourceKey" | "texts"> {
+export interface RawSvg extends Omit<SvgRecord, "sourceKey" | "texts" | "clipped" | "viewportLocal" | "viewportDiagnostic"> {
   /** The SVG root's own `id`, or null. */
   sourceIdentity: string | null;
   /** Canonicalised and hashed in Node; the paginator's `data-ref` nonce is stripped there. */
   outerHtml: string;
   texts: RawSvgText[];
+  /** The facts its local frame is reconstructed from (`src/measure/svg-viewport.ts`). */
+  geometry: RawSvgFrame;
+  /** Index among the document's `.pagedjs_page svg` elements, for the CDP oracle; -1 unless outermost. */
+  oracleIndex: number;
 }
 
 export interface RawSnapshot {
@@ -386,6 +396,8 @@ export interface RawSnapshot {
   blocks: RawBlock[];
   textLines: TextLine[];
   svg: RawSvg[];
+  /** How many `.pagedjs_page svg` elements the page saw; the CDP oracle must see the same set. */
+  svgRendered: number;
   requestedUrls: string[];
   fontFamilies: string[];
   control: ControlSignature;
@@ -424,9 +436,6 @@ export const SNAPSHOT_SOURCE = `(() => {
     || /\\/\\s*0(?:\\.0+)?%?\\s*\\)$/u.test(value);
   const visiblePaint = (value, opacity) => value !== "none"
     && number(opacity, 1) > 0 && !transparentPaint(value);
-  const transformedGeometry = (style) => effect(style.transform)
-    || effect(style.rotate) || effect(style.scale) || effect(style.translate)
-    || effect(style.perspective) || effect(style.offsetPath);
   const referencedTextTargets = (referenced, seen, depth) => {
     let count = P.all(referenced, "text").length
       + (P.closest(referenced, "text") === referenced ? 1 : 0);
@@ -596,6 +605,17 @@ export const SNAPSHOT_SOURCE = `(() => {
   });
 
   const svg = [];
+  // Records are numbered in document order, so an enclosing <svg> always has a lower index than
+  // every SVG inside it. The Node side resolves the local frames in that order.
+  const svgRecordIndex = new Map();
+  // The CDP oracle addresses an outermost SVG as the n-th ".pagedjs_page svg" of the document.
+  const renderedSvgs = P.all(document, ".pagedjs_page svg");
+  const pick = (style, keys) => { const out = {}; for (const key of keys) out[key] = style[key] || ""; return out; };
+  const SVG_BOX_KEYS = ["width", "height", "boxSizing", "borderTopWidth", "borderRightWidth",
+    "borderBottomWidth", "borderLeftWidth", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+    "borderTopLeftRadius", "borderTopRightRadius", "borderBottomRightRadius", "borderBottomLeftRadius",
+    "overflowX", "overflowY", "overflowClipMargin"];
+  const SVG_TRANSFORM_KEYS = ["transform", "rotate", "scale", "translate", "perspective", "offsetPath"];
   pagesEls.forEach((page, pageIndex) => P.all(page, "svg").forEach((el, i) => {
     // querySelectorAll reaches <text> inside <defs>, <symbol>, <clipPath> and <pattern>, under
     // display:none, and inside a NESTED <svg>. None of the first group is drawn; the last group
@@ -645,26 +665,56 @@ export const SNAPSHOT_SOURCE = `(() => {
     }
     const capped = rawCapped || candidateTextEls.length + unsupportedTargets > ${SVG_TEXT_TARGET_CAP};
     const svgStyle = P.style(el, null);
-    // getBoundingClientRect is the border box. It is the viewport only when CSS has not inserted
-    // another box edge or transformed that rectangle. Rounded clipping has the same problem:
-    // containment in the axis-aligned rectangle is not containment in its rounded corners.
-    let viewportUnsupported = [
-      svgStyle.borderTopWidth, svgStyle.borderRightWidth,
-      svgStyle.borderBottomWidth, svgStyle.borderLeftWidth,
-      svgStyle.paddingTop, svgStyle.paddingRight, svgStyle.paddingBottom, svgStyle.paddingLeft,
-      svgStyle.borderTopLeftRadius, svgStyle.borderTopRightRadius,
-      svgStyle.borderBottomRightRadius, svgStyle.borderBottomLeftRadius,
-      svgStyle.overflowClipMargin,
-    ].some(nonzeroLength) || transformedGeometry(svgStyle);
-    // A transform on an HTML/SVG ancestor rotates or skews BOTH the viewport and target into
-    // screen space. Their getBoundingClientRect boxes are then merely axis-aligned envelopes;
-    // containment between those envelopes is not containment in the transformed viewport.
-    let viewportAncestor = P.parent(el);
-    while (!viewportUnsupported && viewportAncestor && P.nodeType(viewportAncestor) === 1) {
-      viewportUnsupported = transformedGeometry(P.style(viewportAncestor, null));
-      viewportAncestor = P.parent(viewportAncestor);
+    // The viewport is reconstructed in Node, in the SVG's own coordinate system, from what is
+    // collected here as plain numbers and computed-style strings (src/measure/svg-viewport.ts).
+    // Nothing on this side decides whether the geometry is supported: a decision taken inside the
+    // document under test is one more thing that document could answer for itself, and one that
+    // only a browser could test.
+    //
+    // Three kinds. An <svg> with no enclosing <svg> is a CSS box: its frame is its own content box.
+    // A nested <svg> lives in its parent element's user space. And an <svg> inside an enclosing
+    // SVG's <foreignObject> is an outermost SVG again, clipped by the foreignObject as well.
+    const parentEl = P.parent(el);
+    const enclosingSvg = parentEl && P.nodeType(parentEl) === 1 ? P.closest(parentEl, "svg") : null;
+    const foreignObject = enclosingSvg ? P.closest(parentEl, "foreignObject") : null;
+    const kind = !enclosingSvg ? "outer"
+      : foreignObject && P.closest(foreignObject, "svg") === enclosingSvg ? "foreign-object" : "nested";
+    // CSS transforms on the SVG and its ancestors no longer matter for containment, which holds in
+    // the SVG's own frame; they are shipped so Node can decline the 3D and motion-path cases.
+    const transforms = [];
+    if (kind === "outer") {
+      for (let at = el; at && P.nodeType(at) === 1; at = P.parent(at)) {
+        const facts = pick(P.style(at, null), SVG_TRANSFORM_KEYS);
+        if (SVG_TRANSFORM_KEYS.some((key) => facts[key] && facts[key] !== "none")) transforms.push(facts);
+      }
     }
-    if (!capped && !viewportUnsupported) {
+    let anchorIndex = -1;
+    let anchorCtm = null;
+    let lengths = null;
+    let computedLengths = null;
+    let lengthAttributes = null;
+    if (kind === "nested") {
+      // x/y/width/height live in the parent element's user space. getCTM() of the parent maps that
+      // space into the viewport space of the parent's own nearest <svg> — or, when the parent IS
+      // an <svg>, into the space of the <svg> above it (for the outermost SVG: into the frame).
+      const parentIsSvg = P.closest(parentEl, "svg") === parentEl;
+      const grandParent = parentIsSvg ? P.parent(parentEl) : null;
+      const anchor = parentIsSvg
+        ? (grandParent && P.nodeType(grandParent) === 1 ? P.closest(grandParent, "svg") : null)
+        : enclosingSvg;
+      anchorIndex = anchor ? (svgRecordIndex.has(anchor) ? svgRecordIndex.get(anchor) : -2) : -1;
+      anchorCtm = P.svgCtm(parentEl);
+      lengths = P.svgViewportLengths(el);
+      computedLengths = { x: svgStyle.x || "", y: svgStyle.y || "", width: svgStyle.width || "",
+        height: svgStyle.height || "", transform: svgStyle.transform || "" };
+      lengthAttributes = { x: P.attr(el, "x"), y: P.attr(el, "y") };
+    }
+    const geometry = { kind,
+      parentIndex: enclosingSvg && svgRecordIndex.has(enclosingSvg) ? svgRecordIndex.get(enclosingSvg) : -1,
+      anchorIndex, anchorCtm, ctm: P.svgCtm(el), screenCtm: P.svgScreenCtm(el),
+      style: pick(svgStyle, SVG_BOX_KEYS), transforms, lengths, computed: computedLengths,
+      attributes: lengthAttributes };
+    if (!capped) {
       for (const textEl of candidateTextEls) {
         // Is this element painted at all? Asked FIRST, because getBBox alone gets it wrong exactly
         // where it matters. Measured in Chrome 152: a <text> inside <defs> answers getBBox() and
@@ -713,24 +763,15 @@ export const SNAPSHOT_SOURCE = `(() => {
         }
         if (paintedBoundsUnsupported) { unsupportedTargets += 1; continue; }
 
-        let bounds = null;
-        // getBBox() throws on a <text> with no rendered geometry; getScreenCTM() returns null on
-        // one that is not in a rendered tree. For an element the browser DID lay out, either is a
-        // measurement this tool owed and did not deliver — declined, and counted against coverage.
-        try { bounds = P.svgBounds(textEl); } catch (e) { bounds = null; }
-        if (!bounds) { unreadableTargets += 1; continue; }
-
-        // All four corners, not two opposite ones: under a rotation the min/max over one diagonal
-        // is smaller than the real extent in both axes, and the rules compare extents. Measured on
-        // the 45-degree fixture: four corners put the label 15.82 px outside the viewport, two put
-        // it 28 px inside it.
-        let minX = bounds.corners[0].x, maxX = minX, minY = bounds.corners[0].y, maxY = minY;
-        for (const corner of bounds.corners) {
-          if (corner.x < minX) minX = corner.x;
-          if (corner.x > maxX) maxX = corner.x;
-          if (corner.y < minY) minY = corner.y;
-          if (corner.y > maxY) maxY = corner.y;
-        }
+        // getBBox() throws on a <text> with no rendered geometry; getCTM()/getScreenCTM() return
+        // null on one that is not in a rendered tree. For an element the browser DID lay out,
+        // either is a measurement this tool owed and did not deliver — declined, and counted
+        // against coverage. The boxes themselves are built in Node from these raw facts, all four
+        // corners through each matrix: under a rotation the min/max over one diagonal is smaller
+        // than the real extent in both axes (measured on the 45-degree fixture: four corners put
+        // the label 15.82 px outside the viewport, two put it 28 px inside it).
+        const targetGeometry = P.svgGeometry(textEl);
+        if (!targetGeometry) { unreadableTargets += 1; continue; }
         const textStyle = style;
         const clipped = !!textStyle.clipPath && textStyle.clipPath !== "none";
         const masked = !!textStyle.mask && textStyle.mask !== "none" && !P.startsWith(textStyle.mask, "none ");
@@ -739,34 +780,36 @@ export const SNAPSHOT_SOURCE = `(() => {
           // Run-local source map address only; SVG fingerprint identity remains source id/content.
           sourceAddressKey: P.attr(textEl, "data-bl-svg-target"),
           signature: P.text(textEl) || "",
-          boxScreen: { x: round(minX), y: round(minY), width: round(maxX - minX), height: round(maxY - minY) },
+          geometry: targetGeometry,
           clipState: clipped && masked ? "both" : clipped ? "clip-path" : masked ? "mask" : "none",
         });
       }
     }
-    // measurable is a statement about the SVG AS A WHOLE. It is false when the candidate cap is
-    // exceeded or when getBoundingClientRect cannot represent the real SVG viewport. A single
-    // unreadable or paint-complex target stays a per-target decline; that preserves every sound
-    // box already measured on the SVG without silently treating the difficult target as covered.
+    // measurable is a statement about the SVG AS A WHOLE. It is false here only when the candidate
+    // cap is exceeded; Node sets it false as well when the viewport cannot be reconstructed. A
+    // single unreadable or paint-complex target stays a per-target decline; that preserves every
+    // sound box already measured on the SVG without silently treating the difficult target as
+    // covered.
     //
     // Geometry is measured here; the ink passes are not implemented in this build. The two are
     // reported separately so a rule needing only boxes is not held back by a pass that does not
     // exist — see TOOL_CAPABILITY_ENV_IDS for what the ink rules do with that.
+    svgRecordIndex.set(el, svg.length);
     svg.push({ nodeKey: "svg:" + pageIndex + ":" + i, page: pageIndex + 1,
       sourceIdentity: P.attr(el, "id"), outerHtml: P.outerHtml(el),
-      measurable: !capped && !viewportUnsupported,
+      measurable: !capped,
       // null, nicht undefined: undefined verschwindet beim JSON-Roundtrip, und das
       // Receipt-Schema fuehrt reason als required. Ein Feld, das nur manchmal existiert,
       // ist fuer jeden Leser ein Sonderfall mehr.
-      reason: capped ? "env/svg-too-many-text-targets"
-        : viewportUnsupported ? "env/svg-viewport-geometry-unsupported" : null,
+      reason: capped ? "env/svg-too-many-text-targets" : null,
       unreadableTargets, unsupportedTargets, notRenderedTargets,
       viewportScreen: box(el), overflow: svgStyle.overflow || "hidden",
       textTargetCount, textTargetsCapped: capped, texts, shapes: [], paths: [],
+      geometry, oracleIndex: kind === "outer" ? renderedSvgs.indexOf(el) : -1,
       inkPasses: { E: { count: 0, maskHash: "" }, S: { count: 0, maskHash: "" }, F: { count: 0, maskHash: "" } },
       inkCollected: false, inkStable: false });
   }));
-  return { pages, blocks, textLines, svg,
+  return { pages, blocks, textLines, svg, svgRendered: renderedSvgs.length,
     requestedUrls: performance.getEntriesByType("resource").map((e) => e.name),
     fontFamilies: [...fonts].filter(Boolean).sort(),
     control: (${CONTROL_SIGNATURE_SOURCE}) };
@@ -797,6 +840,12 @@ export interface AssembleSnapshotInput {
   /** Partial producer-bound original leaves; sourceMap always describes the inspected input. */
   originalSourceMap?: Record<string, SourceRef>;
   originalSourceAmbiguity?: Record<string, SourceRef[]>;
+  /**
+   * CDP `DOM.getBoxModel()` for each `raw.svg` record, by index; null where CDP gave no answer.
+   * Only outermost SVGs have one. Absent means no SVG frame has its independent proof, and every
+   * outermost SVG — with everything nested in it — declines rather than being measured.
+   */
+  svgBoxModels?: readonly (SvgBoxModel | null)[];
 }
 
 export interface SnapshotInvariantValidation {
@@ -863,10 +912,46 @@ export function validateSnapshotInvariants(
       }
     }
   }
+  const finiteBox = (box: unknown): boolean => {
+    const b = box as Partial<Record<"x" | "y" | "width" | "height", unknown>> | null;
+    return !!b && [b.x, b.y, b.width, b.height].every((value) => typeof value === "number" && Number.isFinite(value)) &&
+      (b.width as number) >= 0 && (b.height as number) >= 0;
+  };
+  const sameBox = (a: Box, b: Box): boolean => a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
   for (const svg of snapshot.svg) {
     if (!svg.measurable && !svg.reason) issues.push(`${svg.nodeKey}: unmeasurable SVG has no reason`);
+    // Snapshot 5: a measurable record is measured in its local frame, and nowhere else. A record
+    // that claims to be measurable without one would reach the error rule with nothing to
+    // compare, and a clipped record without a clip rectangle would read as "inside everything".
+    if (svg.measurable) {
+      const frame = svg.viewportLocal;
+      const potential = Math.max(svg.texts.length + svg.unreadableTargets + svg.unsupportedTargets,
+        svg.textTargetCount - svg.notRenderedTargets);
+      if (!frame) {
+        if (potential > 0 || svg.viewportDiagnostic === null) issues.push(`${svg.nodeKey}: measurable SVG has no local frame`);
+      } else {
+        if (!finiteBox(frame.viewport) || !frame.clips.every(finiteBox)) issues.push(`${svg.nodeKey}: local frame is not finite`);
+        if (svg.clipped !== frame.clips.length > 0) issues.push(`${svg.nodeKey}: clipped=${svg.clipped} disagrees with ${frame.clips.length} clip rectangle(s)`);
+      }
+    } else if (svg.texts.length > 0) {
+      issues.push(`${svg.nodeKey}: unmeasurable SVG carries measured targets`);
+    }
+    if (svg.reason === "env/svg-viewport-geometry-unsupported" && svg.viewportDiagnostic === null) {
+      issues.push(`${svg.nodeKey}: viewport decline names no diagnostic`);
+    }
+    if (svg.viewportDiagnostic !== null && svg.viewportLocal !== null) {
+      issues.push(`${svg.nodeKey}: viewport diagnostic ${svg.viewportDiagnostic} on a record with a frame`);
+    }
     for (const text of svg.texts) {
       if (!text.targetKey || !text.svgTextKey) issues.push(`${svg.nodeKey}: SVG text lacks target/source identity`);
+      // boxLocal is derived, and it has to stay derivable: the envelope of bboxUser through
+      // userToLocal, at the stored resolution. A projection that edits one without the other is
+      // describing two different targets.
+      if (!finiteBox(text.boxLocal) || !finiteBox(text.bboxUser) || !finiteBox(text.boxScreen) ||
+          !Array.isArray(text.userToLocal) || text.userToLocal.length !== 6 || !text.userToLocal.every(Number.isFinite) ||
+          !sameBox(roundedBox(envelope(text.bboxUser, text.userToLocal)), text.boxLocal)) {
+        issues.push(`${svg.nodeKey}: ${text.targetKey} local box is not the envelope of its user box`);
+      }
     }
   }
   for (const page of snapshot.pages.filter((item) => item.blank)) {
@@ -1060,16 +1145,42 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
   // that travels into fingerprints. Keeping them apart is not tidiness — conflating them was a
   // measured defect, ten mis-attributions against one.
   let svgTargetCounter = 0;
+  // The local frames first: they decide which records are measurable and which targets keep a box,
+  // and the identity groups below are counted over what is actually measured. A target whose local
+  // matrix does not carry it onto its own getScreenCTM() cannot be placed in the frame the oracle
+  // proved; it becomes unreadable, per target, exactly like a target with no CTM at all.
+  const frames = resolveSvgFrames(input.raw.svg.map((raw) => raw.geometry), input.svgBoxModels);
+  const svgResolved = input.raw.svg.map((raw, svgIndex) => {
+    const resolved = frames[svgIndex]!;
+    const frame = raw.measurable ? resolved.frame : null;
+    // An SVG with no potential target — every <text> unrendered, no <use> — gives the rule nothing
+    // its viewport could clip, so an unprovable viewport is not a decline there. This is the
+    // display:none figure and the text-free icon: CDP has no box model for the first, and neither
+    // was ever a candidate. Declining them would turn a document with a hidden icon into exit 4.
+    const potentialTargets = Math.max(raw.texts.length + raw.unreadableTargets + raw.unsupportedTargets,
+      raw.textTargetCount - raw.notRenderedTargets);
+    const measurable = raw.measurable && (frame !== null || potentialTargets <= 0);
+    let unreadableTargets = raw.unreadableTargets;
+    const texts = [];
+    if (frame) {
+      for (const text of raw.texts) {
+        const boxes = resolveSvgText(frame, text.geometry);
+        if (!boxes) { unreadableTargets += 1; continue; }
+        texts.push({ text, boxes });
+      }
+    }
+    return { raw, resolved, frame, measurable, unreadableTargets, texts };
+  });
   // Two passes, because the group is a property of the DOCUMENT, not of one record. Two
   // structurally identical inline SVGs get the same `svgRootKey` on purpose — which of two
   // identical objects is meant is not a well-formed question — and their labels therefore share
   // `svgTextKey` across records. Counting the group inside one record reported 1 for exactly the
   // collision the field exists for.
-  const svgKeys = input.raw.svg.map((raw) => {
+  const svgKeys = svgResolved.map(({ raw, texts }) => {
     const rootKey = svgRootKey({ authorId: raw.sourceIdentity, outerHtml: raw.outerHtml });
     return {
       rootKey,
-      textKeys: raw.texts.map((text) =>
+      textKeys: texts.map(({ text }) =>
         svgTextKey({ svgRootKey: rootKey, authorId: text.sourceIdentity, textSignature: text.signature })),
     };
   });
@@ -1077,18 +1188,39 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
   for (const entry of svgKeys) {
     for (const key of entry.textKeys) svgGroupSize.set(key, (svgGroupSize.get(key) ?? 0) + 1);
   }
-  const svg: SvgRecord[] = input.raw.svg.map((raw, svgIndex) => {
-    const { sourceIdentity: _rootId, outerHtml: _outerHtml, texts, ...rest } = raw;
+  const svg: SvgRecord[] = svgResolved.map(({ raw, resolved, frame, measurable, unreadableTargets, texts }, svgIndex) => {
+    const {
+      sourceIdentity: _rootId, outerHtml: _outerHtml, texts: _rawTexts, geometry: _geometry, oracleIndex: _oracleIndex,
+      measurable: _measurable, reason: rawReason, unreadableTargets: _unreadable, ...rest
+    } = raw;
     const { rootKey, textKeys } = svgKeys[svgIndex]!;
+    // The page's own reason (the target cap) takes precedence, as it did before the frame existed.
+    const viewportDeclined = raw.measurable && !measurable;
     return {
       ...rest,
+      measurable,
+      reason: rawReason ?? (viewportDeclined ? "env/svg-viewport-geometry-unsupported" : null),
+      unreadableTargets,
       sourceKey: rootKey,
-      texts: texts.map((text, index) => {
-        const { sourceIdentity: _textId, signature: _signature, ...target } = text;
+      clipped: resolved.clipped,
+      viewportLocal: frame
+        ? {
+          viewport: roundedBox(frame.viewport),
+          clips: frame.clips.map(roundedBox),
+          localToScreen: frame.localToScreen,
+          oracleDeltaPx: frame.oracleDeltaPx,
+        }
+        : null,
+      // Why there is no frame, whenever there is none and the page did not already decline the
+      // record for its target cap — including the target-free record that is not declined for it.
+      viewportDiagnostic: raw.measurable && frame === null ? resolved.diagnostic : null,
+      texts: texts.map(({ text, boxes }, index) => {
+        const { sourceIdentity: _textId, signature: _signature, geometry: _textGeometry, ...target } = text;
         svgTargetCounter += 1;
         const key = textKeys[index]!;
         return {
           ...target,
+          ...boxes,
           targetKey: `bt${String(svgTargetCounter).padStart(3, "0")}`,
           svgTextKey: key,
           ambiguityGroupSize: svgGroupSize.get(key) ?? 1,

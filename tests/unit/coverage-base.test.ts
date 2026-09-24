@@ -127,7 +127,13 @@ describe("the coverage base", () => {
     it(`overflow visible stays non-applicable before ${kind} geometry declines`, () => {
       const projected = structuredClone(svgSnapshot);
       const svg = structuredClone(projected.svg[0]!);
+      // Snapshot 5: non-applicability is the collector's `clipped` statement about the whole clip
+      // chain, not the SVG's own overflow string (a nested SVG with overflow: visible can still be
+      // clipped by the SVG around it). Both are set so the record describes one real state.
       svg.overflow = "visible";
+      svg.clipped = false;
+      svg.viewportLocal = kind === "paint-target" && svg.viewportLocal ? { ...svg.viewportLocal, clips: [] } : null;
+      svg.viewportDiagnostic = kind === "whole-viewport" ? "three-dimensional-transform" : null;
       svg.texts = [];
       svg.textTargetCount = 1;
       svg.notRenderedTargets = 0;

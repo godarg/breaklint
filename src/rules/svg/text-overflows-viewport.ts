@@ -1,6 +1,7 @@
 import { defineRule } from "../../core/rule.ts";
 import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
 import { SNAPSHOT_ROUNDING_PX } from "../../core/enums.ts";
+import { overshootBeyond } from "../../measure/svg-viewport.ts";
 
 /**
  * svg/text-overflows-viewport — a `<text>` sits outside the SVG's viewport and is clipped away.
@@ -9,13 +10,17 @@ import { SNAPSHOT_ROUNDING_PX } from "../../core/enums.ts";
  * two directly measured boxes and a structural boundary. What lies outside the viewport is not
  * drawn. There is no threshold to choose.
  *
- * Both boxes are CTM-normalised before they are compared. `getBBox()` returns *local*
- * coordinates; measured on a transformed group, local (60, 0) is absolute (284.57, 70.78) — an
- * error of 235.46 px. Comparing a local box against an absolute viewport is not an approximation,
- * it is a different measurement.
+ * Both boxes live in ONE coordinate system before they are compared: the outermost SVG's own
+ * viewport frame (`SvgViewportLocal`), where the browser applies the clip. `getBBox()` returns
+ * the text's user-space coordinates; measured on a transformed group, local (60, 0) is absolute
+ * (284.57, 70.78) — an error of 235.46 px — so the text goes through its CTM chain into the frame.
+ * The screen is not that frame: under a CSS rotation or zoom of the SVG or an ancestor, the screen
+ * rectangles are only envelopes, and containment between envelopes is not containment.
  *
- * The exemption matters as much as the rule: with `overflow: visible` on the SVG, the text *is*
- * drawn, and the rule declines rather than reports.
+ * A nested `<svg>` is clipped by its own viewport and by every enclosing one, and the rule
+ * measures against all of them. The exemption matters as much as the rule: where nothing clips —
+ * `overflow: visible` on the SVG and every enclosing SVG — the text *is* drawn, and the rule
+ * declines rather than reports.
  */
 export const textOverflowsViewport = defineRule(
   {
@@ -64,7 +69,10 @@ export const textOverflowsViewport = defineRule(
         svg.measurable ? 0 : 1,
       );
 
-      const overflowVisible = /\bvisible\b/u.test(svg.overflow);
+      // Not the SVG's own `overflow` string: a nested SVG with `overflow: visible` is still
+      // clipped by the SVG around it, and `overflow: visible clip` clips one axis. `clipped` is
+      // the collector's statement that anything in the chain clips.
+      const overflowVisible = !svg.clipped;
       // Text that did not render is explicitly outside this rule's observable target set. Keep
       // the unknown count visible so removing/hiding text cannot resemble a visible repair.
       if (svg.notRenderedTargets > 0) {
@@ -177,26 +185,42 @@ export const textOverflowsViewport = defineRule(
         for (const [textIndex, text] of svg.texts.entries()) evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, status: "not-measured", reason: "env/svg-too-many-text-targets" }));
         continue;
       }
+      // A measurable record without its frame, or a clipped one without a clip rectangle, can
+      // only come from a projection built outside the collector (the snapshot invariants refuse
+      // it on the live path). Comparing against nothing would read as "inside everything", so
+      // every target declines instead, still counted.
+      const clips = svg.viewportLocal?.clips ?? [];
+      if (clips.length === 0) {
+        notMeasured.push(
+          declined({
+            scope: "svgText",
+            ruleId: "svg/text-overflows-viewport",
+            reason: "env/svg-viewport-geometry-unsupported",
+            count: targets,
+          }),
+        );
+        for (const [textIndex, text] of svg.texts.entries()) evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, status: "not-measured", reason: "env/svg-viewport-geometry-unsupported" }));
+        continue;
+      }
       measured += targets;
 
-      const vp = svg.viewportScreen;
       const permitted = num(ctx.options.maxOvershootPx, 0);
       for (const [textIndex, text] of svg.texts.entries()) {
-        const b = text.boxScreen;
-        const overshoot = Math.max(
-          vp.x - b.x,
-          vp.y - b.y,
-          b.x + b.width - (vp.x + vp.width),
-          b.y + b.height - (vp.y + vp.height),
-        );
+        // Frame px: CSS px of the outermost SVG before its CSS transforms and zoom. The screen box
+        // stays the evidence and the position a reader looks at.
+        const overshoot = overshootBeyond(text.boxLocal, clips);
         const violated = overshoot > permitted + SNAPSHOT_ROUNDING_PX;
-        evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: b, status: "measured", measurements: [{ name: "viewport-overshoot", value: overshoot, unit: "px", operator: ">", threshold: permitted + SNAPSHOT_ROUNDING_PX }], violated }));
-        // The two boxes come from different APIs — the viewport from getBoundingClientRect, the
-        // target from CTM-transformed getBBox corners — and the collector stores both rounded to
-        // two decimals. Each value therefore carries up to 0.005 px of rounding, and a difference
-        // of two of them up to 0.01. SNAPSHOT_ROUNDING_PX is that granularity, read off the
-        // collector rather than chosen: it is what the stored numbers cannot resolve, not a
-        // tolerance somebody picked, and it does not make the threshold configurable.
+        evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, status: "measured", measurements: [{ name: "viewport-overshoot", value: overshoot, unit: "px", operator: ">", threshold: permitted + SNAPSHOT_ROUNDING_PX }], violated }));
+        // The clip rectangles and the target box are derived separately — the clips from computed
+        // box values and viewport lengths, the target from CTM-transformed getBBox corners — and
+        // the collector stores both rounded to two decimals. Each value therefore carries up to
+        // 0.005 px of rounding, and a difference of two of them up to 0.01. SNAPSHOT_ROUNDING_PX
+        // is that granularity, read off the collector rather than chosen: it is what the stored
+        // numbers cannot resolve, not a tolerance somebody picked, and it does not make the
+        // threshold configurable. It also covers the frame: a stored overshoot above it is at
+        // least 0.02 on the 0.01 grid, so the unrounded one is at least 0.01, and the frame is
+        // proven to within half of that (SVG_FRAME_TOLERANCE_PX) — whatever the oracle admitted,
+        // the label still reaches past the edge.
         //
         // Measured on the sharpest constructible case — textLength set to the full width of the
         // viewBox, so the box ends on the edge by construction — the difference came out at
@@ -211,13 +235,13 @@ export const textOverflowsViewport = defineRule(
             severity: "error",
             message:
               `This text extends ${overshoot.toFixed(2)} px beyond the SVG viewport and is not ` +
-              `drawn. Coordinates are normalised through getScreenCTM().`,
+              `drawn. Measured in the SVG's own coordinates, before CSS transforms and zoom.`,
             page: svg.page,
             keyType: "svg-text",
             key: text.svgTextKey,
             nodeKey: svg.nodeKey,
             sid: text.sourceAddressKey ?? null,
-            boxScreen: b,
+            boxScreen: text.boxScreen,
             source: text.sourceAddressKey ? snapshot.source.map[text.sourceAddressKey] ?? null : null,
             value: Number(overshoot.toFixed(2)),
             threshold: permitted,

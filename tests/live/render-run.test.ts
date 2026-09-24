@@ -22,6 +22,9 @@ import { straightQuotes } from "../../src/rules/type/straight-quotes.ts";
 import { textOverflowsViewport } from "../../src/rules/svg/text-overflows-viewport.ts";
 import { textClipped } from "../../src/rules/svg/text-clipped.ts";
 import { blockKey } from "../../src/core/fingerprint.ts";
+import type { DocumentInput } from "../../src/core/engine.ts";
+import type { SvgRecord } from "../../src/core/types.ts";
+import { SVG_FRAME_TOLERANCE_PX } from "../../src/measure/svg-viewport.ts";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 const FIXTURES = join(REPO, "tests", "fixtures");
@@ -48,6 +51,7 @@ describe("the M2d live production chain", () => {
   let chain = "";
   let result: RenderResult | null = null;
   let noSource: RenderResult | null = null;
+  let svgFrames: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
     if (result?.documents.length === 24 && noSource?.documents.length === 4) return true;
@@ -121,6 +125,16 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "no-source-ambiguous.html"),
       ],
       options(join(root, "no-source-evidence"), false),
+    );
+    // The SVG local-frame documents run as a batch of their own, so the index-addressed documents
+    // above keep their numbers.
+    svgFrames = await renderDocuments(
+      [
+        join(FIXTURES, "svg-viewport-boxes.html"),
+        join(FIXTURES, "svg-viewport-nested.html"),
+        join(FIXTURES, "svg-clip-margin-keyword.html"),
+      ],
+      options(join(root, "svg-frame-evidence")),
     );
   });
 
@@ -768,6 +782,17 @@ describe("the M2d live production chain", () => {
       1,
       "the outer record claimed the inner label as well",
     );
+    // The inner record is measured against its own viewport AND the outer one, in the outer SVG's
+    // frame: x/y/width/height (200, 60, 180, 120) in user units of a 400 x 200 viewBox drawn at
+    // 260pt x 130pt, so scaled by 346.667 / 400.
+    const inner = document.snapshot.svg.find((record) => record.sourceKey === "svgid:inner");
+    assert.ok(inner?.viewportLocal, "the nested viewport was not reconstructed");
+    assert.equal(inner.viewportLocal.clips.length, 2);
+    const scale = inner.viewportLocal.clips[1]!.width / 400;
+    assert.ok(Math.abs(scale - 346.67 / 400) < 0.001, `outer frame scale ${scale}`);
+    for (const [field, value] of [["x", 200], ["y", 60], ["width", 180], ["height", 120]] as const) {
+      assert.ok(Math.abs(inner.viewportLocal.clips[0]![field] - value * scale) <= 0.01, `nested viewport ${field}`);
+    }
   });
 
   it("fails closed when SVG paint or viewport geometry is outside the box oracle", (t) => {
@@ -794,9 +819,41 @@ describe("the M2d live production chain", () => {
     assert.equal(complex.unsupportedTargets, 6, "clip, mask, filter, stroke, direct use and nested use must all decline");
     assert.equal(complex.texts.length, 1, "the ordinary text in the mixed SVG remains measurable");
 
+    // Declined up to 0.6.0; since the viewport is reconstructed from the content box it is measured,
+    // and its label is inside.
     const border = record("border-box");
-    assert.equal(border.measurable, false);
-    assert.equal(border.reason, "env/svg-viewport-geometry-unsupported");
+    assert.equal(border.measurable, true);
+    assert.equal(border.viewportDiagnostic, null);
+    assert.equal(border.texts.length, 1);
+    assert.equal(border.viewportLocal?.clips.length, 1);
+    assert.deepEqual(border.viewportLocal?.clips[0], border.viewportLocal?.viewport, "the default clip is the content box");
+
+    // What still declines, each for its own named reason. Exact root keys: "nested-transform" is
+    // also a prefix of its outer SVG's id.
+    const exact = (id: string) => {
+      const found = document.snapshot!.svg.find((item) => item.sourceKey === `svgid:${id}`);
+      assert.ok(found, `missing SVG ${id}`);
+      return found;
+    };
+    for (const [id, diagnostic] of [
+      ["rounded-clip", "rounded-clip"],
+      ["radius-with-margin", "radius-with-clip-margin"],
+      ["perspective", "three-dimensional-transform"],
+      ["mixed-overflow", "overflow-axes-differ"],
+      ["nested-transform", "nested-transform"],
+      ["nested-css-sized", "nested-lengths-disagree"],
+      ["inside-foreign-object", "inside-foreign-object"],
+    ] as const) {
+      const declined = exact(id);
+      assert.equal(declined.measurable, false, `${id} was measured`);
+      assert.equal(declined.reason, "env/svg-viewport-geometry-unsupported", id);
+      assert.equal(declined.viewportDiagnostic, diagnostic, id);
+      assert.deepEqual(declined.texts, [], `${id} kept a measured target`);
+    }
+    // The outer SVGs around the declined nested ones hold no text of their own: nothing to decline.
+    for (const id of ["nested-transform-outer", "nested-css-outer", "foreign-outer"]) {
+      assert.equal(exact(id).measurable, true, id);
+    }
 
     const definitions = record("many-definitions");
     assert.equal(definitions.textTargetCount, 502);
@@ -812,17 +869,121 @@ describe("the M2d live production chain", () => {
     });
     assert.deepEqual(outcome.report.findings, [], "unsupported geometry produced a guessed error finding");
     const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
-    assert.equal(coverage?.candidates, 10);
-    assert.equal(coverage?.measured, 3);
+    assert.equal(coverage?.candidates, 17);
+    assert.equal(coverage?.measured, 4);
     assert.deepEqual(
       coverage?.notMeasured.map((entry) => ({ reason: entry.reason, count: entry.count })),
       [
         { reason: "env/svg-painted-bounds-unsupported", count: 6 },
-        { reason: "env/svg-viewport-geometry-unsupported", count: 1 },
+        { reason: "env/svg-viewport-geometry-unsupported", count: 7 },
       ],
     );
     assert.equal(outcome.report.verdict, "insufficient-coverage");
     assert.equal(exitCodeFor(outcome.report.verdict), 4);
+  });
+
+  /**
+   * The SVG local frame, live. Each fixture carries per figure one label at least 3 px inside the
+   * real clip edge and one at least 3 px outside it, pixel-verified when authored (Chromium 141).
+   * Up to 0.6.0 the first ended exit 4 without a verdict, the second exit 0 over two clipped
+   * labels, the third exit 1 with two labels reported that are drawn.
+   */
+  const svgFrameDocument = (t: TestContext, index: number): DocumentInput | null => {
+    if (svgFrames?.documents.length !== 3) {
+      t.skip(`the SVG frame batch did not complete: ${svgFrames?.documents.length ?? 0} of 3 documents`);
+      return null;
+    }
+    const document = svgFrames.documents[index]!;
+    assert.ok(document.snapshot, `SVG frame document ${index} produced no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    assert.equal(document.infrastructure.some((event) => !["geometry-cross-check-passed"].includes(event.kind)), false,
+      `unexpected infrastructure: ${JSON.stringify(document.infrastructure)}`);
+    return document;
+  };
+  /** Every label's id and its overshoot, as the rule measured it, keyed through the source map. */
+  const svgFrameVerdicts = (document: DocumentInput) => {
+    const outcome = runDocument(document, { failOn: "error", activeRules: [textOverflowsViewport], optionsByRule: {}, coverageFloors: {} });
+    const idOf = (sid: string | null) => {
+      const text = document.snapshot!.svg.flatMap((record) => record.texts).find((item) => item.sourceAddressKey === sid);
+      assert.ok(text, `no target for ${String(sid)}`);
+      return text.svgTextKey.split("|id:")[1]!;
+    };
+    const overshoot = new Map(outcome.report.evaluations
+      .filter((row) => row.ruleId === "svg/text-overflows-viewport" && row.status === "measured")
+      .map((row) => [idOf(row.targetRef.sid), row.measurements[0]!.value as number]));
+    const reported = outcome.report.findings.filter((item) => item.ruleId === "svg/text-overflows-viewport").map((item) => idOf(item.target.sid)).sort();
+    return { outcome, overshoot, reported };
+  };
+  const assertFrame = (records: readonly SvgRecord[]) => {
+    for (const record of records) {
+      assert.equal(record.measurable, true, `${record.sourceKey} declined: ${String(record.viewportDiagnostic)}`);
+      assert.equal(record.viewportDiagnostic, null);
+      // The independent proof: CDP's content quad agrees with the reconstructed content box.
+      assert.ok(record.viewportLocal && record.viewportLocal.oracleDeltaPx !== null && record.viewportLocal.oracleDeltaPx <= SVG_FRAME_TOLERANCE_PX,
+        `${record.sourceKey}: CDP content quad disagreed by ${String(record.viewportLocal?.oracleDeltaPx)} px`);
+    }
+  };
+  const assertLabels = (overshoot: ReadonlyMap<string, number>, reported: readonly string[], ids: readonly string[]) => {
+    assert.deepEqual([...overshoot.keys()].sort(), [...ids].sort(), "not every label was measured");
+    for (const id of ids) {
+      const value = overshoot.get(id)!;
+      if (id.endsWith("-out")) assert.ok(value >= 3, `${id} overshoots by ${value}, authored as at least 3 px outside`);
+      else assert.ok(value <= -3, `${id} overshoots by ${value}, authored as at least 3 px inside`);
+    }
+    assert.deepEqual(reported, ids.filter((id) => id.endsWith("-out")).sort(), "the findings are not exactly the clipped labels");
+  };
+
+  it("measures padded, bordered, rotated, zoomed and clip-margin SVGs in their own frame", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = svgFrameDocument(t, 0);
+    if (!document) return;
+    const records = document.snapshot!.svg;
+    assert.equal(records.length, 9);
+    assertFrame(records);
+    // The clip rectangle each overflow-clip-margin form names (padding 8, border 4, content 200 x 60).
+    const clip = (id: string) => records.find((record) => record.sourceKey === `svgid:${id}`)!.viewportLocal!.clips;
+    assert.deepEqual(clip("padded"), [{ x: 0, y: 0, width: 200, height: 60 }]);
+    assert.deepEqual(clip("margin-length"), [{ x: -18, y: -18, width: 236, height: 96 }]);
+    assert.deepEqual(clip("margin-content"), [{ x: -10, y: -10, width: 220, height: 80 }]);
+    assert.deepEqual(clip("margin-padding"), [{ x: -8, y: -8, width: 216, height: 76 }]);
+    assert.deepEqual(clip("margin-border-plain"), [{ x: -12, y: -12, width: 224, height: 84 }]);
+    assert.deepEqual(clip("margin-border"), [{ x: -17, y: -17, width: 234, height: 94 }]);
+    const { outcome, overshoot, reported } = svgFrameVerdicts(document);
+    const figures = ["padded", "bordered", "rotated", "zoomed", "margin-length", "margin-content", "margin-padding", "margin-border-plain", "margin-border"];
+    assertLabels(overshoot, reported, figures.flatMap((id) => [`${id}-in`, `${id}-out`]));
+    const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
+    assert.deepEqual([coverage?.candidates, coverage?.measured, coverage?.notMeasured.length], [18, 18, 0]);
+    assert.equal(exitCodeFor(outcome.report.verdict), 1);
+  });
+
+  it("clips nested labels at the nested viewport and at the enclosing one", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = svgFrameDocument(t, 1);
+    if (!document) return;
+    const records = document.snapshot!.svg;
+    assert.equal(records.length, 4);
+    assertFrame(records);
+    const inner = records.find((record) => record.sourceKey === "svgid:nest-inner")!;
+    assert.deepEqual(inner.viewportLocal!.clips, [{ x: 40, y: 20, width: 160, height: 60 }, { x: 0, y: 0, width: 400, height: 160 }]);
+    const chain = records.find((record) => record.sourceKey === "svgid:chain-inner")!;
+    assert.equal(chain.overflow, "visible");
+    assert.equal(chain.clipped, true, "an enclosing SVG clips a nested SVG with overflow: visible");
+    assert.deepEqual(chain.viewportLocal!.clips, [{ x: 0, y: 0, width: 400, height: 160 }]);
+    const { outcome, overshoot, reported } = svgFrameVerdicts(document);
+    assertLabels(overshoot, reported, ["nested-in", "nested-out", "chain-in", "chain-out"]);
+    assert.equal(exitCodeFor(outcome.report.verdict), 1);
+  });
+
+  it("does not report text a keyword overflow-clip-margin still draws", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = svgFrameDocument(t, 2);
+    if (!document) return;
+    const records = document.snapshot!.svg;
+    assert.equal(records.length, 2);
+    assertFrame(records);
+    for (const record of records) assert.deepEqual(record.viewportLocal!.clips, [{ x: -10, y: -10, width: 220, height: 80 }]);
+    const { outcome, overshoot, reported } = svgFrameVerdicts(document);
+    assertLabels(overshoot, reported, ["keyword-hidden-in", "keyword-hidden-out", "keyword-clip-in", "keyword-clip-out"]);
+    assert.equal(exitCodeFor(outcome.report.verdict), 1);
   });
 
   it("keeps duplicate-input evidence paths disjoint and records loaded redirect provenance", async (t) => {

@@ -38,6 +38,7 @@ import {
   canonicalJson,
   contentDerivedRendererId,
   rendererContentHash,
+  snapshotRecordFromReceiptV1,
   type DocumentEntry,
 } from "./readiness-validator.ts";
 
@@ -331,7 +332,9 @@ function svgRecord(target: {
   occludedInk?: number;
 }, viewport = box(), overflow = "hidden"): SvgRecord {
   const t0 = target.t0 ?? target.t;
-  return {
+  // The lab measures its untransformed synthetic documents in screen space, as receipt v1 does, so
+  // its records enter the product rule through the same explicit adapter.
+  return snapshotRecordFromReceiptV1({
     nodeKey: "lab-svg-node",
     page: 1,
     sourceKey: "lab-svg-source",
@@ -369,7 +372,7 @@ function svgRecord(target: {
     },
     inkCollected: true,
     inkStable: true,
-  };
+  });
 }
 
 async function preparePage(browser: { newPage(): Promise<PageLike> }, source: string): Promise<ScreenshotPage> {

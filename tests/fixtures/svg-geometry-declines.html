@@ -35,9 +35,54 @@
   <use href="#used-symbol"></use>
 </svg>
 
+<!-- Declined up to 0.6.0; measured since the viewport is reconstructed from the content box. -->
 <svg id="border-box" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg"
      style="box-sizing: content-box; border: 8px solid #333; padding: 6px">
   <text x="10" y="80">The viewport is not this element's border box</text>
+</svg>
+
+<!--
+  Viewport geometry that still declines, one case per figure, each counted against coverage.
+  The clip rectangle of every one is either not a rectangle, not in the SVG's own frame, or not
+  what its attributes say, and none of that is reconstructed in this build.
+-->
+<svg id="rounded-clip" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg" style="border-radius: 16px">
+  <text x="10" y="80">A rounded clip is not a rectangle</text>
+</svg>
+
+<svg id="radius-with-margin" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg"
+     style="padding: 8px; border-radius: 4px; overflow-clip-margin: content-box 6px">
+  <text x="10" y="80">A clip margin grows the corner curve too</text>
+</svg>
+
+<div style="perspective: 300px"><div style="transform: rotateY(20deg)">
+<svg id="perspective" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <text x="10" y="80">Under perspective the screen map is not affine</text>
+</svg>
+</div></div>
+
+<svg id="mixed-overflow" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg" style="overflow-x: visible; overflow-y: clip">
+  <text x="10" y="80">One axis clips, the other does not</text>
+</svg>
+
+<svg id="nested-transform-outer" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <svg id="nested-transform" x="20" y="20" width="300" height="100" transform="translate(10 5)" style="width: 300px; height: 100px">
+    <text x="10" y="60">A transformed nested viewport</text>
+  </svg>
+</svg>
+
+<svg id="nested-css-outer" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <svg id="nested-css-sized" x="20" y="20" width="300" height="100" style="width: 200px; height: 60px">
+    <text x="10" y="40">CSS sizes this viewport, not its attributes</text>
+  </svg>
+</svg>
+
+<svg id="foreign-outer" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <foreignObject x="10" y="10" width="380" height="130">
+    <div><svg id="inside-foreign-object" viewBox="0 0 300 100" style="width: 300px; height: 100px">
+      <text x="10" y="50">A foreignObject clips this too</text>
+    </svg></div>
+  </foreignObject>
 </svg>
 
 <svg id="many-definitions" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">

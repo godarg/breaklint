@@ -257,6 +257,7 @@ describe("target evaluation contract", () => {
   it("records the actual SVG overflow state in visible-viewport declines", () => {
     const snapshot = structuredClone(loadCorpus().find((item) => item.snapshot.svg.length > 0)!.snapshot);
     snapshot.svg[0]!.overflow = "visible";
+    snapshot.svg[0]!.clipped = false;
     const row = textOverflowsViewport.run(snapshot, { ...context, options: textOverflowsViewport.defaultOptions, fingerprint })
       .evaluations!.find((item) => item.reason === "env/svg-overflow-visible")!;
     assert.deepEqual(row.measurements[0], {

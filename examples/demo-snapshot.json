@@ -5,7 +5,7 @@
     "note": "Hand-written rule fixture, not an acquired document. No original HTML artifact exists for its former illustrative line addresses; source locations are unavailable. The real rule and report chains run, while mode/source identify this demo."
   },
   "snapshot": {
-    "schemaVersion": 4,
+    "schemaVersion": 5,
     "meta": {
       "renderer": null,
       "browserVersion": "",
@@ -596,6 +596,33 @@
           "height": 200
         },
         "overflow": "hidden",
+        "clipped": true,
+        "viewportLocal": {
+          "viewport": {
+            "x": 0,
+            "y": 0,
+            "width": 300,
+            "height": 200
+          },
+          "clips": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 300,
+              "height": 200
+            }
+          ],
+          "localToScreen": [
+            1,
+            0,
+            0,
+            1,
+            48,
+            48
+          ],
+          "oracleDeltaPx": null
+        },
+        "viewportDiagnostic": null,
         "textTargetCount": 2,
         "textTargetsCapped": false,
         "unreadableTargets": 0,
@@ -611,6 +638,26 @@
               "width": 80,
               "height": 12
             },
+            "boxLocal": {
+              "x": 12,
+              "y": 72,
+              "width": 80,
+              "height": 12
+            },
+            "bboxUser": {
+              "x": 12,
+              "y": 72,
+              "width": 80,
+              "height": 12
+            },
+            "userToLocal": [
+              1,
+              0,
+              0,
+              1,
+              0,
+              0
+            ],
             "clipState": "clip-path",
             "ambiguityGroupSize": 1,
             "ink": {
@@ -636,6 +683,26 @@
               "width": 120,
               "height": 12
             },
+            "boxLocal": {
+              "x": 252,
+              "y": 12,
+              "width": 120,
+              "height": 12
+            },
+            "bboxUser": {
+              "x": 252,
+              "y": 12,
+              "width": 120,
+              "height": 12
+            },
+            "userToLocal": [
+              1,
+              0,
+              0,
+              1,
+              0,
+              0
+            ],
             "clipState": "none",
             "ambiguityGroupSize": 1,
             "ink": {

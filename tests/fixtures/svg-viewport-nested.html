@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Labels clipped by nested SVG viewports</title>
+<!--
+  The false clean of 0.6.0, twice.
+
+  A nested <svg> is its own record, and 0.6.0 took its viewport from getBoundingClientRect. For an
+  inner <svg> that is the union of its CONTENT, not its viewport (measured on Chromium 141: 210 to
+  293.5 against a viewport of 150 to 250), so a label running past the inner viewport's edge can
+  never overshoot it — this document ended exit 0 with a label cut in half.
+
+  The first figure clips a label at the inner viewport's right edge. Its viewport is
+  x/y/width/height in the parent's user space, scaled 2 by its own viewBox, and nothing paints the
+  inner viewport's full area, so no rectangle the size of the viewport rescues the client rect.
+
+  The second figure's inner <svg> has overflow: visible: its own viewport clips nothing, but the
+  outer SVG still does, at 400. The record's own overflow says "visible" and 0.6.0 therefore
+  called its label non-applicable; the clip chain says clipped.
+
+  Advances are fixed with textLength, labels sit well inside vertically, and each `*-in` label ends
+  6 px inside the edge that clips it, each `*-out` label 6 px past it. Pixel-verified on
+  Chromium 141 when authored.
+-->
+<style>
+  @page { size: 420pt 400pt; margin: 24pt; }
+  body { font: 11pt/1.35 serif; margin: 0; }
+  figure { margin: 0 0 14pt; }
+  svg.outer { display: block; width: 400px; height: 160px; }
+  figcaption { font-size: 8pt; }
+</style>
+</head>
+<body>
+<p>Two nested viewports, each clipping one label.</p>
+
+<figure>
+  <svg class="outer" id="nest-outer" viewBox="0 0 400 160" xmlns="http://www.w3.org/2000/svg">
+    <rect width="400" height="160" fill="#eeeeee"></rect>
+    <!-- inner viewport x 40..200, y 20..80 in the outer frame; user space scaled 2 -->
+    <svg id="nest-inner" x="40" y="20" width="160" height="60" viewBox="0 0 80 30">
+      <rect x="2" y="2" width="20" height="8" fill="#cccccc"></rect>
+      <text id="nested-in" x="47" y="12" font-size="8" font-family="DejaVu Sans, sans-serif" textLength="30" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+      <text id="nested-out" x="53" y="24" font-size="8" font-family="DejaVu Sans, sans-serif" textLength="30" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    </svg>
+  </svg>
+  <figcaption>The inner viewport clips at x = 200; its client rect would not.</figcaption>
+</figure>
+
+<figure>
+  <svg class="outer" id="chain-outer" viewBox="0 0 400 160" xmlns="http://www.w3.org/2000/svg">
+    <rect width="400" height="160" fill="#eeeeee"></rect>
+    <svg id="chain-inner" x="260" y="60" width="100" height="60" style="overflow: visible">
+      <text id="chain-in" x="4" y="18" font-size="16" font-family="DejaVu Sans, sans-serif" textLength="130" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+      <text id="chain-out" x="16" y="44" font-size="16" font-family="DejaVu Sans, sans-serif" textLength="130" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    </svg>
+  </svg>
+  <figcaption>The inner viewport does not clip; the outer one does, at x = 400.</figcaption>
+</figure>
+</body>
+</html>

@@ -133,7 +133,7 @@ The fingerprint is computed over canonicalised effective semantics with the doma
 report format, observed runtime counters and absolute machine paths. Reordering object keys or
 set-like values therefore does not change it; changing an effective option does.
 
-Report schema and snapshot schema evolve independently. The current source-bound report is schema 5, stored measurement snapshots are schema 4, and Configuration Contract remains v1. Each changes only when its own structure changes — including for an additive, optional field: an optional property does not let a schema-aware consumer tell the two shapes apart, and a strict decoder may reject it. Schema 5 adds the optional `remediation` on a finding. Readers accept 4 and 5; only the emitter moved.
+Report schema and snapshot schema evolve independently. The current source-bound report is schema 5, stored measurement snapshots are schema 5, and Configuration Contract remains v1. Each changes only when its own structure changes — including for an additive, optional field: an optional property does not let a schema-aware consumer tell the two shapes apart, and a strict decoder may reject it. Report schema 5 adds the optional `remediation` on a finding; report readers accept 4 and 5, and only the emitter moved. Snapshot schema 5 (unreleased) adds the SVG local frame — `SvgRecord.clipped`, `viewportLocal` and `viewportDiagnostic`, and per target `boxLocal`, `bboxUser` and `userToLocal` — and the engine reads snapshot schema 5 only: a schema-4 snapshot has no local geometry and cannot be converted, only re-measured.
 
 ## Failure boundary
 

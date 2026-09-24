@@ -310,7 +310,56 @@ export const SUPPORTED_PDFJS_VERSION = "6.2.108";
 export const REPORT_SCHEMA_VERSION = 5;
 /** Document report shapes this build can read. A 4 simply carries no `remediation`. */
 export const READABLE_REPORT_SCHEMA_VERSIONS: readonly number[] = [4, 5];
-export const SNAPSHOT_SCHEMA_VERSION = 4;
+/**
+ * The measurement snapshot's shape. 5 adds the SVG local frame: `SvgRecord.clipped`,
+ * `viewportLocal` and `viewportDiagnostic`, and `SvgTextTarget.boxLocal`, `bboxUser` and
+ * `userToLocal`. There is no reader for 4: a schema-4 snapshot carries no local geometry, the
+ * viewport rule cannot be run on it without guessing, and the missing numbers cannot be derived
+ * from what it does carry — only re-measured. The engine therefore refuses any other stamp.
+ */
+export const SNAPSHOT_SCHEMA_VERSION = 5;
+
+/**
+ * Which case of `env/svg-viewport-geometry-unsupported` applied, carried on the snapshot record
+ * (`SvgRecord.viewportDiagnostic`) and never in the report. Every entry is a geometry the collector
+ * could not reconstruct in the SVG's own coordinate system and therefore declines, counted against
+ * coverage, rather than judging against a rectangle it has not proven.
+ */
+export const SVG_VIEWPORT_DIAGNOSTICS = [
+  /** Computed width, height, border or padding is not a plain px length, or box-sizing is unknown. */
+  "box-unreadable",
+  /** overflow-x and overflow-y differ: measured on Chromium 141, a one-axis clip moves the edge. */
+  "overflow-axes-differ",
+  /** An overflow keyword this collector does not model. */
+  "overflow-unrecognised",
+  /** An `overflow-clip-margin` serialisation outside `<visual-box>? <length>?`. */
+  "clip-margin-unrecognised",
+  /** A nonzero inner corner radius: the clip is rounded, not the rectangle compared against. */
+  "rounded-clip",
+  /** Any corner radius together with a nonzero or non-content-box clip margin. */
+  "radius-with-clip-margin",
+  /** A 3D transform, perspective or motion path on the SVG or an ancestor. */
+  "three-dimensional-transform",
+  /** An `<svg>` inside `<foreignObject>`: an enclosing SVG and the foreignObject also clip it. */
+  "inside-foreign-object",
+  /** getCTM()/getScreenCTM() returned nothing, or a singular matrix, for the SVG or its parent. */
+  "matrix-unavailable",
+  /** CDP returned no content quad for the SVG, so the frame has no independent proof. */
+  "oracle-unavailable",
+  /** The reconstructed content box and CDP's content quad disagree beyond the stated tolerance. */
+  "oracle-disagreed",
+  /** A nested `<svg>` with a non-identity transform. */
+  "nested-transform",
+  /** A nested `<svg>`'s x/y/width/height from its attributes disagree with its computed style. */
+  "nested-lengths-disagree",
+  /** A nested `<svg>` with an `overflow-clip-margin` other than the UA default. */
+  "nested-clip-margin",
+  /** A nested viewport that is rotated or skewed in the frame, so it is not a frame rectangle. */
+  "nested-viewport-rotated",
+  /** An enclosing `<svg>` was itself declined, so this record has no proven frame. */
+  "enclosing-viewport-unsupported",
+] as const;
+export type SvgViewportDiagnostic = (typeof SVG_VIEWPORT_DIAGNOSTICS)[number];
 
 const asSet = <T extends string>(values: readonly T[]): ReadonlySet<string> => new Set(values);
 
@@ -337,4 +386,5 @@ export const IS = {
   outputFormat: asSet(OUTPUT_FORMATS),
   proofSource: asSet(PROOF_SOURCES),
   ruleNamespace: asSet(RULE_NAMESPACES),
+  svgViewportDiagnostic: asSet(SVG_VIEWPORT_DIAGNOSTICS),
 } as const;
