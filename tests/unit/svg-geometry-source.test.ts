@@ -35,6 +35,16 @@ it("the injected SVG collector ships raw frame facts through captured primitives
   assert.match(SNAPSHOT_SOURCE, /svgRendered: renderedSvgs\.length/u);
 });
 
+it("collects SVG only from the page content area, never from margin-box clones", () => {
+  // Up to 0.6.0 the SVG collector read the whole page, so a running element's SVG was collected
+  // once per page under one target id and the viewport rule stopped the run (exit 3). The area
+  // is the one the block collection keeps (PAGE_AREA_SELECTOR in the paginator's collector).
+  assert.match(SNAPSHOT_SOURCE, /const SVG_FLOW_AREA_SELECTOR = "\.pagedjs_pagebox > \.pagedjs_area";/u);
+  assert.match(SNAPSHOT_SOURCE, /const svgInFlow = \(el\) => P\.closest\(el, SVG_FLOW_AREA_SELECTOR\) !== null;/u);
+  assert.match(SNAPSHOT_SOURCE, /P\.all\(page, "svg"\)\.filter\(svgInFlow\)\.forEach/u);
+  assert.doesNotMatch(SNAPSHOT_SOURCE, /P\.all\(page, "svg"\)\.forEach/u, "an unfiltered page-wide SVG query is back");
+});
+
 it("captures the SVG matrix, rect and length getters before any document script", () => {
   for (const capture of [
     "SVGGraphicsElement.prototype.getCTM",

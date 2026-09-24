@@ -133,6 +133,7 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "svg-viewport-boxes.html"),
         join(FIXTURES, "svg-viewport-nested.html"),
         join(FIXTURES, "svg-clip-margin-keyword.html"),
+        join(FIXTURES, "svg-running-element.html"),
       ],
       options(join(root, "svg-frame-evidence")),
     );
@@ -889,8 +890,8 @@ describe("the M2d live production chain", () => {
    * labels, the third exit 1 with two labels reported that are drawn.
    */
   const svgFrameDocument = (t: TestContext, index: number): DocumentInput | null => {
-    if (svgFrames?.documents.length !== 3) {
-      t.skip(`the SVG frame batch did not complete: ${svgFrames?.documents.length ?? 0} of 3 documents`);
+    if (svgFrames?.documents.length !== 4) {
+      t.skip(`the SVG frame batch did not complete: ${svgFrames?.documents.length ?? 0} of 4 documents`);
       return null;
     }
     const document = svgFrames.documents[index]!;
@@ -983,6 +984,23 @@ describe("the M2d live production chain", () => {
     for (const record of records) assert.deepEqual(record.viewportLocal!.clips, [{ x: -10, y: -10, width: 220, height: 80 }]);
     const { outcome, overshoot, reported } = svgFrameVerdicts(document);
     assertLabels(overshoot, reported, ["keyword-hidden-in", "keyword-hidden-out", "keyword-clip-in", "keyword-clip-out"]);
+    assert.equal(exitCodeFor(outcome.report.verdict), 1);
+  });
+
+  it("does not collect the margin-box clones of an SVG inside a running element", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = svgFrameDocument(t, 3);
+    if (!document) return;
+    assert.equal(document.snapshot!.pages.length, 3);
+    // Paged.js clones the running element into the margin box of all three pages. Only the in-flow
+    // original is collected, and it is display: none there, so its text is no candidate.
+    const logos = document.snapshot!.svg.filter((record) => record.sourceKey === "svgid:running-logo");
+    assert.equal(logos.length, 1, "a margin-box clone was collected as an SVG of the flow");
+    assert.deepEqual([logos[0]!.textTargetCount, logos[0]!.notRenderedTargets, logos[0]!.texts.length], [1, 1, 0]);
+    assertFrame(document.snapshot!.svg.filter((record) => record.sourceKey === "svgid:in-flow"));
+    const { outcome, overshoot, reported } = svgFrameVerdicts(document);
+    assert.equal(outcome.report.infrastructure.some((event) => event.kind === "checker-crashed"), false);
+    assertLabels(overshoot, reported, ["figure-in", "figure-out"]);
     assert.equal(exitCodeFor(outcome.report.verdict), 1);
   });
 

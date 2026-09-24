@@ -184,6 +184,15 @@ grown from the padding box of an SVG with a fractional padding (`0.5em` at 11pt,
 What the rule compares is still the text's typographic cell box rather than its ink, and HTML
 ancestors' own clipping (`overflow: hidden` on a `<div>`) is not part of its question.
 
+**An SVG in a page margin box is not measured.** Paged.js clones a `position: running(...)`
+element into the margin box of every page (and a `position: fixed` one into every page box), and
+the SVG collector keeps, like the block collection, only what lies inside the page's content area.
+A running logo is therefore neither judged nor counted; its in-flow original, which Paged.js leaves
+in the page with `display: none`, has no rendered text and contributes no candidate. Up to 0.6.0
+the collector read the whole page, so an SVG with a `<text>` in a running element that repeated on
+two or more pages was one target per page under one id, and the run ended `checker-crashed`
+(exit 3).
+
 **Every threshold is uncalibrated.** There is no corpus of real documents with human-checked truth
 behind any of the thirteen released numbers. The fixtures show that each rule does what it says; they do not
 show that what it says is the right thing to say about your document. That is the difference between

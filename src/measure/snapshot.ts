@@ -616,7 +616,20 @@ export const SNAPSHOT_SOURCE = `(() => {
     "borderTopLeftRadius", "borderTopRightRadius", "borderBottomRightRadius", "borderBottomLeftRadius",
     "overflowX", "overflowY", "overflowClipMargin"];
   const SVG_TRANSFORM_KEYS = ["transform", "rotate", "scale", "translate", "perspective", "offsetPath"];
-  pagesEls.forEach((page, pageIndex) => P.all(page, "svg").forEach((el, i) => {
+  // FLOW MEMBERSHIP, the same test the block collection applies: an <svg> is measured only inside
+  // its page's content area, the .pagedjs_area child of the page box (page content and footnote
+  // area; the selector is PAGE_AREA_SELECTOR of src/paginate/collector.ts and must stay equal to
+  // it). Paged.js deep-clones a position: running(...) element into the margin box of every page
+  // and a position: fixed one into every page box, and each clone keeps the injected target ids.
+  // Read from the whole page, a running logo with one <text> became one target per page under one
+  // id, and the viewport rule's per-target accounting stopped the run: "duplicate target
+  // evaluation", checker-crashed, exit 3 (measured with a three-page document, Paged.js 0.4.3).
+  // Margin-box SVG is unmeasured content, like everything else in a margin box. The running
+  // element's in-flow original stays in the content area with display: none: its text is not
+  // rendered, so it is kept and contributes no candidate.
+  const SVG_FLOW_AREA_SELECTOR = ".pagedjs_pagebox > .pagedjs_area";
+  const svgInFlow = (el) => P.closest(el, SVG_FLOW_AREA_SELECTOR) !== null;
+  pagesEls.forEach((page, pageIndex) => P.all(page, "svg").filter(svgInFlow).forEach((el, i) => {
     // querySelectorAll reaches <text> inside <defs>, <symbol>, <clipPath> and <pattern>, under
     // display:none, and inside a NESTED <svg>. None of the first group is drawn; the last group
     // belongs to a different viewport and is collected with that inner SVG, which appears as its

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>An inline SVG inside a running element</title>
+<!--
+  A running header carrying an inline SVG with a <text>, on three pages.
+
+  Paged.js implements position: running(...) by deep-cloning the element into the margin box of
+  every page, and every clone keeps the injected target id of its <text>. Up to 0.6.0 the SVG
+  collector read the whole page, so the logo below became three targets under one id, the viewport
+  rule saw one target evaluated three times, and its accounting invariant ended the run
+  checker-crashed, exit 3 — for a document whose only defect is the one in-flow figure.
+
+  The complication is that the margin-box logo is itself clipped (its label runs past its 120-unit
+  viewBox), so a collector that still read the margin boxes would also report it; the in-flow
+  figure carries one label 6 px inside its viewport and one 6 px past it. Margin-box content is not
+  measured: the expected verdict is exit 1 with exactly the in-flow `figure-out` label.
+-->
+<style>
+  @page { size: 150mm 120mm; margin: 18mm 15mm; }
+  @page { @top-center { content: element(title); } }
+  body { margin: 0; font: 10pt/1.4 serif; }
+  p { margin: 0 0 6pt; }
+  .title { position: running(title); }
+  .brk { break-before: page; }
+  svg.f { display: block; box-sizing: content-box; width: 200px; height: 60px; overflow: hidden; }
+  svg.f text { font-size: 16px; font-family: "DejaVu Sans", sans-serif; }
+</style>
+</head>
+<body>
+<div class="title" id="running-title"><svg id="running-logo" width="120" height="16" viewBox="0 0 120 16"><text id="running-logo-text" x="90" y="12" font-size="10">Logo text running out</text></svg> Running title</div>
+<p>The first page.</p>
+<svg class="f" id="in-flow" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="60" fill="#eeeeee"></rect>
+  <text id="figure-in" x="94" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  <text id="figure-out" x="106" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+</svg>
+<p class="brk">The second page.</p>
+<p class="brk">The third page.</p>
+</body>
+</html>

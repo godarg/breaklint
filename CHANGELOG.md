@@ -56,6 +56,15 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   transforms and zoom." instead of "Coordinates are normalised through getScreenCTM()." The report
   shape is unchanged.
 
+### Fixed
+
+- **An inline SVG with `<text>` inside a `position: running(...)` element no longer stops the
+  run.** Paged.js clones the element into the margin box of every page; the SVG collector read the
+  whole page, so a logo repeated on three pages was three targets under one id and the viewport
+  rule's accounting ended the document `checker-crashed`, exit 3. SVG is now collected only from the
+  page's content area, as blocks are: margin-box SVG is not measured, and the running element's
+  hidden in-flow original contributes no candidate.
+
 ### Schema
 
 - **Snapshot schema 4 → 5.** Snapshot 5 adds the SVG local frame: `SvgRecord.clipped`,
