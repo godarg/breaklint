@@ -166,7 +166,29 @@ describe("HTML Report Surface v2", () => {
     assert.match(html, /Bound evidence/u);
     assert.match(html, /does not bind this finding/u);
     assert.match(html, /Ambiguity:/u);
-    assert.doesNotMatch(html, /<table\b/u, "findings and coverage must reflow instead of requiring a table scroll");
+    const findingsSection = /<section class="findings-section[\s\S]*?<\/section>/u.exec(html)?.[0] ?? "";
+    assert.ok(findingsSection.length > 0, "the findings section is missing");
+    assert.doesNotMatch(findingsSection, /<table\b/u, "findings must reflow as articles instead of requiring a table scroll");
+  });
+
+  it("renders coverage as one aligned table per document with real header semantics", () => {
+    const report = findingsReportState();
+    const html = renderHtml(report);
+    const document = report.documents[0]!;
+    const rules = Object.keys(document.coverage);
+    const table = /<table class="coverage-table"[\s\S]*?<\/table>/u.exec(html)?.[0] ?? "";
+    assert.ok(table.length > 0, "coverage is not a table");
+    assert.match(table, /<caption><span class="coverage-path mono">examples\/demo\.html<\/span> <span class="document-verdict">Document verdict: findings<\/span><\/caption>/u,
+      "the document path and verdict belong to the table caption, so they cannot strand above it");
+    assert.equal((table.match(/<th scope="col"/gu) ?? []).length, 7, "seven column headers");
+    assert.equal((table.match(/<th scope="row" class="rule"><code>/gu) ?? []).length, rules.length, "every rule is a row header");
+    for (const rule of rules) assert.ok(table.includes(`<code>${rule}</code>`), `${rule} is missing from the table`);
+    assert.doesNotMatch(html, /<dt>Rule<\/dt>|coverage-record/u, "no card-era coverage labels remain");
+    assert.match(table, /<tbody class="coverage-tail">(?:\s*<tr[\s\S]*?<\/tr>){2}\s*<\/tbody>/u, "the last two rows are bracketed");
+    const zero = renderHtml(insufficientCoverageReportState());
+    assert.match(zero, /<tr id="coverage-1-1" class="short">/u, "a below-floor row is marked");
+    assert.match(zero, /<span class="coverage-result short">Below floor<\/span>/u, "a below-floor row says so in words");
+    assert.match(html, /<td class="num"><abbr title="Not applicable: no candidates">n\/a<\/abbr><\/td>/u, "a zero-candidate rule shows n/a, not a number");
   });
 
   it("uses unique deterministic IDs for every labelled surface", () => {
@@ -223,9 +245,10 @@ describe("HTML Report Surface v2", () => {
     assert.match(html, /<section class="findings-section findings-empty"/u, "clean findings must remain explicit on screen and targetable in print");
     assert.match(html, /\.summary-grid \{ grid-template-columns: minmax\(0, 1\.7fr\) repeat\(3, minmax\(0, 1fr\)\); \}/u, "print must reserve enough width for the complete Coverage Trust verdict");
     assert.match(html, /\.summary-grid > div:first-child dd \{[^}]*white-space: nowrap/su, "Coverage Trust label must stay intact in print");
-    assert.match(html, /\.coverage-list \{ display: block; \}/u, "print coverage must leave the fragment-prone grid context");
-    assert.match(html, /\.coverage-record \{[^}]*display: flow-root;[^}]*break-inside: avoid;[^}]*page-break-inside: avoid;/su, "print coverage rows need a non-grid fragmentation context and both guards");
-    assert.match(html, /\.coverage-record > div \{[^}]*float: left;[^}]*width: 50%/su, "print coverage facts need a readable two-column reflow");
+    assert.match(html, /\.coverage-table thead \{ display: table-header-group; \}/u, "print repeats the coverage header on a continuation page");
+    assert.match(html, /\.coverage-table tr \{ break-inside: avoid; \}/u, "a printed coverage row never splits");
+    assert.match(html, /\.coverage-tail \{ break-inside: avoid; \}/u, "the last two coverage rows stay together");
+    assert.match(html, /\.coverage-table \.num \{ text-align: end; \}/u, "numeric coverage columns are end-aligned");
     assert.match(html, /\.finding \{ break-inside: avoid-page; \}/u, "compact findings should not split across pages");
     assert.match(html, /section > h2 \{ break-after: avoid; \}/u, "section headings must stay with their first content");
     assert.match(html, /\.report-footer \{ display: none; \}/u, "the redundant screen footer must not create a print-only page");

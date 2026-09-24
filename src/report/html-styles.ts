@@ -52,13 +52,13 @@ export const REPORT_HTML_STYLES = String.raw`
   .summary-grid { display: grid; grid-template-columns: minmax(12rem, 1.5fr) repeat(3, minmax(7rem, 1fr)); gap: var(--bl-space-3); }
   .summary-grid > div { min-height: 7rem; padding: var(--bl-space-4); border-block-start: var(--bl-border-strong) solid var(--bl-color-divider); background: var(--bl-color-soft); }
   .summary-grid > div:first-child { border-block-start-color: var(--bl-color-fg-primary); background: var(--bl-color-paper); }
-  .summary-grid dt, .run-facts dt, .finding-facts dt, .coverage-record dt { color: var(--bl-color-fg-muted); font-size: var(--bl-font-size-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .summary-grid dt, .run-facts dt, .finding-facts dt { color: var(--bl-color-fg-muted); font-size: var(--bl-font-size-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
   .summary-grid dd { margin: var(--bl-space-2) 0 0; font: 700 var(--bl-font-size-xl)/1.2 var(--bl-font-mono); }
   .summary-grid small { display: block; margin-block-start: var(--bl-space-2); color: var(--bl-color-fg-muted); font-size: var(--bl-font-size-sm); font-weight: 400; }
   .run-facts { display: grid; grid-template-columns: repeat(4, minmax(9rem, 1fr)); gap: var(--bl-space-4); margin-block: var(--bl-space-5) 0; padding-block: var(--bl-space-4); border-block: var(--bl-border-thin) solid var(--bl-color-divider); }
-  .run-facts dd, .finding-facts dd, .coverage-record dd { margin: var(--bl-space-1) 0 0; }
+  .run-facts dd, .finding-facts dd { margin: var(--bl-space-1) 0 0; }
   .state-alert { max-width: var(--bl-text-width); padding: var(--bl-space-5); border-inline-start: var(--bl-border-strong) solid var(--bl-color-accent-warn); background: var(--bl-color-soft); }
-  .checker-list, .finding-list, .coverage-documents { padding: 0; list-style: none; }
+  .checker-list, .finding-list { padding: 0; list-style: none; }
   .checker-list { display: grid; gap: var(--bl-space-4); }
   .checker-event { padding: var(--bl-space-4); border: var(--bl-border-thin) solid var(--bl-color-divider); border-radius: var(--bl-radius-sm); background: var(--bl-color-paper); }
   .checker-event p { margin-block-end: var(--bl-space-2); }
@@ -80,7 +80,7 @@ export const REPORT_HTML_STYLES = String.raw`
   .finding h3 { margin-block-start: var(--bl-space-4); padding-inline-end: var(--bl-space-6); }
   .finding-message { max-width: var(--bl-text-width); font-size: var(--bl-font-size-lg); }
   .finding-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bl-space-4) var(--bl-space-5); margin-block: var(--bl-space-5) 0; padding-block-start: var(--bl-space-4); border-block-start: var(--bl-border-thin) solid var(--bl-color-divider); }
-  .finding-facts > div, .coverage-record > div { min-width: 0; }
+  .finding-facts > div { min-width: 0; }
   .evidence-state { margin-block: var(--bl-space-4) 0; color: var(--bl-color-fg-muted); font-size: var(--bl-font-size-sm); }
   .evidence-state strong { color: var(--bl-color-fg-primary); }
   .finding-remediation-untested { margin-block-start: var(--bl-space-2); color: var(--bl-color-fg-muted); font-size: var(--bl-font-size-sm); }
@@ -93,30 +93,49 @@ export const REPORT_HTML_STYLES = String.raw`
   .coverage-shortfall-item ul { margin: var(--bl-space-1) 0 0; padding-inline-start: var(--bl-space-4); }
   .empty-state { max-width: var(--bl-text-width); padding: var(--bl-space-5); border: var(--bl-border-thin) solid var(--bl-color-divider); border-radius: var(--bl-radius-sm); background: var(--bl-color-paper); }
   .coverage-documents { display: grid; gap: var(--bl-space-6); }
-  .coverage-document { padding-block-start: var(--bl-space-4); border-block-start: var(--bl-border-strong) solid var(--bl-color-fg-primary); }
+  /* Coverage is one aligned table per document: the rule id is the row header, counts, coverage and
+     floor are right-aligned tabular numbers, the result is text. */
+  .coverage-table { width: 100%; border-collapse: collapse; font-size: var(--bl-font-size-sm); font-variant-numeric: tabular-nums; }
+  .coverage-table caption { padding-block: var(--bl-space-3); border-block-start: var(--bl-border-strong) solid var(--bl-color-fg-primary); text-align: start; }
+  .coverage-path { margin-inline-end: var(--bl-space-3); font-size: var(--bl-font-size-base); font-weight: 700; }
   .document-verdict { color: var(--bl-color-fg-muted); font-family: var(--bl-font-mono); font-size: var(--bl-font-size-sm); }
-  .coverage-list { display: grid; gap: var(--bl-space-3); margin-block-start: var(--bl-space-4); }
-  /* The print-only pagination bracket around the last two records. On screen it must contribute no
-     box at all: as a grid item it would collapse the two records into one cell and swallow the gap
-     between them. */
-  .coverage-tail { display: contents; }
-  .coverage-record { display: grid; grid-template-columns: minmax(14rem, 2fr) repeat(5, minmax(5rem, 1fr)); gap: var(--bl-space-3); margin: 0; padding: var(--bl-space-3); border: var(--bl-border-thin) solid var(--bl-color-divider); background: var(--bl-color-paper); }
-  .coverage-record.short { border-inline-start: var(--bl-border-strong) solid var(--bl-color-accent-warn); }
+  .coverage-table th, .coverage-table td { padding: var(--bl-space-2) var(--bl-space-3); border-block-end: var(--bl-border-thin) solid var(--bl-color-divider); overflow-wrap: normal; text-align: start; vertical-align: baseline; }
+  .coverage-table thead th { border-block-end: var(--bl-border-strong) solid var(--bl-color-fg-primary); color: var(--bl-color-fg-muted); font-size: var(--bl-font-size-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; vertical-align: bottom; }
+  .coverage-table tbody th { position: relative; font-weight: 400; }
+  .coverage-table .num { text-align: end; }
+  .coverage-table td.num, .coverage-table td.result { white-space: nowrap; }
+  .coverage-table abbr { text-decoration: none; }
+  /* A below-floor row carries its state three ways: the words, weight and colour of its result, and
+     a strong edge on its row header. The edge is a positioned border, not a cell border: in the
+     collapsed-border model a wider border on one cell would shift that row's text off the column. */
+  .coverage-table tr.short th[scope="row"]::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; border-inline-start: var(--bl-border-strong) solid var(--bl-color-accent-warn); }
   .coverage-result { font-weight: 700; }
   .coverage-result.short { color: var(--bl-color-accent-warn); }
   .report-footer { margin-block-start: var(--bl-space-7); padding-block-start: var(--bl-space-4); border-block-start: var(--bl-border-thin) solid var(--bl-color-divider); color: var(--bl-color-fg-muted); font-size: var(--bl-font-size-sm); }
   @media (max-width: 64rem) {
     .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .run-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .coverage-record { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .coverage-record > div:first-child { grid-column: 1 / -1; }
   }
   @media (max-width: 30rem) {
     main { padding: var(--bl-space-3); }
     .report-header { min-height: 0; padding: var(--bl-space-4); }
     .tool-line { display: grid; margin-block-end: var(--bl-space-6); }
-    .summary-grid, .run-facts, .finding-facts, .coverage-record { grid-template-columns: minmax(0, 1fr); }
-    .coverage-record > div:first-child { grid-column: auto; }
+    .summary-grid, .run-facts, .finding-facts { grid-template-columns: minmax(0, 1fr); }
+    /* The same table on a phone: each row becomes a two-line grid on one shared five-column
+       template — rule and result on the first line, the five numbers below — so every column still
+       aligns across rows and with its header, and nothing scrolls sideways. */
+    .coverage-table, .coverage-table thead, .coverage-table tbody, .coverage-table caption { display: block; }
+    .coverage-table tr { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: var(--bl-space-2); row-gap: var(--bl-space-1); padding-block: var(--bl-space-2); border-block-end: var(--bl-border-thin) solid var(--bl-color-divider); }
+    .coverage-table thead tr { border-block-end: var(--bl-border-strong) solid var(--bl-color-fg-primary); }
+    .coverage-table th, .coverage-table td, .coverage-table thead th { padding: 0; border: 0; }
+    /* Five value columns share 366 CSS px: header labels must fit a 67 px column, or a right-aligned
+       label overflows past its column edge (measured: MEASURED at .75rem overran by 5.7 px). */
+    .coverage-table thead th { font-size: .6875rem; letter-spacing: .02em; }
+    .coverage-table tbody th[scope="row"] { padding-inline-start: var(--bl-space-2); }
+    .coverage-table thead .rule { padding-inline-start: var(--bl-space-2); }
+    .coverage-table .rule { grid-column: 1 / 4; grid-row: 1; }
+    .coverage-table .result { grid-column: 4 / 6; grid-row: 1; text-align: end; }
+    .coverage-table .num { grid-row: 2; }
     .summary-grid > div { min-height: 0; }
     .finding { padding: var(--bl-space-4); }
     .finding::before { inset-block-start: var(--bl-space-3); inset-inline-end: var(--bl-space-3); }
@@ -147,25 +166,17 @@ export const REPORT_HTML_STYLES = String.raw`
        Keep the semantic unit together; a measured red control put the heading on page 1 and the
        positive card alone on page 2 when only the generic h2 break rule was present. */
     .apparatus-section { break-inside: avoid; page-break-inside: avoid; }
-    .coverage-list { display: block; }
-    .coverage-record { position: relative; display: flow-root; margin-block-end: var(--bl-space-3); padding: var(--bl-space-3); break-inside: avoid; page-break-inside: avoid; }
-    /* Chrome can omit the physical inline-end border of a paged flow-root containing floats even
-       though computed style reports it as 1px. Paint the same tokenized edge as a child border
-       inside the box so it survives rasterization without depending on printed backgrounds. */
-    .coverage-record::after { content: ""; position: absolute; inset-block: 0; inset-inline-end: 0; inline-size: 0; border-inline-end: var(--bl-border-thin) solid var(--bl-color-divider); }
-    .coverage-record:last-child { margin-block-end: 0; }
-    /* Records do not fragment, so the terminal page carries the remainder of the pack, and where
-       the coverage section starts is decided by unrelated content above it. A remainder of one ends
-       the report on a page holding a single record. Bracketing the last two keeps that remainder at
-       two without changing any flow height. Two is enough at the measured four records per page,
-       where the gate's minimum ceil(perPage/2) is two; at six or more per page the bracket would
-       have to grow with it. A break-before: avoid on the last record is the direct
-       expression and does not hold here — the same measured Blink limitation as the apparatus
-       heading above; a non-breaking container is what worked. */
-    .coverage-tail { display: block; break-inside: avoid; page-break-inside: avoid; }
-    .coverage-record > div { float: left; width: 50%; min-height: var(--bl-space-6); padding-inline-end: var(--bl-space-3); }
-    .coverage-record > div:first-child { float: none; width: 100%; margin-block-end: var(--bl-space-3); padding-inline-end: 0; }
-    .report-header, .summary-grid > div, .checker-event, .state-alert, .empty-state, .coverage-record { break-inside: avoid; }
+    /* The table must fit the 703 px content box: wider content makes Chrome shrink the whole
+       printed document to fit (measured 736.6 px -> every page scaled to 95 %). */
+    .coverage-table { font-size: .8125rem; }
+    .coverage-table th, .coverage-table td { padding: var(--bl-space-1) .375rem; }
+    .coverage-table thead th { font-size: .6875rem; letter-spacing: .02em; }
+    .coverage-table thead { display: table-header-group; }
+    .coverage-table tr { break-inside: avoid; }
+    .coverage-table .rule code { white-space: nowrap; }
+    /* The last two rows never part: see renderCoverageTable in html.ts. */
+    .coverage-tail { break-inside: avoid; }
+    .report-header, .summary-grid > div, .checker-event, .state-alert, .empty-state { break-inside: avoid; }
     /* Compact findings stay whole. A finding taller than the page still fragments by necessity. */
     .finding { break-inside: avoid-page; }
     .finding h3, .finding-facts > div, .evidence-state { break-inside: avoid; }

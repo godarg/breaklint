@@ -50,170 +50,126 @@ function run(command, args) {
   return result.stdout;
 }
 
-function independentlyLongestDarkHorizontalRun(path, maxY = 120) {
-  const decoded = PNG.sync.read(readFileSync(path), { checkCRC: true });
-  let longest = 0;
-  for (let y = 0; y < Math.min(maxY, decoded.height); y += 1) {
-    let current = 0;
-    for (let x = 0; x < decoded.width; x += 1) {
-      const offset = (y * decoded.width + x) * 4;
-      const dark = decoded.data[offset] < 180 && decoded.data[offset + 1] < 180 && decoded.data[offset + 2] < 180;
-      current = dark ? current + 1 : 0;
-      longest = Math.max(longest, current);
-    }
-  }
-  return { pixels: longest, required: Math.ceil(decoded.width * 0.75) };
-}
+const COVERAGE_ROW_LINE = /^\s*([a-z0-9]+\/[a-z0-9-]+)\s+\d+\s+\d+\s+\d+\s+(?:\d+(?:\.\d+)?%|n\/a)\s+\d+(?:\.\d+)?%\s+(?:Coverage met|Below floor)\s*$/u;
 
-function independentlyCheckCoveragePageStarts(pdf, raster) {
-  const pdfPath = resolve(output, pdf.path);
-  return raster.pages.map((pageArtifact, index) => {
-    const page = index + 1;
-    const firstToken = run("pdftotext", ["-f", String(page), "-l", String(page), "-layout", pdfPath, "-"])
-      .trim()
-      .match(/^\S+/u)?.[0] ?? null;
-    const border = independentlyLongestDarkHorizontalRun(resolve(output, pageArtifact.path));
-    const beginsWithCoverageRecord = firstToken === "RULE";
-    const beginsWithCoverageFragment = firstToken !== null && firstToken !== "RULE" && firstToken.includes("/");
-    assert.equal(beginsWithCoverageFragment, false, `${pageArtifact.path}: page begins inside a coverage record at ${firstToken}`);
-    assert.ok(!beginsWithCoverageRecord || border.pixels >= border.required, `${pageArtifact.path}: fragmented coverage record at page start`);
-    return { page, firstToken, beginsWithCoverageRecord, beginsWithCoverageFragment, topHorizontalBorderPx: border.pixels, requiredBorderPx: border.required };
-  });
-}
-
-function independentlyCheckCoverageBoxClosure(pdf, raster, expectedRecords) {
-  assert.ok(expectedRecords > 0, `${pdf.cell}: coverage box inventory must not be empty`);
-  const pdfPath = resolve(output, pdf.path);
+/**
+ * Independent of the renderer's DOM geometry and of its PDF word anchors: rows are read from the
+ * `-layout` text (a rule id followed by five values and a result on one line), the table extent is
+ * the projected A4 content box, and each row's closing rule is looked for in the raster between the
+ * row's own text and the next row's. The renderer's report is then cross-checked against this.
+ */
+function independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, reported, label) {
   const rasterDpi = manifest.reviewEnvironment.print.rasterDpi;
   const contentWidthCssPx = manifest.reviewEnvironment.print.contentViewportCssPx.width;
   const minimumEdgeCoverage = 0.98;
   const maximumEdgeGapPx = 2;
-  const minimumHorizontalCoverage = 0.95;
-  const pages = raster.pages.map((pageArtifact, pageIndex) => {
+  const pages = rasterPages.map((pageArtifact, pageIndex) => {
     const page = pageIndex + 1;
+    const layout = run("pdftotext", ["-f", String(page), "-l", String(page), "-layout", pdfPath, "-"]).split("\n");
+    const rowIds = layout.map((line) => COVERAGE_ROW_LINE.exec(line)?.[1]).filter(Boolean);
+    const firstRowLine = layout.findIndex((line) => COVERAGE_ROW_LINE.test(line));
+    const header = firstRowLine > 0 && layout.slice(0, firstRowLine).some((line) => /^\s*RULE\b.*\bRESULT\s*$/u.test(line));
+    const caption = layout.some((line) => /Document verdict:/u.test(line));
     const xml = run("pdftotext", ["-f", String(page), "-l", String(page), "-bbox-layout", pdfPath, "-"]);
-    const words = [...xml.matchAll(
-      /<word xMin="([0-9.]+)" yMin="([0-9.]+)" xMax="([0-9.]+)" yMax="([0-9.]+)">([^<]+)<\/word>/gu,
-    )].map((match) => ({
-      xMin: Number(match[1]),
-      yMin: Number(match[2]),
-      xMax: Number(match[3]),
-      yMax: Number(match[4]),
-      text: match[5],
-    }));
-    const rules = words.filter((word) => word.text === "RULE").sort((a, b) => a.yMin - b.yMin);
-    const results = words.filter((word) => word.text === "RESULT").sort((a, b) => a.yMin - b.yMin);
+    const words = [...xml.matchAll(/<word xMin="[0-9.]+" yMin="([0-9.]+)" xMax="[0-9.]+" yMax="([0-9.]+)">([^<]+)<\/word>/gu)]
+      .map((match) => ({ yMin: Number(match[1]), yMax: Number(match[2]), text: match[3] }));
     const decoded = PNG.sync.read(readFileSync(resolve(output, pageArtifact.path)), { checkCRC: true });
     const contentWidthRasterPx = contentWidthCssPx * rasterDpi / 96;
-    const projectedLeft = Math.round((decoded.width - contentWidthRasterPx) / 2);
-    const projectedRight = Math.round(decoded.width - (decoded.width - contentWidthRasterPx) / 2 - 1);
+    const left = Math.round((decoded.width - contentWidthRasterPx) / 2);
+    const right = Math.round(decoded.width - (decoded.width - contentWidthRasterPx) / 2 - 1);
+    const middle = Math.round((left + right) / 2);
     const isDark = (x, y) => {
+      if (y < 0 || y >= decoded.height) return false;
       const offset = (y * decoded.width + x) * 4;
-      return decoded.data[offset] < 180 && decoded.data[offset + 1] < 180 &&
-        decoded.data[offset + 2] < 180 && decoded.data[offset + 3] > 0;
+      return decoded.data[offset] < 180 && decoded.data[offset + 1] < 180 && decoded.data[offset + 2] < 180 && decoded.data[offset + 3] > 0;
     };
-    const edgeRowIsDark = (x, y) => [x - 2, x - 1, x, x + 1, x + 2]
-      .some((candidate) => candidate >= 0 && candidate < decoded.width && isDark(candidate, y));
-    const horizontalCoverage = (y) => {
+    const rowCoverage = (y) => {
       let hits = 0;
-      for (let x = projectedLeft; x <= projectedRight; x += 1) {
-        if (isDark(x, y)) hits += 1;
-      }
-      return hits / (projectedRight - projectedLeft + 1);
+      for (let x = left; x <= right; x += 1) if (isDark(x, y)) hits += 1;
+      return hits / (right - left + 1);
     };
-    const edgeStats = (x, top, bottom) => {
-      let darkRows = 0;
-      let currentGapPx = 0;
+    const half = (y, from, to) => {
+      let hits = 0;
+      let gap = 0;
       let maximumGapPx = 0;
-      for (let y = top; y <= bottom; y += 1) {
-        if (edgeRowIsDark(x, y)) {
-          darkRows += 1;
-          currentGapPx = 0;
+      for (let x = from; x <= to; x += 1) {
+        if (isDark(x, y - 1) || isDark(x, y) || isDark(x, y + 1)) {
+          hits += 1;
+          gap = 0;
         } else {
-          currentGapPx += 1;
-          maximumGapPx = Math.max(maximumGapPx, currentGapPx);
+          maximumGapPx = Math.max(maximumGapPx, ++gap);
         }
       }
-      const rows = bottom - top + 1;
-      return { coverage: Math.round(darkRows / rows * 1_000) / 1_000, maximumGapPx };
+      return { coverage: Math.round(hits / (to - from + 1) * 1_000) / 1_000, maximumGapPx };
     };
-    const anchors = rules.map((rule, index) => {
-      const nextRuleY = rules[index + 1]?.yMin ?? Number.POSITIVE_INFINITY;
-      const result = results.find((candidate) => candidate.yMin > rule.yMax && candidate.yMin < nextRuleY);
-      assert.ok(result, `${pageArtifact.path}: RULE has no RESULT anchor before the next coverage card`);
-      const ruleY = Math.round((rule.yMin + rule.yMax) / 2 * rasterDpi / 72);
-      const resultY = Math.round((result.yMin + result.yMax) / 2 * rasterDpi / 72);
-      let top = ruleY;
-      while (top >= 0 && horizontalCoverage(top) < minimumHorizontalCoverage) top -= 1;
-      let bottom = resultY;
-      while (bottom < decoded.height && horizontalCoverage(bottom) < minimumHorizontalCoverage) bottom += 1;
-      assert.ok(top >= 0 && bottom < decoded.height && top < ruleY && bottom > resultY,
-        `${pageArtifact.path}: PDF text anchors have no complete enclosing horizontal frame`);
-      const leftStats = edgeStats(projectedLeft, top, bottom);
-      const rightStats = edgeStats(projectedRight, top, bottom);
+    const used = new Set();
+    const anchors = rowIds.map((id) => {
+      const word = words.find((candidate, index) => candidate.text === id && !used.has(index) && used.add(index));
+      assert.ok(word, `${label}: page ${page} row ${id} has no positioned word`);
+      return { id, top: Math.ceil(word.yMax * rasterDpi / 72), start: Math.floor(word.yMin * rasterDpi / 72) };
+    }).sort((a, b) => a.top - b.top);
+    const rows = anchors.map((anchor, index) => {
+      const limit = index + 1 < anchors.length ? anchors[index + 1].start : anchor.top + 30;
+      // The first raster row below the row's text that is at least half dark across the table is its
+      // rule; if the rule is gone, the darkest row in the band stands in and is judged below.
+      let y = anchor.top;
+      while (y < limit && rowCoverage(y) < 0.5) y += 1;
+      if (y >= limit) {
+        let best = anchor.top;
+        for (let candidate = anchor.top; candidate < limit; candidate += 1) if (rowCoverage(candidate) > rowCoverage(best)) best = candidate;
+        y = best;
+      }
+      const leftStats = half(y, left, middle - 1);
+      const rightStats = half(y, middle, right);
       assert.ok(
         leftStats.coverage >= minimumEdgeCoverage && leftStats.maximumGapPx <= maximumEdgeGapPx &&
         rightStats.coverage >= minimumEdgeCoverage && rightStats.maximumGapPx <= maximumEdgeGapPx,
-        `${pageArtifact.path}: full-height physical edge is open ` +
-          `(left ${leftStats.coverage}/${leftStats.maximumGapPx}px, right ${rightStats.coverage}/${rightStats.maximumGapPx}px; ` +
-          `required ${minimumEdgeCoverage}/${maximumEdgeGapPx}px)`,
+        `${label}: page ${page} row ${anchor.id} rule is open (left ${leftStats.coverage}/${leftStats.maximumGapPx}px, right ${rightStats.coverage}/${rightStats.maximumGapPx}px)`,
       );
-      return {
-        ruleY,
-        resultY,
-        top,
-        bottom,
-        left: projectedLeft,
-        right: projectedRight,
-        leftCoverage: leftStats.coverage,
-        leftMaximumGapPx: leftStats.maximumGapPx,
-        rightCoverage: rightStats.coverage,
-        rightMaximumGapPx: rightStats.maximumGapPx,
-      };
+      return { ruleId: anchor.id, ruleY: y, left, right };
     });
-    return { page, path: pageArtifact.path, anchors };
+    return { page, rows, header, caption };
   });
-  const anchors = pages.flatMap((page) => page.anchors);
-  assert.equal(anchors.length, expectedRecords, `coverage text-anchor inventory drift: detected ${anchors.length}/${expectedRecords}`);
-
-  assert.equal(pdf.boxClosureChecks.expectedRecords, expectedRecords, `${pdf.cell}: reported box inventory input drift`);
-  assert.equal(pdf.boxClosureChecks.detectedRecords, expectedRecords, `${pdf.cell}: renderer did not detect every coverage box`);
-  assert.equal(pdf.boxClosureChecks.minimumHorizontalCoverage, minimumHorizontalCoverage, `${pdf.cell}: horizontal frame threshold drift`);
-  assert.equal(pdf.boxClosureChecks.minimumEdgeCoverage, minimumEdgeCoverage, `${pdf.cell}: box edge threshold drift`);
-  assert.equal(pdf.boxClosureChecks.maximumEdgeGapPx, maximumEdgeGapPx, `${pdf.cell}: box edge gap threshold drift`);
-  const reportedBoxes = pdf.boxClosureChecks.pages.flatMap((page) => page.boxes);
-  assert.equal(reportedBoxes.length, expectedRecords, `${pdf.cell}: reported box detail inventory drift`);
-  assert.ok(
-    reportedBoxes.every((box) =>
-      box.leftCoverage >= minimumEdgeCoverage && box.leftMaximumGapPx <= maximumEdgeGapPx &&
-      box.rightCoverage >= minimumEdgeCoverage && box.rightMaximumGapPx <= maximumEdgeGapPx
-    ),
-    `${pdf.cell}: renderer reported an open coverage edge`,
-  );
+  const detected = pages.reduce((sum, page) => sum + page.rows.length, 0);
+  assert.equal(detected, expectedRows, `${label}: coverage row text inventory drift: detected ${detected}/${expectedRows}`);
+  for (const page of pages.filter((candidate) => candidate.rows.length > 0)) {
+    assert.ok(page.header, `${label}: page ${page.page} carries coverage rows without the table header`);
+    if (!page.caption) assert.ok(page.rows.length >= 2, `${label}: page ${page.page} continues the table with ${page.rows.length} row`);
+  }
+  assert.equal(reported.detectedRows, expectedRows, `${label}: renderer row inventory drift`);
+  assert.equal(reported.minimumEdgeCoverage, minimumEdgeCoverage, `${label}: row rule threshold drift`);
+  assert.equal(reported.maximumEdgeGapPx, maximumEdgeGapPx, `${label}: row rule gap threshold drift`);
   for (const page of pages) {
-    const reported = pdf.boxClosureChecks.pages.find((candidate) => candidate.page === page.page);
-    assert.ok(reported, `${pdf.cell}: renderer omitted box details for page ${page.page}`);
-    assert.equal(reported.path, page.path, `${pdf.cell}: renderer box page path drift`);
-    assert.equal(reported.boxes.length, page.anchors.length, `${pdf.cell}: renderer/PDF-anchor page inventory drift`);
-    const orderedReported = [...reported.boxes].sort((a, b) => a.top - b.top);
-    for (const [index, anchor] of page.anchors.entries()) {
-      const box = orderedReported[index];
-      for (const coordinate of ["top", "bottom", "left", "right"]) {
-        assert.ok(
-          Math.abs(box[coordinate] - anchor[coordinate]) <= 2,
-          `${pdf.cell}: renderer ${coordinate} geometry disagrees with independent PDF-anchor frame on page ${page.page}`,
-        );
+    const other = reported.pages.find((candidate) => candidate.page === page.page);
+    assert.ok(other, `${label}: renderer omitted row details for page ${page.page}`);
+    assert.deepEqual(other.rows.map((row) => row.ruleId), page.rows.map((row) => row.ruleId), `${label}: renderer/PDF row order drift on page ${page.page}`);
+    for (const [index, row] of page.rows.entries()) {
+      for (const coordinate of ["ruleY", "left", "right"]) {
+        assert.ok(Math.abs(other.rows[index][coordinate] - row[coordinate]) <= 2,
+          `${label}: renderer ${coordinate} of row ${row.ruleId} disagrees with the independent raster reading on page ${page.page}`);
       }
+      assert.ok(other.rows[index].leftCoverage >= minimumEdgeCoverage && other.rows[index].rightCoverage >= minimumEdgeCoverage,
+        `${label}: renderer reported an open row rule`);
     }
   }
-  return {
-    expectedRecords,
-    verifiedAnchors: anchors.length,
-    minimumHorizontalCoverage,
-    minimumEdgeCoverage,
-    maximumEdgeGapPx,
-    pages,
-  };
+  return { pagesWithRows: pages.filter((page) => page.rows.length > 0).map((page) => page.page) };
+}
+
+function independentlyCheckPageContent(pdf, raster) {
+  const pdfPath = resolve(output, pdf.path);
+  const pages = raster.pages.map((pageArtifact, index) => {
+    const page = index + 1;
+    const pageText = run("pdftotext", ["-f", String(page), "-l", String(page), "-layout", pdfPath, "-"]);
+    return {
+      page,
+      firstToken: pageText.trim().match(/^\S+/u)?.[0] ?? null,
+      nonWhitespaceCharacters: pageText.replace(/\s/gu, "").length,
+      ink: independentlyRasterInkBounds(resolve(output, pageArtifact.path)),
+    };
+  });
+  const emptyNonCoverPages = pages.filter((page) => page.page > 1 && page.nonWhitespaceCharacters === 0).map((page) => page.page);
+  assert.deepEqual(emptyNonCoverPages, [], `${pdf.cell}: empty non-cover page`);
+  return { pages, emptyNonCoverPages };
 }
 
 function independentlyRasterInkBounds(path) {
@@ -232,47 +188,16 @@ function independentlyRasterInkBounds(path) {
   return { topPx: bottomPx === 0 ? null : topPx, bottomPx, pageHeightPx: decoded.height };
 }
 
-function independentlyCheckTerminalPageContent(pdf, raster) {
-  const pdfPath = resolve(output, pdf.path);
-  const pages = raster.pages.map((pageArtifact, index) => {
-    const page = index + 1;
-    const pageText = run("pdftotext", ["-f", String(page), "-l", String(page), "-layout", pdfPath, "-"]);
-    return {
-      page,
-      firstToken: pageText.trim().match(/^\S+/u)?.[0] ?? null,
-      nonWhitespaceCharacters: pageText.replace(/\s/gu, "").length,
-      coverageRecords: (pageText.match(/^\s*RULE\s*$/gmu) ?? []).length,
-      ink: independentlyRasterInkBounds(resolve(output, pageArtifact.path)),
-    };
-  });
-  const emptyNonCoverPages = pages.filter((page) => page.page > 1 && page.nonWhitespaceCharacters === 0).map((page) => page.page);
-  const terminal = pages.at(-1);
-  const previous = pages.at(-2);
-  const continuesCoverage = Boolean(terminal && previous && terminal.firstToken === "RULE" && previous.coverageRecords > 0);
-  const minimumTerminalCoverageRecords = continuesCoverage ? Math.max(1, Math.ceil(previous.coverageRecords / 2)) : 0;
-  const expectedMinimumInkBottomPx = continuesCoverage
-    ? Math.round(previous.ink.bottomPx * minimumTerminalCoverageRecords / previous.coverageRecords)
-    : 0;
-  const underfilledCoverageContinuation = Boolean(
-    continuesCoverage && terminal &&
-    terminal.coverageRecords < minimumTerminalCoverageRecords &&
-    terminal.ink.bottomPx < expectedMinimumInkBottomPx
-  );
-  assert.deepEqual(emptyNonCoverPages, [], `${pdf.cell}: empty non-cover page`);
-  assert.equal(underfilledCoverageContinuation, false, `${pdf.cell}: underfilled terminal coverage continuation`);
-  return {
-    pages,
-    emptyNonCoverPages,
-    terminalCoverage: {
-      continuesCoverage,
-      previousCoverageRecords: previous?.coverageRecords ?? 0,
-      terminalCoverageRecords: terminal?.coverageRecords ?? 0,
-      minimumTerminalCoverageRecords,
-      terminalInkBottomPx: terminal?.ink.bottomPx ?? 0,
-      expectedMinimumInkBottomPx,
-      underfilledCoverageContinuation,
-    },
-  };
+/** The recorded DOM geometry of every coverage table: aligned columns, no overflowing cell. */
+function assertRecordedTableGeometry(tables, label) {
+  assert.ok(Array.isArray(tables) && tables.length > 0, `${label}: no coverage table geometry recorded`);
+  for (const table of tables) {
+    for (const column of table.columns) {
+      assert.ok(column.spreadPx !== null && column.spreadPx <= 1 && column.headerDeltaPx !== null && column.headerDeltaPx <= 1 && column.bodyAlign.length === 1,
+        `${label}: coverage column ${column.column} misaligned`);
+    }
+    assert.deepEqual(table.overflowingCells, [], `${label}: coverage cell overflows its column`);
+  }
 }
 
 /**
@@ -419,14 +344,13 @@ function printVisibleContract(state) {
   assert.equal(pdf.printSemantics.trustLabelLines, 1, `print/${state}: Coverage Trust label split across lines`);
   assert.equal(pdf.printSemantics.trustValueOverflowPx, 0, `print/${state}: Coverage Trust verdict is not fully visible inside its card`);
   assert.equal(pdf.printSemantics.trustSiblingOverlapPx, 0, `print/${state}: Coverage Trust verdict overlaps its sibling summary card`);
-  assert.equal(pdf.printSemantics.coverageListDisplay, "block", `print/${state}: coverage list fragmentation context drift`);
-  assert.ok(pdf.printSemantics.coverageRecordDisplay.every((value) => value === "flow-root"), `print/${state}: coverage record uses a fragment-prone layout context`);
-  assert.ok(pdf.printSemantics.coverageMaxCellsPerRow.every((count) => count <= 2), `print/${state}: coverage print columns are compressed`);
-  assert.ok(pdf.printSemantics.coverageRecordBreakInside.every((value) => ["avoid", "avoid-page"].includes(value)), `print/${state}: coverage row may fragment`);
-  assert.deepEqual(pdf.printSemantics.overflowingCoverageCells, [], `print/${state}: coverage cell overflows its column`);
-  assert.deepEqual(pdf.pageStartChecks, independentlyCheckCoveragePageStarts(pdf, raster), `print/${state}: page-start raster invariant drift`);
-  assert.deepEqual(pdf.pageContentChecks, independentlyCheckTerminalPageContent(pdf, raster), `print/${state}: terminal-page content invariant drift`);
-  independentlyCheckCoverageBoxClosure(pdf, raster, pdf.printSemantics.coverageRecordCount);
+  assert.equal(pdf.printSemantics.horizontalOverflowPx, 0, `print/${state}: content overflows the A4 content box, so Chrome scales the printed document`);
+  assertRecordedTableGeometry(pdf.printSemantics.coverageTables, `print/${state}`);
+  assert.ok(pdf.printSemantics.coverageTables.every((table) => table.rowBreakInside.every((value) => ["avoid", "avoid-page"].includes(value))), `print/${state}: coverage row may fragment`);
+  assert.ok(pdf.printSemantics.coverageTables.every((table) => table.heightPx <= (297 - 24) / 25.4 * 96 / 2), `print/${state}: coverage table taller than half a page`);
+  assert.deepEqual(pdf.pageContentChecks, independentlyCheckPageContent(pdf, raster), `print/${state}: page content invariant drift`);
+  const rows = independentlyCheckCoverageRows(resolve(output, pdf.path), raster.pages, pdf.printSemantics.coverageRowCount, pdf.rowChecks, `print/${state}`);
+  assert.ok(rows.pagesWithRows.length <= 2, `print/${state}: 13 coverage rows span ${rows.pagesWithRows.length} pages`);
   if (state === "clean") independentlyCheckPositiveApparatusGrouping(pdf);
   return {
     pages: pdf.pages,
@@ -434,45 +358,50 @@ function printVisibleContract(state) {
     contrast: pdf.contrast,
     fonts: pdf.fonts,
     printSemantics: pdf.printSemantics,
-    pageStartChecks: pdf.pageStartChecks,
     pageContentChecks: pdf.pageContentChecks,
-    boxClosureChecks: pdf.boxClosureChecks,
+    rowChecks: pdf.rowChecks,
     rasterPages: raster.pages.map((page) => ({ sha256: page.sha256, dimensions: page.dimensions })),
   };
 }
 
-function verifyBackgroundDisabledProbe() {
-  assert.ok(Array.isArray(manifest.technicalProbes), "technical report-surface probes are missing");
-  assert.equal(manifest.technicalProbes.length, 1, "exactly one background-disabled technical probe is required");
-  const probe = manifest.technicalProbes[0];
-  assert.equal(probe.id, "print-background-disabled/insufficient-coverage");
-  assert.equal(probe.state, "insufficient-coverage");
-  assert.equal(probe.printBackground, false, "background-disabled probe was rendered with background graphics");
-  assert.equal(probe.coverageRecordCount, 13, "background-disabled probe coverage inventory drift");
-  assert.equal(probe.shortCoverageRecordCount, 1, "background-disabled probe must include the strong-border warning variant");
+function verifyProbeFiles(probe) {
   const pdfPath = resolve(output, probe.pdf.path);
-  assert.equal(existsSync(pdfPath), true, `background-disabled probe PDF missing: ${probe.pdf.path}`);
-  assert.equal(hash(pdfPath), probe.pdf.sha256, "background-disabled probe PDF hash drift");
-  assert.ok(probe.pdf.bytes > 1_000, "background-disabled probe PDF is implausibly small");
-  assert.equal(probe.pdf.pages, probe.rasterPages.length, "background-disabled probe PDF/raster page-count mismatch");
-  assert.match(probe.pdf.pageSize, /A4|594\.9\d* x 841\.9\d* pts/iu, "background-disabled probe is not A4");
+  assert.equal(existsSync(pdfPath), true, `${probe.id}: probe PDF missing: ${probe.pdf.path}`);
+  assert.equal(hash(pdfPath), probe.pdf.sha256, `${probe.id}: probe PDF hash drift`);
+  assert.ok(probe.pdf.bytes > 1_000, `${probe.id}: probe PDF is implausibly small`);
+  assert.equal(probe.pdf.pages, probe.rasterPages.length, `${probe.id}: probe PDF/raster page-count mismatch`);
+  assert.match(probe.pdf.pageSize, /A4|594\.9\d* x 841\.9\d* pts/iu, `${probe.id}: probe is not A4`);
   for (const page of probe.rasterPages) {
     const path = resolve(output, page.path);
-    assert.equal(existsSync(path), true, `background-disabled probe raster missing: ${page.path}`);
-    assert.equal(hash(path), page.sha256, `background-disabled probe raster hash drift: ${page.path}`);
-    assert.ok(page.bytes > 1_000, `background-disabled probe raster is implausibly small: ${page.path}`);
+    assert.equal(existsSync(path), true, `${probe.id}: probe raster missing: ${page.path}`);
+    assert.equal(hash(path), page.sha256, `${probe.id}: probe raster hash drift: ${page.path}`);
+    assert.ok(page.bytes > 1_000, `${probe.id}: probe raster is implausibly small: ${page.path}`);
     const decoded = PNG.sync.read(readFileSync(path), { checkCRC: true });
-    assert.deepEqual(page.dimensions, { width: decoded.width, height: decoded.height }, `background-disabled raster dimensions drift: ${page.path}`);
+    assert.deepEqual(page.dimensions, { width: decoded.width, height: decoded.height }, `${probe.id}: raster dimensions drift: ${page.path}`);
   }
-  independentlyCheckCoverageBoxClosure(
-    {
-      cell: "technical/print-background-disabled/insufficient-coverage",
-      path: probe.pdf.path,
-      boxClosureChecks: probe.boxClosureChecks,
-    },
-    { pages: probe.rasterPages },
-    probe.coverageRecordCount,
-  );
+  return pdfPath;
+}
+
+function verifyTechnicalProbes() {
+  assert.ok(Array.isArray(manifest.technicalProbes), "technical report-surface probes are missing");
+  assert.deepEqual(manifest.technicalProbes.map((probe) => probe.id).sort(),
+    ["print-background-disabled/insufficient-coverage", "print-long-coverage-table/clean"], "technical probe inventory drift");
+  const background = manifest.technicalProbes.find((probe) => probe.id === "print-background-disabled/insufficient-coverage");
+  assert.equal(background.state, "insufficient-coverage");
+  assert.equal(background.printBackground, false, "background-disabled probe was rendered with background graphics");
+  assert.equal(background.coverageRowCount, 13, "background-disabled probe coverage inventory drift");
+  assert.equal(background.shortCoverageRowCount, 1, "background-disabled probe must include the below-floor row");
+  const backgroundPdf = verifyProbeFiles(background);
+  assert.equal((run("pdftotext", ["-layout", backgroundPdf, "-"]).match(/Below floor/gu) ?? []).length, background.belowFloorWordsInText,
+    "background-disabled probe: below-floor wording drift");
+  assert.ok(background.belowFloorWordsInText >= 1, "background-disabled probe: the below-floor state is not carried in words");
+  independentlyCheckCoverageRows(backgroundPdf, background.rasterPages, background.coverageRowCount, background.rowChecks, background.id);
+  const long = manifest.technicalProbes.find((probe) => probe.id === "print-long-coverage-table/clean");
+  assert.equal(long.printBackground, true);
+  assert.ok(long.coverageRowCount >= 60, "long-table probe no longer carries a long table");
+  const longPdf = verifyProbeFiles(long);
+  const longRows = independentlyCheckCoverageRows(longPdf, long.rasterPages, long.coverageRowCount, long.rowChecks, long.id);
+  assert.ok(longRows.pagesWithRows.length >= 2, "long-table probe does not continue onto a second page, so header repetition is untested");
 }
 
 function assertUtcTimestamp(value, message) {
@@ -526,7 +455,7 @@ const currentReviewInput = assertCurrentReviewInput(manifest.reviewInputFingerpr
 // Both modes read the ledger structurally first: a malformed historical record is a defect in
 // either mode, and a recorded FAIL is valid evidence in both.
 validateReviewLedger(ledger);
-verifyBackgroundDisabledProbe();
+verifyTechnicalProbes();
 assert.deepEqual(manifest.reviewInputs, currentReviewInput.files, "render manifest input inventory does not match an independent current-worktree reconstruction");
 runReviewInputMutationControl(manifest.reviewInputFingerprint, reviewInputRoot);
 assert.equal(manifest.artifacts.length, 32, "the surface matrix must contain exactly 32 review cells");
@@ -586,12 +515,12 @@ for (const artifact of manifest.artifacts) {
 assert.ok(pixelMutationControl, "screen pixel mutation control did not run");
 assert.ok(fontMutationControl, "PDF font mutation control did not run");
 
-// The printed inventory grew from 32 page rasters to 43 in this release, and the growth is the
-// release: every finding now carries a remediation box and, where the advice is untested, the
-// sentence that says so. Measured per state: clean 5, findings 12, infrastructure 13,
-// insufficient-coverage 13. The number is pinned rather than derived so that a report which
-// silently doubles in length is a failing gate and not a shrug.
-assert.deepEqual(manifest.physicalArtifacts, { screens: 24, pdfs: 4, rasterPages: 43 }, "the report-surface inventory must be exactly 24 screens, 4 PDFs and 43 PDF page rasters");
+// The printed inventory is pinned rather than derived, so that a report which silently doubles in
+// length is a failing gate and not a shrug. History: 32 page rasters; 43 in 0.6.0 when every finding
+// gained a remediation box; 31 when coverage became one aligned table instead of thirteen six-label
+// cards (measured per state: clean 5 -> 2, findings 12 -> 9, infrastructure 13 -> 10,
+// insufficient-coverage 13 -> 10 on Chromium 141 / linux).
+assert.deepEqual(manifest.physicalArtifacts, { screens: 24, pdfs: 4, rasterPages: 31 }, "the report-surface inventory must be exactly 24 screens, 4 PDFs and 31 PDF page rasters");
 
 const latestRound = describeLatestRound(ledger, currentReviewInput.fingerprint);
 // The human gate's state belongs where a release reader looks, not only in a log line.

@@ -29,18 +29,18 @@ const controls = [
     name: "broken-tail-cohesion",
     state: "findings",
     expect: /underfilled terminal coverage continuation/u,
-    // The phase this control must reproduce, pinned. It releases the tail bracket and forces four
-    // records per page against thirteen rules, so the terminal page carries exactly one. Should the
-    // rule count stop leaving a remainder of one, the mutation would still run and still exit 1 for
-    // the wrong reason — or go green — and this assertion is what says so out loud instead.
-    phase: /"previousCoverageRecords":4,"terminalCoverageRecords":1/u,
-    phaseHint: "the forced phase no longer leaves one record on the terminal page; " +
-      "re-derive the nth-child stride in render-report-surfaces.mjs from the current rule count",
+    // The phase this control must reproduce, pinned: exactly one row on the continuation page.
+    // Should the forced break stop producing it, the mutation could still exit 1 for another
+    // reason — or go green — and this assertion is what says so out loud instead.
+    phase: /"rows":1\}/u,
+    phaseHint: "the forced break no longer leaves one row on a continuation page; re-derive the control from the current table",
   },
-  { name: "broken-box-closure", state: "insufficient-coverage", expect: /coverage boxes have an open physical edge/u, sides: ["right"] },
-  { name: "broken-partial-box-closure", state: "insufficient-coverage", expect: /coverage boxes have an open physical edge/u, sides: ["right"] },
-  { name: "broken-left-box-closure", state: "insufficient-coverage", expect: /coverage boxes have an open physical edge/u, sides: ["left"] },
-  { name: "broken-partial-both-box-closure", state: "insufficient-coverage", expect: /coverage boxes have an open physical edge/u, sides: ["left", "right"] },
+  { name: "broken-row-rule", state: "insufficient-coverage", expect: /coverage row rule is open/u, sides: ["left", "right"] },
+  { name: "broken-right-row-rule", state: "insufficient-coverage", expect: /coverage row rule is open/u, sides: ["right"] },
+  { name: "broken-left-row-rule", state: "insufficient-coverage", expect: /coverage row rule is open/u, sides: ["left"] },
+  { name: "broken-both-row-rule", state: "insufficient-coverage", expect: /coverage row rule is open/u, sides: ["left", "right"] },
+  { name: "broken-column-alignment", state: "findings", expect: /coverage column 3 misaligned/u },
+  { name: "broken-header-repeat", state: "clean", expect: /long coverage table: continuation page lacks the table header/u },
   {
     name: "broken-soft-contrast",
     state: "findings",

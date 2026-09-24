@@ -57,15 +57,22 @@ references remain visible as inert text.
 ## Responsive and print behaviour
 
 - Findings never use a table or horizontal scrolling.
-- Coverage uses per-document definition lists that collapse to one column on narrow screens.
+- Coverage is one aligned table per document: the document path and verdict are the caption, the
+  rule id is the row header, candidates, measured, not measured, coverage and floor are
+  right-aligned tabular numbers, and the result is text — "Below floor" in words, weight and colour,
+  with a strong edge on its row header. It replaced one six-label card per rule (78 repeated labels
+  for 13 rules, five printed pages). On narrow screens (≤ 30 rem) the same table becomes a two-line
+  grid per row on one shared five-column template, so columns still align and nothing scrolls
+  sideways.
 - Body text remains 16 CSS pixels and long paths may wrap anywhere.
 - Keyboard focus uses a visible three-pixel-equivalent outline.
 - The report follows the operating-system light/dark preference and honours reduced motion.
 - Print forces the light palette, uses an A4 page with 12 mm margins and keeps finding evidence in
-  the normal vertical flow. Compact findings, labels and coverage records stay together. Coverage
-  reflows to one full-width rule label followed by at most two value columns, so measured and
-  not-measured values cannot be compressed into colliding columns. A finding taller than one page
-  may still split instead of creating a clipped or missing continuation.
+  the normal vertical flow. Compact findings stay together; a finding taller than one page may
+  still split instead of creating a clipped or missing continuation. A coverage row never splits,
+  the column header repeats on a continuation page, and the last two rows of a table never part.
+  Printed content never exceeds the 703 CSS px content box: wider content makes Chrome scale the
+  whole printed document down to fit, silently.
 - The redundant screen footer is omitted from print so it cannot become an otherwise empty page.
 - The clean-state empty-findings explanation remains available on screen but is omitted from print;
   the clean verdict already carries the same information and the duplicate block must not push one
@@ -267,34 +274,43 @@ already human-reviewed. The strict local gate remains red until a real reviewer 
 inputs.
 
 Print verification is outcome-level as well as structural. The renderer measures the actual print
-layout at the A4 content width, requires the Coverage Trust verdict to remain on one line, fit completely inside its own
-card and have zero bounding-box overlap with the neighbouring summary card. It limits coverage
-values to two columns and rejects overflow. Each rasterized page is then checked independently: a coverage record
-that starts a page must begin with its complete top border, and a page may not begin with a detached
-coverage value. Every wide coverage card must also have continuous visible left and right raster
-edges. This is an outcome check rather than a computed-style assertion: Chrome can report a physical
-right border on a paged `flow-root` containing floats while omitting that edge from the PDF. The
-renderer associates every `RULE`/`RESULT` PDF text pair with its nearest long horizontal raster
-strokes and measures both physical sides between those frame rows. The verifier independently
-projects the A4 content edges, finds the enclosing full-width raster rows around each text pair,
-remeasures both full-height sides and cross-checks the renderer geometry. Neither oracle relies on
-a global count of anonymous card-like rectangles or a fixed card-height band. Both require at least
-98% edge coverage and reject any contiguous gap longer than two raster rows. The raster DPI is pinned
-to 110 in both oracles. The inner repair is a real child border rather than a background fill. A
-separate technical A4 probe renders the insufficient-coverage state with `printBackground: false`,
-including its strong-left-border warning card, and both oracles must still measure all 13 cards as
-closed; this probe is not an additional human-review cell. The complete visible contract is bound to
-the review fingerprint. A CI mutation runner executes four genuine failing renderer processes for a
-missing whole right edge, a missing whole left edge, a missing lower right fifth and simultaneously
-missing lower fifths on both sides, and requires the named side or sides to cross both rejection
-thresholds. A
-deliberately fragment-prone print mutation must likewise make the gate fail.
+layout at the A4 content width, requires the Coverage Trust verdict to remain on one line, fit
+completely inside its own card and have zero bounding-box overlap with the neighbouring summary
+card, and rejects any horizontal overflow of the content box.
 
-The terminal-page density gate uses report structure rather than a global pixel quota. It rejects
-empty non-cover pages. When the final page continues an atomic sequence of coverage cards, it must
-carry at least half as many cards as the preceding coverage page, rounded up, unless its visible
-raster ink reaches the corresponding proportional depth. This permits genuinely short reports and
-tall individual cards while blocking the reproducible four-cards-plus-one nearly empty continuation.
+Coverage tables are checked in the DOM in every screen cell and in print: for every column, each
+body cell's text edge — the end edge for a right-aligned column, the start edge otherwise — lies
+within 1 px of the others and of the column header's (the header comparison matters: the canonical
+counts are single digits, so a body-only comparison could not see a numeric column that lost its
+alignment); no cell overflows; in print every row is `break-inside: avoid` and a 13-row table is at
+most half an A4 content box tall (measured 475.7 of 1031.8 CSS px).
 
+Each rasterized page is then checked from the PDF itself. The renderer anchors every printed row by
+its rule id and result on one PDF text line; the verifier independently reads rows from the
+`-layout` text and projects the A4 content edges. Both require every row to be found exactly once,
+every page carrying rows to show the column header above its first row, every continuation (a page
+with rows but no caption) to carry at least two rows, and each row to be closed by its rule: the
+raster rule below the row must cover at least 98 % of each half of the table width with no gap
+longer than two raster rows at 110 DPI. The verifier cross-checks the renderer's rows, rule
+positions and table edges within 2 raster px. Thirteen rules span at most two pages.
+
+Two technical A4 probes, which are not human-review cells, cover what the canonical states cannot:
+the insufficient-coverage state printed with `printBackground: false` must still close all 13 rows
+and carry "Below floor" in words (colour is never the only carrier of state), and a long-table probe
+(one document, 73 coverage rows) must continue across pages with its header repeated on every page.
+The complete visible contract is bound to the review fingerprint.
+
+A CI mutation runner (`npm run test:report-surface-mutants`) executes a genuine failing renderer
+process per negative control and requires the expected failure message; the renderer's control
+table and the runner's list are held against each other. The coverage controls replaced the
+card-era ones one for one when coverage became a table: a wrapped trust verdict with a compressed
+table (`broken-coverage`), a four-column trust grid (`broken-trust-geometry`), a forced one-row
+continuation (`broken-tail-cohesion`, pinned to that phase), four physical row-rule controls — a
+whole rule, its right half, its left half and both (`broken-row-rule`, `broken-right-row-rule`,
+`broken-left-row-rule`, `broken-both-row-rule`, each required to cross both thresholds on the named
+side) — and, new with the table, a numeric column losing its alignment (`broken-column-alignment`)
+and a header that stops repeating (`broken-header-repeat`, on the long-table probe).
+
+Page content checks reject empty non-cover pages.
 
 The portable bundle keeps `report.json` as the historical capture record. `context.json` adds `bundleEvidence` contract version 1 with current per-finding asset availability; `bundle.json` lists every copied PNG/PDF and its SHA-256 and byte length. A missing or tampered local asset remains `missing-or-integrity-failed` in both HTML and AI context. A historical report comparison is not a fresh verification of local bundle assets. Overflow crops show the visible intersection while preserving the original target coordinates.

@@ -112,67 +112,65 @@ ${list}
 
 type HtmlCoverageRow = ReturnType<typeof buildHtmlReportModel>["coverage"][number]["rows"][number];
 
-function renderCoverageRecord(row: HtmlCoverageRow): string {
-  return `<dl class="coverage-record${row.ok ? "" : " short"}" id="${esc(row.id)}">
-  <div><dt>Rule</dt><dd><code>${esc(row.ruleId)}</code></dd></div>
-  <div><dt>Candidates</dt><dd class="mono">${row.candidates}</dd></div>
-  <div><dt>Measured</dt><dd class="mono">${row.measured}</dd></div>
-  <div><dt>Not measured</dt><dd class="mono">${row.notMeasured}</dd></div>
-  <div><dt>Coverage / floor</dt><dd class="mono">${esc(row.ratio)} / ${esc(row.floor)}</dd></div>
-  <div><dt>Result</dt><dd class="coverage-result${row.ok ? "" : " short"}">${row.ok ? "Coverage met" : "Below floor"}</dd></div>
-</dl>`;
+const COVERAGE_COLUMNS = `<tr>
+    <th scope="col" class="rule">Rule</th>
+    <th scope="col" class="num">Candi&shy;dates</th>
+    <th scope="col" class="num">Measured</th>
+    <th scope="col" class="num">Not measured</th>
+    <th scope="col" class="num">Coverage</th>
+    <th scope="col" class="num">Floor</th>
+    <th scope="col" class="result">Result</th>
+  </tr>`;
+
+function renderCoverageRow(row: HtmlCoverageRow): string {
+  const ratio = row.ratio === "Not applicable"
+    ? `<abbr title="Not applicable: no candidates">n/a</abbr>`
+    : esc(row.ratio);
+  return `<tr id="${esc(row.id)}"${row.ok ? "" : ` class="short"`}>
+    <th scope="row" class="rule"><code>${esc(row.ruleId)}</code></th>
+    <td class="num">${row.candidates}</td>
+    <td class="num">${row.measured}</td>
+    <td class="num">${row.notMeasured}</td>
+    <td class="num">${ratio}</td>
+    <td class="num">${esc(row.floor)}</td>
+    <td class="result"><span class="coverage-result${row.ok ? "" : " short"}">${row.ok ? "Coverage met" : "Below floor"}</span></td>
+  </tr>`;
 }
 
 /**
- * Coverage records are equal-height boxes that must not fragment, so a printed report packs a whole
- * number of them per page and the terminal page carries `rows mod perPage`. When that remainder is
- * one, the report ends on a page holding a single record — measured on the four canonical surface
- * states: twelve pages, ninety-three non-whitespace characters on the last. Which remainder occurs
- * is not a property of the coverage section at all; it is decided by where the findings section
- * above it happens to end, so any unrelated content change can produce it.
+ * One aligned table per document: rule id as the row header, the counts, coverage and floor as
+ * right-aligned numeric columns, the result as text. It replaced one six-label card per rule
+ * (13 rules, 78 repeated labels, five printed pages).
  *
- * The last two records are therefore bracketed in a container that may not break. It changes no
- * flow height, so it cannot shift pagination elsewhere, and it only acts when the last two records
- * would otherwise be split — at every other remainder the pair already shares a page.
- *
- * The bracket holds exactly two records, and the gate's minimum is `ceil(perPage / 2)`. At the
- * measured capacity of four records per A4 page that minimum is two, so a bracket of two is
- * sufficient and a remainder of one is the only failing phase. It would NOT be sufficient at six
- * or more records per page, where the minimum rises to three. That is a real limit of this repair,
- * not a general guarantee: if the record box ever shrinks enough to fit six per page, the bracket
- * has to grow with `ceil(perPage / 2)`.
- *
- * `break-before: avoid` on the last record would say this more directly, but this
- * stylesheet has already measured that Blink does not honour avoid-between-siblings here — see the
- * note above `.apparatus-section` in html-styles.ts, where the same attempt put a heading alone on
- * one page and its card on the next. A non-breaking container is the technique that worked.
+ * The last two rows are a second `tbody` that may not break, so a printed table never continues
+ * onto a page with a single row. Rows are single-line and small, so which remainder reaches the
+ * terminal page depends on content far above the section; the bracket makes that phase harmless at
+ * no flow-height cost. `break-before: avoid` on the last row would say the same thing directly, and
+ * Blink does not honour avoid-between-siblings here (see `.apparatus-section` in html-styles.ts).
  */
-function renderCoverageRows(rows: readonly HtmlCoverageRow[]): string {
-  const records = rows.map(renderCoverageRecord);
-  if (records.length < 3) return records.join("\n");
-  return `${records.slice(0, -2).join("\n")}
-<div class="coverage-tail">
-${records.slice(-2).join("\n")}
-</div>`;
+function renderCoverageTable(document: ReturnType<typeof buildHtmlReportModel>["coverage"][number]): string {
+  const rows = document.rows.map(renderCoverageRow);
+  const body = rows.length < 3
+    ? `<tbody>\n  ${rows.join("\n  ")}\n</tbody>`
+    : `<tbody>\n  ${rows.slice(0, -2).join("\n  ")}\n</tbody>\n<tbody class="coverage-tail">\n  ${rows.slice(-2).join("\n  ")}\n</tbody>`;
+  return `<table class="coverage-table" id="${esc(document.id)}">
+<caption><span class="coverage-path mono">${esc(document.path)}</span> <span class="document-verdict">Document verdict: ${esc(document.verdict)}</span></caption>
+<thead>
+  ${COVERAGE_COLUMNS}
+</thead>
+${body}
+</table>`;
 }
 
 function renderCoverage(model: ReturnType<typeof buildHtmlReportModel>): string {
   const documents = model.coverage.length === 0
     ? `<div class="empty-state"><h3>Coverage unavailable</h3><p>No document coverage was produced by this run.</p></div>`
-    : `<ol class="coverage-documents">
-${model.coverage.map((document) => `<li>
-<article class="coverage-document" aria-labelledby="${esc(document.id)}-heading">
-  <h3 id="${esc(document.id)}-heading" class="mono">${esc(document.path)}</h3>
-  <p class="document-verdict">Document verdict: ${esc(document.verdict)}</p>
-  ${document.rows.length === 0
-    ? `<p>No rule coverage rows were produced for this document.</p>`
-    : `<div class="coverage-list" aria-label="Rule coverage for ${esc(document.path)}">
-${renderCoverageRows(document.rows)}
-</div>`}
-</article>
-</li>`).join("\n")}
-</ol>`;
-  return `<section aria-labelledby="coverage-heading">
+    : `<div class="coverage-documents">
+${model.coverage.map((document) => document.rows.length === 0
+    ? `<div class="empty-state" id="${esc(document.id)}"><h3 class="mono">${esc(document.path)}</h3><p>Document verdict: ${esc(document.verdict)}. No rule coverage rows were produced for this document.</p></div>`
+    : renderCoverageTable(document)).join("\n")}
+</div>`;
+  return `<section class="coverage-section" aria-labelledby="coverage-heading">
 <div class="section-heading">
   <h2 id="coverage-heading">Coverage details</h2>
   <p class="section-lead">Coverage is reported for every rule and document, including zero-candidate rules.</p>

@@ -13,7 +13,7 @@ import { PNG } from "pngjs";
 import { resolveBrowser } from "../../src/acquire/browser.ts";
 import { render } from "../../src/report/index.ts";
 import { REPORT_FONT_ROLES, REPORT_TEXT_CONTRAST_PAIRS, TOKEN_PREFIX } from "../../src/report/html-tokens.ts";
-import { canonicalReportStates } from "../fixtures/report-states.ts";
+import { canonicalReportStates, longCoverageReportState } from "../fixtures/report-states.ts";
 import {
   REQUIRED_BROWSER_RENDER_ARGS,
   REVIEW_ARTIFACT_CONTRACT_VERSION,
@@ -42,40 +42,45 @@ const BROWSER_RENDER_ARGS = [...REQUIRED_BROWSER_RENDER_ARGS];
  * holds it against its own expectations, so a control nobody runs cannot exist here unnoticed.
  */
 const SURFACE_CONTROLS = {
+  // The trust verdict wraps and the coverage table is forced into fixed columns too narrow for
+  // its rule ids: both must fail the print reflow contract.
   "broken-coverage": { print: `@media print {
     .summary-grid > div:first-child dd { overflow-wrap: anywhere !important; font-size: var(--bl-font-size-xl) !important; white-space: normal !important; }
-    .coverage-list { display: grid !important; }
-    .coverage-record { display: grid !important; grid-template-columns: minmax(11rem, 2fr) repeat(5, minmax(0, 1fr)) !important; break-inside: auto !important; page-break-inside: auto !important; }
-    .coverage-record > div:first-child { grid-column: auto !important; }
+    .coverage-table { table-layout: fixed !important; }
+    .coverage-table .rule { width: 4rem !important; }
   }` },
   "broken-trust-geometry": { print: `@media print {
     .report-header.state-insufficient-coverage + section .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
   }` },
-  // The terminal-density check only fires when the last page begins with a coverage record, and
-  // which remainder the pack leaves there depends on content far above the section. A control that
-  // relies on today's content would go green the day a finding gains a line, so this one forces the
-  // phase itself: it releases the tail bracket and breaks the page before records 1, 5, 9 and 13,
-  // leaving exactly one record on the terminal page.
+  // Replaces the card-era phase control: releases the two-row tail bracket and forces the last row
+  // onto a page of its own, whatever the content above it does — a continuation with one row.
   "broken-tail-cohesion": { print: `@media print {
     .coverage-tail { break-inside: auto !important; page-break-inside: auto !important; }
-    section[aria-labelledby="coverage-heading"] { break-before: page !important; }
-    .coverage-list > .coverage-record:nth-child(4n+1) { break-before: page !important; }
-    .coverage-tail > .coverage-record:last-child { break-before: page !important; }
+    .coverage-tail > tr:last-child { break-before: page !important; }
   }` },
-  "broken-box-closure": { print: `@media print {
-    .coverage-record::after { content: none !important; }
+  // Four physical controls on the printed row rules, replacing the four card-edge controls: a whole
+  // rule gone, the rule under the last column gone (right half open), under the first column gone
+  // (left half open), and both. Each must cross the 98 % / 2 px thresholds on the named side.
+  "broken-row-rule": { print: `@media print {
+    .coverage-table tbody tr:nth-child(5) > * { border-block-end-color: transparent !important; }
   }` },
-  "broken-partial-box-closure": { print: `@media print {
-    .coverage-record::after { inset-block-end: auto !important; block-size: 80% !important; }
+  "broken-right-row-rule": { print: `@media print {
+    .coverage-table tbody tr > :last-child { border-block-end-color: transparent !important; }
   }` },
-  "broken-left-box-closure": { print: `@media print {
-    .coverage-record { border-inline-start-color: transparent !important; }
+  "broken-left-row-rule": { print: `@media print {
+    .coverage-table tbody tr > :first-child { border-block-end-color: transparent !important; }
   }` },
-  "broken-partial-both-box-closure": { print: `@media print {
-    .coverage-record::after { inset-block-end: auto !important; block-size: 80% !important; }
-    .coverage-record::before { content: ""; position: absolute; z-index: 1; inset-inline-start: -4px;
-      inset-block-end: 0; inline-size: 10px; block-size: 20%; background: var(--bl-color-paper); }
+  "broken-both-row-rule": { print: `@media print {
+    .coverage-table tbody tr > :first-child, .coverage-table tbody tr > :last-child { border-block-end-color: transparent !important; }
   }` },
+  // One numeric column loses its end alignment. The canonical counts are single digits, so only
+  // the header comparison can see it.
+  "broken-column-alignment": {
+    screen: `.coverage-table td:nth-child(3) { text-align: start !important; }`,
+    print: `.coverage-table td:nth-child(3) { text-align: start !important; }`,
+  },
+  // The column header stops repeating on a continuation page (long-table probe).
+  "broken-header-repeat": { print: `@media print { .coverage-table thead { display: table-row-group !important; } }` },
   // Text on the soft background (alert, remediation box, frequency note) was not measured before
   // the token table named the pair. Darken only soft in print: every other pair stays AA.
   "broken-soft-contrast": { print: `@media print { :root { --bl-color-soft: #8C8C86 !important; } }` },
@@ -271,163 +276,184 @@ function run(command, args) {
   return result.stdout;
 }
 
-function longestDarkHorizontalRun(path, maxY = 120) {
-  const decoded = PNG.sync.read(readFileSync(path), { checkCRC: true });
-  let longest = 0;
-  for (let y = 0; y < Math.min(maxY, decoded.height); y += 1) {
-    let current = 0;
-    for (let x = 0; x < decoded.width; x += 1) {
-      const offset = (y * decoded.width + x) * 4;
-      const dark = decoded.data[offset] < 180 && decoded.data[offset + 1] < 180 && decoded.data[offset + 2] < 180;
-      current = dark ? current + 1 : 0;
-      longest = Math.max(longest, current);
-    }
-  }
-  return { pixels: longest, required: Math.ceil(decoded.width * 0.75) };
-}
+/** Millimetres of the A4 @page margin; the content box starts this far in on every side. */
+const PRINT_MARGIN_MM = 12;
+const PRINT_MARGIN_RASTER_PX = PRINT_MARGIN_MM / 25.4 * PRINT_RASTER_DPI;
+const PT_TO_RASTER = PRINT_RASTER_DPI / 72;
+const CSS_TO_RASTER = PRINT_RASTER_DPI / 96;
 
-function coveragePageStartChecks(pdfPath, rasterPages) {
-  return rasterPages.map((raster, index) => {
-    const page = index + 1;
-    const firstToken = run("pdftotext", ["-f", String(page), "-l", String(page), "-layout", pdfPath, "-"])
-      .trim()
-      .match(/^\S+/u)?.[0] ?? null;
-    const border = longestDarkHorizontalRun(join(OUTPUT, raster.path));
-    const beginsWithCoverageRecord = firstToken === "RULE";
-    const beginsWithCoverageFragment = firstToken !== null && firstToken !== "RULE" && firstToken.includes("/");
-    if (beginsWithCoverageFragment) {
-      throw new Error(`${raster.path}: page begins inside a coverage record at ${firstToken}`);
-    }
-    if (beginsWithCoverageRecord && border.pixels < border.required) {
-      throw new Error(`${raster.path}: coverage record begins at page top without its complete top border (${border.pixels}/${border.required}px)`);
-    }
-    return { page, firstToken, beginsWithCoverageRecord, beginsWithCoverageFragment, topHorizontalBorderPx: border.pixels, requiredBorderPx: border.required };
+/**
+ * Evaluated in the page for every screen cell and for print: the geometry of every coverage table.
+ * A column is aligned when every body cell's text edge — the end edge for a right-aligned column,
+ * the start edge otherwise — lies within 1 px of the others AND of its header's. The header
+ * comparison matters: the canonical counts are all single digits, so a body-only spread could not
+ * tell a numeric column that lost its alignment from one that kept it.
+ */
+function coverageTableGeometryInPage() {
+  const round = (value) => Math.round(value * 100) / 100;
+  const textEdge = (cell, side) => {
+    const range = document.createRange();
+    range.selectNodeContents(cell);
+    const rects = [...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0);
+    if (rects.length === 0) return null;
+    return side === "end" ? Math.max(...rects.map((rect) => rect.right)) : Math.min(...rects.map((rect) => rect.left));
+  };
+  return [...document.querySelectorAll(".coverage-table")].map((table) => {
+    const header = [...(table.tHead?.rows[0]?.cells ?? [])];
+    const rows = [...table.tBodies].flatMap((body) => [...body.rows]);
+    const columns = header.map((th, index) => {
+      const align = /^(?:end|right)$/u.test(getComputedStyle(th).textAlign) ? "end" : "start";
+      const edges = rows.map((row) => textEdge(row.cells[index], align)).filter((edge) => edge !== null);
+      const headerEdge = textEdge(th, align);
+      return {
+        column: index + 1,
+        align,
+        bodyAlign: [...new Set(rows.map((row) => getComputedStyle(row.cells[index]).textAlign))],
+        spreadPx: edges.length ? round(Math.max(...edges) - Math.min(...edges)) : null,
+        headerDeltaPx: edges.length && headerEdge !== null ? round(Math.max(...edges.map((edge) => Math.abs(edge - headerEdge)))) : null,
+      };
+    });
+    const rect = table.getBoundingClientRect();
+    return {
+      id: table.id,
+      rows: rows.length,
+      shortRows: rows.filter((row) => row.classList.contains("short")).length,
+      columns,
+      overflowingCells: rows.flatMap((row) => [...row.cells]
+        .filter((cell) => cell.scrollWidth > cell.clientWidth + 1)
+        .map((cell) => `${row.id}:${cell.cellIndex + 1}`)),
+      rowBreakInside: [...new Set(rows.map((row) => getComputedStyle(row).breakInside))],
+      heightPx: round(rect.height),
+      leftPx: round(rect.left),
+      rightPx: round(rect.right),
+    };
   });
 }
 
-function coverageBoxClosureChecks(pdfPath, rasterPages, expectedRecords) {
-  if (expectedRecords <= 0) throw new Error("coverage box inventory must not be empty");
+function assertCoverageTableGeometry(tables, label) {
+  if (tables.length === 0) throw new Error(`${label}: no coverage table rendered`);
+  for (const table of tables) {
+    for (const column of table.columns) {
+      if (column.spreadPx === null || column.headerDeltaPx === null || column.spreadPx > 1 || column.headerDeltaPx > 1 ||
+        column.bodyAlign.length !== 1) {
+        throw new Error(`${label}: coverage column ${column.column} misaligned: ${JSON.stringify(column)}`);
+      }
+    }
+    if (table.overflowingCells.length > 0) throw new Error(`${label}: coverage cells overflow: ${table.overflowingCells.join(", ")}`);
+  }
+}
+
+function pdfPageWords(pdfPath, page) {
+  const xml = run("pdftotext", ["-f", String(page), "-l", String(page), "-bbox-layout", pdfPath, "-"]);
+  return [...xml.matchAll(/<word xMin="([0-9.]+)" yMin="([0-9.]+)" xMax="([0-9.]+)" yMax="([0-9.]+)">([^<]+)<\/word>/gu)]
+    .map((match) => ({ xMin: Number(match[1]), yMin: Number(match[2]), xMax: Number(match[3]), yMax: Number(match[4]), text: match[5] }));
+}
+
+/**
+ * A printed coverage row, read from the PDF text: a rule id with its result ("… met" or
+ * "… floor") on the same baseline. That signature excludes rule ids in finding headings and in the
+ * coverage alert, which carry no result on their line.
+ */
+function coverageRowAnchors(words) {
+  return words
+    // A rule id is namespace/name, each at least two characters: "n/a" in a value column is not.
+    .filter((word) => /^[a-z][a-z0-9]+\/[a-z][a-z0-9-]+$/u.test(word.text))
+    .filter((id) => words.some((word) => /^(?:met|floor)$/u.test(word.text) && Math.abs(word.yMin - id.yMin) < 2 && word.xMin > id.xMax))
+    .sort((a, b) => a.yMin - b.yMin);
+}
+
+/**
+ * Outcome-level coverage print checks over the rasterized PDF pages, one pass per page:
+ * - every table row is found, and no more (rows cannot silently split or vanish);
+ * - every row is closed by its rule: the horizontal rule below the row covers ≥ 98 % of each half of
+ *   the table width with no gap longer than two raster rows. This replaced the per-card closed-edge
+ *   oracle; a table whose rules drop out in print is as unreadable as a card without its side;
+ * - every page carrying rows shows the column header above its first row (a continuation repeats
+ *   it), and a continuation — a page with rows but no table caption — carries at least two rows.
+ */
+function coverageRowChecks(pdfPath, rasterPages, expectedRows, tableEdgesCssPx, label) {
   const minimumEdgeCoverage = 0.98;
   const maximumEdgeGapPx = 2;
-  const minimumHorizontalCoverage = 0.95;
+  const left = Math.round(PRINT_MARGIN_RASTER_PX + tableEdgesCssPx.left * CSS_TO_RASTER);
+  const right = Math.round(PRINT_MARGIN_RASTER_PX + tableEdgesCssPx.right * CSS_TO_RASTER) - 1;
+  const middle = Math.round((left + right) / 2);
   const pages = rasterPages.map((raster, pageIndex) => {
     const page = pageIndex + 1;
+    const words = pdfPageWords(pdfPath, page);
+    const anchors = coverageRowAnchors(words);
+    const header = words.some((word) => word.text === "RULE" && words.some((other) => other.text === "RESULT" && Math.abs(other.yMin - word.yMin) < 2 &&
+      anchors.length > 0 && word.yMax < anchors[0].yMin));
+    const caption = words.some((word) => word.text === "verdict:");
     const decoded = PNG.sync.read(readFileSync(join(OUTPUT, raster.path)), { checkCRC: true });
     const dark = (x, y) => {
+      if (y < 0 || y >= decoded.height) return false;
       const offset = (y * decoded.width + x) * 4;
-      return decoded.data[offset] < 180 && decoded.data[offset + 1] < 180 &&
-        decoded.data[offset + 2] < 180 && decoded.data[offset + 3] > 0;
+      return decoded.data[offset] < 180 && decoded.data[offset + 1] < 180 && decoded.data[offset + 2] < 180 && decoded.data[offset + 3] > 0;
     };
-    const requiredHorizontalPixels = Math.floor(
-      PRINT_CONTENT_VIEWPORT.width * PRINT_RASTER_DPI / 96 * minimumHorizontalCoverage,
-    );
-    const rawRuns = [];
-    for (let y = 0; y < decoded.height; y += 1) {
-      let best = null;
-      let start = -1;
-      for (let x = 0; x <= decoded.width; x += 1) {
-        const on = x < decoded.width && dark(x, y);
-        if (on && start < 0) start = x;
-        if (!on && start >= 0) {
-          const run = { y, left: start, right: x - 1, length: x - start };
-          if (!best || run.length > best.length) best = run;
-          start = -1;
-        }
-      }
-      if (best && best.length >= requiredHorizontalPixels) rawRuns.push(best);
-    }
-    const strokes = [];
-    for (const run of rawRuns) {
-      const previous = strokes.at(-1);
-      if (
-        previous && run.y <= previous.bottom + 1 &&
-        Math.abs(run.left - previous.left) <= 2 && Math.abs(run.right - previous.right) <= 2
-      ) {
-        previous.bottom = run.y;
-        if (run.length > previous.length) Object.assign(previous, { left: run.left, right: run.right, length: run.length });
-      } else {
-        strokes.push({ top: run.y, bottom: run.y, left: run.left, right: run.right, length: run.length });
-      }
-    }
-    const xml = run("pdftotext", ["-f", String(page), "-l", String(page), "-bbox-layout", pdfPath, "-"]);
-    const words = [...xml.matchAll(
-      /<word xMin="([0-9.]+)" yMin="([0-9.]+)" xMax="([0-9.]+)" yMax="([0-9.]+)">([^<]+)<\/word>/gu,
-    )].map((match) => ({ yMin: Number(match[2]), yMax: Number(match[4]), text: match[5] }));
-    const rules = words.filter((word) => word.text === "RULE").sort((a, b) => a.yMin - b.yMin);
-    const results = words.filter((word) => word.text === "RESULT").sort((a, b) => a.yMin - b.yMin);
-    const anchors = rules.map((rule, index) => {
-      const nextRuleY = rules[index + 1]?.yMin ?? Number.POSITIVE_INFINITY;
-      const result = results.find((candidate) => candidate.yMin > rule.yMax && candidate.yMin < nextRuleY);
-      if (!result) throw new Error(`${raster.path}: RULE has no RESULT anchor before the next coverage card`);
-      return {
-        ruleY: Math.round((rule.yMin + rule.yMax) / 2 * PRINT_RASTER_DPI / 72),
-        resultY: Math.round((result.yMin + result.yMax) / 2 * PRINT_RASTER_DPI / 72),
-      };
-    });
-    const edgeStats = (x, top, bottom) => {
-      let rows = 0;
+    const halfStats = (y, from, to) => {
       let hits = 0;
-      let currentGapPx = 0;
+      let gap = 0;
       let maximumGapPx = 0;
-      for (let y = top; y <= bottom; y += 1) {
-        rows += 1;
-        const hit = [x - 2, x - 1, x, x + 1, x + 2]
-          .some((candidate) => candidate >= 0 && candidate < decoded.width && dark(candidate, y));
-        if (hit) {
+      for (let x = from; x <= to; x += 1) {
+        if (dark(x, y - 1) || dark(x, y) || dark(x, y + 1)) {
           hits += 1;
-          currentGapPx = 0;
+          gap = 0;
         } else {
-          currentGapPx += 1;
-          maximumGapPx = Math.max(maximumGapPx, currentGapPx);
+          gap += 1;
+          maximumGapPx = Math.max(maximumGapPx, gap);
         }
       }
-      return { coverage: hits / rows, maximumGapPx };
+      return { coverage: Math.round(hits / (to - from + 1) * 1_000) / 1_000, maximumGapPx };
     };
-    const boxes = anchors.map((anchor) => {
-      const top = strokes.filter((stroke) => stroke.bottom < anchor.ruleY).at(-1);
-      const bottom = strokes.find((stroke) => stroke.top > anchor.resultY);
-      if (!top || !bottom || top.bottom >= bottom.top) {
-        throw new Error(`${raster.path}: coverage text anchors have no enclosing horizontal frame`);
+    const rows = anchors.map((anchor, index) => {
+      const top = Math.ceil(anchor.yMax * PT_TO_RASTER);
+      const bottom = index + 1 < anchors.length ? Math.floor(anchors[index + 1].yMin * PT_TO_RASTER) : top + 30;
+      let ruleY = top;
+      let best = -1;
+      for (let y = top; y < Math.min(bottom, decoded.height); y += 1) {
+        let count = 0;
+        for (let x = left; x <= right; x += 1) if (dark(x, y)) count += 1;
+        if (count > best) {
+          best = count;
+          ruleY = y;
+        }
       }
-      if (Math.abs(top.left - bottom.left) > 2 || Math.abs(top.right - bottom.right) > 2) {
-        throw new Error(`${raster.path}: coverage frame sides do not align`);
-      }
-      const left = Math.round((top.left + bottom.left) / 2);
-      const right = Math.round((top.right + bottom.right) / 2);
-      const leftStats = edgeStats(left, top.bottom, bottom.top);
-      const rightStats = edgeStats(right, top.bottom, bottom.top);
+      const leftStats = halfStats(ruleY, left, middle - 1);
+      const rightStats = halfStats(ruleY, middle, right);
       return {
-        top: top.top,
-        bottom: bottom.bottom,
+        ruleId: anchor.text,
+        ruleY,
         left,
         right,
-        ruleY: anchor.ruleY,
-        resultY: anchor.resultY,
-        leftCoverage: Math.round(leftStats.coverage * 1_000) / 1_000,
+        leftCoverage: leftStats.coverage,
         leftMaximumGapPx: leftStats.maximumGapPx,
-        rightCoverage: Math.round(rightStats.coverage * 1_000) / 1_000,
+        rightCoverage: rightStats.coverage,
         rightMaximumGapPx: rightStats.maximumGapPx,
       };
     });
-    return { page, path: raster.path, boxes };
+    return { page, path: raster.path, rows, header, caption };
   });
-  const boxes = pages.flatMap((page) => page.boxes.map((box) => ({ page: page.page, path: page.path, ...box })));
-  if (boxes.length !== expectedRecords) {
-    throw new Error(`coverage box PDF-anchor inventory drift: detected ${boxes.length}/${expectedRecords}`);
-  }
-  const open = boxes.filter((box) =>
-    box.leftCoverage < minimumEdgeCoverage || box.leftMaximumGapPx > maximumEdgeGapPx ||
-    box.rightCoverage < minimumEdgeCoverage || box.rightMaximumGapPx > maximumEdgeGapPx
-  );
-  if (open.length > 0) {
-    throw new Error(`coverage boxes have an open physical edge: ${JSON.stringify(open)}`);
-  }
+  const rows = pages.flatMap((page) => page.rows.map((row) => ({ page: page.page, ...row })));
+  // Structure first, then the physical rules: a control that breaks the page structure must fail
+  // for that reason, not for the distorted rows a forced break can leave behind.
+  if (rows.length !== expectedRows) throw new Error(`${label}: coverage row PDF inventory drift: detected ${rows.length}/${expectedRows}`);
+  const withRows = pages.filter((page) => page.rows.length > 0);
+  const headerless = withRows.filter((page) => !page.header).map((page) => page.page);
+  if (headerless.length > 0) throw new Error(`${label}: continuation page lacks the table header: pages ${headerless.join(", ")}`);
+  const continuations = withRows.filter((page) => !page.caption).map((page) => ({ page: page.page, rows: page.rows.length }));
+  const underfilled = continuations.filter((continuation) => continuation.rows < 2);
+  if (underfilled.length > 0) throw new Error(`${label}: underfilled terminal coverage continuation: ${JSON.stringify(underfilled)}`);
+  const open = rows.filter((row) =>
+    row.leftCoverage < minimumEdgeCoverage || row.leftMaximumGapPx > maximumEdgeGapPx ||
+    row.rightCoverage < minimumEdgeCoverage || row.rightMaximumGapPx > maximumEdgeGapPx);
+  if (open.length > 0) throw new Error(`${label}: coverage row rule is open: ${JSON.stringify(open)}`);
   return {
-    expectedRecords,
-    detectedRecords: boxes.length,
-    minimumHorizontalCoverage,
+    expectedRows,
+    detectedRows: rows.length,
     minimumEdgeCoverage,
     maximumEdgeGapPx,
+    pagesWithRows: withRows.map((page) => page.page),
+    continuations,
     pages,
   };
 }
@@ -448,7 +474,7 @@ function rasterInkBounds(path) {
   return { topPx: bottomPx === 0 ? null : topPx, bottomPx, pageHeightPx: decoded.height };
 }
 
-function terminalPageContentChecks(pdfPath, rasterPages) {
+function pageContentChecks(pdfPath, rasterPages) {
   const pages = rasterPages.map((raster, index) => {
     const page = index + 1;
     const text = run("pdftotext", ["-f", String(page), "-l", String(page), "-layout", pdfPath, "-"]);
@@ -456,35 +482,41 @@ function terminalPageContentChecks(pdfPath, rasterPages) {
       page,
       firstToken: text.trim().match(/^\S+/u)?.[0] ?? null,
       nonWhitespaceCharacters: text.replace(/\s/gu, "").length,
-      coverageRecords: (text.match(/^\s*RULE\s*$/gmu) ?? []).length,
       ink: rasterInkBounds(join(OUTPUT, raster.path)),
     };
   });
   const emptyNonCoverPages = pages.filter((page) => page.page > 1 && page.nonWhitespaceCharacters === 0).map((page) => page.page);
-  const terminal = pages.at(-1);
-  const previous = pages.at(-2);
-  const continuesCoverage = Boolean(terminal && previous && terminal.firstToken === "RULE" && previous.coverageRecords > 0);
-  const minimumTerminalCoverageRecords = continuesCoverage ? Math.max(1, Math.ceil(previous.coverageRecords / 2)) : 0;
-  const expectedMinimumInkBottomPx = continuesCoverage
-    ? Math.round(previous.ink.bottomPx * minimumTerminalCoverageRecords / previous.coverageRecords)
-    : 0;
-  const underfilledCoverageContinuation = Boolean(
-    continuesCoverage && terminal &&
-    terminal.coverageRecords < minimumTerminalCoverageRecords &&
-    terminal.ink.bottomPx < expectedMinimumInkBottomPx
-  );
-  const terminalCoverage = {
-    continuesCoverage,
-    previousCoverageRecords: previous?.coverageRecords ?? 0,
-    terminalCoverageRecords: terminal?.coverageRecords ?? 0,
-    minimumTerminalCoverageRecords,
-    terminalInkBottomPx: terminal?.ink.bottomPx ?? 0,
-    expectedMinimumInkBottomPx,
-    underfilledCoverageContinuation,
-  };
   if (emptyNonCoverPages.length > 0) throw new Error(`${pdfPath}: empty non-cover pages ${emptyNonCoverPages.join(", ")}`);
-  if (underfilledCoverageContinuation) throw new Error(`${pdfPath}: underfilled terminal coverage continuation: ${JSON.stringify(terminalCoverage)}`);
-  return { pages, emptyNonCoverPages, terminalCoverage };
+  return { pages, emptyNonCoverPages };
+}
+
+async function writePrintArtifacts(page, pdfRelativePath, rasterPrefixRelative, printBackground, label) {
+  const pdfPath = join(OUTPUT, pdfRelativePath);
+  mkdirSync(dirname(pdfPath), { recursive: true });
+  writeFileSync(pdfPath, await page.pdf({ printBackground, preferCSSPageSize: true }));
+  const pdfInfo = run("pdfinfo", [pdfPath]);
+  const pages = Number(/^Pages:\s+(\d+)$/mu.exec(pdfInfo)?.[1] ?? "0");
+  const pageSize = /^Page size:\s+(.+)$/mu.exec(pdfInfo)?.[1] ?? "unknown";
+  if (pages < 1 || !/A4|594\.9\d* x 841\.9\d* pts/iu.test(pageSize)) {
+    throw new Error(`${label}: unexpected PDF geometry: ${pages} pages, ${pageSize}`);
+  }
+  run("pdftoppm", ["-png", "-r", String(PRINT_RASTER_DPI), pdfPath, join(OUTPUT, rasterPrefixRelative)]);
+  const directory = dirname(join(OUTPUT, rasterPrefixRelative));
+  const prefix = `${rasterPrefixRelative.split("/").at(-1)}-`;
+  const rasterPaths = readdirSync(directory)
+    .filter((name) => name.startsWith(prefix) && name.endsWith(".png"))
+    .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+  if (rasterPaths.length !== pages) throw new Error(`${label}: rasterized ${rasterPaths.length}/${pages} PDF pages`);
+  const rasterPages = rasterPaths.map((name) => {
+    const relativePath = join(dirname(rasterPrefixRelative), name).replace(/^\.\//u, "");
+    const path = join(OUTPUT, relativePath);
+    return { path: relativePath, bytes: readFileSync(path).length, sha256: sha256(path), dimensions: pngDimensions(path) };
+  });
+  return {
+    pdf: { path: pdfRelativePath, bytes: readFileSync(pdfPath).length, sha256: sha256(pdfPath), pages, pageSize },
+    pdfPath,
+    rasterPages,
+  };
 }
 
 rmSync(OUTPUT, { recursive: true, force: true });
@@ -567,6 +599,8 @@ try {
             };
           });
           semantics.contrast = await measuredContrast(page);
+          semantics.coverageTables = await page.evaluate(coverageTableGeometryInPage);
+          assertCoverageTableGeometry(semantics.coverageTables, `${state}/${theme}/${viewport}`);
           if (
             semantics.mainCount !== 1 || semantics.h1Count !== 1 || semantics.bodyFontPx < 16 ||
             semantics.horizontalOverflowPx !== 0 || semantics.overflowingFindings.length !== 0 ||
@@ -636,118 +670,86 @@ try {
               : 0;
           }))
           : -1;
-        const records = [...document.querySelectorAll(".coverage-record")];
         return {
           trustLabelLines,
           trustValueOverflowPx: Math.round(trustValueOverflowPx * 100) / 100,
           trustSiblingOverlapPx: Math.round(Math.max(0, trustSiblingOverlapPx) * 100) / 100,
-          coverageListDisplay: getComputedStyle(document.querySelector(".coverage-list")).display,
-          coverageRecordDisplay: records.map((record) => getComputedStyle(record).display),
-          coverageMaxCellsPerRow: records.map((record) => {
-            const rows = new Map();
-            for (const cell of record.children) {
-              const top = Math.round(cell.getBoundingClientRect().top * 100) / 100;
-              rows.set(top, (rows.get(top) ?? 0) + 1);
-            }
-            return Math.max(0, ...rows.values());
-          }),
-          coverageRecordBreakInside: records.map((record) => getComputedStyle(record).breakInside),
-          coverageRecordCount: records.length,
-          overflowingCoverageCells: records.flatMap((record) => [...record.children]
-            .filter((cell) => cell.scrollWidth > cell.clientWidth + 1)
-            .map((cell) => record.id)),
+          // Content wider than the A4 content box makes Chrome scale the WHOLE printed document
+          // down to fit, silently: every page and every measurement below would shrink with it.
+          horizontalOverflowPx: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
         };
       });
+      printSemantics.coverageTables = await page.evaluate(coverageTableGeometryInPage);
+      printSemantics.coverageRowCount = printSemantics.coverageTables.reduce((sum, table) => sum + table.rows, 0);
       if (
         printSemantics.trustLabelLines !== 1 ||
         printSemantics.trustValueOverflowPx !== 0 ||
         printSemantics.trustSiblingOverlapPx !== 0 ||
-        printSemantics.coverageListDisplay !== "block" ||
-        printSemantics.coverageRecordDisplay.some((value) => value !== "flow-root") ||
-        printSemantics.coverageMaxCellsPerRow.some((count) => count > 2) ||
-        printSemantics.coverageRecordBreakInside.some((value) => !["avoid", "avoid-page"].includes(value)) ||
-        printSemantics.overflowingCoverageCells.length > 0
+        printSemantics.horizontalOverflowPx !== 0 ||
+        printSemantics.coverageTables.some((table) => table.rowBreakInside.some((value) => !["avoid", "avoid-page"].includes(value)))
       ) {
         throw new Error(`${state}: print reflow contract failed: ${JSON.stringify(printSemantics)}`);
       }
-      const pdfName = `${state}--a4.pdf`;
-      const pdfPath = join(OUTPUT, pdfName);
-      writeFileSync(pdfPath, await page.pdf({ printBackground: true, preferCSSPageSize: true }));
-      const pdfInfo = run("pdfinfo", [pdfPath]);
-      const pages = Number(/^Pages:\s+(\d+)$/mu.exec(pdfInfo)?.[1] ?? "0");
-      const pageSize = /^Page size:\s+(.+)$/mu.exec(pdfInfo)?.[1] ?? "unknown";
-      if (pages < 1 || !/A4|594\.9\d* x 841\.9\d* pts/iu.test(pageSize)) {
-        throw new Error(`${state}: unexpected PDF geometry: ${pages} pages, ${pageSize}`);
+      try {
+        assertCoverageTableGeometry(printSemantics.coverageTables, `print/${state}`);
+      } catch (error) {
+        throw new Error(`${state}: print reflow contract failed: ${error.message}`);
       }
-      const rasterPrefix = join(OUTPUT, `${state}--a4-page`);
-      run("pdftoppm", ["-png", "-r", String(PRINT_RASTER_DPI), pdfPath, rasterPrefix]);
-      const rasterPaths = readdirSync(OUTPUT)
-        .filter((name) => name.startsWith(`${state}--a4-page-`) && name.endsWith(".png"))
-        .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
-      if (rasterPaths.length !== pages) throw new Error(`${state}: rasterized ${rasterPaths.length}/${pages} PDF pages`);
-      const rasterPages = rasterPaths.map((name) => {
-        const path = join(OUTPUT, name);
-        return {
-          path: name,
-          bytes: readFileSync(path).length,
-          sha256: sha256(path),
-          dimensions: pngDimensions(path),
-        };
-      });
-      const pageStartChecks = coveragePageStartChecks(pdfPath, rasterPages);
-      const pageContentChecks = terminalPageContentChecks(pdfPath, rasterPages);
-      const boxClosureChecks = coverageBoxClosureChecks(pdfPath, rasterPages, printSemantics.coverageRecordCount);
-      if (SURFACE_CONTROL === "none" && state === "insufficient-coverage") {
-        const technicalDirectory = join(OUTPUT, ".technical");
-        mkdirSync(technicalDirectory, { recursive: true });
-        const technicalPdfName = `${state}--no-background.pdf`;
-        const technicalPdfRelativePath = join(".technical", technicalPdfName);
-        const technicalPdfPath = join(OUTPUT, technicalPdfRelativePath);
-        writeFileSync(technicalPdfPath, await page.pdf({ printBackground: false, preferCSSPageSize: true }));
-        const technicalPdfInfo = run("pdfinfo", [technicalPdfPath]);
-        const technicalPages = Number(/^Pages:\s+(\d+)$/mu.exec(technicalPdfInfo)?.[1] ?? "0");
-        const technicalPageSize = /^Page size:\s+(.+)$/mu.exec(technicalPdfInfo)?.[1] ?? "unknown";
-        if (technicalPages < 1 || !/A4|594\.9\d* x 841\.9\d* pts/iu.test(technicalPageSize)) {
-          throw new Error(`${state}: unexpected no-background PDF geometry: ${technicalPages} pages, ${technicalPageSize}`);
-        }
-        const technicalRasterPrefix = join(technicalDirectory, `${state}--no-background-page`);
-        run("pdftoppm", ["-png", "-r", String(PRINT_RASTER_DPI), technicalPdfPath, technicalRasterPrefix]);
-        const technicalRasterPaths = readdirSync(technicalDirectory)
-          .filter((name) => name.startsWith(`${state}--no-background-page-`) && name.endsWith(".png"))
-          .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
-        if (technicalRasterPaths.length !== technicalPages) {
-          throw new Error(`${state}: rasterized ${technicalRasterPaths.length}/${technicalPages} no-background PDF pages`);
-        }
-        const technicalRasterPages = technicalRasterPaths.map((name) => {
-          const relativePath = join(".technical", name);
-          const path = join(OUTPUT, relativePath);
-          return {
-            path: relativePath,
-            bytes: readFileSync(path).length,
-            sha256: sha256(path),
-            dimensions: pngDimensions(path),
-          };
-        });
+      // 13 rules in one table: at most half an A4 content box (1032 CSS px). The cards it replaced
+      // took 3.19 content boxes.
+      const contentHeightCssPx = (297 - 2 * PRINT_MARGIN_MM) / 25.4 * 96;
+      if (printSemantics.coverageTables.some((table) => table.heightPx > contentHeightCssPx / 2)) {
+        throw new Error(`${state}: coverage table taller than half a page: ${JSON.stringify(printSemantics.coverageTables.map((table) => table.heightPx))}`);
+      }
+      const tableEdges = { left: printSemantics.coverageTables[0].leftPx, right: printSemantics.coverageTables[0].rightPx };
+      const printed = await writePrintArtifacts(page, `${state}--a4.pdf`, `${state}--a4-page`, true, state);
+      const { pdfPath, rasterPages } = printed;
+      const { pages, pageSize } = printed.pdf;
+      const pageContent = pageContentChecks(pdfPath, rasterPages);
+      const rowChecks = coverageRowChecks(pdfPath, rasterPages, printSemantics.coverageRowCount, tableEdges, state);
+      if (rowChecks.pagesWithRows.length > 2) {
+        throw new Error(`${state}: the coverage table spans ${rowChecks.pagesWithRows.length} pages; 13 rules must fit on at most two`);
+      }
+      if (state === "insufficient-coverage") {
+        // Colour must not be the only carrier of state: with background graphics off the table must
+        // still close every row and say "Below floor" in words.
+        const probe = await writePrintArtifacts(page, `.technical/${state}--no-background.pdf`, `.technical/${state}--no-background-page`, false, `${state} (no background)`);
+        const text = run("pdftotext", ["-layout", probe.pdfPath, "-"]);
         technicalProbes.push({
           id: "print-background-disabled/insufficient-coverage",
           state,
           printBackground: false,
-          pdf: {
-            path: technicalPdfRelativePath,
-            bytes: readFileSync(technicalPdfPath).length,
-            sha256: sha256(technicalPdfPath),
-            pages: technicalPages,
-            pageSize: technicalPageSize,
-          },
-          rasterPages: technicalRasterPages,
-          coverageRecordCount: printSemantics.coverageRecordCount,
-          shortCoverageRecordCount: await page.evaluate(() => document.querySelectorAll(".coverage-record.short").length),
-          boxClosureChecks: coverageBoxClosureChecks(
-            technicalPdfPath,
-            technicalRasterPages,
-            printSemantics.coverageRecordCount,
-          ),
+          pdf: probe.pdf,
+          rasterPages: probe.rasterPages,
+          coverageRowCount: printSemantics.coverageRowCount,
+          shortCoverageRowCount: printSemantics.coverageTables.reduce((sum, table) => sum + table.shortRows, 0),
+          belowFloorWordsInText: (text.match(/Below floor/gu) ?? []).length,
+          rowChecks: coverageRowChecks(probe.pdfPath, probe.rasterPages, printSemantics.coverageRowCount, tableEdges, `${state} (no background)`),
         });
+      }
+      if (state === "clean") {
+        // Thirteen rows fit on one page, so no canonical state has to repeat the header. This probe
+        // does: one document with a long coverage table, printed, must repeat the column header on
+        // every page that carries rows.
+        await page.setContent(render(longCoverageReportState(), "html"), { waitUntil: "load", timeout: 60_000 });
+        await page.evaluate(() => document.fonts.ready);
+        if (ACTIVE_CONTROL.print) await page.addStyleTag({ content: ACTIVE_CONTROL.print });
+        const longTables = await page.evaluate(coverageTableGeometryInPage);
+        assertCoverageTableGeometry(longTables, "print/long-coverage-table");
+        const longRows = longTables.reduce((sum, table) => sum + table.rows, 0);
+        const probe = await writePrintArtifacts(page, ".technical/long-coverage-table.pdf", ".technical/long-coverage-table-page", true, "long coverage table");
+        const longChecks = coverageRowChecks(probe.pdfPath, probe.rasterPages, longRows, { left: longTables[0].leftPx, right: longTables[0].rightPx }, "long coverage table");
+        if (longChecks.continuations.length === 0) throw new Error("long coverage table: the probe no longer continues onto a second page");
+        technicalProbes.push({
+          id: "print-long-coverage-table/clean",
+          state,
+          printBackground: true,
+          pdf: probe.pdf,
+          rasterPages: probe.rasterPages,
+          coverageRowCount: longRows,
+          rowChecks: longChecks,
+        });
+        await page.setContent(html, { waitUntil: "load", timeout: 60_000 });
       }
       const visiblePrintContract = {
         pages,
@@ -755,20 +757,18 @@ try {
         contrast: printContrast,
         fonts: printFonts,
         printSemantics,
-        pageStartChecks,
-        pageContentChecks,
-        boxClosureChecks,
+        pageContentChecks: pageContent,
+        rowChecks,
         rasterPages: rasterPages.map((page) => ({ sha256: page.sha256, dimensions: page.dimensions })),
       };
       const pdfCell = `print/${state}/pdf`;
       const rasterCell = `print/${state}/raster-set`;
-      const pdfSha256 = sha256(pdfPath);
       artifacts.push({
         cell: pdfCell,
         kind: "pdf",
-        path: pdfName,
-        bytes: readFileSync(pdfPath).length,
-        sha256: pdfSha256,
+        path: printed.pdf.path,
+        bytes: printed.pdf.bytes,
+        sha256: printed.pdf.sha256,
         reviewArtifactFingerprint: stableReviewArtifactFingerprint(
           reviewInput.fingerprint,
           reviewEnvironment,
@@ -780,9 +780,8 @@ try {
         contrast: printContrast,
         fonts: printFonts,
         printSemantics,
-        pageStartChecks,
-        pageContentChecks,
-        boxClosureChecks,
+        pageContentChecks: pageContent,
+        rowChecks,
         rasterPageVisualHashes: rasterPages.map((page) => page.sha256),
       });
       artifacts.push({

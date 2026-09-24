@@ -59,6 +59,17 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   every PDF-embedded face (`pdffonts`) with the declared per-platform expectation; the render
   manifest records the resolved faces.
 
+- **Coverage is an aligned table.** Each document's coverage was thirteen cards repeating six
+  labels each (78 labels) and spanning five printed pages; it is now one table per document — path
+  and verdict in the caption, the rule id as row header, right-aligned tabular counts, coverage and
+  floor, and the result in words. A 13-rule table is 0.46 of an A4 page and spans at most two;
+  printed reports shrink from 43 to 31 pages across the four canonical states (clean 5 → 2). A
+  zero-candidate rule shows `n/a`. On phones the same table becomes a two-line grid per row with
+  aligned columns and no sideways scroll. The surface gate replaced every card-era check and control
+  one for one (column alignment against the header, closed row rules in the raster, a repeated
+  header on continuation pages, no one-row continuation) and now also rejects printed content wider
+  than the A4 content box, which makes Chrome shrink the whole PDF silently.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as

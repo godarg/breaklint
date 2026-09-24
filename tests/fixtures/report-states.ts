@@ -160,6 +160,32 @@ export function insufficientCoverageReportState(): Report {
   return report;
 }
 
+/**
+ * Technical probe, not a review cell. Complication: thirteen coverage rows fit on one A4 page, so no
+ * canonical state ever has to repeat the table header on a continuation page — a table whose header
+ * stopped repeating would pass every canonical cell. Sixty synthetic rows force the table across
+ * pages. The rule ids are synthetic and never reach a rule registry; only the HTML projection reads
+ * them.
+ */
+export function longCoverageReportState(): Report {
+  const report = cleanReportState();
+  const document = report.documents[0];
+  if (!document) throw new Error("surface fixture requires one document");
+  for (let index = 1; index <= 60; index += 1) {
+    const candidates = (index % 7) + 1;
+    document.coverage[`probe/long-table-rule-${String(index).padStart(2, "0")}`] = {
+      candidates,
+      measured: candidates,
+      notMeasured: [],
+      notMeasuredCount: 0,
+      coverage: 1,
+      floor: 0.5,
+      ok: true,
+    };
+  }
+  return report;
+}
+
 export function canonicalReportStates(): Record<ReportSurfaceState, Report> {
   return {
     clean: cleanReportState(),
