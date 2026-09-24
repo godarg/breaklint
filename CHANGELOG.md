@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.0 package.
+
+### Rule behaviour
+
+- **`layout/unbreakable-block-too-tall`: a `position: running(...)` element placed in a side
+  margin box (`@left-middle`, `@right-middle`) is no longer summed into a false `error`.** In
+  0.6.0 the filter that keeps per-page margin-box clones out of the fragment sum tested only the
+  vertical axis. A side margin box starts at a content-box `y`, so its clones passed that test and
+  a short running element repeated on three or more pages could be reported as a block taller than
+  the page (e46a1bf). The 0.6.0 section below claimed this exclusion held "by construction"; it
+  held for the top and bottom margin boxes only.
+- **The same rule's advice no longer claims the block "cannot fit unbroken on any page".** The
+  finding message had already stopped making that all-pages claim from one measured page; the
+  advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
+  compared advice text will see the new string.
+
+### Documentation
+
+- Naming an off-by-default rule in `rules` with only an options object enables it, exactly as
+  `true` does. This was always the behaviour; it is now written down in `docs/limitations.md` and
+  pinned by a contract test.
+
 ## 0.6.0 — 2026-09-18
 
 A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0: the canonical
