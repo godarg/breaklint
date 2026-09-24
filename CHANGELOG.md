@@ -18,6 +18,28 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
   compared advice text will see the new string.
 
+### Fixed
+
+- **Process cleanup no longer counts a zombie as a surviving process (Linux).** An exited process
+  stays in the process table until its parent collects it. When that parent is PID 1 of a
+  container without an init process — Docker without `--init`, a GitHub Actions `container:` job,
+  a Kubernetes pod whose entrypoint is node — that takes seconds or never happens, and
+  `kill(pid, 0)` succeeds on such a zombie. Every cleanup of the browser's process tree and of a
+  producer's process group therefore waited out its deadline and reported a survivor: in those
+  environments every live run ended with `renderer-not-terminated` and exit 3, and
+  `checkProducedDocuments` with `source/producer-incomplete`, although nothing had survived. It
+  failed closed, never clean. On Linux the process table is now read from `/proc` rather than from
+  `ps`, and a process counts as gone only when it reads `Z` with a single remaining thread (a
+  leader that left with `pthread_exit()` while a thread still runs also reads `Z`). The deadlines
+  are unchanged. The failure message of an
+  unverified browser close now also lists `defunct=` pids. macOS behaviour is unchanged. Measured
+  on one VM whose PID 1 collects late, and under a parent that never collects, in
+  `docs/limitations.md`.
+- The producer cleanup's `EPERM` retry and its deadline expiry had no test, because they lived in
+  closures that ran only when an environment happened to produce `EPERM`. They are one function
+  with a seam for the kernel, the clock and the group's members now, pinned on a fake clock with a
+  named mutation per case. Internal; no public API changed.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as

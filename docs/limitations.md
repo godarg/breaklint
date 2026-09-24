@@ -235,9 +235,35 @@ corpus and the independent rasteriser cross-check, is green in a Linux container
 151, poppler 22.12), against 15 red cases with the fix removed.
 
 That is no longer only a container result: the fixed commit has since run on the x86_64 CI
-runner, where the same step that reported the defect now passes. What remains true is narrower —
-the process-termination and profile-cleanup path has empirical evidence on macOS only. Linux is
-measured for the measurement chain, not yet for the process lifecycle.
+runner, where the same step that reported the defect now passes.
+
+**The Linux process lifecycle has now been measured too, and it showed a second defect: zombies
+were counted as survivors.** An exited process stays in the process table as a zombie until its
+parent collects it. When the parent is PID 1 of a container without an init process — Docker
+without `--init`, a GitHub Actions `container:` job, a Kubernetes pod whose entrypoint is node —
+that takes seconds or never happens. `kill(pid, 0)` succeeds on a zombie, and `kill(-pgid, 0)` on
+a group whose only members are zombies, so the bounded cleanup of the browser tree (2 s) and of a
+producer's group (0.5 s + 1 s) ended in "survived" although nothing survived: fail-closed, but in
+those environments every live run ended with `renderer-not-terminated` and exit 3. On Linux the
+process table is now read from `/proc`, and a process counts as gone only when it reads `Z` with a
+single remaining thread (a leader that left with `pthread_exit()` while another thread runs also
+reads `Z`, and still counts as alive). The deadlines did not move; a host that never collects
+cannot be out-waited.
+
+Measured on one machine, and these are data about that machine rather than promises: a
+Firecracker VM, Linux 6.18, 4 vCPUs, whose PID 1 is not an init system and collects exited orphans
+on a timer, after 1.02–1.96 s (n = 40); Chromium 141; Node 24. The three process-group unit tests
+(the browser tree, a producer descendant on the success path, a producer descendant after a
+timeout), 10 isolated runs each under three parents — this VM's PID 1, a subreaper that collects at
+once (what `--init`, tini or systemd do) and a subreaper that never collects: before the change
+30 of 30 red, 30 of 30 green and 30 of 30 red; after it, 30 of 30 green in each of the three. The
+one-minute load average was 1.3–4.4 before and 2.7–9.0 after, because other work shared the
+machine. Under load one of the three tests also exposed a race of its own, a SIGTERM landing
+before the process under test had installed its handler (3 of 10); the test now arms the handler
+first. What this machine cannot show, and CI has
+to: a real container without `--init` (the never-collecting subreaper reproduces its reparenting,
+not the container itself), and macOS, where no process is marked a zombie and the behaviour is
+unchanged.
 
 There is deliberately no `os` field in `package.json`, which means npm will install this on
 Windows without complaint. That is not an oversight: `--demo` and the whole rule and reporter
@@ -352,9 +378,18 @@ that group is being torn down — 8 of 20 acquisitions, every one followed withi
 with the descendant dead. The producer cleanup therefore retries inside its existing bounded
 deadline instead of failing on the first sample. What this does NOT establish is the kernel reason
 for the answer; the behaviour is measured, not explained, and it was measured on one platform and
-one version. An `EPERM` that outlives the deadline still fails the acquisition. The retry itself
-and the deadline-expiry failure have **no test**: both live in closures that only run when the
-environment produces `EPERM`, which is not deterministic. What is pinned is the errno truth table.
+one version. An `EPERM` that outlives the deadline still fails the acquisition. The retry and the
+deadline expiry used to have no test, because they lived in closures that ran only when an
+environment happened to produce `EPERM`. They are now one exported function with a seam for the
+kernel, the clock and the group's members, and `tests/unit/producer-boundary.test.ts` pins them on
+a fake kernel and a fake clock: "retries EPERM inside the deadline and accepts the ESRCH that
+follows (retry path)", "fails an EPERM that outlives the deadline as unverifiable, after SIGKILL
+(deadline path)", the unknown-errno and signal-delivery cases, and the zombie reading below. Each
+names the mutation that turns it red, and each mutation was run and observed red. The budgets are
+unchanged. One hypothesis is not settled and needs a macOS run: that this `EPERM` is XNU's answer
+for a group whose members are exiting or already zombies, the window that Linux answers with
+success instead. Sampling `ps -o pid,stat` of the group at the moment `EPERM` comes back would
+settle it.
 
 **The 40-document corpus behind the `layout/half-empty-page` default is not in this repository.**
 The 37-of-40 figure was measured on a corpus constructed for that purpose during the same work, and

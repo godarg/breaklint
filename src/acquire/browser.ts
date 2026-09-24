@@ -9,7 +9,7 @@
  * document.
  */
 
-import { existsSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import type { Server } from "node:http";
 import { createRequire } from "node:module";
@@ -108,13 +108,25 @@ export interface ProcessTreeTermination {
   pgid: number | null;
   initialPids: number[];
   survivingPids: number[];
+  /**
+   * Owned pids that had already exited but were not yet collected by their parent when the final
+   * table was read (zombies). They cannot run code and hold no descriptor, socket or file, so they
+   * are recorded here and not counted as survivors. Only a reader that can prove the state sets
+   * this; see `linuxProcessTable`.
+   */
+  defunctPids: number[];
   groupSafe: boolean;
   termSent: boolean;
   killSent: boolean;
   verified: boolean;
 }
 
-type ProcessRow = { pid: number; ppid: number; pgid: number };
+/**
+ * One row of the POSIX process table. `defunct` is true only when the reader has PROVED that the
+ * process has exited and merely awaits collection by its parent; a reader that cannot tell leaves
+ * it unset, and the row then counts as alive.
+ */
+export type ProcessRow = { pid: number; ppid: number; pgid: number; defunct?: boolean };
 export type ProcessTableReader = () => ProcessRow[];
 
 /** Ownership observed while the browser root still exists, retained across a later CDP close. */
@@ -124,8 +136,116 @@ export interface ProcessTreeOwnership {
   initialPids: number[];
 }
 
+/**
+ * Why a zombie is not a survivor, and why the proof is two reads rather than one.
+ *
+ * A process that has exited stays in the table as a zombie until its parent collects its exit
+ * status. When its parent dies first, the orphan is collected by PID 1 or the nearest subreaper.
+ * On an ordinary host that takes microseconds. Measured on a Linux VM whose PID 1 is not an init
+ * system, an exited orphan stayed a zombie for 1.02–1.96 s (n = 40); under a parent that never
+ * collects orphans — Docker without `--init`, a GitHub Actions `container:` job, a Kubernetes pod
+ * whose entrypoint is node — it stays until the container ends. `kill(pid, 0)` succeeds on a
+ * zombie, and `kill(-pgid, 0)` succeeds on a group whose only members are zombies, so the old
+ * liveness check reported every such cleanup as a survivor: fail-closed, but every live run ended
+ * exit 3 in those environments although nothing had survived.
+ *
+ * `Z` alone is not the proof. A thread-group leader that leaves with `pthread_exit()` while
+ * another thread keeps running also reads `Z`, and that process still executes code. Measured on
+ * Linux 6.18: a true zombie reads `Z` with `Threads: 1`; a leader that left a second thread
+ * running reads `Z` with `Threads: 2`, and after SIGKILL `Z` with `Threads: 1`. Only `Z`
+ * together with a single remaining thread therefore counts as defunct.
+ *
+ * Linux only. macOS offers neither file, and whether XNU answers `kill(pid, 0)` on a zombie with
+ * success is not measured here; there the table is still read with `ps`, no row is ever marked
+ * defunct, and the errno reading in the producer cleanup is unchanged.
+ */
+const PROC_ROOT = "/proc";
+
+function vanished(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === "ENOENT" || code === "ESRCH";
+}
+
+/** A process the reader may not inspect: another user's, or hidden by `hidepid`. `ps` skips it too. */
+function invisible(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === "EACCES" || code === "EPERM";
+}
+
+/**
+ * `null` = unparseable. A process in state `X` ("dead", being released after its parent collected
+ * it) is reported as `released`: its ppid and pgid already read 0 and -1, and it is gone. Measured
+ * under process churn on Linux 6.18, before this case existed: one full table read in 215 and one
+ * in 302 met such a row, and a strict parser turned it into an unreadable table, therefore a
+ * cleanup that could not be verified. After it: 0 in 4 026.
+ */
+function parseLinuxStat(text: string): { state: string; ppid: number; pgid: number } | "released" | null {
+  // `comm` is parenthesised and may itself contain spaces and parentheses; the fields that follow
+  // start after the LAST closing parenthesis.
+  const close = text.lastIndexOf(")");
+  if (close === -1) return null;
+  const fields = text.slice(close + 1).trim().split(/\s+/u);
+  const state = fields[0] ?? "";
+  if (state === "X" || state === "x") return "released";
+  const ppid = Number(fields[1]);
+  const pgid = Number(fields[2]);
+  if (!/^[A-Za-z]$/u.test(state) || !Number.isInteger(ppid) || ppid < 0 || !Number.isInteger(pgid) || pgid < 0) return null;
+  return { state, ppid, pgid };
+}
+
+/** `true` = exited and only awaiting collection, or already gone; `false` = may still run code. */
+function linuxDefunct(pid: number, state: string, procRoot: string): boolean {
+  if (state !== "Z") return false;
+  let status: string;
+  try {
+    status = readFileSync(join(procRoot, String(pid), "status"), "utf8");
+  } catch (error) {
+    return vanished(error); // collected between the two reads: gone; otherwise unprovable
+  }
+  return /^Threads:\s*1\s*$/mu.test(status);
+}
+
+/** The Linux process table read from `/proc` directly: no `ps` binary is needed, and zombies are proved. */
+export function linuxProcessTable(procRoot: string = PROC_ROOT): ProcessRow[] {
+  const rows: ProcessRow[] = [];
+  for (const name of readdirSync(procRoot)) {
+    if (!/^[1-9][0-9]*$/u.test(name)) continue;
+    const pid = Number(name);
+    let text: string;
+    try {
+      text = readFileSync(join(procRoot, name, "stat"), "utf8");
+    } catch (error) {
+      if (vanished(error) || invisible(error)) continue;
+      throw error;
+    }
+    const stat = parseLinuxStat(text);
+    if (stat === "released") continue;
+    if (!stat) throw new Error(`unparseable ${join(procRoot, name, "stat")}`);
+    const row: ProcessRow = { pid, ppid: stat.ppid, pgid: stat.pgid };
+    if (linuxDefunct(pid, stat.state, procRoot)) row.defunct = true;
+    rows.push(row);
+  }
+  if (rows.length === 0) throw new Error(`${procRoot} returned no process rows`);
+  return rows;
+}
+
+/** Linux only: has `pid` exited so that it can no longer run code? `false` wherever that is not proved. */
+export function processIsDefunct(pid: number, platform: NodeJS.Platform = process.platform, procRoot: string = PROC_ROOT): boolean {
+  if (platform !== "linux") return false;
+  let text: string;
+  try {
+    text = readFileSync(join(procRoot, String(pid), "stat"), "utf8");
+  } catch (error) {
+    return vanished(error); // collected after the caller's successful kill(pid, 0): gone
+  }
+  const stat = parseLinuxStat(text);
+  if (stat === "released") return true;
+  return stat !== null && linuxDefunct(pid, stat.state, procRoot);
+}
+
 function processTable(): ProcessRow[] {
   if (process.platform === "win32") throw new Error("POSIX process table unavailable on Windows");
+  if (process.platform === "linux") return linuxProcessTable();
   const output = execFileSync("ps", ["-axo", "pid=,ppid=,pgid="], { encoding: "utf8" }).trim();
   if (!output) throw new Error("ps returned no process rows");
   return output.split("\n").map((line) => {
@@ -137,10 +257,29 @@ function processTable(): ProcessRow[] {
   });
 }
 
-function alive(pid: number): boolean {
-  try { process.kill(pid, 0); return true; } catch (error) {
+/**
+ * Members of process group `pgid` with the reader's defunct proof, or `null` when this platform
+ * cannot enumerate them with that proof (everything except Linux) or the table is unreadable.
+ * `null` never means "empty"; a caller must read it as "present".
+ */
+export function processGroupMembers(pgid: number, platform: NodeJS.Platform = process.platform): { pid: number; defunct: boolean }[] | null {
+  if (platform !== "linux") return null;
+  try {
+    return linuxProcessTable()
+      .filter((row) => row.pgid === pgid)
+      .map((row) => ({ pid: row.pid, defunct: row.defunct === true }))
+      .sort((a, b) => a.pid - b.pid);
+  } catch {
+    return null;
+  }
+}
+
+/** Can `pid` still run code? `EPERM` stays "alive" (another user's process); a proved zombie does not. */
+export function alive(pid: number): boolean {
+  try { process.kill(pid, 0); } catch (error) {
     return (error as NodeJS.ErrnoException).code === "EPERM";
   }
+  return !processIsDefunct(pid);
 }
 
 function descendantsOf(table: ProcessRow[], rootPid: number): number[] {
@@ -162,6 +301,10 @@ function groupMembers(table: ProcessRow[], pgid: number | null): number[] {
   return pgid === null ? [] : table.filter((entry) => entry.pgid === pgid).map((entry) => entry.pid).sort((a, b) => a - b);
 }
 
+function defunctIn(table: ProcessRow[]): Set<number> {
+  return new Set(table.filter((entry) => entry.defunct === true).map((entry) => entry.pid));
+}
+
 function ownershipFrom(table: ProcessRow[], rootPid: number, isAlive: (pid: number) => boolean = alive): ProcessTreeOwnership | null {
   const root = table.find((entry) => entry.pid === rootPid);
   if (!root) return null;
@@ -174,10 +317,11 @@ function ownershipFrom(table: ProcessRow[], rootPid: number, isAlive: (pid: numb
   const observed = groupSafe
     ? [...groupMembers(table, pgid), ...descendantsOf(table, rootPid)]
     : descendantsOf(table, rootPid);
+  const defunct = defunctIn(table);
   return {
     pgid,
     groupSafe,
-    initialPids: [...new Set(observed)].filter(isAlive),
+    initialPids: [...new Set(observed)].filter((pid) => !defunct.has(pid) && isAlive(pid)),
   };
 }
 
@@ -256,17 +400,26 @@ export function ownServerLifecycle(server: Server): OwnedServerLifecycle {
   };
 }
 
+/** The seam `terminateProcessTree` acts through. Production uses the kernel and the wall clock. */
+export interface ProcessTreeOperations {
+  alive(pid: number): boolean;
+  signal(pid: number, signal: NodeJS.Signals): void;
+  wait(ms: number): Promise<void>;
+  /** Clock for the deadlines. Optional so that a seam written before it existed keeps working. */
+  now?(): number;
+}
+
+/** After SIGTERM, how long the tree may take to leave before SIGKILL; then two 100 ms rechecks. */
+export const TERMINATION_GRACE_MS = 2_000;
+
 /** POSIX process-group termination with a post-signal existence check; signal delivery alone is not success. */
 export async function terminateProcessTree(
   rootPid: number,
   readProcessTable: ProcessTableReader = processTable,
-  operations: {
-    alive(pid: number): boolean;
-    signal(pid: number, signal: NodeJS.Signals): void;
-    wait(ms: number): Promise<void>;
-  } = { alive, signal: (pid, signal) => process.kill(pid, signal), wait },
+  operations: ProcessTreeOperations = { alive, signal: (pid, signal) => process.kill(pid, signal), wait, now: Date.now },
   preservedOwnership: ProcessTreeOwnership | null = null,
 ): Promise<ProcessTreeTermination> {
+  const now = operations.now ?? Date.now;
   let table: ProcessRow[];
   try {
     table = readProcessTable();
@@ -276,8 +429,8 @@ export async function terminateProcessTree(
     let killSent = false;
     if (initialPids.length > 0) {
       try { operations.signal(rootPid, "SIGTERM"); termSent = true; } catch { /* alive recheck below is authoritative */ }
-      const deadline = Date.now() + 2_000;
-      while (Date.now() < deadline && operations.alive(rootPid)) await operations.wait(50);
+      const deadline = now() + TERMINATION_GRACE_MS;
+      while (now() < deadline && operations.alive(rootPid)) await operations.wait(50);
       if (operations.alive(rootPid)) {
         try { operations.signal(rootPid, "SIGKILL"); killSent = true; } catch { /* final recheck below */ }
         await operations.wait(100);
@@ -285,14 +438,14 @@ export async function terminateProcessTree(
     }
     const survivingPids = operations.alive(rootPid) ? [rootPid] : [];
     return {
-      rootPid, pgid: null, initialPids, survivingPids,
+      rootPid, pgid: null, initialPids, survivingPids, defunctPids: [],
       groupSafe: false, termSent, killSent, verified: false,
     };
   }
   const ownership = preservedOwnership ?? ownershipFrom(table, rootPid, operations.alive);
   if (!ownership) {
     return {
-      rootPid, pgid: null, initialPids: [], survivingPids: [],
+      rootPid, pgid: null, initialPids: [], survivingPids: [], defunctPids: [],
       groupSafe: false, termSent: false, killSent: false, verified: false,
     };
   }
@@ -300,10 +453,12 @@ export async function terminateProcessTree(
   // A shared process group is never an ownership oracle. Only descendants of the browser root
   // belong to breaklint in that case; signalling every member could include this process, its
   // shell and unrelated CI siblings. Group membership is used only after isolation is proven.
-  const owned = (): number[] => groupSafe
-    ? [...new Set([...groupMembers(table, pgid), ...descendantsOf(table, rootPid)])]
-    : descendantsOf(table, rootPid);
-  const initialPids = [...new Set([...ownership.initialPids, ...owned()])].filter(operations.alive);
+  const ownedIn = (rows: ProcessRow[]): number[] => groupSafe
+    ? [...new Set([...groupMembers(rows, pgid), ...descendantsOf(rows, rootPid)])]
+    : descendantsOf(rows, rootPid);
+  const initialDefunct = defunctIn(table);
+  const initialPids = [...new Set([...ownership.initialPids, ...ownedIn(table)])]
+    .filter((pid) => !initialDefunct.has(pid) && operations.alive(pid));
   let termSent = false;
   let killSent = false;
   try {
@@ -316,20 +471,25 @@ export async function terminateProcessTree(
   } catch { /* the recheck below decides whether this mattered */ }
 
   let processTableVerified = true;
+  let defunctPids: number[] = [];
   const refresh = (): number[] => {
     let current: number[] = [];
+    // A pid proved defunct in THIS table is neither a survivor nor a signal target. A pid the
+    // table cannot speak about keeps its old reading: alive until proved otherwise.
+    let defunct = new Set<number>();
     try {
       const fresh = readProcessTable();
-      current = (groupSafe
-        ? [...new Set([...groupMembers(fresh, pgid), ...descendantsOf(fresh, rootPid)])]
-        : descendantsOf(fresh, rootPid)).filter(operations.alive);
+      defunct = defunctIn(fresh);
+      const owned = ownedIn(fresh);
+      defunctPids = [...new Set([...initialPids, ...owned])].filter((pid) => defunct.has(pid)).sort((a, b) => a - b);
+      current = owned.filter((pid) => !defunct.has(pid) && operations.alive(pid));
     } catch {
       processTableVerified = false;
     }
-    return [...new Set([...initialPids.filter(operations.alive), ...current])].sort((a, b) => a - b);
+    return [...new Set([...initialPids.filter((pid) => !defunct.has(pid) && operations.alive(pid)), ...current])].sort((a, b) => a - b);
   };
-  const deadline = Date.now() + 2_000;
-  while (Date.now() < deadline && refresh().length > 0) await operations.wait(50);
+  const deadline = now() + TERMINATION_GRACE_MS;
+  while (now() < deadline && refresh().length > 0) await operations.wait(50);
   let survivors = refresh();
   if (survivors.length > 0) {
     try {
@@ -347,7 +507,7 @@ export async function terminateProcessTree(
   // therefore based on a fresh descendant/process-group table, not signal delivery or old PIDs.
   const survivingPids = refresh();
   return {
-    rootPid, pgid, initialPids, survivingPids, groupSafe, termSent, killSent,
+    rootPid, pgid, initialPids, survivingPids, defunctPids, groupSafe, termSent, killSent,
     verified: processTableVerified && survivingPids.length === 0,
   };
 }

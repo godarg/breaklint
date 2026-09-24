@@ -5,7 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { acquireProducedDocuments, ownedGroupProbeState, resolveProducedSourceOrigin, type ProducerRecord } from "../../src/source/producer.ts";
+import {
+  acquireProducedDocuments, cleanupOwnedGroup, OWNED_GROUP_BUDGETS, ownedGroupProbeState, resolveProducedSourceOrigin,
+  type OwnedGroupOperations, type ProducerRecord,
+} from "../../src/source/producer.ts";
 import { checkProducedDocuments } from "../../src/index.ts";
 import { CapturedResourceClosureError, capturedResourceClosure } from "../../src/acquire/render-run.ts";
 
@@ -203,5 +206,120 @@ describe("owned process group probe", () => {
     for (const foreign of ["EACCES", "EINVAL", "EAGAIN", "", undefined]) {
       assert.equal(ownedGroupProbeState(foreign), "unknown-errno", `${String(foreign)} must not be read as a verdict`);
     }
+  });
+});
+
+/**
+ * The retry and deadline paths of the owned-group cleanup, on a fake kernel and a fake clock.
+ *
+ * They used to live in closures that called `process.kill`, `Date.now` and `setTimeout` directly,
+ * so they ran only when an environment happened to produce the errno — which on the machine that
+ * measured the EPERM row it did in 8 of 20 acquisitions, and elsewhere never. The seam now carries
+ * the kernel answers, the clock and the group's members; the budgets are the unchanged 500 ms and
+ * 1 000 ms. Every test names the mutation that turns it red; each was applied and observed red.
+ */
+describe("owned process group cleanup: retry, deadline and zombie paths", () => {
+  const PGID = 51_000;
+  type Members = { pid: number; defunct: boolean }[] | null;
+  function kernel(script: {
+    /** errno answered by kill(-pgid, 0) on the n-th probe, or null for success. */
+    probe: (n: number) => string | null;
+    members?: Members;
+    /** errno answered when a real signal is delivered, or null. */
+    deliver?: (signal: NodeJS.Signals) => string | null;
+  }) {
+    let clock = 0;
+    let probes = 0;
+    const signals: NodeJS.Signals[] = [];
+    const fail = (code: string): never => { throw Object.assign(new Error(code), { code }); };
+    const operations: OwnedGroupOperations = {
+      kill(target, signal) {
+        assert.equal(target, -PGID, "the cleanup signalled something other than its own group");
+        if (signal === 0) {
+          const code = script.probe(probes++);
+          if (code) fail(code);
+          return;
+        }
+        signals.push(signal);
+        const code = script.deliver?.(signal) ?? null;
+        if (code) fail(code);
+      },
+      now: () => clock,
+      // A cleanup that has lost its deadline polls forever. Stop it on the fake clock, far past the
+      // real budget, so that mutant fails as a runaway instead of hanging the test process.
+      async sleep(ms) {
+        clock += ms;
+        if (clock > 20 * (OWNED_GROUP_BUDGETS.termMs + OWNED_GROUP_BUDGETS.killMs)) throw new Error("runaway: the cleanup kept polling far past its budget");
+        await new Promise((resolve) => setImmediate(resolve));
+      },
+      groupMembers: () => script.members === undefined ? null : script.members,
+    };
+    return { operations, signals, clock: () => clock, probes: () => probes };
+  }
+  const budgetMs = OWNED_GROUP_BUDGETS.termMs + OWNED_GROUP_BUDGETS.killMs;
+
+  // Mutation "zombie counts as present" (probe ignores groupMembers): red, it survives cleanup.
+  it("reads a group whose only members are proved zombies as gone, without a signal or a wait", { timeout: 2_000 }, async () => {
+    const k = kernel({ probe: () => null, members: [{ pid: 51_001, defunct: true }, { pid: 51_002, defunct: true }] });
+    await cleanupOwnedGroup(PGID, k.operations);
+    assert.deepEqual(k.signals, []);
+    assert.equal(k.clock(), 0);
+  });
+
+  // Mutation "some instead of every": red on the mixed row. Mutation "no SIGKILL escalation": red
+  // on every row. Mutation "an empty member list means absent": red on the [] row.
+  for (const [label, members] of [
+    ["one live member beside a zombie", [{ pid: 51_001, defunct: true }, { pid: 51_002, defunct: false }]],
+    ["no member information (every platform but Linux)", null],
+    ["an empty member list after a successful kill(-pgid, 0)", []],
+  ] as Array<[string, Members]>) {
+    it(`keeps the group present with ${label}, escalates, and fails at the deadline`, { timeout: 2_000 }, async () => {
+      const k = kernel({ probe: () => null, members });
+      await assert.rejects(cleanupOwnedGroup(PGID, k.operations), /survived bounded cleanup/u);
+      assert.deepEqual(k.signals, ["SIGTERM", "SIGKILL"]);
+      assert.ok(k.clock() >= budgetMs, `gave up at ${k.clock()} ms, before the ${budgetMs} ms budget`);
+    });
+  }
+
+  // Mutation "EPERM is fatal" (ownedGroupProbeState maps EPERM to unknown-errno): red, it throws
+  // "could not be verified" on the first EPERM.
+  it("retries EPERM inside the deadline and accepts the ESRCH that follows (retry path)", { timeout: 2_000 }, async () => {
+    const answers: Array<string | null> = [null, "EPERM", "EPERM", "ESRCH"];
+    const k = kernel({ probe: (n) => n < answers.length ? answers[n]! : "ESRCH", members: [{ pid: 51_001, defunct: false }] });
+    await cleanupOwnedGroup(PGID, k.operations);
+    assert.deepEqual(k.signals, ["SIGTERM"], "SIGKILL was sent although the group left inside the SIGTERM budget");
+    assert.equal(k.probes(), 4);
+    assert.equal(k.clock(), 2 * OWNED_GROUP_BUDGETS.pollMs);
+  });
+
+  // Mutation "deadline check removed": the loop never ends; the fake clock's runaway guard turns it red.
+  // Mutation "indeterminate at the deadline read as absent": red, it resolves.
+  it("fails an EPERM that outlives the deadline as unverifiable, after SIGKILL (deadline path)", { timeout: 2_000 }, async () => {
+    const k = kernel({ probe: (n) => n === 0 ? null : "EPERM", members: [{ pid: 51_001, defunct: false }] });
+    await assert.rejects(cleanupOwnedGroup(PGID, k.operations), /could not be verified/u);
+    assert.deepEqual(k.signals, ["SIGTERM", "SIGKILL"]);
+    assert.ok(k.clock() >= budgetMs, `gave up at ${k.clock()} ms, before the ${budgetMs} ms budget`);
+  });
+
+  // Mutation "unknown errno read as indeterminate": red, it waits out the budget and signals.
+  it("fails at once on an errno outside the truth table, before any signal", { timeout: 2_000 }, async () => {
+    const k = kernel({ probe: () => "EINVAL" });
+    await assert.rejects(cleanupOwnedGroup(PGID, k.operations), /could not be verified/u);
+    assert.deepEqual(k.signals, []);
+    assert.equal(k.clock(), 0);
+  });
+
+  // Mutation "every delivery errno is fatal": red on EPERM/ESRCH. Mutation "every delivery errno
+  // is tolerated": red on EIO.
+  for (const code of ["EPERM", "ESRCH"]) {
+    it(`tolerates ${code} when delivering SIGTERM and lets the probe decide`, { timeout: 2_000 }, async () => {
+      const k = kernel({ probe: (n) => n === 0 ? null : "ESRCH", deliver: () => code, members: [{ pid: 51_001, defunct: false }] });
+      await cleanupOwnedGroup(PGID, k.operations);
+      assert.deepEqual(k.signals, ["SIGTERM"]);
+    });
+  }
+  it("reports any other delivery errno as a termination failure", { timeout: 2_000 }, async () => {
+    const k = kernel({ probe: () => null, deliver: () => "EIO", members: [{ pid: 51_001, defunct: false }] });
+    await assert.rejects(cleanupOwnedGroup(PGID, k.operations), /termination failed/u);
   });
 });

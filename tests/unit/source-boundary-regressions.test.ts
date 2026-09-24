@@ -91,7 +91,27 @@ function fixture() {
   });
   return { root, program, producer, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
-function alive(pid: number): boolean { try { process.kill(pid, 0); return true; } catch { return false; } }
+/**
+ * Can `pid` still run code? `kill(pid, 0)` alone answered "yes" for a ZOMBIE — a process that has
+ * exited and waits only for its parent to collect it. The descendant here is orphaned when the
+ * producer exits, so its parent becomes PID 1; measured on a Linux VM whose PID 1 collects orphans
+ * only every 1–2 s, the two cleanup tests below failed 10 of 10 isolated runs on a descendant that
+ * was already dead, and 10 of 10 under a parent that never collects. A zombie cannot run code or
+ * hold FD3, so it is not a survivor. Deliberately independent of the product's reader: this oracle
+ * reads `/proc` itself, and `Z` counts as dead only with one remaining thread (a leader that left
+ * with `pthread_exit()` while another thread runs also reads `Z`). Elsewhere `kill(pid, 0)` decides.
+ */
+function alive(pid: number): boolean {
+  try { process.kill(pid, 0); } catch { return false; }
+  if (process.platform !== "linux") return true;
+  const gone = (error: unknown) => ["ENOENT", "ESRCH"].includes((error as NodeJS.ErrnoException).code ?? "");
+  let stat: string;
+  try { stat = readFileSync(`/proc/${pid}/stat`, "utf8"); } catch (error) { if (gone(error)) return false; throw error; }
+  if (stat.slice(stat.lastIndexOf(")") + 1).trim().split(/\s+/u)[0] !== "Z") return true;
+  let status: string;
+  try { status = readFileSync(`/proc/${pid}/status`, "utf8"); } catch (error) { if (gone(error)) return false; throw error; }
+  return !/^Threads:\s*1\s*$/mu.test(status);
+}
 /**
  * Reads the descendant pid the producer registered, and says so when it did not.
  * A bare readFileSync answered a missing file with ENOENT, which reads in the TAP output as a

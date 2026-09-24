@@ -815,8 +815,10 @@ status/bytes/hash and redirects, renderer/platform data and resolved font-family
 not yet supply platform-stable `systemFontIds`, and canonical treatment of every dynamically
 loaded resource is not complete. “Same input identity implies the same findings” is therefore
 still an intended contract, not a guarantee over inputs outside the fields actually captured.
-The process-tree and profile-cleanup behaviour has real macOS evidence; an equivalent empirical
-Linux run is still missing, and Windows remains unsupported.
+The process-tree and profile-cleanup behaviour has real macOS evidence and now a measured Linux
+run on one VM whose PID 1 collects exited processes late; that run found zombies counted as
+survivors, which is fixed (`docs/limitations.md`). A real container without `--init` is still
+for CI to show, and Windows remains unsupported.
 
 **The break cause comes from the paginator's own attributes, and the two alternatives are
 measured-refuted rather than merely rejected.** Reading the browser cascade is wrong in 4 of 19

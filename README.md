@@ -199,8 +199,12 @@ the run with exit 3, and no flag overrides that: a report produced on an unmeasu
 states things nobody measured.
 
 **Windows is not supported.** Process termination here rests on POSIX process groups. The
-termination and profile-cleanup path is measured on macOS; equivalent Linux behaviour has not
-yet been established empirically. Windows job objects are neither designed for nor measured.
+termination and profile-cleanup path is measured on macOS, and on Linux on one virtual machine
+whose PID 1 collects exited processes late, which is how a defect was found and fixed: exited
+processes waiting for collection (zombies) were counted as survivors, so in a container without an
+init process every live run ended with exit 3. The numbers, and what CI still has to confirm, are
+in [`docs/limitations.md`](docs/limitations.md). Windows job objects are neither designed for nor
+measured.
 
 **The M2/M2d live render path is built.** A live run loads the document through an owned loopback
 origin, paginates it, assembles and validates the snapshot, runs the rules, and binds evidence to

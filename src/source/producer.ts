@@ -28,6 +28,7 @@ import type { ConfigFile } from "../config/contract.ts";
 import type { Report } from "../core/types.ts";
 import type { DocumentRevision } from "../core/types.ts";
 import { identitiesForProducedOutput } from "./identity.ts";
+import { processGroupMembers } from "../acquire/browser.ts";
 import { captureHostGit, bindCapturedRevision, type HostGitRevisionOptions } from "./revision.ts";
 
 export const PRODUCER_RECORD_PROTOCOL = "studio-producer-record-v1" as const;
@@ -524,16 +525,50 @@ export function ownedGroupProbeState(errnoCode: string | undefined): OwnedGroupS
   return "unknown-errno";
 }
 
-/** Verifies closure of the process group created for this producer, independently of its leader. */
-async function cleanupOwnedProducer(child: ReturnType<typeof spawn>): Promise<void> {
-  if (!child.pid) return; // A process-start failure created no owned process group.
-  if (process.platform === "win32") {
-    child.kill("SIGKILL");
-    throw new PublicProducerError("producer incomplete: owned process group cleanup is unsupported");
-  }
-  const group = -child.pid;
+/**
+ * The seam `cleanupOwnedGroup` acts through: the kernel, a clock, and the group's members.
+ *
+ * `groupMembers` answers who carries the pgid, with the platform's proof of which of them have
+ * already exited and only await collection (zombies). `null` means "this platform cannot say",
+ * never "empty". Production reads `/proc` on Linux and answers `null` elsewhere, so macOS keeps the
+ * exact errno reading it had.
+ */
+export interface OwnedGroupOperations {
+  /** `process.kill(target, signal)`: throws the errno exactly as the kernel returned it. */
+  kill(target: number, signal: NodeJS.Signals | 0): void;
+  now(): number;
+  sleep(ms: number): Promise<void>;
+  groupMembers(pgid: number): readonly { pid: number; defunct: boolean }[] | null;
+}
+
+/**
+ * The bounded deadlines, unchanged from the closures they replace: 500 ms for the group to leave
+ * after SIGTERM, 1 000 ms after SIGKILL, sampled every 10 ms. Nothing here waits for PID 1 to
+ * collect a zombie; a proved zombie already counts as gone.
+ */
+export const OWNED_GROUP_BUDGETS: Readonly<{ termMs: number; killMs: number; pollMs: number }> = { termMs: 500, killMs: 1_000, pollMs: 10 };
+
+const KERNEL_GROUP_OPERATIONS: OwnedGroupOperations = {
+  kill: (target, signal) => { process.kill(target, signal); },
+  now: () => Date.now(),
+  sleep: (ms) => new Promise<void>((resolveWait) => setTimeout(resolveWait, ms)),
+  groupMembers: (pgid) => processGroupMembers(pgid),
+};
+
+/**
+ * Verifies that process group `pgid` has left: SIGTERM, a bounded wait, SIGKILL, a bounded wait,
+ * and a failure if the group can still be observed or its state cannot be read at the deadline.
+ * Exported with its seam so the retry and deadline paths are tested with a fake clock rather than
+ * only when an environment happens to produce the errno.
+ */
+export async function cleanupOwnedGroup(
+  pgid: number,
+  operations: OwnedGroupOperations = KERNEL_GROUP_OPERATIONS,
+  budgets: Readonly<{ termMs: number; killMs: number; pollMs: number }> = OWNED_GROUP_BUDGETS,
+): Promise<void> {
+  const group = -pgid;
   const probe = (): OwnedGroupState => {
-    try { process.kill(group, 0); return "present"; }
+    try { operations.kill(group, 0); }
     catch (error) {
       const state = ownedGroupProbeState((error as NodeJS.ErrnoException).code);
       if (state === "unknown-errno") {
@@ -541,9 +576,15 @@ async function cleanupOwnedProducer(child: ReturnType<typeof spawn>): Promise<vo
       }
       return state;
     }
+    // kill() succeeded, so something carried this pgid a moment ago. Only a member list that is
+    // non-empty and entirely defunct turns that into "absent": a zombie cannot run code and holds
+    // no descriptor. An empty list (collected in between) or no list at all stays "present", and
+    // the next sample decides.
+    const members = operations.groupMembers(pgid);
+    return members !== null && members.length > 0 && members.every((member) => member.defunct) ? "absent" : "present";
   };
   const signal = (value: NodeJS.Signals): void => {
-    try { process.kill(group, value); }
+    try { operations.kill(group, value); }
     catch (error) {
       // Same reasoning as the probe: ESRCH means the group is already gone, EPERM means it is on
       // its way out. Neither is a termination failure; the settle loop below decides, and it
@@ -555,21 +596,31 @@ async function cleanupOwnedProducer(child: ReturnType<typeof spawn>): Promise<vo
     }
   };
   const settle = async (duration: number): Promise<OwnedGroupState> => {
-    const deadline = Date.now() + duration;
+    const deadline = operations.now() + duration;
     for (;;) {
       const state = probe();
       if (state === "absent") return "absent";
-      if (Date.now() >= deadline) return state;
-      await new Promise<void>((resolveWait) => setTimeout(resolveWait, 10));
+      if (operations.now() >= deadline) return state;
+      await operations.sleep(budgets.pollMs);
     }
   };
   if (probe() === "absent") return;
   signal("SIGTERM");
-  if (await settle(500) === "absent") return;
+  if (await settle(budgets.termMs) === "absent") return;
   signal("SIGKILL");
-  const final = await settle(1000);
+  const final = await settle(budgets.killMs);
   if (final === "present") throw new PublicProducerError("producer incomplete: owned process group survived bounded cleanup");
   if (final === "indeterminate") throw new PublicProducerError("producer incomplete: owned process group cleanup could not be verified");
+}
+
+/** Verifies closure of the process group created for this producer, independently of its leader. */
+async function cleanupOwnedProducer(child: ReturnType<typeof spawn>): Promise<void> {
+  if (!child.pid) return; // A process-start failure created no owned process group.
+  if (process.platform === "win32") {
+    child.kill("SIGKILL");
+    throw new PublicProducerError("producer incomplete: owned process group cleanup is unsupported");
+  }
+  await cleanupOwnedGroup(child.pid);
 }
 function waitForResult(child: ReturnType<typeof spawn>, timeoutMs: number): Promise<{ exitCode: number | null; recordBytes: Buffer; stderrPresent: boolean }> {
   return new Promise((resolveResult, reject) => {

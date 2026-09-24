@@ -187,7 +187,8 @@ export async function closeBrowserBounded(
   return (
     `${closeError ? `${closeError}; ` : ""}process termination FAILED ` +
     `(pgid=${termination.pgid ?? "unknown"}, groupSafe=${termination.groupSafe}, ` +
-    `initial=${termination.initialPids.join(",")}, survivors=${termination.survivingPids.join(",") || "none"})`
+    `initial=${termination.initialPids.join(",")}, survivors=${termination.survivingPids.join(",") || "none"}` +
+    `${termination.defunctPids.length > 0 ? `, defunct=${termination.defunctPids.join(",")}` : ""})`
   );
 }
 

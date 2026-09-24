@@ -8,7 +8,7 @@
 
 import { strict as assert } from "node:assert";
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { createConnection } from "node:net";
 import { once } from "node:events";
@@ -37,7 +37,10 @@ import {
   type RenderDependencies,
   BROWSER_CLOSE_TIMEOUT_MS,
 } from "../../src/acquire/render-run.ts";
-import { captureProcessTreeOwnership, ownServerLifecycle, terminateProcessTree, type PageLike } from "../../src/acquire/browser.ts";
+import {
+  captureProcessTreeOwnership, linuxProcessTable, ownServerLifecycle, processIsDefunct, terminateProcessTree,
+  TERMINATION_GRACE_MS, type PageLike, type ProcessRow,
+} from "../../src/acquire/browser.ts";
 import type { EvidenceOutcome } from "../../src/render/evidence.ts";
 import { writeEvidencePng, type Rasterizer } from "../../src/render/rasterizer.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
@@ -67,6 +70,24 @@ async function waitForObserved<T>(observe: () => T, accept: (value: T) => boolea
   }
   assert.ok(accept(value), `observable state did not arrive within ${timeoutMs} ms`);
   return value;
+}
+
+/**
+ * Can `pid` still run code? Deliberately independent of the product's reader. A zombie cannot: it
+ * has exited and waits only for its parent to collect it, and for a child of this test process
+ * that collection happens on a later turn of this very event loop, after the assertion. So on
+ * Linux `Z` with one remaining thread reads as dead; elsewhere `kill(pid, 0)` decides.
+ */
+function canRunCode(pid: number): boolean {
+  try { process.kill(pid, 0); } catch { return false; }
+  if (process.platform !== "linux") return true;
+  const gone = (error: unknown) => ["ENOENT", "ESRCH"].includes((error as NodeJS.ErrnoException).code ?? "");
+  let stat: string;
+  try { stat = readFileSync(`/proc/${pid}/stat`, "utf8"); } catch (error) { if (gone(error)) return false; throw error; }
+  if (stat.slice(stat.lastIndexOf(")") + 1).trim().split(/\s+/u)[0] !== "Z") return true;
+  let status: string;
+  try { status = readFileSync(`/proc/${pid}/status`, "utf8"); } catch (error) { if (gone(error)) return false; throw error; }
+  return !/^Threads:\s*1\s*$/mu.test(status);
 }
 
 describe("renderer ownership cleanup order", () => {
@@ -413,12 +434,16 @@ describe("the live path fails closed at its process boundary", () => {
 
   it("terminates and rechecks an isolated process group, including a child born after SIGTERM", async (t) => {
     if (process.platform === "win32") return t.skip("POSIX process groups are unsupported on Windows");
+    // The SIGTERM handler is installed BEFORE the first child is spawned, so that observing two
+    // pids below also proves the root is armed. In the other order a SIGTERM that lands between
+    // the spawn and the handler kills the root outright and the escalation is never exercised:
+    // measured 3 of 10 isolated runs red that way at load 12, once zombies stopped masking it.
     const child = detachedNode(`
       const { spawn } = require("node:child_process");
-      spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
       process.on("SIGTERM", () => {
         spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
       });
+      spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
       setInterval(() => {}, 1000);
     `);
     child.unref();
@@ -433,6 +458,136 @@ describe("the live path fails closed at its process boundary", () => {
     assert.equal(termination.killSent, true, "the SIGTERM-resistant group never reached SIGKILL");
     assert.deepEqual(termination.survivingPids, []);
     assert.equal(termination.verified, true);
+  });
+
+  /*
+   * A zombie is not a survivor. The three tests below pin that from both sides. The fake-table
+   * pair is platform-independent: a row proved `defunct` must not count, a row that is not proved
+   * must, and the deadline runs on the injected clock. The real-kernel one builds a zombie that no
+   * PID 1 can collect early — its parent is a living `sleep` that never waits — so it reproduces
+   * the no-init container case on any Linux host, including a CI runner whose init reaps at once.
+   * Named mutations, each run against these tests:
+   *   M1 "zombie counts as alive": drop the `defunct` filter in refresh/ownership and
+   *      processIsDefunct in alive() -> the first and third go red.
+   *   M2 "every owned row is defunct": defunctIn() ignores the flag -> the second goes red.
+   *   M3 "wall-clock deadline": terminateProcessTree ignores operations.now -> the second goes red.
+   */
+  it("verifies a group whose only remaining member is a proved zombie, and records it separately", async () => {
+    const root = 43_001, child = 43_002;
+    let table: ProcessRow[] = [
+      { pid: root, ppid: 1, pgid: root },
+      { pid: child, ppid: root, pgid: root },
+    ];
+    const signals: Array<[number, NodeJS.Signals]> = [];
+    const result = await terminateProcessTree(root, () => table, {
+      // kill(pid, 0) succeeds on a zombie: the fake answers exactly what the kernel answers.
+      alive: (pid) => pid === root ? table.some((row) => row.pid === root) : true,
+      signal(pid, signal) {
+        signals.push([pid, signal]);
+        // SIGTERM: the root leaves and is collected by its parent; the child exits, is orphaned,
+        // and stays a zombie in the group because nobody collects it.
+        if (pid === -root) table = [{ pid: child, ppid: 1, pgid: root, defunct: true }];
+      },
+      async wait() {},
+    });
+    assert.deepEqual(signals, [[-root, "SIGTERM"]], "a zombie was escalated to SIGKILL as if it were alive");
+    assert.deepEqual(result.survivingPids, []);
+    assert.deepEqual(result.defunctPids, [child]);
+    assert.equal(result.killSent, false);
+    assert.equal(result.verified, true);
+  });
+
+  it("counts an unproved member as a survivor and escalates on a fake clock at the deadline", async () => {
+    const root = 43_101, child = 43_102;
+    let clock = 0;
+    const waits: number[] = [];
+    const signals: Array<[number, NodeJS.Signals]> = [];
+    // The child ignores SIGTERM and SIGKILL alike (a process in uninterruptible sleep does): it is
+    // live and NOT proved defunct, so it must remain a survivor however long the loop runs.
+    const table: ProcessRow[] = [
+      { pid: root, ppid: 1, pgid: root, defunct: true },
+      { pid: child, ppid: root, pgid: root },
+    ];
+    const result = await terminateProcessTree(root, () => table, {
+      alive: () => true,
+      signal(pid, signal) { signals.push([pid, signal]); },
+      // Yield to the event loop so that a mutant that ignores the clock and spins is still
+      // bounded by real time instead of starving the test runner's own timeout.
+      async wait(ms) { waits.push(ms); clock += ms; await new Promise((resolve) => setImmediate(resolve)); },
+      now: () => clock,
+    });
+    assert.deepEqual(result.survivingPids, [child]);
+    assert.deepEqual(result.defunctPids, [root]);
+    assert.equal(result.verified, false);
+    assert.equal(result.killSent, true);
+    assert.deepEqual(signals.filter(([, signal]) => signal === "SIGKILL").map(([pid]) => pid), [-root, child]);
+    // The grace period is measured on the injected clock, not the wall clock: it ran to the
+    // deadline and not one poll further, then the two fixed rechecks.
+    assert.ok(clock >= TERMINATION_GRACE_MS + 200, `the fake clock only reached ${clock} ms`);
+    assert.equal(waits.filter((ms) => ms === 50).length, TERMINATION_GRACE_MS / 50);
+  });
+
+  it("verifies a real group whose leader is a zombie that its living parent never collects", { timeout: 30_000 }, async (t) => {
+    if (process.platform !== "linux") return t.skip("the zombie proof reads /proc; elsewhere kill(pid, 0) still decides");
+    // `setsid` makes the backgrounded sleep the leader of its own group; `exec` then turns its
+    // parent shell into a sleep that never calls wait(). Killing the group leaves the leader a
+    // zombie for as long as the holder lives, whatever PID 1 does.
+    const holder = spawn("sh", ["-c", "setsid sleep 300 & echo $!; exec sleep 300"], { stdio: ["ignore", "pipe", "ignore"] });
+    try {
+      const [line] = await once(holder.stdout!, "data") as [Buffer];
+      const leader = Number(String(line).trim());
+      assert.ok(Number.isSafeInteger(leader) && leader > 1, `no leader pid: ${String(line)}`);
+      await waitForObserved(() => captureProcessTreeOwnership(leader), (ownership) => ownership?.groupSafe === true);
+      const termination = await terminateProcessTree(leader);
+      // Positive control, read independently of the product: the case really happened — the
+      // leader is still in the table as a zombie with one thread, not already collected.
+      const stat = readFileSync(`/proc/${leader}/stat`, "utf8");
+      assert.equal(stat.slice(stat.lastIndexOf(")") + 1).trim().split(/\s+/u)[0], "Z", "the leader never became a zombie; the case did not run");
+      assert.match(readFileSync(`/proc/${leader}/status`, "utf8"), /^Threads:\s*1\s*$/mu);
+      assert.deepEqual(termination.survivingPids, [], "a zombie was reported as a surviving renderer process");
+      assert.deepEqual(termination.defunctPids, [leader]);
+      assert.equal(termination.killSent, false, "a zombie was escalated to SIGKILL as if it were alive");
+      assert.equal(termination.verified, true);
+    } finally {
+      holder.kill("SIGKILL");
+    }
+  });
+
+  it("reads the Linux process table from /proc: proves zombies by thread count and skips released rows", () => {
+    // A synthetic /proc, so the parser's decisions are pinned on every platform. Each row names
+    // its complication. Mutations: accept `Z` without the thread count -> 402 turns defunct, red;
+    // drop the released-row case -> the whole table throws, red; split `comm` at the first `)` ->
+    // 401 is unparseable, red.
+    const proc = mkdtempSync(join(tmpdir(), "breaklint-proc-fixture-"));
+    const row = (pid: number, stat: string, threads?: number) => {
+      mkdirSync(join(proc, String(pid)));
+      writeFileSync(join(proc, String(pid), "stat"), `${stat}\n`);
+      if (threads !== undefined) writeFileSync(join(proc, String(pid), "status"), `Name:\tx\nState:\tx\nThreads:\t${threads}\n`);
+    };
+    try {
+      row(400, "400 (chrome) S 1 400 400 0 -1", 12); // a live group leader
+      row(401, "401 (a ) Z 7 (b)) Z 400 400 400 0 -1", 1); // comm with spaces and parentheses; a true zombie
+      row(402, "402 (leader) Z 1 400 400 0 -1", 2); // left with pthread_exit(): Z, but a thread still runs
+      row(403, "403 (ps) X 0 -1 -1 0 -1"); // released after collection: ppid 0 and pgid -1, already gone
+      mkdirSync(join(proc, "404")); // vanished between readdir and read: no stat any more
+      mkdirSync(join(proc, "self"));
+      const table = linuxProcessTable(proc).sort((a, b) => a.pid - b.pid);
+      assert.deepEqual(table, [
+        { pid: 400, ppid: 1, pgid: 400 },
+        { pid: 401, ppid: 400, pgid: 400, defunct: true },
+        { pid: 402, ppid: 1, pgid: 400 },
+      ]);
+      assert.equal(processIsDefunct(401, "linux", proc), true);
+      assert.equal(processIsDefunct(402, "linux", proc), false, "a zombie leader with a live thread was declared dead");
+      assert.equal(processIsDefunct(403, "linux", proc), true);
+      assert.equal(processIsDefunct(404, "linux", proc), true, "a pid whose /proc entry vanished is gone");
+      assert.equal(processIsDefunct(400, "linux", proc), false);
+      assert.equal(processIsDefunct(401, "darwin", proc), false, "only the Linux reader may prove a zombie");
+      row(405, "405 (broken) S not-a-pid 400");
+      assert.throws(() => linuxProcessTable(proc), /unparseable/u, "a malformed row must make the table unreadable, not disappear");
+    } finally {
+      rmSync(proc, { recursive: true, force: true });
+    }
   });
 
   it("never signals caller or group siblings when the browser process group is shared", async () => {
@@ -518,7 +673,7 @@ describe("the live path fails closed at its process boundary", () => {
       verified += 1;
       forwarded = ownership;
       return {
-        rootPid: pid, pgid: pid, initialPids: [pid], survivingPids: [pid], groupSafe: true,
+        rootPid: pid, pgid: pid, initialPids: [pid], survivingPids: [pid], defunctPids: [], groupSafe: true,
         termSent: true, killSent: true, verified: false,
       };
     }, (pid) => {
@@ -536,7 +691,7 @@ describe("the live path fails closed at its process boundary", () => {
       async newPage() { throw new Error("not reached"); }, async version() { return "Fake/1"; },
       process() { return { pid: 71_002 }; }, async close() {},
     }, async (pid) => ({
-      rootPid: pid, pgid: null, initialPids: [], survivingPids: [], groupSafe: false,
+      rootPid: pid, pgid: null, initialPids: [], survivingPids: [], defunctPids: [], groupSafe: false,
       termSent: false, killSent: false, verified: true,
     }), () => null);
     assert.match(error ?? "", /pre-close process ownership unavailable/u);
@@ -591,7 +746,7 @@ describe("the live path fails closed at its process boundary", () => {
         throw new Error("ps unavailable at initial read");
       }),
     });
-    assert.throws(() => process.kill(pid, 0), /ESRCH/u, "known browser root was not killed");
+    assert.equal(canRunCode(pid), false, "known browser root was not killed");
     assert.equal(existsSync(profile), false, "profile cleanup did not follow root escalation");
     assert.ok(result.documents[0]!.infrastructure.some((event) => event.kind === "renderer-not-terminated"));
   });
@@ -660,7 +815,7 @@ describe("the live path fails closed at its process boundary", () => {
     assert.equal(BROWSER_CLOSE_TIMEOUT_MS, 5_000, "the product's close bound moved; this test is about that bound");
     assert.ok(elapsed >= BROWSER_CLOSE_TIMEOUT_MS, `cleanup gave up before its bound: ${elapsed} ms`);
     assert.ok(elapsed < 60_000, `cleanup hung rather than finishing: ${elapsed} ms`);
-    assert.throws(() => process.kill(pid, 0), /ESRCH/u, "browser PID still exists after verified escalation");
+    assert.equal(canRunCode(pid), false, "browser PID can still run code after verified escalation");
     assert.equal(existsSync(profile), false, "the escalated browser left its explicit profile behind");
     const infrastructure = result.documents[0]!.infrastructure;
     assert.equal(infrastructure.some((event) => event.kind === "renderer-not-terminated"), false);
@@ -718,7 +873,9 @@ describe("the live path fails closed at its process boundary", () => {
       (event) => event.kind === "checker-crashed" && event.measured?.stage === "document-timeout" &&
         event.measured.timeoutMs === 25,
     ));
-    assert.throws(() => process.kill(pid, 0), /ESRCH/u);
+    // Not `ESRCH`: the product's promise is that nothing of the tree can run code any more. The
+    // pid itself is a child of this test process, which collects it on a later loop turn.
+    assert.equal(canRunCode(pid), false, "the timed-out browser pid can still run code");
     assert.equal(existsSync(profile), false);
   });
 
