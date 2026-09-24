@@ -68,6 +68,16 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   guard rather than tightened — and the exit-3 message names the elapsed time and the last lines
   of the browser's stderr (for example a missing shared library).
 
+### Tooling
+
+- **A `lifecycle-soak` CI job.** It runs the browser's close, document-timeout, SIGKILL, SIGINT,
+  SIGTERM and SIGHUP paths 20 times each (`tests/tools/lifecycle-soak.mjs`), under the runner's
+  own init and under `tests/tools/noreap.py`, a parent that adopts orphans and never collects
+  them, and asserts after every iteration that no browser process of that run is alive 2 s later
+  and no profile directory is left. It is its own job so that no other step's browser can confound
+  it and the minutes it takes stay off the critical path. Measured locally: 120 of 120 green in
+  both regimes; on the previous tree, red on every path.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as

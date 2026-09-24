@@ -305,6 +305,23 @@ bounded as a whole by `BROWSER_LAUNCH_TIMEOUT_MS`, 30 s: that is a hang guard, n
 budget — measured starts took 0.3–2.4 s even with twelve at once — and a start that fails now
 reports its elapsed time and the last lines of the browser's stderr.
 
+**What CI has to confirm, and how it can fail.** The `lifecycle-soak` CI job runs the close,
+document-timeout, SIGKILL, SIGINT, SIGTERM and SIGHUP paths 20 times each, first under the
+runner's own init and then under a parent that adopts orphans and never collects them
+(`tests/tools/noreap.py`, the PID 1 of a container without `--init`), and runs the three
+process-group unit tests under that parent too. After every iteration it asserts, with a process
+reader of its own, that no process of that run's browser group is alive 2 s later, that no
+browser process still names the run's private profile root, that no profile directory remains (a
+SIGKILLed run's once the next run's browser is up), that an interrupted CLI ended by its signal,
+and — once per run, against a live CLI — that a sweep keeps a running breaklint's profile. On this
+machine, Chromium 141, both regimes were 120 of 120 green (load up to 17 and 23; 623 zombies held
+by the never-collecting parent at the end). On the tree before this change, three iterations
+each, it was red on all 18 path runs under the never-collecting parent, for the reasons the tables
+above give. Under this machine's own PID 1 the four signal paths were red 3 of 3; close and
+timeout passed in the first iteration and failed afterwards only because browsers that outlived
+earlier kills were still running. That CI reproduces the same on its current Chrome is the open
+part.
+
 **What is still unmeasured.** A real container without `--init` (the never-collecting subreaper
 reproduces its reparenting, not the container), and every interrupt, kill and sweep path on
 macOS.

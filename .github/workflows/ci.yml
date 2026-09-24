@@ -241,3 +241,37 @@ jobs:
           grep -q "uncalibrated" demo.out || { echo "--demo printed no findings on Node 22.13"; exit 1; }
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           echo "Node 22.13: the installed package behaves as documented"
+
+  # The browser's process lifecycle, soaked: close, document timeout, SIGKILL, SIGINT, SIGTERM and
+  # SIGHUP of a real run, 20 times each, asserting after every iteration that nothing of that run is
+  # left — no live process in its browser's group 2 s later, no profile directory (a SIGKILLed run's
+  # by the next run's start-up sweep) — and that an interrupted run ended by its signal, never 0.
+  #
+  # Its own job, not a step of `check`: it must start on a runner where no other step has left a
+  # browser behind, it takes minutes that would otherwise lengthen the critical path, and nothing in
+  # it depends on the build or the live suite. It runs twice: under the runner's own init, and under
+  # a parent that adopts orphans and never collects them — the PID 1 of a container without
+  # `--init`, where zombies once made every live run end with exit 3. `--expect-zombies` is the
+  # positive control that the second regime actually held zombies; the three process-group unit
+  # tests run under it too, so the real kernel sees the no-reap case on every CI run.
+  lifecycle-soak:
+    runs-on: ubuntu-latest
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: "1"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: process lifecycle soak, normal parent and a parent that never collects orphans
+        run: |
+          node --experimental-strip-types tests/tools/lifecycle-soak.mjs --iterations 20
+          python3 tests/tools/noreap.py --expect-zombies 1 -- \
+            node --experimental-strip-types tests/tools/lifecycle-soak.mjs --iterations 20
+          python3 tests/tools/noreap.py --expect-zombies 1 -- \
+            node --test --experimental-strip-types \
+              --test-name-pattern="terminates and rechecks an isolated process group|cleans an owned descendant before a successful acquisition returns|completes timeout cleanup even when the API consumer immediately exits" \
+              tests/unit/render-run.test.ts tests/unit/source-boundary-regressions.test.ts
