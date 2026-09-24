@@ -39,6 +39,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   no test named it. It is now in all three, `tests/e2e/input-validation.test.ts` pins its exit-2
   cases, and the live test `tests/live/cli-out-dir.test.ts` observes the evidence in the named and
   in the default directory (one more live test).
+- The two documented blind spots of the community-intake secret tripwire — candidates shorter
+  than 12 characters, and candidates containing a character outside `A-Z a-z 0-9 + / _ = . : % -`
+  — are pinned on both sides of each boundary by `tests/e2e/community-intake-limits.test.ts`, so a
+  detector change cannot make `docs/community-testing.md` wrong unnoticed.
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as
   `true` does. This was always the behaviour; it is now written down in `docs/limitations.md` and
