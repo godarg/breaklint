@@ -188,6 +188,81 @@ function independentlyRasterInkBounds(path) {
   return { topPx: bottomPx === 0 ? null : topPx, bottomPx, pageHeightPx: decoded.height };
 }
 
+const MINIMUM_PAGE_FILL = 0.6;
+
+/** The first line of each section's first unit, as documented, per section heading. */
+const SECTION_FIRST_UNITS = {
+  "Run summary": /^COVERAGE TRUST\b/u,
+  "Measurement apparatus": /^These non-fatal diagnostics/u,
+  "Checker failure": /^This is not a clean run\./u,
+  "Coverage did not meet the contract": /^This is not a clean run\./u,
+  Findings: /^(?:\d+ measured findings?|0 findings\.|Partial findings only:)/u,
+  "Coverage details": /^Coverage is reported for every rule/u,
+};
+
+/**
+ * Independent of the renderer's DOM: fill is re-measured from each raster's content box, and a
+ * short page is exempt only when the next page's first content line begins with a forced break the
+ * renderer recorded; every documented section heading must share its page with the first line of its
+ * first unit, and every coverage caption with the table's first row.
+ */
+function independentlyCheckPageFlow(pdfPath, rasterPages, recorded, label) {
+  const lines = rasterPages.map((_, index) => run("pdftotext", ["-f", String(index + 1), "-l", String(index + 1), "-layout", pdfPath, "-"])
+    .split("\n").map((line) => line.replace(/\s+/gu, " ").trim()).filter(Boolean)
+    .filter((line) => !/^Page \d+ of \d+$/u.test(line) && !(index > 0 && /^breaklint · /u.test(line))));
+  const rasterDpi = manifest.reviewEnvironment.print.rasterDpi;
+  const marginPx = 12 / 25.4 * rasterDpi;
+  const fill = rasterPages.map((pageArtifact, index) => {
+    const decoded = PNG.sync.read(readFileSync(resolve(output, pageArtifact.path)), { checkCRC: true });
+    const top = Math.ceil(marginPx);
+    const bottom = Math.floor(decoded.height - marginPx);
+    let last = top;
+    for (let y = bottom - 1; y >= top && last === top; y -= 1) {
+      for (let x = 0; x < decoded.width; x += 1) {
+        const offset = (y * decoded.width + x) * 4;
+        if (decoded.data[offset] < 248 || decoded.data[offset + 1] < 248 || decoded.data[offset + 2] < 248) {
+          last = y + 1;
+          break;
+        }
+      }
+    }
+    const depth = Math.round((last - top) / (bottom - top) * 1_000) / 1_000;
+    const nextFirst = lines[index + 1]?.[0] ?? "";
+    const exempt = recorded.forcedBreaks.some((text) => text.length > 0 && nextFirst.startsWith(text.slice(0, 16)));
+    const final = index === rasterPages.length - 1;
+    assert.ok(final || exempt || depth >= MINIMUM_PAGE_FILL, `${label}: page ${index + 1} content ink depth ${(depth * 100).toFixed(1)} % is below ${MINIMUM_PAGE_FILL * 100} %`);
+    return { page: index + 1, contentDepth: depth, final, forcedBreakFollows: exempt };
+  });
+  // Section headings follow the banner: the h1 may wrap so that its first line reads "Findings".
+  let inBody = false;
+  for (const [pageIndex, pageLines] of lines.entries()) {
+    for (const [lineIndex, line] of pageLines.entries()) {
+      inBody ||= line === "Run summary";
+      const unit = inBody ? SECTION_FIRST_UNITS[line] : undefined;
+      if (unit) {
+        assert.ok(pageLines.slice(lineIndex + 1).some((candidate) => unit.test(candidate)), `${label}: section heading "${line}" is stranded on page ${pageIndex + 1}`);
+      }
+      if (/Document verdict:/u.test(line)) {
+        assert.ok(pageLines.slice(lineIndex + 1).some((candidate) => COVERAGE_ROW_LINE.test(candidate)), `${label}: coverage caption is stranded on page ${pageIndex + 1}`);
+      }
+    }
+  }
+  assert.equal(recorded.minimumPageFill, MINIMUM_PAGE_FILL, `${label}: page fill threshold drift`);
+  for (const page of fill) {
+    const other = recorded.fill.find((candidate) => candidate.page === page.page);
+    assert.ok(other && Math.abs(other.contentDepth - page.contentDepth) <= 0.002, `${label}: renderer fill of page ${page.page} disagrees with the independent raster reading`);
+  }
+  assert.ok(recorded.keeps.length >= 4 && recorded.keeps.every((keep) => keep.headingPage !== null && keep.headingPage === keep.unitPage), `${label}: renderer recorded a stranded heading`);
+  return fill;
+}
+
+/** Recorded boxed-block geometry: one left edge, one right edge, and a real gap between blocks. */
+function assertRecordedBoxedBlocks(boxes, label) {
+  assert.ok(boxes.blocks >= 6, `${label}: boxed-block inventory is implausibly small`);
+  assert.ok(boxes.leftSpreadPx <= 1 && boxes.rightSpreadPx <= 1, `${label}: boxed blocks do not share the column's edges`);
+  assert.ok(boxes.smallestGap === null || boxes.smallestGap.gapPx >= 8, `${label}: boxed blocks abut`);
+}
+
 /** The verdict headings docs/reporting.md defines, and their exit codes: the running head's text. */
 const STATE_HEADINGS = {
   clean: ["Clean run", 0],
@@ -447,6 +522,10 @@ function printVisibleContract(state) {
   assert.ok(pageContent.identifierBreaks.flagsWhole.every((flag) => flag.whole), `print/${state}: a command is not whole on one PDF line`);
   assert.ok(pdf.printSemantics.identifiers.every((identifier) => identifier.lines.length === 1), `print/${state}: an identifier is split in the print layout`);
   pageContent.furniture = independentlyCheckPageFurniture(resolve(output, pdf.path), pdf.pages, state, `print/${state}`);
+  assert.ok(pdf.pageContentChecks.flow, `print/${state}: renderer recorded no page-flow checks`);
+  independentlyCheckPageFlow(resolve(output, pdf.path), raster.pages, pdf.pageContentChecks.flow, `print/${state}`);
+  pageContent.flow = pdf.pageContentChecks.flow;
+  assertRecordedBoxedBlocks(pdf.printSemantics.boxedBlocks, `print/${state}`);
   if (state === "clean") {
     const text = run("pdftotext", ["-layout", resolve(output, pdf.path), "-"]).replace(/\s+/gu, " ");
     pageContent.cleanFindingsStatement = { heading: /\bFindings\b/u.test(text.replace(/Findings \(0\)/gu, "")), zeroFindings: text.includes("0 findings") };
@@ -622,6 +701,7 @@ for (const artifact of manifest.artifacts) {
     assertRecordedFonts(artifact.semantics.fonts, artifact.cell);
     assertRecordedTableGeometry(artifact.semantics.coverageTables, artifact.cell);
     assertRecordedAccessibility(artifact.semantics.accessibility, artifact.cell);
+    assertRecordedBoxedBlocks(artifact.semantics.boxedBlocks, artifact.cell);
     assert.ok(artifact.semantics.identifiers.every((identifier) => identifier.lines.length === 1 ||
       (identifier.lines.length === 2 && identifier.lines[0].endsWith("/"))), `${artifact.cell}: an identifier breaks outside its namespace slash`);
     const caveat = artifact.semantics.remediationCaveat;
@@ -654,9 +734,11 @@ assert.ok(fontMutationControl, "PDF font mutation control did not run");
 // gained a remediation box; 31 when coverage became one aligned table instead of thirteen six-label
 // cards (measured per state: clean 5 -> 2, findings 12 -> 9, infrastructure 13 -> 10,
 // insufficient-coverage 13 -> 10 on Chromium 141 / linux); 32 when the clean print kept its findings
-// section (clean 2 -> 3). Tablet and mobile cells also ship viewport-height tiles, pinned the same way.
-assert.deepEqual(manifest.physicalArtifacts, { screens: 24, screenTiles: 148, pdfs: 4, rasterPages: 32 },
-  "the report-surface inventory must be exactly 24 screens with 148 viewport tiles, 4 PDFs and 32 PDF page rasters");
+// section (clean 2 -> 3); 26 when findings fragment between their units instead of taking one page
+// each (findings 9 -> 7, infrastructure 10 -> 8, insufficient-coverage 10 -> 8). Tablet and mobile
+// cells also ship viewport-height tiles, pinned the same way.
+assert.deepEqual(manifest.physicalArtifacts, { screens: 24, screenTiles: 148, pdfs: 4, rasterPages: 26 },
+  "the report-surface inventory must be exactly 24 screens with 148 viewport tiles, 4 PDFs and 26 PDF page rasters");
 
 const latestRound = describeLatestRound(ledger, currentReviewInput.fingerprint);
 // The human gate's state belongs where a release reader looks, not only in a log line.

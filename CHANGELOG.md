@@ -105,6 +105,17 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   header and the end mark show the run id, and every findings lead states its count ("0
   findings"). The run id reaches CSS only through a string escaper, tested with hostile ids.
 
+- **Printed pages are full, and boxed blocks share one edge.** Every finding was kept whole on one
+  page, so seven findings took seven pages and three of four PDFs had pages filled to 29–45 %; the
+  alert box ended 62 px short of the card below it in print (527 px on a desktop) and touched it.
+  Findings now split between their units — head, each fact, tail — never inside one, with the
+  card frame repeated on both pages; boxed blocks share the column's edges with a real gap. Printed
+  reports drop from 43 pages in 0.6.0 to 26 (clean 3, findings 7, infrastructure 8,
+  insufficient-coverage 8) with every non-final page at 80–100 %. The surface gate fails any
+  non-final page below 60 % of the content box (unless the next page starts with a declared forced
+  break), any heading or caption stranded from what it introduces, and any boxed block off the
+  column edge or abutting its neighbour.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as

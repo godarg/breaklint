@@ -67,7 +67,12 @@ export const REPORT_HTML_STYLES = String.raw`
   .summary-grid small { display: block; margin-block-start: var(--bl-space-2); color: var(--bl-color-fg-muted); font-size: var(--bl-font-size-sm); font-weight: 400; }
   .run-facts { display: grid; grid-template-columns: repeat(4, minmax(9rem, 1fr)); gap: var(--bl-space-4); margin-block: var(--bl-space-5) 0; padding-block: var(--bl-space-4); border-block: var(--bl-border-thin) solid var(--bl-color-divider); }
   .run-facts dd, .finding-facts dd { margin: var(--bl-space-1) 0 0; }
-  .state-alert { max-width: var(--bl-text-width); padding: var(--bl-space-5); border-inline-start: var(--bl-border-strong) solid var(--bl-color-accent-warn); background: var(--bl-color-soft); }
+  /* Boxed blocks share the column's edges; the 72ch measure applies to the text inside them. An
+     alert as wide as its text ended 62 px short of the card below it in print and 527 px on a
+     desktop, and abutted that card with no gap. */
+  .state-alert { margin-block-end: var(--bl-space-4); padding: var(--bl-space-5); border-inline-start: var(--bl-border-strong) solid var(--bl-color-accent-warn); background: var(--bl-color-soft); }
+  .state-alert > p, .state-alert > ul, .empty-state > p { max-width: var(--bl-text-width); }
+  .state-alert > :last-child, .empty-state > :last-child { margin-block-end: 0; }
   .checker-list, .finding-list { padding: 0; list-style: none; }
   .checker-list { display: grid; gap: var(--bl-space-4); }
   .checker-event { padding: var(--bl-space-4); border: var(--bl-border-thin) solid var(--bl-color-divider); border-radius: var(--bl-radius-sm); background: var(--bl-color-paper); }
@@ -103,7 +108,7 @@ export const REPORT_HTML_STYLES = String.raw`
   .coverage-shortfall-item { margin-block-end: var(--bl-space-3); }
   .coverage-shortfall-item p { margin: 0 0 var(--bl-space-1); }
   .coverage-shortfall-item ul { margin: var(--bl-space-1) 0 0; padding-inline-start: var(--bl-space-4); }
-  .empty-state { max-width: var(--bl-text-width); padding: var(--bl-space-5); border: var(--bl-border-thin) solid var(--bl-color-divider); border-radius: var(--bl-radius-sm); background: var(--bl-color-paper); }
+  .empty-state { padding: var(--bl-space-5); border: var(--bl-border-thin) solid var(--bl-color-divider); border-radius: var(--bl-radius-sm); background: var(--bl-color-paper); }
   .coverage-documents { display: grid; gap: var(--bl-space-6); }
   /* Coverage is one aligned table per document: the rule id is the row header, counts, coverage and
      floor are right-aligned tabular numbers, the result is text. */
@@ -196,9 +201,16 @@ export const REPORT_HTML_STYLES = String.raw`
     /* The last two rows never part: see renderCoverageTable in html.ts. */
     .coverage-tail { break-inside: avoid; }
     .report-header, .summary-grid > div, .checker-event, .state-alert, .empty-state { break-inside: avoid; }
-    /* Compact findings stay whole. A finding taller than the page still fragments by necessity. */
-    .finding { break-inside: avoid-page; }
-    .finding h3, .finding-facts > div, .evidence-state { break-inside: avoid; }
+    /* A finding is 60-73 % of an A4 content box, so whole findings meant one finding per page and
+       pages filled to 29-45 % (measured on 0.6.0). A finding now fragments BETWEEN its units and
+       never inside one: its head (severity, rule, message), each fact, and its tail (remediation,
+       note, evidence) — the tail is one unit, because an evidence line alone in a cloned frame at
+       the top of a page reads as a stray. A split card repeats its frame on both pages. */
+    .finding-list { display: block; }
+    .finding-list > li + li { margin-block-start: var(--bl-space-4); }
+    .finding { break-inside: auto; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+    .finding-head, .finding-facts > div, .finding-tail { break-inside: avoid; }
+    .finding-head { break-after: avoid; }
     /* The footer prints as the end mark and stays with the content before it. */
     .report-footer { margin-block-start: var(--bl-space-5); break-before: avoid; break-inside: avoid; }
     a { color: var(--bl-color-fg-primary); }

@@ -94,8 +94,13 @@ cell; `broken-untested-repeat` and `broken-untested-marker` are its red controls
   three and twelve screens down. Print omits both.
 - The report follows the operating-system light/dark preference and honours reduced motion.
 - Print forces the light palette, uses an A4 page with 12 mm margins and keeps finding evidence in
-  the normal vertical flow. Compact findings stay together; a finding taller than one page may
-  still split instead of creating a clipped or missing continuation. A coverage row never splits,
+  the normal vertical flow. A finding fragments between its units and never inside one: its head
+  (severity, rule and message), each measured fact, and its tail (remediation, note and evidence);
+  a split card repeats its frame on both pages. Whole, page-atomic findings (60–73 % of a page
+  each) meant one finding per printed page and pages filled to 29–45 % in 0.6.0. Boxed blocks —
+  header, contents, summary, run facts, alert, checker card, empty state, finding, coverage table
+  and footer — share one left and one right edge, and each is separated from the next by a gap; the
+  72ch measure applies to the text inside them. A coverage row never splits,
   the column header repeats on a continuation page, and the last two rows of a table never part.
   Printed content never exceeds the 703 CSS px content box: wider content makes Chrome scale the
   whole printed document down to fit, silently.
@@ -368,6 +373,29 @@ whole rule, its right half, its left half and both (`broken-row-rule`, `broken-r
 side) — and, new with the table, a numeric column losing its alignment (`broken-column-alignment`)
 and a header that stops repeating (`broken-header-repeat`, on the long-table probe).
 
-Page content checks reject empty non-cover pages.
+Page content checks reject empty non-cover pages. Page fill is checked from the rasters: every
+page except the last must carry ink to at least **60 %** of the content box's height (measured
+between the 12 mm margins, so the running head and folio cannot make a short page look full). The
+threshold is derived, not chosen: the tallest unit the print layout may not break is measured and
+recorded per PDF (at most 384.8 CSS px, 37 % of the 1031.8 px content box, in the canonical
+states), so a page that ends early because its next unit did not fit is still at least 63 % full;
+anything shorter means a unit is larger than it has to be or a break is in the wrong place. The only
+exemption is a deliberate section boundary, defined mechanically: the next page begins with an
+element whose computed `break-before` is `page`, `left`, `right`, `recto` or `verso` — the canonical
+report declares none. Measured on Chromium 141 / linux, every non-final page reaches 80–100 %
+(clean 3 pages, findings 7, infrastructure 8, insufficient-coverage 8; 43 in 0.6.0). Keep-with-next
+is checked from the PDF text: every section heading shares its page with the first line of the unit
+it introduces, and every coverage caption with its table's first row (the verifier holds its own
+table of documented section openings). Boxed-block edges and gaps are checked in the DOM of every
+screen cell and in print. Red controls: `broken-page-fill` restores page-atomic findings ("page 6
+content ink depth 57.5 % is below 60 %"), `broken-alert-width` restores the narrow alert ("right
+spread 527.31 px" on a desktop), `broken-alert-gap` removes its gap, and `broken-heading-keep`
+forces the first coverage row away from its caption.
+
+`selfcheck:live` runs the report's own HTML through the real paginator and must catch an injected
+block that promises not to break and cannot keep the promise. That control used to inject into a
+whole finding card; since findings fragment between units, the card is no longer a candidate of the
+rule (measured: the old injection now ends clean, exit 0), so the control injects into a finding's
+tail, which still asks not to be broken.
 
 The portable bundle keeps `report.json` as the historical capture record. `context.json` adds `bundleEvidence` contract version 1 with current per-finding asset availability; `bundle.json` lists every copied PNG/PDF and its SHA-256 and byte length. A missing or tampered local asset remains `missing-or-integrity-failed` in both HTML and AI context. A historical report comparison is not a fresh verification of local bundle assets. Overflow crops show the visible intersection while preserving the original target coordinates.

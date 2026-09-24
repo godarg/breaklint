@@ -142,12 +142,14 @@ function renderFindings(model: ReturnType<typeof buildHtmlReportModel>): string 
     : `<ol class="finding-list">
 ${model.findings.map((finding) => `<li>
 <article class="finding ${esc(finding.severity)}" id="${esc(finding.id)}" aria-labelledby="${esc(finding.id)}-title">
+  <div class="finding-head">
   <div class="finding-kicker">
     <span class="severity ${esc(finding.severity)}">${esc(finding.severityLabel)}</span>
     ${finding.experimental ? `<span class="experimental">Experimental</span>` : ""}
   </div>
   <h3 id="${esc(finding.id)}-title">${ruleIdCode(finding.ruleId)} · page ${finding.page}</h3>
   <p class="finding-message">${esc(finding.message)}</p>
+  </div>
   <dl class="finding-facts">
     <div><dt>Document</dt><dd class="mono">${esc(finding.document)}</dd></div>
     <div><dt>Source</dt><dd class="mono">${finding.source ? esc(finding.source) : "Unknown — no source location was measured"}</dd></div>
@@ -156,10 +158,12 @@ ${model.findings.map((finding) => `<li>
     <div><dt>Calibration</dt><dd>${esc(finding.calibration)}</dd></div>
     <div><dt>Proof source</dt><dd>${finding.proofSource ? esc(finding.proofSource) : "None declared"}</dd></div>
   </dl>
+  <div class="finding-tail">
   ${finding.remediation ? `<div class="finding-remediation"><p><strong>Remediation</strong>${finding.remediationTested === false ? ` <span class="untested-marker">untested</span>` : ""} ${esc(finding.remediation)}</p></div>` : ""}
   ${finding.frequencyNote ? `<div class="finding-frequency-note"><p><strong>Note:</strong> ${esc(finding.frequencyNote)}</p></div>` : ""}
   ${renderFindingEvidence(finding)}
   ${finding.ambiguity ? `<p class="evidence-state"><strong>Ambiguity:</strong> ${esc(finding.ambiguity)}</p>` : ""}
+  </div>
 </article>
 </li>`).join("\n")}
 </ol>`;

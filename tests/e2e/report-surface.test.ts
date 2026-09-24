@@ -158,6 +158,8 @@ describe("HTML Report Surface v2", () => {
     const report = findingsReportState();
     const html = renderHtml(report);
     assert.equal((html.match(/<article class="finding /gu) ?? []).length, report.findings.length);
+    assert.equal((html.match(/<div class="finding-head">/gu) ?? []).length, report.findings.length, "each finding has one head unit");
+    assert.equal((html.match(/<div class="finding-tail">/gu) ?? []).length, report.findings.length, "each finding has one tail unit");
     for (const field of ["Document", "Source", "Measured", "Threshold", "Calibration", "Proof source", "Evidence:"]) {
       assert.ok(html.includes(field), `finding grammar is missing ${field}`);
     }
@@ -342,7 +344,9 @@ describe("HTML Report Surface v2", () => {
     assert.match(html, /\.coverage-table tr \{ break-inside: avoid; \}/u, "a printed coverage row never splits");
     assert.match(html, /\.coverage-tail \{ break-inside: avoid; \}/u, "the last two coverage rows stay together");
     assert.match(html, /\.coverage-table \.num \{ text-align: end; \}/u, "numeric coverage columns are end-aligned");
-    assert.match(html, /\.finding \{ break-inside: avoid-page; \}/u, "compact findings should not split across pages");
+    assert.match(html, /\.finding \{ break-inside: auto; box-decoration-break: clone;/u, "findings fragment between their units and repeat their frame");
+    assert.match(html, /\.finding-head, \.finding-facts > div, \.finding-tail \{ break-inside: avoid; \}/u, "a finding never splits inside a unit");
+    assert.doesNotMatch(html, /\.finding \{ break-inside: avoid-page; \}/u, "whole findings meant one finding per printed page");
     assert.match(html, /section > h2 \{ break-after: avoid; \}/u, "section headings must stay with their first content");
     assert.match(html, /\.report-footer \{[^}]*break-before: avoid;[^}]*\}/u, "the printed end mark stays with the content before it");
     assert.doesNotMatch(html, /findings-empty \{ display: none; \}/u, "clean print keeps its findings statement");

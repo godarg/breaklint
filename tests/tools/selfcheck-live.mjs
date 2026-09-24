@@ -5,7 +5,7 @@
  *
  * This does not trust HTML wording or the child process alone. It creates the report through the
  * public CLI, runs that exact HTML through the real browser/paginator/evidence/engine path, and
- * checks the canonical JSON. A transformed unbreakable finding card is the paired red control.
+ * checks the canonical JSON. A transformed unbreakable finding tail is the paired red control.
  */
 
 import assert from "node:assert/strict";
@@ -82,10 +82,19 @@ try {
     }
   }
 
-  // Fault injection: the report's finding cards promise `break-inside: avoid-page`. Giving the
-  // first card a fixed height beyond the page content box makes that promise arithmetically
-  // impossible without touching the rule threshold. If the exact same browser chain stays green,
-  // the selfcheck is theatre.
+  // Fault injection: each finding's tail (remediation, note and evidence) promises
+  // `break-inside: avoid` in print. Giving the first tail a fixed height beyond the page content box
+  // makes that promise arithmetically impossible without touching the rule threshold. If the exact
+  // same browser chain stays green, the selfcheck is theatre.
+  //
+  // The target moved from the whole finding card to one of its units when findings started to
+  // fragment between their units: the card itself is `break-inside: auto` now, so it is no longer a
+  // candidate of the rule and injecting into it would prove nothing. The tail still asks not to be
+  // broken, so the control keeps testing what it tested before — a block that promises not to break
+  // and cannot keep the promise. Measured locally (patched Chromium 141, no evidence binding): the
+  // tail, the report header and the findings section heading each give one error finding at
+  // exactly 1600 px; the finding HEAD does not qualify — Paged.js 0.4.3 dropped 117 of 331 source
+  // ids after an oversized head that also carries `break-after: avoid`, and the run ended exit 3.
   //
   // The injected height is absolute, and that is the point. This control used to multiply the
   // card's own height with `transform: scaleY(20)`, which made the fault a MULTIPLE of the card's
@@ -96,15 +105,15 @@ try {
   // with an expiry date. (That the rule measures a FRAGMENT rather than the block when the
   // paginator splits it is a separate open question about the rule, not about this control.)
   const source = readFileSync(ownHtml, "utf8");
-  const needle = '<article class="finding ';
-  assert.ok(source.includes(needle), "the own report contains no finding card for the red control");
+  const needle = '<div class="finding-tail">';
+  assert.ok(source.includes(needle), "the own report contains no finding tail for the red control");
   const INJECTED_CARD_HEIGHT_PX = 1600;
   const brokenHtml = join(scratch, "breaklint-own-report-broken.html");
   writeFileSync(
     brokenHtml,
     source.replace(
       needle,
-      `<article style="height:${INJECTED_CARD_HEIGHT_PX}px;overflow:hidden" class="finding `,
+      `<div style="height:${INJECTED_CARD_HEIGHT_PX}px;overflow:hidden" class="finding-tail">`,
     ),
   );
   const redJson = join(scratch, "selfcheck-red.json");
@@ -152,7 +161,7 @@ try {
 
   process.stdout.write(
     `live self-application: ${PROOF_A_RULES.length} proof-A rules clean with full candidate coverage; ` +
-      "oversized unbreakable-card control caught\n",
+      "oversized unbreakable finding-tail control caught\n",
   );
 } finally {
   rmSync(scratch, { recursive: true, force: true });

@@ -88,6 +88,17 @@ const SURFACE_CONTROLS = {
   }` },
   // Rule ids may break at a hyphen inside the name again.
   "broken-rule-id-wrap": { screen: `.rule-id > span { white-space: normal !important; } .finding h3 { max-inline-size: 12ch !important; }` },
+  // Page fill, alignment and keep-with-next controls.
+  "broken-page-fill": { print: `@media print { .finding, .finding-list > li { break-inside: avoid-page !important; } }` },
+  "broken-alert-width": {
+    screen: `.state-alert { max-width: 72ch !important; }`,
+    print: `.state-alert { max-width: 72ch !important; }`,
+  },
+  "broken-alert-gap": {
+    screen: `.state-alert { margin-block-end: 0 !important; }`,
+    print: `.state-alert { margin-block-end: 0 !important; }`,
+  },
+  "broken-heading-keep": { print: `@media print { .coverage-table tbody:first-of-type > tr:first-child { break-before: page !important; } }` },
   // Page furniture controls: the folio, the running head, the clean findings statement and the end mark.
   "broken-folio": { print: `@page { @bottom-right { content: none !important; } }` },
   "broken-running-head": { print: `@page { @top-right { content: none !important; } }` },
@@ -681,6 +692,143 @@ function rasterInkBounds(path) {
   return { topPx: bottomPx === 0 ? null : topPx, bottomPx, pageHeightPx: decoded.height };
 }
 
+/** Fill threshold for every non-final printed page, as a share of the A4 content box's height. */
+const MINIMUM_PAGE_FILL = 0.6;
+
+/**
+ * Ink depth inside the content box only: the last raster row with ink, between the 12 mm top and
+ * bottom margins, as a share of the content-box height. The running head and folio live in the
+ * margins and cannot make a short page look full.
+ */
+function contentBoxInkDepth(path) {
+  const decoded = PNG.sync.read(readFileSync(path), { checkCRC: true });
+  const top = Math.ceil(PRINT_MARGIN_RASTER_PX);
+  const bottom = Math.floor(decoded.height - PRINT_MARGIN_RASTER_PX);
+  let last = top;
+  for (let y = top; y < bottom; y += 1) {
+    for (let x = 0; x < decoded.width; x += 1) {
+      const offset = (y * decoded.width + x) * 4;
+      if (decoded.data[offset] < 248 || decoded.data[offset + 1] < 248 || decoded.data[offset + 2] < 248) {
+        last = y + 1;
+        break;
+      }
+    }
+  }
+  return Math.round((last - top) / (bottom - top) * 1_000) / 1_000;
+}
+
+/**
+ * Evaluated in print: the geometry the fill, alignment and keep-with-next checks need.
+ * - boxed blocks of the main column (header, contents, summary grid, run facts, alert, checker
+ *   card, empty state, finding, coverage table, footer) must share one left and one right edge
+ *   within 1 px, and each must be separated from the next by a real gap;
+ * - declared forced breaks (a computed break-before of page/left/right/recto/verso) are the only
+ *   "deliberate section boundary" a short page may end at, recorded with their first text;
+ * - every section heading and table caption is paired with the first text of the unit it
+ *   introduces;
+ * - the tallest unit that may not break, which bounds how short a page can honestly end.
+ */
+function printLayoutInPage() {
+  const round = (value) => Math.round(value * 100) / 100;
+  const visible = (element) => getComputedStyle(element).display !== "none" && element.getClientRects().length > 0;
+  // The first rendered line of an element: innerText separates block-level boxes with newlines,
+  // so this is what pdftotext will find on one line.
+  const firstText = (element) => ((element?.innerText ?? "").split("\n").map((line) => line.replace(/\s+/gu, " ").trim()).find(Boolean) ?? "").slice(0, 32);
+  const forcedBreaks = [...document.querySelectorAll("body *")]
+    .filter((element) => ["page", "left", "right", "recto", "verso"].includes(getComputedStyle(element).breakBefore) && visible(element))
+    .map((element) => firstText(element));
+  const keeps = [];
+  for (const heading of document.querySelectorAll("main h2")) {
+    if (!visible(heading)) continue;
+    const group = heading.closest(".section-heading") ?? heading;
+    let next = group.nextElementSibling;
+    while (next && (!visible(next) || firstText(next) === "")) next = next.nextElementSibling;
+    if (next) keeps.push({ heading: heading.textContent.trim(), unit: firstText(next.matches(".coverage-documents") ? next.querySelector("caption") : next) });
+  }
+  for (const caption of document.querySelectorAll(".coverage-table caption")) {
+    const row = caption.closest("table").querySelector("tbody th[scope=row]");
+    if (row) keeps.push({ heading: caption.innerText.replace(/\s+/gu, " ").trim(), unit: firstText(row) });
+  }
+  const units = [...document.querySelectorAll(".report-header, .apparatus-section, .checker-event, .state-alert, .empty-state, .section-heading, .finding-head, .finding-facts > div, .finding-tail, .coverage-tail, .coverage-table tr")]
+    .filter(visible).map((element) => element.getBoundingClientRect().height);
+  return { forcedBreaks, keeps, largestUnbreakableUnitPx: round(Math.max(0, ...units)) };
+}
+
+function boxedBlocksInPage() {
+  const round = (value) => Math.round(value * 100) / 100;
+  const blocks = [...document.querySelectorAll(".report-header, .report-contents, .summary-grid, .run-facts, .state-alert, .checker-event, .empty-state, .finding, .coverage-table, .report-footer")]
+    .filter((element) => getComputedStyle(element).display !== "none" && element.getClientRects().length > 0)
+    .map((element) => ({ block: element.classList[0] ?? element.tagName.toLowerCase(), rect: element.getBoundingClientRect() }));
+  const lefts = blocks.map((block) => block.rect.left);
+  const rights = blocks.map((block) => block.rect.right);
+  const gaps = blocks.slice(1).map((block, index) => ({
+    after: blocks[index].block,
+    before: block.block,
+    gapPx: round(block.rect.top - blocks[index].rect.bottom),
+  }));
+  return {
+    blocks: blocks.length,
+    leftSpreadPx: round(Math.max(...lefts) - Math.min(...lefts)),
+    rightSpreadPx: round(Math.max(...rights) - Math.min(...rights)),
+    narrowest: blocks.reduce((best, block) => (block.rect.right < (best?.right ?? Infinity) ? { block: block.block, right: round(block.rect.right) } : best), null),
+    smallestGap: gaps.reduce((best, gap) => (gap.gapPx < (best?.gapPx ?? Infinity) ? gap : best), null),
+  };
+}
+
+const MINIMUM_BLOCK_GAP_PX = 8;
+
+function assertBoxedBlocks(boxes, label) {
+  if (boxes.leftSpreadPx > 1 || boxes.rightSpreadPx > 1) {
+    throw new Error(`${label}: boxed blocks do not share the column's edges (left spread ${boxes.leftSpreadPx} px, right spread ${boxes.rightSpreadPx} px; narrowest ${JSON.stringify(boxes.narrowest)})`);
+  }
+  if (boxes.smallestGap && boxes.smallestGap.gapPx < MINIMUM_BLOCK_GAP_PX) {
+    throw new Error(`${label}: boxed blocks abut: ${JSON.stringify(boxes.smallestGap)} (minimum gap ${MINIMUM_BLOCK_GAP_PX} px)`);
+  }
+}
+
+/**
+ * Page fill and keep-with-next, read from the PDF and its rasters.
+ * - every non-final page reaches MINIMUM_PAGE_FILL of the content box, unless the page after it
+ *   begins with a declared forced break;
+ * - no heading or caption ends up on a different page from the first text of what it introduces.
+ */
+function pageFlowChecks(pdfPath, rasterPages, layout, label) {
+  const pageLines = rasterPages.map((_, index) => run("pdftotext", ["-f", String(index + 1), "-l", String(index + 1), "-layout", pdfPath, "-"])
+    .split("\n").map((line) => line.replace(/\s+/gu, " ").trim()).filter(Boolean));
+  const contentLines = pageLines.map((lines, index) => lines.filter((line) =>
+    !/^Page \d+ of \d+$/u.test(line) && !(index > 0 && /^breaklint · /u.test(line))));
+  const fill = rasterPages.map((raster, index) => {
+    const depth = contentBoxInkDepth(join(OUTPUT, raster.path));
+    const nextFirst = contentLines[index + 1]?.[0] ?? "";
+    const forcedBreakFollows = layout.forcedBreaks.some((text) => text.length > 0 && nextFirst.replace(/\s+/gu, " ").startsWith(text.slice(0, 16)));
+    return { page: index + 1, contentDepth: depth, final: index === rasterPages.length - 1, forcedBreakFollows };
+  });
+  const locate = (text, from) => {
+    for (let page = from.page; page < contentLines.length; page += 1) {
+      const start = page === from.page ? from.line + 1 : 0;
+      const hit = contentLines[page].findIndex((line, index) => index >= start && line.replace(/\s+/gu, " ").includes(text));
+      if (hit >= 0) return { page, line: hit };
+    }
+    return null;
+  };
+  const keeps = layout.keeps.map((keep) => {
+    let heading = null;
+    for (let page = 0; page < contentLines.length && !heading; page += 1) {
+      const line = contentLines[page].findIndex((candidate) => candidate === keep.heading);
+      if (line >= 0) heading = { page, line };
+    }
+    const unit = heading ? locate(keep.unit.slice(0, 24), heading) : null;
+    return { heading: keep.heading, unit: keep.unit, headingPage: heading ? heading.page + 1 : null, unitPage: unit ? unit.page + 1 : null };
+  });
+  const stranded = keeps.filter((keep) => keep.headingPage === null || keep.unitPage === null || keep.headingPage !== keep.unitPage);
+  if (stranded.length > 0) throw new Error(`${label}: heading stranded from what it introduces: ${JSON.stringify(stranded)}`);
+  const short = fill.filter((page) => !page.final && !page.forcedBreakFollows && page.contentDepth < MINIMUM_PAGE_FILL);
+  if (short.length > 0) {
+    throw new Error(`${label}: page ${short[0].page} content ink depth ${(short[0].contentDepth * 100).toFixed(1)} % is below ${MINIMUM_PAGE_FILL * 100} %: ${JSON.stringify(short)}`);
+  }
+  return { minimumPageFill: MINIMUM_PAGE_FILL, fill, keeps, forcedBreaks: layout.forcedBreaks, largestUnbreakableUnitPx: layout.largestUnbreakableUnitPx };
+}
+
 function pageContentChecks(pdfPath, rasterPages) {
   const pages = rasterPages.map((raster, index) => {
     const page = index + 1;
@@ -842,6 +990,8 @@ try {
           assertCoverageTableGeometry(semantics.coverageTables, `${state}/${theme}/${viewport}`);
           semantics.identifiers = await page.evaluate(identifierLinesInPage);
           assertIdentifierLines(semantics.identifiers, `${state}/${theme}/${viewport}`, { print: false });
+          semantics.boxedBlocks = await page.evaluate(boxedBlocksInPage);
+          assertBoxedBlocks(semantics.boxedBlocks, `${state}/${theme}/${viewport}`);
           semantics.remediationCaveat = await page.evaluate(remediationCaveatInPage);
           assertRemediationCaveat(semantics.remediationCaveat, `${state}/${theme}/${viewport}`);
           if (
@@ -930,6 +1080,9 @@ try {
       assertIdentifierLines(printSemantics.identifiers, `print/${state}`, { print: true });
       printSemantics.remediationCaveat = await page.evaluate(remediationCaveatInPage);
       assertRemediationCaveat(printSemantics.remediationCaveat, `print/${state}`);
+      printSemantics.layout = await page.evaluate(printLayoutInPage);
+      printSemantics.boxedBlocks = await page.evaluate(boxedBlocksInPage);
+      assertBoxedBlocks(printSemantics.boxedBlocks, `print/${state}`);
       printSemantics.coverageTables = await page.evaluate(coverageTableGeometryInPage);
       printSemantics.coverageRowCount = printSemantics.coverageTables.reduce((sum, table) => sum + table.rows, 0);
       if (
@@ -957,6 +1110,7 @@ try {
       const { pdfPath, rasterPages } = printed;
       const { pages, pageSize } = printed.pdf;
       const pageContent = pageContentChecks(pdfPath, rasterPages);
+      pageContent.flow = pageFlowChecks(pdfPath, rasterPages, printSemantics.layout, state);
       const reportTitle = await page.evaluate(() => document.querySelector("h1")?.textContent ?? "");
       pageContent.furniture = pageFurnitureChecks(pdfPath, pages, {
         runningHead: `breaklint · ${reportTitle} · exit ${report.exitCode}`,
