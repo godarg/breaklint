@@ -287,11 +287,17 @@ The real Studio repair attempt was performed by an independent agent. No fresh h
 **A per-fragment applicability decision can be silent about a property of the whole element.**
 `layout/unbreakable-block-too-tall` skipped every fragment after the first and therefore compared
 the height of a *piece* against the page. Measured on 2026-09-18: a six-page `break-inside: avoid`
-section came back `clean` at exit 0, fragment 0 reading 596.36 px against a 680.31 px page. That
-particular rule now sums its fragments. The **class** is not closed: every rule in this registry
-decides applicability per fragment, and any future rule whose quantity belongs to the element
-rather than to the piece can repeat this. There is no gate that detects the shape; what caught this
-one was a red control that had quietly stopped being red.
+section came back `clean` at exit 0, fragment 0 reading 596.36 px against a 680.31 px page. 0.6.0
+repaired that only from the third fragment on (below). Every rule in this registry decides per
+snapshot record, so the class is general; since this release it has a gate. Every rule declares
+what its quantity belongs to (`quantityScope`; a rule that does not, does not compile), and every
+rule that declares the whole element is split by `tests/unit/fragment-contract.test.ts` over two and
+three pages on each corpus fixture about it and must give the same findings and verdict, while the
+`first-fragment-only` mutant in `npm run test:mutants` must change its answer. The gate is only as
+good as the declaration: a rule that measures an element-level quantity and declares `fragment` is
+not held to it. Two released rules sit near that line and are declared `fragment` for what they do
+today: `type/short-last-line` judges the closing line of a paragraph's last fragment and skips a
+fragment of one line, and `type/excessive-word-spacing` reports per fragment.
 
 **Nothing printed in a page margin box is measured by any block, line or page rule.** Paged.js
 implements `position: running(...)` by deep-cloning the element into the margin box of every page,
@@ -405,24 +411,51 @@ signature of all its text, so without an id that page's fingerprint follows any 
 wrapper.
 
 **How often oversized `break-inside: avoid` blocks occur in real documents is not measured.** The
-repair is arithmetically correct and conservative, but its frequency in the field is unknown, so
-how much this changes in practice for a given project is unknown too. A project that sees a new
-`error` after upgrading is seeing a block that never fitted; that is all this version claims.
+measurement is a lower bound and errs toward silence (below), but its frequency in the field is
+unknown, so how much this changes in practice for a given project is unknown too. A project that
+sees a new `error` after upgrading is seeing a block that never fitted, within the assumptions
+stated below; that is all this version claims.
 
-**A two-fragment split is measured but never reported, and that is a proof obligation.** Paged.js
-does not fragment natively — it produces two DOM elements — so `box-decoration-break` does not
-apply here at all. What strips decoration at a split is Paged.js' own stylesheet, and it unsets
-`margin` and `padding` on `[data-split-from]`/`[data-split-to]` but **not** `border`, and without
-`!important`. A bordered block that is split therefore carries its border height once per fragment,
-and an author rule with `!important` padding does the same — so two fragments can sum above the
-page for a block that fitted unsplit. From three fragments on that cannot happen: an intermediate
-fragment fills an entire content box and there is content before and after it, so the block is
-taller than one page by construction. **The residual gap is a block split into exactly two
-fragments whose real height does exceed the page: it is not reported, and the value recorded for it
-is the first fragment's box rather than the sum** — exactly as in 0.5.0, and stated here because a
-reader of the summed-height paragraph above would otherwise assume the sum is recorded everywhere. The residual risk
-in the other direction is a block with borders thicker than the content of its own outer fragments,
-which would have to be several tens of pixels per edge.
+**A split `break-inside: avoid` block is reported as "at least" the height of its text lines — two
+fragments included — and some split blocks are not judged at all.** 0.6.0 believed a split block
+only from the third fragment on and judged one or two fragments on the first fragment's box, so a
+block split in exactly two was never reported. Two fragments is the usual outcome for a block
+between one and two pages tall, because Paged.js moves an avoid block that fits a fresh page onto
+one: measured on 2026-09-24 with Paged.js 0.4.3, a block 503.72 px tall split 335.81 + 167.91 px
+against a 340.16 px page came back `clean` at exit 0. Summing the fragment boxes is not the answer
+either: Paged.js repeats a block's border (and `!important` or inline padding) at every split
+edge, and because it ignores that repeated bottom edge when it picks the break, the last line
+before the split lands in a hidden overflow column beside the page and the fragment reads as a
+union box one page tall — a block 301.19 px tall, which fits, had fragment boxes summing to
+417.47 px. The 0.6.0 argument that three fragments cannot mislead ("a middle fragment fills a
+whole page") fails the same way: a middle fragment fills what a split ancestor's repeated border
+leaves of the page.
+
+What is reported instead is a **lower bound**: per fragment, the extent of the text lines that
+start in the page's own column, clipped to the fragment's box, summed. The lines of each fragment
+are, in the unsplit block at the same width, a run of consecutive lines with the same spacing, and
+everything a split adds or removes lies outside them, so the sum cannot exceed the unsplit height.
+It is below it by the block's own borders and padding, by every line in the overflow column (which
+is printed nowhere), and by the half-leading at both ends of every fragment — measured: 7.33 px for
+a plain block split in two, 88.32 px for a 20 px-bordered block split in three. A split block whose
+bound does not exceed the page is not reported, whether or not the block would have fitted.
+
+Where the snapshot shows the argument's premises failing, the block is **declined** as
+`env/invalid-measurement`, which counts against the rule's full coverage floor and ends the run at
+exit 4: two elements' text side by side in one fragment (a table of two or more columns — Paged.js
+lays out each fragment of a table as a table of its own and moves the cells after a split cell to
+the next page whole; measured, 697.95 px of lines for a block 522.38 px tall — or flex or grid items,
+or a float), a piece of a split element away from the fragment's edge (content laid out twice:
+measured with an absolutely positioned caption at the foot of a split block), a line out of its own
+element's box by half its height (a fixed height, an offset, a transform), or no text line at all
+(a split block of images). **What the snapshot cannot see is assumed**: no absolutely positioned,
+fixed or transformed text that stays inside its box, no side-by-side content without an element of
+its own (inline blocks, anonymous flex items, text beside an image float), no content repeated
+outside an element of its own, a split-word hyphen (U+2011) no wider than the one it replaces, and
+line boxes at least as tall as the smallest `line-height` recorded in the fragment (a taller glyph
+box's overhang is given back). A document that breaks one of these can be reported although the
+block would have fitted. The snapshot records neither positioning, transforms nor display types; a
+proof-grade guard for them needs the page to record them.
 
 **The boundary is the content box of the page the block was laid out on.** Comparing against the
 largest content box in the document was tried and is worse: in a document with a named landscape
@@ -433,8 +466,8 @@ differently sized page elsewhere in the document is still reported, because it s
 `break-inside: avoid` where it was.
 
 **Flow membership is decided by page structure, never by coordinates, so a fragment that bleeds
-into the margin still counts.** `layout/unbreakable-block-too-tall` sums every record carrying the
-element's source id. A coordinate test ("a real fragment starts inside the content box") cannot tell
+into the margin still counts.** `layout/unbreakable-block-too-tall` judges every record carrying
+the element's source id. A coordinate test ("a real fragment starts inside the content box") cannot tell
 a margin box from a fragment that bleeds into the margin: measured on 2026-09-24, a
 `break-inside: avoid` block with negative side margins had all six fragments at x = 18.91 against a
 content box at x = 56.69, the filter discarded every one of them, the first fragment (335.81 px

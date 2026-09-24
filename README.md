@@ -118,7 +118,7 @@ quantities against a structural boundary.
 |---|---|---|
 | [`layout/widow`](docs/rules/layout-widow.md) | lines in the opening fragment against the element's own `widows` | warn |
 | [`layout/orphan`](docs/rules/layout-orphan.md) | lines in the closing fragment against its own `orphans` | warn |
-| [`layout/unbreakable-block-too-tall`](docs/rules/layout-unbreakable-block-too-tall.md) | height of a `break-inside: avoid` block against the page | **error** |
+| [`layout/unbreakable-block-too-tall`](docs/rules/layout-unbreakable-block-too-tall.md) | height of a `break-inside: avoid` block (a lower bound once it is split) against the page | **error** |
 | [`layout/heading-at-page-bottom`](docs/rules/layout-heading-at-page-bottom.md) | space under a heading, in its own line heights | warn |
 | [`layout/half-empty-page`](docs/rules/layout-half-empty-page.md) | summed height of semantic bands over the content box | warn, experimental, **off by default** |
 | [`layout/orphaned-continuation-page`](docs/rules/layout-orphaned-continuation-page.md) | a page holding only the tail of an earlier block | warn |
