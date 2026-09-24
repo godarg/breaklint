@@ -1,14 +1,25 @@
 import { strict as assert } from "node:assert";
-import { appendFileSync, cpSync, mkdtempSync } from "node:fs";
+import { appendFileSync, cpSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 
 import {
   buildM31ToM30ReadinessBridge,
   verifyStoredM31ToM30ReadinessBridge,
 } from "../tools/calibration/m3-1-readiness-bridge.ts";
+
+/** Every temporary directory this file creates, removed once its tests are done. */
+const temporaryDirectories: string[] = [];
+function temporaryDirectory(prefix: string): string {
+  const directory = mkdtempSync(join(tmpdir(), prefix));
+  temporaryDirectories.push(directory);
+  return directory;
+}
+after(() => {
+  for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
+});
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const BUNDLE = join(ROOT, "corpus/public/m3-1-pilot-v1");
@@ -39,7 +50,7 @@ describe("M3-1 to M3-0 readiness bridge", () => {
   });
 
   it("fails closed when indexed artifact bytes drift after intake", () => {
-    const temporary = mkdtempSync(join(tmpdir(), "breaklint-m3-1-bridge-red-"));
+    const temporary = temporaryDirectory("breaklint-m3-1-bridge-red-");
     const copy = join(temporary, "bundle");
     cpSync(BUNDLE, copy, { recursive: true });
     appendFileSync(join(copy, "documents/wikimedia-carbon-cycle.svg"), "\n<!-- drift -->\n");

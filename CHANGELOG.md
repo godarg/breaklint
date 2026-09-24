@@ -59,6 +59,16 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   cannot move the floor silently. Without `pdfjs-dist` installed the check does not run and the
   run reports without evidence, as before.
 
+### Tooling
+
+- **`npm test` fails when a test leaves a temporary entry behind.** Every run used to leave twelve
+  `breaklint-*` directories in the shared temporary directory (nine from
+  `tests/unit/m3-1-pilot.test.ts`, one from `tests/unit/m3-1-readiness-bridge.test.ts`, two from
+  `tests/e2e/m3-1-real-corpus-pilot.test.ts`); those files now remove what they create. The runner,
+  `tests/tools/test-with-tap.mjs`, gives both of its child runs one private `TMPDIR` (and `TMP`,
+  `TEMP`), and afterwards fails with the names of any entry in it that its allowlist does not
+  justify. The allowlist holds one entry, Node's own `node-compile-cache`.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as
