@@ -20,6 +20,7 @@ export const orphanedContinuationPage = defineRule(
     calibrated: false,
     experimental: false,
     unit: "fill ratio",
+    quantityScope: "page",
     defaultOptions: { maxNetFill: 0.5 },
     summary: "A page holds nothing but the tail of a block that began earlier.",
     declines: ["env/parity-blank-page", "env/forced-break"],

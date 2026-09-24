@@ -524,9 +524,9 @@ function metricValue(report: AcceptanceReport, metric: AcceptanceReport["gates"]
   return pair[1] === 0 ? null : pair[0]! / pair[1]!;
 }
 export const PRODUCT_RULE_EXECUTABLE_CONTRACTS: Readonly<Record<RuleId, { moduleRelativePath: string; sourceSha256: string; executableContractVersion: "m3-0-real-rule-run-v1" }>> = Object.freeze({
-  "svg/text-clipped": { moduleRelativePath: "src/rules/svg/text-clipped.ts", sourceSha256: "6e55541c82526ec89ee0d5b95574647399111e4a90c43ada849b0385a3c13307", executableContractVersion: "m3-0-real-rule-run-v1" },
-  "svg/text-ink-collision": { moduleRelativePath: "src/rules/svg/text-ink-collision.ts", sourceSha256: "e6f3389c7df1ee5d3dd9cfc8dc8f8a218c63ce436c2e5e481e3640a3e560fe61", executableContractVersion: "m3-0-real-rule-run-v1" },
-  "svg/text-overflows-viewport": { moduleRelativePath: "src/rules/svg/text-overflows-viewport.ts", sourceSha256: "3f7288c7a41618f9b29d9c86a42eae82e1baa5f00c3fed007190fd9797312304", executableContractVersion: "m3-0-real-rule-run-v1" },
+  "svg/text-clipped": { moduleRelativePath: "src/rules/svg/text-clipped.ts", sourceSha256: "eb1fa63cf1c4f6670fdad1b91af17562d8e538337da29cd6b69fcbfb08214ef9", executableContractVersion: "m3-0-real-rule-run-v1" },
+  "svg/text-ink-collision": { moduleRelativePath: "src/rules/svg/text-ink-collision.ts", sourceSha256: "121e70f0fa304077c62e109635ccf04731e4e6f0693ff48b3cc0f749f502eae1", executableContractVersion: "m3-0-real-rule-run-v1" },
+  "svg/text-overflows-viewport": { moduleRelativePath: "src/rules/svg/text-overflows-viewport.ts", sourceSha256: "720537c7a2e54587ccb78502fe5b0f7ed83e27eaad5852160bf68e1d96842b6a", executableContractVersion: "m3-0-real-rule-run-v1" },
 });
 
 export function producerSourceIdentitySha256(sourceIdentity: unknown): string { return sha256(canonicalJson(sourceIdentity)); }

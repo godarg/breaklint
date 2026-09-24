@@ -36,6 +36,7 @@ export const halfEmptyPage = defineRule(
     calibrated: false,
     experimental: true,
     unit: "fill ratio",
+    quantityScope: "page",
     defaultOptions: { minNetFill: 0.6, maxTopGap: 0.5 },
     summary: "A page is filled well below what its content box allows.",
     declines: ["env/parity-blank-page", "env/forced-break"],

@@ -77,6 +77,7 @@ export const unbreakableBlockTooTall = defineRule(
     calibrated: false,
     experimental: false,
     unit: "px",
+    quantityScope: "element",
     defaultOptions: { toleranceRatio: 1.0 },
     summary: "A block with break-inside: avoid is taller than the page content box.",
     declines: ["env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],

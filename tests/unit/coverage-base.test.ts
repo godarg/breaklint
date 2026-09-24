@@ -40,6 +40,7 @@ function decliningRule(id: string, reason: EnvId, severity: "error" | "warn", co
       calibrated: false,
       experimental: false,
       unit: "px",
+      quantityScope: "svg-target",
       defaultOptions: {},
       summary: `test double declining with ${reason}`,
       declines: [reason],
@@ -69,7 +70,7 @@ function decliningRule(id: string, reason: EnvId, severity: "error" | "warn", co
 const measuresOne = defineRule(
   {
     id: "layout/measures-one", severity: "warn", proofSource: null, calibrated: false,
-    experimental: false, unit: "px", defaultOptions: {}, summary: "measures one candidate", declines: [],
+    experimental: false, unit: "px", quantityScope: "fragment", defaultOptions: {}, summary: "measures one candidate", declines: [],
   },
   () => ({ findings: [], candidates: 1, measured: 1, notMeasured: [], evaluations: [
     targetEvaluation({ ruleId: "layout/measures-one", keyType: "block", nodeKey: "test-measured", sid: null, status: "measured" }),
@@ -218,7 +219,7 @@ describe("the coverage base", () => {
     const partial = defineRule(
       {
         id: "svg/partial", severity: "error", proofSource: "A", calibrated: false, experimental: false,
-        unit: "px", defaultOptions: {}, summary: "measures three of four",
+        unit: "px", quantityScope: "svg-target", defaultOptions: {}, summary: "measures three of four",
         declines: ["env/svg-ctm-unavailable"],
       },
       () => ({
@@ -242,7 +243,7 @@ describe("the coverage base", () => {
     const mixed = defineRule(
       {
         id: "svg/mixed", severity: "warn", proofSource: null, calibrated: false, experimental: false,
-        unit: "px", defaultOptions: {}, summary: "declines for two different kinds of reason",
+        unit: "px", quantityScope: "svg-target", defaultOptions: {}, summary: "declines for two different kinds of reason",
         declines: ["env/pixel-oracle-unavailable", "env/multicolumn"],
       },
       () => ({

@@ -22,6 +22,7 @@ export const shortLastLine = defineRule(
     calibrated: false,
     experimental: false,
     unit: "width ratio",
+    quantityScope: "fragment",
     defaultOptions: { maxWidthRatio: 0.15, maxEms: 2 },
     summary: "The closing line of a paragraph is a stub.",
     declines: ["env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],

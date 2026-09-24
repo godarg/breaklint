@@ -25,6 +25,7 @@ export const localUri = defineRule(
     calibrated: false,
     experimental: false,
     unit: "occurrences",
+    quantityScope: "resource",
     defaultOptions: { maxOccurrences: 0 },
     summary: "A file: URI or an absolute build-machine path remains in the artefact.",
     declines: [],

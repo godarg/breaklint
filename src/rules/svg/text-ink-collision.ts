@@ -39,6 +39,7 @@ export const textInkCollision = defineRule(
     calibrated: false,
     experimental: false,
     unit: "device pixels",
+    quantityScope: "svg-target",
     defaultOptions: { minCollisionInk: 8, minOccludedInk: 8 },
     summary: "A shape crosses or covers the glyphs of a text element.",
     // The collector emits only `env/svg-too-many-text-targets` at SVG level; the other two are

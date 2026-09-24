@@ -23,6 +23,7 @@ export const headingAtPageBottom = defineRule(
     calibrated: false,
     experimental: false,
     unit: "line heights",
+    quantityScope: "fragment",
     defaultOptions: { minTrailingLineHeights: 2 },
     summary: "A heading is the last thing on a page; what it introduces begins on the next.",
     declines: ["env/multicolumn", "env/vertical-writing"],

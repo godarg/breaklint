@@ -21,6 +21,7 @@ export const hyphenAcrossPage = defineRule(
     calibrated: false,
     experimental: false,
     unit: "occurrences",
+    quantityScope: "fragment",
     defaultOptions: { maxOccurrences: 0 },
     summary: "A word is split by a hyphen across a page boundary.",
     declines: ["env/multicolumn", "env/vertical-writing"],

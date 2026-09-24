@@ -81,6 +81,7 @@ describe("HTML Report Surface v2", () => {
       calibrated: false,
       experimental: false,
       unit: "candidates",
+      quantityScope: "page",
       defaultOptions: {},
       summary: "Produces no candidates for the exit-4 report contract control.",
       declines: [],

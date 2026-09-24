@@ -18,6 +18,7 @@ export const straightQuotes = defineRule(
     calibrated: false,
     experimental: false,
     unit: "occurrences",
+    quantityScope: "text-run",
     defaultOptions: { locale: "de-DE", maxOccurrences: 0, excludeTags: [] },
     summary: "A straight quotation mark or apostrophe appears in typeset prose.",
     declines: [],

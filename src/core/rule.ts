@@ -28,6 +28,29 @@ const RESEARCH_ONLY_EVALUATION_EXCEPTIONS = new Set([
 
 
 
+/**
+ * What a rule's measured quantity is a property of.
+ *
+ * The snapshot is per fragment: a block the paginator split is several records, one per page. A
+ * rule that decides per record is right for a quantity that belongs to a piece — the lines a
+ * fragment strands at a page boundary — and silently wrong for one that belongs to the whole
+ * element. That is how `layout/unbreakable-block-too-tall` came back clean on a block five and a
+ * half pages tall (0.6.0), and nothing in the type of a rule said which kind it was.
+ *
+ *   - `element`: a property of the whole source element, however the paginator split it (its
+ *     height). The answer must not depend on the split; tests/unit/fragment-contract.test.ts and
+ *     the `first-fragment-only` mutant hold every such rule to that.
+ *   - `fragment`: a property of one fragment as the paginator placed it on one page — its lines at
+ *     a boundary, its position on the page, the lines it carries.
+ *   - `page`, `text-run`, `svg-target`, `resource`: a page, a run of source text, one SVG text
+ *     target, one URI reference.
+ *
+ * Internal. It is not emitted in any report or schema: it describes how a rule is tested, not
+ * what a finding means.
+ */
+export const QUANTITY_SCOPES = ["element", "fragment", "page", "text-run", "svg-target", "resource"] as const;
+export type QuantityScope = (typeof QUANTITY_SCOPES)[number];
+
 /** Values a rule may be configured with. Numbers only; JSON config, no executable code. */
 export type RuleOptions = Readonly<Record<string, number | string | boolean | readonly string[]>>;
 
@@ -63,6 +86,11 @@ export interface RuleMeta {
   /** Experimental findings never move an exit code, not even with `--fail-on warn`. */
   readonly experimental: boolean;
   readonly unit: string;
+  /**
+   * What the measured quantity belongs to (see QUANTITY_SCOPES). Required, so a rule that does
+   * not say whether a split changes its answer does not compile.
+   */
+  readonly quantityScope: QuantityScope;
   readonly defaultOptions: RuleOptions;
   /** One line, English, third person about the document. Used in `--help` and the rule table. */
   readonly summary: string;
@@ -85,8 +113,8 @@ export interface Rule extends RuleMeta {
 }
 
 /**
- * Builds a rule and, in doing so, enforces the two constraints that cannot be left to
- * discipline: the coverage invariant, and the ban on `error` without a proof source.
+ * Builds a rule and, in doing so, enforces the constraints that cannot be left to discipline: the
+ * coverage invariant, the ban on `error` without a proof source, and a declared quantity scope.
  *
  * The invariant is checked *here*, on every run, rather than in a test. A test proves it for
  * the cases the test thought of; this proves it for every case that ever runs. A rule that
@@ -104,6 +132,15 @@ export function defineRule(meta: RuleMeta, run: Rule["run"]): Rule {
     throw new Error(
       `${meta.id}: carries proof source ${meta.proofSource} but is not an error. Either the ` +
         `proof holds and the rule is an error, or it does not and the claim goes.`,
+    );
+  }
+  // The type already requires it; this is for the caller the type cannot see (a spread, a cast,
+  // a rule assembled at run time). An unknown scope would escape the fragment contract silently.
+  if (!(QUANTITY_SCOPES as readonly string[]).includes(meta.quantityScope)) {
+    throw new Error(
+      `${meta.id}: quantityScope ${JSON.stringify(meta.quantityScope)} is not one of ` +
+        `${QUANTITY_SCOPES.join(", ")}. A rule has to say what its quantity belongs to, or nothing ` +
+        `can check whether a split changes its answer.`,
     );
   }
   return {

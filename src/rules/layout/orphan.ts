@@ -17,6 +17,7 @@ export const orphan = defineRule(
     calibrated: false,
     experimental: false,
     unit: "lines",
+    quantityScope: "fragment",
     defaultOptions: { extraLines: 0 },
     summary: "The last fragment of a block on a page has fewer lines than its own orphans value.",
     declines: ["env/multicolumn", "env/vertical-writing", "env/forced-break"],

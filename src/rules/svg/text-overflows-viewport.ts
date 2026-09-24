@@ -25,6 +25,7 @@ export const textOverflowsViewport = defineRule(
     calibrated: false,
     experimental: false,
     unit: "px",
+    quantityScope: "svg-target",
     defaultOptions: { maxOvershootPx: 0 },
     summary: "A text element lies outside the viewport of its SVG and is not drawn.",
     // The collector emits `env/svg-too-many-text-targets` at SVG level, `env/svg-ctm-unavailable`

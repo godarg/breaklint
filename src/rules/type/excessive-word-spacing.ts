@@ -24,6 +24,7 @@ export const excessiveWordSpacing = defineRule(
     calibrated: false,
     experimental: false,
     unit: "× natural space",
+    quantityScope: "fragment",
     defaultOptions: { maxSpaceFactor: 3.0 },
     summary: "Word gaps in a justified block are far wider than the natural space.",
     declines: ["env/multicolumn", "env/vertical-writing"],

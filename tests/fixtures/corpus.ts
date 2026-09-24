@@ -105,6 +105,18 @@ function line(blockKey: string, index: number, width = 399): TextLine {
   };
 }
 
+/** `count` corpus-pitch lines of one fragment, the first at `y`, numbered on from `firstIndex`. */
+function linesFrom(blockKey: string, firstIndex: number, count: number, y: number, x = 48, width = 399): TextLine[] {
+  return Array.from({ length: count }, (_, i) => ({
+    blockKey,
+    index: firstIndex + i,
+    box: box(x, y + i * 15.4, width, 15.4),
+    visible: true,
+    width,
+    wordBoxes: null,
+  }));
+}
+
 function run(blockKey: string, text: string, over: Partial<TextRun> = {}): TextRun {
   return { blockKey, text, nodeType: "text", ancestorTags: ["p", "body"], lang: "de", excluded: false, ...over };
 }
@@ -333,18 +345,23 @@ export function loadCorpus(): CorpusEntry[] {
       name: "too-tall-trigger",
       kind: "trigger",
       about: "layout/unbreakable-block-too-tall",
-      complication: "A table at 1.4 times the page height that promises not to break.",
+      complication:
+        "A table at 1.4 times the page height that promises not to break. It carries its 55 text " +
+        "lines, so the fragment contract can split it the way the paginator would and ask whether " +
+        "the rule still sees a table that does not fit.",
       snapshot: snapshot({
-        blocks: [block("t1", { tag: "table", box: box(48, 48, 399, 848), effectiveStyle: style({ breakInside: "avoid" }) })],
+        blocks: [block("t1", { tag: "table", box: box(48, 48, 399, 848), effectiveStyle: style({ breakInside: "avoid" }), lines: linesFrom("t1", 0, 55, 48).map((l) => l.index) })],
+        textLines: linesFrom("t1", 0, 55, 48),
       }),
     },
     {
       name: "too-tall-clean-fits",
       kind: "clean",
       about: "layout/unbreakable-block-too-tall",
-      complication: "The same table at 0.9 times the page height. It fits, so it keeps its promise.",
+      complication: "The same table at 0.9 times the page height, 35 lines. It fits, so it keeps its promise.",
       snapshot: snapshot({
-        blocks: [block("t1", { tag: "table", box: box(48, 48, 399, 545), effectiveStyle: style({ breakInside: "avoid" }) })],
+        blocks: [block("t1", { tag: "table", box: box(48, 48, 399, 545), effectiveStyle: style({ breakInside: "avoid" }), lines: linesFrom("t1", 0, 35, 48).map((l) => l.index) })],
+        textLines: linesFrom("t1", 0, 35, 48),
       }),
     },
 

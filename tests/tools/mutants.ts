@@ -2,7 +2,8 @@
  * The mutation guard.
  *
  * A test suite that passes tells you nothing until you know it can fail. This tool breaks each
- * rule on purpose, five ways, and requires that the assertion notices every time.
+ * rule on purpose, five ways — six for a rule whose quantity belongs to the whole element — and
+ * requires that the assertion notices every time.
  *
  * What counts as noticing is the whole point, and it is narrower than it looks. An assertion on
  * the *threshold* is not enough: measured against five mutants, a threshold-only test kills
@@ -21,6 +22,7 @@ import { ALL_RULES } from "../../src/rules/index.ts";
 import type { Rule, RuleOptions } from "../../src/core/rule.ts";
 import type { Finding, Snapshot } from "../../src/core/types.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
+import { firstFragmentOnly, splitSnapshot } from "../fixtures/fragments.ts";
 
 export type MutantName =
   | "emits-nothing"
@@ -28,7 +30,8 @@ export type MutantName =
   | "threshold-shifted"
   | "threshold-multiplied"
   | "rule-id-swapped"
-  | "isolation-pass-swapped";
+  | "isolation-pass-swapped"
+  | "first-fragment-only";
 
 /** The observable triple. Anything coarser lets the dangerous mutants through. */
 export interface Observation {
@@ -109,6 +112,12 @@ export function mutate(rule: Rule, mutant: MutantName, observedValues: readonly 
       // Only meaningful for the two ink rules: T against T0, S against F. This is the guard
       // against the `<defs>` mistake, which reported every clipped graphic as fully destroyed.
       return [{ ...rule, run: (s, c) => rule.run(swapInkPasses(s), c) }];
+
+    case "first-fragment-only":
+      // The 0.5.0 shape of `layout/unbreakable-block-too-tall`: every element judged on its first
+      // fragment as if that were all of it. Only meaningful for a rule whose quantity belongs to
+      // the element, and only on a fixture the paginator split — runMutationGuard supplies one.
+      return [{ ...rule, run: (s, c) => rule.run(firstFragmentOnly(s), c) }];
   }
 }
 
@@ -148,7 +157,10 @@ function swapInkPasses(snapshot: Snapshot): Snapshot {
   };
 }
 
-/** The five that apply to every released rule; legacy ink handling remains for lab imports only. */
+/**
+ * The five that apply to every released rule, plus `first-fragment-only` for element-scope rules;
+ * legacy ink handling remains for lab imports only.
+ */
 export function mutantsFor(rule: Rule): MutantName[] {
   const base: MutantName[] = [
     "emits-nothing",
@@ -160,6 +172,9 @@ export function mutantsFor(rule: Rule): MutantName[] {
   if (rule.id === "svg/text-clipped" || rule.id === "svg/text-ink-collision") {
     base.push("isolation-pass-swapped");
   }
+  // A rule whose quantity belongs to the element must notice when only the first piece of it is
+  // left. Declared by the rule (`quantityScope`), so a new element rule is enrolled automatically.
+  if (rule.quantityScope === "element") base.push("first-fragment-only");
   return base;
 }
 
@@ -207,16 +222,27 @@ export function runMutationGuard(): KillReport[] {
     const killed: MutantName[] = [];
     const survived: MutantName[] = [];
     for (const mutant of mutantsFor(rule)) {
+      // `first-fragment-only` changes nothing on an unsplit fixture, so it is judged on the
+      // trigger split in two by the paginator model in tests/fixtures/fragments.ts, against the
+      // real rule on that same split fixture. A trigger that cannot be split counts as a survivor:
+      // a mutant that was never given a chance to be noticed has not been killed.
+      const target = mutant === "first-fragment-only" ? splitTarget(rule, trigger) : null;
+      if (mutant === "first-fragment-only" && target === null) {
+        survived.push(mutant);
+        continue;
+      }
+      const snapshot = target?.snapshot ?? trigger.snapshot;
+      const expected = target?.baseline ?? baseline;
       const variants = mutate(rule, mutant, observedValues);
       const anyDiffers = variants.some((mutated) => {
         try {
           const observation = observe(
             runDocument(
-              { path: trigger.name, snapshot: trigger.snapshot, infrastructure: [] },
+              { path: trigger.name, snapshot, infrastructure: [] },
               { failOn: "never", activeRules: [mutated], optionsByRule: {}, coverageFloors: {} },
             ).report.findings,
           );
-          return differs(baseline, observation);
+          return differs(expected, observation);
         } catch {
           // A mutant that makes the rule throw is a detected change: the engine turns it into
           // an infrastructure event, and the document is no longer clean.
@@ -229,6 +255,31 @@ export function runMutationGuard(): KillReport[] {
     reports.push({ ruleId: rule.id, killed, survived, triggerFixture: trigger.name });
   }
   return reports;
+}
+
+/**
+ * The trigger split into two fragments at the block the rule reported, and what the real rule says
+ * about that split fixture. `null` when the trigger cannot be split (no block finding, or a block
+ * without the text lines the splitter distributes).
+ */
+function splitTarget(rule: Rule, trigger: { name: string; snapshot: Snapshot }): { snapshot: Snapshot; baseline: Observation } | null {
+  const findings = runDocument(
+    { path: trigger.name, snapshot: trigger.snapshot, infrastructure: [] },
+    { failOn: "never", activeRules: [rule], optionsByRule: {}, coverageFloors: {} },
+  ).report.findings;
+  const nodeKey = findings.find((finding) => finding.target.keyType === "block")?.target.nodeKey;
+  if (!nodeKey) return null;
+  let snapshot: Snapshot;
+  try {
+    snapshot = splitSnapshot(trigger.snapshot, nodeKey, 2);
+  } catch {
+    return null;
+  }
+  const baseline = observe(runDocument(
+    { path: trigger.name, snapshot, infrastructure: [] },
+    { failOn: "never", activeRules: [rule], optionsByRule: {}, coverageFloors: {} },
+  ).report.findings);
+  return { snapshot, baseline };
 }
 
 const invokedDirectly = process.argv[1]?.endsWith("mutants.ts");

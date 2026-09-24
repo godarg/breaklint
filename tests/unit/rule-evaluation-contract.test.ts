@@ -18,6 +18,7 @@ const meta = {
   calibrated: false as const,
   experimental: false,
   unit: "test",
+  quantityScope: "fragment" as const,
   defaultOptions: {},
   summary: "Test-only contract guard.",
   declines: ["env/multicolumn", "env/vertical-writing"] as const,

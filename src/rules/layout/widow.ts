@@ -28,6 +28,7 @@ export const widow = defineRule(
     calibrated: false,
     experimental: false,
     unit: "lines",
+    quantityScope: "fragment",
     defaultOptions: { extraLines: 0 },
     summary: "The first fragment of a block on a page has fewer lines than its own widows value.",
     declines: ["env/multicolumn", "env/vertical-writing", "env/forced-break"],

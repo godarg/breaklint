@@ -31,6 +31,7 @@ export const textClipped = defineRule(
     calibrated: false,
     experimental: false,
     unit: "missing ink ratio",
+    quantityScope: "svg-target",
     defaultOptions: { maxMissingInk: 0.05 },
     summary: "Part of a text's glyph ink is removed by a clip path or mask.",
     // The collector emits only `env/svg-too-many-text-targets` at SVG level; the other two are

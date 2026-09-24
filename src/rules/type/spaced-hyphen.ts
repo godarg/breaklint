@@ -25,6 +25,7 @@ export const spacedHyphen = defineRule(
     calibrated: false,
     experimental: false,
     unit: "occurrences",
+    quantityScope: "text-run",
     defaultOptions: { locale: "de-DE", mathWindow: 12, maxOccurrences: 0, excludeTags: [] },
     summary: "A hyphen stands between spaces where the convention asks for a dash.",
     declines: [],
