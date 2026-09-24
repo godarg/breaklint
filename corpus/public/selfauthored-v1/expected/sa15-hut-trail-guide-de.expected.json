@@ -2,8 +2,8 @@
   "schemaVersion": "selfauthored-expected-v1",
   "documentId": "sa15-hut-trail-guide-de",
   "artifact": "documents/sa15-hut-trail-guide-de.html",
-  "sha256": "a5b62009b767496d9908efc1910d4edd499b2205b9ba4dd100daa0d55b97dc92",
-  "byteLength": 10743,
+  "sha256": "c973ebb08f7d9d3ba7548797f1051fde1f7fd115a6478e41d7c12ffe4071ef54",
+  "byteLength": 10770,
   "authoredOn": "2026-09-24",
   "provenanceClass": "synthetic_first_party",
   "calibrationEvidenceEligible": false,
@@ -11,7 +11,7 @@
   "genre": "long-form hiking guide (German)",
   "language": {
     "htmlLang": "de",
-    "typeRulesUnderDefaultLocale": "measured: lang de matches the default locale de-DE"
+    "typeRulesUnderDefaultLocale": "not measured: read from src/rules/type/shared-type.ts isExcludedRun (never executed): lang de matches the default locale de-DE, so every run outside code-like elements is judged"
   },
   "paper": [
     {
@@ -330,7 +330,7 @@
               "pr-titel"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "pr-km-0": 22,
@@ -338,12 +338,12 @@
               "pr-km-6": 22,
               "pr-km-9": 22,
               "pr-km-12": 22,
-              "pr-km-15": 9.38,
-              "pr-h-1200": 35,
-              "pr-h-1500": 35,
-              "pr-h-1800": 35,
-              "pr-h-2100": 15,
-              "pr-start": 65,
+              "pr-km-15": 7,
+              "pr-h-1200": 29.81,
+              "pr-h-1500": 29.81,
+              "pr-h-1800": 29.81,
+              "pr-h-2100": 14,
+              "pr-start": 64.6,
               "pr-alm": 114.4,
               "pr-huette": 84.6,
               "pr-titel": 12
@@ -376,21 +376,9 @@
       "mustNotFire": [
         {
           "target": {
-            "id": "li-r1-2"
-          },
-          "why": "8 - 18 Uhr: digits next to the hyphen"
-        },
-        {
-          "target": {
-            "id": "p-r2-3"
-          },
-          "why": "N - S: two single letters joined by the hyphen"
-        },
-        {
-          "target": {
             "id": "span-en"
           },
-          "why": "spaced hyphen inside a lang=\"en\" span"
+          "why": "spaced hyphen inside a lang=\"en\" span; runs whose lang differs from the locale are excluded (docs/rules/type-spaced-hyphen.md)"
         },
         {
           "target": {
@@ -400,20 +388,43 @@
         },
         {
           "target": {
-            "document": true
+            "document": true,
+            "except": [
+              {
+                "id": "p-sh-weg"
+              },
+              {
+                "id": "td-sh-abschnitt"
+              },
+              {
+                "id": "li-r1-2"
+              },
+              {
+                "id": "p-r2-3"
+              }
+            ]
           },
-          "except": [
-            {
-              "id": "p-sh-weg"
-            },
-            {
-              "id": "td-sh-abschnitt"
-            }
-          ],
           "why": "no other spaced hyphen outside the exclusions"
         }
       ],
-      "allowed": [],
+      "allowed": [
+        {
+          "target": {
+            "id": "li-r1-2"
+          },
+          "class": "heuristic-boundary",
+          "text": "werktags 8 - 18 Uhr",
+          "why": "a digit range written with a spaced hyphen; the mathematical exclusion is a chosen, unmeasured +-12-character neighbourhood heuristic (docs/rules/type-spaced-hyphen.md 'Limits'); the rule page does not say which neighbourhoods count as mathematical, so a report is neither required nor forbidden"
+        },
+        {
+          "target": {
+            "id": "p-r2-3"
+          },
+          "class": "heuristic-boundary",
+          "text": "Richtung N - S",
+          "why": "two single letters joined by a spaced hyphen; the mathematical exclusion is a chosen, unmeasured +-12-character neighbourhood heuristic (docs/rules/type-spaced-hyphen.md 'Limits'); the rule page does not say which neighbourhoods count as mathematical, so a report is neither required nor forbidden"
+        }
+      ],
       "expectedDeclines": []
     },
     "type/straight-quotes": {
@@ -450,16 +461,16 @@
         },
         {
           "target": {
-            "document": true
+            "document": true,
+            "except": [
+              {
+                "id": "p-sq-huette"
+              },
+              {
+                "id": "li-sq-2"
+              }
+            ]
           },
-          "except": [
-            {
-              "id": "p-sq-huette"
-            },
-            {
-              "id": "li-sq-2"
-            }
-          ],
           "why": "no other straight quotation mark"
         }
       ],
@@ -486,12 +497,10 @@
       "allowed": [
         {
           "target": {
-            "selectors": [
-              "main#fuehrer > p:not(.unterzeile):not(.impressum)"
-            ]
+            "within": "fuehrer"
           },
           "class": "font-dependent",
-          "why": "justified blocks: word gaps depend on font metrics and on whether hyphenation dictionaries are available"
+          "why": "any justified block (the stylesheet justifies p (text-align: justify)): word gaps depend on font metrics and on whether hyphenation dictionaries are available, including in one-line-looking blocks that wrap under another font"
         }
       ],
       "expectedDeclines": []
@@ -522,9 +531,9 @@
       "mustNotFire": [
         {
           "target": {
-            "id": "hinweis-gpx-p"
+            "id": "gpx-pfad"
           },
-          "why": "the path /opt/tourdaten/gpx in the visible text is not a URI-bearing attribute"
+          "why": "the path /opt/tourdaten/gpx appears only as visible text inside span#gpx-pfad, which carries no URI-bearing attribute (docs/rules/artifact-local-uri.md reads uriRefs)"
         }
       ],
       "allowed": [],
@@ -543,6 +552,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 3,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 3,
+      "dejavu substitution": 3,
+      "free substitution": 3
+    },
     "pdfPageCount": 3,
     "contentBoxHeightsPx": [
       956.22
@@ -565,7 +579,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

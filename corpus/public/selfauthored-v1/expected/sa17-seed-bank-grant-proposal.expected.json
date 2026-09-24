@@ -2,8 +2,8 @@
   "schemaVersion": "selfauthored-expected-v1",
   "documentId": "sa17-seed-bank-grant-proposal",
   "artifact": "documents/sa17-seed-bank-grant-proposal.html",
-  "sha256": "c67b3129846aa675dbb87d0883cb4fbe70ce263f526525f491f1aedafc4015e5",
-  "byteLength": 13515,
+  "sha256": "3fd5bbab7e2c000cfd45ffe4811284dede1e95b941d0385881c8dffc51acfab3",
+  "byteLength": 13701,
   "authoredOn": "2026-09-24",
   "provenanceClass": "synthetic_first_party",
   "calibrationEvidenceEligible": false,
@@ -173,7 +173,7 @@
             "id": "h4-risks"
           },
           "why": "the h4 is the last block on its page; the risk matrix it introduces starts on the next page",
-          "construction": "Page opened by h2.grid#h-workplan (break-before: page): 48 px + 16 px; figure#plate-gantt 520 px (64..584) + 12 px; figure#plate-milestones 316 px (596..912); h4 margin-top 18 px (collapses with 12) -> 930..954, 24 px line height, white-space: nowrap, no break-after; content box 971.34 px -> 17.34 px = 0.72 line heights remain. figure#plate-risks (300 px) cannot follow.",
+          "construction": "Page opened by section#sec-workplan (break-before: page), whose first child h2.grid#h-workplan is 48 px + 16 px; figure#plate-gantt 520 px (64..584) + 12 px; figure#plate-milestones 316 px (596..912); h4 margin-top 18 px (collapses with 12) -> 930..954, 24 px line height, white-space: nowrap, no break-after; content box 971.34 px -> 17.34 px = 0.72 line heights remain. figure#plate-risks (300 px) cannot follow.",
           "measured": {
             "page": 2,
             "remainingPx": 17.33,
@@ -330,7 +330,7 @@
               "g-title"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "g-q1": 43,
@@ -339,11 +339,11 @@
               "g-q4": 43,
               "g-q5": 43,
               "g-q6": 43,
-              "g-task-1": 140,
-              "g-task-2": 93.83,
-              "g-task-3": 114.5,
-              "g-task-4": 90.5,
-              "g-task-5": 93.5,
+              "g-task-1": 130.33,
+              "g-task-2": 57.59,
+              "g-task-3": 88.5,
+              "g-task-4": 53.5,
+              "g-task-5": 77,
               "g-title": 15,
               "g-note": 38
             }
@@ -361,15 +361,15 @@
               "ms-title"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
-              "ms-1": 54.5,
-              "ms-2": 94.85,
-              "ms-3": 121,
-              "ms-4": 95.5,
+              "ms-1": 46,
+              "ms-2": 85.85,
+              "ms-3": 120,
+              "ms-4": 95,
               "ms-title": 15,
-              "ms-inset-cap": 82.46
+              "ms-inset-cap": 71.79
             }
           }
         },
@@ -381,7 +381,7 @@
               "inset-scale"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "inset-plot-a": 15,
@@ -403,17 +403,17 @@
               "rk-unlikely"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "rk-likely": 46,
-              "rk-possible": 112,
-              "rk-unlikely": 60.5,
+              "rk-possible": 108.5,
+              "rk-unlikely": 60,
               "rk-sev-0": 12,
               "rk-sev-1": 12,
               "rk-sev-2": 12,
               "rk-1": 112,
-              "rk-2": 60.5
+              "rk-2": 60
             }
           }
         }
@@ -503,6 +503,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 3,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 3,
+      "dejavu substitution": 4,
+      "free substitution": 3
+    },
     "pdfPageCount": 3,
     "contentBoxHeightsPx": [
       937.33,
@@ -526,7 +531,14 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
-  "notes": []
+  "notes": [
+    "Erratum E12 wrapped the work plan in section#sec-workplan (which now carries break-before: page) and its plates in div#workplan-plates. The grid positions are unchanged; the two wrappers cross the overflow break from page 2 to page 3 and give layout/widow and layout/orphan three measurable candidates beside the one declined after the forced break (3 of 4, clear of the 0.5 floor instead of exactly on it)."
+  ]
 }

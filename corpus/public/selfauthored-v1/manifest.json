@@ -37,7 +37,7 @@
       },
       "expected": {
         "relativePath": "expected/sa01-riverbank-survey-handbook.expected.json",
-        "sha256": "a0663526573df604a4c66f8a4a2de662e46a2f74e997ed922e62465c01ef36e8",
+        "sha256": "23b98cfedf451d26f4fda0b5ece0d501f4c287ea2f20a8fa41a9a2596abf62c9",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -107,7 +107,7 @@
       },
       "expected": {
         "relativePath": "expected/sa02-pump-service-manual.expected.json",
-        "sha256": "ce0141ed545812dd6ee73f4f06b45208167b4b8282d9600722c56da4a4251884",
+        "sha256": "0f191786d0eee0f61f83ecef8f2e051780141a419b92fd831e5b121c27f3aaea",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -177,7 +177,7 @@
       },
       "expected": {
         "relativePath": "expected/sa03-transit-ridership-report.expected.json",
-        "sha256": "c5c1ecc4a64fd02fd9f61dd2a153afa30cc059037b367aec52506200d487894b",
+        "sha256": "e4aba36ba620fa6dd25035349b45d0eddbd2dffefac857d27f67464830bb18fa",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -259,7 +259,7 @@
       },
       "expected": {
         "relativePath": "expected/sa04-essay-chapter-footnotes.expected.json",
-        "sha256": "b65f5c6d9aea9191747330f99301f2b19d595e45d662d6188101d89d4039ec80",
+        "sha256": "6f023cb20db1fe90c9b1ff4f76e3c35eb1f410dd4aa5779f1e725474bbc03529",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -320,15 +320,15 @@
       "documentId": "doc_sa05-kitchen-notebook",
       "id": "sa05-kitchen-notebook",
       "artifact": {
-        "sha256": "a3f14ab4cc87d97c81376ccf7d3fd8e0621f3519daf7c87ab56391c44801933d",
-        "byteLength": 12742,
+        "sha256": "9ac99e559dc1598e8a89cda2d73c0c581cace04107406dafa90dd94bf619cadc",
+        "byteLength": 12756,
         "storage": "public-repository",
         "relativePath": "documents/sa05-kitchen-notebook.html",
         "mediaType": "text/html"
       },
       "expected": {
         "relativePath": "expected/sa05-kitchen-notebook.expected.json",
-        "sha256": "bdfc4b480e9980f7a864349d066b43a96a8d564c2f8ba7abb5928818e43e361b",
+        "sha256": "bed6ebb72fdd7740cbbe52976e49ee0336694c7412a7d1360fd4d29f3b18b036",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -395,7 +395,7 @@
       },
       "expected": {
         "relativePath": "expected/sa06-mobile-work-policy-de.expected.json",
-        "sha256": "c6532c9abb7426ad4207b6a4aaefa167b4abfe188dbe55bc9bc1bfbb37d25e83",
+        "sha256": "66a3dbcdf117cdc8c0e6dab3f308044c4b29eaa0e3e3060b083f51d9756e0aaf",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -465,7 +465,7 @@
       },
       "expected": {
         "relativePath": "expected/sa07-sensor-datasheet.expected.json",
-        "sha256": "911836373d78fb2fd0c202a3213d900c95c43593a96eafb6303cab83e6591a6c",
+        "sha256": "a153b9eac9c9207aff3043a78bbee8b6c72e01e7fe88f10a462632f5eea7f8df",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -535,7 +535,7 @@
       },
       "expected": {
         "relativePath": "expected/sa08-tidewell-newsletter.expected.json",
-        "sha256": "d320afe17527ffa6ba92f752989ec3be4a52d7a4ded9e5fb7af48d8d2217490e",
+        "sha256": "9eb08c6821542cdbbda2c6641c36496165238d63681680c600debd2af271f4fa",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -607,7 +607,7 @@
       },
       "expected": {
         "relativePath": "expected/sa09-queue-worker-tutorial.expected.json",
-        "sha256": "d2d496eecb09a4a84a5673346ba4587ac83331a03de5ebbaa07cea387670c182",
+        "sha256": "92bf14c811bed76623e889e0016b3a398de249da4b1840c144624d7dc093b025",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -676,7 +676,7 @@
       },
       "expected": {
         "relativePath": "expected/sa10-lagoon-oxygen-report.expected.json",
-        "sha256": "c6676908fb57551e23d77f3a1f210daeac1806bb7e515a70a6ec22e1032288a1",
+        "sha256": "ecb0168d75179ef0fa48259793eee9a8889177e84a4e2be8607e2386e4fd5e9d",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -740,15 +740,15 @@
       "documentId": "doc_sa11-insect-chorus-survey",
       "id": "sa11-insect-chorus-survey",
       "artifact": {
-        "sha256": "dc713476f4c56804b801524bb2f1ecd034b035a96ae992c7162cdb3b13a1c3c5",
-        "byteLength": 16266,
+        "sha256": "fb286a6c07515a3cd9e3216ba4945feb7fbfb61337bbd50d237aefadef083f1b",
+        "byteLength": 16249,
         "storage": "public-repository",
         "relativePath": "documents/sa11-insect-chorus-survey.html",
         "mediaType": "text/html"
       },
       "expected": {
         "relativePath": "expected/sa11-insect-chorus-survey.expected.json",
-        "sha256": "3412c7cd852d987cbe64642c06318787f11e1f5f5f33cae2790eed5bf57a4352",
+        "sha256": "06875a6575f4b20589b028a301ac1b2b7b6e09f5c345b8f62465cc5f3c95fd92",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -820,7 +820,7 @@
       },
       "expected": {
         "relativePath": "expected/sa12-library-annual-report.expected.json",
-        "sha256": "b9cb67eb5c22bb469b2e797c41c679cb319e4c8229aca47e503294ff7b8f2662",
+        "sha256": "87151bc4569a8c18b4600390563157a33c177d06af6d4e4130bae52b5305d86c",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -900,7 +900,7 @@
       },
       "expected": {
         "relativePath": "expected/sa13-planning-forum-transcript.expected.json",
-        "sha256": "14abf757082be360f39d99285a63473d69b214fc89aee8f36577be416de5c919",
+        "sha256": "bd396be3088fd311183374161561560fa7f3ebfd552fc713426cbdd601c45dbd",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -961,15 +961,15 @@
       "documentId": "doc_sa14-weather-station-install-guide",
       "id": "sa14-weather-station-install-guide",
       "artifact": {
-        "sha256": "c0e181125bb20ae293f2959f172b84bdae2862be330c08adfb091be0061867fc",
-        "byteLength": 15243,
+        "sha256": "33be46f56f0e0b5bbe3db6d59c9e5c5b967e54f34f71ce840f056cf27be8050d",
+        "byteLength": 15554,
         "storage": "public-repository",
         "relativePath": "documents/sa14-weather-station-install-guide.html",
         "mediaType": "text/html"
       },
       "expected": {
         "relativePath": "expected/sa14-weather-station-install-guide.expected.json",
-        "sha256": "5ba1423cf70d2e9dac395cbf17736c84ffa5ad037893439f7205f0a607f2e3c8",
+        "sha256": "3568fbb52e42e06ef96eb9169bd28b58be6b84ddf9cfdafd08325a3912cf820a",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1019,6 +1019,7 @@
         "lang:en",
         "running-element:top",
         "running-element:side",
+        "running-element:side-keep-together-tall",
         "left-right-pages",
         "full-bleed",
         "planted:avoid-too-tall-full-bleed",
@@ -1030,15 +1031,15 @@
       "documentId": "doc_sa15-hut-trail-guide-de",
       "id": "sa15-hut-trail-guide-de",
       "artifact": {
-        "sha256": "a5b62009b767496d9908efc1910d4edd499b2205b9ba4dd100daa0d55b97dc92",
-        "byteLength": 10743,
+        "sha256": "c973ebb08f7d9d3ba7548797f1051fde1f7fd115a6478e41d7c12ffe4071ef54",
+        "byteLength": 10770,
         "storage": "public-repository",
         "relativePath": "documents/sa15-hut-trail-guide-de.html",
         "mediaType": "text/html"
       },
       "expected": {
         "relativePath": "expected/sa15-hut-trail-guide-de.expected.json",
-        "sha256": "00a13dcbac51e8d588df77ab640dc832895069dcf38977459c1accaa003f01c0",
+        "sha256": "847142d86ad13b88b0d24a5f96dd7714aaefbd947f469ae2df28a758b9ca46de",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1111,7 +1112,7 @@
       },
       "expected": {
         "relativePath": "expected/sa16-lab-safety-manual.expected.json",
-        "sha256": "0949d4250f8eac3cf3f6d617a5750baa8e46162a87ff189769ecb0ae153bbf1f",
+        "sha256": "7d10a214204a8cfb1fea8b70599f9494475f330a914798caf7c5b7bcdaec3dfe",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1150,11 +1151,12 @@
         }
       ],
       "pagesRange": [
-        6,
+        5,
         7
       ],
       "expectedExit": [
         0,
+        1,
         3
       ],
       "features": [
@@ -1174,15 +1176,15 @@
       "documentId": "doc_sa17-seed-bank-grant-proposal",
       "id": "sa17-seed-bank-grant-proposal",
       "artifact": {
-        "sha256": "c67b3129846aa675dbb87d0883cb4fbe70ce263f526525f491f1aedafc4015e5",
-        "byteLength": 13515,
+        "sha256": "3fd5bbab7e2c000cfd45ffe4811284dede1e95b941d0385881c8dffc51acfab3",
+        "byteLength": 13701,
         "storage": "public-repository",
         "relativePath": "documents/sa17-seed-bank-grant-proposal.html",
         "mediaType": "text/html"
       },
       "expected": {
         "relativePath": "expected/sa17-seed-bank-grant-proposal.expected.json",
-        "sha256": "f371185c88770d8b977a473111bc5f1419b9f7bc534fe2fdcaf8c3a3eca1bdb9",
+        "sha256": "55e875580f64e0efc94a38305d92de09b02d32d73865a6972da85861ac3ae7da",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1253,7 +1255,7 @@
       },
       "expected": {
         "relativePath": "expected/sa18-hand-tools-catalogue.expected.json",
-        "sha256": "ff34c3a84e890ba7f1d3be95f415f249bc52e13c496efc2aca0f8082a49a4abd",
+        "sha256": "7f468caa5b61827fd008055a1a47249628dc6d87f3ecf0d766015edd53475e31",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1323,7 +1325,7 @@
       },
       "expected": {
         "relativePath": "expected/sa19-release-notes.expected.json",
-        "sha256": "99c1c0df4d936ecf699c2c649c414809c21900c35f92d6d778aec5a0caad8ee9",
+        "sha256": "3f0130f6453b43913b6aa55c93ccff84df9a163a60a470e2e2375a4af97f9c63",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1394,7 +1396,7 @@
       },
       "expected": {
         "relativePath": "expected/sa20-wiki-meeting-minutes.expected.json",
-        "sha256": "4488b8e16b017188e6669282654b51c86a63be2831c20a76506c17dad770a361",
+        "sha256": "b7c0a1eed93816fdcd759db02f1dc4869cfdd9a5787b51b9c97365e9fab49547",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1661,6 +1663,9 @@
       "sa14-weather-station-install-guide",
       "sa16-lab-safety-manual"
     ],
+    "running-element:side-keep-together-tall": [
+      "sa14-weather-station-install-guide"
+    ],
     "running-element:top": [
       "sa01-riverbank-survey-handbook",
       "sa03-transit-ridership-report",
@@ -1782,8 +1787,8 @@
     },
     {
       "path": "documents/sa05-kitchen-notebook.html",
-      "sha256": "a3f14ab4cc87d97c81376ccf7d3fd8e0621f3519daf7c87ab56391c44801933d",
-      "byteLength": 12742
+      "sha256": "9ac99e559dc1598e8a89cda2d73c0c581cace04107406dafa90dd94bf619cadc",
+      "byteLength": 12756
     },
     {
       "path": "documents/sa06-mobile-work-policy-de.html",
@@ -1812,8 +1817,8 @@
     },
     {
       "path": "documents/sa11-insect-chorus-survey.html",
-      "sha256": "dc713476f4c56804b801524bb2f1ecd034b035a96ae992c7162cdb3b13a1c3c5",
-      "byteLength": 16266
+      "sha256": "fb286a6c07515a3cd9e3216ba4945feb7fbfb61337bbd50d237aefadef083f1b",
+      "byteLength": 16249
     },
     {
       "path": "documents/sa12-library-annual-report.html",
@@ -1827,13 +1832,13 @@
     },
     {
       "path": "documents/sa14-weather-station-install-guide.html",
-      "sha256": "c0e181125bb20ae293f2959f172b84bdae2862be330c08adfb091be0061867fc",
-      "byteLength": 15243
+      "sha256": "33be46f56f0e0b5bbe3db6d59c9e5c5b967e54f34f71ce840f056cf27be8050d",
+      "byteLength": 15554
     },
     {
       "path": "documents/sa15-hut-trail-guide-de.html",
-      "sha256": "a5b62009b767496d9908efc1910d4edd499b2205b9ba4dd100daa0d55b97dc92",
-      "byteLength": 10743
+      "sha256": "c973ebb08f7d9d3ba7548797f1051fde1f7fd115a6478e41d7c12ffe4071ef54",
+      "byteLength": 10770
     },
     {
       "path": "documents/sa16-lab-safety-manual.html",
@@ -1842,8 +1847,8 @@
     },
     {
       "path": "documents/sa17-seed-bank-grant-proposal.html",
-      "sha256": "c67b3129846aa675dbb87d0883cb4fbe70ce263f526525f491f1aedafc4015e5",
-      "byteLength": 13515
+      "sha256": "3fd5bbab7e2c000cfd45ffe4811284dede1e95b941d0385881c8dffc51acfab3",
+      "byteLength": 13701
     },
     {
       "path": "documents/sa18-hand-tools-catalogue.html",
@@ -1862,108 +1867,108 @@
     },
     {
       "path": "expected/sa01-riverbank-survey-handbook.expected.json",
-      "sha256": "a0663526573df604a4c66f8a4a2de662e46a2f74e997ed922e62465c01ef36e8",
-      "byteLength": 24190
+      "sha256": "23b98cfedf451d26f4fda0b5ece0d501f4c287ea2f20a8fa41a9a2596abf62c9",
+      "byteLength": 25486
     },
     {
       "path": "expected/sa02-pump-service-manual.expected.json",
-      "sha256": "ce0141ed545812dd6ee73f4f06b45208167b4b8282d9600722c56da4a4251884",
-      "byteLength": 17226
+      "sha256": "0f191786d0eee0f61f83ecef8f2e051780141a419b92fd831e5b121c27f3aaea",
+      "byteLength": 17880
     },
     {
       "path": "expected/sa03-transit-ridership-report.expected.json",
-      "sha256": "c5c1ecc4a64fd02fd9f61dd2a153afa30cc059037b367aec52506200d487894b",
-      "byteLength": 23278
+      "sha256": "e4aba36ba620fa6dd25035349b45d0eddbd2dffefac857d27f67464830bb18fa",
+      "byteLength": 24042
     },
     {
       "path": "expected/sa04-essay-chapter-footnotes.expected.json",
-      "sha256": "b65f5c6d9aea9191747330f99301f2b19d595e45d662d6188101d89d4039ec80",
-      "byteLength": 10362
+      "sha256": "6f023cb20db1fe90c9b1ff4f76e3c35eb1f410dd4aa5779f1e725474bbc03529",
+      "byteLength": 10957
     },
     {
       "path": "expected/sa05-kitchen-notebook.expected.json",
-      "sha256": "bdfc4b480e9980f7a864349d066b43a96a8d564c2f8ba7abb5928818e43e361b",
-      "byteLength": 15519
+      "sha256": "bed6ebb72fdd7740cbbe52976e49ee0336694c7412a7d1360fd4d29f3b18b036",
+      "byteLength": 16095
     },
     {
       "path": "expected/sa06-mobile-work-policy-de.expected.json",
-      "sha256": "c6532c9abb7426ad4207b6a4aaefa167b4abfe188dbe55bc9bc1bfbb37d25e83",
-      "byteLength": 16280
+      "sha256": "66a3dbcdf117cdc8c0e6dab3f308044c4b29eaa0e3e3060b083f51d9756e0aaf",
+      "byteLength": 17746
     },
     {
       "path": "expected/sa07-sensor-datasheet.expected.json",
-      "sha256": "911836373d78fb2fd0c202a3213d900c95c43593a96eafb6303cab83e6591a6c",
-      "byteLength": 24997
+      "sha256": "a153b9eac9c9207aff3043a78bbee8b6c72e01e7fe88f10a462632f5eea7f8df",
+      "byteLength": 25862
     },
     {
       "path": "expected/sa08-tidewell-newsletter.expected.json",
-      "sha256": "d320afe17527ffa6ba92f752989ec3be4a52d7a4ded9e5fb7af48d8d2217490e",
-      "byteLength": 21521
+      "sha256": "9eb08c6821542cdbbda2c6641c36496165238d63681680c600debd2af271f4fa",
+      "byteLength": 22656
     },
     {
       "path": "expected/sa09-queue-worker-tutorial.expected.json",
-      "sha256": "d2d496eecb09a4a84a5673346ba4587ac83331a03de5ebbaa07cea387670c182",
-      "byteLength": 14462
+      "sha256": "92bf14c811bed76623e889e0016b3a398de249da4b1840c144624d7dc093b025",
+      "byteLength": 15014
     },
     {
       "path": "expected/sa10-lagoon-oxygen-report.expected.json",
-      "sha256": "c6676908fb57551e23d77f3a1f210daeac1806bb7e515a70a6ec22e1032288a1",
-      "byteLength": 34262
+      "sha256": "ecb0168d75179ef0fa48259793eee9a8889177e84a4e2be8607e2386e4fd5e9d",
+      "byteLength": 35236
     },
     {
       "path": "expected/sa11-insect-chorus-survey.expected.json",
-      "sha256": "3412c7cd852d987cbe64642c06318787f11e1f5f5f33cae2790eed5bf57a4352",
-      "byteLength": 25775
+      "sha256": "06875a6575f4b20589b028a301ac1b2b7b6e09f5c345b8f62465cc5f3c95fd92",
+      "byteLength": 26750
     },
     {
       "path": "expected/sa12-library-annual-report.expected.json",
-      "sha256": "b9cb67eb5c22bb469b2e797c41c679cb319e4c8229aca47e503294ff7b8f2662",
-      "byteLength": 16920
+      "sha256": "87151bc4569a8c18b4600390563157a33c177d06af6d4e4130bae52b5305d86c",
+      "byteLength": 17587
     },
     {
       "path": "expected/sa13-planning-forum-transcript.expected.json",
-      "sha256": "14abf757082be360f39d99285a63473d69b214fc89aee8f36577be416de5c919",
-      "byteLength": 16421
+      "sha256": "bd396be3088fd311183374161561560fa7f3ebfd552fc713426cbdd601c45dbd",
+      "byteLength": 17848
     },
     {
       "path": "expected/sa14-weather-station-install-guide.expected.json",
-      "sha256": "5ba1423cf70d2e9dac395cbf17736c84ffa5ad037893439f7205f0a607f2e3c8",
-      "byteLength": 19051
+      "sha256": "3568fbb52e42e06ef96eb9169bd28b58be6b84ddf9cfdafd08325a3912cf820a",
+      "byteLength": 22901
     },
     {
       "path": "expected/sa15-hut-trail-guide-de.expected.json",
-      "sha256": "00a13dcbac51e8d588df77ab640dc832895069dcf38977459c1accaa003f01c0",
-      "byteLength": 18106
+      "sha256": "847142d86ad13b88b0d24a5f96dd7714aaefbd947f469ae2df28a758b9ca46de",
+      "byteLength": 19950
     },
     {
       "path": "expected/sa16-lab-safety-manual.expected.json",
-      "sha256": "0949d4250f8eac3cf3f6d617a5750baa8e46162a87ff189769ecb0ae153bbf1f",
-      "byteLength": 21119
+      "sha256": "7d10a214204a8cfb1fea8b70599f9494475f330a914798caf7c5b7bcdaec3dfe",
+      "byteLength": 22450
     },
     {
       "path": "expected/sa17-seed-bank-grant-proposal.expected.json",
-      "sha256": "f371185c88770d8b977a473111bc5f1419b9f7bc534fe2fdcaf8c3a3eca1bdb9",
-      "byteLength": 18100
+      "sha256": "55e875580f64e0efc94a38305d92de09b02d32d73865a6972da85861ac3ae7da",
+      "byteLength": 19521
     },
     {
       "path": "expected/sa18-hand-tools-catalogue.expected.json",
-      "sha256": "ff34c3a84e890ba7f1d3be95f415f249bc52e13c496efc2aca0f8082a49a4abd",
-      "byteLength": 23000
+      "sha256": "7f468caa5b61827fd008055a1a47249628dc6d87f3ecf0d766015edd53475e31",
+      "byteLength": 24166
     },
     {
       "path": "expected/sa19-release-notes.expected.json",
-      "sha256": "99c1c0df4d936ecf699c2c649c414809c21900c35f92d6d778aec5a0caad8ee9",
-      "byteLength": 13762
+      "sha256": "3f0130f6453b43913b6aa55c93ccff84df9a163a60a470e2e2375a4af97f9c63",
+      "byteLength": 14429
     },
     {
       "path": "expected/sa20-wiki-meeting-minutes.expected.json",
-      "sha256": "4488b8e16b017188e6669282654b51c86a63be2831c20a76506c17dad770a361",
-      "byteLength": 14087
+      "sha256": "b7c0a1eed93816fdcd759db02f1dc4869cfdd9a5787b51b9c97365e9fab49547",
+      "byteLength": 15232
     },
     {
       "path": "probe/construction-measurements.json",
-      "sha256": "f07784cf30d3bb7aaf68f233020eee839ee5d16e8822d139977c9151e643ef13",
-      "byteLength": 498757
+      "sha256": "b41ebbcb14ed1e100b2136a07850e54f3ca5e878d1458043cffcd27823cc3af2",
+      "byteLength": 608752
     },
     {
       "path": "probe/construction-probe.mjs",
@@ -1971,14 +1976,24 @@
       "byteLength": 30918
     },
     {
+      "path": "probe/fontconfig/free.conf",
+      "sha256": "3246f38e2e5b81a431618afd6b58b9ef49378aeb2626744cd0f2772403b055db",
+      "byteLength": 1135
+    },
+    {
+      "path": "probe/fontconfig/no-liberation.conf",
+      "sha256": "e1e71912c5772c3b085cbab63a265d60cfb741e4bea7fe5fef3dc45e4a9f7a2b",
+      "byteLength": 476
+    },
+    {
       "path": "README.md",
-      "sha256": "f098a9e0b532f9f879181c4812b3027e3830ba2c015e8c40f9dc3586fab1a8d6",
-      "byteLength": 10479
+      "sha256": "212486151a42a23477d4c9fe91afdab6db36637ba0417a476d8cbe5520ef4fe0",
+      "byteLength": 12676
     },
     {
       "path": "PROVENANCE.md",
-      "sha256": "22e70fe9ecd098d793a1c1e00b3aa84b8ec1c440e1a8ec268727dd7477ccd7ff",
-      "byteLength": 5753
+      "sha256": "ce06d08770664fe1145e0562ea45023fe4e4bdd9c51535873bde5cbfcfb9a412",
+      "byteLength": 6838
     },
     {
       "path": "RIGHTS.md",
@@ -1986,5 +2001,245 @@
       "byteLength": 1356
     }
   ],
-  "expectationHistory": []
+  "expectationHistory": [
+    {
+      "id": "E1",
+      "reviewItem": "H1",
+      "documents": [
+        "sa15-hut-trail-guide-de"
+      ],
+      "what": "artifact/local-uri mustNotFire target {\"id\": \"hinweis-gpx-p\"} replaced by {\"id\": \"gpx-pfad\"}; the visible-text path in that paragraph is now wrapped in <span id=\"gpx-pfad\">. README defines the semantics of 'except' and of id targets for artifact/local-uri.",
+      "why": "p#hinweis-gpx-p contains both planted links (#a-abs-gpx, #a-file-karte), so the mustNotFire entry contradicted the two mustFire entries and could never pass.",
+      "previous": {
+        "target": {
+          "id": "hinweis-gpx-p"
+        }
+      },
+      "byteChange": {
+        "document": "documents/sa15-hut-trail-guide-de.html",
+        "previousSha256": "a5b62009b767496d9908efc1910d4edd499b2205b9ba4dd100daa0d55b97dc92",
+        "sha256": "c973ebb08f7d9d3ba7548797f1051fde1f7fd115a6478e41d7c12ffe4071ef54",
+        "reprobed": true
+      },
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E2",
+      "reviewItem": "H2",
+      "documents": [
+        "sa13-planning-forum-transcript"
+      ],
+      "what": "layout/orphaned-continuation-page mustNotFire on the middle pages of #verbatim now carries dependsOn {item G-15, workPackage WP-F4} with the basis that the release's rule page judges a page only \"where its content ends\".",
+      "why": "Under the rule page at the base commit these continuation-only pages (net fill about 0.46 to 0.47 against 0.50) would fire; the expectation holds only under the semantics the release documents. The entry is kept and marked so that a gate reports it as depending on G-15 semantics.",
+      "previous": "same entry without dependsOn",
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E3",
+      "reviewItem": "M1",
+      "documents": [
+        "sa06-mobile-work-policy-de",
+        "sa15-hut-trail-guide-de",
+        "sa20-wiki-meeting-minutes"
+      ],
+      "what": "type/spaced-hyphen mustNotFire entries sa06 #p-4-3 (7 - 18 Uhr), #p-4-4 (a - b), sa15 #li-r1-2 (8 - 18 Uhr), #p-r2-3 (N - S) and sa20 #p-rota-2 (10 - 12) moved to allowed with class heuristic-boundary; the document-wide mustNotFire entries now list them under except.",
+      "why": "They relied on the details of the mathematical-neighbourhood heuristic, which the rule page calls chosen and unmeasured without saying which neighbourhoods count; a correct tool may report or not report them.",
+      "previous": "mustNotFire",
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E4",
+      "reviewItem": "M2",
+      "documents": [
+        "sa16-lab-safety-manual"
+      ],
+      "what": "expectedExit.set {0, 3} -> {0, 1, 3}; a note records the reviewer's measurement that the first fragment of #signoff-sheet is 912 px by getBoundingClientRect() but 928.17 px as the CDP layout box.",
+      "why": "The two-fragment sheet is an allowed documented-gap entry; a tool that closes the gap reports it as an error and exits 1 when no residue occurs, which the old set forbade.",
+      "previous": {
+        "expectedExit": [
+          0,
+          3
+        ]
+      },
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E5",
+      "reviewItem": "M3",
+      "documents": [],
+      "what": "README gate procedure: exit-3 handling now comes first; on an allowed exit 3 only the reason render-unstable is checked and page and rule checks are skipped.",
+      "why": "A render-unstable run reports no pages, so checking pagesAnalysed against the range first would fail every correct exit-3 outcome.",
+      "previous": "page range checked before exit-3 handling",
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E6",
+      "reviewItem": "M4",
+      "documents": [
+        "all"
+      ],
+      "what": "sa16 pages.range [6, 7] -> [5, 7]. Every expected file now records verification.pageCountByFontStack, and every SVG mustNotFire inset is the minimum over three font stacks (machine fonts, probe/fontconfig/no-liberation.conf, probe/fontconfig/free.conf). The generator refuses a range that any stack violates and a label whose class differs between stacks.",
+      "why": "sa16 paginates to 5 pages under FreeFont (reviewer's measurement, reproduced with the construction probe). No other document leaves its range under the three stacks.",
+      "previous": {
+        "sa16-lab-safety-manual": {
+          "pages.range": [
+            6,
+            7
+          ]
+        }
+      },
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E7",
+      "reviewItem": "M5",
+      "documents": [
+        "sa04-essay-chapter-footnotes",
+        "sa06-mobile-work-policy-de",
+        "sa08-tidewell-newsletter",
+        "sa10-lagoon-oxygen-report",
+        "sa15-hut-trail-guide-de"
+      ],
+      "what": "type/excessive-word-spacing allowed entry changed from :not()-restricted selectors to {\"within\": <main container>}: every justified block is allowed.",
+      "why": "Justified blocks excluded by :not() (sa06 #untertitel, sa10 #imprint, #affil, sa15 #unterzeile and others) wrap onto several lines under some fonts, so a word-spacing finding there is font-dependent and must be allowed.",
+      "previous": "selectors with :not() exclusions",
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E8",
+      "reviewItem": "M6",
+      "documents": [
+        "sa14-weather-station-install-guide"
+      ],
+      "what": "layout/unbreakable-block-too-tall mustFire #parts-band now carries dependsOn {item G-02, workPackage WP-F1} with the flow-by-ancestry basis.",
+      "why": "A literal reading of the base commit's docs/limitations.md sentence ('only counts a box that STARTS inside the content box') excludes every fragment of the full-bleed band; the release removes that coordinate filter and its sentence.",
+      "previous": "same entry without dependsOn",
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E9",
+      "reviewItem": "M7",
+      "documents": [
+        "sa08-tidewell-newsletter"
+      ],
+      "what": "expectedDeclines required true -> false for layout/heading-at-page-bottom #spine-h (env/vertical-writing), layout/hyphen-across-page, layout/widow and layout/orphan #lead-story (env/multicolumn) and type/excessive-word-spacing #lead-story (env/multicolumn). README states that a decline is required only where a rule page, docs/limitations.md or the README states it.",
+      "why": "These declines rest only on the rules' declines lists in the source; no rule page states them, so a correct tool may measure the targets instead. The required declines of layout/unbreakable-block-too-tall (rule page) and svg/text-overflows-viewport (rule page) are unchanged, so the expected exit 4 still holds.",
+      "previous": "required: true",
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E10",
+      "reviewItem": "M8",
+      "documents": [
+        "sa05-kitchen-notebook"
+      ],
+      "what": "<body> now carries id=\"notebook\"; the six {\"within\": \"body\"} targets now read {\"within\": \"notebook\"}.",
+      "why": "No element had the id 'body', so the targets did not resolve.",
+      "previous": {
+        "within": "body"
+      },
+      "byteChange": {
+        "document": "documents/sa05-kitchen-notebook.html",
+        "previousSha256": "a3f14ab4cc87d97c81376ccf7d3fd8e0621f3519daf7c87ab56391c44801933d",
+        "sha256": "9ac99e559dc1598e8a89cda2d73c0c581cace04107406dafa90dd94bf619cadc",
+        "reprobed": true
+      },
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E11",
+      "reviewItem": "L1",
+      "documents": [
+        "sa11-insect-chorus-survey"
+      ],
+      "what": "#site-hedge is now start-anchored at viewBox x = -16 (screen x = 52 - 16 x 2.6 = 10.4 px) instead of end-anchored at x = -3.",
+      "why": "The end-anchored label's left edge depended on the font: 0.83 px inside the viewport with DejaVu Serif, below the corpus's 3 px clearance rule. The new left edge is font-independent; minimum inset over the three stacks is now 10.4 px.",
+      "previous": {
+        "text": "x=-3 text-anchor=end",
+        "minInsetPx": 0.83
+      },
+      "byteChange": {
+        "document": "documents/sa11-insect-chorus-survey.html",
+        "previousSha256": "dc713476f4c56804b801524bb2f1ecd034b035a96ae992c7162cdb3b13a1c3c5",
+        "sha256": "fb286a6c07515a3cd9e3216ba4945feb7fbfb61337bbd50d237aefadef083f1b",
+        "reprobed": true
+      },
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E12",
+      "reviewItem": "L2",
+      "documents": [
+        "sa17-seed-bank-grant-proposal"
+      ],
+      "what": "The work plan is wrapped in section#sec-workplan (which now carries break-before: page instead of h2.grid) and its plates in div#workplan-plates. The fixed grid and the stranded h4 are unchanged (h4 930..954, 17.33 px left).",
+      "why": "layout/widow and layout/orphan had two candidates each, one declined after the forced break, so coverage sat exactly on the 0.5 floor. The two wrappers cross the overflow break between the work-plan pages and add measurable candidates: 3 of 4 with the machine fonts (4 of 5 with DejaVu).",
+      "previous": {
+        "widowOrphanCoverage": "1 of 2"
+      },
+      "byteChange": {
+        "document": "documents/sa17-seed-bank-grant-proposal.html",
+        "previousSha256": "c67b3129846aa675dbb87d0883cb4fbe70ce263f526525f491f1aedafc4015e5",
+        "sha256": "3fd5bbab7e2c000cfd45ffe4811284dede1e95b941d0385881c8dffc51acfab3",
+        "reprobed": true
+      },
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E13",
+      "reviewItem": "L3",
+      "documents": [],
+      "what": "README defines how pageOf targets resolve (from the run's own page map; measuredPage is informational; an unresolvable target fails) and that all keys of one target combine with AND while list entries combine with OR (uri plus id).",
+      "why": "The resolution of page-keyed targets and the combination of uri and id were not defined.",
+      "previous": "undefined",
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E14",
+      "reviewItem": "L4",
+      "documents": [
+        "sa06-mobile-work-policy-de",
+        "sa15-hut-trail-guide-de",
+        "sa20-wiki-meeting-minutes"
+      ],
+      "what": "language.typeRulesUnderDefaultLocale no longer says 'measured'; it says the statement was read from src/rules/type/shared-type.ts and not executed. sa20 and the README describe the last line 'Ok.' as three glyphs.",
+      "why": "The locale statement is code reading, not a measurement; the README called the three-glyph line two-glyph.",
+      "previous": "measured: ... / 'a two-glyph last line'",
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E15",
+      "reviewItem": "L5",
+      "documents": [
+        "sa14-weather-station-install-guide"
+      ],
+      "what": "#sidetab is now a keep-together running element of fixed height 320 px in the side margin boxes (@left-middle on left pages, @right-middle on right pages), copied onto five pages; a layout/unbreakable-block-too-tall mustNotFire entry with dependsOn G-02 / WP-F1 names it.",
+      "why": "The side-margin running elements could not observe the G-02 class: their copies summed to about 171 to 333 px, below the content box. Now each copy (320 px) fits its margin box, while five copies sum to 1600 px and the three right-page copies, which start exactly at the content box's right edge, to 960 px, both above the 912 px content box.",
+      "previous": {
+        "sidetab": "34.11 px, no break-inside"
+      },
+      "byteChange": {
+        "document": "documents/sa14-weather-station-install-guide.html",
+        "previousSha256": "c0e181125bb20ae293f2959f172b84bdae2862be330c08adfb091be0061867fc",
+        "sha256": "33be46f56f0e0b5bbe3db6d59c9e5c5b967e54f34f71ce840f056cf27be8050d",
+        "reprobed": true
+      },
+      "date": "2026-09-24",
+      "source": "independent pre-run review (no breaklint output seen)"
+    }
+  ]
 }

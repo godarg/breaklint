@@ -365,19 +365,19 @@
               "do-title"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "do-name-0": 60,
-              "do-pct-0": 32,
+              "do-pct-0": 31.4,
               "do-name-1": 98,
-              "do-pct-1": 32,
+              "do-pct-1": 31.4,
               "do-name-2": 136,
-              "do-pct-2": 32,
+              "do-pct-2": 31.4,
               "do-name-3": 112,
-              "do-pct-3": 32,
+              "do-pct-3": 31.4,
               "do-name-4": 74,
-              "do-pct-4": 32,
+              "do-pct-4": 31.41,
               "do-centre": 132,
               "do-title": 15
             }
@@ -466,6 +466,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 9,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 9,
+      "dejavu substitution": 9,
+      "free substitution": 9
+    },
     "pdfPageCount": 9,
     "contentBoxHeightsPx": [
       700.8,
@@ -489,7 +494,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

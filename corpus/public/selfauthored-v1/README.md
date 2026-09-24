@@ -42,13 +42,13 @@ PROVENANCE.md, RIGHTS.md
 | sa11-insect-chorus-survey | Letter | none; SVG traps (letterbox, overflow visible, defs, hidden text, halos inside) | 0, 4 |
 | sa12-library-annual-report | Letter + landscape named page | 2331 px keep-together table, 3 fragments | 1, 3 |
 | sa13-planning-forum-transcript | A4 | three-line tail page of a 97-line record; full middle pages must not fire | 0 |
-| sa14-weather-station-install-guide | Letter | full-bleed keep-together band, 2344 px, 3 fragments | 1 |
+| sa14-weather-station-install-guide | Letter | full-bleed keep-together band, 2344 px, 3 fragments; 320 px keep-together side tab copied onto five pages (must not fire) | 1 |
 | sa15-hut-trail-guide-de | A4, de | clipped summit label; straight quotes, spaced hyphens, local links | 1 |
-| sa16-lab-safety-manual | Letter | 1368 px sheet in 2 fragments (documented gap); table row left in the overflow column (observed) | 0, 3 |
+| sa16-lab-safety-manual | Letter | 1368 px sheet in 2 fragments (documented gap); table row left in the overflow column (observed) | 0, 1, 3 |
 | sa17-seed-bank-grant-proposal | A4 | label outside the left edge; label clipped by a nested SVG; stranded h4 | 1 |
 | sa18-hand-tools-catalogue | A4 | none; tall cards that fit (up to 950 of 971 px), halos inside | 0, 4 |
 | sa19-release-notes | Letter | `file:` link, `file:` xlink:href, root-relative absolute path | 0, 3 |
-| sa20-wiki-meeting-minutes | A4, no `lang` | straight quotes, spaced hyphens, a two-glyph last line | 0 |
+| sa20-wiki-meeting-minutes | A4, no `lang` | straight quotes, spaced hyphens, a three-glyph last line (`Ok.`) | 0 |
 
 Feature coverage (both page sizes, named landscape pages, running elements in top and side margin
 boxes, string-set, counters, footnotes, multi-column, vertical writing, tables crossing pages,
@@ -69,7 +69,13 @@ Each file binds its document by `sha256` and carries:
     `heuristic-boundary`, `docs-silent`);
   - `expectedDeclines` — `reason` from `src/core/enums.ts` `ENV_IDS`, `required`, `count`,
     `countsTowardCoverage`; for halo labels `perText[].ifMeasured` gives the construction truth a
-    tool must report once it measures them;
+    tool must report once it measures them. A decline is `required: true` only where a rule page,
+    `docs/limitations.md` or the README states it; a decline that rests only on a rule's
+    `declines` list in the source is `required: false` (a correct tool may measure instead);
+  - an entry may carry `dependsOn` (`item`, `workPackage`, `semantics`, `basis`): it holds under
+    rule semantics that this release documents but the base commit's rule page does not yet state.
+    A gate reports such entries separately ("depends on G-15 semantics") and does not count their
+    failure as a new false alarm while the rule page lacks the sentence;
 - `permittedDeclineReasons`, `constructionFacts` (the arithmetic), `runningElements`, `features`,
   `verification` (renderer, fonts, residue seen by the probe) and `notes`.
 
@@ -77,13 +83,13 @@ Targets:
 
 | target | matches |
 |---|---|
-| `{"id": X}` | the element or SVG `<text>` whose author `id` is X (resolve to its source span; a block finding matches when its source lies within that span) |
+| `{"id": X}` | the element or SVG `<text>` whose author `id` is X (resolve to its source span; a block finding matches when its source lies within that span). For `artifact/local-uri` it matches the URI-bearing attributes of X and of its descendants |
 | `{"ids": [...]}`, `{"selector": S}`, `{"selectors": [...]}` | each listed element / every element matching the CSS selector in the source document |
 | `{"within": X}` | any finding whose source lies inside element X |
-| `{"document": true}` | the whole document; `except` lists targets carved out of it |
+| `{"document": true}` | the whole document. `except` (a list of targets) carves findings out of it: the entry matches every finding of that rule in the document that matches none of the `except` targets. `except` is used only on `document` targets |
 | `{"svg": X, "texts": [...]}` | the listed `<text>` ids whose nearest `<svg>` is X; `{"svg": X, "use": U}` a `<use>` instance |
-| `{"uri": {"attribute": A, "value": V}}` | the resource reference with that attribute and raw value |
-| `{"pageOf": {"id": X, "fragment": "last" \| "nonFinal", "excludeFirst": bool}}` | the page(s) holding those fragments of X (page-keyed rules); `measuredPage(s)` records the reference layout |
+| `{"uri": {"attribute": A, "value": V}}` | the resource reference with that attribute and raw (authored) value. When a target also names `id`, both must hold (AND): the reference must be that attribute of that element. All keys of one target combine with AND; several entries in a list combine with OR |
+| `{"pageOf": {"id": X, "fragment": "last" \| "nonFinal", "excludeFirst": bool}}` | page(s) of the run under test, resolved from that run's own page map: the pages on which the report places the named fragments of X (the block records that carry X's source identity, in fragment order). `nonFinal` means every fragment except the last; `excludeFirst` also drops the first. `measuredPage(s)` is the reference layout for orientation only, never matched directly, so renderer-dependent page numbers need no tolerance. A target that the run cannot resolve fails the entry, whichever list it is in |
 | `{"pages": "any page not named in mustNotFire"}` | a page-level allowance |
 
 ## How a gate consumes this
@@ -91,11 +97,12 @@ Targets:
 1. Read `manifest.json`; verify the SHA-256 of every file in `files`. **Zero documents read is a
    failure, never a skip.**
 2. Run each document under the default profile and read the canonical JSON report.
-3. Check `exitCode ∈ expectedExit.set` and `pagesAnalysed ∈ pages.range`.
-4. If the document ended in exit 3 with `render-unstable` and 3 is in the set, the tool withheld
-   its findings by design (`docs/limitations.md`); check the exit reason and stop there for that
-   document.
-5. Otherwise, per rule: every `mustFire` entry matched; no `mustNotFire` target matched; **every
+3. If the document ended in exit 3: pass only if 3 is in `expectedExit.set` and the exit reason is
+   `render-unstable`. A render-unstable run withholds its findings and reports no pages by design
+   (`docs/limitations.md`), so page and rule checks are skipped for that document. Any other exit
+   3 fails.
+4. Otherwise check `exitCode ∈ expectedExit.set` and `pagesAnalysed ∈ pages.range`.
+5. Then, per rule: every `mustFire` entry matched; no `mustNotFire` target matched; **every
    finding is covered by `mustFire ∪ allowed` of its rule (closed world)**; every required decline
    present; no decline reason outside `permittedDeclineReasons`. `layout/half-empty-page` is not
    active in the default profile, so any finding of it fails.
@@ -114,14 +121,19 @@ resolves: every construction fact is built from explicit heights, fixed line pit
 breaks or SVG coordinates, and every font-dependent outcome (widows, orphans, hyphens at page
 boundaries, short last lines, word spacing in justified text, text tails) is listed as `allowed`.
 SVG labels are planted at least 3 px clear of every edge on both the `getBBox()` cell box and the
-pixel ink box; most are far clearer (see `measured` in each entry).
+pixel ink box; most are far clearer (see `measured` in each entry). The clearances and the page
+ranges were checked with the machine's fonts and with two substitutions (`probe/fontconfig/`:
+Liberation rejected, and Liberation plus DejaVu rejected in favour of FreeFont); the recorded
+insets are the minimum over the three, and `verification.pageCountByFontStack` gives the page
+counts.
 
 ## Changing the truth
 
 The truth is frozen with the documents. It is never edited to make a gate pass. If a construction
-fact turns out to be wrong, add a dated entry to `manifest.json` `expectationHistory` (what, why,
-previous value, which run showed it) in the same change that edits the expected file, and change
-the document's bytes only together with a new hash and a new entry.
+fact or an expectation turns out to be wrong, add a dated entry to `manifest.json`
+`expectationHistory` (id, date, what changed, why, previous value, source) in the same change that
+edits the expected file, and change the document's bytes only together with a new hash and a new
+entry. Errata E1 to E15 (2026-09-24) came from an independent review before any breaklint run.
 
 ## Reproducing the construction measurements
 
@@ -130,6 +142,8 @@ the document's bytes only together with a new hash and a new entry.
 node corpus/public/selfauthored-v1/probe/construction-probe.mjs \
   --chrome /path/to/chrome --out /tmp/probe --keep-pdf \
   corpus/public/selfauthored-v1/documents/*.html
+# the same with a font substitution
+FONTCONFIG_FILE=corpus/public/selfauthored-v1/probe/fontconfig/free.conf node ...
 ```
 
 The probe uses puppeteer-core, the Paged.js 0.4.3 UMD bundle and pngjs, nothing from `src/`.

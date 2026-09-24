@@ -11,7 +11,7 @@
   "genre": "policy handbook (German)",
   "language": {
     "htmlLang": "de",
-    "typeRulesUnderDefaultLocale": "measured: lang de matches the default locale de-DE"
+    "typeRulesUnderDefaultLocale": "not measured: read from src/rules/type/shared-type.ts isExcludedRun (never executed): lang de matches the default locale de-DE, so every run outside code-like elements is judged"
   },
   "paper": [
     {
@@ -280,18 +280,6 @@
       "mustNotFire": [
         {
           "target": {
-            "id": "p-4-3"
-          },
-          "why": "7 - 18 Uhr: digits next to the hyphen (mathematical neighbourhood exclusion)"
-        },
-        {
-          "target": {
-            "id": "p-4-4"
-          },
-          "why": "a - b: two single letters joined by the hyphen (formula), plus en dashes elsewhere in the run"
-        },
-        {
-          "target": {
             "id": "p-5-2"
           },
           "why": "Win - L is inside <kbd>, excluded structurally"
@@ -310,20 +298,43 @@
         },
         {
           "target": {
-            "document": true
+            "document": true,
+            "except": [
+              {
+                "id": "p-sh-1"
+              },
+              {
+                "id": "td-sh-2"
+              },
+              {
+                "id": "p-4-3"
+              },
+              {
+                "id": "p-4-4"
+              }
+            ]
           },
-          "except": [
-            {
-              "id": "p-sh-1"
-            },
-            {
-              "id": "td-sh-2"
-            }
-          ],
           "why": "no other spaced hyphen outside the exclusions above"
         }
       ],
-      "allowed": [],
+      "allowed": [
+        {
+          "target": {
+            "id": "p-4-3"
+          },
+          "class": "heuristic-boundary",
+          "text": "werktags 7 - 18 Uhr",
+          "why": "a digit range written with a spaced hyphen; the mathematical exclusion is a chosen, unmeasured +-12-character neighbourhood heuristic (docs/rules/type-spaced-hyphen.md 'Limits'); the rule page does not say which neighbourhoods count as mathematical, so a report is neither required nor forbidden"
+        },
+        {
+          "target": {
+            "id": "p-4-4"
+          },
+          "class": "heuristic-boundary",
+          "text": "a - b ergibt den Saldo",
+          "why": "a formula of two single letters; the mathematical exclusion is a chosen, unmeasured +-12-character neighbourhood heuristic (docs/rules/type-spaced-hyphen.md 'Limits'); the rule page does not say which neighbourhoods count as mathematical, so a report is neither required nor forbidden"
+        }
+      ],
       "expectedDeclines": []
     },
     "type/straight-quotes": {
@@ -372,16 +383,16 @@
         },
         {
           "target": {
-            "document": true
+            "document": true,
+            "except": [
+              {
+                "id": "p-sq-1"
+              },
+              {
+                "id": "li-sq-2"
+              }
+            ]
           },
-          "except": [
-            {
-              "id": "p-sq-1"
-            },
-            {
-              "id": "li-sq-2"
-            }
-          ],
           "why": "no other straight quotation mark occurs in any text run outside code"
         }
       ],
@@ -408,12 +419,10 @@
       "allowed": [
         {
           "target": {
-            "selectors": [
-              "main#richtlinie > p:not(.untertitel):not(.impressum)"
-            ]
+            "within": "richtlinie"
           },
           "class": "font-dependent",
-          "why": "justified blocks: word gaps depend on font metrics and on whether hyphenation dictionaries are available"
+          "why": "any justified block (the stylesheet justifies p (text-align: justify)): word gaps depend on font metrics and on whether hyphenation dictionaries are available, including in one-line-looking blocks that wrap under another font"
         }
       ],
       "expectedDeclines": []
@@ -483,6 +492,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 3,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 3,
+      "dejavu substitution": 3,
+      "free substitution": 3
+    },
     "pdfPageCount": 3,
     "contentBoxHeightsPx": [
       933.53
@@ -505,7 +519,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

@@ -301,7 +301,14 @@
             5
           ],
           "why": "middle pages of the record: completely full (24 lines each) and the record continues onto the next page, so they hold the middle of a block, not its tail. At 12 pt monospace on a 40 px pitch the glyph bands cover about 0.46 of the page (G-15 class), which is below the 0.5 threshold; a tool that judges them by net fill alone reports a full page.",
-          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'A page holds nothing but the tail of a block that began earlier.'"
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'A page holds nothing but the tail of a block that began earlier.'",
+          "dependsOn": {
+            "item": "G-15",
+            "workPackage": "WP-F4",
+            "status": "rule page and rule change pending in this release",
+            "semantics": "a page is judged only where its content ends: its last flow block is the final fragment of its block, or the next page opens with a fresh block",
+            "basis": "The rule page at the base commit judges every continuation-only page by net fill alone, and these pages read about 0.46-0.47 against 0.50, so under the base wording they would fire. The release changes the rule and its page (WP-F4); the new page states that a page is judged only \"where its content ends\". This entry holds under that sentence. A gate reports it as 'depends on G-15 semantics' and treats a failure before that sentence is on the rule page as the known state, not as a new false alarm."
+          }
         }
       ],
       "allowed": [
@@ -433,6 +440,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 7,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 7,
+      "dejavu substitution": 7,
+      "free substitution": 7
+    },
     "pdfPageCount": 7,
     "contentBoxHeightsPx": [
       971.33
@@ -455,7 +467,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

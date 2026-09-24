@@ -222,14 +222,14 @@
               "arch-workers"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "arch-cli": 85.66,
               "arch-planner": 92,
               "arch-scheduler": 92,
-              "arch-workers": 74.5,
-              "arch-cache": 28,
+              "arch-workers": 72.73,
+              "arch-cache": 27,
               "arch-title": 15
             }
           }
@@ -262,14 +262,14 @@
       "mustNotFire": [
         {
           "target": {
-            "document": true
+            "document": true,
+            "except": [
+              {
+                "id": "up-p1"
+              }
+            ]
           },
-          "why": "outside the ids listed under allowed, no straight quotation mark or apostrophe occurs in any text run outside code-like elements; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')",
-          "except": [
-            {
-              "id": "up-p1"
-            }
-          ]
+          "why": "outside the ids listed under allowed, no straight quotation mark or apostrophe occurs in any text run outside code-like elements; in addition the document declares lang=\"en\"; under the default locale de-DE every run whose language differs from the locale is structurally excluded (docs/rules/type-spaced-hyphen.md 'Limits': 'any run whose lang differs from the locale are structurally excluded, on the ancestor chain')"
         }
       ],
       "allowed": [
@@ -385,6 +385,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 3,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 3,
+      "dejavu substitution": 3,
+      "free substitution": 3
+    },
     "pdfPageCount": 3,
     "contentBoxHeightsPx": [
       902.39
@@ -413,7 +418,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

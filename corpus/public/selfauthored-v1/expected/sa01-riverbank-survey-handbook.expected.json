@@ -356,7 +356,7 @@
               "bp-water"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "bp-tick-0": 10,
@@ -366,13 +366,13 @@
               "bp-tick-8": 10,
               "bp-tick-10": 10,
               "bp-tick-12": 10,
-              "bp-banktop": 52,
+              "bp-banktop": 51.5,
               "bp-upper": 150,
-              "bp-scour": 224,
-              "bp-water": 51.5,
-              "bp-riffle": 76,
+              "bp-scour": 223,
+              "bp-water": 51.19,
+              "bp-riffle": 75,
               "bp-heading": 17,
-              "bp-note": 23.5
+              "bp-note": 23
             }
           }
         },
@@ -388,15 +388,15 @@
               "rg-soil"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
-              "rg-exposed": 133,
+              "rg-exposed": 115.59,
               "rg-pin": 101,
               "rg-soil": 60,
               "rg-face": 167,
               "rg-rule": 23.5,
-              "rg-rule2": 24
+              "rg-rule2": 23.5
             }
           }
         },
@@ -423,7 +423,7 @@
               "q-cell-9"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "q-cell-1": 35,
@@ -434,15 +434,15 @@
               "q-cell-6": 75,
               "q-cell-7": 75,
               "q-cell-8": 75,
-              "q-cell-9": 73,
-              "q-cell-10": 73,
-              "q-cell-11": 73,
-              "q-cell-12": 73,
-              "q-cell-13": 33,
-              "q-cell-14": 33,
-              "q-cell-15": 33,
-              "q-cell-16": 33,
-              "q-caption": 7.5
+              "q-cell-9": 72,
+              "q-cell-10": 72,
+              "q-cell-11": 72,
+              "q-cell-12": 72,
+              "q-cell-13": 32,
+              "q-cell-14": 32,
+              "q-cell-15": 32,
+              "q-cell-16": 32,
+              "q-caption": 7
             }
           }
         },
@@ -471,25 +471,25 @@
               "cv-y-40"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
-              "cv-y-0": 44,
-              "cv-y-10": 39.16,
-              "cv-y-20": 39,
-              "cv-y-30": 39,
-              "cv-y-40": 39,
-              "cv-val-0": 112.58,
+              "cv-y-0": 40.95,
+              "cv-y-10": 34.59,
+              "cv-y-20": 34.59,
+              "cv-y-30": 34.59,
+              "cv-y-40": 34.5,
+              "cv-val-0": 110.3,
               "cv-cat-0": 40,
               "cv-val-1": 111.5,
               "cv-cat-1": 40,
               "cv-val-2": 86.5,
               "cv-cat-2": 40,
               "cv-val-3": 136,
-              "cv-cat-3": 39.5,
+              "cv-cat-3": 39,
               "cv-val-4": 155.5,
               "cv-cat-4": 40,
-              "cv-val-5": 81,
+              "cv-val-5": 79.48,
               "cv-cat-5": 40,
               "cv-xtitle": 9,
               "cv-title": 14
@@ -521,28 +521,28 @@
               "pin-ytitle"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "pin-x-0": 50,
-              "pin-x-1": 49.5,
-              "pin-x-2": 50,
-              "pin-x-3": 49.5,
+              "pin-x-1": 49,
+              "pin-x-2": 49.5,
+              "pin-x-3": 49,
               "pin-x-4": 50,
-              "pin-x-5": 50,
-              "pin-x-6": 33.01,
+              "pin-x-5": 49.5,
+              "pin-x-6": 31,
               "pin-y-0": 64,
-              "pin-y-10": 62,
-              "pin-y-20": 62,
-              "pin-y-30": 62,
-              "pin-y-40": 61.5,
-              "pin-y-50": 62,
+              "pin-y-10": 59.27,
+              "pin-y-20": 59.27,
+              "pin-y-30": 59.27,
+              "pin-y-40": 59,
+              "pin-y-50": 59.27,
               "pin-y-60": 45,
               "pin-lab-B1": 48,
               "pin-lab-B2": 48,
               "pin-lab-B3": 48,
               "pin-ytitle": 16,
-              "pin-xtitle": 15.5
+              "pin-xtitle": 15
             }
           }
         },
@@ -557,14 +557,14 @@
               "pp-note"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "pp-1": 40,
               "pp-2": 40,
               "pp-3": 40,
               "pp-4": 40,
-              "pp-note": 19.5
+              "pp-note": 19
             }
           }
         },
@@ -592,10 +592,10 @@
               "fs-title"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
-              "fs-title": 21,
+              "fs-title": 20,
               "fs-sub": 24,
               "fs-row-0": 34,
               "fs-row-1": 34,
@@ -612,7 +612,7 @@
               "fs-row-12": 34,
               "fs-row-13": 34,
               "fs-row-14": 34,
-              "fs-foot": 11.5
+              "fs-foot": 11
             }
           }
         }
@@ -699,6 +699,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 8,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 8,
+      "dejavu substitution": 8,
+      "free substitution": 8
+    },
     "pdfPageCount": 8,
     "contentBoxHeightsPx": [
       971.33
@@ -718,7 +723,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

@@ -136,8 +136,8 @@
             "id": "lead-story"
           },
           "reason": "env/multicolumn",
-          "required": true,
-          "why": "div#lead-story (column-count: 2) crosses a page boundary; its fragments are declined, not judged",
+          "required": false,
+          "why": "div#lead-story (column-count: 2) crosses a page boundary; its fragments may be declined rather than judged",
           "measured": [
             {
               "page": 1,
@@ -152,7 +152,7 @@
               "startsInsideContentBox": true
             }
           ],
-          "docsBasis": "docs/status.md / README exit-code section: the multi-column case is the reason exit 4 exists; the rule registry lists env/multicolumn for this rule."
+          "docsBasis": "No rule page states this decline; it rests on the rule's declines list in src/ (read, not executed), so a correct tool may measure the target instead of declining it. README 'Exit codes' describes the widow rule declining a multi-column document, but not as a rule-page statement."
         }
       ]
     },
@@ -189,8 +189,8 @@
             "id": "lead-story"
           },
           "reason": "env/multicolumn",
-          "required": true,
-          "why": "div#lead-story (column-count: 2) crosses a page boundary; its fragments are declined, not judged",
+          "required": false,
+          "why": "div#lead-story (column-count: 2) crosses a page boundary; its fragments may be declined rather than judged",
           "measured": [
             {
               "page": 1,
@@ -205,7 +205,7 @@
               "startsInsideContentBox": true
             }
           ],
-          "docsBasis": "docs/status.md / README exit-code section: the multi-column case is the reason exit 4 exists; the rule registry lists env/multicolumn for this rule."
+          "docsBasis": "No rule page states this decline; it rests on the rule's declines list in src/ (read, not executed), so a correct tool may measure the target instead of declining it."
         }
       ]
     },
@@ -335,9 +335,9 @@
             "id": "spine-h"
           },
           "reason": "env/vertical-writing",
-          "required": true,
+          "required": false,
           "why": "the h3 inside the vertical sidebar inherits writing-mode: vertical-rl",
-          "docsBasis": "rule registry declines list for layout/heading-at-page-bottom"
+          "docsBasis": "No rule page states this decline; it rests on the rule's declines list in src/ (read, not executed), so a correct tool may measure the target instead of declining it."
         }
       ]
     },
@@ -398,8 +398,8 @@
             "id": "lead-story"
           },
           "reason": "env/multicolumn",
-          "required": true,
-          "why": "div#lead-story (column-count: 2) crosses a page boundary; its fragments are declined, not judged",
+          "required": false,
+          "why": "div#lead-story (column-count: 2) crosses a page boundary; its fragments may be declined rather than judged",
           "measured": [
             {
               "page": 1,
@@ -414,7 +414,7 @@
               "startsInsideContentBox": true
             }
           ],
-          "docsBasis": "docs/status.md / README exit-code section: the multi-column case is the reason exit 4 exists; the rule registry lists env/multicolumn for this rule."
+          "docsBasis": "No rule page states this decline; it rests on the rule's declines list in src/ (read, not executed), so a correct tool may measure the target instead of declining it."
         }
       ]
     },
@@ -446,7 +446,7 @@
               "en-y-50"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "en-x-0": 24,
@@ -454,11 +454,11 @@
               "en-x-2": 24,
               "en-x-3": 24,
               "en-x-4": 24,
-              "en-x-5": 22,
-              "en-y-0": 29.5,
-              "en-y-50": 25.5,
-              "en-y-100": 21.25,
-              "en-title": 10,
+              "en-x-5": 19.86,
+              "en-y-0": 28.5,
+              "en-y-50": 23.17,
+              "en-y-100": 17.77,
+              "en-title": 9,
               "en-leg-last": 8,
               "en-leg-this": 8
             }
@@ -545,13 +545,10 @@
       "allowed": [
         {
           "target": {
-            "selectors": [
-              "#lead-story",
-              "#lead-story p"
-            ]
+            "within": "issue"
           },
           "class": "font-dependent",
-          "why": "justified blocks: word gaps depend on font metrics and on whether hyphenation dictionaries are available"
+          "why": "any justified block (the stylesheet justifies #lead-story and the paragraphs that inherit from it): word gaps depend on font metrics and on whether hyphenation dictionaries are available, including in one-line-looking blocks that wrap under another font"
         }
       ],
       "expectedDeclines": [
@@ -560,9 +557,9 @@
             "id": "lead-story"
           },
           "reason": "env/multicolumn",
-          "required": true,
+          "required": false,
           "why": "the justified container itself is multi-column",
-          "docsBasis": "rule registry declines list for type/excessive-word-spacing (env/multicolumn)"
+          "docsBasis": "No rule page states this decline; it rests on the rule's declines list in src/ (read, not executed), so a correct tool may measure the target instead of declining it."
         }
       ]
     },
@@ -595,6 +592,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 3,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 3,
+      "dejavu substitution": 3,
+      "free substitution": 3
+    },
     "pdfPageCount": 3,
     "contentBoxHeightsPx": [
       994.02
@@ -617,7 +619,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

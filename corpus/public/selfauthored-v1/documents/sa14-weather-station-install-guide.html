@@ -15,7 +15,9 @@
 @page :first { @top-center { content: none; } }
 body { margin: 0; font: 10pt/1.45 sans-serif; color: #1c2530; }
 .guidehead { position: running(guidehead); font: 7.5pt sans-serif; color: #5d6b78; text-transform: uppercase; letter-spacing: 0.08em; }
-.sidetab { position: running(sidetab); width: 0.45in; background: #16324f; color: #fff; text-align: center; font: bold 8pt/1.2 sans-serif; padding: 8pt 0; }
+/* The side tab is a keep-together strip of fixed height: 320 px, a third of the content box.
+   Each copy fits its side margin box (912 px tall); five copies summed would be 1600 px. */
+.sidetab { position: running(sidetab); width: 0.45in; height: 320px; box-sizing: border-box; overflow: hidden; break-inside: avoid; background: #16324f; color: #fff; text-align: center; font: bold 8pt/16px sans-serif; padding: 12px 0; }
 /* Full-bleed elements: the page margins are 0.75 in on both sides, so pulling the box out by the
    same amount makes it exactly as wide as the sheet (8.5 in = 816 px). */
 .bleed { margin-left: -0.75in; margin-right: -0.75in; }
@@ -45,7 +47,7 @@ th { border-bottom: 1pt solid #16324f; }
 </head>
 <body>
 <div class="guidehead" id="guidehead">Cinderwick WS-3 &middot; installation guide</div>
-<div class="sidetab" id="sidetab">SETUP</div>
+<div class="sidetab" id="sidetab">WS&#8209;3<br><br>SETUP<br><br>STEP<br>BY<br>STEP</div>
 <main id="guide">
 <figure class="bleed" id="fig-banner">
 <svg id="svg-banner" xmlns="http://www.w3.org/2000/svg" width="816" height="150" viewBox="0 0 816 150" role="img"><title>Station overview</title>

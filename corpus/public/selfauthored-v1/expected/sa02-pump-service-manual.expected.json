@@ -372,13 +372,13 @@
               "sch-tank"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "sch-tank": 7.5,
               "sch-pump": 90,
               "sch-gauge": 61,
-              "sch-inject": 17.5,
+              "sch-inject": 17,
               "sch-suction": 71,
               "sch-discharge": 71,
               "sch-bleed": 141,
@@ -469,6 +469,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 7,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 7,
+      "dejavu substitution": 7,
+      "free substitution": 7
+    },
     "pdfPageCount": 7,
     "contentBoxHeightsPx": [
       912
@@ -491,7 +496,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

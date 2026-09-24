@@ -28,7 +28,9 @@ figure { margin: 3mm 0 4mm; break-inside: avoid; }
 figcaption { font: 8.5pt/1.35 sans-serif; color: #444; margin-top: 1.5mm; }
 figure svg { display: block; }
 /* The work plan section is laid out on a fixed grid: explicit heights and margins only. */
-h2.grid { break-before: page; height: 48px; line-height: 48px; margin: 0 0 16px; white-space: nowrap; }
+section.grid-section { break-before: page; margin: 0; padding: 0; }
+h2.grid { height: 48px; line-height: 48px; margin: 0 0 16px; white-space: nowrap; }
+#workplan-plates { margin: 0; padding: 0; }
 figure.plate { margin: 0 0 12px; }
 #plate-gantt { height: 520px; }
 #plate-milestones { height: 316px; }
@@ -67,7 +69,9 @@ h4.grid { font: bold 10.5pt/24px sans-serif; height: 24px; margin: 18px 0 6px; w
 </tbody>
 </table>
 
+<section class="grid-section" id="sec-workplan">
 <h2 class="grid" id="h-workplan">4&ensp;Work plan</h2>
+<div id="workplan-plates">
 <figure class="plate" id="plate-gantt">
 <svg id="svg-gantt" xmlns="http://www.w3.org/2000/svg" width="642" height="470" viewBox="0 0 642 470" role="img"><title>Project timeline by quarter</title>
   <rect x="0" y="0" width="642" height="470" fill="#ffffff"/>
@@ -144,7 +148,9 @@ h4.grid { font: bold 10.5pt/24px sans-serif; height: 24px; margin: 18px 0 6px; w
 </svg>
 <figcaption id="cap-risks">Figure 3. The two main risks placed on a likelihood and severity matrix.</figcaption>
 </figure>
+</div>
 <p id="risk-p1">The main risk to the timetable is a wet autumn, which can make the moor impassable for the corer. The plan allows a second coring window in spring. The main risk to the outcome is flooding of a plot soon after sowing; the two plots are therefore placed on slightly different ground, one on a low ridge and one in a hollow, so that at least one should survive a wet winter.</p>
+</section>
 
 <h2 id="h-outcomes">5&ensp;Outcomes and reporting</h2>
 <p id="out-p1">By the end of the grant we will have a record of the soil seed bank at forty sampling points, germination results for every sample, and two trial plots in their first growing season. A short report will be published at the end of each phase, and a final report, with the full data, at the end of the grant. The data will be released under an open licence so that other groups working on similar sites can use them.</p>

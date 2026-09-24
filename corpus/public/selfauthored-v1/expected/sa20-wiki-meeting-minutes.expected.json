@@ -11,7 +11,7 @@
   "genre": "meeting minutes exported from a wiki, no lang attribute",
   "language": {
     "htmlLang": null,
-    "typeRulesUnderDefaultLocale": "measured: without a lang attribute every run is judged under the default locale de-DE, although the text is English"
+    "typeRulesUnderDefaultLocale": "not measured: read from src/rules/type/shared-type.ts isExcludedRun (never executed): without a lang attribute a run has no language of its own and is judged under the default locale de-DE, although the text is English"
   },
   "paper": [
     {
@@ -242,12 +242,6 @@
       "mustNotFire": [
         {
           "target": {
-            "id": "p-rota-2"
-          },
-          "why": "10 - 12: digits next to the hyphen"
-        },
-        {
-          "target": {
             "id": "p-aob-1"
           },
           "why": "Ctrl - Tab is inside <kbd>"
@@ -260,23 +254,34 @@
         },
         {
           "target": {
-            "document": true
+            "document": true,
+            "except": [
+              {
+                "id": "p-sh-1"
+              },
+              {
+                "id": "td-sh-2"
+              },
+              {
+                "id": "p-aob-3"
+              },
+              {
+                "id": "p-rota-2"
+              }
+            ]
           },
-          "except": [
-            {
-              "id": "p-sh-1"
-            },
-            {
-              "id": "td-sh-2"
-            },
-            {
-              "id": "p-aob-3"
-            }
-          ],
           "why": "no other spaced hyphen outside the exclusions"
         }
       ],
       "allowed": [
+        {
+          "target": {
+            "id": "p-rota-2"
+          },
+          "class": "heuristic-boundary",
+          "text": "between 10 - 12 in the morning",
+          "why": "a digit range written with a spaced hyphen; the mathematical exclusion is a chosen, unmeasured +-12-character neighbourhood heuristic (docs/rules/type-spaced-hyphen.md 'Limits'); the rule page does not say which neighbourhoods count as mathematical, so a report is neither required nor forbidden"
+        },
         {
           "target": {
             "id": "p-aob-3"
@@ -333,16 +338,16 @@
         },
         {
           "target": {
-            "document": true
+            "document": true,
+            "except": [
+              {
+                "id": "li-sq-2"
+              },
+              {
+                "id": "p-sq-1"
+              }
+            ]
           },
-          "except": [
-            {
-              "id": "li-sq-2"
-            },
-            {
-              "id": "p-sq-1"
-            }
-          ],
           "why": "no other straight quotation mark outside code-like elements"
         }
       ],
@@ -355,7 +360,7 @@
           "target": {
             "id": "p-sll"
           },
-          "why": "the paragraph ends on a forced line break followed by the single word 'Ok.'",
+          "why": "the paragraph ends on a forced line break followed by the single word 'Ok.' (three glyphs: O, k, full stop)",
           "construction": "two sentences, then <br>, then 'Ok.': the last line is three glyphs, about 1.6 em in any common sans-serif (below 2 em) and about 3 % of the 657.6 px measure (below 15 %)",
           "measured": {
             "lines": {
@@ -419,6 +424,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 2,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 2,
+      "dejavu substitution": 2,
+      "free substitution": 2
+    },
     "pdfPageCount": 2,
     "contentBoxHeightsPx": [
       978.89
@@ -444,7 +454,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

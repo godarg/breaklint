@@ -2,8 +2,8 @@
   "schemaVersion": "selfauthored-expected-v1",
   "documentId": "sa14-weather-station-install-guide",
   "artifact": "documents/sa14-weather-station-install-guide.html",
-  "sha256": "c0e181125bb20ae293f2959f172b84bdae2862be330c08adfb091be0061867fc",
-  "byteLength": 15243,
+  "sha256": "33be46f56f0e0b5bbe3db6d59c9e5c5b967e54f34f71ce840f056cf27be8050d",
+  "byteLength": 15554,
   "authoredOn": "2026-09-24",
   "provenanceClass": "synthetic_first_party",
   "calibrationEvidenceEligible": false,
@@ -214,10 +214,65 @@
               }
             ]
           },
-          "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md; nothing in the rule documentation exempts a block because it bleeds into the page margin."
+          "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md; nothing in the rule documentation exempts a block because it bleeds into the page margin.",
+          "dependsOn": {
+            "item": "G-02",
+            "workPackage": "WP-F1",
+            "status": "rule change and documentation pending in this release",
+            "semantics": "fragments belong to the flow by ancestry (inside the page content area, not a margin-box copy), not by where their box starts",
+            "basis": "Read literally, docs/limitations.md at the base commit says the rule 'only counts a box that STARTS inside the content box of its page'; every fragment of this band starts 72 px left of it. The release removes that coordinate filter and its sentence (WP-F1). This entry holds under the flow-by-ancestry semantics documented in the same release."
+          }
         }
       ],
       "mustNotFire": [
+        {
+          "target": {
+            "id": "sidetab"
+          },
+          "why": "running element in the side margin boxes with break-inside: avoid. Each copy (320 px) fits its margin box and the content box (912 px); only a tool that sums the per-page margin-box copies as if they were fragments of one flow block would report it",
+          "construction": "div.sidetab: fixed height 320 px (box-sizing: border-box, overflow: hidden), break-inside: avoid, position: running(sidetab), placed in @left-middle on left pages and @right-middle on right pages. Five pages -> five copies: 5 x 320 = 1600 px, and the three right-page copies alone 960 px, both above 912 px. The right-page copies start exactly at the right edge of the content box.",
+          "measured": {
+            "copies": [
+              {
+                "page": 1,
+                "heightPx": 320,
+                "leftInsetPx": 672,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 2,
+                "heightPx": 320,
+                "leftInsetPx": -72,
+                "startsInsideContentBox": false
+              },
+              {
+                "page": 3,
+                "heightPx": 320,
+                "leftInsetPx": 672,
+                "startsInsideContentBox": true
+              },
+              {
+                "page": 4,
+                "heightPx": 320,
+                "leftInsetPx": -72,
+                "startsInsideContentBox": false
+              },
+              {
+                "page": 5,
+                "heightPx": 320,
+                "leftInsetPx": 672,
+                "startsInsideContentBox": true
+              }
+            ]
+          },
+          "docsBasis": "docs/limitations.md 0.6.0 ('Blocks carrying the same source id are not always fragments of one flow') and CHANGELOG Unreleased (side margin boxes); flow-by-ancestry semantics of WP-F1",
+          "dependsOn": {
+            "item": "G-02",
+            "workPackage": "WP-F1",
+            "status": "rule change pending in this release",
+            "semantics": "margin-box copies of a running element are never fragments of the flow"
+          }
+        },
         {
           "target": {
             "id": "guidehead"
@@ -371,7 +426,7 @@
               "bn-title"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "bn-title": 44,
@@ -392,15 +447,15 @@
               "ms-vane"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "ms-b2": 100,
-              "ms-b3": 133.5,
-              "ms-b1": 38,
+              "ms-b3": 133,
+              "ms-b1": 37,
               "ms-cups": 30,
               "ms-vane": 30,
-              "ms-clamp": 81.5,
+              "ms-clamp": 81,
               "ms-fig": 14
             }
           }
@@ -488,6 +543,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 5,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 5,
+      "dejavu substitution": 5,
+      "free substitution": 5
+    },
     "pdfPageCount": 5,
     "contentBoxHeightsPx": [
       912
@@ -510,9 +570,15 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": [
-    "On right-hand pages the @right-middle copy of #sidetab starts exactly at the right edge of the content box (x = content right); it is still a margin-box copy, not part of the flow."
+    "On right-hand pages the @right-middle copy of #sidetab starts exactly at the right edge of the content box (x = content right); it is still a margin-box copy, not part of the flow.",
+    "Erratum E15 made #sidetab a 320 px keep-together strip so that the corpus can observe the G-02 class in a side margin box (the earlier 34 px tab summed to 171 px over five pages and could not)."
   ]
 }

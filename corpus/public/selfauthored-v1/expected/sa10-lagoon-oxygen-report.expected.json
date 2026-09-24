@@ -364,7 +364,7 @@
               "map-title"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "map-scale-0": 10,
@@ -393,23 +393,23 @@
               "ser-y-40"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "ser-x-0": 30,
-              "ser-x-1": 29.5,
-              "ser-x-2": 29.5,
-              "ser-x-3": 30,
-              "ser-x-4": 30,
-              "ser-x-5": 29.5,
-              "ser-x-6": 29.5,
+              "ser-x-1": 29,
+              "ser-x-2": 29,
+              "ser-x-3": 29.5,
+              "ser-x-4": 29.5,
+              "ser-x-5": 29,
+              "ser-x-6": 29,
               "ser-y-40": 35,
-              "ser-y-30": 52,
-              "ser-y-20": 52,
-              "ser-y-10": 52,
+              "ser-y-30": 49.27,
+              "ser-y-20": 49.27,
+              "ser-y-10": 49.27,
               "ser-y-0": 44,
-              "ser-title": 14,
-              "ser-xtitle": 11.5
+              "ser-title": 13,
+              "ser-xtitle": 11
             }
           }
         },
@@ -432,7 +432,7 @@
               "bar-y-0"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "bar-x-s1": 22,
@@ -446,8 +446,8 @@
               "bar-x-s5": 22,
               "bar-val-s5": 141,
               "bar-x-s6": 22,
-              "bar-y-0": 24,
-              "bar-note": 8
+              "bar-y-0": 23.5,
+              "bar-note": 7.5
             }
           }
         },
@@ -471,7 +471,7 @@
               "sc-y-30"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "sc-x-0": 21,
@@ -481,13 +481,13 @@
               "sc-x-4": 21,
               "sc-x-5": 21,
               "sc-x-6": 21,
-              "sc-x-7": 19.5,
+              "sc-x-7": 18.81,
               "sc-y-0": 34,
-              "sc-y-10": 42,
-              "sc-y-20": 42,
+              "sc-y-10": 39.27,
+              "sc-y-20": 39.27,
               "sc-y-30": 25,
-              "sc-xtitle": 7.5,
-              "sc-fit": 81
+              "sc-xtitle": 7,
+              "sc-fit": 80
             }
           }
         }
@@ -922,13 +922,10 @@
       "allowed": [
         {
           "target": {
-            "selectors": [
-              "main#report p:not(.affil):not(.authors):not(.imprint):not(.eq)",
-              ".abstract p"
-            ]
+            "within": "report"
           },
           "class": "font-dependent",
-          "why": "justified blocks: word gaps depend on font metrics and on whether hyphenation dictionaries are available"
+          "why": "any justified block (the stylesheet justifies p, .abstract p): word gaps depend on font metrics and on whether hyphenation dictionaries are available, including in one-line-looking blocks that wrap under another font"
         }
       ],
       "expectedDeclines": []
@@ -960,6 +957,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 5,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 5,
+      "dejavu substitution": 5,
+      "free substitution": 5
+    },
     "pdfPageCount": 5,
     "contentBoxHeightsPx": [
       956.22
@@ -982,7 +984,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

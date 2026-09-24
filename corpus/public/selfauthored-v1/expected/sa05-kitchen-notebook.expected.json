@@ -2,8 +2,8 @@
   "schemaVersion": "selfauthored-expected-v1",
   "documentId": "sa05-kitchen-notebook",
   "artifact": "documents/sa05-kitchen-notebook.html",
-  "sha256": "a3f14ab4cc87d97c81376ccf7d3fd8e0621f3519daf7c87ab56391c44801933d",
-  "byteLength": 12742,
+  "sha256": "9ac99e559dc1598e8a89cda2d73c0c581cace04107406dafa90dd94bf619cadc",
+  "byteLength": 12756,
   "authoredOn": "2026-09-24",
   "provenanceClass": "synthetic_first_party",
   "calibrationEvidenceEligible": false,
@@ -92,7 +92,7 @@
       "allowed": [
         {
           "target": {
-            "within": "body"
+            "within": "notebook"
           },
           "class": "font-dependent",
           "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
@@ -101,7 +101,7 @@
       "expectedDeclines": [
         {
           "target": {
-            "within": "body"
+            "within": "notebook"
           },
           "reason": "env/forced-break",
           "required": false,
@@ -122,7 +122,7 @@
       "allowed": [
         {
           "target": {
-            "within": "body"
+            "within": "notebook"
           },
           "class": "font-dependent",
           "why": "where a block splits and how many lines each fragment carries depends on font metrics and on Chromium's own widows/orphans handling inside the Paged.js fragmentainer"
@@ -131,7 +131,7 @@
       "expectedDeclines": [
         {
           "target": {
-            "within": "body"
+            "within": "notebook"
           },
           "reason": "env/forced-break",
           "required": false,
@@ -307,7 +307,7 @@
       "allowed": [
         {
           "target": {
-            "within": "body"
+            "within": "notebook"
           },
           "class": "font-dependent",
           "why": "whether a word is split at a page boundary depends on font metrics and on the paginator; the class is only set by Paged.js"
@@ -356,7 +356,7 @@
       "allowed": [
         {
           "target": {
-            "within": "body"
+            "within": "notebook"
           },
           "class": "font-dependent",
           "why": "the width of a paragraph's last line depends on font metrics"
@@ -404,6 +404,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 7,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 7,
+      "dejavu substitution": 7,
+      "free substitution": 7
+    },
     "pdfPageCount": 7,
     "contentBoxHeightsPx": [
       892.8
@@ -423,7 +428,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

@@ -2,8 +2,8 @@
   "schemaVersion": "selfauthored-expected-v1",
   "documentId": "sa11-insect-chorus-survey",
   "artifact": "documents/sa11-insect-chorus-survey.html",
-  "sha256": "dc713476f4c56804b801524bb2f1ecd034b035a96ae992c7162cdb3b13a1c3c5",
-  "byteLength": 16266,
+  "sha256": "fb286a6c07515a3cd9e3216ba4945feb7fbfb61337bbd50d237aefadef083f1b",
+  "byteLength": 16249,
   "authoredOn": "2026-09-24",
   "provenanceClass": "synthetic_first_party",
   "calibrationEvidenceEligible": false,
@@ -77,7 +77,7 @@
   "constructionFacts": [
     {
       "fact": "letterbox",
-      "arithmetic": "viewBox 200 x 100 into 624 x 260: scale min(3.12, 2.6) = 2.6, viewBox drawn at x 52..572; #site-hedge ends at 52 - 3 x 2.6 = 44.2 px and starts about 10 px from the left edge"
+      "arithmetic": "viewBox 200 x 100 into 624 x 260: scale min(3.12, 2.6) = 2.6, viewBox drawn at x 52..572; #site-hedge is start-anchored at viewBox x = -16, so it starts at 52 - 16 x 2.6 = 10.4 px from the left edge of the viewport whatever the font, in the band left of the viewBox"
     }
   ],
   "rules": {
@@ -306,7 +306,7 @@
               "site-water"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "site-r1": 52,
@@ -314,9 +314,9 @@
               "site-r3": 46.8,
               "site-r4": 91,
               "site-r5": 39,
-              "site-water": 23,
+              "site-water": 22.5,
               "site-hedge": 10,
-              "site-reed": 20.3,
+              "site-reed": 20.29,
               "site-title": 7.8
             }
           }
@@ -343,14 +343,14 @@
               "ch-xtitle"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
-              "ch-band-0": 39,
-              "ch-band-1": 38.5,
-              "ch-band-2": 39,
-              "ch-band-3": 39,
-              "ch-band-4": 34.3,
+              "ch-band-0": 33.88,
+              "ch-band-1": 33.5,
+              "ch-band-2": 33.88,
+              "ch-band-3": 33.88,
+              "ch-band-4": 27.84,
               "ch-hour-0": 33,
               "ch-hour-1": 33,
               "ch-hour-2": 33,
@@ -361,7 +361,7 @@
               "ch-hour-7": 33,
               "ch-hour-8": 33,
               "ch-title": 12,
-              "ch-xtitle": 8
+              "ch-xtitle": 7.5
             }
           }
         },
@@ -382,7 +382,7 @@
               "ni-ytitle"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "ni-x-1": 32,
@@ -391,11 +391,11 @@
               "ni-x-22": 32,
               "ni-x-29": 32,
               "ni-y-0": 44,
-              "ni-y-20": 62.5,
-              "ni-y-40": 62,
-              "ni-y-60": 36,
+              "ni-y-20": 59.91,
+              "ni-y-40": 59.5,
+              "ni-y-60": 35,
               "ni-ytitle": 21,
-              "ni-xtitle": 8
+              "ni-xtitle": 7.5
             }
           }
         },
@@ -693,6 +693,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 3,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 3,
+      "dejavu substitution": 4,
+      "free substitution": 3
+    },
     "pdfPageCount": 3,
     "contentBoxHeightsPx": [
       883.19
@@ -715,7 +720,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

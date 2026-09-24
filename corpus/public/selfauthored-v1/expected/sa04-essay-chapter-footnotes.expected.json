@@ -247,12 +247,10 @@
       "allowed": [
         {
           "target": {
-            "selectors": [
-              "section#chapter p:not(.imprint):not(.chapter-number)"
-            ]
+            "within": "chapter"
           },
           "class": "font-dependent",
-          "why": "justified blocks: word gaps depend on font metrics and on whether hyphenation dictionaries are available"
+          "why": "any justified block (the stylesheet justifies p (text-align: justify)): word gaps depend on font metrics and on whether hyphenation dictionaries are available, including in one-line-looking blocks that wrap under another font"
         }
       ],
       "expectedDeclines": []
@@ -283,6 +281,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 4,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 4,
+      "dejavu substitution": 4,
+      "free substitution": 4
+    },
     "pdfPageCount": 4,
     "contentBoxHeightsPx": [
       777.39,
@@ -302,7 +305,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": []
 }

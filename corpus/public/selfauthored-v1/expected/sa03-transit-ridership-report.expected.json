@@ -441,20 +441,20 @@
               "rb-val-9"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "rb-title": 13,
               "rb-name-1": 44,
               "rb-name-2": 74,
-              "rb-val-2": 36.81,
-              "rb-name-3": 92.09,
-              "rb-val-3": 96.5,
-              "rb-name-4": 104.36,
+              "rb-val-2": 31.51,
+              "rb-name-3": 82.14,
+              "rb-val-3": 91.37,
+              "rb-name-4": 93.72,
               "rb-val-4": 134,
-              "rb-name-5": 99.69,
+              "rb-name-5": 90.31,
               "rb-val-5": 154,
-              "rb-name-6": 118.95,
+              "rb-name-6": 109.69,
               "rb-val-6": 124,
               "rb-name-7": 93.5,
               "rb-val-7": 94,
@@ -506,7 +506,7 @@
               "hr-y-80"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "hr-x-00": 60,
@@ -532,13 +532,13 @@
               "hr-x-20": 60,
               "hr-x-21": 60,
               "hr-x-22": 60,
-              "hr-x-23": 52.12,
+              "hr-x-23": 51.75,
               "hr-y-0": 74,
-              "hr-y-20": 70.88,
-              "hr-y-40": 70.5,
-              "hr-y-60": 70.88,
-              "hr-y-80": 70.88,
-              "hr-y-100": 65,
+              "hr-y-20": 69.27,
+              "hr-y-40": 69.27,
+              "hr-y-60": 69.27,
+              "hr-y-80": 69.27,
+              "hr-y-100": 62.91,
               "hr-title": 22,
               "hr-xtitle": 42.5,
               "hr-am": 75,
@@ -629,6 +629,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 7,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 7,
+      "dejavu substitution": 8,
+      "free substitution": 7
+    },
     "pdfPageCount": 7,
     "contentBoxHeightsPx": [
       680.31,
@@ -652,7 +657,12 @@
       ],
       ".pagedjs_margin-content": []
     },
-    "overflowColumnResidue": []
+    "overflowColumnResidue": [],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": [
     "Landscape pages 4 and 6 are nearly empty in the output: page 4 holds only a zero-height first fragment of #fig-hourly, page 6 only its caption. That is how Paged.js 0.4.3 handles the planted oversized figure."

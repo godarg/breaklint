@@ -1,14 +1,14 @@
 {
  "record": "selfauthored-v1 construction measurements",
  "producedBy": "probe/construction-probe.mjs",
- "note": "Condensed from the probe's per-document output: page boxes, fragments of every element with an author id that a ground-truth entry names, headings, every SVG <text> and <use> target, and overflow-column residue. Regenerate with the probe; do not edit by hand.",
+ "note": "Condensed from the probe's per-document output with the machine's fonts (fontSubstitutions and minInsetsUnderSubstitution summarise the two substitution runs): page boxes, fragments of every element with an author id that a ground-truth entry names, headings, every SVG <text> and <use> target, and overflow-column residue. Regenerate with the probe; do not edit by hand.",
  "documents": {
   "sa01-riverbank-survey-handbook": {
    "sha256": "e32b36c1a071330f40d268053ce024f8c7facced4f9a7032b24c4a6aa21a437c",
    "byteLength": 31293,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:43:03.148Z",
+   "measuredAt": "2026-09-24T23:41:30.133Z",
    "pageCount": 8,
    "pdf": {
     "count": 8,
@@ -734,6 +734,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      },
+      "free": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      }
      }
     },
     {
@@ -763,6 +773,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 10,
+       "inkMinInset": 12
+      },
+      "free": {
+       "cellMinInset": 10,
+       "inkMinInset": 12
+      }
      }
     },
     {
@@ -792,6 +812,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 10,
+       "inkMinInset": 12
+      },
+      "free": {
+       "cellMinInset": 10,
+       "inkMinInset": 12
+      }
      }
     },
     {
@@ -821,6 +851,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      },
+      "free": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      }
      }
     },
     {
@@ -850,6 +890,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      },
+      "free": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      }
      }
     },
     {
@@ -879,6 +929,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      },
+      "free": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      }
      }
     },
     {
@@ -908,6 +968,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 10,
+       "inkMinInset": 12
+      },
+      "free": {
+       "cellMinInset": 10,
+       "inkMinInset": 12
+      }
      }
     },
     {
@@ -937,6 +1007,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 52,
+       "inkMinInset": 52
+      },
+      "free": {
+       "cellMinInset": 52,
+       "inkMinInset": 51.5
+      }
      }
     },
     {
@@ -966,6 +1046,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 150,
+       "inkMinInset": 151.5
+      },
+      "free": {
+       "cellMinInset": 151,
+       "inkMinInset": 152.5
+      }
      }
     },
     {
@@ -995,6 +1085,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 223,
+       "inkMinInset": 225.5
+      },
+      "free": {
+       "cellMinInset": 224,
+       "inkMinInset": 225.5
+      }
      }
     },
     {
@@ -1024,6 +1124,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 51.23,
+       "inkMinInset": 51.5
+      },
+      "free": {
+       "cellMinInset": 51.19,
+       "inkMinInset": 51.5
+      }
      }
     },
     {
@@ -1053,6 +1163,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 75,
+       "inkMinInset": 77.5
+      },
+      "free": {
+       "cellMinInset": 76,
+       "inkMinInset": 77.5
+      }
      }
     },
     {
@@ -1082,6 +1202,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 17,
+       "inkMinInset": 18.5
+      },
+      "free": {
+       "cellMinInset": 18,
+       "inkMinInset": 19.5
+      }
      }
     },
     {
@@ -1111,6 +1241,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 23,
+       "inkMinInset": 23.5
+      },
+      "free": {
+       "cellMinInset": 24,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -1140,6 +1280,16 @@
       "width": 642,
       "height": 500,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 115.59,
+       "inkMinInset": 116
+      },
+      "free": {
+       "cellMinInset": 134,
+       "inkMinInset": 135.5
+      }
      }
     },
     {
@@ -1169,6 +1319,16 @@
       "width": 642,
       "height": 500,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 101,
+       "inkMinInset": 102.5
+      },
+      "free": {
+       "cellMinInset": 102,
+       "inkMinInset": 103.5
+      }
      }
     },
     {
@@ -1198,6 +1358,16 @@
       "width": 642,
       "height": 500,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 60
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 60
+      }
      }
     },
     {
@@ -1227,6 +1397,16 @@
       "width": 642,
       "height": 500,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 167,
+       "inkMinInset": 169.5
+      },
+      "free": {
+       "cellMinInset": 168,
+       "inkMinInset": 169.5
+      }
      }
     },
     {
@@ -1256,6 +1436,16 @@
       "width": 642,
       "height": 500,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 24,
+       "inkMinInset": 24
+      },
+      "free": {
+       "cellMinInset": 24,
+       "inkMinInset": 24
+      }
      }
     },
     {
@@ -1285,6 +1475,16 @@
       "width": 642,
       "height": 500,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 24,
+       "inkMinInset": 24
+      },
+      "free": {
+       "cellMinInset": 24,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -1314,6 +1514,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 35,
+       "inkMinInset": 36.5
+      },
+      "free": {
+       "cellMinInset": 36,
+       "inkMinInset": 37.5
+      }
      }
     },
     {
@@ -1343,6 +1553,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 35,
+       "inkMinInset": 36.5
+      },
+      "free": {
+       "cellMinInset": 36,
+       "inkMinInset": 37.5
+      }
      }
     },
     {
@@ -1372,6 +1592,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 35,
+       "inkMinInset": 36.5
+      },
+      "free": {
+       "cellMinInset": 36,
+       "inkMinInset": 37.5
+      }
      }
     },
     {
@@ -1401,6 +1631,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 35,
+       "inkMinInset": 36.5
+      },
+      "free": {
+       "cellMinInset": 36,
+       "inkMinInset": 37.5
+      }
      }
     },
     {
@@ -1430,6 +1670,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 75,
+       "inkMinInset": 77
+      },
+      "free": {
+       "cellMinInset": 76,
+       "inkMinInset": 77.5
+      }
      }
     },
     {
@@ -1459,6 +1709,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 75,
+       "inkMinInset": 76.5
+      },
+      "free": {
+       "cellMinInset": 76,
+       "inkMinInset": 77.5
+      }
      }
     },
     {
@@ -1488,6 +1748,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 75,
+       "inkMinInset": 77
+      },
+      "free": {
+       "cellMinInset": 76,
+       "inkMinInset": 77.5
+      }
      }
     },
     {
@@ -1517,6 +1787,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 75,
+       "inkMinInset": 76.5
+      },
+      "free": {
+       "cellMinInset": 76,
+       "inkMinInset": 77.5
+      }
      }
     },
     {
@@ -1546,6 +1826,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 72,
+       "inkMinInset": 74.5
+      },
+      "free": {
+       "cellMinInset": 73,
+       "inkMinInset": 74.5
+      }
      }
     },
     {
@@ -1575,6 +1865,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 72,
+       "inkMinInset": 74.5
+      },
+      "free": {
+       "cellMinInset": 73,
+       "inkMinInset": 74.5
+      }
      }
     },
     {
@@ -1604,6 +1904,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 72,
+       "inkMinInset": 75
+      },
+      "free": {
+       "cellMinInset": 73,
+       "inkMinInset": 75
+      }
      }
     },
     {
@@ -1633,6 +1943,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 72,
+       "inkMinInset": 75
+      },
+      "free": {
+       "cellMinInset": 73,
+       "inkMinInset": 75
+      }
      }
     },
     {
@@ -1662,6 +1982,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 32,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      }
      }
     },
     {
@@ -1691,6 +2021,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 32,
+       "inkMinInset": 35
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 35
+      }
      }
     },
     {
@@ -1720,6 +2060,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 32,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      }
      }
     },
     {
@@ -1749,6 +2099,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 32,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      }
      }
     },
     {
@@ -1778,6 +2138,16 @@
       "width": 300,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 8,
+       "inkMinInset": 7.5
+      },
+      "free": {
+       "cellMinInset": 7,
+       "inkMinInset": 7.5
+      }
      }
     },
     {
@@ -1807,6 +2177,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40.95,
+       "inkMinInset": 41
+      },
+      "free": {
+       "cellMinInset": 44.5,
+       "inkMinInset": 44.5
+      }
      }
     },
     {
@@ -1836,6 +2216,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34.59,
+       "inkMinInset": 35.5
+      },
+      "free": {
+       "cellMinInset": 39.5,
+       "inkMinInset": 40.5
+      }
      }
     },
     {
@@ -1865,6 +2255,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34.59,
+       "inkMinInset": 35
+      },
+      "free": {
+       "cellMinInset": 39.5,
+       "inkMinInset": 39.5
+      }
      }
     },
     {
@@ -1894,6 +2294,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34.59,
+       "inkMinInset": 35
+      },
+      "free": {
+       "cellMinInset": 39.5,
+       "inkMinInset": 39.5
+      }
      }
     },
     {
@@ -1923,6 +2333,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34.59,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 39.5,
+       "inkMinInset": 39
+      }
      }
     },
     {
@@ -1952,6 +2372,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 110.3,
+       "inkMinInset": 111
+      },
+      "free": {
+       "cellMinInset": 112.75,
+       "inkMinInset": 113.5
+      }
      }
     },
     {
@@ -1981,6 +2411,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      },
+      "free": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      }
      }
     },
     {
@@ -2010,6 +2450,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 111.5,
+       "inkMinInset": 113
+      },
+      "free": {
+       "cellMinInset": 111.5,
+       "inkMinInset": 113
+      }
      }
     },
     {
@@ -2039,6 +2489,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      },
+      "free": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      }
      }
     },
     {
@@ -2068,6 +2528,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 86.5,
+       "inkMinInset": 88
+      },
+      "free": {
+       "cellMinInset": 87.5,
+       "inkMinInset": 88.5
+      }
      }
     },
     {
@@ -2097,6 +2567,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      },
+      "free": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      }
      }
     },
     {
@@ -2126,6 +2606,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 136,
+       "inkMinInset": 137.5
+      },
+      "free": {
+       "cellMinInset": 137,
+       "inkMinInset": 138
+      }
      }
     },
     {
@@ -2155,6 +2645,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40,
+       "inkMinInset": 39.5
+      },
+      "free": {
+       "cellMinInset": 39,
+       "inkMinInset": 39.5
+      }
      }
     },
     {
@@ -2184,6 +2684,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 155.5,
+       "inkMinInset": 157
+      },
+      "free": {
+       "cellMinInset": 155.5,
+       "inkMinInset": 157
+      }
      }
     },
     {
@@ -2213,6 +2723,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      },
+      "free": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      }
      }
     },
     {
@@ -2242,6 +2762,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 79.48,
+       "inkMinInset": 79.5
+      },
+      "free": {
+       "cellMinInset": 81.25,
+       "inkMinInset": 81
+      }
      }
     },
     {
@@ -2271,6 +2801,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      },
+      "free": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      }
      }
     },
     {
@@ -2300,6 +2840,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 10,
+       "inkMinInset": 9.5
+      },
+      "free": {
+       "cellMinInset": 9,
+       "inkMinInset": 9.5
+      }
      }
     },
     {
@@ -2329,6 +2879,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 14,
+       "inkMinInset": 15.5
+      },
+      "free": {
+       "cellMinInset": 15,
+       "inkMinInset": 16
+      }
      }
     },
     {
@@ -2358,6 +2918,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 50,
+       "inkMinInset": 51.5
+      },
+      "free": {
+       "cellMinInset": 50,
+       "inkMinInset": 51.5
+      }
      }
     },
     {
@@ -2387,6 +2957,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 50,
+       "inkMinInset": 49.5
+      },
+      "free": {
+       "cellMinInset": 49,
+       "inkMinInset": 49.5
+      }
      }
     },
     {
@@ -2416,6 +2996,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 50,
+       "inkMinInset": 49.5
+      },
+      "free": {
+       "cellMinInset": 50,
+       "inkMinInset": 51.5
+      }
      }
     },
     {
@@ -2445,6 +3035,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 50,
+       "inkMinInset": 49.5
+      },
+      "free": {
+       "cellMinInset": 49,
+       "inkMinInset": 49.5
+      }
      }
     },
     {
@@ -2474,6 +3074,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 50,
+       "inkMinInset": 51.5
+      },
+      "free": {
+       "cellMinInset": 50,
+       "inkMinInset": 51.5
+      }
      }
     },
     {
@@ -2503,6 +3113,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 50,
+       "inkMinInset": 49.5
+      },
+      "free": {
+       "cellMinInset": 50,
+       "inkMinInset": 51.5
+      }
      }
     },
     {
@@ -2532,6 +3152,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 31.29,
+       "inkMinInset": 31
+      },
+      "free": {
+       "cellMinInset": 33.15,
+       "inkMinInset": 33.5
+      }
      }
     },
     {
@@ -2561,6 +3191,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 64,
+       "inkMinInset": 65.5
+      },
+      "free": {
+       "cellMinInset": 64,
+       "inkMinInset": 65.5
+      }
      }
     },
     {
@@ -2590,6 +3230,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 59.27,
+       "inkMinInset": 60
+      },
+      "free": {
+       "cellMinInset": 62,
+       "inkMinInset": 63
+      }
      }
     },
     {
@@ -2619,6 +3269,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 59.27,
+       "inkMinInset": 59.5
+      },
+      "free": {
+       "cellMinInset": 62,
+       "inkMinInset": 62
+      }
      }
     },
     {
@@ -2648,6 +3308,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 59.27,
+       "inkMinInset": 59.5
+      },
+      "free": {
+       "cellMinInset": 62,
+       "inkMinInset": 62
+      }
      }
     },
     {
@@ -2677,6 +3347,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 59.27,
+       "inkMinInset": 59
+      },
+      "free": {
+       "cellMinInset": 62,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -2706,6 +3386,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 59.27,
+       "inkMinInset": 59.5
+      },
+      "free": {
+       "cellMinInset": 62,
+       "inkMinInset": 62
+      }
      }
     },
     {
@@ -2735,6 +3425,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 45,
+       "inkMinInset": 46.5
+      },
+      "free": {
+       "cellMinInset": 46,
+       "inkMinInset": 47
+      }
      }
     },
     {
@@ -2764,6 +3464,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 48,
+       "inkMinInset": 49
+      },
+      "free": {
+       "cellMinInset": 48,
+       "inkMinInset": 48.5
+      }
      }
     },
     {
@@ -2793,6 +3503,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 48,
+       "inkMinInset": 48.5
+      },
+      "free": {
+       "cellMinInset": 48,
+       "inkMinInset": 48
+      }
      }
     },
     {
@@ -2822,6 +3542,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 48,
+       "inkMinInset": 48.5
+      },
+      "free": {
+       "cellMinInset": 48,
+       "inkMinInset": 48
+      }
      }
     },
     {
@@ -2851,6 +3581,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 16,
+       "inkMinInset": 17.5
+      },
+      "free": {
+       "cellMinInset": 17,
+       "inkMinInset": 18
+      }
      }
     },
     {
@@ -2880,6 +3620,16 @@
       "width": 642,
       "height": 410,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 16,
+       "inkMinInset": 15.5
+      },
+      "free": {
+       "cellMinInset": 15,
+       "inkMinInset": 15.5
+      }
      }
     },
     {
@@ -2909,6 +3659,16 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      },
+      "free": {
+       "cellMinInset": 41,
+       "inkMinInset": 42
+      }
      }
     },
     {
@@ -2938,6 +3698,16 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      },
+      "free": {
+       "cellMinInset": 41,
+       "inkMinInset": 42
+      }
      }
     },
     {
@@ -2967,6 +3737,16 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      },
+      "free": {
+       "cellMinInset": 41,
+       "inkMinInset": 42
+      }
      }
     },
     {
@@ -2996,6 +3776,16 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      },
+      "free": {
+       "cellMinInset": 41,
+       "inkMinInset": 42
+      }
      }
     },
     {
@@ -3025,6 +3815,16 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 20,
+       "inkMinInset": 19.5
+      },
+      "free": {
+       "cellMinInset": 19,
+       "inkMinInset": 19.5
+      }
      }
     },
     {
@@ -3054,6 +3854,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 20,
+       "inkMinInset": 22.5
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -3083,6 +3893,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 24,
+       "inkMinInset": 24
+      },
+      "free": {
+       "cellMinInset": 24,
+       "inkMinInset": 24
+      }
      }
     },
     {
@@ -3112,6 +3932,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3141,6 +3971,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3170,6 +4010,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 33.5
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 33.5
+      }
      }
     },
     {
@@ -3199,6 +4049,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 33.5
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 33.5
+      }
      }
     },
     {
@@ -3228,6 +4088,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3257,6 +4127,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3286,6 +4166,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3315,6 +4205,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3344,6 +4244,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3373,6 +4283,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3402,6 +4322,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3431,6 +4361,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3460,6 +4400,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3489,6 +4439,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3518,6 +4478,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34
+      }
      }
     },
     {
@@ -3547,6 +4517,16 @@
       "width": 642,
       "height": 820,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 12,
+       "inkMinInset": 11.5
+      },
+      "free": {
+       "cellMinInset": 11,
+       "inkMinInset": 11.5
+      }
      }
     }
    ],
@@ -3607,14 +4587,54 @@
      "width": 642.52,
      "height": 34.02
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 8,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 75 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 38 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 25 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Serif (system, 3 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 8,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 76 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 38 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 25 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSerif (system, 3 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa02-pump-service-manual": {
    "sha256": "f74dbff93bdfd5d27366e263a9aaca3ec17dee2060c2428641642167cc1c015a",
    "byteLength": 24729,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:43:07.071Z",
+   "measuredAt": "2026-09-24T23:41:34.207Z",
    "pageCount": 7,
    "pdf": {
     "count": 7,
@@ -4186,6 +5206,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 8,
+       "inkMinInset": 7.5
+      },
+      "free": {
+       "cellMinInset": 8,
+       "inkMinInset": 7.5
+      }
      }
     },
     {
@@ -4215,6 +5245,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 90,
+       "inkMinInset": 91.5
+      },
+      "free": {
+       "cellMinInset": 91,
+       "inkMinInset": 92
+      }
      }
     },
     {
@@ -4244,6 +5284,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 61,
+       "inkMinInset": 62.5
+      },
+      "free": {
+       "cellMinInset": 62,
+       "inkMinInset": 62.5
+      }
      }
     },
     {
@@ -4273,6 +5323,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 18,
+       "inkMinInset": 17.5
+      },
+      "free": {
+       "cellMinInset": 17,
+       "inkMinInset": 17.5
+      }
      }
     },
     {
@@ -4302,6 +5362,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 71,
+       "inkMinInset": 72
+      },
+      "free": {
+       "cellMinInset": 71,
+       "inkMinInset": 72.5
+      }
      }
     },
     {
@@ -4331,6 +5401,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 71,
+       "inkMinInset": 72
+      },
+      "free": {
+       "cellMinInset": 71,
+       "inkMinInset": 72.5
+      }
      }
     },
     {
@@ -4360,6 +5440,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 141,
+       "inkMinInset": 142
+      },
+      "free": {
+       "cellMinInset": 141,
+       "inkMinInset": 142.5
+      }
      }
     },
     {
@@ -4389,6 +5479,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 16,
+       "inkMinInset": 17.5
+      },
+      "free": {
+       "cellMinInset": 17,
+       "inkMinInset": 18
+      }
      }
     }
    ],
@@ -4405,14 +5505,60 @@
      "width": 672,
      "height": 18.66
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 7,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 79 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 39 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 20 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Sans (system, 13 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Sans (system, 8 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 7,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 79 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 40 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 20 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSans (system, 13 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSans (system, 8 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa03-transit-ridership-report": {
    "sha256": "8425e95fbaad3aa0d361a2ebc9fd36d3afbed39f862c8e7cc3caeb84a5ce95c0",
    "byteLength": 24983,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:43:23.517Z",
+   "measuredAt": "2026-09-24T23:41:51.119Z",
    "pageCount": 7,
    "pdf": {
     "count": 7,
@@ -4932,6 +6078,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 13,
+       "inkMinInset": 14.5
+      },
+      "free": {
+       "cellMinInset": 14,
+       "inkMinInset": 15
+      }
      }
     },
     {
@@ -4961,6 +6117,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 44,
+       "inkMinInset": 46
+      },
+      "free": {
+       "cellMinInset": 45,
+       "inkMinInset": 46
+      }
      }
     },
     {
@@ -4990,6 +6156,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -27.42,
+       "inkMinInset": -27
+      },
+      "free": {
+       "cellMinInset": -22.11,
+       "inkMinInset": -22
+      }
      }
     },
     {
@@ -5019,6 +6195,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 74,
+       "inkMinInset": 76
+      },
+      "free": {
+       "cellMinInset": 75,
+       "inkMinInset": 76
+      }
      }
     },
     {
@@ -5048,6 +6234,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 31.51,
+       "inkMinInset": 32
+      },
+      "free": {
+       "cellMinInset": 36.82,
+       "inkMinInset": 37
+      }
      }
     },
     {
@@ -5077,6 +6273,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 82.14,
+       "inkMinInset": 82.5
+      },
+      "free": {
+       "cellMinInset": 94.34,
+       "inkMinInset": 94.5
+      }
      }
     },
     {
@@ -5106,6 +6312,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 91.37,
+       "inkMinInset": 91.5
+      },
+      "free": {
+       "cellMinInset": 96.68,
+       "inkMinInset": 97
+      }
      }
     },
     {
@@ -5135,6 +6351,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 93.72,
+       "inkMinInset": 94.5
+      },
+      "free": {
+       "cellMinInset": 106.78,
+       "inkMinInset": 107
+      }
      }
     },
     {
@@ -5164,6 +6390,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 134,
+       "inkMinInset": 136
+      },
+      "free": {
+       "cellMinInset": 136,
+       "inkMinInset": 136.5
+      }
      }
     },
     {
@@ -5193,6 +6429,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 90.31,
+       "inkMinInset": 91
+      },
+      "free": {
+       "cellMinInset": 102.23,
+       "inkMinInset": 102.5
+      }
      }
     },
     {
@@ -5222,6 +6468,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 154,
+       "inkMinInset": 154.5
+      },
+      "free": {
+       "cellMinInset": 154,
+       "inkMinInset": 154.5
+      }
      }
     },
     {
@@ -5251,6 +6507,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 109.69,
+       "inkMinInset": 110.5
+      },
+      "free": {
+       "cellMinInset": 120.42,
+       "inkMinInset": 120.5
+      }
      }
     },
     {
@@ -5280,6 +6546,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 124,
+       "inkMinInset": 124.5
+      },
+      "free": {
+       "cellMinInset": 124,
+       "inkMinInset": 124.5
+      }
      }
     },
     {
@@ -5309,6 +6585,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 93.78,
+       "inkMinInset": 93.5
+      },
+      "free": {
+       "cellMinInset": 94,
+       "inkMinInset": 93.5
+      }
      }
     },
     {
@@ -5338,6 +6624,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 94,
+       "inkMinInset": 94.5
+      },
+      "free": {
+       "cellMinInset": 94,
+       "inkMinInset": 94.5
+      }
      }
     },
     {
@@ -5367,6 +6663,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 64,
+       "inkMinInset": 63.5
+      },
+      "free": {
+       "cellMinInset": 64,
+       "inkMinInset": 63.5
+      }
      }
     },
     {
@@ -5396,6 +6702,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 64,
+       "inkMinInset": 64.5
+      },
+      "free": {
+       "cellMinInset": 64,
+       "inkMinInset": 64.5
+      }
      }
     },
     {
@@ -5425,6 +6741,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 33.5
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 33.5
+      }
      }
     },
     {
@@ -5454,6 +6780,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 34.5
+      }
      }
     },
     {
@@ -5483,6 +6819,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 6,
+       "inkMinInset": 7.5
+      },
+      "free": {
+       "cellMinInset": 6,
+       "inkMinInset": 7.5
+      }
      }
     },
     {
@@ -5512,6 +6858,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5541,6 +6897,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5570,6 +6936,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5599,6 +6975,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5628,6 +7014,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5657,6 +7053,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5686,6 +7092,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5715,6 +7131,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5744,6 +7170,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5773,6 +7209,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5802,6 +7248,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5831,6 +7287,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 62
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 62
+      }
      }
     },
     {
@@ -5860,6 +7326,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 62
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 62
+      }
      }
     },
     {
@@ -5889,6 +7365,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5918,6 +7404,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 62
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 62
+      }
      }
     },
     {
@@ -5947,6 +7443,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -5976,6 +7482,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -6005,6 +7521,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 62
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 62
+      }
      }
     },
     {
@@ -6034,6 +7560,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -6063,6 +7599,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -6092,6 +7638,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -6121,6 +7677,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 62
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 62
+      }
      }
     },
     {
@@ -6150,6 +7716,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 62
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 62
+      }
      }
     },
     {
@@ -6179,6 +7755,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 51.75,
+       "inkMinInset": 52
+      },
+      "free": {
+       "cellMinInset": 52.12,
+       "inkMinInset": 52.5
+      }
      }
     },
     {
@@ -6208,6 +7794,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 74,
+       "inkMinInset": 75.5
+      },
+      "free": {
+       "cellMinInset": 74,
+       "inkMinInset": 75.5
+      }
      }
     },
     {
@@ -6237,6 +7833,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 69.27,
+       "inkMinInset": 69.5
+      },
+      "free": {
+       "cellMinInset": 70.88,
+       "inkMinInset": 71
+      }
      }
     },
     {
@@ -6266,6 +7872,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 69.27,
+       "inkMinInset": 69.5
+      },
+      "free": {
+       "cellMinInset": 70.88,
+       "inkMinInset": 70.5
+      }
      }
     },
     {
@@ -6295,6 +7911,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 69.27,
+       "inkMinInset": 69.5
+      },
+      "free": {
+       "cellMinInset": 70.88,
+       "inkMinInset": 71
+      }
      }
     },
     {
@@ -6324,6 +7950,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 69.27,
+       "inkMinInset": 69.5
+      },
+      "free": {
+       "cellMinInset": 70.88,
+       "inkMinInset": 71
+      }
      }
     },
     {
@@ -6353,6 +7989,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 62.91,
+       "inkMinInset": 63.5
+      },
+      "free": {
+       "cellMinInset": 65.31,
+       "inkMinInset": 66
+      }
      }
     },
     {
@@ -6382,6 +8028,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 22,
+       "inkMinInset": 24
+      },
+      "free": {
+       "cellMinInset": 24,
+       "inkMinInset": 24.5
+      }
      }
     },
     {
@@ -6411,6 +8067,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 43,
+       "inkMinInset": 42.5
+      },
+      "free": {
+       "cellMinInset": 43,
+       "inkMinInset": 42.5
+      }
      }
     },
     {
@@ -6440,6 +8106,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 75,
+       "inkMinInset": 76
+      },
+      "free": {
+       "cellMinInset": 75,
+       "inkMinInset": 76.5
+      }
      }
     },
     {
@@ -6469,6 +8145,16 @@
       "width": 1000,
       "height": 700,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 58.5,
+       "inkMinInset": 59.5
+      },
+      "free": {
+       "cellMinInset": 58.5,
+       "inkMinInset": 60
+      }
      }
     }
    ],
@@ -6518,14 +8204,60 @@
      "width": 657.63,
      "height": 26.45
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 8,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 37 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 46 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 30 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Sans (system, 9 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Sans (system, 32 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 7,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 37 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 47 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 30 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSans (system, 9 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSans (system, 32 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa04-essay-chapter-footnotes": {
    "sha256": "5d0aa4e2c6b8cb8730fab04ba52f38171e8df07eeb6eb538598a9dfdf87a0456",
    "byteLength": 12441,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:43:25.987Z",
+   "measuredAt": "2026-09-24T23:41:53.735Z",
    "pageCount": 4,
    "pdf": {
     "count": 4,
@@ -6702,14 +8434,48 @@
      "width": 624,
      "height": 68.19
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 4,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Serif (system, 13 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Serif (system, 27 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Serif (system, 8 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 4,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSerif (system, 13 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSerif (system, 27 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSerif (system, 8 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa05-kitchen-notebook": {
-   "sha256": "a3f14ab4cc87d97c81376ccf7d3fd8e0621f3519daf7c87ab56391c44801933d",
-   "byteLength": 12742,
+   "sha256": "9ac99e559dc1598e8a89cda2d73c0c581cace04107406dafa90dd94bf619cadc",
+   "byteLength": 12756,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:43:28.487Z",
+   "measuredAt": "2026-09-24T23:41:56.305Z",
    "pageCount": 7,
    "pdf": {
     "count": 7,
@@ -7431,14 +9197,54 @@
      "width": 662.39,
      "height": 134.39
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 7,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Serif (system, 118 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Serif (system, 34 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Serif (system, 32 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Serif (system, 5 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 7,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSerif (system, 118 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSerif (system, 35 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSerif (system, 32 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSerif (system, 5 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa06-mobile-work-policy-de": {
    "sha256": "270f299510835def8e6bb6e1208b186fbb34cc95d3bff72e0f3aa994cea4b844",
    "byteLength": 10257,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:43:31.003Z",
+   "measuredAt": "2026-09-24T23:41:58.899Z",
    "pageCount": 3,
    "pdf": {
     "count": 3,
@@ -8181,14 +9987,60 @@
      "width": 627.39,
      "height": 26.45
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 3,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 95 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 29 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 19 glyphs)"
+      ],
+      ".pagedjs_page_content code": [
+       "DejaVu Sans Mono (system, 17 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Serif (system, 8 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 3,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 96 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 29 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 19 glyphs)"
+      ],
+      ".pagedjs_page_content code": [
+       "FreeMono (system, 17 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSerif (system, 8 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa07-sensor-datasheet": {
    "sha256": "1ebf7286135c1b2dbf7a65236f7847c035e07b1e826b6b0739032945ac9187bb",
    "byteLength": 14271,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:43:40.717Z",
+   "measuredAt": "2026-09-24T23:42:07.891Z",
    "pageCount": 3,
    "pdf": {
     "count": 3,
@@ -8768,6 +10620,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 114,
+       "inkMinInset": 117.5
+      },
+      "free": {
+       "cellMinInset": 115,
+       "inkMinInset": 117.5
+      }
      }
     },
     {
@@ -8797,6 +10659,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 56,
+       "inkMinInset": 57.5
+      },
+      "free": {
+       "cellMinInset": 57,
+       "inkMinInset": 58
+      }
      }
     },
     {
@@ -8826,6 +10698,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 88,
+       "inkMinInset": 89.5
+      },
+      "free": {
+       "cellMinInset": 89,
+       "inkMinInset": 89.5
+      }
      }
     },
     {
@@ -8855,6 +10737,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 117,
+       "inkMinInset": 119.5
+      },
+      "free": {
+       "cellMinInset": 118,
+       "inkMinInset": 119.5
+      }
      }
     },
     {
@@ -8884,6 +10776,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 85,
+       "inkMinInset": 87.5
+      },
+      "free": {
+       "cellMinInset": 86,
+       "inkMinInset": 87.5
+      }
      }
     },
     {
@@ -8913,6 +10815,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 53,
+       "inkMinInset": 55.5
+      },
+      "free": {
+       "cellMinInset": 54,
+       "inkMinInset": 55.5
+      }
      }
     },
     {
@@ -8942,6 +10854,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 56,
+       "inkMinInset": 57.5
+      },
+      "free": {
+       "cellMinInset": 57,
+       "inkMinInset": 58
+      }
      }
     },
     {
@@ -8971,6 +10893,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 88,
+       "inkMinInset": 89.5
+      },
+      "free": {
+       "cellMinInset": 89,
+       "inkMinInset": 89.5
+      }
      }
     },
     {
@@ -9000,6 +10932,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 117,
+       "inkMinInset": 119.5
+      },
+      "free": {
+       "cellMinInset": 118,
+       "inkMinInset": 119.5
+      }
      }
     },
     {
@@ -9029,6 +10971,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 85,
+       "inkMinInset": 87.5
+      },
+      "free": {
+       "cellMinInset": 86,
+       "inkMinInset": 87.5
+      }
      }
     },
     {
@@ -9058,6 +11010,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 53,
+       "inkMinInset": 55.5
+      },
+      "free": {
+       "cellMinInset": 54,
+       "inkMinInset": 55.5
+      }
      }
     },
     {
@@ -9087,6 +11049,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 16,
+       "inkMinInset": 17.5
+      },
+      "free": {
+       "cellMinInset": 17,
+       "inkMinInset": 17.5
+      }
      }
     },
     {
@@ -9116,6 +11088,16 @@
       "width": 672,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 12,
+       "inkMinInset": 11.5
+      },
+      "free": {
+       "cellMinInset": 12,
+       "inkMinInset": 11.5
+      }
      }
     },
     {
@@ -9145,6 +11127,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      },
+      "free": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      }
      }
     },
     {
@@ -9174,6 +11166,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      },
+      "free": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      }
      }
     },
     {
@@ -9203,6 +11205,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      },
+      "free": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      }
      }
     },
     {
@@ -9232,6 +11244,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      },
+      "free": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      }
      }
     },
     {
@@ -9261,6 +11283,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      },
+      "free": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      }
      }
     },
     {
@@ -9290,6 +11322,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 25.63,
+       "inkMinInset": 26
+      },
+      "free": {
+       "cellMinInset": 26,
+       "inkMinInset": 26.5
+      }
      }
     },
     {
@@ -9319,6 +11361,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 35,
+       "inkMinInset": 36.5
+      },
+      "free": {
+       "cellMinInset": 36,
+       "inkMinInset": 36.5
+      }
      }
     },
     {
@@ -9348,6 +11400,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 55.63,
+       "inkMinInset": 56
+      },
+      "free": {
+       "cellMinInset": 56.44,
+       "inkMinInset": 56.5
+      }
      }
     },
     {
@@ -9377,6 +11439,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 55.63,
+       "inkMinInset": 56
+      },
+      "free": {
+       "cellMinInset": 56.44,
+       "inkMinInset": 56.5
+      }
      }
     },
     {
@@ -9406,6 +11478,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 55.63,
+       "inkMinInset": 56
+      },
+      "free": {
+       "cellMinInset": 56.44,
+       "inkMinInset": 57
+      }
      }
     },
     {
@@ -9435,6 +11517,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 44,
+       "inkMinInset": 45.5
+      },
+      "free": {
+       "cellMinInset": 44,
+       "inkMinInset": 45.5
+      }
      }
     },
     {
@@ -9474,6 +11566,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 109,
+       "inkMinInset": 109.5
+      },
+      "free": {
+       "cellMinInset": 109,
+       "inkMinInset": 109.5
+      }
      }
     },
     {
@@ -9513,6 +11615,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 147,
+       "inkMinInset": 149.5
+      },
+      "free": {
+       "cellMinInset": 148,
+       "inkMinInset": 149.5
+      }
      }
     },
     {
@@ -9552,6 +11664,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 112,
+       "inkMinInset": 112.5
+      },
+      "free": {
+       "cellMinInset": 112,
+       "inkMinInset": 112
+      }
      }
     },
     {
@@ -9591,6 +11713,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 49,
+       "inkMinInset": 50.5
+      },
+      "free": {
+       "cellMinInset": 50,
+       "inkMinInset": 50.5
+      }
      }
     },
     {
@@ -9630,6 +11762,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -8,
+       "inkMinInset": -7
+      },
+      "free": {
+       "cellMinInset": -8,
+       "inkMinInset": -6.5
+      }
      }
     },
     {
@@ -9659,6 +11801,16 @@
       "width": 672,
       "height": 320,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 12,
+       "inkMinInset": 11.5
+      },
+      "free": {
+       "cellMinInset": 11,
+       "inkMinInset": 11.5
+      }
      }
     },
     {
@@ -9688,6 +11840,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 26,
+       "inkMinInset": 27.5
+      },
+      "free": {
+       "cellMinInset": 27,
+       "inkMinInset": 28
+      }
      }
     },
     {
@@ -9717,6 +11879,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 69.5,
+       "inkMinInset": 70
+      },
+      "free": {
+       "cellMinInset": 72.89,
+       "inkMinInset": 73
+      }
      }
     },
     {
@@ -9746,6 +11918,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 139,
+       "inkMinInset": 141.5
+      },
+      "free": {
+       "cellMinInset": 140,
+       "inkMinInset": 141.5
+      }
      }
     },
     {
@@ -9775,6 +11957,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 16,
+       "inkMinInset": 17.5
+      },
+      "free": {
+       "cellMinInset": 17,
+       "inkMinInset": 17.5
+      }
      }
     },
     {
@@ -9804,6 +11996,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 18,
+       "inkMinInset": 19.5
+      },
+      "free": {
+       "cellMinInset": 18,
+       "inkMinInset": 19.5
+      }
      }
     },
     {
@@ -9833,6 +12035,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -128.59,
+       "inkMinInset": -128.5
+      },
+      "free": {
+       "cellMinInset": -98.2,
+       "inkMinInset": -98
+      }
      }
     },
     {
@@ -9862,6 +12074,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -17,
+       "inkMinInset": -16.5
+      },
+      "free": {
+       "cellMinInset": -17,
+       "inkMinInset": -16.5
+      }
      }
     }
    ],
@@ -9889,14 +12111,60 @@
      "width": 691.19,
      "height": 16
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 3,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 83 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 32 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 8 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Sans (system, 14 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Sans (system, 4 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 3,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 83 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 32 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 8 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSans (system, 14 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSans (system, 4 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa08-tidewell-newsletter": {
    "sha256": "a55321ddb3b478d6998bac29f8b7992caf6a082e370a113b58b260072d36648c",
    "byteLength": 14888,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:43:44.365Z",
+   "measuredAt": "2026-09-24T23:42:11.767Z",
    "pageCount": 3,
    "pdf": {
     "count": 3,
@@ -10381,6 +12649,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 24,
+       "inkMinInset": 25.5
+      },
+      "free": {
+       "cellMinInset": 24,
+       "inkMinInset": 25.5
+      }
      }
     },
     {
@@ -10410,6 +12688,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 24,
+       "inkMinInset": 25.5
+      },
+      "free": {
+       "cellMinInset": 24,
+       "inkMinInset": 25.5
+      }
      }
     },
     {
@@ -10439,6 +12727,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 24,
+       "inkMinInset": 25.5
+      },
+      "free": {
+       "cellMinInset": 24,
+       "inkMinInset": 25.5
+      }
      }
     },
     {
@@ -10468,6 +12766,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 24,
+       "inkMinInset": 24
+      },
+      "free": {
+       "cellMinInset": 24,
+       "inkMinInset": 25.5
+      }
      }
     },
     {
@@ -10497,6 +12805,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 24,
+       "inkMinInset": 25.5
+      },
+      "free": {
+       "cellMinInset": 24,
+       "inkMinInset": 25.5
+      }
      }
     },
     {
@@ -10526,6 +12844,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 19.86,
+       "inkMinInset": 20
+      },
+      "free": {
+       "cellMinInset": 21.63,
+       "inkMinInset": 22
+      }
      }
     },
     {
@@ -10555,6 +12883,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 28.58,
+       "inkMinInset": 28.5
+      },
+      "free": {
+       "cellMinInset": 29.73,
+       "inkMinInset": 29.5
+      }
      }
     },
     {
@@ -10584,6 +12922,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 23.17,
+       "inkMinInset": 23.5
+      },
+      "free": {
+       "cellMinInset": 25.48,
+       "inkMinInset": 25.5
+      }
      }
     },
     {
@@ -10613,6 +12961,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 17.77,
+       "inkMinInset": 18.5
+      },
+      "free": {
+       "cellMinInset": 21.23,
+       "inkMinInset": 22
+      }
      }
     },
     {
@@ -10642,6 +13000,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 9,
+       "inkMinInset": 11
+      },
+      "free": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      }
      }
     },
     {
@@ -10671,6 +13039,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -8,
+       "inkMinInset": 11
+      },
+      "free": {
+       "cellMinInset": -7,
+       "inkMinInset": 11.5
+      }
      }
     },
     {
@@ -10700,6 +13078,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 8,
+       "inkMinInset": 9.5
+      },
+      "free": {
+       "cellMinInset": 8,
+       "inkMinInset": 9.5
+      }
      }
     },
     {
@@ -10729,6 +13117,16 @@
       "width": 300,
       "height": 190,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 8,
+       "inkMinInset": 9.5
+      },
+      "free": {
+       "cellMinInset": 8,
+       "inkMinInset": 9.5
+      }
      }
     }
    ],
@@ -10758,14 +13156,60 @@
      "width": 672.75,
      "height": 18.89
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 3,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 96 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Serif (system, 29 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Serif (system, 37 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Serif (system, 22 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Serif (system, 3 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 3,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 96 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSerif (system, 30 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSerif (system, 37 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSerif (system, 22 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSerif (system, 3 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa09-queue-worker-tutorial": {
    "sha256": "5540992465de0587422ce4a929a97024f8705f06ac3a95fd7f229ebf4d7896dd",
    "byteLength": 22103,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:43:46.989Z",
+   "measuredAt": "2026-09-24T23:42:14.408Z",
    "pageCount": 8,
    "pdf": {
     "count": 8,
@@ -11219,14 +13663,62 @@
      "width": 642.52,
      "height": 15.11
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 8,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 76 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 47 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 21 glyphs)"
+      ],
+      ".pagedjs_page_content pre": [],
+      ".pagedjs_page_content code": [
+       "DejaVu Sans Mono (system, 8 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Sans Mono (system, 7 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 8,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 76 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 47 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 21 glyphs)"
+      ],
+      ".pagedjs_page_content pre": [],
+      ".pagedjs_page_content code": [
+       "FreeMono (system, 8 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeMono (system, 7 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa10-lagoon-oxygen-report": {
    "sha256": "13961838d9cc4c14805e371db1b910428496f2085e8302188bf32dfe79516f8f",
    "byteLength": 20123,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:44:02.858Z",
+   "measuredAt": "2026-09-24T23:42:29.725Z",
    "pageCount": 5,
    "pdf": {
     "count": 5,
@@ -12042,6 +14534,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 90,
+       "inkMinInset": 90
+      },
+      "free": {
+       "cellMinInset": 90,
+       "inkMinInset": 90
+      }
      }
     },
     {
@@ -12081,6 +14583,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 162,
+       "inkMinInset": 162
+      },
+      "free": {
+       "cellMinInset": 162,
+       "inkMinInset": 162
+      }
      }
     },
     {
@@ -12120,6 +14632,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 71.34,
+       "inkMinInset": 71.5
+      },
+      "free": {
+       "cellMinInset": 82,
+       "inkMinInset": 82
+      }
      }
     },
     {
@@ -12159,6 +14681,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 64,
+       "inkMinInset": 66
+      },
+      "free": {
+       "cellMinInset": 66,
+       "inkMinInset": 66.5
+      }
      }
     },
     {
@@ -12198,6 +14730,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 114,
+       "inkMinInset": 116
+      },
+      "free": {
+       "cellMinInset": 116,
+       "inkMinInset": 116.5
+      }
      }
     },
     {
@@ -12237,6 +14779,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 144,
+       "inkMinInset": 146
+      },
+      "free": {
+       "cellMinInset": 146,
+       "inkMinInset": 146.5
+      }
      }
     },
     {
@@ -12276,6 +14828,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 139,
+       "inkMinInset": 140.5
+      },
+      "free": {
+       "cellMinInset": 139,
+       "inkMinInset": 140.5
+      }
      }
     },
     {
@@ -12315,6 +14877,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 100.11,
+       "inkMinInset": 100.5
+      },
+      "free": {
+       "cellMinInset": 103.78,
+       "inkMinInset": 103.5
+      }
      }
     },
     {
@@ -12354,6 +14926,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 45.11,
+       "inkMinInset": 45
+      },
+      "free": {
+       "cellMinInset": 48.78,
+       "inkMinInset": 48.5
+      }
      }
     },
     {
@@ -12393,6 +14975,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -10,
+       "inkMinInset": -7.5
+      },
+      "free": {
+       "cellMinInset": -9,
+       "inkMinInset": -7.5
+      }
      }
     },
     {
@@ -12422,6 +15014,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      },
+      "free": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      }
      }
     },
     {
@@ -12451,6 +15053,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      },
+      "free": {
+       "cellMinInset": 10,
+       "inkMinInset": 11.5
+      }
      }
     },
     {
@@ -12480,6 +15092,16 @@
       "width": 642,
       "height": 360,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 15,
+       "inkMinInset": 16.5
+      },
+      "free": {
+       "cellMinInset": 16,
+       "inkMinInset": 17.5
+      }
      }
     },
     {
@@ -12509,6 +15131,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      },
+      "free": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      }
      }
     },
     {
@@ -12538,6 +15170,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 29.5
+      },
+      "free": {
+       "cellMinInset": 29,
+       "inkMinInset": 29.5
+      }
      }
     },
     {
@@ -12567,6 +15209,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 29.5
+      },
+      "free": {
+       "cellMinInset": 29,
+       "inkMinInset": 29.5
+      }
      }
     },
     {
@@ -12596,6 +15248,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 29.5
+      },
+      "free": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      }
      }
     },
     {
@@ -12625,6 +15287,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 29.5
+      },
+      "free": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      }
      }
     },
     {
@@ -12654,6 +15326,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 29.5
+      },
+      "free": {
+       "cellMinInset": 29,
+       "inkMinInset": 29.5
+      }
      }
     },
     {
@@ -12683,6 +15365,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 29.5
+      },
+      "free": {
+       "cellMinInset": 29,
+       "inkMinInset": 29.5
+      }
      }
     },
     {
@@ -12712,6 +15404,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 35,
+       "inkMinInset": 36.5
+      },
+      "free": {
+       "cellMinInset": 36,
+       "inkMinInset": 37
+      }
      }
     },
     {
@@ -12741,6 +15443,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 49.27,
+       "inkMinInset": 49.5
+      },
+      "free": {
+       "cellMinInset": 52,
+       "inkMinInset": 52
+      }
      }
     },
     {
@@ -12770,6 +15482,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 49.27,
+       "inkMinInset": 49.5
+      },
+      "free": {
+       "cellMinInset": 52,
+       "inkMinInset": 52
+      }
      }
     },
     {
@@ -12799,6 +15521,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 49.27,
+       "inkMinInset": 50
+      },
+      "free": {
+       "cellMinInset": 52,
+       "inkMinInset": 53
+      }
      }
     },
     {
@@ -12828,6 +15560,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 44,
+       "inkMinInset": 45.5
+      },
+      "free": {
+       "cellMinInset": 44,
+       "inkMinInset": 45.5
+      }
      }
     },
     {
@@ -12867,6 +15609,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 128,
+       "inkMinInset": 129.5
+      },
+      "free": {
+       "cellMinInset": 129,
+       "inkMinInset": 130.5
+      }
      }
     },
     {
@@ -12906,6 +15658,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 133,
+       "inkMinInset": 135.5
+      },
+      "free": {
+       "cellMinInset": 134,
+       "inkMinInset": 135.5
+      }
      }
     },
     {
@@ -12945,6 +15707,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 107,
+       "inkMinInset": 109.5
+      },
+      "free": {
+       "cellMinInset": 108,
+       "inkMinInset": 109.5
+      }
      }
     },
     {
@@ -12984,6 +15756,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -89.42,
+       "inkMinInset": -89.5
+      },
+      "free": {
+       "cellMinInset": -62.48,
+       "inkMinInset": -62
+      }
      }
     },
     {
@@ -13013,6 +15795,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 13,
+       "inkMinInset": 15
+      },
+      "free": {
+       "cellMinInset": 15,
+       "inkMinInset": 16
+      }
      }
     },
     {
@@ -13042,6 +15834,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 12,
+       "inkMinInset": 11.5
+      },
+      "free": {
+       "cellMinInset": 11,
+       "inkMinInset": 11.5
+      }
      }
     },
     {
@@ -13071,6 +15873,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -13100,6 +15912,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 31,
+       "inkMinInset": 32.5
+      },
+      "free": {
+       "cellMinInset": 32,
+       "inkMinInset": 33
+      }
      }
     },
     {
@@ -13129,6 +15951,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -13158,6 +15990,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 57,
+       "inkMinInset": 58.5
+      },
+      "free": {
+       "cellMinInset": 58,
+       "inkMinInset": 59
+      }
      }
     },
     {
@@ -13187,6 +16029,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -13216,6 +16068,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 103,
+       "inkMinInset": 104.5
+      },
+      "free": {
+       "cellMinInset": 104,
+       "inkMinInset": 105
+      }
      }
     },
     {
@@ -13245,6 +16107,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -13274,6 +16146,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 114,
+       "inkMinInset": 115.5
+      },
+      "free": {
+       "cellMinInset": 115,
+       "inkMinInset": 116
+      }
      }
     },
     {
@@ -13303,6 +16185,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -13332,6 +16224,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 141,
+       "inkMinInset": 142.5
+      },
+      "free": {
+       "cellMinInset": 142,
+       "inkMinInset": 143
+      }
      }
     },
     {
@@ -13361,6 +16263,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -13390,6 +16302,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -17,
+       "inkMinInset": -15.5
+      },
+      "free": {
+       "cellMinInset": -16,
+       "inkMinInset": -15
+      }
      }
     },
     {
@@ -13419,6 +16341,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 24,
+       "inkMinInset": 24
+      },
+      "free": {
+       "cellMinInset": 24,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -13448,6 +16380,16 @@
       "width": 642,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 8,
+       "inkMinInset": 7.5
+      },
+      "free": {
+       "cellMinInset": 8,
+       "inkMinInset": 7.5
+      }
      }
     },
     {
@@ -13477,6 +16419,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 21,
+       "inkMinInset": 22.5
+      },
+      "free": {
+       "cellMinInset": 21,
+       "inkMinInset": 22.5
+      }
      }
     },
     {
@@ -13506,6 +16458,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 21,
+       "inkMinInset": 23
+      },
+      "free": {
+       "cellMinInset": 21,
+       "inkMinInset": 23
+      }
      }
     },
     {
@@ -13535,6 +16497,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 21,
+       "inkMinInset": 23
+      },
+      "free": {
+       "cellMinInset": 21,
+       "inkMinInset": 23
+      }
      }
     },
     {
@@ -13564,6 +16536,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 21,
+       "inkMinInset": 22.5
+      },
+      "free": {
+       "cellMinInset": 21,
+       "inkMinInset": 22.5
+      }
      }
     },
     {
@@ -13593,6 +16575,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 21,
+       "inkMinInset": 23
+      },
+      "free": {
+       "cellMinInset": 21,
+       "inkMinInset": 23
+      }
      }
     },
     {
@@ -13622,6 +16614,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 21,
+       "inkMinInset": 22.5
+      },
+      "free": {
+       "cellMinInset": 21,
+       "inkMinInset": 22.5
+      }
      }
     },
     {
@@ -13651,6 +16653,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 21,
+       "inkMinInset": 22.5
+      },
+      "free": {
+       "cellMinInset": 21,
+       "inkMinInset": 22.5
+      }
      }
     },
     {
@@ -13680,6 +16692,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 18.81,
+       "inkMinInset": 19
+      },
+      "free": {
+       "cellMinInset": 19.5,
+       "inkMinInset": 19.5
+      }
      }
     },
     {
@@ -13709,6 +16731,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 34,
+       "inkMinInset": 35.5
+      },
+      "free": {
+       "cellMinInset": 34,
+       "inkMinInset": 35.5
+      }
      }
     },
     {
@@ -13738,6 +16770,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 39.27,
+       "inkMinInset": 40
+      },
+      "free": {
+       "cellMinInset": 42,
+       "inkMinInset": 43
+      }
      }
     },
     {
@@ -13767,6 +16809,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 39.27,
+       "inkMinInset": 39.5
+      },
+      "free": {
+       "cellMinInset": 42,
+       "inkMinInset": 42
+      }
      }
     },
     {
@@ -13796,6 +16848,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 25,
+       "inkMinInset": 26.5
+      },
+      "free": {
+       "cellMinInset": 26,
+       "inkMinInset": 27
+      }
      }
     },
     {
@@ -13825,6 +16887,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 8,
+       "inkMinInset": 7.5
+      },
+      "free": {
+       "cellMinInset": 7,
+       "inkMinInset": 7.5
+      }
      }
     },
     {
@@ -13854,6 +16926,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 80,
+       "inkMinInset": 82
+      },
+      "free": {
+       "cellMinInset": 82,
+       "inkMinInset": 82.5
+      }
      }
     },
     {
@@ -13883,6 +16965,16 @@
       "width": 642,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -24,
+       "inkMinInset": -23
+      },
+      "free": {
+       "cellMinInset": -23,
+       "inkMinInset": -22
+      }
      }
     }
    ],
@@ -13932,14 +17024,60 @@
      "width": 642.52,
      "height": 26.45
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 5,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 60 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Serif (system, 75 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 14 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Serif (system, 5 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Serif (system, 12 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 5,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 60 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSerif (system, 75 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 14 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSerif (system, 5 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSerif (system, 12 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa11-insect-chorus-survey": {
-   "sha256": "dc713476f4c56804b801524bb2f1ecd034b035a96ae992c7162cdb3b13a1c3c5",
-   "byteLength": 16266,
+   "sha256": "fb286a6c07515a3cd9e3216ba4945feb7fbfb61337bbd50d237aefadef083f1b",
+   "byteLength": 16249,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:44:14.671Z",
+   "measuredAt": "2026-09-24T23:42:39.792Z",
    "pageCount": 3,
    "pdf": {
     "count": 3,
@@ -14475,6 +17613,16 @@
       "width": 624,
       "height": 260,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 52,
+       "inkMinInset": 54
+      },
+      "free": {
+       "cellMinInset": 54,
+       "inkMinInset": 55
+      }
      }
     },
     {
@@ -14504,6 +17652,16 @@
       "width": 624,
       "height": 260,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 83.2,
+       "inkMinInset": 85
+      },
+      "free": {
+       "cellMinInset": 85.2,
+       "inkMinInset": 86
+      }
      }
     },
     {
@@ -14533,6 +17691,16 @@
       "width": 624,
       "height": 260,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 46.8,
+       "inkMinInset": 49
+      },
+      "free": {
+       "cellMinInset": 48.8,
+       "inkMinInset": 50
+      }
      }
     },
     {
@@ -14562,6 +17730,16 @@
       "width": 624,
       "height": 260,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 91,
+       "inkMinInset": 93
+      },
+      "free": {
+       "cellMinInset": 93,
+       "inkMinInset": 94
+      }
      }
     },
     {
@@ -14591,6 +17769,16 @@
       "width": 624,
       "height": 260,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 39,
+       "inkMinInset": 41.5
+      },
+      "free": {
+       "cellMinInset": 41,
+       "inkMinInset": 42
+      }
      }
     },
     {
@@ -14620,6 +17808,16 @@
       "width": 624,
       "height": 260,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 23,
+       "inkMinInset": 23
+      },
+      "free": {
+       "cellMinInset": 23,
+       "inkMinInset": 22.5
+      }
      }
     },
     {
@@ -14630,15 +17828,15 @@
      "text": "Hedge",
      "svgOverflow": "hidden",
      "cellInsets": {
-      "left": 10.26,
+      "left": 10.4,
       "top": 118,
-      "right": 579.58,
+      "right": 579.44,
       "bottom": 127
      },
      "inkInsets": {
-      "left": 10,
+      "left": 10.5,
       "top": 121,
-      "right": 580,
+      "right": 579.5,
       "bottom": 127
      },
      "paintedInkInsets": null,
@@ -14649,6 +17847,16 @@
       "width": 624,
       "height": 260,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 10.4,
+       "inkMinInset": 10.5
+      },
+      "free": {
+       "cellMinInset": 10.4,
+       "inkMinInset": 10
+      }
      }
     },
     {
@@ -14678,6 +17886,16 @@
       "width": 624,
       "height": 260,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 20.8,
+       "inkMinInset": 20.5
+      },
+      "free": {
+       "cellMinInset": 20.29,
+       "inkMinInset": 20.5
+      }
      }
     },
     {
@@ -14707,6 +17925,16 @@
       "width": 624,
       "height": 260,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 7.8,
+       "inkMinInset": 10
+      },
+      "free": {
+       "cellMinInset": 9.8,
+       "inkMinInset": 11
+      }
      }
     },
     {
@@ -14736,6 +17964,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33.88,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 39.25,
+       "inkMinInset": 39
+      }
      }
     },
     {
@@ -14765,6 +18003,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33.88,
+       "inkMinInset": 33.5
+      },
+      "free": {
+       "cellMinInset": 39.25,
+       "inkMinInset": 39
+      }
      }
     },
     {
@@ -14794,6 +18042,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33.88,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 39.25,
+       "inkMinInset": 39
+      }
      }
     },
     {
@@ -14823,6 +18081,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33.88,
+       "inkMinInset": 34
+      },
+      "free": {
+       "cellMinInset": 39.25,
+       "inkMinInset": 39.5
+      }
      }
     },
     {
@@ -14852,6 +18120,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 27.84,
+       "inkMinInset": 28.5
+      },
+      "free": {
+       "cellMinInset": 34.5,
+       "inkMinInset": 35.5
+      }
      }
     },
     {
@@ -14881,6 +18159,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      }
      }
     },
     {
@@ -14910,6 +18198,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33,
+       "inkMinInset": 35
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 35
+      }
      }
     },
     {
@@ -14939,6 +18237,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33,
+       "inkMinInset": 35
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 35
+      }
      }
     },
     {
@@ -14968,6 +18276,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      }
      }
     },
     {
@@ -14997,6 +18315,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      }
      }
     },
     {
@@ -15026,6 +18354,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      }
      }
     },
     {
@@ -15055,6 +18393,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      }
      }
     },
     {
@@ -15084,6 +18432,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      }
      }
     },
     {
@@ -15113,6 +18471,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      },
+      "free": {
+       "cellMinInset": 33,
+       "inkMinInset": 34.5
+      }
      }
     },
     {
@@ -15152,6 +18520,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 98,
+       "inkMinInset": 97.5
+      },
+      "free": {
+       "cellMinInset": 97,
+       "inkMinInset": 97.5
+      }
      }
     },
     {
@@ -15191,6 +18569,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 98,
+       "inkMinInset": 100
+      },
+      "free": {
+       "cellMinInset": 100,
+       "inkMinInset": 100.5
+      }
      }
     },
     {
@@ -15230,6 +18618,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 62,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 61,
+       "inkMinInset": 61.5
+      }
      }
     },
     {
@@ -15259,6 +18657,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 12,
+       "inkMinInset": 13.5
+      },
+      "free": {
+       "cellMinInset": 13,
+       "inkMinInset": 14
+      }
      }
     },
     {
@@ -15288,6 +18696,16 @@
       "width": 624,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 8,
+       "inkMinInset": 7.5
+      },
+      "free": {
+       "cellMinInset": 8,
+       "inkMinInset": 7.5
+      }
      }
     },
     {
@@ -15317,6 +18735,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 32,
+       "inkMinInset": 32
+      },
+      "free": {
+       "cellMinInset": 32,
+       "inkMinInset": 33.5
+      }
      }
     },
     {
@@ -15346,6 +18774,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 32,
+       "inkMinInset": 32
+      },
+      "free": {
+       "cellMinInset": 32,
+       "inkMinInset": 33.5
+      }
      }
     },
     {
@@ -15375,6 +18813,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 32,
+       "inkMinInset": 32
+      },
+      "free": {
+       "cellMinInset": 32,
+       "inkMinInset": 33.5
+      }
      }
     },
     {
@@ -15404,6 +18852,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 32,
+       "inkMinInset": 32
+      },
+      "free": {
+       "cellMinInset": 32,
+       "inkMinInset": 33.5
+      }
      }
     },
     {
@@ -15433,6 +18891,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 32,
+       "inkMinInset": 32
+      },
+      "free": {
+       "cellMinInset": 32,
+       "inkMinInset": 33.5
+      }
      }
     },
     {
@@ -15462,6 +18930,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 44,
+       "inkMinInset": 45.5
+      },
+      "free": {
+       "cellMinInset": 44,
+       "inkMinInset": 45.5
+      }
      }
     },
     {
@@ -15491,6 +18969,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 59.91,
+       "inkMinInset": 60
+      },
+      "free": {
+       "cellMinInset": 62.48,
+       "inkMinInset": 62.5
+      }
      }
     },
     {
@@ -15520,6 +19008,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 59.91,
+       "inkMinInset": 59.5
+      },
+      "free": {
+       "cellMinInset": 62.48,
+       "inkMinInset": 62
+      }
      }
     },
     {
@@ -15549,6 +19047,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 35,
+       "inkMinInset": 37
+      },
+      "free": {
+       "cellMinInset": 36,
+       "inkMinInset": 37.5
+      }
      }
     },
     {
@@ -15578,6 +19086,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 21,
+       "inkMinInset": 22
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 22.5
+      }
      }
     },
     {
@@ -15617,6 +19135,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 50,
+       "inkMinInset": 52
+      },
+      "free": {
+       "cellMinInset": 52,
+       "inkMinInset": 52.5
+      }
      }
     },
     {
@@ -15656,6 +19184,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 124,
+       "inkMinInset": 123.5
+      },
+      "free": {
+       "cellMinInset": 123,
+       "inkMinInset": 123.5
+      }
      }
     },
     {
@@ -15695,6 +19233,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 84.38,
+       "inkMinInset": 84
+      },
+      "free": {
+       "cellMinInset": 89.86,
+       "inkMinInset": 89.5
+      }
      }
     },
     {
@@ -15724,6 +19272,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 8,
+       "inkMinInset": 7.5
+      },
+      "free": {
+       "cellMinInset": 8,
+       "inkMinInset": 7.5
+      }
      }
     },
     {
@@ -15777,6 +19335,16 @@
       "width": 624,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -168.16,
+       "inkMinInset": -160
+      },
+      "free": {
+       "cellMinInset": -146.29,
+       "inkMinInset": -146.5
+      }
      }
     },
     {
@@ -15806,6 +19374,16 @@
       "width": 300,
       "height": 120,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 15,
+       "inkMinInset": 16
+      },
+      "free": {
+       "cellMinInset": 16,
+       "inkMinInset": 17
+      }
      }
     },
     {
@@ -15835,6 +19413,16 @@
       "width": 300,
       "height": 120,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -78.12,
+       "inkMinInset": -78.5
+      },
+      "free": {
+       "cellMinInset": -53.68,
+       "inkMinInset": -53.5
+      }
      }
     }
    ],
@@ -15851,14 +19439,60 @@
      "width": 624,
      "height": 15.11
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 4,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 88 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 62 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 7 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Serif (system, 2 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Serif (system, 2 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 3,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 88 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 62 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 7 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSerif (system, 2 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSerif (system, 2 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa12-library-annual-report": {
    "sha256": "e70795ef50ba4fa804f747bdc6bccf2bfdfd7ab6ba1fd7e3e6b63c5781e81ee4",
    "byteLength": 31885,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:44:21.250Z",
+   "measuredAt": "2026-09-24T23:42:45.961Z",
    "pageCount": 9,
    "pdf": {
     "count": 9,
@@ -16430,6 +20064,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 60,
+       "inkMinInset": 61.5
+      },
+      "free": {
+       "cellMinInset": 61,
+       "inkMinInset": 62.5
+      }
      }
     },
     {
@@ -16459,6 +20103,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 31.4,
+       "inkMinInset": 32
+      },
+      "free": {
+       "cellMinInset": 31.61,
+       "inkMinInset": 32
+      }
      }
     },
     {
@@ -16488,6 +20142,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 98,
+       "inkMinInset": 100
+      },
+      "free": {
+       "cellMinInset": 99,
+       "inkMinInset": 100.5
+      }
      }
     },
     {
@@ -16517,6 +20181,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 31.4,
+       "inkMinInset": 32
+      },
+      "free": {
+       "cellMinInset": 31.61,
+       "inkMinInset": 32
+      }
      }
     },
     {
@@ -16546,6 +20220,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 136,
+       "inkMinInset": 137.5
+      },
+      "free": {
+       "cellMinInset": 137,
+       "inkMinInset": 138.5
+      }
      }
     },
     {
@@ -16575,6 +20259,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 31.4,
+       "inkMinInset": 32
+      },
+      "free": {
+       "cellMinInset": 31.61,
+       "inkMinInset": 32
+      }
      }
     },
     {
@@ -16604,6 +20298,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 112,
+       "inkMinInset": 114.5
+      },
+      "free": {
+       "cellMinInset": 113,
+       "inkMinInset": 114.5
+      }
      }
     },
     {
@@ -16633,6 +20337,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 31.4,
+       "inkMinInset": 32
+      },
+      "free": {
+       "cellMinInset": 31.61,
+       "inkMinInset": 32
+      }
      }
     },
     {
@@ -16662,6 +20376,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 74,
+       "inkMinInset": 76.5
+      },
+      "free": {
+       "cellMinInset": 75,
+       "inkMinInset": 76.5
+      }
      }
     },
     {
@@ -16691,6 +20415,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 31.41,
+       "inkMinInset": 32
+      },
+      "free": {
+       "cellMinInset": 31.61,
+       "inkMinInset": 32
+      }
      }
     },
     {
@@ -16720,6 +20454,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 132,
+       "inkMinInset": 134.5
+      },
+      "free": {
+       "cellMinInset": 132,
+       "inkMinInset": 134.5
+      }
      }
     },
     {
@@ -16749,6 +20493,16 @@
       "width": 672,
       "height": 300,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 15,
+       "inkMinInset": 16.5
+      },
+      "free": {
+       "cellMinInset": 16,
+       "inkMinInset": 17.5
+      }
      }
     }
    ],
@@ -16798,14 +20552,60 @@
      "width": 672,
      "height": 21.33
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 9,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Serif (system, 62 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Serif (system, 31 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Serif (system, 14 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Serif (system, 6 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Serif (system, 13 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 9,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSerif (system, 62 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSerif (system, 32 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSerif (system, 14 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSerif (system, 6 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSerif (system, 13 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa13-planning-forum-transcript": {
    "sha256": "10cec73ceb40208af6edb07dd6e11e90c7ba33bcf75c64784058b3c26a438a86",
    "byteLength": 13390,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:44:23.915Z",
+   "measuredAt": "2026-09-24T23:42:48.491Z",
    "pageCount": 7,
    "pdf": {
     "count": 7,
@@ -17258,14 +21058,60 @@
    },
    "svgTexts": [],
    "useTargets": [],
-   "overflowColumnResidue": []
+   "overflowColumnResidue": [],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 7,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 109 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 47 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 15 glyphs)"
+      ],
+      ".pagedjs_page_content pre": [
+       "DejaVu Sans Mono (system, 1001 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Serif (system, 1 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 7,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 110 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 48 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 15 glyphs)"
+      ],
+      ".pagedjs_page_content pre": [
+       "FreeMono (system, 1001 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSerif (system, 1 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa14-weather-station-install-guide": {
-   "sha256": "c0e181125bb20ae293f2959f172b84bdae2862be330c08adfb091be0061867fc",
-   "byteLength": 15243,
+   "sha256": "33be46f56f0e0b5bbe3db6d59c9e5c5b967e54f34f71ce840f056cf27be8050d",
+   "byteLength": 15554,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:44:28.585Z",
+   "measuredAt": "2026-09-24T23:42:52.321Z",
    "pageCount": 5,
    "pdf": {
     "count": 5,
@@ -17338,7 +21184,7 @@
       },
       {
        "box": "pagedjs_margin-right-middle",
-       "text": "SETUP"
+       "text": "WS‑3SETUPSTEPBYSTEP"
       }
      ]
     },
@@ -17363,7 +21209,7 @@
       },
       {
        "box": "pagedjs_margin-left-middle",
-       "text": "SETUP"
+       "text": "WS‑3SETUPSTEPBYSTEP"
       }
      ]
     },
@@ -17388,7 +21234,7 @@
       },
       {
        "box": "pagedjs_margin-right-middle",
-       "text": "SETUP"
+       "text": "WS‑3SETUPSTEPBYSTEP"
       }
      ]
     },
@@ -17413,7 +21259,7 @@
       },
       {
        "box": "pagedjs_margin-left-middle",
-       "text": "SETUP"
+       "text": "WS‑3SETUPSTEPBYSTEP"
       }
      ]
     },
@@ -17438,7 +21284,7 @@
       },
       {
        "box": "pagedjs_margin-right-middle",
-       "text": "SETUP"
+       "text": "WS‑3SETUPSTEPBYSTEP"
       }
      ]
     }
@@ -17610,10 +21456,10 @@
     },
     "sidetab": {
      "tag": "div",
-     "breakInside": "auto",
+     "breakInside": "avoid",
      "columnCount": "auto",
      "writingMode": "horizontal-tb",
-     "naturalHeightPx": 34.11,
+     "naturalHeightPx": 320,
      "fragments": [
       {
        "page": 1,
@@ -17621,10 +21467,10 @@
        "display": "block",
        "splitFrom": false,
        "splitTo": false,
-       "topInContent": 438.94,
+       "topInContent": 296,
        "leftInset": 672,
        "startsInsideContentBox": true,
-       "heightPx": 34.11,
+       "heightPx": 320,
        "widthPx": 43.19
       },
       {
@@ -17645,10 +21491,10 @@
        "display": "block",
        "splitFrom": false,
        "splitTo": false,
-       "topInContent": 438.94,
+       "topInContent": 296,
        "leftInset": -72,
        "startsInsideContentBox": false,
-       "heightPx": 34.11,
+       "heightPx": 320,
        "widthPx": 43.19
       },
       {
@@ -17657,10 +21503,10 @@
        "display": "block",
        "splitFrom": false,
        "splitTo": false,
-       "topInContent": 438.94,
+       "topInContent": 296,
        "leftInset": 672,
        "startsInsideContentBox": true,
-       "heightPx": 34.11,
+       "heightPx": 320,
        "widthPx": 43.19
       },
       {
@@ -17669,10 +21515,10 @@
        "display": "block",
        "splitFrom": false,
        "splitTo": false,
-       "topInContent": 438.94,
+       "topInContent": 296,
        "leftInset": -72,
        "startsInsideContentBox": false,
-       "heightPx": 34.11,
+       "heightPx": 320,
        "widthPx": 43.19
       },
       {
@@ -17681,10 +21527,10 @@
        "display": "block",
        "splitFrom": false,
        "splitTo": false,
-       "topInContent": 438.94,
+       "topInContent": 296,
        "leftInset": 672,
        "startsInsideContentBox": true,
-       "heightPx": 34.11,
+       "heightPx": 320,
        "widthPx": 43.19
       }
      ]
@@ -17847,6 +21693,16 @@
       "width": 816,
       "height": 150,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 44,
+       "inkMinInset": 47
+      },
+      "free": {
+       "cellMinInset": 46,
+       "inkMinInset": 47.5
+      }
      }
     },
     {
@@ -17876,6 +21732,16 @@
       "width": 816,
       "height": 150,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 55,
+       "inkMinInset": 55
+      },
+      "free": {
+       "cellMinInset": 55,
+       "inkMinInset": 55
+      }
      }
     },
     {
@@ -17905,6 +21771,16 @@
       "width": 672,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 100,
+       "inkMinInset": 101.5
+      },
+      "free": {
+       "cellMinInset": 101,
+       "inkMinInset": 102
+      }
      }
     },
     {
@@ -17934,6 +21810,16 @@
       "width": 672,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 133,
+       "inkMinInset": 133.5
+      },
+      "free": {
+       "cellMinInset": 133,
+       "inkMinInset": 133.5
+      }
      }
     },
     {
@@ -17963,6 +21849,16 @@
       "width": 672,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 37,
+       "inkMinInset": 39.5
+      },
+      "free": {
+       "cellMinInset": 38,
+       "inkMinInset": 39.5
+      }
      }
     },
     {
@@ -17992,6 +21888,16 @@
       "width": 672,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      },
+      "free": {
+       "cellMinInset": 31,
+       "inkMinInset": 32
+      }
      }
     },
     {
@@ -18021,6 +21927,16 @@
       "width": 672,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 30,
+       "inkMinInset": 31.5
+      },
+      "free": {
+       "cellMinInset": 31,
+       "inkMinInset": 32
+      }
      }
     },
     {
@@ -18050,6 +21966,16 @@
       "width": 672,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 81,
+       "inkMinInset": 81.5
+      },
+      "free": {
+       "cellMinInset": 81,
+       "inkMinInset": 81.5
+      }
      }
     },
     {
@@ -18079,6 +22005,16 @@
       "width": 672,
       "height": 330,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 14,
+       "inkMinInset": 15.5
+      },
+      "free": {
+       "cellMinInset": 15,
+       "inkMinInset": 16
+      }
      }
     }
    ],
@@ -18095,14 +22031,60 @@
      "width": 672,
      "height": 10.66
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 5,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 439 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 31 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 19 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Sans (system, 10 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Sans (system, 36 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 5,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 440 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 31 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 19 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSans (system, 10 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSans (system, 36 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa15-hut-trail-guide-de": {
-   "sha256": "a5b62009b767496d9908efc1910d4edd499b2205b9ba4dd100daa0d55b97dc92",
-   "byteLength": 10743,
+   "sha256": "c973ebb08f7d9d3ba7548797f1051fde1f7fd115a6478e41d7c12ffe4071ef54",
+   "byteLength": 10770,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:44:34.651Z",
+   "measuredAt": "2026-09-24T23:42:56.873Z",
    "pageCount": 3,
    "pdf": {
     "count": 3,
@@ -18621,32 +22603,6 @@
       }
      ]
     },
-    "hinweis-gpx-p": {
-     "tag": "p",
-     "breakInside": "auto",
-     "columnCount": "auto",
-     "writingMode": "horizontal-tb",
-     "naturalHeightPx": 39.97,
-     "fragments": [
-      {
-       "page": 2,
-       "inMarginBox": false,
-       "display": "block",
-       "splitFrom": false,
-       "splitTo": false,
-       "topInContent": 20.76,
-       "leftInset": 19.11,
-       "startsInsideContentBox": true,
-       "heightPx": 39.97,
-       "widthPx": 608.3,
-       "lines": {
-        "count": 2,
-        "lastLineWidth": 443.7,
-        "fontSizePx": 13.3333
-       }
-      }
-     ]
-    },
     "a-abs-gpx": {
      "tag": "a",
      "breakInside": "auto",
@@ -18686,6 +22642,27 @@
        "startsInsideContentBox": true,
        "heightPx": 15,
        "widthPx": 59.95
+      }
+     ]
+    },
+    "gpx-pfad": {
+     "tag": "span",
+     "breakInside": "auto",
+     "columnCount": "auto",
+     "writingMode": "horizontal-tb",
+     "naturalHeightPx": 15,
+     "fragments": [
+      {
+       "page": 2,
+       "inMarginBox": false,
+       "display": "inline",
+       "splitFrom": false,
+       "splitTo": false,
+       "topInContent": 42.75,
+       "leftInset": 82.03,
+       "startsInsideContentBox": true,
+       "heightPx": 15,
+       "widthPx": 98.47
       }
      ]
     },
@@ -18802,6 +22779,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -18831,6 +22818,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -18860,6 +22857,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -18889,6 +22896,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 23.5
+      }
      }
     },
     {
@@ -18918,6 +22935,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 22,
+       "inkMinInset": 24
+      },
+      "free": {
+       "cellMinInset": 22,
+       "inkMinInset": 24
+      }
      }
     },
     {
@@ -18947,6 +22974,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 7.06,
+       "inkMinInset": 7
+      },
+      "free": {
+       "cellMinInset": 9.33,
+       "inkMinInset": 9.5
+      }
      }
     },
     {
@@ -18976,6 +23013,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 29.81,
+       "inkMinInset": 30.5
+      },
+      "free": {
+       "cellMinInset": 34.98,
+       "inkMinInset": 36
+      }
      }
     },
     {
@@ -19005,6 +23052,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 29.81,
+       "inkMinInset": 30.5
+      },
+      "free": {
+       "cellMinInset": 34.98,
+       "inkMinInset": 36
+      }
      }
     },
     {
@@ -19034,6 +23091,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 29.81,
+       "inkMinInset": 30.5
+      },
+      "free": {
+       "cellMinInset": 34.98,
+       "inkMinInset": 36
+      }
      }
     },
     {
@@ -19063,6 +23130,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 14,
+       "inkMinInset": 16
+      },
+      "free": {
+       "cellMinInset": 15,
+       "inkMinInset": 16.5
+      }
      }
     },
     {
@@ -19092,6 +23169,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 65.6,
+       "inkMinInset": 65
+      },
+      "free": {
+       "cellMinInset": 64.6,
+       "inkMinInset": 65
+      }
      }
     },
     {
@@ -19121,6 +23208,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 114.4,
+       "inkMinInset": 116
+      },
+      "free": {
+       "cellMinInset": 114.4,
+       "inkMinInset": 116
+      }
      }
     },
     {
@@ -19150,6 +23247,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 84.6,
+       "inkMinInset": 85.5
+      },
+      "free": {
+       "cellMinInset": 85.6,
+       "inkMinInset": 86.5
+      }
      }
     },
     {
@@ -19179,6 +23286,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -9,
+       "inkMinInset": -7
+      },
+      "free": {
+       "cellMinInset": -7,
+       "inkMinInset": -6.5
+      }
      }
     },
     {
@@ -19208,6 +23325,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 12,
+       "inkMinInset": 13
+      },
+      "free": {
+       "cellMinInset": 13,
+       "inkMinInset": 14
+      }
      }
     }
    ],
@@ -19235,14 +23362,60 @@
      "width": 642.52,
      "height": 15.11
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 3,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 87 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 28 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 7 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Serif (system, 6 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Serif (system, 4 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 3,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 88 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 28 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 7 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSerif (system, 6 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSerif (system, 4 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa16-lab-safety-manual": {
    "sha256": "6a380f44cac1b9f1bbed2f46e28ddf0d82e58ab42b83029351074dd436baf32c",
    "byteLength": 19049,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:44:41.288Z",
+   "measuredAt": "2026-09-24T23:43:02.667Z",
    "pageCount": 6,
    "pdf": {
     "count": 6,
@@ -19830,6 +24003,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 98,
+       "inkMinInset": 99
+      },
+      "free": {
+       "cellMinInset": 99,
+       "inkMinInset": 99.5
+      }
      }
     },
     {
@@ -19859,6 +24042,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 147.9,
+       "inkMinInset": 148
+      },
+      "free": {
+       "cellMinInset": 149.86,
+       "inkMinInset": 150
+      }
      }
     },
     {
@@ -19888,6 +24081,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 147.9,
+       "inkMinInset": 148
+      },
+      "free": {
+       "cellMinInset": 149.86,
+       "inkMinInset": 150
+      }
      }
     },
     {
@@ -19917,6 +24120,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 147.9,
+       "inkMinInset": 148
+      },
+      "free": {
+       "cellMinInset": 149.86,
+       "inkMinInset": 150
+      }
      }
     },
     {
@@ -19946,6 +24159,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 52.83,
+       "inkMinInset": 52.5
+      },
+      "free": {
+       "cellMinInset": 53.63,
+       "inkMinInset": 53.5
+      }
      }
     },
     {
@@ -19975,6 +24198,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 51.54,
+       "inkMinInset": 51.5
+      },
+      "free": {
+       "cellMinInset": 52.66,
+       "inkMinInset": 53
+      }
      }
     },
     {
@@ -20004,6 +24237,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 46.24,
+       "inkMinInset": 46.5
+      },
+      "free": {
+       "cellMinInset": 48.89,
+       "inkMinInset": 48.5
+      }
      }
     },
     {
@@ -20033,6 +24276,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 50.14,
+       "inkMinInset": 50
+      },
+      "free": {
+       "cellMinInset": 51.53,
+       "inkMinInset": 52
+      }
      }
     },
     {
@@ -20062,6 +24315,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 42.15,
+       "inkMinInset": 42
+      },
+      "free": {
+       "cellMinInset": 45.74,
+       "inkMinInset": 45.5
+      }
      }
     },
     {
@@ -20091,6 +24354,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 50.18,
+       "inkMinInset": 50.5
+      },
+      "free": {
+       "cellMinInset": 52.34,
+       "inkMinInset": 52
+      }
      }
     },
     {
@@ -20120,6 +24393,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 35.92,
+       "inkMinInset": 38.16
+      },
+      "free": {
+       "cellMinInset": 35.92,
+       "inkMinInset": 37.66
+      }
      }
     },
     {
@@ -20149,6 +24432,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 35.92,
+       "inkMinInset": 38.16
+      },
+      "free": {
+       "cellMinInset": 35.92,
+       "inkMinInset": 37.66
+      }
      }
     },
     {
@@ -20178,6 +24471,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 52.5,
+       "inkMinInset": 52
+      },
+      "free": {
+       "cellMinInset": 52.5,
+       "inkMinInset": 52
+      }
      }
     },
     {
@@ -20207,6 +24510,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 15.33,
+       "inkMinInset": 17
+      },
+      "free": {
+       "cellMinInset": 16.33,
+       "inkMinInset": 17.5
+      }
      }
     },
     {
@@ -20236,6 +24549,16 @@
       "width": 392,
       "height": 641.66,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 6.75,
+       "inkMinInset": 7.16
+      },
+      "free": {
+       "cellMinInset": 6.75,
+       "inkMinInset": 7.16
+      }
      }
     }
    ],
@@ -20307,14 +24630,60 @@
      "width": 3.16,
      "height": 12
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 6,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 83 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 39 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 31 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Sans (system, 6 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Sans (system, 7 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 5,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 83 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 39 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 31 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSans (system, 6 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSans (system, 7 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa17-seed-bank-grant-proposal": {
-   "sha256": "c67b3129846aa675dbb87d0883cb4fbe70ce263f526525f491f1aedafc4015e5",
-   "byteLength": 13515,
+   "sha256": "3fd5bbab7e2c000cfd45ffe4811284dede1e95b941d0385881c8dffc51acfab3",
+   "byteLength": 13701,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:44:49.409Z",
+   "measuredAt": "2026-09-24T23:43:09.976Z",
    "pageCount": 3,
    "pdf": {
     "count": 3,
@@ -20469,11 +24838,11 @@
      "remainingPx": 923.33,
      "lineHeightPx": 48,
      "remainingLineHeights": 19.24,
-     "followingOnPage": 56,
+     "followingOnPage": 57,
      "followingSample": [
+      "div#workplan-plates",
       "figure#plate-gantt",
-      "svg#svg-gantt",
-      "rect"
+      "svg#svg-gantt"
      ]
     },
     "h4-risks": {
@@ -20677,6 +25046,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 43,
+       "inkMinInset": 44.5
+      },
+      "free": {
+       "cellMinInset": 44,
+       "inkMinInset": 45
+      }
      }
     },
     {
@@ -20706,6 +25085,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 43,
+       "inkMinInset": 44.5
+      },
+      "free": {
+       "cellMinInset": 44,
+       "inkMinInset": 45
+      }
      }
     },
     {
@@ -20735,6 +25124,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 43,
+       "inkMinInset": 44.5
+      },
+      "free": {
+       "cellMinInset": 44,
+       "inkMinInset": 45
+      }
      }
     },
     {
@@ -20764,6 +25163,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 43,
+       "inkMinInset": 44.5
+      },
+      "free": {
+       "cellMinInset": 44,
+       "inkMinInset": 45
+      }
      }
     },
     {
@@ -20793,6 +25202,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 43,
+       "inkMinInset": 44.5
+      },
+      "free": {
+       "cellMinInset": 44,
+       "inkMinInset": 45
+      }
      }
     },
     {
@@ -20822,6 +25241,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 43,
+       "inkMinInset": 44.5
+      },
+      "free": {
+       "cellMinInset": 44,
+       "inkMinInset": 45
+      }
      }
     },
     {
@@ -20851,6 +25280,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -266.06,
+       "inkMinInset": -160
+      },
+      "free": {
+       "cellMinInset": -200.02,
+       "inkMinInset": -160
+      }
      }
     },
     {
@@ -20880,6 +25319,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 130.33,
+       "inkMinInset": 131
+      },
+      "free": {
+       "cellMinInset": 141,
+       "inkMinInset": 142.5
+      }
      }
     },
     {
@@ -20909,6 +25358,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 57.59,
+       "inkMinInset": 58
+      },
+      "free": {
+       "cellMinInset": 96.14,
+       "inkMinInset": 96
+      }
      }
     },
     {
@@ -20938,6 +25397,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 88.66,
+       "inkMinInset": 88.5
+      },
+      "free": {
+       "cellMinInset": 117.14,
+       "inkMinInset": 117
+      }
      }
     },
     {
@@ -20967,6 +25436,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 53.73,
+       "inkMinInset": 53.5
+      },
+      "free": {
+       "cellMinInset": 93.56,
+       "inkMinInset": 93.5
+      }
      }
     },
     {
@@ -20996,6 +25475,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 77.13,
+       "inkMinInset": 77
+      },
+      "free": {
+       "cellMinInset": 93,
+       "inkMinInset": 93.5
+      }
      }
     },
     {
@@ -21025,6 +25514,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 15,
+       "inkMinInset": 16.5
+      },
+      "free": {
+       "cellMinInset": 16,
+       "inkMinInset": 17.5
+      }
      }
     },
     {
@@ -21054,6 +25553,16 @@
       "width": 642,
       "height": 470,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 38,
+       "inkMinInset": 39.5
+      },
+      "free": {
+       "cellMinInset": 38,
+       "inkMinInset": 39.5
+      }
      }
     },
     {
@@ -21083,6 +25592,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 46,
+       "inkMinInset": 46
+      },
+      "free": {
+       "cellMinInset": 55.38,
+       "inkMinInset": 55
+      }
      }
     },
     {
@@ -21112,6 +25631,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 85.85,
+       "inkMinInset": 86
+      },
+      "free": {
+       "cellMinInset": 95.38,
+       "inkMinInset": 95
+      }
      }
     },
     {
@@ -21141,6 +25670,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 120,
+       "inkMinInset": 122
+      },
+      "free": {
+       "cellMinInset": 122,
+       "inkMinInset": 122.5
+      }
      }
     },
     {
@@ -21170,6 +25709,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 96,
+       "inkMinInset": 95.5
+      },
+      "free": {
+       "cellMinInset": 95,
+       "inkMinInset": 95.5
+      }
      }
     },
     {
@@ -21199,6 +25748,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 15,
+       "inkMinInset": 16.5
+      },
+      "free": {
+       "cellMinInset": 16,
+       "inkMinInset": 17.5
+      }
      }
     },
     {
@@ -21228,6 +25787,16 @@
       "width": 200,
       "height": 120,
       "nested": true
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 15,
+       "inkMinInset": 16
+      },
+      "free": {
+       "cellMinInset": 16,
+       "inkMinInset": 17
+      }
      }
     },
     {
@@ -21257,6 +25826,16 @@
       "width": 200,
       "height": 120,
       "nested": true
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": -97.03,
+       "inkMinInset": -97
+      },
+      "free": {
+       "cellMinInset": -67.42,
+       "inkMinInset": -67.5
+      }
      }
     },
     {
@@ -21286,6 +25865,16 @@
       "width": 200,
       "height": 120,
       "nested": true
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 8,
+       "inkMinInset": 8.5
+      },
+      "free": {
+       "cellMinInset": 8,
+       "inkMinInset": 8.5
+      }
      }
     },
     {
@@ -21315,6 +25904,16 @@
       "width": 642,
       "height": 280,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 71.79,
+       "inkMinInset": 72
+      },
+      "free": {
+       "cellMinInset": 83.47,
+       "inkMinInset": 83.5
+      }
      }
     },
     {
@@ -21344,6 +25943,16 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 46,
+       "inkMinInset": 47
+      },
+      "free": {
+       "cellMinInset": 47,
+       "inkMinInset": 48
+      }
      }
     },
     {
@@ -21373,6 +25982,16 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 108.67,
+       "inkMinInset": 108.5
+      },
+      "free": {
+       "cellMinInset": 113,
+       "inkMinInset": 114
+      }
      }
     },
     {
@@ -21402,6 +26021,16 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 61,
+       "inkMinInset": 60.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 60.5
+      }
      }
     },
     {
@@ -21431,6 +26060,16 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 12,
+       "inkMinInset": 13.5
+      },
+      "free": {
+       "cellMinInset": 12,
+       "inkMinInset": 13.5
+      }
      }
     },
     {
@@ -21460,6 +26099,16 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 12,
+       "inkMinInset": 13.5
+      },
+      "free": {
+       "cellMinInset": 12,
+       "inkMinInset": 13.5
+      }
      }
     },
     {
@@ -21489,6 +26138,16 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 12,
+       "inkMinInset": 13.5
+      },
+      "free": {
+       "cellMinInset": 12,
+       "inkMinInset": 13.5
+      }
      }
     },
     {
@@ -21518,6 +26177,16 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 112,
+       "inkMinInset": 113
+      },
+      "free": {
+       "cellMinInset": 113,
+       "inkMinInset": 114
+      }
      }
     },
     {
@@ -21547,18 +26216,74 @@
       "width": 642,
       "height": 250,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 61,
+       "inkMinInset": 60.5
+      },
+      "free": {
+       "cellMinInset": 60,
+       "inkMinInset": 60.5
+      }
      }
     }
    ],
    "useTargets": [],
-   "overflowColumnResidue": []
+   "overflowColumnResidue": [],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 4,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 108 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 44 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 9 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Serif (system, 31 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Serif (system, 2 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 3,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 109 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 45 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 9 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSerif (system, 30 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSerif (system, 2 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa18-hand-tools-catalogue": {
    "sha256": "22f9d1a7e7bfd79dcead9ef884b4ed59e280c8eeff592ceff40bfef8121b8d9d",
    "byteLength": 12440,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:44:56.980Z",
+   "measuredAt": "2026-09-24T23:43:16.705Z",
    "pageCount": 6,
    "pdf": {
     "count": 6,
@@ -22255,6 +26980,16 @@
       "width": 642,
       "height": 380,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 123,
+       "inkMinInset": 123.5
+      },
+      "free": {
+       "cellMinInset": 123,
+       "inkMinInset": 123.5
+      }
      }
     },
     {
@@ -22294,6 +27029,16 @@
       "width": 642,
       "height": 380,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 102,
+       "inkMinInset": 103.5
+      },
+      "free": {
+       "cellMinInset": 103,
+       "inkMinInset": 104.5
+      }
      }
     },
     {
@@ -22333,6 +27078,16 @@
       "width": 642,
       "height": 380,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 53.3,
+       "inkMinInset": 53.5
+      },
+      "free": {
+       "cellMinInset": 78.97,
+       "inkMinInset": 79.5
+      }
      }
     },
     {
@@ -22372,6 +27127,16 @@
       "width": 642,
       "height": 380,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 152,
+       "inkMinInset": 153.5
+      },
+      "free": {
+       "cellMinInset": 153,
+       "inkMinInset": 154.5
+      }
      }
     },
     {
@@ -22411,6 +27176,16 @@
       "width": 642,
       "height": 380,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 33.41,
+       "inkMinInset": 33.5
+      },
+      "free": {
+       "cellMinInset": 47.08,
+       "inkMinInset": 47
+      }
      }
     },
     {
@@ -22450,6 +27225,16 @@
       "width": 642,
       "height": 380,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40,
+       "inkMinInset": 40
+      },
+      "free": {
+       "cellMinInset": 40,
+       "inkMinInset": 39.5
+      }
      }
     },
     {
@@ -22489,6 +27274,16 @@
       "width": 642,
       "height": 380,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 40,
+       "inkMinInset": 41.5
+      },
+      "free": {
+       "cellMinInset": 41,
+       "inkMinInset": 42.5
+      }
      }
     },
     {
@@ -22518,6 +27313,16 @@
       "width": 642,
       "height": 380,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 15,
+       "inkMinInset": 16.5
+      },
+      "free": {
+       "cellMinInset": 16,
+       "inkMinInset": 17.5
+      }
      }
     },
     {
@@ -22547,6 +27352,16 @@
       "width": 642,
       "height": 420,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 19,
+       "inkMinInset": 21
+      },
+      "free": {
+       "cellMinInset": 20,
+       "inkMinInset": 21.5
+      }
      }
     },
     {
@@ -22576,6 +27391,16 @@
       "width": 642,
       "height": 420,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 18,
+       "inkMinInset": 17.5
+      },
+      "free": {
+       "cellMinInset": 17,
+       "inkMinInset": 17.5
+      }
      }
     },
     {
@@ -22605,6 +27430,16 @@
       "width": 642,
       "height": 420,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 19,
+       "inkMinInset": 21
+      },
+      "free": {
+       "cellMinInset": 20,
+       "inkMinInset": 21.5
+      }
      }
     },
     {
@@ -22634,6 +27469,16 @@
       "width": 642,
       "height": 420,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 18,
+       "inkMinInset": 17.5
+      },
+      "free": {
+       "cellMinInset": 17,
+       "inkMinInset": 17.5
+      }
      }
     },
     {
@@ -22663,6 +27508,16 @@
       "width": 642,
       "height": 420,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 19,
+       "inkMinInset": 21
+      },
+      "free": {
+       "cellMinInset": 20,
+       "inkMinInset": 21.5
+      }
      }
     },
     {
@@ -22692,6 +27547,16 @@
       "width": 642,
       "height": 420,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 18,
+       "inkMinInset": 17.5
+      },
+      "free": {
+       "cellMinInset": 17,
+       "inkMinInset": 17.5
+      }
      }
     },
     {
@@ -22721,6 +27586,16 @@
       "width": 642,
       "height": 420,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 19,
+       "inkMinInset": 21
+      },
+      "free": {
+       "cellMinInset": 20,
+       "inkMinInset": 21.5
+      }
      }
     },
     {
@@ -22750,6 +27625,16 @@
       "width": 642,
       "height": 420,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 18,
+       "inkMinInset": 17.5
+      },
+      "free": {
+       "cellMinInset": 17,
+       "inkMinInset": 17.5
+      }
      }
     },
     {
@@ -22779,6 +27664,16 @@
       "width": 642,
       "height": 420,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 19,
+       "inkMinInset": 21
+      },
+      "free": {
+       "cellMinInset": 20,
+       "inkMinInset": 21.5
+      }
      }
     },
     {
@@ -22808,6 +27703,16 @@
       "width": 642,
       "height": 420,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 18,
+       "inkMinInset": 17.5
+      },
+      "free": {
+       "cellMinInset": 17,
+       "inkMinInset": 17.5
+      }
      }
     }
    ],
@@ -22835,14 +27740,54 @@
      "width": 642.52,
      "height": 30.23
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 6,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Serif (system, 70 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Serif (system, 17 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Serif (system, 12 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Serif (system, 16 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 6,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSerif (system, 70 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSerif (system, 17 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSerif (system, 12 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSerif (system, 16 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa19-release-notes": {
    "sha256": "5b0331c9198a379e5c5a43db63cbd45a49ebb40aaa81f93c681e19e3a84ab43d",
    "byteLength": 11637,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:45:00.401Z",
+   "measuredAt": "2026-09-24T23:43:19.998Z",
    "pageCount": 3,
    "pdf": {
     "count": 3,
@@ -23282,6 +28227,16 @@
       "width": 672,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 85.7,
+       "inkMinInset": 86
+      },
+      "free": {
+       "cellMinInset": 85.92,
+       "inkMinInset": 86
+      }
      }
     },
     {
@@ -23311,6 +28266,16 @@
       "width": 672,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 92,
+       "inkMinInset": 94.5
+      },
+      "free": {
+       "cellMinInset": 93,
+       "inkMinInset": 94.5
+      }
      }
     },
     {
@@ -23340,6 +28305,16 @@
       "width": 672,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 92,
+       "inkMinInset": 94.5
+      },
+      "free": {
+       "cellMinInset": 93,
+       "inkMinInset": 94.5
+      }
      }
     },
     {
@@ -23369,6 +28344,16 @@
       "width": 672,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 72.73,
+       "inkMinInset": 73
+      },
+      "free": {
+       "cellMinInset": 75.16,
+       "inkMinInset": 75
+      }
      }
     },
     {
@@ -23398,6 +28383,16 @@
       "width": 672,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 27,
+       "inkMinInset": 29.5
+      },
+      "free": {
+       "cellMinInset": 28,
+       "inkMinInset": 29.5
+      }
      }
     },
     {
@@ -23427,6 +28422,16 @@
       "width": 672,
       "height": 200,
       "nested": false
+     },
+     "minInsetsUnderSubstitution": {
+      "dejavu": {
+       "cellMinInset": 15,
+       "inkMinInset": 16.5
+      },
+      "free": {
+       "cellMinInset": 16,
+       "inkMinInset": 17
+      }
      }
     }
    ],
@@ -23443,14 +28448,72 @@
      "width": 672,
      "height": 18.66
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 3,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans Mono (system, 43 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Sans (system, 27 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Sans (system, 10 glyphs)"
+      ],
+      ".pagedjs_page_content pre": [
+       "DejaVu Sans Mono (system, 134 glyphs)"
+      ],
+      ".pagedjs_page_content code": [
+       "DejaVu Sans Mono (system, 17 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Sans Mono (system, 15 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "DejaVu Sans (system, 3 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 3,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeMono (system, 43 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSans (system, 27 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSans (system, 10 glyphs)"
+      ],
+      ".pagedjs_page_content pre": [
+       "FreeMono (system, 134 glyphs)"
+      ],
+      ".pagedjs_page_content code": [
+       "FreeMono (system, 17 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeMono (system, 15 glyphs)"
+      ],
+      ".pagedjs_page_content svg text": [
+       "FreeSans (system, 3 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   },
   "sa20-wiki-meeting-minutes": {
    "sha256": "855ab48e5ae3b263ba1f14a4c5fcd59d7b9755e907c9fabcabd71784be23af51",
    "byteLength": 6037,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T22:45:03.146Z",
+   "measuredAt": "2026-09-24T23:43:22.362Z",
    "pageCount": 2,
    "pdf": {
     "count": 2,
@@ -23967,7 +29030,59 @@
      "width": 657.63,
      "height": 22.67
     }
-   ]
+   ],
+   "fontSubstitutions": {
+    "dejavu": {
+     "config": "probe/fontconfig/no-liberation.conf",
+     "pageCount": 2,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "DejaVu Sans (system, 33 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "DejaVu Serif (system, 51 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "DejaVu Serif (system, 34 glyphs)"
+      ],
+      ".pagedjs_page_content pre": [
+       "DejaVu Sans Mono (system, 77 glyphs)"
+      ],
+      ".pagedjs_page_content code": [
+       "DejaVu Sans Mono (system, 31 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "DejaVu Sans (system, 12 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    },
+    "free": {
+     "config": "probe/fontconfig/free.conf",
+     "pageCount": 2,
+     "platformFonts": {
+      ".pagedjs_page_content p": [
+       "FreeSans (system, 33 glyphs)"
+      ],
+      ".pagedjs_page_content h1": [
+       "FreeSerif (system, 52 glyphs)"
+      ],
+      ".pagedjs_page_content h2": [
+       "FreeSerif (system, 34 glyphs)"
+      ],
+      ".pagedjs_page_content pre": [
+       "FreeMono (system, 77 glyphs)"
+      ],
+      ".pagedjs_page_content code": [
+       "FreeMono (system, 32 glyphs)"
+      ],
+      ".pagedjs_page_content td": [
+       "FreeSans (system, 12 glyphs)"
+      ],
+      ".pagedjs_margin-content": []
+     }
+    }
+   }
   }
  }
 }

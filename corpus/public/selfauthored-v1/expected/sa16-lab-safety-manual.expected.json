@@ -32,21 +32,23 @@
   "profile": "default",
   "pages": {
     "range": [
-      6,
+      5,
       7
     ],
     "measured": 6,
-    "basis": "plain Paged.js measurement (6 pages)"
+    "basis": "plain Paged.js measurement: 6 pages with the reference fonts and with DejaVu, 5 with FreeFont (the inspection table and the sign-off sheet shift)"
   },
   "expectedExit": {
     "set": [
       0,
+      1,
       3
     ],
-    "derivation": "Observed on plain Chromium 141: Paged.js leaves table row #so-42 of #signoff-sheet in the overflow column of its first page (a table box right of the content box, invisible and missing from the PDF). docs/limitations.md: such a table residue makes the PDF diverge from the measured geometry and the run must end in exit 3 render-unstable. A renderer that places the row does not produce the residue; the document then has no error finding (the two-fragment sheet is the documented gap), so 0.",
+    "derivation": "Observed on plain Chromium 141: Paged.js leaves table row #so-42 of #signoff-sheet in the overflow column of its first page (a table box right of the content box, invisible and missing from the PDF). docs/limitations.md: such a table residue makes the PDF diverge from the measured geometry and the run must end in exit 3 render-unstable. A renderer that places the row does not produce the residue; the document then has no required error finding: the two-fragment sheet is the documented gap, which a tool may leave unreported (0) or, having closed the gap, report as an error (1).",
     "byCode": {
       "3": "render-unstable: table residue observed in the plain probe (expected on the reference renderer)",
-      "0": "no residue: no error finding"
+      "0": "no residue, two-fragment gap unreported",
+      "1": "no residue, two-fragment sheet reported (allowed documented-gap entry)"
     },
     "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
   },
@@ -425,24 +427,24 @@
               "fp-title"
             ]
           },
-          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box",
+          "why": "every listed label lies >= 3 px inside its nearest SVG viewport on the cell box and on the pixel ink box, with the reference fonts and with the DejaVu and FreeFont substitutions (minimum over the three shown)",
           "measured": {
             "minInsetPxByText": {
               "fp-bench-1": 98,
-              "fp-bench-2": 149.43,
-              "fp-bench-3": 149.43,
-              "fp-bench-4": 149.43,
-              "fp-fume1": 53.38,
-              "fp-fume2": 52.4,
-              "fp-blanket": 48,
-              "fp-eyewash": 51.01,
-              "fp-shower": 44.17,
-              "fp-spill": 52,
+              "fp-bench-2": 147.9,
+              "fp-bench-3": 147.9,
+              "fp-bench-4": 147.9,
+              "fp-fume1": 52.5,
+              "fp-fume2": 51.5,
+              "fp-blanket": 46.24,
+              "fp-eyewash": 50,
+              "fp-shower": 42,
+              "fp-spill": 50.18,
               "fp-exit-a": 35.92,
               "fp-exit-b": 35.92,
               "fp-assembly": 52,
-              "fp-title": 16.33,
-              "fp-scale": 7.16
+              "fp-title": 15.33,
+              "fp-scale": 6.75
             }
           }
         }
@@ -529,6 +531,11 @@
     "pagedjs": "0.4.3",
     "measuredOn": "2026-09-24",
     "pageCount": 6,
+    "pageCountByFontStack": {
+      "reference (Liberation, DejaVu Sans Mono)": 6,
+      "dejavu substitution": 6,
+      "free substitution": 5
+    },
     "pdfPageCount": 6,
     "contentBoxHeightsPx": [
       912
@@ -607,9 +614,15 @@
         "width": 3.16,
         "height": 12
       }
-    ]
+    ],
+    "fontStacks": {
+      "reference": "machine default: Chromium resolves serif, sans-serif, monospace to Liberation Serif, Liberation Sans, DejaVu Sans Mono",
+      "dejavu": "FONTCONFIG_FILE=probe/fontconfig/no-liberation.conf (Liberation rejected: DejaVu families)",
+      "free": "FONTCONFIG_FILE=probe/fontconfig/free.conf (Liberation and DejaVu rejected: FreeSerif, FreeSans, FreeMono)"
+    }
   },
   "notes": [
-    "Rule-level expectations apply when the document is measured (exit 0/1/4). If the run ends in exit 3 render-unstable, the tool withholds findings by design (docs/limitations.md); the gate then checks the exit reason only."
+    "Rule-level expectations apply when the document is measured (exit 0/1/4). If the run ends in exit 3 render-unstable, the tool withholds findings by design (docs/limitations.md); the gate then checks the exit reason only.",
+    "Independent review (2026-09-24): the first fragment of #signoff-sheet measures 912 px by getBoundingClientRect() but 928.17 px as the CDP layout box, because the row left in the overflow column still belongs to it. A tool that reads the layout box sees a first fragment taller than the 912 px content box; that is one more way to reach exit 1, not a different truth."
   ]
 }

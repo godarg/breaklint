@@ -66,12 +66,27 @@ ambiguous and the document was redrawn. Documents were iterated against the prob
 breaklint, until every construction fact held; the probe's condensed output on the final bytes is
 `probe/construction-measurements.json`.
 
+## Independent review and errata
+
+Before breaklint was run on any document, a second agent in the same session reviewed the corpus
+and re-measured it with a probe of its own, including under two font substitutions. It found no
+wrong construction fact but fifteen expectation and format problems. They were corrected on
+2026-09-24 as errata E1 to E15, each recorded in `manifest.json` `expectationHistory` with the
+source "independent pre-run review (no breaklint output seen)". Five documents changed bytes
+(sa05, sa11, sa14, sa15, sa17) and were re-probed. Every document was then measured again with
+the machine's fonts and with the two substitutions in `probe/fontconfig/` (taken from that
+review): SVG label classes agree under all three, recorded insets are the minimum of the three,
+and every page count lies inside its range.
+
 ## Measurement environment
 
 - Browser: Chromium 141.0.7390.37 (Playwright build chromium-1194), headless, sandbox on, run as
   an unprivileged user; Linux 6.18 x86_64. This is not the Chrome the project supports in CI; the
   truth does not depend on it, the recorded numbers do.
 - Paged.js 0.4.3, puppeteer-core 25.8.0, pngjs 7.0.0, Node.js 24.21.0, poppler `pdfinfo` 24.02.0.
+- Font substitutions for the robustness check: `probe/fontconfig/no-liberation.conf` (Chromium then
+  resolves the generic families to DejaVu Serif, DejaVu Sans and DejaVu Sans Mono) and
+  `probe/fontconfig/free.conf` (FreeSerif, FreeSans, FreeMono).
 - Fonts on the machine (`fc-list`, 59 files): Bitstream Charter, Courier 10 Pitch, DejaVu Sans,
   DejaVu Sans Mono, DejaVu Serif, FreeMono, FreeSans, FreeSerif, IPAGothic, IPAPGothic,
   Liberation Mono, Liberation Sans, Liberation Serif, Loma, Noto Color Emoji, OpenSymbol, Unifont
