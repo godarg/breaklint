@@ -1,0 +1,139 @@
+<!doctype html>
+<!--
+  Three `break-inside: avoid` blocks the paginator had to split, each too tall for the 340.16 px
+  content box of these pages. None of their fragments is taller than the page on its own.
+
+  COMPLICATION. A split block's fragment boxes do not add up to its height: Paged.js repeats a
+  border at every split edge and pushes the last line before the split into the hidden overflow
+  column beside the page. `layout/unbreakable-block-too-tall` therefore reports a LOWER BOUND —
+  the extent of the text lines in the fragments — and says "at least". Each block starts on a
+  fresh page, so where it splits is determined by its own height:
+
+    plain-two       27 lines, no decoration: exactly TWO fragments. The case 0.6.0 missed,
+                    because it believed a sum only from the third fragment on.
+    bordered-two    22 lines inside a 20 px border: two fragments, the border repeated at the
+                    split and one line pushed into the overflow column (measured on Paged.js 0.4.3).
+    bordered-three  44 lines inside a 20 px border: three fragments. Its bound must stay at or
+                    below its unsplit height, 44 line boxes plus the two borders.
+
+  The eight plain paragraphs come first on purpose: the geometry cross-check samples the first
+  eight boxes, and the union box of a bordered split piece disagrees with the browser's box model
+  (measured on Chromium 141). This fixture is about the rule, not about that check.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 150mm 120mm; margin: 15mm; }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0; }
+.avoid { break-inside: avoid; }
+.fresh { break-before: page; }
+.border { border: 20px solid #999; }
+</style></head><body>
+<p id="lead-1">Introductory paragraph 1, one short line.</p>
+<p id="lead-2">Introductory paragraph 2, one short line.</p>
+<p id="lead-3">Introductory paragraph 3, one short line.</p>
+<p id="lead-4">Introductory paragraph 4, one short line.</p>
+<p id="lead-5">Introductory paragraph 5, one short line.</p>
+<p id="lead-6">Introductory paragraph 6, one short line.</p>
+<p id="lead-7">Introductory paragraph 7, one short line.</p>
+<p id="lead-8">Introductory paragraph 8, one short line.</p>
+<div class="avoid fresh" id="plain-two">
+  <p>Plain line 001.</p>
+  <p>Plain line 002.</p>
+  <p>Plain line 003.</p>
+  <p>Plain line 004.</p>
+  <p>Plain line 005.</p>
+  <p>Plain line 006.</p>
+  <p>Plain line 007.</p>
+  <p>Plain line 008.</p>
+  <p>Plain line 009.</p>
+  <p>Plain line 010.</p>
+  <p>Plain line 011.</p>
+  <p>Plain line 012.</p>
+  <p>Plain line 013.</p>
+  <p>Plain line 014.</p>
+  <p>Plain line 015.</p>
+  <p>Plain line 016.</p>
+  <p>Plain line 017.</p>
+  <p>Plain line 018.</p>
+  <p>Plain line 019.</p>
+  <p>Plain line 020.</p>
+  <p>Plain line 021.</p>
+  <p>Plain line 022.</p>
+  <p>Plain line 023.</p>
+  <p>Plain line 024.</p>
+  <p>Plain line 025.</p>
+  <p>Plain line 026.</p>
+  <p>Plain line 027.</p>
+</div>
+<div class="avoid fresh border" id="bordered-two">
+  <p>Bordered line 001.</p>
+  <p>Bordered line 002.</p>
+  <p>Bordered line 003.</p>
+  <p>Bordered line 004.</p>
+  <p>Bordered line 005.</p>
+  <p>Bordered line 006.</p>
+  <p>Bordered line 007.</p>
+  <p>Bordered line 008.</p>
+  <p>Bordered line 009.</p>
+  <p>Bordered line 010.</p>
+  <p>Bordered line 011.</p>
+  <p>Bordered line 012.</p>
+  <p>Bordered line 013.</p>
+  <p>Bordered line 014.</p>
+  <p>Bordered line 015.</p>
+  <p>Bordered line 016.</p>
+  <p>Bordered line 017.</p>
+  <p>Bordered line 018.</p>
+  <p>Bordered line 019.</p>
+  <p>Bordered line 020.</p>
+  <p>Bordered line 021.</p>
+  <p>Bordered line 022.</p>
+</div>
+<div class="avoid fresh border" id="bordered-three">
+  <p>Three line 001.</p>
+  <p>Three line 002.</p>
+  <p>Three line 003.</p>
+  <p>Three line 004.</p>
+  <p>Three line 005.</p>
+  <p>Three line 006.</p>
+  <p>Three line 007.</p>
+  <p>Three line 008.</p>
+  <p>Three line 009.</p>
+  <p>Three line 010.</p>
+  <p>Three line 011.</p>
+  <p>Three line 012.</p>
+  <p>Three line 013.</p>
+  <p>Three line 014.</p>
+  <p>Three line 015.</p>
+  <p>Three line 016.</p>
+  <p>Three line 017.</p>
+  <p>Three line 018.</p>
+  <p>Three line 019.</p>
+  <p>Three line 020.</p>
+  <p>Three line 021.</p>
+  <p>Three line 022.</p>
+  <p>Three line 023.</p>
+  <p>Three line 024.</p>
+  <p>Three line 025.</p>
+  <p>Three line 026.</p>
+  <p>Three line 027.</p>
+  <p>Three line 028.</p>
+  <p>Three line 029.</p>
+  <p>Three line 030.</p>
+  <p>Three line 031.</p>
+  <p>Three line 032.</p>
+  <p>Three line 033.</p>
+  <p>Three line 034.</p>
+  <p>Three line 035.</p>
+  <p>Three line 036.</p>
+  <p>Three line 037.</p>
+  <p>Three line 038.</p>
+  <p>Three line 039.</p>
+  <p>Three line 040.</p>
+  <p>Three line 041.</p>
+  <p>Three line 042.</p>
+  <p>Three line 043.</p>
+  <p>Three line 044.</p>
+</div>
+<p class="fresh" id="tail">End of the document.</p>
+</body></html>

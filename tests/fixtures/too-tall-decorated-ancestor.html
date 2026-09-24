@@ -1,0 +1,62 @@
+<!doctype html>
+<!--
+  A `break-inside: avoid` block that FITS an empty page, split anyway.
+
+  COMPLICATION. The block (14 lines inside a 20 px border, 301 px unsplit) is shorter than the
+  340.16 px content box. It sits inside a wrapper with a 40 px border. The wrapper does not fit the
+  rest of page 1 and starts on page 2, where its border leaves the block 300 px; so the block is
+  split across pages 2 and 3, and Paged.js repeats both borders at the split. Measured on Paged.js
+  0.4.3: the first fragment's last line lands in the hidden overflow column beside page 2, the
+  fragment reads as a union box exactly one page tall, and the two fragment boxes sum to
+  417.47 px — above the page. A rule that sums fragment boxes, or subtracts the block's own border
+  from that sum, reports a block that would have fitted. The text lines on the pages are less than
+  a page, and nothing in this document is too tall for anything: it must come back clean.
+
+  The intro block comes first on purpose: the geometry cross-check samples the first eight boxes,
+  and the union box of a bordered split piece disagrees with the browser's box model (measured on
+  Chromium 141). This fixture is about the rule, not about that check.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 150mm 120mm; margin: 15mm; }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0; }
+.avoid { break-inside: avoid; }
+.fresh { break-before: page; }
+.frame { border: 40px solid #555; }
+.inner { border: 20px solid #999; }
+</style></head><body>
+<div id="intro">
+  <p>Intro line 001.</p>
+  <p>Intro line 002.</p>
+  <p>Intro line 003.</p>
+  <p>Intro line 004.</p>
+  <p>Intro line 005.</p>
+  <p>Intro line 006.</p>
+  <p>Intro line 007.</p>
+  <p>Intro line 008.</p>
+  <p>Intro line 009.</p>
+  <p>Intro line 010.</p>
+  <p>Intro line 011.</p>
+  <p>Intro line 012.</p>
+  <p>Intro line 013.</p>
+</div>
+<div class="frame" id="frame">
+<div class="avoid inner" id="fits-unsplit">
+  <p>Inner line 001.</p>
+  <p>Inner line 002.</p>
+  <p>Inner line 003.</p>
+  <p>Inner line 004.</p>
+  <p>Inner line 005.</p>
+  <p>Inner line 006.</p>
+  <p>Inner line 007.</p>
+  <p>Inner line 008.</p>
+  <p>Inner line 009.</p>
+  <p>Inner line 010.</p>
+  <p>Inner line 011.</p>
+  <p>Inner line 012.</p>
+  <p>Inner line 013.</p>
+  <p>Inner line 014.</p>
+</div>
+</div>
+<p id="after">After the wrapper.</p>
+</body></html>

@@ -364,6 +364,48 @@ export function loadCorpus(): CorpusEntry[] {
         textLines: linesFrom("t1", 0, 35, 48),
       }),
     },
+    {
+      name: "too-tall-trigger-two-fragments",
+      kind: "trigger",
+      about: "layout/unbreakable-block-too-tall",
+      complication:
+        "The same 1.4-page table after the paginator split it into exactly two fragments: 39 lines " +
+        "(600.6 px) on page 1 and 16 lines (246.4 px) on page 2. Neither fragment is taller than " +
+        "the 606 px page on its own; only the two together are. Two fragments is the usual outcome " +
+        "for a block between one and two pages tall, and a rule that reads the first fragment, or " +
+        "that believes a sum only from the third fragment on, reports nothing here.",
+      snapshot: snapshot({
+        pages: [page(1), page(2)],
+        blocks: [
+          block("t2:0", { sid: "s-t2", blockSignature: "signature of t2", tag: "table", fragmentIndex: 0, fragmentCount: 2, page: 1, box: box(48, 48, 399, 600.6), effectiveStyle: style({ breakInside: "avoid" }), lines: linesFrom("t2:0", 0, 39, 48).map((l) => l.index) }),
+          block("t2:1", { sid: "s-t2", blockSignature: "signature of t2", tag: "table", fragmentIndex: 1, fragmentCount: 2, page: 2, box: box(48, 48, 399, 246.4), effectiveStyle: style({ breakInside: "avoid" }), lines: linesFrom("t2:1", 39, 16, 48).map((l) => l.index) }),
+        ],
+        textLines: [...linesFrom("t2:0", 0, 39, 48), ...linesFrom("t2:1", 39, 16, 48)],
+      }),
+    },
+    {
+      name: "too-tall-clean-decorated-ancestor",
+      kind: "clean",
+      about: "layout/unbreakable-block-too-tall",
+      complication:
+        "A table 594.4 px tall unsplit (36 lines and a 20 px border) — it fits the 606 px page — " +
+        "inside a wrapper with a 40 px border that is split across the same two pages, so a fresh " +
+        "page inside the wrapper holds only 566 px and the paginator had to split the table too. " +
+        "Paged.js repeats both borders at the split and pushes the table's 29th line into the hidden " +
+        "overflow column beside page 1, so fragment 0 reads as a union box 2020 px wide and exactly " +
+        "one page tall, and the two boxes sum to 753.8 px. That shape is what Paged.js 0.4.3 produced " +
+        "for this construction on 2026-09-24, scaled to the corpus page. A rule that sums boxes " +
+        "reports a block that fits; one that reads the overflow-column line as part of page 1 does " +
+        "too (711 px). The text lines on the pages add up to 539 px.",
+      snapshot: snapshot({
+        pages: [page(1), page(2)],
+        blocks: [
+          block("t3:0", { sid: "s-t3", blockSignature: "signature of t3", tag: "table", fragmentIndex: 0, fragmentCount: 2, page: 1, box: box(48, 48, 2020, 606), effectiveStyle: style({ breakInside: "avoid" }), lines: [...linesFrom("t3:0", 0, 28, 220), ...linesFrom("t3:0", 28, 1, 48, 495, 200)].map((l) => l.index) }),
+          block("t3:1", { sid: "s-t3", blockSignature: "signature of t3", tag: "table", fragmentIndex: 1, fragmentCount: 2, page: 2, box: box(48, 88, 399, 147.8), effectiveStyle: style({ breakInside: "avoid" }), lines: linesFrom("t3:1", 29, 7, 108).map((l) => l.index) }),
+        ],
+        textLines: [...linesFrom("t3:0", 0, 28, 220), ...linesFrom("t3:0", 28, 1, 48, 495, 200), ...linesFrom("t3:1", 29, 7, 108)],
+      }),
+    },
 
     // ------------------------------------------------ layout/heading-at-page-bottom
     {

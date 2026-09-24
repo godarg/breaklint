@@ -90,7 +90,7 @@ describe("the M2d live production chain", () => {
   let noSource: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
-    if (result?.documents.length === 29 && noSource?.documents.length === 4) return true;
+    if (result?.documents.length === 31 && noSource?.documents.length === 4) return true;
     t.skip(
       `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
       `no-source=${noSource?.documents.length ?? 0}`,
@@ -155,6 +155,8 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "fullbleed-avoid.html"),
         join(FIXTURES, "margin-running-after-heading.html"),
         join(FIXTURES, "margin-running-in-section.html"),
+        join(FIXTURES, "too-tall-split-bounds.html"),
+        join(FIXTURES, "too-tall-decorated-ancestor.html"),
       ],
       options(join(root, "evidence")),
     );
@@ -182,7 +184,7 @@ describe("the M2d live production chain", () => {
     }));
     assert.equal(
       result?.documents.length,
-      29,
+      31,
       `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
     );
     assert.equal(
@@ -1051,9 +1053,12 @@ describe("the M2d live production chain", () => {
     const outcome = withProfile(document);
     const tooTall = outcome.report.findings.filter((finding) => finding.ruleId === "layout/unbreakable-block-too-tall");
     assert.equal(tooTall.length, 1, "the full-bleed block was judged on one piece");
+    // The value is the lower bound from the fragments' text lines (tests/unit/too-tall-bound.test.ts):
+    // never above the sum of the fragment boxes, and for this plain block within a few pixels of it.
     const sum = fragments.reduce((total, fragment) => total + fragment.box.height, 0);
     assert.equal(tooTall[0]!.target.sid, fragments[0]!.sid);
-    assert.ok(Math.abs(tooTall[0]!.measurement.value - sum) < 0.01, `value ${tooTall[0]!.measurement.value} is not the sum ${sum}`);
+    assert.ok(tooTall[0]!.measurement.value <= sum, `value ${tooTall[0]!.measurement.value} is above the sum of the boxes ${sum}`);
+    assert.match(tooTall[0]!.message, new RegExp(`is at least ${tooTall[0]!.measurement.value.toFixed(2)} px tall across the ${fragments.length} fragments`, "u"));
     assert.ok(tooTall[0]!.measurement.value > 3 * tooTall[0]!.measurement.threshold);
     assert.equal(tooTall[0]!.severity, "error");
     // Evidence: the fragments bleed into the side margin and are printed there, so their marks are
@@ -1103,5 +1108,83 @@ describe("the M2d live production chain", () => {
       const outcome = withProfile(result!.documents[index]!);
       assert.equal(exitCodeFor(outcome.report.verdict), 0, `document ${index}: ${outcome.report.exitReason}`);
     }
+  });
+
+  /**
+   * Split `break-inside: avoid` blocks are reported as a lower bound built from their text lines,
+   * and a block split into exactly two fragments is reported at all. Until this release the rule
+   * believed a split block only from the third fragment on and judged one or two fragments on the
+   * first fragment's box: measured on 2026-09-24, a block 503.72 px tall split 335.81 + 167.91 against
+   * a 340.16 px page came back clean at exit 0.
+   */
+  it("reports split unbreakable blocks as at least their text lines, two fragments included", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[29]!;
+    const snapshot = document.snapshot;
+    assert.ok(snapshot, `no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    const outcome = withProfile(document);
+    const tooTall = outcome.report.findings.filter((finding) => finding.ruleId === "layout/unbreakable-block-too-tall");
+    // Line boxes are 10pt x 1.4 = 18.67 px; the unsplit height is that per line plus the two borders.
+    const cases = [
+      { id: "plain-two", lines: 27, border: 0, fragments: 2 },
+      { id: "bordered-two", lines: 22, border: 20, fragments: 2 },
+      { id: "bordered-three", lines: 44, border: 20, fragments: 3 },
+    ];
+    for (const item of cases) {
+      const fragments: BlockRecord[] = snapshot.blocks.filter((block) => block.authorId === item.id);
+      assert.equal(fragments.length, item.fragments, `premise: ${item.id} splits into ${item.fragments} fragments`);
+      for (const fragment of fragments) {
+        const page = snapshot.pages[fragment.page - 1]!;
+        assert.ok(fragment.box.height <= page.contentBox.height + 0.5, `premise: ${item.id} fragment ${fragment.fragmentIndex} is ${fragment.box.height} px, taller than its page on its own`);
+      }
+      const finding = tooTall.find((candidate) => candidate.target.sid === fragments[0]!.sid);
+      assert.ok(finding, `${item.id} (${item.fragments} fragments) was not reported`);
+      const unsplit = item.lines * (10 * 4 / 3 * 1.4) + 2 * item.border;
+      assert.ok(finding.measurement.value > finding.measurement.threshold);
+      assert.ok(finding.measurement.value <= unsplit, `${item.id}: ${finding.measurement.value} px is above its unsplit height ${unsplit.toFixed(2)} px — not a lower bound`);
+      assert.match(finding.message, new RegExp(`is at least ${finding.measurement.value.toFixed(2)} px tall across the ${item.fragments} fragments`, "u"));
+      assert.equal(finding.severity, "error");
+      // How far below: the block's own borders, a line in the overflow column beside the page
+      // (printed nowhere, so not counted), and the half-leading at the ends of every fragment —
+      // 3.66 px at 10pt/1.4. Measured on Chromium 141: 7.33, 65.98 and 88.32 px for these three.
+      const columnEnd = (page: number): number => snapshot.pages[page - 1]!.contentBox.x + snapshot.pages[page - 1]!.contentBox.width;
+      const overflowLines = snapshot.textLines.filter((line) =>
+        fragments.some((fragment: BlockRecord) => fragment.nodeKey === line.blockKey && line.box.x >= columnEnd(fragment.page))).length;
+      const allowance = 2 * item.border + overflowLines * (10 * 4 / 3 * 1.4) + item.fragments * 4;
+      assert.ok(
+        unsplit - finding.measurement.value <= allowance,
+        `${item.id}: ${(unsplit - finding.measurement.value).toFixed(2)} px below its unsplit height, more than its borders, ${overflowLines} overflow-column line(s) and 4 px per fragment (${allowance.toFixed(2)})`,
+      );
+    }
+    assert.equal(tooTall.length, 3, `expected exactly the three split blocks: ${tooTall.map((finding) => finding.message).join(" | ")}`);
+    assert.equal(exitCodeFor(outcome.report.verdict), 1);
+  });
+
+  /**
+   * A block that fits an empty page is not reported because the paginator split it. Inside a
+   * 40 px-bordered wrapper it no longer fits the page it starts on and is split in two; measured on
+   * 2026-09-24, its first fragment reads as a union box exactly one page tall and the two boxes sum
+   * to 417.47 px against 340.16 px — a false `error` for any rule that sums boxes.
+   */
+  it("keeps a split block that fits an empty page silent although its fragment boxes sum above the page", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[30]!;
+    const snapshot = document.snapshot;
+    assert.ok(snapshot, `no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    const fragments = snapshot.blocks.filter((block) => block.authorId === "fits-unsplit");
+    assert.equal(fragments.length, 2, "premise: the block is split in two");
+    const page = snapshot.pages[fragments[0]!.page - 1]!;
+    const boxes = fragments.reduce((total, fragment) => total + fragment.box.height, 0);
+    assert.ok(boxes > page.contentBox.height, `premise: the fragment boxes sum above the page (${boxes} vs ${page.contentBox.height})`);
+    const outcome = withProfile(document);
+    assert.deepEqual(outcome.report.findings.map((finding) => `${finding.ruleId}@${finding.page}`), []);
+    const row = outcome.report.evaluations.find((evaluation) =>
+      evaluation.ruleId === "layout/unbreakable-block-too-tall" && evaluation.targetRef.sid === fragments[0]!.sid && evaluation.status === "measured");
+    assert.ok(row, "the split block was not measured");
+    const bound = row.measurements.find((measurement) => measurement.name === "block-height-lower-bound")!.value as number;
+    assert.ok(bound <= 14 * (10 * 4 / 3 * 1.4) + 40, `the bound ${bound} is above the block's unsplit height`);
+    assert.equal(exitCodeFor(outcome.report.verdict), 0);
   });
 });
