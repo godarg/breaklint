@@ -167,7 +167,15 @@ Then verify:
   executable line of the workflow. The release-prep commit moves the version, the lock and the pin
   together; a commit that moves only one of them fails on its pull request.
 - `package.json`, both root version fields in `package-lock.json` and `CHANGELOG.md` name the same
-  version;
+  version. The changelog half is also checked, by `tests/tools/changelog-contract.mjs` in
+  `npm run test:release-tag`: for a version with no tag yet, the first section must be
+  `## X.Y.Z — YYYY-MM-DD`, no `## Unreleased` section may remain, and `docs/status.md` must not
+  call the version unreleased. The same rules apply again in the release workflow at the tag
+  commit, because that commit is what npm serves — the published 0.6.0 tarball says
+  `## 0.6.0 — unreleased`, and nothing checked it. Between releases the same check requires a
+  non-empty `## Unreleased` section naming every changed rule as soon as anything under `src/`
+  differs from the last tag. It needs the tags: in a shallow clone without them it fails rather
+  than passes;
 - README, security policy, status and limitations make no future-tense success claim;
 - `git diff --check` is clean;
 - an independent verifier has no open Blocker/High finding;

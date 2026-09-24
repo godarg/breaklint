@@ -37,6 +37,16 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   moved alone, a lock moved alone, a wildcard, a leftover release literal and a job that reads the
   identity without deriving it, and accepts a coherent release-prep commit. Run against the tree
   of that incident (the parent of 9d53577) it reports "a push of v0.6.0 would start nothing".
+- **The changelog is checked against git, in two states.** `tests/tools/changelog-contract.mjs`,
+  also in `npm run test:release-tag`: after a release, any change under `src/` since the last tag
+  requires a non-empty `## Unreleased` section that names every changed rule id; while a release is
+  prepared, and again at the tag commit in the release workflow, the version's heading must carry
+  a date and no `## Unreleased` section or "(unreleased)" status line may remain. The tag commit
+  of 0.6.0 shipped `## 0.6.0 — unreleased` in the published tarball, and the two post-tag rule
+  changes above had no section to go into; run against those two commits the check fails on
+  exactly those points. Without release tags, or in a shallow clone whose history is cut above
+  them, it fails instead of passing. Its `--self-test` builds throwaway repositories for 16 states,
+  including a shallow clone.
 
 ## 0.6.0 — 2026-09-18
 
