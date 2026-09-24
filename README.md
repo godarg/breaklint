@@ -19,10 +19,10 @@ like. Below is one of its five findings, plus the closing counters, copied from 
 command's output:
 
 ```
-error layout/unbreakable-block-too-tall  page 2
-  measured   848 px; threshold 606 px (uncalibrated)
-  detail     This block asks not to be broken and is 848.00 px tall; the content box of page 2 is 606.00 px. It did not fit there unbroken.
-  remedy     A block with 'break-inside: avoid' is taller than the content box of the page it was laid out on, so the paginator could not keep it whole there. Where it had already been split into three or more fragments, the reported height is the sum of those fragments, which is the height its content needed. Make the block shorter — split it into smaller sections deliberately, or reduce container padding, font size or contained rows. Removing 'break-inside: avoid' also clears the finding, but only because the rule then has no candidate: the block is exactly as tall as before, and it will still be broken, just without having asked not to be.
+error svg/text-overflows-viewport  page 5
+  measured   72 px; threshold 0 px (uncalibrated)
+  detail     This text extends 72.00 px beyond the SVG viewport and is not drawn. Coordinates are normalised through getScreenCTM().
+  remedy     Text rendered inside an SVG extends outside the SVG viewport bounds and is clipped. Enlarge the SVG 'viewBox' or its width/height, or adjust the <text> coordinates ('x', 'y', 'text-anchor'). 'overflow: visible' on the container also clears the finding, but it does not move the text: the viewport then no longer clips, the target becomes non-applicable and this rule stops measuring it. Use that only where the overflow is intended.
              untested: no trigger/remedied pair in this package shows this advice removing this finding
   source     unknown (node produced by the paginator)
   render     unknown (no evidence produced)

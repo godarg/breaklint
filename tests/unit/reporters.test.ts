@@ -73,6 +73,9 @@ function runRealDemo(extraArgs: readonly string[] = []): { code: number; stdout:
     const stdout = execFileSync(process.execPath, ["--experimental-strip-types", CLI_SOURCE, "--demo", ...extraArgs], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
+      // A hung CLI must fail this test, not stall the suite. The demo needs no browser and
+      // finishes in well under a second; the budget only bounds a hang.
+      timeout: 60_000,
     });
     return { code: 0, stdout, stderr: "" };
   } catch (error) {
@@ -149,7 +152,9 @@ describe("output formats", () => {
     const demo = runRealDemo();
     assert.equal(demo.code, 1, `--demo must end 1; stderr: ${demo.stderr}`);
     const output = demo.stdout.split("\n");
-    const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
+    // CRLF-normalised: a Windows checkout with autocrlf would otherwise report a missing excerpt
+    // instead of the actual difference.
+    const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8").replace(/\r\n/gu, "\n");
     const intro = /Below is one of its ([a-z]+) findings, plus the closing counters, copied from that\ncommand's output:\n\n```\n([\s\S]*?)\n```\n/u.exec(readme);
     assert.ok(intro, "README no longer carries the demo excerpt in the shape this guard reads");
     const [, countWord, excerpt] = intro;
@@ -161,12 +166,25 @@ describe("output formats", () => {
     assert.equal(actualCounters.length, 1, "the demo printed no single counter line");
     assert.equal(documentedCounters, actualCounters[0], "README demo counters drifted from actual console output");
 
-    // 2. The quoted finding: opens with a finding header and appears verbatim, as a contiguous run
-    //    of lines, in the real output. An empty or header-less excerpt cannot pass.
+    // 2. The quoted finding: one WHOLE finding — from its header to its closing `render` line —
+    //    verbatim and contiguous in the real output. An empty, header-less or truncated excerpt
+    //    cannot pass.
+    //
+    //    Which finding is quoted matters too. Until a release ships this tree, `npx breaklint
+    //    --demo` runs the published package, whose remedy text for
+    //    `layout/unbreakable-block-too-tall` differs from main's (e46a1bf, 6af6008). The README
+    //    therefore quotes a finding whose lines are identical in both — checked by diffing the
+    //    two outputs on 2026-09-24, not by this test, which can only see the source tree.
     const blank = excerptLines.indexOf("");
     assert.ok(blank > 0, "README excerpt has no finding block before the counters");
     const findingBlock = excerptLines.slice(0, blank);
     assert.match(findingBlock[0]!, FINDING_HEADER, "README excerpt does not open with a finding");
+    assert.match(findingBlock.at(-1)!, /^ {2}render {5}/u, "README finding block does not end at its render line");
+    assert.equal(
+      findingBlock.slice(1).filter((l) => FINDING_HEADER.test(l)).length,
+      0,
+      "README finding block runs into a second finding",
+    );
     const start = output.indexOf(findingBlock[0]!);
     assert.ok(start >= 0, `the demo prints no finding "${findingBlock[0]}"`);
     assert.deepEqual(output.slice(start, start + findingBlock.length), findingBlock, "README finding block drifted from actual console output");
