@@ -44,6 +44,17 @@
  * `{"file","kind","number","unit","reason"}`: one entry matches exactly one issue with the same
  * file, kind, number and exact sentence, so a second copy of the sentence, or an edited one, is an
  * issue again. An entry that matches nothing fails too, so the list can only shrink.
+ *
+ * `--release` is for the release workflow: a pending entry is a stale sentence this check knows
+ * about, and a tag must not ship one. With a non-empty pending list the run fails at once and says
+ * what to do; with an empty one every mention is checked with no exception. Pull requests keep
+ * accepting pending entries; tags do not — the same rule as `TBD-at-tag` in the changelog.
+ *
+ * KNOWN LIMITS, accepted: the history grammar is a heuristic over English. A sentence can take one
+ * of its forms and still be false ("Live reports have used Report 4 since 0.5.0" passes form 3a),
+ * and a stamp named in a shape no pattern reads — "schema version 4", "v4 reports", a number in a
+ * code block — is not seen at all. What it does guarantee is that a stale current-state sentence in
+ * the shapes these documents actually use fails, and that every exception is visible in its text.
  */
 
 import { spawnSync } from "node:child_process";
@@ -255,6 +266,7 @@ export function scanText(file, text, stamps) {
 }
 
 function markdownUnder(dir) {
+  if (!existsSync(dir)) return [];
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
     return entry.isDirectory() ? markdownUnder(path) : entry.name.endsWith(".md") ? [path] : [];
@@ -292,6 +304,8 @@ export function checkDocsTruth({ packageDir, docsRoot = packageDir, extra = [], 
       else issues.push(issue.message);
     }
   }
+  // A check that read nothing has checked nothing, and must not say otherwise.
+  if (scanned === 0) issues.push(`no README, SECURITY.md or docs/**/*.md was found under ${root}; nothing was checked`);
   for (const i of pendingLeft) {
     const entry = pending[i];
     issues.push(`pending entry matches no issue, so remove it: ${entry.file}: ${entry.kind} ${entry.number} in "${entry.unit}" (${entry.reason})`);
@@ -303,27 +317,38 @@ function isMain() {
   return Boolean(process.argv[1]) && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
 }
 
-if (isMain()) {
-  const args = process.argv.slice(2);
+function readPending(file) {
+  return file ? readFileSync(file, "utf8").split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line)) : [];
+}
+
+function main(args) {
   const valueOf = (flag) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
   const packageDir = valueOf("--package");
   if (!packageDir || !statSync(packageDir, { throwIfNoEntry: false })?.isDirectory()) {
-    process.stderr.write("usage: docs-truth.mjs --package <package-dir> [--docs-root <dir>] [--extra <file> ...] [--pending <jsonl>]\n");
-    process.exitCode = 2;
-  } else {
-    const extra = args.flatMap((arg, i) => (arg === "--extra" ? [args[i + 1]] : []));
-    const pendingFile = valueOf("--pending");
-    const pending = pendingFile
-      ? readFileSync(pendingFile, "utf8").split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line))
-      : [];
-    const result = checkDocsTruth({ packageDir, docsRoot: valueOf("--docs-root") ?? packageDir, extra, pending });
-    const { stamps } = result;
-    const summary = `report ${stamps.report} (reads ${stamps.readable.join(", ")}), snapshot ${stamps.snapshot}, context pack ${stamps.context}, comparison ${stamps.comparison}, configuration contract ${stamps.config}`;
-    if (!result.valid) {
-      process.stderr.write(`docs truth: FAILED against the built package (${summary})\n${result.issues.map((issue) => `  - ${issue}`).join("\n")}\n`);
-      process.exitCode = 1;
-    } else {
-      process.stdout.write(`docs truth: ${result.scanned} documents name only the stamps the built package carries: ${summary}\n`);
-    }
+    process.stderr.write("usage: docs-truth.mjs --package <package-dir> [--docs-root <dir>] [--extra <file> ...] [--pending <jsonl>] [--release]\n");
+    return 2;
   }
+  const pendingFile = valueOf("--pending");
+  const pending = readPending(pendingFile);
+  const release = args.includes("--release");
+  if (release && pending.length > 0) {
+    process.stderr.write(
+      `docs truth: FAILED — a release must not ship documents this check knows are stale, and ${pendingFile} lists ${pending.length}:\n` +
+        `${pending.map((entry) => `  - ${entry.file}: ${entry.kind} ${entry.number} in "${entry.unit}" (${entry.reason})`).join("\n")}\n` +
+        "Correct those sentences and delete their entries in a commit on main, let CI go green on that commit, and tag that commit.\n",
+    );
+    return 1;
+  }
+  const extra = args.flatMap((arg, i) => (arg === "--extra" ? [args[i + 1]] : []));
+  const result = checkDocsTruth({ packageDir, docsRoot: valueOf("--docs-root") ?? packageDir, extra, pending: release ? [] : pending });
+  const { stamps } = result;
+  const summary = `report ${stamps.report} (reads ${stamps.readable.join(", ")}), snapshot ${stamps.snapshot}, context pack ${stamps.context}, comparison ${stamps.comparison}, configuration contract ${stamps.config}`;
+  if (!result.valid) {
+    process.stderr.write(`docs truth: FAILED against the built package (${summary})\n${result.issues.map((issue) => `  - ${issue}`).join("\n")}\n`);
+    return 1;
+  }
+  process.stdout.write(`docs truth: ${result.scanned} documents name only the stamps the built package carries${release ? ", with no pending exception" : ""}: ${summary}\n`);
+  return 0;
 }
+
+if (isMain()) process.exitCode = main(process.argv.slice(2));

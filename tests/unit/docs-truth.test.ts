@@ -12,7 +12,7 @@
  */
 
 import { strict as assert } from "node:assert";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -122,6 +122,38 @@ describe("schema stamps in the shipped documents", () => {
       pending: [...PENDING, { file: "README.md", kind: "report", number: 1, unit: "a sentence that is not there", reason: "canary" }],
     });
     assert.ok(result.issues.some((issue) => /pending entry matches no issue/u.test(issue) && /canary/u.test(issue)));
+  });
+
+  /*
+   * The release workflow runs the tool with --release. A pending entry is a sentence this check
+   * knows is stale; pull requests may carry one while its owner fixes it, a tag may not ship one.
+   */
+  it("--release refuses any pending entry, and then allows no exception", () => {
+    const tool = join(ROOT, "tests/tools/docs-truth.mjs");
+    const docs = mkdtempSync(join(tmpdir(), "breaklint-docs-truth-release-"));
+    try {
+      const run = (args: string[]) => spawnSync(process.execPath, [tool, "--package", stage, ...args], { encoding: "utf8", timeout: 120_000 });
+      const pendingFile = join(docs, "pending.jsonl");
+      writeFileSync(pendingFile, `${JSON.stringify({ file: "README.md", kind: "report", number: stamps.report - 1, unit: "x", reason: "canary" })}\n`);
+      const refused = run(["--docs-root", docs, "--pending", pendingFile, "--release"]);
+      assert.equal(refused.status, 1, refused.stdout + refused.stderr);
+      assert.match(refused.stderr, /a release must not ship documents this check knows are stale[\s\S]*Correct those sentences and delete their entries in a commit on main, let CI go green on that commit, and tag that commit/u);
+
+      writeFileSync(pendingFile, "");
+      const nothing = run(["--docs-root", docs, "--pending", pendingFile, "--release"]);
+      assert.equal(nothing.status, 1, "a run that found no document passed");
+      assert.match(nothing.stderr, /nothing was checked/u);
+      writeFileSync(join(docs, "README.md"), `Live document reports use Report ${stamps.report}.\n`);
+      const clean = run(["--docs-root", docs, "--pending", pendingFile, "--release"]);
+      assert.equal(clean.status, 0, clean.stdout + clean.stderr);
+      assert.match(clean.stdout, /with no pending exception/u);
+
+      writeFileSync(join(docs, "README.md"), `Live document reports use Report ${stamps.report - 1}.\n`);
+      const stale = run(["--docs-root", docs, "--pending", pendingFile, "--release"]);
+      assert.equal(stale.status, 1, "a stale sentence passed a release run");
+    } finally {
+      rmSync(docs, { recursive: true, force: true });
+    }
   });
 
   it("a pending entry absorbs exactly its one sentence, and nothing added to it or copied from it", () => {

@@ -221,8 +221,10 @@ jobs:
           # The README inside these exact bytes quotes what their installed bin prints, and every
           # schema stamp their docs name is the one their installed code carries.
           node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$consumer"
+          # --release: a pending exception is a sentence known to be stale, and a tag must not
+          # ship one. A non-empty pending list fails here and says what to change.
           node "$GITHUB_WORKSPACE/tests/tools/docs-truth.mjs" --package "$consumer/node_modules/breaklint" \
-            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl"
+            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl" --release
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
@@ -432,7 +434,7 @@ jobs:
           # registry copy of the CLI prints.
           node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$registry_consumer"
           node "$GITHUB_WORKSPACE/tests/tools/docs-truth.mjs" --package "$registry_consumer/node_modules/breaklint" \
-            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl"
+            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl" --release
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0 \
             @playwright/test@1.62.1 typescript@5.9.2

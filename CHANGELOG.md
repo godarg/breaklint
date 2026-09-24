@@ -194,7 +194,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   sentence, so a copy of the sentence or a stale claim added to it fails, and an entry that
   matches nothing fails. The same check runs in `ci.yml`'s packed clean-install step against the
   installed `node_modules/breaklint` — the README and docs a user installs, and the stamps of the
-  code installed with them.
+  code installed with them. In the release workflow it runs with `--release`, which refuses any
+  pending entry: a tag must not ship a sentence the check knows is stale, so a non-empty pending
+  list stops the release before anything is published and names the sentences to correct. A run
+  that finds no document to read fails instead of passing.
 - **`npm run docs:rules:check` is a CI step.** `AGENTS.md` says generated artifacts are checked
   with their generator; the rule-page remediation blocks written by `tools/write-rule-docs.ts`
   were checked in CI only by a unit test that re-derives the same assertion, and the generator's

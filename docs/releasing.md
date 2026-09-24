@@ -232,7 +232,11 @@ git push origin vX.Y.Z
 ```
 
 A tag on a commit that still says `TBD-at-tag` is refused by the release workflow's first job,
-before anything is packed or published; the log names the heading and what to change.
+before anything is packed or published; the log names the heading and what to change. The same
+holds for `tests/tools/docs-truth-pending.jsonl`: a pull request may carry an entry there while
+the owner of that page corrects it, but the release workflow runs the docs check with `--release`,
+which refuses any entry — the tagged commit must have an empty list. The clean consumers stop on
+it before anything is published, and name the sentences to correct.
 
 The release workflow then:
 
