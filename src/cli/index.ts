@@ -334,9 +334,26 @@ async function exitAfterOutput(code: number): Promise<never> {
 
 const invokedDirectly = Boolean(process.argv[1]) && isSameFile(process.argv[1] as string, fileURLToPath(import.meta.url));
 if (invokedDirectly) {
+  let settled = false;
+  // The event loop emptied while main() was still waiting: whatever it waited on can no longer
+  // answer (a driver whose browser went away, a handle closed underneath it). Node would now end
+  // the process with exit 0, which a gate reads as a clean document - silence reported as success.
+  // `beforeExit` fires only on that drain, never after an explicit process.exit, so a run that
+  // finished normally cannot reach this. The default exit code is 3 for the same reason: any end
+  // that bypasses the explicit exit below is not a verdict.
+  process.exitCode = 3;
+  process.once("beforeExit", () => {
+    if (settled) return;
+    err("breaklint: the run stopped before it finished: nothing was left for it to wait on, so no report exists; exit 3.\n");
+    void exitAfterOutput(3);
+  });
   main(process.argv.slice(2))
-    .then((code) => exitAfterOutput(code))
+    .then((code) => {
+      settled = true;
+      return exitAfterOutput(code);
+    })
     .catch((error: unknown) => {
+      settled = true;
       err(`breaklint: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
       return exitAfterOutput(3);
     });
