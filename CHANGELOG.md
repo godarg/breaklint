@@ -190,8 +190,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
 - **`npm run docs:rules:check` is a CI step.** `AGENTS.md` says generated artifacts are checked
   with their generator; the rule-page remediation blocks written by `tools/write-rule-docs.ts`
   were checked in CI only by a unit test that re-derives the same assertion, and the generator's
-  own `--check` ran in no workflow. The local gate lists in `CONTRIBUTING.md` and
-  `docs/releasing.md` follow, and `tests/unit/workflow-gates.test.ts` keeps them equal to `ci.yml`.
+  own `--check` ran in no workflow. The release workflow runs it too, and its clean consumers and
+  registry readback run the docs-truth check against the installed package; `docs/releasing.md`
+  says the release workflow repeats the complete gate, and `tests/unit/workflow-gates.test.ts` now
+  fails when `release.yml` leaves out any `npm run` gate step `ci.yml` runs. The local gate lists
+  in `CONTRIBUTING.md` and `docs/releasing.md` follow, and the same test keeps them equal to
+  `ci.yml`.
 
 ## 0.6.0 — 2026-09-18
 

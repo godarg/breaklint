@@ -86,10 +86,11 @@ jobs:
           python3 -m pip install --quiet --disable-pip-version-check fonttools
           node tools/make-mark-font.mjs --check
 
-      - name: TypeScript and generated configuration schema
+      - name: TypeScript, generated configuration schema and generated rule-page blocks
         run: |
           npm run typecheck
           npm run schema:check
+          npm run docs:rules:check
 
       - name: unit and process-boundary E2E tests
         run: npm test
@@ -217,8 +218,11 @@ jobs:
           set -e
           test "$code" -eq 1 || { echo "installed --demo exited $code, expected 1"; cat demo.out; exit 1; }
           grep -q "uncalibrated" demo.out || { echo "installed --demo printed no findings"; exit 1; }
-          # The README inside these exact bytes quotes what their installed bin prints.
+          # The README inside these exact bytes quotes what their installed bin prints, and every
+          # schema stamp their docs name is the one their installed code carries.
           node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$consumer"
+          node "$GITHUB_WORKSPACE/tests/tools/docs-truth.mjs" --package "$consumer/node_modules/breaklint" \
+            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl"
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
@@ -427,6 +431,8 @@ jobs:
           # What npmjs.com renders is the registry copy of the README; it must quote what the
           # registry copy of the CLI prints.
           node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$registry_consumer"
+          node "$GITHUB_WORKSPACE/tests/tools/docs-truth.mjs" --package "$registry_consumer/node_modules/breaklint" \
+            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl"
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0 \
             @playwright/test@1.62.1 typescript@5.9.2

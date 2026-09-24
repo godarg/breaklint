@@ -238,11 +238,13 @@ The release workflow then:
 
 1. proves, in every job, that the triggering tag, the workflow's one literal pin, `package.json`
    and `package-lock.json` name one version, and derives the version and package file name from it;
-2. repeats the complete gate on Node 24;
+2. repeats the complete gate on Node 24 — every `npm run` gate step of `ci.yml`, which
+   `tests/unit/workflow-gates.test.ts` checks;
 3. scans Git history/worktree and proves both scanner rules with runtime canaries;
 4. creates exactly one `breaklint-X.Y.Z.tgz`;
 5. records its SHA-256 and SHA-512 SRI;
-6. downloads those same bytes into Node 22.13 and Node 24 clean consumers;
+6. downloads those same bytes into Node 22.13 and Node 24 clean consumers, which check the installed
+   README's demo excerpt and the installed docs' schema stamps against the installed code;
 7. proves the ref is an annotated tag (with a lightweight-tag negative control), then proves
    tag/version, exact `origin/main` SHA and successful main CI;
 8. publishes that tarball with provenance;

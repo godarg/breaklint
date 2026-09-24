@@ -105,6 +105,14 @@ describe("workflow gates", () => {
     assert.deepEqual(unexplained, [], "docs/releasing.md runs a gate step that no workflow runs and that names no reason here");
   });
 
+  // docs/releasing.md says the release workflow "repeats the complete gate". It is a claim a
+  // workflow edit can silently falsify, so it is read off both files.
+  it("release.yml runs every gate step ci.yml runs", () => {
+    const ci = gateSteps(runLinesOf(".github/workflows/ci.yml"));
+    const release = new Set(gateSteps(runLinesOf(".github/workflows/release.yml")));
+    assert.deepEqual(ci.filter((step) => !release.has(step)), [], "release.yml does not repeat these ci.yml gate steps");
+  });
+
   it("the gate-step reader sees npm run, npm test and repository tools, and ignores comments", () => {
     assert.deepEqual(
       gateSteps(["npm ci --no-audit", "X=1 npm run test:live", "npm test", "node tools/make-mark-font.mjs --check", "npm i x # npm run nope"]),
