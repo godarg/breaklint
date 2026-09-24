@@ -220,7 +220,7 @@ are complete; the post-release trust work and remaining validation boundaries ar
 | 0 | checked, coverage met, nothing reached the threshold |
 | 1 | at least one non-experimental finding reached the threshold |
 | 2 | invalid invocation: unknown option, bad config, no input, or an input path that does not exist, is not a regular file or is not `.html`/`.htm`; no report is written |
-| 3 | infrastructure: no renderer, font failed, pagination aborted, checker crashed |
+| 3 | infrastructure: no renderer, font failed, pagination aborted, checker crashed, or the output could not be written completely (for example, the stdout reader closed early) |
 | 4 | nothing or too little was judged |
 
 Exit code 4 exists because of a measured case. A multi-column document with the widow rule

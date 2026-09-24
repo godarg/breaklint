@@ -28,7 +28,7 @@ import { render } from "../report/index.ts";
 import { parseArgs } from "./args.ts";
 import type { Snapshot } from "../core/types.ts";
 import type { RenderEnvironment } from "../acquire/render-run.ts";
-import { err, out } from "./out.ts";
+import { err, flushOutput, out } from "./out.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VERSION = readPackageVersion();
@@ -260,7 +260,8 @@ exit codes
   1  at least one non-experimental finding reached the threshold
   2  invalid invocation: unknown option, bad config, no input, an input path that does not
      exist, is not a regular file or is not .html/.htm. No report is written.
-  3  infrastructure: no renderer, font failed, pagination aborted, checker crashed
+  3  infrastructure: no renderer, font failed, pagination aborted, checker crashed,
+     or the output could not be written completely (the stdout reader closed early)
   4  nothing or too little was judged — an empty document, no rule measured anything,
      coverage below the floor
 
@@ -294,12 +295,37 @@ function isSameFile(a: string, b: string): boolean {
   }
 }
 
+/**
+ * The exit, after the output has been delivered.
+ *
+ * `process.exit()` discards every write still queued for a pipe. Measured: a report behind
+ * `| cat` arrived cut at 65 536 bytes in all six formats while the exit code stayed 1. So the exit
+ * waits for `flushOutput()`. It stays an explicit `process.exit` rather than a natural end of the
+ * event loop, because a natural end would hang on any handle a driver leaked.
+ *
+ * A reader that closed before the output was complete means the output this run was asked for
+ * did not arrive. That is exit 3, infrastructure, and never the verdict's 0 or 1: a gate must not
+ * read a report nobody received as a clean or a judged run.
+ */
+async function exitAfterOutput(code: number): Promise<never> {
+  const failure = await flushOutput();
+  if (failure) {
+    err(
+      `breaklint: could not write to stdout (${failure.code ?? failure.message}); the output did not arrive ` +
+        "complete, so this run ends with exit 3 whatever its verdict.\n",
+    );
+    await flushOutput();
+    process.exit(3);
+  }
+  process.exit(code);
+}
+
 const invokedDirectly = Boolean(process.argv[1]) && isSameFile(process.argv[1] as string, fileURLToPath(import.meta.url));
 if (invokedDirectly) {
   main(process.argv.slice(2))
-    .then((code) => process.exit(code))
+    .then((code) => exitAfterOutput(code))
     .catch((error: unknown) => {
       err(`breaklint: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
-      process.exit(3);
+      return exitAfterOutput(3);
     });
 }
