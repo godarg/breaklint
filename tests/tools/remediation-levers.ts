@@ -9,6 +9,11 @@
  *
  * Nothing here is a second table of levers per rule. `positiveLevers` derives them from the advice
  * at run time, so a changed advice changes what every guard accepts.
+ *
+ * KNOWN LIMITS, accepted: the sentence reader is a heuristic over English (see `proposedLevers`),
+ * and `changedLevers` compares the SET of values per lever — a declaration moved to another
+ * element with the same value, or duplicated, is not a change. Its own tests are in
+ * tests/unit/remediation-levers.test.ts.
  */
 
 /** Actionable CSS levers. A property named as a measurement is not a proposal; see IMPERATIVE. */
@@ -23,14 +28,31 @@ const BREAK_PARAPHRASE = /\bbreak (?:constraint|behaviou?r|rule|propert(?:y|ies)
 const BREAK_LEVERS = ["break-inside", "break-before", "break-after", "page-break-before", "page-break-after"];
 
 /**
- * An imperative verb opening a clause, removal synonyms included: "delete", "drop" or "strip" a
- * declaration proposes a lever exactly as "remove" does.
+ * The verbs of a proposal, removal synonyms included: "delete", "drop" or "strip" a declaration
+ * proposes a lever exactly as "remove" does, and "change … to", "override" and "consider" propose
+ * too.
  */
-const IMPERATIVE_VERB = "(?:set|use|apply|add|insert|enable|disable|remove|delete|drop|strip|omit|unset|eliminate|clear|take out|get rid of|turn off|switch off|replace|increase|reduce|lower|raise|adjust|specify|configure|prevent|force|keep|try|wrap|mark|make|split|tighten|enlarge|move|shorten|constrain|reword|put)";
-const IMPERATIVE_CLAUSE = new RegExp(`^\\s*(?:(?:or|and|then|also|instead|simply|just|first|please)\\s+)*${IMPERATIVE_VERB}\\b`, "iu");
+const VERBS = "set|use|apply|add|insert|enable|disable|remove|delete|drop|strip|omit|unset|eliminate|clear|take out|get rid of|turn off|switch off|replace|change|override|increase|reduce|lower|raise|adjust|specify|configure|prevent|force|keep|try|consider|wrap|mark|make|split|tighten|enlarge|move|shorten|constrain|reword|put|inflate|inject|stretch";
+const GERUNDS = "setting|using|applying|adding|inserting|enabling|disabling|removing|deleting|dropping|stripping|omitting|unsetting|eliminating|clearing|replacing|changing|overriding|increasing|reducing|lowering|raising|adjusting|specifying|forcing|keeping|making|splitting|tightening|moving|shortening";
+/** A clause that opens with an imperative, a modal proposal ("you should remove …") or "consider …". */
+const IMPERATIVE_CLAUSE = new RegExp(
+  `^\\s*(?:(?:or|and|then|also|instead|otherwise|alternatively|simply|just|first|please)\\s+)*(?:(?:you|one)\\s+(?:can|could|should|may|might|must|need to|have to)\\s+)?(?:${VERBS})\\b`,
+  "iu",
+);
+/** "Removing X fixes the finding" proposes X as surely as "remove X" does. */
+const GERUND_PROPOSAL = new RegExp(`^\\s*(?:${GERUNDS})\\b.*\\b(?:fix(?:es)?|resolves?|clears?|removes?|eliminates?)\\b.*\\bfinding`, "iu");
+/** A negated proposal verb — "do not remove", "never delete", "it does not move the text". */
+const NEGATED_VERB = new RegExp(
+  `\\b(?:do not|don't|does not|doesn't|must not|mustn't|should not|shouldn't|never|cannot|can't)\\s+(?:(?:only|just|simply|ever)\\s+)?(?:${VERBS})\\b`,
+  "iu",
+);
 
-/** A clause that names a lever in order to warn against it. */
-export const DISCOURAGING = /\b(?:do not|does not|don't|never|ignored|inert|also clears the finding|only where|only helps|not honou?r)\b/iu;
+/**
+ * A clause that names a lever in order to warn against it: a negated proposal verb, or a phrase
+ * that says the lever does nothing or only makes the rule stop looking. Read on the clause with
+ * its quoted spans masked, so a word inside `` `…` `` cannot void the clause around it.
+ */
+export const DISCOURAGING = new RegExp(`${NEGATED_VERB.source}|\\b(?:ignored|inert|also clears the finding|clears the finding without|has no effect|not honou?red)\\b`, "iu");
 
 /**
  * A hyphenated lever (`break-inside`, `line-height`) cannot be anything but the CSS property. A
@@ -57,30 +79,65 @@ export function leversIn(sentence: string): string[] {
   return found;
 }
 
+interface Segment { text: string; masked: string; separator: string }
+
 /**
- * The clauses of a sentence, split at commas, semicolons, colons, dashes, brackets and the
- * conjunctions that join clauses. Quoted and backticked spans are masked first, so that the colon
- * in `'break-inside: avoid'` does not split a clause in two.
+ * The clauses of a sentence, each with the separator before it: commas, semicolons, colons,
+ * dashes, brackets and the conjunctions that join clauses. Quoted and backticked spans are masked
+ * first, so the colon in `'break-inside: avoid'` does not split a clause and a word inside a quote
+ * is not read as grammar.
  */
-export function clausesOf(sentence: string): string[] {
+function segmentsOf(sentence: string): Segment[] {
   const spans: string[] = [];
   const masked = plain(sentence).replace(/`[^`\n]*`|(?<![\w])'[^'\n]+?'(?![\w])|"[^"\n]*"/gu, (span) => `\u0000${spans.push(span) - 1}\u0000`);
-  return masked
-    .split(/[,;:—()]|\s(?=(?:or|and|but|while|which|so|whereas)\s)/u)
-    .map((clause) => clause.replace(/\u0000(\d+)\u0000/gu, (_, index: string) => spans[Number(index)]!).trim())
-    .filter(Boolean);
+  const segments: Segment[] = [];
+  let separator = "";
+  for (const part of masked.split(/([,;:—()])|\s(?=(?:or|and|but|while|which|so|whereas|nor)\s)/u)) {
+    if (part === undefined) continue;
+    if (/^[,;:—()]$/u.test(part)) { separator = part; continue; }
+    if (!part.trim()) continue;
+    const text = part.replace(/\u0000(\d+)\u0000/gu, (_, index: string) => spans[Number(index)]!).trim();
+    segments.push({ text, masked: part.trim(), separator: separator || (/^(?:or|and|nor)\s/iu.test(part.trim()) ? "conj" : "") });
+    separator = "";
+  }
+  return segments;
+}
+
+export function clausesOf(sentence: string): string[] {
+  return segmentsOf(sentence).map((segment) => segment.text);
 }
 
 /**
- * The levers a sentence proposes. A clause that warns ("do not …", "… also clears the finding")
- * proposes nothing, however the rest of the sentence reads; the other clauses propose the levers
- * they name when some clause of the sentence opens with an imperative. With `requireImperative`
- * false every non-warning clause is a proposal — the shape of a repair instruction.
+ * The levers a sentence proposes — a HEURISTIC reader of English, tested in
+ * tests/unit/remediation-levers.test.ts, not a parser. A clause that warns proposes nothing,
+ * however the rest of the sentence reads, and a negated verb ("never inflate X, inject Y or
+ * stretch Z") voids the list it opens up to the next semicolon, colon, dash or contrast ("but",
+ * "instead", "rather"). The remaining clauses propose the levers they name when some clause of the
+ * sentence opens with a proposal. With `requireImperative` false every non-warning clause is a
+ * proposal — the shape of a repair instruction.
+ *
+ * Known limits: a proposal phrased without any verb it knows ("the right fix is X") or with an
+ * unusual one ("override" is known, "revert" is not) proposes nothing here; a negation phrased
+ * around a verb it does not know ("do not bother with X") does not void; a lever named only in
+ * prose ("the overflow") is not a lever. The guards built on it can therefore miss a restatement,
+ * never invent one: every miss is a false pass, which the tests of this file pin where known.
  */
 export function proposedLevers(sentence: string, { requireImperative = true } = {}): string[] {
-  const clauses = clausesOf(sentence).filter((clause) => !DISCOURAGING.test(clause));
-  if (requireImperative && !clauses.some((clause) => IMPERATIVE_CLAUSE.test(clause))) return [];
-  return [...new Set(clauses.flatMap(leversIn))];
+  const live: Segment[] = [];
+  let negating = false;
+  for (const segment of segmentsOf(sentence)) {
+    const continuesList = segment.separator === "," || segment.separator === "conj";
+    if (negating && continuesList && !/^\s*(?:but|instead|rather|then)\b/iu.test(segment.masked)) continue;
+    negating = false;
+    if (DISCOURAGING.test(segment.masked)) {
+      negating = NEGATED_VERB.test(segment.masked);
+      continue;
+    }
+    live.push(segment);
+  }
+  const proposal = live.some((segment) => IMPERATIVE_CLAUSE.test(segment.masked) || GERUND_PROPOSAL.test(segment.masked));
+  if (requireImperative && !proposal) return [];
+  return [...new Set(live.flatMap((segment) => leversIn(segment.text)))];
 }
 
 /** Whether a sentence proposes any lever at all. */

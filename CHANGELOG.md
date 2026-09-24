@@ -99,8 +99,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `layout/unbreakable-block-too-tall` still uses `break-inside: auto`; that page is rewritten by
   another change of this release and is pending in the guard with exactly that one foreign lever,
   so anything added to the example fails, and the entry fails once it is no longer needed. A
-  sentence proposes a lever clause by clause: "Delete …", "Drop …" and "Strip …" propose as
-  "Remove …" does, and a warning word in one clause no longer exempts the others.
+  sentence proposes a lever clause by clause: "Delete …", "Drop …", "Strip …", "Change … to",
+  "Override …", "Consider removing …", "You should remove …" and "Removing … fixes the finding"
+  propose as "Remove …" does; a warning in one clause no longer exempts the others, a negation
+  voids only when it negates the proposal verb ("does not fit" is not a warning) and then the list
+  it opens, and a word inside a quoted span is not read as grammar. The reader is a heuristic, and
+  `tests/unit/remediation-levers.test.ts` pins its contract sentence by sentence.
 - **Erratum to 0.6.0.** The 0.6.0 entry that introduced `docs/agent-contract.md` says
   "`selfcheck:static` reads it, so its claims are held against the code". It did not:
   `selfcheck:static` scans that file for emoji, first-person wording, marketing words and
