@@ -68,6 +68,15 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   guard rather than tightened — and the exit-3 message names the elapsed time and the last lines
   of the browser's stderr (for example a missing shared library).
 
+- **On Windows a live run now stops before anything is started.** Windows remains unsupported
+  (process cleanup rests on POSIX process groups). Before — read from the code, not run on
+  Windows — a run with `BREAKLINT_CHROME` set started the browser and rendered the whole document
+  before its cleanup check failed with `renderer-not-terminated`, and `checkProducedDocuments`
+  started the producer before refusing its cleanup. Now a live CLI run ends with exit 3 and a
+  message that names the reason, and `checkProducedDocuments` returns `source/producer-incomplete`
+  without running the producer. Exit 3 is the existing "infrastructure" class; no exit code
+  changed meaning.
+
 ### Tooling
 
 - **A `lifecycle-soak` CI job.** It runs the browser's close, document-timeout, SIGKILL, SIGINT,

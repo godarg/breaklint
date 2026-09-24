@@ -223,9 +223,15 @@ because the absent pixels can change layout.
 attributes the paginator writes into the tree and does not guarantee as an interface. Any other
 resolved version stops the run with exit 3, and no flag overrides it.
 
-**Windows is not supported.** Process termination rests on POSIX process groups; the termination
-and profile-cleanup path has real evidence on macOS only, and Windows job objects are neither
-designed for nor measured.
+**Windows is not supported, and a live run there now stops before it starts.** Process termination
+rests on POSIX process groups, and Windows job objects are neither designed for nor measured. Read
+from the code, not run: until this release a Windows run with `BREAKLINT_CHROME` set started the
+browser and rendered the whole document, and only then failed its cleanup check
+(`renderer-not-terminated`, exit 3); a producer was started before its cleanup was refused. Both
+now end before anything is started, with exit 3 — the environment cannot run the check, the same
+class as a missing renderer — and a message naming the reason; a producer acquisition ends with
+`source/producer-incomplete` without running the producer. Unit tests pin both with an injected
+platform. Windows support itself is parked, not planned.
 
 **Linux was unmeasured, then measured, and what it showed was a defect.** The first public CI run
 failed: the evidence binding broke on every document, because the marks shared a font with the
@@ -250,19 +256,17 @@ single remaining thread (a leader that left with `pthread_exit()` while another 
 reads `Z`, and still counts as alive). The deadlines did not move; a host that never collects
 cannot be out-waited.
 
-Measured on one machine, and these are data about that machine rather than promises: a
-Firecracker VM, Linux 6.18, 4 vCPUs, whose PID 1 is not an init system and collects exited orphans
-on a timer, after 1.02–1.96 s (n = 40); Chromium 141; Node 24. The three process-group unit tests
-(the browser tree, a producer descendant on the success path, a producer descendant after a
-timeout), 10 isolated runs each under three parents — this VM's PID 1, a subreaper that collects at
-once (what `--init`, tini or systemd do) and a subreaper that never collects: before the change
-30 of 30 red, 30 of 30 green and 30 of 30 red; after it, 30 of 30 green in each of the three, and
-again on the committed code. The one-minute load average was 1.3–4.4 before and 1.8–9.7 after,
-because other work shared the machine. Under load one of the three tests also exposed a race of its own, a SIGTERM landing
-before the process under test had installed its handler (3 of 10); the test now arms the handler
-first. What this machine cannot show, and CI has
-to: a real container without `--init` (the never-collecting subreaper reproduces its reparenting,
-not the container itself), and macOS, where no process is marked a zombie and the behaviour is
+Measured on one machine, and these are data about that machine rather than promises: a Firecracker
+VM, Linux 6.18, 4 vCPUs, whose PID 1 is not an init system and collects exited orphans on a timer,
+after 1.02–1.96 s (n = 40); Chromium 141; Node 24. The three process-group unit tests (the browser
+tree, a producer descendant on the success path, a producer descendant after a timeout), 10
+isolated runs each under three parents — this VM's PID 1, a subreaper that collects at once (what
+`--init`, tini or systemd do) and a subreaper that never collects: before the change 30 of 30 red,
+30 of 30 green and 30 of 30 red; after it, 30 of 30 green in each of the three, and again on the
+committed code. The one-minute load average was 1.3–4.4 before and 1.8–9.7 after, because other
+work shared the machine. Under load one of the three tests also exposed a race of its own, a
+SIGTERM landing before the process under test had installed its handler (3 of 10); the test now
+arms the handler first. On macOS no process is marked a zombie, and the behaviour there is
 unchanged.
 
 **What an interrupted or killed run leaves behind, measured on the same machine.** The real CLI
@@ -281,23 +285,23 @@ The one-minute load average was 8–21 before and 5–21 after. The one exit 3 a
 signal that landed while the browser was still starting, at load 10: the failed start reached the
 CLI's exit 3 before the handler had raised the signal again. The start-up path now waits for the
 handler's decision; a unit test pins it (3 of 3 red without the wait), and three further SIGINT
-runs ended by the signal. Before, the browser outlived a
-SIGKILLed breaklint because a headless browser on the websocket transport is never told that its
-client has gone; it now speaks over a pipe and exits on end-of-file. The driver's own signal
-handlers left the profile on Ctrl-C, and on SIGTERM and SIGHUP closed the browser underneath the
-running render, which then could not verify its own cleanup (`renderer-not-terminated` in 10 of
-18 SIGTERM and SIGHUP runs across this table and a second series of six each). The exit 0 is the
-one clean exit in the table and it is the worst entry in it: an interrupted run that printed
-nothing and measured nothing; it appeared once in nine SIGHUP runs, at load 19, and its mechanism
-was not isolated. breaklint now handles the three signals itself: it runs the same bounded,
-verified close and profile removal, then raises the signal again, so the process ends by it. A
-SIGKILL cannot be handled; the next launch's sweep removes that run's profile, and only such a
-profile. It removes a `breaklint-chrome-profile-*` directory only when the owner record written
-into every profile names this host, this boot and this PID namespace, the breaklint process it
-names is gone, and the browser it started is gone (its process group has no live member, or,
-without a recorded browser, Chrome's `SingletonLock` names a dead pid on this host, or, without
-either, the directory has not changed for a minute). A running breaklint's profile is kept by
-the second condition, which a unit test checks against a real running process.
+runs ended by the signal. Before, the browser outlived a SIGKILLed breaklint because a headless
+browser on the websocket transport is never told that its client has gone; it now speaks over a
+pipe and exits on end-of-file. The driver's own signal handlers left the profile on Ctrl-C, and on
+SIGTERM and SIGHUP closed the browser underneath the running render, which then could not verify
+its own cleanup (`renderer-not-terminated` in 10 of 18 SIGTERM and SIGHUP runs across this table
+and a second series of six each). The exit 0 is the one clean exit in the table and it is the worst
+entry in it: an interrupted run that printed nothing and measured nothing; it appeared once in nine
+SIGHUP runs, at load 19, and its mechanism was not isolated. breaklint now handles the three
+signals itself: it runs the same bounded, verified close and profile removal, then raises the
+signal again, so the process ends by it. A SIGKILL cannot be handled; the next launch's sweep
+removes that run's profile, and only such a profile. It removes a `breaklint-chrome-profile-*`
+directory only when the owner record written into every profile names this host, this boot and this
+PID namespace, the breaklint process it names is gone, and the browser it started is gone (its
+process group has no live member, or, without a recorded browser, Chrome's `SingletonLock` names a
+dead pid on this host, or, without either, the directory has not changed for a minute). A running
+breaklint's profile is kept by the second condition, which a unit test checks against a real
+running process.
 
 Two things this does not cover. A browser crash writes its dump into `~/.config/chromium/Crash
 Reports`, outside the temporary profile, and nothing here changes that. And the browser start is
@@ -330,7 +334,7 @@ There is deliberately no `os` field in `package.json`, which means npm will inst
 Windows without complaint. That is not an oversight: `--demo` and the whole rule and reporter
 chain need no browser and no process group, so they work there. What does not work is a run over
 your own HTML. Blocking the install would take away the part that functions in order to prevent
-the part that does not, and the part that does not already fails loudly rather than quietly.
+the part that does not, and the part that does not refuses loudly, before it starts anything.
 
 **A file that is not HTML gets an unhelpful error.** Point the tool at a Markdown file and the
 run ends with exit 3 and `pagination aborted: TypeError: node.getAttribute is not a function` —
@@ -445,12 +449,12 @@ environment happened to produce `EPERM`. They are now one exported function with
 kernel, the clock and the group's members, and `tests/unit/producer-boundary.test.ts` pins them on
 a fake kernel and a fake clock: "retries EPERM inside the deadline and accepts the ESRCH that
 follows (retry path)", "fails an EPERM that outlives the deadline as unverifiable, after SIGKILL
-(deadline path)", the unknown-errno and signal-delivery cases, and the zombie reading below. Each
-names the mutation that turns it red, and each mutation was run and observed red. The budgets are
-unchanged. One hypothesis is not settled and needs a macOS run: that this `EPERM` is XNU's answer
-for a group whose members are exiting or already zombies, the window that Linux answers with
-success instead. Sampling `ps -o pid,stat` of the group at the moment `EPERM` comes back would
-settle it.
+(deadline path)", the unknown-errno and signal-delivery cases, and the zombie reading described
+under the Linux process lifecycle above. Each names the mutation that turns it red, and each
+mutation was run and observed red. The budgets are unchanged. One hypothesis is not settled and
+needs a macOS run: that this `EPERM` is XNU's answer for a group whose members are exiting or
+already zombies, the window that Linux answers with success instead. Sampling `ps -o pid,stat` of
+the group at the moment `EPERM` comes back would settle it.
 
 **The 40-document corpus behind the `layout/half-empty-page` default is not in this repository.**
 The 37-of-40 figure was measured on a corpus constructed for that purpose during the same work, and

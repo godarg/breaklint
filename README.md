@@ -209,8 +209,10 @@ collection (zombies) were counted as survivors, so in a container without an ini
 live run ended with exit 3. The numbers, and what CI still has to confirm, are in
 [`docs/limitations.md`](docs/limitations.md).
 
-**Windows is not supported.** Process termination here rests on POSIX process groups. Windows job
-objects are neither designed for nor measured.
+**Windows is not supported.** Process termination here rests on POSIX process groups, and Windows
+job objects are neither designed for nor measured. A live run on Windows therefore stops before
+anything is started — no browser, no producer — with exit 3 (the environment cannot run the
+check) and a message that says so. `--demo` needs neither and works there.
 
 **The M2/M2d live render path is built.** A live run loads the document through an owned loopback
 origin, paginates it, assembles and validates the snapshot, runs the rules, and binds evidence to

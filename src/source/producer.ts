@@ -28,7 +28,7 @@ import type { ConfigFile } from "../config/contract.ts";
 import type { Report } from "../core/types.ts";
 import type { DocumentRevision } from "../core/types.ts";
 import { identitiesForProducedOutput } from "./identity.ts";
-import { processGroupMembers } from "../acquire/browser.ts";
+import { processGroupMembers, unsupportedPlatformRefusal } from "../acquire/browser.ts";
 import { captureHostGit, bindCapturedRevision, type HostGitRevisionOptions } from "./revision.ts";
 
 export const PRODUCER_RECORD_PROTOCOL = "studio-producer-record-v1" as const;
@@ -659,11 +659,17 @@ function waitForResult(child: ReturnType<typeof spawn>, timeoutMs: number): Prom
 /** Executes only host-selected code and returns an internal receipt after complete validation. */
 export async function acquireProducedDocuments(
   input: { producer: HostControlledProducer; manifest?: unknown; options?: Omit<CheckProducedDocumentsOptions, "manifest"> },
+  /** Internal platform seam for the refusal below; not part of any public option. */
+  platform: NodeJS.Platform = process.platform,
 ): Promise<ProducerCheckResult> {
   const { producer } = input;
   const options = input.options ?? {};
   if (producer.trust !== "host-controlled-producer" || !producer.id || !producer.executable || producer.argv.some((arg) => arg.includes("\0"))) {
     return { ok: false, code: "source/producer-record-mismatch", detail: "producer authority is malformed" };
+  }
+  // Its owned process group could never be verified closed here, so the producer is not started.
+  if (unsupportedPlatformRefusal(platform)) {
+    return { ok: false, code: "source/producer-incomplete", detail: "producer incomplete: owned process group cleanup is unsupported on this platform; the producer was not started" };
   }
   const runId = randomBytes(16).toString("hex");
   const runRoot = options.runRoot ? resolve(options.runRoot) : join(process.cwd(), ".breaklint-private", `producer-${runId}`);

@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -183,6 +183,25 @@ describe("host-controlled producer FD3 boundary", () => {
       rmSync(root, { recursive: true, force: true });
       rmSync(consumer, { recursive: true, force: true });
     }
+  });
+});
+
+describe("producer on an unsupported platform", () => {
+  // Mutation "refuse after spawn" (the refusal moved below spawn): red, the producer ran.
+  it("does not start the producer when its process group could not be verified closed", async () => {
+    const root = mkdtempSync(join(tmpdir(), "breaklint-producer-platform-"));
+    try {
+      const marker = join(root, "producer-ran");
+      const codeFile = join(root, "producer.js"); writeFileSync(codeFile, "producer");
+      const result = await acquireProducedDocuments({ producer: {
+        trust: "host-controlled-producer", id: "fixture", executable: process.execPath,
+        argv: ["-e", `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "ran")`],
+        codeFiles: [{ id: "@producer/fixture", path: codeFile }], producerOptions: {},
+      }, options: { runRoot: join(root, "run") } }, "win32");
+      assert.deepEqual(result, { ok: false, code: "source/producer-incomplete", detail: "producer incomplete: owned process group cleanup is unsupported on this platform; the producer was not started" });
+      assert.equal(existsSync(marker), false, "the producer was started on an unsupported platform");
+      assert.equal(existsSync(join(root, "run")), false, "a run directory was created for a refused producer");
+    } finally { rmSync(root, { recursive: true, force: true }); }
   });
 });
 

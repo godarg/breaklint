@@ -21,6 +21,7 @@ import {
   launchBrowser,
   captureProcessTreeOwnership,
   holdForInterrupt,
+  unsupportedPlatformRefusal,
   type InterruptHold,
   ownServerLifecycle,
   resolvePackageRoot,
@@ -136,6 +137,8 @@ export interface RenderDependencies {
   documentTimeoutMs?: number;
   /** Test seam for an unreadable process table; production uses the POSIX verifier above. */
   terminateBrowserProcessTree?: typeof terminateProcessTree;
+  /** Unit-only platform seam for the refusal below; production reads `process.platform`. */
+  platform?: NodeJS.Platform;
 }
 
 const DEFAULT_DEPENDENCIES: RenderDependencies = { launchBrowser, openRasterizer };
@@ -2219,6 +2222,9 @@ export async function renderDocuments(
   capturedByPath?: ReadonlyMap<string, CapturedRenderInput>,
   peerResolutionDir = process.cwd(),
 ): Promise<RenderResult> {
+  // Before anything is resolved or started: a platform that cannot verify the cleanup cannot run.
+  const unsupported = unsupportedPlatformRefusal(dependencies.platform ?? process.platform);
+  if (unsupported) return { documents: [], fatal: { exitCode: 3, message: unsupported }, environment: null };
   const paged = resolvePagedjs(peerResolutionDir);
   if (!paged.ok || !paged.path) {
     return { documents: [], fatal: { exitCode: 3, message: paged.detail }, environment: null };

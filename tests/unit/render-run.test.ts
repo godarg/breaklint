@@ -43,7 +43,7 @@ import {
   ownServerLifecycle, processIsDefunct, profileOwnerIdentity, PROFILE_OWNER_FILE, PROFILE_PREFIX,
   STALE_PROFILE_MIN_AGE_MS, sweepStaleBrowserProfiles, terminateProcessTree, TERMINATION_GRACE_MS,
   type InterruptSignal, type PageLike, type ProcessRow, type ProfileOwnerRecord, type ProfileSweepEnvironment,
-  type ProfileSweepResult, type SignalHost,
+  type ProfileSweepResult, type SignalHost, unsupportedPlatformRefusal,
 } from "../../src/acquire/browser.ts";
 import type { EvidenceOutcome } from "../../src/render/evidence.ts";
 import { writeEvidencePng, type Rasterizer } from "../../src/render/rasterizer.ts";
@@ -346,6 +346,26 @@ describe("the live path fails closed at its process boundary", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  // Mutation "refuse after launch" (move the platform check below launchBrowser): red, a browser
+  // was started. Mutation "no refusal": red, the fatal result is missing.
+  it("refuses a live run on Windows with exit 3 before any browser starts", async () => {
+    let launches = 0;
+    let rasterizers = 0;
+    const result = await renderDocuments(["README.md"], OPTIONS, {
+      platform: "win32",
+      async launchBrowser() { launches += 1; throw new Error("a browser was started on an unsupported platform"); },
+      async openRasterizer() { rasterizers += 1; return { rasterizer: null, detail: "not reached" }; },
+    });
+    assert.equal(launches, 0);
+    assert.equal(rasterizers, 0);
+    assert.deepEqual(result.documents, []);
+    assert.equal(result.environment, null);
+    assert.equal(result.fatal?.exitCode, 3);
+    assert.match(result.fatal?.message ?? "", /not supported on Windows/u);
+    assert.match(result.fatal?.message ?? "", /Nothing was started/u);
+    for (const platform of ["linux", "darwin"] as const) assert.equal(unsupportedPlatformRefusal(platform), null, `${platform} was refused`);
   });
 
   it("closes the browser when browser.version fails during startup", async () => {
@@ -1413,15 +1433,21 @@ describe("breaklint's own interrupt handling while it owns a browser", () => {
     assert.deepEqual(installed(), [0, 0, 0], "listeners outlived the last hold");
   });
 
-  // Mutation "second signal waits like the first": red, force is never called.
-  it("forces the cleanup and ends at once on a second signal", async () => {
+  // Mutation "second signal waits like the first": red, nothing settles before the 60 s bound.
+  it("forces the cleanup and ends at once on a second signal", { timeout: 20_000 }, async () => {
     const { host, emit, events } = fakeHost();
     const registry = createInterruptRegistry(host, 60_000);
     const hold = registry.hold({ cleanup: () => new Promise<void>(() => { events.push("cleanup:hangs"); }), force() { events.push("force"); } });
     emit("SIGINT");
     await tick();
     emit("SIGINT");
-    assert.equal(await hold.settled(), "SIGINT");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const settled = await Promise.race([
+      hold.settled(),
+      new Promise<"still waiting">((resolveWait) => { timer = setTimeout(() => resolveWait("still waiting"), 5_000); }),
+    ]);
+    clearTimeout(timer);
+    assert.equal(settled, "SIGINT", "the second signal did not end the interrupt; it waited for the bound");
     assert.deepEqual(events, ["cleanup:hangs", "force", "kill 4242 SIGINT listeners=0"]);
   });
 

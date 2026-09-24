@@ -844,6 +844,25 @@ function writeProfileOwner(userDataDir: string, browserPid: number | null): void
   }
 }
 
+/**
+ * A live run must prove that its browser's process tree is gone and its profile removed, and that
+ * proof rests on POSIX process groups. Windows has none, so a live run there could never pass its
+ * own cleanup check. Before this refusal existed, such a run was only refused after a complete
+ * render — the process table then failed and the result was `renderer-not-terminated` — and a
+ * producer had already been started. Now nothing starts: the caller returns this message with
+ * exit 3, an environment that cannot run the check, as for a missing renderer. `--demo` needs no
+ * browser and no process group and keeps working there.
+ */
+export function unsupportedPlatformRefusal(platform: NodeJS.Platform = process.platform): string | null {
+  if (platform !== "win32") return null;
+  return (
+    "breaklint: live runs are not supported on Windows.\n" +
+    "  A run must prove that its browser's processes are gone and its profile removed, and that proof\n" +
+    "  rests on POSIX process groups, which Windows does not have. Nothing was started.\n" +
+    "  breaklint --demo needs no browser and works here."
+  );
+}
+
 const CHROME_CANDIDATES_BY_PLATFORM: Readonly<Record<string, readonly string[]>> = {
   darwin: [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
