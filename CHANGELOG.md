@@ -59,6 +59,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   a non-`.html` name has ended with exit 2 before any renderer since 0.3.1, and Markdown text
   saved as `.html` is measured as HTML text (with no element in it, the run ends exit 3
   `geometry-cross-check-failed`).
+- The shipped type declarations called `renderReport`'s input "a Report4" and
+  `Finding.originalSource` "Report4's source/actionability truth"; `renderReport` reads document
+  reports of schema 4 and 5 and screen reports, and `originalSource` has been part of every
+  document report since schema 4. Comment-only; no type changed.
 - **`SECURITY.md`** named 0.2.x as the supported line; only the latest published version receives
   fixes. It also said the sandbox claim was checked in the test suite, and no test checked it:
   `tests/unit/sandbox-boundary.test.ts` now pins the one browser launch — a flat options literal

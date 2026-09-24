@@ -243,10 +243,11 @@ unchanged.
 The six documents are recorded, not published. They are chapters of a paid product, so
 `corpus/public/pagination-residue-v1` carries their SHA-256 values, rights and privacy review and
 exact expected residue while the bytes stay outside this repository — the
-`private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. Without
-`BREAKLINT_RESIDUE_CORPUS_ROOT` that gate prints `SKIPPED` and claims nothing. What holds the class
-in CI is the public `tests/fixtures/fragmentainer-residue.html`, reduced from one of the six until
-no product text remained.
+`private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. At the time, without
+`BREAKLINT_RESIDUE_CORPUS_ROOT` that gate printed `SKIPPED` and claimed nothing; the record has since
+become historical and is no longer a CI step (see the current release above). What held the class
+in CI then, and still does, is the public `tests/fixtures/fragmentainer-residue.html`, reduced from
+one of the six until no product text remained.
 
 Two defects in this repository's own checks were found on the way and fixed in the same release. The
 secret-scanner canary planted a digit-heavy `AKIA` key beside a random secret and asserted only that
