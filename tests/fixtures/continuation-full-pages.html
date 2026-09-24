@@ -4,27 +4,36 @@
 <meta charset="utf-8">
 <title>Full continuation pages and a real tail</title>
 <!--
-  A page that a block CONTINUES from is full by construction: Paged.js only leaves a page when
-  its content overflows it. layout/orphaned-continuation-page used to judge such a page anyway,
-  on a net fill that counts glyph boxes and not line boxes, and at a large line height a full page
-  reads far below the 50 % threshold.
+  A page that running text CONTINUES from is full: Paged.js leaves a page when its next line does
+  not fit. layout/orphaned-continuation-page used to judge such a page anyway, on a net fill that
+  counts glyph boxes and not line boxes, and at a large line height a full page reads far below
+  the 50 % threshold. The rule now judges a page only when what it carries ends on it.
 
   THE COMPLICATION. One paragraph, wrapped in <main> and <section>, is set at 12pt/3 and runs over
   more than four pages. Every page between its first and its last carries nothing but a
-  continuation of that paragraph, and on every one of them the paragraph goes on to the next page.
-  At line-height 3 a glyph box covers little more than a third of the line pitch, so those pages
-  read a net fill near 0.35 although no line more would fit. A rule that asks only "is every block
-  here a continuation?" and "is the fill below 50 %?" reports each of them. The wrappers are there
-  because they are continuations too and come first in document order: the last block on the page
-  is the paragraph, not a wrapper. The paragraph's own last page is a real tail page; whether it
-  is reported depends on how many lines the font leaves there, and nothing asserts it.
+  continuation of that paragraph, and on every one of them the paragraph goes on to the next page
+  and opens it. At line-height 3 a glyph box covers about a third of the line pitch, so those
+  pages read a net fill near 0.34 although no line more would fit. A rule that asks only "is every
+  block here a continuation?" and "is the fill below 50 %?" reports each of them. The wrappers are
+  there because they are continuations too and come first in document order: the last block on
+  the page is the paragraph, not a wrapper. The paragraph's own last page is a tail page, and at
+  line-height 3 any tail page reads below 50 %, so it is reported however many lines the font
+  leaves there; nothing asserts it, because that count depends on the font.
 
-  THE CONTROL. After a forced break, a second paragraph sets fourteen explicit lines under a
+  THE TAIL CONTROL. After a forced break, a second paragraph sets fourteen explicit lines under a
   one-line heading. Twelve fit under the heading on its page; the last two continue alone onto the
   next page, and the next heading forces a page break straight after them. That page carries only
   the end of a block that began earlier: it is the page the rule exists for, and it must still be
   reported. The line count does not depend on the font: every line is an explicit line, far
   shorter than the column, and the page height leaves about 18 px after thirteen 48 px lines.
+
+  THE CARRIED-CHILD CONTROL. After another forced break, a <section> holds twelve explicit lines,
+  its own 200 px SVG and a break-inside: avoid figure 500 px tall. The lines fill the page under
+  the heading; the SVG does not fit and moves on, and the figure does not fit under it. So one page
+  carries only the section's continuation, its SVG, and is two thirds empty, while the section goes
+  on: its last block does not end there. The next page opens with the figure, a block that starts
+  there, so the break fell between blocks and the page must be reported. A rule that only asks
+  whether the page's last block ends calls that page full.
 -->
 <style>
 @page { size: 148mm 210mm; margin: 20mm; }
@@ -33,6 +42,8 @@ main, section, p, h2 { margin: 0; padding: 0; }
 h2 { font: bold 12pt/3 serif; }
 .chapter { break-before: page; }
 .lines { white-space: pre-line; }
+figure { margin: 0; break-inside: avoid; }
+svg { display: block; }
 </style>
 </head>
 <body>
@@ -123,5 +134,23 @@ Tail control line 13
 Tail control line 14</p>
 <h2 class="chapter" id="after-heading">After the forced break</h2>
 <p id="after">A short closing paragraph on a page the author opened on purpose.</p>
+<h2 class="chapter" id="carried-heading">Carried child</h2>
+<section id="carried">
+<p class="lines" id="carried-lines">Carried control line 01
+Carried control line 02
+Carried control line 03
+Carried control line 04
+Carried control line 05
+Carried control line 06
+Carried control line 07
+Carried control line 08
+Carried control line 09
+Carried control line 10
+Carried control line 11
+Carried control line 12</p>
+<svg id="carried-own" width="300" height="200" aria-hidden="true"><rect width="300" height="200" fill="#999"/></svg>
+<figure id="carried-figure"><svg width="300" height="500" aria-hidden="true"><rect width="300" height="500" fill="#555"/></svg></figure>
+</section>
+<p id="closing">The closing paragraph after the carried figure.</p>
 </body>
 </html>

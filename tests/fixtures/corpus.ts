@@ -400,10 +400,12 @@ export function loadCorpus(): CorpusEntry[] {
       kind: "clean",
       about: "layout/half-empty-page",
       complication:
-        "A fully set text page at netFill 0.686. Net fill sums glyph boxes, not line boxes, so a " +
-        "full page reads far below 1 — full prose pages at line-height 1.5 measured 0.58–0.72 — " +
-        "and some full pages fall below the 0.60 threshold, which is why the rule is experimental.",
-      snapshot: snapshot({ pages: [page(1, { fill: { vertical: 0.98, topGap: 0.01, net: 0.686, area: 1 } })] }),
+        "A full page of one long paragraph: netFill 0.72, measured on a middle page set at " +
+        "11pt/1.5 serif on A4 with 20 mm margins (Chromium 141, Paged.js 0.4.3). Net fill sums " +
+        "glyph boxes, not line boxes, so a full page reads far below 1; full prose pages at that " +
+        "line height measured 0.58–0.72, some below the 0.60 threshold, which is why the rule is " +
+        "experimental.",
+      snapshot: snapshot({ pages: [page(1, { fill: { vertical: 0.99, topGap: 0, net: 0.72, area: 1 } })] }),
     },
     {
       name: "half-empty-clean-parity-blank",
@@ -435,6 +437,37 @@ export function loadCorpus(): CorpusEntry[] {
       snapshot: snapshot({
         pages: [page(1, { fill: { vertical: 0.1, topGap: 0.02, net: 0.06, area: 1 } })],
         blocks: [block("c1", { fragmentIndex: 1, fragmentCount: 2 })],
+      }),
+    },
+    {
+      name: "orphaned-continuation-trigger-carried-child",
+      kind: "trigger",
+      about: "layout/orphaned-continuation-page",
+      complication:
+        "A <section> whose paragraph ends on page 1 and whose own 200 px SVG fills a third of " +
+        "page 2; its next child, a break-inside: avoid figure, did not fit and opens page 3. Page " +
+        "2 carries only the section's continuation, net fill 0.31, and the section goes on — so a " +
+        "rule that only asks whether the page's last block ends there calls it full. It is not: the " +
+        "break fell between blocks, and page 3 opens with the fresh figure.",
+      alsoFires: ["layout/half-empty-page"],
+      snapshot: snapshot({
+        pages: [
+          page(1, { fill: { vertical: 0.99, topGap: 0, net: 0.34, area: 1 } }),
+          page(2, { fill: { vertical: 0.33, topGap: 0, net: 0.31, area: 1 } }),
+          page(3, {
+            isLast: true,
+            fill: { vertical: 0.9, topGap: 0, net: 0.8, area: 1 },
+            outgoingBreakCause: { kind: "document-end", determinedBy: "document-boundary", cascadeHint: null },
+          }),
+        ],
+        blocks: [
+          block("section:0", { sid: "s-section", tag: "section", fragmentIndex: 0, fragmentCount: 3, page: 1, box: box(48, 48, 399, 600) }),
+          block("lines", { page: 1, box: box(48, 48, 399, 600) }),
+          block("section:1", { sid: "s-section", tag: "section", fragmentIndex: 1, fragmentCount: 3, page: 2, box: box(48, 48, 399, 200) }),
+          block("section:2", { sid: "s-section", tag: "section", fragmentIndex: 2, fragmentCount: 3, page: 3, box: box(48, 48, 399, 500) }),
+          block("figure", { tag: "figure", page: 3, box: box(48, 48, 399, 500) }),
+          block("after", { page: 3, box: box(48, 548, 399, 48) }),
+        ],
       }),
     },
     {
@@ -473,8 +506,8 @@ export function loadCorpus(): CorpusEntry[] {
         "One paragraph over four pages. Pages 2 and 3 carry nothing but its continuation and read " +
         "a net fill of 0.49 against the 0.50 threshold — the numbers of a real full page at " +
         "line-height 2.2, where glyph boxes cover less than half the line pitch. But the paragraph " +
-        "goes on to the next page, so each was left by overflow and is full by construction. A " +
-        "rule that never asks whether the page's last block ENDS there reports both.",
+        "goes on to the next page and opens it, so each page stopped because its next line did not " +
+        "fit: it is full. A rule that never asks whether what the page carries ENDS there reports both.",
       alsoFires: ["layout/half-empty-page"],
       snapshot: snapshot({
         pages: [

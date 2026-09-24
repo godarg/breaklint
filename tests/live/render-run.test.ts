@@ -361,7 +361,7 @@ describe("the M2d live production chain", () => {
     assert.deepEqual(hiddenPage.fill, { vertical: 0, topGap: 0, net: 0, area: 0 });
   });
 
-  it("judges a continuation page only where its block ends, and keeps the collector's document order", async (t) => {
+  it("judges a continuation page only where what it carries ends, and keeps the collector's document order", async (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     // Its own render: the fixture's pages are the measurement, and the shared batch's indices
     // stay where the other cases expect them.
@@ -424,6 +424,24 @@ describe("the M2d live production chain", () => {
     assert.equal(row(end.page).values["ends-on-page"], true);
     assert.equal(row(end.page).violated, true);
     assert.ok(firedOn.includes(end.page), `the tail page ${end.page} was not reported; fired on ${firedOn.join(",")}`);
+
+    // The carried-child control: a <section> whose own SVG sits alone on a page while its next
+    // child, a break-inside: avoid figure, opens the page after. The section continues, but the
+    // break fell between blocks, and the page is two thirds empty: it must be reported.
+    const carried = snapshot.blocks.filter((block) => block.authorId === "carried");
+    assert.equal(carried.length, 3, `the carried-child section split into ${carried.length} fragments`);
+    const alone = carried[1]!;
+    assert.deepEqual(
+      snapshot.blocks.filter((block) => block.page === alone.page).map((block) => block.authorId),
+      ["carried"],
+      "the carried-child page holds more than the section's continuation",
+    );
+    const figure = snapshot.blocks.find((block) => block.authorId === "carried-figure");
+    assert.ok(figure && figure.page === alone.page + 1 && figure.fragmentIndex === 0, "the figure does not open the next page");
+    assert.equal(row(alone.page).values["continuation-only"], true);
+    assert.ok((row(alone.page).values["net-fill"] as number) < 0.5, `carried-child net=${row(alone.page).values["net-fill"]}`);
+    assert.ok(firedOn.includes(alone.page), `the carried-child page ${alone.page} was not reported; fired on ${firedOn.join(",")}`);
+    assert.equal(row(alone.page).values["ends-on-page"], true);
     assert.ok(report.findings.every((finding) => finding.ruleId === "layout/orphaned-continuation-page"));
   });
 

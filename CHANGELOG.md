@@ -18,24 +18,36 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
   compared advice text will see the new string.
 - **`layout/orphaned-continuation-page` no longer reports the full middle pages of a long block.**
-  A page is now judged only when its last block, in document order, ENDS there; the rule records
-  this as a third measurement, `ends-on-page`, in its evaluations. A page whose last block goes on
-  to the next page was left because its content overflowed it, so it is full by construction.
-  Until now every such page between the first and the last page of a block was reported as soon as
-  its net fill read below 0.50 — and net fill counts glyph boxes, not line boxes, so a full page
-  reads 0.34–0.36 at `line-height: 3`: a long paragraph with generous leading produced one warning
-  per middle page (five on the new live fixture, measured on Chromium 141; none now). The page a
-  block ends on is judged exactly as before, and the message now says what it is: "Page N carries
-  only the end of a block that began on an earlier page, and its net fill is X %". Consumers that
-  match the old message text, or read the evaluation's measurements by position, will see the
-  change. The guard reads the order in which the collector records a page's blocks, document
-  order, and the live suite now pins that order. Not fixed: the completely filled last page of a
-  block, followed by a forced break or the end of the document, still reads below 0.50 at a large
-  line height and is still reported; a line-box fill is the named follow-up
-  (`docs/limitations.md`). No longer reported, and a loss: a nearly empty page whose last block is
-  a wrapper with bare text of its own while a child of it is carried to the next page (measured
-  with a tall `break-inside: avoid` figure); with the text in a `<p>` the page is still reported.
-  No schema stamp moves.
+  A page is judged only when what it carries ENDS on it: its last block in document order is
+  that block's final fragment, or the next page opens with a block that starts there. The rule
+  records this as a third measurement, `ends-on-page`, in its evaluations.
+  - Until now every page between the first and the last page of a block was reported as soon as
+    its net fill read below 0.50. When a block's text runs on and opens the next page, the page
+    stopped because its next line did not fit, so it is full; but net fill counts glyph boxes,
+    not line boxes, and such a page reads 0.34–0.36 at `line-height: 3`. A long paragraph with
+    generous leading produced one warning per middle page (five on the new live fixture,
+    measured on Chromium 141); none now.
+  - The second half keeps what the rule already reported. A wrapper (`<section>`, `<article>`)
+    continues onto the next page whenever a child is carried there, so "the last block continues"
+    alone would have silenced a page whose own content — bare text, an image, an SVG — ended high
+    on it because its next child, such as a `break-inside: avoid` figure, did not fit (measured at
+    net fill 0.08–0.39). Such a page is still reported, because the next page opens with the
+    fresh child.
+  - Only blocks of the page's flow count: a block with a box that lies at least partly inside the
+    content box vertically. A running element's clone in a top or bottom margin box and its
+    box-less `display: none` original no longer decide either condition. Measured, they hid a
+    two-line tail page under a running header, which the rule had never reported; it is now.
+  - The message now says what the page is: "Page N carries only content continued from an earlier
+    page, which ends there, and its net fill is X %". Consumers that match the old message text,
+    or read the evaluation's measurements by position, will see the change.
+  - The guard reads the order in which the collector records a page's blocks, document order,
+    and the live suite now pins that order.
+  - Not fixed: at `line-height: 3` every page whose content ends on it is reported, however full
+    and whatever follows it (measured: 11 of 13 lines before a figure that did not fit, 0.29);
+    a line-box fill is the named follow-up (`docs/limitations.md`). Not caught: a wrapper's own
+    image or SVG that does not fit and opens the next page (measured 0.31); inside its own
+    `<figure>` it is caught.
+  - No schema stamp moves.
 - **`layout/half-empty-page` no longer states a "measured ceiling" in its findings.** Every finding
   said the threshold "sits 0.086 below the measured ceiling of a full text page". Net fill has no
   ceiling: full, non-last prose pages at `line-height: 1.5` read 0.58–0.72 with this collector, and
@@ -43,8 +55,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   "net fill sums the glyph boxes of text, not its line boxes, so a page a reader calls full can
   read below this threshold" — and quotes no number. The rule page, `docs/agent-contract.md` and
   the source comments are corrected; the 0.6.0 entry below, which gives "about 0.686" as the
-  figure for a full page, is corrected by this entry rather than rewritten. The rule stays
-  experimental and off by default, and nothing here is a calibration.
+  figure for a full page, is corrected by this entry rather than rewritten. The rule page also no
+  longer says the last page is "downgraded to a note": its finding keeps `warn`, and only the
+  message says the page is likely intended. The rule stays experimental and off by default, and
+  nothing here is a calibration.
 
 ### Documentation
 
@@ -53,8 +67,9 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   pinned by a contract test.
 - `docs/rules/layout-orphaned-continuation-page.md`: the remedied example changed the font size,
   which is not a lever the rule's advice names; it now tightens the vertical margin above the
-  paragraph. The page also states the tail semantics and the remaining false alarm, and
-  `docs/limitations.md` says what page fill counts and what a line-box fill would change.
+  paragraph. The page also states when a page counts as ending, the remaining false alarm and the
+  remaining blind spot, and `docs/limitations.md` says what page fill counts and what a line-box
+  fill would change.
 
 ## 0.6.0 — 2026-09-18
 

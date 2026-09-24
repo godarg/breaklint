@@ -1,6 +1,42 @@
 import { defineRule } from "../../core/rule.ts";
 import { pageKey } from "../../core/fingerprint.ts";
+import type { BlockRecord, PageRecord, Snapshot } from "../../core/types.ts";
 import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
+
+/** Box-coordinate slack for rounded geometry, in CSS px. A tolerance, not a threshold. */
+const EDGE_TOLERANCE_PX = 1;
+
+/**
+ * The blocks of a page's flow, in document order: those with a box that lie at least partly inside
+ * the content box vertically.
+ */
+function flowBlocks(snapshot: Snapshot, page: PageRecord): BlockRecord[] {
+  const top = page.contentBox.y;
+  const bottom = page.contentBox.y + page.contentBox.height;
+  return snapshot.blocks.filter((b) =>
+    b.page === page.pageNumber &&
+    (b.box.width !== 0 || b.box.height !== 0) &&
+    b.box.y < bottom && b.box.y + b.box.height > top);
+}
+
+/**
+ * Whether the page after `page` (the next one that is not a parity blank) opens with a block that
+ * starts there. Every block before that fresh block in document order has to be a wrapper of it —
+ * starting no higher, and spanning it horizontally — or the next page opens with continuing
+ * content of its own, and the break fell inside that content.
+ */
+function nextPageOpensWithFreshBlock(snapshot: Snapshot, page: PageRecord): boolean {
+  const next = snapshot.pages.find((p) => p.pageNumber > page.pageNumber && !p.blank);
+  if (!next) return false;
+  const blocks = flowBlocks(snapshot, next);
+  const at = blocks.findIndex((b) => b.fragmentIndex === 0);
+  if (at < 0) return false;
+  const fresh = blocks[at]!;
+  return blocks.slice(0, at).every((wrapper) =>
+    wrapper.box.y >= fresh.box.y - EDGE_TOLERANCE_PX &&
+    wrapper.box.x <= fresh.box.x + EDGE_TOLERANCE_PX &&
+    wrapper.box.x + wrapper.box.width >= fresh.box.x + fresh.box.width - EDGE_TOLERANCE_PX);
+}
 
 /**
  * layout/orphaned-continuation-page — a page whose only content is the tail of a block.
@@ -14,29 +50,41 @@ import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
  *
  * The second trap is the middle of a long block. "Every block here is a continuation" is also
  * true of every page between the first and the last fragment of a block that spans three pages
- * or more, and such a page is full by construction: the paginator only leaves a page when the
- * content overflows it. Net fill counts glyph boxes, not line boxes, so a full page reads far
- * below 1 — measured 0.34–0.36 at `line-height: 3` — and the rule reported every middle page of
- * a long paragraph set with generous leading. So a page is judged only when the block that
- * closes it ENDS there (`ends-on-page`): its last block in document order is that block's final
- * fragment. A page whose last block continues was left by overflow, whatever its net fill reads.
- * The guard needs no threshold; it follows from the break semantics. Its one measured cost: a
- * wrapper whose own bare text ends on the page while a child is carried to the next one (a tall
- * `break-inside: avoid` figure) also continues, so that nearly empty page is no longer judged.
- * The rule page states it; with the text in its own `<p>` the paragraph is last and it is judged.
+ * or more. When what goes on to the next page is running text, such a page is full: the text
+ * stopped because the next line did not fit. Net fill counts glyph boxes, not line boxes, so a
+ * full page reads far below 1 — measured 0.34–0.36 at `line-height: 3` — and the rule reported
+ * every middle page of a long paragraph set with generous leading.
+ *
+ * So a page is judged only when what it carries ENDS on it (`ends-on-page`), which is one of:
+ *   - its last block in document order is that block's final fragment; or
+ *   - the next page opens with a block that STARTS there: the break fell between blocks, so the
+ *     page stopped because a fresh block did not fit (or was sent on), not because it was full.
+ *     That is the case of a wrapper — `<section>`, `<article>` — whose own content (bare text,
+ *     an image, an SVG) ends on the page while its next child is carried over; the wrapper then
+ *     continues, and the first condition alone would not judge the page. "Opens with" means
+ *     that every block before the fresh one on the next page, in document order, is a wrapper
+ *     of it: it starts no higher than the fresh block and spans it horizontally. A continuation
+ *     with content of its own above the fresh block (text running on, or a column beside it)
+ *     means the break fell inside that content.
+ * Neither condition needs a threshold; both follow from the break semantics. What is still not
+ * judged: a wrapper whose own image or SVG did not fit and opens the next page (see the rule
+ * page).
+ *
+ * Only blocks of the page's flow count for `continuation-only` and `ends-on-page`: a block with a
+ * box (the `display: none` original of a running element has none) that lies at least partly
+ * inside the content box vertically (a running element's clone in a top or bottom margin box,
+ * wherever the collector records one, lies above or below it; so does the footnote area).
+ * Horizontal position is not tested, so a full-bleed block stays in.
  *
  * It rests on one invariant of the snapshot, stated here because the rule reads it and nothing
  * else in the type says so: `snapshot.blocks` is in collection order — page by page, and within
  * a page in document (pre-)order of the paginated tree. The collector walks `querySelectorAll`
  * once per `.pagedjs_page` (document order by specification) and assembly maps without
- * reordering; `fragmentIndex` is itself counted in that order. Two consequences carry the guard.
- * A wrapper (`main`, `section`) precedes its children, so the last block on a page is the
- * innermost block the page ends in; a wrapper that continues past the page comes before the
- * child that closes it. And every Paged.js margin box precedes `.pagedjs_area` in the page
- * template, so a `position: running()` clone in a margin box, wherever the collector records one
- * as a block, is never last on a page that has content of its own. The invariant is pinned from
- * both sides: the live suite checks the order the real collector produces, and the unit suite
- * checks that this rule reads the last block and nothing else.
+ * reordering; `fragmentIndex` is itself counted in that order. A wrapper (`main`, `section`)
+ * precedes its children, so the last block on a page is the innermost block the page ends in,
+ * and on the next page a wrapper's continuation comes before the fresh child it holds. The
+ * invariant is pinned from both sides: the live suite checks the order the real collector
+ * produces, and the unit suite checks that this rule reads that order and nothing else.
  */
 export const orphanedContinuationPage = defineRule(
   {
@@ -85,10 +133,11 @@ export const orphanedContinuationPage = defineRule(
       measured += 1;
 
       // Collection order: within a page, document order (see the invariant above).
-      const onPage = snapshot.blocks.filter((b) => b.page === page.pageNumber);
+      const onPage = flowBlocks(snapshot, page);
       const continuationOnly = onPage.length > 0 && onPage.every((b) => b.fragmentIndex > 0);
       const last = onPage.at(-1);
-      const endsOnPage = last !== undefined && last.fragmentIndex === last.fragmentCount - 1;
+      const endsOnPage = last !== undefined &&
+        (last.fragmentIndex === last.fragmentCount - 1 || nextPageOpensWithFreshBlock(snapshot, page));
       const violated = continuationOnly && endsOnPage && page.fill.net < maxNetFill;
       evaluations.push(targetEvaluation({ ruleId: "layout/orphaned-continuation-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "measured", measurements: [{ name: "continuation-only", value: continuationOnly, unit: null, operator: "=", threshold: true }, { name: "ends-on-page", value: endsOnPage, unit: null, operator: "=", threshold: true }, { name: "net-fill", value: page.fill.net, unit: "fill ratio", operator: "<", threshold: maxNetFill }], connective: "all", violated }));
       if (!violated) continue;
@@ -103,8 +152,8 @@ export const orphanedContinuationPage = defineRule(
           ruleId: "layout/orphaned-continuation-page",
           severity: "warn",
           message:
-            `Page ${page.pageNumber} carries only the end of a block that began on an earlier page, ` +
-            `and its net fill is ${(page.fill.net * 100).toFixed(1)} %; threshold ` +
+            `Page ${page.pageNumber} carries only content continued from an earlier page, which ends ` +
+            `there, and its net fill is ${(page.fill.net * 100).toFixed(1)} %; threshold ` +
             `${(maxNetFill * 100).toFixed(0)} %. The break into it was an overflow, not a request.`,
           page: page.pageNumber,
           keyType: "page",

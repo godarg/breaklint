@@ -20,9 +20,9 @@ import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
  * in the measurements: full, non-last prose pages at `line-height: 1.5` read 0.58–0.72 with this
  * collector — 0.69–0.72 for one long paragraph, 0.58–0.63 with 1 em paragraph margins, six of
  * sixteen such pages below the 0.60 threshold — and a full page reads 0.51–0.54 at 2 and
- * 0.35–0.36 at 3. The 0.686 this comment used to call "the measured ceiling" is a single reading
- * whose conditions were never recorded, not a bound. A threshold that full pages straddle cannot
- * gate, so it does not.
+ * 0.34–0.36 at 3 (12 pt on A5 and 11 pt on A4). The 0.686 this comment used to call "the
+ * measured ceiling" is a single reading whose conditions were never recorded, not a bound. A
+ * threshold that full pages straddle cannot gate, so it does not.
  *
  * Third, since 0.6.0 this rule is not active in the default profile. Measured on a 40-document
  * corpus built to exercise it, it fired on 37 of them — most of those are pages a reader calls
@@ -84,8 +84,9 @@ export const halfEmptyPage = defineRule(
       evaluations.push(targetEvaluation({ ruleId: "layout/half-empty-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "measured", measurements: [{ name: "net-fill", value: page.fill.net, unit: "fill ratio", operator: "<", threshold: minNetFill }, { name: "top-gap", value: page.fill.topGap, unit: "fill ratio", operator: ">", threshold: maxTopGap }], connective: "any", violated: tooEmpty || tooLowOnPage }));
       if (!tooEmpty && !tooLowOnPage) continue;
 
-      // The last page of a document is usually short on purpose. Downgraded, not suppressed —
-      // and only when nothing continues onto it and no forced break put it there.
+      // The last page of a document is usually short on purpose. Noted in the message, neither
+      // suppressed nor downgraded — and only when nothing continues onto it and no forced break
+      // put it there.
       const isTailPage =
         page.isLast &&
         page.incomingBreakCause.kind !== "forced" &&

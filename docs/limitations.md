@@ -363,17 +363,18 @@ never enter it, so a page no further line would fit on reads roughly glyph heigh
 which the font and the leading set. Measured on full pages that are not the last of their document
 (Chromium 141 on Linux, Paged.js 0.4.3, the machine's default serif and sans-serif; not re-measured
 on the current Chrome that CI runs): 0.58–0.72 at `line-height: 1.5`, 0.51–0.54 at 2, 0.34–0.36 at
-3. Both page-fill rules read this quantity. `layout/half-empty-page` cannot separate a full page
-from a sparse one near its 0.60 threshold, and stays experimental and off by default.
-`layout/orphaned-continuation-page` judges only a page its last block ends on — a page a block
-continues from was left by overflow and is full by construction — but on that page it still reads
-net fill, so with generous leading the completely filled last page of a block that is followed by a
-forced break, or by the end of the document, can be reported. The guard also costs one case the
-old rule caught: when the page's last block is a wrapper whose bare text ends there while a child
-is carried to the next page — measured with a tall `break-inside: avoid` figure after three lines
-of a `<section>`'s own text — the wrapper continues and the nearly empty page is not reported; the
-same text in a `<p>` is. A line-box fill, each text rectangle
-widened to its line height, is the named next step. It changes the snapshot shape and the quantity
+3 (12 pt on A5 and 11 pt on A4). Both page-fill rules read this quantity. `layout/half-empty-page`
+cannot separate a full page from a sparse one near its 0.60 threshold, and stays experimental and
+off by default. `layout/orphaned-continuation-page` judges only a page whose content ends on it —
+its last block's final fragment is there, or the next page opens with a block that starts there —
+because a page whose text runs on and opens the next page stopped for want of room. On a page it
+does judge it still reads net fill, so at `line-height: 3` every such page falls below its 0.50
+threshold however full it is and whatever follows it: measured, 11 of 13 lines before a figure that
+did not fit read 0.29, and a tail page filled to its last line 0.34. The guard is structural and has
+one measured blind spot: a wrapper's own image or SVG that does not fit and opens the next page
+reads as text running on, so the page before it (0.31 in the measured case) is not reported; the
+same element inside its own `<figure>` is. A line-box fill, each text rectangle widened to its line
+height, is the named next step for the net fill. It changes the snapshot shape and the quantity
 behind the public options `minNetFill` and `maxNetFill`, which needs an owner decision, and it is
 not in this release. None of these readings is a calibration.
 
