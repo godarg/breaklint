@@ -7,8 +7,9 @@
  * entry for a server stays in the list after `close()` has already run. So the test spawns this
  * file and asks the only question that matters: did it end?
  *
- * `argv[2]` is where the fake browser fails: `newPage`, `goto`, `evaluate`, `never`, or `leak`
- * for the positive control, which starts a server and deliberately keeps it.
+ * `argv[2]` is where the fake browser fails: `newPage`, `goto`, `evaluate`, `version-mismatch`,
+ * `capabilities-missing` (the page reports a built-in the pinned rasteriser needs as absent),
+ * `never`, or `leak` for the positive control, which starts a server and deliberately keeps it.
  */
 
 import { createServer } from "node:http";
@@ -37,8 +38,12 @@ if (failAt === "leak") {
       return undefined;
     },
     async setContent() {},
-    async evaluate() {
+    async evaluate(expression: unknown) {
       if (failAt === "evaluate") throw new Error("probe: evaluate failed");
+      // The rasteriser page's capability answer, read before the library version.
+      if (expression === "window.__blCapabilities") {
+        return { missing: failAt === "capabilities-missing" ? ["Math.sumPrecise"] : [] } as never;
+      }
       return (failAt === "version-mismatch" ? "0.0.0" : declaredVersion) as never;
     },
     async waitForFunction() {
@@ -64,7 +69,8 @@ if (failAt === "leak") {
   };
 
   const result = await openRasterizer(browser, { fromDir: REPO, contentPagesOpen: () => 0 });
-  process.stdout.write(`${result.rasterizer === null ? "refused" : "opened"}\n`);
+  process.stdout.write(`${result.rasterizer === null ? `refused${result.fatal ? " fatal" : ""}` : "opened"}\n`);
+  if (result.rasterizer === null) process.stdout.write(`${result.detail}\n`);
   // On the success path the caller owns the rasteriser and closing it is its job — which is
   // exactly what the product does. Not closing it here would test the wrong thing.
   if (result.rasterizer) await result.rasterizer.close();

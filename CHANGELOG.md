@@ -36,6 +36,28 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   a freshly built `dist/` entry (through a bin symlink) with a report of at least 256 KiB in every
   format, through a kernel pipe into `cat`, a kernel pipe into a slow reader and a Node pipe, and
   compares the bytes with the `--out` file; it fails on the previous entry point.
+- **A live run no longer depends on the browser exposing `FontFaceSet` as a global.** The
+  measuring primitives captured the font set's `ready` getter and iterator through that global
+  interface object, which a browser need not expose. Chromium 141 does not, and every live run
+  there ended with exit 3 (`FontFaceSet is not defined`) before anything was measured. The
+  primitives now take the prototype of the document's own `document.fonts`. They are still
+  captured on-new-document, before any author script runs, so what an author script can tamper
+  with is unchanged. A unit test runs the real payload in a realm without the global, and in one
+  whose global names a decoy prototype.
+- **A browser below the rasteriser's floor is refused before any document is opened.**
+  `pdfjs-dist` 6.2.108 calls recent JavaScript built-ins without testing for them. It loads
+  without them and failed only when it rasterised — after pagination and measurement — with
+  `this[#methodPromises].getOrInsertComputed is not a function` and exit 3, with
+  `--no-evidence-binding` too. The rasteriser page now checks the 18 built-ins the pinned build
+  calls unguarded before it loads the library. A browser that lacks any of them ends the run with
+  exit 3 at startup, and the message names the missing built-ins, the browser version and
+  `BREAKLINT_CHROME`. Measured on Chromium 141.0.7390.37: exit 3 after about 2.4 s, naming
+  `Map.prototype.getOrInsert`, `Map.prototype.getOrInsertComputed`,
+  `WeakMap.prototype.getOrInsertComputed` and `Math.sumPrecise`. Nothing is polyfilled and the
+  pinned build is unchanged. The floor is documented as capabilities in the README's Requirements
+  and in `docs/limitations.md`, and a unit test rescans the pinned build so that a pdfjs upgrade
+  cannot move the floor silently. Without `pdfjs-dist` installed the check does not run and the
+  run reports without evidence, as before.
 
 ### Documentation
 

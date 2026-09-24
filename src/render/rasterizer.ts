@@ -125,9 +125,96 @@ export function pdfjsVersionIntegrity(
 
 export type OpenRasterizerResult = { rasterizer: Rasterizer; detail: "" } | RasterizerUnavailable;
 
+/**
+ * The browser floor the pinned rasteriser sets: every ES2022-or-later built-in that
+ * `pdfjs-dist` 6.2.108 (`build/pdf.mjs` and `build/pdf.worker.mjs`) calls WITHOUT a feature test.
+ *
+ * Why a list is checked before anything else. pdfjs loads fine on a browser that lacks some of
+ * these; it fails only when it rasterises, and the rasteriser runs after the document has been
+ * paginated and measured. Measured on Chromium 141, which lacks the first four below: every live
+ * run measured its document and then ended with exit 3 on
+ * `this[#methodPromises].getOrInsertComputed is not a function` — an opaque failure, reported
+ * after the work, that named neither the browser nor the remedy. `--no-evidence-binding` does not
+ * avoid it, because the evidence rasterisation is part of acquisition. So the rasteriser page
+ * checks this list before pdfjs is even imported, and a browser below the floor ends the run with
+ * exit 3 before any document is opened, naming what is missing.
+ *
+ * What the list is, and is not. It is the scan of the pinned build, not a guess about browser
+ * versions: `tests/unit/rasterizer-capabilities.test.ts` scans both files for a watch-list of
+ * recent built-ins and fails if one is called unguarded without being on this list, or if an
+ * entry here no longer occurs in the build — so a pdfjs bump cannot silently move the floor.
+ * Guarded uses are not on it (`Float16Array` sits behind pdfjs's own `FeatureTest`). The browser's
+ * worker realm, where most of pdfjs runs, shares the page's JavaScript engine and built-ins. No
+ * polyfill is offered for anything missing: `Math.sumPrecise` has exact-summation semantics, and a
+ * substitute would be an unvalidated component inside the evidence apparatus.
+ */
+export const PDFJS_REQUIRED_BUILTINS: readonly string[] = [
+  "Map.prototype.getOrInsert",
+  "Map.prototype.getOrInsertComputed",
+  "WeakMap.prototype.getOrInsertComputed",
+  "Math.sumPrecise",
+  "Array.prototype.at",
+  "Array.prototype.findLast",
+  "ArrayBuffer.prototype.transferToFixedLength",
+  "Iterator",
+  "Object.hasOwn",
+  "Promise.try",
+  "Promise.withResolvers",
+  "Set.prototype.intersection",
+  "String.prototype.at",
+  "Uint8Array.fromBase64",
+  "Uint8Array.prototype.at",
+  "Uint8Array.prototype.toBase64",
+  "Uint8Array.prototype.toHex",
+  "structuredClone",
+];
+
+/**
+ * The capability probe, as the expression the rasteriser page evaluates. Every name is a dotted
+ * path from the global object and must resolve to a function. It runs as a classic script ahead
+ * of the pdfjs import, so a browser that cannot even load the library still answers.
+ */
+export function capabilityProbeSource(required: readonly string[] = PDFJS_REQUIRED_BUILTINS): string {
+  return `(() => {
+  const missing = [];
+  for (const path of ${JSON.stringify(required)}) {
+    let at = globalThis;
+    for (const part of path.split(".")) at = at === undefined || at === null ? undefined : at[part];
+    if (typeof at !== "function") missing.push(path);
+  }
+  return { missing };
+})()`;
+}
+
+/**
+ * The verdict on the probe's answer. Anything but a well-formed answer that lists nothing missing
+ * refuses: a rasteriser page that cannot say what it provides has not shown that it can rasterise.
+ */
+export function rasterizerCapabilityVerdict(answer: unknown, browserVersion: string): { ok: boolean; detail: string } {
+  const missing = (answer as { missing?: unknown } | null | undefined)?.missing;
+  if (!Array.isArray(missing) || !missing.every((name) => typeof name === "string")) {
+    return {
+      ok: false,
+      detail:
+        `the rasteriser page in the browser (${browserVersion}) did not report which built-ins it provides, ` +
+        `so it cannot be shown to run the pinned rasteriser pdfjs-dist ${SUPPORTED_PDFJS_VERSION}.`,
+    };
+  }
+  if (missing.length === 0) return { ok: true, detail: "" };
+  return {
+    ok: false,
+    detail:
+      `the browser (${browserVersion}) lacks ${missing.join(", ")}, which the pinned rasteriser ` +
+      `pdfjs-dist ${SUPPORTED_PDFJS_VERSION} calls without a feature test.\n` +
+      "  No document was opened: the evidence rasterisation would have failed only after measurement.\n" +
+      "  point breaklint at a newer Chrome or Chromium: BREAKLINT_CHROME=/path/to/chrome",
+  };
+}
+
 /** The page that the rasteriser is. Served over loopback, so ordinary module imports work. */
 function loaderHtml(token: string): string {
   return `<!doctype html><meta charset="utf-8"><title>breaklint rasteriser</title><body>
+<script>window.__blCapabilities = ${capabilityProbeSource()};</script>
 <script type="module">
 import * as pdfjs from "/${token}/pdf.mjs";
 pdfjs.GlobalWorkerOptions.workerSrc = "/${token}/pdf.worker.mjs";
@@ -324,12 +411,7 @@ export async function openRasterizer(
     if (failures.length > 0) throw new Error(`rasterizer ownership cleanup failed: ${failures.join("; ")}`);
   };
 
-  let version: string;
-  try {
-    await page.goto(`${origin}/${token}/`, { waitUntil: "load" });
-    await page.waitForFunction("window.__blReady===true", { timeout: 30_000 });
-    version = await page.evaluate<string>("window.__blVersion");
-  } catch (error) {
+  const didNotLoad = async (error: unknown): Promise<RasterizerUnavailable> => {
     await shutDown();
     return {
       rasterizer: null,
@@ -338,6 +420,35 @@ export async function openRasterizer(
         `  ${String(error).slice(0, 200)}\n` +
         (errors.length ? `  the page reported: ${errors.join(" | ")}` : "  the page reported nothing."),
     };
+  };
+
+  let capabilities: unknown;
+  try {
+    await page.goto(`${origin}/${token}/`, { waitUntil: "load" });
+    capabilities = await page.evaluate<unknown>("window.__blCapabilities");
+  } catch (error) {
+    return didNotLoad(error);
+  }
+  // The capability floor, before the library is awaited and before the caller opens any document.
+  // See PDFJS_REQUIRED_BUILTINS for why this cannot wait until the first rasterisation.
+  let browserVersion = "version unavailable";
+  try {
+    browserVersion = await browser.version();
+  } catch {
+    // The verdict still names what is missing; the version is context, not the reason.
+  }
+  const capability = rasterizerCapabilityVerdict(capabilities, browserVersion);
+  if (!capability.ok) {
+    await shutDown();
+    return { rasterizer: null, fatal: true, detail: capability.detail };
+  }
+
+  let version: string;
+  try {
+    await page.waitForFunction("window.__blReady===true", { timeout: 30_000 });
+    version = await page.evaluate<string>("window.__blVersion");
+  } catch (error) {
+    return didNotLoad(error);
   }
 
   const versionIntegrity = pdfjsVersionIntegrity(declaredVersion, version || null);

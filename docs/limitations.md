@@ -223,6 +223,33 @@ because the absent pixels can change layout.
 attributes the paginator writes into the tree and does not guarantee as an interface. Any other
 resolved version stops the run with exit 3, and no flag overrides it.
 
+**The browser has a floor, and it is stated as capabilities, not as a version.** The pinned
+rasteriser, `pdfjs-dist` 6.2.108, calls recent JavaScript built-ins without testing for them. A
+live run with `pdfjs-dist` installed therefore needs a browser whose engine provides all of
+`Map.prototype.getOrInsert`, `Map.prototype.getOrInsertComputed`,
+`WeakMap.prototype.getOrInsertComputed`, `Math.sumPrecise`, `Array.prototype.at`,
+`Array.prototype.findLast`, `ArrayBuffer.prototype.transferToFixedLength`, `Iterator`,
+`Object.hasOwn`, `Promise.try`, `Promise.withResolvers`, `Set.prototype.intersection`,
+`String.prototype.at`, `Uint8Array.fromBase64`, `Uint8Array.prototype.at`,
+`Uint8Array.prototype.toBase64`, `Uint8Array.prototype.toHex` and `structuredClone`. The rasteriser
+page checks that list before it loads the library, and a browser that lacks any of it ends the run
+with exit 3 before any document is opened; the message names what is missing, the browser version
+and `BREAKLINT_CHROME`. Measured on Chromium 141.0.7390.37, which lacks the first four: before the
+check, every live run paginated and measured its document and only then failed inside the
+rasteriser with an error that named an internal method — with `--no-evidence-binding` too, because
+the evidence rasterisation is part of acquisition. There is no polyfill and no transpiled pdfjs
+build to get below the floor: `Math.sumPrecise` has exact-summation semantics, and either would put
+an unvalidated component inside the evidence apparatus. The list is a scan of the pinned build, and
+a unit test repeats the scan, so a pdfjs upgrade that moves the floor fails the suite rather than
+moving it silently. No minimum version number is stated, because none has been measured; the live
+suite passes on the current Chrome of the CI runner. Without `pdfjs-dist` the check does not run
+and the run reports without evidence, as the README describes; `--demo` needs no browser at all.
+
+The measuring primitives themselves no longer need anything a browser may leave unexposed: they
+used to read the global `FontFaceSet`, which Chromium 141 does not define, and every live run there
+ended with exit 3 before measuring anything. They now take the font set's prototype from the
+document's own `document.fonts`, before any author script runs.
+
 **Windows is not supported.** Process termination rests on POSIX process groups; the termination
 and profile-cleanup path has real evidence on macOS only, and Windows job objects are neither
 designed for nor measured.
