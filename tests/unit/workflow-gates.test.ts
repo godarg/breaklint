@@ -139,11 +139,14 @@ describe("workflow gates", () => {
    * The oracle is the script itself, run here: if it ever reads documents again, or stops
    * exiting 0 over none, this test no longer forbids the step.
    */
-  it("no workflow runs the pagination-residue record while it exits 0 having read no document", () => {
+  it("the pagination-residue record is internally consistent, and no workflow runs it while it reads no document", () => {
     const run = spawnSync(process.execPath, ["tests/tools/pagination-residue-gate.mjs", "--cwd", "."], {
       cwd: ROOT, encoding: "utf8", env: { ...process.env, BREAKLINT_RESIDUE_CORPUS_ROOT: "" },
     });
-    const readsNothing = run.status === 0 && /\b(NO CLAIM|SKIPPED)\b/u.test(run.stdout);
+    // The public half — the record's internal consistency — runs whatever the binding, and it is
+    // the one part of this record anybody can still check. Retiring the CI step must not retire it.
+    assert.equal(run.status, 0, `the pagination-residue record's public half failed:\n${run.stdout}${run.stderr}`);
+    const readsNothing = /\b(NO CLAIM|SKIPPED)\b/u.test(run.stdout);
     if (!readsNothing) return;
     assert.match(run.stdout, /Nothing about the \d+ documents is verified|were NOT read/u, "the record no longer says what it did not read");
     for (const path of WORKFLOWS) {
