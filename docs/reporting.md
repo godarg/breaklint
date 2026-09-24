@@ -90,6 +90,38 @@ the `soft` background of the alert, the remediation box and the frequency note â
 against WCAG AA from the table per theme and, in the surface gate, from computed style in every
 cell. Each lint rule has a red control in the same test.
 
+## Typography
+
+The report ships no font file and adds no dependency. It declares a system-font strategy in three
+roles whose generic families differ, so a missing face can degrade a role but cannot merge two of
+them: **display** (h1, h2) is a serif, **body** a sans-serif, **mono** a monospace for identifiers,
+paths and measured values. A dense evidence report is almost entirely sans and mono text of similar
+size; a serif display face gives headings a second axis of contrast besides size and weight, and
+that axis survives the compressed print scale. Until this release display and body were both sans
+stacks that resolved to the same face on Linux (Liberation Sans), so the hierarchy collapsed
+silently on the platform that generates most reports.
+
+The stacks and the faces each role is declared to resolve to per platform live in
+`REPORT_FONT_ROLES` (`src/report/html-tokens.ts`):
+
+| Role | Generic | Linux | macOS | Windows |
+|---|---|---|---|---|
+| display | serif | Liberation Serif, DejaVu Serif | Iowan Old Style, Charter, Georgia | Georgia, Cambria |
+| body | sans-serif | Liberation Sans, DejaVu Sans | Helvetica Neue, Helvetica, Arial | Arial |
+| mono | monospace | DejaVu Sans Mono, Liberation Mono | SF Mono, Menlo | Consolas |
+
+Rendering is therefore deliberately not identical across operating systems; the hierarchy is. The
+surface gate compares what each role actually resolved to with this declaration, not merely display
+against body: in every screen cell and in print the renderer reads the platform font of every
+probed element per role from the browser's layout (CDP), and the verifier independently reads the
+faces embedded in each PDF (`pdffonts`) and requires every face to belong to exactly one declared
+role and each role to be present. A display role that falls back to the body face fails, and so does
+one that falls back to a *different* sans (`collapsed-display-font` and `accidental-display-font`
+controls). The resolved faces are recorded per cell and summarised as `resolvedFonts` in the render
+manifest. Measured on Linux with Chromium 141: display Liberation Serif, body Liberation Sans, mono
+DejaVu Sans Mono; the four PDFs embed exactly LiberationSerif-Bold, LiberationSans(-Bold) and
+DejaVuSansMono(-Bold). macOS and Windows have not been measured by this gate yet.
+
 ## Trust and privacy boundary
 
 The document contains inline CSS only. It has no scripts, external fonts, external stylesheets,

@@ -2,18 +2,17 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const RENDERER = resolve(ROOT, "tests/tools/render-report-surfaces.mjs");
-const rendererSource = readFileSync(RENDERER, "utf8");
 
 /**
- * Every physical print control the renderer knows. `expect` is the message a genuine red run must
- * carry: a control that fails for a different reason is not the control it claims to be.
+ * Every negative control the renderer knows. `expect` is the message a genuine red run must carry:
+ * a control that fails for a different reason is not the control it claims to be.
  */
 const controls = [
   {
@@ -49,6 +48,8 @@ const controls = [
     phase: /"fg-muted\/soft":(?:[0-3]\.\d+|4\.[0-4]\d*)[,}]/u,
     phaseHint: "the control no longer drives muted text on the soft background below 4.5:1",
   },
+  { name: "collapsed-display-font", state: "clean", expect: /display role resolved to [^\n]*not a declared serif face/u },
+  { name: "accidental-display-font", state: "clean", expect: /display role resolved to DejaVu Sans, not a declared serif face/u },
 ];
 
 /**
@@ -56,22 +57,18 @@ const controls = [
  * broken-terminal-density — sat in the renderer's allowlist and in no control list, so none of them
  * had ever run. In a review they read as negative controls; measured, broken-terminal-density could
  * not go red at all and was removed. A control nobody runs is indistinguishable from a control that
- * does not work, so the allowlist and this list are now held against each other.
+ * does not work, so the renderer's control table and this list are held against each other.
  */
-const allowlist = /^if \(!\[(.+?)\]\.includes\(PRINT_MUTATION_CONTROL\)\)/mu.exec(rendererSource);
-assert.ok(allowlist, "cannot read the renderer's mutation allowlist");
-const declared = [...allowlist[1].matchAll(/"([^"]+)"/gu)].map((match) => match[1]).filter((name) => name !== "none");
+const listed = spawnSync(process.execPath, ["--experimental-strip-types", RENDERER, "--list-controls"], { cwd: ROOT, encoding: "utf8" });
+assert.equal(listed.status, 0, `cannot read the renderer's control table\n${listed.stdout}${listed.stderr}`);
+const declared = JSON.parse(listed.stdout);
 assert.deepEqual(
   [...declared].sort(),
   controls.map((control) => control.name).sort(),
-  "the renderer declares a print mutation that no control runs, or this list names one the renderer does not know",
+  "the renderer declares a mutation that no control runs, or this list names one the renderer does not know",
 );
 
 for (const control of controls) {
-  assert.ok(
-    rendererSource.includes(`PRINT_MUTATION_CONTROL === "${control.name}"`),
-    `${control.name}: renderer mutation branch is absent`,
-  );
   const output = mkdtempSync(join(tmpdir(), `breaklint-${control.name}-`));
   try {
     const result = spawnSync(
@@ -83,7 +80,7 @@ for (const control of controls) {
         env: {
           ...process.env,
           BREAKLINT_SURFACE_DIR: output,
-          BREAKLINT_SURFACE_PRINT_CONTROL: control.name,
+          BREAKLINT_SURFACE_CONTROL: control.name,
           BREAKLINT_SURFACE_STATE: control.state,
         },
       },

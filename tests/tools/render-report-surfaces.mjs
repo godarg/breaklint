@@ -12,7 +12,7 @@ import { PNG } from "pngjs";
 
 import { resolveBrowser } from "../../src/acquire/browser.ts";
 import { render } from "../../src/report/index.ts";
-import { REPORT_TEXT_CONTRAST_PAIRS, TOKEN_PREFIX } from "../../src/report/html-tokens.ts";
+import { REPORT_FONT_ROLES, REPORT_TEXT_CONTRAST_PAIRS, TOKEN_PREFIX } from "../../src/report/html-tokens.ts";
 import { canonicalReportStates } from "../fixtures/report-states.ts";
 import {
   REQUIRED_BROWSER_RENDER_ARGS,
@@ -33,17 +33,78 @@ const VIEWPORTS = {
 const THEMES = ["light", "dark"];
 const PRINT_CONTENT_VIEWPORT = { width: 703, height: 1123 };
 const PRINT_RASTER_DPI = 110;
-const PRINT_MUTATION_CONTROL = process.env.BREAKLINT_SURFACE_PRINT_CONTROL ?? "none";
-const PRINT_STATE_FILTER = process.env.BREAKLINT_SURFACE_STATE ?? null;
 const REPORT_STATES = ["clean", "findings", "infrastructure", "insufficient-coverage"];
 const BROWSER_RENDER_ARGS = [...REQUIRED_BROWSER_RENDER_ARGS];
-if (!["none", "broken-coverage", "broken-trust-geometry", "broken-tail-cohesion", "broken-box-closure", "broken-partial-box-closure", "broken-left-box-closure", "broken-partial-both-box-closure", "broken-soft-contrast"].includes(PRINT_MUTATION_CONTROL)) {
-  throw new Error(`unknown BREAKLINT_SURFACE_PRINT_CONTROL=${PRINT_MUTATION_CONTROL}`);
+
+/**
+ * Every negative control the renderer knows, as the stylesheet it injects into screen cells, print,
+ * or both. tests/tools/report-surface-mutations.mjs reads this list through `--list-controls` and
+ * holds it against its own expectations, so a control nobody runs cannot exist here unnoticed.
+ */
+const SURFACE_CONTROLS = {
+  "broken-coverage": { print: `@media print {
+    .summary-grid > div:first-child dd { overflow-wrap: anywhere !important; font-size: var(--bl-font-size-xl) !important; white-space: normal !important; }
+    .coverage-list { display: grid !important; }
+    .coverage-record { display: grid !important; grid-template-columns: minmax(11rem, 2fr) repeat(5, minmax(0, 1fr)) !important; break-inside: auto !important; page-break-inside: auto !important; }
+    .coverage-record > div:first-child { grid-column: auto !important; }
+  }` },
+  "broken-trust-geometry": { print: `@media print {
+    .report-header.state-insufficient-coverage + section .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+  }` },
+  // The terminal-density check only fires when the last page begins with a coverage record, and
+  // which remainder the pack leaves there depends on content far above the section. A control that
+  // relies on today's content would go green the day a finding gains a line, so this one forces the
+  // phase itself: it releases the tail bracket and breaks the page before records 1, 5, 9 and 13,
+  // leaving exactly one record on the terminal page.
+  "broken-tail-cohesion": { print: `@media print {
+    .coverage-tail { break-inside: auto !important; page-break-inside: auto !important; }
+    section[aria-labelledby="coverage-heading"] { break-before: page !important; }
+    .coverage-list > .coverage-record:nth-child(4n+1) { break-before: page !important; }
+    .coverage-tail > .coverage-record:last-child { break-before: page !important; }
+  }` },
+  "broken-box-closure": { print: `@media print {
+    .coverage-record::after { content: none !important; }
+  }` },
+  "broken-partial-box-closure": { print: `@media print {
+    .coverage-record::after { inset-block-end: auto !important; block-size: 80% !important; }
+  }` },
+  "broken-left-box-closure": { print: `@media print {
+    .coverage-record { border-inline-start-color: transparent !important; }
+  }` },
+  "broken-partial-both-box-closure": { print: `@media print {
+    .coverage-record::after { inset-block-end: auto !important; block-size: 80% !important; }
+    .coverage-record::before { content: ""; position: absolute; z-index: 1; inset-inline-start: -4px;
+      inset-block-end: 0; inline-size: 10px; block-size: 20%; background: var(--bl-color-paper); }
+  }` },
+  // Text on the soft background (alert, remediation box, frequency note) was not measured before
+  // the token table named the pair. Darken only soft in print: every other pair stays AA.
+  "broken-soft-contrast": { print: `@media print { :root { --bl-color-soft: #8C8C86 !important; } }` },
+  // Display falls back to the body face: the collapse the 2026-09-18 review found on Linux.
+  "collapsed-display-font": {
+    screen: `h1, h2 { font-family: var(--bl-font-body) !important; }`,
+    print: `h1, h2 { font-family: var(--bl-font-body) !important; }`,
+  },
+  // Display falls back to a sans that is NOT the body face. "display differs from body" would pass
+  // this; the declared expectation must not.
+  "accidental-display-font": {
+    screen: `h1, h2 { font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif !important; }`,
+    print: `h1, h2 { font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif !important; }`,
+  },
+};
+if (process.argv.includes("--list-controls")) {
+  process.stdout.write(`${JSON.stringify(Object.keys(SURFACE_CONTROLS))}\n`);
+  process.exit(0);
 }
-if (PRINT_STATE_FILTER !== null && !REPORT_STATES.includes(PRINT_STATE_FILTER)) {
-  throw new Error(`unknown BREAKLINT_SURFACE_STATE=${PRINT_STATE_FILTER}`);
+const SURFACE_CONTROL = process.env.BREAKLINT_SURFACE_CONTROL ?? "none";
+const STATE_FILTER = process.env.BREAKLINT_SURFACE_STATE ?? null;
+if (SURFACE_CONTROL !== "none" && !Object.hasOwn(SURFACE_CONTROLS, SURFACE_CONTROL)) {
+  throw new Error(`unknown BREAKLINT_SURFACE_CONTROL=${SURFACE_CONTROL}`);
 }
-if (PRINT_STATE_FILTER !== null && PRINT_MUTATION_CONTROL === "none") {
+const ACTIVE_CONTROL = SURFACE_CONTROL === "none" ? {} : SURFACE_CONTROLS[SURFACE_CONTROL];
+if (STATE_FILTER !== null && !REPORT_STATES.includes(STATE_FILTER)) {
+  throw new Error(`unknown BREAKLINT_SURFACE_STATE=${STATE_FILTER}`);
+}
+if (STATE_FILTER !== null && SURFACE_CONTROL === "none") {
   throw new Error("BREAKLINT_SURFACE_STATE is reserved for negative mutation controls");
 }
 
@@ -126,6 +187,80 @@ async function measuredContrast(page) {
   const minimum = Math.min(...Object.values(pairs));
   if (minimum < 4.5) throw new Error(`WCAG AA contrast failed: ${JSON.stringify(pairs)}`);
   return { minimum, pairs };
+}
+
+/**
+ * Which elements carry each font role. Every matching element is probed (bounded per selector), so
+ * a role that falls back on one heading but not another is still seen.
+ */
+const FONT_ROLE_PROBES = {
+  display: ["h1", "h2"],
+  body: [".status-sentence", ".section-lead", ".run-facts dd:not(.mono)", "h3:not(.mono)", ".finding-message", ".state-alert p"],
+  mono: ["code", ".summary-grid dd", ".mono"],
+};
+const FONT_PROBE_LIMIT = 12;
+
+/**
+ * The resolved platform font of every role, read from the browser's own layout (CDP
+ * CSS.getPlatformFontsForNode), compared with the DECLARED expectation for this platform in
+ * REPORT_FONT_ROLES. Not "display differs from body": a display role that falls back to a sans
+ * other than the body's is just as collapsed, and that comparison would pass it.
+ *
+ * CDP reports the fonts of an element's inline descendants too, so only elements whose descendants
+ * all share their computed font-family are probed: a body paragraph containing inline code would
+ * otherwise report the mono face as body. The probe marks those elements with a data attribute no
+ * stylesheet reads, and removes it again.
+ */
+async function resolvedRoleFonts(page, cdp, label) {
+  const eligible = await page.evaluate((probes, limit) => {
+    const counts = {};
+    for (const [role, selectors] of Object.entries(probes)) {
+      counts[role] = 0;
+      for (const selector of selectors) {
+        let taken = 0;
+        for (const element of document.querySelectorAll(selector)) {
+          if (taken >= limit) break;
+          const family = getComputedStyle(element).fontFamily;
+          const uniform = [...element.querySelectorAll("*")].every((child) => getComputedStyle(child).fontFamily === family);
+          const visible = element.getClientRects().length > 0 && element.textContent.trim().length > 0;
+          if (!uniform || !visible || element.hasAttribute("data-bl-font-probe")) continue;
+          element.setAttribute("data-bl-font-probe", role);
+          taken += 1;
+          counts[role] += 1;
+        }
+      }
+    }
+    return counts;
+  }, FONT_ROLE_PROBES, FONT_PROBE_LIMIT);
+  try {
+    const { root } = await cdp.send("DOM.getDocument", { depth: -1 });
+    const roles = {};
+    for (const role of Object.keys(FONT_ROLE_PROBES)) {
+      const families = new Set();
+      const { nodeIds } = await cdp.send("DOM.querySelectorAll", { nodeId: root.nodeId, selector: `[data-bl-font-probe="${role}"]` });
+      for (const nodeId of nodeIds) {
+        const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId });
+        for (const font of fonts) families.add(font.familyName);
+      }
+      roles[role] = { probedNodes: nodeIds.length, families: [...families].sort() };
+    }
+    const declaredPlatform = platform();
+    for (const [role, measured] of Object.entries(roles)) {
+      const declared = REPORT_FONT_ROLES[role];
+      const expected = declared.resolvesOn[declaredPlatform];
+      if (!expected) throw new Error(`${label}: no declared font expectation for platform ${declaredPlatform}`);
+      if (measured.probedNodes === 0 || measured.probedNodes !== eligible[role]) {
+        throw new Error(`${label}: ${role} role has no measurable rendered text (${measured.probedNodes}/${eligible[role]})`);
+      }
+      const foreign = measured.families.filter((family) => !expected.includes(family));
+      if (foreign.length > 0) {
+        throw new Error(`${label}: ${role} role resolved to ${foreign.join(", ")}, not a declared ${declared.generic} face on ${declaredPlatform} (${expected.join(", ")})`);
+      }
+    }
+    return roles;
+  } finally {
+    await page.evaluate(() => { for (const element of document.querySelectorAll("[data-bl-font-probe]")) element.removeAttribute("data-bl-font-probe"); });
+  }
 }
 
 function run(command, args) {
@@ -399,8 +534,13 @@ const artifacts = [];
 const technicalProbes = [];
 try {
   for (const [state, report] of Object.entries(canonicalReportStates())) {
-    if (PRINT_STATE_FILTER !== null && state !== PRINT_STATE_FILTER) continue;
+    if (STATE_FILTER !== null && state !== STATE_FILTER) continue;
     const page = await browser.newPage();
+    // One CDP session for the page's lifetime: detaching a session resets the page's emulated
+    // media (measured: print -> screen), which would silently turn the print checks into screen checks.
+    const cdp = await page.createCDPSession();
+    await cdp.send("DOM.enable");
+    await cdp.send("CSS.enable");
     try {
       const html = render(report, "html");
       for (const theme of THEMES) {
@@ -408,6 +548,7 @@ try {
         for (const [viewport, dimensions] of Object.entries(VIEWPORTS)) {
           await page.setViewport({ ...dimensions, deviceScaleFactor: 1 });
           await page.setContent(html, { waitUntil: "load", timeout: 60_000 });
+          if (ACTIVE_CONTROL.screen) await page.addStyleTag({ content: ACTIVE_CONTROL.screen });
           await page.evaluate(() => document.fonts.ready);
           const semantics = await page.evaluate(() => {
             const findings = [...document.querySelectorAll("article.finding")];
@@ -436,6 +577,8 @@ try {
           const name = `${state}--${theme}--${viewport}.png`;
           const path = join(OUTPUT, name);
           await page.screenshot({ path, fullPage: true, type: "png" });
+          // After the screenshot: the probe touches the DOM (a data attribute), never the pixels.
+          semantics.fonts = await resolvedRoleFonts(page, cdp, `${state}/${theme}/${viewport}`);
           const artifactSha256 = sha256(path);
           const pixels = normalizedScreenPixels(path);
           const screenshotDimensions = { width: pixels.width, height: pixels.height };
@@ -464,60 +607,9 @@ try {
       await page.setContent(html, { waitUntil: "load", timeout: 60_000 });
       await page.evaluate(() => document.fonts.ready);
       await page.emulateMediaType("print");
-      if (PRINT_MUTATION_CONTROL === "broken-coverage") {
-        await page.addStyleTag({ content: `@media print {
-          .summary-grid > div:first-child dd { overflow-wrap: anywhere !important; font-size: var(--bl-font-size-xl) !important; white-space: normal !important; }
-          .coverage-list { display: grid !important; }
-          .coverage-record { display: grid !important; grid-template-columns: minmax(11rem, 2fr) repeat(5, minmax(0, 1fr)) !important; break-inside: auto !important; page-break-inside: auto !important; }
-          .coverage-record > div:first-child { grid-column: auto !important; }
-        }` });
-      }
-      if (PRINT_MUTATION_CONTROL === "broken-trust-geometry") {
-        await page.addStyleTag({ content: `@media print {
-          .report-header.state-insufficient-coverage + section .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
-        }` });
-      }
-      if (PRINT_MUTATION_CONTROL === "broken-tail-cohesion") {
-        // The terminal-density check only fires when the last page begins with a coverage record,
-        // and which remainder the pack leaves there depends on content far above the section. A
-        // control that relies on today's content would go green the day a finding gains a line, so
-        // this one forces the phase itself: it releases the tail bracket and breaks the page before
-        // records 1, 5, 9 and 13, leaving exactly one record on the terminal page.
-        await page.addStyleTag({ content: `@media print {
-          .coverage-tail { break-inside: auto !important; page-break-inside: auto !important; }
-          section[aria-labelledby="coverage-heading"] { break-before: page !important; }
-          .coverage-list > .coverage-record:nth-child(4n+1) { break-before: page !important; }
-          .coverage-tail > .coverage-record:last-child { break-before: page !important; }
-        }` });
-      }
-      if (PRINT_MUTATION_CONTROL === "broken-box-closure") {
-        await page.addStyleTag({ content: `@media print {
-          .coverage-record::after { content: none !important; }
-        }` });
-      }
-      if (PRINT_MUTATION_CONTROL === "broken-partial-box-closure") {
-        await page.addStyleTag({ content: `@media print {
-          .coverage-record::after { inset-block-end: auto !important; block-size: 80% !important; }
-        }` });
-      }
-      if (PRINT_MUTATION_CONTROL === "broken-left-box-closure") {
-        await page.addStyleTag({ content: `@media print {
-          .coverage-record { border-inline-start-color: transparent !important; }
-        }` });
-      }
-      if (PRINT_MUTATION_CONTROL === "broken-partial-both-box-closure") {
-        await page.addStyleTag({ content: `@media print {
-          .coverage-record::after { inset-block-end: auto !important; block-size: 80% !important; }
-          .coverage-record::before { content: ""; position: absolute; z-index: 1; inset-inline-start: -4px;
-            inset-block-end: 0; inline-size: 10px; block-size: 20%; background: var(--bl-color-paper); }
-        }` });
-      }
-      if (PRINT_MUTATION_CONTROL === "broken-soft-contrast") {
-        // Text on the soft background (alert, remediation box, frequency note) was not measured
-        // before the token table named the pair. Darken only `soft`: every other pair stays AA.
-        await page.addStyleTag({ content: `@media print { :root { --bl-color-soft: #8C8C86 !important; } }` });
-      }
+      if (ACTIVE_CONTROL.print) await page.addStyleTag({ content: ACTIVE_CONTROL.print });
       const printContrast = await measuredContrast(page);
+      const printFonts = await resolvedRoleFonts(page, cdp, `print/${state}`);
       const printSemantics = await page.evaluate(() => {
         const trustValue = document.querySelector(".summary-grid > div:first-child dd");
         const trustText = trustValue
@@ -605,7 +697,7 @@ try {
       const pageStartChecks = coveragePageStartChecks(pdfPath, rasterPages);
       const pageContentChecks = terminalPageContentChecks(pdfPath, rasterPages);
       const boxClosureChecks = coverageBoxClosureChecks(pdfPath, rasterPages, printSemantics.coverageRecordCount);
-      if (PRINT_MUTATION_CONTROL === "none" && state === "insufficient-coverage") {
+      if (SURFACE_CONTROL === "none" && state === "insufficient-coverage") {
         const technicalDirectory = join(OUTPUT, ".technical");
         mkdirSync(technicalDirectory, { recursive: true });
         const technicalPdfName = `${state}--no-background.pdf`;
@@ -661,6 +753,7 @@ try {
         pages,
         pageSize,
         contrast: printContrast,
+        fonts: printFonts,
         printSemantics,
         pageStartChecks,
         pageContentChecks,
@@ -685,6 +778,7 @@ try {
         pages,
         pageSize,
         contrast: printContrast,
+        fonts: printFonts,
         printSemantics,
         pageStartChecks,
         pageContentChecks,
@@ -731,6 +825,12 @@ const manifest = {
       .filter((artifact) => artifact.kind === "raster-set")
       .reduce((sum, artifact) => sum + artifact.pages.length, 0),
   },
+  // What each font role actually resolved to across every cell of this render, for the reviewer
+  // and the ledger: the design a reviewer judges is the one these faces draw, not the CSS stack.
+  resolvedFonts: Object.fromEntries(Object.keys(FONT_ROLE_PROBES).map((role) => [
+    role,
+    [...new Set(artifacts.flatMap((artifact) => (artifact.semantics?.fonts ?? artifact.fonts)?.[role]?.families ?? []))].sort(),
+  ])),
   technicalProbes,
   artifacts,
 };

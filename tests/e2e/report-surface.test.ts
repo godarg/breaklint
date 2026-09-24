@@ -8,6 +8,8 @@ import {
   BUNDLE_COLOR_TOKENS,
   BUNDLE_TEXT_CONTRAST_PAIRS,
   REPORT_COLOR_TOKENS,
+  REPORT_FONT_ROLES,
+  REPORT_LAYOUT_TOKENS,
   REPORT_TEXT_CONTRAST_PAIRS,
 } from "../../src/report/html-tokens.ts";
 import { renderReport } from "../../src/api/bundle.ts";
@@ -486,6 +488,28 @@ describe("report stylesheet tokens", () => {
     };
     walk(new URL("../../src/", import.meta.url));
     assert.deepEqual(offenders, []);
+  });
+
+  it("declares three font roles in different generic families with disjoint per-platform expectations", () => {
+    const roles = Object.entries(REPORT_FONT_ROLES);
+    assert.deepEqual(roles.map(([, role]) => role.generic).sort(), ["monospace", "sans-serif", "serif"],
+      "display, body and mono must be three different generic families, so a fallback cannot merge two roles");
+    for (const platform of ["linux", "darwin", "win32"] as const) {
+      const seen = new Map<string, string>();
+      for (const [name, role] of roles) {
+        assert.ok(role.resolvesOn[platform].length > 0, `${name}: no declared face on ${platform}`);
+        for (const family of role.resolvesOn[platform]) {
+          assert.equal(seen.get(family), undefined, `${platform}: ${family} is declared for both ${seen.get(family)} and ${name}`);
+          seen.set(family, name);
+        }
+      }
+    }
+    for (const [name, role] of roles) {
+      const token = REPORT_LAYOUT_TOKENS[`font-${name}` as keyof typeof REPORT_LAYOUT_TOKENS];
+      assert.ok(token.endsWith(`, ${role.generic}`), `font-${name} must end in its generic family: ${token}`);
+    }
+    assert.match(REPORT_HTML_STYLES, /h1, h2 \{ font-family: var\(--bl-font-display\); \}/u, "headings use the display role");
+    assert.match(REPORT_HTML_STYLES, /font: 400 var\(--bl-font-size-base\)\/var\(--bl-line-body\) var\(--bl-font-body\);/u, "running text uses the body role");
   });
 
   it("meets WCAG AA for every text pair in every theme, including text on the soft background", () => {

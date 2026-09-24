@@ -55,6 +55,59 @@ export const REPORT_TEXT_CONTRAST_PAIRS = [
   ["accent-info", "paper"],
 ] as const satisfies readonly (readonly [ReportColorToken, ReportColorToken])[];
 
+/**
+ * The report's font strategy: system fonts only (no bundled face, no runtime dependency), in three
+ * roles whose GENERIC FAMILIES differ, so the hierarchy cannot collapse silently when the named
+ * faces are missing.
+ *
+ * - display — a serif, for h1/h2 and section titles. In a dense evidence report nearly everything
+ *   is sans or mono text of similar size; a serif gives headings a second axis of contrast besides
+ *   size and weight, which survives the compressed print scale where h2 and a large paragraph are
+ *   only a few points apart.
+ * - body — a sans-serif with a large x-height and open forms for 14–18 px running text on screen
+ *   and in print.
+ * - mono — identifiers, paths, measured values and rule ids.
+ *
+ * `resolvesOn` is the DECLARED expectation per platform: the faces the role may resolve to there.
+ * The surface gate reads the resolved platform font of every role in every cell (CDP) and every
+ * embedded PDF font (pdffonts) and fails when a role resolves outside its declaration — so two
+ * roles falling back to the same face fails, and so does a display role falling back to a
+ * DIFFERENT sans than the body, which a mere "display ≠ body" check would pass.
+ */
+export const REPORT_FONT_ROLES = {
+  display: {
+    generic: "serif",
+    stack: ['"Iowan Old Style"', "Charter", "Georgia", "Cambria", '"Liberation Serif"', '"Times New Roman"', '"DejaVu Serif"'],
+    resolvesOn: {
+      linux: ["Liberation Serif", "DejaVu Serif"],
+      darwin: ["Iowan Old Style", "Charter", "Georgia"],
+      win32: ["Georgia", "Cambria"],
+    },
+  },
+  body: {
+    generic: "sans-serif",
+    stack: ['"Helvetica Neue"', "Helvetica", "Arial", '"Liberation Sans"', '"DejaVu Sans"'],
+    resolvesOn: {
+      linux: ["Liberation Sans", "DejaVu Sans"],
+      darwin: ["Helvetica Neue", "Helvetica", "Arial"],
+      win32: ["Arial"],
+    },
+  },
+  mono: {
+    generic: "monospace",
+    stack: ["SFMono-Regular", "Menlo", "Consolas", '"DejaVu Sans Mono"', '"Liberation Mono"'],
+    resolvesOn: {
+      linux: ["DejaVu Sans Mono", "Liberation Mono"],
+      darwin: ["SF Mono", "Menlo"],
+      win32: ["Consolas"],
+    },
+  },
+} as const;
+
+export type FontRole = keyof typeof REPORT_FONT_ROLES;
+
+const fontStack = (role: FontRole): string => [...REPORT_FONT_ROLES[role].stack, REPORT_FONT_ROLES[role].generic].join(", ");
+
 /** Theme-independent report tokens: spacing, borders, measure, type scale and font stacks. */
 export const REPORT_LAYOUT_TOKENS = {
   "space-1": ".25rem",
@@ -76,12 +129,13 @@ export const REPORT_LAYOUT_TOKENS = {
   "font-size-base": "1rem",
   "font-size-lg": "1.125rem",
   "font-size-xl": "1.375rem",
+  "font-size-heading": "1.5rem",
   "font-size-2xl": "clamp(2rem, 7vw, 4.5rem)",
   "line-tight": "1.08",
   "line-body": "1.55",
-  "font-body": '"Helvetica Neue", Arial, system-ui, sans-serif',
-  "font-display": '"Arial Narrow", "Helvetica Neue", Arial, system-ui, sans-serif',
-  "font-mono": '"IBM Plex Mono", "SFMono-Regular", Consolas, monospace',
+  "font-body": fontStack("body"),
+  "font-display": fontStack("display"),
+  "font-mono": fontStack("mono"),
 } as const satisfies Record<string, string>;
 
 export type ReportLayoutToken = keyof typeof REPORT_LAYOUT_TOKENS;

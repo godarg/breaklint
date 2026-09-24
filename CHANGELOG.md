@@ -50,6 +50,15 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   (`#c1ccc4` on white). Print now redefines the complete colour set; light-theme print and both
   screen themes are pixel-identical to before.
 
+- **Report headings are set in a serif, and the gate proves the three font roles stay apart.**
+  Display and body were both sans stacks that resolved to the same face on Linux, so the
+  typographic hierarchy of the most-generated platform collapsed silently. h1 and h2 now use a
+  system serif stack (Linux: Liberation Serif), running text a sans stack, identifiers a mono stack;
+  no font file ships. `IBM Plex Mono` and `system-ui`, which resolve to no declared face on a stock
+  system, left the stacks. The surface gate compares every role's resolved platform font (CDP) and
+  every PDF-embedded face (`pdffonts`) with the declared per-platform expectation; the render
+  manifest records the resolved faces.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as

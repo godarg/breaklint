@@ -27,9 +27,10 @@ export const REPORT_HTML_STYLES = String.raw`
   }
   main { width: min(100%, var(--bl-report-width)); margin-inline: auto; padding: var(--bl-space-5); }
   h1, h2, h3, p, dl, ol { margin-block-start: 0; }
-  h1, h2, h3 { font-family: var(--bl-font-display); }
-  h1 { max-width: 12ch; margin-block-end: var(--bl-space-4); font-size: var(--bl-font-size-2xl); line-height: var(--bl-line-tight); letter-spacing: -.035em; }
-  h2 { margin-block-end: var(--bl-space-5); font-size: var(--bl-font-size-xl); line-height: 1.2; }
+  /* Display role: h1 and h2 only. h3 carries identifiers (rule ids, paths) and reads as body. */
+  h1, h2 { font-family: var(--bl-font-display); }
+  h1 { max-width: 12ch; margin-block-end: var(--bl-space-4); font-size: var(--bl-font-size-2xl); line-height: var(--bl-line-tight); letter-spacing: -.02em; }
+  h2 { margin-block-end: var(--bl-space-5); font-size: var(--bl-font-size-heading); line-height: 1.2; }
   h3 { margin-block-end: var(--bl-space-3); font-size: var(--bl-font-size-lg); line-height: 1.3; }
   code, .mono { font-family: var(--bl-font-mono); }
   code { font-size: .9em; }

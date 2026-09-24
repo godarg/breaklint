@@ -294,6 +294,71 @@ function independentlyCheckPositiveApparatusGrouping(pdf) {
   return { headingPage: headingPages[0], evidencePage: evidencePages[0], samePage: true };
 }
 
+/**
+ * The declared font expectation, read from the source table by a separate process rather than from
+ * the manifest: the renderer's own record is what is being checked.
+ */
+function readDeclaredFontRoles() {
+  const result = spawnSync(process.execPath, [
+    "--experimental-strip-types", "--no-warnings", "--input-type=module", "-e",
+    "import { REPORT_FONT_ROLES } from './src/report/html-tokens.ts'; process.stdout.write(JSON.stringify(REPORT_FONT_ROLES));",
+  ], { cwd: reviewInputRoot, encoding: "utf8" });
+  assert.equal(result.status, 0, `cannot read the declared font roles: ${result.stderr}`);
+  return JSON.parse(result.stdout);
+}
+const DECLARED_FONT_ROLES = readDeclaredFontRoles();
+
+function declaredFamilies(role) {
+  const families = DECLARED_FONT_ROLES[role]?.resolvesOn?.[manifest.reviewEnvironment.platform];
+  assert.ok(Array.isArray(families) && families.length > 0, `no declared ${role} font expectation for platform ${manifest.reviewEnvironment.platform}`);
+  return families;
+}
+
+/** A renderer font record: every role measured, and every resolved face inside its declaration. */
+function assertRecordedFonts(fonts, label) {
+  for (const role of ["display", "body", "mono"]) {
+    assert.ok(fonts?.[role]?.probedNodes > 0, `${label}: ${role} font role was not measured`);
+    const foreign = fonts[role].families.filter((family) => !declaredFamilies(role).includes(family));
+    assert.deepEqual(foreign, [], `${label}: ${role} role resolved outside its declared ${DECLARED_FONT_ROLES[role].generic} faces`);
+  }
+}
+
+/**
+ * Independent of the DOM: which faces the PDF actually embeds. Every embedded face must belong to
+ * exactly one declared role, and display, body and mono must each be present — a PDF whose headings
+ * fell back to the body face embeds no display face and fails here.
+ */
+function classifyPdfFonts(listingText, label) {
+  const listing = listingText.split("\n").slice(2).filter((line) => line.trim());
+  const bases = [...new Set(listing.map((line) => line.trim().split(/\s+/u)[0].replace(/^[A-Z]{6}\+/u, "")))].sort();
+  const roles = { display: [], body: [], mono: [] };
+  for (const base of bases) {
+    const family = base.split("-")[0];
+    const owners = Object.keys(roles).filter((role) => declaredFamilies(role).some((declared) => declared.replace(/\s/gu, "") === family));
+    assert.equal(owners.length, 1, `${label}: embedded font ${base} belongs to ${owners.length} declared roles`);
+    roles[owners[0]].push(base);
+  }
+  for (const [role, faces] of Object.entries(roles)) {
+    assert.ok(faces.length > 0, `${label}: the PDF embeds no declared ${role} (${DECLARED_FONT_ROLES[role].generic}) face; embedded: ${bases.join(", ")}`);
+  }
+  return roles;
+}
+
+let fontMutationControl = null;
+function independentlyCheckPdfFonts(pdf) {
+  const listing = run("pdffonts", [resolve(output, pdf.path)]);
+  const roles = classifyPdfFonts(listing, pdf.cell);
+  // Negative control, once: the same listing without its display faces must be rejected. A check
+  // that cannot tell a collapsed PDF from a correct one is not a check.
+  if (!fontMutationControl) {
+    const collapsed = listing.split("\n").filter((line) => !roles.display.some((face) => line.includes(face))).join("\n");
+    assert.throws(() => classifyPdfFonts(collapsed, `${pdf.cell} (font control)`), /embeds no declared display/u,
+      `${pdf.cell}: removing every display face from the PDF font list did not fail the font check`);
+    fontMutationControl = { cell: pdf.cell, removed: roles.display };
+  }
+  return roles;
+}
+
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === "object") {
@@ -349,6 +414,8 @@ function printVisibleContract(state) {
     raster.pages.map((page) => page.sha256),
     `print/${state}: PDF is not bound to the current independent page rasters`,
   );
+  assertRecordedFonts(pdf.fonts, `print/${state}`);
+  independentlyCheckPdfFonts(pdf);
   assert.equal(pdf.printSemantics.trustLabelLines, 1, `print/${state}: Coverage Trust label split across lines`);
   assert.equal(pdf.printSemantics.trustValueOverflowPx, 0, `print/${state}: Coverage Trust verdict is not fully visible inside its card`);
   assert.equal(pdf.printSemantics.trustSiblingOverlapPx, 0, `print/${state}: Coverage Trust verdict overlaps its sibling summary card`);
@@ -365,6 +432,7 @@ function printVisibleContract(state) {
     pages: pdf.pages,
     pageSize: pdf.pageSize,
     contrast: pdf.contrast,
+    fonts: pdf.fonts,
     printSemantics: pdf.printSemantics,
     pageStartChecks: pdf.pageStartChecks,
     pageContentChecks: pdf.pageContentChecks,
@@ -506,6 +574,7 @@ for (const artifact of manifest.artifacts) {
     assert.deepEqual(artifact.semantics.overflowingFindings, []);
     assert.deepEqual(artifact.semantics.externalResources, []);
     assert.ok(artifact.semantics.contrast.minimum >= 4.5, `${artifact.cell}: WCAG AA contrast failed`);
+    assertRecordedFonts(artifact.semantics.fonts, artifact.cell);
     assert.ok(artifact.dimensions.width >= 390 && artifact.dimensions.height >= 844);
     pixelMutationControl ??= runScreenPixelMutationControl(artifact, currentReviewInput);
   } else {
@@ -515,6 +584,7 @@ for (const artifact of manifest.artifacts) {
   }
 }
 assert.ok(pixelMutationControl, "screen pixel mutation control did not run");
+assert.ok(fontMutationControl, "PDF font mutation control did not run");
 
 // The printed inventory grew from 32 page rasters to 43 in this release, and the growth is the
 // release: every finding now carries a remediation box and, where the advice is untested, the
@@ -534,7 +604,7 @@ if (mode === "technical") {
   process.stdout.write(
     `report surfaces: technical gate passed 32/32 current cells and ${Object.values(manifest.physicalArtifacts).reduce((sum, count) => sum + count, 0)} physical artifacts; ` +
       `no human-review claim is made; ${latestRound} ` +
-      `(current inputs ${manifest.reviewInputFingerprint}; pixel mutation rejected)\n`,
+      `(current inputs ${manifest.reviewInputFingerprint}; pixel and font mutations rejected)\n`,
   );
 } else {
   process.stdout.write(
