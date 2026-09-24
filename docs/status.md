@@ -668,7 +668,7 @@ them the `<defs>` class through a different door, and all now measured rather th
 | A nested `<svg>` | Its `<text>` was collected twice — once by the inner record and once by the outer one, where it was compared against the wrong viewport. Each record now takes only the targets whose nearest `<svg>` ancestor is itself |
 | Two structurally identical SVGs | They share one `svgRootKey` by design, so their labels share `svgTextKey` across records. The ambiguity group was counted inside a record and reported 1 for exactly the collision the field exists for. It is a property of the document and is counted across the document |
 
-Also from round two: the stored demo snapshot moved to schema 3 with the new fields, rather than
+Also from round two: the stored demo snapshot moved to schema 3 in 0.2.3 with the new fields, rather than
 leaving `docs/limitations.md` claiming a migration that had not happened; `reason` is `null`
 instead of absent so it survives a JSON round trip that the receipt schema requires; and every
 `reviewedAt` in the report-surface ledger is back to the date of the review that actually took

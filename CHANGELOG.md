@@ -90,6 +90,18 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   class remains held in CI by the public `tests/fixtures/fragmentainer-residue.html` in the live
   suite. `docs/releasing.md`, `docs/limitations.md`, `docs/status.md` and the corpus README said
   the step printed `SKIPPED` and could be run in full before a release; neither was true.
+- **Schema stamps in the shipped documents are checked against the built package.**
+  `tests/unit/docs-truth.test.ts` compiles `dist/` into a staging package and reads the stamps by
+  running it (`tests/tools/docs-truth.mjs`): the report stamp from its CLI's `--demo --format json`,
+  the context-pack and comparison stamps from its public API, the readable set and the snapshot
+  stamp from its enums. Every "Report N", "report schema N", "Snapshot N", "context pack N" and
+  contract-table row in README, SECURITY.md, `docs/**` and CONTRIBUTING.md must equal them unless
+  the sentence marks itself as history (a transition word plus a released version, "legacy", or
+  the readable set). Against the documents of the previous commit it names every stale line the
+  README, CONTRIBUTING.md, `docs/source-bound-findings.md`, `docs/status.md` and
+  `docs/configuration.md` carried; two lines in `docs/reporting.md` are listed in
+  `tests/tools/docs-truth-pending.jsonl` for the change that owns that page, and an entry that no
+  longer matches fails.
 
 ## 0.6.0 — 2026-09-18
 

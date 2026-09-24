@@ -1,0 +1,286 @@
+#!/usr/bin/env node
+/**
+ * Every schema stamp a shipped document names is the stamp the built package carries.
+ *
+ * WHY THIS EXISTS. Report 5 shipped in 0.6.0, and the README, `docs/reporting.md`,
+ * `docs/source-bound-findings.md`, `CONTRIBUTING.md` and `docs/status.md` went on saying Report 4 —
+ * or 3 — in present-tense, current-state sentences. Contract tables are what integrators read, and
+ * nothing compared them with the code. Stamps also move independently (the snapshot moves without
+ * the report), so a number that is right today is not right by construction tomorrow.
+ *
+ * THE ORACLE IS THE BUILT PACKAGE, IN A CHILD PROCESS. `--package <dir>` points at a package root
+ * with `dist/` — the installed `node_modules/breaklint` in CI, or a freshly built staging copy in
+ * the unit suite. The stamps are read by running that package, never from this file and never from
+ * the documents under test:
+ *   - report: `schemaVersion` of `<dir>/dist/cli/index.js --demo --format json`, which must also
+ *     equal the package's `REPORT_SCHEMA_VERSION`;
+ *   - readable reports: `READABLE_REPORT_SCHEMA_VERSIONS`;
+ *   - snapshot: `SNAPSHOT_SCHEMA_VERSION`;
+ *   - context pack and comparison: `createContextPack(report).schemaVersion` and
+ *     `compareReports(report, report).schemaVersion` from the package root;
+ *   - configuration contract: `config.contractVersion` of the same report.
+ *
+ * THE GRAMMAR, which decides whether a mention is a claim about now. A mention whose number differs
+ * from the current stamp passes only in one of these explicit forms, and a new stale mention cannot
+ * pass without taking one:
+ *   1. the readable set, e.g. "readers accept Report 4 and 5": its numbers must be exactly
+ *      `READABLE_REPORT_SCHEMA_VERSIONS`;
+ *   2. a stated transition: the sentence carries an arrow or a transition word (becomes, moves,
+ *      stays, remains, was, from, until, adds, introduced, migrate …) AND the sentence or its paragraph names
+ *      a released version no newer than the package — "0.5.0 moves live output to Report 4";
+ *   3. the word "legacy" in the sentence;
+ *   4. a region explicitly marked `<!-- docs-truth: historical -->` … `<!-- docs-truth: end -->`.
+ * Anything else is a current-state claim and must equal the current stamp. CHANGELOG.md is not
+ * scanned: every entry in it states a change, so both sides of one appear by design.
+ *
+ * `--pending <file>` names mentions another change is about to correct, as JSON lines
+ * `{"file","text","reason"}`. Each must still be present — a stale pending entry fails — so the
+ * list can only shrink.
+ */
+
+import { spawnSync } from "node:child_process";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const RELEASE = /\b(\d+)\.(\d+)\.(\d+)\b/gu;
+const TRANSITION = /→|->|\b(becomes?|became|moves?|moved|moving|stays?|stayed|remains?|remained|was|were|until|from|adds?|added|introduced|removed|replaced|migrate[sd]?|migration)\b/iu;
+
+/** Reads the current stamps by running the built package, in child processes. */
+export function currentStamps(packageDir) {
+  const root = resolve(packageDir);
+  const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const cli = join(root, manifest.bin.breaklint);
+  const demo = spawnSync(process.execPath, [cli, "--demo", "--format", "json"], { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 60_000 });
+  if (demo.status !== 1) throw new Error(`the built CLI's --demo ended ${demo.status}, expected 1: ${demo.stderr}`);
+  const probe = `
+    const [index, enums] = await Promise.all([
+      import(${JSON.stringify(pathToFileURL(join(root, "dist/index.js")).href)}),
+      import(${JSON.stringify(pathToFileURL(join(root, "dist/core/enums.js")).href)}),
+    ]);
+    let input = ""; for await (const chunk of process.stdin) input += chunk;
+    const report = JSON.parse(input);
+    process.stdout.write(JSON.stringify({
+      report: report.schemaVersion,
+      reportConstant: enums.REPORT_SCHEMA_VERSION,
+      readable: [...enums.READABLE_REPORT_SCHEMA_VERSIONS].sort((a, b) => a - b),
+      snapshot: enums.SNAPSHOT_SCHEMA_VERSION,
+      context: index.createContextPack(report).schemaVersion,
+      comparison: (await index.compareReports(report, report)).schemaVersion,
+      config: report.config.contractVersion,
+    }));`;
+  const read = spawnSync(process.execPath, ["--input-type=module", "-e", probe], { cwd: root, input: demo.stdout, encoding: "utf8", timeout: 60_000 });
+  if (read.status !== 0) throw new Error(`the built package could not be read: ${read.stderr}`);
+  const stamps = JSON.parse(read.stdout);
+  if (stamps.report !== stamps.reportConstant) {
+    throw new Error(`the CLI writes report schema ${stamps.report} but REPORT_SCHEMA_VERSION is ${stamps.reportConstant}`);
+  }
+  for (const key of ["report", "snapshot", "context", "comparison", "config"]) {
+    if (!Number.isInteger(stamps[key])) throw new Error(`the built package yielded no ${key} stamp`);
+  }
+  return { ...stamps, packageVersion: manifest.version };
+}
+
+function older(a, b) {
+  for (let i = 0; i < 3; i += 1) if (a[i] !== b[i]) return a[i] < b[i];
+  return false;
+}
+
+/** Released versions a unit names that are no newer than the package itself. */
+function namesReleasedVersion(text, packageVersion) {
+  const current = packageVersion.split(".").map(Number);
+  return [...text.matchAll(RELEASE)].some((match) => {
+    const version = match.slice(1, 4).map(Number);
+    return !older(current, version);
+  });
+}
+
+const KIND_WORDS = [
+  { kind: "context", pattern: /\bcontext(?:\.json)?\b/giu },
+  { kind: "comparison", pattern: /\bcomparison\b/giu },
+  { kind: "snapshot", pattern: /\bsnapshots?\b/giu },
+  { kind: "config", pattern: /\bconfiguration\b/giu },
+  { kind: "report", pattern: /\breports?\b/giu },
+];
+
+/** The kind a bare "schema N" belongs to: the nearest kind word before it, in its unit or paragraph. */
+function kindBefore(text, index) {
+  let best = null;
+  for (const { kind, pattern } of KIND_WORDS) {
+    for (const match of text.slice(0, index).matchAll(pattern)) {
+      if (!best || match.index > best.index) best = { kind, index: match.index };
+    }
+  }
+  return best?.kind ?? null;
+}
+
+/** Stamp mentions in one unit of prose. Stamps are small integers; "JSON Schema 2020-12" is not one. */
+function mentionsIn(unit, paragraph, unitOffset) {
+  const found = [];
+  const add = (kind, number, index) => {
+    if (kind && number < 100) found.push({ kind, number, index });
+  };
+  const taken = new Set();
+  const patterns = [
+    { kind: "report", re: /\bReport[- ]?(\d+)\b/gu },
+    { kind: "report", re: /\breport schema(?: is| at| to| moves to| stays| remains)?[- ](\d+)\b/giu },
+    { kind: "report", re: /\bschema-(\d+) report/giu },
+    { kind: "snapshot", re: /\bSnapshot[- ]?(\d+)\b/gu },
+    { kind: "snapshot", re: /\bsnapshot schema(?: is| at| to| moves to| stays| remains)?[- ](\d+)\b/giu },
+    { kind: "context", re: /\bcontext pack(?:\s+(?:schema|is|to|becomes|moves to|at|stays|version|v))*\s+(\d+)\b/giu },
+    { kind: "config", re: /\bConfiguration Contract\s*v?(\d+)\b/giu },
+  ];
+  for (const { kind, re } of patterns) {
+    for (const match of unit.matchAll(re)) {
+      const at = match.index + match[0].length - match[1].length;
+      taken.add(at);
+      add(kind, Number(match[1]), at);
+    }
+  }
+  for (const match of unit.matchAll(/\bschema[- ](\d+)\b/giu)) {
+    const at = match.index + match[0].length - match[1].length;
+    if (taken.has(at)) continue;
+    add(kindBefore(paragraph, unitOffset + match.index) ?? kindBefore(unit, match.index), Number(match[1]), at);
+  }
+  // Contract tables: `| Document report | 5 | … |`.
+  const row = /^\|\s*([^|]+?)\s*\|\s*`?(\d+)`?\s*(?:each\s*)?\|/u.exec(unit);
+  if (row) {
+    const label = row[1].toLowerCase();
+    const kind = /context/u.test(label) ? "context" : /comparison/u.test(label) ? "comparison"
+      : /snapshot/u.test(label) ? "snapshot" : /^configuration$/u.test(label) ? "config"
+      : /^document report$/u.test(label) ? "report" : null;
+    add(kind, Number(row[2]), row.index + row[0].indexOf(row[2]));
+  }
+  return found;
+}
+
+/** Splits a Markdown file into prose units, skipping fenced code and marked historical regions. */
+function unitsOf(text) {
+  const units = [];
+  let fenced = false;
+  let historical = false;
+  let paragraph = [];
+  const flush = () => {
+    if (!paragraph.length) return;
+    const joined = paragraph.map((p) => p.text).join(" ");
+    const firstLine = paragraph[0].line;
+    // Sentences: a full stop, colon or semicolon followed by space and a capital or a backtick.
+    const bounds = [0];
+    for (const match of joined.matchAll(/[.;:](?=\s+[A-Z`*(])/gu)) bounds.push(match.index + 1);
+    bounds.push(joined.length);
+    for (let i = 0; i + 1 < bounds.length; i += 1) {
+      const unit = joined.slice(bounds[i], bounds[i + 1]);
+      if (unit.trim()) units.push({ unit, paragraph: joined, offset: bounds[i], line: firstLine });
+    }
+    paragraph = [];
+  };
+  for (const [index, line] of text.replace(/\r\n/gu, "\n").split("\n").entries()) {
+    if (/^\s*(```|~~~)/u.test(line)) { flush(); fenced = !fenced; continue; }
+    if (fenced) continue;
+    if (/<!--\s*docs-truth:\s*historical\b/u.test(line)) { flush(); historical = true; continue; }
+    if (/<!--\s*docs-truth:\s*end\s*-->/u.test(line)) { flush(); historical = false; continue; }
+    if (historical) continue;
+    if (/^\s*\|/u.test(line)) { flush(); units.push({ unit: line, paragraph: line, offset: 0, line: index + 1 }); continue; }
+    if (!line.trim() || /^#{1,6}\s/u.test(line)) { flush(); if (line.trim()) units.push({ unit: line, paragraph: line, offset: 0, line: index + 1 }); continue; }
+    paragraph.push({ text: line.trim(), line: index + 1 });
+  }
+  flush();
+  return units;
+}
+
+function readableSetOk(unit, stamps) {
+  // "readers accept Report 4 and 5", or "Reports 4 and 5 are readable".
+  const match = /\b(?:readers?|reads?|accepts?|accepted|readable)\b[^.;]{0,40}?(?:Report[- ]?)?(\d+)((?:,\s*\d+)*)\s*(?:and|or)\s*(\d+)/iu.exec(unit)
+    ?? /\bReports?[- ]?(\d+)((?:,\s*\d+)*)\s*(?:and|or)\s*(\d+)\s+(?:are|remain|stay)\s+readable\b/iu.exec(unit);
+  if (!match) return null;
+  const numbers = [match[1], ...match[2].split(",").map((s) => s.trim()).filter(Boolean), match[3]].map(Number).sort((a, b) => a - b);
+  return { numbers, ok: JSON.stringify(numbers) === JSON.stringify(stamps.readable), start: match.index, end: match.index + match[0].length };
+}
+
+export function scanText(file, text, stamps) {
+  const issues = [];
+  for (const { unit, paragraph, offset, line } of unitsOf(text)) {
+    const readable = readableSetOk(unit, stamps);
+    if (readable && !readable.ok) {
+      issues.push(`${file}:${line}: names the readable report set ${readable.numbers.join(" and ")}, but the package reads ${stamps.readable.join(" and ")}: ${unit.trim()}`);
+    }
+    for (const mention of mentionsIn(unit, paragraph, offset)) {
+      if (mention.number === stamps[mention.kind]) continue;
+      if (readable && mention.kind === "report" && mention.index >= readable.start && mention.index <= readable.end) continue;
+      if (/\blegacy\b/iu.test(unit)) continue;
+      if (TRANSITION.test(unit) && (namesReleasedVersion(unit, stamps.packageVersion) || namesReleasedVersion(paragraph, stamps.packageVersion))) continue;
+      if (/→|->/u.test(unit) && unit.trimStart().startsWith("|")) continue;
+      issues.push(`${file}:${line}: says ${mention.kind} ${mention.number}, but the built package is at ${stamps[mention.kind]}: ${unit.trim()}`);
+    }
+  }
+  return issues;
+}
+
+function markdownUnder(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? markdownUnder(path) : entry.name.endsWith(".md") ? [path] : [];
+  });
+}
+
+/** The shipped documents of a package: README, SECURITY and every Markdown file under docs/. */
+export function shippedDocuments(packageDir) {
+  const root = resolve(packageDir);
+  return [join(root, "README.md"), join(root, "SECURITY.md"), ...markdownUnder(join(root, "docs"))].filter((path) => existsSync(path));
+}
+
+/**
+ * `packageDir` supplies the stamps (its `dist/`); `docsRoot`, which defaults to it, supplies the
+ * documents. They differ only in the unit suite, which builds `dist/` into a staging directory and
+ * reads the repository's own documents.
+ */
+export function checkDocsTruth({ packageDir, docsRoot = packageDir, extra = [], pending = [], stamps = currentStamps(packageDir) }) {
+  const root = resolve(docsRoot);
+  const files = [...shippedDocuments(root), ...extra.map((path) => resolve(path))];
+  const issues = [];
+  const pendingLeft = new Set(pending.map((_, i) => i));
+  let scanned = 0;
+  for (const path of files) {
+    const text = readFileSync(path, "utf8");
+    const name = path.startsWith(root) ? relative(root, path) : path;
+    scanned += 1;
+    for (const issue of scanText(name, text, stamps)) {
+      const match = pending.findIndex((entry) => entry.file === name && issue.includes(entry.text));
+      if (match !== -1) pendingLeft.delete(match);
+      else issues.push(issue);
+    }
+  }
+  for (const i of pendingLeft) {
+    issues.push(`pending entry no longer matches anything, so remove it: ${pending[i].file}: "${pending[i].text}" (${pending[i].reason})`);
+  }
+  return { valid: issues.length === 0, issues, scanned, stamps };
+}
+
+function isMain() {
+  return Boolean(process.argv[1]) && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+}
+
+if (isMain()) {
+  const args = process.argv.slice(2);
+  const valueOf = (flag) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
+  const packageDir = valueOf("--package");
+  if (!packageDir || !statSync(packageDir, { throwIfNoEntry: false })?.isDirectory()) {
+    process.stderr.write("usage: docs-truth.mjs --package <package-dir> [--docs-root <dir>] [--extra <file> ...] [--pending <jsonl>]\n");
+    process.exitCode = 2;
+  } else {
+    const extra = args.flatMap((arg, i) => (arg === "--extra" ? [args[i + 1]] : []));
+    const pendingFile = valueOf("--pending");
+    const pending = pendingFile
+      ? readFileSync(pendingFile, "utf8").split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line))
+      : [];
+    const result = checkDocsTruth({ packageDir, docsRoot: valueOf("--docs-root") ?? packageDir, extra, pending });
+    const { stamps } = result;
+    const summary = `report ${stamps.report} (reads ${stamps.readable.join(", ")}), snapshot ${stamps.snapshot}, context pack ${stamps.context}, comparison ${stamps.comparison}, configuration contract ${stamps.config}`;
+    if (!result.valid) {
+      process.stderr.write(`docs truth: FAILED against the built package (${summary})\n${result.issues.map((issue) => `  - ${issue}`).join("\n")}\n`);
+      process.exitCode = 1;
+    } else {
+      process.stdout.write(`docs truth: ${result.scanned} documents name only the stamps the built package carries: ${summary}\n`);
+    }
+  }
+}
