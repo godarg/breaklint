@@ -4,8 +4,9 @@
  * THE DEFECT. The entry point called `process.exit()` as soon as the report had been handed to
  * `process.stdout.write()`. On a pipe the kernel takes what fits into the pipe buffer and Node
  * queues the rest, and `process.exit()` discards the queue. Measured on Linux, Node 24 and 22,
- * source and built entry: a reader behind `| cat`, `| jq` or a slow uploader received exactly
- * 65 536 bytes of a 340 000-byte report in all six formats, and the exit code still said 1. The
+ * source and built entry: a reader behind `| cat`, `| jq` or a slow uploader received a multiple
+ * of the pipe buffer — usually 65 536 bytes, sometimes 131 072 — of a 340 000-byte report in all
+ * six formats, and the exit code still said 1. The
  * shipped demo's own JSON (82 585 bytes) was already over the limit. `--out` and `> file` were
  * never affected, which is why every earlier gate, all of which wrote to a file, stayed green.
  *
@@ -111,18 +112,18 @@ interface Delivery {
 }
 
 /** The oracle: the same entry writing the same report to a file. */
-function reference(entry: { argv: string[] }, format: Format): Delivery {
+function reference(entry: { argv: string[] }, format: Format): Delivery & { confirmation: string } {
   const file = join(pkg, `reference.${format}`);
   rmSync(file, { force: true });
   const run = spawnSync(process.execPath, [...entry.argv, "--demo", "--format", format, "--out", file], { encoding: "utf8" });
-  return { code: run.status, bytes: readFileSync(file), stderr: run.stderr };
+  return { code: run.status, bytes: readFileSync(file), stderr: run.stderr, confirmation: run.stdout };
 }
 
 /**
  * The CLI's stdout into a real kernel pipe, read by `reader`. The CLI's exit code is written to a
  * file inside the pipeline, because the status of a pipeline is its last command's.
  */
-function throughKernelPipe(entry: { argv: string[] }, args: string[], reader: "cat" | "slow" | "head"): Delivery {
+function throughKernelPipe(entry: { argv: string[] }, args: string[], reader: "cat" | "slow" | "head" | "closed"): Delivery {
   const received = join(pkg, "received.bin");
   const status = join(pkg, "status.txt");
   const stderrFile = join(pkg, "stderr.txt");
@@ -131,6 +132,8 @@ function throughKernelPipe(entry: { argv: string[] }, args: string[], reader: "c
     cat: 'cat > "$BL_RECEIVED"',
     slow: '"$BL_NODE" "$BL_SLOW_READER" "$BL_RECEIVED"',
     head: 'head -c 100 > "$BL_RECEIVED"',
+    // Reads nothing and exits at once, long before the CLI has started, let alone written.
+    closed: ': > "$BL_RECEIVED"',
   }[reader];
   const shell = spawnSync("sh", ["-c", `{ "$@" 2> "$BL_STDERR"; echo $? > "$BL_STATUS"; } | ${sink}`, "sh", process.execPath, ...entry.argv, ...args], {
     env: {
@@ -152,12 +155,19 @@ function throughKernelPipe(entry: { argv: string[] }, args: string[], reader: "c
 }
 
 /**
- * The CLI spawned by Node with `stdio: "pipe"` (a socketpair on Linux). With `closeAfterFirstChunk`
- * the reader destroys its end as soon as anything arrives; otherwise it pauses 20 ms per chunk.
+ * The CLI spawned by Node with `stdio: "pipe"` (a socketpair on Linux). `slow` pauses 20 ms per
+ * chunk; `close-after-first-chunk` destroys the reading end as soon as anything arrives; `closed`
+ * destroys it before the CLI can have written anything.
  */
-function throughNodePipe(entry: { argv: string[] }, args: string[], closeAfterFirstChunk = false): Promise<Delivery> {
+function throughNodePipe(
+  entry: { argv: string[] },
+  args: string[],
+  mode: "slow" | "close-after-first-chunk" | "closed" = "slow",
+): Promise<Delivery> {
   return new Promise((resolve, reject) => {
     const cli = spawn(process.execPath, [...entry.argv, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    if (mode === "closed") cli.stdout.destroy();
+    const closeAfterFirstChunk = mode === "close-after-first-chunk";
     const chunks: Buffer[] = [];
     let stderr = "";
     cli.stderr.on("data", (chunk: Buffer) => {
@@ -255,7 +265,7 @@ describe("the CLI delivers its whole report through a pipe (G-01)", () => {
       assert.ok(expected.bytes.length > 4 * MIN_BYTES, `the early-close fixture is only ${expected.bytes.length} B`);
       const cases: [string, Delivery][] = [
         [`${entry.name}, kernel pipe into head -c 100`, throughKernelPipe(entry, args, "head")],
-        [`${entry.name}, Node pipe destroyed after the first chunk`, await throughNodePipe(entry, args, true)],
+        [`${entry.name}, Node pipe destroyed after the first chunk`, await throughNodePipe(entry, args, "close-after-first-chunk")],
       ];
       for (const [route, got] of cases) {
         // The premise first: a reader that got everything did not close early, and the case
@@ -269,6 +279,43 @@ describe("the CLI delivers its whole report through a pipe (G-01)", () => {
           failures.push(`${route}: expected exactly one breaklint line naming the stdout failure, got: ${JSON.stringify(got.stderr)}`);
         }
         if (/Unhandled 'error' event|node:events/u.test(got.stderr)) failures.push(`${route}: the write failure crashed the process`);
+      }
+    }
+    assert.deepEqual(failures, [], failures.join("\n"));
+  });
+  it("with --out, a reader that closed before the confirmation line keeps the verdict and the file", async () => {
+    // The report goes to the file first and is complete before stdout is touched; stdout carries
+    // only a one-line confirmation. Losing that line loses nothing the verdict rests on, so the
+    // exit code stays the run's own and stderr says what was lost. Exit 3 would state that the
+    // report was not delivered, which is false here.
+    writeDemo(EXTRA_REFS.json);
+    const target = join(pkg, "delivered-to-file.json");
+    const args = ["--demo", "--format", "json", "--out", target];
+    const failures: string[] = [];
+    for (const entry of entries) {
+      const expected = reference(entry, "json");
+      // The positive half: with stdout intact, the confirmation arrives and nothing is reported.
+      assert.match(expected.confirmation, /^breaklint: json report written to /u, `${entry.name}: no confirmation line`);
+      assert.deepEqual(breaklintLines(expected.stderr), [], `${entry.name}: a diagnostic on an intact stdout`);
+      for (const [route, run] of [
+        [`${entry.name}, kernel pipe whose reader exited at once`, () => Promise.resolve(throughKernelPipe(entry, args, "closed"))],
+        [`${entry.name}, Node pipe destroyed before the CLI wrote`, () => throughNodePipe(entry, args, "closed")],
+      ] as const) {
+        rmSync(target, { force: true });
+        const got = await run();
+        assert.equal(got.bytes.length, 0, `${route}: the reader received the confirmation, so nothing was tested`);
+        if (got.code !== DEMO_EXIT) failures.push(`${route}: exited ${got.code}, not the verdict's ${DEMO_EXIT}; stderr: ${got.stderr}`);
+        const written = readFileSync(target, "utf8");
+        if (normalise(written) !== normalise(expected.bytes.toString("utf8"))) {
+          failures.push(`${route}: the report file holds ${written.length} of ${expected.bytes.length} bytes, or differs`);
+        }
+        const lines = breaklintLines(got.stderr);
+        if (
+          lines.length !== 1 ||
+          !/could not write the confirmation line to stdout \(E[A-Z]+\); the report file was written in full/u.test(lines[0]!)
+        ) {
+          failures.push(`${route}: expected exactly one line naming the lost confirmation, got: ${JSON.stringify(got.stderr)}`);
+        }
       }
     }
     assert.deepEqual(failures, [], failures.join("\n"));
