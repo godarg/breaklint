@@ -9,15 +9,19 @@
  *     changelog had no section to put them in: one change was not recorded at all, the other was
  *     written into the dated 0.6.0 section as an in-place erratum.
  *
- * TWO STATES, decided by git rather than by the file under test:
- *   A. After a release — `v<package.json version>` is a tag reachable from HEAD. If anything under
- *      `src/` differs between that tag and HEAD, the first section must be `## Unreleased` with at
- *      least one entry, and every changed `src/rules/<ns>/<name>.ts` must name its rule id there.
- *      The released section itself must carry a date. At the tag commit itself (a release build)
- *      the rules of state B apply to the tagged version, because that commit is what ships.
+ * THREE STATES, decided by git rather than by the file under test:
+ *   A. After a release — `v<package.json version>` is a tag reachable from HEAD, and HEAD is a later
+ *      commit. If anything under `src/` differs between that tag and HEAD, the first section must
+ *      be `## Unreleased` with at least one entry, and every changed `src/rules/<ns>/<name>.ts` must
+ *      name its rule id there. The released section itself must carry a date.
  *   B. Release preparation — package.json names a version that has no tag yet. It must be greater
- *      than the last release tag; the first section must be `## <version> — YYYY-MM-DD`; no
+ *      than the last release tag; the first section must be `## <version> — YYYY-MM-DD` or exactly
+ *      `## <version> — TBD-at-tag` (the owner sets the date immediately before tagging); no
  *      `## Unreleased` section may be left; `docs/status.md` must not call the version unreleased.
+ *   C. The release build — HEAD is the commit `v<version>` points at, which is what the release
+ *      workflow checks out and what npm will serve. The rules of B apply, except that ONLY a date
+ *      is accepted: a `TBD-at-tag` left in place stops the release workflow here, before any
+ *      outward action, with the instruction to date the heading in a final commit and tag that.
  *
  * A SHALLOW CLONE IS NOT A PASS. Without the tags, or with history cut above them, "released" and
  * "unreleased" cannot be told apart. The check then fails and says so; CI checks out with
@@ -38,6 +42,8 @@ import { fileURLToPath } from "node:url";
 const SCRIPT = fileURLToPath(import.meta.url);
 const RELEASE_TAG = /^v(\d+)\.(\d+)\.(\d+)$/u;
 const DATED_HEADING = (version) => new RegExp(`^## ${version.replace(/\./gu, "\\.")} — \\d{4}-\\d{2}-\\d{2}$`, "u");
+/** The one placeholder release preparation may carry. It is never accepted at the tag. */
+const PLACEHOLDER = "TBD-at-tag";
 const RULE_FILE = /^src\/rules\/([a-z]+)\/([a-z0-9-]+)\.ts$/u;
 
 function git(root, args) {
@@ -64,13 +70,23 @@ function sectionsOf(text) {
   return sections;
 }
 
-function releasePrepIssues(version, sections, statusText) {
+function releasePrepIssues(version, sections, statusText, { atTag }) {
   const issues = [];
   const first = sections[0];
-  if (!first || !DATED_HEADING(version).test(first.heading)) {
+  const dated = Boolean(first) && DATED_HEADING(version).test(first.heading);
+  const placeholder = Boolean(first) && first.heading === `## ${version} — ${PLACEHOLDER}`;
+  if (atTag && placeholder) {
     issues.push(
-      `the first CHANGELOG section must be "## ${version} — YYYY-MM-DD" for the version being released; it is ` +
-        `${first ? JSON.stringify(first.heading) : "absent"}. A tarball built from this commit would ship that heading.`,
+      `v${version} points at a commit whose CHANGELOG heading is still "## ${version} — ${PLACEHOLDER}", and a tarball ` +
+        `built from it would ship that heading. Replace ${PLACEHOLDER} with the release date ("## ${version} — YYYY-MM-DD") ` +
+        "in a final commit on main, let CI go green on that commit, and tag that commit. This check runs before any outward action.",
+    );
+  } else if (!dated && !(placeholder && !atTag)) {
+    issues.push(
+      (atTag
+        ? `the first CHANGELOG section must be "## ${version} — YYYY-MM-DD" at the tag commit`
+        : `the first CHANGELOG section must be "## ${version} — YYYY-MM-DD", or "## ${version} — ${PLACEHOLDER}" until the tag`) +
+        `; it is ${first ? JSON.stringify(first.heading) : "absent"}. A tarball built from this commit would ship that heading.`,
     );
   }
   // The version's own heading was reported above; any OTHER "unreleased" heading is a leftover.
@@ -126,8 +142,8 @@ export function checkChangelog(root) {
   if (allTags.includes(versionTag)) {
     const tagCommit = git(root, ["rev-parse", `${versionTag}^{commit}`]).out;
     if (tagCommit === head.out) {
-      // The release build: this commit is what npm will serve.
-      issues.push(...releasePrepIssues(version, sections, statusText));
+      // The release build: this commit is what npm will serve, so only a date is accepted.
+      issues.push(...releasePrepIssues(version, sections, statusText, { atTag: true }));
       return { valid: issues.length === 0, state: `release build of ${versionTag}`, issues };
     }
     if (!reachable.includes(versionTag)) {
@@ -175,7 +191,7 @@ export function checkChangelog(root) {
   if (compare(versionTag, lastTag) <= 0) {
     issues.push(`package.json names ${version}, which has no tag and is not newer than the last release tag ${lastTag}`);
   }
-  issues.push(...releasePrepIssues(version, sections, statusText));
+  issues.push(...releasePrepIssues(version, sections, statusText, { atTag: false }));
   return { valid: issues.length === 0, state: `release preparation of ${version} after ${lastTag}`, issues };
 }
 
@@ -252,6 +268,10 @@ function runSelfTest() {
       after: { "README.md": "docs only\n" } },
     { name: "a version bump with a dated heading", expect: 0,
       after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — 2026-02-03") } },
+    { name: "a version bump dated TBD-at-tag, before the tag", expect: 0,
+      after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — TBD-at-tag") } },
+    { name: "a version bump with any other placeholder", expect: 1, match: /or "## 1\.1\.0 — TBD-at-tag" until the tag; it is "## 1\.1\.0 — TBD"/u,
+      after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — TBD") } },
     { name: "a version bump whose heading says unreleased (the 0.6.0 tarball)", expect: 1, match: /must be "## 1\.1\.0 — YYYY-MM-DD"/u,
       after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — unreleased") } },
     { name: "a version bump that leaves an Unreleased section behind", expect: 1, match: /still carries "## Unreleased"/u,
@@ -262,7 +282,10 @@ function runSelfTest() {
       after: { "package.json": JSON.stringify({ name: "canary", version: "0.9.0" }), "CHANGELOG.md": prep("## 0.9.0 — 2026-02-03") } },
     { name: "the release build of a dated tag", expect: 0, tagAfter: "v1.1.0",
       after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — 2026-02-03") } },
-    { name: "the release build of a tag whose heading says unreleased (the 0.6.0 tag)", expect: 1, tagAfter: "v1.1.0", match: /A tarball built from this commit would ship/u,
+    { name: "the release build of a tag whose heading is still TBD-at-tag", expect: 1, tagAfter: "v1.1.0",
+      match: /Replace TBD-at-tag with the release date \("## 1\.1\.0 — YYYY-MM-DD"\) in a final commit on main, let CI go green on that commit, and tag that commit/u,
+      after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — TBD-at-tag") } },
+    { name: "the release build of a tag whose heading says unreleased (the 0.6.0 tag)", expect: 1, tagAfter: "v1.1.0", match: /must be "## 1\.1\.0 — YYYY-MM-DD" at the tag commit/u,
       after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — unreleased") } },
   ];
   try {

@@ -199,13 +199,15 @@ Then verify:
 - `package.json`, both root version fields in `package-lock.json` and `CHANGELOG.md` name the same
   version. The changelog half is also checked, by `tests/tools/changelog-contract.mjs` in
   `npm run test:release-tag`: for a version with no tag yet, the first section must be
-  `## X.Y.Z — YYYY-MM-DD`, no `## Unreleased` section may remain, and `docs/status.md` must not
-  call the version unreleased. The same rules apply again in the release workflow at the tag
-  commit, because that commit is what npm serves — the published 0.6.0 tarball says
-  `## 0.6.0 — unreleased`, and nothing checked it. Between releases the same check requires a
-  non-empty `## Unreleased` section naming every changed rule as soon as anything under `src/`
-  differs from the last tag. It needs the tags: in a shallow clone without them it fails rather
-  than passes;
+  `## X.Y.Z — YYYY-MM-DD` or exactly `## X.Y.Z — TBD-at-tag`, no `## Unreleased` section may
+  remain, and `docs/status.md` must not call the version unreleased. At the tag commit — in the
+  release workflow, because that commit is what npm serves — only a date is accepted: the
+  published 0.6.0 tarball says `## 0.6.0 — unreleased`, and nothing checked it. A `TBD-at-tag`
+  that reaches the tag stops the release workflow in its validation job, before anything is
+  packed or published, with the instruction to date it (see Publishing). Between releases the
+  same check requires a non-empty `## Unreleased` section naming every changed rule as soon as
+  anything under `src/` differs from the last tag. It needs the tags: in a shallow clone without
+  them it fails rather than passes;
 - README, security policy, status and limitations make no future-tense success claim;
 - `git diff --check` is clean;
 - an independent verifier has no open Blocker/High finding;
@@ -213,12 +215,23 @@ Then verify:
 
 ## Publishing
 
-Create and push an annotated tag only after main CI is green:
+The release-prep commit carries the heading `## X.Y.Z — TBD-at-tag`, because the release date is
+not known when it is written. Before tagging:
+
+1. replace `TBD-at-tag` with the date, `## X.Y.Z — YYYY-MM-DD`, in a final commit on main — the
+   only change in that commit;
+2. let `ci.yml` go green on exactly that commit;
+3. tag that commit, and no other.
+
+Create and push the annotated tag only after main CI is green on the dated commit:
 
 ```bash
 git tag -a vX.Y.Z -m "breaklint X.Y.Z"
 git push origin vX.Y.Z
 ```
+
+A tag on a commit that still says `TBD-at-tag` is refused by the release workflow's first job,
+before anything is packed or published; the log names the heading and what to change.
 
 The release workflow then:
 
