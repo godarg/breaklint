@@ -1,23 +1,26 @@
 /**
  * The browser floor of the pinned rasteriser, checked before any document is opened.
  *
- * THE DEFECT. `pdfjs-dist` 6.2.108 calls recent built-ins without a feature test —
- * `Map.prototype.getOrInsertComputed`, `Math.sumPrecise` and others. It LOADS on a browser that
- * lacks them and fails only when it rasterises, which is after the document has been paginated
- * and measured. Measured on Chromium 141: every live run measured its document and then ended
- * exit 3 on `this[#methodPromises].getOrInsertComputed is not a function`, naming neither the
- * browser nor what to do about it. The run now stops at the rasteriser's own start, before any
- * document, with the missing names, the browser version and the remedy.
+ * THE DEFECT. `pdfjs-dist` 6.2.108 uses recent platform names without a feature test —
+ * `Map.prototype.getOrInsertComputed`, `Math.sumPrecise`, `Blob.prototype.bytes` and others. It
+ * LOADS on a browser that lacks them and fails only when it rasterises, which is after the
+ * document has been paginated and measured. Measured on Chromium 141: every live run measured its
+ * document and then ended exit 3 on `this[#methodPromises].getOrInsertComputed is not a function`,
+ * naming neither the browser nor what to do about it. The run now stops at the rasteriser's own
+ * start, before any document, with the missing names, where they are missing, the browser version
+ * and the remedy.
  *
- * FOUR THINGS ARE PINNED HERE, each by the thing that would break it:
- *   1. the in-page probe reports exactly the names that are absent, evaluated as real code in a
- *      realm of its own rather than asserted over its text;
- *   2. the verdict refuses a missing name, and refuses an answer it cannot read;
+ * FIVE THINGS ARE PINNED HERE, each by the thing that would break it:
+ *   1. the real probe script — page half and worker half, with the hand-off between them — reports
+ *      exactly the names that are absent in each realm, run as code in realms of its own;
+ *   2. the verdict refuses a missing name, refuses an answer it cannot read, and refuses a page
+ *      that could not start its worker;
  *   3. through the real `openRasterizer` and the real `renderDocuments`, a browser below the floor
  *      ends exit 3 with no content page ever opened — so no document was measured;
- *   4. the list is the pinned build's, not a guess: the build is scanned for a watch-list of
- *      recent built-ins, and an unguarded one missing from the list, or a listed one the build no
- *      longer calls, fails. A pdfjs bump therefore cannot move the floor silently.
+ *   4. the lists are the pinned build's, not a memory: the build is scanned for every platform name
+ *      it reaches from the global scope (web APIs included) and for recent instance members, and
+ *      the check must equal what that scan, minus its reviewed exemptions, requires;
+ *   5. the documentation states the checked lists exactly.
  */
 
 import assert from "node:assert/strict";
@@ -26,7 +29,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { createContext, runInContext } from "node:vm";
+import { createContext, runInContext, type Context } from "node:vm";
 
 import { resolvePackageRoot, type BrowserLike, type PageLike } from "../../src/acquire/browser.ts";
 import { renderDocuments } from "../../src/acquire/render-run.ts";
@@ -34,9 +37,10 @@ import { SUPPORTED_PDFJS_VERSION } from "../../src/core/enums.ts";
 import {
   capabilityProbeSource,
   openRasterizer,
-  PDFJS_REQUIRED_BUILTINS,
+  PDFJS_REQUIRED_CAPABILITIES,
   rasterizerCapabilityVerdict,
 } from "../../src/render/rasterizer.ts";
+import { platformInventory, REALM_OF, requiredFor, type PdfjsFile } from "../tools/pdfjs-platform-inventory.ts";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 const PROBE = fileURLToPath(new URL("../tools/leak-probe.ts", import.meta.url));
@@ -47,61 +51,147 @@ const OPTIONS = {
   network: { mode: "offline" as const, allowed: [] },
   locale: "de-DE",
 };
-/** What Chromium 141 lacks, measured with an in-page probe on that browser. */
-const CHROMIUM_141_MISSING = [
-  "Map.prototype.getOrInsert",
-  "Map.prototype.getOrInsertComputed",
-  "WeakMap.prototype.getOrInsertComputed",
-  "Math.sumPrecise",
-];
+/** What Chromium 141.0.7390.37 lacks, measured through the real openRasterizer on that browser. */
+const CHROMIUM_141_MISSING = {
+  page: ["Map.prototype.getOrInsertComputed()", "Math.sumPrecise()", "WeakMap.prototype.getOrInsertComputed()"],
+  worker: [
+    "Blob.prototype.bytes()", "Map.prototype.getOrInsert()", "Map.prototype.getOrInsertComputed()", "Math.sumPrecise()",
+    "WeakMap.prototype.getOrInsertComputed()",
+  ],
+};
 
-/** A fresh realm in which every required built-in exists, except those in `absent`. */
-function realmWithout(absent: readonly string[]): object {
-  const context = createContext({});
-  for (const path of PDFJS_REQUIRED_BUILTINS) {
-    // Node's own engine may lack some of them; a stub makes the baseline "all present".
-    runInContext(
-      `(() => {
-        const parts = ${JSON.stringify(path)}.split(".");
+/**
+ * Makes every name in `names` resolve in `context`, the way a browser that has it would: a
+ * constructor or a call becomes a function, anything else a value. Names the realm already
+ * provides are left alone. `absent` names are then removed again.
+ */
+function provide(context: Context, names: readonly string[], absent: readonly string[] = []): void {
+  runInContext(
+    `(() => {
+      const split = (name) => {
+        const constructs = name.startsWith("new "), calls = name.endsWith("()");
+        const path = name.slice(constructs ? 4 : 0, calls ? -2 : undefined);
+        const keys = path.match(/\\[Symbol\\.[A-Za-z]+\\]|[^.[\\]]+/g).map((part) => part.startsWith("[Symbol.") ? Symbol[part.slice(8, -1)] : part);
+        return { keys, callable: constructs || calls };
+      };
+      for (const name of ${JSON.stringify(names)}) {
+        const { keys, callable } = split(name);
         let at = globalThis;
-        for (const part of parts.slice(0, -1)) at = at[part];
-        const last = parts[parts.length - 1];
-        if (typeof at[last] !== "function") at[last] = function builtInStub() {};
-      })()`,
-      context,
-    );
-  }
-  for (const path of absent) {
-    const parts = path.split(".");
-    runInContext(`delete ${parts.slice(0, -1).length ? parts.slice(0, -1).join(".") : "globalThis"}[${JSON.stringify(parts.at(-1))}]`, context);
-  }
-  return context;
+        keys.forEach((key, index) => {
+          const last = index === keys.length - 1;
+          if (last) {
+            if (callable ? typeof at[key] !== "function" : !(key in at)) at[key] = callable ? function stub() {} : {};
+          } else {
+            if (at[key] === undefined || at[key] === null) at[key] = function stubHolder() {};
+            if (typeof at[key] === "function" && !at[key].prototype) at[key].prototype = {};
+            at = at[key];
+          }
+        });
+      }
+      for (const name of ${JSON.stringify(absent)}) {
+        const { keys } = split(name);
+        let at = globalThis;
+        for (const key of keys.slice(0, -1)) at = at[key];
+        delete at[keys[keys.length - 1]];
+      }
+    })()`,
+    context,
+  );
 }
 
-function probe(context: object): unknown {
-  // Parsed into this realm, so the comparison below is not tripped by the other realm's Array.
-  return JSON.parse(JSON.stringify(runInContext(capabilityProbeSource(), context)));
+/**
+ * Runs the real probe script in a page realm whose `Worker` runs the worker half in a worker realm,
+ * and returns what the page published. `page`/`worker` name what each realm lacks.
+ */
+async function runProbe(
+  lacking: { page?: readonly string[]; worker?: readonly string[] },
+  options: { workerFails?: boolean; alterPage?: string } = {},
+): Promise<unknown> {
+  const pageRealm = createContext({});
+  const workerRealm = createContext({});
+  // A page's window is its global object, as in a browser, so window.* stubs land on the global.
+  runInContext("globalThis.window = globalThis;", pageRealm);
+  provide(pageRealm, PDFJS_REQUIRED_CAPABILITIES.page, lacking.page);
+  provide(workerRealm, PDFJS_REQUIRED_CAPABILITIES.worker, lacking.worker);
+  if (options.alterPage) runInContext(options.alterPage, pageRealm);
+  const blobs = new Map<string, string>();
+  let published: unknown;
+  const pageGlobal = pageRealm as Record<string, unknown>;
+  // The probe's own mechanics, installed over whatever stubs `provide` left for these names.
+  pageGlobal.Blob = function Blob(this: { source: string }, parts: string[]) {
+    this.source = parts.join("");
+  };
+  (pageGlobal.URL as Record<string, unknown>).createObjectURL = (blob: { source: string }) => {
+    const url = `blob:probe/${blobs.size}`;
+    blobs.set(url, blob.source);
+    return url;
+  };
+  (pageGlobal.URL as Record<string, unknown>).revokeObjectURL = (url: string) => blobs.delete(url);
+  const delivered = new Promise<void>((resolve) => {
+    pageGlobal.Worker = function Worker(this: Record<string, unknown>, url: string, init: { type?: string }) {
+      assert.equal(init?.type, "module", "the capability worker must be a module worker, as pdfjs's is");
+      if (options.workerFails) throw new Error("worker construction refused");
+      const source = blobs.get(url);
+      assert.ok(source, "the worker was not started from the probe's own blob");
+      (workerRealm as Record<string, unknown>).postMessage = (data: unknown) => {
+        setImmediate(() => {
+          (this.onmessage as (event: { data: unknown }) => void)({ data });
+          resolve();
+        });
+      };
+      this.terminate = () => {};
+      setImmediate(() => runInContext(source, workerRealm));
+    };
+    if (options.workerFails) setImmediate(resolve);
+  });
+  runInContext(capabilityProbeSource(), pageRealm);
+  await delivered;
+  published = pageGlobal.__blCapabilities;
+  // Parsed into this realm, so the comparison is not tripped by the other realm's Array.
+  return JSON.parse(JSON.stringify(published));
 }
 
 describe("the rasteriser's capability floor", () => {
-  it("the probe names exactly the built-ins that are absent, in list order", () => {
-    assert.deepEqual(probe(realmWithout([])), { missing: [] });
-    assert.deepEqual(probe(realmWithout(CHROMIUM_141_MISSING)), { missing: CHROMIUM_141_MISSING });
-    // A name that resolves to something other than a function is as missing as an absent one.
-    const context = realmWithout([]);
-    runInContext("Math.sumPrecise = 1; globalThis.Iterator = undefined;", context);
-    assert.deepEqual(probe(context), { missing: ["Math.sumPrecise", "Iterator"] });
+  it("the probe names exactly what each realm lacks, through the real page-to-worker hand-off", async () => {
+    assert.deepEqual(await runProbe({}), { page: [], worker: [] });
+    assert.deepEqual(await runProbe(CHROMIUM_141_MISSING), CHROMIUM_141_MISSING);
+    // The verifier's web APIs, each in the form the probe tests: a symbol-keyed method, a static
+    // and a prototype method, and a constant that must merely exist.
+    // Listed in the order of the checked list, which is the order the probe reports in.
+    const webApis = ["AbortSignal.any()", "ReadableStream.prototype[Symbol.asyncIterator]()", "Response.prototype.bytes()", "URL.parse()"];
+    assert.deepEqual(await runProbe({ page: webApis }), { page: webApis, worker: [] });
+    assert.deepEqual(await runProbe({ page: ["XMLHttpRequest.DONE", "new Path2D"] }), {
+      page: ["XMLHttpRequest.DONE", "new Path2D"],
+      worker: [],
+    });
   });
 
-  it("the verdict names what is missing, the browser and the remedy, and refuses what it cannot read", () => {
-    assert.deepEqual(rasterizerCapabilityVerdict({ missing: [] }, "Chrome/150.0.0.0"), { ok: true, detail: "" });
-    const refused = rasterizerCapabilityVerdict({ missing: CHROMIUM_141_MISSING }, "HeadlessChrome/141.0.7390.37");
+  it("a name that exists but is not callable is missing when the build calls it", async () => {
+    const answer = await runProbe({}, { alterPage: "Math.sumPrecise = 1; URL.parse = undefined;" });
+    assert.deepEqual(answer, { page: ["Math.sumPrecise()", "URL.parse()"], worker: [] });
+  });
+
+  it("a page that cannot start its worker publishes the failure instead of hanging", async () => {
+    const answer = (await runProbe({}, { workerFails: true })) as { page: unknown; worker: { error: string } };
+    assert.deepEqual(answer.page, []);
+    assert.match(answer.worker.error, /worker construction refused/u);
+    assert.equal(rasterizerCapabilityVerdict(answer, "Chrome/150").ok, false);
+    assert.match(rasterizerCapabilityVerdict(answer, "Chrome/150").detail, /could not start a worker/u);
+  });
+
+  it("the verdict names what is missing and where, the browser and the remedy, and refuses what it cannot read", () => {
+    assert.deepEqual(rasterizerCapabilityVerdict({ page: [], worker: [] }, "Chrome/150.0.0.0"), { ok: true, detail: "" });
+    const refused = rasterizerCapabilityVerdict(CHROMIUM_141_MISSING, "HeadlessChrome/141.0.7390.37");
     assert.equal(refused.ok, false);
-    for (const name of CHROMIUM_141_MISSING) assert.ok(refused.detail.includes(name), `the message omits ${name}`);
+    assert.ok(refused.detail.includes(`in the page ${CHROMIUM_141_MISSING.page.join(", ")}`), refused.detail);
+    assert.ok(refused.detail.includes(`in its worker ${CHROMIUM_141_MISSING.worker.join(", ")}`), refused.detail);
     assert.match(refused.detail, /HeadlessChrome\/141\.0\.7390\.37/u);
     assert.ok(refused.detail.includes(`pdfjs-dist ${SUPPORTED_PDFJS_VERSION}`));
     assert.match(refused.detail, /BREAKLINT_CHROME=/u);
-    for (const unreadable of [undefined, null, SUPPORTED_PDFJS_VERSION, {}, { missing: "Math.sumPrecise" }, { missing: [1] }]) {
+    for (const unreadable of [
+      undefined, null, SUPPORTED_PDFJS_VERSION, {}, { missing: [] }, { page: [] }, { page: [], worker: "x" },
+      { page: [1], worker: [] }, { page: "Math.sumPrecise()", worker: [] },
+    ]) {
       assert.equal(rasterizerCapabilityVerdict(unreadable, "Chrome/150").ok, false, `accepted ${JSON.stringify(unreadable)}`);
     }
   });
@@ -122,7 +212,7 @@ describe("the rasteriser's capability floor", () => {
     });
     assert.equal(result.code, 0);
     assert.match(result.stdout, /^refused fatal$/mu, "a browser below the floor was not a fatal refusal");
-    assert.match(result.stdout, /lacks Math\.sumPrecise/u);
+    assert.match(result.stdout, /in its worker Math\.sumPrecise\(\)/u);
     assert.match(result.stdout, /browser \(fake\)/u, "the message does not name the browser version");
   });
 
@@ -131,8 +221,8 @@ describe("the rasteriser's capability floor", () => {
     const rasteriserPage = {
       async goto() {},
       async setContent() {},
-      async waitForFunction() {
-        opened.waitedForLibrary += 1;
+      async waitForFunction(expression: string) {
+        if (expression.includes("__blReady")) opened.waitedForLibrary += 1;
       },
       async emulateMediaType() {},
       async setViewport() {},
@@ -141,7 +231,7 @@ describe("the rasteriser's capability floor", () => {
       },
       on() {},
       async evaluate(expression: unknown) {
-        if (expression === "window.__blCapabilities") return { missing: CHROMIUM_141_MISSING };
+        if (expression === "window.__blCapabilities") return CHROMIUM_141_MISSING;
         if (expression === "window.__blVersion") return SUPPORTED_PDFJS_VERSION;
         throw new Error(`the rasteriser page was asked for more than its capabilities: ${String(expression).slice(0, 80)}`);
       },
@@ -170,9 +260,13 @@ describe("the rasteriser's capability floor", () => {
       openRasterizer,
     });
     assert.equal(result.fatal?.exitCode, 3, `expected exit 3, got ${JSON.stringify(result.fatal)}`);
-    assert.match(
-      result.fatal?.message ?? "",
-      /renderer startup failed at openRasterizer: the browser \(HeadlessChrome\/141\.0\.7390\.37\) lacks Map\.prototype\.getOrInsert, Map\.prototype\.getOrInsertComputed, WeakMap\.prototype\.getOrInsertComputed, Math\.sumPrecise, which the pinned rasteriser pdfjs-dist 6\.2\.108/u,
+    assert.ok(
+      (result.fatal?.message ?? "").startsWith(
+        "breaklint: renderer startup failed at openRasterizer: the browser (HeadlessChrome/141.0.7390.37) lacks what " +
+          `the pinned rasteriser pdfjs-dist 6.2.108 uses without a feature test: in the page ${CHROMIUM_141_MISSING.page.join(", ")}; ` +
+          `in its worker ${CHROMIUM_141_MISSING.worker.join(", ")}.`,
+      ),
+      result.fatal?.message,
     );
     assert.deepEqual(result.documents, [], "a document was produced");
     assert.equal(opened.pages, 1, "only the rasteriser page may be opened");
@@ -181,87 +275,51 @@ describe("the rasteriser's capability floor", () => {
     assert.equal(opened.closed, 1, "the browser was not closed");
   });
 
-  it("the list is exactly the unguarded recent built-ins the pinned build calls", () => {
+  it("the checked lists are exactly what the scan of the pinned build requires, per realm", () => {
     const root = resolvePackageRoot("pdfjs-dist", REPO);
     assert.ok(root, "pdfjs-dist is not installed; the scan would check nothing");
     const declared = (JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string }).version;
-    assert.equal(declared, SUPPORTED_PDFJS_VERSION, "the scan must read the pinned build");
-    const build = ["build/pdf.mjs", "build/pdf.worker.mjs"].map((file) => readFileSync(join(root, file), "utf8")).join("\n");
-
-    /**
-     * ES2022-or-later built-ins (and structuredClone), by a call pattern that names them without
-     * ambiguity in this build. `receivers` are the built-ins a match can reach: `.at(` may be an
-     * array, a string or a typed array; `.getOrInsertComputed(` is called on Maps and on the
-     * XFA cache, which is a WeakMap. A `guard` is the feature test that makes a use optional.
-     */
-    const WATCH: { pattern: RegExp; receivers: string[]; guard?: RegExp }[] = [
-      { pattern: /\.getOrInsert\(/gu, receivers: ["Map.prototype.getOrInsert"] },
-      { pattern: /\.getOrInsertComputed\(/gu, receivers: ["Map.prototype.getOrInsertComputed", "WeakMap.prototype.getOrInsertComputed"] },
-      { pattern: /\bMath\.sumPrecise\(/gu, receivers: ["Math.sumPrecise"] },
-      { pattern: /\bMath\.f16round\(/gu, receivers: ["Math.f16round"] },
-      { pattern: /\bFloat16Array\b/gu, receivers: ["Float16Array"], guard: /typeof Float16Array !== "undefined"/u },
-      { pattern: /\bPromise\.withResolvers\(/gu, receivers: ["Promise.withResolvers"] },
-      { pattern: /\bPromise\.try\(/gu, receivers: ["Promise.try"] },
-      { pattern: /\bUint8Array\.fromBase64\(/gu, receivers: ["Uint8Array.fromBase64"] },
-      { pattern: /\bUint8Array\.fromHex\(/gu, receivers: ["Uint8Array.fromHex"] },
-      { pattern: /\.toBase64\(/gu, receivers: ["Uint8Array.prototype.toBase64"] },
-      { pattern: /\.toHex\(\)/gu, receivers: ["Uint8Array.prototype.toHex"] },
-      { pattern: /\.setFromBase64\(/gu, receivers: ["Uint8Array.prototype.setFromBase64"] },
-      { pattern: /\.setFromHex\(/gu, receivers: ["Uint8Array.prototype.setFromHex"] },
-      { pattern: /\.transferToFixedLength\(/gu, receivers: ["ArrayBuffer.prototype.transferToFixedLength"] },
-      { pattern: /\.transfer\(/gu, receivers: ["ArrayBuffer.prototype.transfer"] },
-      { pattern: /\bIterator\.(?:prototype|from|concat)\b/gu, receivers: ["Iterator"] },
-      { pattern: /\.findLast\(/gu, receivers: ["Array.prototype.findLast"] },
-      { pattern: /\.findLastIndex\(/gu, receivers: ["Array.prototype.findLastIndex"] },
-      { pattern: /\.toSorted\(/gu, receivers: ["Array.prototype.toSorted"] },
-      { pattern: /\.toReversed\(/gu, receivers: ["Array.prototype.toReversed"] },
-      { pattern: /\.toSpliced\(/gu, receivers: ["Array.prototype.toSpliced"] },
-      { pattern: /\.with\(/gu, receivers: ["Array.prototype.with"] },
-      { pattern: /\.at\(/gu, receivers: ["Array.prototype.at", "String.prototype.at", "Uint8Array.prototype.at"] },
-      { pattern: /\bObject\.hasOwn\(/gu, receivers: ["Object.hasOwn"] },
-      { pattern: /\bObject\.groupBy\(/gu, receivers: ["Object.groupBy"] },
-      { pattern: /\bMap\.groupBy\(/gu, receivers: ["Map.groupBy"] },
-      { pattern: /\bArray\.fromAsync\(/gu, receivers: ["Array.fromAsync"] },
-      { pattern: /\.isWellFormed\(/gu, receivers: ["String.prototype.isWellFormed"] },
-      { pattern: /\.toWellFormed\(/gu, receivers: ["String.prototype.toWellFormed"] },
-      { pattern: /\.intersection\(/gu, receivers: ["Set.prototype.intersection"] },
-      { pattern: /\.union\(/gu, receivers: ["Set.prototype.union"] },
-      { pattern: /\.difference\(/gu, receivers: ["Set.prototype.difference"] },
-      { pattern: /\.symmetricDifference\(/gu, receivers: ["Set.prototype.symmetricDifference"] },
-      { pattern: /\.isSubsetOf\(/gu, receivers: ["Set.prototype.isSubsetOf"] },
-      { pattern: /\.isSupersetOf\(/gu, receivers: ["Set.prototype.isSupersetOf"] },
-      { pattern: /\.isDisjointFrom\(/gu, receivers: ["Set.prototype.isDisjointFrom"] },
-      { pattern: /\bRegExp\.escape\(/gu, receivers: ["RegExp.escape"] },
-      { pattern: /\bError\.isError\(/gu, receivers: ["Error.isError"] },
-      { pattern: /\bAtomics\.(?:waitAsync|pause)\(/gu, receivers: ["Atomics.waitAsync"] },
-      { pattern: /\b(?:Async)?DisposableStack\b|\bSymbol\.(?:async)?[dD]ispose\b/gu, receivers: ["DisposableStack"] },
-      { pattern: /\bTemporal\./gu, receivers: ["Temporal"] },
-      { pattern: /\bstructuredClone\(/gu, receivers: ["structuredClone"] },
-    ];
-    const required = new Set(PDFJS_REQUIRED_BUILTINS);
-    const neededByBuild = new Set<string>();
-    const problems: string[] = [];
-    for (const { pattern, receivers, guard } of WATCH) {
-      const uses = build.match(pattern)?.length ?? 0;
-      if (uses === 0) continue;
-      if (guard) {
-        if (!guard.test(build)) problems.push(`${receivers.join("/")}: ${uses} use(s) and the feature test ${guard} is gone`);
-        continue;
-      }
-      for (const name of receivers) {
-        neededByBuild.add(name);
-        if (!required.has(name)) problems.push(`${name}: called ${uses}x without a feature test, but not in PDFJS_REQUIRED_BUILTINS`);
-      }
+    assert.equal(declared, SUPPORTED_PDFJS_VERSION, "the scan and its classification belong to the pinned build");
+    for (const file of ["pdf.mjs", "pdf.worker.mjs"] as PdfjsFile[]) {
+      const source = readFileSync(join(root, "build", file), "utf8");
+      assert.ok(platformInventory(source).length > 100, `the scan of ${file} found almost nothing; it is broken`);
+      const { required, staleRules } = requiredFor(file, source);
+      assert.deepEqual(staleRules, [], `${file}: exemptions that no longer match the build — review them`);
+      const checked = [...PDFJS_REQUIRED_CAPABILITIES[REALM_OF[file]]].sort();
+      const unchecked = required.filter((name) => !checked.includes(name));
+      const unused = checked.filter((name) => !required.includes(name));
+      assert.deepEqual(
+        { unchecked, unused },
+        { unchecked: [], unused: [] },
+        `${file}: a platform name the build uses is not checked (add it to PDFJS_REQUIRED_CAPABILITIES.${REALM_OF[file]} ` +
+          "or classify it in tests/tools/pdfjs-platform-inventory.ts), or a checked name is no longer used",
+      );
     }
-    for (const name of required) {
-      if (!neededByBuild.has(name)) problems.push(`${name}: in PDFJS_REQUIRED_BUILTINS, but the pinned build no longer calls it`);
-    }
-    assert.deepEqual(problems, []);
   });
 
-  it("the documented floor is the checked floor", () => {
+  it("a new web API in the build is caught by the scan, not only an ECMAScript built-in", () => {
+    // The negative control for the test above: the same classification over the pinned build plus
+    // one line using a web API nobody listed. It must come back as required and unchecked.
+    const root = resolvePackageRoot("pdfjs-dist", REPO)!;
+    const source = readFileSync(join(root, "build", "pdf.mjs"), "utf8");
+    const extended = `${source}\nconst entry = await FileSystemObserver.observe(scheduler.yield(), reportError(x));\n`;
+    const { required } = requiredFor("pdf.mjs", extended);
+    for (const name of ["FileSystemObserver.observe()", "scheduler.yield()", "reportError()"]) {
+      assert.ok(required.includes(name), `${name} was not found by the scan`);
+      assert.ok(!PDFJS_REQUIRED_CAPABILITIES.page.includes(name), `${name} would already be checked`);
+    }
+  });
+
+  it("the documentation states the checked lists exactly", () => {
     const limitations = readFileSync(join(REPO, "docs/limitations.md"), "utf8");
-    const undocumented = PDFJS_REQUIRED_BUILTINS.filter((name) => !limitations.includes(`\`${name}\``));
-    assert.deepEqual(undocumented, [], "docs/limitations.md does not list every capability the rasteriser checks");
+    const counts = /`PDFJS_REQUIRED_CAPABILITIES`\s+in\s+`src\/render\/rasterizer\.ts`:\s+(\d+)\s+names\s+in\s+the\s+page\s+and\s+(\d+)\s+in\s+its\s+worker/u.exec(limitations);
+    assert.ok(counts, "docs/limitations.md does not state the checked lists' sizes in the expected sentence");
+    assert.deepEqual(
+      [Number(counts[1]), Number(counts[2])],
+      [PDFJS_REQUIRED_CAPABILITIES.page.length, PDFJS_REQUIRED_CAPABILITIES.worker.length],
+    );
+    const named = [...new Set([...CHROMIUM_141_MISSING.page, ...CHROMIUM_141_MISSING.worker])];
+    const undocumented = named.filter((name) => !limitations.includes(`\`${name.replace(/\(\)$/u, "")}\``));
+    assert.deepEqual(undocumented, [], "docs/limitations.md does not name what the measured browser lacks");
   });
 });

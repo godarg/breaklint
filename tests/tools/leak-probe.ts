@@ -42,7 +42,7 @@ if (failAt === "leak") {
       if (failAt === "evaluate") throw new Error("probe: evaluate failed");
       // The rasteriser page's capability answer, read before the library version.
       if (expression === "window.__blCapabilities") {
-        return { missing: failAt === "capabilities-missing" ? ["Math.sumPrecise"] : [] } as never;
+        return { page: [], worker: failAt === "capabilities-missing" ? ["Math.sumPrecise()"] : [] } as never;
       }
       return (failAt === "version-mismatch" ? "0.0.0" : declaredVersion) as never;
     },
