@@ -219,7 +219,7 @@ are complete; the post-release trust work and remaining validation boundaries ar
 |---|---|
 | 0 | checked, coverage met, nothing reached the threshold |
 | 1 | at least one non-experimental finding reached the threshold |
-| 2 | invalid invocation: unknown option, bad config, input path does not exist, or input is not `.html`/`.htm` |
+| 2 | invalid invocation: unknown option, bad config, no input, or an input path that does not exist, is not a regular file or is not `.html`/`.htm`; no report is written |
 | 3 | infrastructure: no renderer, font failed, pagination aborted, checker crashed |
 | 4 | nothing or too little was judged |
 
@@ -239,7 +239,12 @@ breaklint --profile strict manual.html   # warnings gate; every rule requires fu
 breaklint --only layout/widow,layout/orphan book.html
 breaklint --only layout/half-empty-page report.html   # ask for the one rule that is off by default
 breaklint --disable layout/hyphen-across-page report.html
+breaklint --out-dir build/evidence book.html   # where the page PNGs and the checked PDF go
 ```
+
+A live run writes its evidence — one PNG per page and the PDF it checked — into
+`./breaklint-report` in the working directory unless `--out-dir <dir>` names another; the report's
+`evidence[].path` entries are relative to that directory. `--demo` writes none.
 
 A rule you disagree with can be switched off for the whole run — `--disable <rule,...>`, or
 `{"rules": {"layout/hyphen-across-page": false}}` in the config file; the same two switches turn
@@ -250,8 +255,10 @@ page that nothing checks, and this tool exists because such claims were wrong.
 There is no directory recursion and no glob expansion inside the tool. The shell has done this
 correctly for fifty years, including symlink cycles.
 
-Input is HTML only (`.html` or `.htm`). A standalone `.svg`, PDF, Markdown file or directory is
-rejected with exit 2 before Chrome starts. Inline SVG inside HTML is supported by the released SVG
+Input is HTML only (`.html` or `.htm`), and the name decides: a standalone `.svg`, PDF or Markdown
+file is rejected by its extension, and anything that is not a regular file — a directory called
+`chapter.html` included — is rejected too, each with exit 2 before Chrome starts. The content of a
+`.html` file is not sniffed. Inline SVG inside HTML is supported by the released SVG
 geometry rule; treating a standalone SVG asset as a paged HTML document would require a separate
 MIME, page-size and embedding contract that this version does not claim.
 

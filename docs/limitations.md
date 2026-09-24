@@ -252,7 +252,10 @@ the part that does not, and the part that does not already fails loudly rather t
 **Non-HTML input is refused by its name, not by its content.** An input path that does not end in
 `.html` or `.htm` — Markdown, PDF, a standalone SVG — ends with exit 2 and `unsupported input type`
 before any renderer starts and before the path is even opened; measured for a `.md` file, existing
-or missing: exit 2, nothing on stdout. The content of a `.html` file is not sniffed. Markdown text
+or missing: exit 2, nothing on stdout. A path that is not a regular file — a directory called
+`chapter.html`, for instance — is refused the same way with `input is not a regular file`; until
+0.7.0 it passed both checks, started Chrome and ended exit 3 with "resource byte limit exceeded".
+The content of a `.html` file is not sniffed. Markdown text
 saved under a `.html` name is served and parsed as HTML: one run of body text with no element in
 it. Such a run then ends with exit 3 and `geometry-cross-check-failed` ("measured no elements"),
 because a cross-check over zero elements is not a passed cross-check (`src/measure/cross-check.ts`)

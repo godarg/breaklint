@@ -18,7 +18,27 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
   compared advice text will see the new string.
 
+### Fixed
+
+- **A directory named `*.html` ends with exit 2 before Chrome starts, instead of exit 3.** The
+  input type is decided by the name, so a directory called `chapter.html` passed the extension and
+  existence checks, started Chrome and ended exit 3 `source-acquisition-failed` with "input
+  capture failed: resource byte limit exceeded" — an infrastructure verdict with the wrong cause for
+  a mistake in the invocation, where the README promised exit 2. Anything that is not a regular
+  file is now `breaklint: input is not a regular file: <path>`, exit 2, no report.
+  `tests/e2e/input-validation.test.ts` pins exit 2 and an empty stdout for an existing and a
+  missing `.md`, a directory named `.html` (also after a valid path) and a missing `.html`.
+- **`--help` described exit 4 as including "no input"**; a run without an input path is exit 2.
+  The exit-2 line now names every usage case and says that no report is written.
+
 ### Documentation
+
+- **`--out-dir <dir>` is documented and tested.** It was parsed, validated and applied — every
+  live run writes its page PNGs and checked PDF there, by default into `./breaklint-report` in the
+  working directory — and appeared in neither `--help`, the README nor `docs/configuration.md`, and
+  no test named it. It is now in all three, `tests/e2e/input-validation.test.ts` pins its exit-2
+  cases, and the live test `tests/live/cli-out-dir.test.ts` observes the evidence in the named and
+  in the default directory (one more live test).
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as
   `true` does. This was always the behaviour; it is now written down in `docs/limitations.md` and

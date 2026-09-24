@@ -139,6 +139,22 @@ set-like values therefore does not change it; changing an effective option does.
 
 Report schema and snapshot schema evolve independently. The current source-bound report is schema 5, stored measurement snapshots are schema 4, and Configuration Contract remains v1. Each changes only when its own structure changes — including for an additive, optional field: an optional property does not let a schema-aware consumer tell the two shapes apart, and a strict decoder may reject it. Report schema 5 adds the optional `remediation` on a finding. Readers accept 4 and 5; only the emitter moved.
 
+## Command-line output options
+
+`--format`, `--out` and `--out-dir` are command-line options only; a config file cannot set them,
+and they are not part of `config.effective` or the fingerprint, because they decide where and in
+which projection a result is written rather than what is measured.
+
+`--out-dir <dir>` is the directory a live run writes its evidence into: one PNG per page and the
+PDF it checked. It defaults to `./breaklint-report`, relative to the working directory, and is
+created when a live run first writes evidence into it; `--demo` writes no evidence and creates
+nothing. A
+missing or blank value is exit 2. The report does not repeat the directory, but every
+`evidence[].path` in it is relative to it, so the report and the directory travel together.
+`tests/e2e/input-validation.test.ts` pins the exit-2 cases and `--help`, and
+`tests/live/cli-out-dir.test.ts` observes the evidence landing in the named directory and in the
+default one.
+
 ## Failure boundary
 
 The following are exit 2 and do not produce a report:
