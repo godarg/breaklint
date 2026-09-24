@@ -341,7 +341,7 @@ GitHub assets.
 | HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 60 physical artifacts with decoded-pixel, contrast, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
 | Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
-| `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 7 findings across 6 rules |
+| `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 5 findings across 5 rules |
 
 ## Finished and verified against a real browser
 

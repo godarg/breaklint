@@ -15,19 +15,19 @@ npx breaklint --demo
 
 That command needs no browser and no configuration. It ends with exit 1, because the demo
 fixture contains findings on purpose — a demo that ends 0 never shows you what a finding looks
-like. Below is one of its seven findings, plus the closing counters, copied from that
+like. Below is one of its five findings, plus the closing counters, copied from that
 command's output:
 
 ```
 error layout/unbreakable-block-too-tall  page 2
   measured   848 px; threshold 606 px (uncalibrated)
-  detail     This block asks not to be broken and is 848.00 px tall; the page content box is
-             606.00 px. It cannot fit on any page.
+  detail     This block asks not to be broken and is 848.00 px tall; the content box of page 2 is 606.00 px. It did not fit there unbroken.
+  remedy     A block with 'break-inside: avoid' is taller than the content box of the page it was laid out on, so the paginator could not keep it whole there. Where it had already been split into three or more fragments, the reported height is the sum of those fragments, which is the height its content needed. Make the block shorter — split it into smaller sections deliberately, or reduce container padding, font size or contained rows. Removing 'break-inside: avoid' also clears the finding, but only because the rule then has no candidate: the block is exactly as tall as before, and it will still be broken, just without having asked not to be.
+             untested: no trigger/remedied pair in this package shows this advice removing this finding
   source     unknown (node produced by the paginator)
   render     unknown (no evidence produced)
 
-inputs found: 1 · pages analysed: 5 · rules run: 13 · rules that measured something: 11 ·
-not measured: 2 · verdict: findings · mode: demo · fail-on: error · gate triggered by: error
+inputs found: 1 · pages analysed: 5 · rules run: 12 · rules that measured something: 10 · not measured: 1 · verdict: findings · mode: demo · fail-on: error · gate triggered by: error
 ```
 
 Every finding carries what was measured, what the threshold was, and the word `uncalibrated` —
