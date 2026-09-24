@@ -42,6 +42,16 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   a freshly built `dist/` entry (through a bin symlink) with a report of at least 256 KiB in every
   format, through a kernel pipe into `cat`, a kernel pipe into a slow reader and a Node pipe, and
   compares the bytes with the `--out` file; it fails on the previous entry point.
+- **A run that stops without an answer ends with exit 3, not 0.** If the work the CLI waits on
+  can no longer settle — a driver whose browser went away, a handle closed underneath it — the
+  event loop empties, and Node then ended the process with exit 0 and no output, which a gate
+  reads as a clean document. This was seen once, on a run under heavy load. The CLI now notices
+  the empty loop while it is still waiting and ends with exit 3 and one line:
+  `breaklint: the run stopped before it finished: nothing was left for it to wait on, so no report exists; exit 3.`
+  Its default exit code is also 3, so no other route past the explicit exit can end at 0.
+  `tests/e2e/cli-unsettled-run.test.ts` runs the real CLI source on the live path. Node's
+  module-customisation hooks replace only the acquisition module with one whose promise never
+  settles; that is harness, not a product option. It ended exit 0 before this change.
 - **A live run no longer depends on the browser exposing `FontFaceSet` as a global.** The
   measuring primitives captured the font set's `ready` getter and iterator through that global
   interface object, which a browser need not expose. Chromium 141 does not, and every live run
