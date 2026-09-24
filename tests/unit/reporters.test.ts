@@ -1,8 +1,10 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { OUTPUT_FORMATS } from "../../src/core/enums.ts";
 import { buildReport } from "../../src/core/build-report.ts";
@@ -53,6 +55,38 @@ function demoReport(): Report {
     }),
   });
 }
+
+/**
+ * What `npx breaklint --demo` actually prints, obtained by running the CLI — not by rebuilding the
+ * report in-process.
+ *
+ * `demoReport()` above is a fixture for the reporters: it activates ALL_RULES and passes
+ * `rulesRun: ALL_RULES.length`. The CLI does neither — it resolves the default configuration, and
+ * since 0.6.0 `layout/half-empty-page` is off by default. Two documentation guards compared against
+ * `demoReport()` (and one of them against a copy of the README typed into this file), so the
+ * published README kept "seven findings" and "rules run: 13" while the shipped command printed five
+ * and 12, and every guard stayed green. The oracle for a documented command is the command.
+ */
+const CLI_SOURCE = fileURLToPath(new URL("../../src/cli/index.ts", import.meta.url));
+function runRealDemo(extraArgs: readonly string[] = []): { code: number; stdout: string; stderr: string } {
+  try {
+    const stdout = execFileSync(process.execPath, ["--experimental-strip-types", CLI_SOURCE, "--demo", ...extraArgs], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      // A hung CLI must fail this test, not stall the suite. The demo needs no browser and
+      // finishes in well under a second; the budget only bounds a hang.
+      timeout: 60_000,
+    });
+    return { code: 0, stdout, stderr: "" };
+  } catch (error) {
+    const e = error as { status: number | null; stdout?: string; stderr?: string };
+    return { code: e.status ?? -1, stdout: e.stdout ?? "", stderr: e.stderr ?? "" };
+  }
+}
+
+/** Finding header lines of the console format: `<severity> <rule-id>  page <n>`. */
+const FINDING_HEADER = /^(error|warn|info) +[a-z]+\/[a-z0-9-]+ +page \d+$/u;
+const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 
 /** A clean live-style report carrying the positive geometry second-opinion event. */
 function positiveApparatusReport(base: Report): Report {
@@ -111,11 +145,54 @@ const ALIASES: Record<keyof typeof LABELS, string[]> = {
 describe("output formats", () => {
   const report = demoReport();
 
-  it("the README demo counter line is the exact console counter line", () => {
-    const documented =
-      "inputs found: 1 · pages analysed: 5 · rules run: 13 · rules that measured something: 11 · " +
-      "not measured: 2 · verdict: findings · mode: demo · fail-on: error · gate triggered by: error";
-    assert.ok(render(report, "console").includes(documented), "README demo counters drifted from actual console output");
+  it("the README demo excerpt is what `npx breaklint --demo` prints", () => {
+    // Read from README.md itself and compared against a real CLI run. The earlier guard compared
+    // a string typed into this test against `demoReport()`; it never opened the README, so the
+    // README could say anything, and the in-process report ran a rule the CLI does not run.
+    const demo = runRealDemo();
+    assert.equal(demo.code, 1, `--demo must end 1; stderr: ${demo.stderr}`);
+    const output = demo.stdout.split("\n");
+    // CRLF-normalised: a Windows checkout with autocrlf would otherwise report a missing excerpt
+    // instead of the actual difference.
+    const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8").replace(/\r\n/gu, "\n");
+    const intro = /Below is one of its ([a-z]+) findings, plus the closing counters, copied from that\ncommand's output:\n\n```\n([\s\S]*?)\n```\n/u.exec(readme);
+    assert.ok(intro, "README no longer carries the demo excerpt in the shape this guard reads");
+    const [, countWord, excerpt] = intro;
+    const excerptLines = excerpt!.split("\n");
+
+    // 1. The counter line: the excerpt's last line, whole-line equal to the CLI's.
+    const documentedCounters = excerptLines.at(-1);
+    const actualCounters = output.filter((l) => l.startsWith("inputs found:"));
+    assert.equal(actualCounters.length, 1, "the demo printed no single counter line");
+    assert.equal(documentedCounters, actualCounters[0], "README demo counters drifted from actual console output");
+
+    // 2. The quoted finding: one WHOLE finding — from its header to its closing `render` line —
+    //    verbatim and contiguous in the real output. An empty, header-less or truncated excerpt
+    //    cannot pass.
+    //
+    //    Which finding is quoted matters too. Until a release ships this tree, `npx breaklint
+    //    --demo` runs the published package, whose remedy text for
+    //    `layout/unbreakable-block-too-tall` differs from main's (e46a1bf, 6af6008). The README
+    //    therefore quotes a finding whose lines are identical in both — checked by diffing the
+    //    two outputs on 2026-09-24, not by this test, which can only see the source tree.
+    const blank = excerptLines.indexOf("");
+    assert.ok(blank > 0, "README excerpt has no finding block before the counters");
+    const findingBlock = excerptLines.slice(0, blank);
+    assert.match(findingBlock[0]!, FINDING_HEADER, "README excerpt does not open with a finding");
+    assert.match(findingBlock.at(-1)!, /^ {2}render {5}/u, "README finding block does not end at its render line");
+    assert.equal(
+      findingBlock.slice(1).filter((l) => FINDING_HEADER.test(l)).length,
+      0,
+      "README finding block runs into a second finding",
+    );
+    const start = output.indexOf(findingBlock[0]!);
+    assert.ok(start >= 0, `the demo prints no finding "${findingBlock[0]}"`);
+    assert.deepEqual(output.slice(start, start + findingBlock.length), findingBlock, "README finding block drifted from actual console output");
+
+    // 3. "one of its N findings": N is the number of finding headers the CLI printed.
+    const printed = output.filter((l) => FINDING_HEADER.test(l)).length;
+    assert.ok(printed > 0, "the demo printed no finding at all");
+    assert.equal(countWord, NUMBER_WORDS[printed], `README says "${countWord}" findings; the demo printed ${printed}`);
   });
 
   for (const format of OUTPUT_FORMATS) {
@@ -348,9 +425,9 @@ describe("output formats", () => {
   /**
    * The demo's own numbers, so `docs/status.md` cannot state them wrong again.
    *
-   * That file once said "8 findings across 8 rules". After the two unreachable ink definitions
-   * left the public registry, the product output is seven findings across SIX rules —
-   * `layout/half-empty-page` fires twice. Nothing in the repository
+   * That file once said "8 findings across 8 rules", later "7 findings across 6 rules" — the
+   * second was true only of `demoReport()`, where `layout/half-empty-page` still runs and fires
+   * twice; the CLI has had it off by default since 0.6.0. Nothing in the repository
    * computed either number, which is precisely how the earlier "209 leaf values" survived: a
    * figure in the file designated as the truth source, arrived at by counting once, by hand.
    *
@@ -358,10 +435,29 @@ describe("output formats", () => {
    * this fails with both values named.
    */
   it("the demo produces the counts docs/status.md states", () => {
-    const demo = demoReport();
+    // From the real CLI's JSON report, not from `demoReport()`: that fixture activates every rule,
+    // and it carried "7 findings across 6 rules" in this assertion and in the row for as long as
+    // the shipped command printed 5 across 5 (see `runRealDemo`).
+    let demoJson = "";
+    //
+    // Written with `--out`, not read from stdout: measured on 2026-09-24, the 82 586-byte JSON
+    // report arrives cut at 65 536 bytes when stdout is a pipe, because the CLI calls
+    // `process.exit` before the pipe has drained. That is a separate product defect; this guard
+    // checks the counts, so it reads the file the CLI finished writing.
+    const outDir = mkdtempSync(join(tmpdir(), "breaklint-demo-json-"));
+    try {
+      const outFile = join(outDir, "demo.json");
+      const run = runRealDemo(["--format", "json", "--out", outFile]);
+      assert.equal(run.code, 1, `the demo must end 1 — a demo that ends 0 shows no finding; stderr: ${run.stderr}`);
+      demoJson = readFileSync(outFile, "utf8");
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+    const demo = JSON.parse(demoJson) as Report;
+    assert.equal(demo.mode, "demo", "the JSON report is not the demo's");
     const ruleIds = new Set(demo.findings.map((f) => f.ruleId));
-    assert.equal(demo.findings.length, 7, "findings in the demo");
-    assert.equal(ruleIds.size, 6, "distinct rules in the demo");
+    assert.equal(demo.findings.length, 5, "findings in the demo");
+    assert.equal(ruleIds.size, 5, "distinct rules in the demo");
     assert.equal(demo.exitCode, 1, "the demo must end 1 — a demo that ends 0 shows no finding");
     // The doc row itself, matched WHOLE. A substring match is not enough and was measured not
     // enough: an audit replaced the row with "NOT VERIFIED: the demo does not run at all, and never

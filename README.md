@@ -15,19 +15,19 @@ npx breaklint --demo
 
 That command needs no browser and no configuration. It ends with exit 1, because the demo
 fixture contains findings on purpose — a demo that ends 0 never shows you what a finding looks
-like. Below is one of its seven findings, plus the closing counters, copied from that
+like. Below is one of its five findings, plus the closing counters, copied from that
 command's output:
 
 ```
-error layout/unbreakable-block-too-tall  page 2
-  measured   848 px; threshold 606 px (uncalibrated)
-  detail     This block asks not to be broken and is 848.00 px tall; the page content box is
-             606.00 px. It cannot fit on any page.
+error svg/text-overflows-viewport  page 5
+  measured   72 px; threshold 0 px (uncalibrated)
+  detail     This text extends 72.00 px beyond the SVG viewport and is not drawn. Coordinates are normalised through getScreenCTM().
+  remedy     Text rendered inside an SVG extends outside the SVG viewport bounds and is clipped. Enlarge the SVG 'viewBox' or its width/height, or adjust the <text> coordinates ('x', 'y', 'text-anchor'). 'overflow: visible' on the container also clears the finding, but it does not move the text: the viewport then no longer clips, the target becomes non-applicable and this rule stops measuring it. Use that only where the overflow is intended.
+             untested: no trigger/remedied pair in this package shows this advice removing this finding
   source     unknown (node produced by the paginator)
   render     unknown (no evidence produced)
 
-inputs found: 1 · pages analysed: 5 · rules run: 13 · rules that measured something: 11 ·
-not measured: 2 · verdict: findings · mode: demo · fail-on: error · gate triggered by: error
+inputs found: 1 · pages analysed: 5 · rules run: 12 · rules that measured something: 10 · not measured: 1 · verdict: findings · mode: demo · fail-on: error · gate triggered by: error
 ```
 
 Every finding carries what was measured, what the threshold was, and the word `uncalibrated` —
