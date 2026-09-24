@@ -84,7 +84,9 @@ code of `tail`: read every return value directly after its command.
 The technical surface gate reconstructs and verifies every current cell without claiming a human
 look. `npm run test:report-surfaces` is the separate exact-environment human gate. It must stay red
 when the bound inputs changed and no person reviewed the new artifacts; never refresh its ledger as
-release ceremony. A real later review may rebind it with its actual reviewer and timestamp.
+release ceremony. A real later review is recorded as a new round with its actual reviewers, date and
+outcome — `pass` or `fail` — and only a passing latest round with a human reviewer, bound to the
+exact current inputs, turns the gate green.
 
 The ledger is bound to the 0.2.3 input fingerprint from 2026-08-29. It was therefore red for
 0.3.0, 0.3.1, 0.4.0 and 0.5.0 without anyone noticing, because CI runs the technical mode, which
@@ -101,7 +103,11 @@ stacks collapse to the same family on a Linux CI container, and six of the thirt
 mobile screens — are rendered as single 390 x 15 000 px strips that no reviewer can actually judge.
 
 The ledger was therefore **not** rebound. Binding it would have recorded a review outcome that did
-not happen, which is the one thing this gate exists to prevent.
+not happen, which is the one thing this gate exists to prevent. The ledger format of the time
+(schema 4) could not hold a failed review at all; since schema 5 the 2026-09-18 FAIL is round 2 of
+the ledger itself, marked as a historical reconstruction from this record and carrying only what is
+stated here — date, outcome, scope, finding counts and headline findings, with no reviewer handle,
+per-cell outcome or binding invented after the fact (see `docs/reporting.md`).
 
 **That leaves 0.6.0 in a third state this document did not provide for, and the decision to ship in
 it was taken deliberately.** The release plan for this version pre-registered exactly two

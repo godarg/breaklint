@@ -134,14 +134,47 @@ The report-surface gate has two explicit modes over the complete matrix in
 `.artifacts/report-surfaces/`:
 
 - `npm run test:report-surfaces` and `npm run test:report-surfaces:local` are the strict local
-  human gate. They require the current source fingerprint, browser, operating system, architecture,
-  runtime, render contract, stable artifact fingerprints and visible screen-pixel hashes to match
-  the reviewed ledger exactly.
+  human gate. They pass only when the **latest** review round in the ledger passed, names at least
+  one human reviewer, and is bound to exactly the current source fingerprint, declared review
+  environment, stable artifact fingerprints, visible screen-pixel hashes and physical inventory.
 - `npm run test:report-surfaces:technical` is the release/CI technical gate. It renders and
-  validates the current platform's complete matrix, checks that the separately retained human
-  ledger is structurally genuine, and says whether that ledger matches or differs from the current
-  input fingerprint. It never transfers a historical human PASS onto changed inputs and does not
-  require a ceremonial re-review for a technical release gate.
+  validates the current platform's complete matrix, validates every round of the separately
+  retained human ledger structurally, and prints the latest round's outcome and whether it is
+  bound to the current inputs (also into the GitHub job summary when one exists). It never
+  transfers a historical human PASS onto changed inputs and does not require a ceremonial
+  re-review for a technical release gate.
+
+### Review ledger and declared review environment
+
+`tests/golden/report-surfaces/review-ledger.json` is schema 5: a list of numbered review
+**rounds**, each `pass`, `fail` or `pending`. Schema 4 could hold only one all-pass record, and
+technical mode rejected any cell that was not `pass`, so the one failed review this gate produced
+(2026-09-18) could not be written into it without turning CI red and existed only as prose. The
+migration kept the 0.2.3 review unchanged as round 1 (`historical`, pass, all 32 cell records as
+they were) and added the 2026-09-18 review as round 2 (`historical-reconstruction`, fail, one
+blocker, three high and four medium findings). Round 2 carries only what the public release record
+states; per-cell outcomes, reviewer handles, the render fingerprint and the environment were not
+recorded at the time, so its `binding` and `cells` are `null` and its two reviewers are
+`not-recorded` instead of named after the fact.
+
+A round is validated fail-closed: a `pass` round names its reviewers, binds an input fingerprint,
+a render timestamp and an environment, covers all 32 cells with every cell `pass`, and records no
+blocker or high finding; a `fail` round records at least one finding or one failed cell; a
+`pending` round carries no outcome. A reviewer is `human` (with a role handle), `agent` (with the
+label of the model or tool that reviewed; an agent is never counted as a human, and an agent-only
+round does not pass the human gate) or `not-recorded`. An earlier passing round never carries
+forward over a later failed or pending one.
+
+The render manifest (schema 5) splits the environment in two. `reviewEnvironment` is the
+**declared** review environment and is what a review binds: artifact and pixel contract versions,
+the browser product and four-part version, platform, architecture, the Node major line, device
+scale, the deterministic launch arguments, viewports, themes and the print contract (media, A4,
+raster DPI, rasterizer version, content viewport). `observedEnvironment` records the kernel or
+Darwin release string and the exact Node version beside it without binding them: neither changes a
+pixel, and a binding nobody can re-enter after one operating-system update is not reproducible. A
+browser version is measurable when it names a product and a four-part version — `Chromium
+141.0.7390.37` and `Google Chrome 152.0.7977.64` both qualify, since any Chromium-based browser is
+supported; a bare product name or a user-agent token does not.
 
 Both modes cover:
 
@@ -150,7 +183,7 @@ Both modes cover:
 - one real A4 PDF per state and an independently rasterized page set for each PDF.
 
 That is 32 review cells. The generated manifest records raw SHA-256, byte size, raster dimensions,
-PDF page geometry, DOM invariants and the exact browser/platform/render environment. Every screen
+PDF page geometry, DOM invariants and the declared and observed environment. Every screen
 PNG is also decoded to eight-bit straight RGBA. Fully transparent pixels have their invisible RGB
 channels canonicalized to zero; SHA-256 is then computed over the normalized RGBA bytes. The
 verifier independently decodes and normalizes the file and rejects a one-channel mutation of one
@@ -173,11 +206,11 @@ The review gate deliberately keeps two distinct bindings:
 
 The verifier independently reconstructs the current source/input fingerprint, every stable artifact
 fingerprint and every screen RGBA hash. A local human PASS transfers only when those fingerprints,
-pixels and the complete review environment are identical. It also runs two negative controls:
-changing one bound input in a temporary tree must invalidate the source fingerprint, and changing
-one visible RGBA channel must invalidate the screen fingerprint. A new or changed bound source
-therefore returns the ledger to `pending` until the complete local matrix has been rendered and
-reviewed again. Technical CI still fails on malformed historical review evidence or any technical
+pixels and the complete declared review environment are identical. It also runs two negative
+controls: changing one bound input in a temporary tree must invalidate the source fingerprint, and
+changing one visible RGBA channel must invalidate the screen fingerprint. A new or changed bound
+source therefore leaves the latest round unbound until the complete local matrix has been rendered
+and reviewed again in a new round. Technical CI still fails on malformed historical review evidence or any technical
 defect in its own current matrix; changed source is reported as different rather than mislabeled as
 already human-reviewed. The strict local gate remains red until a real reviewer binds the new exact
 inputs.

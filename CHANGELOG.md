@@ -18,6 +18,25 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
   compared advice text will see the new string.
 
+### Reporting
+
+- **The report-surface review ledger can now record a failed review (ledger schema 4 → 5).** The
+  ledger holds numbered review rounds, each `pass`, `fail` or `pending`; schema 4 could hold only
+  one all-pass record, so the failed 2026-09-18 review existed as prose only. The file was migrated:
+  the 0.2.3 review is round 1 unchanged, the 2026-09-18 FAIL is round 2, marked as a historical
+  reconstruction and carrying only what the release record states. `npm run test:report-surfaces`
+  stays red and now says why ("latest human review round 2 is FAIL"); the technical mode prints the
+  same line and whether the latest round is bound to the current inputs. Reviewers are `human`,
+  `agent` (named by model or tool, never counted as human) or `not-recorded`.
+- **The technical surface gate accepts every Chromium-based browser.** It required the string
+  `Chrome` in `--version`, so `Chromium 141.0.7390.37` failed the gate after a complete render and
+  no review on a Chromium build could ever be bound. It now requires a product name and a four-part
+  version.
+- **The review environment is declared rather than copied (render manifest schema 4 → 5, artifact
+  contract 3 → 4).** A review binds browser, platform, architecture, Node major line, launch
+  arguments, viewports and the print contract; the kernel release and the exact Node version are
+  recorded as observations and no longer unbind a review after an OS or Node patch update.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as

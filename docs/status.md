@@ -149,7 +149,10 @@ generated most often; and the six mobile cells are rendered as single 390 x 15 0
 cannot be judged at all.
 
 The ledger was **not** rebound. Recording `pass` for 32 cells after a review that failed would be
-exactly the false claim this gate exists to prevent. The gate stays red for 0.6.0 — with a date,
+exactly the false claim this gate exists to prevent. Since ledger schema 5 the failed review is a
+round of the ledger itself — round 2, `fail`, marked as a historical reconstruction from the release
+record — instead of prose only; `npm run test:report-surfaces` now fails on it by name ("latest human
+review round 2 is FAIL"), and the technical mode prints the same line. The gate stays red for 0.6.0 — with a date,
 two named reviewers, an enumerated finding list and an owner, which is the difference that mattered.
 What is honestly established about these surfaces is the technical half: `test:report-surfaces:technical`
 passes 32 of 32 cells and all 71 artifacts, and makes no human-review claim.
@@ -338,7 +341,7 @@ GitHub assets.
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
 | Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in report schema 3; generated schema drift and process-boundary exit 2 are tested |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
-| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 60 physical artifacts with decoded-pixel, contrast, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
+| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 71 physical artifacts with decoded-pixel, contrast, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
 | Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
 | `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 5 findings across 5 rules |

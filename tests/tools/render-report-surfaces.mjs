@@ -13,7 +13,14 @@ import { PNG } from "pngjs";
 import { resolveBrowser } from "../../src/acquire/browser.ts";
 import { render } from "../../src/report/index.ts";
 import { canonicalReportStates } from "../fixtures/report-states.ts";
-import { computeReviewInput } from "./report-surface-contract.mjs";
+import {
+  REQUIRED_BROWSER_RENDER_ARGS,
+  REVIEW_ARTIFACT_CONTRACT_VERSION,
+  SCREEN_PIXEL_CONTRACT_VERSION,
+  assertObservedEnvironment,
+  assertReviewEnvironment,
+  computeReviewInput,
+} from "./report-surface-contract.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const OUTPUT = resolve(process.env.BREAKLINT_SURFACE_DIR ?? join(ROOT, ".artifacts/report-surfaces"));
@@ -25,20 +32,10 @@ const VIEWPORTS = {
 const THEMES = ["light", "dark"];
 const PRINT_CONTENT_VIEWPORT = { width: 703, height: 1123 };
 const PRINT_RASTER_DPI = 110;
-const REVIEW_ARTIFACT_CONTRACT_VERSION = 3;
-const SCREEN_PIXEL_CONTRACT_VERSION = 1;
 const PRINT_MUTATION_CONTROL = process.env.BREAKLINT_SURFACE_PRINT_CONTROL ?? "none";
 const PRINT_STATE_FILTER = process.env.BREAKLINT_SURFACE_STATE ?? null;
 const REPORT_STATES = ["clean", "findings", "infrastructure", "insufficient-coverage"];
-const BROWSER_RENDER_ARGS = [
-  "--deterministic-mode",
-  "--disable-gpu",
-  "--disable-lcd-text",
-  "--disable-skia-runtime-opts",
-  "--font-render-hinting=none",
-  "--force-color-profile=srgb",
-  "--hide-scrollbars",
-];
+const BROWSER_RENDER_ARGS = [...REQUIRED_BROWSER_RENDER_ARGS];
 if (!["none", "broken-coverage", "broken-trust-geometry", "broken-tail-cohesion", "broken-box-closure", "broken-partial-box-closure", "broken-left-box-closure", "broken-partial-both-box-closure"].includes(PRINT_MUTATION_CONTROL)) {
   throw new Error(`unknown BREAKLINT_SURFACE_PRINT_CONTROL=${PRINT_MUTATION_CONTROL}`);
 }
@@ -63,7 +60,7 @@ function canonical(value) {
 
 function stableReviewArtifactFingerprint(reviewInputFingerprint, reviewEnvironment, cell, visibleContract) {
   return createHash("sha256")
-    .update("breaklint-stable-review-artifact-v3\0")
+    .update(`breaklint-stable-review-artifact-v${REVIEW_ARTIFACT_CONTRACT_VERSION}\0`)
     .update(JSON.stringify(canonical({
       reviewInputFingerprint,
       reviewEnvironment,
@@ -376,14 +373,15 @@ const rasterizerVersion = (popplerVersionResult.stderr || popplerVersionResult.s
 if (popplerVersionResult.status !== 0 || !/^pdftoppm version\s+\S+/u.test(rasterizerVersion)) {
   throw new Error(`pdftoppm version probe failed (${popplerVersionResult.status}): ${popplerVersionResult.stdout}${popplerVersionResult.stderr}`);
 }
+// The declared environment binds what decides the pixels; the kernel release and the exact Node
+// version are observations recorded beside it (see DECLARED_ENVIRONMENT_FIELDS).
 const reviewEnvironment = {
   reviewArtifactContractVersion: REVIEW_ARTIFACT_CONTRACT_VERSION,
   screenPixelContractVersion: SCREEN_PIXEL_CONTRACT_VERSION,
   browser: browserVersionResult.stdout.trim(),
   platform: platform(),
   architecture: arch(),
-  platformRelease: release(),
-  node: process.version,
+  nodeMajor: process.versions.node.split(".")[0],
   deviceScaleFactor: 1,
   browserRenderArgs: BROWSER_RENDER_ARGS,
   viewports: VIEWPORTS,
@@ -396,6 +394,10 @@ const reviewEnvironment = {
     contentViewportCssPx: PRINT_CONTENT_VIEWPORT,
   },
 };
+const observedEnvironment = { platformRelease: release(), node: process.version };
+// Fail before rendering, not after: an unmeasurable environment cannot bind any artifact.
+assertReviewEnvironment(reviewEnvironment, "current render environment");
+assertObservedEnvironment(observedEnvironment, "current render environment");
 const browser = await puppeteer.launch({ executablePath: browserResolution.path, headless: true, args: BROWSER_RENDER_ARGS });
 const artifacts = [];
 const technicalProbes = [];
@@ -710,15 +712,16 @@ try {
 
 const manifest = {
   // The report-surface render manifest carries its own version, independent of the canonical
-  // report schema. Report 4 -> 5 moved this stamp along with it in error: the manifest's own
-  // structure did not change, and its verifier pins 4. A stamp that moves for someone else's
-  // structure change says nothing about this artifact.
-  schemaVersion: 4,
+  // report schema: it moves only when THIS artifact's structure changes. 4 -> 5 because the
+  // environment is split into the declared, bound `reviewEnvironment` and the
+  // `observedEnvironment` recorded beside it; the verifier pins 5 and rejects a 4 manifest.
+  schemaVersion: 5,
   generatedAt: new Date().toISOString(),
   reviewInputContractVersion: 1,
   reviewInputFingerprint: reviewInput.fingerprint,
   reviewInputs: reviewInput.files,
   reviewEnvironment,
+  observedEnvironment,
   matrix: "4 states × (2 themes × 3 screen viewports + A4 PDF + A4 raster set) = 32 review cells",
   physicalArtifacts: {
     screens: artifacts.filter((artifact) => artifact.kind === "screen").length,

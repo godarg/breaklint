@@ -15,6 +15,17 @@ import {
   infrastructureReportState,
   insufficientCoverageReportState,
 } from "../fixtures/report-states.ts";
+import {
+  BROWSER_VERSION_PATTERN,
+  DECLARED_ENVIRONMENT_FIELDS,
+  REQUIRED_BROWSER_RENDER_ARGS,
+  REVIEW_ARTIFACT_CONTRACT_VERSION,
+  assessHumanGate,
+  isMeasurableBrowserVersion,
+  validateReviewLedger,
+  type ReviewLedger,
+  type ReviewRound,
+} from "../tools/report-surface-contract.mjs";
 
 describe("HTML Report Surface v2", () => {
   it("renders the current package version on every canonical review surface", () => {
@@ -211,5 +222,158 @@ describe("HTML Report Surface v2", () => {
     assert.match(html, /\.report-header\.state-clean ~ \.findings-empty \{ display: none; \}/u, "clean print must omit the redundant empty-findings block");
     assert.match(html, /overflow-wrap: anywhere/u);
     assert.match(html, /outline: var\(--ds-focus-width\) solid/u);
+  });
+});
+
+function committedLedger(): ReviewLedger {
+  return JSON.parse(readFileSync(new URL("../golden/report-surfaces/review-ledger.json", import.meta.url), "utf8")) as ReviewLedger;
+}
+
+/** A complete, current-shape manifest and a round bound to it: the positive control for the gate. */
+function boundPassingFixture(): { ledger: ReviewLedger; manifest: Record<string, unknown>; fingerprint: string } {
+  const fingerprint = "a".repeat(64);
+  const reviewEnvironment = {
+    reviewArtifactContractVersion: REVIEW_ARTIFACT_CONTRACT_VERSION,
+    screenPixelContractVersion: 1,
+    browser: "Chromium 141.0.7390.37",
+    platform: "linux",
+    architecture: "x64",
+    nodeMajor: "24",
+    deviceScaleFactor: 1,
+    browserRenderArgs: [...REQUIRED_BROWSER_RENDER_ARGS],
+    viewports: { desktop: { width: 1440, height: 1000 } },
+    themes: ["light", "dark"],
+    print: { media: "print", format: "A4 from CSS @page", rasterDpi: 110, rasterizer: "pdftoppm version 24.02.0", contentViewportCssPx: { width: 703, height: 1123 } },
+  };
+  const artifacts: Record<string, unknown>[] = [];
+  const cells: Record<string, Record<string, unknown> & { status: "pass" }> = {};
+  const hex = (index: number) => index.toString(16).padStart(64, "0");
+  let index = 0;
+  for (const state of ["clean", "findings", "infrastructure", "insufficient-coverage"]) {
+    for (const theme of ["light", "dark"]) {
+      for (const viewport of ["desktop", "tablet", "mobile"]) {
+        const cell = `screen/${state}/${theme}/${viewport}`;
+        const path = `${state}--${theme}--${viewport}.png`;
+        const tiles = viewport === "desktop" ? [] : [{ path: `${state}--${theme}--${viewport}--tile-01.png` }];
+        artifacts.push({ cell, kind: "screen", path, tiles, reviewArtifactFingerprint: hex(++index), pixels: { normalizedRgbaSha256: hex(++index) } });
+        cells[cell] = { status: "pass", reviewer: "@Reviewer", reviewedAt: "2026-10-01T10:00:00.000Z", note: "Looked at the full page and every tile.", reviewArtifactFingerprint: hex(index - 1), reviewedRawSha256: hex(900), reviewedNormalizedRgbaSha256: hex(index), reviewedArtifacts: [path, ...tiles.map((tile) => tile.path)] };
+      }
+    }
+    const pdfCell = `print/${state}/pdf`;
+    artifacts.push({ cell: pdfCell, kind: "pdf", path: `${state}--a4.pdf`, pages: 2, reviewArtifactFingerprint: hex(++index) });
+    cells[pdfCell] = { status: "pass", reviewer: "@Reviewer", reviewedAt: "2026-10-01T10:00:00.000Z", note: "Read both pages of the PDF.", reviewArtifactFingerprint: hex(index), reviewedRawSha256: hex(901), reviewedPages: [1, 2], reviewedArtifacts: [`${state}--a4.pdf`] };
+    const rasterCell = `print/${state}/raster-set`;
+    const pages = [{ path: `${state}--a4-page-1.png` }, { path: `${state}--a4-page-2.png` }];
+    artifacts.push({ cell: rasterCell, kind: "raster-set", pages, reviewArtifactFingerprint: hex(++index) });
+    cells[rasterCell] = { status: "pass", reviewer: "@Reviewer", reviewedAt: "2026-10-01T10:00:00.000Z", note: "Compared both rasters with the PDF.", reviewArtifactFingerprint: hex(index), reviewedRawSha256: [hex(902), hex(903)], reviewedPages: [1, 2], reviewedArtifacts: pages.map((page) => page.path) };
+  }
+  const physicalArtifacts = { screens: 24, pdfs: 4, rasterPages: 8 };
+  const manifest = { reviewEnvironment, observedEnvironment: { platformRelease: "6.18.44", node: "v24.21.0" }, artifacts, physicalArtifacts };
+  const ledger = committedLedger();
+  const round: ReviewRound = {
+    round: ledger.rounds.length + 1,
+    record: "current",
+    outcome: "pass",
+    reviewedAt: "2026-10-01T10:00:00.000Z",
+    reviewers: [{ handle: "@Reviewer", kind: "human" }],
+    binding: { reviewInputFingerprint: fingerprint, renderManifestGeneratedAt: "2026-10-01T09:00:00.000Z", reviewEnvironment: structuredClone(reviewEnvironment) },
+    physicalArtifactsReviewed: { ...physicalArtifacts },
+    findings: { blocker: 0, high: 0, medium: 0, low: 0 },
+    note: "Synthetic positive control for the strict local gate.",
+    cells,
+  };
+  ledger.rounds.push(round);
+  return { ledger, manifest, fingerprint };
+}
+
+describe("report-surface human review gate", () => {
+  it("accepts every Chromium-family four-part browser version and rejects an unmeasurable one", () => {
+    for (const accepted of [
+      "Google Chrome 152.0.7977.64",
+      "Google Chrome for Testing 141.0.7390.37",
+      "Chromium 141.0.7390.37",
+      "Chromium 141.0.7390.37 built on Debian 13",
+      "Microsoft Edge 140.0.3485.54",
+    ]) {
+      assert.equal(isMeasurableBrowserVersion(accepted), true, `a supported Chromium-based browser was rejected: ${accepted}`);
+    }
+    for (const rejected of ["Chrome", "HeadlessChrome/141.0.7390.37", "Chromium 141.0.7390", "", "141.0.7390.37", "Chromium\n141.0.7390.37"]) {
+      assert.equal(isMeasurableBrowserVersion(rejected), false, `an unmeasurable browser string was accepted: ${JSON.stringify(rejected)}`);
+    }
+    assert.equal(isMeasurableBrowserVersion(undefined), false);
+    assert.ok(BROWSER_VERSION_PATTERN.unicode, "the pattern is a unicode regular expression");
+  });
+
+  it("records the 2026-09-18 FAIL as a structural round, and the strict local gate stays red on it", () => {
+    const ledger = committedLedger();
+    const { rounds, latest } = validateReviewLedger(ledger);
+    assert.equal(rounds, 2);
+    assert.equal(ledger.rounds[0]!.outcome, "pass", "the 0.2.3 review stays on record as the pass it was");
+    assert.equal(ledger.rounds[0]!.record, "historical");
+    assert.equal(latest.outcome, "fail");
+    assert.equal(latest.record, "historical-reconstruction", "a round written after the fact must say so");
+    assert.deepEqual(latest.findings, { blocker: 1, high: 3, medium: 4, low: 0 });
+    assert.equal(latest.binding, null, "no fingerprint or environment was recorded in 2026-09-18 and none is invented");
+    assert.ok(latest.reviewers.every((reviewer) => reviewer.kind === "not-recorded" && reviewer.handle === null),
+      "the public record names no reviewer handle, so the ledger names none");
+    const { manifest, fingerprint } = boundPassingFixture();
+    assert.throws(() => assessHumanGate(committedLedger(), manifest, fingerprint), /latest human review round 2 is FAIL \(2026-09-18/u);
+  });
+
+  it("passes only a latest human round bound to the current inputs, environment and cells", () => {
+    const { ledger, manifest, fingerprint } = boundPassingFixture();
+    assert.equal(assessHumanGate(ledger, manifest, fingerprint).round, 3, "positive control: a genuinely bound round passes");
+
+    // Mutation: a passing round over changed inputs is not a review of those inputs.
+    assert.throws(() => assessHumanGate(ledger, manifest, "b".repeat(64)), /bound to a different source\/input revision/u);
+
+    // Observations may drift without re-reviewing; the declared environment may not.
+    const observedOnly = structuredClone(manifest);
+    (observedOnly.observedEnvironment as Record<string, string>).platformRelease = "6.19.0";
+    (observedOnly.observedEnvironment as Record<string, string>).node = "v24.99.1";
+    assert.equal(assessHumanGate(ledger, observedOnly, fingerprint).round, 3, "a kernel or Node patch update must not unbind a review");
+    const otherBrowser = structuredClone(manifest);
+    (otherBrowser.reviewEnvironment as Record<string, string>).browser = "Google Chrome 152.0.7977.64";
+    assert.throws(() => assessHumanGate(ledger, otherBrowser, fingerprint), /different declared browser\/platform\/render environment/u);
+
+    // One changed cell fingerprint is a different rendered artifact.
+    const changedCell = structuredClone(ledger);
+    changedCell.rounds.at(-1)!.cells!["print/findings/pdf"]!.reviewArtifactFingerprint = "c".repeat(64);
+    assert.throws(() => assessHumanGate(changedCell, manifest, fingerprint), /print\/findings\/pdf: strict local human review is bound to a different rendered artifact/u);
+
+    // A screen cell is reviewed as its full page AND its tiles.
+    const missingTile = structuredClone(ledger);
+    missingTile.rounds.at(-1)!.cells!["screen/clean/light/mobile"]!.reviewedArtifacts = ["clean--light--mobile.png"];
+    assert.throws(() => assessHumanGate(missingTile, manifest, fingerprint), /reviewed screen artifacts are not named exactly/u);
+
+    // An agent review is recorded honestly and does not pass the human gate.
+    const agentOnly = structuredClone(ledger);
+    agentOnly.rounds.at(-1)!.reviewers = [{ handle: "@Reviewer", kind: "agent", model: "example-review-model" }];
+    assert.throws(() => assessHumanGate(agentOnly, manifest, fingerprint), /has no human reviewer/u);
+
+    // An earlier pass never carries forward over a later failed round.
+    const laterFail = structuredClone(ledger);
+    laterFail.rounds.push({ ...structuredClone(ledger.rounds[1]!), round: 4, record: "current", reviewedAt: "2026-10-02" });
+    assert.throws(() => assessHumanGate(laterFail, manifest, fingerprint), /latest human review round 4 is FAIL/u);
+  });
+
+  it("rejects a ledger round whose record contradicts its outcome", () => {
+    const failed = (mutate: (ledger: ReviewLedger) => void, expected: RegExp) => {
+      const { ledger } = boundPassingFixture();
+      mutate(ledger);
+      assert.throws(() => validateReviewLedger(ledger), expected);
+    };
+    failed((ledger) => { ledger.rounds.at(-1)!.cells!["screen/clean/dark/tablet"]!.status = "fail"; }, /contains a cell that did not pass/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.findings.high = 1; }, /cannot carry a blocker or high finding/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.reviewers = [{ handle: null, kind: "agent" }]; }, /must name its model or tool/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.reviewers = [{ handle: "@Reviewer", kind: "human", model: "example-review-model" }]; }, /does not carry a model label/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.round = 7; }, /numbered in order/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.binding = null; }, /must bind inputs and environment/u);
+    failed((ledger) => { delete ledger.rounds.at(-1)!.cells!["print/clean/raster-set"]; }, /must cover all 32 cells/u);
+    failed((ledger) => { Object.assign(ledger.rounds[1]!, { findings: { blocker: 0, high: 0, medium: 0, low: 0 } }); }, /must record a finding or a failed cell/u);
+    failed((ledger) => { delete ledger.rounds[1]!.source; }, /must name its source record/u);
+    failed((ledger) => { (ledger.rounds.at(-1)!.binding!.reviewEnvironment as Record<string, unknown>).platformRelease = "6.18.44"; },
+      new RegExp(`binds exactly ${DECLARED_ENVIRONMENT_FIELDS.join(", ")}`, "u"));
+    failed((ledger) => { ledger.schemaVersion = 4; }, /human ledger schema drift/u);
   });
 });
