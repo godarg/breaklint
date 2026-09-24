@@ -5,7 +5,7 @@ import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
 /**
  * layout/half-empty-page — a page carries far less content than it could.
  *
- * Three things about this rule are worth more than the rule itself.
+ * Four things about this rule are worth more than the rule itself.
  *
  * First, what is measured. `verticalFill` — the span from the top of the content box to the
  * lowest band — is *not* the threshold quantity, because it measures where the content is, not
@@ -13,20 +13,28 @@ import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
  * reads 0.992, and the same line at the head reads 0.056. Identical content, a spread of 0.936.
  * The threshold quantity is `netFill`, the summed height of semantic bands.
  *
- * Second, why this rule is experimental and therefore never moves an exit code. The *ceiling*
- * of netFill on a fully set text page is 0.686 — line boxes do not cover leading. The threshold
- * is 0.60. Eighty-six thousandths separate "full" from "flagged", and a typeface with more
- * leading can spend that. Shipping this as a gate would be a wager, so it does not gate.
+ * Second, why this rule is experimental and therefore never moves an exit code. netFill sums the
+ * glyph boxes of text runs (plus replaced elements), not their line boxes: half-leading and
+ * block margins never count. So a page no line more would fit on reads roughly glyph height over
+ * line pitch, and that depends on the font and the leading. There is no ceiling, in the code or
+ * in the measurements: full, non-last prose pages at `line-height: 1.5` read 0.58–0.72 with this
+ * collector — 0.69–0.72 for one long paragraph, 0.58–0.63 with 1 em paragraph margins, six of
+ * sixteen such pages below the 0.60 threshold — and a full page reads 0.51–0.54 at 2 and
+ * 0.35–0.36 at 3. The 0.686 this comment used to call "the measured ceiling" is a single reading
+ * whose conditions were never recorded, not a bound. A threshold that full pages straddle cannot
+ * gate, so it does not.
  *
  * Third, since 0.6.0 this rule is not active in the default profile. Measured on a 40-document
  * corpus built to exercise it, it fired on 37 of them — most of those are pages a reader calls
- * full, because of the saturation above. Registration is not activation: the id, the options and
- * the schema entry are unchanged, and `profile: "strict"`, `rules: { "layout/half-empty-page":
- * true }` or `--only` each turn it back on. See OFF_BY_DEFAULT_RULE_IDS in src/config/contract.ts.
+ * full, because of the glyph-box quantity above. Registration is not activation: the id, the
+ * options and the schema entry are unchanged, and `profile: "strict"`, `rules: {
+ * "layout/half-empty-page": true }` or `--only` each turn it back on. See OFF_BY_DEFAULT_RULE_IDS
+ * in src/config/contract.ts.
  *
  * Fourth, the last page. It is not exempted wholesale — that would hide a real defect on the one
- * page most likely to have one. It is downgraded to `info`, and only when it also carries no
- * continuation fragment and was not reached by a forced break.
+ * page most likely to have one. Its finding keeps `warn`, because a rule may not emit a severity
+ * it did not declare; the message says the page is likely intended, and only when it also carries
+ * no continuation fragment and was not reached by a forced break.
  */
 export const halfEmptyPage = defineRule(
   {
@@ -106,7 +114,8 @@ export const halfEmptyPage = defineRule(
           message:
             `Page ${page.pageNumber} ${what}.` +
             (isTailPage ? " This is the last page and carries no continuation — likely intended." : "") +
-            " Experimental: the threshold sits 0.086 below the measured ceiling of a full text page.",
+            " Experimental: net fill sums the glyph boxes of text, not its line boxes, so a page a " +
+            "reader calls full can read below this threshold.",
           page: page.pageNumber,
           keyType: "page",
           key: key.key,

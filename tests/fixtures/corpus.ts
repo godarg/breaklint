@@ -5,7 +5,7 @@
  * that makes exactly one rule fire — a corpus in which the breaking case is missing is not a
  * corpus. The `clean` fixtures contain the cases most likely to produce a false alarm: the
  * formula minus, the inch mark, the parity blank page, the deliberate chapter break, the
- * fully-set page at its measured ceiling of 0.686.
+ * fully set page whose net fill reads far below 1.
  *
  * A false alarm on a clean fixture is a release blocker, not a note. A rule that cries wolf on
  * a correct document gets switched off after the second time, and a switched-off rule finds
@@ -400,8 +400,9 @@ export function loadCorpus(): CorpusEntry[] {
       kind: "clean",
       about: "layout/half-empty-page",
       complication:
-        "A fully set text page at netFill 0.686 — the measured ceiling, because line boxes do " +
-        "not cover leading. Only 0.086 above the threshold, which is why the rule is experimental.",
+        "A fully set text page at netFill 0.686. Net fill sums glyph boxes, not line boxes, so a " +
+        "full page reads far below 1 — full prose pages at line-height 1.5 measured 0.58–0.72 — " +
+        "and some full pages fall below the 0.60 threshold, which is why the rule is experimental.",
       snapshot: snapshot({ pages: [page(1, { fill: { vertical: 0.98, topGap: 0.01, net: 0.686, area: 1 } })] }),
     },
     {
@@ -462,6 +463,40 @@ export function loadCorpus(): CorpusEntry[] {
       snapshot: snapshot({
         pages: [page(1, { fill: { vertical: 0.9, topGap: 0.02, net: 0.62, area: 1 } })],
         blocks: [block("c1", { fragmentIndex: 1, fragmentCount: 2 }), block("c2"), block("c3")],
+      }),
+    },
+    {
+      name: "orphaned-continuation-clean-full-middle-page",
+      kind: "clean",
+      about: "layout/orphaned-continuation-page",
+      complication:
+        "One paragraph over four pages. Pages 2 and 3 carry nothing but its continuation and read " +
+        "a net fill of 0.49 against the 0.50 threshold — the numbers of a real full page at " +
+        "line-height 2.2, where glyph boxes cover less than half the line pitch. But the paragraph " +
+        "goes on to the next page, so each was left by overflow and is full by construction. A " +
+        "rule that never asks whether the page's last block ENDS there reports both.",
+      alsoFires: ["layout/half-empty-page"],
+      snapshot: snapshot({
+        pages: [
+          page(1, { fill: { vertical: 0.99, topGap: 0, net: 0.46, area: 1 } }),
+          page(2, { fill: { vertical: 0.99, topGap: 0, net: 0.49, area: 1 } }),
+          page(3, { fill: { vertical: 0.99, topGap: 0, net: 0.49, area: 1 } }),
+          page(4, {
+            isLast: true,
+            fill: { vertical: 0.99, topGap: 0, net: 0.73, area: 1 },
+            outgoingBreakCause: { kind: "document-end", determinedBy: "document-boundary", cascadeHint: null },
+          }),
+        ],
+        blocks: [0, 1, 2, 3].map((i) =>
+          block(`long:${i}`, {
+            sid: "s-long",
+            fragmentIndex: i,
+            fragmentCount: 4,
+            page: i + 1,
+            lineHeight: 32.27,
+            effectiveStyle: style({ lineHeight: 32.27 }),
+          }),
+        ),
       }),
     },
 

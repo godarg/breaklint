@@ -60,10 +60,10 @@ export interface ProfileDefinition {
  * Being registered and being on by default are different claims, and until 0.6.0 this project
  * only had the first. `layout/half-empty-page` is the case that forced the distinction: measured
  * on a 40-document corpus built for the purpose, it fired on 37 of them. Its quantity saturates —
- * `netFill` sums line-box heights and so never counts leading or block margins, which caps a fully
- * set text page at about 0.686 against a threshold of 0.60 — so most of those 37 are pages a
- * reader calls full. A warning that appears on nine documents out of ten teaches its reader to
- * skip warnings, and that cost is paid by the twelve rules that are right.
+ * `netFill` sums glyph-box heights, not line boxes, and so never counts leading or block margins;
+ * full prose pages at line-height 1.5 read 0.58–0.72 against a threshold of 0.60 — so most of
+ * those 37 are pages a reader calls full. A warning that appears on nine documents out of ten
+ * teaches its reader to skip warnings, and that cost is paid by the twelve rules that are right.
  *
  * It is not retired and not renamed: `layout/half-empty-page` has been a public rule id since
  * 0.5.0 and lives in configurations, `--disable` invocations, stored reports and fingerprints.

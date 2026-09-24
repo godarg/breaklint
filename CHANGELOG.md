@@ -17,12 +17,44 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   finding message had already stopped making that all-pages claim from one measured page; the
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
   compared advice text will see the new string.
+- **`layout/orphaned-continuation-page` no longer reports the full middle pages of a long block.**
+  A page is now judged only when its last block, in document order, ENDS there; the rule records
+  this as a third measurement, `ends-on-page`, in its evaluations. A page whose last block goes on
+  to the next page was left because its content overflowed it, so it is full by construction.
+  Until now every such page between the first and the last page of a block was reported as soon as
+  its net fill read below 0.50 — and net fill counts glyph boxes, not line boxes, so a full page
+  reads 0.34–0.36 at `line-height: 3`: a long paragraph with generous leading produced one warning
+  per middle page (five on the new live fixture, measured on Chromium 141; none now). The page a
+  block ends on is judged exactly as before, and the message now says what it is: "Page N carries
+  only the end of a block that began on an earlier page, and its net fill is X %". Consumers that
+  match the old message text, or read the evaluation's measurements by position, will see the
+  change. The guard reads the order in which the collector records a page's blocks, document
+  order, and the live suite now pins that order. Not fixed: the completely filled last page of a
+  block, followed by a forced break or the end of the document, still reads below 0.50 at a large
+  line height and is still reported; a line-box fill is the named follow-up
+  (`docs/limitations.md`). No longer reported, and a loss: a nearly empty page whose last block is
+  a wrapper with bare text of its own while a child of it is carried to the next page (measured
+  with a tall `break-inside: avoid` figure); with the text in a `<p>` the page is still reported.
+  No schema stamp moves.
+- **`layout/half-empty-page` no longer states a "measured ceiling" in its findings.** Every finding
+  said the threshold "sits 0.086 below the measured ceiling of a full text page". Net fill has no
+  ceiling: full, non-last prose pages at `line-height: 1.5` read 0.58–0.72 with this collector, and
+  6 of 16 such pages read below the 0.60 threshold. The message now says what the quantity is —
+  "net fill sums the glyph boxes of text, not its line boxes, so a page a reader calls full can
+  read below this threshold" — and quotes no number. The rule page, `docs/agent-contract.md` and
+  the source comments are corrected; the 0.6.0 entry below, which gives "about 0.686" as the
+  figure for a full page, is corrected by this entry rather than rewritten. The rule stays
+  experimental and off by default, and nothing here is a calibration.
 
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as
   `true` does. This was always the behaviour; it is now written down in `docs/limitations.md` and
   pinned by a contract test.
+- `docs/rules/layout-orphaned-continuation-page.md`: the remedied example changed the font size,
+  which is not a lever the rule's advice names; it now tightens the vertical margin above the
+  paragraph. The page also states the tail semantics and the remaining false alarm, and
+  `docs/limitations.md` says what page fill counts and what a line-box fill would change.
 
 ## 0.6.0 — 2026-09-18
 

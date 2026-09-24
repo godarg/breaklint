@@ -13,13 +13,13 @@ A page carries far less content than its content box allows.
 
 ## Why
 
-**Experimental, and therefore never gates — not even at `--fail-on warn`.** The ceiling of `netFill` on a fully set text page is 0.686, because line boxes do not cover leading. The threshold is 0.60. Eighty-six thousandths separate *full* from *flagged*, and a typeface with more leading can spend that.
+**Experimental, and therefore never gates — not even at `--fail-on warn`.** `netFill` sums the glyph boxes of a page's text, not its line boxes, so a page no further line would fit on reads roughly glyph height over line pitch — a figure set by the font and the leading, not a fixed ceiling. Measured with this collector on full pages that are not the last page of their document (Chromium 141, Paged.js 0.4.3, the measuring machine's default serif and sans-serif): 0.58–0.72 at `line-height: 1.5` — 0.69–0.72 for pages of one long paragraph, 0.58–0.63 for prose with 1 em paragraph margins, where 6 of 16 full pages read below the threshold — then 0.51–0.54 at `line-height: 2` and 0.35–0.36 at `line-height: 3`. The threshold is 0.60. Full pages fall on both sides of it, so it cannot gate.
 
 What is measured is `netFill`, the summed height of semantic bands — not `verticalFill`. A page holding one absolutely positioned line at the foot reads `verticalFill` 0.992; the same line at the head reads 0.056. Identical content, a spread of 0.936. `verticalFill` measures where the content is, not how much there is.
 
 ## Limits and known false alarms
 
-A parity blank page is declined, not reported: it has `netFill` 0 and would fire under any threshold, and the author asked for it with `break-before: right`. The last page is downgraded to a note when it also carries no continuation and no forced break.
+A parity blank page is declined, not reported: it has `netFill` 0 and would fire under any threshold, and the author asked for it with `break-before: right`. The last page keeps its `warn` finding, but when it also carries no continuation and no forced break, the message says it is likely intended.
 
 ## Calibration
 
@@ -35,7 +35,7 @@ This rule fires on either of two quantities: the page's net fill ratio fell belo
 <!-- end generated remediation: layout/half-empty-page -->
 
 > [!NOTE]
-> **This rule saturates.** `netFill` merges the client rectangles of a page's text runs and replaced elements and divides the summed band height by the content box height. Half-leading falls between the bands, and no element margin ever enters the rectangles, so the quantity is systematically smaller than the fill a reader perceives: a page of prose at `line-height: 1.5` reaches at most about 0.686, against a threshold of 0.60. Measured on a 40-document corpus constructed for this purpose, it fired on 37 of 40 documents, including pages a reader would call full. No measurement on a corpus of real-world documents exists. It is classified as experimental, never gates CI, and since 0.6.0 is no longer active in the default profile — `profile: "strict"` or `rules: { "layout/half-empty-page": true }` turns it back on.
+> **This rule saturates.** `netFill` merges the client rectangles of a page's text runs and replaced elements and divides the summed band height by the content box height. Half-leading falls between the bands, and no element margin ever enters the rectangles, so the quantity is systematically smaller than the fill a reader perceives: full pages of prose at `line-height: 1.5` read 0.58–0.72, against a threshold of 0.60, and less with more leading. Measured on a 40-document corpus constructed for this purpose, it fired on 37 of 40 documents, including pages a reader would call full. No measurement on a corpus of real-world documents exists. It is classified as experimental, never gates CI, and since 0.6.0 is no longer active in the default profile — `profile: "strict"` or `rules: { "layout/half-empty-page": true }` turns it back on.
 
 ## Examples
 
