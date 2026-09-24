@@ -93,7 +93,7 @@ ${model.findings.map((finding) => `<li>
     <div><dt>Calibration</dt><dd>${esc(finding.calibration)}</dd></div>
     <div><dt>Proof source</dt><dd>${finding.proofSource ? esc(finding.proofSource) : "None declared"}</dd></div>
   </dl>
-  ${finding.remediation ? `<div class="finding-remediation"><p><strong>Remediation:</strong> ${esc(finding.remediation)}</p>${finding.remediationTested === false ? `<p class="finding-remediation-untested">Untested: no trigger/remedied pair in this package shows this advice removing this finding.</p>` : ""}</div>` : ""}
+  ${finding.remediation ? `<div class="finding-remediation"><p><strong>Remediation</strong>${finding.remediationTested === false ? ` <span class="untested-marker">untested</span>` : ""} ${esc(finding.remediation)}</p></div>` : ""}
   ${finding.frequencyNote ? `<div class="finding-frequency-note"><p><strong>Note:</strong> ${esc(finding.frequencyNote)}</p></div>` : ""}
   ${renderFindingEvidence(finding)}
   ${finding.ambiguity ? `<p class="evidence-state"><strong>Ambiguity:</strong> ${esc(finding.ambiguity)}</p>` : ""}
@@ -101,10 +101,16 @@ ${model.findings.map((finding) => `<li>
 </li>`).join("\n")}
 </ol>`;
 
+  const { untested, withAdvice } = model.remediationSummary;
+  // Stated once, at body size and colour, where the reader meets the findings; each finding then
+  // carries only a compact marker.
+  const caveat = untested === 0
+    ? ""
+    : `\n  <p class="remediation-caveat"><strong>Remediation advice in this report is untested.</strong> No trigger/remedied pair in this package shows it removing its finding; this applies to ${untested} of ${withAdvice} finding${withAdvice === 1 ? "" : "s"} with advice, each marked <span class="untested-marker">untested</span> in its remediation box.</p>`;
   return `<section class="findings-section${model.findings.length === 0 ? " findings-empty" : ""}" aria-labelledby="findings-heading">
 <div class="section-heading">
   <h2 id="findings-heading">Findings</h2>
-  <p class="section-lead">${esc(model.findingsLead)}</p>
+  <p class="section-lead">${esc(model.findingsLead)}</p>${caveat}
 </div>
 ${list}
 </section>`;

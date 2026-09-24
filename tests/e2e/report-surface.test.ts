@@ -191,6 +191,21 @@ describe("HTML Report Surface v2", () => {
     assert.match(html, /<td class="num"><abbr title="Not applicable: no candidates">n\/a<\/abbr><\/td>/u, "a zero-candidate rule shows n/a, not a number");
   });
 
+  it("states the untested-advice caveat once per report and marks each untested finding compactly", () => {
+    for (const [state, report] of Object.entries(canonicalReportStates())) {
+      const html = renderHtml(report);
+      const model = buildHtmlReportModel(report);
+      const untested = model.findings.filter((finding) => finding.remediation !== null && finding.remediationTested === false).length;
+      assert.deepEqual(model.remediationSummary, { withAdvice: model.findings.filter((finding) => finding.remediation !== null).length, untested });
+      assert.equal((html.match(/class="remediation-caveat"/gu) ?? []).length, untested > 0 ? 1 : 0, `${state}: caveat count`);
+      assert.equal((html.match(/no trigger\/remedied pair in this package/giu) ?? []).length, untested > 0 ? 1 : 0, `${state}: the long sentence appears once, not per finding`);
+      assert.equal((html.match(/<strong>Remediation<\/strong> <span class="untested-marker">untested<\/span>/gu) ?? []).length, untested, `${state}: one marker per untested finding`);
+      if (untested > 0) assert.match(html, new RegExp(`this applies to ${untested} of ${model.remediationSummary.withAdvice} findings with advice`, "u"));
+    }
+    assert.equal(buildHtmlReportModel(findingsReportState()).remediationSummary.untested, 7, "all seven canonical findings carry untested advice today");
+    assert.doesNotMatch(REPORT_HTML_STYLES, /\.untested-marker \{[^}]*fg-muted/su, "the marker is not muted small print");
+  });
+
   it("uses unique deterministic IDs for every labelled surface", () => {
     const html = renderHtml(findingsReportState());
     const ids = [...html.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]);

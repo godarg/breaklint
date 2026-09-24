@@ -41,6 +41,8 @@ const controls = [
   { name: "broken-both-row-rule", state: "insufficient-coverage", expect: /coverage row rule is open/u, sides: ["left", "right"] },
   { name: "broken-column-alignment", state: "findings", expect: /coverage column 3 misaligned/u },
   { name: "broken-header-repeat", state: "clean", expect: /long coverage table: continuation page lacks the table header/u },
+  { name: "broken-untested-repeat", state: "findings", expect: /untested-advice caveat appears 8 times in the PDF/u },
+  { name: "broken-untested-marker", state: "findings", expect: /untested marker is not set in body-text colour/u },
   {
     name: "broken-soft-contrast",
     state: "findings",

@@ -75,6 +75,12 @@ export interface HtmlReportModel {
     candidates: number;
   };
   findingsLead: string;
+  /**
+   * How many findings carry remediation advice, and how many of those no trigger/remedied pair in
+   * this package substantiates. The report states the caveat once, from these counts, instead of
+   * repeating it inside every finding.
+   */
+  remediationSummary: { withAdvice: number; untested: number };
   findings: HtmlFinding[];
   infrastructure: ReturnType<typeof infraLines>;
   coverage: HtmlCoverageDocument[];
@@ -275,6 +281,7 @@ export function buildHtmlReportModel(report: Report): HtmlReportModel {
           measured,
         };
 
+  const findings = report.findings.map(findingModel);
   return {
     status: { key: report.runVerdict, ...STATUS[report.runVerdict] },
     facts: mandatoryFacts(report),
@@ -289,7 +296,11 @@ export function buildHtmlReportModel(report: Report): HtmlReportModel {
       : report.findings.length === 0
         ? "The requested checks completed without a gate-triggering finding."
         : `${report.findings.length} measured finding${report.findings.length === 1 ? "" : "s"}, ordered as produced by the checker.`,
-    findings: report.findings.map(findingModel),
+    findings,
+    remediationSummary: {
+      withAdvice: findings.filter((finding) => finding.remediation !== null).length,
+      untested: findings.filter((finding) => finding.remediation !== null && finding.remediationTested === false).length,
+    },
     // Non-fatal apparatus diagnostics and positive second-opinion evidence remain visible too.
     // Presence is not equivalent to failure; `InfraLine.fatal` carries that engine decision.
     infrastructure: infraLines(report),

@@ -83,7 +83,9 @@ export const REPORT_HTML_STYLES = String.raw`
   .finding-facts > div { min-width: 0; }
   .evidence-state { margin-block: var(--bl-space-4) 0; color: var(--bl-color-fg-muted); font-size: var(--bl-font-size-sm); }
   .evidence-state strong { color: var(--bl-color-fg-primary); }
-  .finding-remediation-untested { margin-block-start: var(--bl-space-2); color: var(--bl-color-fg-muted); font-size: var(--bl-font-size-sm); }
+  .remediation-caveat { max-width: var(--bl-text-width); margin-block: calc(-1 * var(--bl-space-2)) var(--bl-space-5); padding-inline-start: var(--bl-space-3); border-inline-start: var(--bl-border-strong) solid var(--bl-color-fg-primary); }
+  /* The per-finding marker is set at the advice's own size and in body-text colour, not muted. */
+  .untested-marker { display: inline-block; margin-inline: var(--bl-space-1); padding: 0 var(--bl-space-1); border: var(--bl-border-thin) solid currentColor; border-radius: var(--bl-radius-sm); color: var(--bl-color-fg-primary); font-size: 1em; font-weight: 700; line-height: 1.3; }
   .finding-remediation { margin-block: var(--bl-space-4) 0; padding: var(--bl-space-3); border-inline-start: var(--bl-border-strong) solid var(--bl-color-fg-primary); background: var(--bl-color-soft); font-size: var(--bl-font-size-sm); }
   .finding-remediation p, .finding-frequency-note p { margin: 0; }
   .finding-frequency-note { margin-block: var(--bl-space-3) 0; padding: var(--bl-space-3); border-inline-start: var(--bl-border-strong) solid var(--bl-color-divider); background: var(--bl-color-soft); font-size: var(--bl-font-size-sm); color: var(--bl-color-fg-muted); }

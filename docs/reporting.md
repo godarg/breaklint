@@ -54,6 +54,18 @@ An unknown source remains unknown. The HTML renderer does not invent a filename 
 is clickable only when its path matches the relative page-artifact form minted by breaklint. Other
 references remain visible as inert text.
 
+## Untested remediation advice
+
+Every rule in this package declares remediation advice, and no trigger/remedied pair in the package
+shows any of it removing its finding (`remediation.tested: false`). The report says so **once**,
+directly under the Findings heading, at body size and body-text colour, with the count it applies
+to ("this applies to 7 of 7 findings with advice"). Each finding's remediation box then carries a
+compact `untested` marker at the advice's own size in body-text colour, instead of a muted
+small-print sentence repeated in every finding (seven times in each finding-bearing PDF before).
+The surface gate counts the long sentence in each PDF's text — exactly once per finding-bearing
+state, never in the clean state — and checks every marker's computed colour and size in every
+cell; `broken-untested-repeat` and `broken-untested-marker` are its red controls.
+
 ## Responsive and print behaviour
 
 - Findings never use a table or horizontal scrolling.

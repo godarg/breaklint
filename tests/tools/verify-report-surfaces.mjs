@@ -348,7 +348,16 @@ function printVisibleContract(state) {
   assertRecordedTableGeometry(pdf.printSemantics.coverageTables, `print/${state}`);
   assert.ok(pdf.printSemantics.coverageTables.every((table) => table.rowBreakInside.every((value) => ["avoid", "avoid-page"].includes(value))), `print/${state}: coverage row may fragment`);
   assert.ok(pdf.printSemantics.coverageTables.every((table) => table.heightPx <= (297 - 24) / 25.4 * 96 / 2), `print/${state}: coverage table taller than half a page`);
-  assert.deepEqual(pdf.pageContentChecks, independentlyCheckPageContent(pdf, raster), `print/${state}: page content invariant drift`);
+  const pageContent = independentlyCheckPageContent(pdf, raster);
+  // Independent expectation: the canonical clean state has no finding; every other state states the
+  // untested-advice caveat exactly once, however many findings it has.
+  const caveatText = run("pdftotext", [resolve(output, pdf.path), "-"]).replace(/\s+/gu, " ");
+  pageContent.untestedCaveatOccurrences = (caveatText.match(/no trigger\/remedied pair in this package/giu) ?? []).length;
+  assert.equal(pageContent.untestedCaveatOccurrences, state === "clean" ? 0 : 1, `print/${state}: the untested-advice caveat must appear once per finding-bearing report`);
+  assert.deepEqual(pdf.pageContentChecks, pageContent, `print/${state}: page content invariant drift`);
+  for (const caveat of [pdf.printSemantics.remediationCaveat]) {
+    assert.ok(caveat.markersInBodyTextColour && (caveat.markers === 0 || caveat.smallestMarkerToAdviceRatio >= 1), `print/${state}: untested marker below body-text salience`);
+  }
   const rows = independentlyCheckCoverageRows(resolve(output, pdf.path), raster.pages, pdf.printSemantics.coverageRowCount, pdf.rowChecks, `print/${state}`);
   assert.ok(rows.pagesWithRows.length <= 2, `print/${state}: 13 coverage rows span ${rows.pagesWithRows.length} pages`);
   if (state === "clean") independentlyCheckPositiveApparatusGrouping(pdf);
@@ -504,6 +513,10 @@ for (const artifact of manifest.artifacts) {
     assert.deepEqual(artifact.semantics.externalResources, []);
     assert.ok(artifact.semantics.contrast.minimum >= 4.5, `${artifact.cell}: WCAG AA contrast failed`);
     assertRecordedFonts(artifact.semantics.fonts, artifact.cell);
+    assertRecordedTableGeometry(artifact.semantics.coverageTables, artifact.cell);
+    const caveat = artifact.semantics.remediationCaveat;
+    assert.equal(caveat.statements, state === "clean" ? 0 : 1, `${artifact.cell}: untested-advice caveat count`);
+    assert.ok(caveat.markersInBodyTextColour && (caveat.markers === 0 || caveat.smallestMarkerToAdviceRatio >= 1), `${artifact.cell}: untested marker below body-text salience`);
     assert.ok(artifact.dimensions.width >= 390 && artifact.dimensions.height >= 844);
     pixelMutationControl ??= runScreenPixelMutationControl(artifact, currentReviewInput);
   } else {

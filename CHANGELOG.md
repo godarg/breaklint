@@ -70,6 +70,14 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   header on continuation pages, no one-row continuation) and now also rejects printed content wider
   than the A4 content box, which makes Chrome shrink the whole PDF silently.
 
+- **The untested-advice caveat is stated once, prominently.** Each finding repeated "Untested: no
+  trigger/remedied pair in this package shows this advice removing this finding." in muted small
+  print — seven times per finding-bearing report, forty times in a forty-finding one. The report now
+  states it once under the Findings heading at body size and colour, with the count it applies to,
+  and each remediation box carries a compact `untested` marker in body-text colour. The HTML model
+  gains `remediationSummary { withAdvice, untested }`; JSON is unchanged (`Finding.remediation`
+  already carries `tested`).
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as

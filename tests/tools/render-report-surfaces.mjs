@@ -79,6 +79,13 @@ const SURFACE_CONTROLS = {
     screen: `.coverage-table td:nth-child(3) { text-align: start !important; }`,
     print: `.coverage-table td:nth-child(3) { text-align: start !important; }`,
   },
+  // The per-finding sentence comes back: seven repetitions of one caveat in small print.
+  "broken-untested-repeat": { print: `@media print { .finding-remediation::after { content: "Untested: no trigger/remedied pair in this package shows this advice removing this finding."; display: block; } }` },
+  // The marker falls back to muted small print.
+  "broken-untested-marker": {
+    screen: `.untested-marker { color: var(--bl-color-fg-muted) !important; }`,
+    print: `.untested-marker { color: var(--bl-color-fg-muted) !important; }`,
+  },
   // The column header stops repeating on a continuation page (long-table probe).
   "broken-header-repeat": { print: `@media print { .coverage-table thead { display: table-row-group !important; } }` },
   // Text on the soft background (alert, remediation box, frequency note) was not measured before
@@ -328,6 +335,40 @@ function coverageTableGeometryInPage() {
       rightPx: round(rect.right),
     };
   });
+}
+
+/**
+ * Evaluated in the page: the untested-advice caveat is stated once per report and each finding
+ * carries a compact marker in body-text colour at least as large as the advice it marks.
+ */
+function remediationCaveatInPage() {
+  const probe = document.createElement("span");
+  probe.style.color = "var(--bl-color-fg-primary)";
+  document.body.append(probe);
+  const bodyText = getComputedStyle(probe).color;
+  probe.remove();
+  const markers = [...document.querySelectorAll(".finding .untested-marker")];
+  return {
+    statements: document.querySelectorAll(".remediation-caveat").length,
+    markers: markers.length,
+    markersInBodyTextColour: markers.every((marker) => getComputedStyle(marker).color === bodyText),
+    smallestMarkerToAdviceRatio: markers.length === 0 ? null : Math.min(...markers.map((marker) =>
+      Number.parseFloat(getComputedStyle(marker).fontSize) / Number.parseFloat(getComputedStyle(marker.parentElement).fontSize))),
+  };
+}
+
+function assertRemediationCaveat(caveat, label) {
+  if (caveat.statements !== (caveat.markers > 0 ? 1 : 0)) {
+    throw new Error(`${label}: the untested-advice caveat must be stated once per report with markers, found ${caveat.statements} statements for ${caveat.markers} markers`);
+  }
+  if (!caveat.markersInBodyTextColour) throw new Error(`${label}: untested marker is not set in body-text colour`);
+  if (caveat.markers > 0 && caveat.smallestMarkerToAdviceRatio < 1) throw new Error(`${label}: untested marker is smaller than the advice it marks`);
+}
+
+/** The long caveat sentence, counted in a PDF's text with line breaks normalised away. */
+function untestedCaveatOccurrences(pdfPath) {
+  const text = run("pdftotext", [pdfPath, "-"]).replace(/\s+/gu, " ");
+  return (text.match(/no trigger\/remedied pair in this package/giu) ?? []).length;
 }
 
 function assertCoverageTableGeometry(tables, label) {
@@ -601,6 +642,8 @@ try {
           semantics.contrast = await measuredContrast(page);
           semantics.coverageTables = await page.evaluate(coverageTableGeometryInPage);
           assertCoverageTableGeometry(semantics.coverageTables, `${state}/${theme}/${viewport}`);
+          semantics.remediationCaveat = await page.evaluate(remediationCaveatInPage);
+          assertRemediationCaveat(semantics.remediationCaveat, `${state}/${theme}/${viewport}`);
           if (
             semantics.mainCount !== 1 || semantics.h1Count !== 1 || semantics.bodyFontPx < 16 ||
             semantics.horizontalOverflowPx !== 0 || semantics.overflowingFindings.length !== 0 ||
@@ -679,6 +722,8 @@ try {
           horizontalOverflowPx: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
         };
       });
+      printSemantics.remediationCaveat = await page.evaluate(remediationCaveatInPage);
+      assertRemediationCaveat(printSemantics.remediationCaveat, `print/${state}`);
       printSemantics.coverageTables = await page.evaluate(coverageTableGeometryInPage);
       printSemantics.coverageRowCount = printSemantics.coverageTables.reduce((sum, table) => sum + table.rows, 0);
       if (
@@ -706,6 +751,10 @@ try {
       const { pdfPath, rasterPages } = printed;
       const { pages, pageSize } = printed.pdf;
       const pageContent = pageContentChecks(pdfPath, rasterPages);
+      pageContent.untestedCaveatOccurrences = untestedCaveatOccurrences(pdfPath);
+      if (pageContent.untestedCaveatOccurrences !== printSemantics.remediationCaveat.statements) {
+        throw new Error(`${state}: untested-advice caveat appears ${pageContent.untestedCaveatOccurrences} times in the PDF; it is stated once per report`);
+      }
       const rowChecks = coverageRowChecks(pdfPath, rasterPages, printSemantics.coverageRowCount, tableEdges, state);
       if (rowChecks.pagesWithRows.length > 2) {
         throw new Error(`${state}: the coverage table spans ${rowChecks.pagesWithRows.length} pages; 13 rules must fit on at most two`);
