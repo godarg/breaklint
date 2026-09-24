@@ -77,6 +77,15 @@ cell; `broken-untested-repeat` and `broken-untested-marker` are its red controls
   grid per row on one shared five-column template, so columns still align and nothing scrolls
   sideways.
 - Body text remains 16 CSS pixels and long paths may wrap anywhere.
+- Commands and rule ids are `<code>` that cannot break where a break changes what is copied. A
+  command such as `--disable layout/widow` is carried in the HTML model apart from the prose around
+  it and rendered as one `cli-flag` element; a rule id never breaks at a hyphen inside its name. On a
+  narrow screen the only permitted break is after the namespace slash (a `<wbr>`, which adds no
+  character); print keeps every command and rule id on one line. The surface gate measures the
+  rendered lines of every command and rule id per character in every cell and in print, and reads
+  each PDF's text for a line ending inside a flag or rule id (`broken-flag-wrap` and
+  `broken-rule-id-wrap` are its red controls). In 0.6.0 the one printed command broke as
+  `--` / `disable layout/widow`.
 - Keyboard focus uses a visible three-pixel-equivalent outline.
 - The report follows the operating-system light/dark preference and honours reduced motion.
 - Print forces the light palette, uses an A4 page with 12 mm margins and keeps finding evidence in

@@ -78,6 +78,13 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   gains `remediationSummary { withAdvice, untested }`; JSON is unchanged (`Finding.remediation`
   already carries `tested`).
 
+- **A printed command no longer breaks inside itself.** The coverage alert printed
+  `--disable layout/widow` as `--` at the end of one line and `disable layout/widow` on the next, so
+  copying it from the PDF gave a broken command. Commands are now carried in the HTML model apart
+  from the prose around them and rendered as one unbreakable `<code>`; rule ids break only after
+  their namespace slash on narrow screens (they broke at hyphens, `layout/unbreakable-block-too-/tall`)
+  and never in print.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as

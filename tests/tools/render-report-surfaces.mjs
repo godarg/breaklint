@@ -79,6 +79,13 @@ const SURFACE_CONTROLS = {
     screen: `.coverage-table td:nth-child(3) { text-align: start !important; }`,
     print: `.coverage-table td:nth-child(3) { text-align: start !important; }`,
   },
+  // Forces a break inside the one printed command, whatever today's text length is.
+  "broken-flag-wrap": { print: `@media print {
+    .cli-flag, .cli-flag > span { white-space: normal !important; }
+    .coverage-shortfall-item li { max-inline-size: 6ch !important; }
+  }` },
+  // Rule ids may break at a hyphen inside the name again.
+  "broken-rule-id-wrap": { screen: `.rule-id > span { white-space: normal !important; } .finding h3 { max-inline-size: 12ch !important; }` },
   // The per-finding sentence comes back: seven repetitions of one caveat in small print.
   "broken-untested-repeat": { print: `@media print { .finding-remediation::after { content: "Untested: no trigger/remedied pair in this package shows this advice removing this finding."; display: block; } }` },
   // The marker falls back to muted small print.
@@ -371,6 +378,60 @@ function untestedCaveatOccurrences(pdfPath) {
   return (text.match(/no trigger\/remedied pair in this package/giu) ?? []).length;
 }
 
+/**
+ * Evaluated in the page: how every command (`.cli-flag`) and rule id (`.rule-id`) is broken into
+ * rendered lines, measured per character, so a break is seen wherever it falls.
+ */
+function identifierLinesInPage() {
+  return [...document.querySelectorAll(".cli-flag, .rule-id")].flatMap((element) => {
+    if (element.parentElement?.closest(".cli-flag, .rule-id")) return [];
+    const lines = [];
+    let currentTop = null;
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      for (let index = 0; index < node.textContent.length; index += 1) {
+        const range = document.createRange();
+        range.setStart(node, index);
+        range.setEnd(node, index + 1);
+        const rect = range.getClientRects()[0];
+        if (!rect) continue;
+        if (currentTop === null || rect.top > currentTop + rect.height / 2) {
+          lines.push("");
+          currentTop = rect.top;
+        }
+        lines[lines.length - 1] += node.textContent[index];
+      }
+    }
+    return lines.length === 0 ? [] : [{ kind: element.classList.contains("cli-flag") ? "flag" : "rule-id", text: element.textContent, lines }];
+  });
+}
+
+/**
+ * A command or rule id may break only after its namespace slash, and only on screen: print keeps
+ * every one on a single line, because a line break in a PDF is a newline in the copied command.
+ */
+function assertIdentifierLines(identifiers, label, { print }) {
+  for (const identifier of identifiers) {
+    const permitted = print ? identifier.lines.length === 1
+      : identifier.lines.length === 1 || (identifier.lines.length === 2 && identifier.lines[0].endsWith("/"));
+    if (!permitted) {
+      const what = identifier.kind === "flag" ? `flag ${identifier.text}` : `rule id ${identifier.text}`;
+      throw new Error(`${label}: ${what} split across ${identifier.lines.length} lines (${JSON.stringify(identifier.lines)}); ${identifier.kind === "flag" ? "a flag" : "a rule id"} may break only after its namespace slash, and never in print`);
+    }
+  }
+}
+
+/** Independent of the DOM: in the PDF's text no command or rule id is split across lines. */
+function pdfIdentifierBreaks(pdfPath, flags) {
+  const text = run("pdftotext", ["-layout", pdfPath, "-"]);
+  const lines = text.split("\n");
+  return {
+    linesEndingInsideAFlag: lines.filter((line) => /(?:^|\s)--(?:[a-z-]*)?\s*$/u.test(line)).length,
+    linesEndingInsideARuleId: lines.filter((line) => /\b(?:layout|svg|type|artifact)\/(?:[a-z0-9-]*-)?\s*$/u.test(line)).length,
+    flagsWhole: flags.map((flag) => ({ flag, whole: lines.some((line) => line.includes(flag)) })),
+  };
+}
+
 function assertCoverageTableGeometry(tables, label) {
   if (tables.length === 0) throw new Error(`${label}: no coverage table rendered`);
   for (const table of tables) {
@@ -642,6 +703,8 @@ try {
           semantics.contrast = await measuredContrast(page);
           semantics.coverageTables = await page.evaluate(coverageTableGeometryInPage);
           assertCoverageTableGeometry(semantics.coverageTables, `${state}/${theme}/${viewport}`);
+          semantics.identifiers = await page.evaluate(identifierLinesInPage);
+          assertIdentifierLines(semantics.identifiers, `${state}/${theme}/${viewport}`, { print: false });
           semantics.remediationCaveat = await page.evaluate(remediationCaveatInPage);
           assertRemediationCaveat(semantics.remediationCaveat, `${state}/${theme}/${viewport}`);
           if (
@@ -722,6 +785,8 @@ try {
           horizontalOverflowPx: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
         };
       });
+      printSemantics.identifiers = await page.evaluate(identifierLinesInPage);
+      assertIdentifierLines(printSemantics.identifiers, `print/${state}`, { print: true });
       printSemantics.remediationCaveat = await page.evaluate(remediationCaveatInPage);
       assertRemediationCaveat(printSemantics.remediationCaveat, `print/${state}`);
       printSemantics.coverageTables = await page.evaluate(coverageTableGeometryInPage);
@@ -752,6 +817,11 @@ try {
       const { pages, pageSize } = printed.pdf;
       const pageContent = pageContentChecks(pdfPath, rasterPages);
       pageContent.untestedCaveatOccurrences = untestedCaveatOccurrences(pdfPath);
+      pageContent.identifierBreaks = pdfIdentifierBreaks(pdfPath, printSemantics.identifiers.filter((identifier) => identifier.kind === "flag").map((identifier) => identifier.text));
+      if (pageContent.identifierBreaks.linesEndingInsideAFlag > 0 || pageContent.identifierBreaks.linesEndingInsideARuleId > 0 ||
+        pageContent.identifierBreaks.flagsWhole.some((flag) => !flag.whole)) {
+        throw new Error(`${state}: the PDF text splits a flag or rule id across lines: ${JSON.stringify(pageContent.identifierBreaks)}`);
+      }
       if (pageContent.untestedCaveatOccurrences !== printSemantics.remediationCaveat.statements) {
         throw new Error(`${state}: untested-advice caveat appears ${pageContent.untestedCaveatOccurrences} times in the PDF; it is stated once per report`);
       }

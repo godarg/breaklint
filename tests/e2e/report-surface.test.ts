@@ -181,14 +181,34 @@ describe("HTML Report Surface v2", () => {
     assert.match(table, /<caption><span class="coverage-path mono">examples\/demo\.html<\/span> <span class="document-verdict">Document verdict: findings<\/span><\/caption>/u,
       "the document path and verdict belong to the table caption, so they cannot strand above it");
     assert.equal((table.match(/<th scope="col"/gu) ?? []).length, 7, "seven column headers");
-    assert.equal((table.match(/<th scope="row" class="rule"><code>/gu) ?? []).length, rules.length, "every rule is a row header");
-    for (const rule of rules) assert.ok(table.includes(`<code>${rule}</code>`), `${rule} is missing from the table`);
+    assert.equal((table.match(/<th scope="row" class="rule"><code class="rule-id">/gu) ?? []).length, rules.length, "every rule is a row header");
+    for (const rule of rules) {
+      const [namespace, name] = rule.split("/");
+      assert.ok(table.includes(`<code class="rule-id"><span>${namespace}/</span><wbr><span>${name}</span></code>`), `${rule} is missing from the table`);
+    }
     assert.doesNotMatch(html, /<dt>Rule<\/dt>|coverage-record/u, "no card-era coverage labels remain");
     assert.match(table, /<tbody class="coverage-tail">(?:\s*<tr[\s\S]*?<\/tr>){2}\s*<\/tbody>/u, "the last two rows are bracketed");
     const zero = renderHtml(insufficientCoverageReportState());
     assert.match(zero, /<tr id="coverage-1-1" class="short">/u, "a below-floor row is marked");
     assert.match(zero, /<span class="coverage-result short">Below floor<\/span>/u, "a below-floor row says so in words");
     assert.match(html, /<td class="num"><abbr title="Not applicable: no candidates">n\/a<\/abbr><\/td>/u, "a zero-candidate rule shows n/a, not a number");
+  });
+
+  it("renders commands and rule ids as code that cannot break where a break changes what is copied", () => {
+    const report = insufficientCoverageReportState();
+    const model = buildHtmlReportModel(report);
+    const shortfall = model.coverage[0]!.rows.find((row) => !row.ok)!;
+    assert.deepEqual(shortfall.options.map((option) => option.command), [null, `--disable ${shortfall.ruleId}`],
+      "the command is carried apart from its prose, not pre-joined into a sentence");
+    const html = renderHtml(report);
+    assert.match(html, /<code class="cli-flag"><span>--disable layout\/<\/span><wbr><span>widow<\/span><\/code> stops the check\./u);
+    const withoutCode = html.replace(/<style>[\s\S]*?<\/style>/u, "").replace(/<code class="cli-flag">[\s\S]*?<\/code>/gu, "");
+    assert.doesNotMatch(withoutCode, /--disable/u, "every command is inside a cli-flag code element");
+    assert.match(html, /<h3 id="finding-1-title"><code class="rule-id"><span>layout\/<\/span><wbr><span>widow<\/span><\/code> · page 2<\/h3>/u);
+    assert.match(REPORT_HTML_STYLES, /\.rule-id > span, \.cli-flag > span \{ white-space: nowrap; \}/u, "no break inside a flag or a rule name");
+    assert.match(REPORT_HTML_STYLES, /\.rule-id wbr, \.cli-flag wbr \{ display: none; \}/u, "print removes even the slash break");
+    const gating = buildHtmlReportModel(findingsReportState()).coverage[0]!.rows.find((row) => row.ruleId === "layout/unbreakable-block-too-tall")!;
+    assert.match(gating.options[1]!.after, /removes the gate, not the defect/u, "a gating rule keeps its stronger warning");
   });
 
   it("states the untested-advice caveat once per report and marks each untested finding compactly", () => {

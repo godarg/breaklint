@@ -11,6 +11,31 @@ const esc = (value: unknown): string =>
     .replace(/>/gu, "&gt;")
     .replace(/"/gu, "&quot;");
 
+/**
+ * A rule id as code that may break only after its namespace slash (`layout/` + name) on a narrow
+ * screen, never inside the name at a hyphen; print keeps it on one line. `<wbr>` adds no character,
+ * so the copied text is the id unchanged.
+ */
+function ruleIdCode(ruleId: string): string {
+  const slash = ruleId.indexOf("/");
+  if (slash < 0) return `<code class="rule-id"><span>${esc(ruleId)}</span></code>`;
+  return `<code class="rule-id"><span>${esc(ruleId.slice(0, slash + 1))}</span><wbr><span>${esc(ruleId.slice(slash + 1))}</span></code>`;
+}
+
+/**
+ * A command the reader may run, as one `<code class="cli-flag">`. It never breaks inside the flag or
+ * the rule name; on a narrow screen the only permitted break is after the rule's namespace slash,
+ * and print keeps the whole command on one line.
+ */
+function renderOption(option: ReturnType<typeof buildHtmlReportModel>["coverage"][number]["rows"][number]["options"][number]): string {
+  if (option.command === null) return esc(option.before);
+  const slash = option.command.lastIndexOf("/");
+  const command = slash < 0
+    ? `<code class="cli-flag"><span>${esc(option.command)}</span></code>`
+    : `<code class="cli-flag"><span>${esc(option.command.slice(0, slash + 1))}</span><wbr><span>${esc(option.command.slice(slash + 1))}</span></code>`;
+  return `${esc(option.before)}${command}${esc(option.after)}`;
+}
+
 function renderInfrastructure(model: ReturnType<typeof buildHtmlReportModel>): string {
   if (model.infrastructure.length === 0 && model.status.key !== "infrastructure") return "";
   const fatal = model.status.key === "infrastructure";
@@ -47,12 +72,12 @@ function renderCoverageAlert(model: ReturnType<typeof buildHtmlReportModel>): st
   ${shortfalls.length === 0
     ? `<p>The run declared insufficient coverage without a per-rule shortfall. Inspect the canonical JSON report.</p>`
     : `<ul class="coverage-shortfall-list">${shortfalls.map((row) => `<li class="coverage-shortfall-item">
-      <p><strong>Rule:</strong> <code>${esc(row.ruleId)}</code> in <span class="mono">${esc(row.document)}</span></p>
+      <p><strong>Rule:</strong> ${ruleIdCode(row.ruleId)} in <span class="mono">${esc(row.document)}</span></p>
       <p><strong>Measurement:</strong> ${row.measured} of ${row.candidates} candidates measured (${esc(row.ratio)}); required floor ${esc(row.floor)}</p>
       <p><strong>Reason verbatim:</strong> <code>${esc(row.reasons.join(", ") || "none declared")}</code></p>
       <p><strong>Options:</strong></p>
       <ul>
-        ${row.options.map((opt) => `<li>${esc(opt)}</li>`).join("\n        ")}
+        ${row.options.map((option) => `<li>${renderOption(option)}</li>`).join("\n        ")}
       </ul>
     </li>`).join("\n")}</ul>`}
 </div>
@@ -83,7 +108,7 @@ ${model.findings.map((finding) => `<li>
     <span class="severity ${esc(finding.severity)}">${esc(finding.severityLabel)}</span>
     ${finding.experimental ? `<span class="experimental">Experimental</span>` : ""}
   </div>
-  <h3 id="${esc(finding.id)}-title"><code>${esc(finding.ruleId)}</code> · page ${finding.page}</h3>
+  <h3 id="${esc(finding.id)}-title">${ruleIdCode(finding.ruleId)} · page ${finding.page}</h3>
   <p class="finding-message">${esc(finding.message)}</p>
   <dl class="finding-facts">
     <div><dt>Document</dt><dd class="mono">${esc(finding.document)}</dd></div>
@@ -133,7 +158,7 @@ function renderCoverageRow(row: HtmlCoverageRow): string {
     ? `<abbr title="Not applicable: no candidates">n/a</abbr>`
     : esc(row.ratio);
   return `<tr id="${esc(row.id)}"${row.ok ? "" : ` class="short"`}>
-    <th scope="row" class="rule"><code>${esc(row.ruleId)}</code></th>
+    <th scope="row" class="rule">${ruleIdCode(row.ruleId)}</th>
     <td class="num">${row.candidates}</td>
     <td class="num">${row.measured}</td>
     <td class="num">${row.notMeasured}</td>

@@ -354,6 +354,18 @@ function printVisibleContract(state) {
   const caveatText = run("pdftotext", [resolve(output, pdf.path), "-"]).replace(/\s+/gu, " ");
   pageContent.untestedCaveatOccurrences = (caveatText.match(/no trigger\/remedied pair in this package/giu) ?? []).length;
   assert.equal(pageContent.untestedCaveatOccurrences, state === "clean" ? 0 : 1, `print/${state}: the untested-advice caveat must appear once per finding-bearing report`);
+  // Commands and rule ids in the PDF text: none split, and the one canonical command whole.
+  const expectedFlags = state === "insufficient-coverage" ? ["--disable layout/widow"] : [];
+  const layoutLines = run("pdftotext", ["-layout", resolve(output, pdf.path), "-"]).split("\n");
+  pageContent.identifierBreaks = {
+    linesEndingInsideAFlag: layoutLines.filter((line) => /(?:^|\s)--(?:[a-z-]*)?\s*$/u.test(line)).length,
+    linesEndingInsideARuleId: layoutLines.filter((line) => /\b(?:layout|svg|type|artifact)\/(?:[a-z0-9-]*-)?\s*$/u.test(line)).length,
+    flagsWhole: expectedFlags.map((flag) => ({ flag, whole: layoutLines.some((line) => line.includes(flag)) })),
+  };
+  assert.equal(pageContent.identifierBreaks.linesEndingInsideAFlag, 0, `print/${state}: a PDF line ends inside a command flag`);
+  assert.equal(pageContent.identifierBreaks.linesEndingInsideARuleId, 0, `print/${state}: a PDF line ends inside a rule id`);
+  assert.ok(pageContent.identifierBreaks.flagsWhole.every((flag) => flag.whole), `print/${state}: a command is not whole on one PDF line`);
+  assert.ok(pdf.printSemantics.identifiers.every((identifier) => identifier.lines.length === 1), `print/${state}: an identifier is split in the print layout`);
   assert.deepEqual(pdf.pageContentChecks, pageContent, `print/${state}: page content invariant drift`);
   for (const caveat of [pdf.printSemantics.remediationCaveat]) {
     assert.ok(caveat.markersInBodyTextColour && (caveat.markers === 0 || caveat.smallestMarkerToAdviceRatio >= 1), `print/${state}: untested marker below body-text salience`);
@@ -514,6 +526,8 @@ for (const artifact of manifest.artifacts) {
     assert.ok(artifact.semantics.contrast.minimum >= 4.5, `${artifact.cell}: WCAG AA contrast failed`);
     assertRecordedFonts(artifact.semantics.fonts, artifact.cell);
     assertRecordedTableGeometry(artifact.semantics.coverageTables, artifact.cell);
+    assert.ok(artifact.semantics.identifiers.every((identifier) => identifier.lines.length === 1 ||
+      (identifier.lines.length === 2 && identifier.lines[0].endsWith("/"))), `${artifact.cell}: an identifier breaks outside its namespace slash`);
     const caveat = artifact.semantics.remediationCaveat;
     assert.equal(caveat.statements, state === "clean" ? 0 : 1, `${artifact.cell}: untested-advice caveat count`);
     assert.ok(caveat.markersInBodyTextColour && (caveat.markers === 0 || caveat.smallestMarkerToAdviceRatio >= 1), `${artifact.cell}: untested marker below body-text salience`);

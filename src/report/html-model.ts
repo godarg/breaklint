@@ -53,7 +53,18 @@ export interface HtmlCoverageRow {
   floor: string;
   ok: boolean;
   reasons: string[];
-  options: string[];
+  /**
+   * What the reader can do, each as prose around at most one command. The command is kept apart so
+   * the HTML can render it as one unbreakable `<code>` unit: a flag split across a line
+   * ("--" / "disable layout/widow") is a broken command when copied from the page or the PDF.
+   */
+  options: HtmlOption[];
+}
+
+export interface HtmlOption {
+  before: string;
+  command: string | null;
+  after: string;
 }
 
 export interface HtmlCoverageDocument {
@@ -214,10 +225,10 @@ function coverageRow(
     ok: coverage.ok,
     reasons,
     options: [
-      "Inspect the document for unsupported constructs or environment limits.",
+      { before: "Inspect the document for unsupported constructs or environment limits.", command: null, after: "" },
       GATING_RULE_IDS.has(ruleId)
-        ? `This rule gates by default. --disable ${ruleId} removes the gate, not the defect — use it only if this document intentionally uses constructs this version cannot measure.`
-        : `If this document intentionally uses constructs this version cannot measure, --disable ${ruleId} stops the check.`,
+        ? { before: "This rule gates by default. ", command: `--disable ${ruleId}`, after: " removes the gate, not the defect — use it only if this document intentionally uses constructs this version cannot measure." }
+        : { before: "If this document intentionally uses constructs this version cannot measure, ", command: `--disable ${ruleId}`, after: " stops the check." },
     ],
   };
 }

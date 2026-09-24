@@ -34,6 +34,10 @@ export const REPORT_HTML_STYLES = String.raw`
   h3 { margin-block-end: var(--bl-space-3); font-size: var(--bl-font-size-lg); line-height: 1.3; }
   code, .mono { font-family: var(--bl-font-mono); }
   code { font-size: .9em; }
+  /* Identifiers and commands break only where a break cannot change what is copied: after a rule's
+     namespace slash (a <wbr>), never at a hyphen inside the name or inside a flag. */
+  .rule-id, .cli-flag { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+  .rule-id > span, .cli-flag > span { white-space: nowrap; }
   a { color: var(--bl-color-accent-info); text-underline-offset: .2em; text-decoration-thickness: var(--bl-border-thin); }
   a:hover { text-decoration-thickness: var(--bl-border-strong); }
   a:focus-visible, [tabindex]:focus-visible { outline: var(--bl-focus-width) solid var(--bl-color-focus); outline-offset: var(--bl-space-1); }
@@ -117,6 +121,9 @@ export const REPORT_HTML_STYLES = String.raw`
   @media (max-width: 64rem) {
     .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .run-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* A 768 px tablet has 720 px for seven columns; the longest rule name alone needs 198 px. */
+    .coverage-table th, .coverage-table td { padding-inline: var(--bl-space-2); }
+    .coverage-table thead th { font-size: .6875rem; letter-spacing: .02em; }
   }
   @media (max-width: 30rem) {
     main { padding: var(--bl-space-3); }
@@ -175,7 +182,10 @@ export const REPORT_HTML_STYLES = String.raw`
     .coverage-table thead th { font-size: .6875rem; letter-spacing: .02em; }
     .coverage-table thead { display: table-header-group; }
     .coverage-table tr { break-inside: avoid; }
-    .coverage-table .rule code { white-space: nowrap; }
+    /* Blink honours <wbr> even under nowrap (measured: the table rule id broke at the slash), so
+       print removes the opportunity itself. */
+    .rule-id, .cli-flag { white-space: nowrap; }
+    .rule-id wbr, .cli-flag wbr { display: none; }
     /* The last two rows never part: see renderCoverageTable in html.ts. */
     .coverage-tail { break-inside: avoid; }
     .report-header, .summary-grid > div, .checker-event, .state-alert, .empty-state { break-inside: avoid; }
