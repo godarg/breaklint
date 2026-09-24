@@ -20,22 +20,30 @@
  *     `compareReports(report, report).schemaVersion` from the package root;
  *   - configuration contract: `config.contractVersion` of the same report.
  *
- * THE GRAMMAR, which decides whether a mention is a claim about now. A mention whose number differs
- * from the current stamp passes only in one of these explicit forms, and a new stale mention cannot
- * pass without taking one:
- *   1. the readable set, e.g. "readers accept Report 4 and 5": its numbers must be exactly
- *      `READABLE_REPORT_SCHEMA_VERSIONS`;
- *   2. a stated transition: the sentence carries an arrow or a transition word (becomes, moves,
- *      stays, remains, was, from, until, adds, introduced, migrate …) AND the sentence or its paragraph names
- *      a released version no newer than the package — "0.5.0 moves live output to Report 4";
- *   3. the word "legacy" in the sentence;
- *   4. a region explicitly marked `<!-- docs-truth: historical -->` … `<!-- docs-truth: end -->`.
+ * THE GRAMMAR, which decides whether a mention is a claim about now. It is read per mention and per
+ * sentence — never from the surrounding paragraph. A mention whose number differs from the current
+ * stamp passes only in one of these forms, and a new stale mention cannot pass without taking one:
+ *   1. the readable set: "readers accept Report 4 and 5", "Reports 4 and 5 are readable" — its
+ *      numbers must be exactly `READABLE_REPORT_SCHEMA_VERSIONS`;
+ *   2. an arrow on the mention itself: "Report 4 → 5", "Snapshot schema | 2 → 3";
+ *   3. a dated transition, with a released version no newer than the package IN THE SAME SENTENCE:
+ *      (a) the mention is followed by "from/until/since/before <version>" — "schema 3 from 0.2.3";
+ *      (b) the mention is followed by "in <version>" and the sentence has a transition verb —
+ *          "moved to schema 3 in 0.2.3";
+ *      (c) the version comes first and a transition verb stands between it and the mention, or
+ *          within four words after the mention — "0.5.0 moves live output to Report 4",
+ *          "Report 3 consumers must migrate when adopting 0.5.0".
+ *      Transition verbs: become(s), became, move(s), moved, stay(s), stayed, remain(s), remained,
+ *      add(s), added, introduce(s|d), migrate(s|d), replace(s|d), drop(s|ped), raise(s|d).
+ *   4. "legacy" immediately before the mention — "Legacy Report 3 input";
+ *   5. a region explicitly marked `<!-- docs-truth: historical -->` … `<!-- docs-truth: end -->`.
  * Anything else is a current-state claim and must equal the current stamp. CHANGELOG.md is not
  * scanned: every entry in it states a change, so both sides of one appear by design.
  *
  * `--pending <file>` names mentions another change is about to correct, as JSON lines
- * `{"file","text","reason"}`. Each must still be present — a stale pending entry fails — so the
- * list can only shrink.
+ * `{"file","kind","number","unit","reason"}`: one entry matches exactly one issue with the same
+ * file, kind, number and exact sentence, so a second copy of the sentence, or an edited one, is an
+ * issue again. An entry that matches nothing fails too, so the list can only shrink.
  */
 
 import { spawnSync } from "node:child_process";
@@ -43,8 +51,9 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const RELEASE = /\b(\d+)\.(\d+)\.(\d+)\b/gu;
-const TRANSITION = /→|->|\b(becomes?|became|moves?|moved|moving|stays?|stayed|remains?|remained|was|were|until|from|adds?|added|introduced|removed|replaced|migrate[sd]?|migration)\b/iu;
+const RELEASE = /\bv?(\d+)\.(\d+)\.(\d+)\b/gu;
+const TRANSITION_VERB = "(?:becomes?|became|moves?|moved|stays?|stayed|remains?|remained|adds?|added|introduce[sd]?|migrate[sd]?|replace[sd]?|drops?|dropped|raise[sd]?)";
+const TRANSITION = new RegExp(`\\b${TRANSITION_VERB}\\b`, "iu");
 
 /** Reads the current stamps by running the built package, in child processes. */
 export function currentStamps(packageDir) {
@@ -86,13 +95,32 @@ function older(a, b) {
   return false;
 }
 
-/** Released versions a unit names that are no newer than the package itself. */
-function namesReleasedVersion(text, packageVersion) {
+/** Positions of the released versions a sentence names that are no newer than the package. */
+function releasedVersions(text, packageVersion) {
   const current = packageVersion.split(".").map(Number);
-  return [...text.matchAll(RELEASE)].some((match) => {
-    const version = match.slice(1, 4).map(Number);
-    return !older(current, version);
-  });
+  return [...text.matchAll(RELEASE)]
+    .filter((match) => !older(current, match.slice(1, 4).map(Number)))
+    .map((match) => ({ start: match.index, end: match.index + match[0].length }));
+}
+
+/**
+ * Whether one mention is stated as history, by the forms in the header. `start` is where the
+ * mention's words begin, `at` where its number is.
+ */
+function statedAsHistory(unit, mention, packageVersion) {
+  const after = unit.slice(mention.at + String(mention.number).length);
+  const before = unit.slice(0, mention.start);
+  if (/^\s*(?:→|->)\s*`?\d/u.test(after) || /\d`?\s*(?:→|->)\s*(?:Report[- ]?|Snapshot[- ]?|schema[- ])?$/iu.test(unit.slice(0, mention.at))) return true;
+  if (/\blegacy\s+(?:[\w-]+\s+)?$/iu.test(before)) return true;
+  const versions = releasedVersions(unit, packageVersion);
+  if (versions.length === 0) return false;
+  const adjacent = /^\s*\)?\s*(from|until|since|before|in)\s+v?\d+\.\d+\.\d+\b/iu.exec(after);
+  if (adjacent) {
+    const version = releasedVersions(after.slice(0, adjacent[0].length), packageVersion).length > 0;
+    if (version && (adjacent[1].toLowerCase() !== "in" || TRANSITION.test(unit))) return true;
+  }
+  if (new RegExp(`^\\W*(?:[\\w-]+\\W+){0,3}${TRANSITION_VERB}\\b`, "iu").test(after)) return true;
+  return versions.some((version) => version.end <= mention.start && TRANSITION.test(unit.slice(version.end, mention.start)));
 }
 
 const KIND_WORDS = [
@@ -117,8 +145,8 @@ function kindBefore(text, index) {
 /** Stamp mentions in one unit of prose. Stamps are small integers; "JSON Schema 2020-12" is not one. */
 function mentionsIn(unit, paragraph, unitOffset) {
   const found = [];
-  const add = (kind, number, index) => {
-    if (kind && number < 100) found.push({ kind, number, index });
+  const add = (kind, number, at, start = at) => {
+    if (kind && number < 100) found.push({ kind, number, at, start });
   };
   const taken = new Set();
   const patterns = [
@@ -134,13 +162,13 @@ function mentionsIn(unit, paragraph, unitOffset) {
     for (const match of unit.matchAll(re)) {
       const at = match.index + match[0].length - match[1].length;
       taken.add(at);
-      add(kind, Number(match[1]), at);
+      add(kind, Number(match[1]), at, match.index);
     }
   }
   for (const match of unit.matchAll(/\bschema[- ](\d+)\b/giu)) {
     const at = match.index + match[0].length - match[1].length;
     if (taken.has(at)) continue;
-    add(kindBefore(paragraph, unitOffset + match.index) ?? kindBefore(unit, match.index), Number(match[1]), at);
+    add(kindBefore(paragraph, unitOffset + match.index) ?? kindBefore(unit, match.index), Number(match[1]), at, match.index);
   }
   // Contract tables: `| Document report | 5 | … |`.
   const row = /^\|\s*([^|]+?)\s*\|\s*`?(\d+)`?\s*(?:each\s*)?\|/u.exec(unit);
@@ -197,23 +225,33 @@ function readableSetOk(unit, stamps) {
   return { numbers, ok: JSON.stringify(numbers) === JSON.stringify(stamps.readable), start: match.index, end: match.index + match[0].length };
 }
 
-export function scanText(file, text, stamps) {
+/** Structured issues: `{ file, line, kind, number, unit, message }`, one per stale mention. */
+export function scanIssues(file, text, stamps) {
   const issues = [];
   for (const { unit, paragraph, offset, line } of unitsOf(text)) {
+    const sentence = unit.trim();
     const readable = readableSetOk(unit, stamps);
     if (readable && !readable.ok) {
-      issues.push(`${file}:${line}: names the readable report set ${readable.numbers.join(" and ")}, but the package reads ${stamps.readable.join(" and ")}: ${unit.trim()}`);
+      issues.push({
+        file, line, kind: "readable", number: readable.numbers.join(","), unit: sentence,
+        message: `${file}:${line}: names the readable report set ${readable.numbers.join(" and ")}, but the package reads ${stamps.readable.join(" and ")}: ${sentence}`,
+      });
     }
     for (const mention of mentionsIn(unit, paragraph, offset)) {
       if (mention.number === stamps[mention.kind]) continue;
-      if (readable && mention.kind === "report" && mention.index >= readable.start && mention.index <= readable.end) continue;
-      if (/\blegacy\b/iu.test(unit)) continue;
-      if (TRANSITION.test(unit) && (namesReleasedVersion(unit, stamps.packageVersion) || namesReleasedVersion(paragraph, stamps.packageVersion))) continue;
-      if (/→|->/u.test(unit) && unit.trimStart().startsWith("|")) continue;
-      issues.push(`${file}:${line}: says ${mention.kind} ${mention.number}, but the built package is at ${stamps[mention.kind]}: ${unit.trim()}`);
+      if (readable && mention.kind === "report" && mention.at >= readable.start && mention.at <= readable.end) continue;
+      if (statedAsHistory(unit, mention, stamps.packageVersion)) continue;
+      issues.push({
+        file, line, kind: mention.kind, number: mention.number, unit: sentence,
+        message: `${file}:${line}: says ${mention.kind} ${mention.number}, but the built package is at ${stamps[mention.kind]}: ${sentence}`,
+      });
     }
   }
   return issues;
+}
+
+export function scanText(file, text, stamps) {
+  return scanIssues(file, text, stamps).map((issue) => issue.message);
 }
 
 function markdownUnder(dir) {
@@ -238,20 +276,25 @@ export function checkDocsTruth({ packageDir, docsRoot = packageDir, extra = [], 
   const root = resolve(docsRoot);
   const files = [...shippedDocuments(root), ...extra.map((path) => resolve(path))];
   const issues = [];
+  // One entry absorbs exactly one issue: same file, kind, number and exact sentence.
   const pendingLeft = new Set(pending.map((_, i) => i));
   let scanned = 0;
   for (const path of files) {
     const text = readFileSync(path, "utf8");
     const name = path.startsWith(root) ? relative(root, path) : path;
     scanned += 1;
-    for (const issue of scanText(name, text, stamps)) {
-      const match = pending.findIndex((entry) => entry.file === name && issue.includes(entry.text));
-      if (match !== -1) pendingLeft.delete(match);
-      else issues.push(issue);
+    for (const issue of scanIssues(name, text, stamps)) {
+      const match = [...pendingLeft].find((i) => {
+        const entry = pending[i];
+        return entry.file === name && entry.kind === issue.kind && String(entry.number) === String(issue.number) && entry.unit === issue.unit;
+      });
+      if (match !== undefined) pendingLeft.delete(match);
+      else issues.push(issue.message);
     }
   }
   for (const i of pendingLeft) {
-    issues.push(`pending entry no longer matches anything, so remove it: ${pending[i].file}: "${pending[i].text}" (${pending[i].reason})`);
+    const entry = pending[i];
+    issues.push(`pending entry matches no issue, so remove it: ${entry.file}: ${entry.kind} ${entry.number} in "${entry.unit}" (${entry.reason})`);
   }
   return { valid: issues.length === 0, issues, scanned, stamps };
 }

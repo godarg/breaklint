@@ -562,8 +562,8 @@ Node-22.13/Puppeteer-25 security migration. The annotated `v0.2.0` tag resolves 
 `ce7097b99beafcedc71b30ee0ed81451811532a0`. Registry SRI, signed SLSA source binding, npm
 signatures, byte-identical GitHub assets and a fresh registry consumer were independently checked.
 The minor-version change is intentional: unknown or formerly inert configuration now fails closed,
-`excludeSelectors` is corrected to `excludeTags`, and report schema moves to 3 while snapshot schema
-remains 2. This status paragraph is a later documentation commit and is not retroactively part of
+`excludeSelectors` is corrected to `excludeTags`, and in 0.2.0 report schema moves to 3 while
+snapshot schema remains 2. This status paragraph is a later documentation commit and is not retroactively part of
 the published tarball.
 
 **Released on 2026-08-25:** `breaklint@0.2.1` packages the open-community-QA documentation and the
@@ -619,7 +619,7 @@ What changed:
 | Two decline classes leave the coverage base | `TOOL_CAPABILITY_ENV_IDS` (this build cannot take the measurement) and `NON_APPLICABLE_ENV_IDS` (the question does not arise for that target). Both stay in `notMeasured` with rule, reason and count; only the ratio changes, and the subtraction happens after each rule's own books are checked |
 | The ink rules say which of two things is true | `inkCollected` separates "the passes do not exist in this build" from "the passes ran and disagreed". They reported the second while the first was the case |
 | The corpus holds an inline SVG at last | `tests/fixtures/svg-text-geometry.html`, seven figures, seven different answers, plus `svg-in-viewport.html` — the sound document that must end exit 0 — both in the live chain. Five of those cases exist because two independent reviews found the earlier ones insufficient |
-| Snapshot schema | 2 → 3, for the added `inkCollected`. Report schema stays 3 |
+| Snapshot schema | 2 → 3, for the added `inkCollected`. Report schema stays 3 in 0.2.3 |
 
 What did NOT change: no threshold, no severity, no `calibrated` flag, and no rule was added or
 removed. The SVG ink passes remain unimplemented — M3 — so `svg/text-clipped` and

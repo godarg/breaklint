@@ -11,9 +11,22 @@ export interface Stamps {
 
 export interface PendingCorrection {
   file: string;
-  text: string;
+  kind: string;
+  number: number | string;
+  unit: string;
   reason: string;
 }
+
+export interface DocsTruthIssue {
+  file: string;
+  line: number;
+  kind: string;
+  number: number | string;
+  unit: string;
+  message: string;
+}
+
+export function scanIssues(file: string, text: string, stamps: Stamps): DocsTruthIssue[];
 
 export function currentStamps(packageDir: string): Stamps;
 

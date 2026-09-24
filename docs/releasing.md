@@ -26,15 +26,16 @@ run `33320332110` completed the Node 22.13/24 consumer matrix, npm provenance ve
 GitHub Release creation on 2026-08-30.
 
 0.6.0 is a minor pre-1.0 release by the same test this document applied to 0.5.0: the canonical
-document report changes structure, so its stamp moves. Report 4 becomes Report 5 with the optional
-`Finding.remediation`, and the agent context pack becomes 2 with one new required key and three new
+document report changes structure, so its stamp moves. In 0.6.0 Report 4 becomes Report 5 with the
+optional `Finding.remediation`, and the agent context pack becomes 2 with one new required key and three new
 finding-card keys. Snapshot stays 4 and Configuration Contract 1 is untouched. Readers accept
 Report 4 and 5, so a stored artefact does not have to be migrated — but an optional property does
 not let a schema-aware consumer distinguish the two shapes, and that is what a version is for.
 
 0.5.0 is a minor pre-1.0 release because live document output moves to Report 4 and Snapshot 4,
 and the installed package gains public producer, screen, comparison and report-bundle APIs.
-Configuration Contract 1 remains separate and unchanged. Consumers of Report 3 must migrate;
+Configuration Contract 1 remains separate and unchanged. Consumers of Report 3 must migrate when
+adopting 0.5.0;
 source identity, declared provenance and verified original positions are separate fields.
 The screen report is its own version-1 contract and contains no document-page semantics.
 

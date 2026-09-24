@@ -13,18 +13,18 @@
 
 import { strict as assert } from "node:assert";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { checkDocsTruth, currentStamps, scanText } from "../tools/docs-truth.mjs";
-import type { Stamps } from "../tools/docs-truth.mjs";
+import type { PendingCorrection, Stamps } from "../tools/docs-truth.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const PENDING = readFileSync(join(ROOT, "tests/tools/docs-truth-pending.jsonl"), "utf8")
-  .split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line) as { file: string; text: string; reason: string });
+  .split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line) as PendingCorrection);
 
 let stage = "";
 let stamps: Stamps;
@@ -89,7 +89,7 @@ describe("schema stamps in the shipped documents", () => {
       `Legacy Report ${stamps.report - 2} input is shown as legacy.`,
       `Readers accept Report ${stamps.readable.join(" and ")}.`,
       `Reports ${stamps.readable.join(" and ")} are readable.`,
-      `| Snapshot schema | 2 → 3, for the added field. Report schema stays 3 |`,
+      `| Snapshot schema | 2 → 3, for the added field. Report schema stays 3 in 0.2.3 |`,
       `The report carries schema 3 from 0.2.3, schema 4 from 0.5.0 and schema ${stamps.report} today.`,
       "<!-- docs-truth: historical -->\nThe demo reported Snapshot 1.\n<!-- docs-truth: end -->",
     ];
@@ -101,13 +101,53 @@ describe("schema stamps in the shipped documents", () => {
     assert.equal(scanText("x.md", `Live reports moved to Report ${stamps.report - 1}.\n`, stamps).length, 1);
     // A version newer than the package cannot anchor anything.
     assert.equal(scanText("x.md", `99.0.0 moves live reports to Report ${stamps.report - 1}.\n`, stamps).length, 1);
+    // The forms are read per mention and per sentence, not from whatever surrounds it: a version
+    // in the next sentence, a common word, "legacy" elsewhere, an arrow elsewhere in a row.
+    const loose = [
+      `0.6.0 is out. Live reports moved to Report ${stamps.report - 1}.`,
+      `Live reports use Report ${stamps.report - 1} from the CLI in 0.6.0.`,
+      `Live reports were Report ${stamps.report - 1} until the next release, 0.6.0 said.`,
+      `Live reports use Report ${stamps.report - 1}, not the legacy format.`,
+      `| Document report | ${stamps.report - 1} | findings → evaluations |`,
+      `Stored snapshots stay at Snapshot ${stamps.snapshot - 1} for readers of 0.5.0.`,
+    ];
+    for (const line of loose) {
+      assert.equal(scanText("x.md", `${line}\n`, stamps).length, 1, `a current-state mention passed as history: ${line}`);
+    }
   });
 
   it("a pending correction that is no longer needed fails, so the list can only shrink", () => {
     const result = checkDocsTruth({
       packageDir: stage, docsRoot: ROOT, stamps,
-      pending: [...PENDING, { file: "README.md", text: "a sentence that is not there", reason: "canary" }],
+      pending: [...PENDING, { file: "README.md", kind: "report", number: 1, unit: "a sentence that is not there", reason: "canary" }],
     });
-    assert.ok(result.issues.some((issue) => /pending entry no longer matches anything/u.test(issue) && /canary/u.test(issue)));
+    assert.ok(result.issues.some((issue) => /pending entry matches no issue/u.test(issue) && /canary/u.test(issue)));
+  });
+
+  it("a pending entry absorbs exactly its one sentence, and nothing added to it or copied from it", () => {
+    assert.ok(PENDING.length > 0, "no pending entry is left to exercise; delete this test with the last one");
+    const entry = PENDING[0]!;
+    const docs = mkdtempSync(join(tmpdir(), "breaklint-docs-truth-pending-"));
+    try {
+      mkdirSync(join(docs, "docs"), { recursive: true });
+      const original = readFileSync(join(ROOT, entry.file), "utf8");
+      assert.ok(original.replace(/\s+/gu, " ").includes(entry.unit), `the pending sentence is not in ${entry.file}`);
+      const check = (text: string) => {
+        writeFileSync(join(docs, entry.file), text);
+        return checkDocsTruth({ packageDir: stage, docsRoot: docs, stamps, pending: PENDING.filter((e) => e.file === entry.file) });
+      };
+      assert.deepEqual(check(original).issues, [], "the unchanged page is not green with its pending entries");
+      // A second copy of the pending sentence is a second issue.
+      assert.equal(check(`${original}\n${entry.unit}\n`).issues.length, 1, "a copied pending sentence was absorbed");
+      // A new stale claim inside the pending sentence un-matches the entry: the claim and the entry both fail.
+      const words = entry.unit.split(" ");
+      const edited = original.replace(words.slice(-3).join(" "), `${words.slice(-3).join(" ").replace(/\.$/u, "")} and write Snapshot ${stamps.snapshot - 1}.`);
+      assert.notEqual(edited, original, "the pending sentence could not be edited in place");
+      const result = check(edited);
+      assert.ok(result.issues.some((issue) => /says snapshot/u.test(issue)), "a stale claim added to a pending sentence passed");
+      assert.ok(result.issues.some((issue) => /pending entry matches no issue/u.test(issue)), "an edited pending sentence still matched its entry");
+    } finally {
+      rmSync(docs, { recursive: true, force: true });
+    }
   });
 });

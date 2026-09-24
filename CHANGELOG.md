@@ -161,12 +161,18 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   the context-pack and comparison stamps from its public API, the readable set and the snapshot
   stamp from its enums. Every "Report N", "report schema N", "Snapshot N", "context pack N" and
   contract-table row in README, SECURITY.md, `docs/**` and CONTRIBUTING.md must equal them unless
-  the sentence marks itself as history (a transition word plus a released version, "legacy", or
-  the readable set). Against the documents of the previous commit it names every stale line the
-  README, CONTRIBUTING.md, `docs/source-bound-findings.md`, `docs/status.md` and
-  `docs/configuration.md` carried; two lines in `docs/reporting.md` are listed in
-  `tests/tools/docs-truth-pending.jsonl` for the change that owns that page, and an entry that no
-  longer matches fails. The same check runs in `ci.yml`'s packed clean-install step against the
+  that mention is stated as history within its own sentence — an arrow on it, a released version
+  joined to it by "from"/"until"/"since"/"before", by "in" plus a transition verb, or by a
+  transition verb between the version and the mention, "legacy" directly before it, or the exact
+  readable set. A version elsewhere in the paragraph, a common word such as "was" or "from the",
+  "legacy" elsewhere in the sentence or an arrow elsewhere in a table row does not count. Against
+  the documents of the previous commit it names every stale line the README, CONTRIBUTING.md,
+  `docs/source-bound-findings.md`, `docs/status.md` and `docs/configuration.md` carried; four
+  genuinely historical sentences in `docs/releasing.md` and `docs/status.md` now name their release.
+  Two lines in `docs/reporting.md` are listed in `tests/tools/docs-truth-pending.jsonl` for the
+  change that owns that page; each entry matches exactly one issue by file, kind, number and exact
+  sentence, so a copy of the sentence or a stale claim added to it fails, and an entry that
+  matches nothing fails. The same check runs in `ci.yml`'s packed clean-install step against the
   installed `node_modules/breaklint` — the README and docs a user installs, and the stamps of the
   code installed with them.
 - **`npm run docs:rules:check` is a CI step.** `AGENTS.md` says generated artifacts are checked
