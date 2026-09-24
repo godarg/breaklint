@@ -23,6 +23,30 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as
   `true` does. This was always the behaviour; it is now written down in `docs/limitations.md` and
   pinned by a contract test.
+- **Stale contract statements corrected against the code.** The README said live reports use
+  Report 4 (they use 5; readers accept 4 and 5), that `examples/demo.html` is the document behind the
+  demo snapshot (no such file exists or ever did), that print uses a "verified" A4 layout (what is
+  verified is the technical surface gate; the 0.6.0 human review did not pass) and that a live run
+  needs `puppeteer-core@25.8.x` (the peer range is `>=25.8.0 <26`). `docs/source-bound-findings.md`
+  listed the document report as 4 and the context pack as 1 (5 and 2). `docs/configuration.md` now
+  says that any rule value other than `false` — an options object, even an empty one — enables a
+  rule, and that `strict` also enables `layout/half-empty-page`; `tests/e2e/configuration-doc-claims.test.ts`
+  pins both through the CLI. `docs/limitations.md` described a Paged.js exit 3 for a Markdown file;
+  a non-`.html` name has ended with exit 2 before any renderer since 0.3.1, and Markdown text
+  saved as `.html` is measured as HTML text (with no element in it, the run ends exit 3
+  `geometry-cross-check-failed`).
+- **`SECURITY.md`** named 0.2.x as the supported line; only the latest published version receives
+  fixes. It also said the sandbox claim was checked in the test suite, and no test checked it:
+  `tests/unit/sandbox-boundary.test.ts` now pins the one browser launch (`args: []`, driver
+  defaults kept) and fails if any source, tool, test or workflow file names a sandbox-disabling
+  switch.
+- **The complete local gate is in `CONTRIBUTING.md`**, where `AGENTS.md` said it was and it was
+  not: the `npm run` steps of `ci.yml` in CI's order, plus the packed-consumer checks.
+  `docs/releasing.md` ran `test:real-document` before the build it needs, left out
+  `make-mark-font --check`, `test:report-surface-mutants`, `docs:rules:check` and the packed
+  consumer, and named 0.6.0 in its procedure; it is now version-neutral and complete.
+  `tests/unit/workflow-gates.test.ts` holds both lists against the workflow. `CONTRIBUTING.md` no
+  longer names schema numbers (it said Report 4 and Snapshot 3).
 
 ### Tooling
 

@@ -50,7 +50,69 @@ function runLinesOf(path: string): string[] {
   return workflowRunLines(readFileSync(new URL(`../../${path}`, import.meta.url), "utf8"));
 }
 
+/** The gate commands of a list of shell lines: `npm run <script>`, `npm test` and `node tools/…`. */
+export function gateSteps(lines: readonly string[]): string[] {
+  const steps: string[] = [];
+  for (const line of lines) {
+    const command = line.replace(/\s+#.*$/u, "");
+    for (const match of command.matchAll(/\bnpm (?:run ([\w:.-]+)|(test)\b)|\bnode (tools\/[\w./-]+\.mjs(?: --[\w-]+)*)/gu)) {
+      steps.push(match[1] ? `npm run ${match[1]}` : match[2] ? "npm test" : `node ${match[3]}`);
+    }
+  }
+  return steps;
+}
+
+/** The lines of the first ```bash block after a Markdown heading. */
+function firstBashBlockAfter(path: string, heading: string): string[] {
+  const text = readFileSync(new URL(`../../${path}`, import.meta.url), "utf8").replace(/\r\n/gu, "\n");
+  const at = text.indexOf(`\n${heading}\n`);
+  assert.ok(at !== -1, `${path} has no "${heading}" section; this guard has lost its subject`);
+  const open = text.indexOf("\n```bash\n", at);
+  const close = text.indexOf("\n```\n", open + 1);
+  assert.ok(open !== -1 && close > open, `${path}: "${heading}" carries no bash block`);
+  return text.slice(open + "\n```bash\n".length, close).split("\n");
+}
+
+/** `sub` occurs in `list` in the same order, not necessarily contiguously. */
+function isSubsequence(sub: readonly string[], list: readonly string[]): boolean {
+  let i = 0;
+  for (const item of list) if (item === sub[i]) i += 1;
+  return i === sub.length;
+}
+
 describe("workflow gates", () => {
+  /*
+   * AGENTS.md says the complete repository gate is documented in CONTRIBUTING.md. It was not:
+   * CONTRIBUTING.md listed no gate, and the list in docs/releasing.md ran `test:real-document`
+   * before the build it needs and left out three of CI's steps. Both lists are now read here and
+   * held against the workflow itself.
+   */
+  it("CONTRIBUTING.md lists exactly the gate steps ci.yml runs, in CI's order", () => {
+    const ci = gateSteps(runLinesOf(".github/workflows/ci.yml"));
+    assert.ok(ci.length >= 15, `ci.yml yielded only ${ci.length} gate steps; the reader has lost its subject`);
+    assert.deepEqual(gateSteps(firstBashBlockAfter("CONTRIBUTING.md", "## The complete local gate")), ci);
+  });
+
+  it("docs/releasing.md runs every ci.yml gate step in CI's order, and names why it runs any other", () => {
+    const ci = gateSteps(runLinesOf(".github/workflows/ci.yml"));
+    const release = new Set(gateSteps(runLinesOf(".github/workflows/release.yml")));
+    // A step the release checklist runs beyond CI's, and why it is there.
+    const EXTRA: Record<string, string> = {
+      "npm run docs:rules:check": "the generator's own check of the rule pages; npm test repeats it",
+    };
+    const listed = gateSteps(firstBashBlockAfter("docs/releasing.md", "## Before creating the tag"));
+    assert.ok(isSubsequence(ci, listed), `docs/releasing.md leaves out or reorders a ci.yml step.\n  ci.yml:    ${ci.join(" | ")}\n  releasing: ${listed.join(" | ")}`);
+    const unexplained = listed.filter((step) => !ci.includes(step) && !release.has(step) && !(step in EXTRA));
+    assert.deepEqual(unexplained, [], "docs/releasing.md runs a gate step that no workflow runs and that names no reason here");
+  });
+
+  it("the gate-step reader sees npm run, npm test and repository tools, and ignores comments", () => {
+    assert.deepEqual(
+      gateSteps(["npm ci --no-audit", "X=1 npm run test:live", "npm test", "node tools/make-mark-font.mjs --check", "npm i x # npm run nope"]),
+      ["npm run test:live", "npm test", "node tools/make-mark-font.mjs --check"],
+    );
+  });
+
   it("the run-line reader sees single-line and block commands and ignores comments", () => {
     const text = [
       "jobs:",

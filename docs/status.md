@@ -126,7 +126,7 @@ it existed — under load the answer was `ENOENT`, which reads as a cleanup fail
 now registers synchronously from its parent, the budgets are sized for what they wrap, and a
 missing registration says so. A fourth test bounded a 5 s product wait at 8 s and failed at 8700 ms.
 
-Measured on `tests/unit/source-boundary-regressions.ts` before the change, three full runs at start
+Measured on `tests/unit/source-boundary-regressions.test.ts` before the change, three full runs at start
 loads 6.18, 5.06 and 6.37: **three red**. After, three full runs at 2.92, 4.30 and 8.63: **three
 green**, the last at a higher load than any of the three that failed. No test was excluded and no
 concurrency setting was changed.
@@ -341,7 +341,7 @@ GitHub assets.
 | Mutation guard | 13/13 released rules kill every mutant, each on a fixture that actually triggers it |
 | False-alarm corpus | every clean fixture stays silent, every trigger fixture fires and is attributed correctly |
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
-| Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in report schema 3; generated schema drift and process-boundary exit 2 are tested |
+| Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in the canonical JSON report; generated schema drift and process-boundary exit 2 are tested |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
 | HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 60 physical artifacts with decoded-pixel, contrast, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
 | Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |

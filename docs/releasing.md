@@ -5,13 +5,14 @@ Releases are published by GitHub Actions from an annotated version tag. A laptop
 
 ## Release contract
 
-For 0.6.0, all of the following must refer to the same commit and the same package bytes:
+For a release `X.Y.Z`, all of the following must refer to the same commit and the same package
+bytes:
 
-1. `origin/main` and annotated tag `v0.6.0`;
+1. `origin/main` and annotated tag `vX.Y.Z`;
 2. the successful `ci.yml` run queried by commit SHA;
 3. the one tarball created by the release workflow;
 4. both clean consumers, on Node 22.13 and Node 24;
-5. npm `breaklint@0.6.0` and its `dist.integrity`;
+5. npm `breaklint@X.Y.Z` and its `dist.integrity`;
 6. the tarball and checksum files attached to the GitHub Release.
 
 Any mismatch ends the workflow before or immediately after the outward action. A failed registry
@@ -52,25 +53,52 @@ workflow passes it as `NODE_AUTH_TOKEN` only to the publish step.
 
 ## Before creating the tag
 
-Run from a clean checkout with the supported Node line and all live prerequisites present:
+Run from a clean checkout on Node 24 with all live prerequisites present — Chrome, poppler's
+`pdftoppm`, python3 with `fontTools`, gitleaks 8.30.1 on `PATH` and network access — in this order,
+which is the order `.github/workflows/ci.yml` runs them in (`tests/unit/workflow-gates.test.ts` fails
+when the `npm run` steps below leave out or reorder one of CI's):
 
 ```bash
 npm ci --no-audit --no-fund
 npm run test:secrets
-npm run test:advisories
 npm run test:release-tag
 node tests/tools/registry-provenance-contract.mjs --self-test
+npm run test:advisories
+node tools/make-mark-font.mjs --check
 npm run typecheck
 npm run schema:check
+npm run docs:rules:check
 npm test
 npm run test:mutants
-npm run test:real-document
 npm run test:licenses
 BREAKLINT_LIVE_REPORT=.tmp/live-report.json BREAKLINT_LIVE_SUMMARY=.tmp/live-summary.json npm run test:live
 npm run test:documented-figures
-npm run test:report-surfaces:technical
-npm run selfcheck
 npm run build
+npm run test:real-document
+npm run test:report-surfaces:technical
+npm run test:report-surface-mutants
+npm run selfcheck
+```
+
+`npm run build` comes before `test:real-document` because that gate runs `dist/cli/index.js`: in
+the other order a clean checkout fails, and a used one tests a stale build. The registry-provenance
+self-test runs in the release workflow rather than in `ci.yml`; `docs:rules:check` repeats an
+assertion `npm test` already makes, and is listed because it is the generator's own check.
+
+Then check the packed package the way CI does, because none of the commands above sees it:
+
+```bash
+repo=$PWD
+tgz=$(npm pack --silent)
+consumer=$(mktemp -d) && cd "$consumer" && npm init -y > /dev/null
+npm i "$repo/$tgz" --no-audit --no-fund
+npx breaklint --version                                  # prints the package.json version
+npx breaklint --demo > demo.out; echo "exit $?"          # exit 1
+node "$repo/tests/tools/readme-demo-contract.mjs" --consumer .
+node "$repo/tests/tools/installed-config-contract.mjs"
+npm i --no-audit --no-fund --save-exact pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
+node "$repo/tests/tools/real-document-gate.mjs" --cli "$PWD/node_modules/breaklint/dist/cli/index.js" --cwd "$PWD"
+cd "$repo"
 ```
 
 Two of these need the tap and summary files the runs before them write, and are therefore easy to
@@ -188,8 +216,8 @@ Then verify:
 Create and push an annotated tag only after main CI is green:
 
 ```bash
-git tag -a v0.6.0 -m "breaklint 0.6.0"
-git push origin v0.6.0
+git tag -a vX.Y.Z -m "breaklint X.Y.Z"
+git push origin vX.Y.Z
 ```
 
 The release workflow then:
@@ -210,7 +238,7 @@ The release workflow then:
 10. creates the GitHub Release with the tarball and both identity records attached.
 
 Do not rerun a partially successful publish blindly: npm versions are immutable. Inspect the npm
-version, workflow logs and GitHub Release first. If npm already serves 0.6.0 but a post-publish
+version, workflow logs and GitHub Release first. If npm already serves `X.Y.Z` but a post-publish
 verification failed, repair the release metadata or publish a new patch version; never move the tag
 or overwrite evidence to make the old run look green.
 
@@ -226,13 +254,13 @@ source identity is never ignored.
 From a new temporary directory, independently verify the registry route:
 
 ```bash
-npm view breaklint@0.6.0 version dist.integrity
+npm view breaklint@X.Y.Z version dist.integrity
 npm init -y
-npm install breaklint@0.6.0 --no-audit --no-fund
+npm install breaklint@X.Y.Z --no-audit --no-fund
 npx breaklint --version
 npx breaklint --demo
 ```
 
-The version must be `0.6.0`; demo must produce real findings and exit 1. Import
+The version must be `X.Y.Z`; demo must produce real findings and exit 1. Import
 `breaklint/config.schema.json` and rerun the installed Configuration Contract gate. The later status
 commit records the completed release but is not retroactively part of the published tarball.

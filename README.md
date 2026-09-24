@@ -40,10 +40,11 @@ that hides that is worse than no number.
 
 One thing about that output, since the demo invites the assumption: the rule and reporter chain
 running there is the real one, but the page it judges is a **hand-written snapshot**, built so
-that every rule path is reachable in a command that needs no browser. `examples/demo.html` is
-the document that snapshot describes; it is not shipped, and the run says which kind of fixture
-it used in its own `source` field rather than leaving you to guess. Point the tool at your own
-HTML and the same chain measures a real page.
+that every rule path is reachable in a command that needs no browser. No HTML document stands
+behind it: the snapshot names `examples/demo.html` as its document path, but that file does not
+exist and never did, which is why the demo's findings carry no source location. The run says which
+kind of fixture it used in its own `source` field rather than leaving you to guess. Point the tool
+at your own HTML and the same chain measures a real page.
 
 ## Install
 
@@ -57,8 +58,9 @@ needs a browser and the paginator; see [Requirements](#requirements).
 ## Source-bound findings and existing web pages
 
 The installed package now exposes `checkProducedDocuments`, `checkPage`, `compareReports`,
-`createContextPack`, `renderReport` and `writeReportBundle`. Live document reports use Report 4;
-the screen profile has a separate contract and checks visible geometry without pagination.
+`createContextPack`, `renderReport` and `writeReportBundle`. Live document reports use Report 5, and
+the report readers accept Report 4 and 5; the screen profile has a separate contract and checks
+visible geometry without pagination.
 
 ```js
 import { checkPage, writeReportBundle } from 'breaklint';
@@ -263,7 +265,11 @@ code from a foreign repository inside CI, so it is intentionally unsupported.
 
 The HTML reporter is a self-contained evidence view, not a second source of truth. Its header
 distinguishes clean, findings, checker failure and insufficient coverage in words; findings reflow
-without a horizontal table on mobile; print uses a verified A4 layout. JSON remains canonical.
+without a horizontal table on mobile; print uses an A4 layout. What is verified about these surfaces
+is technical — `test:report-surfaces:technical` checks every current screen and print cell for
+decoded pixels, contrast, accessibility and fragmentation — and the most recent human review, of
+the 0.6.0 surfaces, did not pass (see [`docs/releasing.md`](docs/releasing.md)). JSON remains
+canonical.
 The information contract and the reproducible 32-cell screen/print review are documented in
 [`docs/reporting.md`](docs/reporting.md).
 
@@ -271,8 +277,8 @@ The information contract and the reproducible 32-cell screen/print review are do
 
 Node 22.13 or newer, on macOS or Linux. The floor is exact because `pdfjs-dist@6.2.108` requires
 Node 22.13 or Node 24, and the release gate installs the packed package on both Node 22.13 and 24.
-A live run additionally needs a Chromium-based browser, `puppeteer-core@25.8.x` and
-`pagedjs@0.4.3`. `pdfjs-dist` is what rasterises the produced PDF to bind evidence to findings; a
+A live run additionally needs a Chromium-based browser, `puppeteer-core` at `>=25.8.0 <26` (the
+declared peer range) and `pagedjs@0.4.3`. `pdfjs-dist` is what rasterises the produced PDF to bind evidence to findings; a
 run without it still measures and still reports, but the findings carry no evidence and the report
 says so rather than pretending otherwise. Poppler's `pdftoppm` is **not** used by the tool at all: the live test suite uses
 it as an independent rasteriser, so that Chrome is not both the producer and the sole judge of

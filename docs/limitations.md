@@ -249,15 +249,17 @@ chain need no browser and no process group, so they work there. What does not wo
 your own HTML. Blocking the install would take away the part that functions in order to prevent
 the part that does not, and the part that does not already fails loudly rather than quietly.
 
-**A file that is not HTML gets an unhelpful error.** Point the tool at a Markdown file and the
-run ends with exit 3 and `pagination aborted: TypeError: node.getAttribute is not a function` —
-which is Paged.js throwing on a document that has none of the structure it expects, caught at the
-boundary and reported fail-closed. The behaviour is safe: nothing is measured and nothing is
-claimed. The message is not: it names an internal function rather than the mistake, and the
-mistake is one a first-time user makes. Found by a CI step whose own premise had quietly become
-false. Not fixed in 0.1.0, because a clean answer means deciding whether a non-HTML input is an
-infrastructure fault (exit 3) or an invalid invocation (exit 2), and that decision changes the
-exit matrix rather than a message.
+**Non-HTML input is refused by its name, not by its content.** An input path that does not end in
+`.html` or `.htm` — Markdown, PDF, a standalone SVG — ends with exit 2 and `unsupported input type`
+before any renderer starts and before the path is even opened; measured for a `.md` file, existing
+or missing: exit 2, nothing on stdout. The content of a `.html` file is not sniffed. Markdown text
+saved under a `.html` name is served and parsed as HTML: one run of body text with no element in
+it. Such a run then ends with exit 3 and `geometry-cross-check-failed` ("measured no elements"),
+because a cross-check over zero elements is not a passed cross-check (`src/measure/cross-check.ts`)
+— measured locally on Chromium 141 with the evidence binding off; the zero-sample rule itself does
+not depend on the browser. A converter's HTML output is ordinary HTML and is measured as such. The
+paragraph that stood here through 0.6.0 described a Paged.js `pagination aborted` exit 3 for a
+Markdown file; that path is gone, because the name check runs first.
 
 **Foreign HTML is executed.** The run uses a fresh browser profile, keeps the sandbox on, has no
 flag that disables it, and blocks every network request by default. That is protection against

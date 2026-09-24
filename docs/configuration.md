@@ -1,9 +1,9 @@
 # Configuration Contract v1
 
-Configuration is a public input contract, not a bag of values. In `breaklint` 0.2.x every accepted
-field has four obligations: it is validated, affects the run, appears in the canonical JSON report,
-and carries the source that won during resolution. Anything unknown is rejected with exit 2 before
-an input document is opened.
+Configuration is a public input contract, not a bag of values. Under Configuration Contract v1,
+introduced in 0.2.0, every accepted field has four obligations: it is validated, affects the run,
+appears in the canonical JSON report, and carries the source that won during resolution. Anything
+unknown is rejected with exit 2 before an input document is opened.
 
 The default file is `breaklint.config.json`. A different JSON file can be selected with
 `--config <file>`. JavaScript configuration is intentionally unsupported because loading it would
@@ -80,10 +80,10 @@ built-in defaults < selected profile < config file < command line
 
 There are exactly two profiles:
 
-| profile | finding gate | coverage floors |
-|---|---|---|
-| `default` | `error` | by severity: error 1, warning 0.5, info 0 |
-| `strict` | `warn` | 1 for every rule |
+| profile | finding gate | coverage floors | rules enabled |
+|---|---|---|---|
+| `default` | `error` | by severity: error 1, warning 0.5, info 0 | every rule except the off-by-default `layout/half-empty-page` |
+| `strict` | `warn` | 1 for every rule | every rule, `layout/half-empty-page` included |
 
 `strict` is a real preset, not a label. A config-file `failOn` can replace its warning gate and a
 CLI `--fail-on` can replace the file. Coverage is different: `coverageFloors` can equal or raise
@@ -96,10 +96,14 @@ errors.
 
 ## Rules and options
 
-A rule value is either `true`, `false`, or an options object. The complete rule and option surface,
-including types and defaults, is in the generated [JSON Schema](../breaklint.schema.json). Runtime
-validation and that file derive from the same rule registry; an option cannot be added to one
-without appearing in the other.
+A rule value is either `true`, `false`, or an options object. `false` disables the rule; any other
+value enables it — `true`, and equally an options object, including an empty one. For the rules that
+run by default this is invisible; for the off-by-default `layout/half-empty-page` it means that
+configuring an option also turns the rule on (see [limitations](limitations.md)), and a
+`{"rules": {"layout/half-empty-page": false}}` still turns it off under `strict`. The complete rule
+and option surface, including types and defaults, is in the generated
+[JSON Schema](../breaklint.schema.json). Runtime validation and that file derive from the same rule
+registry; an option cannot be added to one without appearing in the other.
 
 The two proof-source-A rules are deliberately limited to enablement:
 
