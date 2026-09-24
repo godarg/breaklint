@@ -121,20 +121,23 @@ describe("target evaluation contract", () => {
   });
 
   /**
-   * The height of a split block is the height of what it was split into — from the third fragment.
+   * A split block is judged on all of its fragments: by a lower bound built from their text lines.
    *
    * Until 0.6.0 this rule read the first fragment and skipped the rest, and a six-page
    * `break-inside: avoid` section therefore came back clean: fragment 0 measured 596.36 px against
-   * a 680.31 px page. The first case below is the same shape with round numbers, so the expected
-   * value is arithmetic a reader can check rather than a recorded output — 320 + 300 + 260 = 880
-   * against a 606 px content box.
+   * a 680.31 px page. The first case below is the same shape with round numbers: 21 + 19 + 17 text
+   * lines at the corpus pitch of 15.4 px, so the expected value is arithmetic a reader can check —
+   * 877.8 px of lines, less the snapshot's 0.01 px rounding per fragment, against a 606 px box.
    *
-   * The other four cases are each a way the sum can lie, and each was named by an independent
-   * review before this shipped:
-   *   - two fragments whose heights sum above the page: NOT reported, because Paged.js repeats a
-   *     block's border (and `!important` padding) at every split edge, so a block that fitted
-   *     unsplit can sum above the page. From three fragments on that cannot happen — an
-   *     intermediate fragment fills a whole content box and carries content before and after it.
+   * The other cases are each a way the measurement can lie, and each was named by an independent
+   * review:
+   *   - two fragments: REPORTED. This test used to pin the opposite — "two fragments are not
+   *     proof", because repeated border and `!important` padding can carry a summed box height
+   *     over the page for a block that fitted. That is true of the boxes and it is why they are
+   *     not summed any more; the text lines are, and decoration lies outside them. Pinning the
+   *     gap made a block split into exactly two pieces — the usual outcome for one between one
+   *     and two pages tall — pass as clean (tests/unit/too-tall-bound.test.ts has the measured
+   *     decorated shapes, and why the three-fragment argument did not hold either).
    *   - boxes that start outside the content box: STILL fragments. Flow membership is decided by
    *     the snapshot, which keeps only blocks inside a page's content area, so a
    *     `position: running(...)` clone never reaches this rule (tests/unit/margin-boxes.test.ts);
@@ -145,49 +148,65 @@ describe("target evaluation contract", () => {
    *     document that also has a landscape page.
    *   - one fragment: exactly the 0.5.0 behaviour, unchanged.
    */
-  it("measures a split block over its fragments and refuses the ways that sum can lie", () => {
+  it("bounds a split block by the lines of all its fragments and refuses the ways that can lie", () => {
     const run = (snapshot: Snapshot) =>
       unbreakableBlockTooTall.run(snapshot, { ...context, options: unbreakableBlockTooTall.defaultOptions, fingerprint });
-    const fragmented = (boxes: readonly ({ height: number; y?: number; x?: number; width?: number })[]): Snapshot => {
+    // Each fragment carries `lines` text lines at the corpus pitch from the top of its box, and the
+    // box is exactly that tall unless `height` says otherwise; a shape without lines has none.
+    const PITCH = 15.4;
+    const fragmented = (boxes: readonly ({ height?: number; lines?: number; y?: number; x?: number; width?: number })[]): Snapshot => {
       const snapshot = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
       const template = snapshot.blocks[0]!;
+      snapshot.textLines = [];
+      let lineIndex = 0;
       snapshot.blocks = boxes.map((shape, index) => {
         const fragment = structuredClone(template);
         fragment.nodeKey = `t1:${index}`;
         fragment.fragmentIndex = index;
         fragment.fragmentCount = boxes.length;
         fragment.box = {
-          ...template.box, height: shape.height, ...(shape.y === undefined ? {} : { y: shape.y }),
+          ...template.box, height: shape.height ?? (shape.lines ?? 0) * PITCH, ...(shape.y === undefined ? {} : { y: shape.y }),
           ...(shape.x === undefined ? {} : { x: shape.x }), ...(shape.width === undefined ? {} : { width: shape.width }),
         };
+        fragment.lines = [];
+        for (let line = 0; line < (shape.lines ?? 0); line += 1) {
+          fragment.lines.push(lineIndex);
+          snapshot.textLines.push({
+            blockKey: fragment.nodeKey, index: lineIndex++, visible: true, width: 300, wordBoxes: null,
+            box: { x: fragment.box.x, y: fragment.box.y + line * PITCH, width: 300, height: PITCH },
+          });
+        }
         return fragment;
       });
       return snapshot;
     };
     const heights = (...values: readonly number[]) => values.map((height) => ({ height }));
+    const ofLines = (...counts: readonly number[]) => counts.map((lines) => ({ lines }));
 
-    const tall = run(fragmented(heights(320, 300, 260)));
+    const tall = run(fragmented(ofLines(21, 19, 17)));
     assert.equal(tall.findings.length, 1, "a block split across three pages produced no finding");
-    assert.equal(tall.findings[0]!.measurement.value, 880);
+    assert.equal(tall.findings[0]!.measurement.value, 877.77);
     assert.equal(tall.findings[0]!.measurement.threshold, 606);
-    assert.match(tall.findings[0]!.message, /880\.00 px tall across the 3 fragments/u);
+    assert.match(tall.findings[0]!.message, /at least 877\.77 px tall across the 3 fragments/u);
     assert.match(tall.findings[0]!.message, /content box of page 1 is 606\.00 px/u);
     const tallRows = tall.evaluations!.filter((row) => row.status === "measured");
     assert.equal(tallRows.length, 1, "one candidate per block, judged at its first fragment");
-    assert.equal(tallRows[0]!.measurements[0]!.value, 880);
+    assert.equal(tallRows[0]!.measurements[0]!.name, "block-height-lower-bound");
+    assert.equal(tallRows[0]!.measurements[0]!.value, 877.77);
     assert.equal(tall.candidates, 1);
     assert.equal(tall.measured, 1);
 
-    // Two fragments summing to 750 px on a 606 px page: not reported. Repeated border/padding at
-    // the split edge can carry a block that fitted unsplit over the line, and two fragments alone
-    // do not prove otherwise. The value recorded is the first fragment's, as in 0.5.0.
-    const twoFragments = run(fragmented(heights(400, 350)));
-    assert.deepEqual(twoFragments.findings, [], "two fragments are not proof: repeated decoration can inflate their sum");
-    assert.equal(twoFragments.evaluations!.find((row) => row.status === "measured")!.measurements[0]!.value, 400);
+    // Two fragments, 26 + 23 lines (754.6 px of text) on a 606 px page: REPORTED, as a lower bound.
+    // This used to assert `[]` and a recorded value of the first fragment's box — the gap pinned as
+    // desired behaviour. Neither fragment exceeds the page on its own; only the lines of both do.
+    const twoFragments = run(fragmented(ofLines(26, 23)));
+    assert.equal(twoFragments.findings.length, 1, "a block split into exactly two fragments is not reported");
+    assert.equal(twoFragments.findings[0]!.measurement.value, 754.58);
+    assert.match(twoFragments.findings[0]!.message, /at least 754\.58 px tall across the 2 fragments/u);
 
-    const short = run(fragmented(heights(200, 160)));
+    const short = run(fragmented(ofLines(13, 10)));
     assert.deepEqual(short.findings, [], "a block shorter than the page must stay silent when it is split");
-    assert.equal(short.evaluations!.find((row) => row.status === "measured")!.measurements[0]!.value, 200);
+    assert.equal(short.evaluations!.find((row) => row.status === "measured")!.measurements[0]!.value, 354.18);
 
     const whole = run(fragmented(heights(848)));
     assert.equal(whole.findings.length, 1);
@@ -199,16 +218,16 @@ describe("target evaluation contract", () => {
     // `break-inside: avoid` block with six fragments at x = 18.91 against a content box at
     // x = 56.69 was judged on its first fragment by the coordinate filter this rule used to carry,
     // and the document came back clean. Re-adding any coordinate test turns this red.
-    const fullBleed = run(fragmented([{ height: 320, x: 8 }, { height: 300, x: 8 }, { height: 260, x: 8 }]));
+    const fullBleed = run(fragmented([{ lines: 21, x: 8 }, { lines: 19, x: 8 }, { lines: 17, x: 8 }]));
     assert.equal(fullBleed.findings.length, 1, "a full-bleed split block was judged on one piece");
-    assert.equal(fullBleed.findings[0]!.measurement.value, 880);
+    assert.equal(fullBleed.findings[0]!.measurement.value, 877.77);
     assert.match(fullBleed.findings[0]!.message, /across the 3 fragments/u);
 
     // The vertical axis of the same class: a negative top margin starts the FIRST fragment above
     // the content box (y = 8 against y = 48). It is still the first third of the block.
-    const pulledUp = run(fragmented([{ height: 320, y: 8 }, { height: 300 }, { height: 260 }]));
+    const pulledUp = run(fragmented([{ lines: 21, y: 8 }, { lines: 19 }, { lines: 17 }]));
     assert.equal(pulledUp.findings.length, 1, "a split block whose first fragment starts above the content box lost it");
-    assert.equal(pulledUp.findings[0]!.measurement.value, 880);
+    assert.equal(pulledUp.findings[0]!.measurement.value, 877.77);
 
     // A running element, as the snapshot now carries it. Paged.js clones `position: running(...)`
     // into the margin box of every page and the clone keeps the injected source id — measured on
@@ -238,7 +257,7 @@ describe("target evaluation contract", () => {
     // element a script created) three records of one split block cannot be told from three
     // blocks, and measuring the first of them compares a piece with the page. Declined, charged
     // to coverage; never a measured value.
-    const sidless = fragmented(heights(320, 300, 260));
+    const sidless = fragmented(ofLines(21, 19, 17));
     for (const fragment of sidless.blocks) fragment.sid = null;
     const uncorrelated = run(sidless);
     assert.deepEqual(uncorrelated.findings, []);
@@ -256,7 +275,7 @@ describe("target evaluation contract", () => {
 
     // A sid that does not account for the fragments the snapshot counted: three fragments
     // declared, two present. The sum of two would be a piece again.
-    const incomplete = fragmented(heights(320, 300, 260));
+    const incomplete = fragmented(ofLines(21, 19, 17));
     incomplete.blocks.pop();
     const partial = run(incomplete);
     assert.deepEqual(partial.findings, []);
