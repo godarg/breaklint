@@ -166,7 +166,12 @@ one of the seven admitted artifacts still exists at its recorded digest; the sha
 five of the six documents have changed since the measurement of 2026-09-06. The digests were not
 re-recorded — the expectations beside them were measured on the old bytes. The manifest carries
 `binding.status: "historical"` with that measurement in it and the gate says so and makes no claim.
-Re-admitting the corpus is a follow-up with its own rights and privacy review.
+Re-admitting the corpus is a follow-up with its own rights and privacy review. Since then it is no
+longer a CI or release step either: it prints `NO CLAIM` and exits 0 having read none of the six
+documents, with or without an artifact root, and a step like that is a green light over nothing.
+The class is held in CI by the public `tests/fixtures/fragmentainer-residue.html` in the live
+suite, and `tests/unit/workflow-gates.test.ts` fails if the step returns while the record reads
+nothing.
 
 `test:secrets` is red in the development worktree used for this release and green on the published
 history. Measured 2026-09-18: scanning `origin/main` gives **no leaks over 143 commits**; scanning

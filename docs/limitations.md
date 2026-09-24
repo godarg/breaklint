@@ -197,10 +197,14 @@ stylesheet, no `break-inside` and no script are needed, only a table that crosse
 The six documents are recorded, not published. They are chapters of a paid product, and this
 repository is public and MIT, so `corpus/public/pagination-residue-v1` keeps their SHA-256 values,
 rights and privacy review and exact expected residue while their bytes stay outside it —
-the `private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. Without
-`BREAKLINT_RESIDUE_CORPUS_ROOT` the gate says `SKIPPED` and claims nothing about them. What holds
-this class in CI is the public `tests/fixtures/fragmentainer-residue.html`, reduced from one of the
-six until no product text remained; the reduction is itself the measurement that nothing exotic is
+the `private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. That record is
+now historical: re-measured on 2026-09-18, five of the six documents and their shared stylesheet no
+longer exist at the recorded digests, so nobody can run its private half. `npm run
+test:pagination-residue` prints `NO CLAIM` and reads none of the six, with or without
+`BREAKLINT_RESIDUE_CORPUS_ROOT`, and it is no longer a CI or release step — a step that exits 0
+having read zero documents would be a green light over nothing. What holds this class in CI is the
+public `tests/fixtures/fragmentainer-residue.html` in the live suite, reduced from one of the six
+until no product text remained; the reduction is itself the measurement that nothing exotic is
 required.
 
 **Rendering is not reproducible across machines.** Browser rendering varies with the host operating

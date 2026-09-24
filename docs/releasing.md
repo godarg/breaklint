@@ -65,7 +65,6 @@ npm run schema:check
 npm test
 npm run test:mutants
 npm run test:real-document
-npm run test:pagination-residue          # SKIPPED without BREAKLINT_RESIDUE_CORPUS_ROOT; see below
 npm run test:licenses
 BREAKLINT_LIVE_REPORT=.tmp/live-report.json BREAKLINT_LIVE_SUMMARY=.tmp/live-summary.json npm run test:live
 npm run test:documented-figures
@@ -133,23 +132,26 @@ must NOT measure, and must say why — which elements a paginator left in an ove
 pages, and by how far. Their bytes are **not in this repository**: they are chapters of a paid
 product, 27 492 of that bundle's 69 017 words, and this repository is public and MIT. What is public
 is a hash-only record in the shape `docs/validation/corpus-contract-v1.md` defines for
-`private_nonredistributable` material, and the gate says `SKIPPED` rather than claiming a
-verification it did not perform. The class itself is held in CI by the public
-`tests/fixtures/fragmentainer-residue.html`, which carries no product text.
+`private_nonredistributable` material.
 
-Before a release, run the full gate once against the admitted bundle and read the six lines it
-prints:
+**That record is historical, and it is not a release step.** Re-measured on 2026-09-18, five of the
+six documents and the shared stylesheet no longer exist at their recorded digests, so the private
+half cannot be run by anybody. `npm run test:pagination-residue` therefore prints `NO CLAIM`, reads
+none of the six documents — with or without `BREAKLINT_RESIDUE_CORPUS_ROOT` — and exits 0; what it
+can still fail on is the internal consistency of its own manifest. It was a CI and release-workflow
+step until that became clear, and a step that exits 0 having read zero documents is a green light
+over nothing, so both steps were retired. `tests/unit/workflow-gates.test.ts` fails if either
+workflow runs it again while it reads nothing. The script remains as a local check of the record.
+The class itself is held in CI by the public `tests/fixtures/fragmentainer-residue.html` in the live
+suite, which was reduced from one of the six and carries no product text. Re-admitting the corpus
+against current bytes is a fresh admission with its own rights and privacy review.
 
-```bash
-BREAKLINT_RESIDUE_CORPUS_ROOT=<unpacked-bundle> npm run test:pagination-residue
-BREAKLINT_RESIDUE_CORPUS_ROOT=<unpacked-bundle> npm run test:pagination-residue:red-control
-```
-
-The red condition is not historical but re-derivable: the red control builds the parent of the
-commit that introduced `src/measure/fragmentainer.ts` and asserts that both cases were already fatal
-there and named no cause. Without the artifact root it still proves red-to-green on the public
-fixture and skips the corpus case by name. It is a local gate rather than a CI step because it
-compiles a second tree.
+The red control, `npm run test:pagination-residue:red-control`, builds the parent of the commit that
+introduced `src/measure/fragmentainer.ts`, asserts that each case it can run was already fatal
+there and named no cause, and that the current build names it. It is a local check rather than a CI
+step because it compiles a second tree. Without an artifact root it skips the corpus case by name
+and refuses to pass with zero cases, so its green result is a statement about the public fixture
+only.
 
 Then verify:
 

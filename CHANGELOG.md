@@ -56,6 +56,16 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `node_modules/breaklint/README.md` and the installed `bin` in a child process. Each run also
   rejects three corrupted copies of that README against the same output. Installed from the
   registry, 0.6.0 fails it on all three counts it states.
+- **The pagination-residue record is no longer a CI or release step.** Its binding has been
+  historical since 2026-09-18 — five of the six private documents no longer exist at their
+  recorded digests — so `npm run test:pagination-residue` printed `NO CLAIM` and exited 0 having
+  read none of them, with or without an artifact root; the only thing the step could fail on was
+  its own manifest. A step that exits 0 over zero documents is a green light over nothing, so it
+  was retired from `ci.yml` and `release.yml`, and `tests/unit/workflow-gates.test.ts` fails if it
+  returns while the script reads nothing. The script stays as a local check of the record. The
+  class remains held in CI by the public `tests/fixtures/fragmentainer-residue.html` in the live
+  suite. `docs/releasing.md`, `docs/limitations.md`, `docs/status.md` and the corpus README said
+  the step printed `SKIPPED` and could be run in full before a release; neither was true.
 
 ## 0.6.0 — 2026-09-18
 

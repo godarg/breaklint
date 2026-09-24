@@ -125,10 +125,9 @@ jobs:
       - name: admitted real-document acquisition gate
         run: npm run test:real-document
 
-      - name: pagination-residue corpus record
-        # Hash-only in this repository; SKIPPED here and no success claim about the six documents.
-        # The class is held by tests/fixtures/fragmentainer-residue.html in the live suite.
-        run: npm run test:pagination-residue
+      # No pagination-residue step: its record is historical and it reads no document (see the
+      # note in ci.yml). The class is held by tests/fixtures/fragmentainer-residue.html in the
+      # live suite above.
 
       - name: create the only npm package in this workflow
         id: package

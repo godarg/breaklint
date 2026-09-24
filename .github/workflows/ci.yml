@@ -110,15 +110,13 @@ jobs:
           npm run build
           npm run test:real-document
 
-      - name: pagination-residue corpus record
-        # The negative half of the same property: six real documents that must NOT measure, and
-        # must say why. Their bytes are a paid product and are NOT in this repository, so here this
-        # step only checks that the hash-only record is internally consistent and then reports
-        # SKIPPED. It makes no success claim about the six. What actually holds the class in CI is
-        # tests/fixtures/fragmentainer-residue.html in the live suite above, which is public and
-        # carries no product text. Supplying BREAKLINT_RESIDUE_CORPUS_ROOT on a private runner
-        # turns this step into the full gate without changing anything else.
-        run: npm run test:pagination-residue
+      # There is deliberately no pagination-residue step. `npm run test:pagination-residue` binds
+      # six private documents by digest, and that record is historical: the digests are reachable
+      # nowhere, so the script prints NO CLAIM and exits 0 having read none of them, with or
+      # without an artifact root. A step that exits 0 over zero documents is the shape this file
+      # exists to prevent, so it was retired rather than kept as a green light. The class is held
+      # by tests/fixtures/fragmentainer-residue.html in the live suite above, which is public and
+      # carries no product text. tests/unit/workflow-gates.test.ts fails if the step returns.
 
       - name: technical report-surface matrix
         # Linux verifies all 32 current cells, including decoded-pixel, semantic, accessibility
