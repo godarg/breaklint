@@ -153,14 +153,19 @@ compiles a second tree.
 
 Then verify:
 
-- `.github/workflows/release.yml` is pinned to this tag and this tarball. The trigger is the
-  literal `tags: ["vX.Y.Z"]`, not a wildcard, and `PACKAGE_FILE` plus every version assertion in
-  the file name the same version. **This step is the one that is easy to forget and silent when
-  forgotten**: a tag pushed while the workflow still names the previous version starts nothing at
-  all — no run, no error, no notification, and the tag sits on the remote looking done. Measured on
-  2026-09-18: `v0.6.0` was pushed against a workflow still pinned to `v0.5.0`, nothing ran, and the
-  tag had to be deleted and recreated. The pinning is deliberate — a wildcard would let any `v*`
-  tag publish — but it belongs in this list.
+- `.github/workflows/release.yml` is pinned to this tag. The trigger is the literal
+  `tags: ["vX.Y.Z"]`, not a wildcard — a wildcard would let any `v*` tag publish — and it is the
+  only place the file names the version: every job derives `RELEASE_VERSION` and `PACKAGE_FILE`
+  from the triggering tag with `tests/tools/release-workflow-contract.mjs --derive-env`. A stale
+  pin is silent when it happens: a tag pushed while the workflow still names the previous version
+  starts nothing at all — no run, no error, no notification, and the tag sits on the remote
+  looking done. Measured on 2026-09-18: `v0.6.0` was pushed against a workflow still pinned to
+  `v0.5.0`, nothing ran, and the tag had to be deleted and recreated. The pin is therefore no
+  longer a manual check. `npm run test:release-tag` runs `release-workflow-contract.mjs --check`
+  on every CI run and fails when the trigger, `package.json` and both root version fields of
+  `package-lock.json` do not name one version, or when any other release literal is left in an
+  executable line of the workflow. The release-prep commit moves the version, the lock and the pin
+  together; a commit that moves only one of them fails on its pull request.
 - `package.json`, both root version fields in `package-lock.json` and `CHANGELOG.md` name the same
   version;
 - README, security policy, status and limitations make no future-tense success claim;
@@ -179,18 +184,20 @@ git push origin v0.6.0
 
 The release workflow then:
 
-1. repeats the complete gate on Node 24;
-2. scans Git history/worktree and proves both scanner rules with runtime canaries;
-3. creates exactly one `breaklint-0.6.0.tgz`;
-4. records its SHA-256 and SHA-512 SRI;
-5. downloads those same bytes into Node 22.13 and Node 24 clean consumers;
-6. proves the ref is an annotated tag (with a lightweight-tag negative control), then proves
+1. proves, in every job, that the triggering tag, the workflow's one literal pin, `package.json`
+   and `package-lock.json` name one version, and derives the version and package file name from it;
+2. repeats the complete gate on Node 24;
+3. scans Git history/worktree and proves both scanner rules with runtime canaries;
+4. creates exactly one `breaklint-X.Y.Z.tgz`;
+5. records its SHA-256 and SHA-512 SRI;
+6. downloads those same bytes into Node 22.13 and Node 24 clean consumers;
+7. proves the ref is an annotated tag (with a lightweight-tag negative control), then proves
    tag/version, exact `origin/main` SHA and successful main CI;
-7. publishes that tarball with provenance;
-8. waits until npm exposes the version, compares `dist.integrity`, binds the package digest and Git
+8. publishes that tarball with provenance;
+9. waits until npm exposes the version, compares `dist.integrity`, binds the package digest and Git
    commit through the signed SLSA provenance, runs npm signature verification and installs the
    registry version in a final consumer;
-9. creates the GitHub Release with the tarball and both identity records attached.
+10. creates the GitHub Release with the tarball and both identity records attached.
 
 Do not rerun a partially successful publish blindly: npm versions are immutable. Inspect the npm
 version, workflow logs and GitHub Release first. If npm already serves 0.6.0 but a post-publish

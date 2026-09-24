@@ -24,6 +24,20 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `true` does. This was always the behaviour; it is now written down in `docs/limitations.md` and
   pinned by a contract test.
 
+### Tooling
+
+- **The release workflow names its version once, and CI checks that it is the right one.**
+  `release.yml` carried the release version as a literal 28 times; the literal tag trigger is now
+  the only one in an executable line, and every job derives `RELEASE_VERSION` and `PACKAGE_FILE`
+  from the triggering tag after proving that the tag, the trigger, `package.json` and both root
+  fields of `package-lock.json` agree. `npm run test:release-tag` now also runs
+  `tests/tools/release-workflow-contract.mjs --check` on every CI run, so the 0.6.0 incident — a
+  version bump whose tag started nothing because the trigger still named the previous release —
+  fails on the pull request that causes it. Its `--self-test` rejects a pin moved alone, a version
+  moved alone, a lock moved alone, a wildcard, a leftover release literal and a job that reads the
+  identity without deriving it, and accepts a coherent release-prep commit. Run against the tree
+  of that incident (the parent of 9d53577) it reports "a push of v0.6.0 would start nothing".
+
 ## 0.6.0 — 2026-09-18
 
 A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0: the canonical

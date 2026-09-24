@@ -42,7 +42,10 @@ jobs:
       - name: Git history, worktree and secret-scanner canary
         run: npm run test:secrets
 
-      - name: annotated release-tag contract and lightweight-tag negative control
+      - name: annotated release-tag and release-pin contracts, each with its negative controls
+        # The pin half compares .github/workflows/release.yml against package.json at THIS commit,
+        # so a version bump that forgets the literal tag trigger fails here, on its pull request,
+        # instead of starting nothing when the tag is pushed.
         run: npm run test:release-tag
 
       - name: published dependency graph and pinned development advisory disposition
