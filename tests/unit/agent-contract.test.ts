@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 
 import { ENV_IDS, EXIT_CODE_BY_VERDICT, NON_APPLICABLE_ENV_IDS, RUN_VERDICTS, TOOL_CAPABILITY_ENV_IDS } from "../../src/core/enums.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
-import { leversIn, positiveLevers, proposes, sentencesOf } from "../tools/remediation-levers.ts";
+import { positiveLevers, proposedLevers, sentencesOf } from "../tools/remediation-levers.ts";
 
 const CLI = fileURLToPath(new URL("../../src/cli/index.ts", import.meta.url));
 const TEXT = readFileSync(new URL("../../docs/agent-contract.md", import.meta.url), "utf8").replace(/\r\n/gu, "\n");
@@ -115,10 +115,17 @@ describe("docs/agent-contract.md", () => {
     assert.deepEqual(named.filter((id) => !RULE_IDS.has(id)), [], "the contract names a rule id the released registry does not have");
   });
 
-  it("names only env/ reasons a released rule declares, and attributes each to a rule that declares it", () => {
+  /*
+   * A decline list the page attributes to a rule is complete, not a sample: an agent reading "this
+   * rule declines on A or B" plans for A and B only. Every reason in that rule's `declines` that
+   * counts against coverage must be listed, so a rule that gains a reason — as the unbreakable-block
+   * and SVG rules do in this release — fails here until the page says so.
+   */
+  it("names only env/ reasons a released rule declares, and lists all of a rule's reasons wherever it lists them", () => {
     const declared = new Set<string>(ALL_RULES.flatMap((rule) => [...rule.declines]));
     const outOfCoverage = new Set<string>([...NON_APPLICABLE_ENV_IDS, ...TOOL_CAPABILITY_ENV_IDS]);
     let seen = 0;
+    const attributed = new Map<string, Set<string>>();
     for (const sentence of blocks(TEXT).flatMap(sentencesOf)) {
       let owner: string | null = null;
       for (const token of backticked(sentence)) {
@@ -130,11 +137,18 @@ describe("docs/agent-contract.md", () => {
         if (owner) {
           const rule = ALL_RULES.find((candidate) => candidate.id === owner)!;
           assert.ok((rule.declines as readonly string[]).includes(token), `${owner} does not decline with ${token}: ${sentence}`);
+          attributed.set(owner, (attributed.get(owner) ?? new Set<string>()).add(token));
         }
         if (/does not count against coverage/u.test(sentence)) assert.ok(outOfCoverage.has(token), `${token} does count against coverage: ${sentence}`);
       }
     }
     assert.ok(seen >= 3, "the contract names almost no env/ reason; this guard has lost its subject");
+    assert.ok(attributed.size >= 2, "the contract attributes no decline list to a rule; this guard has lost its subject");
+    for (const [owner, listed] of attributed) {
+      const rule = ALL_RULES.find((candidate) => candidate.id === owner)!;
+      const expected = rule.declines.filter((reason) => !outOfCoverage.has(reason)).sort();
+      assert.deepEqual([...listed].sort(), expected, `docs/agent-contract.md lists the coverage-relevant declines of ${owner} incompletely`);
+    }
   });
 
   it("names only report fields a real --demo report carries", () => {
@@ -148,8 +162,8 @@ describe("docs/agent-contract.md", () => {
     for (const block of blocks(TEXT)) {
       const rules = backticked(block).filter((token) => RULE_IDS.has(token));
       for (const sentence of sentencesOf(block)) {
-        if (!proposes(sentence)) continue;
-        const levers = leversIn(sentence);
+        // Clause by clause: "Remove X; this never hurts" proposes X, and so does "Delete X".
+        const levers = proposedLevers(sentence);
         if (levers.length === 0) continue;
         proposals += 1;
         assert.ok(rules.length > 0, `a repair lever (${levers.join(", ")}) is proposed without naming the rule it is for: ${sentence}`);

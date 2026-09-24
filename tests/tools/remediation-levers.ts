@@ -22,10 +22,14 @@ export const LEVERS = [
 const BREAK_PARAPHRASE = /\bbreak (?:constraint|behaviou?r|rule|propert(?:y|ies)|setting)s?\b/iu;
 const BREAK_LEVERS = ["break-inside", "break-before", "break-after", "page-break-before", "page-break-after"];
 
-/** An imperative verb that opens the sentence or one of its clauses. */
-const IMPERATIVE = /(?:^|[,;(—:]\s*|\b(?:or|and|then)\s+)(?:set|use|apply|add|insert|enable|disable|remove|replace|increase|reduce|lower|raise|adjust|specify|configure|prevent|force|keep|try|wrap|mark|make|split|tighten|enlarge|move|shorten|constrain|reword|put)\b/iu;
+/**
+ * An imperative verb opening a clause, removal synonyms included: "delete", "drop" or "strip" a
+ * declaration proposes a lever exactly as "remove" does.
+ */
+const IMPERATIVE_VERB = "(?:set|use|apply|add|insert|enable|disable|remove|delete|drop|strip|omit|unset|eliminate|clear|take out|get rid of|turn off|switch off|replace|increase|reduce|lower|raise|adjust|specify|configure|prevent|force|keep|try|wrap|mark|make|split|tighten|enlarge|move|shorten|constrain|reword|put)";
+const IMPERATIVE_CLAUSE = new RegExp(`^\\s*(?:(?:or|and|then|also|instead|simply|just|first|please)\\s+)*${IMPERATIVE_VERB}\\b`, "iu");
 
-/** A sentence that names a lever in order to warn against it. */
+/** A clause that names a lever in order to warn against it. */
 export const DISCOURAGING = /\b(?:do not|does not|don't|never|ignored|inert|also clears the finding|only where|only helps|not honou?r)\b/iu;
 
 /**
@@ -53,20 +57,40 @@ export function leversIn(sentence: string): string[] {
   return found;
 }
 
-/** Whether a sentence proposes something, rather than describing or warning. */
-export function proposes(sentence: string): boolean {
-  const text = plain(sentence);
-  return IMPERATIVE.test(text) && !DISCOURAGING.test(text);
+/**
+ * The clauses of a sentence, split at commas, semicolons, colons, dashes, brackets and the
+ * conjunctions that join clauses. Quoted and backticked spans are masked first, so that the colon
+ * in `'break-inside: avoid'` does not split a clause in two.
+ */
+export function clausesOf(sentence: string): string[] {
+  const spans: string[] = [];
+  const masked = plain(sentence).replace(/`[^`\n]*`|(?<![\w])'[^'\n]+?'(?![\w])|"[^"\n]*"/gu, (span) => `\u0000${spans.push(span) - 1}\u0000`);
+  return masked
+    .split(/[,;:—()]|\s(?=(?:or|and|but|while|which|so|whereas)\s)/u)
+    .map((clause) => clause.replace(/\u0000(\d+)\u0000/gu, (_, index: string) => spans[Number(index)]!).trim())
+    .filter(Boolean);
 }
 
-/** The levers an advice text proposes: named in a sentence that proposes and does not warn. */
+/**
+ * The levers a sentence proposes. A clause that warns ("do not …", "… also clears the finding")
+ * proposes nothing, however the rest of the sentence reads; the other clauses propose the levers
+ * they name when some clause of the sentence opens with an imperative. With `requireImperative`
+ * false every non-warning clause is a proposal — the shape of a repair instruction.
+ */
+export function proposedLevers(sentence: string, { requireImperative = true } = {}): string[] {
+  const clauses = clausesOf(sentence).filter((clause) => !DISCOURAGING.test(clause));
+  if (requireImperative && !clauses.some((clause) => IMPERATIVE_CLAUSE.test(clause))) return [];
+  return [...new Set(clauses.flatMap(leversIn))];
+}
+
+/** Whether a sentence proposes any lever at all. */
+export function proposes(sentence: string): boolean {
+  return proposedLevers(sentence).length > 0;
+}
+
+/** The levers an advice text proposes, sentence by sentence and clause by clause. */
 export function positiveLevers(advice: string): Set<string> {
-  const levers = new Set<string>();
-  for (const sentence of sentencesOf(advice)) {
-    if (!proposes(sentence)) continue;
-    for (const lever of leversIn(sentence)) levers.add(lever);
-  }
-  return levers;
+  return new Set(sentencesOf(advice).flatMap((sentence) => proposedLevers(sentence)));
 }
 
 /** `lever: value` declarations in a code block, per lever, for comparing a trigger with its remedy. */
@@ -82,11 +106,19 @@ export function declarations(code: string): Map<string, Set<string>> {
   return found;
 }
 
-/** The levers a remedied example sets to a value its trigger does not carry. */
+/**
+ * The levers whose declarations differ between a trigger and its remedied example — set to a new
+ * value, added, or REMOVED. Deleting `break-inside: avoid` is the false repair this project warns
+ * about most, and it only shows as a declaration that is no longer there.
+ */
 export function changedLevers(trigger: string, remedied: string): string[] {
   const before = declarations(trigger);
   const after = declarations(remedied);
-  return [...after.entries()]
-    .filter(([lever, values]) => [...values].some((value) => !before.get(lever)?.has(value)))
-    .map(([lever]) => lever);
+  return [...new Set([...before.keys(), ...after.keys()])]
+    .filter((lever) => {
+      const was = before.get(lever) ?? new Set<string>();
+      const is = after.get(lever) ?? new Set<string>();
+      return was.size !== is.size || [...was].some((value) => !is.has(value));
+    })
+    .sort();
 }

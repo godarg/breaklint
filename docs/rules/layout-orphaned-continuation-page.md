@@ -59,7 +59,8 @@ A continuation page holds only a tiny trailing fragment of an earlier block. Tig
 ```
 
 Illustrative, like every example on these pages: the advice ships `tested: false`, and no
-trigger/remedied pair in this package demonstrates it. The example changes only levers the advice
-names — a preceding vertical margin and `line-height` — which
-`tests/unit/registry.test.ts` checks for every rule page.
+trigger/remedied pair in this package demonstrates it. The example changes a preceding vertical
+margin and `line-height`, both of which the advice names. `tests/unit/registry.test.ts` compares
+every CSS lever it tracks between trigger and remedied example against the levers the advice
+proposes; `line-height` is one of them, margins are not.
 

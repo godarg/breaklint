@@ -83,13 +83,19 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `EXIT_CODE_BY_VERDICT`, every rule id against the registry, every `env/` id against `ENV_IDS` and
   the declaring rule, every field path against a real `--demo --format json` run, and every lever
   it proposes against the positive levers of that rule's `remediation.advice`; each of the six
-  contradictions, reinserted, fails a named test.
-- **The lever guard now also reads each rule page's Examples.** The remedied example of
+  contradictions, reinserted, fails a named test. A decline list the page attributes to a rule
+  must be that rule's complete coverage-relevant `declines`, so a rule that gains a reason fails
+  the test until the page lists it.
+- **The lever guard now also reads each rule page's Examples.** A lever counts as changed when the
+  remedied example sets it to a new value, adds it or REMOVES it — deleting `break-inside: avoid`
+  is the false repair the guard exists for. The remedied example of
   `layout/orphaned-continuation-page` changed `font-size`, which its advice does not propose; it now
   changes a preceding margin and `line-height`. The remedied example of
   `layout/unbreakable-block-too-tall` still uses `break-inside: auto`; that page is rewritten by
-  another change of this release and is listed as pending in the guard, which fails once the entry
-  is no longer needed.
+  another change of this release and is pending in the guard with exactly that one foreign lever,
+  so anything added to the example fails, and the entry fails once it is no longer needed. A
+  sentence proposes a lever clause by clause: "Delete …", "Drop …" and "Strip …" propose as
+  "Remove …" does, and a warning word in one clause no longer exempts the others.
 - **Erratum to 0.6.0.** The 0.6.0 entry that introduced `docs/agent-contract.md` says
   "`selfcheck:static` reads it, so its claims are held against the code". It did not:
   `selfcheck:static` scans that file for emoji, first-person wording, marketing words and

@@ -5,7 +5,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { ALL_RULES, VALIDATION_RULES_BY_ID } from "../../src/rules/index.ts";
 import { generatedBlock, markerPairCount, pageNameFor } from "../../tools/rule-docs.ts";
 import { IS, SEVERITIES } from "../../src/core/enums.ts";
-import { changedLevers, DISCOURAGING, LEVERS, leversIn, positiveLevers } from "../tools/remediation-levers.ts";
+import { changedLevers, LEVERS, positiveLevers, proposedLevers } from "../tools/remediation-levers.ts";
 
 /**
  * The declaration form, and the three prose forms that got past the narrow first version of this
@@ -162,10 +162,14 @@ describe("rule registry", () => {
    */
   it("every rule page's remedied example changes only levers its rule's advice proposes", () => {
     const dir = new URL("../../docs/rules/", import.meta.url);
-    // A page another change of this release rewrites. An entry must still be needed: once the page
-    // is corrected this test fails until the entry is deleted, so the list can only shrink.
-    const PENDING: Record<string, string> = {
-      "layout/unbreakable-block-too-tall": "its page, including this example, is rewritten by the margin-box change of this release",
+    // A page another change of this release rewrites, with the EXACT foreign levers it is known to
+    // carry. Anything added to that example fails like on any other page, and once the page is
+    // corrected this test fails until the entry is deleted, so the list can only shrink.
+    const PENDING: Record<string, { foreign: string[]; reason: string }> = {
+      "layout/unbreakable-block-too-tall": {
+        foreign: ["break-inside"],
+        reason: "its page, including this example, is rewritten by another change of this release",
+      },
     };
     let compared = 0;
     for (const rule of ALL_RULES) {
@@ -184,8 +188,10 @@ describe("rule registry", () => {
       compared += 1;
       const positive = positiveLevers(rule.remediation!.advice);
       const foreign = changedLevers(trigger, remedied).filter((lever) => !positive.has(lever));
-      if (rule.id in PENDING) {
-        assert.notDeepEqual(foreign, [], `docs/rules/${page} no longer needs its pending entry (${PENDING[rule.id]}); delete it`);
+      const pending = PENDING[rule.id];
+      if (pending) {
+        assert.notDeepEqual(foreign, [], `docs/rules/${page} no longer needs its pending entry (${pending.reason}); delete it`);
+        assert.deepEqual(foreign, pending.foreign, `docs/rules/${page}: the remedied example changes ${foreign.join(", ")}; its pending entry covers only ${pending.foreign.join(", ")}`);
         continue;
       }
       assert.deepEqual(
@@ -215,11 +221,9 @@ describe("rule registry", () => {
     assert.ok(released.length >= 4, `only ${released.length} released-rule entries were read from repairOptions`);
     for (const [, id, option] of released) {
       const positive = positiveLevers(ALL_RULES.find((rule) => rule.id === id)!.remediation!.advice);
-      for (const clause of option!.split(/;\s*/u)) {
-        if (DISCOURAGING.test(clause)) continue;
-        const foreign = leversIn(clause).filter((lever) => !positive.has(lever));
-        assert.deepEqual(foreign, [], `src/api/context.ts repair option for ${id} proposes ${foreign.join(", ")}, which its advice does not: ${clause}`);
-      }
+      // A repair option is an instruction throughout: every clause that does not warn proposes.
+      const foreign = proposedLevers(option!, { requireImperative: false }).filter((lever) => !positive.has(lever));
+      assert.deepEqual(foreign, [], `src/api/context.ts repair option for ${id} proposes ${foreign.join(", ")}, which its advice does not: ${option}`);
     }
   });
 
