@@ -199,7 +199,8 @@ export const REPORT_HTML_STYLES = String.raw`
     /* Compact findings stay whole. A finding taller than the page still fragments by necessity. */
     .finding { break-inside: avoid-page; }
     .finding h3, .finding-facts > div, .evidence-state { break-inside: avoid; }
-    .report-footer { display: none; }
+    /* The footer prints as the end mark and stays with the content before it. */
+    .report-footer { margin-block-start: var(--bl-space-5); break-before: avoid; break-inside: avoid; }
     a { color: var(--bl-color-fg-primary); }
   }
 `;

@@ -39,6 +39,9 @@ function findingsBase(): Report {
     startedAt: "2026-08-22T12:00:00.000Z",
     durationMs: 184,
     rulesRun: ALL_RULES.length,
+    // A real CLI run id has this shape (randomUUID). The canonical surfaces print it in the tool
+    // line, the running head of every printed page after the first, and the end mark.
+    runId: "3f6c1a2e-8b4d-4f7a-9c21-5e0b7d9a4c68",
     failOn: "error",
     environment: {
       browserVersion: "",

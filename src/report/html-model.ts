@@ -141,6 +141,10 @@ const SEVERITY_LABELS: Record<Severity, string> = {
   info: "Information",
 };
 
+function findingCount(count: number): string {
+  return `${count} finding${count === 1 ? "" : "s"}`;
+}
+
 function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(4)));
 }
@@ -302,10 +306,12 @@ export function buildHtmlReportModel(report: Report): HtmlReportModel {
       info: report.summary.info,
     },
     coverageTrust,
+    // Every lead states the count, so a printed report — clean ones included — says "0 findings"
+    // in words rather than leaving the reader to infer it from an absent list.
     findingsLead: STATUS[report.runVerdict].partial
-      ? "Partial findings only. The run did not establish enough trust for these findings to describe the whole document."
+      ? `Partial findings only: ${findingCount(report.findings.length)}. The run did not establish enough trust for these findings to describe the whole document.`
       : report.findings.length === 0
-        ? "The requested checks completed without a gate-triggering finding."
+        ? "0 findings. The requested checks completed without a gate-triggering finding."
         : `${report.findings.length} measured finding${report.findings.length === 1 ? "" : "s"}, ordered as produced by the checker.`,
     findings,
     remediationSummary: {

@@ -97,6 +97,14 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   The surface gate checks the accessibility tree per cell (landmarks, link targets, table
   semantics on the phone grid, first Tab stop and its focus outline) and re-cuts every tile.
 
+- **Printed reports carry page numbers, a running head with the run id, and an end mark; the printed
+  clean report keeps its findings section.** No page of any printed report had a page number or a
+  running head, the report's run id appeared nowhere in the HTML, the footer was hidden in print in
+  every state and the clean state dropped its findings section entirely. Now every page shows
+  "Page N of M", every page from the second `breaklint · <verdict> · exit N` and `run <runId>`, the
+  header and the end mark show the run id, and every findings lead states its count ("0
+  findings"). The run id reaches CSS only through a string escaper, tested with hostile ids.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as

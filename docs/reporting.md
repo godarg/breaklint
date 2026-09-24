@@ -99,11 +99,26 @@ cell; `broken-untested-repeat` and `broken-untested-marker` are its red controls
   the column header repeats on a continuation page, and the last two rows of a table never part.
   Printed content never exceeds the 703 CSS px content box: wider content makes Chrome scale the
   whole printed document down to fit, silently.
-- The redundant screen footer is omitted from print so it cannot become an otherwise empty page.
-- The clean state prints its findings section too. It used to be omitted from print so that the
-  duplicate block could not push one atomic coverage card onto a nearly empty terminal page; with
-  coverage as a table that reason is gone, and a printed clean report without a findings heading
-  reads as if the section was lost.
+- Every printed page carries "Page N of M", and every page from the second a running head with the
+  verdict, the exit code and the report's run id (`breaklint · Checker failed · exit 3` /
+  `run <runId>`), in CSS `@page` margin boxes inside the 12 mm margin, so the content box is
+  unchanged. The run id is also shown in the header's tool line and in the end mark. Because the run
+  id is caller-supplied through the API it reaches the page's CSS only through a string escaper that
+  emits `[A-Za-z0-9 ._:/-]` literally and everything else as a six-digit hex escape; a technical
+  probe prints a hostile run id (`"; } body { display: none } /* </style><script>…`) and must find
+  it as literal text in the running head with the report's layout unchanged. The footer prints as
+  the end mark ("End of report. … JSON remains the canonical report."), on the final page and never
+  alone there. Engines without margin-box support (Chromium before 131) print no folio.
+- The clean state prints its findings section too, and every findings lead states the count in
+  words ("0 findings. The requested checks completed …", "Partial findings only: 7 findings. …").
+  It used to be omitted from print so that the duplicate block could not push one atomic coverage
+  card onto a nearly empty terminal page; with coverage as a table that reason is gone, and a
+  printed clean report without a findings heading reads as if the section was lost.
+- The surface gate reads the furniture back from each PDF's text (renderer, and the verifier
+  independently from the documented verdict table and page 1's run id): the folio on every page,
+  the running head on every page from 2, the clean state's "Findings" heading and "0 findings", and
+  the end mark on the final page only, with report content beside it. `broken-folio`,
+  `broken-running-head`, `broken-clean-findings` and `broken-end-mark` are its red controls.
 
 ## Design tokens
 
