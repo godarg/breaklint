@@ -18,6 +18,25 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
   compared advice text will see the new string.
 
+### Fixed
+
+- **A report written to a pipe arrives whole.** Through 0.6.0 the CLI exited as soon as it had
+  handed the report to stdout, which discarded everything the pipe had not taken yet: behind
+  `| cat`, `| jq` or a slow uploader a report larger than the pipe buffer arrived cut at 65 536
+  bytes on Linux — in all six formats, on Node 22 and 24, from the source and from the built
+  entry — while the exit code still stated the verdict, so the loss was silent. The demo's own
+  JSON report (82 585 bytes) was already over that size. The CLI now exits only after every write
+  has been accepted. `--out` and a `> file` redirect were never affected.
+- **Output that cannot be delivered is exit 3, not a verdict.** When stdout cannot be written
+  completely — the reader closed early (`| head`), or the device is full — the run now ends with
+  exit 3 and one `breaklint: could not write to stdout (…)` line on stderr, whatever its verdict.
+  Before, a reader that closed early left the run at exit 1 with no message, a verdict about a
+  report nobody received. The exit-code table in the README and in `--help` names the case. A
+  process-boundary test, `tests/e2e/cli-pipe-integrity.test.ts`, drives the real source entry and
+  a freshly built `dist/` entry (through a bin symlink) with a report of at least 256 KiB in every
+  format, through a kernel pipe into `cat`, a kernel pipe into a slow reader and a Node pipe, and
+  compares the bytes with the `--out` file; it fails on the previous entry point.
+
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as
