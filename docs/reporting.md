@@ -142,7 +142,8 @@ outside the generated token blocks; and dark and print blocks that redefine the 
 of the light block. Every foreground/background pair the report sets text in — including text on
 the `soft` background of the alert, the remediation box and the frequency note — is measured
 against WCAG AA from the table per theme and, in the surface gate, from computed style in every
-cell. Each lint rule has a red control in the same test.
+cell (`broken-soft-contrast` darkens only `soft` and must fail it). Each lint rule has a red control
+in the same test.
 
 ## Typography
 
