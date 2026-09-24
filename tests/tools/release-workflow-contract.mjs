@@ -40,6 +40,7 @@ import { fileURLToPath } from "node:url";
 const SCRIPT = fileURLToPath(import.meta.url);
 const WORKFLOW = ".github/workflows/release.yml";
 const DERIVE_STEP = "release-workflow-contract.mjs --derive-env";
+const DERIVE_RUN = /^\s*(?:-\s+)?run:\s*node tests\/tools\/release-workflow-contract\.mjs --derive-env\s*$/u;
 const SEMVER = /^\d+\.\d+\.\d+$/u;
 // A version-shaped token that is not part of a longer dotted or word token. A following `.tgz`
 // does not make it longer: `breaklint-X.Y.Z.tgz` names the release as surely as `X.Y.Z` does.
@@ -62,6 +63,22 @@ function isThirdPartyPin(line, index) {
   if (/^\s*GITLEAKS_VERSION:\s*$/u.test(before)) return true;
   if (/^\s*node(-version)?:\s*[[\s"',\d.]*$/u.test(before)) return true;
   return false;
+}
+
+/** The steps of a job: each begins at a `- ` item of its `steps:` list. */
+function stepsOf(jobLines) {
+  const steps = [];
+  let indent = null;
+  for (const line of jobLines) {
+    const item = /^(\s*)- /u.exec(line.text);
+    if (item && (indent === null || item[1].length === indent)) {
+      indent = item[1].length;
+      steps.push([line]);
+    } else if (steps.length && (indent === null || line.text.trim() === "" || line.text.length - line.text.trimStart().length > indent)) {
+      steps.at(-1).push(line);
+    }
+  }
+  return steps;
 }
 
 /** Splits the `jobs:` mapping into `{ name, startLine, lines }` by its two-space keys. */
@@ -143,11 +160,24 @@ export function checkReleaseWorkflow({ workflowText, manifest, lock }) {
     }
   }
 
-  // 3. Every job that reads the derived identity derives it first.
+  // 3. Every job that reads the derived identity derives it first, in a step that always runs
+  //    and that invokes the script rather than mentioning it: no `if:`, no `continue-on-error:`,
+  //    and exactly `run: node tests/tools/<script> --derive-env` — not echoed, not `|| true`.
   for (const job of jobsOf(lines)) {
+    for (const step of stepsOf(job.lines)) {
+      if (!step.some(({ text }) => executablePart(text).includes(DERIVE_STEP))) continue;
+      const at = step[0].number;
+      if (!step.some(({ text }) => DERIVE_RUN.test(executablePart(text)))) {
+        issues.push(`${WORKFLOW}:${at}: job ${job.name}: the derive step must be exactly "run: node tests/tools/${DERIVE_STEP}"`);
+      }
+      for (const { text, number } of step) {
+        const key = /^\s*(?:-\s+)?(if|continue-on-error)\s*:/u.exec(executablePart(text));
+        if (key) issues.push(`${WORKFLOW}:${number}: job ${job.name}: the derive step must be unconditional; it carries ${key[1]}:`);
+      }
+    }
     const firstUse = job.lines.find(({ text }) => /\bRELEASE_VERSION\b|\bPACKAGE_FILE\b/u.test(executablePart(text)));
     if (!firstUse) continue;
-    const derive = job.lines.find(({ text }) => executablePart(text).includes(DERIVE_STEP));
+    const derive = job.lines.find(({ text }) => DERIVE_RUN.test(executablePart(text)));
     if (!derive || derive.number > firstUse.number) {
       issues.push(
         `${WORKFLOW}:${firstUse.number}: job ${job.name} reads the release identity without deriving it first ` +
@@ -220,6 +250,8 @@ function runSelfTest() {
     return copy;
   };
   const movePin = (text, value) => text.replace(`tags: ["v${version}"]`, `tags: ["v${value}"]`);
+  const deriveRun = "        run: node tests/tools/release-workflow-contract.mjs --derive-env";
+  assert.ok(real.workflowText.includes(deriveRun), "the real workflow has no derive step to mutate");
   const cases = [
     { name: "the real files", expect: 0 },
     { name: "a release-prep commit that moves version, lock and pin together", expect: 0,
@@ -238,6 +270,14 @@ function runSelfTest() {
       workflowText: real.workflowText.replace(`tags: ["v${version}"]`, `tags: ["v${version}", "v${next}"]`) },
     { name: "one leftover release literal in a registry step", expect: 1, match: /:\d+: version literal \S+ outside the trigger \(stale release pin\)/u,
       workflowText: `${real.workflowText.trimEnd()}\n      - run: npm view breaklint@${version} version\n` },
+    { name: "a derive step that may be skipped", expect: 1, match: /the derive step must be unconditional; it carries if:/u,
+      workflowText: real.workflowText.replace(deriveRun, `        if: \${{ false }}\n${deriveRun}`) },
+    { name: "a derive step whose failure is ignored", expect: 1, match: /the derive step must be unconditional; it carries continue-on-error:/u,
+      workflowText: real.workflowText.replace(deriveRun, `        continue-on-error: true\n${deriveRun}`) },
+    { name: "a derive step that only echoes the command", expect: 1, match: /the derive step must be exactly "run: node tests\/tools\/release-workflow-contract\.mjs --derive-env"/u,
+      workflowText: real.workflowText.replace(deriveRun, deriveRun.replace("run: node", "run: echo node")) },
+    { name: "a derive step whose exit code is swallowed", expect: 1, match: /the derive step must be exactly/u,
+      workflowText: real.workflowText.replace(deriveRun, `${deriveRun} || true`) },
     { name: "a job that reads the identity without deriving it", expect: 1, match: /job extra reads the release identity without deriving it first/u,
       workflowText: `${real.workflowText.trimEnd()}\n  extra:\n    runs-on: ubuntu-latest\n    steps:\n      - run: test -s "$PACKAGE_FILE"\n` },
   ];

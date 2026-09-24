@@ -126,9 +126,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   fields of `package-lock.json` agree. `npm run test:release-tag` now also runs
   `tests/tools/release-workflow-contract.mjs --check` on every CI run, so the 0.6.0 incident — a
   version bump whose tag started nothing because the trigger still named the previous release —
-  fails on the pull request that causes it. Its `--self-test` rejects a pin moved alone, a version
-  moved alone, a lock moved alone, a wildcard, a leftover release literal and a job that reads the
-  identity without deriving it, and accepts a coherent release-prep commit. Run against the tree
+  fails on the pull request that causes it. The derive step must always run and must invoke the
+  script: no `if:`, no `continue-on-error:`, and exactly `run: node
+  tests/tools/release-workflow-contract.mjs --derive-env`. Its `--self-test` rejects a pin moved
+  alone, a version moved alone, a lock moved alone, a wildcard, a leftover release literal, a job
+  that reads the identity without deriving it and four ways of disarming the derive step, and
+  accepts a coherent release-prep commit. Run against the tree
   of that incident (the parent of 9d53577) it reports "a push of v0.6.0 would start nothing".
 - **The changelog is checked against git, in three states.** `tests/tools/changelog-contract.mjs`,
   also in `npm run test:release-tag`: after a release, any change under `src/` since the last tag
