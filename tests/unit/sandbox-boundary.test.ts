@@ -60,9 +60,23 @@ describe("the browser sandbox", () => {
     const end = site!.text.indexOf("});", site!.index);
     assert.ok(end > site!.index, "the launch call has no closing brace");
     const call = site!.text.slice(site!.index, end);
-    const code = call.split("\n").filter((line) => !/^\s*\/\//u.test(line)).join("\n");
-    assert.match(code, /^\s*args:\s*\[\],\s*$/mu, `the launch passes switches:\n${call}`);
-    assert.doesNotMatch(code, /ignoreDefaultArgs|chromiumSandbox/u, `the launch alters the driver's defaults:\n${call}`);
+    // The options object must stay a flat literal, one `key: value,` or `key,` per line, of keys
+    // known not to touch the sandbox. A spread, a computed key or a key outside the list could carry
+    // `args` or `ignoreDefaultArgs` in from elsewhere, where nothing here would read it.
+    const entries = call.slice("launch({".length).split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("//"));
+    const keys: Record<string, string> = {};
+    for (const line of entries) {
+      const entry = /^([A-Za-z_$][\w$]*)(?:\s*:\s*(.+?))?,$/u.exec(line);
+      assert.ok(entry, `the launch options are no longer a flat literal of named keys: "${line}"\n${call}`);
+      assert.ok(!(entry[1]! in keys), `the launch options name ${entry[1]} twice`);
+      keys[entry[1]!] = entry[2] ?? entry[1]!;
+    }
+    const ALLOWED = ["executablePath", "headless", "userDataDir", "args", "detached", "protocolTimeout", "pipe"];
+    assert.deepEqual(Object.keys(keys).filter((key) => !ALLOWED.includes(key)), [], `the launch passes an option outside ${ALLOWED.join(", ")}:\n${call}`);
+    assert.equal(keys.args, "[]", `the launch passes switches:\n${call}`);
+    if ("pipe" in keys) assert.equal(keys.pipe, "true", "the pipe transport option must be the literal true");
   });
 
   it("no source, tool, test or workflow names a sandbox-disabling switch", () => {

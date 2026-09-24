@@ -61,9 +61,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `geometry-cross-check-failed`).
 - **`SECURITY.md`** named 0.2.x as the supported line; only the latest published version receives
   fixes. It also said the sandbox claim was checked in the test suite, and no test checked it:
-  `tests/unit/sandbox-boundary.test.ts` now pins the one browser launch (`args: []`, driver
-  defaults kept) and fails if any source, tool, test or workflow file names a sandbox-disabling
-  switch.
+  `tests/unit/sandbox-boundary.test.ts` now pins the one browser launch — a flat options literal
+  of allow-listed keys (`executablePath`, `headless`, `userDataDir`, `args`, `detached`,
+  `protocolTimeout`, `pipe`), no spread and no computed key, with `args: []` — and fails if any
+  source, tool, test or workflow file names a sandbox-disabling switch.
 - **The complete local gate is in `CONTRIBUTING.md`**, where `AGENTS.md` said it was and it was
   not: the `npm run` steps of `ci.yml` in CI's order, plus the packed-consumer checks.
   `docs/releasing.md` ran `test:real-document` before the build it needs, left out
