@@ -18,6 +18,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const SELF = fileURLToPath(import.meta.url);
@@ -45,38 +46,120 @@ function filesUnder(path: string): string[] {
   });
 }
 
+/**
+ * The options a launch may pass, each with why it cannot touch the sandbox. `args` is the one
+ * through which a sandbox switch would travel, so it must be the literal `[]`; `ignoreDefaultArgs`
+ * is not on the list at all, because it can drop the driver's own sandbox-preserving defaults.
+ */
+const ALLOWED_LAUNCH_OPTIONS: Record<string, string> = {
+  executablePath: "which binary starts; the sandbox is a property of the switches, not the path",
+  headless: "the display mode; Chrome keeps its sandbox headless",
+  userDataDir: "the fresh per-run profile directory",
+  args: "extra switches — pinned to the literal []",
+  detached: "whether the child gets its own process group, for cleanup",
+  protocolTimeout: "how long one DevTools call may take",
+  pipe: "the control transport: pipes instead of a loopback DevTools port",
+  handleSIGINT: "whether the driver installs its own SIGINT handler; process management only",
+  handleSIGTERM: "whether the driver installs its own SIGTERM handler; process management only",
+  handleSIGHUP: "whether the driver installs its own SIGHUP handler; process management only",
+  timeout: "how long the driver waits for the browser to start",
+  signal: "an AbortSignal that cancels the launch",
+};
+
+/**
+ * Every `launch(…)` call in a TypeScript source, read with the compiler's own parser rather than
+ * line by line: a spread or a second `args` on one line is a property like any other here.
+ */
+function launchOptionIssues(source: string, fileName: string): { calls: number; issues: string[] } {
+  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const issues: string[] = [];
+  let calls = 0;
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      const name = ts.isIdentifier(callee) ? callee.text : ts.isPropertyAccessExpression(callee) ? callee.name.text : null;
+      if (name === "launch") {
+        calls += 1;
+        const options = node.arguments[0];
+        if (node.arguments.length !== 1 || !options || !ts.isObjectLiteralExpression(options)) {
+          issues.push(`${fileName}: the launch options are not an object literal`);
+        } else {
+          const seen = new Set<string>();
+          for (const property of options.properties) {
+            if (ts.isSpreadAssignment(property)) { issues.push(`${fileName}: the launch spreads options from elsewhere`); continue; }
+            if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) {
+              issues.push(`${fileName}: the launch options carry a ${ts.SyntaxKind[property.kind]}`);
+              continue;
+            }
+            if (ts.isComputedPropertyName(property.name)) { issues.push(`${fileName}: the launch options use a computed key`); continue; }
+            const key = property.name.getText(file).replace(/^["']|["']$/gu, "");
+            if (seen.has(key)) issues.push(`${fileName}: the launch options names ${key} twice`);
+            seen.add(key);
+            if (!(key in ALLOWED_LAUNCH_OPTIONS)) { issues.push(`${fileName}: ${key} is not an allowed launch option`); continue; }
+            const value = ts.isPropertyAssignment(property) ? property.initializer : null;
+            if (key === "args" && !(value && ts.isArrayLiteralExpression(value) && value.elements.length === 0)) {
+              issues.push(`${fileName}: args must be the literal [] — it is ${value ? value.getText(file) : "a shorthand"}`);
+            }
+            if (key === "pipe" && value?.kind !== ts.SyntaxKind.TrueKeyword) issues.push(`${fileName}: pipe must be the literal true`);
+            if (/^handleSIG/u.test(key) && value?.kind !== ts.SyntaxKind.FalseKeyword && value?.kind !== ts.SyntaxKind.TrueKeyword) {
+              issues.push(`${fileName}: ${key} must be a boolean literal`);
+            }
+          }
+          if (!seen.has("args")) issues.push(`${fileName}: the launch does not pin args: []`);
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return { calls, issues };
+}
+
 describe("the browser sandbox", () => {
   it("the one browser launch passes no switch and keeps Puppeteer's defaults", () => {
-    const launchSites = filesUnder("src").flatMap((file) => {
-      const text = readFileSync(file, "utf8");
-      return [...text.matchAll(/\blaunch\(\{/gu)].map((match) => ({ file, text, index: match.index }));
+    const sites = filesUnder("src").filter((file) => file.endsWith(".ts")).flatMap((file) => {
+      const result = launchOptionIssues(readFileSync(file, "utf8"), file);
+      return Array.from({ length: result.calls }, () => ({ file: relative(ROOT, file), issues: result.issues }));
     });
     assert.deepEqual(
-      launchSites.map((site) => relative(ROOT, site.file)),
+      sites.map((site) => site.file),
       ["src/acquire/browser.ts"],
       "a browser is launched somewhere other than src/acquire/browser.ts; that path needs the same pin",
     );
-    const [site] = launchSites;
-    const end = site!.text.indexOf("});", site!.index);
-    assert.ok(end > site!.index, "the launch call has no closing brace");
-    const call = site!.text.slice(site!.index, end);
-    // The options object must stay a flat literal, one `key: value,` or `key,` per line, of keys
-    // known not to touch the sandbox. A spread, a computed key or a key outside the list could carry
-    // `args` or `ignoreDefaultArgs` in from elsewhere, where nothing here would read it.
-    const entries = call.slice("launch({".length).split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith("//"));
-    const keys: Record<string, string> = {};
-    for (const line of entries) {
-      const entry = /^([A-Za-z_$][\w$]*)(?:\s*:\s*(.+?))?,$/u.exec(line);
-      assert.ok(entry, `the launch options are no longer a flat literal of named keys: "${line}"\n${call}`);
-      assert.ok(!(entry[1]! in keys), `the launch options name ${entry[1]} twice`);
-      keys[entry[1]!] = entry[2] ?? entry[1]!;
+    assert.deepEqual(sites[0]!.issues, [], "the one browser launch does not keep the sandbox's options shape");
+  });
+
+  it("accepts the launch shape of the lifecycle change, and refuses every way around the pin", () => {
+    // The options another change of this release passes (its src/acquire/browser.ts), verbatim.
+    const lifecycle = `browser = await launch({
+      executablePath,
+      headless: true,
+      userDataDir,
+      args: [],
+      detached: process.platform !== "win32",
+      pipe: true,
+      handleSIGINT: false,
+      handleSIGTERM: false,
+      handleSIGHUP: false,
+      timeout: boundMs,
+      signal: abort.signal,
+      protocolTimeout: 300_000,
+    });`;
+    assert.deepEqual(launchOptionIssues(lifecycle, "lifecycle.ts"), { calls: 1, issues: [] });
+    const refused: [string, RegExp][] = [
+      ["protocolTimeout: 300_000, ...extraLaunchOptions,", /spreads options/u],
+      ['args: [], args: ["--no-sandbox"],', /names args twice/u],
+      ["[key]: value,", /computed key/u],
+      ["args: flags,", /args must be the literal \[\]/u],
+      ['args: ["--no-sandbox"],', /args must be the literal \[\]/u],
+      ["ignoreDefaultArgs: true,", /ignoreDefaultArgs is not an allowed launch option/u],
+      ["pipe: usePipe,", /pipe must be the literal true/u],
+    ];
+    for (const [entry, message] of refused) {
+      const result = launchOptionIssues(`launch({ headless: true, ${entry} });`, "mutant.ts");
+      assert.ok(result.issues.some((issue) => message.test(issue)), `"${entry}" was not refused: ${result.issues.join("; ")}`);
     }
-    const ALLOWED = ["executablePath", "headless", "userDataDir", "args", "detached", "protocolTimeout", "pipe"];
-    assert.deepEqual(Object.keys(keys).filter((key) => !ALLOWED.includes(key)), [], `the launch passes an option outside ${ALLOWED.join(", ")}:\n${call}`);
-    assert.equal(keys.args, "[]", `the launch passes switches:\n${call}`);
-    if ("pipe" in keys) assert.equal(keys.pipe, "true", "the pipe transport option must be the literal true");
+    assert.match(launchOptionIssues("launch(options);", "mutant.ts").issues.join(), /not an object literal/u);
   });
 
   it("no source, tool, test or workflow names a sandbox-disabling switch", () => {

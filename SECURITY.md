@@ -25,8 +25,9 @@ intended:
 - **The browser sandbox stays on.** The one browser launch in `src/acquire/browser.ts` passes no
   switch at all (`args: []`), no code path, tool, test or workflow passes `--no-sandbox` or any
   other sandbox-disabling switch, and there is no flag that turns the sandbox off.
-  `tests/unit/sandbox-boundary.test.ts` holds both: it pins that launch call and scans `src/`,
-  `tools/`, `tests/` and the workflows for the switches.
+  `tests/unit/sandbox-boundary.test.ts` holds both: it reads that launch call with the TypeScript
+  parser and allows only named options that cannot touch the sandbox, with `args: []`, and it scans
+  `src/`, `tools/`, `tests/` and the workflows for the switches.
 - **The network is blocked by default.** Request interception is on, the default policy is
   `offline`, and only the tool's own loopback origin plus `data:`, `blob:` and `about:` are let
   through. `--allow-network <origin>` opens exactly one origin per use and nothing else.

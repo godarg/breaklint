@@ -65,10 +65,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   document report since schema 4. Comment-only; no type changed.
 - **`SECURITY.md`** named 0.2.x as the supported line; only the latest published version receives
   fixes. It also said the sandbox claim was checked in the test suite, and no test checked it:
-  `tests/unit/sandbox-boundary.test.ts` now pins the one browser launch — a flat options literal
-  of allow-listed keys (`executablePath`, `headless`, `userDataDir`, `args`, `detached`,
-  `protocolTimeout`, `pipe`), no spread and no computed key, with `args: []` — and fails if any
-  source, tool, test or workflow file names a sandbox-disabling switch.
+  `tests/unit/sandbox-boundary.test.ts` now pins the one browser launch, read with the TypeScript
+  compiler's parser: an object literal of allow-listed keys (`executablePath`, `headless`,
+  `userDataDir`, `args`, `detached`, `protocolTimeout`, `pipe`, `handleSIGINT`, `handleSIGTERM`,
+  `handleSIGHUP`, `timeout`, `signal`, each with the reason it cannot touch the sandbox), no spread,
+  no computed key and no key twice, with `args` the literal `[]` — and fails if any source, tool,
+  test or workflow file names a sandbox-disabling switch.
 - **The complete local gate is in `CONTRIBUTING.md`**, where `AGENTS.md` said it was and it was
   not: the `npm run` steps of `ci.yml` in CI's order, plus the packed-consumer checks.
   `docs/releasing.md` ran `test:real-document` before the build it needs, left out
