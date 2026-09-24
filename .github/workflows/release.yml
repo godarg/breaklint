@@ -218,6 +218,8 @@ jobs:
           set -e
           test "$code" -eq 1 || { echo "installed --demo exited $code, expected 1"; cat demo.out; exit 1; }
           grep -q "uncalibrated" demo.out || { echo "installed --demo printed no findings"; exit 1; }
+          # The README inside these exact bytes quotes what their installed bin prints.
+          node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$consumer"
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
@@ -423,6 +425,9 @@ jobs:
           code=$?
           set -e
           test "$code" -eq 1 || { cat demo.out; exit 1; }
+          # What npmjs.com renders is the registry copy of the README; it must quote what the
+          # registry copy of the CLI prints.
+          node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$registry_consumer"
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0 \
             @playwright/test@1.62.1 typescript@5.9.2

@@ -47,6 +47,15 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   exactly those points. Without release tags, or in a shallow clone whose history is cut above
   them, it fails instead of passing. Its `--self-test` builds throwaway repositories for 16 states,
   including a shallow clone.
+- **The README that ships is checked against the CLI that ships.** The published 0.6.0 README says
+  "one of its seven findings" and `rules run: 13`; `npx breaklint --demo` from the same tarball
+  prints five findings and `rules run: 12`. The only guard read the repository README and ran the
+  source CLI. Its parser now lives in `tests/tools/readme-demo-contract.mjs`, shared by the unit
+  test and by the packed-consumer steps of `ci.yml` (Node 24 and the Node 22.13 floor) and
+  `release.yml` (both clean consumers and the registry readback), which run it over
+  `node_modules/breaklint/README.md` and the installed `bin` in a child process. Each run also
+  rejects three corrupted copies of that README against the same output. Installed from the
+  registry, 0.6.0 fails it on all three counts it states.
 
 ## 0.6.0 — 2026-09-18
 

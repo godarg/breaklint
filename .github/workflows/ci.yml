@@ -173,6 +173,10 @@ jobs:
           set -e
           test "$code" -eq 1 || { echo "installed --demo exited $code, expected 1"; cat demo.out; exit 1; }
           grep -q "uncalibrated" demo.out || { echo "installed --demo printed no findings"; exit 1; }
+          # The README a user reads on npm is the one in this tarball. Its demo excerpt must be what
+          # THIS installed bin prints, not what the source tree prints: the published 0.6.0 README
+          # said "seven findings" while its own --demo printed five.
+          node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$PWD"
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
@@ -244,5 +248,6 @@ jobs:
           set -e
           test "$code" -eq 1 || { echo "--demo exited $code on Node 22.13, expected 1"; cat demo.out; exit 1; }
           grep -q "uncalibrated" demo.out || { echo "--demo printed no findings on Node 22.13"; exit 1; }
+          node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$PWD"
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           echo "Node 22.13: the installed package behaves as documented"
