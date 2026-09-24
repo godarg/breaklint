@@ -41,7 +41,19 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const RELEASE_TAG = /^v(\d+)\.(\d+)\.(\d+)$/u;
-const DATED_HEADING = (version) => new RegExp(`^## ${version.replace(/\./gu, "\\.")} — \\d{4}-\\d{2}-\\d{2}$`, "u");
+const HEADING_DATE = (version) => new RegExp(`^## ${version.replace(/\./gu, "\\.")} — (\\d{4})-(\\d{2})-(\\d{2})$`, "u");
+/** `## X.Y.Z — YYYY-MM-DD` with a date that exists: 2026-02-30 is not a release date. */
+const DATED_HEADING = (version) => ({
+  test(heading) {
+    const match = HEADING_DATE(version).exec(heading);
+    if (!match) return false;
+    const [year, month, day] = match.slice(1).map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+  },
+});
+/** A rule id as a whole token: `layout/orphan` is not named by `layout/orphaned-continuation-page`. */
+const namesId = (text, id) => new RegExp(`(?<![\\w/-])${id.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?![\\w/-])`, "u").test(text);
 /** The one placeholder release preparation may carry. It is never accepted at the tag. */
 const PLACEHOLDER = "TBD-at-tag";
 const RULE_FILE = /^src\/rules\/([a-z]+)\/([a-z0-9-]+)\.ts$/u;
@@ -157,7 +169,8 @@ export function checkChangelog(root) {
     else if (!DATED_HEADING(version).test(released.heading)) {
       issues.push(`the released section ${JSON.stringify(released.heading)} carries no date`);
     }
-    const diff = git(root, ["diff", "--name-only", `${versionTag}..HEAD`, "--", "src"]);
+    // --no-renames: a moved rule module lists its old path too, so its old id must be named.
+    const diff = git(root, ["diff", "--no-renames", "--name-only", `${versionTag}..HEAD`, "--", "src"]);
     if (!diff.ok) return fail(`git diff ${versionTag}..HEAD failed: ${diff.err}`);
     const changed = diff.out.split("\n").filter(Boolean);
     if (changed.length > 0) {
@@ -180,7 +193,7 @@ export function checkChangelog(root) {
           const atTag = git(root, ["show", `${versionTag}:${path}`]).out;
           // A rule module declares its id as a string literal; a helper in the same directory does not.
           if (!atHead.includes(`"${id}"`) && !atTag.includes(`"${id}"`)) continue;
-          if (!body.includes(id)) issues.push(`${path} changed since ${versionTag}, but ## Unreleased does not name ${id}`);
+          if (!namesId(body, id)) issues.push(`${path} changed since ${versionTag}, but ## Unreleased does not name ${id}`);
         }
       }
     }
@@ -242,6 +255,8 @@ function releasedRepo(scratch, name) {
     "CHANGELOG.md": `# Changelog\n\n${DATED}`,
     "src/rules/layout/widow.ts": RULE_SOURCE,
     "src/rules/layout/shared.ts": "export const helper = 1;\n",
+    "src/rules/layout/orphan.ts": 'export const rule = { id: "layout/orphan" };\n',
+    "src/rules/layout/orphaned-continuation-page.ts": 'export const rule = { id: "layout/orphaned-continuation-page" };\n',
     "docs/status.md": "# Status\n",
   });
   commitAll(root, "release 1.0.0");
@@ -262,6 +277,15 @@ function runSelfTest() {
       after: { "src/rules/layout/widow.ts": `${RULE_SOURCE}// changed\n`, "CHANGELOG.md": unreleased("- Something changed.\n") } },
     { name: "an Unreleased section with no entry", expect: 1, match: /## Unreleased has no entry/u,
       after: { "src/rules/layout/widow.ts": `${RULE_SOURCE}// changed\n`, "CHANGELOG.md": unreleased("Changes since the tag.\n") } },
+    { name: "a changed rule named only inside a longer rule id", expect: 1, match: /does not name layout\/orphan$/mu,
+      after: { "src/rules/layout/orphan.ts": 'export const rule = { id: "layout/orphan" }; // changed\n', "CHANGELOG.md": unreleased("- `layout/orphaned-continuation-page` changed.\n") } },
+    { name: "a changed rule with a hyphenated id, named as a whole token", expect: 0,
+      after: { "src/rules/layout/orphaned-continuation-page.ts": 'export const rule = { id: "layout/orphaned-continuation-page" }; // changed\n', "CHANGELOG.md": unreleased("- `layout/orphaned-continuation-page` changed.\n") } },
+    { name: "a rule module moved to a new path must still name its id", expect: 1, match: /src\/rules\/layout\/widow\.ts changed since v1\.0\.0, but ## Unreleased does not name layout\/widow/u,
+      remove: ["src/rules/layout/widow.ts"],
+      after: { "src/rules/layout/window.ts": RULE_SOURCE, "CHANGELOG.md": unreleased("- A module moved.\n") } },
+    { name: "a version bump dated with a day that does not exist", expect: 1, match: /it is "## 1\.1\.0 — 2026-02-30"/u,
+      after: { "package.json": JSON.stringify({ name: "canary", version: "1.1.0" }), "CHANGELOG.md": prep("## 1.1.0 — 2026-02-30") } },
     { name: "a helper change needs an entry but no rule id", expect: 0,
       after: { "src/rules/layout/shared.ts": "export const helper = 2;\n", "CHANGELOG.md": unreleased("- A helper changed.\n") } },
     { name: "no src change after the tag and no Unreleased section", expect: 0,
@@ -292,6 +316,7 @@ function runSelfTest() {
     const results = [];
     for (const [index, testCase] of cases.entries()) {
       const root = releasedRepo(scratch, `case-${index}`);
+      for (const path of testCase.remove ?? []) rmSync(join(root, path));
       write(root, testCase.after);
       commitAll(root, "after the release");
       if (testCase.tagAfter) sh(root, ["tag", "-a", testCase.tagAfter, "-m", testCase.tagAfter]);

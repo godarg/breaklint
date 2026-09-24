@@ -139,9 +139,11 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   tag commit of 0.6.0 shipped `## 0.6.0 — unreleased` in the published tarball, and the two
   post-tag rule changes above had no section to go into; run against those two commits the check
   fails on exactly those points. Without release tags, or in a shallow clone whose history is cut
-  above them, it fails instead of passing. Its `--self-test` builds throwaway repositories for 19
-  states, including a shallow clone, a `TBD-at-tag` heading before the tag (accepted) and at the
-  tag (rejected).
+  above them, it fails instead of passing. A rule id counts as named only as a whole token
+  (`layout/orphan` is not named by `layout/orphaned-continuation-page`), a moved rule module must
+  name its old id too, and a heading date must exist (2026-02-30 is refused). Its `--self-test`
+  builds throwaway repositories for 23 states, including a shallow clone, a `TBD-at-tag` heading
+  before the tag (accepted) and at the tag (rejected).
 - **The README that ships is checked against the CLI that ships.** The published 0.6.0 README says
   "one of its seven findings" and `rules run: 13`; `npx breaklint --demo` from the same tarball
   prints five findings and `rules run: 12`. The only guard read the repository README and ran the
