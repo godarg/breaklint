@@ -37,8 +37,9 @@ A continuation page holds only a tiny trailing fragment of an earlier block. Tig
 ### Firing case (trigger)
 
 ```html
-<!-- A long paragraph overflows onto page 2 with just 2 trailing lines, and nothing else follows -->
-<p>
+<!-- A generous margin above a long paragraph pushes its last two lines onto page 2, and nothing else follows -->
+<h2 style="margin-bottom: 48px;">Section</h2>
+<p style="line-height: 1.6;">
   First line of paragraph...<br>
   ...many lines on page 1...<br>
   Line spilling onto page 2.<br>
@@ -49,9 +50,16 @@ A continuation page holds only a tiny trailing fragment of an earlier block. Tig
 ### Non-firing case (remedied)
 
 ```html
-<!-- By slightly reducing font size or margins, the trailing lines pull onto page 1 -->
-<p style="font-size: 10pt; line-height: 14px;">
-  All lines of the paragraph fit onto a single page cleanly.
+<!-- Tightening the preceding vertical margin and the line-height on page 1 can pull the trailing lines back -->
+<h2 style="margin-bottom: 12px;">Section</h2>
+<p style="line-height: 1.5;">
+  First line of paragraph...<br>
+  ...every line now fits on page 1.
 </p>
 ```
+
+Illustrative, like every example on these pages: the advice ships `tested: false`, and no
+trigger/remedied pair in this package demonstrates it. The example changes only levers the advice
+names — a preceding vertical margin and `line-height` — which
+`tests/unit/registry.test.ts` checks for every rule page.
 

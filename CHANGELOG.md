@@ -47,6 +47,44 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   consumer, and named 0.6.0 in its procedure; it is now version-neutral and complete.
   `tests/unit/workflow-gates.test.ts` holds both lists against the workflow. `CONTRIBUTING.md` no
   longer names schema numbers (it said Report 4 and Snapshot 3).
+- **`docs/agent-contract.md` is now held against the code, and it contradicted it in six places.**
+  It recommended removing `break-inside: avoid` for `layout/unbreakable-block-too-tall`, whose own
+  advice says that clears the finding only by removing the rule's candidate; named an exit-2
+  verdict `usage-error` (it is `usage`, and exit 2 writes no report); explained exit 4 as declined
+  candidates only, with "unmeasured RTL runs" as an example (no rule declines on direction, and
+  exit 4 also ends a run in which no rule measured anything, an empty input or incomplete required
+  evidence); listed the research rules `svg/text-clipped` and `svg/text-ink-collision` among the
+  rules that null `finding.source` (three released rules do); and named a `finding.id` that no
+  finding carries. `tests/unit/agent-contract.test.ts` checks the exit table against
+  `EXIT_CODE_BY_VERDICT`, every rule id against the registry, every `env/` id against `ENV_IDS` and
+  the declaring rule, every field path against a real `--demo --format json` run, and every lever
+  it proposes against the positive levers of that rule's `remediation.advice`; each of the six
+  contradictions, reinserted, fails a named test.
+- **The lever guard now also reads each rule page's Examples.** The remedied example of
+  `layout/orphaned-continuation-page` changed `font-size`, which its advice does not propose; it now
+  changes a preceding margin and `line-height`. The remedied example of
+  `layout/unbreakable-block-too-tall` still uses `break-inside: auto`; that page is rewritten by
+  another change of this release and is listed as pending in the guard, which fails once the entry
+  is no longer needed.
+- **Erratum to 0.6.0.** The 0.6.0 entry that introduced `docs/agent-contract.md` says
+  "`selfcheck:static` reads it, so its claims are held against the code". It did not:
+  `selfcheck:static` scans that file for emoji, first-person wording, marketing words and
+  uniqueness claims only, which is why the contradictions above shipped. The same entry's "five rules set
+  `finding.source` unconditionally to null" counted two research rules.
+
+### Reporting
+
+- **The context pack's repair option for `layout/unbreakable-block-too-tall` no longer proposes a
+  false repair.** For a finding with a verified original source, `repair.options` in
+  `context.json` and on the HTML bundle's finding card said "Adjust the verified block's break
+  constraint or split its content; expected effect: the block can fit a page fragment". The
+  rule's advice warns that the break constraint is the one lever that clears the finding without
+  making the block fit. It now reads "Shorten the verified block or split its content into smaller
+  sections deliberately; do not only remove its 'break-inside: avoid', which clears the finding
+  without making the block fit; expected effect: the block no longer exceeds the content box of the
+  page it is laid out on." Context pack schema unchanged (2): the field and its type are the same.
+  `tests/unit/registry.test.ts` now checks every entry of that map against the levers its rule's
+  advice proposes.
 
 ### Tooling
 
