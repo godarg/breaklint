@@ -413,10 +413,9 @@ describe("output formats", () => {
     // the shipped command printed 5 across 5 (see `runRealDemo`).
     let demoJson = "";
     //
-    // Written with `--out`, not read from stdout: measured on 2026-09-24, the 82 586-byte JSON
-    // report arrives cut at 65 536 bytes when stdout is a pipe, because the CLI calls
-    // `process.exit` before the pipe has drained. That is a separate product defect; this guard
-    // checks the counts, so it reads the file the CLI finished writing.
+    // Written with `--out`, not read from stdout: this guard checks the counts, so it reads the
+    // file the CLI finished writing. (The pipe once cut the report at a multiple of the pipe
+    // buffer; that is fixed and pinned by tests/e2e/cli-pipe-integrity.test.ts.)
     const outDir = mkdtempSync(join(tmpdir(), "breaklint-demo-json-"));
     try {
       const outFile = join(outDir, "demo.json");

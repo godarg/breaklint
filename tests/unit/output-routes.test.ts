@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, relative } from "node:path";
 
-import { err, out } from "../../src/cli/out.ts";
+import { err, notice, out } from "../../src/cli/out.ts";
 import { unionSnapshotInterventions } from "../../src/cli/index.ts";
 
 /**
@@ -86,6 +86,7 @@ describe("output routes", () => {
       (process.stdout as { write: unknown }).write = (s: string) => (written.push(s), true);
       (process.stderr as { write: unknown }).write = (s: string) => (written.push(s), true);
       out(`report written to ${process.env.HOME}/out.json\n`);
+      notice(`breaklint: json report written to ${process.env.HOME}/out.json\n`);
       err(`no renderer available. looked in: ${process.env.HOME}/.cache/puppeteer/chrome\n`);
     } finally {
       (process.stdout as { write: unknown }).write = stdout;
@@ -93,7 +94,7 @@ describe("output routes", () => {
       if (realHome === undefined) delete process.env.HOME;
       else process.env.HOME = realHome;
     }
-    assert.equal(written.length, 2, "both writes must reach the stream");
+    assert.equal(written.length, 3, "every write must reach the stream");
     for (const text of written) {
       assert.ok(!text.includes(account), `a write leaked the account name: ${text}`);
       assert.match(text, /~/u, "the redaction marker is absent — did the payload reach it at all?");
