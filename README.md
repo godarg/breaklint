@@ -9,6 +9,10 @@
 widows, orphans, blocks too tall to keep together and hyphenation across page breaks, each with
 the measured value and the threshold it failed.
 
+[![A still from the 39-second breaklint film, with the line “Perfect in the browser. Broken on page 47.” over a blurred page of layout findings](https://raw.githubusercontent.com/godarg/breaklint/main/assets/breaklint-film-poster.jpg)](https://dargel-solutions.de/en/breaklint/#film)
+
+The image links to the project page, which carries the 39-second film about breaklint.
+
 ```bash
 npx breaklint --demo
 ```
