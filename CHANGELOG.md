@@ -303,8 +303,8 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   at a forced boundary (`env/forced-break`), and those declines count against coverage: on a
   self-authored report with a landscape region, 9 of 14 widow and orphan candidates were declined,
   both rules fell below their floor and the run ended `insufficient-coverage`, exit 4 (patched
-  Chromium 141, no evidence binding; 13 declines each and widow coverage 8 of 21 on the corpus
-  gate's current Chrome). The named page is now the one Paged.js applied to the page — the
+  Chromium 141, no evidence binding; a corpus-gate run of the same document recorded 13 declines
+  each and widow coverage 8 of 21). The named page is now the one Paged.js applied to the page — the
   `pagedjs_<name>_page` class on the page element, counted only where an element on the page
   carries that `data-page` — and a boundary is forced by it only where the two pages' named pages
   differ. On the same report 2 candidates of each rule are declined, at the two boundaries the

@@ -296,8 +296,8 @@ named ancestor. Every boundary inside a named region and the one after it then r
 and the boundary into the region as `overflow`. Measured on a self-authored report with a landscape
 region (patched Chromium 141, no evidence binding): 9 of 14 widow and 9 of 14 orphan candidates
 declined as `env/forced-break`, both below the coverage floor, exit 4; with the page-element read,
-2 of 14 each, at the two boundaries the region really forces. The same document on the corpus
-gate's current Chrome had 13 declines of each and widow coverage 8 of 21.
+2 of 14 each, at the two boundaries the region really forces. A corpus-gate run of the same
+document, also on Chromium 141, recorded 13 declines of each and widow coverage 8 of 21.
 
 The same first-node read hid a `break-after` on an element inside such a wrapper: Paged.js puts
 `data-previous-break-after` on the element after the declaring one and strips it from continuation
