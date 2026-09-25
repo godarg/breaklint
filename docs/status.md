@@ -149,8 +149,12 @@ generated most often; and the six mobile cells are rendered as single 390 x 15 0
 cannot be judged at all.
 
 The ledger was **not** rebound. Recording `pass` for 32 cells after a review that failed would be
-exactly the false claim this gate exists to prevent. The gate stays red for 0.6.0 — with a date,
-two named reviewers, an enumerated finding list and an owner, which is the difference that mattered.
+exactly the false claim this gate exists to prevent. Since ledger schema 5 the failed review is a
+round of the ledger itself — round 2, `fail`, marked as a historical reconstruction from the release
+record — instead of prose only; `npm run test:report-surfaces` now fails on it by name ("latest
+review round 2 is FAIL"), and the technical mode prints the same line. The gate stays red for 0.6.0 — with a date,
+two reviewers (recorded as `not-recorded`, because the release record does not name their handles),
+an enumerated finding list and an owner, which is the difference that mattered.
 What is honestly established about these surfaces is the technical half: `test:report-surfaces:technical`
 passes 32 of 32 cells and all 71 artifacts, and makes no human-review claim.
 
@@ -158,6 +162,19 @@ The review matrix is **32 cells** (4 report states x 2 themes x 3 viewports for 
 print PDF and raster-set cells) containing **71 physical artifacts** — 24 screen PNGs, 4 PDFs and
 43 PDF page rasters. `test:report-surfaces:technical`, which makes no human-review claim, passes
 32 of 32 cells and all 71 artifacts.
+
+**On `main` since 0.6.0 (unreleased), re-measured on Chromium 141 / linux:** the surface work on the
+eight review findings changes these figures. The matrix is still 32 cells; it now contains
+**55 primary artifacts** — 24 screen PNGs, 4 PDFs and 27 PDF page rasters (clean 3, findings 8,
+infrastructure 8, insufficient-coverage 8; on every non-final page the last line of text sits at
+64.0–97.6 % of the content box's height, and no unbreakable unit exceeds 37.3 % of it) — plus
+**152 viewport-height tiles** cut from the 16 tablet and mobile screens, 207 files in all,
+presented in one review gallery. The technical gate passes 32 of 32 cells and all 207 files; 32
+renderer negative controls each fail it for their named reason, and the verifier breaks a copy of
+real evidence for each of its independent checks once per run. No human review of these surfaces
+is claimed, and the strict local gate stays red on the recorded 2026-09-18 FAIL until a new round
+passes. The resolved fonts were measured in the Linux development container only; the
+`ubuntu-latest` CI runner's font resolution is unmeasured (NEEDS-CI).
 
 ### Two records that no longer claim what they cannot
 
@@ -344,7 +361,7 @@ GitHub assets.
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
 | Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in the canonical JSON report; generated schema drift and process-boundary exit 2 are tested |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
-| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 60 physical artifacts with decoded-pixel, contrast, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
+| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 55 primary artifacts and 152 viewport tiles (unreleased `main`; 71 artifacts in 0.6.0) with decoded-pixel, contrast, font-role, table-alignment, accessibility-tree and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
 | Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
 | `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 5 findings across 5 rules |
@@ -379,7 +396,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=670 aggregateTests=810 liveTests=106 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=670 aggregateTests=830 liveTests=106 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against

@@ -39,6 +39,9 @@ function findingsBase(): Report {
     startedAt: "2026-08-22T12:00:00.000Z",
     durationMs: 184,
     rulesRun: ALL_RULES.length,
+    // A real CLI run id has this shape (randomUUID). The canonical surfaces print it in the tool
+    // line, the running head of every printed page after the first, and the end mark.
+    runId: "3f6c1a2e-8b4d-4f7a-9c21-5e0b7d9a4c68",
     failOn: "error",
     environment: {
       browserVersion: "",
@@ -61,11 +64,21 @@ function findingsBase(): Report {
     };
   }
   if (report.findings[1]) {
+    // Real-shaped: the name the evidence writer gives a page (`<run>-<document>-<source hash>-page-NNN.png`),
+    // 52 characters without a slash, so on a phone it is one segment wider than its line.
     report.findings[1].evidence = {
-      ref: "surface-demo-page-002.png",
+      ref: "1f5788f1e439-0001-demo-472f73b732bb5453-page-002.png",
       bindsFinding: false,
     };
     report.findings[1].ambiguity = { groupSize: 2, resolvable: false };
+  }
+  if (report.findings[2]) {
+    // A long basename behind a slash: wider than a phone line and than the A4 content box's
+    // evidence line would be at half width, so the slash break alone cannot save it.
+    report.findings[2].evidence = {
+      ref: "evidence/2c9d41a07be3-0003-annual-report-typeset-final-revision-9f14e2c7a0b35d61-page-003.png",
+      bindsFinding: true,
+    };
   }
   return report;
 }
@@ -157,6 +170,47 @@ export function insufficientCoverageReportState(): Report {
   coverage.coverage = 0.5;
   coverage.floor = 1;
   coverage.ok = false;
+  return report;
+}
+
+/**
+ * Technical probe, not a review cell. Complication: thirteen coverage rows fit on one A4 page, so no
+ * canonical state ever has to repeat the table header on a continuation page — a table whose header
+ * stopped repeating would pass every canonical cell. Sixty synthetic rows force the table across
+ * pages. The rule ids are synthetic and never reach a rule registry; only the HTML projection reads
+ * them.
+ */
+export function longCoverageReportState(): Report {
+  const report = cleanReportState();
+  const document = report.documents[0];
+  if (!document) throw new Error("surface fixture requires one document");
+  for (let index = 1; index <= 60; index += 1) {
+    const candidates = (index % 7) + 1;
+    document.coverage[`probe/long-table-rule-${String(index).padStart(2, "0")}`] = {
+      candidates,
+      measured: candidates,
+      notMeasured: [],
+      notMeasuredCount: 0,
+      coverage: 1,
+      floor: 0.5,
+      ok: true,
+    };
+  }
+  return report;
+}
+
+/**
+ * The findings state with a long document path whose last segment alone is wider than a printed
+ * line: the print probe for a caption, fact or path that must wrap rather than widen the page.
+ */
+export const LONG_DOCUMENT_PATH = "reports/2026/q3/annual-report-typeset-final-revision-with-appendices-glossary-and-index-v12.html";
+export function longDocumentPathReportState(): Report {
+  const report = findingsReportState();
+  const document = report.documents[0];
+  if (!document) throw new Error("surface fixture requires one document");
+  const previous = document.path;
+  document.path = LONG_DOCUMENT_PATH;
+  for (const finding of report.findings) if (finding.document === previous) finding.document = LONG_DOCUMENT_PATH;
   return report;
 }
 

@@ -486,6 +486,192 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   module-customisation hooks replace only the acquisition module with one whose promise never
   settles; that is harness, not a product option. It ended exit 0 before this change.
 
+### Reporting
+
+- **The report-surface review ledger can now record a failed review (ledger schema 4 → 5).** The
+  ledger holds numbered review rounds, each `pass`, `fail` or `pending`; schema 4 could hold only
+  one all-pass record, so the failed 2026-09-18 review existed as prose only. The file was migrated:
+  the 0.2.3 review is round 1 unchanged, the 2026-09-18 FAIL is round 2, marked as a historical
+  reconstruction and carrying only what the release record states. `npm run test:report-surfaces`
+  stays red and now says why ("latest review round 2 is FAIL"); the technical mode prints the
+  same line, the reviewers by kind, and whether the latest round is bound to the current inputs.
+  Reviewers are `human`, `agent` (named by model or tool) or `not-recorded`.
+- **A human review pass is recorded only by a closed roster of human roles.** `human` reviewers are
+  limited to `@Brand`, `@Neo` and `@Founder` (one code constant, changed only by a reviewed code
+  change); every cell that passed must name one of them as a `human` reviewer of its round. An
+  agent may be recorded, with its model label, and may record a failed cell, but a cell it passed
+  is rejected; a handle listed as both agent and human, an agent carrying a human role handle and
+  any extra reviewer field are rejected too. The ledger line and the GitHub job summary
+  ("Report-surface review ledger") name each reviewer's kind and say "human review … PASS" only
+  when a rostered human passed every cell.
+- **The technical surface gate accepts every Chromium-based browser.** It required the string
+  `Chrome` in `--version`, so `Chromium 141.0.7390.37` failed the gate after a complete render and
+  no review on a Chromium build could ever be bound. It now requires a product name and a four-part
+  version.
+- **The review environment is declared rather than copied (render manifest schema 4 → 5, artifact
+  contract 3 → 4).** A review binds browser, platform, architecture, Node major line, launch
+  arguments, viewports and the print contract; the kernel release and the exact Node version are
+  recorded as observations and no longer unbind a review after an OS or Node patch update.
+
+- **Both HTML renderers take their design tokens from one table under a `--bl-` prefix.** The
+  report reused the parent brand design system's `--ds-` prefix (with two dead tokens) and the
+  bundle view's `report.html` used bare names such as `--ink`; a host stylesheet embedding either
+  could collide with them. A consumer who restyled the report through those custom properties must
+  rename them. No pixel changed: all 24 screens and 43 page rasters of the surface matrix are
+  identical before and after. A stylesheet lint in `npm test` now rejects foreign prefixes, unused
+  or undefined tokens, colour literals outside the token blocks and partial themes, and the surface
+  gate also measures text contrast on the `soft` background.
+- **The bundle view printed with `theme: "dark"` is legible.** Its print rules forced white paper
+  and black ink but kept the dark palette's muted colour, so every label printed at 1.6:1
+  (`#c1ccc4` on white). Print now redefines the complete colour set; light-theme print and both
+  screen themes are pixel-identical to before.
+
+- **Report headings are set in a serif, and the gate proves the three font roles stay apart.**
+  Display and body were both sans stacks that resolved to the same face on Linux, so the
+  typographic hierarchy of the most-generated platform collapsed silently. h1 and h2 now use a
+  system serif stack (Linux: Liberation Serif), running text a sans stack, identifiers a mono stack;
+  no font file ships. `IBM Plex Mono` and `system-ui`, which resolve to no declared face on a stock
+  system, left the stacks. The surface gate compares every role's resolved platform font (CDP) and
+  every PDF-embedded face (`pdffonts`) with the declared per-platform expectation; the render
+  manifest records the resolved faces.
+
+- **Coverage is an aligned table.** Each document's coverage was thirteen cards repeating six
+  labels each (78 labels) and spanning five printed pages; it is now one table per document — path
+  and verdict in the caption, the rule id as row header, right-aligned tabular counts, coverage and
+  floor, and the result in words. A 13-rule table is 0.46 of an A4 page and spans at most two;
+  this step alone removed twelve printed pages across the four canonical states (the complete page
+  count, after the later changes below, is under "Printed pages are full"). A
+  zero-candidate rule shows `n/a`. On phones the same table becomes a two-line grid per row with
+  aligned columns and no sideways scroll. The surface gate replaced every card-era check and control
+  one for one (column alignment against the header, closed row rules in the raster, a repeated
+  header on continuation pages, no one-row continuation) and now also rejects printed content wider
+  than the A4 content box, which makes Chrome shrink the whole PDF silently.
+
+- **The untested-advice caveat is stated once, prominently.** Each finding repeated "Untested: no
+  trigger/remedied pair in this package shows this advice removing this finding." in muted small
+  print — seven times per finding-bearing report, forty times in a forty-finding one. The report now
+  states it once under the Findings heading at body size and colour, with the count it applies to,
+  and each remediation box carries a compact `untested` marker in body-text colour. The HTML model
+  gains `remediationSummary { withAdvice, untested }`; JSON is unchanged (`Finding.remediation`
+  already carries `tested`).
+
+- **A printed command no longer breaks inside itself.** The coverage alert printed
+  `--disable layout/widow` as `--` at the end of one line and `disable layout/widow` on the next, so
+  copying it from the PDF gave a broken command. Commands are now carried in the HTML model apart
+  from the prose around them and rendered as one unbreakable `<code>`; rule ids break only after
+  their namespace slash on narrow screens (they broke at hyphens, `layout/unbreakable-block-too-/tall`)
+  and never in print. Paths (document, evidence, coverage caption) break after a slash, and inside
+  a segment only when that segment alone is wider than its line: on a phone the evidence line broke
+  as `evidence/surface-` / `demo-page-001.png`, and a real evidence name (52 characters, no slash)
+  must still wrap rather than scroll the page sideways.
+
+- **The report has named landmarks, a skip link and a contents navigation.** Header and footer
+  sat inside `main`, so there was no banner, navigation or content info and no in-page link; on a
+  phone the findings began three screens down and coverage twelve. The verdict header is now the
+  banner, a "Report contents" navigation links every rendered section ("Findings (7)", "Coverage
+  details"), a skip link is the first keyboard stop, and the footer is the content info. Print omits
+  the navigation.
+- **Phone and tablet review cells come as viewport-height tiles plus a gallery.** A 390 × 15 000 px
+  strip cannot be judged; each tablet and mobile cell now also ships tiles cut from the same decoded
+  pixels (152 in the matrix), and `review-gallery.html` presents every screen, tile and printed page.
+  The surface gate checks the accessibility tree per cell (landmarks, link targets, table
+  semantics on the phone grid, first Tab stop and its focus outline) and re-cuts every tile.
+
+- **Printed reports carry page numbers, a running head with the run id, and an end mark; the printed
+  clean report keeps its findings section.** No page of any printed report had a page number or a
+  running head, the report's run id appeared nowhere in the HTML, the footer was hidden in print in
+  every state and the clean state dropped its findings section entirely. Now every page shows
+  "Page N of M", every page from the second `breaklint · <verdict> · exit N` and `run <runId>`, the
+  header and the end mark show the run id, and every findings lead states its count ("0
+  findings"). The run id reaches CSS only through a string escaper, tested with hostile ids.
+
+- **Printed pages are full, and boxed blocks share one edge.** Every finding was kept whole on one
+  page, so seven findings took seven pages and three of four PDFs had pages filled to 29–45 %; the
+  alert box ended 62 px short of the card below it in print (527 px on a desktop) and touched it.
+  Findings now split between their units — head, each fact, tail — never inside one, with the
+  card frame repeated on both pages; boxed blocks share the column's edges with a real gap. Printed
+  reports drop from 43 pages in 0.6.0 to 27 (clean 3, findings 8, infrastructure 8,
+  insufficient-coverage 8) with every non-final page's text at 64.0–97.6 % of the content box.
+  The surface gate fails any non-final page whose last text line is above 60 % of the content box
+  (unless the next page starts with a declared forced break), any unbreakable unit taller than 40 %
+  (keep-with-next chains counted as one unit, and the failure names it), any heading or caption
+  stranded from what it introduces, and any boxed block off the column edge or abutting its
+  neighbour. Fill is the depth of the last line of text, read from the PDF's text layer and
+  cross-checked against a raster reading that ignores frames and backgrounds: the first version
+  measured ink, and a split finding's repeated frame, stretched to the page end, made a page 44 %
+  empty inside that frame read as 99.9 % full. The findings heading and its untested-advice caveat
+  are one unbreakable intro; inside the heading group they had formed a 44–47 % keep-with-next
+  chain with the first finding.
+- **A split finding says whose it is.** A printed finding could leave its facts' top rule alone at
+  the foot of a page and open the next page on a bare fact or remediation box in a repeated frame.
+  In print the head now keeps with its facts (three columns, one unit under their rule) and the
+  tail opens with "Finding NN · rule · remediation and evidence"; the gate rejects a page that opens
+  on a bare fact or tail line. A table's caption and column header no longer end a page without
+  its first row.
+- **Print typography.** The coverage header prints CANDIDATES whole (a soft hyphen printed it as
+  CANDI- / DATES); the table uses separate borders in print, so a continuation page no longer shows
+  the previous page's last row rule again under the repeated header; remediation and note text
+  keep the 72ch measure inside their boxes; counts of one read "1 line" and "1 occurrence", and
+  the `layout/widow` and `layout/orphan` messages read "1 line of this block continues / remains".
+- **A long document path no longer shrinks the whole printed report.** The coverage caption put
+  a trailing margin after the path, whose last segment was already capped at the line, so a long
+  path pushed the print 12 px past the A4 content box and Chrome scaled every page to 98.3 %.
+  Path and verdict are now wrapping flex items with a column gap, which never follows the last
+  item on a line. A technical print probe with a long document path fails on any overflow, and
+  the verifier compares its page-1 word heights with the canonical PDF (`broken-caption-gap`).
+- **The single rule under a repeated table header is checked.** Renderer and verifier count the
+  rules between the column header and the first row on every page; a second rule, or a thin rule
+  painted through the strong one (what collapsed borders did), fails (`broken-border-collapse`).
+- **A review time in the future is rejected.** No round or cell of the ledger may be dated more
+  than ten minutes after the verifying clock.
+- **Printed coverage rows keep one pitch across pages.** Rows on a table's continuation page were
+  stretched (21.7 pt on the first page, 24.8–26.3 pt after the break) with a second rule under the
+  header, and the end mark's own rule sat under the last row rule like a double line: the coverage
+  list was a grid, and a fragmenting grid item is stretched to its unfragmented area. Print lays it
+  out as block flow and drops the end mark's rule; the gate rejects any row pitch more than 8 % off
+  the table's median, measured independently by the verifier.
+- **Review rounds are ordered in time, and "bound" means the whole binding.** A passing latest
+  round must be a `current` record; `reviewedAt` never decreases from round to round; no historical
+  or reconstructed record follows a current one; and a current round and each cell it reviewed
+  carry an exact UTC time at or after the render they bind. Moving the historical round-1 pass to
+  the end, with or without re-binding it to today's render, passed the strict gate before. The
+  ledger line and job summary now report the binding as "inputs yes|no; environment/artifacts
+  yes|no" — a matching input fingerprint over a different environment, cell fingerprint or
+  inventory printed "bound … yes". Both state that the roster check proves only that a rostered
+  handle was written, not who wrote it: that rests on repository access control and diff review.
+- **The live self-application red control checks the evidence outcome it gets, instead of assuming
+  one.** It required exit 4 because the injected oversized tail supposedly could receive no
+  evidence mark; its start mark is placed, so the page binds whenever the browser's PDF returns its
+  marks, and CI on current Chrome ended exit 1 once the tail gained its print label. The control
+  now prints the per-page evidence and checks either outcome completely (complete evidence: exit 1,
+  the error gates; partial evidence: exit 4, the error still reported), always requiring the
+  injected 1600 px block to be the one measured.
+- **The verifier measures the 40 % unit bound itself and proves four more of its checks.** It
+  finds the allowed break opportunities of the canonical states' print layout in its own browser
+  process (a different formulation from the renderer's unit chains) and requires the tallest
+  stretch between two of them to stay under 40 % of the content box and above the renderer's
+  figure. Its fill application, continuation-label, row-rule and row-pitch checks now each have a
+  red control on a broken copy of real evidence, as the tile, gallery, keep and text-depth checks
+  already did.
+- **The verifier proves its own independent checks.** Beside its pixel, font and input
+  controls it now breaks, once per run, a copy of real evidence for its tile re-cut (a doctored tile
+  with rewritten manifest hashes), its gallery completeness (one tile reference removed), its
+  stranded-heading check (the findings lead moved to the next page) and its text-depth reading (an
+  empty cloned frame with borders, an accent bar and a split rule), and fails when a check accepts
+  the broken copy.
+
+- **The context pack's repair option for `layout/unbreakable-block-too-tall` no longer proposes a
+  false repair.** For a finding with a verified original source, `repair.options` in
+  `context.json` and on the HTML bundle's finding card said "Adjust the verified block's break
+  constraint or split its content; expected effect: the block can fit a page fragment". The
+  rule's advice warns that the break constraint is the one lever that clears the finding without
+  making the block fit. It now reads "Shorten the verified block or split its content into smaller
+  sections deliberately; do not only remove its 'break-inside: avoid', which clears the finding
+  without making the block fit; expected effect: the block no longer exceeds the content box of the
+  page it is laid out on." Context pack schema unchanged (2): the field and its type are the same.
+  `tests/unit/registry.test.ts` now checks every entry of that map against the levers its rule's
+  advice proposes.
+
 ### Documentation
 
 - `docs/limitations.md` now states that a document with a page that carries no source block — the
@@ -594,20 +780,6 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   paragraph. The page also states when a page counts as ending, what was measured, and the
   remaining limits, and `docs/limitations.md` says what page fill counts and what a line-box fill
   would change.
-
-### Reporting
-
-- **The context pack's repair option for `layout/unbreakable-block-too-tall` no longer proposes a
-  false repair.** For a finding with a verified original source, `repair.options` in
-  `context.json` and on the HTML bundle's finding card said "Adjust the verified block's break
-  constraint or split its content; expected effect: the block can fit a page fragment". The
-  rule's advice warns that the break constraint is the one lever that clears the finding without
-  making the block fit. It now reads "Shorten the verified block or split its content into smaller
-  sections deliberately; do not only remove its 'break-inside: avoid', which clears the finding
-  without making the block fit; expected effect: the block no longer exceeds the content box of the
-  page it is laid out on." Context pack schema unchanged (2): the field and its type are the same.
-  `tests/unit/registry.test.ts` now checks every entry of that map against the levers its rule's
-  advice proposes.
 
 ### Tooling
 

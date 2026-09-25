@@ -53,7 +53,18 @@ export interface HtmlCoverageRow {
   floor: string;
   ok: boolean;
   reasons: string[];
-  options: string[];
+  /**
+   * What the reader can do, each as prose around at most one command. The command is kept apart so
+   * the HTML can render it as one unbreakable `<code>` unit: a flag split across a line
+   * ("--" / "disable layout/widow") is a broken command when copied from the page or the PDF.
+   */
+  options: HtmlOption[];
+}
+
+export interface HtmlOption {
+  before: string;
+  command: string | null;
+  after: string;
 }
 
 export interface HtmlCoverageDocument {
@@ -75,6 +86,12 @@ export interface HtmlReportModel {
     candidates: number;
   };
   findingsLead: string;
+  /**
+   * How many findings carry remediation advice, and how many of those no trigger/remedied pair in
+   * this package substantiates. The report states the caveat once, from these counts, instead of
+   * repeating it inside every finding.
+   */
+  remediationSummary: { withAdvice: number; untested: number };
   findings: HtmlFinding[];
   infrastructure: ReturnType<typeof infraLines>;
   coverage: HtmlCoverageDocument[];
@@ -124,12 +141,19 @@ const SEVERITY_LABELS: Record<Severity, string> = {
   info: "Information",
 };
 
+function findingCount(count: number): string {
+  return `${count} finding${count === 1 ? "" : "s"}`;
+}
+
 function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(4)));
 }
 
+/** Count units read in the singular for exactly one: "1 line", "1 occurrence", not "1 lines". */
+const SINGULAR_UNITS: Readonly<Record<string, string>> = Object.freeze({ lines: "line", occurrences: "occurrence", pages: "page" });
+
 function formatMeasurement(value: number, unit: string): string {
-  return `${formatNumber(value)} ${unit}`;
+  return `${formatNumber(value)} ${value === 1 ? SINGULAR_UNITS[unit] ?? unit : unit}`;
 }
 
 /**
@@ -208,10 +232,10 @@ function coverageRow(
     ok: coverage.ok,
     reasons,
     options: [
-      "Inspect the document for unsupported constructs or environment limits.",
+      { before: "Inspect the document for unsupported constructs or environment limits.", command: null, after: "" },
       GATING_RULE_IDS.has(ruleId)
-        ? `This rule gates by default. --disable ${ruleId} removes the gate, not the defect — use it only if this document intentionally uses constructs this version cannot measure.`
-        : `If this document intentionally uses constructs this version cannot measure, --disable ${ruleId} stops the check.`,
+        ? { before: "This rule gates by default. ", command: `--disable ${ruleId}`, after: " removes the gate, not the defect — use it only if this document intentionally uses constructs this version cannot measure." }
+        : { before: "If this document intentionally uses constructs this version cannot measure, ", command: `--disable ${ruleId}`, after: " stops the check." },
     ],
   };
 }
@@ -275,6 +299,7 @@ export function buildHtmlReportModel(report: Report): HtmlReportModel {
           measured,
         };
 
+  const findings = report.findings.map(findingModel);
   return {
     status: { key: report.runVerdict, ...STATUS[report.runVerdict] },
     facts: mandatoryFacts(report),
@@ -284,12 +309,18 @@ export function buildHtmlReportModel(report: Report): HtmlReportModel {
       info: report.summary.info,
     },
     coverageTrust,
+    // Every lead states the count, so a printed report — clean ones included — says "0 findings"
+    // in words rather than leaving the reader to infer it from an absent list.
     findingsLead: STATUS[report.runVerdict].partial
-      ? "Partial findings only. The run did not establish enough trust for these findings to describe the whole document."
+      ? `Partial findings only: ${findingCount(report.findings.length)}. The run did not establish enough trust for these findings to describe the whole document.`
       : report.findings.length === 0
-        ? "The requested checks completed without a gate-triggering finding."
+        ? "0 findings. The requested checks completed without a gate-triggering finding."
         : `${report.findings.length} measured finding${report.findings.length === 1 ? "" : "s"}, ordered as produced by the checker.`,
-    findings: report.findings.map(findingModel),
+    findings,
+    remediationSummary: {
+      withAdvice: findings.filter((finding) => finding.remediation !== null).length,
+      untested: findings.filter((finding) => finding.remediation !== null && finding.remediationTested === false).length,
+    },
     // Non-fatal apparatus diagnostics and positive second-opinion evidence remain visible too.
     // Presence is not equivalent to failure; `InfraLine.fatal` carries that engine decision.
     infrastructure: infraLines(report),

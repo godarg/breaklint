@@ -141,7 +141,7 @@ export const widow = defineRule(
           ruleId: "layout/widow",
           severity: "warn",
           message:
-            `${lines} line${lines === 1 ? "" : "s"} of this block continue onto page ${block.page}; ` +
+            `${lines} line${lines === 1 ? " of this block continues" : "s of this block continue"} onto page ${block.page}; ` +
             `its own widows value asks for ${required}. Heuristic: CSS Fragmentation Level 3 ` +
             `permits this relaxation when no conforming split exists.`,
           page: block.page,

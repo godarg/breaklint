@@ -117,7 +117,7 @@ export const orphan = defineRule(
           ruleId: "layout/orphan",
           severity: "warn",
           message:
-            `${lines} line${lines === 1 ? "" : "s"} of this block remain at the foot of page ` +
+            `${lines} line${lines === 1 ? " of this block remains" : "s of this block remain"} at the foot of page ` +
             `${block.page}; its own orphans value asks for ${required}. Heuristic: the ` +
             `specification permits this relaxation when no conforming split exists.`,
           page: block.page,

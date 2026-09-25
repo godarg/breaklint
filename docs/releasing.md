@@ -112,7 +112,16 @@ code of `tail`: read every return value directly after its command.
 The technical surface gate reconstructs and verifies every current cell without claiming a human
 look. `npm run test:report-surfaces` is the separate exact-environment human gate. It must stay red
 when the bound inputs changed and no person reviewed the new artifacts; never refresh its ledger as
-release ceremony. A real later review may rebind it with its actual reviewer and timestamp.
+release ceremony. A real later review is recorded as a new round with its actual reviewers, date and
+outcome — `pass` or `fail` — and only a passing latest round in which a rostered human role
+(`@Brand`, `@Neo` or `@Founder`) passed every cell, bound to the exact current inputs, turns the
+gate green. An agent's review may be recorded in a round, by kind and model, and never passes a
+cell; the roster itself changes only by a reviewed code change (`docs/reporting.md`).
+<!-- human-review-roles: @Brand, @Neo, @Founder -->
+The roster check proves only that a rostered handle was written into the ledger; it does not
+authenticate a person. Whether a rostered human really reviewed rests on repository access control
+and on reviewing the ledger diff before it merges — check who committed it and that the round's
+cells name the artifacts actually rendered — not on this gate.
 
 The ledger is bound to the 0.2.3 input fingerprint from 2026-08-29. It was therefore red for
 0.3.0, 0.3.1, 0.4.0 and 0.5.0 without anyone noticing, because CI runs the technical mode, which
@@ -129,7 +138,11 @@ stacks collapse to the same family on a Linux CI container, and six of the thirt
 mobile screens — are rendered as single 390 x 15 000 px strips that no reviewer can actually judge.
 
 The ledger was therefore **not** rebound. Binding it would have recorded a review outcome that did
-not happen, which is the one thing this gate exists to prevent.
+not happen, which is the one thing this gate exists to prevent. The ledger format of the time
+(schema 4) could not hold a failed review at all; since schema 5 the 2026-09-18 FAIL is round 2 of
+the ledger itself, marked as a historical reconstruction from this record and carrying only what is
+stated here — date, outcome, scope, finding counts and headline findings, with no reviewer handle,
+per-cell outcome or binding invented after the fact (see `docs/reporting.md`).
 
 **That leaves 0.6.0 in a third state this document did not provide for, and the decision to ship in
 it was taken deliberately.** The release plan for this version pre-registered exactly two
@@ -143,8 +156,9 @@ meeting it.
 For the next release the choice is the original two, and it has to be made before the tag: either a
 review that passes and rebinds the ledger, or a documented decision to drop the gate and the
 paragraph above with it. `npm run test:report-surfaces`
-stays red for 0.6.0 — but it is now red with a date, two named reviewers, an enumerated finding list
-and an owner, instead of red and unread. The findings and their addressees are carried in the
+stays red for 0.6.0 — but it is now red with a date, two reviewers (whose handles this record does
+not name, so the ledger records them as `not-recorded`), an enumerated finding list and an owner,
+instead of red and unread. The findings and their addressees are carried in the
 release's follow-up register; they are surface work, and they are not repaired in a release that
 already changes what the rules report.
 
