@@ -79,6 +79,9 @@ npm run test:real-document
 npm run test:report-surfaces:technical
 npm run test:report-surface-mutants
 npm run selfcheck
+# ci.yml job `corpus`: its own build, then the self-authored corpus gate
+npm run build
+npm run test:corpus
 ```
 
 `npm run build` comes before `test:real-document` because that gate runs `dist/cli/index.js`: in

@@ -9,14 +9,15 @@
  */
 
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import type { Finding, Report } from "../../src/core/types.ts";
+import { conditionKeys, executablePart, jobsOf, stepsOf } from "../tools/release-workflow-contract.mjs";
 import {
   compileExpected,
   ENTRY_FIELDS,
@@ -26,7 +27,9 @@ import {
   indexSource,
   PAGE_OF_FIELDS,
   PER_TEXT_FIELDS,
+  processGroupMembers,
   selectElements,
+  summarizeGate,
   TARGET_SHAPES,
   URI_FIELDS,
   verifyManifest,
@@ -650,6 +653,8 @@ test("an unknown field anywhere the gate interprets fails the expected file", ()
   delete ((withoutWhy.rules as Record<string, { mustFire: Json[] }>)["layout/widow"]!.mustFire[0]!).why;
   assert.throws(() => compile(withoutWhy), /mustFire\[0\]: required field "why" is missing/u);
   assert.throws(() => compile(expectedFile({ "layout/widow": { expectedDeclines: [{ target: { id: "p1" }, reason: "env/forced-break" }] } })), /required field "required" is missing/u);
+  // README "Expected files": a reason is a member of ENV_IDS, not merely an env/ string.
+  assert.throws(() => compile(expectedFile({ "layout/widow": { expectedDeclines: [{ target: { id: "p1" }, reason: "env/forced-brake", required: false }] } })), /reason env\/forced-brake is not one of src\/core\/enums\.ts ENV_IDS/u);
   // Informational fields are checked for type.
   assert.throws(() => compile(expectedFile({}, { title: 7 })), /syn\.title: expected string/u);
   assert.throws(() => compile(expectedFile({}, { calibrationEvidenceEligible: true })), /calibrationEvidenceEligible: expected false/u);
@@ -666,6 +671,7 @@ test("an unknown field anywhere the gate interprets fails the expected file", ()
 // The process boundary: a temporary one-document corpus and a stand-in CLI.
 
 const FAKE_CLI = `
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
@@ -679,9 +685,23 @@ const html = createHash("sha256").update(readFileSync(input)).digest("hex");
 const file = isAbsolute(input) ? "~" + input.slice(input.indexOf("/", 1)) : input;
 const findings = spec.findings.map((f, i) => ({ runFindingId: "f" + i, page: 1, message: "m", ...f,
   source: f.source ? { ...f.source, file, coordinateSystem: "utf8-bytes-unicode-codepoints-v1" } : null }));
-writeFileSync(out, JSON.stringify({ schemaVersion: 5, exitCode: spec.exit, config: { profile: "default", activeRules: spec.activeRules, disabledRules: ["layout/half-empty-page"] },
-  documents: [{ exitReason: null, pages: 2, inputIdentity: { html }, findings, notMeasured: [] }] }));
-process.exit(spec.exit);
+if (spec.leaderPid) writeFileSync(spec.leaderPid, String(process.pid));
+// A grandchild in the CLI's process group, as Chrome is: it records its pid and may ignore SIGTERM.
+if (spec.grandchild) {
+  const code = "process.on('SIGTERM', () => {" + (spec.grandchildIgnoresTerm ? "" : " process.exit(0);") + " });" +
+    "require('node:fs').writeFileSync(" + JSON.stringify(spec.grandchild) + ", String(process.pid)); setInterval(() => {}, 1000);";
+  spawn(process.execPath, ["-e", code], { stdio: "ignore" }).unref();
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) { try { readFileSync(spec.grandchild); break; } catch {} }
+}
+if (spec.hang) {
+  if (spec.ignoreTerm) process.on("SIGTERM", () => {});
+  setInterval(() => {}, 1000);
+} else {
+  writeFileSync(out, JSON.stringify({ schemaVersion: 5, exitCode: spec.exit, config: { profile: "default", activeRules: spec.activeRules, disabledRules: ["layout/half-empty-page"] },
+    documents: [{ exitReason: null, pages: 2, inputIdentity: { html }, findings, notMeasured: [] }] }));
+  process.exit(spec.exit);
+}
 `;
 
 function makeCorpus(options: { documents?: number; expected?: Json } = {}) {
@@ -710,11 +730,13 @@ function makeCorpus(options: { documents?: number; expected?: Json } = {}) {
   return { root, corpus, manifest };
 }
 
-function runGateProcess(root: string, corpus: string, spec: Json) {
+function runGateProcess(root: string, corpus: string, spec: Json, extra: string[] = []) {
   writeFileSync(join(root, "spec.json"), JSON.stringify(spec));
-  return spawnSync(process.execPath, ["--experimental-strip-types", GATE, "--corpus", corpus, "--cli", join(root, "fake-cli.mjs"), "--cwd", root], {
+  return spawnSync(process.execPath, ["--experimental-strip-types", GATE, "--corpus", corpus, "--cli", join(root, "fake-cli.mjs"), "--cwd", root, ...extra], {
     cwd: root,
     encoding: "utf8",
+    // A gate that never returns must fail this test, not hang it.
+    timeout: 60_000,
     env: { ...process.env, FAKE_SPEC: join(root, "spec.json") },
   });
 }
@@ -795,6 +817,211 @@ test("process boundary: an unknown field in an expected file fails the gate", ()
   }
 });
 
+// ---------------------------------------------------------------------------------------------
+// Harness integrity: each guard of the gate that is not a README matching rule, red on its own.
+
+test("report shape: one document, schema 5, default profile, bound to the verified bytes", () => {
+  const raw = expectedFile();
+  const mutate = (change: (report: Record<string, unknown>, document: Record<string, unknown>) => void): RunOutcome => {
+    const run = outcome([]);
+    const report = run.report as unknown as Record<string, unknown>;
+    change(report, (report.documents as Record<string, unknown>[])[0]!);
+    return run;
+  };
+  assertFail(judge(raw, mutate((report, document) => { report.documents = [document, { ...document }]; })), /report holds 2 documents; one document per invocation/u);
+  assertFail(judge(raw, mutate((report) => { report.documents = []; })), /report holds 0 documents/u);
+  assertFail(judge(raw, mutate((report) => { report.schemaVersion = 4; })), /report schemaVersion 4, this gate reads 5/u);
+  assertFail(judge(raw, mutate((report) => { (report.config as Record<string, unknown>).profile = "strict"; })), /report profile strict/u);
+  assertFail(judge(raw, mutate((_report, document) => { document.inputIdentity = { html: "0".repeat(64) }; })), /inputIdentity\.html 0{64} is not the verified document/u);
+  // L1: a report that binds nothing is not accepted as bound.
+  assertFail(judge(raw, mutate((_report, document) => { document.inputIdentity = null; })), /inputIdentity is null/u);
+});
+
+test("process outcome: a signal, a missing exit code or a timeout fails the document", () => {
+  const raw = expectedFile();
+  assertFail(judge(raw, { ...outcome([]), signal: "SIGKILL" }), /terminated by SIGKILL/u);
+  assertFail(judge(raw, { ...outcome([]), exitCode: null }), /produced no exit code/u);
+  assertFail(judge(raw, { ...outcome([]), timedOutMs: 1234 }), /timed out after 1234 ms/u);
+  assertFail(judge(raw, { ...outcome([]), leftovers: { pids: [7], survivedSigkill: [7] } }), /survived SIGKILL: 7/u);
+  const leftover = judge(raw, { ...outcome([]), timedOutMs: null, leftovers: { pids: [7], survivedSigkill: [] } });
+  assertPass(leftover);
+  assert.match(leftover.notes.join("\n"), /left 1 process\(es\) in its group/u);
+});
+
+test("decline rows: a malformed count and a rule the expected file does not name fail", () => {
+  const raw = expectedFile();
+  const row = (ruleId: string, count: number) => ({ scope: "block", ruleId, reason: "env/forced-break", target: null, count });
+  assertFail(judge(raw, outcome([], { notMeasured: [row("layout/widow", 0)] })), /malformed decline row count: layout\/widow env\/forced-break 0/u);
+  assertFail(judge(raw, outcome([], { notMeasured: [row("layout/widow", 1.5)] })), /malformed decline row count/u);
+  assertFail(judge(raw, outcome([], { notMeasured: [row("layout/unknown", 1)] })), /decline of a rule the expected file does not name: layout\/unknown/u);
+});
+
+test("the default profile: a rule listed as not active must not be active", () => {
+  const run = outcome([], { activeRules: RULES });
+  (run.report!.config as unknown as { disabledRules: string[] }).disabledRules = [];
+  assertFail(judge(expectedFile(), run), /layout\/half-empty-page is active/u);
+});
+
+test("a source in another coordinate system lies within no span", () => {
+  const raw = expectedFile({ "layout/widow": { mustFire: [{ target: { id: "p1" } }] } });
+  const utf16 = finding("layout/widow", span("p1"));
+  (utf16.source as unknown as { coordinateSystem: string }).coordinateSystem = "utf16-code-units";
+  assertFail(judge(raw, outcome([utf16])), /mustFire missed/u);
+});
+
+test("expected-file invariants the gate enforces before any run", () => {
+  const byStack = (pages: number[]) => ({ reference: pages });
+  assert.throws(() => compile(expectedFile({ "layout/orphaned-continuation-page": {
+    mustFire: [{ target: { pageOf: { id: "p1", fragment: "last", resolvedPages: [3, 4], resolvedPagesByFontStack: byStack([3, 4]) } } }],
+    mustNotFire: [{ target: { pageOf: { id: "p1", fragment: "middle", resolvedPages: [4], resolvedPagesByFontStack: byStack([4]) } } }],
+  } })), /page sets overlap on 4/u);
+  assert.throws(() => compile(expectedFile({}, { rules: {} })), /rules is empty/u);
+  assert.throws(() => compileExpected(expectedFile(), INDEX, { id: "syn", artifact: "documents/syn.html", sha256: "f".repeat(64), byteLength: HTML_BYTES.length }), /binds sha256/u);
+  assert.throws(() => compileExpected(expectedFile(), INDEX, { id: "other", artifact: "documents/syn.html", sha256: HTML_SHA, byteLength: HTML_BYTES.length }), /documentId syn does not name the manifest document/u);
+  assert.throws(() => compileExpected(expectedFile(), INDEX, { id: "syn", artifact: "documents/other.html", sha256: HTML_SHA, byteLength: HTML_BYTES.length }), /artifact documents\/syn\.html differs/u);
+  assert.throws(() => compileExpected(expectedFile(), INDEX, { id: "syn", artifact: "documents/syn.html", sha256: HTML_SHA, byteLength: 1 }), /binds byteLength/u);
+  assert.throws(() => compile(expectedFile({ "svg/text-overflows-viewport": { expectedDeclines: [{
+    target: { svg: "s1", texts: ["t1"] }, reason: "env/svg-painted-bounds-unsupported", required: false, count: 1, measuredAlternative: true, perText: [pt("t1", "mustNotFire")],
+  }] } })), /a measuredAlternative decline is required/u);
+  assert.throws(() => compile(expectedFile({ "layout/orphaned-continuation-page": { mustNotFire: [{ target: { pages: "any page not named in mustNotFire" } }] } })), /the pages target is a page-level allowance/u);
+});
+
+test("the gate passes only when every bound document was judged and passed", () => {
+  const passed = judge(expectedFile(), outcome([]));
+  assertPass(passed);
+  assert.equal(summarizeGate(1, [passed]).pass, true);
+  assert.equal(summarizeGate(2, [passed]).pass, false, "one verdict for two documents is not a pass");
+  assert.equal(summarizeGate(1, [{ ...passed, pass: false }]).pass, false);
+  assert.throws(() => summarizeGate(0, []), /zero documents were run/u);
+});
+
+test("process boundary: configuration in the CLI's cwd, an unknown argument and bad numbers are refused", () => {
+  const { root, corpus } = makeCorpus();
+  try {
+    const spec = { exit: 1, activeRules: ACTIVE, findings: [{ ruleId: "layout/widow", source: { offset: p1.start, endOffset: p1.end } }] };
+    const bogus = runGateProcess(root, corpus, spec, ["--bogus"]);
+    assert.equal(bogus.status, 1);
+    assert.match(bogus.stderr, /unknown argument --bogus/u);
+    for (const [flag, value] of [["--timeout-ms", "0"], ["--grace-ms", "x"]] as const) {
+      const run = runGateProcess(root, corpus, spec, [flag, value]);
+      assert.equal(run.status, 1);
+      assert.match(run.stderr, new RegExp(`${flag} must be a positive integer`, "u"));
+    }
+    writeFileSync(join(root, "breaklint.config.json"), "{}");
+    const configured = runGateProcess(root, corpus, spec);
+    assert.equal(configured.status, 1);
+    assert.match(configured.stderr, /holds a breaklint\.config\.json/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("process boundary: the manifest's paths, counts and summaries bind", () => {
+  const { root, corpus, manifest } = makeCorpus();
+  const rewrite = (change: (copy: typeof manifest) => void) => {
+    const copy = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
+    change(copy);
+    writeFileSync(join(corpus, "manifest.json"), JSON.stringify(copy));
+  };
+  const spec = { exit: 1, activeRules: ACTIVE, findings: [{ ruleId: "layout/widow", source: { offset: p1.start, endOffset: p1.end } }] };
+  try {
+    writeFileSync(join(root, "outside.txt"), "x");
+    rewrite((copy) => { copy.files.push({ path: "../outside.txt", sha256: createHash("sha256").update("x").digest("hex"), byteLength: 1 }); });
+    assert.match(runGateProcess(root, corpus, spec).stderr, /path \.\.\/outside\.txt leaves the corpus directory/u);
+    rewrite((copy) => { copy.documentCount = 2; });
+    assert.match(runGateProcess(root, corpus, spec).stderr, /documentCount 2 differs from 1 listed documents/u);
+    rewrite((copy) => { copy.documents[0]!.expectedExit = [1]; });
+    assert.match(runGateProcess(root, corpus, spec).stderr, /manifest expectedExit \[1\] differs from the expected file \[0, 1\]/u);
+    rewrite((copy) => { copy.documents[0]!.pagesRange = [2, 4]; });
+    assert.match(runGateProcess(root, corpus, spec).stderr, /manifest pagesRange differs from the expected file/u);
+    // L2: every bound document belongs to exactly one manifest document.
+    rewrite((copy) => { copy.documents.push({ ...copy.documents[0]!, id: "syn-twin" }); copy.documentCount = 2; });
+    assert.match(runGateProcess(root, corpus, spec).stderr, /documents\/syn\.html belongs to 2 manifest documents \(syn, syn-twin\)/u);
+    writeFileSync(join(corpus, "documents/orphan.html"), "<p>x</p>");
+    rewrite((copy) => { copy.files.push({ path: "documents/orphan.html", sha256: createHash("sha256").update("<p>x</p>").digest("hex"), byteLength: 8 }); });
+    const orphan = runGateProcess(root, corpus, spec);
+    assert.equal(orphan.status, 1);
+    assert.match(orphan.stderr, /documents\/orphan\.html belongs to no manifest document/u);
+    assert.doesNotMatch(orphan.stdout, /\| syn /u, "nothing may be judged when the manifest does not bind");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function alive(pid: number): boolean {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const state = stat.slice(stat.lastIndexOf(")") + 2).split(" ")[0];
+    return state !== "Z" && state !== "X";
+  } catch {
+    return false;
+  }
+}
+
+test("process boundary: on timeout the CLI's whole process group is terminated, and the failure says so", { skip: process.platform !== "linux" ? "reads /proc" : false }, () => {
+  for (const ignoreTerm of [false, true]) {
+    const { root, corpus } = makeCorpus();
+    const pidFile = join(root, "grandchild.pid");
+    const leaderFile = join(root, "leader.pid");
+    try {
+      const run = runGateProcess(root, corpus, { exit: 1, activeRules: ACTIVE, findings: [], hang: true, ignoreTerm, grandchild: pidFile, grandchildIgnoresTerm: ignoreTerm, leaderPid: leaderFile }, ["--timeout-ms", "1500", "--grace-ms", "500"]);
+      assert.equal(run.status, 1, run.stdout + run.stderr);
+      assert.match(run.stdout, /FAIL syn: the CLI timed out after 1500 ms; its process group was sent SIGTERM, then SIGKILL/u);
+      // SIGTERM first: a CLI that honours it ends on SIGTERM; one that ignores it is killed after the grace period.
+      assert.match(run.stdout, new RegExp(`FAIL syn: the CLI was terminated by ${ignoreTerm ? "SIGKILL" : "SIGTERM"}\n`, "u"));
+      const grandchild = Number(readFileSync(pidFile, "utf8"));
+      const leader = Number(readFileSync(leaderFile, "utf8"));
+      assert.ok(grandchild > 0 && leader > 0 && grandchild !== leader);
+      assert.equal(alive(grandchild), false, `grandchild ${grandchild} survived (ignoreTerm=${ignoreTerm})`);
+      // The CLI's pid is its process group's id: nothing of the group is left.
+      assert.deepEqual(processGroupMembers(leader), []);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("a zombie is not a live member of a process group", { skip: process.platform !== "linux" ? "reads /proc" : false }, async () => {
+  // `sleep 5` replaces the shell and never waits for its background child, which becomes a zombie.
+  const group = spawn("sh", ["-c", "sleep 0.2 & exec sleep 5"], { detached: true, stdio: "ignore" });
+  try {
+    const pgid = group.pid!;
+    let zombies: number[] = [];
+    for (let i = 0; i < 40 && zombies.length === 0; i += 1) {
+      await new Promise((resolveWait) => setTimeout(resolveWait, 50));
+      zombies = readdirSync("/proc").filter((name) => /^\d+$/u.test(name)).map(Number).filter((pid) => {
+        try {
+          const fields = readFileSync(`/proc/${pid}/stat`, "utf8").split(") ")[1]!.split(" ");
+          return fields[0] === "Z" && Number(fields[2]) === pgid;
+        } catch {
+          return false;
+        }
+      });
+    }
+    assert.equal(zombies.length, 1, "the fixture produced no zombie; this test has lost its subject");
+    assert.deepEqual(processGroupMembers(pgid), [pgid]);
+  } finally {
+    try {
+      process.kill(-group.pid!, "SIGKILL");
+    } catch {
+      // already gone
+    }
+  }
+});
+
+test("process boundary: what the CLI leaves in its group after a normal exit is terminated and noted", { skip: process.platform !== "linux" ? "reads /proc" : false }, () => {
+  const { root, corpus } = makeCorpus();
+  const pidFile = join(root, "grandchild.pid");
+  try {
+    const run = runGateProcess(root, corpus, { exit: 1, activeRules: ACTIVE, findings: [{ ruleId: "layout/widow", source: { offset: p1.start, endOffset: p1.end } }], grandchild: pidFile }, ["--grace-ms", "500"]);
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    assert.match(run.stdout, /note syn: the CLI exited and left 1 process\(es\) in its group; they were terminated/u);
+    assert.equal(alive(Number(readFileSync(pidFile, "utf8"))), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("the frozen corpus verifies and compiles, and CI runs the gate with the default binding", () => {
   // Every expected file validates and every target resolves in its document before any run.
   const manifest = verifyManifest(join(ROOT, "corpus/public/selfauthored-v1"));
@@ -809,10 +1036,18 @@ test("the frozen corpus verifies and compiles, and CI runs the gate with the def
   }
   const packageJson = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { scripts: Record<string, string> };
   assert.equal(packageJson.scripts["test:corpus"], "node --experimental-strip-types tests/tools/corpus-gate.ts --cwd .");
+  // CI: the gate is its own job, `corpus`, which builds and then runs it, and which may not fail
+  // quietly; the release workflow runs it too.
   const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
-  const check = ci.slice(ci.indexOf("\n  check:"), ci.indexOf("\n  node-floor:"));
-  assert.ok(check.includes("run: npm run test:corpus"), "the check job does not run the corpus gate");
-  assert.ok(check.indexOf("npm run test:corpus") > check.indexOf("npm run test:live"), "the corpus gate runs before the live suite");
-  assert.ok(check.indexOf("npm run test:corpus") > check.indexOf("npm run build"), "the corpus gate runs before the CLI is built");
+  const job = jobsOf(ci.split("\n")).find((candidate) => candidate.name === "corpus");
+  assert.ok(job, "ci.yml has no corpus job");
+  assert.ok(!job.lines.some(({ text }) => /^\s*(continue-on-error|if)\s*:/u.test(executablePart(text))), "the corpus job may be skipped or fail without failing the workflow");
+  const steps = stepsOf(job.lines);
+  for (const step of steps) assert.deepEqual(conditionKeys(step), [], "a corpus job step is conditional or may fail silently");
+  const runs = steps.map((step) => step.map(({ text }) => text).join("\n")).filter((text) => /run:/u.test(text));
+  const build = runs.findIndex((text) => /run: npm run build$/mu.test(text));
+  const gate = runs.findIndex((text) => /run: npm run test:corpus$/mu.test(text));
+  assert.ok(build >= 0 && gate > build, "the corpus job does not build before it runs the gate");
+  assert.match(readFileSync(join(ROOT, ".github/workflows/release.yml"), "utf8"), /^\s+run: npm run test:corpus$/mu, "release.yml does not run the corpus gate");
   assert.doesNotMatch(ci, /no-evidence-binding/u);
 });

@@ -126,6 +126,10 @@ jobs:
       - name: admitted real-document acquisition gate
         run: npm run test:real-document
 
+      - name: self-authored closed-world corpus gate
+        # The same gate as ci.yml's `corpus` job, over the build above. A release waits for it.
+        run: npm run test:corpus
+
       # No pagination-residue step: its record is historical and it reads no document (see the
       # note in ci.yml). The class is held by tests/fixtures/fragmentainer-residue.html in the
       # live suite above.

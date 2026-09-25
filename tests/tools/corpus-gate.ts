@@ -13,7 +13,8 @@
  *   before it has verified every byte it will judge the report against.
  * - Element spans are computed here, with parse5 over the source bytes, in UTF-8 bytes. Nothing
  *   from `src/measure/**` or `src/source/**` is imported: an oracle that borrowed the tool's own
- *   source map would agree with the tool by construction. Only report TYPES are imported.
+ *   source map would agree with the tool by construction. Report TYPES are imported, and one
+ *   vocabulary (`ENV_IDS`, which the README names as the set of decline reasons); nothing else.
  * - breaklint runs the way a consumer runs it: the built CLI, one document per invocation, the
  *   default profile, the canonical JSON report.
  *
@@ -22,7 +23,7 @@
  * count that differs are all failures. The process exits 0 only when every document passed.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, copyFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -30,6 +31,10 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse, type DefaultTreeAdapterMap } from "parse5";
 import type { DocumentReport, Finding, NotMeasured, Report } from "../../src/core/types.ts";
+// The one runtime import from the tool: the corpus README ("Expected files") defines an
+// `expectedDeclines` reason as a member of this list. It is a vocabulary of constants with no
+// imports of its own and no measurement code; nothing the gate judges a report by comes from it.
+import { ENV_IDS } from "../../src/core/enums.ts";
 
 type Element = DefaultTreeAdapterMap["element"];
 type ParentNode = DefaultTreeAdapterMap["parentNode"];
@@ -162,11 +167,20 @@ export function verifyManifest(corpusRoot: string): VerifiedManifest {
     });
   }
 
-  for (const directory of ["documents", "expected"]) {
+  // Every file in documents/ and expected/ is bound by `files` and belongs to exactly one manifest
+  // document: a document nobody judges, or one judged twice, is a hole in the closed world.
+  for (const [directory, pathOf] of [["documents", (item: ManifestDocument) => item.htmlPath], ["expected", (item: ManifestDocument) => item.expectedPath]] as const) {
     const absolute = join(root, directory);
     if (!existsSync(absolute)) fail(`${directory}/ is missing`);
     for (const name of readdirSync(absolute)) {
-      if (!verified.has(join(absolute, name))) fail(`${directory}/${name} is on disk but not bound by the manifest`);
+      const path = join(absolute, name);
+      if (!verified.has(path)) fail(`${directory}/${name} is on disk but not bound by the manifest`);
+      const owners = documents.filter((item) => pathOf(item) === path).map((item) => item.id);
+      if (owners.length !== 1) fail(`${directory}/${name} belongs to ${owners.length === 0 ? "no manifest document" : `${owners.length} manifest documents (${owners.join(", ")})`}; it must belong to exactly one`);
+    }
+    for (const item of documents) {
+      const rel = relative(absolute, pathOf(item));
+      if (rel.startsWith("..") || rel.includes(sep)) fail(`${item.id}: its ${directory === "documents" ? "document" : "expected file"} is not directly in ${directory}/`);
     }
   }
   if (typeof manifest.manifestId !== "string") fail("manifest has no manifestId");
@@ -973,7 +987,8 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
       if (declineKeys.has(key)) fail(`${entryLabel}: repeats the target and reason of ${declineKeys.get(key)}`);
       declineKeys.set(key, entryLabel);
       const reason = entry.reason as string;
-      if (!reason.startsWith("env/")) fail(`${entryLabel}: reason must be an env/ id`);
+      // README "Expected files": "`reason` from `src/core/enums.ts` `ENV_IDS`".
+      if (!(ENV_IDS as readonly string[]).includes(reason)) fail(`${entryLabel}: reason ${reason} is not one of src/core/enums.ts ENV_IDS`);
       if ("count" in entry && (entry.count as number) < 1) fail(`${entryLabel}: count must be a positive integer`);
       if (entry.required && !("count" in entry)) fail(`${entryLabel}: a required decline needs a count`);
       const alternative = entry.measuredAlternative === true;
@@ -1046,6 +1061,10 @@ export interface RunOutcome {
   report: Report | null;
   reportProblem: string | null;
   stderr: string;
+  /** The timeout, when it fired. */
+  timedOutMs?: number | null;
+  /** Processes the CLI left in its group (see `runCli`). */
+  leftovers?: CliRun["leftovers"];
 }
 
 export interface DeclineSummary {
@@ -1122,7 +1141,10 @@ export function evaluateDocument(expected: CompiledExpected, outcome: RunOutcome
   };
 
   // Step 2, harness integrity: the report must be the canonical JSON report of THIS invocation.
+  if (outcome.timedOutMs) failures.push(`the CLI timed out after ${outcome.timedOutMs} ms; its process group was sent SIGTERM, then SIGKILL`);
   if (outcome.signal) failures.push(`the CLI was terminated by ${outcome.signal}`);
+  if (outcome.leftovers?.survivedSigkill.length) failures.push(`processes of the CLI's group survived SIGKILL: ${outcome.leftovers.survivedSigkill.join(", ")}`);
+  if (outcome.leftovers && outcome.timedOutMs === null) verdict.notes.push(`the CLI exited and left ${outcome.leftovers.pids.length} process(es) in its group; they were terminated`);
   if (outcome.exitCode === null) failures.push("the CLI produced no exit code");
   if (outcome.reportProblem || !outcome.report) {
     failures.push(`no canonical JSON report: ${outcome.reportProblem ?? "missing"}`);
@@ -1138,7 +1160,8 @@ export function evaluateDocument(expected: CompiledExpected, outcome: RunOutcome
   }
   const document: DocumentReport = report.documents[0]!;
   verdict.exitReason = document.exitReason;
-  if (document.inputIdentity && document.inputIdentity.html !== options.sha256) failures.push(`report inputIdentity.html ${document.inputIdentity.html} is not the verified document`);
+  if (!document.inputIdentity) failures.push("report inputIdentity is null: nothing binds the report to the verified document");
+  else if (document.inputIdentity.html !== options.sha256) failures.push(`report inputIdentity.html ${document.inputIdentity.html} is not the verified document`);
   if (failures.length) return done();
   const exitCode = outcome.exitCode!;
 
@@ -1283,6 +1306,8 @@ export interface GateOptions {
   noEvidenceBinding: boolean;
   keepReports: string | null;
   timeoutMs: number;
+  /** Between SIGTERM and SIGKILL to the CLI's process group. */
+  graceMs: number;
   log: (line: string) => void;
 }
 
@@ -1292,7 +1317,105 @@ export interface GateResult {
   documentsRead: number;
 }
 
-function runOne(document: ManifestDocument, options: GateOptions, temporary: string): RunOutcome {
+/** Live members of a process group, zombies excluded. Linux reads /proc; elsewhere kill(-pgid, 0). */
+export function processGroupMembers(pgid: number): number[] {
+  if (existsSync("/proc/self/stat")) {
+    const members: number[] = [];
+    for (const name of readdirSync("/proc")) {
+      if (!/^\d+$/u.test(name)) continue;
+      let stat: string;
+      try {
+        stat = readFileSync(`/proc/${name}/stat`, "utf8");
+      } catch {
+        continue; // exited while we looked
+      }
+      // pid (comm) state ppid pgrp ...; comm may contain spaces and parentheses.
+      const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+      if (Number(fields[2]) === pgid && fields[0] !== "Z" && fields[0] !== "X") members.push(Number(name));
+    }
+    return members;
+  }
+  try {
+    process.kill(-pgid, 0);
+    return [pgid];
+  } catch {
+    return [];
+  }
+}
+
+function signalGroup(pgid: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-pgid, signal);
+  } catch {
+    // the group is already gone
+  }
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
+
+async function waitForGroupExit(pgid: number, ms: number): Promise<boolean> {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    if (processGroupMembers(pgid).length === 0) return true;
+    if (Date.now() >= deadline) return false;
+    await sleep(50);
+  }
+}
+
+export interface CliRun {
+  status: number | null;
+  signal: string | null;
+  stderr: string;
+  /** Set when the timeout fired: the group got SIGTERM, then SIGKILL after the grace period. */
+  timedOutMs: number | null;
+  /** Processes of the CLI's group still alive after it exited, and what became of them. */
+  leftovers: { pids: number[]; survivedSigkill: number[] } | null;
+  error: Error | null;
+}
+
+/**
+ * One CLI invocation in its own process group. On timeout the whole group (the CLI, its Chrome and
+ * anything else it started) receives SIGTERM and, after `graceMs`, SIGKILL; killing only the CLI
+ * would orphan the browser and leave its profile behind. Whatever the CLI leaves in its group
+ * after it exits is terminated the same way and reported.
+ */
+export async function runCli(args: string[], cwd: string, timeoutMs: number, graceMs: number): Promise<CliRun> {
+  const child = spawn(process.execPath, args, { cwd, stdio: ["ignore", "ignore", "pipe"], detached: true });
+  let stderr = "";
+  child.stderr!.setEncoding("utf8");
+  child.stderr!.on("data", (chunk: string) => {
+    if (stderr.length < 1_000_000) stderr += chunk;
+  });
+  const exited = new Promise<{ status: number | null; signal: string | null; error: Error | null }>((resolveExit) => {
+    child.once("error", (error) => resolveExit({ status: null, signal: null, error }));
+    child.once("exit", (status, signal) => resolveExit({ status, signal, error: null }));
+  });
+  const pgid = child.pid;
+  let timedOutMs: number | null = null;
+  let killTimer: NodeJS.Timeout | null = null;
+  const timer = setTimeout(() => {
+    if (pgid === undefined) return;
+    timedOutMs = timeoutMs;
+    signalGroup(pgid, "SIGTERM");
+    killTimer = setTimeout(() => signalGroup(pgid, "SIGKILL"), graceMs);
+  }, timeoutMs);
+  const outcome = await exited;
+  clearTimeout(timer);
+  let leftovers: CliRun["leftovers"] = null;
+  if (pgid !== undefined) {
+    const pids = processGroupMembers(pgid);
+    if (pids.length) {
+      if (timedOutMs === null) signalGroup(pgid, "SIGTERM");
+      if (!(await waitForGroupExit(pgid, graceMs))) signalGroup(pgid, "SIGKILL");
+      await waitForGroupExit(pgid, 5_000);
+      leftovers = { pids, survivedSigkill: processGroupMembers(pgid) };
+    }
+  }
+  if (killTimer) clearTimeout(killTimer);
+  return { status: outcome.status, signal: outcome.signal, stderr, timedOutMs, leftovers, error: outcome.error };
+}
+
+async function runOne(document: ManifestDocument, options: GateOptions, temporary: string): Promise<RunOutcome> {
   const reportPath = join(temporary, `${document.id}.json`);
   const args = [options.cli, "--format", "json", "--out", reportPath];
   if (options.noEvidenceBinding) args.push("--no-evidence-binding");
@@ -1300,18 +1423,11 @@ function runOne(document: ManifestDocument, options: GateOptions, temporary: str
   // `source.file`; an absolute path under the home directory is redacted there (`~/...`) and
   // could then no longer be resolved to the document, so every source match would fail.
   args.push(relative(options.cwd, document.htmlPath));
-  const run = spawnSync(process.execPath, args, {
-    cwd: options.cwd,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: options.timeoutMs,
-    killSignal: "SIGKILL",
-    maxBuffer: 64 * 1024 * 1024,
-  });
+  const run = await runCli(args, options.cwd, options.timeoutMs, options.graceMs);
   let report: Report | null = null;
   let reportProblem: string | null = null;
-  if (run.error && !run.signal) reportProblem = `the CLI could not be started: ${run.error.message}`;
-  else if (!existsSync(reportPath)) reportProblem = `the invocation wrote no report (exit ${String(run.status)}; stderr: ${(run.stderr ?? "").trim().slice(0, 400)})`;
+  if (run.error) reportProblem = `the CLI could not be started: ${run.error.message}`;
+  else if (!existsSync(reportPath)) reportProblem = `the invocation wrote no report (exit ${String(run.status)}; stderr: ${run.stderr.trim().slice(0, 400)})`;
   else {
     try {
       report = JSON.parse(readFileSync(reportPath, "utf8")) as Report;
@@ -1323,7 +1439,7 @@ function runOne(document: ManifestDocument, options: GateOptions, temporary: str
       reportProblem = `the report is not JSON: ${(error as Error).message}`;
     }
   }
-  return { exitCode: run.status, signal: run.signal, report, reportProblem, stderr: run.stderr ?? "" };
+  return { exitCode: run.status, signal: run.signal, report, reportProblem, stderr: run.stderr, timedOutMs: run.timedOutMs, leftovers: run.leftovers };
 }
 
 function pad(value: string, width: number): string {
@@ -1352,7 +1468,7 @@ export function formatTable(verdicts: DocumentVerdict[]): string[] {
   return [line(header), `|${widths.map((width) => "-".repeat(width + 2)).join("|")}|`, ...rows.map(line)];
 }
 
-export function runGate(options: GateOptions): GateResult {
+export async function runGate(options: GateOptions): Promise<GateResult> {
   const manifest = verifyManifest(options.corpus);
   options.log(`corpus gate: ${manifest.manifestId}: ${manifest.filesVerified} files verified by SHA-256 and byte length, ${manifest.documents.length} documents`);
   if (options.noEvidenceBinding) options.log("corpus gate: LOCAL DIAGNOSTIC RUN with --no-evidence-binding; this is not the CI gate");
@@ -1382,7 +1498,7 @@ export function runGate(options: GateOptions): GateResult {
   try {
     for (const { document, expected } of compiled) {
       const started = Date.now();
-      const outcome = runOne(document, options, temporary);
+      const outcome = await runOne(document, options, temporary);
       const verdict = evaluateDocument(expected, outcome, { documentPath: document.htmlPath, cwd: options.cwd, sha256: document.sha256 });
       verdicts.push(verdict);
       options.log(`corpus gate: ${document.id}: ${verdict.pass ? "PASS" : "FAIL"} (exit ${String(outcome.exitCode)}, ${((Date.now() - started) / 1000).toFixed(1)} s)`);
@@ -1390,8 +1506,13 @@ export function runGate(options: GateOptions): GateResult {
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }
+  return summarizeGate(manifest.documents.length, verdicts);
+}
+
+/** The gate's verdict: every bound document was judged, and every judgement passed. */
+export function summarizeGate(documentCount: number, verdicts: DocumentVerdict[]): GateResult {
   if (verdicts.length === 0) fail("zero documents were run");
-  return { pass: verdicts.length === manifest.documents.length && verdicts.every((verdict) => verdict.pass), verdicts, documentsRead: verdicts.length };
+  return { pass: verdicts.length === documentCount && verdicts.every((verdict) => verdict.pass), verdicts, documentsRead: verdicts.length };
 }
 
 function argument(argv: string[], name: string): string | undefined {
@@ -1402,9 +1523,9 @@ function argument(argv: string[], name: string): string | undefined {
   return value;
 }
 
-const KNOWN_FLAGS = new Set(["--corpus", "--cli", "--cwd", "--no-evidence-binding", "--keep-reports", "--timeout-ms"]);
+const KNOWN_FLAGS = new Set(["--corpus", "--cli", "--cwd", "--no-evidence-binding", "--keep-reports", "--timeout-ms", "--grace-ms"]);
 
-export function main(argv: string[]): number {
+export async function main(argv: string[]): Promise<number> {
   const log = (line: string): void => void process.stdout.write(`${line}\n`);
   try {
     for (let i = 0; i < argv.length; i += 1) {
@@ -1418,14 +1539,17 @@ export function main(argv: string[]): number {
     if (!existsSync(cwd) || !statSync(cwd).isDirectory()) fail(`--cwd is not a directory: ${cwd}`);
     const timeout = Number(argument(argv, "--timeout-ms") ?? 600_000);
     if (!Number.isInteger(timeout) || timeout <= 0) fail("--timeout-ms must be a positive integer");
+    const grace = Number(argument(argv, "--grace-ms") ?? 10_000);
+    if (!Number.isInteger(grace) || grace <= 0) fail("--grace-ms must be a positive integer");
     const keep = argument(argv, "--keep-reports");
-    const result = runGate({
+    const result = await runGate({
       corpus: resolve(argument(argv, "--corpus") ?? DEFAULT_CORPUS),
       cli: resolve(argument(argv, "--cli") ?? join(ROOT, "dist/cli/index.js")),
       cwd,
       noEvidenceBinding: argv.includes("--no-evidence-binding"),
       keepReports: keep ? resolve(keep) : null,
       timeoutMs: timeout,
+      graceMs: grace,
       log,
     });
     log("");
@@ -1449,5 +1573,5 @@ export function main(argv: string[]): number {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  process.exitCode = main(process.argv.slice(2));
+  process.exitCode = await main(process.argv.slice(2));
 }

@@ -527,29 +527,32 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `npm run build` does and loads it through the runner's own loader. No `npm run` step was added,
   so the local gate lists are unchanged.
 
-- **`npm run test:corpus`: a closed-world gate over `corpus/public/selfauthored-v1`, and a CI step
-  that runs it** (`tests/tools/corpus-gate.ts`; step "self-authored closed-world corpus gate" in
-  the `check` job, after the real-document gate). It implements the corpus README's five gate steps
-  and nothing else: every manifest file verified by SHA-256 and length; one built-CLI invocation
-  per document under the default profile; exit 3 passes only as `render-unstable` inside the
-  expected set; otherwise exit set and page range; then per rule `mustFire`, `mustNotFire`, the
-  closed world, declines checked by count per rule and reason, `measuredAlternative` entries all
-  or nothing, and no decline reason outside `permittedDeclineReasons`. Element spans are computed
-  by the gate itself with parse5 in UTF-8 bytes, not with breaklint's source map. Zero documents,
-  a hash mismatch, an unknown field in an expected file and an unaccounted finding are failures.
-  Expected files are checked against the corpus README's closed field list (every level, required
-  keys, types; opaque values unread), and a unit test fails if the gate's encoding of that list and
-  the README diverge. Decline rows without a rule are left out of the per-rule checks only for the
-  two evidence-level declines the README names (`env/evidence-fragment-outside-page` on a page,
-  `env/evidence-overlay-removed` on the document), while `env/parity-blank-page` rows without a
-  rule (scope page) must add up to the expected file's `parityBlankPages.count`; any other such row
-  fails, and the exit code is judged as always.
-  `tests/unit/corpus-gate.test.ts` exercises every matching rule and fail-closed path on synthetic
-  reports and through the gate's process boundary. **The step is expected to be red until the
-  0.7.0 packages it depends on are integrated**: on the commit that adds it, measured locally on
-  Chromium 141 with evidence binding off, 4 of 20 documents pass (`docs/status.md`). The corpus is
-  regression truth, not calibration: a green gate says the tool agrees with twenty constructions,
-  not that its thresholds are right for real documents.
+- **`npm run test:corpus`: a closed-world gate over `corpus/public/selfauthored-v1`, run by its
+  own CI job and by the release workflow** (`tests/tools/corpus-gate.ts`; job `corpus` in
+  `ci.yml`, a build and then the gate, with no condition and no `continue-on-error`; a step in the
+  release workflow's `validate-pack` job after the real-document gate). It implements the corpus
+  README's five gate steps: every manifest file verified by SHA-256 and length, and every document
+  and expected file bound to exactly one manifest document; one built-CLI invocation per document
+  under the default profile; exit 3 passes only as `render-unstable` inside the expected set;
+  otherwise exit set and page range; then per rule `mustFire`, `mustNotFire`, the closed world,
+  declines checked by count per rule and reason, `measuredAlternative` entries all or nothing, and
+  no decline reason outside `permittedDeclineReasons`. Element spans are computed by the gate
+  itself with parse5 in UTF-8 bytes, not with breaklint's source map. Expected files are checked
+  against the corpus README's closed field list (every level, required keys, types; opaque values
+  unread; decline reasons from `ENV_IDS`), and a unit test fails if the gate's encoding of that list
+  and the README diverge. Decline rows without a rule are left out of the per-rule checks only for
+  the two evidence-level declines the README names (`env/evidence-fragment-outside-page` on a
+  page, `env/evidence-overlay-removed` on the document), while `env/parity-blank-page` rows
+  without a rule (scope page) must add up to the expected file's `parityBlankPages.count`; any
+  other such row fails, and the exit code is judged as always. A report must be the one document
+  of its invocation, schema 5, default profile, and bound to the verified bytes by
+  `inputIdentity.html`. Each CLI runs in its own process group: on a timeout the group gets SIGTERM
+  and then SIGKILL, and the document fails naming the timeout, so no browser is orphaned.
+  `tests/unit/corpus-gate.test.ts` holds a red case for every matching rule and every guard, on
+  synthetic reports and through the gate's process boundary with a stand-in CLI. **The job is
+  expected to be red until the 0.7.0 packages it depends on are integrated** (the state is in
+  `docs/status.md`). The corpus is regression truth, not calibration: a green gate says the tool
+  agrees with twenty constructions, not that its thresholds are right for real documents.
 
 ### Validation corpus
 

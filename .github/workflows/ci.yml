@@ -224,6 +224,33 @@ jobs:
           grep -q "install:" err.txt || { echo "no install command on stderr"; cat err.txt; exit 1; }
           echo "exit 3 with an install command:"; cat err.txt
 
+  # The self-authored closed-world corpus gate (corpus/public/selfauthored-v1): twenty documents
+  # with planted defects and clean controls, each judged against ground truth written before
+  # breaklint ever ran on it. One invocation of the built CLI per document, default profile,
+  # evidence binding on. Closed world: a finding no entry accounts for fails, and so do zero
+  # documents, a hash mismatch or an unknown field in an expected file. It is a regression corpus,
+  # not calibration evidence.
+  #
+  # Its own job, because it needs nothing but a build and a browser, and because while a document
+  # still fails for a known, tracked cause, the gates after it in `check` must still run. It is not
+  # optional: no continue-on-error, no condition, and a red job here is a red workflow.
+  corpus:
+    runs-on: ubuntu-latest
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: "1"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: build the CLI the corpus gate runs
+        run: npm run build
+      - name: self-authored closed-world corpus gate
+        run: npm run test:corpus
+
   # The complete gate runs on Node 24 above. `engines` starts at Node 22.13, so a packed-consumer
   # job exercises that exact lower bound rather than treating a newer runtime as proof for it.
   #

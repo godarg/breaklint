@@ -66,7 +66,10 @@ corpus gates need to run locally.
   set, page range, `mustFire`, `mustNotFire`, the closed world (a finding no entry accounts for
   fails), declines by count and the `measuredAlternative` all-or-nothing rule, and every expected
   file against the README's closed field list. It prints one row
-  per document and exits 0 only when every document passed. Needs `npm run build` and a browser in
+  per document and exits 0 only when every document passed. Each invocation runs in its own process
+  group; on `--timeout-ms` (default 600000) the group gets SIGTERM and, after `--grace-ms` (default
+  10000), SIGKILL, and the document fails naming the timeout. In CI it is its own `corpus` job, so a
+  red corpus gate does not stop the gates of the `check` job, and the release workflow runs it too. Needs `npm run build` and a browser in
   which evidence binding works; `--no-evidence-binding` exists for local diagnosis on a renderer
   that cannot bind evidence, labels the run as not the gate, and is not used in CI. Its matcher and
   every fail-closed path are unit-tested on synthetic reports in `tests/unit/corpus-gate.test.ts`.
@@ -106,6 +109,9 @@ npm run test:real-document
 npm run test:report-surfaces:technical
 npm run test:report-surface-mutants
 npm run selfcheck
+# ci.yml job `corpus`: its own build, then the self-authored corpus gate
+npm run build
+npm run test:corpus
 ```
 
 CI then checks the packed package, which no command above sees: it runs `npm pack`, installs the
