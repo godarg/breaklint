@@ -144,7 +144,7 @@ export interface MeasurementReceipt {
   evidentiaryStatus: "externally-attested-real-render" | "non-evidentiary-contract-simulation";
   captureAttestationSha256: string | null;
   producer: { contractId: "breaklint-svg-measurement-producer"; contractVersion: "m3-0-measurement-producer-v1"; sourceIdentity: unknown; sourceIdentitySha256: string };
-  ruleContract: { ruleId: RuleId; moduleRelativePath: string; sourceSha256: string; executableContractVersion: "m3-0-real-rule-run-v1" };
+  ruleContract: { ruleId: RuleId; moduleRelativePath: string; sourceSha256: string; executableContractVersion: "m3-0-real-rule-run-v2" };
   ruleId: RuleId; candidateConfig: CandidateConfig; candidateConfigHash: string; rendererFreezeId: string; rendererContentHash: string; rows: MeasurementReceiptRow[];
 }
 export interface CaptureAttestation {
@@ -164,7 +164,7 @@ export interface CaptureEvidenceBundle {
 }
 interface RuleResultProjection { findings: { ruleId: RuleId; targetSvgTextKey: string; value: number; threshold: number; unit: string }[]; candidates: number; measured: number; notMeasured: { scope: "svg" | "svgText"; ruleId: RuleId; reason: string; count: number }[] }
 interface ProductionEvaluationRow { documentId: string; artifactSha256: string; targetId: string; ruleId: RuleId; candidateConfigHash: string; rendererFreezeId: string; rendererContentHash: string; measurementReceiptRowSha256: string; ruleResult: RuleResultProjection; productionDecision: "finding" | "clean" | "declined" }
-export interface ProductionEvaluation { contractVersion: "m3-0-production-evaluation-v1"; evaluationId: string; createdAt: string; ruleId: RuleId; ruleExecutableContractVersion: "m3-0-real-rule-run-v1"; productRuleSourceSha256: string; measurementReceiptSha256: string; candidateConfig: CandidateConfig; candidateConfigHash: string; rows: ProductionEvaluationRow[] }
+export interface ProductionEvaluation { contractVersion: "m3-0-production-evaluation-v1"; evaluationId: string; createdAt: string; ruleId: RuleId; ruleExecutableContractVersion: "m3-0-real-rule-run-v2"; productRuleSourceSha256: string; measurementReceiptSha256: string; candidateConfig: CandidateConfig; candidateConfigHash: string; rows: ProductionEvaluationRow[] }
 interface DerivedOutcome {
   outcome: OutcomeArtifact;
   claimEvidentiary: boolean;
@@ -523,10 +523,10 @@ function metricValue(report: AcceptanceReport, metric: AcceptanceReport["gates"]
   const pair = metric === "precision" ? [tp, tp + fp] : metric === "recall" ? [tp, tp + fn] : metric === "specificity" ? [tn, tn + fp] : [fp, fp + tn];
   return pair[1] === 0 ? null : pair[0]! / pair[1]!;
 }
-export const PRODUCT_RULE_EXECUTABLE_CONTRACTS: Readonly<Record<RuleId, { moduleRelativePath: string; sourceSha256: string; executableContractVersion: "m3-0-real-rule-run-v1" }>> = Object.freeze({
-  "svg/text-clipped": { moduleRelativePath: "src/rules/svg/text-clipped.ts", sourceSha256: "eb1fa63cf1c4f6670fdad1b91af17562d8e538337da29cd6b69fcbfb08214ef9", executableContractVersion: "m3-0-real-rule-run-v1" },
-  "svg/text-ink-collision": { moduleRelativePath: "src/rules/svg/text-ink-collision.ts", sourceSha256: "121e70f0fa304077c62e109635ccf04731e4e6f0693ff48b3cc0f749f502eae1", executableContractVersion: "m3-0-real-rule-run-v1" },
-  "svg/text-overflows-viewport": { moduleRelativePath: "src/rules/svg/text-overflows-viewport.ts", sourceSha256: "720537c7a2e54587ccb78502fe5b0f7ed83e27eaad5852160bf68e1d96842b6a", executableContractVersion: "m3-0-real-rule-run-v1" },
+export const PRODUCT_RULE_EXECUTABLE_CONTRACTS: Readonly<Record<RuleId, { moduleRelativePath: string; sourceSha256: string; executableContractVersion: "m3-0-real-rule-run-v2" }>> = Object.freeze({
+  "svg/text-clipped": { moduleRelativePath: "src/rules/svg/text-clipped.ts", sourceSha256: "eb1fa63cf1c4f6670fdad1b91af17562d8e538337da29cd6b69fcbfb08214ef9", executableContractVersion: "m3-0-real-rule-run-v2" },
+  "svg/text-ink-collision": { moduleRelativePath: "src/rules/svg/text-ink-collision.ts", sourceSha256: "121e70f0fa304077c62e109635ccf04731e4e6f0693ff48b3cc0f749f502eae1", executableContractVersion: "m3-0-real-rule-run-v2" },
+  "svg/text-overflows-viewport": { moduleRelativePath: "src/rules/svg/text-overflows-viewport.ts", sourceSha256: "720537c7a2e54587ccb78502fe5b0f7ed83e27eaad5852160bf68e1d96842b6a", executableContractVersion: "m3-0-real-rule-run-v2" },
 });
 
 export function producerSourceIdentitySha256(sourceIdentity: unknown): string { return sha256(canonicalJson(sourceIdentity)); }

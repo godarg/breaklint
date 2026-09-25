@@ -10,7 +10,7 @@
     "evaluationId": { "type": "string", "pattern": "^production_[A-Za-z0-9._-]{8,80}$" },
     "createdAt": { "type": "string", "format": "date-time" },
     "ruleId": { "$ref": "#/$defs/ruleId" },
-    "ruleExecutableContractVersion": { "const": "m3-0-real-rule-run-v1" },
+    "ruleExecutableContractVersion": { "const": "m3-0-real-rule-run-v2" },
     "productRuleSourceSha256": { "$ref": "#/$defs/sha256" },
     "measurementReceiptSha256": { "$ref": "#/$defs/sha256" },
     "candidateConfig": { "$ref": "#/$defs/candidateConfig" },

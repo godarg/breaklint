@@ -48,7 +48,7 @@
     "ruleContract": {
       "type": "object", "additionalProperties": false,
       "required": ["ruleId", "moduleRelativePath", "sourceSha256", "executableContractVersion"],
-      "properties": { "ruleId": { "$ref": "#/$defs/ruleId" }, "moduleRelativePath": { "enum": ["src/rules/svg/text-clipped.ts", "src/rules/svg/text-ink-collision.ts", "src/rules/svg/text-overflows-viewport.ts"] }, "sourceSha256": { "$ref": "#/$defs/sha256" }, "executableContractVersion": { "const": "m3-0-real-rule-run-v1" } }
+      "properties": { "ruleId": { "$ref": "#/$defs/ruleId" }, "moduleRelativePath": { "enum": ["src/rules/svg/text-clipped.ts", "src/rules/svg/text-ink-collision.ts", "src/rules/svg/text-overflows-viewport.ts"] }, "sourceSha256": { "$ref": "#/$defs/sha256" }, "executableContractVersion": { "const": "m3-0-real-rule-run-v2" } }
     },
     "candidateConfig": {
       "oneOf": [
