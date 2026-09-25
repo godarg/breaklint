@@ -39,8 +39,18 @@ const IMPERATIVE_CLAUSE = new RegExp(
   `^\\s*(?:(?:or|and|then|also|instead|otherwise|alternatively|simply|just|first|please)\\s+)*(?:(?:you|one)\\s+(?:can|could|should|may|might|must|need to|have to)\\s+)?(?:${VERBS})\\b`,
   "iu",
 );
-/** "Removing X fixes the finding" proposes X as surely as "remove X" does. */
-const GERUND_PROPOSAL = new RegExp(`^\\s*(?:${GERUNDS})\\b.*\\b(?:fix(?:es)?|resolves?|clears?|removes?|eliminates?)\\b.*\\bfinding`, "iu");
+/**
+ * "Removing X fixes the finding" proposes X as surely as "remove X" does. "Clears" is not a fix
+ * verb: clearing a finding is exactly what a false repair does.
+ */
+const GERUND_PROPOSAL = new RegExp(`^\\s*(?:${GERUNDS})\\b.*\\b(?:fix(?:es)?|resolves?|removes?|eliminates?)\\b.*\\bfinding`, "iu");
+/**
+ * A sentence that says the gerund's fix is no fix: "never fixes the finding", "does not fix it",
+ * "resolves it only because the rule has no candidate", "without making the block fit", "by
+ * hiding it, which is a false repair". Read on the whole sentence with its quoted spans masked,
+ * because the qualifier usually follows a comma, which ends the gerund's clause.
+ */
+const GERUND_VOID = /\b(?:never|not|nothing|only because|without|false repair|hid(?:e|es|ing))\b|n't\b/iu;
 /** A negated proposal verb — "do not remove", "never delete", "it does not move the text". */
 const NEGATED_VERB = new RegExp(
   `\\b(?:do not|don't|does not|doesn't|must not|mustn't|should not|shouldn't|never|cannot|can't)\\s+(?:(?:only|just|simply|ever)\\s+)?(?:${VERBS})\\b`,
@@ -116,16 +126,25 @@ export function clausesOf(sentence: string): string[] {
  * sentence opens with a proposal. With `requireImperative` false every non-warning clause is a
  * proposal — the shape of a repair instruction.
  *
+ * A gerund opening a sentence ("Removing X fixes the finding") proposes only when a fix verb
+ * follows and nothing in the sentence says the fix is none (never, not, nothing, only because,
+ * without, false repair, hiding).
+ *
  * Known limits: a proposal phrased without any verb it knows ("the right fix is X") or with an
  * unusual one ("override" is known, "revert" is not) proposes nothing here; a negation phrased
  * around a verb it does not know ("do not bother with X") does not void; a lever named only in
- * prose ("the overflow") is not a lever. The guards built on it can therefore miss a restatement,
- * never invent one: every miss is a false pass, which the tests of this file pin where known.
+ * prose ("the overflow") is not a lever; a warning phrased in words it does not know ("Removing X
+ * fixes the finding in name only") is read as a proposal. The reader errs in BOTH directions, and
+ * which one passes silently depends on the text: on a restatement (a rule page, the agent
+ * contract, a repair option) a missed proposal is a false pass and an invented one a loud failure;
+ * on the advice itself an invented proposal widens what every guard accepts, which is the silent
+ * direction. The tests of this file pin every case known in either direction.
  */
 export function proposedLevers(sentence: string, { requireImperative = true } = {}): string[] {
   const live: Segment[] = [];
   let negating = false;
-  for (const segment of segmentsOf(sentence)) {
+  const segments = segmentsOf(sentence);
+  for (const segment of segments) {
     const continuesList = segment.separator === "," || segment.separator === "conj";
     if (negating && continuesList && !/^\s*(?:but|instead|rather|then)\b/iu.test(segment.masked)) continue;
     negating = false;
@@ -135,7 +154,8 @@ export function proposedLevers(sentence: string, { requireImperative = true } = 
     }
     live.push(segment);
   }
-  const proposal = live.some((segment) => IMPERATIVE_CLAUSE.test(segment.masked) || GERUND_PROPOSAL.test(segment.masked));
+  const gerundVoided = segments.some((segment) => GERUND_VOID.test(segment.masked));
+  const proposal = live.some((segment) => IMPERATIVE_CLAUSE.test(segment.masked) || (!gerundVoided && GERUND_PROPOSAL.test(segment.masked)));
   if (requireImperative && !proposal) return [];
   return [...new Set(live.flatMap((segment) => leversIn(segment.text)))];
 }

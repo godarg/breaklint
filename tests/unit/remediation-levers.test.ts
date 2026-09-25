@@ -9,8 +9,10 @@
  * forgetting the removal synonyms. Each case below fails on one of those reversions.
  *
  * The reader is a heuristic over English, not a parser; its known limits are stated in its own
- * header. The sentences below are its contract — the proposals it must see and the warnings it
- * must not read as proposals — including the rewordings two verification rounds used against it.
+ * header. It errs in both directions, and on the advice text an invented proposal is the silent
+ * one, because it widens what every guard accepts. The sentences below are its contract — the
+ * proposals it must see and the warnings it must not read as proposals — including the rewordings
+ * three verification rounds used against it.
  */
 
 import { strict as assert } from "node:assert";
@@ -79,6 +81,28 @@ describe("the lever reader", () => {
       "Replace spaced hyphens with an en dash, and straight quotes with curly ones.",
     ];
     for (const sentence of warnings) assert.deepEqual(proposedLevers(sentence), [], sentence);
+  });
+
+  it("does not read a gerund as a proposal when the sentence says its fix is none", () => {
+    const warnings = [
+      "Removing `break-inside: avoid` never fixes the finding.",
+      "Removing `break-inside: avoid` clears the finding only because the rule then has no candidate.",
+      "Removing `break-inside: avoid` resolves the finding by hiding it, which is a false repair.",
+      "Removing `break-inside: avoid` does not fix the finding.",
+      "Removing `break-inside: avoid` removes the finding without making the block fit.",
+      // Clearing a finding is what a false repair does; it is not a fix verb.
+      "Removing `break-inside: avoid` clears the finding.",
+    ];
+    for (const sentence of warnings) assert.deepEqual(proposedLevers(sentence), [], sentence);
+    // A word inside a quoted span is not grammar, and the gerund still proposes.
+    assert.deepEqual(proposedLevers("Removing `break-inside: avoid, never auto` fixes the finding."), ["break-inside"]);
+    // The real layout/unbreakable-block-too-tall advice (as of this change), without its "also":
+    // the false repair it describes must not become a lever the advice proposes.
+    const unbreakable =
+      "Make the block shorter — split it into smaller sections deliberately, or reduce container padding, font size or contained rows. " +
+      "Removing 'break-inside: avoid' clears the finding, but only because the rule then has no candidate: the block is exactly as tall as before, and it will still be broken, just without having asked not to be.";
+    assert.deepEqual([...positiveLevers(unbreakable)], []);
+    assert.deepEqual([...positiveLevers(unbreakable.replace("avoid' clears", "avoid' also clears"))], []);
   });
 
   it("derives an advice text's positive levers without the levers it warns about", () => {

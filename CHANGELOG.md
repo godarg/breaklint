@@ -105,7 +105,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   "Override …", "Consider removing …", "You should remove …" and "Removing … fixes the finding"
   propose as "Remove …" does; a warning in one clause no longer exempts the others, a negation
   voids only when it negates the proposal verb ("does not fit" is not a warning) and then the list
-  it opens, and a word inside a quoted span is not read as grammar. The reader is a heuristic, and
+  it opens, and a word inside a quoted span is not read as grammar. "Removing … fixes the finding"
+  proposes only when nothing in the sentence says the fix is none — never, not, nothing, only
+  because, without, false repair, hiding — and "clears the finding" is not a fix at all, so the
+  false repair `layout/unbreakable-block-too-tall` describes is not read as a lever even without
+  its "also". The reader is a heuristic that errs in both directions; on the advice itself an
+  invented proposal is the silent one, because it widens what the guards accept, and
   `tests/unit/remediation-levers.test.ts` pins its contract sentence by sentence.
 - **Erratum to 0.6.0.** The 0.6.0 entry that introduced `docs/agent-contract.md` says
   "`selfcheck:static` reads it, so its claims are held against the code". It did not:
