@@ -29,7 +29,8 @@ widow of the section around it, measured on patched Chromium 141 with Paged.js 0
 by `tests/live/rule-targets.test.ts`. The paragraph is the one judged; a wrapper is reported only for
 a break that splits text of its own, and a continuation that opens with a nested block's line has
 none. A `display: contents` element is no block container: a line that a block around it also holds
-is that block's. Ownership is read from line geometry and collection order, and its known limits —
+is that block's. One case is still counted as before: a wrapper's own text that opens a page right
+after a nested block ended the previous one reads as a split run of its own. Ownership is read from line geometry and collection order, and its known limits —
 text of the wrapper's own between two nested blocks on one line, a `display: contents` element with
 no block around it — are listed at `lineOwnership` in `src/rules/shared.ts`.
 

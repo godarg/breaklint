@@ -157,7 +157,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   own value, and a real widow inside a wrapper is reported once, on the paragraph. A wrapper's own
   text split by the break is still judged — and a section whose own two-line text split 1+1 below a
   nested paragraph is now an orphan too, which the old count, adding the paragraph's line, missed.
-  For a block without nested blocks nothing changes. Consumers see wrapper fragments measured with
+  For a block without nested blocks nothing changes. On the first-party robustness document
+  (`dargel-kleingewerbe`, patched Chromium 141, no evidence binding) three of its three
+  `layout/orphan` findings were such wrappers — a `<ul>` and two footer wrappers whose fragment
+  ended on a nested block's line — and are gone; its `layout/widow` finding stays, a `<nav>` whose
+  own links open a page after its title paragraph ended the previous one, which still reads as a
+  split (a known limit, `docs/limitations.md`). Consumers see wrapper fragments measured with
   0 lines where they carried findings, and a fourth, informational measurement in both rules'
   evaluations (`opening-fragment-lines-of-nested-blocks`, `closing-fragment-lines-of-nested-blocks`).
   Advice and message texts are unchanged. Pinned by `tests/live/rule-targets.test.ts`, which

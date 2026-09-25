@@ -528,9 +528,13 @@ give a line to the latest record in collection order (pages ascending, document 
 page) that records it and has a box of its own, and count only the run of a block's own lines next
 to the break. What that cannot see: the wrapper's own text lying between two nested blocks on one
 line (between two floats) is inside their span and goes to them; a wrapper's own text that ends
-exactly at a break, with a nested block opening the next page, still reads as a split run of its
-own, because telling it from a split needs the wrapper's next fragment, which the rules do not
-join; and a `display: contents` element with no boxed block around it keeps its lines and is judged
+exactly at a break, with a nested block opening the next page — or, for `layout/widow`, that opens a
+page right after a nested block ended the one before — still reads as a split run of its own,
+because telling it from a split needs the wrapper's other fragment, which the rules do not join.
+Measured on the first-party robustness document (`dargel-kleingewerbe`, patched Chromium 141): of
+its three `layout/orphan` and one `layout/widow` findings, all three orphan findings were wrappers whose
+page-5 or page-4 fragment ended on a nested block's line and are gone; the widow, a `<nav>` whose
+own links open page 6 after its title paragraph ended page 5, is this limit and stays; and a `display: contents` element with no boxed block around it keeps its lines and is judged
 by its own value. `type/excessive-word-spacing` asks about the text rather than its container: it
 gives a line to the deepest record that records it, box or not, because that element's font set the
 gaps. The same limit on text between two nested blocks applies there.

@@ -225,8 +225,9 @@ function within(inner: Box, outer: Box, tolerance: number): boolean {
  * apart from them, so the wrapper loses that line; a `display: contents` record with no boxed record around it keeps
  * its lines and is judged by its own value, which is inherited from its parent unless the author
  * set it on the element; the wrapper's own text that ends exactly at a break, with a nested block
- * opening the next page, is still counted as a split run of its own, because finding the wrapper's
- * next fragment would need a join this helper does not make — the count the rules used before;
+ * opening the next page (or, for widows, that opens a page right after a nested block ended the one
+ * before), is still counted as a split run of its own, because finding the wrapper's other fragment
+ * would need a join this helper does not make — the count the rules used before;
  * and a hand-written snapshot that does not follow collection order gets the
  * ownership that order implies.
  *
