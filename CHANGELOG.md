@@ -1,5 +1,433 @@
 # Changelog
 
+## 0.7.0 — TBD-at-tag
+
+A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0 and 0.6.0: a
+versioned structure changes, so its stamp moves. **Snapshot 4 → 5.** The document report stays at
+5 (readers accept Report 4 and 5), the agent context pack at 2, the report comparison at 1 and the
+Configuration Contract at 1. Most of this release changes what the rules report about documents
+that did not change, and those changes come first.
+
+### What a consumer has to do
+
+- **Snapshot 5 is the only snapshot the engine judges.** Every `BlockRecord` gains the required
+  fields `display` (computed), `marginCopies` (how many copies Paged.js printed in margin boxes —
+  the clones of a `position: running(...)` element), `float` and `position` (computed) and
+  `boundaryHyphen` (Paged.js marked a boundary hyphen in the block's own inline content), and every
+  `TextLine` gains `ownText` (text whose nearest block container is the record is on the line).
+  `TextLine.visible` is now true when any text on the line is visible, read from each text node's
+  element, where it used to copy the block's visibility. The engine refuses a snapshot of any
+  other stamp, and a stamp-5 snapshot that lacks one of these fields, with `checker-crashed`
+  (exit 3) and names what is missing; there is no reader for the previous stamp. The one stored
+  snapshot the package ships, `examples/demo-snapshot.json`, is migrated, and the demo's findings
+  do not change. A consumer that stores or produces snapshots must produce stamp 5.
+- **Findings change on documents that did not change.** Seven rules judge differently — see
+  *Rule behaviour*. Some documents gain findings (a full-bleed `break-inside: avoid` block, a split
+  block whose first fragment a script hid, a boundary hyphen inside `<em>`, justified text whose
+  first space the old divisor read wrongly, a wrapper whose own two lines split 1+1) and many lose
+  them (clones of running elements, full pages whose text runs on, wrappers around a nested
+  paragraph).
+- **Take a new baseline if you key on page-finding fingerprints.** A page finding is keyed to the
+  page's first semantic block. For a document with running elements, `position: fixed` elements or
+  a page whose first block is `display: none`, that used to be the same clone on every page, so
+  several page findings shared one fingerprint; for a document wrapped in `<main>`, `<article>`,
+  `<section>` or a long `<div>`, it was the wrapper on every page it covered. A page is now
+  anchored to the first block of its content area that starts on it, skipping only blocks nothing
+  was printed from — a running element's `display: none` original, another `display: none` block,
+  or a box-less block whose recorded lines are all invisible; a block with a box anchors even when
+  it is `visibility: hidden`. Margin-box clones are not in the snapshot at all. Only a page on
+  which nothing starts falls back to its first continuing block. Old page findings will read as gone and the
+  re-keyed ones as new in anything that keys on `Finding.fingerprint` or SARIF
+  `properties.fingerprint`. `compareReports` does not match page findings by fingerprint and is
+  not misled.
+- **More runs can end `insufficient-coverage` (exit 4), and fewer do for running elements.**
+  `layout/unbreakable-block-too-tall`, `layout/heading-at-page-bottom`,
+  `type/excessive-word-spacing`, `layout/widow` and `layout/orphan` newly declare
+  `env/invalid-measurement` and decline, counted against coverage, what they cannot measure instead
+  of judging it on a stand-in. No new `env/` id is added. New non-measurement reasons outside the
+  coverage base: `rule/target-in-margin-box`, `rule/target-not-rendered`,
+  `rule/target-generates-no-box`, `rule/fragment-not-rendered`,
+  `rule/fragment-without-visible-box` and `rule/no-text-lines`. In the other direction, with
+  evidence binding on (the default), a running element, a `position: fixed` element or a fragment
+  bleeding into the side margin no longer ends a run at exit 4 by itself. What `evidenceCoverage`
+  means is unchanged; its outcome changes for those documents.
+- **Exit codes.** A report that cannot be delivered to stdout — the reader closed
+  early (`| head`) or the device is full — now ends with exit 3 and one
+  `breaklint: could not write to stdout (…)` line, whatever the verdict; before, a reader that closed
+  early left the run at its verdict's exit code, with no message. A run that stops without an answer — the work it waits on can
+  no longer settle — now ends with exit 3 and a one-line explanation, where Node ended it with exit
+  0 and no output. An input that is not a regular file (a directory named `chapter.html`) is exit 2
+  before Chrome starts, where it was exit 3.
+- **Message and advice wording changed** — a consumer that matches or stores these strings will
+  see new ones:
+  - `layout/orphaned-continuation-page`: "Page N carries only content continued from an earlier
+    page, which ends there, and its net fill is X %"; its evaluations carry a third measurement,
+    `ends-on-page`, **inserted at index 1**: `continuation-only` stays at index 0 and `net-fill`
+    moves from index 1 to index 2. A consumer that reads the measurements by position must read
+    them by `name`.
+  - `layout/half-empty-page`: the message no longer states a "measured ceiling"; it says that net
+    fill sums the glyph boxes of text, not its line boxes, so a page a reader calls full can read
+    below the threshold.
+  - `layout/widow` and `layout/orphan`: "1 line of this block continues" / "remains" (was "1 line
+    … continue" / "remain"). Both rules' evaluations gain two informational measurements
+    (`opening-`/`closing-fragment-lines-of-nested-blocks`,
+    `previous-fragment-closing-lines`/`next-fragment-opening-lines`), and
+    `type/excessive-word-spacing` gains `lines-of-nested-blocks`.
+  - `Finding.remediation.advice` changes for `layout/unbreakable-block-too-tall`, `layout/widow`,
+    `layout/orphan`, `layout/hyphen-across-page` and `type/excessive-word-spacing` (see *Rule
+    behaviour*).
+  - The source-id check's refusal for an element moved into the footnote area now names what is
+    missing (`data-note="footnote"`); still exit 3.
+  - `repair.options` for `layout/unbreakable-block-too-tall` in the context pack and on the HTML
+    bundle's finding card (see *Reporting*).
+- **Snapshot break-cause reasons can name a different source id.** A forced boundary's reason now
+  names the element at the break, not a wrapper around it (see *Fixed*). No stamp moves for this.
+- **The HTML report's CSS custom properties are renamed to a `--bl-` prefix** in both renderers
+  (they were `--ds-`, and bare names such as `--ink` in the bundle view's `report.html`). A
+  consumer who restyled the report through those properties must rename them. The HTML model gains
+  `remediationSummary { withAdvice, untested }`; the JSON report is unchanged.
+
+### Rule behaviour
+
+- **`layout/unbreakable-block-too-tall` decides what a fragment is by the page structure, not by
+  coordinates.** In 0.6.0 the filter that kept margin-box clones out of the fragment sum tested
+  only the vertical axis, so a short running element placed in a side margin box (`@left-middle`,
+  `@right-middle`) and repeated on three or more pages could be summed into a false `error`
+  (582.00 px against 340.16 px for a 97 px element on six pages). The 0.6.0 entry below says that
+  exclusion held "by construction"; it held for the top and bottom margin boxes only. Margin-box
+  content now leaves the snapshot altogether (see *Fixed*), and the rule sums every fragment of the
+  element wherever its box lies: the side-margin element is silent, and a full-bleed block with
+  negative side margins is still reported (1865.61 px). Measured with Paged.js 0.4.3 on the live
+  fixtures `margin-running-elements.html` and `fullbleed-avoid.html`.
+- **The same rule declines a split block it cannot join, and judges a split block at its first
+  fragment that printed.** Fragments are joined by source id. A split block without one — every
+  block of a `--no-source-map` run, or an element a script created — or one whose id does not
+  account for exactly the fragments the snapshot counted is declined as `env/invalid-measurement`
+  instead of being judged on its first fragment; the decline counts against the coverage floor, so
+  such a run can end `insufficient-coverage` (exit 4) where it ended `clean`. An unsplit block
+  without a source id is measured as before. A split block is judged at its first fragment laid out
+  with a visible box of its own, over the sum of all its fragments; earlier fragments are
+  `not-applicable` (`rule/fragment-not-rendered`, `rule/fragment-without-visible-box`). A script
+  that hid only the first fragment of a four-page avoid block used to turn a finding (exit 1) into
+  a clean run (exit 0); the block is reported again.
+- **Three rules no longer count a block nothing was printed from as measured.** A block the
+  browser did not lay out was a measured candidate of `layout/unbreakable-block-too-tall` (at 0 px),
+  `layout/heading-at-page-bottom` and `type/excessive-word-spacing`. The case that matters is the
+  in-flow original of every `position: running(...)` element, which Paged.js hides with
+  `display: none`: a document whose only avoid block was a running element reported coverage 1/1
+  and a clean run, also under `--profile strict`, for a check that had looked at nothing. Such a
+  block is now `excluded`, outside the coverage base, with `rule/target-in-margin-box` for a running
+  element's original and `rule/target-not-rendered` for a block the author hid (or one in a hidden
+  subtree or a closed `<details>`). An empty paragraph (full width, zero height) has a box and is
+  still measured.
+- **A block's computed `display`, not a zero box, decides how it is judged.** A
+  `display: contents` block has no box of its own but prints its text and children:
+  `type/excessive-word-spacing` measures it from its lines, `layout/heading-at-page-bottom` places
+  such a heading and the block below it by their visible line boxes (it used to read the zero box
+  at the page origin and call every such heading followed), and `layout/unbreakable-block-too-tall`
+  records it as `not-applicable` (`rule/target-generates-no-box`, outside coverage), because
+  `break-inside` does not apply to it. An image-only `display: contents` figure is no longer called
+  unrendered. Where a box-less block has no line to read, the heading rule excludes it when its
+  lines are all invisible (`rule/target-not-visible`) and declines it as `env/invalid-measurement`
+  when it has no line or unrecorded lines. A zero-size block that printed its text outside its box
+  (`width: 0; height: 0; overflow: visible`) is placed by its lines by the heading rule, measured
+  by the word-spacing rule and declined, counted, by `layout/unbreakable-block-too-tall`.
+  `type/excessive-word-spacing` no longer measures a factor of 0 from lines nobody saw: all lines
+  invisible is `rule/target-not-visible`, no line at all (an empty or image-only justified block) is
+  `rule/no-text-lines`, both outside coverage, and unrecorded lines are declined, counted.
+- **`layout/unbreakable-block-too-tall`'s advice no longer claims the block "cannot fit unbroken on
+  any page".** It now says the block is taller than the content box of the page it was laid out
+  on, as the finding message already did.
+- **`layout/widow` and `layout/orphan` judge a split at the block whose own lines it split, not at
+  a wrapper around it.** The collector records a block's lines from every text node beneath it, so
+  a `<section>` or `<div>` crossing a page break carried its paragraphs' lines, and both rules
+  judged them by the wrapper's own values: a paragraph that asked for single-line widows and split
+  8+1 was reported as a widow of the section around it, and a section whose second paragraph moved
+  whole to the next page as an orphan of the intro paragraph's one line. Both rules now count the
+  run of the block's own lines next to the break (`TextLine.ownText`), end the run at an in-flow
+  nested block's line and pass over the lines of a float, a positioned box or an inline-block
+  beside the text (told apart by the recorded `display`, `float` and `position`), and judge the run
+  only when the break split it — the fragment on the other side, joined by source id, must meet
+  the break with own text too. A real widow inside a wrapper is reported once, on the paragraph; a
+  section whose own two-line text split 1+1 below a nested paragraph is now an orphan, which the
+  old count missed. A block whose lines no recorded block holds is declined as
+  `env/invalid-measurement`. For a block without nested blocks nothing changes. Checked against an
+  independent probe (plain Paged.js and Range rectangles) at four thresholds: 96 of 96 judgements
+  agree on 24 layouts, and 70 of 76 on a second set of 19, the six others being splits inside
+  custom elements that no rule sees. Known limits, in `docs/limitations.md`: a recorded block inside
+  an unrecorded inline-block or inline-flex box is taken for an in-flow block and can give a false
+  `layout/orphan`; text in an unrecorded floated or absolutely positioned box counts as the
+  surrounding block's own; lines are still grouped by the top edge of their text within 0.5 px.
+- **`layout/widow` and `layout/orphan` no longer say that CSS `widows`/`orphans` are "ignored by
+  Paged.js".** Paged.js 0.4.3 never reads either property, but it cuts every page where the
+  browser's own fragmentation broke, and the browser applies both there (measured on Chromium 141:
+  `widows` 1, initial and 5 split a 9-line paragraph 8+1, 7+2 and 4+5). The advice now says so,
+  that what is left to report is a split the browser had to relax, and that changing the block's
+  own value moves the threshold and is not a fix. The levers are unchanged.
+- **`layout/hyphen-across-page` no longer recommends soft hyphens, `hyphens: manual`, `&nbsp;` or
+  block-level `hyphens: none` in justified text.** Paged.js marks a split right after a soft hyphen
+  exactly like a split inside a word, so the old cure re-created the finding, and `manual` is the
+  value under which soft hyphens break. In a justified block the advice now changes only the
+  boundary word — `<span style="hyphens: none">`, `white-space: nowrap` or rewording; in a block
+  that is not justified, `hyphens: none` on the paragraph remains the fix.
+- **`layout/hyphen-across-page` reports a boundary hyphen inside an inline element.** Paged.js
+  puts `pagedjs_hyphen` on the parent of the text node it cut; for a word cut inside `<em>`, `<a>`
+  or `<span>` that is the inline element, and the rule, reading the block's own classes, missed it.
+  It now reads `BlockRecord.boundaryHyphen`. An author's `pagedjs_hyphen` class on an element that
+  holds no cut word is no longer read as a boundary hyphen.
+- **`type/excessive-word-spacing` and `layout/hyphen-across-page` say which of them owns
+  `hyphens` and soft hyphens.** The word-spacing rule owns the block-level `hyphens` setting and the
+  soft hyphens of justified blocks; the hyphen rule defers to it there and changes only the
+  boundary word. The word-spacing advice adds that `hyphens: auto` hyphenates only where the
+  rendering browser has a dictionary for the language — the measured headless Chromium 141 had
+  none for English, so soft hyphens were the lever that worked. The order is declared in the new
+  registry field `remediation.interactions`, which does not travel into reports.
+- **`type/excessive-word-spacing` divides by the font's natural space, not by the block's first
+  rendered space.** In justified text no rendered space is natural: at a line end it collapses (a
+  monospace block recorded 0.02 px and reported an ordinary gap as "540.50× the natural space"),
+  and inside a line it is stretched with that line (a block with six- and seven-space gaps was
+  clean). `spaceWidth` now records the block's own font's advance for one space plus its
+  `letter-spacing`, times its effective `zoom`, measured with a canvas that is never inserted into
+  the document and only once the font has loaded. Where a canvas cannot reproduce the font
+  (`font-variation-settings` other than a matching `wght`, `font-size-adjust`, a non-keyword
+  `font-stretch`, synthesised caps other than `small-caps`, a font not yet loaded) it is read from
+  the rendered layout — word gaps on the unjustified last lines of justified blocks, pooled per
+  layout key and taken only when every sample agrees within 0.1 px or 3 %. When neither exists or
+  the samples disagree, the block is declined as `env/invalid-measurement`, counted: a document in
+  which more than half of the justified blocks decline ends `insufficient-coverage` (exit 4). It
+  used to divide by a third of the font size. Gaps inside an inline element with its own
+  `word-spacing` are no longer judged. Right-to-left text is still not judged: its gaps read
+  negative in text order and are skipped. Expect more findings on justified documents whose first
+  spaces were stretched and fewer where they were collapsed. The field keeps its shape.
+- **`type/excessive-word-spacing` judges a line at the block whose font sets it.** A justified
+  wrapper records its paragraphs' lines too, and reported a monospace paragraph's gap a second
+  time, on the serif `<div>` around it. A line now belongs to the deepest record that records it,
+  a wrapper is measured on its own text only, and whether a line is justified is its block
+  container's `text-align`: a `display: contents` paragraph with `text-align: left` inside a
+  justified `<div>` prints justified lines, and its gap is now reported.
+- **`layout/orphaned-continuation-page` judges only pages whose content ends on them.** A page is
+  judged only when the next page does not open with text running on from it. Until now every page
+  between the first and last page of a block was reported as soon as its net fill read below 0.50;
+  such a page stopped because its next line did not fit, so it is full, but net fill counts glyph
+  boxes and reads 0.34–0.36 at `line-height: 3`. A long paragraph with generous leading produced
+  one warning per middle page; it produces none. A page that ends early is still reported, whatever
+  the shape of its wrapper. Only blocks of the page's flow count, so a running element's original
+  or a margin-box clone no longer hides a two-line tail page under a running header, which 0.6.0
+  did not report. The extra room at the top of the next page is given for inline SVG only: the
+  snapshot records no box for an inline `<img>`, `<canvas>` or `<video>`, so the full page before
+  such a line is still reported. At `line-height: 3` every page whose content ends on it is still
+  reported, however full; a line-box fill would remove that and is not in this release
+  (`docs/limitations.md`).
+- **`layout/half-empty-page` no longer states a "measured ceiling".** Net fill has no ceiling:
+  full, non-last prose pages at `line-height: 1.5` read 0.58–0.72, and 6 of 16 such pages read
+  below the 0.60 threshold. The 0.6.0 entry below, which gives "about 0.686" for a full page, is
+  corrected by this entry rather than rewritten. The rule stays experimental and off by default.
+
+### Fixed
+
+- **Margin-box content is no longer part of the flow.** Paged.js clones every
+  `position: running(...)` element into a margin box of every page and every `position: fixed`
+  element into every page box, and each clone keeps the source id, so every clone was one more
+  fragment of its source block. A six-page document with a running title and a side running
+  element reported ten `layout/widow`/`layout/orphan` warnings, all about clones; under a running
+  header, the blank page a `break-before: recto` inserts was not blank, its boundaries were
+  classified `overflow` and `forced` instead of `parity`, and every page was anchored to the header.
+  The snapshot, the in-page collector, the evidence overlay and the page anchors now keep only
+  blocks inside a page's content area (the page content and the footnote area). A page with no
+  content area stops the run at exit 3 instead of being measured as empty. **Newly unmeasured, and
+  stated in `docs/limitations.md`:** nothing printed in a margin box is judged by any rule, and a
+  `position: fixed` element is not measured at all. For every document with running elements,
+  `blocks`, `fragmentIndex`/`fragmentCount`, `blank`, the break causes and `firstSemanticBlockKey`
+  mean something different.
+- **With evidence binding on, running elements, `position: fixed` elements and side-margin bleed
+  no longer end the run at exit 4.** The evidence overlay tried to mark every source element on the
+  page, clones included, and a clone outside the content box stayed unplaced, so required evidence
+  never completed (24, 6 and 212 unplaced marks on three measured documents; 0 after). The overlay
+  now skips everything outside the content area and places a mark for an in-flow fragment in the
+  side margin where it is printed. Still unbindable, so still exit 4 with evidence on, and stated in
+  `docs/limitations.md`: a fragment pulled above or below the content box, a footnote-area block,
+  and a page with no source block at all, such as the blank page a `break-before: recto` inserts.
+- **A running title that is not the first element of the source no longer stops the run at
+  exit 3.** The post-pagination source-id check compared the order of every id in the page box with
+  the source order, and the margin boxes come first, so a running title written after a heading
+  ended the run `checker-crashed`. Order is now checked over the page content only; margin-box
+  clones, footnote-area blocks and `position: fixed` clones are checked for identity, presence and
+  the signature Paged.js leaves. A changed, unknown, missing or reordered id, and an element a
+  script moved into the page box or the footnote area without that signature, still fail the run
+  (exit 3). Block footnotes still end the run at exit 3 (`injection-interference`), because Paged.js
+  gives each footnote call a per-run random `href`; see `docs/limitations.md`.
+- **A page boundary is `forced` only where Paged.js' own break decision forced it.** The named page
+  of a page was taken from its first source-bearing node, which in a document wrapped in `<main>`
+  or `<article>` is the wrapper's continuation, so every boundary inside a named-page region read
+  as `forced` and `layout/widow`, `layout/orphan` and `layout/orphaned-continuation-page` declined
+  across the whole region (`env/forced-break`, counted): on a report with a landscape region, 9 of
+  14 widow and orphan candidates were declined and the run ended exit 4 (patched Chromium 141, no
+  evidence binding). The collector now
+  evaluates the paginator's own `shouldBreak()` at the node the break token names; on the same
+  report 2 candidates of each rule are declined, at the two boundaries the paginator forced, and
+  widows and orphans hidden before can now be reported. A `break-after` whose next element sits
+  inside a continuing wrapper, or is loose inline content, is `forced`; a `page:` on an inline
+  element breaks where its text starts; a token with no node to evaluate makes the boundary
+  `unknown` (`break-cause-undetermined`, not fatal). See `docs/limitations.md`, *The break cause of
+  a page boundary*.
+- **A report written to a pipe arrives whole.** Through 0.6.0 the CLI exited as soon as it had
+  handed the report to stdout, so behind `| cat`, `| jq` or a slow uploader a report larger than
+  the pipe buffer arrived cut at a multiple of it, usually 65 536 bytes on Linux — in every format,
+  on Node 22 and 24, while the exit code still stated the verdict. The demo's own JSON report is
+  larger than that. The CLI now exits only after every write has been accepted. `--out` and a
+  `> file` redirect were never affected. With `--out`, the file is complete before stdout is
+  touched; if the confirmation line then cannot be written, the run keeps its verdict's exit code
+  and says so on stderr.
+- **`--help` described exit 4 as including "no input";** a run without an input path is exit 2.
+  The exit-2 line now names every usage case and says that no report is written.
+
+### Added
+
+- **A GitHub Action for gating HTML-to-PDF builds** (`action.yml` at the repository root; not in
+  the npm package). `uses: godarg/breaklint@<ref>` installs `breaklint@<version>` from npm, where
+  `<version>` is that ref's `package.json` version — so a branch ref runs the last published
+  release, and a tag works only after its npm publish succeeded — with the pinned peers
+  `puppeteer-core@25.8.0`, `pagedjs@0.4.3` and `pdfjs-dist@6.2.108` (or the project's own install),
+  hands it the runner's Chrome with the sandbox on, and writes the canonical JSON plus SARIF, JUnit
+  and Markdown from that one report; the Markdown goes to the step summary. The step ends with
+  breaklint's exit code; exits 2, 3 and 4 always fail it, and only exit 1 can be left ungated.
+  Inputs are never pasted into a script.
+- **`docs/ci-recipe.md`**: a workflow to copy — build, check, keep the reports, upload SARIF from a
+  separate job that alone holds `security-events: write` — with what each exit code does to the
+  job, several documents, pull-request summaries and caching.
+
+### Reporting
+
+- **Printed reports are full, numbered and shorter.** Findings now split between their units
+  (head, each fact, tail), never inside one, with the card frame repeated and the tail labelled
+  with the finding's number and rule; boxed blocks share the column's edges. Every printed page
+  shows "Page N of M", every page from the second a running head with the verdict, exit code and
+  run id, and the report ends with an end mark. The printed clean report keeps its findings section
+  ("0 findings"). The four canonical printed states drop from 43 pages to 27, and a long document
+  path no longer makes Chrome shrink the whole print.
+- **Coverage is one aligned table per document** instead of thirteen cards: the rule id as row
+  header, right-aligned counts, coverage and floor, the result in words, `n/a` for a rule with no
+  candidates; on phones a two-line grid per row without sideways scroll.
+- **The untested-advice caveat is stated once, under the Findings heading, with the count it
+  applies to,** and each remediation box carries a compact `untested` marker instead of the
+  sentence repeated per finding.
+- **Commands and paths no longer break inside themselves.** A command such as
+  `--disable layout/widow` is one unbreakable `<code>`; rule ids break only after their namespace
+  slash on narrow screens and never in print; paths break after a slash.
+- **Headings are set in a serif,** running text in a sans and identifiers in a mono stack, so the
+  display and body roles no longer resolve to the same face on Linux. No font file ships.
+- **Landmarks, a skip link and a "Report contents" navigation.** The verdict header is the banner,
+  the footer is the content info, and print omits the navigation.
+- **The bundle view printed with `theme: "dark"` is legible;** its labels printed at 1.6:1.
+- **The context pack's repair option for `layout/unbreakable-block-too-tall` no longer proposes a
+  false repair.** `repair.options` said to adjust "the verified block's break constraint", which is
+  the one lever the rule's advice says clears the finding without making the block fit. It now
+  says to shorten or split the block, not only to remove its `break-inside: avoid`. Context pack
+  schema unchanged (2).
+
+### Documentation
+
+- **`--out-dir <dir>` is documented.** It was parsed, validated and applied — every live run writes
+  its page PNGs and checked PDF there, by default `./breaklint-report` — and appeared in neither
+  `--help`, the README nor `docs/configuration.md`.
+- `docs/configuration.md` says that any rule value other than `false` — an options object, even an
+  empty one — enables a rule, and that `strict` also enables `layout/half-empty-page`.
+- **Stale contract statements corrected.** The README said live reports use Report 4 (they use 5),
+  that `examples/demo.html` is the document behind the demo snapshot (no such file exists), that
+  print uses a "verified" A4 layout (the 0.6.0 human review did not pass) and that a live run needs
+  `puppeteer-core@25.8.x` (the peer range is `>=25.8.0 <26`). `docs/source-bound-findings.md` and
+  `docs/reporting.md` named stale stamps. `docs/limitations.md` described a Paged.js exit 3 for a
+  Markdown file; a non-`.html` name has ended with exit 2 before any renderer since 0.3.1. The
+  shipped type declarations called `renderReport`'s input "a Report4"; comment-only, no type changed.
+- **`docs/agent-contract.md` contradicted the code in six places,** among them recommending the
+  removal of `break-inside: avoid` for `layout/unbreakable-block-too-tall`, an exit-2 verdict named
+  `usage-error` (it is `usage`), and research rules counted among the released rules that null
+  `finding.source`. It is now held against the code by a unit test. **Erratum to 0.6.0:** the 0.6.0
+  entry says "`selfcheck:static` reads it, so its claims are held against the code"; it scanned the
+  file only for wording, which is why those contradictions shipped, and its "five rules set
+  `finding.source` unconditionally to null" counted two research rules.
+- **`SECURITY.md`** named 0.2.x as the supported line; only the latest published version receives
+  fixes. It said the sandbox claim was checked in the test suite, and no test checked it; one does
+  now (`tests/unit/sandbox-boundary.test.ts`).
+- Rule pages: `layout-widow.md` and `layout-orphan.md` replace "Chromium does not honour it under
+  Paged.js" with the measured splits; `layout-hyphen-across-page.md` adds a justified example and
+  the measured limit that a split next to a non-ASCII letter such as `ü` is not reported; the
+  remedied examples of `layout-orphaned-continuation-page.md` and
+  `layout-unbreakable-block-too-tall.md` no longer use a lever their rule's advice does not
+  propose — the latter set `break-inside: auto`, the false repair its advice warns about.
+- `docs/limitations.md` now states that a page carrying no source block cannot complete required
+  evidence (exit 4 under evidence binding), that naming an off-by-default rule with only an options
+  object enables it, what page fill counts, and the new margin-box and break-cause limits above.
+- `CONTRIBUTING.md` carries the complete local gate in `ci.yml`'s order, and `docs/releasing.md` is
+  version-neutral and complete, with the release as seven numbered steps and the human
+  report-surface review as a precondition of the tag.
+- **The security statements no longer overclaim.** `SECURITY.md`, the README and
+  `docs/limitations.md` said the network is blocked by default and that nothing about a document
+  leaves the machine, and that no flag turns the sandbox off. The offline policy is request
+  interception: it does not cover WebSocket, WebTransport or WebRTC connections a document opens,
+  nor the browser's own secure DNS and component updater traffic (measured on 0.7.0: a WebSocket to
+  another loopback port delivered, a WebRTC STUN request sent, verdict `clean`). And the
+  environment can turn the sandbox off: puppeteer-core adds `--no-sandbox` for
+  `PUPPETEER_DANGEROUS_NO_SANDBOX=true` and honours `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES`,
+  and the browser inherits variables such as `CHROME_EXTRA_FLAGS`. The documents now say so, tell
+  operators to keep those variables unset, and recommend a container or network namespace with no
+  egress for untrusted documents. The `--help` line for `--allow-network` now says the same;
+  nothing else in the code changed.
+- `docs/limitations.md` lists two known false-clean defects this release does not fix:
+  `body { column-count: 1 }` can end `clean` (exit 0) over a PDF missing most of the document, and
+  a `display: contents` heading split by a page break can lose its continuation at exit 0. Its
+  0.7.0 limits now have a section of their own instead of standing under the 0.6.0 heading.
+- The README's film poster is loaded from the `v0.7.0` tag instead of `main`, so the published
+  README shows the image it was released with.
+
+### Tooling
+
+These change how this repository is checked and released, not what the package does.
+
+- **The release workflow names its version once.** `release.yml` carried the release version 28
+  times; the literal tag trigger is now the only one in an executable line, every job derives the version and package
+  file name from the triggering tag after proving that the tag, the trigger, `package.json` and
+  both root fields of `package-lock.json` agree, and `npm run test:release-tag` fails on every pull
+  request that moves only one of them. A version bump whose tag starts nothing — the 0.6.0
+  incident — fails before the tag.
+- **The changelog is checked against git in three states** (between releases, release
+  preparation, the tag commit), in `npm run test:release-tag` and in the release workflow: the tag
+  commit must carry a dated heading. The published 0.6.0 tarball says `## 0.6.0 — unreleased`.
+- **The shipped README and docs are checked against the shipped code.** The packed-consumer steps
+  of `ci.yml` and `release.yml` run the README's demo excerpt against the installed CLI and every
+  schema stamp named in README, `SECURITY.md` and `docs/**` against the installed package's own
+  stamps; the published 0.6.0 README says "seven findings" and `rules run: 13` where its demo prints
+  five and 12. In the release workflow the stamp check refuses any pending correction.
+- **`npm run docs:rules:check` is a CI and release step,** and `tests/unit/workflow-gates.test.ts`
+  fails when `release.yml` leaves out a gate step `ci.yml` runs, or a packed-consumer check stops
+  running in a way whose exit code reaches the job.
+- **The pagination-residue record is no longer a CI or release step.** It printed `NO CLAIM` and
+  exited 0 having read none of its six private documents; a step that passes over zero documents is
+  retired, and the workflow test fails if it returns while it reads nothing.
+- **A live suite asks the browser what the widows/orphans and soft-hyphen advice claims**
+  (`tests/live/fragmentation-levers.test.ts`), and a registry guard holds every published sentence
+  about `widows` and `orphans` against that pin.
+- **Lever guards.** The rule pages' Examples, the context pack's repair map and
+  `docs/agent-contract.md` are checked against the levers each rule's advice proposes, removals
+  included; the reader is a tested heuristic (`tests/tools/remediation-levers.ts`).
+- **`remediation.interactions` is validated** by `defineRule` and the registry test, and
+  `npm run docs:rules:write` renders a generated "Precedence" line into both rule pages.
+- **SARIF output is validated against the SARIF 2.1.0 JSON schema** (vendored, test-only, MIT, with
+  its source commit and sha256); JUnit and Markdown get structural checks. breaklint's SARIF needed
+  no change. A new `action` CI job runs the Action from the same commit's tarball in seven arms.
+- **The report-surface gates.** The review ledger can record a failed review (ledger schema 4 → 5),
+  a human pass is recorded only by the closed roster `@Brand`, `@Neo` and `@Founder`, rounds are
+  ordered in time and a review time in the future is refused; the render manifest declares the
+  review environment (schema 4 → 5, artifact contract 3 → 4); the technical gate accepts any
+  Chromium-based browser; and the verifier re-measures the print checks independently and proves
+  its own checks with red controls on broken copies of real evidence. <!-- review-state --> `npm run test:report-surfaces`, the human gate, stays red on
+  the recorded 2026-09-18 FAIL until a rostered human passes a new round.
+- **The live late-mutation test no longer depends on when a timer fires;** it requires what the
+  product guarantees — an event, or neither the measured snapshot nor the delivered PDF carrying
+  the late text.
+- **The four workflow tools this release adds refuse any argument they do not know** (exit 2), and
+  `tests/unit/sandbox-boundary.test.ts` reads the one browser launch with the TypeScript parser.
+
 ## 0.6.0 — 2026-09-18
 
 A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0: the canonical

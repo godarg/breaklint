@@ -20,7 +20,9 @@
  *
  * WHAT IS READ INSTEAD. Paged.js writes its resolved decision into the tree itself, and
  * `shouldBreak()` reads exactly three attributes. Over the same 19 fixtures that method is wrong
- * in 0. The coupling to an undocumented internal is deliberate and is bounded by an exact version
+ * in 0. They are read where `shouldBreak()` reads them: in the paginator's source, at the node the
+ * next page starts at, which the break token names — not on the rendered page, whose first node
+ * is often a wrapper continuing from the page before. The coupling to an undocumented internal is deliberate and is bounded by an exact version
  * pin with a fail-closed runtime check (L-35).
  *
  * MEASURED AGAINST PAGED.JS 0.4.3 FOR THIS IMPLEMENTATION, on documents built to carry every
@@ -31,7 +33,11 @@
  *   break-before: recto                    -> `data-break-before="recto"`, and a blank page appears
  *   break-after via CLASS, ID or `p.adj+p` -> `data-previous-break-after="page"` on the node AFTER
  *   a named page (`page: named`)           -> `data-page="named"`, and the boundary has NO other
- *                                             attribute — the third branch of `shouldBreak()`
+ *                                             attribute — the third branch of `shouldBreak()`.
+ *                                             Paged.js decides it by comparing the named page
+ *                                             in force at the node with the one at the node
+ *                                             before it; that comparison is re-evaluated at the
+ *                                             break token (collector.ts, BreakDecision).
  *   break-before or break-after INLINE     -> NO attribute at all, and NO boundary. Inert.
  *
  * A FOURTH ATTRIBUTE EXISTS AND IS DELIBERATELY NOT READ. Paged.js also writes `data-break-after`
@@ -86,14 +92,27 @@ export function isForcingValue(value: string | null | undefined): boolean {
 export interface BoundaryFacts {
   /** The page AFTER the boundary carries no author content at all. */
   nextPageBlank: boolean;
-  /** `data-break-before` on the first source-bearing node of the page after the boundary. */
+  /**
+   * `shouldBreak()` evaluated at the node the page after the boundary starts at — the node in the
+   * break token of the page before (see `BreakDecision` in `collector.ts`). `breakBefore` and
+   * `previousBreakAfter` are that node's `data-break-before` (unless suppressed as a doubled
+   * break) and `data-previous-break-after`.
+   */
   breakBefore: string | null;
-  /** `data-previous-break-after` on that same node. */
   previousBreakAfter: string | null;
-  /** `data-page` on the last source-bearing node BEFORE the boundary. */
+  /**
+   * The named pages `needsPageBreak()` compares there: the one in force at the node before and at
+   * the node, null for none, and both null where that comparison does not apply. They are not the
+   * named pages the two PAGES were styled with: the `pagedjs_<name>_page` classes record which
+   * `@page` rule applied, and a page can change its rule without a forced break.
+   */
   pageBefore: string | null;
-  /** `data-page` on the first source-bearing node AFTER it. */
   pageAfter: string | null;
+  /**
+   * False when the paginator's decision could not be evaluated — no break token, or one without a
+   * node. The boundary is then `unknown` unless the next page is blank: nothing is guessed.
+   */
+  decisionKnown: boolean;
   /** Whether `afterPageLayout` handed out a break token for the page before the boundary. */
   hasBreakToken: boolean;
   /** Source ids, for the human-readable reason. Null when the node carries none. */
@@ -130,6 +149,12 @@ export function classifyBoundary(facts: BoundaryFacts): ClassifiedBoundary {
     return { kind: "parity", determinedBy: "page-blank", cascadeHint: facts.cascadeHint, reason: "" };
   }
 
+  // No decision to read means no evidence either way: not `forced`, and not `overflow` on the
+  // strength of a token whose node could not be examined.
+  if (!facts.decisionKnown) {
+    return { kind: "unknown", determinedBy: "undetermined", cascadeHint: facts.cascadeHint, reason: "" };
+  }
+
   if (isForcingValue(facts.breakBefore)) {
     return {
       kind: "forced",
@@ -152,7 +177,8 @@ export function classifyBoundary(facts: BoundaryFacts): ClassifiedBoundary {
 
   // The third branch of `shouldBreak()`: a change of named page breaks, with no break-before and
   // no break-after anywhere. Measured firing on a real boundary, and a reader that knows only the
-  // two break attributes calls this boundary free.
+  // two break attributes calls this boundary free. It is the comparison needsPageBreak() makes at
+  // the node the next page starts at, not a comparison of the two pages' page styles.
   if (facts.pageBefore !== facts.pageAfter) {
     return {
       kind: "forced",

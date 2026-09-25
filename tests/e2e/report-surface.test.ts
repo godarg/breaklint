@@ -1,8 +1,18 @@
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { renderHtml } from "../../src/report/html.ts";
+import { cssString, renderHtml } from "../../src/report/html.ts";
+import { REPORT_HTML_STYLES } from "../../src/report/html-styles.ts";
+import {
+  BUNDLE_COLOR_TOKENS,
+  BUNDLE_TEXT_CONTRAST_PAIRS,
+  REPORT_COLOR_TOKENS,
+  REPORT_FONT_ROLES,
+  REPORT_LAYOUT_TOKENS,
+  REPORT_TEXT_CONTRAST_PAIRS,
+} from "../../src/report/html-tokens.ts";
+import { renderReport } from "../../src/api/bundle.ts";
 import { buildHtmlReportModel, safeEvidenceHref } from "../../src/report/html-model.ts";
 import { buildReport } from "../../src/core/build-report.ts";
 import { runDocument } from "../../src/core/engine.ts";
@@ -15,6 +25,22 @@ import {
   infrastructureReportState,
   insufficientCoverageReportState,
 } from "../fixtures/report-states.ts";
+import {
+  BROWSER_VERSION_PATTERN,
+  DECLARED_ENVIRONMENT_FIELDS,
+  HUMAN_REVIEW_ROLES,
+  REQUIRED_BROWSER_RENDER_ARGS,
+  REVIEWER_AUTHENTICATION_NOTE,
+  REVIEW_INPUT_ROOTS,
+  REVIEW_ARTIFACT_CONTRACT_VERSION,
+  assessHumanGate,
+  describeLatestRound,
+  isMeasurableBrowserVersion,
+  latestBindingStatus,
+  validateReviewLedger,
+  type ReviewLedger,
+  type ReviewRound,
+} from "../tools/report-surface-contract.mjs";
 
 describe("HTML Report Surface v2", () => {
   it("renders the current package version on every canonical review surface", () => {
@@ -137,6 +163,8 @@ describe("HTML Report Surface v2", () => {
     const report = findingsReportState();
     const html = renderHtml(report);
     assert.equal((html.match(/<article class="finding /gu) ?? []).length, report.findings.length);
+    assert.equal((html.match(/<div class="finding-head">/gu) ?? []).length, report.findings.length, "each finding has one head unit");
+    assert.equal((html.match(/<div class="finding-tail">/gu) ?? []).length, report.findings.length, "each finding has one tail unit");
     for (const field of ["Document", "Source", "Measured", "Threshold", "Calibration", "Proof source", "Evidence:"]) {
       assert.ok(html.includes(field), `finding grammar is missing ${field}`);
     }
@@ -145,7 +173,140 @@ describe("HTML Report Surface v2", () => {
     assert.match(html, /Bound evidence/u);
     assert.match(html, /does not bind this finding/u);
     assert.match(html, /Ambiguity:/u);
-    assert.doesNotMatch(html, /<table\b/u, "findings and coverage must reflow instead of requiring a table scroll");
+    const findingsSection = /<section class="findings-section[\s\S]*?<\/section>/u.exec(html)?.[0] ?? "";
+    assert.ok(findingsSection.length > 0, "the findings section is missing");
+    assert.doesNotMatch(findingsSection, /<table\b/u, "findings must reflow as articles instead of requiring a table scroll");
+  });
+
+  it("renders coverage as one aligned table per document with real header semantics", () => {
+    const report = findingsReportState();
+    const html = renderHtml(report);
+    const document = report.documents[0]!;
+    const rules = Object.keys(document.coverage);
+    const table = /<table class="coverage-table"[\s\S]*?<\/table>/u.exec(html)?.[0] ?? "";
+    assert.ok(table.length > 0, "coverage is not a table");
+    assert.match(table, /<caption><span class="caption-line"><span class="coverage-path mono"><span class="path-id"><span>examples\/<\/span><wbr><span>demo\.html<\/span><\/span><\/span> <span class="document-verdict">Document verdict: findings<\/span><\/span><\/caption>/u,
+      "the document path and verdict belong to the table caption, so they cannot strand above it");
+    assert.equal((table.match(/<th scope="col"/gu) ?? []).length, 7, "seven column headers");
+    assert.equal((table.match(/<th scope="row" class="rule"><code class="rule-id">/gu) ?? []).length, rules.length, "every rule is a row header");
+    for (const rule of rules) {
+      const [namespace, name] = rule.split("/");
+      assert.ok(table.includes(`<code class="rule-id"><span>${namespace}/</span><wbr><span>${name}</span></code>`), `${rule} is missing from the table`);
+    }
+    assert.doesNotMatch(html, /<dt>Rule<\/dt>|coverage-record/u, "no card-era coverage labels remain");
+    assert.match(table, /<tbody class="coverage-tail">(?:\s*<tr[\s\S]*?<\/tr>){2}\s*<\/tbody>/u, "the last two rows are bracketed");
+    const zero = renderHtml(insufficientCoverageReportState());
+    assert.match(zero, /<tr id="coverage-1-1" class="short">/u, "a below-floor row is marked");
+    assert.match(zero, /<span class="coverage-result short">Below floor<\/span>/u, "a below-floor row says so in words");
+    assert.match(html, /<td class="num"><abbr title="Not applicable: no candidates">n\/a<\/abbr><\/td>/u, "a zero-candidate rule shows n/a, not a number");
+  });
+
+  it("renders commands and rule ids as code that cannot break where a break changes what is copied", () => {
+    const report = insufficientCoverageReportState();
+    const model = buildHtmlReportModel(report);
+    const shortfall = model.coverage[0]!.rows.find((row) => !row.ok)!;
+    assert.deepEqual(shortfall.options.map((option) => option.command), [null, `--disable ${shortfall.ruleId}`],
+      "the command is carried apart from its prose, not pre-joined into a sentence");
+    const html = renderHtml(report);
+    assert.match(html, /<code class="cli-flag"><span>--disable layout\/<\/span><wbr><span>widow<\/span><\/code> stops the check\./u);
+    const withoutCode = html.replace(/<style>[\s\S]*?<\/style>/u, "").replace(/<code class="cli-flag">[\s\S]*?<\/code>/gu, "");
+    assert.doesNotMatch(withoutCode, /--disable/u, "every command is inside a cli-flag code element");
+    assert.match(html, /<h3 id="finding-1-title"><code class="rule-id"><span>layout\/<\/span><wbr><span>widow<\/span><\/code> · page 2<\/h3>/u);
+    assert.match(REPORT_HTML_STYLES, /\.rule-id > span, \.cli-flag > span \{ white-space: nowrap; \}/u, "no break inside a flag or a rule name");
+    assert.match(REPORT_HTML_STYLES, /\.path-id > span \{ display: inline-block; max-inline-size: 100%; overflow-wrap: anywhere;/u,
+      "a path segment is an atomic box that wraps inside itself only when it alone is wider than its line");
+    assert.match(findingsHtmlForPaths(), /<span class="path-id"><span>1f5788f1e439-0001-demo-472f73b732bb5453-page-002\.png<\/span><\/span>/u,
+      "the matrix carries a real-shaped evidence name, one segment without a slash");
+    const findingsHtml = renderHtml(findingsReportState());
+    assert.match(findingsHtml, /<a href="evidence\/surface-demo-page-001\.png"><span class="path-id"><span>evidence\/<\/span><wbr><span>surface-demo-page-001\.png<\/span><\/span><\/a>/u,
+      "an evidence path may break only after its slash, never at a hyphen");
+    assert.match(REPORT_HTML_STYLES, /\.rule-id wbr, \.cli-flag wbr \{ display: none; \}/u, "print removes even the slash break");
+    const gating = buildHtmlReportModel(findingsReportState()).coverage[0]!.rows.find((row) => row.ruleId === "layout/unbreakable-block-too-tall")!;
+    assert.match(gating.options[1]!.after, /removes the gate, not the defect/u, "a gating rule keeps its stronger warning");
+  });
+
+  it("counts in the singular for exactly one, in measurements and in the rule messages it shows", () => {
+    const html = renderHtml(findingsReportState());
+    assert.doesNotMatch(html, /\b1 (?:lines|occurrences|pages)\b/u, "a count of one reads in the singular");
+    assert.match(html, /<dd class="mono">1 line<\/dd>/u, "the widow finding measured one line");
+    assert.match(html, /<dd class="mono">1 occurrence<\/dd>/u, "a one-occurrence finding reads in the singular");
+    assert.match(html, /<dd class="mono">2 lines<\/dd>/u, "plural stays plural");
+    assert.match(html, /1 line of this block continues onto page 2;/u, "the widow message agrees with one line");
+    assert.doesNotMatch(html, /\b1 line of this block (?:continue|remain) /u);
+    assert.match(html, /<th scope="col" class="num">Candidates<\/th>/u, "the column header is one word, not a soft-hyphenated CANDI- / DATES");
+  });
+
+  it("states the untested-advice caveat once per report and marks each untested finding compactly", () => {
+    for (const [state, report] of Object.entries(canonicalReportStates())) {
+      const html = renderHtml(report);
+      const model = buildHtmlReportModel(report);
+      const untested = model.findings.filter((finding) => finding.remediation !== null && finding.remediationTested === false).length;
+      assert.deepEqual(model.remediationSummary, { withAdvice: model.findings.filter((finding) => finding.remediation !== null).length, untested });
+      assert.equal((html.match(/class="remediation-caveat"/gu) ?? []).length, untested > 0 ? 1 : 0, `${state}: caveat count`);
+      assert.equal((html.match(/no trigger\/remedied pair in this package/giu) ?? []).length, untested > 0 ? 1 : 0, `${state}: the long sentence appears once, not per finding`);
+      assert.equal((html.match(/<strong>Remediation<\/strong> <span class="untested-marker">untested<\/span>/gu) ?? []).length, untested, `${state}: one marker per untested finding`);
+      if (untested > 0) assert.match(html, new RegExp(`this applies to ${untested} of ${model.remediationSummary.withAdvice} findings with advice`, "u"));
+    }
+    assert.equal(buildHtmlReportModel(findingsReportState()).remediationSummary.untested, 7, "all seven canonical findings carry untested advice today");
+    assert.doesNotMatch(REPORT_HTML_STYLES, /\.untested-marker \{[^}]*fg-muted/su, "the marker is not muted small print");
+  });
+
+  it("names its landmarks and reaches every section from a skip link and a contents navigation", () => {
+    for (const [state, report] of Object.entries(canonicalReportStates())) {
+      const html = renderHtml(report);
+      const body = /<body>([\s\S]*)<\/body>/u.exec(html)?.[1] ?? "";
+      assert.match(body, /^\s*<a class="skip-link" href="#report">Skip to the report<\/a>/u, `${state}: the skip link is the first element`);
+      const main = /<main id="report">[\s\S]*<\/main>/u.exec(body)?.[0] ?? "";
+      assert.ok(main.length > 0, `${state}: main landmark missing`);
+      assert.doesNotMatch(main, /<header|<footer|<nav/u, `${state}: banner, navigation and contentinfo must not sit inside main`);
+      assert.match(body, /<header class="report-header[^"]*" aria-labelledby="report-title">[\s\S]*<\/header>\s*<nav class="report-contents" aria-label="Report contents">/u, `${state}: contents follow the banner`);
+      assert.match(body, /<\/main>\s*<footer class="report-footer">/u, `${state}: contentinfo follows main`);
+      const ids = new Set([...html.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]));
+      const targets = [...(/<nav class="report-contents"[\s\S]*?<\/nav>/u.exec(html)?.[0] ?? "").matchAll(/href="#([^"]+)"/gu)].map((match) => match[1]!);
+      assert.ok(targets.includes("findings-heading") && targets.includes("coverage-heading"), `${state}: contents must reach findings and coverage`);
+      for (const target of targets) assert.ok(ids.has(target), `${state}: contents link #${target} has no target`);
+      assert.match(html, new RegExp(`href="#findings-heading">Findings \\(${report.findings.length}\\)</a>`, "u"), `${state}: contents carry the finding count`);
+    }
+    assert.match(REPORT_HTML_STYLES, /\.skip-link, \.report-contents \{ display: none; \}/u, "print drops the screen navigation");
+  });
+
+  it("prints page furniture from the report: folio, running head with the run id, end mark, 0 findings", () => {
+    const report = cleanReportState();
+    const html = renderHtml(report);
+    assert.match(html, /@bottom-right \{ content: "Page " counter\(page\) " of " counter\(pages\);/u, "every printed page carries its folio");
+    assert.ok(html.includes(`@top-right { content: ${cssString(`run ${report.runId}`, 52)};`), "the running head carries the run id");
+    assert.ok(html.includes(`@top-left { content: ${cssString("breaklint · Clean run · exit 0", 80)};`), "the running head carries the verdict and exit");
+    assert.match(html, /@page :first \{\s*@top-left \{ content: none; \}\s*@top-right \{ content: none; \}/u, "page 1 carries the full header instead");
+    assert.match(html, new RegExp(`· run <span class="run-id">${report.runId}</span></span></div>`, "u"), "the run id is visible in the tool line");
+    assert.match(html, new RegExp(`<p><strong>End of report\\.</strong> Generated by breaklint [^·]+ · run <span class="run-id">${report.runId}</span>\\. JSON remains the canonical report\\.</p>`, "u"));
+    assert.match(html, /<p class="section-lead">0 findings\. The requested checks completed without a gate-triggering finding\.<\/p>/u, "the clean lead states its count");
+    assert.doesNotMatch(REPORT_HTML_STYLES, /\.report-footer \{ display: none; \}/u, "the footer prints as the end mark");
+    assert.match(renderHtml(infrastructureReportState()), /Partial findings only: 7 findings\./u, "partial states state their count too");
+  });
+
+  it("escapes a caller-supplied run id for a CSS string, so it cannot leave the string or the style element", () => {
+    const decode = (literal: string): string => {
+      assert.match(literal, /^"(?:[A-Za-z0-9 ._:/-]|\\[0-9A-F]{6} )*"$/u, `only safe characters and six-digit escapes: ${literal}`);
+      return literal.slice(1, -1).replace(/\\([0-9A-F]{6}) /gu, (_match, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)));
+    };
+    for (const hostile of [
+      `"; } body { display: none } /*`,
+      "</style><script>alert(1)</script>",
+      "back\\slash and \"quote\" and 'apostrophe'",
+      "line\nbreak\r\ttab\u0000nul",
+      "emoji 😀 and ü and \u202e bidi",
+      "*/ @import url(x); /*",
+    ]) {
+      const literal = cssString(hostile, 200);
+      assert.equal(decode(literal), hostile, "the escaped string decodes to exactly the input");
+      for (const unsafe of ["</", ";", "{", "}", "\n", "*", "'", "<", ">"]) assert.ok(!literal.includes(unsafe), `${JSON.stringify(unsafe)} survived in ${literal}`);
+    }
+    assert.equal(decode(cssString("x".repeat(80), 52)), `${"x".repeat(51)}…`, "long values are truncated to the stated code-point count");
+    const report = cleanReportState();
+    report.runId = `"; } body { display: none } /* </style><script>alert(1)</script>`;
+    const html = renderHtml(report);
+    assert.equal((html.match(/<\/style>/gu) ?? []).length, 2, "the run id cannot close a style element");
+    assert.doesNotMatch(html, /<script/iu, "the run id cannot inject markup");
   });
 
   it("uses unique deterministic IDs for every labelled surface", () => {
@@ -202,14 +363,471 @@ describe("HTML Report Surface v2", () => {
     assert.match(html, /<section class="findings-section findings-empty"/u, "clean findings must remain explicit on screen and targetable in print");
     assert.match(html, /\.summary-grid \{ grid-template-columns: minmax\(0, 1\.7fr\) repeat\(3, minmax\(0, 1fr\)\); \}/u, "print must reserve enough width for the complete Coverage Trust verdict");
     assert.match(html, /\.summary-grid > div:first-child dd \{[^}]*white-space: nowrap/su, "Coverage Trust label must stay intact in print");
-    assert.match(html, /\.coverage-list \{ display: block; \}/u, "print coverage must leave the fragment-prone grid context");
-    assert.match(html, /\.coverage-record \{[^}]*display: flow-root;[^}]*break-inside: avoid;[^}]*page-break-inside: avoid;/su, "print coverage rows need a non-grid fragmentation context and both guards");
-    assert.match(html, /\.coverage-record > div \{[^}]*float: left;[^}]*width: 50%/su, "print coverage facts need a readable two-column reflow");
-    assert.match(html, /\.finding \{ break-inside: avoid-page; \}/u, "compact findings should not split across pages");
+    assert.match(html, /\.coverage-table thead \{ display: table-header-group; \}/u, "print repeats the coverage header on a continuation page");
+    assert.match(html, /\.coverage-table tr \{ break-inside: avoid; \}/u, "a printed coverage row never splits");
+    assert.match(html, /\.coverage-tail \{ break-inside: avoid; \}/u, "the last two coverage rows stay together");
+    assert.match(html, /\.coverage-table \.num \{ text-align: end; \}/u, "numeric coverage columns are end-aligned");
+    assert.match(html, /\.finding \{ break-inside: auto; box-decoration-break: clone;/u, "findings fragment between their units and repeat their frame");
+    assert.match(html, /\.finding-head, \.finding-facts, \.finding-tail \{ break-inside: avoid; \}/u, "a finding never splits inside a unit, and its facts stay under their rule");
+    assert.doesNotMatch(html, /\.finding \{ break-inside: avoid-page; \}/u, "whole findings meant one finding per printed page");
+    assert.match(html, /\.coverage-table thead \{ break-after: avoid; \}/u, "the printed column header keeps with the first row");
+    const findingsHtml = renderHtml(findingsReportState());
+    const labels = [...findingsHtml.matchAll(/<p class="finding-continued">Finding (\d{2}) · <code class="rule-id">/gu)].map((match) => match[1]);
+    assert.deepEqual(labels, ["01", "02", "03", "04", "05", "06", "07"], "every finding's tail names its finding for a printed continuation");
     assert.match(html, /section > h2 \{ break-after: avoid; \}/u, "section headings must stay with their first content");
-    assert.match(html, /\.report-footer \{ display: none; \}/u, "the redundant screen footer must not create a print-only page");
-    assert.match(html, /\.report-header\.state-clean ~ \.findings-empty \{ display: none; \}/u, "clean print must omit the redundant empty-findings block");
+    assert.match(html, /\.report-footer \{[^}]*break-before: avoid;[^}]*\}/u, "the printed end mark stays with the content before it");
+    assert.doesNotMatch(html, /findings-empty \{ display: none; \}/u, "clean print keeps its findings statement");
     assert.match(html, /overflow-wrap: anywhere/u);
-    assert.match(html, /outline: var\(--ds-focus-width\) solid/u);
+    assert.match(html, /outline: var\(--bl-focus-width\) solid/u);
+  });
+});
+
+function committedLedger(): ReviewLedger {
+  return JSON.parse(readFileSync(new URL("../golden/report-surfaces/review-ledger.json", import.meta.url), "utf8")) as ReviewLedger;
+}
+
+/** A complete, current-shape manifest and a round bound to it: the positive control for the gate. */
+function boundPassingFixture(): { ledger: ReviewLedger; manifest: Record<string, unknown>; fingerprint: string } {
+  const fingerprint = "a".repeat(64);
+  const reviewEnvironment = {
+    reviewArtifactContractVersion: REVIEW_ARTIFACT_CONTRACT_VERSION,
+    screenPixelContractVersion: 1,
+    browser: "Chromium 141.0.7390.37",
+    platform: "linux",
+    architecture: "x64",
+    nodeMajor: "24",
+    deviceScaleFactor: 1,
+    browserRenderArgs: [...REQUIRED_BROWSER_RENDER_ARGS],
+    viewports: { desktop: { width: 1440, height: 1000 } },
+    themes: ["light", "dark"],
+    print: { media: "print", format: "A4 from CSS @page", rasterDpi: 110, rasterizer: "pdftoppm version 24.02.0", contentViewportCssPx: { width: 703, height: 1123 } },
+  };
+  const artifacts: Record<string, unknown>[] = [];
+  const cells: Record<string, Record<string, unknown> & { status: "pass" }> = {};
+  const hex = (index: number) => index.toString(16).padStart(64, "0");
+  let index = 0;
+  for (const state of ["clean", "findings", "infrastructure", "insufficient-coverage"]) {
+    for (const theme of ["light", "dark"]) {
+      for (const viewport of ["desktop", "tablet", "mobile"]) {
+        const cell = `screen/${state}/${theme}/${viewport}`;
+        const path = `${state}--${theme}--${viewport}.png`;
+        const tiles = viewport === "desktop" ? [] : [{ path: `${state}--${theme}--${viewport}--tile-01.png` }];
+        artifacts.push({ cell, kind: "screen", path, tiles, reviewArtifactFingerprint: hex(++index), pixels: { normalizedRgbaSha256: hex(++index) } });
+        cells[cell] = { status: "pass", reviewer: "@Neo", reviewedAt: "2026-09-20T10:00:00.000Z", note: "Looked at the full page and every tile.", reviewArtifactFingerprint: hex(index - 1), reviewedRawSha256: hex(900), reviewedNormalizedRgbaSha256: hex(index), reviewedArtifacts: [path, ...tiles.map((tile) => tile.path)] };
+      }
+    }
+    const pdfCell = `print/${state}/pdf`;
+    artifacts.push({ cell: pdfCell, kind: "pdf", path: `${state}--a4.pdf`, pages: 2, reviewArtifactFingerprint: hex(++index) });
+    cells[pdfCell] = { status: "pass", reviewer: "@Neo", reviewedAt: "2026-09-20T10:00:00.000Z", note: "Read both pages of the PDF.", reviewArtifactFingerprint: hex(index), reviewedRawSha256: hex(901), reviewedPages: [1, 2], reviewedArtifacts: [`${state}--a4.pdf`] };
+    const rasterCell = `print/${state}/raster-set`;
+    const pages = [{ path: `${state}--a4-page-1.png` }, { path: `${state}--a4-page-2.png` }];
+    artifacts.push({ cell: rasterCell, kind: "raster-set", pages, reviewArtifactFingerprint: hex(++index) });
+    cells[rasterCell] = { status: "pass", reviewer: "@Neo", reviewedAt: "2026-09-20T10:00:00.000Z", note: "Compared both rasters with the PDF.", reviewArtifactFingerprint: hex(index), reviewedRawSha256: [hex(902), hex(903)], reviewedPages: [1, 2], reviewedArtifacts: pages.map((page) => page.path) };
+  }
+  const physicalArtifacts = { screens: 24, pdfs: 4, rasterPages: 8 };
+  const manifest = { reviewEnvironment, observedEnvironment: { platformRelease: "6.18.44", node: "v24.21.0" }, artifacts, physicalArtifacts };
+  const ledger = committedLedger();
+  const round: ReviewRound = {
+    round: ledger.rounds.length + 1,
+    record: "current",
+    outcome: "pass",
+    reviewedAt: "2026-09-20T10:00:00.000Z",
+    reviewers: [{ handle: "@Neo", kind: "human" }],
+    binding: { reviewInputFingerprint: fingerprint, renderManifestGeneratedAt: "2026-09-20T09:00:00.000Z", reviewEnvironment: structuredClone(reviewEnvironment) },
+    physicalArtifactsReviewed: { ...physicalArtifacts },
+    findings: { blocker: 0, high: 0, medium: 0, low: 0 },
+    note: "Synthetic positive control for the strict local gate.",
+    cells,
+  };
+  ledger.rounds.push(round);
+  return { ledger, manifest, fingerprint };
+}
+
+describe("report-surface human review gate", () => {
+  it("accepts every Chromium-family four-part browser version and rejects an unmeasurable one", () => {
+    for (const accepted of [
+      "Google Chrome 152.0.7977.64",
+      "Google Chrome for Testing 141.0.7390.37",
+      "Chromium 141.0.7390.37",
+      "Chromium 141.0.7390.37 built on Debian 13",
+      "Microsoft Edge 140.0.3485.54",
+    ]) {
+      assert.equal(isMeasurableBrowserVersion(accepted), true, `a supported Chromium-based browser was rejected: ${accepted}`);
+    }
+    for (const rejected of ["Chrome", "HeadlessChrome/141.0.7390.37", "Chromium 141.0.7390", "", "141.0.7390.37", "Chromium\n141.0.7390.37"]) {
+      assert.equal(isMeasurableBrowserVersion(rejected), false, `an unmeasurable browser string was accepted: ${JSON.stringify(rejected)}`);
+    }
+    assert.equal(isMeasurableBrowserVersion(undefined), false);
+    assert.ok(BROWSER_VERSION_PATTERN.unicode, "the pattern is a unicode regular expression");
+  });
+
+  it("records the 2026-09-18 FAIL as a structural round, and the strict local gate stays red on it", () => {
+    const ledger = committedLedger();
+    const { rounds, latest } = validateReviewLedger(ledger);
+    assert.equal(rounds, 2);
+    assert.equal(ledger.rounds[0]!.outcome, "pass", "the 0.2.3 review stays on record as the pass it was");
+    assert.equal(ledger.rounds[0]!.record, "historical");
+    assert.equal(latest.outcome, "fail");
+    assert.equal(latest.record, "historical-reconstruction", "a round written after the fact must say so");
+    assert.deepEqual(latest.findings, { blocker: 1, high: 3, medium: 4, low: 0 });
+    assert.equal(latest.binding, null, "no fingerprint or environment was recorded in 2026-09-18 and none is invented");
+    assert.ok(latest.reviewers.every((reviewer) => reviewer.kind === "not-recorded" && reviewer.handle === null),
+      "the public record names no reviewer handle, so the ledger names none");
+    const { manifest, fingerprint } = boundPassingFixture();
+    assert.throws(() => assessHumanGate(committedLedger(), manifest, fingerprint), /latest review round 2 is FAIL \(2026-09-18/u);
+    assert.match(describeLatestRound(committedLedger(), manifest, fingerprint),
+      /reviewers: not recorded, not recorded; cells passed by a rostered human: 0 of 0 passing\); bound to the current render: inputs no; environment\/artifacts no$/u);
+  });
+
+  it("passes only a latest human round bound to the current inputs, environment and cells", () => {
+    const { ledger, manifest, fingerprint } = boundPassingFixture();
+    assert.equal(assessHumanGate(ledger, manifest, fingerprint).round, 3, "positive control: a genuinely bound round passes");
+
+    // Mutation: a passing round over changed inputs is not a review of those inputs.
+    assert.throws(() => assessHumanGate(ledger, manifest, "b".repeat(64)), /bound to a different source\/input revision/u);
+
+    // Observations may drift without re-reviewing; the declared environment may not.
+    const observedOnly = structuredClone(manifest);
+    (observedOnly.observedEnvironment as Record<string, string>).platformRelease = "6.19.0";
+    (observedOnly.observedEnvironment as Record<string, string>).node = "v24.99.1";
+    assert.equal(assessHumanGate(ledger, observedOnly, fingerprint).round, 3, "a kernel or Node patch update must not unbind a review");
+    const otherBrowser = structuredClone(manifest);
+    (otherBrowser.reviewEnvironment as Record<string, string>).browser = "Google Chrome 152.0.7977.64";
+    assert.throws(() => assessHumanGate(ledger, otherBrowser, fingerprint), /different declared browser\/platform\/render environment/u);
+
+    // One changed cell fingerprint is a different rendered artifact.
+    const changedCell = structuredClone(ledger);
+    changedCell.rounds.at(-1)!.cells!["print/findings/pdf"]!.reviewArtifactFingerprint = "c".repeat(64);
+    assert.throws(() => assessHumanGate(changedCell, manifest, fingerprint), /print\/findings\/pdf: strict local human review is bound to a different rendered artifact/u);
+
+    // A screen cell is reviewed as its full page AND its tiles.
+    const missingTile = structuredClone(ledger);
+    missingTile.rounds.at(-1)!.cells!["screen/clean/light/mobile"]!.reviewedArtifacts = ["clean--light--mobile.png"];
+    assert.throws(() => assessHumanGate(missingTile, manifest, fingerprint), /reviewed screen artifacts are not named exactly/u);
+
+    // An earlier pass never carries forward over a later failed round.
+    const laterFail = structuredClone(ledger);
+    laterFail.rounds.push({ ...structuredClone(ledger.rounds[1]!), round: 4, record: "current", reviewedAt: "2026-09-21" });
+    assert.throws(() => assessHumanGate(laterFail, manifest, fingerprint), /latest review round 4 is FAIL/u);
+  });
+
+  it("admits only the closed human roster, and an agent never passes a cell (bypasses A-I)", () => {
+    assert.deepEqual([...HUMAN_REVIEW_ROLES], ["@Brand", "@Neo", "@Founder"], "the roster changes only by a reviewed code change");
+    assert.ok(Object.isFrozen(HUMAN_REVIEW_ROLES), "the roster cannot be extended at run time");
+    const agent = { handle: "@Bot", kind: "agent" as const, model: "example-review-model" };
+    /** The bound fixture with the latest round's reviewers and every cell's reviewer replaced. */
+    const probe = (reviewers: unknown[], cellReviewer: string, only?: string) => {
+      const { ledger, manifest, fingerprint } = boundPassingFixture();
+      const round = ledger.rounds.at(-1)!;
+      round.reviewers = reviewers as ReviewRound["reviewers"];
+      for (const [cellId, cell] of Object.entries(round.cells!)) if (!only || cellId === only) cell.reviewer = cellReviewer;
+      return () => assessHumanGate(ledger, manifest, fingerprint);
+    };
+    // A: an agent labels itself human under a handle of its own.
+    assert.throws(probe([{ kind: "human", handle: "@review-model-5" }], "@review-model-5"), /"@review-model-5" is not a rostered human review role \(@Brand, @Neo, @Founder\)/u);
+    // B: the same with the model label moved into a field of its own, under an unrostered and a rostered handle.
+    assert.throws(probe([{ kind: "human", handle: "@Agent", tool: "example-review-model" }], "@Agent"), /human reviewer carries only handle and kind; unknown field tool/u);
+    assert.throws(probe([{ kind: "human", handle: "@Neo", tool: "example-review-model" }], "@Neo"), /human reviewer carries only handle and kind; unknown field tool/u);
+    // C: a rostered human is named, but an agent passed every cell, or just one of them.
+    assert.throws(probe([{ kind: "human", handle: "@Neo" }, agent], "@Bot"), /screen\/clean\/light\/desktop passed under @Bot, an agent reviewer; a pass is recorded only by a rostered human/u);
+    assert.throws(probe([{ kind: "human", handle: "@Neo" }, agent], "@Bot", "print/findings/raster-set"), /print\/findings\/raster-set passed under @Bot, an agent reviewer/u);
+    // D: one handle listed as both agent and human, and an agent borrowing a human role on its own.
+    assert.throws(probe([{ kind: "agent", handle: "@Neo", model: "example-review-model" }, { kind: "human", handle: "@Neo" }], "@Neo"), /reviewer handle @Neo is listed more than once \(agent and human\)/u);
+    assert.throws(probe([{ kind: "human", handle: "@Neo" }, { kind: "human", handle: "@Neo" }], "@Neo"), /reviewer handle @Neo is listed more than once \(human and human\)/u);
+    assert.throws(probe([{ kind: "human", handle: "@Founder" }, { kind: "agent", handle: "@Neo", model: "example-review-model" }], "@Founder"), /an agent cannot carry the human review role @Neo/u);
+    // E-I: agent only, nobody, no kind, a null model on a human, not-recorded beside an agent.
+    assert.throws(probe([agent], "@Bot"), /passed under @Bot, an agent reviewer/u);
+    assert.throws(probe([], "@Bot"), /reviewer @Bot is not a reviewer of this round/u);
+    assert.throws(probe([{ handle: "@Neo" }], "@Neo"), /reviewer kind must be human, agent or not-recorded/u);
+    assert.throws(probe([{ kind: "human", handle: "@Neo", model: null }], "@Neo"), /does not carry a model label/u);
+    assert.throws(probe([{ kind: "not-recorded", handle: null }, agent], "@Bot"), /passed under @Bot, an agent reviewer/u);
+
+    // Positive controls: an agent may be recorded beside the humans who passed the cells, and may
+    // record a failed cell; the summary line names every reviewer by kind.
+    const recorded = probe([{ kind: "human", handle: "@Neo" }, agent], "@Neo");
+    assert.equal(recorded().round, 3, "an agent recorded beside the rostered human who passed every cell does not block the gate");
+    const { ledger, manifest, fingerprint } = boundPassingFixture();
+    ledger.rounds.at(-1)!.reviewers = [{ kind: "human", handle: "@Neo" }, agent];
+    assert.equal(describeLatestRound(ledger, manifest, fingerprint),
+      "latest human review round 3 is PASS (2026-09-20T10:00:00.000Z; 0 blocker, 0 high, 0 medium, 0 low; current record; " +
+        "reviewers: @Neo (human), @Bot (agent: example-review-model); cells passed by a rostered human: 32 of 32 passing); " +
+        "bound to the current render: inputs yes; environment/artifacts yes");
+    const agentFail = structuredClone(ledger);
+    const failRound = agentFail.rounds.at(-1)!;
+    Object.assign(failRound, { outcome: "fail", findings: { blocker: 0, high: 0, medium: 1, low: 0 } });
+    Object.assign(failRound.cells!["screen/findings/dark/mobile"]!, { status: "fail", reviewer: "@Bot" });
+    assert.equal(validateReviewLedger(agentFail).latest.outcome, "fail", "an agent may record a failed cell");
+
+    // The summary never calls a round a human PASS unless a rostered human passed every cell, even
+    // when it is handed a ledger that skipped validation.
+    const unvalidated = structuredClone(ledger);
+    unvalidated.rounds.at(-1)!.reviewers = [agent];
+    for (const cell of Object.values(unvalidated.rounds.at(-1)!.cells!)) cell.reviewer = "@Bot";
+    const line = describeLatestRound(unvalidated, manifest, fingerprint);
+    assert.doesNotMatch(line, /human review/u);
+    assert.match(line, /^latest review round 3 is PASS but NOT a human pass \(.*reviewers: @Bot \(agent: example-review-model\); cells passed by a rostered human: 0 of 32 passing\)/u);
+    assert.throws(() => validateReviewLedger(unvalidated), /passed under @Bot, an agent reviewer/u);
+  });
+
+  it("says 'bound' only for the full binding the strict gate checks", () => {
+    const { ledger, manifest, fingerprint } = boundPassingFixture();
+    // Same inputs, a different declared environment: the fingerprint alone would say "bound".
+    const otherBrowser = structuredClone(manifest);
+    (otherBrowser.reviewEnvironment as Record<string, string>).browser = "Google Chrome 152.0.7977.64";
+    assert.match(describeLatestRound(ledger, otherBrowser, fingerprint), /bound to the current render: inputs yes; environment\/artifacts no$/u);
+    assert.throws(() => assessHumanGate(ledger, otherBrowser, fingerprint), /different declared browser/u);
+    // Same inputs, one changed cell fingerprint.
+    const otherCell = structuredClone(manifest);
+    ((otherCell.artifacts as Record<string, unknown>[])[0]!).reviewArtifactFingerprint = "d".repeat(64);
+    const status = latestBindingStatus(ledger, otherCell, fingerprint);
+    assert.deepEqual([status.inputs, status.environmentAndArtifacts, status.bound], [true, false, false]);
+    assert.match(status.reason ?? "", /strict local human review is bound to a different rendered artifact/u);
+    // Same inputs, a different physical inventory.
+    const otherInventory = structuredClone(manifest);
+    (otherInventory.physicalArtifacts as Record<string, number>).rasterPages = 9;
+    assert.match(describeLatestRound(ledger, otherInventory, fingerprint), /environment\/artifacts no$/u);
+    assert.equal(latestBindingStatus(ledger, manifest, fingerprint).bound, true, "positive control");
+  });
+
+  it("orders rounds in time and never lets a historical record claim the latest pass", () => {
+    const failed = (mutate: (ledger: ReviewLedger) => void, expected: RegExp) => {
+      const { ledger } = boundPassingFixture();
+      mutate(ledger);
+      assert.throws(() => validateReviewLedger(ledger), expected);
+    };
+    // The verifier's historical-latest: a pass appended as a historical record.
+    failed((ledger) => { ledger.rounds.at(-1)!.record = "historical"; }, /a historical record cannot follow a current round|a passing latest round must be a current record, not historical/u);
+    // ...and as the only kind of round in the ledger (the forged round 1 pass moved last).
+    failed((ledger) => {
+      ledger.rounds.pop();
+      const [first, second] = ledger.rounds;
+      Object.assign(first!, { round: 2 });
+      Object.assign(second!, { round: 1 });
+      ledger.rounds = [second!, first!];
+    }, /reviewed 2026-08-29T03:22:30\.000Z, before the round it follows/u);
+    // The verifier's reorder-rebind: round 1's pass moved after round 2 and re-bound to a render of today.
+    failed((ledger) => {
+      const fresh = ledger.rounds.pop()!;
+      const [first, second] = ledger.rounds;
+      Object.assign(first!, { round: 2, binding: fresh.binding, cells: fresh.cells, physicalArtifactsReviewed: fresh.physicalArtifactsReviewed });
+      for (const cell of Object.values(first!.cells!)) cell.reviewer = "@Founder";
+      Object.assign(second!, { round: 1 });
+      ledger.rounds = [second!, first!];
+    }, /before the round it follows|must be a current record/u);
+    // Even in time order, a historical pass is not a current one.
+    failed((ledger) => {
+      const round = ledger.rounds.at(-1)!;
+      Object.assign(round, { record: "historical" });
+      ledger.rounds = [ledger.rounds[1]!, round].map((entry, index) => Object.assign(entry, { round: index + 1 }));
+    }, /a passing latest round must be a current record, not historical/u);
+    // A record written after the fact never follows a current one, even in time order and failed.
+    failed((ledger) => {
+      ledger.rounds.push({ ...structuredClone(ledger.rounds[1]!), round: 4, reviewedAt: "2026-09-21" });
+    }, /round 4: a historical-reconstruction record cannot follow a current round/u);
+    // A current round reviewed before the render it binds, as a round and cell by cell.
+    failed((ledger) => { ledger.rounds.at(-1)!.reviewedAt = "2026-09-20T08:59:59.000Z"; }, /round 3: reviewed 2026-09-20T08:59:59\.000Z, before the render it binds/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.cells!["print/clean/pdf"]!.reviewedAt = "2026-09-20T08:00:00.000Z"; },
+      /print\/clean\/pdf reviewed 2026-09-20T08:00:00\.000Z, before the render it binds/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.reviewedAt = "2026-09-20"; }, /a current round's reviewedAt must be an exact UTC timestamp/u);
+    // A later round reviewed before the one it follows.
+    failed((ledger) => { ledger.rounds.push({ ...structuredClone(ledger.rounds.at(-1)!), round: 4, reviewedAt: "2026-09-19T10:00:00.000Z" }); },
+      /round 4: reviewed 2026-09-19T10:00:00\.000Z, before the round it follows/u);
+    // A review recorded in the future, beyond clock skew, as a round or as a cell.
+    const verifiedAt = Date.parse("2026-09-20T12:00:00.000Z");
+    const future = (mutate: (ledger: ReviewLedger) => void, expected: RegExp) => {
+      const { ledger } = boundPassingFixture();
+      mutate(ledger);
+      assert.throws(() => validateReviewLedger(ledger, { now: verifiedAt }), expected);
+    };
+    future((ledger) => { Object.assign(ledger.rounds.at(-1)!, { reviewedAt: "2026-09-20T12:30:00.000Z" }); },
+      /round 3: reviewed 2026-09-20T12:30:00\.000Z lies in the future/u);
+    future((ledger) => { ledger.rounds.at(-1)!.cells!["screen/clean/dark/mobile"]!.reviewedAt = "2027-01-01T00:00:00.000Z"; },
+      /screen\/clean\/dark\/mobile reviewed 2027-01-01T00:00:00\.000Z lies in the future/u);
+    const { ledger } = boundPassingFixture();
+    assert.equal(validateReviewLedger(ledger, { now: verifiedAt }).latest.round, 3, "positive control: reviewed two hours before the verifier's clock");
+    assert.equal(validateReviewLedger(structuredClone(ledger), { now: Date.parse("2026-09-20T09:55:00.000Z") }).latest.round, 3,
+      "within the clock-skew margin is accepted");
+    assert.equal(validateReviewLedger(structuredClone(ledger)).latest.round, 3, "positive control: a current round reviewed after its render");
+  });
+
+  it("names exactly the code roster wherever the docs name the human roles", () => {
+    const roster = [...HUMAN_REVIEW_ROLES].sort();
+    for (const path of ["docs/reporting.md", "docs/releasing.md"]) {
+      const text = readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+      const listed = [...text.matchAll(/<!-- human-review-roles: ([^>]*?) -->/gu)];
+      assert.equal(listed.length, 1, `${path} must carry exactly one human-review-roles marker`);
+      assert.deepEqual(listed[0]![1]!.split(/,\s*/u).sort(), roster, `${path} lists a human roster other than HUMAN_REVIEW_ROLES`);
+      for (const role of roster) assert.ok(text.includes(`\`${role}\``), `${path} does not name ${role}`);
+    }
+    assert.ok(REVIEWER_AUTHENTICATION_NOTE.includes("does not authenticate a person"), "the residual is stated, not implied");
+    // The review package names exactly the inputs a review is bound to.
+    const reporting = readFileSync(new URL("../../docs/reporting.md", import.meta.url), "utf8");
+    const roots = [...reporting.matchAll(/<!-- review-input-roots: ([^>]*?) -->/gu)];
+    assert.equal(roots.length, 1, "docs/reporting.md must carry exactly one review-input-roots marker");
+    assert.deepEqual(roots[0]![1]!.split(/,\s*/u), [...REVIEW_INPUT_ROOTS], "the review package lists bound inputs other than REVIEW_INPUT_ROOTS");
+    for (const root of REVIEW_INPUT_ROOTS) assert.ok(reporting.includes(`\`${root}\``), `the review package does not name ${root}`);
+  });
+
+  it("rejects a ledger round whose record contradicts its outcome", () => {
+    const failed = (mutate: (ledger: ReviewLedger) => void, expected: RegExp) => {
+      const { ledger } = boundPassingFixture();
+      mutate(ledger);
+      assert.throws(() => validateReviewLedger(ledger), expected);
+    };
+    failed((ledger) => { ledger.rounds.at(-1)!.cells!["screen/clean/dark/tablet"]!.status = "fail"; }, /contains a cell that did not pass/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.findings.high = 1; }, /cannot carry a blocker or high finding/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.reviewers = [{ handle: null, kind: "agent" }]; }, /must name its model or tool/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.reviewers = [{ handle: "@Neo", kind: "human", model: "example-review-model" }]; }, /does not carry a model label/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.round = 7; }, /numbered in order/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.binding = null; }, /must bind inputs and environment/u);
+    failed((ledger) => { delete ledger.rounds.at(-1)!.cells!["print/clean/raster-set"]; }, /must cover all 32 cells/u);
+    failed((ledger) => { Object.assign(ledger.rounds[1]!, { findings: { blocker: 0, high: 0, medium: 0, low: 0 } }); }, /must record a finding or a failed cell/u);
+    failed((ledger) => { delete ledger.rounds[1]!.source; }, /must name its source record/u);
+    failed((ledger) => { (ledger.rounds.at(-1)!.binding!.reviewEnvironment as Record<string, unknown>).platformRelease = "6.18.44"; },
+      new RegExp(`binds exactly ${DECLARED_ENVIRONMENT_FIELDS.join(", ")}`, "u"));
+    failed((ledger) => { ledger.schemaVersion = 4; }, /human ledger schema drift/u);
+  });
+});
+
+function findingsHtmlForPaths(): string {
+  return renderHtml(findingsReportState());
+}
+
+/** The body of the first `{…}` block that follows `marker`, braces balanced. */
+function blockAfter(css: string, marker: string): string {
+  const start = css.indexOf(marker);
+  assert.ok(start >= 0, `stylesheet has no ${marker} block`);
+  const open = css.indexOf("{", start + marker.length - 1);
+  let depth = 0;
+  for (let index = open; index < css.length; index += 1) {
+    if (css[index] === "{") depth += 1;
+    if (css[index] === "}") depth -= 1;
+    if (depth === 0) return css.slice(open + 1, index);
+  }
+  throw new Error(`unbalanced ${marker} block`);
+}
+
+const declaredTokens = (css: string): string[] => [...css.matchAll(/(--[A-Za-z0-9_-]+)\s*:/gu)].map((match) => match[1]!);
+const NAMED_COLOURS = /\b(?:white|black|red|green|blue|gray|grey|silver|yellow|orange|purple|navy|maroon|teal|olive|lime|aqua|fuchsia)\b/iu;
+
+/**
+ * The stylesheet lint both HTML renderers are held to (G-37): one prefix, no foreign namespace,
+ * every declared token consumed, every consumed token declared, no colour outside the token blocks,
+ * and every themed block redefining the complete colour set of the light block.
+ */
+function lintStylesheet(css: string, themes: { colorPrefix: string; blocks: string[] }): string[] {
+  const issues: string[] = [];
+  const declared = declaredTokens(css);
+  const referenced = [...css.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)/gu)].map((match) => match[1]!);
+  for (const name of new Set(declared)) {
+    if (!/^--bl-[a-z0-9-]+$/u.test(name)) issues.push(`foreign or malformed token prefix: ${name}`);
+    if (!referenced.includes(name)) issues.push(`unused token: ${name}`);
+  }
+  for (const name of new Set(referenced)) if (!declared.includes(name)) issues.push(`undefined token reference: ${name}`);
+  if (css.includes("--ds-")) issues.push("the parent design-system prefix appears in the stylesheet");
+  const withoutTokens = css.replace(/--bl-[a-z0-9-]+\s*:[^;{}]*;/gu, "");
+  for (const [, property, value] of withoutTokens.matchAll(/([a-z-]+)\s*:\s*([^;{}]+)/gu)) {
+    if (/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/u.test(value!) || NAMED_COLOURS.test(value!)) {
+      issues.push(`colour literal outside the token blocks: ${property}: ${value!.trim()}`);
+    }
+  }
+  const lightColours = declaredTokens(blockAfter(css, ":root")).filter((name) => name.startsWith(themes.colorPrefix)).sort();
+  for (const marker of themes.blocks) {
+    const themed = declaredTokens(blockAfter(css, marker)).filter((name) => name.startsWith(themes.colorPrefix)).sort();
+    if (JSON.stringify(themed) !== JSON.stringify(lightColours)) issues.push(`partial theme in ${marker}: ${themed.length}/${lightColours.length} colour tokens`);
+  }
+  return issues;
+}
+
+function contrast(first: string, second: string): number {
+  const luminance = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255)
+      .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+  };
+  const [a, b] = [luminance(first), luminance(second)];
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+function bundleStylesheet(): string {
+  const style = /<style>([\s\S]*?)<\/style>/u.exec(renderReport(findingsReportState()))?.[1];
+  assert.ok(style, "the bundle view renders no stylesheet");
+  return style;
+}
+
+const REPORT_THEMES = { colorPrefix: "--bl-color-", blocks: ["@media (prefers-color-scheme: dark)", "@media print"] };
+const BUNDLE_THEMES = { colorPrefix: "--bl-bundle-color-", blocks: ["html[data-theme=dark]", "html[data-theme]{"] };
+
+describe("report stylesheet tokens", () => {
+  it("holds both HTML renderers to one prefix, a closed token set and colour only in token blocks", () => {
+    assert.deepEqual(lintStylesheet(REPORT_HTML_STYLES, REPORT_THEMES), [], "report stylesheet lint");
+    assert.deepEqual(lintStylesheet(bundleStylesheet(), BUNDLE_THEMES), [], "bundle view stylesheet lint");
+    // The rendered report carries the same stylesheet it was linted as.
+    assert.ok(renderHtml(cleanReportState()).includes(REPORT_HTML_STYLES), "renderHtml must embed the linted stylesheet unchanged");
+  });
+
+  it("rejects each drift the lint exists for (red controls)", () => {
+    const controls: [string, (css: string) => string, RegExp][] = [
+      ["colour literal in a component rule", (css) => css.replace("a:hover {", "a:hover { color: #123456;"), /colour literal outside the token blocks: color: #123456/u],
+      ["named colour in a component rule", (css) => css.replace("a:hover {", "a:hover { background: white;"), /colour literal outside the token blocks/u],
+      ["foreign prefix", (css) => css.replace(":root {", ":root { --ds-space-9: 1px; margin: var(--ds-space-9);"), /foreign or malformed token prefix: --ds-space-9/u],
+      ["undefined reference", (css) => css.replace("a:hover {", "a:hover { padding: var(--bl-space-99);"), /undefined token reference: --bl-space-99/u],
+      ["unused token", (css) => css.replace(":root {", ":root { --bl-unused: 0;"), /unused token: --bl-unused/u],
+      ["partial dark theme", (css) => css.replace(/(@media \(prefers-color-scheme: dark\) \{\s*:root \{[^}]*?)--bl-color-soft: [^;]+;/u, "$1"), /partial theme in @media \(prefers-color-scheme: dark\)/u],
+    ];
+    for (const [name, mutate, expected] of controls) {
+      const mutated = mutate(REPORT_HTML_STYLES);
+      assert.notEqual(mutated, REPORT_HTML_STYLES, `${name}: the red control did not change the stylesheet`);
+      assert.match(lintStylesheet(mutated, REPORT_THEMES).join("\n"), expected, `${name}: the lint did not reject it`);
+    }
+  });
+
+  it("keeps the parent design-system prefix out of every source file", () => {
+    const offenders: string[] = [];
+    const walk = (directory: URL): void => {
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const child = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, directory);
+        if (entry.isDirectory()) walk(child);
+        else if (/\.(?:ts|mjs|js|css|html)$/u.test(entry.name) && readFileSync(child, "utf8").includes("--ds-")) offenders.push(child.pathname);
+      }
+    };
+    walk(new URL("../../src/", import.meta.url));
+    assert.deepEqual(offenders, []);
+  });
+
+  it("declares three font roles in different generic families with disjoint per-platform expectations", () => {
+    const roles = Object.entries(REPORT_FONT_ROLES);
+    assert.deepEqual(roles.map(([, role]) => role.generic).sort(), ["monospace", "sans-serif", "serif"],
+      "display, body and mono must be three different generic families, so a fallback cannot merge two roles");
+    for (const platform of ["linux", "darwin", "win32"] as const) {
+      const seen = new Map<string, string>();
+      for (const [name, role] of roles) {
+        assert.ok(role.resolvesOn[platform].length > 0, `${name}: no declared face on ${platform}`);
+        for (const family of role.resolvesOn[platform]) {
+          assert.equal(seen.get(family), undefined, `${platform}: ${family} is declared for both ${seen.get(family)} and ${name}`);
+          seen.set(family, name);
+        }
+      }
+    }
+    for (const [name, role] of roles) {
+      const token = REPORT_LAYOUT_TOKENS[`font-${name}` as keyof typeof REPORT_LAYOUT_TOKENS];
+      assert.ok(token.endsWith(`, ${role.generic}`), `font-${name} must end in its generic family: ${token}`);
+    }
+    assert.match(REPORT_HTML_STYLES, /h1, h2 \{ font-family: var\(--bl-font-display\); \}/u, "headings use the display role");
+    assert.match(REPORT_HTML_STYLES, /font: 400 var\(--bl-font-size-base\)\/var\(--bl-line-body\) var\(--bl-font-body\);/u, "running text uses the body role");
+  });
+
+  it("meets WCAG AA for every text pair in every theme, including text on the soft background", () => {
+    for (const theme of ["light", "dark", "print"] as const) {
+      for (const [foreground, background] of REPORT_TEXT_CONTRAST_PAIRS) {
+        const ratio = contrast(REPORT_COLOR_TOKENS[foreground][theme], REPORT_COLOR_TOKENS[background][theme]);
+        assert.ok(ratio >= 4.5, `report ${theme}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1`);
+      }
+      for (const [foreground, background] of BUNDLE_TEXT_CONTRAST_PAIRS) {
+        const ratio = contrast(BUNDLE_COLOR_TOKENS[foreground][theme], BUNDLE_COLOR_TOKENS[background][theme]);
+        assert.ok(ratio >= 4.5, `bundle ${theme}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1`);
+      }
+    }
+    assert.ok(REPORT_TEXT_CONTRAST_PAIRS.some(([, background]) => background === "soft"), "text on soft must be measured (N7)");
   });
 });

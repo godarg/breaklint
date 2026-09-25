@@ -13,11 +13,84 @@ Word gaps in a justified block are far wider than the natural space.
 
 ## Why
 
-The threshold is chosen. Word boxes are held for every line of every justified block; an earlier version limited them to a window around page boundaries, which contradicted the rule that needs them. Keeping them all costs a measured 4 221 bytes per page — about 8 MiB over 2 000 pages.
+The threshold is chosen. The natural space it multiplies is the block's own font's advance for one
+space, plus its `letter-spacing`, times its effective CSS `zoom` (computed font sizes are unzoomed
+while every rendered box is zoomed, so without it `zoom: 1.25` scaled every factor). It is measured
+in the page with a canvas that is never inserted into the document, through the same captured
+references as every other measurement, and only once the font is loaded. It used to be the block's
+first rendered space, and in justified text no rendered space is natural: at a line end it
+collapses — 0.02 px measured on patched Chromium 141, which made an ordinary gap "540.50× the
+natural space" — and inside a justified line it is stretched with its line, which divided a real
+six-space gap by itself, so a block with gaps of six and seven spaces was clean. Both are pinned by
+`tests/live/rule-targets.test.ts`, against blocks whose unjustified last line shows the natural
+space, in twelve font settings.
+
+A font a canvas cannot reproduce is measured from the layout instead. That covers
+`font-variation-settings` other than a `wght` that restates the computed weight, `font-size-adjust`,
+a `font-stretch` that is not a keyword, synthesised caps other than `small-caps` (`all-small-caps`
+shrinks the space with the letters: the canvas read 46 % too wide) and a font not loaded when
+measured. Exactly what is sampled, pooled over the whole document per layout key — font, caps,
+`letter-spacing`, `word-spacing`, variation settings, `font-size-adjust`, `font-kerning` and zoom:
+
+- only the last line of the last fragment of a justified block that is its own block container
+  (not `display: contents` or inline, whose last line can be any line of the container around it),
+  has no nested source block, and whose `text-align-last` does not justify that line;
+- only a gap between two consecutive words of ONE text node whose own element computes the
+  block's layout key — so no `<code>`, `<em>` or spaced `<span>` contributes — and separated by
+  collapsible whitespace only (no `&nbsp;`, no space kept by `white-space: pre-wrap`). This holds
+  for left-to-right text. In right-to-left text the words are paired in visual order, so a gap
+  between two text nodes can be sampled; a divisor polluted that way needs every sample of the
+  layout key polluted alike, since samples that disagree decline the block;
+- only a gap wider than zero.
+
+The natural space is the median of those gaps, and only when every gap lies within 0.1 px or 3 %
+of it, whichever is larger; samples that disagree are not one natural space, and the block is
+declined. The two layout-measured settings in the live pin are checked against an independent
+one-line control that nothing stretches, not against the lines the measurement reads.
+
+Word boxes are held for every line of every justified block; an earlier version limited them to a window around page boundaries, which contradicted the rule that needs them. Keeping them all costs a measured 4 221 bytes per page — about 8 MiB over 2 000 pages.
 
 ## Limits and known false alarms
 
 Blocks with an explicit `word-spacing` are out: the width is a stated intention. Table cells are out: a justified cell has no room to do better.
+
+A block whose natural space neither the canvas nor the layout gives — such a font with no sample
+anywhere in the document, for instance because every such block ends in a one-word line or sets
+`text-align-last: justify`, or with samples that disagree — is declined as `env/invalid-measurement`, counted against
+coverage. That is the exit-4 consequence: where more than half of a document's justified blocks
+are declined, the rule falls below its 0.5 coverage floor and the run ends
+`insufficient-coverage` (exit 4) instead of clean. It used to divide by a third of the font size.
+
+Right-to-left text is not judged. The word gaps are read in the order the words occur in the text,
+and in right-to-left text that order runs against their positions, so every gap reads negative and
+is skipped: such a block is reported as measured with a largest factor of 0 — a check that looked
+at no gap. Lines are grouped by the top edge of their text rectangles, within 0.5 px: an inline
+`<code>` or `<sup>` whose text sits at another height than the rest of its line forms a line of its
+own, and the gaps between it and its neighbours are not measured.
+
+Gaps are measured against the block's own natural space. A gap set in an inline element in another
+font or size is measured against it too: on patched Chromium 141 a monospace `<span>` in a serif
+paragraph read 2.41× and a 150 % `<span>` 1.50× on natural spaces. An inline element with its own
+`word-spacing` is the author's decision, like a block's: its words are one unit in the word boxes,
+and no gap inside it is judged.
+
+A line is judged by the block whose font sets it. A justified wrapper records its paragraphs' lines
+as well, and once the divisor was the font's own space, a serif `<div>` around a monospace paragraph
+reported the paragraph's seven-space gap a second time, as 16.84 of the div's spaces (patched
+Chromium 141). A line now belongs to the deepest record that records it — a `display: contents`
+paragraph included, whose text is set in its own font — and a wrapper is measured on its own text
+only. Whether a line is justified is its block container's `text-align`: a `display: contents`
+paragraph with `text-align: left` in a justified `<div>` prints justified lines and is measured.
+
+Gaps are read from a block's VISIBLE lines only, and no block is measured at a factor of 0 for
+lines nobody saw. The in-flow original of a running element is `excluded`
+(`rule/target-in-margin-box`), a block the author hid `excluded` (`rule/target-not-rendered`), a
+block whose lines are all invisible `excluded` (`rule/target-not-visible`) and a block with no line
+at all — empty, or image-only — `not-applicable` (`rule/no-text-lines`), all outside the coverage
+base; a block whose lines the snapshot did not record is declined as `env/invalid-measurement`,
+counted against coverage. A `display: contents` block has no box but prints its lines, and it is
+measured from them like any other block. Text inside a margin box is not measured. See
+`docs/limitations.md`.
 
 ## Calibration
 
@@ -29,7 +102,11 @@ also why this rule ships with the severity it has.
 ## Remediation
 
 <!-- begin generated remediation: type/excessive-word-spacing -->
-Justified text produces word spacing exceeding the uncalibrated threshold ('rivers' of whitespace). Enable hyphenation with 'hyphens: auto;' (specifying an HTML 'lang' attribute), use left alignment ('text-align: left;'), or insert soft hyphens ('&shy;') into long words. Note that enabling hyphenation can produce 'layout/hyphen-across-page' findings where a hyphenated word then falls on a page boundary; the two rules pull in opposite directions and neither threshold is calibrated.
+Justified text produces word spacing exceeding the uncalibrated threshold ('rivers' of whitespace). Use left alignment ('text-align: left;'), insert soft hyphens ('&shy;') into long words, or enable hyphenation with 'hyphens: auto;' together with an HTML 'lang' attribute. Automatic hyphenation happens only where the rendering browser has a hyphenation dictionary for that language; where it has none, 'hyphens: auto' changes nothing and soft hyphens are the lever that works. This rule owns the block-level 'hyphens' setting and the soft hyphens of justified text: where a hyphen, soft or automatic, then falls on a page boundary, 'layout/hyphen-across-page' changes only that word and neither turns hyphenation off nor removes soft hyphens for the block.
+
+**Precedence.** `hyphens` in justified blocks: this rule owns the block-level setting, and [`layout/hyphen-across-page`](layout-hyphen-across-page.md) defers to it, acting only on the affected word.
+
+**Precedence.** Soft hyphens (`&shy;`) in justified blocks: this rule owns where they are inserted, and [`layout/hyphen-across-page`](layout-hyphen-across-page.md) defers to it, acting only on the affected word.
 <!-- end generated remediation: type/excessive-word-spacing -->
 
 ## Examples

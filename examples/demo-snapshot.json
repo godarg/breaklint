@@ -5,7 +5,7 @@
     "note": "Hand-written rule fixture, not an acquired document. No original HTML artifact exists for its former illustrative line addresses; source locations are unavailable. The real rule and report chains run, while mode/source identify this demo."
   },
   "snapshot": {
-    "schemaVersion": 4,
+    "schemaVersion": 5,
     "meta": {
       "renderer": null,
       "browserVersion": "",
@@ -240,6 +240,11 @@
           "lineHeight": 15.4,
           "lang": "de"
         },
+        "display": "block",
+        "marginCopies": 0,
+        "float": "none",
+        "position": "static",
+        "boundaryHyphen": false,
         "lines": [
           0,
           1,
@@ -285,6 +290,11 @@
           "lineHeight": 15.4,
           "lang": "de"
         },
+        "display": "block",
+        "marginCopies": 0,
+        "float": "none",
+        "position": "static",
+        "boundaryHyphen": false,
         "lines": [
           8
         ]
@@ -323,6 +333,11 @@
           "lineHeight": 15.4,
           "lang": "de"
         },
+        "display": "table",
+        "marginCopies": 0,
+        "float": "none",
+        "position": "static",
+        "boundaryHyphen": false,
         "lines": []
       },
       {
@@ -359,6 +374,11 @@
           "lineHeight": 15.4,
           "lang": "de"
         },
+        "display": "block",
+        "marginCopies": 0,
+        "float": "none",
+        "position": "static",
+        "boundaryHyphen": false,
         "lines": [
           0,
           1
@@ -398,6 +418,11 @@
           "lineHeight": 15.4,
           "lang": "de"
         },
+        "display": "block",
+        "marginCopies": 0,
+        "float": "none",
+        "position": "static",
+        "boundaryHyphen": false,
         "lines": []
       }
     ],
@@ -412,6 +437,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -425,6 +451,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -438,6 +465,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -451,6 +479,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -464,6 +493,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -477,6 +507,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -490,6 +521,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -503,6 +535,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -516,6 +549,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 120,
         "wordBoxes": null
       },
@@ -529,6 +563,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -542,6 +577,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       }

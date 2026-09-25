@@ -3,6 +3,44 @@ import { LABELS } from "./mandatory.ts";
 import { buildHtmlReportModel } from "./html-model.ts";
 import { REPORT_HTML_STYLES } from "./html-styles.ts";
 
+/**
+ * A CSS string literal for text the report does not control (the run id is caller-supplied through
+ * the API). HTML escaping is no protection inside <style>: `";}body{display:none}/*` or
+ * `</style>` would end the string or the element. Only `[A-Za-z0-9 ._:/-]` is emitted literally;
+ * every other code point becomes a six-digit hex escape followed by the one space CSS consumes as
+ * its terminator, so no quote, brace, semicolon, backslash, `<` or line break survives. The value
+ * is truncated to `maxCodePoints` first.
+ */
+export function cssString(value: string, maxCodePoints = 64): string {
+  const codePoints = [...value];
+  const shown = codePoints.length > maxCodePoints ? [...codePoints.slice(0, maxCodePoints - 1), "…"] : codePoints;
+  const body = shown.map((character) => /^[A-Za-z0-9 ._:/-]$/u.test(character)
+    ? character
+    : `\\${character.codePointAt(0)!.toString(16).toUpperCase().padStart(6, "0")} `).join("");
+  return `"${body}"`;
+}
+
+/**
+ * Page furniture for print, generated per report: "Page N of M" on every page, and from page 2 a
+ * running head with the verdict and the report's run id, in the 12 mm @page margin (so the content
+ * box and its 703 px layout contract are untouched). Page 1 carries the full header instead.
+ */
+function renderPageMargins(report: Report, title: string): string {
+  const head = cssString(`breaklint · ${title} · exit ${report.exitCode}`, 80);
+  const run = cssString(`run ${report.runId}`, 52);
+  return `
+  @page {
+    @top-left { content: ${head}; font: 8pt/1.2 var(--bl-font-mono); color: var(--bl-color-fg-muted); vertical-align: middle; }
+    @top-right { content: ${run}; font: 8pt/1.2 var(--bl-font-mono); color: var(--bl-color-fg-muted); vertical-align: middle; }
+    @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt/1.2 var(--bl-font-mono); color: var(--bl-color-fg-muted); vertical-align: middle; }
+  }
+  @page :first {
+    @top-left { content: none; }
+    @top-right { content: none; }
+  }
+`;
+}
+
 const esc = (value: unknown): string =>
   String(value)
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, "�")
@@ -10,6 +48,43 @@ const esc = (value: unknown): string =>
     .replace(/</gu, "&lt;")
     .replace(/>/gu, "&gt;")
     .replace(/"/gu, "&quot;");
+
+/**
+ * A rule id as code that may break only after its namespace slash (`layout/` + name) on a narrow
+ * screen, never inside the name at a hyphen; print keeps it on one line. `<wbr>` adds no character,
+ * so the copied text is the id unchanged.
+ */
+function ruleIdCode(ruleId: string): string {
+  const slash = ruleId.indexOf("/");
+  if (slash < 0) return `<code class="rule-id"><span>${esc(ruleId)}</span></code>`;
+  return `<code class="rule-id"><span>${esc(ruleId.slice(0, slash + 1))}</span><wbr><span>${esc(ruleId.slice(slash + 1))}</span></code>`;
+}
+
+/**
+ * A path as text that breaks after a slash: each segment is an atomic inline box, with a break
+ * opportunity after every "/". Browsers otherwise break a path at its hyphens on a phone
+ * (measured: `evidence/surface-` / `demo-page-001.png`), and the line then reads as two names. A
+ * segment wider than its whole line still wraps inside itself (see `.path-id` in html-styles.ts),
+ * because a line that cannot break scrolls the page sideways.
+ */
+function pathText(path: string): string {
+  const segments = path.split(/(?<=\/)/u);
+  return `<span class="path-id">${segments.map((segment) => `<span>${esc(segment)}</span>`).join("<wbr>")}</span>`;
+}
+
+/**
+ * A command the reader may run, as one `<code class="cli-flag">`. It never breaks inside the flag or
+ * the rule name; on a narrow screen the only permitted break is after the rule's namespace slash,
+ * and print keeps the whole command on one line.
+ */
+function renderOption(option: ReturnType<typeof buildHtmlReportModel>["coverage"][number]["rows"][number]["options"][number]): string {
+  if (option.command === null) return esc(option.before);
+  const slash = option.command.lastIndexOf("/");
+  const command = slash < 0
+    ? `<code class="cli-flag"><span>${esc(option.command)}</span></code>`
+    : `<code class="cli-flag"><span>${esc(option.command.slice(0, slash + 1))}</span><wbr><span>${esc(option.command.slice(slash + 1))}</span></code>`;
+  return `${esc(option.before)}${command}${esc(option.after)}`;
+}
 
 function renderInfrastructure(model: ReturnType<typeof buildHtmlReportModel>): string {
   if (model.infrastructure.length === 0 && model.status.key !== "infrastructure") return "";
@@ -47,12 +122,12 @@ function renderCoverageAlert(model: ReturnType<typeof buildHtmlReportModel>): st
   ${shortfalls.length === 0
     ? `<p>The run declared insufficient coverage without a per-rule shortfall. Inspect the canonical JSON report.</p>`
     : `<ul class="coverage-shortfall-list">${shortfalls.map((row) => `<li class="coverage-shortfall-item">
-      <p><strong>Rule:</strong> <code>${esc(row.ruleId)}</code> in <span class="mono">${esc(row.document)}</span></p>
+      <p><strong>Rule:</strong> ${ruleIdCode(row.ruleId)} in <span class="mono">${pathText(row.document)}</span></p>
       <p><strong>Measurement:</strong> ${row.measured} of ${row.candidates} candidates measured (${esc(row.ratio)}); required floor ${esc(row.floor)}</p>
       <p><strong>Reason verbatim:</strong> <code>${esc(row.reasons.join(", ") || "none declared")}</code></p>
       <p><strong>Options:</strong></p>
       <ul>
-        ${row.options.map((opt) => `<li>${esc(opt)}</li>`).join("\n        ")}
+        ${row.options.map((option) => `<li>${renderOption(option)}</li>`).join("\n        ")}
       </ul>
     </li>`).join("\n")}</ul>`}
 </div>
@@ -65,8 +140,8 @@ function renderFindingEvidence(finding: ReturnType<typeof buildHtmlReportModel>[
   }
   const reference = finding.evidence.ref ?? "Unavailable";
   const renderedReference = finding.evidence.href
-    ? `<a href="${esc(finding.evidence.href)}">${esc(reference)}</a>`
-    : `<span class="mono">${esc(reference)}</span> <span>(not navigable)</span>`;
+    ? `<a href="${esc(finding.evidence.href)}">${pathText(reference)}</a>`
+    : `<span class="mono">${pathText(reference)}</span> <span>(not navigable)</span>`;
   return `<p class="evidence-state"><strong>Evidence:</strong> ${esc(finding.evidence.label)} · ${renderedReference}</p>`;
 }
 
@@ -74,37 +149,54 @@ function renderFindings(model: ReturnType<typeof buildHtmlReportModel>): string 
   const list = model.findings.length === 0
     ? `<div class="empty-state">
   <h3>${model.status.key === "clean" ? "Nothing reached the gate" : "No trustworthy finding list"}</h3>
-  <p>${esc(model.findingsLead)}</p>
+  <p>${model.status.key === "clean" ? "No finding was recorded, so nothing is listed here." : "The run ended before a trustworthy finding list existed."}</p>
 </div>`
     : `<ol class="finding-list">
-${model.findings.map((finding) => `<li>
+${model.findings.map((finding, index) => `<li>
 <article class="finding ${esc(finding.severity)}" id="${esc(finding.id)}" aria-labelledby="${esc(finding.id)}-title">
+  <div class="finding-head">
   <div class="finding-kicker">
     <span class="severity ${esc(finding.severity)}">${esc(finding.severityLabel)}</span>
     ${finding.experimental ? `<span class="experimental">Experimental</span>` : ""}
   </div>
-  <h3 id="${esc(finding.id)}-title"><code>${esc(finding.ruleId)}</code> · page ${finding.page}</h3>
+  <h3 id="${esc(finding.id)}-title">${ruleIdCode(finding.ruleId)} · page ${finding.page}</h3>
   <p class="finding-message">${esc(finding.message)}</p>
+  </div>
   <dl class="finding-facts">
-    <div><dt>Document</dt><dd class="mono">${esc(finding.document)}</dd></div>
+    <div><dt>Document</dt><dd class="mono">${pathText(finding.document)}</dd></div>
     <div><dt>Source</dt><dd class="mono">${finding.source ? esc(finding.source) : "Unknown — no source location was measured"}</dd></div>
     <div><dt>Measured</dt><dd class="mono">${esc(finding.measured)}</dd></div>
     <div><dt>Threshold</dt><dd class="mono">${esc(finding.threshold)}</dd></div>
     <div><dt>Calibration</dt><dd>${esc(finding.calibration)}</dd></div>
     <div><dt>Proof source</dt><dd>${finding.proofSource ? esc(finding.proofSource) : "None declared"}</dd></div>
   </dl>
-  ${finding.remediation ? `<div class="finding-remediation"><p><strong>Remediation:</strong> ${esc(finding.remediation)}</p>${finding.remediationTested === false ? `<p class="finding-remediation-untested">Untested: no trigger/remedied pair in this package shows this advice removing this finding.</p>` : ""}</div>` : ""}
+  <div class="finding-tail">
+  <p class="finding-continued">Finding ${String(index + 1).padStart(2, "0")} · ${ruleIdCode(finding.ruleId)} · ${finding.remediation ? "remediation and evidence" : "evidence"}</p>
+  ${finding.remediation ? `<div class="finding-remediation"><p><strong>Remediation</strong>${finding.remediationTested === false ? ` <span class="untested-marker">untested</span>` : ""} ${esc(finding.remediation)}</p></div>` : ""}
   ${finding.frequencyNote ? `<div class="finding-frequency-note"><p><strong>Note:</strong> ${esc(finding.frequencyNote)}</p></div>` : ""}
   ${renderFindingEvidence(finding)}
   ${finding.ambiguity ? `<p class="evidence-state"><strong>Ambiguity:</strong> ${esc(finding.ambiguity)}</p>` : ""}
+  </div>
 </article>
 </li>`).join("\n")}
 </ol>`;
 
+  const { untested, withAdvice } = model.remediationSummary;
+  // Stated once, at body size and colour, where the reader meets the findings; each finding then
+  // carries only a compact marker. Heading group and caveat form one unbreakable intro that does
+  // not keep with the first finding: inside the heading group (break-after: avoid), heading +
+  // caveat + the first finding's head and first facts formed one 456-481 px keep-with-next chain
+  // (44-47 % of an A4 content box) that left a hole that size; a sibling caveat outside any
+  // wrapper was measured separated from its heading (Blink does not honour avoid there).
+  const caveat = untested === 0
+    ? ""
+    : `\n  <p class="remediation-caveat"><strong>Remediation advice in this report is untested.</strong> No trigger/remedied pair in this package shows it removing its finding; this applies to ${untested} of ${withAdvice} finding${withAdvice === 1 ? "" : "s"} with advice, each marked <span class="untested-marker">untested</span> in its remediation box.</p>`;
   return `<section class="findings-section${model.findings.length === 0 ? " findings-empty" : ""}" aria-labelledby="findings-heading">
+<div class="findings-intro">
 <div class="section-heading">
   <h2 id="findings-heading">Findings</h2>
   <p class="section-lead">${esc(model.findingsLead)}</p>
+</div>${caveat}
 </div>
 ${list}
 </section>`;
@@ -112,67 +204,65 @@ ${list}
 
 type HtmlCoverageRow = ReturnType<typeof buildHtmlReportModel>["coverage"][number]["rows"][number];
 
-function renderCoverageRecord(row: HtmlCoverageRow): string {
-  return `<dl class="coverage-record${row.ok ? "" : " short"}" id="${esc(row.id)}">
-  <div><dt>Rule</dt><dd><code>${esc(row.ruleId)}</code></dd></div>
-  <div><dt>Candidates</dt><dd class="mono">${row.candidates}</dd></div>
-  <div><dt>Measured</dt><dd class="mono">${row.measured}</dd></div>
-  <div><dt>Not measured</dt><dd class="mono">${row.notMeasured}</dd></div>
-  <div><dt>Coverage / floor</dt><dd class="mono">${esc(row.ratio)} / ${esc(row.floor)}</dd></div>
-  <div><dt>Result</dt><dd class="coverage-result${row.ok ? "" : " short"}">${row.ok ? "Coverage met" : "Below floor"}</dd></div>
-</dl>`;
+const COVERAGE_COLUMNS = `<tr>
+    <th scope="col" class="rule">Rule</th>
+    <th scope="col" class="num">Candidates</th>
+    <th scope="col" class="num">Measured</th>
+    <th scope="col" class="num">Not measured</th>
+    <th scope="col" class="num">Coverage</th>
+    <th scope="col" class="num">Floor</th>
+    <th scope="col" class="result">Result</th>
+  </tr>`;
+
+function renderCoverageRow(row: HtmlCoverageRow): string {
+  const ratio = row.ratio === "Not applicable"
+    ? `<abbr title="Not applicable: no candidates">n/a</abbr>`
+    : esc(row.ratio);
+  return `<tr id="${esc(row.id)}"${row.ok ? "" : ` class="short"`}>
+    <th scope="row" class="rule">${ruleIdCode(row.ruleId)}</th>
+    <td class="num">${row.candidates}</td>
+    <td class="num">${row.measured}</td>
+    <td class="num">${row.notMeasured}</td>
+    <td class="num">${ratio}</td>
+    <td class="num">${esc(row.floor)}</td>
+    <td class="result"><span class="coverage-result${row.ok ? "" : " short"}">${row.ok ? "Coverage met" : "Below floor"}</span></td>
+  </tr>`;
 }
 
 /**
- * Coverage records are equal-height boxes that must not fragment, so a printed report packs a whole
- * number of them per page and the terminal page carries `rows mod perPage`. When that remainder is
- * one, the report ends on a page holding a single record — measured on the four canonical surface
- * states: twelve pages, ninety-three non-whitespace characters on the last. Which remainder occurs
- * is not a property of the coverage section at all; it is decided by where the findings section
- * above it happens to end, so any unrelated content change can produce it.
+ * One aligned table per document: rule id as the row header, the counts, coverage and floor as
+ * right-aligned numeric columns, the result as text. It replaced one six-label card per rule
+ * (13 rules, 78 repeated labels, five printed pages).
  *
- * The last two records are therefore bracketed in a container that may not break. It changes no
- * flow height, so it cannot shift pagination elsewhere, and it only acts when the last two records
- * would otherwise be split — at every other remainder the pair already shares a page.
- *
- * The bracket holds exactly two records, and the gate's minimum is `ceil(perPage / 2)`. At the
- * measured capacity of four records per A4 page that minimum is two, so a bracket of two is
- * sufficient and a remainder of one is the only failing phase. It would NOT be sufficient at six
- * or more records per page, where the minimum rises to three. That is a real limit of this repair,
- * not a general guarantee: if the record box ever shrinks enough to fit six per page, the bracket
- * has to grow with `ceil(perPage / 2)`.
- *
- * `break-before: avoid` on the last record would say this more directly, but this
- * stylesheet has already measured that Blink does not honour avoid-between-siblings here — see the
- * note above `.apparatus-section` in html-styles.ts, where the same attempt put a heading alone on
- * one page and its card on the next. A non-breaking container is the technique that worked.
+ * The last two rows are a second `tbody` that may not break, so a printed table never continues
+ * onto a page with a single row. Rows are single-line and small, so which remainder reaches the
+ * terminal page depends on content far above the section; the bracket makes that phase harmless at
+ * no flow-height cost. `break-before: avoid` on the last row would say the same thing directly, and
+ * Blink does not honour avoid-between-siblings here (see `.apparatus-section` in html-styles.ts).
  */
-function renderCoverageRows(rows: readonly HtmlCoverageRow[]): string {
-  const records = rows.map(renderCoverageRecord);
-  if (records.length < 3) return records.join("\n");
-  return `${records.slice(0, -2).join("\n")}
-<div class="coverage-tail">
-${records.slice(-2).join("\n")}
-</div>`;
+function renderCoverageTable(document: ReturnType<typeof buildHtmlReportModel>["coverage"][number]): string {
+  const rows = document.rows.map(renderCoverageRow);
+  const body = rows.length < 3
+    ? `<tbody>\n  ${rows.join("\n  ")}\n</tbody>`
+    : `<tbody>\n  ${rows.slice(0, -2).join("\n  ")}\n</tbody>\n<tbody class="coverage-tail">\n  ${rows.slice(-2).join("\n  ")}\n</tbody>`;
+  return `<table class="coverage-table" id="${esc(document.id)}">
+<caption><span class="caption-line"><span class="coverage-path mono">${pathText(document.path)}</span> <span class="document-verdict">Document verdict: ${esc(document.verdict)}</span></span></caption>
+<thead>
+  ${COVERAGE_COLUMNS}
+</thead>
+${body}
+</table>`;
 }
 
 function renderCoverage(model: ReturnType<typeof buildHtmlReportModel>): string {
   const documents = model.coverage.length === 0
     ? `<div class="empty-state"><h3>Coverage unavailable</h3><p>No document coverage was produced by this run.</p></div>`
-    : `<ol class="coverage-documents">
-${model.coverage.map((document) => `<li>
-<article class="coverage-document" aria-labelledby="${esc(document.id)}-heading">
-  <h3 id="${esc(document.id)}-heading" class="mono">${esc(document.path)}</h3>
-  <p class="document-verdict">Document verdict: ${esc(document.verdict)}</p>
-  ${document.rows.length === 0
-    ? `<p>No rule coverage rows were produced for this document.</p>`
-    : `<div class="coverage-list" aria-label="Rule coverage for ${esc(document.path)}">
-${renderCoverageRows(document.rows)}
-</div>`}
-</article>
-</li>`).join("\n")}
-</ol>`;
-  return `<section aria-labelledby="coverage-heading">
+    : `<div class="coverage-documents">
+${model.coverage.map((document) => document.rows.length === 0
+    ? `<div class="empty-state" id="${esc(document.id)}"><h3 class="mono">${pathText(document.path)}</h3><p>Document verdict: ${esc(document.verdict)}. No rule coverage rows were produced for this document.</p></div>`
+    : renderCoverageTable(document)).join("\n")}
+</div>`;
+  return `<section class="coverage-section" aria-labelledby="coverage-heading">
 <div class="section-heading">
   <h2 id="coverage-heading">Coverage details</h2>
   <p class="section-lead">Coverage is reported for every rule and document, including zero-candidate rules.</p>
@@ -186,6 +276,26 @@ ${documents}
  * around evidence reading: status and gate first, vertical finding grammar second, per-document
  * coverage last. No HTML state is allowed to turn an incomplete run into clean-run language.
  */
+/**
+ * In-page contents, in document order, for exactly the sections this report renders. On a phone
+ * the findings start about three screens down and coverage about twelve; the contents navigation
+ * reaches both from the first screen.
+ */
+function renderContents(model: ReturnType<typeof buildHtmlReportModel>): string {
+  const entries: [string, string][] = [["summary-heading", "Run summary"]];
+  if (model.infrastructure.length > 0 || model.status.key === "infrastructure") {
+    entries.push(["apparatus-heading", model.status.key === "infrastructure" ? "Checker failure" : "Measurement apparatus"]);
+  }
+  if (model.status.key === "insufficient-coverage") entries.push(["coverage-alert-heading", "Coverage did not meet the contract"]);
+  entries.push(["findings-heading", `Findings (${model.findings.length})`]);
+  entries.push(["coverage-heading", "Coverage details"]);
+  return `<nav class="report-contents" aria-label="Report contents">
+  <ol>
+    ${entries.map(([target, label]) => `<li><a href="#${target}">${esc(label)}</a></li>`).join("\n    ")}
+  </ol>
+</nav>`;
+}
+
 export function renderHtml(report: Report): string {
   const model = buildHtmlReportModel(report);
   const f = model.facts;
@@ -197,17 +307,20 @@ export function renderHtml(report: Report): string {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
 <title>breaklint report · ${esc(model.status.title)}</title>
 <style>${REPORT_HTML_STYLES}</style>
+<style>${renderPageMargins(report, model.status.title)}</style>
 </head>
 <body>
-<main id="report">
+<a class="skip-link" href="#report">Skip to the report</a>
+<div class="report-shell">
 <header class="report-header state-${esc(model.status.key)}" aria-labelledby="report-title">
-  <div class="tool-line"><strong>${esc(report.tool.name)}</strong><span>v${esc(report.tool.version)} · report schema ${report.schemaVersion}</span></div>
+  <div class="tool-line"><strong>${esc(report.tool.name)}</strong><span>v${esc(report.tool.version)} · report schema ${report.schemaVersion} · run <span class="run-id">${esc(report.runId)}</span></span></div>
   <span class="state-marker">${esc(model.status.marker)} · EXIT ${report.exitCode}</span>
   <h1 id="report-title">${esc(model.status.title)}</h1>
   <p class="status-sentence">${esc(model.status.sentence)}</p>
   <p class="gate-effect"><span>Gate effect</span><strong>${esc(model.status.gate)}</strong></p>
 </header>
-
+${renderContents(model)}
+<main id="report">
 <section aria-labelledby="summary-heading">
 <h2 id="summary-heading">Run summary</h2>
 <dl class="summary-grid">
@@ -236,11 +349,11 @@ ${renderInfrastructure(model)}
 ${renderCoverageAlert(model)}
 ${renderFindings(model)}
 ${renderCoverage(model)}
-
-<footer class="report-footer">
-  <p>Generated by ${esc(report.tool.name)} ${esc(report.tool.version)}. JSON remains the canonical report.</p>
-</footer>
 </main>
+<footer class="report-footer">
+  <p><strong>End of report.</strong> Generated by ${esc(report.tool.name)} ${esc(report.tool.version)} · run <span class="run-id">${esc(report.runId)}</span>. JSON remains the canonical report.</p>
+</footer>
+</div>
 </body>
 </html>
 `;

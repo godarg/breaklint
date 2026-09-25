@@ -9,7 +9,7 @@
 widows, orphans, blocks too tall to keep together and hyphenation across page breaks, each with
 the measured value and the threshold it failed.
 
-[![A still from the 39-second breaklint film, with the line “Perfect in the browser. Broken on page 47.” over a blurred page of layout findings](https://raw.githubusercontent.com/godarg/breaklint/main/assets/breaklint-film-poster.jpg)](https://dargel-solutions.de/en/breaklint/#film)
+[![A still from the 39-second breaklint film, with the line “Perfect in the browser. Broken on page 47.” over a blurred page of layout findings](https://raw.githubusercontent.com/godarg/breaklint/v0.7.0/assets/breaklint-film-poster.jpg)](https://dargel-solutions.de/en/breaklint/#film)
 
 The image links to the project page, which carries the 39-second film about breaklint.
 
@@ -40,10 +40,11 @@ that hides that is worse than no number.
 
 One thing about that output, since the demo invites the assumption: the rule and reporter chain
 running there is the real one, but the page it judges is a **hand-written snapshot**, built so
-that every rule path is reachable in a command that needs no browser. `examples/demo.html` is
-the document that snapshot describes; it is not shipped, and the run says which kind of fixture
-it used in its own `source` field rather than leaving you to guess. Point the tool at your own
-HTML and the same chain measures a real page.
+that every rule path is reachable in a command that needs no browser. No HTML document stands
+behind it: the snapshot names `examples/demo.html` as its document path, but that file does not
+exist and never did, which is why the demo's findings carry no source location. The run says which
+kind of fixture it used in its own `source` field rather than leaving you to guess. Point the tool
+at your own HTML and the same chain measures a real page.
 
 ## Install
 
@@ -57,8 +58,9 @@ needs a browser and the paginator; see [Requirements](#requirements).
 ## Source-bound findings and existing web pages
 
 The installed package now exposes `checkProducedDocuments`, `checkPage`, `compareReports`,
-`createContextPack`, `renderReport` and `writeReportBundle`. Live document reports use Report 4;
-the screen profile has a separate contract and checks visible geometry without pagination.
+`createContextPack`, `renderReport` and `writeReportBundle`. Live document reports use Report 5, and
+the report readers accept Report 4 and 5; the screen profile has a separate contract and checks
+visible geometry without pagination.
 
 ```js
 import { checkPage, writeReportBundle } from 'breaklint';
@@ -217,8 +219,8 @@ are complete; the post-release trust work and remaining validation boundaries ar
 |---|---|
 | 0 | checked, coverage met, nothing reached the threshold |
 | 1 | at least one non-experimental finding reached the threshold |
-| 2 | invalid invocation: unknown option, bad config, input path does not exist, or input is not `.html`/`.htm` |
-| 3 | infrastructure: no renderer, font failed, pagination aborted, checker crashed |
+| 2 | invalid invocation: unknown option, bad config, no input, or an input path that does not exist, is not a regular file or is not `.html`/`.htm`; no report is written |
+| 3 | infrastructure: no renderer, font failed, pagination aborted, checker crashed, or the output could not be written completely (for example, the stdout reader closed early; with `--out`, a lost confirmation line keeps the verdict's code) |
 | 4 | nothing or too little was judged |
 
 Exit code 4 exists because of a measured case. A multi-column document with the widow rule
@@ -237,7 +239,12 @@ breaklint --profile strict manual.html   # warnings gate; every rule requires fu
 breaklint --only layout/widow,layout/orphan book.html
 breaklint --only layout/half-empty-page report.html   # ask for the one rule that is off by default
 breaklint --disable layout/hyphen-across-page report.html
+breaklint --out-dir build/evidence book.html   # where the page PNGs and the checked PDF go
 ```
+
+A live run writes its evidence — one PNG per page and the PDF it checked — into
+`./breaklint-report` in the working directory unless `--out-dir <dir>` names another; the report's
+`evidence[].path` entries are relative to that directory. `--demo` writes none.
 
 A rule you disagree with can be switched off for the whole run — `--disable <rule,...>`, or
 `{"rules": {"layout/hyphen-across-page": false}}` in the config file; the same two switches turn
@@ -245,11 +252,23 @@ an off-by-default rule on, with `true`. There is deliberately no way to
 silence a rule at ONE place in a document: an inline suppression comment would be a claim about a
 page that nothing checks, and this tool exists because such claims were wrong.
 
+In GitHub Actions, the composite Action at the root of this repository
+(`uses: godarg/breaklint@<ref>`) runs the check as a gate: one run over the HTML paths or bash
+globs you give it, a step that fails on breaklint's own exit code (1 to 4 by default; only 1 may
+be left ungated), and SARIF for code scanning, JUnit and a Markdown step summary, all rendered
+from the one canonical JSON report. It installs the npm release named in that ref's
+`package.json`, not the ref's code: a tag works once its npm publish has succeeded, and a branch
+ref runs the last release, or fails with exit 3 after a version bump that is not yet published.
+[`docs/ci-recipe.md`](docs/ci-recipe.md) has a workflow to copy,
+the permissions it needs and what each exit code does to the job.
+
 There is no directory recursion and no glob expansion inside the tool. The shell has done this
 correctly for fifty years, including symlink cycles.
 
-Input is HTML only (`.html` or `.htm`). A standalone `.svg`, PDF, Markdown file or directory is
-rejected with exit 2 before Chrome starts. Inline SVG inside HTML is supported by the released SVG
+Input is HTML only (`.html` or `.htm`), and the name decides: a standalone `.svg`, PDF or Markdown
+file is rejected by its extension, and anything that is not a regular file — a directory called
+`chapter.html` included — is rejected too, each with exit 2 before Chrome starts. The content of a
+`.html` file is not sniffed. Inline SVG inside HTML is supported by the released SVG
 geometry rule; treating a standalone SVG asset as a paged HTML document would require a separate
 MIME, page-size and embedding contract that this version does not claim.
 
@@ -263,7 +282,14 @@ code from a foreign repository inside CI, so it is intentionally unsupported.
 
 The HTML reporter is a self-contained evidence view, not a second source of truth. Its header
 distinguishes clean, findings, checker failure and insufficient coverage in words; findings reflow
-without a horizontal table on mobile; print uses a verified A4 layout. JSON remains canonical.
+without a horizontal table on mobile; print uses an A4 layout. What CI verifies about these
+surfaces is technical — `test:report-surfaces:technical` checks every current screen and print
+cell for decoded pixels, contrast, accessibility and fragmentation. A human review counts only as
+a passing round by a rostered reviewer in the review ledger, bound to the current inputs; see its
+latest round and [`docs/releasing.md`](docs/releasing.md).
+<!-- review-state -->
+At the release preparation of 0.7.0 the latest round was the review of the 0.6.0 surfaces, which
+did not pass. JSON remains canonical.
 The information contract and the reproducible 32-cell screen/print review are documented in
 [`docs/reporting.md`](docs/reporting.md).
 
@@ -271,8 +297,8 @@ The information contract and the reproducible 32-cell screen/print review are do
 
 Node 22.13 or newer, on macOS or Linux. The floor is exact because `pdfjs-dist@6.2.108` requires
 Node 22.13 or Node 24, and the release gate installs the packed package on both Node 22.13 and 24.
-A live run additionally needs a Chromium-based browser, `puppeteer-core@25.8.x` and
-`pagedjs@0.4.3`. `pdfjs-dist` is what rasterises the produced PDF to bind evidence to findings; a
+A live run additionally needs a Chromium-based browser, `puppeteer-core` at `>=25.8.0 <26` (the
+declared peer range) and `pagedjs@0.4.3`. `pdfjs-dist` is what rasterises the produced PDF to bind evidence to findings; a
 run without it still measures and still reports, but the findings carry no evidence and the report
 says so rather than pretending otherwise. Poppler's `pdftoppm` is **not** used by the tool at all: the live test suite uses
 it as an independent rasteriser, so that Chrome is not both the producer and the sole judge of
@@ -285,10 +311,22 @@ npm i -D puppeteer-core@^25.8.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
 ## Running foreign HTML
 
 This tool executes foreign HTML including its scripts. It uses a fresh browser profile per run,
-keeps the sandbox on, has no flag that disables it, and blocks every network request by default.
-That protects against mistakes and badly built documents. It is **not** protection against
-someone deliberately attacking the browser sandbox — for untrusted third-party HTML, use a
-container.
+never asks for the sandbox to be off and has no flag that does, and by default lets no page
+request through except to its own loopback origin. That protects against mistakes and badly built
+documents. It is **not** an egress control and **not** protection against someone deliberately
+attacking the browser:
+
+- The request policy does not cover WebSocket, WebTransport or WebRTC connections a document
+  opens, nor the browser's own secure DNS and component updater traffic. Measured on 0.7.0 in the
+  default offline mode: a document's WebSocket to another loopback port was delivered and a WebRTC
+  STUN request was sent, and the run came back clean.
+- The environment can turn the sandbox off: puppeteer-core adds `--no-sandbox` when
+  `PUPPETEER_DANGEROUS_NO_SANDBOX=true`, and the browser inherits the environment. Make sure
+  `PUPPETEER_DANGEROUS_NO_SANDBOX`, `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` and
+  `CHROME_EXTRA_FLAGS` are unset.
+
+For untrusted third-party HTML, use a container or network namespace with no egress. Details are
+in [SECURITY.md](SECURITY.md).
 
 ## How this was made
 

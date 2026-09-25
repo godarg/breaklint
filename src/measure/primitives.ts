@@ -41,6 +41,37 @@
 const TEST_APPARATUS_CAPABILITY = "breaklint-static-test-capability";
 const APPARATUS_CAPABILITY_MARKER = "__BREAKLINT_NODE_CAPABILITY__";
 
+/**
+ * The natural-space measurement, as the source of a factory over its captured dependencies, so that
+ * the unit suite can run the SAME text over a fake canvas (tests/unit/natural-space.test.ts). It
+ * answers the advance of one U+0020 in a CSS font shorthand, with a letter-spacing length added the
+ * way the browser adds it to every character — or null, never a guess:
+ *   - when `document.fonts` does not report the font loaded: asking a canvas for an unloaded font
+ *     starts a font load after the measured state;
+ *   - when the canvas rejected the shorthand: it then keeps the sentinel set just before;
+ *   - when the letter-spacing cannot be applied, or reads back as another value;
+ *   - when the width is not a positive finite number, or anything throws.
+ */
+export const SPACE_ADVANCE_FACTORY_SOURCE = `(deps) => (font, letterSpacing) => {
+  try {
+    if (!deps.loaded(font)) return null;
+    const context = deps.context();
+    if (!context) return null;
+    deps.setFont(context, deps.sentinel);
+    deps.setFont(context, font);
+    if (deps.getFont(context) === deps.sentinel) return null;
+    if (!deps.setLetterSpacing) { if (letterSpacing !== "0px") return null; }
+    else {
+      deps.setLetterSpacing(context, letterSpacing);
+      if (deps.getLetterSpacing(context) !== letterSpacing) return null;
+    }
+    const width = deps.measureSpace(context);
+    return typeof width === "number" && width > 0 && width < Infinity ? width : null;
+  } catch (_) {
+    return null;
+  }
+}`;
+
 const PRIMITIVES_TEMPLATE = `(() => {
   const apparatusCapability = "${APPARATUS_CAPABILITY_MARKER}";
   const call = Function.prototype.call;
@@ -150,6 +181,32 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const canvasHeightGet = getter(HTMLCanvasElement.prototype, "height");
   const imageDataFn = CanvasRenderingContext2D.prototype.getImageData;
   const imageDataGet = getter(ImageData.prototype, "data");
+  // The natural space of a font, for type/excessive-word-spacing. A space rendered on the page is
+  // no measure of it: in a justified line every space is stretched, and a space at a line end is
+  // collapsed to almost nothing (0.02 px measured). The font's own advance is asked of a canvas
+  // that is never inserted into the document, through references captured here like every other
+  // measurement, and only for a font that is already loaded — asking for one that is not would
+  // start a font load after the measured state (see the mark font below for what that costs).
+  const setter = (prototype, name) => {
+    let at = prototype;
+    while (at) {
+      const found = descriptor(at, name);
+      if (found && found.set) return found.set;
+      at = Object.getPrototypeOf(at);
+    }
+    return null;
+  };
+  // Taken from the document's own set rather than the FontFaceSet global, which not every
+  // Chromium exposes (141 does not); before any document script has run the two are the same.
+  const fontCheckFn = Object.getPrototypeOf(document.fonts).check;
+  const measureTextFn = CanvasRenderingContext2D.prototype.measureText;
+  const canvasFontGet = getter(CanvasRenderingContext2D.prototype, "font");
+  const canvasFontSet = setter(CanvasRenderingContext2D.prototype, "font");
+  const canvasLetterSpacingSet = setter(CanvasRenderingContext2D.prototype, "letterSpacing");
+  const canvasLetterSpacingGet = getter(CanvasRenderingContext2D.prototype, "letterSpacing");
+  const metricsWidthGet = getter(TextMetrics.prototype, "width");
+  const SPACE_FONT_SENTINEL = "7px __breaklint_space_sentinel__";
+  let spaceContext = null;
   const styleSheetsGet = getter(Document.prototype, "styleSheets");
   const adoptedStyleSheetsGet = getter(Document.prototype, "adoptedStyleSheets");
   const sheetHrefGet = getter(StyleSheet.prototype, "href");
@@ -356,6 +413,20 @@ const PRIMITIVES_TEMPLATE = `(() => {
           return { width, height, data: null };
         }
       },
+      // The advance of one U+0020 in a CSS font shorthand; see SPACE_ADVANCE_FACTORY_SOURCE.
+      spaceAdvance: (${SPACE_ADVANCE_FACTORY_SOURCE})({
+        loaded: (font) => call.call(fontCheckFn, call.call(fontsGet, document), font, " ") === true,
+        context: () => {
+          if (spaceContext === null) spaceContext = call.call(canvasContextFn, call.call(createElementFn, document, "canvas"), "2d");
+          return spaceContext;
+        },
+        setFont: (context, value) => call.call(canvasFontSet, context, value),
+        getFont: (context) => call.call(canvasFontGet, context),
+        setLetterSpacing: canvasLetterSpacingSet ? (context, value) => call.call(canvasLetterSpacingSet, context, value) : null,
+        getLetterSpacing: (context) => call.call(canvasLetterSpacingGet, context),
+        measureSpace: (context) => call.call(metricsWidthGet, call.call(measureTextFn, context, " ")),
+        sentinel: SPACE_FONT_SENTINEL,
+      }),
       styleSheets: () => {
         const regular = call.call(sliceFn, call.call(styleSheetsGet, document));
         const adopted = adoptedStyleSheetsGet ? call.call(sliceFn, call.call(adoptedStyleSheetsGet, document)) : [];
@@ -465,7 +536,7 @@ export const PRIMITIVES_CHECK = `(() => {
     return { ok: false, reason: "the primitive references are replaceable, so they prove nothing" };
   }
   for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
-    "outerHtml", "painted", "byId", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
+    "outerHtml", "painted", "byId", "replaced", "canvas", "spaceAdvance", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
     "rects", "setAttr", "setText", "nodeType", "parent", "next", "create", "append", "remove", "setCssText",
     "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityRecordPreview",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",

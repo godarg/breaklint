@@ -2,16 +2,26 @@ import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
 
-/** The class the paginator sets on a block it hyphenated at a page boundary. */
-const PAGEDJS_HYPHEN_CLASS = "pagedjs_hyphen";
-
 /**
  * layout/hyphen-across-page — a word was hyphenated across a page boundary.
  *
- * Detection is by the paginator's own class, never by comparing characters. The hyphen glyph is
+ * Detection is by the paginator's own class (`pagedjs_hyphen`, recorded per block as
+ * `boundaryHyphen`, on the block or an inline element in it), never by comparing characters. The hyphen glyph is
  * configurable, so a character comparison would miss a document that changed it and would fire
  * on a compound word that legitimately ends a line with a hyphen ("Ein- und Ausgang"). The
  * class says the paginator did it; the character says nothing about who did.
+ *
+ * Paged.js 0.4.3 sets the class when the characters on both sides of its split are word
+ * characters OR soft hyphens (`hyphenateAtBreak`, src/chunker/layout.js). The earlier advice
+ * therefore recommended its own finding: "insert soft hyphens" re-creates the class when the
+ * page ends at one, and `hyphens: manual` is the value under which soft hyphens break. Measured
+ * and pinned by tests/live/fragmentation-levers.test.ts, with the word-local levers as controls.
+ *
+ * Precedence with `type/excessive-word-spacing`: that rule owns the block-level `hyphens` setting
+ * and the soft hyphens of justified blocks, because word spacing touches every line of the block
+ * and a boundary hyphen touches one word. In a justified block this advice changes only the
+ * boundary word. Both levers are declared on both rules in `remediation.interactions`, and the
+ * registry test refuses a one-sided pair.
  */
 export const hyphenAcrossPage = defineRule(
   {
@@ -26,7 +36,11 @@ export const hyphenAcrossPage = defineRule(
     declines: ["env/multicolumn", "env/vertical-writing"],
     remediation: {
       advice:
-        "The last text line on a page ends in a hyphen that breaks a word across the page boundary. The rule reads the paginator's own hyphenation class, so it only reports a hyphen Paged.js introduced — a hard hyphen you typed is not reported, and turning hyphenation off only helps where the paginator was doing the hyphenating. Apply 'hyphens: none' or 'hyphens: manual' to the paragraph, reword slightly, or insert non-breaking spaces ('&nbsp;') or soft hyphens ('&shy;') to shift the line break. Note that disabling hyphenation can produce 'type/excessive-word-spacing' findings in justified text; the two rules pull in opposite directions and neither threshold is calibrated.",
+        "The last text line on a page ends in a hyphen that breaks a word across the page boundary. The rule reads the paginator's own hyphenation class, so it only reports a hyphen Paged.js introduced — a hard hyphen you typed is not reported. Paged.js marks a page split that falls inside a word, and a split right after a soft hyphen counts as one: do not insert soft hyphens ('&shy;') to cure this finding, and do not rely on 'hyphens: manual', under which soft hyphens still break. In justified text 'type/excessive-word-spacing' owns the block-level 'hyphens' setting and where soft hyphens go, so change only the boundary word there: wrap it in '<span style=\"hyphens: none\">' or 'white-space: nowrap', or reword slightly. In a block that is not justified, 'hyphens: none' on the paragraph is the direct fix.",
+      interactions: [
+        { ruleId: "type/excessive-word-spacing", lever: "hyphens", relation: "defers", scope: "justified" },
+        { ruleId: "type/excessive-word-spacing", lever: "soft-hyphen", relation: "defers", scope: "justified" },
+      ],
       // No trigger/remedied pair ships with this package and no gate re-runs one, so this
       // advice is untested in the sense the field defines.
       tested: false,
@@ -52,7 +66,10 @@ export const hyphenAcrossPage = defineRule(
       }
       measured += 1;
 
-      const occurrences = block.classList.includes(PAGEDJS_HYPHEN_CLASS) ? 1 : 0;
+      // Recorded by the collector (Snapshot 5): the class on the block or on an inline element
+      // inside it. Paged.js marks the parent of the text node it cut, so a word cut inside `<em>`
+      // carries the class on the `<em>`, and the block's own classes missed it.
+      const occurrences = block.boundaryHyphen ? 1 : 0;
       const permitted = num(ctx.options.maxOccurrences, 0);
       evaluations.push(targetEvaluation({ ruleId: "layout/hyphen-across-page", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured", measurements: [{ name: "boundary-hyphens", value: occurrences, unit: "occurrences", operator: ">", threshold: permitted }], violated: occurrences > permitted }));
       if (occurrences <= permitted) continue;

@@ -15,7 +15,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { readFileSync, existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, relative, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,7 +28,7 @@ import { render } from "../report/index.ts";
 import { parseArgs } from "./args.ts";
 import type { Snapshot } from "../core/types.ts";
 import type { RenderEnvironment } from "../acquire/render-run.ts";
-import { err, out } from "./out.ts";
+import { err, flushOutput, notice, out } from "./out.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VERSION = readPackageVersion();
@@ -104,6 +104,14 @@ export async function main(argv: string[]): Promise<number> {
         err(`breaklint: input not found: ${p}\n`);
         return 2;
       }
+      if (!statSync(p).isFile()) {
+        // The name decides the type, so a DIRECTORY called `chapter.html` passed both checks
+        // above, started Chrome and ended exit 3 with "resource byte limit exceeded" — an
+        // infrastructure verdict with the wrong cause for a mistake in the invocation. There is
+        // no directory recursion (see the header), so anything but a regular file is usage.
+        err(`breaklint: input is not a regular file: ${p}\n`);
+        return 2;
+      }
     }
     // The live path needs a renderer. Saying which one, with a command that installs it, is
     // the difference between a tool that failed and a tool that told you how to proceed.
@@ -165,7 +173,7 @@ export async function main(argv: string[]): Promise<number> {
   if (args.outFile) {
     mkdirSync(dirname(resolvePath(args.outFile)), { recursive: true });
     writeFileSync(args.outFile, rendered);
-    out(`breaklint: ${config.format} report written to ${relative(process.cwd(), args.outFile)}\n`);
+    notice(`breaklint: ${config.format} report written to ${relative(process.cwd(), args.outFile)}\n`);
   } else {
     out(rendered);
   }
@@ -231,6 +239,8 @@ options
   --format <f>              json | sarif | console | html | junit | markdown  (default console)
                             json is the truth; every other format is a lossy projection.
   --out <file>              Write the report to a file instead of stdout.
+  --out-dir <dir>           Where a live run writes its evidence: one PNG per page and the
+                            checked PDF (default ./breaklint-report). Not written by --demo.
   --fail-on <level>         error | warn | never   (default error)
                             error: the two rules with a named proof source gate.
                             warn:  the heuristics gate too — deliberately, on request.
@@ -242,15 +252,21 @@ options
   --locale <tag>            Locale for the type/ rules (default de-DE).
   --no-evidence-binding     Skip the evidence marks. Findings keep bindsFinding: false.
   --no-source-map           Skip source id injection. Every finding then has source: null.
-  --allow-network <origin>  Permit one origin. Repeatable. Default is fully offline.
+  --allow-network <origin>  Let page requests reach this origin. Repeatable. By default
+                            page requests are blocked; this is not an egress control
+                            (see SECURITY.md).
   --help, --version
 
 exit codes
   0  checked, coverage met, nothing reached the threshold
   1  at least one non-experimental finding reached the threshold
-  2  invalid invocation: unknown option, bad config, input path does not exist
-  3  infrastructure: no renderer, font failed, pagination aborted, checker crashed
-  4  nothing or too little was judged — no input, no active rule, coverage below the floor
+  2  invalid invocation: unknown option, bad config, no input, an input path that does not
+     exist, is not a regular file or is not .html/.htm. No report is written.
+  3  infrastructure: no renderer, font failed, pagination aborted, checker crashed,
+     or the output could not be written completely (the stdout reader closed early;
+     with --out, a lost confirmation line keeps the verdict's code)
+  4  nothing or too little was judged — an empty document, no rule measured anything,
+     coverage below the floor
 
   Paged.js is pinned to exactly ${SUPPORTED_PAGEDJS_VERSION}. Any other resolved version stops
   the run with exit 3: the break cause is read from attributes the paginator writes and does
@@ -282,12 +298,65 @@ function isSameFile(a: string, b: string): boolean {
   }
 }
 
+/**
+ * The exit, after the output has been delivered.
+ *
+ * `process.exit()` discards every write still queued for a pipe. Measured: a report behind
+ * `| cat` arrived cut at a multiple of the pipe buffer, usually 65 536 bytes, in all six formats
+ * while the exit code stayed 1. So the exit waits for `flushOutput()`. It stays an explicit
+ * `process.exit` rather than a natural end of the event loop, because a natural end would hang on
+ * any handle a driver leaked.
+ *
+ * A reader that closed before the output was complete means the output this run was asked for
+ * did not arrive. That is exit 3, infrastructure, and never the verdict's 0 or 1: a gate must not
+ * read a report nobody received as a clean or a judged run. With `--out`, the report is on disk
+ * and complete before stdout is touched, and stdout carries only a confirmation line; losing that
+ * line loses nothing the verdict rests on, so the verdict's code stands and stderr says what was
+ * lost.
+ */
+async function exitAfterOutput(code: number): Promise<never> {
+  const failure = await flushOutput();
+  if (failure.output) {
+    err(
+      `breaklint: could not write to stdout (${failure.output.code ?? failure.output.message}); the output did not ` +
+        "arrive complete, so this run ends with exit 3 whatever its verdict.\n",
+    );
+    await flushOutput();
+    process.exit(3);
+  }
+  if (failure.notice) {
+    err(
+      `breaklint: could not write the confirmation line to stdout (${failure.notice.code ?? failure.notice.message}); ` +
+        "the report file was written in full, so the exit code is the run's own.\n",
+    );
+    await flushOutput();
+  }
+  process.exit(code);
+}
+
 const invokedDirectly = Boolean(process.argv[1]) && isSameFile(process.argv[1] as string, fileURLToPath(import.meta.url));
 if (invokedDirectly) {
+  let settled = false;
+  // The event loop emptied while main() was still waiting: whatever it waited on can no longer
+  // answer (a driver whose browser went away, a handle closed underneath it). Node would now end
+  // the process with exit 0, which a gate reads as a clean document - silence reported as success.
+  // `beforeExit` fires only on that drain, never after an explicit process.exit, so a run that
+  // finished normally cannot reach this. The default exit code is 3 for the same reason: any end
+  // that bypasses the explicit exit below is not a verdict.
+  process.exitCode = 3;
+  process.once("beforeExit", () => {
+    if (settled) return;
+    err("breaklint: the run stopped before it finished: nothing was left for it to wait on, so no report exists; exit 3.\n");
+    void exitAfterOutput(3);
+  });
   main(process.argv.slice(2))
-    .then((code) => process.exit(code))
+    .then((code) => {
+      settled = true;
+      return exitAfterOutput(code);
+    })
     .catch((error: unknown) => {
+      settled = true;
       err(`breaklint: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
-      process.exit(3);
+      return exitAfterOutput(3);
     });
 }

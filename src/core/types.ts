@@ -94,6 +94,13 @@ export interface TextLine {
   index: number;
   box: Box;
   visible: boolean;
+  /**
+   * Whether some text on this line has this record as its BLOCK CONTAINER (Snapshot 5): the text
+   * node's nearest source-block ancestor that is not `display: contents` or inline is this record.
+   * A record records its descendants' lines too; this says which of them are its own. Always false
+   * for a `display: contents` or inline record, whose text belongs to the container around it.
+   */
+  ownText: boolean;
   width: number;
   /** Always populated for justified blocks; measured at 4 221 bytes per page, so affordable. */
   wordBoxes: WordBox[] | null;
@@ -129,6 +136,36 @@ export interface BlockRecord {
   lineHeight: number;
   spaceWidth: number;
   effectiveStyle: EffectiveStyle;
+  /**
+   * The element's computed `display` (Snapshot 5). It is recorded because a zero box does not say
+   * why there is no box: `none` generates none and prints nothing, while `contents` generates no box
+   * for the element itself but lays out its text and children, and properties that apply to a box
+   * (`break-inside`) do not apply to it. The rules read it; it is never inferred from geometry.
+   */
+  display: string;
+  /**
+   * How many copies of this element Paged.js printed in margin boxes (Snapshot 5): the clones of a
+   * `position: running(...)` element, counted over every page. Zero for everything else. The
+   * in-flow original of a running element is the record with `display: none` and a count above
+   * zero, which is how the rules tell it from an element the author hid.
+   */
+  marginCopies: number;
+  /**
+   * The element's computed `float` and `position` (Snapshot 5). With `display` they say whether a
+   * nested block sits IN the flow of the block around it, where its lines end that block's own run
+   * of lines, or beside it — a float, an absolutely or fixed positioned box, an inline-block —
+   * where the lines on either side of it are still one run. Geometry cannot tell a full-line
+   * inline-block from a block child; these fields can.
+   */
+  float: string;
+  position: string;
+  /**
+   * Whether Paged.js marked a hyphen at a page split in this block's own inline content (Snapshot
+   * 5): the block, or an inline element inside it that is not inside a nested source block,
+   * carries `pagedjs_hyphen`. Paged.js marks the parent of the text node it cut, so the class alone
+   * in `classList` misses a word cut inside `<em>`.
+   */
+  boundaryHyphen: boolean;
   /** Either populated, or `notMeasuredReason` says why not. Never silently empty. */
   lines: number[] | null;
   notMeasuredReason?: EnvId;
@@ -458,7 +495,7 @@ export interface Finding {
   measurement: Measurement;
   ambiguity: { groupSize: number; resolvable: false } | null;
   evidence: { ref: string | null; bindsFinding: boolean };
-  /** Report4's source/actionability truth; scalar `source` remains the legacy projection. */
+  /** Source/actionability truth, present since report schema 4; scalar `source` remains the legacy projection. */
   originalSource: {
     status: "verified" | "declared" | "ambiguous" | "unavailable";
     role: "exact-original-range" | "verified-container-only" | "declared-matching-bytes" | "unknown";

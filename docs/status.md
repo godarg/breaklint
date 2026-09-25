@@ -4,6 +4,55 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
+## Release in preparation — 0.7.0 — the rules judge what printed
+
+This is the release-preparation record. Nothing about 0.7.0 is published: there is no tag, no npm
+version and no GitHub Release for it, and the 0.6.0 record below stays the current published
+record until the release workflow has run. The changelog heading carries `TBD-at-tag`
+until the final dated commit.
+
+| | |
+|---|---|
+| version | `0.7.0` in `package.json`, both root fields of `package-lock.json` and the `release.yml` trigger |
+| document report | 5, unchanged; readers accept Report 4 and 5 |
+| measurement snapshot | **4 → 5**; the engine refuses any other stamp, and a stamp-5 snapshot missing a required field, with exit 3 |
+| agent context pack · comparison · Configuration Contract | 2 · 1 · 1, unchanged |
+
+### What 0.7.0 changes
+
+Most of it changes what the rules report about documents that did not change, and the changelog
+lists those changes first. Margin-box content — the per-page clones Paged.js makes of
+`position: running(...)` and `position: fixed` elements — is no longer part of the flow, so it no
+longer produces widow, orphan and block-height findings about clones, no longer anchors every page,
+and no longer keeps required evidence from completing. Snapshot 5 records each block's computed
+`display`, `float` and `position`, its margin-box copies, its own boundary hyphen and which lines
+carry its own text, and the rules read those instead of inferring them from a zero box or from a
+wrapper's lines. `layout/widow` and `layout/orphan` judge the block whose own lines a break split;
+`type/excessive-word-spacing` divides by the font's natural space; `layout/orphaned-continuation-page`
+judges only pages whose content ends on them; a page boundary is `forced` only where the paginator
+forced it. The CLI delivers a report through a pipe whole and ends with exit 3 when it cannot, or
+when a run stops without an answer. The printed HTML report is numbered, carries a running head and
+drops from 43 pages to 27 across the four canonical states.
+
+**What this release does not establish.** No rule is calibrated, and all thirteen still declare
+`tested: false`. Every measurement quoted in the changelog as "patched Chromium 141" was taken on a
+local build with measurement shims and without evidence binding; the live suite on current Chrome
+in CI is the authority for the live path. Several limits are new and are stated in
+`docs/limitations.md` rather than hidden: nothing printed in a margin box is judged, a
+`position: fixed` element is not measured, block footnotes still end a run at exit 3, and a page
+with no source block cannot complete required evidence.
+
+### The exact-environment human gate for 0.7.0
+
+<!-- review-state -->
+`npm run test:report-surfaces` is red: its latest ledger round is the 2026-09-18 FAIL, and no
+human has reviewed the surfaces this release renders. The technical gate
+(`test:report-surfaces:technical`), which CI and the release workflow run, makes no human-review
+claim. `docs/releasing.md` makes a rostered human review that passes and binds the current render
+a precondition of the tag (step 2 of its release sequence); only a genuine review passes the gate,
+by the owner's decision for 0.7.0. It has not happened at the time of this record, and the ledger
+commit that records it updates this paragraph.
+
 ## Current published release — 0.6.0 (2026-09-18) — remediation that says when nobody checked
 
 | | |
@@ -126,7 +175,7 @@ it existed — under load the answer was `ENOENT`, which reads as a cleanup fail
 now registers synchronously from its parent, the budgets are sized for what they wrap, and a
 missing registration says so. A fourth test bounded a 5 s product wait at 8 s and failed at 8700 ms.
 
-Measured on `tests/unit/source-boundary-regressions.ts` before the change, three full runs at start
+Measured on `tests/unit/source-boundary-regressions.test.ts` before the change, three full runs at start
 loads 6.18, 5.06 and 6.37: **three red**. After, three full runs at 2.92, 4.30 and 8.63: **three
 green**, the last at a higher load than any of the three that failed. No test was excluded and no
 concurrency setting was changed.
@@ -149,8 +198,12 @@ generated most often; and the six mobile cells are rendered as single 390 x 15 0
 cannot be judged at all.
 
 The ledger was **not** rebound. Recording `pass` for 32 cells after a review that failed would be
-exactly the false claim this gate exists to prevent. The gate stays red for 0.6.0 — with a date,
-two named reviewers, an enumerated finding list and an owner, which is the difference that mattered.
+exactly the false claim this gate exists to prevent. Since ledger schema 5 the failed review is a
+round of the ledger itself — round 2, `fail`, marked as a historical reconstruction from the release
+record — instead of prose only; `npm run test:report-surfaces` now fails on it by name ("latest
+review round 2 is FAIL"), and the technical mode prints the same line. The gate stays red for 0.6.0 — with a date,
+two reviewers (recorded as `not-recorded`, because the release record does not name their handles),
+an enumerated finding list and an owner, which is the difference that mattered.
 What is honestly established about these surfaces is the technical half: `test:report-surfaces:technical`
 passes 32 of 32 cells and all 71 artifacts, and makes no human-review claim.
 
@@ -159,6 +212,19 @@ print PDF and raster-set cells) containing **71 physical artifacts** — 24 scre
 43 PDF page rasters. `test:report-surfaces:technical`, which makes no human-review claim, passes
 32 of 32 cells and all 71 artifacts.
 
+**In 0.7.0, re-measured on Chromium 141 / linux:** the surface work on the
+eight review findings changes these figures. The matrix is still 32 cells; it now contains
+**55 primary artifacts** — 24 screen PNGs, 4 PDFs and 27 PDF page rasters (clean 3, findings 8,
+infrastructure 8, insufficient-coverage 8; on every non-final page the last line of text sits at
+64.0–97.6 % of the content box's height, and no unbreakable unit exceeds 37.3 % of it) — plus
+**152 viewport-height tiles** cut from the 16 tablet and mobile screens, 207 files in all,
+presented in one review gallery. The technical gate passes 32 of 32 cells and all 207 files; 32
+renderer negative controls each fail it for their named reason, and the verifier breaks a copy of
+real evidence for each of its independent checks once per run. No human review of these surfaces
+is claimed, and <!-- review-state --> the strict local gate stays red on the recorded 2026-09-18
+FAIL until a new round passes. The resolved fonts were measured in the Linux development container only; the
+`ubuntu-latest` CI runner's font resolution is unmeasured (NEEDS-CI).
+
 ### Two records that no longer claim what they cannot
 
 `test:pagination-residue` binds six documents of a paid bundle by digest. Re-measured 2026-09-18:
@@ -166,7 +232,12 @@ one of the seven admitted artifacts still exists at its recorded digest; the sha
 five of the six documents have changed since the measurement of 2026-09-06. The digests were not
 re-recorded — the expectations beside them were measured on the old bytes. The manifest carries
 `binding.status: "historical"` with that measurement in it and the gate says so and makes no claim.
-Re-admitting the corpus is a follow-up with its own rights and privacy review.
+Re-admitting the corpus is a follow-up with its own rights and privacy review. Since then it is no
+longer a CI or release step either: it prints `NO CLAIM` and exits 0 having read none of the six
+documents, with or without an artifact root, and a step like that is a green light over nothing.
+The class is held in CI by the public `tests/fixtures/fragmentainer-residue.html` in the live
+suite, and `tests/unit/workflow-gates.test.ts` fails if the step returns while the record reads
+nothing.
 
 `test:secrets` is red in the development worktree used for this release and green on the published
 history. Measured 2026-09-18: scanning `origin/main` gives **no leaks over 143 commits**; scanning
@@ -238,10 +309,11 @@ unchanged.
 The six documents are recorded, not published. They are chapters of a paid product, so
 `corpus/public/pagination-residue-v1` carries their SHA-256 values, rights and privacy review and
 exact expected residue while the bytes stay outside this repository — the
-`private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. Without
-`BREAKLINT_RESIDUE_CORPUS_ROOT` that gate prints `SKIPPED` and claims nothing. What holds the class
-in CI is the public `tests/fixtures/fragmentainer-residue.html`, reduced from one of the six until
-no product text remained.
+`private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. At the time, without
+`BREAKLINT_RESIDUE_CORPUS_ROOT` that gate printed `SKIPPED` and claimed nothing; the record has since
+become historical and is no longer a CI step (see the current release above). What held the class
+in CI then, and still does, is the public `tests/fixtures/fragmentainer-residue.html`, reduced from
+one of the six until no product text remained.
 
 Two defects in this repository's own checks were found on the way and fixed in the same release. The
 secret-scanner canary planted a digit-heavy `AKIA` key beside a random secret and asserted only that
@@ -336,9 +408,9 @@ GitHub assets.
 | Mutation guard | 13/13 released rules kill every mutant, each on a fixture that actually triggers it |
 | False-alarm corpus | every clean fixture stays silent, every trigger fixture fires and is attributed correctly |
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
-| Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in report schema 3; generated schema drift and process-boundary exit 2 are tested |
+| Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in the canonical JSON report; generated schema drift and process-boundary exit 2 are tested |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
-| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 60 physical artifacts with decoded-pixel, contrast, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
+| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 55 primary artifacts and 152 viewport tiles (0.7.0; 71 artifacts in 0.6.0) with decoded-pixel, contrast, font-role, table-alignment, accessibility-tree and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
 | Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
 | `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 5 findings across 5 rules |
@@ -373,7 +445,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=455 aggregateTests=571 liveTests=71 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=670 aggregateTests=830 liveTests=106 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -545,7 +617,7 @@ The components below are now connected rather than isolated pieces:
 | Freeze signature | all seven components of §11.3, 250 ms window, 3 retries, and a drift report that names WHICH components moved; a real author-script inline-transform sabotage exhausts the budget (4 failed samples) and yields exit 3 with neither snapshot nor evidence |
 | Untouched primitives | references captured before any author script runs. Measured: a document that replaces `getBoundingClientRect`, `getComputedStyle` and `querySelectorAll` after pagination sees `x:999` and `"HIJACKED"`, and the probe reads values byte-identical to a clean run across all seven components. The positive control is in the same test — a naive collector under the same attack loses its boxes entirely, 5 097 characters to 0 |
 | Geometry cross-check | the product and live oracle share one sampler; selector plus rendered-fragment occurrence binds each in-page box to the exact CDP `DOM.getBoxModel` node. The two agree EXACTLY on this corpus, twice; a systematic 0.002 px disagreement fails the suite |
-| Break-cause collector | all five Paged.js hooks registered and each one verified to have fired; boundaries classified from the three attributes the paginator writes, on a document carrying six boundary kinds at once |
+| Break-cause collector | all five Paged.js hooks registered and each one verified to have fired; boundaries classified from the three attributes the paginator writes, on a document carrying six boundary kinds at once, and, on eleven named-region documents inside a continuing wrapper, checked boundary by boundary against the paginator's own `shouldBreak()` answers |
 
 **Released:** `breaklint@0.1.0` is published on npm from the versioned release workflow with
 provenance, and the packed package is exercised from a clean consumer directory on Node 20 and 22.
@@ -557,8 +629,8 @@ Node-22.13/Puppeteer-25 security migration. The annotated `v0.2.0` tag resolves 
 `ce7097b99beafcedc71b30ee0ed81451811532a0`. Registry SRI, signed SLSA source binding, npm
 signatures, byte-identical GitHub assets and a fresh registry consumer were independently checked.
 The minor-version change is intentional: unknown or formerly inert configuration now fails closed,
-`excludeSelectors` is corrected to `excludeTags`, and report schema moves to 3 while snapshot schema
-remains 2. This status paragraph is a later documentation commit and is not retroactively part of
+`excludeSelectors` is corrected to `excludeTags`, and in 0.2.0 report schema moves to 3 while
+snapshot schema remains 2. This status paragraph is a later documentation commit and is not retroactively part of
 the published tarball.
 
 **Released on 2026-08-25:** `breaklint@0.2.1` packages the open-community-QA documentation and the
@@ -614,7 +686,7 @@ What changed:
 | Two decline classes leave the coverage base | `TOOL_CAPABILITY_ENV_IDS` (this build cannot take the measurement) and `NON_APPLICABLE_ENV_IDS` (the question does not arise for that target). Both stay in `notMeasured` with rule, reason and count; only the ratio changes, and the subtraction happens after each rule's own books are checked |
 | The ink rules say which of two things is true | `inkCollected` separates "the passes do not exist in this build" from "the passes ran and disagreed". They reported the second while the first was the case |
 | The corpus holds an inline SVG at last | `tests/fixtures/svg-text-geometry.html`, seven figures, seven different answers, plus `svg-in-viewport.html` — the sound document that must end exit 0 — both in the live chain. Five of those cases exist because two independent reviews found the earlier ones insufficient |
-| Snapshot schema | 2 → 3, for the added `inkCollected`. Report schema stays 3 |
+| Snapshot schema | 2 → 3, for the added `inkCollected`. Report schema stays 3 in 0.2.3 |
 
 What did NOT change: no threshold, no severity, no `calibrated` flag, and no rule was added or
 removed. The SVG ink passes remain unimplemented — M3 — so `svg/text-clipped` and
@@ -663,7 +735,7 @@ them the `<defs>` class through a different door, and all now measured rather th
 | A nested `<svg>` | Its `<text>` was collected twice — once by the inner record and once by the outer one, where it was compared against the wrong viewport. Each record now takes only the targets whose nearest `<svg>` ancestor is itself |
 | Two structurally identical SVGs | They share one `svgRootKey` by design, so their labels share `svgTextKey` across records. The ambiguity group was counted inside a record and reported 1 for exactly the collision the field exists for. It is a property of the document and is counted across the document |
 
-Also from round two: the stored demo snapshot moved to schema 3 with the new fields, rather than
+Also from round two: the stored demo snapshot moved to schema 3 in 0.2.3 with the new fields, rather than
 leaving `docs/limitations.md` claiming a migration that had not happened; `reason` is `null`
 instead of absent so it survives a JSON round trip that the receipt schema requires; and every
 `reviewedAt` in the report-surface ledger is back to the date of the review that actually took
@@ -832,14 +904,14 @@ Measured against Paged.js 0.4.3 for this build, on one document containing every
 | `break-before` via stylesheet class or id | `data-break-before="page"` | forced |
 | `break-before: recto` | `data-break-before="recto"`, plus a blank page | forced, and the blank page is `parity` |
 | `break-after` via class, id or `p.adj + p` | `data-previous-break-after="page"` on the node AFTER | forced |
-| `page: named` | `data-page="named"` and **no break attribute at all** | forced — the third branch of `shouldBreak()` |
+| `page: named` | `data-page="named"` on the element and **no break attribute at all** | forced where the named page in force at the node the next page starts at differs from the one at the node before it — the third branch of `shouldBreak()`, `needsPageBreak()` |
 | `break-before` or `break-after` **inline** | nothing | **no boundary** — inert in 0.4.3 |
 | nothing | a break token from `afterPageLayout` | overflow |
 
 The named-page case is the one a partial implementation misses, and it is not hypothetical: a
 reader that knows only the two break attributes calls that boundary free, and a free boundary in
 front of a deliberately started page is exactly the false `layout/half-empty-page` finding this
-classification exists to prevent. Deleting that branch reddens two live cases.
+classification exists to prevent. Deleting that branch reddens twelve live cases (patched Chromium 141).
 
 A fourth attribute exists and is deliberately not read. Paged.js also writes `data-break-after` on
 the node that CARRIES the declaration; reading it would answer a question about a different
@@ -850,13 +922,26 @@ handlers by bare method-name equality — no interface, no registration list, no
 does not recognise. A typo in `afterPageLayout` is a silent no-op, and a silent no-op there means
 no break tokens, every boundary classified `unknown`, and a report that looks clean.
 
-**A named page is resolved through the nearest ancestor, and reading the leaf alone was wrong in
-both directions.** A named region is normally declared on a container — `section.chapter { page:
-chapter }` — and the paginator puts `data-page` on the SECTION, not on the paragraphs inside it.
-Measured on a section spanning three pages: the leaf reported `null`, the ancestor reported
-`chapter`. Reverting to the leaf-only read on the live fixture produces a **false `forced`** on a
-boundary inside the region and **misses the real `forced`** on the boundary leaving it — the second
-being the more expensive error, because a false `forced` silences four rules.
+**The decision is read where the paginator took it, and three readings of the finished pages were
+wrong.** A named region is normally declared on a container — `section.chapter { page: chapter }`
+— and the paginator puts `data-page` on the SECTION, not on the paragraphs inside it. Reading the
+leaf alone reported `null` in the middle of a section spanning three pages, which produced a
+**false `forced`** inside the region and **missed the real `forced`** leaving it; the
+nearest-ancestor read fixed that. It did not fix the next case: the first node of a page inside a
+region is, on a real document, a wrapper (`<main>`) continuing from the page before, with no named
+ancestor at all, so every boundary inside the region and the one after it came out `forced` and
+the one into it `overflow` — measured on a self-authored report with a landscape region, where it
+declined 9 of the 14 candidates of `layout/widow` and of `layout/orphan` and ended exit 4
+(patched Chromium 141). Comparing the named pages the two pages were styled with (the
+`pagedjs_<name>_page` classes on the page element) was the third wrong reading, found by an
+independent probe of the paginator's own answers: a page changes its `@page` style without a
+forced break when a named region nested in a `<div>` ends, because `needsPageBreak()` compares the
+next element with the `<div>`. The collector now evaluates `shouldBreak()` itself at the node the
+break token names, in the paginator's parsed source, with the paginator's limiter and previous-node
+walk, and only where that node is the one the layout walker handed out last. The live region
+documents check every boundary against Paged.js' own `shouldBreak()` answers, recorded by a
+test-only wrapper; the remaining limits are in
+[limitations.md](limitations.md#the-break-cause-of-a-page-boundary).
 
 **A page the paginator never reported is `unknown`, not a page with default values.** A final page
 with no `afterPageLayout` record used to receive a fabricated record and be counted nowhere, so a

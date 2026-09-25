@@ -8,14 +8,15 @@ are deliberately not exported. Document renderer peers remain optional for scree
 
 | Contract | Version | Boundary |
 |---|---:|---|
-| Document report | 4 | Findings, positive/declined evaluations, artifact/source/evidence identity |
-| Measured snapshot | 4 | Internal geometry input with source/evaluation prerequisites |
+| Document report | 5 | Findings, positive/declined evaluations, artifact/source/evidence identity; readers accept 4 and 5 |
+| Measured snapshot | 5 | Internal geometry input with source/evaluation prerequisites; 5 adds the computed `display`, `float` and `position`, `marginCopies` and `boundaryHyphen` on each block, and `ownText` on each line |
 | Configuration | 1 | Existing generated `breaklint/config.schema.json` |
 | Producer record | `studio-producer-record-v1` | Host-launched producer, FD 3, captured bytes |
 | Declared source manifest | 1 | Matching-byte declaration; never producer authority |
 | Screen report | 1 | `profileKind: "screen"`, route/viewport/scenario geometry |
 | Screen options | 1 | Closed runtime validation and exported `SCREEN_OPTIONS_SCHEMA` |
-| AI context / comparison | 1 each | Bounded projection / explicit continuity decisions |
+| AI context pack | 2 | Bounded projection of one canonical report |
+| Report comparison | 1 | Explicit continuity decisions between two reports |
 
 Report 3 consumers must migrate when adopting 0.5.0. A legacy report can be displayed as legacy;
 it cannot acquire original-source or repaired-target claims. The old scalar finding measurement

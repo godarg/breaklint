@@ -39,11 +39,14 @@ stylesheet, no `break-inside`, no script — a default-letter page, a 68ch measu
 crosses a page boundary. That fixture, not this record, is the regression protection, and it must
 stay that way: a gate that can only run on bytes most contributors cannot obtain is not a gate.
 
-Without an artifact root the corpus gate prints `SKIPPED` and makes no success claim. It never
-reports the six as verified when it has not read them.
+The corpus gate never reports the six as verified when it has not read them. While this record is
+historical (below) it prints `NO CLAIM` and reads none of them, with or without an artifact root,
+and for that reason it is not a CI or release-workflow step: a step that exits 0 having read zero
+documents is a green light over nothing.
 
 ## Running the full gate
 
+This section describes a current binding; it cannot be carried out against this historical record.
 Unpack the admitted bundle somewhere outside this repository and point the gate at it:
 
 ```bash

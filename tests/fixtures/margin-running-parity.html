@@ -1,0 +1,40 @@
+<!doctype html>
+<!--
+  A running header on a document whose recto break inserts a blank page.
+
+  COMPLICATION. `break-before: recto` on the second chapter makes Paged.js insert an empty verso
+  page. That page is blank, and both of its boundaries are `parity` — unless something on it is
+  mistaken for author content. Paged.js clones the running header into the margin box of every
+  page, the blank one included, and the clone keeps the header's source id. Counted as content,
+  it makes the blank page look occupied, re-classifies both of its boundaries, turns it into an
+  "orphaned continuation page", and anchors every page to the header, so that page findings on
+  three different pages share one fingerprint.
+
+  Without the running header this document has no findings under the default profile. The
+  header is the first element in the source on purpose: its in-flow original (display: none)
+  then sits at the top of page 1, where it must not become that page's anchor either.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 150mm 120mm; margin: 15mm; }
+@page { @top-center { content: element(title); } }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0; }
+h2 { margin: 0 0 6px; font-size: 12pt; }
+.title { position: running(title); }
+.recto { break-before: recto; }
+</style></head><body>
+<p class="title" id="running-title">Running title on every page</p>
+<p id="c1p1">Chapter one paragraph 1.</p>
+<p id="c1p2">Chapter one paragraph 2.</p>
+<p id="c1p3">Chapter one paragraph 3.</p>
+<p id="c1p4">Chapter one paragraph 4.</p>
+<p id="c1p5">Chapter one paragraph 5.</p>
+<p id="c1p6">Chapter one paragraph 6.</p>
+<p id="c1p7">Chapter one paragraph 7.</p>
+<p id="c1p8">Chapter one paragraph 8.</p>
+<p id="c1p9">Chapter one paragraph 9.</p>
+<h2 class="recto" id="chapter-two">Chapter two</h2>
+<p id="c2p1">Chapter two paragraph 1.</p>
+<p id="c2p2">Chapter two paragraph 2.</p>
+<p id="c2p3">Chapter two paragraph 3.</p>
+</body></html>

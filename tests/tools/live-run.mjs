@@ -29,8 +29,12 @@ const DEFAULT_SPECS = [
   { file: "tests/live/check-page.test.ts", suite: "screen checkPage host-page adapter, live", leaves: 7 },
   { file: "tests/live/overlay-page-membership.test.ts", suite: "evidence overlay page membership, live", leaves: 1 },
   { file: "tests/live/measure.test.ts", suite: "the measurement probe, live", leaves: 8 },
-  { file: "tests/live/breaks.test.ts", suite: "the collector, live", leaves: 7 },
-  { file: "tests/live/render-run.test.ts", suite: "the M2d live production chain", leaves: 30 },
+  { file: "tests/live/breaks.test.ts", suite: "the collector, live", leaves: 22 },
+  { file: "tests/live/named-page-regions.test.ts", suite: "named-page regions through the production chain, live", leaves: 1 },
+  { file: "tests/live/fragmentation-levers.test.ts", suite: "fragmentation levers under Paged.js, live", leaves: 6 },
+  { file: "tests/live/rule-targets.test.ts", suite: "rule targets on wrapped and justified blocks, live", leaves: 7 },
+  { file: "tests/live/render-run.test.ts", suite: "the M2d live production chain", leaves: 35 },
+  { file: "tests/live/cli-out-dir.test.ts", suite: "the CLI evidence directory, live", leaves: 1 },
 ];
 
 function structuredChildResult(file, terminal, state) {

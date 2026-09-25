@@ -3,10 +3,19 @@ name: release
 # A tag starts validation; it does not confer trust by itself. The publish job proves that the
 # tag resolves to origin/main and that ci.yml already passed for exactly that commit. Validation
 # builds ONE tarball. Both clean consumers, npm and the GitHub Release receive those exact bytes.
+#
+# The trigger below is the ONLY place this file names the release version, and it is a literal
+# tag on purpose: a wildcard would let any `v*` tag start a publish. Every job derives
+# RELEASE_VERSION and PACKAGE_FILE from the triggering tag with
+# `tests/tools/release-workflow-contract.mjs --derive-env`, which first proves that the tag,
+# this trigger, package.json and both root fields of package-lock.json name one version. The same
+# script runs statically in `npm run test:release-tag` on every CI run, so a release-prep commit
+# that moves the version without this pin (or the pin without the version) fails before anything
+# is tagged — a stale pin otherwise starts nothing at all, silently.
 
 on:
   push:
-    tags: ["v0.6.0"]
+    tags: ["v0.7.0"]
 
 permissions:
   contents: read
@@ -16,7 +25,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PACKAGE_FILE: breaklint-0.6.0.tgz
   GITLEAKS_VERSION: 8.30.1
 
 jobs:
@@ -38,17 +46,8 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: release manifests declare exactly 0.6.0
-        run: |
-          node --input-type=module <<'NODE'
-          import { strict as assert } from "node:assert";
-          import { readFileSync } from "node:fs";
-          const manifest = JSON.parse(readFileSync("package.json", "utf8"));
-          const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
-          assert.equal(manifest.version, "0.6.0", "package.json is not release version 0.6.0");
-          assert.equal(lock.version, manifest.version, "package-lock.json root version differs");
-          assert.equal(lock.packages?.[""]?.version, manifest.version, "lockfile root package version differs");
-          NODE
+      - name: the triggering tag, this workflow's pin, package.json and the lock name one version
+        run: node tests/tools/release-workflow-contract.mjs --derive-env
 
       - name: install the locked dependency graph without hiding its later audit
         run: npm ci --no-audit --no-fund
@@ -66,7 +65,7 @@ jobs:
       - name: Git history, tag worktree and secret-scanner canaries
         run: npm run test:secrets
 
-      - name: release-tag and registry-provenance contracts with negative controls
+      - name: release-tag, release-pin and registry-provenance contracts with negative controls
         run: |
           npm run test:release-tag
           node tests/tools/registry-provenance-contract.mjs --self-test
@@ -87,10 +86,11 @@ jobs:
           python3 -m pip install --quiet --disable-pip-version-check fonttools
           node tools/make-mark-font.mjs --check
 
-      - name: TypeScript and generated configuration schema
+      - name: TypeScript, generated configuration schema and generated rule-page blocks
         run: |
           npm run typecheck
           npm run schema:check
+          npm run docs:rules:check
 
       - name: unit and process-boundary E2E tests
         run: npm test
@@ -126,16 +126,15 @@ jobs:
       - name: admitted real-document acquisition gate
         run: npm run test:real-document
 
-      - name: pagination-residue corpus record
-        # Hash-only in this repository; SKIPPED here and no success claim about the six documents.
-        # The class is held by tests/fixtures/fragmentainer-residue.html in the live suite.
-        run: npm run test:pagination-residue
+      # No pagination-residue step: its record is historical and it reads no document (see the
+      # note in ci.yml). The class is held by tests/fixtures/fragmentainer-residue.html in the
+      # live suite above.
 
       - name: create the only npm package in this workflow
         id: package
         run: |
           version=$(node -p "require('./package.json').version")
-          test "$version" = "0.6.0" || { echo "release workflow expected 0.6.0, found $version"; exit 1; }
+          test "$version" = "$RELEASE_VERSION" || { echo "release workflow expected $RELEASE_VERSION, found $version"; exit 1; }
 
           # npm pack invokes prepack: schema drift is checked again, dist/ is removed, and the
           # production build is recreated from the same commit. No later job runs npm pack or
@@ -165,11 +164,11 @@ jobs:
       - name: store the one package and both independent identity records
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: breaklint-0.6.0-package
+          name: breaklint-${{ env.RELEASE_VERSION }}-package
           path: |
-            breaklint-0.6.0.tgz
-            breaklint-0.6.0.tgz.sha256
-            breaklint-0.6.0.tgz.sri
+            ${{ env.PACKAGE_FILE }}
+            ${{ env.PACKAGE_FILE }}.sha256
+            ${{ env.PACKAGE_FILE }}.sri
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
@@ -190,10 +189,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node }}
+      - name: the triggering tag, this workflow's pin, package.json and the lock name one version
+        run: node tests/tools/release-workflow-contract.mjs --derive-env
       - name: download the package created by validate-pack
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: breaklint-0.6.0-package
+          name: breaklint-${{ env.RELEASE_VERSION }}-package
           path: release-artifact
 
       - name: verify artifact identity before installation
@@ -210,13 +211,20 @@ jobs:
           cd "$consumer"
           npm init -y > /dev/null
           npm install "$GITHUB_WORKSPACE/release-artifact/$PACKAGE_FILE" --no-audit --no-fund
-          test "$(npx breaklint --version)" = "0.6.0"
+          test "$(npx breaklint --version)" = "$RELEASE_VERSION"
           set +e
           npx breaklint --demo > demo.out
           code=$?
           set -e
           test "$code" -eq 1 || { echo "installed --demo exited $code, expected 1"; cat demo.out; exit 1; }
           grep -q "uncalibrated" demo.out || { echo "installed --demo printed no findings"; exit 1; }
+          # The README inside these exact bytes quotes what their installed bin prints, and every
+          # schema stamp their docs name is the one their installed code carries.
+          node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$consumer"
+          # --release: a pending exception is a sentence known to be stale, and a tag must not
+          # ship one. A non-empty pending list fails here and says what to change.
+          node "$GITHUB_WORKSPACE/tests/tools/docs-truth.mjs" --package "$consumer/node_modules/breaklint" \
+            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl" --release
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
@@ -257,10 +265,12 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
           cache: npm
+      - name: the triggering tag, this workflow's pin, package.json and the lock name one version
+        run: node tests/tools/release-workflow-contract.mjs --derive-env
       - name: download the bytes accepted by both clean consumers
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: breaklint-0.6.0-package
+          name: breaklint-${{ env.RELEASE_VERSION }}-package
           path: .
 
       - name: verify package, tag, origin/main and the successful CI run for one commit
@@ -285,7 +295,10 @@ jobs:
             echo "artifact version $artifact_version does not match source version $source_version"
             exit 1
           }
-          test "$artifact_version" = "0.6.0" || { echo "only 0.6.0 is authorised"; exit 1; }
+          # Authorisation is the literal trigger: only its one tag can start this workflow, and
+          # --derive-env proved at the top of this job that the tag, the trigger and package.json
+          # agree. The artifact must be exactly that version too.
+          test "$artifact_version" = "$RELEASE_VERSION" || { echo "only $RELEASE_VERSION is authorised"; exit 1; }
 
           # Peeling a ref proves only its commit: lightweight and annotated tags both peel. Require
           # the remote tag OBJECT first, through the same guard whose process-boundary canary runs
@@ -328,15 +341,15 @@ jobs:
           RELEASE_COMMIT: ${{ steps.identity.outputs.release_commit }}
         run: |
           set +e
-          npm view "breaklint@0.6.0" version dist.integrity dist.attestations gitHead --json > /tmp/existing.json 2> /tmp/existing.err
+          npm view "breaklint@$RELEASE_VERSION" version dist.integrity dist.attestations gitHead --json > /tmp/existing.json 2> /tmp/existing.err
           status=$?
           set -e
           if [ "$status" -eq 0 ]; then
             curl -fsSL \
-              "https://registry.npmjs.org/-/npm/v1/attestations/breaklint@0.6.0" \
+              "https://registry.npmjs.org/-/npm/v1/attestations/breaklint@$RELEASE_VERSION" \
               > /tmp/existing-attestations.json
             EXPECTED_PACKAGE_NAME=breaklint \
-            EXPECTED_VERSION=0.6.0 \
+            EXPECTED_VERSION="$RELEASE_VERSION" \
             EXPECTED_SRI=$(cat "$PACKAGE_FILE.sri") \
             EXPECTED_COMMIT="$RELEASE_COMMIT" \
             EXPECTED_REPOSITORY_URL="https://github.com/$GITHUB_REPOSITORY" \
@@ -345,7 +358,7 @@ jobs:
               node tests/tools/registry-provenance-contract.mjs \
                 --verify /tmp/existing.json /tmp/existing-attestations.json
             echo "publish_needed=false" >> "$GITHUB_OUTPUT"
-            echo "breaklint@0.6.0 already contains these exact bytes; continuing recovery verification"
+            echo "breaklint@$RELEASE_VERSION already contains these exact bytes; continuing recovery verification"
           else
             if ! grep -q "E404" /tmp/existing.err; then
               echo "registry lookup failed for a reason other than an absent version"
@@ -357,7 +370,7 @@ jobs:
 
       - name: publish exactly the validated tarball with provenance
         if: steps.registry.outputs.publish_needed == 'true'
-        run: npm publish ./breaklint-0.6.0.tgz --provenance --access public
+        run: npm publish "./$PACKAGE_FILE" --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -376,13 +389,13 @@ jobs:
           # propagation delay nobody controls.
           verified=false
           for attempt in $(seq 1 60); do
-            if npm view breaklint@0.6.0 version dist.integrity dist.attestations gitHead --json \
+            if npm view "breaklint@$RELEASE_VERSION" version dist.integrity dist.attestations gitHead --json \
                 > /tmp/registry.json 2> /tmp/registry.err && \
                curl -fsSL \
-                 "https://registry.npmjs.org/-/npm/v1/attestations/breaklint@0.6.0" \
+                 "https://registry.npmjs.org/-/npm/v1/attestations/breaklint@$RELEASE_VERSION" \
                  > /tmp/registry-attestations.json && \
                EXPECTED_PACKAGE_NAME=breaklint \
-               EXPECTED_VERSION=0.6.0 \
+               EXPECTED_VERSION="$RELEASE_VERSION" \
                EXPECTED_SRI=$(cat "$PACKAGE_FILE.sri") \
                EXPECTED_COMMIT="$RELEASE_COMMIT" \
                EXPECTED_REPOSITORY_URL="https://github.com/$GITHUB_REPOSITORY" \
@@ -402,7 +415,7 @@ jobs:
           registry_consumer=$(mktemp -d)
           cd "$registry_consumer"
           npm init -y > /dev/null
-          npm install breaklint@0.6.0 --ignore-scripts --no-audit --no-fund
+          npm install "breaklint@$RELEASE_VERSION" --ignore-scripts --no-audit --no-fund
           npm audit signatures --json > signatures.json
           node --input-type=module <<'NODE'
           import { strict as assert } from "node:assert";
@@ -411,12 +424,17 @@ jobs:
           assert.deepEqual(result.invalid, [], "npm reported an invalid registry signature or attestation");
           assert.deepEqual(result.missing, [], "npm reported a missing registry signature or attestation");
           NODE
-          test "$(npx breaklint --version)" = "0.6.0"
+          test "$(npx breaklint --version)" = "$RELEASE_VERSION"
           set +e
           npx breaklint --demo > demo.out
           code=$?
           set -e
           test "$code" -eq 1 || { cat demo.out; exit 1; }
+          # What npmjs.com renders is the registry copy of the README; it must quote what the
+          # registry copy of the CLI prints.
+          node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$registry_consumer"
+          node "$GITHUB_WORKSPACE/tests/tools/docs-truth.mjs" --package "$registry_consumer/node_modules/breaklint" \
+            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl" --release
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0 \
             @playwright/test@1.62.1 typescript@5.9.2

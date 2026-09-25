@@ -6,6 +6,7 @@ import type { ReportComparison } from "./compare.ts";
 import { captureBoundedSourceFile, sha256Bytes } from "../source/bytes.ts";
 import { createContextPack, type ContextFinding, type CreateContextPackOptions } from "./context.ts";
 import { READABLE_REPORT_SCHEMA_VERSIONS } from "../core/enums.ts";
+import { bundleColor, bundleToken, bundleTokenDeclarations } from "../report/html-tokens.ts";
 
 export interface RenderReportOptions extends CreateContextPackOptions { title?: string; theme?: "light" | "dark"; comparison?: ReportComparison; }
 export interface WriteReportBundleOptions extends RenderReportOptions { outDir: string; evidenceDir?: string; }
@@ -13,6 +14,42 @@ export interface ReportBundleResult { outDir: string; reportPath: string; htmlPa
 
 const esc = (value: unknown): string => String(value ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, "�").replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
 const MAX_ASSET_BYTES = 64 * 1024 * 1024;
+
+/**
+ * The bundle view's stylesheet. Its custom properties are generated from the shared token table
+ * (src/report/html-tokens.ts) and every colour is a token, so the same stylesheet lint covers both
+ * HTML renderers. `print` redefines the complete colour set for paper whatever `theme` was chosen.
+ */
+const BUNDLE_HTML_STYLES = `:root{${bundleTokenDeclarations("light")}color-scheme:light dark}` +
+  `html[data-theme=dark]{${bundleTokenDeclarations("dark")}}` +
+  `*{box-sizing:border-box}` +
+  `body{margin:0;background:${bundleColor("paper")};color:${bundleColor("ink")};font:16px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}` +
+  `main{max-width:74rem;margin:auto;padding:${bundleToken("space")}}` +
+  `header{border-inline-start:.4rem solid ${bundleColor("accent")};padding-inline-start:1rem}` +
+  `h1{font:700 clamp(2rem,6vw,4.4rem)/.98 Georgia,serif;letter-spacing:-.035em;margin:.4rem 0 1rem}` +
+  `.eyebrow,.section-label{text-transform:uppercase;letter-spacing:.08em;font-size:.78rem;color:${bundleColor("muted")}}` +
+  `.state,.finding,.diagnostics{border:1px solid ${bundleColor("line")};padding:1.2rem;margin-block:1.2rem}` +
+  `.state.incomplete{border-inline-start:.4rem solid ${bundleColor("warn")}}` +
+  `.finding.error{border-inline-start:.4rem solid ${bundleColor("bad")}}` +
+  `.finding.warn{border-inline-start:.4rem solid ${bundleColor("warn")}}` +
+  `.finding.info{border-inline-start:.4rem solid ${bundleColor("accent")}}` +
+  `.diagnostics{overflow-wrap:anywhere}` +
+  `.finding h2{font-size:1rem;overflow-wrap:anywhere}` +
+  `dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;margin:1rem 0}` +
+  `dt{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:${bundleColor("muted")}}` +
+  `dd{margin:0;overflow-wrap:anywhere}` +
+  `a{color:${bundleColor("ink")};text-decoration-thickness:2px;text-underline-offset:.18em}` +
+  `.crop{margin:1rem 0;break-inside:avoid}` +
+  `.crop svg{max-height:32rem;background:${bundleColor("evidence-ground")}}` +
+  `.crop .target-outline{stroke:${bundleColor("target")}}` +
+  `.crop figcaption{font-size:.82rem;color:${bundleColor("muted")}}` +
+  `.evidence figure{position:relative;margin:1rem 0}` +
+  `.evidence figure>.target-outline{position:absolute;border:3px solid ${bundleColor("target")};box-shadow:0 0 0 1px ${bundleColor("target-halo")};pointer-events:none}` +
+  `.evidence figure>img{display:block;width:100%}` +
+  `@media(max-width:390px){main{padding:1rem}dl{grid-template-columns:1fr}.finding{padding:1rem}}` +
+  `@media print{@page{size:A4;margin:12mm}html[data-theme]{${bundleTokenDeclarations("print")}}main{max-width:none;padding:0}` +
+  `.finding,.state{break-inside:avoid}.finding:has(.crop){break-inside:auto}.crop{break-inside:avoid;max-height:none}.crop svg{max-height:90mm!important}}` +
+  `@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}`;
 
 interface Asset { href: string; kind: "png" | "pdf"; integrity: { sha256: string; byteLength: number }; }
 type AssetMap = Map<string, Asset>;
@@ -101,7 +138,7 @@ function crop(asset: Asset | null, finding: Finding): string {
   const width = Math.min(box.pageWidth, box.x + box.width + pad) - left;
   const height = Math.min(box.pageHeight, box.y + box.height + pad) - top;
   const clipId = `crop-${sha256Bytes(Buffer.from(`${finding.runFindingId}:${left}:${top}:${width}:${height}`)).slice(0, 24)}`;
-  return `<figure class="crop"><svg role="img" aria-label="Verified target and surrounding context" viewBox="${left} ${top} ${width} ${height}" style="display:block;width:100%;background:#fff"><defs><clipPath id="${clipId}" clipPathUnits="userSpaceOnUse"><rect x="${left}" y="${top}" width="${width}" height="${height}"/></clipPath></defs><g clip-path="url(#${clipId})"><image href="${esc(asset.href)}" x="0" y="0" width="${box.pageWidth}" height="${box.pageHeight}"/><rect class="target-outline" x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" fill="none" stroke="#bd3500" stroke-width="3" vector-effect="non-scaling-stroke"/></g></svg><figcaption>Marked target context from verified full-page evidence; only the visible intersection is shown for overflow. The original box is page-relative in css-page-top-left coordinates. Source: ${source(finding)}.</figcaption></figure>`;
+  return `<figure class="crop"><svg role="img" aria-label="Verified target and surrounding context" viewBox="${left} ${top} ${width} ${height}" style="display:block;width:100%"><defs><clipPath id="${clipId}" clipPathUnits="userSpaceOnUse"><rect x="${left}" y="${top}" width="${width}" height="${height}"/></clipPath></defs><g clip-path="url(#${clipId})"><image href="${esc(asset.href)}" x="0" y="0" width="${box.pageWidth}" height="${box.pageHeight}"/><rect class="target-outline" x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" fill="none" stroke-width="3" vector-effect="non-scaling-stroke"/></g></svg><figcaption>Marked target context from verified full-page evidence; only the visible intersection is shown for overflow. The original box is page-relative in css-page-top-left coordinates. Source: ${source(finding)}.</figcaption></figure>`;
 }
 
 function source(finding: Finding): string {
@@ -150,7 +187,7 @@ function findingCard(report: Report, finding: Finding, index: number, assets: As
   return `<article class="finding ${esc(finding.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(finding.severity)} · ${esc(finding.ruleId)}</p><h2>${esc(finding.runFindingId)}</h2><p>${esc(finding.message)}</p><dl><div><dt>Measured</dt><dd>${esc(finding.measurement.value)} ${esc(finding.measurement.unit)}</dd></div><div><dt>Threshold</dt><dd>${esc(finding.measurement.threshold)} ${esc(finding.measurement.unit)}</dd></div><div><dt>Scope</dt><dd>${displayPath(finding.document)} · diagnostic page ${finding.page} · target ${esc(finding.target.nodeKey)} · box ${finding.target.renderBox ? "css-page-top-left" : "css-screen-pixels"}</dd></div><div><dt>Original source range</dt><dd>${origin}</dd></div><div><dt>Canonical evaluation</dt><dd>${esc(evaluation)}</dd></div><div><dt>Input position / identity</dt><dd>${finding.source ? `${displayPath(finding.source.file)}:${finding.source.line}:${finding.source.column} (${esc(finding.source.coordinateSystem)})` : "unavailable"} · ${esc(finding.stableIdentity.status)}</dd></div></dl><p><strong>Proven fact:</strong> the measurement above was recorded for this target.</p><p><strong>Possible causes:</strong> not established by this report.</p><p><strong>Repair option:</strong> ${repair}</p><p><strong>Next check:</strong> inspect source and evidence, then recheck under compatible conditions.</p><p class="evidence">${evidence}${pdfLink}</p>${crop(asset, finding)}<p><a href="#finding-navigation">Back to findings</a></p></article>`;
 }
 
-/** Script-free, offline HTML from a Report4. It does not make evidence navigable by itself. */
+/** Script-free, offline HTML from a canonical document report (schema 4 or 5) or a screen report. It does not make evidence navigable by itself. */
 export function renderReport(report: Report | unknown, options: RenderReportOptions = {}): string {
   const context = createContextPack(report, options);
   const isScreen = context.canonicalReport.schemaVersion === 1 && context.canonicalReport.profileKind === "screen";
@@ -165,7 +202,7 @@ export function renderReport(report: Report | unknown, options: RenderReportOpti
   const diagnostics = context.diagnostics.items.length === 0 ? "" : `<section class="diagnostics" aria-labelledby="diagnostics-heading"><h2 id="diagnostics-heading">Infrastructure and nonmeasurement</h2><ul>${context.diagnostics.items.map((item) => `<li><code>${esc(item.kind)}</code>: ${esc(item.reason)}${item.context ? ` · ${esc(item.context)}` : ""}</li>`).join("")}</ul>${context.diagnostics.omittedCount ? `<p>${context.diagnostics.omittedCount} additional diagnostic entries omitted from this bounded view; inspect canonical JSON.</p>` : ""}</section>`;
   const navigation = `<nav id="finding-navigation" aria-label="Finding navigation">${context.findings.map((item, index) => `<a href="#finding-${index + 1}">${index + 1}. ${esc(item.severity)} ${esc(item.ruleId)}</a>`).join(" · ")}</nav>`;
   const cards = legacy ? `<section class="state"><h2>Legacy or invalid report</h2><p>Source verification and repair claims are unavailable for this report shape. Inspect canonical JSON with a compatible breaklint version.</p>${runState}</section>` : `<section class="state ${context.selection.complete ? "complete" : "incomplete"}"><h2>${context.selection.complete ? "Measured report" : "Incomplete report"}</h2><p>${context.selection.complete ? "The bounded context includes all recorded findings." : `Do not treat absence as repair. ${esc(context.selection.reason)}; omitted findings: ${context.selection.omittedCount}.`}</p>${runState}</section><section class="cards"><p class="section-label">Prioritized findings</p>${navigation}${isScreen ? screenCards : documentFindings.map((item, index) => `<article class="finding ${esc(item.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(item.severity)} · ${esc(item.ruleId)}</p><h2>${esc(item.runFindingId)}</h2><p>${esc(item.observation)}</p><dl><div><dt>Measured</dt><dd>${esc(item.measurement.value)} ${esc(item.measurement.unit)}</dd></div><div><dt>Threshold</dt><dd>${esc(item.measurement.threshold)} ${esc(item.measurement.unit)}</dd></div><div><dt>Scope</dt><dd>${esc(item.scope.document)} · diagnostic page ${item.scope.page} · ${esc(item.scope.coordinateSystem)}</dd></div><div><dt>Original source range</dt><dd>${contextOrigin(item)}</dd></div></dl><p><strong>Canonical evaluation:</strong> ${esc(contextEvaluation(item))}</p><p><strong>Repair option:</strong> ${item.repair.options.length ? item.repair.options.map(esc).join(" ") : "No concrete verified-source repair option is available."}</p><p><strong>Next check:</strong> inspect source and evidence, then recheck after a bounded repair.</p><p><a href="#finding-navigation">Back to findings</a></p></article>`).join("") || "<p>No finding cards were recorded. Infrastructure and nonmeasurement counts remain above.</p>"}</section>`;
-  return `<!doctype html><html lang="en" data-theme="${esc(theme)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'"><title>${esc(title)}</title><style>:root{--ink:#17231f;--paper:#f8f6f0;--muted:#53615b;--line:#bec8c0;--accent:#b55b24;--warn:#936c00;--bad:#9e3030;--space:clamp(1rem,3vw,2.5rem);color-scheme:light dark}html[data-theme=dark]{--ink:#edf2ec;--paper:#16211d;--muted:#c1ccc4;--line:#4d5a52;--accent:#ed9a61;--warn:#e8c163;--bad:#f18b8b}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}main{max-width:74rem;margin:auto;padding:var(--space)}header{border-inline-start:.4rem solid var(--accent);padding-inline-start:1rem}h1{font:700 clamp(2rem,6vw,4.4rem)/.98 Georgia,serif;letter-spacing:-.035em;margin:.4rem 0 1rem}.eyebrow,.section-label{text-transform:uppercase;letter-spacing:.08em;font-size:.78rem;color:var(--muted)}.state,.finding,.diagnostics{border:1px solid var(--line);padding:1.2rem;margin-block:1.2rem}.state.incomplete{border-inline-start:.4rem solid var(--warn)}.finding.error{border-inline-start:.4rem solid var(--bad)}.finding.warn{border-inline-start:.4rem solid var(--warn)}.finding.info{border-inline-start:.4rem solid var(--accent)}.diagnostics{overflow-wrap:anywhere}.finding h2{font-size:1rem;overflow-wrap:anywhere}dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;margin:1rem 0}dt{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}a{color:var(--ink);text-decoration-thickness:2px;text-underline-offset:.18em}.crop{margin:1rem 0;break-inside:avoid}.crop svg{max-height:32rem}.crop figcaption{font-size:.82rem;color:var(--muted)}.evidence figure{position:relative;margin:1rem 0}.evidence figure>.target-outline{position:absolute;border:3px solid #bd3500;box-shadow:0 0 0 1px #fff;pointer-events:none}.evidence figure>img{display:block;width:100%}@media(max-width:390px){main{padding:1rem}dl{grid-template-columns:1fr}.finding{padding:1rem}}@media print{@page{size:A4;margin:12mm}body{background:#fff;color:#000}main{max-width:none;padding:0}.finding,.state{break-inside:avoid}.finding:has(.crop){break-inside:auto}.crop{break-inside:avoid;max-height:none}.crop svg{max-height:90mm!important}a{color:#000}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}</style></head><body><main><header><p class="eyebrow">Canonical JSON report ${esc(context.canonicalReport.runId ?? "unavailable")}</p><h1>${esc(title)}</h1><p>JSON is canonical. This offline view is a bounded projection.</p></header>${comparison}${diagnostics}${cards}<footer><p>${esc(context.untrustedData.notice)}</p></footer></main></body></html>`;
+  return `<!doctype html><html lang="en" data-theme="${esc(theme)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'"><title>${esc(title)}</title><style>${BUNDLE_HTML_STYLES}</style></head><body><main><header><p class="eyebrow">Canonical JSON report ${esc(context.canonicalReport.runId ?? "unavailable")}</p><h1>${esc(title)}</h1><p>JSON is canonical. This offline view is a bounded projection.</p></header>${comparison}${diagnostics}${cards}<footer><p>${esc(context.untrustedData.notice)}</p></footer></main></body></html>`;
 }
 
 /** Writes report.json, context.json and a self-contained report.html. Assets are copied only after hash and path verification. */

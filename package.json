@@ -1,6 +1,6 @@
 {
   "name": "breaklint",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Source-bound layout diagnostics for paginated HTML documents and existing Playwright pages.",
   "keywords": [
     "pagedjs",
@@ -70,7 +70,7 @@
     "test:licenses": "node --experimental-strip-types tests/tools/licenses.ts",
     "test:secrets": "node tests/tools/secrets.mjs",
     "test:advisories": "node tests/tools/dependency-audit.mjs",
-    "test:release-tag": "node tests/tools/release-tag-contract.mjs --self-test",
+    "test:release-tag": "node tests/tools/release-tag-contract.mjs --self-test && node tests/tools/release-workflow-contract.mjs --check && node tests/tools/release-workflow-contract.mjs --self-test && node tests/tools/changelog-contract.mjs --check && node tests/tools/changelog-contract.mjs --self-test",
     "test:documented-figures": "node tests/tools/documented-figures.mjs --unit-tap .tmp/unit.tap --aggregate-tap .tmp/test.tap --live-summary .tmp/live-summary.json --live-report .tmp/live-report.json",
     "render:report-surfaces": "node --experimental-strip-types tests/tools/render-report-surfaces.mjs",
     "test:report-surface-mutants": "node tests/tools/report-surface-mutations.mjs",

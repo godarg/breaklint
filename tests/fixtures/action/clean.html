@@ -1,0 +1,41 @@
+<!doctype html>
+<!--
+  Action e2e fixture, clean arm. Complication: the clean arm has to reach exit 0 by MEASURING,
+  not by finding nothing to measure. A page with no candidates would end with exit 4 ("nothing
+  was judged"), and an Action that reported that as a pass would be the defect this fixture is
+  here to catch. So the document spans several pages, breaks paragraphs across page boundaries
+  and carries a heading with enough text under it, while nothing reaches a proof-source-A
+  boundary: no `break-inside: avoid` block is taller than the page and there is no SVG.
+  Self-authored text; no third-party content.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>breaklint Action fixture: clean</title>
+  <style>
+    @page { size: 120mm 90mm; margin: 12mm; }
+    body { margin: 0; font: 10pt/1.45 Georgia, serif; text-align: left; hyphens: manual; }
+    h1, h2 { font-weight: bold; margin: 0 0 6px; break-after: avoid; }
+    h1 { font-size: 14pt; }
+    h2 { font-size: 11pt; }
+    p { margin: 0 0 6px; widows: 2; orphans: 2; }
+  </style>
+</head>
+<body>
+  <h1>A short guide that should pass</h1>
+  <p>This document exists to be checked and to pass. It is long enough to run over several pages, so that the paginator has real work to do and the rules that look at page boundaries have something to measure.</p>
+  <p>Each paragraph is plain running text. None of them asks to be kept together, so none of them can be too tall for the page, and the only thing that decides where a page ends is the amount of text that fits.</p>
+  <h2>What the first section says</h2>
+  <p>A clean report is a statement about what was measured. It says that the checks ran, that they had enough to look at, and that nothing they looked at crossed the line that makes a build fail.</p>
+  <p>That is different from a report about an empty page. A run that measured nothing has nothing to say, and it must not be mistaken for a run that measured everything and found it in order.</p>
+  <p>The difference is visible in the counters the report carries: how many inputs were found, how many pages were analysed, how many rules ran and how many of them measured at least one candidate.</p>
+  <h2>What the second section says</h2>
+  <p>Headings in this document are followed by at least two paragraphs, so that a heading never has to sit alone at the foot of a page with its text starting on the next one.</p>
+  <p>Paragraphs are separated by a small gap and set flush left, which keeps the word spacing natural and gives the typographic rules ordinary lines to measure rather than stretched ones.</p>
+  <p>The text uses typographic quotation marks where it quotes anything at all, such as the word &#8220;clean&#8221;, and it uses a real dash &#8211; not a spaced hyphen &#8211; where a dash belongs.</p>
+  <h2>What the third section says</h2>
+  <p>The last section repeats the point in different words. A gate is only as good as the evidence that it looked, and a pass that cannot show its counters is not a pass that anyone should rely on.</p>
+  <p>This paragraph closes the document with a few more lines of text, so that the final page carries more than a single line and the layout ends on an ordinary, well-filled page.</p>
+  <p>One more paragraph follows, because a document that ends exactly at a page boundary is a special case, and this fixture is meant to be an ordinary one rather than a clever one.</p>
+</body>
+</html>

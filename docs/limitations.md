@@ -197,10 +197,14 @@ stylesheet, no `break-inside` and no script are needed, only a table that crosse
 The six documents are recorded, not published. They are chapters of a paid product, and this
 repository is public and MIT, so `corpus/public/pagination-residue-v1` keeps their SHA-256 values,
 rights and privacy review and exact expected residue while their bytes stay outside it —
-the `private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. Without
-`BREAKLINT_RESIDUE_CORPUS_ROOT` the gate says `SKIPPED` and claims nothing about them. What holds
-this class in CI is the public `tests/fixtures/fragmentainer-residue.html`, reduced from one of the
-six until no product text remained; the reduction is itself the measurement that nothing exotic is
+the `private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. That record is
+now historical: re-measured on 2026-09-18, five of the six documents and their shared stylesheet no
+longer exist at the recorded digests, so nobody can run its private half. `npm run
+test:pagination-residue` prints `NO CLAIM` and reads none of the six, with or without
+`BREAKLINT_RESIDUE_CORPUS_ROOT`, and it is no longer a CI or release step — a step that exits 0
+having read zero documents would be a green light over nothing. What holds this class in CI is the
+public `tests/fixtures/fragmentainer-residue.html` in the live suite, reduced from one of the six
+until no product text remained; the reduction is itself the measurement that nothing exotic is
 required.
 
 **Rendering is not reproducible across machines.** Browser rendering varies with the host operating
@@ -245,23 +249,100 @@ chain need no browser and no process group, so they work there. What does not wo
 your own HTML. Blocking the install would take away the part that functions in order to prevent
 the part that does not, and the part that does not already fails loudly rather than quietly.
 
-**A file that is not HTML gets an unhelpful error.** Point the tool at a Markdown file and the
-run ends with exit 3 and `pagination aborted: TypeError: node.getAttribute is not a function` —
-which is Paged.js throwing on a document that has none of the structure it expects, caught at the
-boundary and reported fail-closed. The behaviour is safe: nothing is measured and nothing is
-claimed. The message is not: it names an internal function rather than the mistake, and the
-mistake is one a first-time user makes. Found by a CI step whose own premise had quietly become
-false. Not fixed in 0.1.0, because a clean answer means deciding whether a non-HTML input is an
-infrastructure fault (exit 3) or an invalid invocation (exit 2), and that decision changes the
-exit matrix rather than a message.
+**Non-HTML input is refused by its name, not by its content.** An input path that does not end in
+`.html` or `.htm` — Markdown, PDF, a standalone SVG — ends with exit 2 and `unsupported input type`
+before any renderer starts and before the path is even opened; measured for a `.md` file, existing
+or missing: exit 2, nothing on stdout. A path that is not a regular file — a directory called
+`chapter.html`, for instance — is refused the same way with `input is not a regular file`; through
+0.6.0 it passed both checks, started Chrome and ended exit 3 with "resource byte limit exceeded".
+The content of a `.html` file is not sniffed. Markdown text
+saved under a `.html` name is served and parsed as HTML: one run of body text with no element in
+it. Such a run then ends with exit 3 and `geometry-cross-check-failed` ("measured no elements"),
+because a cross-check over zero elements is not a passed cross-check (`src/measure/cross-check.ts`)
+— measured locally on Chromium 141 with the evidence binding off; the zero-sample rule itself does
+not depend on the browser. A converter's HTML output is ordinary HTML and is measured as such. The
+paragraph that stood here through 0.6.0 described a Paged.js `pagination aborted` exit 3 for a
+Markdown file; that path is gone, because the name check runs first.
 
-**Foreign HTML is executed.** The run uses a fresh browser profile, keeps the sandbox on, has no
-flag that disables it, and blocks every network request by default. That is protection against
-mistakes and badly built documents, not against a deliberate attack on the browser sandbox. See
-[SECURITY.md](../SECURITY.md).
+**Foreign HTML is executed, and the offline policy is not an egress control.** The run uses a
+fresh browser profile, never asks for the sandbox to be off, and intercepts the page's requests,
+letting through only its own loopback origin (plus `data:`, `blob:`, `about:` and any
+`--allow-network` origin). Interception does not cover WebSocket, WebTransport or WebRTC
+connections a document opens, nor the browser's own traffic — secure DNS (DNS over HTTPS) and the
+component updater. Measured on 0.7.0 in the default offline mode with a self-authored document: a
+WebSocket to a loopback port that was not the tool's was delivered, a WebRTC STUN request was sent,
+and the run came back `clean`. The sandbox can be turned off from the environment, which breaklint
+does not clear: puppeteer-core adds `--no-sandbox` when `PUPPETEER_DANGEROUS_NO_SANDBOX=true`,
+honours `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES`, and the browser inherits variables such as
+`CHROME_EXTRA_FLAGS`; keep them unset. For a document you do not trust, run breaklint in a
+container or network namespace with no egress. See [SECURITY.md](../SECURITY.md).
 
 The longer, measurement-by-measurement account of what has been established and what has not is in
 [status.md](status.md).
+
+## The break cause of a page boundary
+
+A `forced` boundary is a decision the author made, so `layout/widow` declines the fragment that
+opens the page after it, `layout/orphan` the fragment that closes the page before it and
+`layout/orphaned-continuation-page` the page after it (`env/forced-break`, counted against
+coverage), and `layout/half-empty-page` does not call a last page it opened "likely intended".
+
+**The cause is the decision Paged.js' `shouldBreak()` took, evaluated again at the break token.**
+When a page is laid out, Paged.js 0.4.3 hands the collector a break token naming the node of its
+parsed source at which the next page starts. The collector evaluates the three clauses of
+`shouldBreak()` there, with the paginator's own rules: the node's `data-break-before` (unless it
+repeats its parent's and no node precedes it), its `data-previous-break-after`, and
+`needsPageBreak()`, which compares the named page in force at the node (its own `data-page`, else
+its nearest ancestor's) with the one in force at the node **before** it — a previous sibling, or an
+ancestor's previous sibling, whose named page comes from itself and its ancestors, never from its
+descendants. Only a token at the node the layout walker handed out last on the page can be
+forced — layout.js asks `shouldBreak()` about each node it walks, immediately before laying it
+out, and breaks at that node — so the collector records it from the `layoutNode` hook. A token
+that points into a node (an offset) was not forced: `shouldBreak()` was asked of that node where it
+started. Nor was a token at a node the walker never handed out: Paged.js deep-clones `p`, `li`,
+`td`, `dd`, `dt`, `blockquote`, `h1`–`h6`, `pre` and `figcaption`, so a `break-before` or `page:`
+on a block inside one is never evaluated, and an overflow can still end a page exactly at that
+block. Measured: a list whose items each hold a `break-before: page` box classified as forced at
+every such overflow, 36 widow and 36 orphan candidates declined and exit 4, against the same list
+without the declaration at exit 0; now both end exit 0 with the same findings. The boundary is then, in this order: `parity` when the next page is
+blank; `unknown` when there was no token or it carried no node; `forced` by a forcing break-before,
+break-after or named-page difference; `overflow` otherwise. `unknown` suppresses nothing.
+
+**Two readings of the finished pages were measured wrong, and neither is used.** Through 0.6.0 the
+named page was taken from each page's first source-bearing node, which on a real document is
+usually a wrapper — `<main>`, `<article>` — continuing from the page before, with no named
+ancestor: every boundary inside a named region and the one after it read as `forced`, and the
+boundary into the region as `overflow`. Measured on a self-authored report with a landscape region
+(patched Chromium 141, no evidence binding): 9 of 14 widow and 9 of 14 orphan candidates declined
+as `env/forced-break`, both below the coverage floor, exit 4; now 2 of 14 each, at the two
+boundaries the paginator forced. A first repair compared the named pages
+the two pages were **styled** with — the `pagedjs_<name>_page` classes on the page element — and
+that is not the paginator's rule either: the classes record which `@page` rule a page got, not
+whether a break was forced. `<div><section style="page: chap">…</section></div><p>` does not break
+on leaving the section, because the paragraph is compared with the `<div>`, and it is laid out on
+the `chap` page; the next overflow boundary, where the page style changes, was then called
+`forced`. The same first-node read also missed a `break-after` whose following element sits inside
+a continuing wrapper, and one followed by loose inline content: Paged.js puts
+`data-previous-break-after` on that following element, which may be an `<em>` at the head of the
+page. The live suite checks every boundary of its named-region documents against Paged.js' own
+`shouldBreak()` answers, recorded by a test-only wrapper around it.
+
+What remains:
+
+- **It reads Paged.js internals.** The token's node, the three attributes Paged.js writes into its
+  parsed source and the shape of `shouldBreak()` are not an interface; the version pin above is
+  what bounds that.
+- **A page Paged.js inserts for parity has no token**, so the boundary out of it has no decision
+  of its own; both edges of a blank page are `parity` by the page rule.
+- **An element hidden with `display: none` and carrying `page:` still breaks.** Paged.js compares
+  its named page like any other element's, so the page it would have started is forced although
+  nothing visible starts there, and the tool reports the break as `forced` because that is what
+  the paginator did.
+- **A `break-after` reason names the last source node before the boundary**, which is the element
+  that declared it only when that element ends its page itself — a paragraph, not a section
+  around it. A forced boundary's reason otherwise names the nearest source-bearing element at the
+  token's node: an inline element carries no source id, so a break at an inline named page names
+  the paragraph it is in. The classification does not depend on the reason.
 
 ## Raising the number of error rules
 
@@ -284,6 +365,7 @@ The real Studio repair attempt was performed by an independent agent. No fresh h
 
 ## 0.6.0 limits
 
+
 **A per-fragment applicability decision can be silent about a property of the whole element.**
 `layout/unbreakable-block-too-tall` skipped every fragment after the first and therefore compared
 the height of a *piece* against the page. Measured on 2026-09-18: a six-page `break-inside: avoid`
@@ -292,19 +374,6 @@ particular rule now sums its fragments. The **class** is not closed: every rule 
 decides applicability per fragment, and any future rule whose quantity belongs to the element
 rather than to the piece can repeat this. There is no gate that detects the shape; what caught this
 one was a red control that had quietly stopped being red.
-
-**Blocks carrying the same source id are not always fragments of one flow, and the snapshot does
-not distinguish them.** Paged.js implements `position: running(...)` by deep-cloning the element
-into the page margin box of every page, and the clone keeps the injected source id. The collector
-gathers blocks from the whole `.pagedjs_page`, margin boxes included, so `BlockRecord.fragmentIndex`
-and `BlockRecord.fragmentCount` count those clones as fragments. Measured on 2026-09-18: an ordinary
-twelve-page document whose only running header is three lines tall produced thirteen "fragments" of
-an 81.59 px header, and the first version of the summed height above reported 979.08 px against a
-619.83 px page as `severity: error` — a build-breaking finding on a document with nothing too tall
-in it. This rule now only counts a box that STARTS inside the content box of its page, which
-excludes a margin box by construction. **The underlying snapshot fields are still wrong for running
-elements**, and any other consumer of `fragmentIndex`/`fragmentCount` inherits that. Repairing the
-collector is a separate change with a wider blast radius and is not in this release.
 
 **How often oversized `break-inside: avoid` blocks occur in real documents is not measured.** The
 repair is arithmetically correct and conservative, but its frequency in the field is unknown, so
@@ -334,18 +403,6 @@ longer claims anything about pages it did not measure. A block that would have f
 differently sized page elsewhere in the document is still reported, because it still broke its own
 `break-inside: avoid` where it was.
 
-**Fragments are correlated by authoring-source id.** A block whose fragments carry no `sid` — a
-node the paginator produced with no authoring source — keeps the old first-fragment behaviour. It
-is not guessed at by geometry, and it is not reported as a decline either, because the first
-fragment is still a real measurement of a real box.
-
-**Naming an off-by-default rule in a config file turns it on, even with only options.** `rules` is
-read as "the caller has an opinion about this rule": `false` disables, anything else enables, and
-that includes an options object such as `{ "layout/half-empty-page": { "minNetFill": 0.4 } }`. For
-the twelve rules that are on anyway this is invisible; for the one that is not, it means tuning it
-also activates it. That is the intended reading — configuring a rule you do not want is not a
-thing anyone does — but it is not obvious, so it is written down.
-
 **`kill(pgid, 0)` answering `EPERM` is read as indeterminate, not as failure.** Measured on darwin
 25.6.0, macOS answers `EPERM` transiently for a process group this process created and owns while
 that group is being torn down — 8 of 20 acquisitions, every one followed within 10 ms by `ESRCH`
@@ -362,3 +419,289 @@ it is not admitted here, not hashed here and not reproducible from this reposito
 cites the number says "a corpus constructed for this purpose"; this paragraph says the rest of it.
 The decision it supports is reversible by configuration and moves no exit code either way, which is
 why it was taken on that evidence — the same standard would not have been enough for a gating rule.
+
+## 0.7.0 limits
+
+**`body { column-count: 1 }` can end `clean` over a PDF that lost most of its content — a known
+false-clean defect, not fixed in 0.7.0.** `column-count: 1` or `columns: 1` on `body` makes the
+body a multi-column container, and Paged.js then lays its pages out inside it. Measured by
+independent verifications of this release cycle: the produced PDF was missing most of the
+document's content — in one run it held one page and about half the words — while the run
+reported its pages as measured and ended `clean`, exit 0. No check in this release catches it; the `env/multicolumn` decline applies to multi-column blocks
+the rules measure, not to a paginated body.
+
+**A `display: contents` heading that a page break splits can lose its continuation — a known
+false-clean defect, not fixed in 0.7.0.** Paged.js does not carry the rest of such a heading to
+the next page: measured by an independent verification of this release cycle, 17 of the heading's
+89 words were printed, and the run ended exit 0. No rule or cross-check in this release sees the
+missing text. Avoid `display: contents` on headings long enough to break, or check the PDF.
+
+**Nothing printed in a page margin box is measured by any block, line or page rule.** Paged.js
+implements `position: running(...)` by deep-cloning the element into the margin box of every page,
+and `position: fixed` by cloning it into every page box; both clones keep the injected source id.
+The collector used to gather blocks from the whole `.pagedjs_page`, so every clone became one more
+"fragment" of its source block. Measured on 2026-09-24 with Paged.js 0.4.3: a six-page document
+with a one-line running title and an eight-line side running element carried seven records per
+element and reported ten `layout/widow` and `layout/orphan` warnings, every one about a clone; under a running header,
+the blank page a `break-before: recto` inserts was not blank, both of its boundaries came out
+`overflow`/`forced` instead of `parity`, it drew a `layout/orphaned-continuation-page` finding, and
+every page was anchored to the header, so three `layout/half-empty-page` findings on three pages
+shared one fingerprint. An earlier repair of the one symptom that could fail a build —
+`layout/unbreakable-block-too-tall` summing the clones — decided flow membership in that rule by
+coordinates, and that test also discarded every fragment of a full-bleed block (see below).
+
+The snapshot, the collector and the evidence overlay now all keep only source blocks inside a
+page's content area, `.pagedjs_pagebox > .pagedjs_area`. That area holds the page content **and the
+footnote area**: footnotes stay part of the page they are printed on, as before. It is an inclusion
+test on the page structure rather than an exclusion by class name, so author markup that happens to
+carry a `pagedjs_margin` class does not leave the flow, and a page with no content area stops the
+run (exit 3) instead of being measured as empty. What that leaves unmeasured, stated because no rule
+reports it:
+
+- **Margin-box content.** A widow, an oversized block or an unfilled band inside a running header or
+  footer is not judged. Generated margin content (`@top-center { content: "…" }`) never was.
+- **A running element keeps exactly one record**: the in-flow original Paged.js leaves in the page
+  content with an inline `display: none`. Snapshot 5 records each block's computed `display` and how
+  many margin-box copies of it Paged.js printed (`marginCopies`), so the block rules that could
+  select the original — `layout/unbreakable-block-too-tall`, `layout/heading-at-page-bottom`,
+  `type/excessive-word-spacing` — record it as `excluded` with the reason
+  `rule/target-in-margin-box`, outside the coverage base, and never as measured. Until this repair
+  it counted as measured at 0 px, and a document whose only avoid block was a running element
+  reported full coverage for a check that looked at nothing. An element the author hid
+  (`display: none`, no margin copies), or one inside a hidden subtree or a closed `<details>`, is
+  `rule/target-not-rendered`. The type rules still read a running element's source text once,
+  attributed to that hidden position, where there is no box for evidence to mark. A page is
+  anchored to its first rendered block, so the hidden original never anchors one.
+- **A `display: contents` block is judged by what it prints, never by its zero box.** It generates
+  no box of its own while its text and children are laid out. `layout/unbreakable-block-too-tall`
+  asks about a box, and `break-inside` does not apply to an element without one, so such a block is
+  `not-applicable` with the reason `rule/target-generates-no-box`, outside coverage; its children
+  are candidates in their own right. (An unreleased intermediate state declined it against
+  coverage instead, and a key/value grid whose `li` items were flattened with `display: contents`
+  under a print rule `li { break-inside: avoid }` ended exit 4 with twelve declines, where it had
+  ended exit 0.) An
+  image-only `display: contents` figure is the same case, not an unrendered one.
+  `layout/heading-at-page-bottom` places such a heading, and a block below it, by its visible line
+  boxes; with no visible line but recorded lines it is excluded as `rule/target-not-visible`, and
+  with no line or unrecorded lines it is declined as `env/invalid-measurement`, counted.
+  `type/excessive-word-spacing` reads the visible lines of every block: lines that are all
+  invisible are `rule/target-not-visible`, a block with no line at all (empty, or image-only) is
+  `rule/no-text-lines`, and lines the snapshot did not record are declined as
+  `env/invalid-measurement` — never a measurement of factor 0.
+- **A box of zero by zero is not by itself "not rendered".** A block counts as not rendered only
+  when the snapshot shows nothing printed from it: `display: none`, or recorded lines none of which
+  is visible (an element inside a hidden subtree or a closed `<details>` has no line box). A
+  zero-size block that is neither — `width: 0; height: 0; overflow: visible` prints its text
+  outside the box, or its lines were not recorded — is placed by its visible lines where the rule
+  reads positions (`layout/heading-at-page-bottom`, and the continuation rule's flow), measured
+  from its lines by `type/excessive-word-spacing`, and declined as `env/invalid-measurement`,
+  counted, by `layout/unbreakable-block-too-tall`, whose question is the height of a box that
+  printed nothing of its own. A line is visible when any text on it is: visibility is read from
+  each text node's element, so `p { visibility: hidden } span { visibility: visible }` prints and
+  is measured. What remains: `layout/unbreakable-block-too-tall` still reads the BLOCK's own
+  visibility, so a hidden block with a visible descendant is excluded there as not visible.
+- **A split block is judged at the first fragment that printed.** `layout/unbreakable-block-too-tall`
+  takes the block's lead fragment to be the first one laid out with a box of its own and visible,
+  joined by source id; earlier fragments are recorded `not-applicable` as
+  `rule/fragment-not-rendered`. Measured on 2026-09-25 with hostile documents: a script that set
+  `display: none` on only the first fragment of a four-page avoid block, or marked it as a note and
+  moved it into the footnote area where it has no box, hid the whole block (exit 0, where the base
+  reported it at exit 1), because the later fragments were skipped as continuations of an excluded
+  candidate. What remains: a script that hides EVERY fragment hides the block, which is then also
+  not printed; a script that changes the first printed fragment's own `break-inside` changes the
+  question the rule asks; and a two-fragment block whose first fragment is hidden is judged by the
+  second fragment's box alone, as every two-fragment block is (see the rule page).
+- **A `position: fixed` element is not measured at all.** Paged.js removes it from the flow, so there
+  is no in-flow original, and its per-page clones are outside the content area. (An element whose
+  `position: fixed` is an INLINE style is not recognised by Paged.js at all: it stays in the flow,
+  is measured there, and is painted at the viewport origin, where its evidence marks cannot be
+  placed.)
+- **Markup that reproduces the page structure inside a running element comes back into the flow.**
+  The test asks whether an element has an ancestor that is the area child of a page box. A running
+  element whose own markup contains `<div class="pagedjs_pagebox"><div class="pagedjs_area">` makes
+  its descendants pass that test in every margin-box clone, so they are measured once per page again
+  — the pre-repair behaviour, with its false `layout/widow` findings and shared fingerprints, for that markup only.
+  It cannot hide flow content from measurement: that would need an element of the real content area
+  to lose the ancestor it has. A class name alone (`pagedjs_area` without the page-box parent) does
+  not pass the test.
+- **Inline SVG inside a margin box is still collected once per page, and SVG text there stops the
+  run.** The SVG collector still reads the whole page, so a running element that contains an SVG
+  contributes one SVG record per page, all with one key. When that SVG carries `<text>` and the
+  element repeats on two or more pages, every clone carries the same injected target id,
+  `svg/text-overflows-viewport` sees one target evaluated twice, and its accounting invariant ends
+  the run `checker-crashed` (exit 3). Measured on 2026-09-24 on a three-page document with a
+  running logo; it predates the flow repair above and is not changed by it.
+- **Footnotes are in the flow, but a document with footnotes does not reach the rules.** Measured on
+  2026-09-24 with the real paginator: a block footnote moved into the footnote area is recorded on
+  its page and is an edge of that page's flow, and the source-id check accepts its position after
+  the page content (`tests/live/breaks.test.ts`). The production run stops before any rule, though:
+  Paged.js gives each footnote call an `href` built from the paginator's per-run random `data-ref`,
+  the paired control run reads that as a changed resource, and the run ends
+  `injection-interference` (exit 3). That holds for block and inline footnotes alike, before this
+  repair and after it. Before it, a block footnote already stopped the run one step earlier, at
+  the source-id order check.
+
+**The source-id integrity check reads the order of the flow; copies outside it are checked for
+identity, presence and the signature of the Paged.js step that put them there, not for order.**
+Paged.js puts three kinds of copies out of source order: a running element's clones in the margin
+boxes (which come before the content area in every page box), a block footnote in the footnote area
+(after the page content) and a `position: fixed` clone at the head of every page box. The check used
+to read every source id in the document in document order, so a running title that was not the
+first element of the source — a heading before it, or a section around it — ended the run
+`checker-crashed` (exit 3). What still fails the run: any attribute change of a reserved id,
+anywhere; an unknown id, in the flow or out of it; an expected id that is nowhere; a flow whose
+order differs from the source; an id found only in margin boxes, without the in-flow original every
+running element keeps; an id in the footnote area outside an element Paged.js marked as a note
+(`data-note="footnote"`); and an id in a page box that is not on every page, sits after the page's
+content area, or also occurs in the flow — none of which Paged.js produces for a `position: fixed`
+element. Each of those is an element a script moved out of the flow. What the signature cannot
+tell apart is a script that reproduces it exactly — marks an element as a note before Paged.js moves
+it, or clones it into the head of every page box and removes the original.
+
+**Evidence marks follow the same boundary, and three kinds of page still cannot bind.** The overlay
+places no mark on a margin-box or page-box clone: no finding can target one, and requiring a mark
+for it left every page of a document with a running header unbound, so that the default run
+(evidence binding on) ended exit 4 — measured on 2026-09-24 before this repair, with 24 unplaced
+marks on a six-page document with two running elements. A fragment that bleeds into the side margin
+is marked where it is printed, inside the page box; before this repair all 212 marks of a full-bleed
+document were refused; measured after it, every one of the 212 is laid out exactly where the overlay
+recorded it and inside the page box. Whether the PDF text layer then returns each mark at that
+position can only be checked on a browser whose PDF carries the marks: the Chromium 141 build these
+repairs were developed on writes a PDF with no mark in it at all, in the margin or not, so that
+half is established by the live suite on current Chrome in CI and nowhere else. What does not bind,
+and so ends a run with evidence binding on at `insufficient-coverage` (exit 4):
+
+- a page whose flow contains a fragment pulled ABOVE or below the content box (a negative top
+  margin, content hanging past the column): down the page a mark must lie inside the content box,
+  so that mark is refused, and a fragment with no mark on its page leaves the page unbound. The
+  bound is a conservative choice, not a measured necessity: the marks hang in Paged.js'
+  multi-column fragmentainer, and on Chromium 141 a mark positioned above or below it printed at
+  its DOM position; the vertical bound was kept rather than rely on that for every browser;
+- a page carrying a footnote-area block, for the same reason (the footnote area lies below the
+  content box) — moot today, because footnotes stop the run earlier;
+- **a page with no source block at all, such as the blank page a `break-before: recto` inserts.**
+  A page binds only on marks it carries (`src/render/evidence.ts`), and required evidence is
+  complete only when every page binds (`src/core/engine.ts`), so every document with a
+  parity-blank page ends exit 4 under evidence binding, with or without running elements. That is
+  the evidence contract as it stands, read from the code; the margin-box repair did not change it.
+
+**A page is anchored to the first block that starts on it.** A block that spans pages — `<main>`,
+`<article>`, a section, a full-bleed block — has a fragment on every page it covers, and as an
+ancestor it comes first in document order, so it used to anchor every one of those pages: the page
+findings on them shared one fingerprint. Now the first block whose first fragment is on the page
+anchors it. Only a page on which nothing starts — the middle of a single block taller than a page —
+falls back to its first continuing block, and two such pages of the same block share an anchor. A
+wrapper that starts on page 1 still anchors page 1, keyed by its author id or, without one, by the
+signature of all its text, so without an id that page's fingerprint follows any edit inside the
+wrapper.
+
+**Flow membership is decided by page structure, never by coordinates, so a fragment that bleeds
+into the margin still counts.** `layout/unbreakable-block-too-tall` sums every record carrying the
+element's source id. A coordinate test ("a real fragment starts inside the content box") cannot tell
+a margin box from a fragment that bleeds into the margin: measured on 2026-09-24, a
+`break-inside: avoid` block with negative side margins had all six fragments at x = 18.91 against a
+content box at x = 56.69, the filter discarded every one of them, the first fragment (335.81 px
+against 340.16 px) was measured instead of the 1865.61 px sum, and the document came back `clean`.
+It is reported again.
+
+**Fragments are correlated by authoring-source id, and a split block that cannot be correlated is
+declined, not measured on one piece.** A split block whose fragments carry no `sid` — every block of
+a `--no-source-map` run, or an element a script created — has nothing to join its fragments by, and
+neither has one whose sid does not account for exactly the fragments the snapshot counted.
+`layout/unbreakable-block-too-tall` used to measure the first fragment of such a block, which
+compares a piece with the page and can call a six-page block clean. It now declines it as
+`env/invalid-measurement`, which counts against the rule's coverage floor: the run ends
+`insufficient-coverage` (exit 4) rather than `clean`. An unsplit block without a sid is the whole
+block and is still measured. In a `--no-source-map` run a split block does not reach the rule today:
+measured on 2026-09-24, the sid-less source join refuses it first (`checker-crashed`, exit 3). The
+decline is what remains once that join can join fragments.
+
+**Naming an off-by-default rule in a config file turns it on, even with only options.** `rules` is
+read as "the caller has an opinion about this rule": `false` disables, anything else enables, and
+that includes an options object such as `{ "layout/half-empty-page": { "minNetFill": 0.4 } }`. For
+the twelve rules that are on anyway this is invisible; for the one that is not, it means tuning it
+also activates it. That is the intended reading — configuring a rule you do not want is not a
+thing anyone does — but it is not obvious, so it is written down.
+
+**Page fill counts glyph boxes, not line boxes, and has no ceiling.** `netFill` merges the
+vertical bands of every text run's client rectangles — the glyph content area, not the line box —
+and of replaced elements, and divides by the content box height. Half-leading and block margins
+never enter it, so a page no further line would fit on reads roughly glyph height over line pitch,
+which the font and the leading set. Measured on full pages that are not the last of their document
+(Chromium 141 on Linux, Paged.js 0.4.3, the machine's default serif and sans-serif; not re-measured
+on the current Chrome that CI runs): 0.58–0.72 at `line-height: 1.5`, 0.51–0.54 at 2, 0.34–0.36 at
+3 (12 pt on A5 and 11 pt on A4). Both page-fill rules read this quantity. `layout/half-empty-page`
+cannot separate a full page from a sparse one near its 0.60 threshold, and stays experimental and
+off by default. `layout/orphaned-continuation-page` judges only a page whose content ends on it:
+the next page does not open with its text running on, because a page whose text runs on and opens
+the next page stopped for want of room. On a page it does judge it still reads net fill, so at
+`line-height: 3` every such page falls below its 0.50 threshold however full it is and whatever
+follows it: measured, 11 of 13 lines before a figure that did not fit read 0.29, and a tail page
+filled to its last line 0.34. The "running on" test relies on the collector keeping margin-box
+content out of the snapshot, as this release's collector does: a clone in a side margin box lies
+inside the content box and would count as running text. A line-box fill, each text rectangle
+widened to its line height, is the named next step for the net fill. It changes the snapshot shape and the quantity
+behind the public options `minNetFill` and `maxNetFill`, which needs an owner decision, and it is
+not in this release. None of these readings is a calibration.
+
+**Which block a split belongs to is read from four recorded facts and line geometry.** The
+snapshot records a block's lines from every text node beneath it and carries no parent link, so a
+wrapper and the paragraph inside it hold the same line boxes. `layout/widow` and `layout/orphan`
+count a line as a block's own when the collector saw text on it whose nearest block container is
+that block (`TextLine.ownText`, Snapshot 5), and count only the run of the block's own lines next to
+the break. The run ends at an in-flow nested block and passes over a float, a positioned box or an
+inline-level box beside the block's text, which the recorded `display`, `float` and `position` tell
+apart; and a run is judged only when the run on the other side of the break, in the block's
+fragment joined by source id, is own text too. Checked against a probe of the same documents with
+plain Paged.js and Range rectangles, at four thresholds each, on patched Chromium 141: 24 layouts,
+all 96 judgements agreeing, and a second set of 19 layouts, 70 of 76 agreeing, where the six
+disagreements are the two custom-element layouts at the three stricter thresholds — splits no rule
+sees, and none reported wrongly. Pinned in `tests/live/rule-targets.test.ts`. On the first-party
+robustness document (`dargel-kleingewerbe`) three `layout/orphan` findings and one `layout/widow`
+finding were wrappers around nested blocks and are gone. What remains unseen: a block container the
+snapshot does not record — a custom element, a `<span style="display: block">` — owns its text, so
+its splits are not judged and the block around it is not judged on those lines; a split block
+without a source id is judged on its own side of the break only; and a `display: contents` element
+whose lines no recorded block holds is declined (`env/invalid-measurement`), not judged by its own
+value. `type/excessive-word-spacing` asks about the text rather than its container: it gives a line
+to the deepest record that records it, by geometry, because that element's font set the gaps, and
+takes whether the line is justified from its block container; there, text of a block's own lying
+between two nested blocks on one line (between two floats) is taken for theirs. Three more limits
+of the fragmentation rules, found by an independent verification and not fixed in this release: a
+recorded block inside an UNRECORDED inline-level box (a `<p>` in a `<span style="display:
+inline-block">` or `inline-flex`) is taken for an in-flow block, so its lines end the surrounding
+block's run and can give a false `layout/orphan` or `layout/widow` — the pass-over of inline-level
+boxes holds only for boxes the snapshot records; text in an unrecorded absolutely positioned or
+floated box counts as the surrounding block's own lines; and lines are grouped by the top edge of
+their text rectangles within 0.5 px, so an inline `<code>`, `<sup>` or badge at another height
+than its line forms a line of its own, which both these rules and `type/excessive-word-spacing`
+count as one (the last predates this release).
+
+**The natural space comes from the font, or from the layout where a canvas cannot reproduce the
+font.** `type/excessive-word-spacing` divides by the advance of one space in the block's computed
+font plus its `letter-spacing`, times its effective `zoom`, measured with a canvas inside the page
+once `document.fonts` reports the font loaded. Where a canvas cannot reproduce the font —
+`font-variation-settings` beyond a `wght` that restates the weight, `font-size-adjust`, a
+non-keyword `font-stretch`, synthesised caps other than `small-caps`, a font not yet loaded — the
+layout is sampled instead, pooled over the document per layout key (font, caps, `letter-spacing`,
+`word-spacing`, variation settings, `font-size-adjust`, `font-kerning`, zoom): gaps between two
+consecutive words of one text node (in left-to-right text; in right-to-left text the words are
+paired in visual order and a gap between two text nodes can be sampled, which pollutes the divisor
+only if every sample of the key is polluted alike, since samples that disagree decline the block)
+whose element computes that key, separated by collapsible
+whitespace only, on the last line of the last fragment of a justified block that is its own block
+container, has no nested source block and whose `text-align-last` does not justify that line. The
+median is taken only when every sample lies within 0.1 px or 3 % of it. A block for which neither
+source gives a value is declined as `env/invalid-measurement` and counted against coverage, so a
+document in which more than half of the justified blocks are declined ends `insufficient-coverage`
+(exit 4). Gaps set in an inline element in another font or size are still measured against the
+block's own space (a monospace `<span>` in serif read 2.41× on natural spaces); an inline element's
+own `word-spacing` is not judged. `tests/live/rule-targets.test.ts` pins ten canvas-measured font
+settings against their unjustified last lines and the two layout-measured ones against an
+independent one-line control each (within 0.05 px; measured within 0.03 px on patched Chromium 141
+with the machine's default fonts), and CI re-takes exactly those. No web font (`@font-face`) is
+among them: on the Chromium 141 these changes were developed on, a document loading one does not
+reach a quiescent state, so the pin could not be recorded there. Right-to-left text is not judged
+at all, and this predates the release: word gaps are read in text order, which in right-to-left
+text runs against their positions, so every gap reads negative and is skipped, and the block is
+reported as measured with a largest factor of 0.
