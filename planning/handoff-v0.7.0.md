@@ -1,158 +1,153 @@
-# Handoff — breaklint 0.7.0 cycle
+# Handoff — breaklint 0.7.0
 
-Status: **cycle closed by the owner on 2026-09-25; not ready to tag.** This file records where the 0.7.0 cycle stands, what was
-proven and by whom, and which decisions the owner has to take before release preparation can
-finish. Nothing has been published, tagged, or merged to `main` from this session.
-
-## 1. Where things are
+Status: **release-prepared; not yet tagged.** The owner still has two things to do: merge the
+integration PR, and have a rostered human carry out a genuine report-surface review. Nothing has
+been published, tagged, or merged to `main` from this session.
 
 - Integration branch: `claude/inspiring-archimedes-x2xq5t`.
-- Integration PR: godarg/breaklint#18 (draft, not merged).
-- `package.json` is still `0.6.0`. No version bump, release-workflow pin, dated CHANGELOG heading
-  or README poster pin has been made. See §6 for why.
+- Integration PR: godarg/breaklint#18. It is not merged.
+- Author on record: `package.json` has `"author": "Gottlieb Dargel"`, and `LICENSE` reads
+  "Copyright (c) 2026 Gottlieb Dargel". Every commit is authored as `godarg`.
 
-### Integrated work packages (each merged with `--no-ff`; the merge message records the verification)
+## 1. In 0.7.0
 
-| package | register items | independent verification | integration merge | CI on the integration head |
-|---|---|---|---|---|
-| WP-D1 docs truth, release plumbing | G-30 G-40 G-42–G-46 G-52 G-55 G-56 G-67 G-68 | 3 rounds PASS, then an orchestrator delta check | ebf1c91 | run 36077869324 green |
-| WP-K3 advice precedence, widows/orphans pin | G-27 G-28 | 2 rounds PASS, then an orchestrator delta check; CI probe #21 green on Chrome 153 | 2cae038 | green |
-| WP-E1 GitHub Action, CI recipe, SARIF/JUnit/Markdown | pipeline | PASS; CI probe #22 green (all Action arms); micro-round checked by the orchestrator | 9c97c0d | run 36091216378 green |
-| WP-F1 margin-box content leaves flow membership | G-02 G-04 G-06 G-69 G-71 G-72 | 32c2272 FAIL → eee9f06 PASS → 3380781 PASS; CI probe #20 green with evidence binding | d0623d1 | green |
-| WP-F4 fill rules judge only pages that end early | G-14 G-15 | 4 rounds PASS, the last with a medium fixed and checked by the orchestrator | 8c3e4fd | run 36094144890 green |
-| WP-F1b Snapshot 5 (`display`, `marginCopies`), judge what printed | F1 follow-ups | 75f596d PASS; CI probe #29 green; micro-round e20bed8 checked by the orchestrator | 2a7ba4c | run 36100693632 green |
+Each package was merged with `--no-ff`. The merge message records how it was verified.
 
-Schema stamps on the integration head: Report 5 (unchanged), **Snapshot 5** (moved once, by
-WP-F1b, with migration and an engine gate), context pack 2, Configuration Contract 1.
-
-### Work packages stopped under the brief's stop condition
-
-The condition: two consecutive verifier rounds, each finding new blocker or high defects. None of
-these packages is merged. Each branch and worktree is intact. The owner decides whether each gets
-one final round.
-
-| package | register items | last frozen commit | why it stopped (last round) |
+| package | register items | independent verification | integration merge |
 |---|---|---|---|
-| WP-S1 SVG local viewport (+ WP-S2 bracket on top) | G-10 G-62 G-63 G-73–G-76 (G-09 G-61 G-66) | 2ea9801 (S2: 18e81e4) | CI red on nested SVGs (Chrome 153); outer-SVG clip is pixel-snapped; shadow-DOM and `-webkit-mask-box-image` clipping missed |
-| WP-F3 split-block lower bound | G-03 G-07 G-08 G-81 | 8a374a2 | CI red; side-by-side inline-block columns and `::first-line` give false errors |
-| WP-R1 report surfaces | G-31–G-39 | ed84d2c | CI red (`selfcheck:live` oversized-card control); phone overflow with real evidence names |
-| WP-C1 + WP-C2 output drain, browser floor, lifecycle, egress | G-01 G-23 G-48–G-51 G-59 G-77 G-80 G-85 | 14d62d3 | Chrome 153 DNS-over-HTTPS bypasses the offline resolver lock; inherited `CHROME_EXTRA_FLAGS` reaches the browser |
-| WP-F5 footnotes and blank pages | G-78 G-79 | dc664e3 | a footnote clipped at the footnote area's edge still binds its page |
-| WP-L1 local-uri absolute paths | G-86 G-88 | 48efb2f | `@import` without whitespace escapes discovery and the new guard (pre-existing mechanism) |
-| WP-X cross-check, multicol, residue | G-12 G-13 G-64 G-65 | 9750c5e | CI red (real-document manifest); clip exemption too broad; `body { column-count: 1 }` |
+| WP-D1 docs truth, release plumbing | G-30 G-40 G-42–G-46 G-52 G-55 G-56 G-67 G-68 | 3 rounds PASS, then an orchestrator delta check | ebf1c91 |
+| WP-K3 advice precedence, widows/orphans pin | G-27 G-28 | 2 rounds PASS; CI probe green on Chrome 153 | 2cae038 |
+| WP-E1 GitHub Action, CI recipe, SARIF/JUnit/Markdown | pipeline | PASS; CI probe green (all Action arms) | 9c97c0d |
+| WP-F1 margin-box content leaves flow membership | G-02 G-04 G-06 G-69 G-71 G-72 | FAIL → PASS → PASS; CI probe green with evidence binding | d0623d1 |
+| WP-F4 fill rules judge only pages that end early | G-14 G-15 | 4 rounds PASS | 8c3e4fd |
+| WP-F1b Snapshot 5 (`display`, `marginCopies`) | F1 follow-ups | PASS; CI probe green | 2a7ba4c |
+| WP-B1 named-page break cause | G-99 G-107 | final round PASS with one medium (a deep-cloned forcing element gave a false forced break), fixed in 0c24a32; orchestrator delta check 36/36, and the mutation turns 1 test red | 2336a4b |
+| G-01 / G-77 output drain (extracted from WP-C1) | G-01 G-77 | orchestrator check: piped output 84578 B equals the `--out` size; `head -c 100` gives exit 3 | d7c477d |
+| WP-R2 wrapper widows/orphans, natural space | G-82 G-83 G-104 G-105 | final round PASS with two mediums, documented in `docs/limitations.md` (RTL sampler; an unrecorded inline-block that contains a block can give a false orphan) | a1a72b9 |
+| WP-R1 report surfaces | G-31–G-39 | final round PASS; micro-round db187c9 (print caption gap, header-rule count control, future-time rejection) | c1e220c |
+| Release preparation | — | independent release audit (§3) | f1dc9f2 |
 
-### Work packages stopped or unfinished at close
+- **Schema stamps:** Report 5 (unchanged); **Snapshot 5** (moved once, by WP-F1b, with migration
+  and an engine gate); context pack 2; Configuration Contract 1.
+- **CI:**
+  - run 36118067384 is green on the R2 merge;
+  - run 36122707882 is green on the release-prep head: 830/830 tests and 106/106 live.
+  - The run on the head carrying the audit fixes is recorded in the PR #18 description.
+- **Release prep (86b1304):**
+  - `package.json` and both root fields of `package-lock.json` are at 0.7.0;
+  - the `release.yml` tag trigger is `v0.7.0`;
+  - CHANGELOG has `## 0.7.0 — TBD-at-tag`;
+  - the status.md release record makes no publication claim;
+  - the README poster is pinned to `https://raw.githubusercontent.com/godarg/breaklint/v0.7.0/assets/breaklint-film-poster.jpg`;
+  - `npm pack --dry-run` lists 190 files. It was reviewed: no `planning/`, `tests/`, `action/` or corpus work files ship.
 
-| package | register items | last frozen commit | state at close |
+## 2. Not in 0.7.0
+
+Each of these packages got one final round with a hard exit: any new blocker or high defect
+dropped the package. The branches are pushed and intact.
+
+| package | branch (`claude/…`) | tip | why it was dropped |
 |---|---|---|---|
-| WP-R2 wrapper widows/orphans, natural space, inline hyphen | G-82 G-83 (G-104 G-105) | c502ead | stopped: round 2 FAIL (the word-spacing layout fallback can sample non-natural gaps and hide findings); the wrapper fixes held (64/76 vs 40/76 on base) |
-| WP-B1 named-page break cause | G-99 (G-107) | cae6d1a | round 1 FAIL (false `forced` on leaving a nested named region); round 2 not finished at close |
-| WP-K1 + WP-K2 self-authored corpus and closed-world gate | G-29 (G-106) | corpus 6ffba2a, gate 0cbf466 | corpus reviewed (errata E1–E43). Gate round 2 FAIL: timeouts do not reach Chrome's own process group. Locally 15/20 pass; the 5 failures need WP-F5 and WP-L1 |
+| WP-F5 footnotes, blank pages | wp-f5-real-documents | 92a7d3a | a footnote clipped at `.pagedjs_footnote_content` still binds its page |
+| WP-X cross-check, multicol, residue | wp-x-geometry | 8dbcea1 | `selfcheck` red; the clip exemption can still be bypassed |
+| WP-L1 local-uri absolute paths | wp-l1-local-uri | 992177a | an escaped `@import` gives a silent clean |
+| WP-C1 + WP-C2 floor, lifecycle, egress | wp-c1-output-floor, wp-c2-lifecycle | ea3f60a, 73562e2 | Chrome 153 still connects to `[2001:4860:4860::8888]:443` in offline mode |
+| WP-S1 (+ S2) SVG local viewport | wp-s1-svg-viewport, wp-s2-svg-bracket | 76f0728, 18e81e4 | Chrome 153 reports nested SVG sizes as `auto`; a `startsWith` spoof; false errors under zoom |
+| WP-F3 split-block lower bound | wp-f3-fragment-bound | bb33a6a | self-application ends exit 4; false error on `min-content` |
+| WP-K1 + WP-K2 corpus and closed-world gate | wp-k1-corpus, wp-k2-corpus-gate | 6ffba2a, 3c10784 | the gate cannot pass without F5 and L1; it was not weakened |
 
-### Where the unintegrated work lives
+**Known defects that ship in 0.7.0.** Each is disclosed in `docs/limitations.md` and `SECURITY.md`,
+or in the register.
 
-Every unintegrated package branch is pushed as `claude/wp-<name>`:
-- b1-break-cause, c1-output-floor, c2-lifecycle, f3-fragment-bound, f5-real-documents;
-- k1-corpus, k2-corpus-gate, l1-local-uri, r1-surfaces, r2-rule-findings;
-- s1-svg-viewport, s2-svg-bracket, x-geometry.
+- **Network (G-80, G-91, G-94):**
+  - the offline mode blocks page requests, but not browser-level egress (secure DNS, the component updater);
+  - `--allow-network` does not limit WebSocket, WebRTC or WebTransport.
+- **Sandbox environment (G-85, G-92):** these variables disable Chrome's sandbox:
+  - `PUPPETEER_DANGEROUS_NO_SANDBOX`;
+  - `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES`;
+  - an inherited `CHROME_EXTRA_FLAGS`.
+- **Footnotes and blank pages (G-79, G-78):** documents with footnotes can end exit 3.
+- **Silent content loss:**
+  - G-103: `body { column-count: 1 }` loses content;
+  - G-89: a `display: contents` heading split across a page loses its continuation.
 
-Each branch tip is the frozen commit in the tables above. The verifier findings for each final
-round are summarised in `planning/progress.md` and in the register (`planning/open-work.md`,
-G-85 … G-107).
+## 3. Release audit
 
-## 2. Decisions the owner has to take
+- **Audit:** an independent audit by a fresh AI verifier at f1dc9f2.
+- **Verdict: NOT READY, for documentation only.** Mechanics, package contents, schema honesty,
+  gates and CI all passed.
+- **Findings:**
+  - H1: network-blocking overclaim;
+  - H2: sandbox overclaim;
+  - M1: `docs/releasing.md` pre-tag steps lack the human review, and still offer to drop the gate;
+  - M2: sentences that become false after the review;
+  - M3: G-103 and G-89 were not disclosed;
+  - L1–L4, L6, L7: wording, citations, the poster mention, and the stale PR description.
+- **Fix:** docs-only, on branch `wp/release-docs`, merged into the integration branch. The merge
+  commit is named in the PR #18 description. No gate, ledger or `REVIEW_INPUT_ROOTS` entry was touched.
 
-1. **Stopped packages.** For S1, F3, R1, C1+C2, F5, L1, X, R2, K2 and B1, choose one:
-   - one final round with a hard exit, meaning any new blocker or high finding drops the package from 0.7.0 (recommended);
-   - drop the package from 0.7.0 and document the gap;
-   - a conservative decline-only variant.
+Every verifier this cycle was an AI agent. No human has looked at any of it, and nothing here
+claims otherwise.
 
-   Each package's fix direction for its open findings is recorded in the verifier reports and
-   summarised in the owner messages.
-2. **Release-blocking items that are not fixed on the integration head:**
-   - **G-01:** output through a pipe is silently truncated at 64 KiB. This is fixed only in the stopped WP-C1.
-   - **G-31 / G-32:** report-surface blockers. The fix is in the stopped WP-R1, and a genuine review is still owed.
-   - **G-79:** documents with footnotes end exit 3. The fix is in the stopped WP-F5.
+## 4. Owner steps before the tag
 
-   A 0.7.0 without these would still carry G-01, which is a silent wrong-output defect.
-3. **Report-surface gate path** (open since the start): a human review of the prepared surfaces, an
-   owner-approved relaxation, or a documented drop. The gate still requires a rostered human; it was not weakened.
-4. **Human-review binding.** Any committer can write a rostered handle into the ledger, and nothing binds it to an authenticated act. The options are a signature (`ssh-keygen -Y verify` against committed `allowed_signers`) or a required approving review by a mapped login. Both touch keys or repository settings.
-5. **Corpus gate before F5/L1.** WP-K2's CI job will be red until F5 and L1 land. It must not be weakened: no `continue-on-error`, no expected-failures list. So it can only be integrated after them, or with the owner's explicit call.
-6. **Chrome for Testing download.** The request to download it, to run the live path locally, is still open. Local live work used patched Chromium 141, labelled as such everywhere; CI on Chrome 153 was the authority.
+1. Merge PR #18 into `main`. Do not force-push or rewrite history.
+2. A rostered human (`docs/reporting.md`, the review package, steps 1–4) reviews the report
+   surfaces on that exact commit.
+3. Commit the review ledger. In the same commit, update the sentences that `docs/reporting.md`
+   lists as becoming false after the review.
+4. Confirm CI is green on `main`.
+5. Make a date-only commit: `## 0.7.0 — TBD-at-tag` becomes `## 0.7.0 — <ISO date>`.
+6. Confirm CI is green on exactly that commit.
+7. Create and push the annotated tag:
+   `git tag -a v0.7.0 -m "breaklint 0.7.0" <that commit>` and then `git push origin v0.7.0`.
+   The release workflow publishes and verifies.
 
-## 3. Verification record
+**Residual, by owner decision.** The review ledger names a rostered handle. Nothing
+cryptographically binds that handle to the person who actually reviewed: there is no signature and
+no required review. Any committer could write it. This is documented and accepted.
 
-Every package was verified by a fresh verifier that had not written the change, at a frozen
-commit, with PASS/FAIL graded blocker/high/medium/low. Verifiers were AI agents. No human looked
-at any of it, and nothing here claims one did. The orchestrator also ran its own delta checks on
-the small final rounds, each with a mutation shown to go red. That is recorded in the merge
-messages and in `planning/progress.md`.
+## 5. Post-release checks
 
-The typography lens asked for in the brief was applied only by an agent, inside the WP-R1 round-2
-verification, and it is labelled as agent judgement there. It found eight concrete defects: a
-doubled header rule, the tail label on unsplit findings, an unbounded measure in remediation
-boxes, "1 lines", "CANDI-/DATES", a runt line, an empty cloned frame, and phone density.
+- `npm view breaklint@0.7.0 dist.integrity` equals the checksum on the GitHub Release.
+- Both clean-consumer jobs in the release workflow are green.
+- The README poster URL resolves at `v0.7.0`.
+- `uses: godarg/breaklint@v0.7.0` works only after the npm publish (`docs/ci-recipe.md`).
 
-## 4. Gate numbers on the integration head
+## 6. Website facts (valid once the tag is published)
 
-**Local** (unprivileged runner, Node 24, Chromium 141), at the last full run of each package merge:
-- typecheck, schema:check, docs:rules:check and test:release-tag: rc 0.
-- test:mutants: 13/13.
-- npm test: all tests pass except the 9 known environment-bound failures (Chromium 141 live path, VM PID 1). Those 9 are green in CI.
+- breaklint 0.7.0, MIT licence, author Gottlieb Dargel.
+- Requires Node ≥ 22.13. Paginator: Paged.js 0.4.3 in headless Chrome.
+- Report schema 5, Snapshot 5, Configuration Contract 1.
+- 13 rules. The two proof-source-A error rules have fixed thresholds.
+- Exit codes: 0 clean, 1 findings, 2 usage, 3 infrastructure, 4 insufficient coverage.
+- New in 0.7.0:
+  - a GitHub Action and a CI recipe;
+  - SARIF, JUnit and Markdown reporters;
+  - pipe-safe output;
+  - named-page break causes;
+  - margin-box content is no longer counted as body flow.
+- Caveats to state honestly:
+  - offline mode does not block browser-level egress;
+  - sandbox-disabling environment variables are honoured;
+  - footnotes and multicol bodies can fail;
+  - the report surfaces were reviewed by a human only if step 2 of §4 took place.
 
-**CI:** the check, action and node-floor jobs are green on every integration head listed in §1.
-Exact test counts are in the machine-checked figures marker in `docs/status.md`, which CI's
-`test:documented-figures` verifies.
+## 7. Not done
 
-## 5. Register status (G-01 … G-103)
-
-- **Fixed and integrated:**
-  - G-02, G-04, G-06, G-14, G-15, G-27, G-28, G-30, G-40, G-42–G-46, G-52, G-55, G-56, G-67, G-68, G-69, G-71, G-72 (via WP-D1, K3, F1, F4);
-  - the pipeline work of WP-E1;
-  - G-87 (resolved: corpus erratum E42 plus G-99) and G-90 (test hardened in WP-F1b).
-- **Fixed but not integrated (stopped packages):** G-01, G-03, G-07, G-08, G-09, G-10, G-12, G-13, G-23, G-31–G-39, G-48–G-51, G-59, G-61–G-66, G-73–G-81, G-85, G-86, G-88 (each only partly, as the stop reasons in §1 say).
-- **Fixed but not integrated (later packages):** G-29 (corpus and gate), G-82, G-83 (WP-R2), G-99 (WP-B1).
-- **Open, found late, not yet fixed:** G-89, G-91–G-98, G-100–G-107 (see `planning/open-work.md`).
-- **Not attempted this cycle:**
-  - G-05 and G-60 (WP-F2, `--no-source-map` join);
-  - G-70 (WP-P1, `Function.prototype.call` hardening);
-  - G-16, G-17 (docs);
+- Dropped packages (§2): F5, X, L1, C1+C2, S1+S2, F3, K1+K2.
+- Not attempted:
+  - G-05 and G-60 (WP-F2);
+  - G-70 (WP-P1);
+  - G-16 and G-17 (docs);
   - G-18 (streaming rasteriser);
   - G-26 (remedy proofs);
   - G-53 (`--bundle`);
   - G-54 (container recipe).
-- **Out of scope or parked by decision:** G-11 (M3 research), G-19–G-22, G-24 (multi-OS), G-25 (calibration parked), G-58 (record only).
-- **Already fixed on main before this cycle:** G-41, G-47 (G-47 is still to be verified at publish).
-
-## 6. Release preparation: not started, deliberately
-
-The brief's release prep has not been done yet:
-- the version bump to 0.7.0;
-- the `release.yml` pin and tarball;
-- the CHANGELOG `TBD-at-tag` heading;
-- the status.md record;
-- pinning the README poster URL to `v0.7.0`;
-- the `npm pack --dry-run` review;
-- an independent release audit.
-
-The reason is that the release's content depends on decision 1 and the blockers in decision 2. A
-release prepared now would be re-prepared after those decisions. Once they are taken, the sequence is:
-
-1. Integrate whatever is decided, and re-run CI.
-2. Release-prep commit on the integration branch: the version in `package.json` and both root fields of `package-lock.json`, the `release.yml` tag trigger, `## 0.7.0 — TBD-at-tag`, the status.md release record without a publication claim, and the README poster URL pinned to `https://raw.githubusercontent.com/godarg/breaklint/v0.7.0/assets/breaklint-film-poster.jpg`. `npm run test:release-tag` must pass in release-prep mode.
-3. Review `npm pack --dry-run`: `planning/`, `corpus/` work files, `action/` and `tests/` must not ship.
-4. An independent release audit by a fresh verifier.
-5. Owner: merge PR #18 to `main` (no force-push, no history rewrite).
-6. A final commit on `main` that dates the heading (`## 0.7.0 — <ISO date>`). CI must be green on that exact commit.
-7. Owner: `git tag -a v0.7.0 -m "breaklint 0.7.0" <that commit>`, then `git push origin v0.7.0`. The release workflow publishes and verifies.
-8. Post-release checks: `npm view breaklint@0.7.0 dist.integrity` equals the GitHub Release checksum; both clean consumers are green; the README poster URL resolves; the GitHub Action works at `@v0.7.0` only after the npm publish (docs/ci-recipe.md).
-
-## 7. Website facts
-
-To be filled at release time from the release record. Until then, every public fact stays at 0.6.0.
-
-## 8. Housekeeping left for the owner
-
-- The remote probe branches `claude/ci-probe-*` belong to closed probe PRs #19–#32. They can be deleted. Deleting them from the session was refused (HTTP 403 through the git proxy).
-- The session's local worktrees were removed at close. All work is on the pushed branches listed in §1.
+- Open register items: G-84, G-86, G-88, G-89, G-91–G-98, G-100–G-103, G-106 (`planning/open-work.md`).
+  Where the register's status column predates the final round, the tables in §1 and §2 of this
+  handoff take precedence.
+- Housekeeping for the owner:
+  - The remote probe branches `claude/ci-probe-*` (closed PRs #19–#32) can be deleted. The session's
+    delete was refused (HTTP 403 through the git proxy).
+  - Once they are no longer needed, the dropped-package branches listed in §2 can be deleted as well.
