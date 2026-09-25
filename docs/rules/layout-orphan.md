@@ -31,7 +31,10 @@ with a paragraph that moved whole after it is complete, not split. A `display: c
 element whose lines no recorded block holds is declined as `env/invalid-measurement`. A line counts
 as the block's own when the collector saw the block's own text on it (`TextLine.ownText`), so text
 between two floats is still the block's. A custom element's splits are not judged (see
-[`layout/widow`](layout-widow.md)).
+[`layout/widow`](layout-widow.md)). The known limits listed there apply here too: a recorded block
+inside an unrecorded inline-block or inline-flex box ends the run and can give a false finding;
+text in an unrecorded floated or absolutely positioned box counts as the block's own lines; and an
+inline `<code>` or `<sup>` at another height than its line counts as a line of its own.
 
 ## Calibration
 

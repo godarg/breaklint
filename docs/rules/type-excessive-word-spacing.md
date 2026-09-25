@@ -37,7 +37,10 @@ measured. Exactly what is sampled, pooled over the whole document per layout key
   has no nested source block, and whose `text-align-last` does not justify that line;
 - only a gap between two consecutive words of ONE text node whose own element computes the
   block's layout key — so no `<code>`, `<em>` or spaced `<span>` contributes — and separated by
-  collapsible whitespace only (no `&nbsp;`, no space kept by `white-space: pre-wrap`);
+  collapsible whitespace only (no `&nbsp;`, no space kept by `white-space: pre-wrap`). This holds
+  for left-to-right text. In right-to-left text the words are paired in visual order, so a gap
+  between two text nodes can be sampled; a divisor polluted that way needs every sample of the
+  layout key polluted alike, since samples that disagree decline the block;
 - only a gap wider than zero.
 
 The natural space is the median of those gaps, and only when every gap lies within 0.1 px or 3 %
@@ -57,6 +60,13 @@ anywhere in the document, for instance because every such block ends in a one-wo
 coverage. That is the exit-4 consequence: where more than half of a document's justified blocks
 are declined, the rule falls below its 0.5 coverage floor and the run ends
 `insufficient-coverage` (exit 4) instead of clean. It used to divide by a third of the font size.
+
+Right-to-left text is not judged. The word gaps are read in the order the words occur in the text,
+and in right-to-left text that order runs against their positions, so every gap reads negative and
+is skipped: such a block is reported as measured with a largest factor of 0 — a check that looked
+at no gap. Lines are grouped by the top edge of their text rectangles, within 0.5 px: an inline
+`<code>` or `<sup>` whose text sits at another height than the rest of its line forms a line of its
+own, and the gaps between it and its neighbours are not measured.
 
 Gaps are measured against the block's own natural space. A gap set in an inline element in another
 font or size is measured against it too: on patched Chromium 141 a monospace `<span>` in a serif

@@ -309,8 +309,11 @@ function within(inner: Box, outer: Box, tolerance: number): boolean {
  * KNOWN LIMITS, stated because they are real: in `containers: false` mode, text of a block's own
  * that sits BETWEEN nested blocks' line boxes on one line (between two floats) is inside their span
  * and is taken for theirs; a block container the snapshot does not record (a custom element) owns
- * its text, so neither it nor the record around it is judged on those lines; and a hand-written
- * snapshot that does not follow collection order gets the ownership that order implies.
+ * its text, so neither it nor the record around it is judged on those lines; a recorded block
+ * inside an UNRECORDED inline-level box is taken for an in-flow block, because the outermost
+ * RECORD covering the line decides, so its lines end the run; text in an unrecorded float or
+ * positioned box counts as the record's own; and a hand-written snapshot that does not follow
+ * collection order gets the ownership that order implies.
  *
  * Computed once per call, over the whole snapshot. The function returned answers for a record of
  * that snapshot; a record it has not seen owns nothing.

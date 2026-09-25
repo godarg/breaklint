@@ -720,7 +720,9 @@ export const SNAPSHOT_SOURCE = `(() => {
       const last = measured.groups[measured.groups.length - 1];
       const onLast = measured.sampleWords.filter((w) => Math.abs(w.y - last.y) <= 0.5).sort((a, b) => a.x - b.x);
       for (let i = 1; i < onLast.length; i += 1) {
-        // sepOk is false for the first word of a text node, so no gap across two nodes is sampled.
+        // sepOk is false for the first word of a text node, so in left-to-right text no gap across
+        // two nodes is sampled. Words are paired in visual order, so in right-to-left text one can
+        // be; the agreement check below declines unless every sample is polluted alike.
         if (!onLast[i].sepOk) continue;
         const gap = onLast[i].x - onLast[i - 1].right;
         if (gap > 0) (layoutSamples[facts.layoutKey] = layoutSamples[facts.layoutKey] || []).push(gap);

@@ -219,7 +219,13 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   the old count missed. For a block without nested blocks nothing changes. Checked against a
   ground-truth probe (plain Paged.js and Range rectangles) at four thresholds: on 24 layouts all 96
   judgements agree, and on a second set of 19 layouts 70 of 76, the six others being splits inside
-  the two custom-element layouts that no rule sees. On the first-party robustness document (`dargel-kleingewerbe`) all three
+  the two custom-element layouts that no rule sees. Known limits, documented and not fixed: a
+  recorded block inside an UNRECORDED inline-block or inline-flex box is taken for an in-flow block
+  and ends the surrounding block's run, which can give a false `layout/orphan` (0.6.0 counted every
+  recorded line and did not have this); text in an unrecorded floated or absolutely positioned box
+  counts as the surrounding block's own lines; and, as in 0.6.0, lines are grouped by the top edge
+  of their text within 0.5 px, so an inline `<code>` or `<sup>` at another height counts as a line
+  of its own. On the first-party robustness document (`dargel-kleingewerbe`) all three
   `layout/orphan` findings and the one `layout/widow` finding were wrappers and are gone. Consumers
   see wrapper fragments measured with 0 lines where they carried findings, the applicability
   measurement false where the other side does not continue the run, and two informational
@@ -259,6 +265,11 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
     declared), counted against coverage: a document in which more than half of the justified
     blocks decline falls below the 0.5 floor and ends `insufficient-coverage` (exit 4). It used to
     divide by a third of the font size.
+  In right-to-left text the sampler pairs words in visual order and can take a gap between two
+  text nodes; a divisor polluted that way needs every sample of its key polluted alike, since
+  samples that disagree decline the block. Right-to-left text is not judged at all, as in 0.6.0:
+  its gaps read negative in text order and are skipped, and the block is reported as measured
+  with a largest factor of 0 (documented).
   Twelve font settings are pinned (within 0.05 px, measured within 0.03 px on patched Chromium 141,
   default fonts; no web font): the ten canvas-measured ones against their unjustified last lines,
   the two layout-measured ones against an independent one-line control each. Gaps inside an inline element with its own

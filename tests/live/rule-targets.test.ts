@@ -173,8 +173,11 @@ describe("rule targets on wrapped and justified blocks, live", () => {
     }
     assert.deepEqual(off, {}, "natural space against its reference gaps, per variant");
     // The paragraphs that would pollute the layout measurement if it sampled them (one with its own
-    // word-spacing, one ending in <code>) share its font and leave it unchanged.
-    assert.equal(only(snapshot, "v-optical-size-code").spaceWidth, only(snapshot, "v-optical-size").spaceWidth);
+    // word-spacing, one ending in <code>) share its font; the value their key gets must still be the
+    // independent control's natural space, not one they moved.
+    const controlGaps = lastGaps("ctl-optical-size");
+    const polluted = controlGaps.map((gap) => Math.abs(gap - only(snapshot, "v-optical-size-code").spaceWidth)).filter((delta) => delta > 0.05);
+    assert.deepEqual(polluted, [], "the <code> paragraph's natural space against the independent control");
   });
 
   it("reports the real wide gap and neither the collapsed nor the stretched first space", (t) => {

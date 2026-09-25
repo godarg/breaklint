@@ -52,6 +52,19 @@ break that splits text of its own:
   `<span style="display: block">` is a block container nobody records: its own splits are not
   judged, and its lines are not counted for the block around it either.
 
+Known limits, found by an independent verification and not fixed in this release:
+
+- A recorded block inside an UNRECORDED inline-level box — a `<p>` in a
+  `<span style="display: inline-block">` or `inline-flex` — is taken for an in-flow block: its lines
+  end the surrounding block's run, which can report a false `layout/orphan` or `layout/widow`
+  there. The pass-over above holds for inline-level boxes the snapshot records, not for this case.
+- Text in an unrecorded absolutely positioned or floated box (a `<span style="float: right">`)
+  counts as the surrounding block's own lines, so the run can be counted longer than the block's
+  own line boxes are.
+- Lines are grouped by the top edge of their text rectangles, within 0.5 px. An inline `<code>`,
+  `<sup>` or badge whose text sits at another height than the rest of its line forms a line of its
+  own, and a fragment's line count includes it.
+
 The ground truth these rules were checked against is a probe of the same documents with plain
 Paged.js and Range rectangles.
 

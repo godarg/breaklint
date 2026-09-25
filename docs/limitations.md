@@ -644,7 +644,16 @@ whose lines no recorded block holds is declined (`env/invalid-measurement`), not
 value. `type/excessive-word-spacing` asks about the text rather than its container: it gives a line
 to the deepest record that records it, by geometry, because that element's font set the gaps, and
 takes whether the line is justified from its block container; there, text of a block's own lying
-between two nested blocks on one line (between two floats) is taken for theirs.
+between two nested blocks on one line (between two floats) is taken for theirs. Three more limits
+of the fragmentation rules, found by an independent verification and not fixed in this release: a
+recorded block inside an UNRECORDED inline-level box (a `<p>` in a `<span style="display:
+inline-block">` or `inline-flex`) is taken for an in-flow block, so its lines end the surrounding
+block's run and can give a false `layout/orphan` or `layout/widow` — the pass-over of inline-level
+boxes holds only for boxes the snapshot records; text in an unrecorded absolutely positioned or
+floated box counts as the surrounding block's own lines; and lines are grouped by the top edge of
+their text rectangles within 0.5 px, so an inline `<code>`, `<sup>` or badge at another height
+than its line forms a line of its own, which both these rules and `type/excessive-word-spacing`
+count as one (the last predates this release).
 
 **The natural space comes from the font, or from the layout where a canvas cannot reproduce the
 font.** `type/excessive-word-spacing` divides by the advance of one space in the block's computed
@@ -654,7 +663,10 @@ once `document.fonts` reports the font loaded. Where a canvas cannot reproduce t
 non-keyword `font-stretch`, synthesised caps other than `small-caps`, a font not yet loaded — the
 layout is sampled instead, pooled over the document per layout key (font, caps, `letter-spacing`,
 `word-spacing`, variation settings, `font-size-adjust`, `font-kerning`, zoom): gaps between two
-consecutive words of one text node whose element computes that key, separated by collapsible
+consecutive words of one text node (in left-to-right text; in right-to-left text the words are
+paired in visual order and a gap between two text nodes can be sampled, which pollutes the divisor
+only if every sample of the key is polluted alike, since samples that disagree decline the block)
+whose element computes that key, separated by collapsible
 whitespace only, on the last line of the last fragment of a justified block that is its own block
 container, has no nested source block and whose `text-align-last` does not justify that line. The
 median is taken only when every sample lies within 0.1 px or 3 % of it. A block for which neither
@@ -667,4 +679,7 @@ settings against their unjustified last lines and the two layout-measured ones a
 independent one-line control each (within 0.05 px; measured within 0.03 px on patched Chromium 141
 with the machine's default fonts), and CI re-takes exactly those. No web font (`@font-face`) is
 among them: on the Chromium 141 these changes were developed on, a document loading one does not
-reach a quiescent state, so the pin could not be recorded there.
+reach a quiescent state, so the pin could not be recorded there. Right-to-left text is not judged
+at all, and this predates the release: word gaps are read in text order, which in right-to-left
+text runs against their positions, so every gap reads negative and is skipped, and the block is
+reported as measured with a largest factor of 0.
