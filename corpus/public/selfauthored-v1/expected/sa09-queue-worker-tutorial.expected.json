@@ -383,6 +383,15 @@
       "expectedDeclines": []
     }
   },
+  "parityBlankPages": {
+    "count": 0,
+    "byFontStack": {
+      "reference": [],
+      "dejavu": [],
+      "free": []
+    },
+    "basis": "Construction: no element carries break-before or break-after right, left, recto or verso, so Paged.js has no parity page to insert; the construction probe found no page with the class pagedjs_blank_page under any of the three font stacks."
+  },
   "permittedDeclineReasons": [
     "env/forced-break"
   ],
