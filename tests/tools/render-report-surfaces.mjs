@@ -88,6 +88,9 @@ const SURFACE_CONTROLS = {
   }` },
   // Rule ids may break at a hyphen inside the name again.
   "broken-rule-id-wrap": { screen: `.rule-id > span { white-space: normal !important; } .finding h3 { max-inline-size: 12ch !important; }` },
+  // The coverage list becomes a grid again: its fragmenting table item is stretched on the
+  // continuation page (round-2 finding L2).
+  "broken-row-pitch": { print: `@media print { .coverage-documents { display: grid !important; } }` },
   // Page fill, alignment and keep-with-next controls.
   // Page-atomic findings, each well under half a page, with a gap after each that the next one
   // cannot fit beside: one finding per page, text to about 40 % of the content box. (Page-atomic
@@ -607,6 +610,9 @@ function coverageRowAnchors(words) {
  * - every page carrying rows shows the column header above its first row (a continuation repeats
  *   it), and a continuation — a page with rows but no table caption — carries at least two rows.
  */
+/** Largest share by which one printed row pitch may differ from the table's median pitch. */
+const MAXIMUM_ROW_PITCH_DEVIATION = 0.08;
+
 function coverageRowChecks(pdfPath, rasterPages, expectedRows, tableEdgesCssPx, label) {
   const minimumEdgeCoverage = 0.98;
   const maximumEdgeGapPx = 2;
@@ -683,12 +689,25 @@ function coverageRowChecks(pdfPath, rasterPages, expectedRows, tableEdgesCssPx, 
     row.leftCoverage < minimumEdgeCoverage || row.leftMaximumGapPx > maximumEdgeGapPx ||
     row.rightCoverage < minimumEdgeCoverage || row.rightMaximumGapPx > maximumEdgeGapPx);
   if (open.length > 0) throw new Error(`${label}: coverage row rule is open: ${JSON.stringify(open)}`);
+  // Row pitch, measured once every rule is known to be there: the distance between consecutive row rules on one page. Every printed row is one
+  // line, so every pitch lies within MAXIMUM_ROW_PITCH_DEVIATION of the table's median; a stretched
+  // continuation (a fragmenting grid item, measured 14-21 % taller rows) does not.
+  const pitches = pages.flatMap((page) => page.rows.slice(1).map((row, index) => ({ page: page.page, ruleId: row.ruleId, pitchPx: row.ruleY - page.rows[index].ruleY })));
+  const sortedPitches = pitches.map((pitch) => pitch.pitchPx).sort((a, b) => a - b);
+  const medianPitchPx = sortedPitches.length === 0 ? null : sortedPitches[Math.floor(sortedPitches.length / 2)];
+  const irregular = medianPitchPx === null ? [] : pitches.filter((pitch) => Math.abs(pitch.pitchPx - medianPitchPx) > MAXIMUM_ROW_PITCH_DEVIATION * medianPitchPx);
+  if (irregular.length > 0) {
+    throw new Error(`${label}: coverage row pitch is irregular (median ${medianPitchPx} px, at most ±${MAXIMUM_ROW_PITCH_DEVIATION * 100} %): ${JSON.stringify(irregular)}`);
+  }
   return {
     expectedRows,
     detectedRows: rows.length,
     minimumEdgeCoverage,
     maximumEdgeGapPx,
     pagesWithRows: withRows.map((page) => page.page),
+    medianPitchPx,
+    maximumPitchDeviation: MAXIMUM_ROW_PITCH_DEVIATION,
+    pitchRangePx: sortedPitches.length === 0 ? null : [sortedPitches[0], sortedPitches.at(-1)],
     continuations,
     pages,
   };

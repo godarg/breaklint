@@ -136,6 +136,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   tail opens with "Finding NN · rule · remediation and evidence"; the gate rejects a page that opens
   on a bare fact or tail line. A table's caption and column header no longer end a page without
   its first row.
+- **Printed coverage rows keep one pitch across pages.** Rows on a table's continuation page were
+  stretched (21.7 pt on the first page, 24.8–26.3 pt after the break) with a second rule under the
+  header, and the end mark's own rule sat under the last row rule like a double line: the coverage
+  list was a grid, and a fragmenting grid item is stretched to its unfragmented area. Print lays it
+  out as block flow and drops the end mark's rule; the gate rejects any row pitch more than 8 % off
+  the table's median, measured independently by the verifier.
 
 ### Documentation
 

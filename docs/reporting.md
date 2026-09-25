@@ -381,7 +381,15 @@ every page carrying rows to show the column header above its first row, every co
 with rows but no caption) to carry at least two rows, and each row to be closed by its rule: the
 raster rule below the row must cover at least 98 % of each half of the table width with no gap
 longer than two raster rows at 110 DPI. The verifier cross-checks the renderer's rows, rule
-positions and table edges within 2 raster px. Thirteen rules span at most two pages.
+positions and table edges within 2 raster px. Thirteen rules span at most two pages. Every
+printed row is one line, so the distance between consecutive row rules on a page — the row pitch —
+must lie within 8 % of the table's median pitch (about 33 raster px, 21.7 pt, in the canonical
+states); the verifier measures the pitch from its own rule positions and cross-checks the median
+within 2 px. The check exists because the coverage list was a CSS grid: a grid item that fragments
+is stretched to its unfragmented grid area, and Blink gave the continuation page's rows the surplus
+the repeated header creates (24.8–26.3 pt instead of 21.7 pt, with a second rule under the header).
+In print the list is block flow, and the end mark carries no rule of its own, so the table's last
+row rule is the only line under it. `broken-row-pitch` restores the grid.
 
 Two technical A4 probes, which are not human-review cells, cover what the canonical states cannot:
 the insufficient-coverage state printed with `printBackground: false` must still close all 13 rows

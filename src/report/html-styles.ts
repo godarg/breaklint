@@ -183,7 +183,13 @@ export const REPORT_HTML_STYLES = String.raw`
     .summary-grid > div:first-child dd { overflow-wrap: normal; font-size: var(--bl-font-size-base); white-space: nowrap; word-break: normal; }
     .summary-grid > div:first-child small { white-space: normal; }
     .run-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .finding-list, .coverage-documents { gap: var(--bl-space-4); }
+    .finding-list { gap: var(--bl-space-4); }
+    /* Block flow, not a grid: a grid item that fragments is stretched to its unfragmented grid
+       area, and Blink handed the surplus a repeated table header creates to the continuation
+       page's rows (measured: 21.7 pt rows on the first page, 24.8-26.3 pt on the next, and a
+       second rule under the header). */
+    .coverage-documents { display: block; }
+    .coverage-documents > * + * { margin-block-start: var(--bl-space-4); }
     .finding { padding: var(--bl-space-4); }
     /* Three columns: the six facts take two rows, so head + facts (one keep-with-next run) stay
        under 40 % of a page. In two columns the run measured 427.7 px (41.5 %). */
@@ -228,7 +234,8 @@ export const REPORT_HTML_STYLES = String.raw`
     .finding-continued .rule-id { text-transform: none; letter-spacing: 0; }
     .finding-continued + .finding-remediation { margin-block-start: var(--bl-space-2); }
     /* The footer prints as the end mark and stays with the content before it. */
-    .report-footer { margin-block-start: var(--bl-space-5); break-before: avoid; break-inside: avoid; }
+    /* The table above ends on its own row rule; a footer rule 28 px below it read as a double rule. */
+    .report-footer { margin-block-start: var(--bl-space-5); padding-block-start: 0; border-block-start: 0; break-before: avoid; break-inside: avoid; }
     a { color: var(--bl-color-fg-primary); }
   }
 `;

@@ -133,6 +133,19 @@ function independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, repo
     });
     return { page, rows, header, caption };
   });
+  // Every printed row is one line: consecutive rule positions on a page lie within 8 % of the
+  // table's median pitch. A stretched continuation page does not.
+  const pitches = pages.flatMap((page) => page.rows.slice(1).map((row, index) => ({ page: page.page, ruleId: row.ruleId, pitchPx: row.ruleY - page.rows[index].ruleY })));
+  const sortedPitches = pitches.map((pitch) => pitch.pitchPx).sort((a, b) => a - b);
+  const medianPitchPx = sortedPitches[Math.floor(sortedPitches.length / 2)];
+  for (const pitch of pitches) {
+    assert.ok(Math.abs(pitch.pitchPx - medianPitchPx) <= 0.08 * medianPitchPx,
+      `${label}: page ${pitch.page} row ${pitch.ruleId} pitch ${pitch.pitchPx} px is irregular (median ${medianPitchPx} px)`);
+  }
+  if (sortedPitches.length > 0) {
+    assert.ok(Math.abs(reported.medianPitchPx - medianPitchPx) <= 2, `${label}: renderer row pitch ${reported.medianPitchPx} px disagrees with the independent ${medianPitchPx} px`);
+    assert.equal(reported.maximumPitchDeviation, 0.08, `${label}: row pitch threshold drift`);
+  }
   const detected = pages.reduce((sum, page) => sum + page.rows.length, 0);
   assert.equal(detected, expectedRows, `${label}: coverage row text inventory drift: detected ${detected}/${expectedRows}`);
   for (const page of pages.filter((candidate) => candidate.rows.length > 0)) {
