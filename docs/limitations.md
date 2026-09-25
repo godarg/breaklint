@@ -177,21 +177,53 @@ show that what it says is the right thing to say about your document. That is th
 a verified implementation and a validated one, and only the first is claimed. `calibrated: false`
 travels in the type, in every finding and on every rule page for that reason.
 
-**A document whose paginator could not place its content is not measured at all.** Paged.js
-fragments a page by making `.pagedjs_page_content` a multi-column container whose pitch is the
-content width plus a gap of `margins + bleed + 1000px`. What it fails to move onto a new page stays
-in the second column, one pitch to the right, invisible behind an `overflow: hidden` sheet. Where
-that content is a table box, `page.pdf()` — which renders in print media, with a re-sized
-fragmentainer — puts it somewhere else and leaves it there, so the PDF does not reproduce the
-geometry the rules measured. The run ends in exit 3 with `render-unstable`, and the event names the
-elements, their source ids, the pages and the column pitch. It is not a rule finding and cannot
-become one: nothing about the pages that DID lay out is reported, because the state they were
-measured in was withdrawn.
+**Content the paginator could not place is not measured, and it costs either the page or the
+document.** Paged.js fragments a page by making `.pagedjs_page_content` a multi-column container
+whose pitch is the content width plus a gap of `margins + bleed + 1000px`. What it fails to move
+onto a new page stays in the next column, one pitch along, past the page box and behind an
+`overflow: hidden` sheet. Two cases are distinguished by what the PDF does with it.
+
+*When the PDF moves it, the document is not measured.* Where the stranded content is a table box,
+`page.pdf()` — which renders in print media, with a re-sized fragmentainer — puts it somewhere else
+and leaves it there, so the PDF does not reproduce the geometry the rules measured. The run ends in
+exit 3 with `render-unstable`, and the event names the elements, their source ids, the pages and the
+column pitch. That is still the whole document: the drift is confined to the pages that carry the
+residue (measured on the public fixture: only page 4 moved), but withdrawing just those pages would
+also mean binding evidence per page, and this build does not. The public
+`tests/fixtures/fragmentainer-residue.html` ends there, exit 3, with page 4's table named. Through
+0.6.0 it ended one gate earlier, in `geometry-cross-check-failed` with a sentence that blamed page 4
+for a disagreement measured on page 1; that gate now compares a fragmented box fragment by fragment
+(see status.md).
+
+*When the PDF does not move it, the page is withdrawn.* Text left in the overflow column that the
+print reflow does not bring back is simply not printed. Measured on Chromium 141 with pdftotext as
+the oracle: on the public residue fixture the last 20 words of page 1 lay one pitch to the right of
+the page and exactly those 20 of its 1136 words were missing from the PDF. Over 45 probe documents
+(fonts, sizes, paragraph lengths, wrappers), 17 of them with stranded text, the number of words
+missing from the PDF equalled the number lying past the page box in every document but one: the
+public fixture, whose page-4 table row the print reflow brings back. Nothing had reported it
+— the residue probe skipped a box that straddles the column boundary — and once the cross-check no
+longer refused such a document, it came back measured. The collector therefore takes a census of
+every page: a visible text line box, `img`, `svg`, `canvas` or `video` lying ENTIRELY past the page
+box's edge in the column progression (right for left-to-right content, left for right-to-left) has no
+pixel on the paper. Such a page is withdrawn: one `env/pagination-residue` row in its
+`pages[].notMeasured`, every rule that judges page geometry declines its candidates there (the
+matrix below), the report's `documents[].notMeasured` carries the page row, and the document cannot
+end clean whatever rules are active — `exitReason` reads `page(s) … withdrawn from measurement`, exit
+4. Content past the content box but inside the page box — a margin note, a hanging figure — is
+printed, and is not counted. `tests/fixtures/pagination-text-residue.html` is the live case.
+
+What this does not do is REPORT the missing content. The page is refused, not judged; which words
+are lost is not in the report, and no rule names them. A rule that does — the loss is a property of
+the document and would be a finding, not a decline — is a later step and is not in this release.
+Content stranded in the overflow column without text or a replaced element (an empty block's
+border, a background) is not counted either.
 
 Measured over eighteen chapters of one shipped HTML bundle: 6 of 6 documents with table residue in
 an overflow column could not be measured, 12 of 12 without it could. Two of those twelve carried
-residue of other kinds — one `<p>`, one `<em>` — and measured cleanly, because ordinary block
-content re-fragments to the same boxes. Nothing exotic produces this: no `@page`, no print
+residue of other kinds — one `<p>`, one `<em>` — and measured cleanly at the time. Whether their
+stranded text was printed was not checked then; on the public fixture text of that kind is missing
+from the PDF, and such pages are now withdrawn. Nothing exotic produces this: no `@page`, no print
 stylesheet, no `break-inside` and no script are needed, only a table that crosses a page boundary.
 
 The six documents are recorded, not published. They are chapters of a paid product, and this
@@ -206,6 +238,49 @@ having read zero documents would be a green light over nothing. What holds this 
 public `tests/fixtures/fragmentainer-residue.html` in the live suite, reduced from one of the six
 until no product text remained; the reduction is itself the measurement that nothing exotic is
 required.
+
+**Multi-column content is declined, and it is found through its container.** `column-count` and
+`column-width` are not inherited, so a paragraph inside a two-column section has `column-count: auto`
+of its own. Through 0.6.0 the decline read the block's own value and missed exactly those blocks:
+measured on Chromium 141, such a paragraph was either measured on the union of its column fragments
+(453.31 px wide in a 214.66 px column, exit 0 on a document whose error-rule candidate sat in the
+columns) or, when it was among the boxes the geometry cross-check samples, ended the run in exit 3.
+The collector now records, per block, whether an ancestor between it and the Paged.js page structure
+(itself a multi-column fragmentainer, and never counted) is a multi-column container: `column-count`
+other than `auto` or `1`, or any `column-width` (`columns: 12em` sets only the width). A
+`column-span: all` element that is an in-flow, block-level, unfloated DIRECT child of the container
+lies across the columns and is judged with its subtree by the containers above; a spanner deeper
+down may also be honoured by the browser, but it is not recognised here and stays declined, which
+costs coverage and never a verdict. A container whose columns do not apply (a flex or grid
+container with `column-count` set) is declined all the same, on the same terms.
+
+Which rules decline, and on what ground. The same table covers a page withdrawn for pagination
+residue (above). `tests/unit/columns-and-residue.test.ts` runs every registered rule over one
+snapshot that gives each of them a candidate and requires the declining rules to be exactly the
+rows marked `declined` below, read from this file.
+
+<!-- breaklint-column-matrix-v1 -->
+| Rule | In the columns of a multi-column ancestor | On a page withdrawn for pagination residue |
+| --- | --- | --- |
+| `layout/widow` | declined — counts the lines a continuation carries onto its page; lines are grouped across columns | declined |
+| `layout/orphan` | declined — the same count at the foot of the page | declined |
+| `layout/hyphen-across-page` | declined — reads the last line of a fragment before the page break, which is not the last line in the columns | declined |
+| `layout/heading-at-page-bottom` | declined — judges what follows a heading on its page; in columns the next content may be beside it | declined |
+| `layout/unbreakable-block-too-tall` | declined — compares a block's height with the page; a column-split box's height is not the block's | declined, when any fragment of the block is on such a page, because it sums them |
+| `type/excessive-word-spacing` | declined — measures gaps between the words of a line; a line grouped across two columns contains the column gap | declined |
+| `type/short-last-line` | declined — compares the last line with the block's width, which is the union of its columns | declined |
+| `layout/half-empty-page` | measured — the page's fill bands are vertical and columns do not change them | declined |
+| `layout/orphaned-continuation-page` | measured — the page's structure and fill are column-independent | declined, also when the NEXT page is, because it reads that page's opening lines |
+| `svg/text-overflows-viewport` | measured — an SVG is one unfragmented box and the rule compares its text with its own viewport | measured — the comparison is translation-invariant; the engine still refuses clean for the document |
+| `type/spaced-hyphen` | measured — reads source text, not layout | measured — source text; the engine still refuses clean |
+| `type/straight-quotes` | measured — reads source text, not layout | measured — source text; the engine still refuses clean |
+| `artifact/local-uri` | measured — reads references, not layout | measured — references; the engine still refuses clean |
+<!-- /breaklint-column-matrix-v1 -->
+
+Measuring the type rules inside columns would need line rects grouped per column (the collector
+groups lines by y alone) and is not in this release. Vertical writing is unchanged: `writing-mode`
+is inherited, and a block in vertical writing is declined as `env/vertical-writing` by the same seven
+rules.
 
 **Rendering is not reproducible across machines.** Browser rendering varies with the host operating
 system, browser version, settings, hardware and headless mode. PNG output here is evidence, never a

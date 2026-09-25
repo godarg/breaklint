@@ -185,7 +185,8 @@ const DEFAULT_STYLE: Record<string, string> = {
   display: "block", position: "static", visibility: "visible", fontFamily: "serif", fontSize: "13.33px",
   lineHeight: "18.66px", fontWeight: "400", color: "rgb(0, 0, 0)", backgroundColor: "rgba(0, 0, 0, 0)",
   textDecorationLine: "none", breakBefore: "auto", breakAfter: "auto", breakInside: "auto",
-  writingMode: "horizontal-tb", columnCount: "auto", widows: "2", orphans: "2", textAlign: "start",
+  writingMode: "horizontal-tb", columnCount: "auto", columnWidth: "auto", columnSpan: "none", float: "none",
+  direction: "ltr", widows: "2", orphans: "2", textAlign: "start",
   wordSpacing: "0px", content: "normal",
 };
 
@@ -194,7 +195,10 @@ const DEFAULT_STYLE: Record<string, string> = {
  * content, the page box and the sheet are positioned, and the sheet clips.
  */
 const CLASS_STYLE: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  pagedjs_page_content: { position: "relative" },
+  // Paged.js makes every page content a multi-column fragmentainer (`Page.create` sets the column
+  // width and gap inline). Present here so that a payload asking "is this block in columns?" has
+  // to stop at the page structure, as it must in a real document.
+  pagedjs_page_content: { position: "relative", columnWidth: "453.53px", columnGap: "1113.39px" },
   pagedjs_pagebox: { position: "relative", display: "grid" },
   pagedjs_sheet: { position: "relative", overflow: "hidden", display: "grid" },
 };

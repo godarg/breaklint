@@ -1,7 +1,7 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  boxlessDeclined, declined, isNotRendered, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber,
+  boxlessDeclined, declined, isNotRendered, blockOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber,
   renderedBox, sourceOf, targetEvaluation,
 } from "../shared.ts";
 
@@ -26,7 +26,7 @@ export const headingAtPageBottom = defineRule(
     unit: "line heights",
     defaultOptions: { minTrailingLineHeights: 2 },
     summary: "A heading is the last thing on a page; what it introduces begins on the next.",
-    declines: ["env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],
+    declines: ["env/pagination-residue", "env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],
     remediation: {
       advice:
         "A heading sits at the bottom of the page with less room than the uncalibrated threshold following it. Add 'break-after: avoid;' to the heading style rule so it advances with its following content, or insert an explicit 'break-before: page;' before the heading.",
@@ -71,7 +71,7 @@ export const headingAtPageBottom = defineRule(
         continue;
       }
 
-      const outOfScope = layoutOutOfScope(block.effectiveStyle);
+      const outOfScope = blockOutOfScope(snapshot, block);
       if (outOfScope) {
         notMeasured.push(declined({ scope: "block", ruleId: "layout/heading-at-page-bottom", reason: outOfScope }));
         evaluations.push(targetEvaluation({ ruleId: "layout/heading-at-page-bottom", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: outOfScope }));

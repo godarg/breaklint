@@ -17,6 +17,8 @@ Both conditions must hold. The relative test alone fires on narrow columns where
 
 ## Limits and known false alarms
 
+A block set in the columns of a multi-column ancestor — the container's `column-count` other than `auto` or `1`, or any `column-width` — is declined as `env/multicolumn`, like a block with columns of its own; the decline counts against coverage. `column-count` is not inherited, so through 0.6.0 such a block was measured on the union of its column fragments. A `column-span: all` direct child of the container lies across the columns and is measured. Its width would be the union of its columns. A block on a page withdrawn because content lies past its page box (`env/pagination-residue`: Paged.js left it in its overflow column, and the PDF does not print it) is declined, and the decline counts against coverage.
+
 Single-line paragraphs, centred text, and the non-final fragment of a split block are all out of scope.
 
 ## Calibration

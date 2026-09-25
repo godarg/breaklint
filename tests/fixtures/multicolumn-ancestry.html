@@ -1,0 +1,52 @@
+<!doctype html>
+<!--
+  Blocks inside an author's multi-column container, found through their ANCESTOR. Self-authored.
+
+  THE COMPLICATION. `column-count` and `column-width` are not inherited. Every paragraph below that
+  sits in columns has `column-count: auto` of its own, so a check keyed on the block's own value --
+  what breaklint did through 0.6.0 -- measures it as a single-column block: its bounding box is the
+  union of its column fragments, and its lines are grouped across both columns. Four cases, each
+  load-bearing:
+
+    - `.split` is long enough that the browser breaks it across the two columns of `.duo`: one box,
+      two fragments. Through 0.6.0 it also ended the run in exit 3, because the geometry
+      cross-check compared that union with CDP's box model, which describes the box as neither
+      fragment. It is among the first eight addressable boxes on purpose, so the cross-check
+      samples it.
+    - `.keep` is a `break-inside: avoid` box inside the columns: a candidate of the error rule
+      `layout/unbreakable-block-too-tall`, declined as `env/multicolumn`, so the run ends exit 4.
+    - `.spanner` is a `column-span: all` direct child of the same container: it lies across both
+      columns, outside them, and is measured like any heading.
+    - `.narrow` sets only `columns: 11em` -- `column-count` stays auto -- and its paragraph is in
+      columns all the same.
+
+  A fifth, separate complication is a control for page withdrawal: `.note` is placed in the right
+  page margin, past the content box but inside the page box. It is printed (the PDF text layer
+  has it), so it is not residue and must not withdraw its page. The only content past the page box
+  here is an empty fragment of the Paged.js wrapper, which carries no text and withdraws nothing.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>multi-column ancestry</title>
+<style>
+  @page { size: 400pt 500pt; margin: 30pt 60pt 30pt 30pt; }
+  body { margin: 0; font: 11pt/1.45 serif; }
+  .duo { column-count: 2; column-gap: 18pt; }
+  .narrow { columns: 11em; column-gap: 12pt; }
+  .keep { break-inside: avoid; border: 1px solid #999; padding: 4pt; }
+  .spanner { column-span: all; font-size: 13pt; margin: 6pt 0; }
+  .note { width: 52pt; margin: 0 0 0 calc(100% + 6pt); font-size: 7pt; line-height: 1.2; }
+</style></head>
+<body>
+<h1>Columns by ancestry</h1>
+<p class="intro">An opening paragraph in the single column of the page. It is measured as usual, and it keeps the section below high enough on the first page for the cross-check to sample its boxes.</p>
+<section class="duo" id="duo">
+<h2 class="spanner" id="spanner">A heading across both columns</h2>
+<p class="split" id="split">This paragraph runs long enough to be set over many lines in the narrow measure of one column, so the column break falls inside it and the second column opens with its tail. Its own column count is auto, like every paragraph here; only its container asks for two columns, and the columns are where its lines are set.</p>
+<div class="keep" id="keep">A small boxed note that asks not to be broken, set inside the columns.</div>
+<p class="after-keep" id="after-keep">A closing paragraph inside the container balances the two columns with a few more lines of ordinary running text.</p>
+</section>
+<p class="note" id="note">Margin note printed beside the text.</p>
+<section class="narrow" id="narrow">
+<p class="width-only" id="width-only">This container sets only a column width. Its column count stays auto, yet the browser fits as many columns of that width as the measure allows, and this paragraph is set in them.</p>
+</section>
+<p class="outro" id="outro">A final paragraph back in the single column of the page, measured as usual.</p>
+</body></html>

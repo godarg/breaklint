@@ -30,6 +30,12 @@ export const ENV_IDS = [
   "env/evidence-fragment-outside-page",
   /** A collector projection supplied unusable geometry; never report it as a clean measurement. */
   "env/invalid-measurement",
+  /**
+   * The page laid out content entirely past its page box -- what Paged.js could not place and left
+   * in its fragmentainer's overflow column, which the PDF does not print. The page is withdrawn
+   * from measurement; counted against coverage (a property of the document, not of this build).
+   */
+  "env/pagination-residue",
 ] as const;
 export type EnvId = (typeof ENV_IDS)[number];
 

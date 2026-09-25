@@ -197,12 +197,27 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
     if (result.measured > 0) measuredRuleIds.push(rule.id);
   }
 
+  // Pages the collector withdrew from measurement as a whole — today a page whose content lies
+  // partly past its page box, where Paged.js left it and the PDF does not print it. Each rule that
+  // judges page geometry has already declined its candidates there; this is the document-level
+  // half. The page rows go into `notMeasured` beside the rules' own, and such a document cannot be
+  // called clean whatever rules are active: a rule set that happened to have no candidate on the
+  // page, or one that reads only source text, would otherwise let content that is missing from
+  // the PDF end the run at exit 0.
+  const withdrawnRows = snapshot.pages.flatMap((page) =>
+    page.notMeasured.filter((n) => !IS.toolCapabilityEnvId.has(n.reason) && !IS.nonApplicableEnvId.has(n.reason)));
+  const withdrawnPages = snapshot.pages
+    .filter((page) => page.notMeasured.some((n) => withdrawnRows.includes(n)))
+    .map((page) => page.pageNumber);
+  documentNotMeasured.push(...snapshot.pages.flatMap((page) => page.notMeasured));
+
   const verdict = documentVerdict({
     infrastructure,
     coverage,
     measuredRuleCount: measuredRuleIds.length,
     findings,
     failOn: config.failOn,
+    withdrawnPages,
     ...(evidenceCoverage ? { evidenceCoverage } : {}),
   });
 
@@ -301,7 +316,8 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
         files: snapshot.source.files ?? [],
       },
       verdict,
-      exitReason: exitReasonFor(verdict, infrastructure, coverage, measuredRuleIds.length, evidenceCoverage),
+      exitReason: exitReasonFor(verdict, infrastructure, coverage, measuredRuleIds.length, evidenceCoverage,
+        withdrawnPages.length === 0 ? null : withdrawnReason(snapshot, withdrawnPages)),
       pages: snapshot.pages.length,
       coverage,
       findings,
@@ -342,12 +358,15 @@ function documentVerdict(input: {
   measuredRuleCount: number;
   findings: Finding[];
   failOn: FailOn;
+  /** Pages withdrawn from measurement with a coverage-counted reason. */
+  withdrawnPages?: readonly number[];
   evidenceCoverage?: DocumentEvidenceCoverage;
 }): RunVerdict {
   // Not every infrastructure event means exit 3. `NON_FATAL_INFRA_EVENT_KINDS` names the narrow
   // that do not, each for a reason the contract states; everything else does.
   if (input.infrastructure.some((e) => isFatalInfra(e))) return "infrastructure";
   if (input.evidenceCoverage?.required && input.evidenceCoverage.status !== "complete") return "insufficient-coverage";
+  if ((input.withdrawnPages?.length ?? 0) > 0) return "insufficient-coverage";
   if (input.measuredRuleCount === 0) return "insufficient-coverage";
   if (Object.values(input.coverage).some((c) => !c.ok)) return "insufficient-coverage";
   return gateTriggeredBy(input.findings, input.failOn) ? "findings" : "clean";
@@ -359,18 +378,28 @@ function exitReasonFor(
   coverage: Record<string, RuleCoverage>,
   measuredRuleCount: number,
   evidenceCoverage?: DocumentEvidenceCoverage,
+  withdrawn: string | null = null,
 ): string | null {
   if (verdict === "infrastructure") {
     return infrastructure.find((e) => isFatalInfra(e))?.kind ?? null;
   }
   if (verdict === "insufficient-coverage") {
     if (evidenceCoverage?.reason) return evidenceCoverage.reason;
+    if (withdrawn) return withdrawn;
     if (infrastructure.some((e) => e.kind === "empty-input")) return "empty-input";
     if (measuredRuleCount === 0) return "no rule measured a single candidate";
     const short = Object.entries(coverage).find(([, c]) => !c.ok);
     return short ? `${short[0]} below its coverage floor` : null;
   }
   return null;
+}
+
+/** The exit reason for withdrawn pages: which pages, and why, in page order. */
+function withdrawnReason(snapshot: Snapshot, pages: readonly number[]): string {
+  const reasons = [...new Set(snapshot.pages
+    .filter((page) => pages.includes(page.pageNumber))
+    .flatMap((page) => page.notMeasured.map((n) => n.reason)))].sort();
+  return `page(s) ${pages.join(", ")} withdrawn from measurement (${reasons.join(", ")})`;
 }
 
 /**

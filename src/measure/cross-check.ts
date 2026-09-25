@@ -39,6 +39,23 @@
  * Those inline formatting boxes are excluded too; their block children remain eligible. None of
  * these findings justifies spending the tolerance on a comparison of different quantities.
  *
+ * A FRAGMENTED BOX IS COMPARED FRAGMENT BY FRAGMENT. A box the browser split — across the columns
+ * of an author's multi-column container, or into the overflow column of the fragmentainer Paged.js
+ * builds for every page — has one client rect per fragment, and `getBoundingClientRect` is their
+ * union. `DOM.getBoxModel` describes none of those: measured on Chromium 141 over 16 fragmented
+ * boxes in three documents, its border quad had the FIRST fragment's x and width and the height of
+ * the whole unfragmented flow. Comparing the union with that quad is comparing two different
+ * quantities, and it ended ordinary two-column pages and every page with overflow residue in exit
+ * 3 (by 238.66 px and 1816 px) while both sources were right. CDP's `DOM.getContentQuads` returns
+ * one quad per fragment; measured on the same 16 boxes it equals `getClientRects()` exactly, in
+ * count, order and every coordinate, and on 789 unfragmented boxes it equals the border quad. So a
+ * sample with more than one fragment is compared fragment by fragment against the content quads,
+ * and its union — the number the snapshot carries — against the union of those quads, taken the
+ * way Chromium takes it: an empty fragment (zero width or height) does not enlarge the union.
+ * An unfragmented sample is compared against the border quad exactly as before, and must also have
+ * exactly one content quad. A difference in the number of fragments is a disagreement, never a
+ * skip: a probe that saw one fragment where the layout tree has two is describing another layout.
+ *
  * THE TOLERANCE IS THEREFORE NOT A MEASURED DISAGREEMENT AT ALL. There is none to accommodate. It
  * is a guard band for machines this build has never run on — a different device pixel ratio, a
  * different zoom, a browser that rounds one path and not the other — and it is a CHOSEN number,
@@ -70,24 +87,41 @@ export const CROSS_CHECK_MEASURED_MAX_PX = 0;
 /** Maximum elements cross-examined. A smaller document contributes every eligible CSS box. */
 export const CROSS_CHECK_SAMPLE_SIZE = 8;
 
-export interface GeometrySample {
-  key: string;
+/** One rectangle: a whole box or one fragment of it. */
+export interface GeometryBox {
   x: number;
   y: number;
   width: number;
   height: number;
+}
+
+export interface GeometrySample extends GeometryBox {
+  key: string;
   /** CDP selector for exactly the sampled attribute family; never authored CSS. */
   selector?: string;
   /** Zero-based occurrence among the rendered nodes matching `selector`. */
   occurrence?: number;
+  /** 1-based `.pagedjs_page` the sampled element is laid out on, so a failure names its page. */
+  page?: number;
+  /**
+   * One box per fragment, in the browser's order: `getClientRects()` in the page, one envelope per
+   * `DOM.getContentQuads` quad out of process. Absent means "not collected", and a sample that has
+   * fragments on one side only is a disagreement.
+   */
+  fragments?: GeometryBox[];
 }
 
 export interface Disagreement {
   key: string;
-  field: "x" | "y" | "width" | "height";
+  /** `fragments` is a disagreement about how many fragments the box has. */
+  field: "x" | "y" | "width" | "height" | "fragments";
   inPage: number;
   outOfProcess: number;
   delta: number;
+  /** 0-based fragment the disagreement is about; absent for the box itself and for the count. */
+  fragment?: number;
+  /** The in-page sample's page, when it was collected. */
+  page?: number;
 }
 
 export interface CrossCheckResult {
@@ -97,6 +131,8 @@ export interface CrossCheckResult {
   eligible: number;
   excludedSvgDescendants: number;
   excludedInlineBlockContainers: number;
+  /** Checked samples with more than one fragment, compared fragment by fragment. */
+  fragmentedSamples: number;
   maxDelta: number;
   disagreements: Disagreement[];
   ok: boolean;
@@ -108,6 +144,23 @@ export interface GeometrySampleBatch {
   eligible: number;
   excludedSvgDescendants: number;
   excludedInlineBlockContainers: number;
+}
+
+/**
+ * The union of fragment boxes as `getBoundingClientRect()` forms it from `getClientRects()`.
+ *
+ * An empty fragment — zero width or zero height — does not enlarge the union. Measured on Chromium
+ * 141: a Paged.js wrapper with fragments (96, 96, 624 x 864) and (1912, 96, 624 x 0) reports a
+ * bounding rect 624 px wide, not 2440. Null when every fragment is empty.
+ */
+export function fragmentUnion(fragments: readonly GeometryBox[]): GeometryBox | null {
+  const solid = fragments.filter((f) => f.width > 0 && f.height > 0);
+  if (solid.length === 0) return null;
+  const x = Math.min(...solid.map((f) => f.x));
+  const y = Math.min(...solid.map((f) => f.y));
+  const right = Math.max(...solid.map((f) => f.x + f.width));
+  const bottom = Math.max(...solid.map((f) => f.y + f.height));
+  return { x, y, width: right - x, height: bottom - y };
 }
 
 /** Convert CDP's four-corner quad to the axis-aligned box returned by getBoundingClientRect(). */
@@ -147,27 +200,52 @@ export function compareGeometry(
   const byKey = new Map(outOfProcess.map((s) => [s.key, s]));
   const disagreements: Disagreement[] = [];
   let maxDelta = 0;
+  let fragmentedSamples = 0;
+  const where = (probe: GeometrySample) => (probe.page === undefined ? {} : { page: probe.page });
+  const compareBox = (probe: GeometrySample, a: GeometryBox, b: GeometryBox, fragment?: number) => {
+    for (const field of ["x", "y", "width", "height"] as const) {
+      const delta = Math.abs(a[field] - b[field]);
+      if (delta > maxDelta) maxDelta = delta;
+      if (delta > tolerance) {
+        disagreements.push({
+          key: probe.key, field, inPage: a[field], outOfProcess: b[field], delta,
+          ...(fragment === undefined ? {} : { fragment }), ...where(probe),
+        });
+      }
+    }
+  };
 
   for (const probe of inPage) {
     const other = byKey.get(probe.key);
     if (!other) {
-      disagreements.push({ key: probe.key, field: "x", inPage: probe.x, outOfProcess: Number.NaN, delta: Infinity });
+      disagreements.push({ key: probe.key, field: "x", inPage: probe.x, outOfProcess: Number.NaN, delta: Infinity, ...where(probe) });
       maxDelta = Infinity;
       continue;
     }
-    for (const field of ["x", "y", "width", "height"] as const) {
-      const delta = Math.abs(probe[field] - other[field]);
-      if (delta > maxDelta) maxDelta = delta;
-      if (delta > tolerance) {
-        disagreements.push({ key: probe.key, field, inPage: probe[field], outOfProcess: other[field], delta });
-      }
+    // The box itself: the number the snapshot will carry, against the same quantity out of process.
+    compareBox(probe, probe, other);
+    // Its fragments, when either side collected them. One side without them is a disagreement: a
+    // comparison that silently fell back to the box would be the first-fragment shortcut again.
+    if (probe.fragments === undefined && other.fragments === undefined) continue;
+    const mine = probe.fragments ?? [];
+    const theirs = other.fragments ?? [];
+    if (probe.fragments === undefined || other.fragments === undefined || mine.length !== theirs.length) {
+      disagreements.push({
+        key: probe.key, field: "fragments", inPage: probe.fragments === undefined ? Number.NaN : mine.length,
+        outOfProcess: other.fragments === undefined ? Number.NaN : theirs.length, delta: Infinity, ...where(probe),
+      });
+      maxDelta = Infinity;
+      continue;
     }
+    if (mine.length > 1) fragmentedSamples += 1;
+    mine.forEach((fragment, index) => compareBox(probe, fragment, theirs[index]!, index));
   }
 
   return {
     checked: inPage.length,
     required,
     ...stats,
+    fragmentedSamples,
     maxDelta,
     disagreements,
     // A cross-check over nothing is not a passed cross-check. Measuring zero elements and
@@ -189,7 +267,17 @@ export function compareGeometry(
  */
 export function crossCheckEvent(result: CrossCheckResult, residue?: FragmentainerReport): InfraEvent {
   const worst = [...result.disagreements].sort((a, b) => b.delta - a.delta).slice(0, 3);
-  const cause = residue && residue.count > 0 ? ` ${residueDetail(residue)}` : "";
+  // The pages the DISAGREEING samples are on. The sentence used to name only the residue probe's
+  // pages, and on the public residue fixture that blamed page 4's table for a disagreement measured
+  // on page 1's containers: a cause is attached only where it is on the same page as the failure.
+  const failedPages = [...new Set(result.disagreements.flatMap((d) => (d.page === undefined ? [] : [d.page])))]
+    .sort((a, b) => a - b);
+  const onFailedPage = !!residue && residue.count > 0 &&
+    (failedPages.length === 0 || residue.pages.some((page) => failedPages.includes(page)));
+  const cause = onFailedPage ? ` ${residueDetail(residue!)}` : "";
+  const pages = failedPages.length === 0 ? "" : ` on page(s) ${failedPages.join(", ")}`;
+  const count = result.disagreements.filter((d) => d.field === "fragments").length;
+  const fragments = count === 0 ? "" : ` For ${count} of them the two sources do not even agree on how many fragments the box has.`;
   return {
     kind: "geometry-cross-check-failed",
     detail:
@@ -199,9 +287,10 @@ export function crossCheckEvent(result: CrossCheckResult, residue?: Fragmentaine
           ? `the geometry cross-check measured ${result.checked} of ${result.required} required elements, ` +
             `so the report is not written.`
         : `the in-page probe and the browser's layout tree disagree about ${result.disagreements.length} ` +
-          `measurement(s) of ${result.checked} element(s) sampled, by up to ${result.maxDelta.toFixed(4)} px ` +
-          `against a tolerance of ${CROSS_CHECK_TOLERANCE_PX} px.${cause} Every number in the report comes ` +
-          `from the probe, so the report is not written.`,
+          `measurement(s) of ${result.checked} element(s) sampled${pages}, by up to ` +
+          `${Number.isFinite(result.maxDelta) ? result.maxDelta.toFixed(4) : "an unbounded amount of"} px ` +
+          `against a tolerance of ${CROSS_CHECK_TOLERANCE_PX} px.${fragments}${cause} Every number in the ` +
+          `report comes from the probe, so the report is not written.`,
     measured: {
       ...(residue && residue.count > 0 ? { fragmentainerResidue: residue } : {}),
       checked: result.checked,
@@ -210,9 +299,14 @@ export function crossCheckEvent(result: CrossCheckResult, residue?: Fragmentaine
       eligible: result.eligible,
       excludedSvgDescendants: result.excludedSvgDescendants,
       excludedInlineBlockContainers: result.excludedInlineBlockContainers,
+      fragmentedSamples: result.fragmentedSamples,
       maxDeltaPx: Number.isFinite(result.maxDelta) ? Number(result.maxDelta.toFixed(4)) : null,
       tolerancePx: CROSS_CHECK_TOLERANCE_PX,
-      worst: worst.map((d) => ({ key: d.key, field: d.field, inPage: d.inPage, outOfProcess: d.outOfProcess })),
+      failedPages,
+      worst: worst.map((d) => ({
+        key: d.key, field: d.field, inPage: d.inPage, outOfProcess: d.outOfProcess,
+        ...(d.fragment === undefined ? {} : { fragment: d.fragment }), ...(d.page === undefined ? {} : { page: d.page }),
+      })),
     },
   };
 }
@@ -223,7 +317,9 @@ export function crossCheckPassedEvent(result: CrossCheckResult): InfraEvent {
     kind: "geometry-cross-check-passed",
     detail:
       `the in-page probe matched the browser's layout tree for ${result.checked} of ${result.eligible} ` +
-      `eligible CSS box(es); ${result.excludedSvgDescendants} SVG graphics descendant(s) and ` +
+      `eligible CSS box(es)` +
+      (result.fragmentedSamples > 0 ? `, ${result.fragmentedSamples} of them fragment by fragment` : "") +
+      `; ${result.excludedSvgDescendants} SVG graphics descendant(s) and ` +
       `${result.excludedInlineBlockContainers} inline block-container(s) used different box semantics.`,
     measured: {
       checked: result.checked,
@@ -232,6 +328,7 @@ export function crossCheckPassedEvent(result: CrossCheckResult): InfraEvent {
       eligible: result.eligible,
       excludedSvgDescendants: result.excludedSvgDescendants,
       excludedInlineBlockContainers: result.excludedInlineBlockContainers,
+      fragmentedSamples: result.fragmentedSamples,
       maxDeltaPx: Number(result.maxDelta.toFixed(4)),
       tolerancePx: CROSS_CHECK_TOLERANCE_PX,
     },
@@ -252,6 +349,7 @@ export const SAMPLE_SOURCE = `((limit) => {
   const selector = "[data-bl-sid],address[data-ref],article[data-ref],aside[data-ref],blockquote[data-ref],caption[data-ref],dd[data-ref],details[data-ref],div[data-ref],dl[data-ref],dt[data-ref],fieldset[data-ref],figcaption[data-ref],figure[data-ref],footer[data-ref],form[data-ref],h1[data-ref],h2[data-ref],h3[data-ref],h4[data-ref],h5[data-ref],h6[data-ref],header[data-ref],hgroup[data-ref],hr[data-ref],li[data-ref],main[data-ref],nav[data-ref],ol[data-ref],p[data-ref],pre[data-ref],section[data-ref],summary[data-ref],table[data-ref],tbody[data-ref],td[data-ref],tfoot[data-ref],th[data-ref],thead[data-ref],tr[data-ref],ul[data-ref],[id]";
   const rendered = ".pagedjs_page " + selector.replaceAll(",", ",.pagedjs_page ");
   const all = P.all(document, rendered);
+  const pages = P.all(document, ".pagedjs_page");
   const seen = new Set();
   const out = [];
   let candidates = 0;
@@ -304,7 +402,16 @@ export const SAMPLE_SOURCE = `((limit) => {
     // before this guard can make a sound small document require more samples than can be queried.
     eligible += 1;
     if (out.length < limit) {
-      out.push({ key, x: b.x, y: b.y, width: b.width, height: b.height, selector: exactSelector, occurrence });
+      // Every fragment, as the browser lists them. A box split across columns or into Paged.js's
+      // overflow column has several, and its bounding rect is their union; CDP is asked for the
+      // same list, so each fragment is compared with its own counterpart.
+      const rects = P.rects(el);
+      const fragments = [];
+      for (let i = 0; i < rects.length; i += 1) {
+        fragments.push({ x: rects[i].x, y: rects[i].y, width: rects[i].width, height: rects[i].height });
+      }
+      const page = pages.indexOf(P.closest(el, ".pagedjs_page")) + 1;
+      out.push({ key, x: b.x, y: b.y, width: b.width, height: b.height, selector: exactSelector, occurrence, page, fragments });
     }
   }
   return { samples: out, candidates, eligible, excludedSvgDescendants, excludedInlineBlockContainers };

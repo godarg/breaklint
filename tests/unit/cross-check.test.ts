@@ -93,6 +93,7 @@ describe("the geometry cross-check", () => {
       eligible: 5,
       excludedSvgDescendants: 1,
       excludedInlineBlockContainers: 1,
+      fragmentedSamples: 0,
       maxDeltaPx: 0,
       tolerancePx: 0.05,
     });

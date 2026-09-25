@@ -21,6 +21,7 @@ import {
 import type {
   BlockRecord,
   InputIdentity,
+  NotMeasured,
   PageRecord,
   Snapshot,
   SourceRef,
@@ -382,8 +383,23 @@ interface RawSvg extends Omit<SvgRecord, "sourceKey" | "texts"> {
   texts: RawSvgText[];
 }
 
+/**
+ * Content a page laid out entirely past its own page box, as the in-page census counted it. Raw
+ * collector output only: `assembleSnapshot` turns a nonzero census into the page's withdrawal and
+ * does not persist the counts (see `pageResidueWithdrawal`).
+ */
+export interface OverflowResidueCensus {
+  /** Visible text line boxes (Range client rects) with no pixel on the page. */
+  textRects: number;
+  /** Visible `img`, `svg`, `canvas` or `video` boxes with no pixel on the page. */
+  replacedElements: number;
+}
+
 export interface RawSnapshot {
-  pages: Omit<PageRecord, "incomingBreakCause" | "outgoingBreakCause" | "firstSemanticBlockKey">[];
+  pages: (Omit<PageRecord, "incomingBreakCause" | "outgoingBreakCause" | "firstSemanticBlockKey"> & {
+    /** Absent on raw input recorded before the census existed; read as no residue. */
+    overflowResidue?: OverflowResidueCensus;
+  })[];
   blocks: RawBlock[];
   textLines: TextLine[];
   svg: RawSvg[];
@@ -472,6 +488,40 @@ export const SNAPSHOT_SOURCE = `(() => {
         "), so its flow content cannot be told apart from margin-box content");
     }
   }
+  // MULTI-COLUMN BY ANCESTRY. Whether a block's own content sits in columns of an author's
+  // multi-column container. \`column-count\` and \`column-width\` are not inherited, so the block's own
+  // computed value -- all \`effectiveStyle.columns\` records -- says nothing about a paragraph INSIDE a
+  // two-column section, and that paragraph used to be measured: its line rects were grouped across
+  // both columns and its bounding box was the union of its column fragments (measured on Chromium
+  // 141: 453.31 px wide in a 214.66 px column). The walk goes up to, and never includes, the Paged.js
+  // page structure: \`.pagedjs_page_content\` is itself a multi-column fragmentainer, and every block
+  // of every document would otherwise be in columns.
+  //
+  // A container is multi-column when either property is set: \`column-count\` other than auto or 1,
+  // or any \`column-width\` (\`columns: 12em\` sets only the width). A \`column-span: all\` element
+  // leaves its container's columns only when Chromium can honour it -- an in-flow, block-level,
+  // unfloated DIRECT child of the container -- and then its subtree is judged by the containers
+  // above. A deeper spanner may be honoured too; it is not recognised here and stays declined, which
+  // costs coverage and never a verdict.
+  const PAGE_STRUCTURE = ".pagedjs_page_content,.pagedjs_area,.pagedjs_pagebox,.pagedjs_sheet,.pagedjs_page";
+  const multicolContainer = (style) => {
+    const count = style.columnCount || "auto";
+    const width = style.columnWidth || "auto";
+    return (count !== "auto" && count !== "1") || width !== "auto";
+  };
+  const honouredSpanner = (style) => style.columnSpan === "all" && (style.float || "none") === "none" &&
+    style.position !== "absolute" && style.position !== "fixed" &&
+    !/^(inline|contents|none)/u.test(style.display || "block");
+  const inMulticol = (el) => {
+    let child = el;
+    for (let at = P.parent(el); at && P.nodeType(at) === 1; child = at, at = P.parent(at)) {
+      if (P.closest(at, PAGE_STRUCTURE) === at) return false;
+      if (!multicolContainer(P.style(at, null))) continue;
+      if (honouredSpanner(P.style(child, null))) continue;
+      return true;
+    }
+    return false;
+  };
   const fragments = [];
   const bySidCount = {};
   for (const page of pagesEls) for (const el of P.all(page, SOURCE_BLOCK_SELECTOR)) {
@@ -556,7 +606,8 @@ export const SNAPSHOT_SOURCE = `(() => {
       classList: (P.attr(el, "class") || "").split(/\\s+/u).filter(Boolean), lineHeight,
       spaceWidth: measured.spaceWidth || round(fontSize * 0.33),
       effectiveStyle: { breakInside: s.breakInside || "auto", breakBefore: s.breakBefore || "auto",
-        breakAfter: s.breakAfter || "auto", columns: s.columnCount || "auto", writingMode: s.writingMode || "horizontal-tb",
+        breakAfter: s.breakAfter || "auto", columns: s.columnCount || "auto", multicolAncestor: inMulticol(el),
+        writingMode: s.writingMode || "horizontal-tb",
         visibility: s.visibility || "visible", widows: number(s.widows, 2), orphans: number(s.orphans, 2),
         textAlign: s.textAlign || "start", wordSpacing: s.wordSpacing || "normal", fontFamily: s.fontFamily || "",
         fontSize, lineHeight, lang: P.attr(el, "lang") || document.documentElement.lang || "" },
@@ -596,16 +647,34 @@ export const SNAPSHOT_SOURCE = `(() => {
     const content = P.all(page, ".pagedjs_page_content")[0] || page;
     const cb = box(content);
     const pageBlocks = blocks.filter((b) => b.page === index + 1);
+    // CONTENT LAID OUT BEYOND THE PAGE. Paged.js turns the page content into a multi-column
+    // fragmentainer and moves what overflows its first column onto the next page; what it fails to
+    // move stays in the next column, one pitch (content width + margins + bleed + 1000 px) along
+    // the column progression, which is past the page box and never printed. Measured on Chromium
+    // 141 with the public residue fixture: 20 words of page 1 lay there, and exactly those 20 words
+    // were absent from pdftotext's reading of the PDF. The census is structural: a visible text
+    // line box or replaced element lying ENTIRELY past the page box's edge in the column progression
+    // (right for ltr, left for rtl) has no pixel on the page. Content beyond the content box but
+    // inside the page box -- a margin note, a hanging figure -- prints, and is not counted.
+    const pageRect = P.rect(page);
+    const rtl = P.style(content, null).direction === "rtl";
+    const offPage = (r) => r.width > 0 && r.height > 0 &&
+      (rtl ? r.x + r.width <= pageRect.x : r.x >= pageRect.x + pageRect.width);
+    const overflowResidue = { textRects: 0, replacedElements: 0 };
     // Page fill is independent of source-block identity. Anonymous/inline-only authored text has
     // no BlockRecord, but its visible Range boxes still consume the page and must prevent blank.
     const rectangles = [];
     for (const node of textNodes(content)) {
-      for (const rect of P.range(node)) if (rect.width > 0 && rect.height > 0) rectangles.push(rect);
+      for (const rect of P.range(node)) {
+        if (rect.width > 0 && rect.height > 0) rectangles.push(rect);
+        if (offPage(rect)) overflowResidue.textRects += 1;
+      }
     }
     for (const el of P.all(content, "img,svg,canvas,video,table")) {
       const style = P.style(el, null);
       if (style.display === "none" || style.visibility === "hidden") continue;
       rectangles.push(box(el));
+      if (el.tagName !== "TABLE" && offPage(P.rect(el))) overflowResidue.replacedElements += 1;
     }
     const measuredRects = rectangles.map((rect) => clipped(rect, cb)).filter(Boolean);
     const merged = mergedBands(measuredRects);
@@ -620,7 +689,7 @@ export const SNAPSHOT_SOURCE = `(() => {
         topGap: cb.height > 0 && first ? round((first[0] - cb.y) / cb.height) : 0,
         net: cb.height > 0 ? round(netHeight / cb.height) : 0,
         area: cb.width > 0 && cb.height > 0 ? round(unionArea(measuredRects) / (cb.width * cb.height)) : 0 },
-      notMeasured: [] };
+      notMeasured: [], overflowResidue };
   });
 
   const svg = [];
@@ -916,6 +985,29 @@ export function validateSnapshotInvariants(
   return { ok: issues.length === 0, issues };
 }
 
+/**
+ * The withdrawal of a page whose content was laid out past its page box.
+ *
+ * What the census counts is not on the paper: Paged.js left it in its fragmentainer's overflow
+ * column, and on the public residue fixture pdftotext finds exactly those words missing from the
+ * PDF. Every geometry on such a page was measured in a state the PDF does not show -- the stranded
+ * lines are still in the block's line list, its box is the union with a column past the page -- so
+ * the page is withdrawn from measurement as a whole: one `env/pagination-residue` row on the page,
+ * which every page-located rule honours for its candidates there (`rules/shared.ts`) and which the
+ * engine refuses to call clean. Reporting the missing content itself would need a rule of its own;
+ * this build only refuses to vouch for the page.
+ */
+export function pageResidueWithdrawal(pageNumber: number, census: OverflowResidueCensus | undefined): NotMeasured[] {
+  if (!census || census.textRects + census.replacedElements === 0) return [];
+  return [{
+    scope: "page",
+    ruleId: null,
+    reason: "env/pagination-residue",
+    target: { keyType: "page", nodeKey: `page:${pageNumber}`, sid: null },
+    count: 1,
+  }];
+}
+
 /** Join browser measurements to source identity and classify each page boundary exactly once. */
 export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
   const sourceInput = input.sourceInput ?? {
@@ -1061,12 +1153,13 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
     list.push(block);
     anchorCandidates.set(block.page, list);
   }
-  const pages: PageRecord[] = input.raw.pages.map((page, index) => {
+  const pages: PageRecord[] = input.raw.pages.map(({ overflowResidue, ...page }, index) => {
     const onPage = anchorCandidates.get(page.pageNumber) ?? [];
     const first = onPage.find((b) => b.fragmentIndex === 0) ?? onPage[0];
     const identity = first ? blockKey({ authorId: first.authorId, blockSignature: first.blockSignature }) : null;
     return {
       ...page,
+      notMeasured: [...page.notMeasured, ...pageResidueWithdrawal(page.pageNumber, overflowResidue)],
       epoch: input.collector.pages[index]?.epoch ?? 0,
       blank: page.blank,
       incomingBreakCause: causes[index]?.incoming ?? {

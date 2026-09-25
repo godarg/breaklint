@@ -1,0 +1,72 @@
+<!doctype html>
+<!--
+  Text that Paged.js leaves in its fragmentainer's overflow column, and that the PDF therefore does
+  not print. Self-authored: the words are generated from a small neutral vocabulary; no third-party
+  text.
+
+  THE COMPLICATION. Nothing on the page is exotic -- no @page, no print stylesheet, no break
+  property, no script, no table. Paragraphs of one length inside a padded content column, set in
+  DejaVu Sans at 18 px, are enough: measured on Chromium 141 with Paged.js 0.4.3, the last two lines
+  of the paragraph at the bottom of seven of the nine pages lie one column pitch to the right of the
+  page (x = content left + 1816 px), past the page box, and pdftotext finds exactly those 88 words
+  missing from the PDF while every other word is present. The page after starts with the NEXT
+  paragraph, so nothing was moved; the lines are simply lost. Which paragraphs strand depends on the
+  font's metrics (Liberation, Free and the serif faces strand none here), so the fixture relies on
+  seven chances, not one.
+
+  WHY IT IS HARD. The geometry cross-check used to end this document in exit 3: the stranded
+  paragraph and every container around it have two client rects, and CDP's box model describes a
+  fragmented box as none of them. With the cross-check comparing fragment by fragment, nothing
+  refused the document any more, and the PDF does not change under print either: before page
+  withdrawal it came back measured, with rule coverage 1 over pages whose text is missing on paper.
+
+  Every paragraph ends with a unique word (coda01 ... coda40), so a test can say WHICH paragraphs
+  lost their tail, from the PDF text layer, independently of the collector.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>pagination text residue</title><style>
+  body { margin: 0; font-family: 'DejaVu Sans', system-ui, sans-serif; font-size: 18px; line-height: 1.65; }
+  .wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { width: 100%; min-width: 0; max-width: 68ch; padding: 8px 0 96px; }
+</style></head>
+<body><div class="wrap"><div class="layout"><main>
+<p>The sturdy beacon returns a beacon the plain cellar measures a saddle the humble beacon shelters a window the early tavern returns a kettle the amber thicket lowers a river the narrow saddle answers a valley the narrow willow lowers and closes on coda01.</p>
+<p>The silver quarry carries a thicket the modest saddle mirrors a ribbon the gentle quarry follows a thicket the quiet mantle returns a meadow the quiet lantern borrows a anchor the steady thicket carries a cellar the sturdy letter measures and closes on coda02.</p>
+<p>The level window returns a garden the amber market measures a harbour the amber meadow measures a quarry the patient compass returns a timber the level meadow records a bridge the distant cellar borrows a pebble the patient harbour gathers and closes on coda03.</p>
+<p>The crooked orchard settles a orchard the level market settles a meadow the quiet beacon mirrors a harbour the steady window turns a timber the quiet kettle settles a parcel the modest compass gathers a barrow the amber window lowers and closes on coda04.</p>
+<p>The patient letter gathers a market the distant harbour settles a cellar the plain orchard follows a garden the silver orchard carries a lantern the sturdy tavern measures a river the amber willow borrows a saddle the humble window records and closes on coda05.</p>
+<p>The early compass mirrors a ledger the narrow ledger settles a window the quiet bridge warms a tavern the gentle market turns a harbour the steady river settles a beacon the gentle quarry shelters a orchard the quiet valley borrows and closes on coda06.</p>
+<p>The patient harbour lowers a thicket the distant mantle answers a ledger the narrow meadow gathers a window the gentle quarry borrows a harbour the gentle candle reaches a thicket the sturdy valley shelters a kettle the level barrow follows and closes on coda07.</p>
+<p>The modest river mirrors a valley the patient timber borrows a mantle the gentle garden records a window the early ribbon mirrors a willow the steady hollow settles a anchor the sturdy thicket gathers a compass the quiet orchard gathers and closes on coda08.</p>
+<p>The humble bridge borrows a ribbon the silver ledger answers a compass the level anchor shelters a kettle the patient pebble follows a timber the silver meadow follows a garden the sturdy willow mirrors a beacon the gentle thicket gathers and closes on coda09.</p>
+<p>The steady timber turns a window the silver harbour gathers a bridge the modest saddle borrows a lantern the quiet river answers a candle the humble barrow follows a meadow the distant valley turns a saddle the distant hollow records and closes on coda10.</p>
+<p>The humble barrow follows a barrow the quiet timber carries a kettle the plain candle records a market the quiet harbour shelters a quarry the narrow kettle gathers a ribbon the patient letter follows a meadow the narrow saddle returns and closes on coda11.</p>
+<p>The silver lantern turns a timber the silver ribbon records a valley the crooked timber reaches a candle the narrow hollow measures a anchor the narrow beacon warms a compass the crooked harbour warms a kettle the gentle harbour shelters and closes on coda12.</p>
+<p>The modest ledger shelters a harbour the gentle meadow gathers a meadow the amber orchard answers a anchor the modest ribbon reaches a ledger the plain ribbon records a barrow the sturdy saddle measures a mantle the humble meadow returns and closes on coda13.</p>
+<p>The humble harbour answers a thicket the narrow kettle carries a garden the silver orchard measures a cellar the gentle hollow turns a kettle the patient anchor carries a candle the patient valley mirrors a thicket the steady pebble follows and closes on coda14.</p>
+<p>The plain letter mirrors a timber the sturdy kettle turns a garden the distant ledger mirrors a bridge the steady quarry settles a tavern the crooked cellar turns a window the plain window settles a garden the gentle timber reaches and closes on coda15.</p>
+<p>The early valley measures a candle the level anchor warms a lantern the silver meadow answers a mantle the early orchard measures a kettle the patient timber borrows a mantle the modest ledger mirrors a pebble the sturdy hollow reaches and closes on coda16.</p>
+<p>The level mantle shelters a saddle the distant meadow warms a lantern the patient beacon shelters a lantern the amber parcel answers a barrow the distant market mirrors a tavern the gentle harbour mirrors a valley the modest saddle borrows and closes on coda17.</p>
+<p>The crooked mantle answers a garden the crooked valley lowers a lantern the amber orchard measures a orchard the amber willow mirrors a quarry the crooked candle gathers a hollow the steady window warms a kettle the patient river records and closes on coda18.</p>
+<p>The crooked kettle returns a parcel the quiet river borrows a bridge the crooked candle returns a parcel the humble pebble shelters a cellar the early ledger warms a tavern the silver anchor borrows a meadow the modest timber turns and closes on coda19.</p>
+<p>The modest valley measures a saddle the steady quarry turns a timber the quiet ledger returns a barrow the amber anchor returns a tavern the level letter measures a letter the amber window gathers a ribbon the level mantle lowers and closes on coda20.</p>
+<p>The plain parcel gathers a window the steady anchor settles a meadow the patient willow lowers a timber the distant bridge turns a parcel the level harbour reaches a pebble the narrow lantern measures a letter the humble compass lowers and closes on coda21.</p>
+<p>The sturdy timber carries a window the crooked beacon gathers a compass the crooked lantern follows a willow the distant hollow lowers a timber the early kettle follows a pebble the plain ribbon returns a mantle the amber parcel measures and closes on coda22.</p>
+<p>The sturdy barrow records a meadow the crooked garden measures a pebble the humble market warms a ribbon the humble quarry follows a pebble the humble mantle turns a willow the patient market mirrors a ledger the level beacon turns and closes on coda23.</p>
+<p>The steady market warms a valley the humble pebble answers a barrow the sturdy window settles a willow the narrow pebble carries a thicket the modest harbour returns a lantern the humble timber settles a willow the crooked barrow gathers and closes on coda24.</p>
+<p>The narrow parcel follows a meadow the plain willow measures a compass the plain tavern turns a ledger the patient garden measures a kettle the early letter settles a anchor the level timber turns a timber the sturdy pebble reaches and closes on coda25.</p>
+<p>The steady compass shelters a harbour the plain bridge follows a parcel the crooked harbour carries a window the early garden carries a hollow the patient letter records a candle the steady thicket measures a orchard the sturdy ribbon shelters and closes on coda26.</p>
+<p>The level pebble shelters a bridge the silver window records a pebble the plain compass carries a ledger the amber compass warms a pebble the gentle river returns a window the level quarry returns a quarry the steady pebble borrows and closes on coda27.</p>
+<p>The humble thicket shelters a beacon the early garden turns a ribbon the amber tavern reaches a anchor the early letter shelters a letter the plain timber borrows a window the crooked window turns a orchard the early anchor borrows and closes on coda28.</p>
+<p>The silver meadow answers a ledger the narrow compass warms a compass the humble tavern records a valley the steady ledger mirrors a hollow the crooked harbour gathers a window the gentle hollow reaches a timber the level candle gathers and closes on coda29.</p>
+<p>The humble quarry lowers a letter the humble hollow warms a window the crooked meadow measures a orchard the quiet lantern lowers a willow the gentle pebble turns a barrow the sturdy valley borrows a river the narrow window follows and closes on coda30.</p>
+<p>The early market turns a hollow the narrow barrow carries a valley the amber saddle gathers a cellar the narrow letter settles a saddle the modest pebble reaches a compass the steady thicket reaches a harbour the amber parcel carries and closes on coda31.</p>
+<p>The steady river settles a saddle the distant ribbon reaches a ledger the plain window shelters a river the narrow pebble lowers a harbour the distant anchor gathers a tavern the level parcel turns a beacon the plain quarry settles and closes on coda32.</p>
+<p>The gentle window returns a barrow the distant tavern lowers a bridge the patient timber gathers a ribbon the silver cellar follows a mantle the plain ledger follows a anchor the distant anchor returns a parcel the distant cellar settles and closes on coda33.</p>
+<p>The early ledger borrows a ribbon the early meadow lowers a letter the patient kettle gathers a harbour the plain candle mirrors a anchor the gentle lantern borrows a bridge the amber market reaches a window the amber ledger shelters and closes on coda34.</p>
+<p>The humble meadow settles a pebble the sturdy quarry borrows a parcel the narrow cellar settles a barrow the quiet orchard shelters a orchard the silver garden answers a saddle the modest pebble carries a cellar the steady quarry settles and closes on coda35.</p>
+<p>The narrow bridge answers a bridge the plain letter returns a willow the humble compass returns a barrow the level orchard mirrors a saddle the crooked quarry gathers a willow the gentle hollow lowers a lantern the modest timber follows and closes on coda36.</p>
+<p>The sturdy river warms a kettle the humble thicket shelters a lantern the modest kettle settles a market the humble ledger shelters a market the distant pebble answers a kettle the amber bridge returns a timber the patient hollow records and closes on coda37.</p>
+<p>The patient harbour carries a cellar the steady barrow carries a quarry the early compass lowers a hollow the modest lantern turns a letter the silver ledger carries a barrow the silver letter gathers a tavern the plain garden settles and closes on coda38.</p>
+<p>The sturdy bridge lowers a garden the quiet pebble gathers a timber the crooked ribbon turns a saddle the early mantle borrows a thicket the silver orchard carries a thicket the modest saddle gathers a window the level lantern reaches and closes on coda39.</p>
+<p>The early orchard reaches a saddle the early hollow settles a saddle the gentle bridge mirrors a barrow the amber compass reaches a cellar the silver pebble warms a valley the patient ribbon follows a garden the sturdy orchard returns and closes on coda40.</p>
+</main></div></div></body></html>

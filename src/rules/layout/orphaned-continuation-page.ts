@@ -1,7 +1,7 @@
 import { defineRule } from "../../core/rule.ts";
 import { pageKey } from "../../core/fingerprint.ts";
 import type { BlockRecord, Box, PageRecord, Snapshot, TextLine } from "../../core/types.ts";
-import { declined, makeFinding, num, renderedBox, targetEvaluation } from "../shared.ts";
+import { declined, makeFinding, pageWithdrawal, num, renderedBox, targetEvaluation } from "../shared.ts";
 
 /** Box-coordinate slack for rounded geometry, in CSS px. A tolerance, not a threshold. */
 const EDGE_TOLERANCE_PX = 1;
@@ -150,7 +150,7 @@ export const orphanedContinuationPage = defineRule(
     unit: "fill ratio",
     defaultOptions: { maxNetFill: 0.5 },
     summary: "A page holds nothing but the tail of a block that began earlier.",
-    declines: ["env/parity-blank-page", "env/forced-break"],
+    declines: ["env/parity-blank-page", "env/forced-break", "env/pagination-residue"],
     remediation: {
       advice:
         "A continuation page holds only a tiny trailing fragment of an earlier block. Tighten preceding vertical margins, padding, or line-height on earlier pages to pull the remaining lines back, or insert 'break-before: page' earlier to balance content across pages.",
@@ -180,6 +180,15 @@ export const orphanedContinuationPage = defineRule(
           declined({ scope: "page", ruleId: "layout/orphaned-continuation-page", reason: "env/parity-blank-page" }),
         );
         evaluations.push(targetEvaluation({ ruleId: "layout/orphaned-continuation-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "not-measured", reason: "env/parity-blank-page" }));
+        continue;
+      }
+      // The judgement reads this page and the first lines of the next one. A withdrawn page on
+      // either side is measured in a state the PDF does not show: a tail Paged.js stranded at the
+      // top of the next page's overflow column reads exactly like running text opening that page.
+      const withdrawn = pageWithdrawal(snapshot, page.pageNumber) ?? pageWithdrawal(snapshot, page.pageNumber + 1);
+      if (withdrawn) {
+        notMeasured.push(declined({ scope: "page", ruleId: "layout/orphaned-continuation-page", reason: withdrawn }));
+        evaluations.push(targetEvaluation({ ruleId: "layout/orphaned-continuation-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "not-measured", reason: withdrawn }));
         continue;
       }
       // A page the author forced open is a decision. Judging its fill reports the intent back.

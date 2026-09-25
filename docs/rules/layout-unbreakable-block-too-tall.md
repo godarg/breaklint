@@ -17,7 +17,7 @@ One of two rules that carry `error`. Two directly measured heights, a structural
 
 ## Limits and known false alarms
 
-Multi-column and vertical writing are declined rather than judged.
+Multi-column and vertical writing are declined rather than judged. That includes a block set in the columns of a multi-column ancestor (`env/multicolumn`): `column-count` is not inherited, and through 0.6.0 such a block was measured on the union of its column fragments. A block with any fragment on a page withdrawn because content lies past its page box (`env/pagination-residue`: Paged.js left it in its overflow column, and the PDF does not print it) is declined too, because the height of a split block is summed over its fragments. Both declines count against coverage, so either one ends the run in exit 4.
 
 A block the paginator split is judged on all of its fragments, joined by source id. A split block
 whose fragments cannot be joined — it has no source id (a `--no-source-map` run, or an element a

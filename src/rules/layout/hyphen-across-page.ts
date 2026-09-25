@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
+import { declined, blockOutOfScope, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
 
 /** The class the paginator sets on a block it hyphenated at a page boundary. */
 const PAGEDJS_HYPHEN_CLASS = "pagedjs_hyphen";
@@ -35,7 +35,7 @@ export const hyphenAcrossPage = defineRule(
     unit: "occurrences",
     defaultOptions: { maxOccurrences: 0 },
     summary: "A word is split by a hyphen across a page boundary.",
-    declines: ["env/multicolumn", "env/vertical-writing"],
+    declines: ["env/pagination-residue", "env/multicolumn", "env/vertical-writing"],
     remediation: {
       advice:
         "The last text line on a page ends in a hyphen that breaks a word across the page boundary. The rule reads the paginator's own hyphenation class, so it only reports a hyphen Paged.js introduced — a hard hyphen you typed is not reported. Paged.js marks a page split that falls inside a word, and a split right after a soft hyphen counts as one: do not insert soft hyphens ('&shy;') to cure this finding, and do not rely on 'hyphens: manual', under which soft hyphens still break. In justified text 'type/excessive-word-spacing' owns the block-level 'hyphens' setting and where soft hyphens go, so change only the boundary word there: wrap it in '<span style=\"hyphens: none\">' or 'white-space: nowrap', or reword slightly. In a block that is not justified, 'hyphens: none' on the paragraph is the direct fix.",
@@ -60,7 +60,7 @@ export const hyphenAcrossPage = defineRule(
       if (block.fragmentCount < 2 || block.fragmentIndex >= block.fragmentCount - 1) continue;
       candidates += 1;
 
-      const outOfScope = layoutOutOfScope(block.effectiveStyle);
+      const outOfScope = blockOutOfScope(snapshot, block);
       if (outOfScope) {
         notMeasured.push(declined({ scope: "block", ruleId: "layout/hyphen-across-page", reason: outOfScope }));
         evaluations.push(targetEvaluation({ ruleId: "layout/hyphen-across-page", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: outOfScope }));

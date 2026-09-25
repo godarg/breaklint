@@ -37,7 +37,7 @@ import type { DocumentInput } from "../core/engine.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InfraEvent, ReportEnvironment, ResourceRecord, SourceRef } from "../core/types.ts";
 import {
-  compareGeometry, crossCheckEvent, crossCheckPassedEvent, CROSS_CHECK_SAMPLE_SIZE,
+  compareGeometry, crossCheckEvent, crossCheckPassedEvent, CROSS_CHECK_SAMPLE_SIZE, fragmentUnion,
   CROSS_CHECK_TOLERANCE_PX, geometrySampleSource, quadEnvelope,
   type GeometrySample, type GeometrySampleBatch,
 } from "../measure/cross-check.ts";
@@ -917,7 +917,13 @@ async function configureNetwork(
   return tracker;
 }
 
-async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compareGeometry>> {
+/**
+ * The geometry cross-check of one paginated page: the in-page sample against CDP.
+ *
+ * Exported for the live negative control only (`tests/live/cross-check-fragments.test.ts`), which
+ * changes the layout between the two reads and requires this function, unmodified, to fail.
+ */
+export async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compareGeometry>> {
   const batch = await page.evaluate<GeometrySampleBatch>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
   const inPage = batch.samples;
   if (!page.createCDPSession) throw new Error("the browser driver exposes no CDP session for the geometry oracle");
@@ -940,8 +946,21 @@ async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compare
         // checker crash or a quiet skip.
         continue;
       }
-      const q = model.border;
-      out.push({ key: sample.key, ...quadEnvelope(q) });
+      // One quad per fragment. The border quad above describes a fragmented box as none of its
+      // fragments (see cross-check.ts), so for a box CDP itself reports in several pieces the
+      // comparable whole is the union of those pieces. Which case applies is decided by CDP's own
+      // answer, not by the probe's: the probe's fragment count is one of the things being checked.
+      let fragments: GeometrySample["fragments"];
+      try {
+        const { quads } = await session.send<{ quads: number[][] }>("DOM.getContentQuads", { nodeId });
+        fragments = quads.map((quad) => quadEnvelope(quad));
+      } catch {
+        // No fragment list is a missing answer too; compareGeometry turns it into a disagreement.
+        fragments = undefined;
+      }
+      const whole = fragments && fragments.length > 1 ? fragmentUnion(fragments) : quadEnvelope(model.border);
+      if (!whole) continue;
+      out.push({ key: sample.key, ...whole, ...(fragments ? { fragments } : {}) });
     }
     // Small documents can expose fewer than eight addressable eligible CSS boxes; in that case
     // every one is checked. Returning the full pre-limit eligible population makes that reduction

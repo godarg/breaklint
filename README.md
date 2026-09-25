@@ -169,8 +169,8 @@ changes the box is not accepted as stable geometry.
 Reports retain a resource index and dimensions, never the failed file URL or remote query string.
 
 A successful live document retains a non-fatal `geometry-cross-check-passed` event with candidate,
-eligible, checked and required box counts, every semantic exclusion and the maximum delta against
-the 0.05 px tolerance. This is positive evidence from Chrome's CDP layout tree, not a second read
+eligible, checked and required box counts, every semantic exclusion, how many sampled boxes were
+compared fragment by fragment, and the maximum delta against the 0.05 px tolerance. This is positive evidence from Chrome's CDP layout tree, not a second read
 from the in-page collector; a zero or truncated required sample is fatal.
 
 **SVG clipping and ink collision are not released rules.** The research modules

@@ -142,6 +142,35 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   longer says the last page is "downgraded to a note": its finding keeps `warn`, and only the
   message says the page is likely intended. The rule stays experimental and off by default, and
   nothing here is a calibration.
+- **Blocks inside a multi-column container are declined by the seven rules that read their frame,
+  found through the container.** `column-count` is not inherited, and the multi-column decline read
+  the block's own value, so a paragraph in a two-column section was measured on the union of its
+  column fragments (measured on patched Chromium 141: 453.31 px wide in a 214.66 px column; a
+  document whose `break-inside: avoid` box sat in the columns ended `clean`, exit 0) or, when the
+  geometry cross-check sampled it, ended the run in exit 3. The collector now records, per block,
+  whether an ancestor between it and the Paged.js page structure is a multi-column container —
+  `column-count` other than `auto`/`1`, or any `column-width` — and `layout/widow`, `layout/orphan`,
+  `layout/hyphen-across-page`, `layout/heading-at-page-bottom`,
+  `layout/unbreakable-block-too-tall`, `type/excessive-word-spacing` and `type/short-last-line`
+  decline such a block as `env/multicolumn`, counted against coverage. A `column-span: all` direct
+  child of the container, and its subtree, is measured; a deeper spanner stays declined. A document
+  whose error-rule candidate is in columns now ends exit 4 instead of 0 or 3. The rule-by-rule
+  matrix, with the reason for each row, is in `docs/limitations.md` and is pinned against the
+  registry by `tests/unit/columns-and-residue.test.ts`.
+- **A page whose content Paged.js left past the page box is withdrawn from measurement.** Text left
+  in the overflow column of Paged.js's fragmentainer is not printed: on the public residue fixture
+  the last 20 words of page 1 lie one column pitch to the right of the page and exactly those 20 of
+  its 1136 words are missing from the PDF (pdftotext on the checked PDF). Nothing reported it. The
+  collector now counts, per page, visible text line boxes and `img`/`svg`/`canvas`/`video` boxes
+  lying entirely past the page box in the column progression; such a page carries one
+  `env/pagination-residue` row in `pages[].notMeasured`. The seven rules above and
+  `layout/half-empty-page` decline their candidates on it (`layout/unbreakable-block-too-tall` when
+  any fragment of a split block is on it, `layout/orphaned-continuation-page` also for the page
+  before it), counted against coverage, and the engine refuses to call such a document clean
+  whatever rules are active: exit 4, `exitReason` `page(s) … withdrawn from measurement
+  (env/pagination-residue)`. The lost content itself is not reported; a rule for that is a later
+  step and not in this release. Where the PDF moves the residue instead (a table row), the document
+  still ends `render-unstable`, exit 3.
 
 ### Added
 
@@ -254,6 +283,22 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   now anchored to the first block that STARTS on it; only a page on which nothing starts falls back
   to its first continuing block. Page 1 of a wrapped document is still anchored to the wrapper;
   every later page moves to its first paragraph. The same baseline advice applies.
+- **The geometry cross-check compares a fragmented box fragment by fragment.** It compared
+  `getBoundingClientRect` — the union of a box's fragments — with CDP's `DOM.getBoxModel`, whose
+  border quad describes a fragmented box as none of them (measured on patched Chromium 141 over 16
+  fragmented boxes: the first fragment's x and width, the whole flow's height). A paragraph split
+  across two author columns, or into Paged.js's overflow column, therefore ended the whole run in
+  exit 3 (`geometry-cross-check-failed`, by 238.66 px and 1816 px), and the sentence could name a
+  cause on another page than the failing sample: on the public residue fixture it blamed page 4's
+  table for a disagreement measured on page 1. The in-page sample now carries every fragment
+  (`getClientRects()`), CDP answers with `DOM.getContentQuads` — measured equal to it in count,
+  order and every coordinate on all 16 boxes, and equal to the border quad on 789 unfragmented ones
+  — and a box CDP reports in several pieces is compared piece by piece, its union against the union
+  of CDP's pieces. An unfragmented box is still compared with the border quad. A different number of
+  fragments, a missing fragment list or a fragment out of place fails as before, at the same
+  0.05 px tolerance; the negative controls in `tests/live/measure.test.ts` change a split box's
+  layout between the two reads and require the unmodified check to fail. The failure sentence now
+  names the pages of the disagreeing samples and attaches the residue cause only from those pages.
 
 ### Documentation
 
@@ -363,6 +408,13 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   paragraph. The page also states when a page counts as ending, what was measured, and the
   remaining limits, and `docs/limitations.md` says what page fill counts and what a line-box fill
   would change.
+- **`docs/limitations.md`: pagination residue and multi-column content rewritten from the
+  measurements.** The residue paragraph distinguished neither the PDF moving the residue (exit 3)
+  from the PDF losing it (now a withdrawn page, exit 4), and described the two corpus documents with
+  `<p>`/`<em>` residue as measured cleanly "because ordinary block content re-fragments to the same
+  boxes" — text of that kind is missing from the PDF. A new section explains the multi-column decline
+  by ancestry, and a rule-by-rule matrix says which rules decline in columns and on a withdrawn page,
+  and why. The affected rule pages and `docs/agent-contract.md` say the same.
 
 ### Reporting
 
@@ -377,6 +429,14 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   page it is laid out on." Context pack schema unchanged (2): the field and its type are the same.
   `tests/unit/registry.test.ts` now checks every entry of that map against the levers its rule's
   advice proposes.
+- **New decline reason `env/pagination-residue`, page rows in `documents[].notMeasured`, and two
+  counters on the cross-check events.** A withdrawn page appears as a `scope: "page"`,
+  `ruleId: null` row (aggregated per reason) beside the rules' own declines, and in `exitReason`.
+  `geometry-cross-check-passed` and `-failed` carry `fragmentedSamples`; the failed event also
+  carries `failedPages`, and each `worst[]` entry its `fragment` and `page` where known. All
+  additions; Report schema stays 5. Snapshot: `effectiveStyle.multicolAncestor` is a new optional
+  field (absent on stored snapshots, read as false), and `pages[].notMeasured`, which was always
+  empty, is now populated; the Snapshot stamp is not moved by this change.
 
 ### Tooling
 
@@ -526,6 +586,15 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `exports` map is unchanged), is also held locally: a unit test builds `src/` the way
   `npm run build` does and loads it through the runner's own loader. No `npm run` step was added,
   so the local gate lists are unchanged.
+- **Live fixtures for fragmented boxes.** `tests/fixtures/multicolumn-ancestry.html` (a
+  column-split paragraph among the sampled boxes, an avoid box in columns, a `column-span: all`
+  heading, width-only columns, and a printed margin note as the control that content outside the
+  content box does not withdraw its page) and `tests/fixtures/pagination-text-residue.html` (text
+  Paged.js leaves past the page box; every paragraph ends with a unique word, so the live test
+  compares the collector's stranded paragraphs with the codas pdftotext does not find). The live
+  denominators move: `render-run.test.ts` 35 → 37, `measure.test.ts` 8 → 9. The public
+  `fragmentainer-residue.html` now ends `render-unstable` (page 4's table), no longer
+  `geometry-cross-check-failed`, and its live test says so.
 
 ## 0.6.0 — 2026-09-18
 

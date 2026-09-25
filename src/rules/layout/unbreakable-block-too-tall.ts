@@ -1,7 +1,7 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  boxlessDeclined, declined, hasLayoutBox, isNotRendered, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber,
+  boxlessDeclined, declined, hasLayoutBox, isNotRendered, blockOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber,
   sourceOf, targetEvaluation,
 } from "../shared.ts";
 
@@ -80,7 +80,7 @@ export const unbreakableBlockTooTall = defineRule(
     unit: "px",
     defaultOptions: { toleranceRatio: 1.0 },
     summary: "A block with break-inside: avoid is taller than the page content box.",
-    declines: ["env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],
+    declines: ["env/pagination-residue", "env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],
     remediation: {
       advice:
         "A block with 'break-inside: avoid' is taller than the content box of the page it was laid out on, so the paginator could not keep it whole there. Where it had already been split into three or more fragments, the reported height is the sum of those fragments, which is the height its content needed. Make the block shorter — split it into smaller sections deliberately, or reduce container padding, font size or contained rows. Removing 'break-inside: avoid' also clears the finding, but only because the rule then has no candidate: the block is exactly as tall as before, and it will still be broken, just without having asked not to be.",
@@ -165,7 +165,7 @@ export const unbreakableBlockTooTall = defineRule(
         continue;
       }
 
-      const outOfScope = layoutOutOfScope(block.effectiveStyle);
+      const outOfScope = blockOutOfScope(snapshot, block, { allFragments: true });
       if (outOfScope) {
         notMeasured.push(
           declined({ scope: "block", ruleId: "layout/unbreakable-block-too-tall", reason: outOfScope }),

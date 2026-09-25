@@ -7,6 +7,7 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
@@ -91,7 +92,7 @@ describe("the M2d live production chain", () => {
   let noSource: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
-    if (result?.documents.length === 29 && noSource?.documents.length === 4) return true;
+    if (result?.documents.length === 31 && noSource?.documents.length === 4) return true;
     t.skip(
       `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
       `no-source=${noSource?.documents.length ?? 0}`,
@@ -156,6 +157,8 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "fullbleed-avoid.html"),
         join(FIXTURES, "margin-running-after-heading.html"),
         join(FIXTURES, "margin-running-in-section.html"),
+        join(FIXTURES, "multicolumn-ancestry.html"),
+        join(FIXTURES, "pagination-text-residue.html"),
       ],
       options(join(root, "evidence")),
     );
@@ -183,7 +186,7 @@ describe("the M2d live production chain", () => {
     }));
     assert.equal(
       result?.documents.length,
-      29,
+      31,
       `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
     );
     assert.equal(
@@ -633,20 +636,25 @@ describe("the M2d live production chain", () => {
   });
 
   /**
-   * The negative control for the class that took six of eighteen real chapters out of measurement.
+   * The class that took six of eighteen real chapters out of measurement, on the public fixture.
    *
-   * RED WITHOUT THE FIX: the event carried `maxDeltaPx: 1816` and a sentence ending "Every number
-   * in the report comes from the probe, so the report is not written" — a 1 816 px disagreement
-   * blamed on this tool's own geometry, with nothing in `measured` that could be acted on. The two
-   * assertions below are exactly what was missing: the cause, named, and the elements it is about.
+   * Two gates see it. Through 0.6.0 the FIRST was the geometry cross-check: it compared the union
+   * of a fragmented box with CDP's box model and failed by exactly one column pitch (1816 px) on
+   * page 1's containers — whose last paragraph Paged.js left partly in the overflow column — while
+   * its sentence named page 4's table. The cross-check now compares fragment by fragment and passes
+   * (`tests/unit/columns-and-residue.test.ts`), so the document reaches the second gate, the PDF
+   * reconciliation, where page 4's table row moves under print media. That is `render-unstable`,
+   * exit 3, and its sentence names the table on the page it is on.
    */
-  it("names the unplaced fragmentainer content behind a geometry disagreement", (t) => {
+  it("names the unplaced table behind the render instability, and the cross-check no longer blames page 1's fragments", (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     if (!completeChain(t)) return;
     const document = result!.documents[23]!;
-    assert.equal(document.snapshot, null, "a document with unplaced content remained reportable");
-    const event = document.infrastructure.find((e) => e.kind === "geometry-cross-check-failed");
-    assert.ok(event, `no cross-check failure: ${JSON.stringify(document.infrastructure.map((e) => e.kind))}`);
+    assert.equal(document.snapshot, null, "a document whose PDF does not reproduce its measured state remained reportable");
+    assert.equal(document.infrastructure.some((e) => e.kind === "geometry-cross-check-failed"), false,
+      `the cross-check still refuses a fragmented box: ${JSON.stringify(document.infrastructure.find((e) => e.kind === "geometry-cross-check-failed"))}`);
+    const event = document.infrastructure.find((e) => e.kind === "render-unstable");
+    assert.ok(event, `no render instability: ${JSON.stringify(document.infrastructure.map((e) => e.kind))}`);
     assert.match(event.detail, /Paged\.js left \d+ element\(s\).*in an overflow column of page\(s\)/u, event.detail);
     assert.match(event.detail, /unsplittable table box/u, event.detail);
     const residue = (event.measured as Record<string, unknown>).fragmentainerResidue as {
@@ -656,8 +664,7 @@ describe("the M2d live production chain", () => {
     assert.ok(residue, `the cause is named in the sentence but absent from measured: ${JSON.stringify(event.measured)}`);
     assert.ok(residue.count > 0 && residue.atomicCount > 0);
     assert.ok(residue.pages.length > 0);
-    // The pitch is `column-width + column-gap` on `.pagedjs_page_content`, and it is what the two
-    // geometry sources disagree by. Reporting it lets a reader check the arithmetic themselves.
+    // The pitch is `column-width + column-gap` on `.pagedjs_page_content`.
     assert.equal(residue.pitchPx, 1816);
     // The TABLE residue must be attributable; other tags carry no injected id and are not required
     // to. Same boundary, same reason, as tests/tools/pagination-residue-gate.mjs.
@@ -665,6 +672,118 @@ describe("the M2d live production chain", () => {
     assert.ok(tableResidue.length > 0);
     assert.ok(tableResidue.every((r) => r.sourceId !== null), JSON.stringify(residue.sample));
     assert.ok(residue.sample.some((r) => r.display === "table-row"));
+    assert.deepEqual((event.measured as { driftedComponents: string[] }).driftedComponents, ["boxes"]);
+  });
+
+  /**
+   * Multi-column content found through its container, end to end. Four complications in one
+   * self-authored document (see its header): a paragraph split across two author columns among the
+   * first eight sampled boxes, a `break-inside: avoid` box in the columns, a `column-span: all`
+   * heading, width-only columns — and a margin note past the content box but inside the page box,
+   * the control that printed content outside the content box does not withdraw its page.
+   *
+   * RED BEFORE THIS CHANGE: exit 3, `geometry-cross-check-failed`, the split paragraph's union
+   * (453.31 px) against CDP's box model (214.66 px); measured on patched Chromium 141. With only the
+   * cross-check fixed, the in-column blocks would have been measured on their column unions.
+   */
+  it("declines the blocks set in an ancestor's columns, measures the spanner, and compares the split box fragment by fragment", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[29]!;
+    assert.ok(document.snapshot, `no snapshot: ${JSON.stringify(document.infrastructure.map((e) => [e.kind, e.detail]))}`);
+    const passed = document.infrastructure.find((e) => e.kind === "geometry-cross-check-passed");
+    assert.ok(passed, JSON.stringify(document.infrastructure.map((e) => e.kind)));
+    const measured = passed.measured as { checked: number; fragmentedSamples: number; maxDeltaPx: number };
+    assert.ok(measured.fragmentedSamples >= 1, `the split paragraph was not sampled fragment by fragment: ${JSON.stringify(measured)}`);
+    assert.equal(measured.maxDeltaPx, 0);
+
+    const snapshot = document.snapshot;
+    const byAuthor = (id: string) => snapshot.blocks.filter((block) => block.authorId === id);
+    const inColumns = (id: string) => {
+      const blocks = byAuthor(id);
+      assert.ok(blocks.length > 0, `${id} was not recorded`);
+      return blocks.every((block) => block.effectiveStyle.multicolAncestor === true);
+    };
+    for (const id of ["split", "keep", "after-keep", "width-only"]) assert.equal(inColumns(id), true, `${id} is not in columns`);
+    for (const id of ["spanner", "duo", "narrow", "note", "outro"]) assert.equal(byAuthor(id).some((b) => b.effectiveStyle.multicolAncestor), false, `${id} was put in columns`);
+    assert.deepEqual(snapshot.pages.map((page) => page.notMeasured), snapshot.pages.map(() => []),
+      "a page was withdrawn although nothing lies past its page box");
+
+    const { evidenceRequirement: _evidence, ...unbound } = document;
+    const outcome = withProfile(unbound);
+    const reason = (rule: string, id: string) => outcome.report.evaluations.find((row) =>
+      row.ruleId === rule && byAuthor(id).some((block) => block.nodeKey === row.targetRef.nodeKey))?.reason ?? null;
+    assert.equal(reason("layout/unbreakable-block-too-tall", "keep"), "env/multicolumn");
+    for (const id of ["split", "after-keep", "width-only"]) assert.equal(reason("type/short-last-line", id), "env/multicolumn", id);
+    const spanner = outcome.report.evaluations.find((row) => row.ruleId === "layout/heading-at-page-bottom" &&
+      byAuthor("spanner").some((block) => block.nodeKey === row.targetRef.nodeKey));
+    assert.equal(spanner?.status, "measured", "the column-span: all heading was not measured");
+    assert.equal(outcome.report.verdict, "insufficient-coverage");
+    assert.equal(outcome.report.exitReason, "layout/unbreakable-block-too-tall below its coverage floor");
+
+    // The margin note is printed: the PDF's text layer has it.
+    const pdf = join(root, "evidence", document.renderArtifact!.path);
+    const text = execFileSync("pdftotext", ["-layout", pdf, "-"], { encoding: "utf8" }).replace(/\s+/gu, " ");
+    assert.match(text, /Margin note printed beside the text/u, "the control note is not in the PDF, so it does not control anything");
+  });
+
+  /**
+   * Text Paged.js left past the page box withdraws its page, and the oracle is the PDF.
+   *
+   * Every paragraph of the fixture ends with a unique word (`coda01` … `coda40`). Two independent
+   * readings are compared: the collector's — which paragraphs have a line box past their page box —
+   * and pdftotext's — which codas the checked PDF does not contain. They must name the same
+   * paragraphs, those paragraphs must lie on exactly the withdrawn pages, and at least one must be
+   * stranded, or the case is not exercised at all.
+   *
+   * RED BEFORE THIS CHANGE: exit 3, `geometry-cross-check-failed` (the stranded paragraphs and their
+   * containers have two client rects). With only the cross-check fixed: no page withdrawn, and the
+   * document measured over pages whose last lines are not on paper.
+   */
+  it("withdraws exactly the pages whose text Paged.js left past the page box, which is the text the PDF lacks", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[30]!;
+    assert.ok(document.snapshot, `no snapshot: ${JSON.stringify(document.infrastructure.map((e) => [e.kind, e.detail]))}`);
+    const snapshot = document.snapshot;
+    const withdrawn = snapshot.pages
+      .filter((page) => page.notMeasured.some((n) => n.reason === "env/pagination-residue"))
+      .map((page) => page.pageNumber);
+
+    const strandedByCollector = new Map<string, number>();
+    for (const block of snapshot.blocks.filter((item) => item.tag === "p")) {
+      const pageBox = snapshot.pages.find((page) => page.pageNumber === block.page)!.pageBox!;
+      const past = snapshot.textLines.some((line) => line.blockKey === block.nodeKey && line.box.x >= pageBox.x + pageBox.width);
+      if (past) strandedByCollector.set(/coda(\d\d)/u.exec(block.blockSignature)![1]!, block.page);
+    }
+    const pdf = join(root, "evidence", document.renderArtifact!.path);
+    const printed = new Set([...execFileSync("pdftotext", ["-layout", pdf, "-"], { encoding: "utf8" }).matchAll(/coda(\d\d)/gu)].map((m) => m[1]!));
+    const missingFromPdf = Array.from({ length: 40 }, (_, i) => String(i + 1).padStart(2, "0")).filter((coda) => !printed.has(coda));
+
+    assert.ok(missingFromPdf.length > 0, "no paragraph lost its tail on this browser, so the case was not exercised");
+    assert.deepEqual([...strandedByCollector.keys()].sort(), missingFromPdf,
+      "the paragraphs the collector found past the page box are not the paragraphs the PDF lacks");
+    assert.deepEqual([...new Set(strandedByCollector.values())].sort((a, b) => a - b), withdrawn,
+      "the withdrawn pages are not the pages carrying the stranded text");
+
+    const { evidenceRequirement: _evidence, ...unbound } = document;
+    const outcome = withProfile(unbound);
+    assert.equal(outcome.report.verdict, "insufficient-coverage");
+    assert.equal(outcome.report.exitReason, `page(s) ${withdrawn.join(", ")} withdrawn from measurement (env/pagination-residue)`);
+    // Only the page rows of the withdrawal; the evidence apparatus adds page rows of its own (on
+    // patched Chromium 141 it also declined the stranded marks as outside their page).
+    assert.deepEqual(
+      outcome.report.notMeasured.filter((row) => row.ruleId === null && row.reason === "env/pagination-residue")
+        .map((row) => [row.scope, row.count]),
+      [["page", withdrawn.length]],
+    );
+    // Nothing on a withdrawn page is judged by a rule that reads page geometry.
+    for (const row of outcome.report.evaluations.filter((item) => item.status === "measured" && item.targetRef.keyType === "block")) {
+      const block = snapshot.blocks.find((item) => item.nodeKey === row.targetRef.nodeKey);
+      if (block && ["layout/widow", "layout/orphan", "layout/hyphen-across-page", "type/short-last-line"].includes(row.ruleId)) {
+        assert.equal(withdrawn.includes(block.page), false, `${row.ruleId} measured ${block.nodeKey} on withdrawn page ${block.page}`);
+      }
+    }
   });
 
   it("fails closed when author code removes the animation intervention", (t) => {
@@ -852,6 +971,7 @@ describe("the M2d live production chain", () => {
           eligible: 12,
           excludedSvgDescendants: 0,
           excludedInlineBlockContainers: 0,
+          fragmentedSamples: 0,
           maxDeltaPx: 0,
           tolerancePx: 0.05,
         },

@@ -19,6 +19,8 @@ What is measured is `netFill`, the summed height of semantic bands — not `vert
 
 ## Limits and known false alarms
 
+A page withdrawn because content lies past its page box (`env/pagination-residue`: Paged.js left it in its overflow column, and the PDF does not print it) is declined, and the decline counts against coverage. Multi-column content is measured: the fill bands are vertical, and columns do not change them.
+
 A parity blank page is declined, not reported: it has `netFill` 0 and would fire under any threshold, and the author asked for it with `break-before: right`. The last page keeps its `warn` finding, but when it also carries no continuation and no forced break, the message says it is likely intended.
 
 ## Calibration

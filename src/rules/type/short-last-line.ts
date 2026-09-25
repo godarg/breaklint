@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, sourceOf, targetEvaluation } from "../shared.ts";
+import { declined, blockOutOfScope, linesOfBlock, makeFinding, num, sourceOf, targetEvaluation } from "../shared.ts";
 
 /**
  * type/short-last-line — a paragraph ends on a stub of a line.
@@ -24,7 +24,7 @@ export const shortLastLine = defineRule(
     unit: "width ratio",
     defaultOptions: { maxWidthRatio: 0.15, maxEms: 2 },
     summary: "The closing line of a paragraph is a stub.",
-    declines: ["env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],
+    declines: ["env/pagination-residue", "env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],
     remediation: {
       advice:
         "The final line of a paragraph is shorter than the uncalibrated threshold (a runt). Insert a non-breaking space ('&nbsp;') between the last two words to prevent a single word from standing alone, or reword the paragraph to balance line lengths.",
@@ -52,7 +52,7 @@ export const shortLastLine = defineRule(
       if (lines.length < 2) continue;
       candidates += 1;
 
-      const outOfScope = layoutOutOfScope(block.effectiveStyle);
+      const outOfScope = blockOutOfScope(snapshot, block);
       if (outOfScope) {
         notMeasured.push(declined({ scope: "block", ruleId: "type/short-last-line", reason: outOfScope }));
         evaluations.push(targetEvaluation({ ruleId: "type/short-last-line", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: outOfScope }));

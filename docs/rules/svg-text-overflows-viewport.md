@@ -51,6 +51,8 @@ a figure ended in exit 3 rather than being checked.
 
 ## Limits and fail-closed cases
 
+An SVG inside a multi-column container, or on a page withdrawn because content lies past its page box (`env/pagination-residue`), is still measured: an SVG is one unfragmented box, and the rule compares its text with its own viewport, which neither the column nor the page position changes. A withdrawn page keeps the document from ending clean all the same (see `docs/limitations.md`).
+
 With `overflow: visible` the glyphs are painted after all, and the rule declines rather than
 reports. Those targets are not counted against coverage either: the question does not arise for
 them, and one such figure would otherwise take an error rule with a coverage floor of 1 below its

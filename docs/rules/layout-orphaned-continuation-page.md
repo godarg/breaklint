@@ -38,6 +38,8 @@ Neither half of this needs a threshold or a calibration; it follows from how the
 
 ## Limits and known false alarms
 
+Declined on a page withdrawn because content lies past its page box (`env/pagination-residue`: Paged.js left it in its overflow column, and the PDF does not print it), and on the page before one, because the judgement reads the next page's opening lines and a stranded tail at the top of the overflow column reads exactly like running text. The decline counts against coverage.
+
 Declined after a forced incoming break. Reading the break reason from the computed style is verifiably wrong in both directions: `break-before: page` from a stylesheet reads back as `auto`, while the same declaration written inline survives as `page` and is measured *not* to take effect.
 
 **At a large line height every tail page is reported, however full.** A page whose content ends on it is judged by net fill, and net fill counts glyph boxes, not line boxes: with the fonts measured here a page filled to its last line reads 0.51–0.54 at `line-height: 2` and 0.34–0.36 at `line-height: 3`, and the reading depends on the font. So at `line-height: 3` any tail page falls below 0.50, whatever follows it — a forced break, the end of the document, or a block that did not fit. Measured: a page holding 11 of its 13 lines, followed by a figure that did not fit, reads 0.29 and is reported; a tail page filled to its last line reads 0.34 and is reported. A line-box fill would remove that; it changes the snapshot and the meaning of `maxNetFill`, and it is not in this release.

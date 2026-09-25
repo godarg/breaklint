@@ -1,7 +1,7 @@
 /** Helpers shared by rules. Nothing here reaches outside the snapshot. */
 
-import type { EnvId, KeyType, Severity } from "../core/enums.ts";
-import type { Box, Finding, NotMeasured, PageRecord, Snapshot, SourceRef, TargetEvaluation } from "../core/types.ts";
+import { IS, type EnvId, type KeyType, type Severity } from "../core/enums.ts";
+import type { BlockRecord, Box, Finding, NotMeasured, PageRecord, Snapshot, SourceRef, TargetEvaluation } from "../core/types.ts";
 import type { RuleContext } from "../core/rule.ts";
 
 export function sourceOf(snapshot: Snapshot, sid: string | null): SourceRef | null {
@@ -156,6 +156,82 @@ export function layoutOutOfScope(style: {
     columns === "" || columns === "auto" || columns === "1" || /^(auto\s+)?1$|^1(\s+auto)?$/u.test(columns);
   if (!isSingleColumn) return "env/multicolumn";
   if (style.writingMode && style.writingMode !== "horizontal-tb") return "env/vertical-writing";
+  return null;
+}
+
+/**
+ * Why a page was withdrawn from measurement as a whole, or null when it was not.
+ *
+ * The collector withdraws a page whose content lies partly past its page box, where Paged.js left
+ * it and the PDF does not print it (`pageResidueWithdrawal` in `measure/snapshot.ts`). Only a
+ * coverage-counted reason withdraws; a page row naming a build capability or a question that does
+ * not arise would not be a statement about the page's geometry. A page number the snapshot does
+ * not contain is not withdrawn here: that is the rule's own well-formedness question.
+ */
+export function pageWithdrawal(snapshot: Snapshot, pageNumber: number): EnvId | null {
+  const page = pageByNumber(snapshot, pageNumber);
+  const row = page?.notMeasured.find((n) => !IS.toolCapabilityEnvId.has(n.reason) && !IS.nonApplicableEnvId.has(n.reason));
+  return row?.reason ?? null;
+}
+
+const fragmentsCache = new WeakMap<Snapshot, Map<string, BlockRecord[]>>();
+
+/** Every fragment of the block's source element (by sid); the block alone when it has no sid. */
+function fragmentsOf(snapshot: Snapshot, block: BlockRecord): readonly BlockRecord[] {
+  if (block.sid === null) return [block];
+  let bySid = fragmentsCache.get(snapshot);
+  if (!bySid) {
+    bySid = new Map();
+    for (const item of snapshot.blocks) {
+      if (item.sid === null) continue;
+      const list = bySid.get(item.sid);
+      if (list) list.push(item);
+      else bySid.set(item.sid, [item]);
+    }
+    fragmentsCache.set(snapshot, bySid);
+  }
+  return bySid.get(block.sid) ?? [block];
+}
+
+/**
+ * Whether a block is out of scope for the block rules that read page geometry, and why.
+ *
+ * The seven rules that judge a block against its page or its lines — widow, orphan,
+ * heading-at-page-bottom, hyphen-across-page, unbreakable-block-too-tall, excessive-word-spacing and
+ * short-last-line — each ask this once per candidate and decline it, counted against coverage,
+ * with the reason returned. In order:
+ *
+ *   1. The block lies on a withdrawn page (`pageWithdrawal`): measured in a state the PDF does not
+ *      show — stranded lines still in its line list, a box that is the union with a column past
+ *      the page.
+ *   2. Its content is in the columns of an ancestor multi-column container
+ *      (`effectiveStyle.multicolAncestor`): its box is the union of its column fragments and its
+ *      lines are grouped across columns, so none of the seven questions has a single frame to be
+ *      asked in. `column-count` is not inherited, so the block's own value used to miss exactly
+ *      these blocks.
+ *   3. Its own style is out of scope (`layoutOutOfScope`): its own columns, or vertical writing.
+ *
+ * `allFragments` asks the three questions of every fragment of the block's source element (by
+ * sid), for a rule whose judgement combines them: `layout/unbreakable-block-too-tall` sums the
+ * fragment heights, so one fragment on a withdrawn page corrupts the sum. The other six judge the
+ * fragment on its own page and leave `allFragments` off: a page withdrawn elsewhere does not
+ * change what is printed on this one.
+ */
+export function blockOutOfScope(
+  snapshot: Snapshot,
+  block: BlockRecord,
+  options: { allFragments?: boolean } = {},
+): EnvId | null {
+  const fragments = options.allFragments ? fragmentsOf(snapshot, block) : [block];
+  for (const fragment of fragments) {
+    const withdrawn = pageWithdrawal(snapshot, fragment.page);
+    if (withdrawn) return withdrawn;
+  }
+  if (fragments.some((fragment) => fragment.effectiveStyle.multicolAncestor === true)) return "env/multicolumn";
+  for (const fragment of fragments) {
+    const own = layoutOutOfScope(fragment.effectiveStyle);
+    if (own) return own;
+  }
   return null;
 }
 

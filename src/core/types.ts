@@ -72,7 +72,17 @@ export interface EffectiveStyle {
   breakInside: string;
   breakBefore: string;
   breakAfter: string;
+  /** The block's OWN computed `column-count`. Not inherited: see `multicolAncestor`. */
   columns: string;
+  /**
+   * Whether the block's content sits in the columns of an ancestor multi-column container (its
+   * `column-count` other than auto or 1, or any `column-width`), between the block and the
+   * Paged.js page structure, which is itself a multi-column fragmentainer and never counts. A
+   * `column-span: all` direct child of the container, and its subtree, is outside that container's
+   * columns. Absent on snapshots collected before the field existed; read as false there, which is
+   * what those snapshots were measured as.
+   */
+  multicolAncestor?: boolean;
   writingMode: string;
   visibility: string;
   widows: number;
@@ -161,6 +171,11 @@ export interface PageRecord {
   fill: PageFill;
   /** Fingerprint anchor for page findings: the page's first semantic block. */
   firstSemanticBlockKey: string | null;
+  /**
+   * Why the page as a whole was withdrawn from measurement; empty when it was not. A row with a
+   * coverage-counted reason (today only `env/pagination-residue`) makes every page-located rule
+   * decline its candidates on the page and keeps the document from ending clean.
+   */
   notMeasured: NotMeasured[];
 }
 

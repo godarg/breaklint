@@ -23,7 +23,7 @@ import {
   launchBrowser, ownServerLifecycle, resolveBrowser, resolvePackageRoot, type BrowserLike, type PageLike,
 } from "../../src/acquire/browser.ts";
 import {
-  cleanupBrowserProfile, closeBrowserBounded, integritySource, integrityStatusSource,
+  cleanupBrowserProfile, closeBrowserBounded, crossCheckPage, integritySource, integrityStatusSource,
   paginationApparatusSource, PAGINATION_PREVIEW_SOURCE, withPagination,
   type RuntimeIntegrityStatus,
 } from "../../src/acquire/render-run.ts";
@@ -142,6 +142,7 @@ describe("the measurement probe, live", () => {
   let serverLifecycle: ReturnType<typeof ownServerLifecycle> | null = null;
   let origin = "";
   let source = "";
+  let columns = "";
 
   before(async () => {
     if (missing.length > 0) {
@@ -150,9 +151,14 @@ describe("the measurement probe, live", () => {
       assert.fail(`${why}. Set BREAKLINT_LIVE_OPTIONAL=1 to allow skipping.`);
     }
     source = documentSource(readFileSync(join(pagedjsRoot!, "dist", "paged.js"), "utf8"));
-    server = createServer((_req, res) => {
+    columns = withPagination(
+      injectSourceIds(readFileSync(join(REPO, "tests", "fixtures", "multicolumn-ancestry.html"), "utf8"), "multicolumn-ancestry.html").html,
+      readFileSync(join(pagedjsRoot!, "dist", "paged.js"), "utf8"),
+      false,
+    );
+    server = createServer((req, res) => {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(source);
+      res.end(req.url === "/columns.html" ? columns : source);
     });
     serverLifecycle = ownServerLifecycle(server);
     await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", () => resolve()));
@@ -190,7 +196,7 @@ describe("the measurement probe, live", () => {
    * fires. Two independent measurements now point at the same loader design: this one, and the
    * `file://` origin measurement in `docs/status.md` that showed `cssRules` unreadable off a file.
    */
-  async function loaded(): Promise<PageLike> {
+  async function loaded(path = "/doc.html"): Promise<PageLike> {
     const page = await browser!.newPage();
     await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(
       PRIMITIVES_SOURCE,
@@ -200,12 +206,12 @@ describe("the measurement probe, live", () => {
     );
     await page.setViewport({ width: 1000, height: 800 });
     await page.emulateMediaType("print");
-    await page.goto(`${origin}/doc.html`, { waitUntil: "load", timeout: 30_000 });
+    await page.goto(`${origin}${path}`, { waitUntil: "load", timeout: 30_000 });
     return page;
   }
 
-  async function paginated(): Promise<PageLike> {
-    const page = await loaded();
+  async function paginated(path = "/doc.html"): Promise<PageLike> {
+    const page = await loaded(path);
     // Production installs the collector before the pagination apparatus.  The rendered Paged
     // tree receives its runtime `data-ref` identities there, so the live sampler must exercise
     // the same order rather than certifying source IDs that Paged.js no longer carries.
@@ -431,7 +437,10 @@ describe("the measurement probe, live", () => {
         continue;
       }
       const q = model.border;
-      outOfProcess.push({ key: sample.key, ...quadEnvelope(q) });
+      // The fragment list, as production reads it: one content quad per fragment. This document
+      // fragments no sampled box, so each list has one entry, equal to the border quad.
+      const { quads } = await session.send<{ quads: number[][] }>("DOM.getContentQuads", { nodeId });
+      outOfProcess.push({ key: sample.key, ...quadEnvelope(q), fragments: quads.map((quad) => quadEnvelope(quad)) });
       worstModelDelta = Math.max(worstModelDelta, Math.abs(model.width - sample.width));
     }
     await page.close();
@@ -453,6 +462,65 @@ describe("the measurement probe, live", () => {
       worstModelDelta > CROSS_CHECK_MEASURED_MAX_PX,
       "model.width is no longer rounded; the reason this code reads the quad instead has expired",
     );
+  });
+
+  /**
+   * The cross-check on a box the browser split across two author columns — and its negative
+   * control, the reason the per-fragment comparison is not an exemption.
+   *
+   * RED BEFORE THIS CHANGE, measured on patched Chromium 141: the split paragraph's bounding rect
+   * (the union of its two column fragments, 453.31 px wide) was compared with CDP's border quad
+   * (214.66 px wide), the check failed and the document ended exit 3.
+   *
+   * The negative controls change the layout AFTER the in-page sample was read and BEFORE CDP is
+   * asked, through the production `crossCheckPage`, unmodified. That is a real geometry
+   * disagreement between the two sources — the probe describes a state the browser no longer has —
+   * and it must fail: once where the split box's fragments change, once where the box stops being
+   * split at all.
+   */
+  it("compares a column-split box fragment by fragment, and still fails when the fragments move behind the probe", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const page = await paginated("/columns.html");
+    try {
+      const clean = await crossCheckPage(page);
+      assert.equal(clean.ok, true, `a correct column-split box failed the cross-check: ${JSON.stringify(clean.disagreements)}`);
+      assert.ok(clean.fragmentedSamples >= 1, `no sampled box was split: ${JSON.stringify(clean)}`);
+      assert.equal(clean.maxDelta, 0);
+      const batch = await page.evaluate<GeometrySampleBatch>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
+      const split = batch.samples.filter((sample) => (sample.fragments?.length ?? 0) > 1);
+      assert.ok(split.length >= 1, "the split paragraph is not among the sampled boxes");
+
+      // Once, after the in-page sample: the page's own evaluate answers first, then the change.
+      const behindTheProbe = (script: string): PageLike => {
+        let changed = false;
+        return {
+          evaluate: async <T>(expression: string): Promise<T> => {
+            const value = await page.evaluate<T>(expression);
+            if (!changed) { changed = true; await page.evaluate<void>(script); }
+            return value;
+          },
+          createCDPSession: () => page.createCDPSession!(),
+        } as unknown as PageLike;
+      };
+      const reflowed = await crossCheckPage(behindTheProbe(
+        `(() => { document.getElementById("split").style.letterSpacing = "0.8px"; })()`,
+      ));
+      assert.equal(reflowed.ok, false, "a column-split box whose fragments moved passed the cross-check");
+      assert.ok(reflowed.disagreements.some((d) => split.some((s) => s.key === d.key)),
+        `the disagreement is not on the split box: ${JSON.stringify(reflowed.disagreements)}`);
+      await page.evaluate<void>(`(() => { document.getElementById("split").style.letterSpacing = ""; })()`);
+      assert.equal((await crossCheckPage(page)).ok, true, "restoring the paragraph did not restore agreement");
+
+      const unsplit = await crossCheckPage(behindTheProbe(
+        // A spanner lies across both columns: one fragment where the probe recorded two.
+        `(() => { document.getElementById("split").style.columnSpan = "all"; })()`,
+      ));
+      assert.equal(unsplit.ok, false, "a box that stopped being split passed the cross-check");
+      assert.ok(unsplit.disagreements.some((d) => d.field === "fragments" && split.some((s) => s.key === d.key)),
+        `no fragment-count disagreement on the split box: ${JSON.stringify(unsplit.disagreements)}`);
+    } finally {
+      await page.close();
+    }
   });
 
   it("normalises a rotated HTML border quad from all four CDP corners", async (t) => {
