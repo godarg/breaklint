@@ -366,54 +366,290 @@ export function selectElements(index: SourceIndex, selector: string): SourceElem
 }
 
 // ---------------------------------------------------------------------------------------------
-// Expected files: strict shape, then compiled targets.
+// Expected files: the README's closed field list, then compiled targets.
 
-const TOP_KEYS = new Set([
-  "schemaVersion", "documentId", "artifact", "sha256", "byteLength", "authoredOn", "provenanceClass",
-  "calibrationEvidenceEligible", "title", "genre", "language", "paper", "profile", "pages", "expectedExit",
-  "fontDependence", "features", "runningElements", "constructionFacts", "rules", "permittedDeclineReasons",
-  "notActiveInDefaultProfile", "verification", "notes",
-]);
-const LANGUAGE_KEYS = new Set(["htmlLang", "typeRulesUnderDefaultLocale"]);
-const PAPER_KEYS = new Set(["pageRule", "size", "orientation", "pageBoxCssPx", "margins", "contentBoxCssPx", "selector", "observed", "note"]);
-const PAGES_KEYS = new Set(["range", "measured", "basis"]);
-const EXIT_KEYS = new Set(["set", "derivation", "byCode", "environmentNote"]);
-const VERIFICATION_KEYS = new Set([
-  "method", "browser", "pagedjs", "measuredOn", "pageCount", "pageCountByFontStack", "pdfPageCount",
-  "contentBoxHeightsPx", "platformFonts", "overflowColumnResidue", "fontStacks",
-]);
-const RUNNING_KEYS = new Set(["id", "marginBox", "marginBoxCopies", "pages", "zeroSizeCopyPages", "zeroSizeCopyNote"]);
-const FACT_KEYS = new Set(["fact", "arithmetic", "measured"]);
-const RULE_KEYS = new Set(["mustFire", "mustNotFire", "allowed", "expectedDeclines", "notes"]);
-/** `measured`, `construction`, `text`, `observed`, `why`, `docsBasis`, `future` and the like are informational. */
-const ENTRY_KEYS: Record<ListName, Set<string>> = {
-  mustFire: new Set(["target", "why", "docsBasis", "construction", "measured", "observed", "text", "occurrences", "underContentExtentLowerBound"]),
-  mustNotFire: new Set(["target", "why", "docsBasis", "construction", "measured"]),
-  allowed: new Set(["target", "class", "why", "docsBasis", "construction", "measured", "text", "constructionTruth"]),
-  expectedDeclines: new Set([
-    "target", "reason", "required", "count", "countsTowardCoverage", "docsBasis", "why", "measured",
-    "measuredAlternative", "future", "perText", "ifMeasured",
-  ]),
+/**
+ * README "Field list" (E38), encoded level by level. N is a key the gate interprets; I is a key
+ * it checks for presence and type only; `opaque` values are never looked into. The list is
+ * closed: a key it does not name fails the file at every level it describes.
+ *
+ * It is encoded rather than parsed from the README because the README states types in prose.
+ * tests/unit/corpus-gate.test.ts parses the README section and fails when its key names, roles,
+ * optional and opaque markers, entry lists, `perText`, target shapes, `uri`, `pageOf` and `except`
+ * diverge from this encoding.
+ */
+export type FieldType =
+  | { kind: "string" }
+  | { kind: "stringOrNull" }
+  | { kind: "boolean" }
+  | { kind: "integer" }
+  | { kind: "number" }
+  | { kind: "literal"; value: string | boolean }
+  | { kind: "opaque" }
+  | { kind: "array"; of: FieldType }
+  | { kind: "map"; of: FieldType; keys?: RegExp }
+  | { kind: "object"; fields: Record<string, Field> }
+  /** A list of rule entries; each item is checked against `ENTRY_FIELDS[list]`. */
+  | { kind: "entries"; list: ListName }
+  /** A target; its shape is checked by `compileTarget` against `TARGET_SHAPES`. */
+  | { kind: "target" };
+
+export interface Field {
+  role: "N" | "I";
+  required: boolean;
+  type: FieldType;
+}
+
+type ListName = "mustFire" | "mustNotFire" | "allowed" | "expectedDeclines";
+const LISTS: ListName[] = ["mustFire", "mustNotFire", "allowed", "expectedDeclines"];
+
+const T = {
+  string: { kind: "string" } as FieldType,
+  stringOrNull: { kind: "stringOrNull" } as FieldType,
+  boolean: { kind: "boolean" } as FieldType,
+  integer: { kind: "integer" } as FieldType,
+  number: { kind: "number" } as FieldType,
+  opaque: { kind: "opaque" } as FieldType,
+  target: { kind: "target" } as FieldType,
+  literal: (value: string | boolean): FieldType => ({ kind: "literal", value }),
+  array: (of: FieldType): FieldType => ({ kind: "array", of }),
+  map: (of: FieldType, keys?: RegExp): FieldType => (keys ? { kind: "map", of, keys } : { kind: "map", of }),
+  object: (fields: Record<string, Field>): FieldType => ({ kind: "object", fields }),
+  entries: (list: ListName): FieldType => ({ kind: "entries", list }),
 };
-const PER_TEXT_KEYS = new Set(["id", "ifMeasured", "why", "cellInsetsPx", "fillInkInsetsPx", "paintedInkInsetsPx", "strokeWidthPx"]);
-const TARGET_KEYS = new Set(["id", "ids", "selector", "selectors", "within", "document", "except", "svg", "texts", "use", "uri", "pageOf", "pages"]);
-const PAGE_OF_KEYS = new Set(["id", "fragment", "resolvedPages", "resolvedPagesByFontStack"]);
-const URI_KEYS = new Set(["attribute", "value"]);
+const N = (type: FieldType, required = true): Field => ({ role: "N", required, type });
+const I = (type: FieldType, required = true): Field => ({ role: "I", required, type });
+
+export const RULE_FIELDS: Record<string, Field> = {
+  mustFire: N(T.entries("mustFire")),
+  mustNotFire: N(T.entries("mustNotFire")),
+  allowed: N(T.entries("allowed")),
+  expectedDeclines: N(T.entries("expectedDeclines")),
+  notes: I(T.array(T.string), false),
+};
+
+export const FIELD_LIST: Record<string, Field> = {
+  schemaVersion: N(T.literal("selfauthored-expected-v1")),
+  documentId: N(T.string),
+  artifact: N(T.string),
+  sha256: N(T.string),
+  byteLength: N(T.integer),
+  authoredOn: I(T.string),
+  provenanceClass: I(T.literal("synthetic_first_party")),
+  calibrationEvidenceEligible: I(T.literal(false)),
+  title: I(T.string),
+  genre: I(T.string),
+  fontDependence: I(T.string),
+  language: I(T.object({ htmlLang: I(T.stringOrNull), typeRulesUnderDefaultLocale: I(T.string) })),
+  paper: I(T.array(T.object({
+    pageRule: I(T.string),
+    size: I(T.string),
+    orientation: I(T.string),
+    pageBoxCssPx: I(T.array(T.number)),
+    margins: I(T.string),
+    contentBoxCssPx: I(T.array(T.number)),
+    selector: I(T.string, false),
+    observed: I(T.string, false),
+    note: I(T.string, false),
+  }))),
+  profile: N(T.literal("default")),
+  pages: N(T.object({ range: N(T.array(T.integer)), measured: I(T.integer), basis: I(T.string) })),
+  expectedExit: N(T.object({
+    set: N(T.array(T.integer)),
+    derivation: I(T.string),
+    byCode: I(T.map(T.string, /^[0-4]$/u)),
+    environmentNote: I(T.string),
+  })),
+  features: I(T.array(T.string)),
+  notes: I(T.array(T.string)),
+  runningElements: I(T.array(T.object({
+    id: I(T.string),
+    marginBox: I(T.string),
+    marginBoxCopies: I(T.integer),
+    pages: I(T.array(T.integer)),
+    zeroSizeCopyPages: I(T.array(T.integer), false),
+    zeroSizeCopyNote: I(T.string, false),
+  }))),
+  constructionFacts: I(T.array(T.object({ fact: I(T.string), arithmetic: I(T.string, false), measured: I(T.opaque, false) }))),
+  rules: N(T.map(T.object(RULE_FIELDS))),
+  permittedDeclineReasons: N(T.array(T.string)),
+  notActiveInDefaultProfile: N(T.array(T.string)),
+  verification: I(T.object({
+    method: I(T.string),
+    browser: I(T.string),
+    pagedjs: I(T.string),
+    measuredOn: I(T.string),
+    pageCount: I(T.integer),
+    pageCountByFontStack: I(T.map(T.integer)),
+    pdfPageCount: I(T.integer),
+    contentBoxHeightsPx: I(T.array(T.number)),
+    platformFonts: I(T.opaque),
+    overflowColumnResidue: I(T.array(T.object({
+      page: I(T.integer),
+      kind: I(T.string),
+      tag: I(T.string),
+      id: I(T.stringOrNull),
+      cls: I(T.stringOrNull),
+      text: I(T.string),
+      left: I(T.number),
+      width: I(T.number),
+      height: I(T.number),
+    }))),
+    fontStacks: I(T.object({ reference: I(T.string), dejavu: I(T.string), free: I(T.string) })),
+  })),
+};
+
+export const PER_TEXT_FIELDS: Record<string, Field> = {
+  id: N(T.string),
+  ifMeasured: N(T.string),
+  why: I(T.string),
+  strokeWidthPx: I(T.number),
+  cellInsetsPx: I(T.opaque),
+  fillInkInsetsPx: I(T.opaque),
+  paintedInkInsetsPx: I(T.opaque),
+};
+/** Entries: `target` and `why` required in the three finding lists, `class` in `allowed`; see
+ * the README for `count`, which is required only when `required` is true (checked below). */
+export const ENTRY_FIELDS: Record<ListName, Record<string, Field>> = {
+  mustFire: {
+    target: N(T.target),
+    why: I(T.string),
+    occurrences: I(T.integer, false),
+    text: I(T.string, false),
+    construction: I(T.string, false),
+    measured: I(T.opaque, false),
+    docsBasis: I(T.string, false),
+    observed: I(T.string, false),
+    underContentExtentLowerBound: I(T.string, false),
+  },
+  mustNotFire: {
+    target: N(T.target),
+    why: I(T.string),
+    docsBasis: I(T.string, false),
+    measured: I(T.opaque, false),
+    construction: I(T.string, false),
+  },
+  allowed: {
+    target: N(T.target),
+    class: N(T.string),
+    why: I(T.string),
+    constructionTruth: I(T.literal("defect"), false),
+    text: I(T.string, false),
+    construction: I(T.string, false),
+    measured: I(T.opaque, false),
+    docsBasis: I(T.string, false),
+  },
+  expectedDeclines: {
+    target: N(T.target),
+    reason: N(T.string),
+    required: N(T.boolean),
+    count: N(T.integer, false),
+    measuredAlternative: N(T.boolean, false),
+    ifMeasured: N(T.string, false),
+    perText: N(T.array(T.object(PER_TEXT_FIELDS)), false),
+    countsTowardCoverage: I(T.boolean, false),
+    why: I(T.string, false),
+    docsBasis: I(T.string, false),
+    future: I(T.string, false),
+    measured: I(T.opaque, false),
+  },
+};
+
+
+/** README "Field list": "Targets use only the keys of the Targets table, in one of these shapes". */
+export const TARGET_SHAPES: string[][] = [
+  ["id"], ["ids"], ["selector"], ["selectors"], ["within"], ["document"], ["document", "except"],
+  ["svg", "id"], ["svg", "texts"], ["svg", "use"], ["uri", "id"], ["pageOf"], ["pages"],
+];
+export const EXCEPT_ITEM_SHAPE = ["id"];
+export const URI_FIELDS: Record<string, Field> = { attribute: N(T.string), value: N(T.string) };
+export const PAGE_OF_FIELDS: Record<string, Field> = {
+  id: N(T.string),
+  fragment: N(T.string),
+  resolvedPages: N(T.array(T.integer)),
+  resolvedPagesByFontStack: I(T.map(T.array(T.integer))),
+};
+
 const ALLOWED_CLASSES = new Set(["font-dependent", "documented-gap", "heuristic-boundary", "docs-silent"]);
 const PAGES_ALLOWANCE = "any page not named in mustNotFire";
 export const LOCAL_URI_RULE = "artifact/local-uri";
 /** README step 5: "`layout/half-empty-page` is not active in the default profile, so any finding of it fails." */
 export const INACTIVE_RULE = "layout/half-empty-page";
-/** README "`artifact/local-uri`": the URI-bearing attributes an `id` target reads. */
-const URI_ATTRIBUTES = new Set(["href", "src", "srcset", "poster", "data"]);
+/**
+ * README "Evidence-level declines" (E37): the only rows with `ruleId: null` a gate leaves out of
+ * the per-rule checks, each with its scope. Any other row without a rule fails.
+ */
+export const EVIDENCE_LEVEL_DECLINES: readonly { reason: string; scope: string }[] = [
+  { reason: "env/evidence-fragment-outside-page", scope: "page" },
+  { reason: "env/evidence-overlay-removed", scope: "document" },
+];
+/**
+ * README "`artifact/local-uri`" (E39): the URI-bearing attributes an `id` target reads. `srcset`
+ * is out of scope, so a `uri` target naming it is rejected rather than guessed.
+ */
+const URI_ATTRIBUTES = new Set(["href", "src", "poster", "data"]);
+const URI_TARGET_ATTRIBUTES = new Set(["href", "src", "poster", "data", "xlink:href"]);
 
-type ListName = "mustFire" | "mustNotFire" | "allowed" | "expectedDeclines";
-const LISTS: ListName[] = ["mustFire", "mustNotFire", "allowed", "expectedDeclines"];
+function typeName(type: FieldType): string {
+  switch (type.kind) {
+    case "literal": return JSON.stringify(type.value);
+    case "array": return `array of ${typeName(type.of)}`;
+    case "map": return `map of ${typeName(type.of)}`;
+    default: return type.kind;
+  }
+}
 
-function assertKeys(value: unknown, allowed: Set<string>, label: string): Record<string, unknown> {
+/** Presence and type, and the closed key set, of one object level (README "Field list"). */
+export function checkFields(value: unknown, fields: Record<string, Field>, label: string): Record<string, unknown> {
   if (!isObject(value)) fail(`${label}: expected an object`);
-  for (const key of Object.keys(value)) if (!allowed.has(key)) fail(`${label}: unknown field "${key}"`);
+  for (const key of Object.keys(value)) if (!(key in fields)) fail(`${label}: unknown field "${key}"`);
+  for (const [key, field] of Object.entries(fields)) {
+    if (!(key in value)) {
+      if (field.required) fail(`${label}: required field "${key}" is missing`);
+      continue;
+    }
+    checkType(value[key], field.type, `${label}.${key}`);
+  }
   return value;
+}
+
+function checkType(value: unknown, type: FieldType, label: string): void {
+  const wrong = (): never => fail(`${label}: expected ${typeName(type)}`);
+  switch (type.kind) {
+    case "string": if (typeof value !== "string") wrong(); return;
+    case "stringOrNull": if (value !== null && typeof value !== "string") wrong(); return;
+    case "boolean": if (typeof value !== "boolean") wrong(); return;
+    case "integer": if (!Number.isInteger(value)) wrong(); return;
+    case "number": if (typeof value !== "number" || !Number.isFinite(value)) wrong(); return;
+    case "literal": if (value !== type.value) wrong(); return;
+    case "opaque": return;
+    case "target": if (!isObject(value)) wrong(); return;
+    case "array":
+      if (!Array.isArray(value)) wrong();
+      (value as unknown[]).forEach((item, i) => checkType(item, type.of, `${label}[${i}]`));
+      return;
+    case "map":
+      if (!isObject(value)) wrong();
+      for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+        if (type.keys && !type.keys.test(key)) fail(`${label}: key "${key}" is not allowed here`);
+        checkType(item, type.of, `${label}.${key}`);
+      }
+      return;
+    case "object":
+      checkFields(value, type.fields, label);
+      return;
+    case "entries":
+      if (!Array.isArray(value)) wrong();
+      (value as unknown[]).forEach((item, i) => checkFields(item, ENTRY_FIELDS[type.list], `${label}[${i}]`));
+      return;
+  }
+}
+
+/** Canonical JSON (sorted keys), for "targets compared as canonical JSON" (E40). */
+export function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (isObject(value)) return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
 }
 
 function stringArray(value: unknown, label: string, nonEmpty = true): string[] {
@@ -502,7 +738,10 @@ function anyOf(predicates: Predicate[]): Predicate {
   return (finding, context) => predicates.some((predicate) => predicate(finding, context));
 }
 
-/** The authored `L="V"` strings of URI-bearing attributes of an element and its descendants. */
+/**
+ * The `L="V"` strings of URI-bearing attributes of an element and its descendants. V is the value
+ * as the HTML parser returns it: character references decoded, nothing else changed (E39).
+ */
 function uriNeedles(index: SourceIndex, element: SourceElement): string[] {
   const needles: string[] = [];
   const scope = index.elements.filter((candidate) => candidate === element || isDescendant(candidate, element));
@@ -510,16 +749,9 @@ function uriNeedles(index: SourceIndex, element: SourceElement): string[] {
     for (const attr of candidate.node.attrs) {
       // parse5 reports `xlink:href` as local name `href` with prefix `xlink` (README: "the
       // attribute's local name as the HTML parser reports it, so `xlink:href` appears as `href`").
-      if (attr.prefix && attr.prefix !== "xlink") continue;
+      if (attr.prefix && !(attr.prefix === "xlink" && attr.name === "href")) continue;
       if (!URI_ATTRIBUTES.has(attr.name)) continue;
-      if (attr.prefix === "xlink" && attr.name !== "href") continue;
-      if (attr.name === "srcset") {
-        for (const candidateUrl of attr.value.split(",").map((part) => part.trim().split(/\s+/u)[0]).filter((part): part is string => Boolean(part))) {
-          needles.push(`srcset="${candidateUrl}"`);
-        }
-      } else {
-        needles.push(`${attr.name}="${attr.value}"`);
-      }
+      needles.push(`${attr.name}="${attr.value}"`);
     }
   }
   return needles;
@@ -537,21 +769,32 @@ function localName(attribute: string): string {
 interface TargetScope {
   ruleId: string;
   index: SourceIndex;
-  fontStacks: string[];
   /** Resolved pages of the rule's `mustNotFire` `pageOf` targets, for the `pages` allowance. */
   mustNotFirePages: () => number[];
   label: string;
-  allowExcept: boolean;
+}
+
+function svgText(scope: TargetScope, svg: SourceElement, id: unknown, label: string): SourceElement {
+  const text = elementById(scope.index, id, label);
+  if (text.tag !== "text" || text.namespace !== SVG_NS) fail(`${label}: "${String(id)}" is not an SVG <text> element`);
+  // README Targets table (E36): X is T's nearest `<svg>` ancestor, for `{svg, id}` and every id
+  // in `texts`; "a gate that finds otherwise fails the entry".
+  if (nearestSvg(text) !== svg) fail(`${label}: "${String(id)}" does not have "${svg.id ?? "?"}" as its nearest <svg>`);
+  return text;
 }
 
 /**
- * README "Targets" table and "Combination": all keys of one target combine with AND; a
- * list-valued key (`ids`, `selectors`, `texts`, `except`) matches when any item matches.
+ * README "Targets" table, "Identity" and "Combination": a target has one of the Field list's
+ * shapes; every id it names occurs exactly once; all keys combine with AND, and a list-valued key
+ * (`ids`, `selectors`, `texts`, `except`) matches when any item matches.
  */
-export function compileTarget(raw: unknown, scope: TargetScope): CompiledTarget {
-  const target = assertKeys(raw, TARGET_KEYS, `${scope.label} target`);
-  const keys = Object.keys(target);
-  if (keys.length === 0) fail(`${scope.label}: empty target`);
+export function compileTarget(raw: unknown, scope: TargetScope, shapes: string[][] = TARGET_SHAPES): CompiledTarget {
+  if (!isObject(raw)) fail(`${scope.label}: target must be an object`);
+  const target = raw;
+  const shape = Object.keys(target).sort().join(",");
+  if (!shapes.some((allowed) => [...allowed].sort().join(",") === shape)) {
+    fail(`${scope.label}: target shape {${Object.keys(target).join(", ")}} is not one of the Field list's target shapes`);
+  }
   const shown = Object.fromEntries(Object.entries(target).map(([key, value]) => [key, key === "pageOf" && isObject(value) ? { id: value.id, fragment: value.fragment, resolvedPages: value.resolvedPages } : value]));
   const label = `${scope.label} ${JSON.stringify(shown)}`;
   const conditions: Predicate[] = [];
@@ -569,13 +812,27 @@ export function compileTarget(raw: unknown, scope: TargetScope): CompiledTarget 
     conditions.push(() => true);
   }
   if ("except" in target) {
-    if (!("document" in target)) fail(`${scope.label}: except is used only on document targets`);
     if (!Array.isArray(target.except) || target.except.length === 0) fail(`${scope.label}: except must be a non-empty list of targets`);
-    const excepted = target.except.map((item, i) => compileTarget(item, { ...scope, label: `${scope.label} except[${i}]`, allowExcept: false }));
+    // Field list: "every `except` item is `{id}`".
+    const excepted = target.except.map((item, i) => compileTarget(item, { ...scope, label: `${scope.label} except[${i}]` }, [EXCEPT_ITEM_SHAPE]));
     conditions.push((finding, context) => !excepted.some((item) => item.matches(finding, context)));
   }
-  if (!scope.allowExcept && ("except" in target || "document" in target)) fail(`${scope.label}: a document target cannot appear inside except`);
-  if ("id" in target) conditions.push(idCondition(target.id, `${scope.label} id`));
+  if ("svg" in target) {
+    const svg = elementById(scope.index, target.svg, `${scope.label} svg`);
+    if (svg.tag !== "svg" || svg.namespace !== SVG_NS) fail(`${scope.label}: "${String(target.svg)}" is not an <svg> element`);
+    if ("texts" in target) {
+      const texts = stringArray(target.texts, `${scope.label} texts`);
+      conditions.push(anyOf(texts.map((id) => sourceWithin(spanOf(svgText(scope, svg, id, `${scope.label} texts`), `${scope.label} texts`)))));
+    }
+    if ("use" in target) {
+      conditions.push(sourceWithin(spanOf(useReferencedText(scope, svg, target.use), `${scope.label} use`)));
+    }
+    if ("id" in target) {
+      conditions.push(sourceWithin(spanOf(svgText(scope, svg, target.id, `${scope.label} id`), `${scope.label} id`)));
+    }
+  } else if ("id" in target) {
+    conditions.push(idCondition(target.id, `${scope.label} id`));
+  }
   if ("ids" in target) {
     const ids = stringArray(target.ids, `${scope.label} ids`);
     conditions.push(anyOf(ids.map((id) => idCondition(id, `${scope.label} ids`))));
@@ -593,63 +850,23 @@ export function compileTarget(raw: unknown, scope: TargetScope): CompiledTarget 
     const element = elementById(scope.index, target.within, `${scope.label} within`);
     conditions.push(sourceWithin(spanOf(element, `${scope.label} within`)));
   }
-  if ("svg" in target) {
-    const svg = elementById(scope.index, target.svg, `${scope.label} svg`);
-    if (svg.tag !== "svg" || svg.namespace !== SVG_NS) fail(`${scope.label}: "${String(target.svg)}" is not an <svg> element`);
-    const forms = ["texts", "use", "id"].filter((key) => key in target);
-    if (forms.length !== 1) fail(`${scope.label}: an svg target needs exactly one of texts, use or id`);
-    if ("texts" in target) {
-      const texts = stringArray(target.texts, `${scope.label} texts`);
-      const spans = texts.map((id) => {
-        const text = elementById(scope.index, id, `${scope.label} texts`);
-        if (text.tag !== "text" || text.namespace !== SVG_NS) fail(`${scope.label}: "${id}" is not an SVG <text> element`);
-        // README: "one of the listed <text> elements (each has X as its nearest <svg>)".
-        if (nearestSvg(text) !== svg) fail(`${scope.label}: "${id}" does not have "${String(target.svg)}" as its nearest <svg>`);
-        return sourceWithin(spanOf(text, `${scope.label} texts`));
-      });
-      conditions.push(anyOf(spans));
-    }
-    if ("use" in target) {
-      conditions.push(sourceWithin(spanOf(useReferencedText(scope, svg, target.use), `${scope.label} use`)));
-    }
-    if ("id" in target) {
-      // `{svg, id}` is not in the README table; by "Combination" it is the id AND the svg. The
-      // svg key is enforced as structure (the id lies inside that svg), and the match is the
-      // id's span, which any reading of "inside the svg" contains.
-      const element = elementById(scope.index, target.id, `${scope.label} id`);
-      if (!isDescendant(element, svg)) fail(`${scope.label}: "${String(target.id)}" is not inside "${String(target.svg)}"`);
-    }
-  } else if ("texts" in target || "use" in target) {
-    fail(`${scope.label}: texts and use require svg`);
-  }
   if ("uri" in target) {
     if (!localUri) fail(`${scope.label}: uri targets are defined only for ${LOCAL_URI_RULE}`);
-    const uri = assertKeys(target.uri, URI_KEYS, `${scope.label} uri`);
-    if (typeof uri.attribute !== "string" || typeof uri.value !== "string" || !uri.attribute || !uri.value) fail(`${scope.label}: uri needs attribute and value strings`);
-    const needle = `${localName(uri.attribute)}="${uri.value}"`;
-    if ("id" in target) {
-      // README: "Where a target has both `uri` and `id`, the pair is an attribute of X."
-      const element = elementById(scope.index, target.id, `${scope.label} id`);
-      const own = element.node.attrs.some((attr) => {
-        const name = attr.prefix ? `${attr.prefix}:${attr.name}` : attr.name;
-        return name === uri.attribute && attr.value === uri.value;
-      });
-      if (!own) fail(`${scope.label}: ${uri.attribute}="${uri.value}" is not an attribute of "${String(target.id)}"`);
-    }
-    conditions.push(messageContainsAny([needle]));
+    const uri = checkFields(target.uri, URI_FIELDS, `${scope.label} uri`);
+    const attribute = uri.attribute as string;
+    const value = uri.value as string;
+    if (!URI_TARGET_ATTRIBUTES.has(attribute)) fail(`${scope.label}: uri attribute "${attribute}" is not one of ${[...URI_TARGET_ATTRIBUTES].join(", ")} (srcset is out of scope)`);
+    // README: "Where a target has both `uri` and `id`, the pair is an attribute of X."
+    const element = elementById(scope.index, target.id, `${scope.label} id`);
+    const own = element.node.attrs.some((attr) => (attr.prefix ? `${attr.prefix}:${attr.name}` : attr.name) === attribute && attr.value === value);
+    if (!own) fail(`${scope.label}: ${attribute}="${value}" is not an attribute of "${String(target.id)}"`);
+    conditions.push(messageContainsAny([`${localName(attribute)}="${value}"`]));
   }
   if ("pageOf" in target) {
-    const pageOf = assertKeys(target.pageOf, PAGE_OF_KEYS, `${scope.label} pageOf`);
+    const pageOf = checkFields(target.pageOf, PAGE_OF_FIELDS, `${scope.label} pageOf`);
     elementById(scope.index, pageOf.id, `${scope.label} pageOf`);
     if (!["first", "last", "middle"].includes(pageOf.fragment as string)) fail(`${scope.label}: pageOf.fragment must be first, last or middle`);
     const pages = intArray(pageOf.resolvedPages, `${scope.label} pageOf.resolvedPages`);
-    const byStack = pageOf.resolvedPagesByFontStack;
-    if (!isObject(byStack)) fail(`${scope.label}: pageOf.resolvedPagesByFontStack is missing`);
-    const stacks = Object.keys(byStack).sort();
-    if (stacks.join(",") !== [...scope.fontStacks].sort().join(",")) fail(`${scope.label}: resolvedPagesByFontStack names ${stacks.join(", ")}, verification.fontStacks names ${scope.fontStacks.join(", ")}`);
-    // README "Page targets": "`resolvedPages` is ... the union, over the three font stacks".
-    const union = [...new Set(stacks.flatMap((stack) => intArray(byStack[stack], `${scope.label} resolvedPagesByFontStack.${stack}`)))].sort((a, b) => a - b);
-    if (union.join(",") !== [...pages].sort((a, b) => a - b).join(",")) fail(`${scope.label}: resolvedPages [${pages.join(", ")}] is not the union of resolvedPagesByFontStack [${union.join(", ")}]`);
     pageOfPages = pages;
     conditions.push((finding) => pages.includes(finding.page));
   }
@@ -674,86 +891,55 @@ function useReferencedText(scope: TargetScope, svg: SourceElement, useId: unknow
 }
 
 /**
- * Validates one expected file against the `selfauthored-expected-v1` format and compiles its
- * targets against the source document. Every unknown field, malformed target and violated
- * README invariant is a failure.
+ * Validates one expected file against the README's field list and compiles its targets against
+ * the source document. Every unknown field, malformed target and violated README invariant fails
+ * the file, and with it the gate, before any document runs.
  */
 export function compileExpected(raw: unknown, index: SourceIndex, binding: { id: string; artifact: string; sha256: string; byteLength: number }): CompiledExpected {
   const label = binding.id;
-  const expected = assertKeys(raw, TOP_KEYS, label);
-  for (const key of ["schemaVersion", "documentId", "artifact", "sha256", "byteLength", "profile", "pages", "expectedExit", "rules", "permittedDeclineReasons", "notActiveInDefaultProfile", "verification"]) {
-    if (!(key in expected)) fail(`${label}: required field "${key}" is missing`);
-  }
-  if (expected.schemaVersion !== "selfauthored-expected-v1") fail(`${label}: schemaVersion ${String(expected.schemaVersion)}`);
+  const expected = checkFields(raw, FIELD_LIST, label);
   if (expected.documentId !== binding.id) fail(`${label}: documentId ${String(expected.documentId)} does not name the manifest document`);
   if (expected.artifact !== binding.artifact) fail(`${label}: artifact ${String(expected.artifact)} differs from the manifest path ${binding.artifact}`);
   if (expected.sha256 !== binding.sha256) fail(`${label}: expected file binds sha256 ${String(expected.sha256)}, the document is ${binding.sha256}`);
   if (expected.byteLength !== binding.byteLength) fail(`${label}: expected file binds byteLength ${String(expected.byteLength)}, the document has ${binding.byteLength}`);
-  if (expected.profile !== "default") fail(`${label}: profile ${String(expected.profile)}; the gate runs the default profile only`);
-  if ("language" in expected) assertKeys(expected.language, LANGUAGE_KEYS, `${label} language`);
-  if ("paper" in expected) {
-    if (!Array.isArray(expected.paper)) fail(`${label}: paper must be a list`);
-    expected.paper.forEach((paper, i) => assertKeys(paper, PAPER_KEYS, `${label} paper[${i}]`));
-  }
-  if ("runningElements" in expected) {
-    if (!Array.isArray(expected.runningElements)) fail(`${label}: runningElements must be a list`);
-    expected.runningElements.forEach((item, i) => assertKeys(item, RUNNING_KEYS, `${label} runningElements[${i}]`));
-  }
-  if ("constructionFacts" in expected) {
-    if (!Array.isArray(expected.constructionFacts)) fail(`${label}: constructionFacts must be a list`);
-    expected.constructionFacts.forEach((item, i) => assertKeys(item, FACT_KEYS, `${label} constructionFacts[${i}]`));
-  }
-  for (const key of ["features", "notes"]) {
-    if (key in expected && (!Array.isArray(expected[key]) || !(expected[key] as unknown[]).every((item) => typeof item === "string"))) fail(`${label}: ${key} must be a list of strings`);
-  }
 
-  const pages = assertKeys(expected.pages, PAGES_KEYS, `${label} pages`);
+  const pages = expected.pages as Record<string, unknown>;
   const range = intArray(pages.range, `${label} pages.range`);
+  // E40: `[lo, hi]`, both ends included.
   if (range.length !== 2 || range[0]! < 1 || range[0]! > range[1]!) fail(`${label}: pages.range must be [low, high] with 1 <= low <= high`);
 
-  const exit = assertKeys(expected.expectedExit, EXIT_KEYS, `${label} expectedExit`);
+  const exit = expected.expectedExit as Record<string, unknown>;
   const exitSet = intArray(exit.set, `${label} expectedExit.set`);
   if (new Set(exitSet).size !== exitSet.length || !exitSet.every((code) => code >= 0 && code <= 4)) fail(`${label}: expectedExit.set must hold distinct codes 0..4`);
-  if (!isObject(exit.byCode)) fail(`${label}: expectedExit.byCode is missing`);
-  const byCode = Object.keys(exit.byCode).map(Number).sort((a, b) => a - b);
-  if (byCode.join(",") !== [...exitSet].sort((a, b) => a - b).join(",")) fail(`${label}: expectedExit.byCode names ${byCode.join(",")}, the set is ${exitSet.join(",")}`);
-
-  const verification = assertKeys(expected.verification, VERIFICATION_KEYS, `${label} verification`);
-  if (!isObject(verification.fontStacks) || Object.keys(verification.fontStacks).length === 0) fail(`${label}: verification.fontStacks is missing`);
-  const fontStacks = Object.keys(verification.fontStacks);
 
   const permitted = stringArray(expected.permittedDeclineReasons, `${label} permittedDeclineReasons`);
   const inactive = stringArray(expected.notActiveInDefaultProfile, `${label} notActiveInDefaultProfile`, false);
-  if (!isObject(expected.rules) || Object.keys(expected.rules).length === 0) fail(`${label}: rules is missing`);
-  for (const ruleId of inactive) if (!(ruleId in expected.rules)) fail(`${label}: notActiveInDefaultProfile names ${ruleId}, which has no rules entry`);
+  const rulesRaw = expected.rules as Record<string, Record<string, unknown>>;
+  if (Object.keys(rulesRaw).length === 0) fail(`${label}: rules is empty`);
+  for (const ruleId of inactive) if (!(ruleId in rulesRaw)) fail(`${label}: notActiveInDefaultProfile names ${ruleId}, which has no rules entry`);
 
   const rules = new Map<string, CompiledRule>();
-  for (const [ruleId, ruleRaw] of Object.entries(expected.rules)) {
+  for (const [ruleId, rule] of Object.entries(rulesRaw)) {
     const ruleLabel = `${label} ${ruleId}`;
-    const rule = assertKeys(ruleRaw, RULE_KEYS, ruleLabel);
-    for (const list of LISTS) if (!Array.isArray(rule[list])) fail(`${ruleLabel}: ${list} must be a list`);
-    if ("notes" in rule && (!Array.isArray(rule.notes) || !rule.notes.every((note) => typeof note === "string"))) fail(`${ruleLabel}: notes must be a list of strings`);
     const compiled: CompiledRule = { ruleId, mustFire: [], mustNotFire: [], allowed: [], declines: [] };
     const mustNotFirePages: number[] = [];
-    const scopeFor = (entryLabel: string): TargetScope => ({ ruleId, index, fontStacks, mustNotFirePages: () => mustNotFirePages, label: entryLabel, allowExcept: true });
+    const scopeFor = (entryLabel: string): TargetScope => ({ ruleId, index, mustNotFirePages: () => mustNotFirePages, label: entryLabel });
+    // E40, "Identity": no target repeats within one list; `mustFire`, `mustNotFire` and `allowed`
+    // share no target; a `mustFire` or `allowed` target may also appear in `expectedDeclines`.
+    const findingListOf = new Map<string, string>();
     // mustNotFire first, so that a `pages` allowance knows the pages it excludes.
     for (const list of ["mustNotFire", "mustFire", "allowed"] as const) {
-      // E17: "No list of any rule in any expected file now repeats a target."
-      const seenTargets = new Map<string, string>();
-      (rule[list] as unknown[]).forEach((entryRaw, i) => {
+      (rule[list] as Record<string, unknown>[]).forEach((entry, i) => {
         const entryLabel = `${ruleLabel} ${list}[${i}]`;
-        const entry = assertKeys(entryRaw, ENTRY_KEYS[list], entryLabel);
-        if (!("target" in entry)) fail(`${entryLabel}: target is missing`);
-        const key = JSON.stringify(entry.target);
-        if (seenTargets.has(key)) fail(`${entryLabel}: repeats the target of ${seenTargets.get(key)}`);
-        seenTargets.set(key, entryLabel);
+        const key = canonicalJson(entry.target);
+        const previous = findingListOf.get(key);
+        if (previous) fail(`${entryLabel}: repeats the target of ${previous}`);
+        findingListOf.set(key, entryLabel);
         if (list === "allowed") {
           if (!ALLOWED_CLASSES.has(entry.class as string)) fail(`${entryLabel}: class ${String(entry.class)} is not one of ${[...ALLOWED_CLASSES].join(", ")}`);
-          if (entry.class === "documented-gap" && entry.constructionTruth !== "defect") fail(`${entryLabel}: a documented-gap entry carries constructionTruth "defect"`);
-        } else if ("class" in entry) {
-          fail(`${entryLabel}: class belongs to allowed entries`);
+          if ((entry.class === "documented-gap") !== ("constructionTruth" in entry)) fail(`${entryLabel}: constructionTruth "defect" goes with class documented-gap`);
         }
-        if ("occurrences" in entry && (!Number.isInteger(entry.occurrences) || (entry.occurrences as number) < 1)) fail(`${entryLabel}: occurrences must be a positive integer`);
+        if ("occurrences" in entry && (entry.occurrences as number) < 1) fail(`${entryLabel}: occurrences must be a positive integer`);
         const target = compileTarget(entry.target, scopeFor(entryLabel));
         if (list === "mustNotFire" && target.pageOfPages) mustNotFirePages.push(...target.pageOfPages);
         if ("pages" in (entry.target as Record<string, unknown>) && list !== "allowed") fail(`${entryLabel}: the pages target is a page-level allowance`);
@@ -767,21 +953,22 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
     }
 
     const groups = new Map<string, { required: boolean[]; alternative: boolean[]; counts: (number | null)[]; alternatives: MeasuredAlternativeTarget[] }>();
-    (rule.expectedDeclines as unknown[]).forEach((entryRaw, i) => {
+    const declineKeys = new Map<string, string>();
+    (rule.expectedDeclines as Record<string, unknown>[]).forEach((entry, i) => {
       const entryLabel = `${ruleLabel} expectedDeclines[${i}]`;
-      const entry = assertKeys(entryRaw, ENTRY_KEYS.expectedDeclines, entryLabel);
-      if (typeof entry.reason !== "string" || !entry.reason.startsWith("env/")) fail(`${entryLabel}: reason must be an env/ id`);
-      if (typeof entry.required !== "boolean") fail(`${entryLabel}: required must be a boolean`);
-      if ("count" in entry && (!Number.isInteger(entry.count) || (entry.count as number) < 1)) fail(`${entryLabel}: count must be a positive integer`);
+      // E40: in `expectedDeclines` the target together with `reason` does not repeat.
+      const key = canonicalJson({ target: entry.target, reason: entry.reason });
+      if (declineKeys.has(key)) fail(`${entryLabel}: repeats the target and reason of ${declineKeys.get(key)}`);
+      declineKeys.set(key, entryLabel);
+      const reason = entry.reason as string;
+      if (!reason.startsWith("env/")) fail(`${entryLabel}: reason must be an env/ id`);
+      if ("count" in entry && (entry.count as number) < 1) fail(`${entryLabel}: count must be a positive integer`);
       if (entry.required && !("count" in entry)) fail(`${entryLabel}: a required decline needs a count`);
-      if ("measuredAlternative" in entry && entry.measuredAlternative !== true) fail(`${entryLabel}: measuredAlternative is either true or absent`);
-      if ("countsTowardCoverage" in entry && typeof entry.countsTowardCoverage !== "boolean") fail(`${entryLabel}: countsTowardCoverage must be a boolean`);
       const alternative = entry.measuredAlternative === true;
       // Compiling the target checks that it resolves in the source, even where only the count is judged.
-      const target = compileTarget(entry.target, scopeFor(entryLabel));
-      void target;
-      const group = groups.get(entry.reason) ?? { required: [], alternative: [], counts: [], alternatives: [] };
-      group.required.push(entry.required);
+      compileTarget(entry.target, scopeFor(entryLabel));
+      const group = groups.get(reason) ?? { required: [], alternative: [], counts: [], alternatives: [] };
+      group.required.push(entry.required as boolean);
       group.alternative.push(alternative);
       group.counts.push(typeof entry.count === "number" ? entry.count : null);
       if (alternative) {
@@ -794,12 +981,12 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
           if ("ifMeasured" in entry) fail(`${entryLabel}: a texts entry carries ifMeasured per text, in perText`);
           if (!Array.isArray(entry.perText)) fail(`${entryLabel}: perText is missing`);
           const texts = stringArray(targetRaw.texts, `${entryLabel} texts`);
-          const perText = entry.perText.map((item, j) => assertKeys(item, PER_TEXT_KEYS, `${entryLabel} perText[${j}]`));
+          const perText = entry.perText as Record<string, unknown>[];
           const perIds = perText.map((item) => item.id as string);
           if ([...perIds].sort().join(",") !== [...texts].sort().join(",") || new Set(perIds).size !== perIds.length) fail(`${entryLabel}: perText ids differ from the target's texts`);
           targets = perText.map((item) => {
             if (item.ifMeasured !== "mustFire" && item.ifMeasured !== "mustNotFire") fail(`${entryLabel}: perText ${String(item.id)} ifMeasured must be mustFire or mustNotFire`);
-            const text = elementById(index, item.id, `${entryLabel} perText`);
+            const text = svgText(svgScope, svg, item.id, `${entryLabel} perText`);
             return { label: `${ruleLabel} measured ${String(item.id)}`, ifMeasured: item.ifMeasured, matches: sourceWithin(spanOf(text, `${entryLabel} perText`)) };
           });
         } else if ("use" in targetRaw) {
@@ -816,7 +1003,7 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
       } else if ("ifMeasured" in entry || "perText" in entry) {
         fail(`${entryLabel}: ifMeasured and perText belong to measuredAlternative entries`);
       }
-      groups.set(entry.reason, group);
+      groups.set(reason, group);
     });
     for (const [reason, group] of groups) {
       // README invariant: "for one rule and reason the entries are either all `required: true` or
@@ -873,6 +1060,8 @@ export interface DocumentVerdict {
   unaccounted: number;
   findings: number;
   declines: DeclineSummary[];
+  /** Sum of the counts of evidence-level rows (`ruleId: null`), left out of the per-rule checks. */
+  evidenceLevelDeclines: number;
   failures: string[];
   notes: string[];
 }
@@ -907,6 +1096,7 @@ export function evaluateDocument(expected: CompiledExpected, outcome: RunOutcome
     unaccounted: 0,
     findings: 0,
     declines: [],
+    evidenceLevelDeclines: 0,
     failures: [],
     notes: [],
   };
@@ -963,7 +1153,12 @@ export function evaluateDocument(expected: CompiledExpected, outcome: RunOutcome
   const rows: NotMeasured[] = Array.isArray(document.notMeasured) ? document.notMeasured : (failures.push("report has no notMeasured list"), []);
   verdict.findings = findings.length;
   const active = new Set(report.config?.activeRules ?? []);
-  for (const ruleId of active) if (!expected.rules.has(ruleId)) failures.push(`the report ran rule ${ruleId}, which the expected file does not account for`);
+  // Field list: `rules` holds "exactly the thirteen registered rule ids". The registered set is
+  // what the run reports as active plus disabled; no second rule table is kept here.
+  const registered = [...new Set([...active, ...(report.config?.disabledRules ?? [])])].sort();
+  if (registered.join(",") !== [...expected.rules.keys()].sort().join(",")) {
+    failures.push(`the report's registered rules [${registered.join(", ")}] are not the expected file's rules [${[...expected.rules.keys()].sort().join(", ")}]`);
+  }
   for (const ruleId of expected.notActiveInDefaultProfile) if (active.has(ruleId)) failures.push(`${ruleId} is active; it is not active in the default profile`);
 
   const covered = new Set<Finding>();
@@ -1032,12 +1227,22 @@ export function evaluateDocument(expected: CompiledExpected, outcome: RunOutcome
     }
   }
 
-  // "no decline carries a reason outside `permittedDeclineReasons`" — read literally, over every
-  // row of the document, including rows that name no rule.
+  // Step 5 (E37): "no decline row of that rule carries a reason outside `permittedDeclineReasons`
+  // (rows with `ruleId: null` follow the paragraph 'Evidence-level declines')".
   for (const row of rows) {
-    if (row.ruleId !== null && !expected.rules.has(row.ruleId)) failures.push(`decline of a rule the expected file does not name: ${row.ruleId} ${row.reason} x${row.count}`);
-    if (!expected.permittedDeclineReasons.includes(row.reason)) failures.push(`decline reason outside permittedDeclineReasons: ${row.ruleId ?? "(no rule)"} ${row.reason} x${row.count}`);
     if (!Number.isInteger(row.count) || row.count < 1) failures.push(`malformed decline row count: ${row.ruleId ?? "(no rule)"} ${row.reason} ${String(row.count)}`);
+    if (row.ruleId === null) {
+      const exempt = EVIDENCE_LEVEL_DECLINES.some((allowed) => allowed.reason === row.reason && allowed.scope === row.scope);
+      if (exempt) {
+        verdict.evidenceLevelDeclines += row.count;
+        verdict.notes.push(`evidence-level decline left out of the per-rule checks: ${row.scope} ${row.reason} x${row.count}`);
+      } else {
+        failures.push(`decline row with ruleId null that is not an evidence-level decline: ${row.scope} ${row.reason} x${row.count}`);
+      }
+      continue;
+    }
+    if (!expected.rules.has(row.ruleId)) failures.push(`decline of a rule the expected file does not name: ${row.ruleId} ${row.reason} x${row.count}`);
+    if (!expected.permittedDeclineReasons.includes(row.reason)) failures.push(`decline reason outside permittedDeclineReasons: ${row.ruleId} ${row.reason} x${row.count}`);
   }
   return done();
 }
@@ -1110,7 +1315,10 @@ export function formatTable(verdicts: DocumentVerdict[]): string[] {
     v.ruleChecksSkipped ? "skipped" : `${v.mustFireHit}/${v.mustFireTotal}`,
     v.ruleChecksSkipped ? "skipped" : String(v.mustNotFireViolations),
     v.ruleChecksSkipped ? "skipped" : `${v.unaccounted}/${v.findings}`,
-    v.declines.length === 0 ? "-" : v.declines.map((d) => `${d.ruleId.split("/")[1]} ${d.reason.slice(4)} ${d.actual}/${d.expected}${d.kind === "measured-alternative" ? ` ${d.state}` : d.state === "ok" ? "" : " MISMATCH"}`).join("; "),
+    [
+      ...v.declines.map((d) => `${d.ruleId.split("/")[1]} ${d.reason.slice(4)} ${d.actual}/${d.expected}${d.kind === "measured-alternative" ? ` ${d.state}` : d.state === "ok" ? "" : " MISMATCH"}`),
+      ...(v.evidenceLevelDeclines ? [`evidence-level ${v.evidenceLevelDeclines}`] : []),
+    ].join("; ") || "-",
     v.pass ? "PASS" : "FAIL",
   ]);
   const widths = header.map((title, column) => Math.max(title.length, ...rows.map((row) => row[column]!.length)));

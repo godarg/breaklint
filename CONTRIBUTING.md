@@ -64,7 +64,8 @@ corpus gates need to run locally.
   through the built CLI in its own invocation under the default profile, and judges the JSON report
   against the frozen ground truth exactly as the corpus README's gate procedure defines it: exit
   set, page range, `mustFire`, `mustNotFire`, the closed world (a finding no entry accounts for
-  fails), declines by count and the `measuredAlternative` all-or-nothing rule. It prints one row
+  fails), declines by count and the `measuredAlternative` all-or-nothing rule, and every expected
+  file against the README's closed field list. It prints one row
   per document and exits 0 only when every document passed. Needs `npm run build` and a browser in
   which evidence binding works; `--no-evidence-binding` exists for local diagnosis on a renderer
   that cannot bind evidence, labels the run as not the gate, and is not used in CI. Its matcher and

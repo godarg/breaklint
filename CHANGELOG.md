@@ -50,6 +50,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   or nothing, and no decline reason outside `permittedDeclineReasons`. Element spans are computed
   by the gate itself with parse5 in UTF-8 bytes, not with breaklint's source map. Zero documents,
   a hash mismatch, an unknown field in an expected file and an unaccounted finding are failures.
+  Expected files are checked against the corpus README's closed field list (every level, required
+  keys, types; opaque values unread), and a unit test fails if the gate's encoding of that list and
+  the README diverge. Decline rows without a rule are left out of the per-rule checks only for the
+  two evidence-level declines the README names (`env/evidence-fragment-outside-page` on a page,
+  `env/evidence-overlay-removed` on the document); any other such row fails, and the exit code is
+  judged as always.
   `tests/unit/corpus-gate.test.ts` exercises every matching rule and fail-closed path on synthetic
   reports and through the gate's process boundary. **The step is expected to be red until the
   0.7.0 packages it depends on are integrated**: on the commit that adds it, measured locally on

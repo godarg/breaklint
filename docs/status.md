@@ -373,7 +373,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=474 aggregateTests=590 liveTests=71 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=481 aggregateTests=597 liveTests=71 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -950,7 +950,10 @@ document per invocation: the exit code is in the document's expected set and the
 range; every planted defect (`mustFire`) is reported on the element, text or page it was planted
 on; no clean control (`mustNotFire`) is reported; every finding is accounted for by a `mustFire` or
 `allowed` entry (closed world); required declines have exactly the construction's count; and no
-decline carries a reason the document does not permit. Element spans come from the gate's own
+decline row of a rule carries a reason the document does not permit. Rows without a rule are
+outside the corpus's truth: the two evidence-level declines (`env/evidence-fragment-outside-page`,
+`env/evidence-overlay-removed`) are left out of those checks and any other one fails, so a pass says
+nothing about evidence binding beyond the exit code. Element spans come from the gate's own
 parse5 pass over the source bytes, not from breaklint's source map, so a source attribution the
 tool gets wrong cannot agree with itself.
 

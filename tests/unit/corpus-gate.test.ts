@@ -19,10 +19,19 @@ import { fileURLToPath } from "node:url";
 import type { Finding, Report } from "../../src/core/types.ts";
 import {
   compileExpected,
+  ENTRY_FIELDS,
   evaluateDocument,
+  EXCEPT_ITEM_SHAPE,
+  FIELD_LIST,
   indexSource,
+  PAGE_OF_FIELDS,
+  PER_TEXT_FIELDS,
   selectElements,
+  TARGET_SHAPES,
+  URI_FIELDS,
   verifyManifest,
+  type Field,
+  type FieldType,
   type CompiledExpected,
   type RunOutcome,
   type SourceIndex,
@@ -38,6 +47,7 @@ const HTML = [
   "<p id=\"p1\">Ä first paragraph with <span id=\"inner\">an inline span</span>.</p>",
   "<p id=\"p2\">See <a id=\"a-file\" href=\"file:///srv/x.txt\">x</a> and <a id=\"a-rel\" href=\"x.html\">y</a>.</p>",
   "<p id=\"p-plain\">No link here.</p>",
+  "<p id=\"p-amp\"><a id=\"a-amp\" href=\"file:///srv/a&amp;b.txt\">z</a></p>",
   "<h3 id=\"h3-a\" class=\"k\">A</h3><h3 id=\"h3-b\">B</h3>",
   "<table id=\"tbl\"><tr id=\"r1\"><td>1</td></tr><tr id=\"r2\"><td>2</td></tr></table>",
   "<svg id=\"s1\" viewBox=\"0 0 100 50\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">",
@@ -71,29 +81,50 @@ function span(id: string): { start: number; end: number } {
 type Json = Record<string, unknown>;
 type RuleLists = { mustFire?: Json[]; mustNotFire?: Json[]; allowed?: Json[]; expectedDeclines?: Json[] };
 
+const withWhy = (entries: Json[] | undefined): Json[] => (entries ?? []).map((entry) => ({ why: "synthetic", ...entry }));
+
 function expectedFile(rules: Record<string, RuleLists> = {}, overrides: Json = {}): Json {
+  // Every top-level key of the README's field list is required, so the fixture carries all of them.
   return {
     schemaVersion: "selfauthored-expected-v1",
     documentId: "syn",
     artifact: "documents/syn.html",
     sha256: HTML_SHA,
     byteLength: HTML_BYTES.length,
+    authoredOn: "2026-09-25",
+    provenanceClass: "synthetic_first_party",
+    calibrationEvidenceEligible: false,
+    title: "synthetic",
+    genre: "test fixture",
+    language: { htmlLang: "en", typeRulesUnderDefaultLocale: "synthetic" },
+    paper: [{ pageRule: "@page", size: "A4", orientation: "portrait", pageBoxCssPx: [793.7, 1122.5], margins: "20mm", contentBoxCssPx: [642.5, 971.3] }],
     profile: "default",
     pages: { range: [2, 3], measured: 2, basis: "synthetic" },
-    expectedExit: { set: [0, 1], derivation: "synthetic", byCode: { "0": "clean", "1": "error" } },
+    expectedExit: { set: [0, 1], derivation: "synthetic", byCode: { "0": "clean", "1": "error" }, environmentNote: "synthetic" },
+    fontDependence: "synthetic",
+    features: [],
+    runningElements: [],
+    constructionFacts: [],
     rules: Object.fromEntries(RULES.map((ruleId) => [ruleId, {
-      mustFire: rules[ruleId]?.mustFire ?? [],
-      mustNotFire: rules[ruleId]?.mustNotFire ?? [],
-      allowed: rules[ruleId]?.allowed ?? [],
+      mustFire: withWhy(rules[ruleId]?.mustFire),
+      mustNotFire: withWhy(rules[ruleId]?.mustNotFire),
+      allowed: withWhy(rules[ruleId]?.allowed),
       expectedDeclines: rules[ruleId]?.expectedDeclines ?? [],
     }])),
     permittedDeclineReasons: ["env/forced-break", "env/svg-painted-bounds-unsupported"],
     notActiveInDefaultProfile: ["layout/half-empty-page"],
-    verification: { fontStacks: { reference: "machine", dejavu: "no-liberation", free: "free" } },
+    verification: {
+      method: "synthetic", browser: "none", pagedjs: "0.4.3", measuredOn: "2026-09-25", pageCount: 2,
+      pageCountByFontStack: { reference: 2 }, pdfPageCount: 2, contentBoxHeightsPx: [971.3], platformFonts: {},
+      overflowColumnResidue: [], fontStacks: { reference: "machine", dejavu: "no-liberation", free: "free" },
+    },
     notes: [],
     ...overrides,
   };
 }
+
+/** A `perText` item with every field the README's field list names. */
+const pt = (id: string, ifMeasured: string): Json => ({ id, ifMeasured, why: "synthetic", strokeWidthPx: 3, cellInsetsPx: {}, fillInkInsetsPx: {}, paintedInkInsetsPx: {} });
 
 function compile(raw: Json): CompiledExpected {
   return compileExpected(raw, INDEX, { id: "syn", artifact: "documents/syn.html", sha256: HTML_SHA, byteLength: HTML_BYTES.length });
@@ -126,7 +157,7 @@ function outcome(findings: Finding[], options: { exit?: number; reason?: string 
   const report = {
     schemaVersion: 5,
     exitCode: options.reportExit ?? exit,
-    config: { profile: "default", activeRules: options.activeRules ?? RULES.filter((ruleId) => ruleId !== "layout/half-empty-page") },
+    config: { profile: "default", activeRules: options.activeRules ?? RULES.filter((ruleId) => ruleId !== "layout/half-empty-page"), disabledRules: ["layout/half-empty-page"] },
     documents: [{
       exitReason: options.reason ?? null,
       pages: options.pages ?? 2,
@@ -209,7 +240,9 @@ test("a document target matches findings whose source is null, and except carves
   assertFail(judge(raw, outcome([finding("type/straight-quotes", null)])), /mustNotFire violated/u);
   assertFail(judge(raw, outcome([finding("type/straight-quotes", span("p1"))])), /mustNotFire violated/u);
   assertPass(judge(raw, outcome([finding("type/straight-quotes", span("a-file"))])));
-  assert.throws(() => compile(expectedFile({ "type/straight-quotes": { mustNotFire: [{ target: { id: "p1", except: [{ id: "p2" }] } }] } })), /except is used only on document targets/u);
+  // Field list: except belongs to a document target, and every except item is `{id}`.
+  assert.throws(() => compile(expectedFile({ "type/straight-quotes": { mustNotFire: [{ target: { id: "p1", except: [{ id: "p2" }] } }] } })), /target shape \{id, except\}/u);
+  assert.throws(() => compile(expectedFile({ "type/straight-quotes": { mustNotFire: [{ target: { document: true, except: [{ within: "p2" }] } }] } })), /except\[0\]: target shape \{within\}/u);
 });
 
 test("svg texts need X as nearest <svg>; a use target matches the referenced <text>", () => {
@@ -265,8 +298,11 @@ test("page targets match Finding.page; the pages allowance excludes the mustNotF
   // The allowance does not reach a mustNotFire page, so that finding is also unaccounted.
   assert.equal(onForbiddenPage.unaccounted, 1);
   assertFail(judge(raw, outcome([finding("layout/orphaned-continuation-page", null, { page: 1 })])), /mustFire missed/u);
-  const broken = expectedFile({ "layout/orphaned-continuation-page": { mustFire: [{ target: { pageOf: { id: "p1", fragment: "last", resolvedPages: [3], resolvedPagesByFontStack: { reference: [3], dejavu: [4], free: [3] } } } }] } });
-  assert.throws(() => compile(broken), /not the union/u);
+  // resolvedPagesByFontStack is informational (E38): its type is checked, not its content.
+  const disagreeing = expectedFile({ "layout/orphaned-continuation-page": { mustFire: [{ target: { pageOf: { id: "p1", fragment: "last", resolvedPages: [3], resolvedPagesByFontStack: { reference: [3], dejavu: [4], free: [3] } } } }] } });
+  assertPass(judge(disagreeing, outcome([finding("layout/orphaned-continuation-page", null, { page: 3 })])));
+  const mistyped = expectedFile({ "layout/orphaned-continuation-page": { mustFire: [{ target: { pageOf: { id: "p1", fragment: "last", resolvedPages: [3], resolvedPagesByFontStack: { reference: 3 } } } }] } });
+  assert.throws(() => compile(mistyped), /resolvedPagesByFontStack\.reference: expected array of integer/u);
 });
 
 test("closed world: every finding must be accounted for by mustFire or allowed", () => {
@@ -306,7 +342,6 @@ test("a non-required decline is checked only against permittedDeclineReasons", (
   assertPass(judge(raw, outcome([])));
   assertPass(judge(raw, outcome([], { notMeasured: [{ scope: "block", ruleId: "layout/widow", reason: "env/forced-break", target: null, count: 7 }] })));
   assertFail(judge(raw, outcome([], { notMeasured: [{ scope: "block", ruleId: "layout/widow", reason: "env/multicolumn", target: null, count: 1 }] })), /outside permittedDeclineReasons/u);
-  assertFail(judge(raw, outcome([], { notMeasured: [{ scope: "page", ruleId: null, reason: "env/evidence-fragment-outside-page", target: null, count: 1 }] })), /outside permittedDeclineReasons/u);
   assert.throws(() => compile(expectedFile({ "layout/widow": { expectedDeclines: [
     { target: { id: "p1" }, reason: "env/forced-break", required: true, count: 1 },
     { target: { id: "p2" }, reason: "env/forced-break", required: false },
@@ -319,7 +354,7 @@ test("measuredAlternative entries are all or nothing per rule and reason", () =>
       expectedDeclines: [
         {
           target: { svg: "s1", texts: ["t1", "t2"] }, reason: "env/svg-painted-bounds-unsupported", required: true, count: 2, measuredAlternative: true,
-          perText: [{ id: "t1", ifMeasured: "mustNotFire" }, { id: "t2", ifMeasured: "mustFire" }],
+          perText: [pt("t1", "mustNotFire"), pt("t2", "mustFire")],
         },
         { target: { svg: "s1", use: "u1" }, reason: "env/svg-painted-bounds-unsupported", required: true, count: 1, measuredAlternative: true, ifMeasured: "mustNotFire" },
       ],
@@ -346,16 +381,16 @@ test("measuredAlternative entries are all or nothing per rule and reason", () =>
   // The format invariants hold: count equals the number of targets, perText equals texts.
   assert.throws(() => compile(expectedFile({ "svg/text-overflows-viewport": { expectedDeclines: [{
     target: { svg: "s1", texts: ["t1", "t2"] }, reason: "env/svg-painted-bounds-unsupported", required: true, count: 3, measuredAlternative: true,
-    perText: [{ id: "t1", ifMeasured: "mustNotFire" }, { id: "t2", ifMeasured: "mustFire" }],
+    perText: [pt("t1", "mustNotFire"), pt("t2", "mustFire")],
   }] } })), /count 3 differs/u);
   assert.throws(() => compile(expectedFile({ "svg/text-overflows-viewport": { expectedDeclines: [{
     target: { svg: "s1", texts: ["t1", "t2"] }, reason: "env/svg-painted-bounds-unsupported", required: true, count: 2, measuredAlternative: true,
-    perText: [{ id: "t1", ifMeasured: "mustNotFire" }],
+    perText: [pt("t1", "mustNotFire")],
   }] } })), /perText ids differ/u);
 });
 
 test("exit and page steps: exit 3 passes only as render-unstable in the set; otherwise set and range", () => {
-  const withThree = expectedFile({}, { expectedExit: { set: [0, 3], derivation: "d", byCode: { "0": "a", "3": "b" } } });
+  const withThree = expectedFile({}, { expectedExit: { set: [0, 3], derivation: "d", byCode: { "0": "a", "3": "b" }, environmentNote: "e" } });
   const skipped = judge(withThree, outcome([finding("layout/widow", span("p1"))], { exit: 3, reason: "render-unstable", pages: 0 }));
   assertPass(skipped);
   assert.equal(skipped.ruleChecksSkipped, true);
@@ -368,10 +403,235 @@ test("exit and page steps: exit 3 passes only as render-unstable in the set; oth
   assertFail(judge(expectedFile(), { exitCode: 0, signal: null, report: null, reportProblem: "none written", stderr: "" }), /no canonical JSON report/u);
 });
 
+test("E36: {svg, id} matches the span of the <text> T and needs X as T's nearest <svg>", () => {
+  const raw = expectedFile({ "svg/text-overflows-viewport": { mustFire: [{ target: { svg: "s1", id: "t4" } }] } });
+  // t4 sits inside an <a> inside s1: its nearest <svg> is still s1.
+  assertPass(judge(raw, outcome([finding("svg/text-overflows-viewport", span("t4"))])));
+  // A finding on the enclosing <a> is not within the text.
+  assertFail(judge(raw, outcome([finding("svg/text-overflows-viewport", span("svg-link"))])), /mustFire missed/u);
+  // Inside s1 but under the nested svg: s1 is not its nearest <svg>.
+  assert.throws(() => compile(expectedFile({ "svg/text-overflows-viewport": { mustFire: [{ target: { svg: "s1", id: "t-nested" } }] } })), /nearest <svg>/u);
+  assert.throws(() => compile(expectedFile({ "svg/text-overflows-viewport": { mustFire: [{ target: { svg: "s1", id: "svg-link" } }] } })), /not an SVG <text>/u);
+});
+
+test("E37: rows with ruleId null are left out only for the two evidence-level declines, each with its scope", () => {
+  const raw = expectedFile();
+  const row = (scope: string, reason: string) => ({ scope, ruleId: null, reason, target: null, count: 2 });
+  const allowed = judge(raw, outcome([], { notMeasured: [row("page", "env/evidence-fragment-outside-page"), row("document", "env/evidence-overlay-removed")] }));
+  assertPass(allowed);
+  assert.equal(allowed.evidenceLevelDeclines, 4);
+  // Any other reason without a rule fails, even one the document permits for its rules.
+  assertFail(judge(raw, outcome([], { notMeasured: [row("page", "env/forced-break")] })), /ruleId null that is not an evidence-level decline: page env\/forced-break/u);
+  // The right reason under the other scope is not exempt.
+  assertFail(judge(raw, outcome([], { notMeasured: [row("document", "env/evidence-fragment-outside-page")] })), /not an evidence-level decline/u);
+  assertFail(judge(raw, outcome([], { notMeasured: [row("page", "env/evidence-overlay-removed")] })), /not an evidence-level decline/u);
+  // The exemption covers the per-rule checks, not the exit: an evidence exit 4 outside the set fails.
+  assertFail(judge(raw, outcome([], { exit: 4, reason: "evidence/required-page-binding-incomplete", notMeasured: [row("page", "env/evidence-fragment-outside-page")] })), /exit 4 .* not in the expected set/u);
+});
+
+test("E39: uri values are compared as the parser decodes them, and srcset targets are rejected", () => {
+  const raw = expectedFile({ "artifact/local-uri": { mustFire: [{ target: { uri: { attribute: "href", value: "file:///srv/a&b.txt" }, id: "a-amp" } }] } });
+  const local = (message: string) => finding("artifact/local-uri", null, { message: `occurrences: 1 (permitted: 0). ${message} resolves only on the machine.` });
+  assertPass(judge(raw, outcome([local("href=\"file:///srv/a&b.txt\"")])));
+  assertFail(judge(raw, outcome([local("href=\"file:///srv/a&amp;b.txt\"")])), /mustFire missed/u);
+  assert.throws(() => compile(expectedFile({ "artifact/local-uri": { mustFire: [{ target: { uri: { attribute: "href", value: "file:///srv/a&amp;b.txt" }, id: "a-amp" } }] } })), /not an attribute/u);
+  assert.throws(() => compile(expectedFile({ "artifact/local-uri": { mustFire: [{ target: { uri: { attribute: "srcset", value: "file:///x.png" }, id: "a-amp" } }] } })), /srcset is out of scope/u);
+  // A bare `{uri}` is not a Field list shape.
+  assert.throws(() => compile(expectedFile({ "artifact/local-uri": { mustFire: [{ target: { uri: { attribute: "href", value: "file:///srv/x.txt" } } }] } })), /target shape \{uri\}/u);
+});
+
+test("E40: ids occur exactly once, targets do not repeat, and the page range includes both ends", () => {
+  const duplicated = indexSource(Buffer.from("<p id=\"dup\">a</p><p id=\"dup\">b</p><p id=\"one\">c</p>", "utf8"));
+  const binding = { id: "syn", artifact: "documents/syn.html", sha256: HTML_SHA, byteLength: HTML_BYTES.length };
+  assert.throws(() => compileExpected(expectedFile({ "layout/widow": { mustNotFire: [{ target: { id: "dup" } }] } }), duplicated, binding), /id "dup" occurs 2 times/u);
+  assert.throws(() => compileExpected(expectedFile({ "layout/widow": { allowed: [{ target: { within: "dup" }, class: "font-dependent" }] } }), duplicated, binding), /id "dup" occurs 2 times/u);
+  compileExpected(expectedFile({ "layout/widow": { mustNotFire: [{ target: { id: "one" } }] } }), duplicated, binding);
+  // Within one list; across mustFire, mustNotFire and allowed; compared as canonical JSON.
+  assert.throws(() => compile(expectedFile({ "layout/widow": { mustNotFire: [{ target: { svg: "s1", texts: ["t1"] } }, { target: { texts: ["t1"], svg: "s1" } }] } })), /repeats the target/u);
+  assert.throws(() => compile(expectedFile({ "layout/widow": { mustFire: [{ target: { id: "p1" } }], allowed: [{ target: { id: "p1" }, class: "font-dependent" }] } })), /repeats the target/u);
+  // A mustFire or allowed target may also be an expectedDeclines target; declines compare target and reason.
+  compile(expectedFile({ "layout/widow": { allowed: [{ target: { id: "p1" }, class: "font-dependent" }], expectedDeclines: [
+    { target: { id: "p1" }, reason: "env/forced-break", required: false },
+    { target: { id: "p1" }, reason: "env/multicolumn", required: false },
+  ] } }));
+  assert.throws(() => compile(expectedFile({ "layout/widow": { expectedDeclines: [
+    { target: { id: "p1" }, reason: "env/forced-break", required: false },
+    { target: { id: "p1" }, reason: "env/forced-break", required: false },
+  ] } })), /repeats the target and reason/u);
+  assertPass(judge(expectedFile(), outcome([], { pages: 2 })));
+  assertPass(judge(expectedFile(), outcome([], { pages: 3 })));
+});
+
+test("the expected rules must be exactly the registered rules the run reports", () => {
+  const run = outcome([]);
+  (run.report!.config as unknown as { disabledRules: string[] }).disabledRules = [];
+  assertFail(judge(expectedFile(), run), /registered rules/u);
+});
+
+// ---------------------------------------------------------------------------------------------
+// E38: the README's closed field list and the gate's encoding must not diverge.
+
+const IDENTIFIER = /^[A-Za-z][A-Za-z0-9]*$/u;
+const NOT_KEYS = new Set(["true", "false", "null"]);
+
+/** Key names mentioned in a README cell: backticked names and the items of backticked `{a, b: t}` lists. */
+function keysIn(text: string): string[] {
+  const keys: string[] = [];
+  for (const [, token] of text.matchAll(/`([^`]+)`/gu)) {
+    const inner = /^\{(.*)\}$/u.exec(token!);
+    const items = inner ? inner[1]!.split(",").map((item) => item.split(":")[0]!.trim()) : [token!];
+    for (const item of items) if (IDENTIFIER.test(item) && !NOT_KEYS.has(item)) keys.push(item);
+  }
+  return keys;
+}
+
+interface Flat { name: string; role: "N" | "I"; required: boolean; opaque: boolean }
+
+function nestedOf(type: FieldType): Flat[] {
+  switch (type.kind) {
+    case "object":
+      return Object.entries(type.fields).flatMap(([name, field]) => [
+        { name, role: field.role, required: field.required, opaque: field.type.kind === "opaque" },
+        ...nestedOf(field.type),
+      ]);
+    case "array":
+    case "map":
+      return nestedOf(type.of);
+    default:
+      return [];
+  }
+}
+
+const sortedSet = (items: Iterable<string>): string => [...new Set(items)].sort().join(", ");
+
+function fieldListDivergences(readme: string, encoded: {
+  top: Record<string, Field>;
+  entries: Record<string, Record<string, Field>>;
+  perText: Record<string, Field>;
+  shapes: string[][];
+  uri: Record<string, Field>;
+  pageOf: Record<string, Field>;
+  exceptItem: string[];
+}): string[] {
+  const issues: string[] = [];
+  const differ = (what: string, readmeSide: string, encodedSide: string): void => {
+    if (readmeSide !== encodedSide) issues.push(`${what}: README [${readmeSide}], gate [${encodedSide}]`);
+  };
+  const start = readme.indexOf("\n## Field list\n");
+  if (start < 0) return ["README has no Field list section"];
+  const end = readme.indexOf("\n## ", start + 5);
+  const section = readme.slice(start, end < 0 ? undefined : end);
+  const [topPart, rest] = section.split("\nEntries.");
+  if (!rest) return ["Field list has no Entries paragraph"];
+
+  // Top level: every row, key column, role column, nested keys, optional and opaque markers.
+  const rows = topPart!.split("\n").filter((line) => line.startsWith("| `"));
+  const readmeTop: string[] = [];
+  for (const row of rows) {
+    const [, keyCell, roleCell, meaning] = row.split("|").map((cell) => cell.trim());
+    const role = roleCell as "N" | "I";
+    for (const key of keysIn(keyCell!)) {
+      readmeTop.push(key);
+      const field = encoded.top[key];
+      if (!field) continue;
+      if (field.role !== role) issues.push(`${key}: README role ${role}, gate ${field.role}`);
+      if (!field.required) issues.push(`${key}: the README requires every top-level key`);
+      const literal = /^`("[^"]*"|true|false)`$/u.exec(meaning!);
+      if (literal) differ(`${key} literal`, literal[1]!, field.type.kind === "literal" ? JSON.stringify(field.type.value) : field.type.kind);
+      const nested = nestedOf(field.type);
+      differ(`${key} nested keys`, sortedSet(keysIn(meaning!)), sortedSet(nested.map((item) => item.name)));
+      const optionalAt = meaning!.indexOf("optional");
+      differ(`${key} optional keys`, sortedSet(optionalAt < 0 ? [] : keysIn(meaning!.slice(optionalAt))), sortedSet(nested.filter((item) => !item.required).map((item) => item.name)));
+      differ(`${key} opaque keys`, sortedSet([...meaning!.matchAll(/`(\w+)` \((?:[NI], )?opaque\)/gu)].map((match) => match[1]!)), sortedSet(nested.filter((item) => item.opaque).map((item) => item.name)));
+      const stated = new Map<string, string>();
+      for (const match of meaning!.matchAll(/`(\w+)` \((N|I)\b/gu)) stated.set(match[1]!, match[2]!);
+      for (const match of meaning!.matchAll(/`\{([^}]*)\}` \((N|I)\b/gu)) for (const item of match[1]!.split(",")) stated.set(item.trim(), match[2]!);
+      for (const item of nested) differ(`${key}.${item.name} role`, stated.get(item.name) ?? role, item.role);
+    }
+  }
+  differ("top-level keys", sortedSet(readmeTop), sortedSet(Object.keys(encoded.top)));
+
+  // Entries: the "Required:" sentence, then the table of N and I keys.
+  const entriesText = rest.replace(/\n/gu, " ");
+  const requiredSentence = /Required: (.*?) Every other key is optional/u.exec(entriesText)?.[1] ?? "";
+  const readmeRequired = new Map<string, Set<string>>();
+  for (const match of requiredSentence.matchAll(/((?:`\w+`(?:, | and )?)+) in ((?:`\w+`(?:, | and )?)+)/gu)) {
+    for (const list of keysIn(match[2]!)) for (const key of keysIn(match[1]!)) readmeRequired.set(list, new Set([...(readmeRequired.get(list) ?? []), key]));
+  }
+  const entryRows = rest.split("\n").filter((line) => /^\| `(mustFire|mustNotFire|allowed|expectedDeclines)` \|/u.test(line));
+  differ("entry lists", sortedSet(entryRows.map((line) => keysIn(line.split("|")[1]!)[0]!)), sortedSet(Object.keys(encoded.entries)));
+  for (const line of entryRows) {
+    const [, listCell, nCell, iCell] = line.split("|");
+    const list = keysIn(listCell!)[0]!;
+    const fields = encoded.entries[list] ?? {};
+    const byRole = (role: string) => sortedSet(Object.entries(fields).filter(([, field]) => field.role === role).map(([name]) => name));
+    differ(`${list} N keys`, sortedSet(keysIn(nCell!)), byRole("N"));
+    differ(`${list} I keys`, sortedSet(keysIn(iCell!)), byRole("I"));
+    differ(`${list} required keys`, sortedSet(readmeRequired.get(list) ?? []), sortedSet(Object.entries(fields).filter(([, field]) => field.required).map(([name]) => name)));
+    differ(`${list} opaque keys`, sortedSet([...line.matchAll(/`(\w+)` \(opaque\)/gu)].map((match) => match[1]!)), sortedSet(Object.entries(fields).filter(([, field]) => field.type.kind === "opaque").map(([name]) => name)));
+  }
+
+  // perText.
+  const perText = /`perText\[\]` \([^)]*\): (.*?)\. /u.exec(entriesText)?.[1];
+  if (!perText) issues.push("Field list has no perText sentence");
+  else {
+    const [nPart, iPart] = perText.split("(N);");
+    differ("perText N keys", sortedSet(keysIn(nPart!)), sortedSet(Object.entries(encoded.perText).filter(([, field]) => field.role === "N").map(([name]) => name)));
+    differ("perText I keys", sortedSet(keysIn(iPart ?? "")), sortedSet(Object.entries(encoded.perText).filter(([, field]) => field.role === "I").map(([name]) => name)));
+    const opaqueAt = (iPart ?? "").indexOf("opaque");
+    differ("perText opaque keys", sortedSet(opaqueAt < 0 ? [] : keysIn(iPart!.slice(opaqueAt))), sortedSet(Object.entries(encoded.perText).filter(([, field]) => field.type.kind === "opaque").map(([name]) => name)));
+  }
+
+  // Targets: shapes, uri, pageOf, except.
+  const shapesText = /in one of these shapes: (.*?)\. `uri` is/u.exec(entriesText)?.[1] ?? "";
+  const shape = (keys: string) => keys.split(",").map((key) => key.trim()).sort().join("+");
+  differ("target shapes", sortedSet([...shapesText.matchAll(/`\{([^}]*)\}`/gu)].map((match) => shape(match[1]!))), sortedSet(encoded.shapes.map((keys) => shape(keys.join(",")))));
+  differ("uri keys", shape(/`uri` is `\{([^}]*)\}`/u.exec(entriesText)?.[1] ?? ""), shape(Object.keys(encoded.uri).join(",")));
+  const pageOf = /`pageOf` is\s*`\{([^}]*)\}`\s*\(the last one I/u.exec(entriesText)?.[1] ?? "";
+  differ("pageOf keys", shape(pageOf), shape(Object.keys(encoded.pageOf).join(",")));
+  const pageOfKeys = pageOf.split(",").map((key) => key.trim());
+  pageOfKeys.forEach((key, i) => differ(`pageOf.${key} role`, i === pageOfKeys.length - 1 ? "I" : "N", encoded.pageOf[key]?.role ?? "-"));
+  differ("except item", shape(/every `except` item is `\{([^}]*)\}`/u.exec(entriesText)?.[1] ?? ""), shape(encoded.exceptItem.join(",")));
+  return issues;
+}
+
+const ENCODED = { top: FIELD_LIST, entries: ENTRY_FIELDS, perText: PER_TEXT_FIELDS, shapes: TARGET_SHAPES, uri: URI_FIELDS, pageOf: PAGE_OF_FIELDS, exceptItem: EXCEPT_ITEM_SHAPE };
+const CORPUS_README = readFileSync(join(ROOT, "corpus/public/selfauthored-v1/README.md"), "utf8");
+
+test("E38: the gate's encoded field list is the README's closed field list", () => {
+  assert.deepEqual(fieldListDivergences(CORPUS_README, ENCODED), []);
+});
+
+test("E38: a divergence on either side is detected", () => {
+  // README gains a key the gate does not know, or loses one it does.
+  assert.match(fieldListDivergences(CORPUS_README.replace("`title`, `genre`, `fontDependence`", "`title`, `genre`, `fontDependence`, `subtitle`"), ENCODED).join("\n"), /top-level keys/u);
+  assert.match(fieldListDivergences(CORPUS_README.replace("`{reference, dejavu, free}`", "`{reference, dejavu}`"), ENCODED).join("\n"), /verification nested keys/u);
+  assert.match(fieldListDivergences(CORPUS_README.replace("`docsBasis`, `observed` (renderer", "`observed` (renderer"), ENCODED).join("\n"), /mustFire I keys/u);
+  assert.match(fieldListDivergences(CORPUS_README.replace("`{svg, use}`, ", ""), ENCODED).join("\n"), /target shapes/u);
+  // The gate's encoding drops a key, changes a role, makes a key optional or stops treating it as opaque.
+  const { genre: _genre, ...withoutGenre } = FIELD_LIST;
+  assert.match(fieldListDivergences(CORPUS_README, { ...ENCODED, top: withoutGenre }).join("\n"), /top-level keys/u);
+  assert.match(fieldListDivergences(CORPUS_README, { ...ENCODED, top: { ...FIELD_LIST, title: { ...FIELD_LIST.title!, role: "N" } } }).join("\n"), /title: README role I, gate N/u);
+  assert.match(fieldListDivergences(CORPUS_README, { ...ENCODED, entries: { ...ENTRY_FIELDS, allowed: { ...ENTRY_FIELDS.allowed, why: { ...ENTRY_FIELDS.allowed.why!, required: false } } } }).join("\n"), /allowed required keys/u);
+  assert.match(fieldListDivergences(CORPUS_README, { ...ENCODED, perText: { ...PER_TEXT_FIELDS, cellInsetsPx: { role: "I", required: true, type: { kind: "string" } } } }).join("\n"), /perText opaque keys/u);
+});
+
 test("an unknown field anywhere the gate interprets fails the expected file", () => {
   assert.throws(() => compile({ ...expectedFile(), surprise: 1 }), /unknown field "surprise"/u);
+  // The field list is closed in both directions: a required field that is missing fails too.
+  const { genre: _genre, ...withoutGenre } = expectedFile();
+  assert.throws(() => compile(withoutGenre), /required field "genre" is missing/u);
+  const withoutWhy = expectedFile({ "layout/widow": { mustFire: [{ target: { id: "p1" } }] } });
+  delete ((withoutWhy.rules as Record<string, { mustFire: Json[] }>)["layout/widow"]!.mustFire[0]!).why;
+  assert.throws(() => compile(withoutWhy), /mustFire\[0\]: required field "why" is missing/u);
+  assert.throws(() => compile(expectedFile({ "layout/widow": { expectedDeclines: [{ target: { id: "p1" }, reason: "env/forced-break" }] } })), /required field "required" is missing/u);
+  // Informational fields are checked for type.
+  assert.throws(() => compile(expectedFile({}, { title: 7 })), /syn\.title: expected string/u);
+  assert.throws(() => compile(expectedFile({}, { calibrationEvidenceEligible: true })), /calibrationEvidenceEligible: expected false/u);
+  // Opaque values are not looked into.
+  compile(expectedFile({ "layout/widow": { mustNotFire: [{ target: { id: "p1" }, measured: { anything: [1, { goes: true }] } }] } }));
   assert.throws(() => compile(expectedFile({ "layout/widow": { mustFire: [{ target: { id: "p1" }, dependsOn: "G-02" }] } })), /unknown field "dependsOn"/u);
-  assert.throws(() => compile(expectedFile({ "layout/widow": { mustFire: [{ target: { id: "p1", nth: 2 } }] } })), /unknown field "nth"/u);
+  assert.throws(() => compile(expectedFile({ "layout/widow": { mustFire: [{ target: { id: "p1", nth: 2 } }] } })), /target shape \{id, nth\}/u);
   assert.throws(() => compile(expectedFile({}, { pages: { range: [2, 3], exact: 2 } })), /unknown field "exact"/u);
   assert.throws(() => compile(expectedFile({ "layout/widow": { mustFire: [{ target: { id: "nope" } }] } })), /no element with id "nope"/u);
   assert.throws(() => compile(expectedFile({ "layout/widow": { allowed: [{ target: { id: "p1" }, class: "sometimes" }] } })), /class sometimes/u);
@@ -394,7 +654,7 @@ const html = createHash("sha256").update(readFileSync(input)).digest("hex");
 const file = isAbsolute(input) ? "~" + input.slice(input.indexOf("/", 1)) : input;
 const findings = spec.findings.map((f, i) => ({ runFindingId: "f" + i, page: 1, message: "m", ...f,
   source: f.source ? { ...f.source, file, coordinateSystem: "utf8-bytes-unicode-codepoints-v1" } : null }));
-writeFileSync(out, JSON.stringify({ schemaVersion: 5, exitCode: spec.exit, config: { profile: "default", activeRules: spec.activeRules },
+writeFileSync(out, JSON.stringify({ schemaVersion: 5, exitCode: spec.exit, config: { profile: "default", activeRules: spec.activeRules, disabledRules: ["layout/half-empty-page"] },
   documents: [{ exitReason: null, pages: 2, inputIdentity: { html }, findings, notMeasured: [] }] }));
 process.exit(spec.exit);
 `;
