@@ -276,10 +276,15 @@ function within(inner: Box, outer: Box, tolerance: number): boolean {
  *   - `snapshot.blocks` is in collection order: pages ascending, document order within a page. Every
  *     record that contains a text node is an ancestor of it, so the records recording one line form
  *     an ancestor chain and the LATEST of them in that order is the deepest.
- *   - A line box of record B is a nested block's when later block containers on the same page
- *     record line boxes inside it that together span it, edge for edge within
- *     `LINE_OWNERSHIP_TOLERANCE_PX` (the collector's own line-grouping tolerance). Spanning, not
- *     touching: a line that also carries text of B's own beyond the nested boxes stays B's.
+ *   - In `containers` mode a block container's line is its own exactly when the collector saw text
+ *     of its own on it (`TextLine.ownText`: text whose nearest block container is this record). A
+ *     line shared with a float on each side carries the container's text between the floats'
+ *     although their boxes together span it, so geometry cannot say this; the flag can.
+ *   - Otherwise — `containers: false`, and for a non-container record — a line box of record B is a
+ *     nested block's when later records on the same page record line boxes inside it that together
+ *     span it, edge for edge within `LINE_OWNERSHIP_TOLERANCE_PX` (the collector's own line-grouping
+ *     tolerance). Spanning, not touching: a line that also carries text of B's own beyond the nested
+ *     boxes stays B's.
  *   - A record that is not a block container (`isBlockContainer`: `display: contents` or inline,
  *     agreeing with `renderingOf`) cannot take a line from the record around it, and a line of it
  *     that an EARLIER block container also holds — equal or larger, on the same line — is that
@@ -301,10 +306,11 @@ function within(inner: Box, outer: Box, tolerance: number): boolean {
  * join a record's fragments by source id (`fragmentNeighbours`) and judge a run only when the run on
  * the other side is own text too.
  *
- * KNOWN LIMITS, stated because they are real: text of the wrapper's own that sits BETWEEN nested
- * blocks' line boxes on one line (between two floats, say) is inside their span and cannot be told
- * apart from them, so the wrapper loses that line; and a hand-written snapshot that does not follow
- * collection order gets the ownership that order implies.
+ * KNOWN LIMITS, stated because they are real: in `containers: false` mode, text of a block's own
+ * that sits BETWEEN nested blocks' line boxes on one line (between two floats) is inside their span
+ * and is taken for theirs; a block container the snapshot does not record (a custom element) owns
+ * its text, so neither it nor the record around it is judged on those lines; and a hand-written
+ * snapshot that does not follow collection order gets the ownership that order implies.
  *
  * Computed once per call, over the whole snapshot. The function returned answers for a record of
  * that snapshot; a record it has not seen owns nothing.
@@ -338,7 +344,7 @@ export function lineOwnership(
     const lines = linesByKey.get(block.nodeKey) ?? [];
     const entries = entriesByPage.get(block.page) ?? [];
     const boxed = counts(block);
-    const classified: { line: TextLine; held: boolean; coverers: number[] }[] = [];
+    const classified: { line: TextLine; held: boolean; nested: boolean; coverers: number[] }[] = [];
     let enclosedBy: number | null = null;
     for (const line of lines) {
       const row = line.box;
@@ -373,17 +379,25 @@ export function lineOwnership(
       const nested = left <= row.x + tolerance && top <= row.y + tolerance &&
         right >= row.x + row.width - tolerance && bottom >= row.y + row.height - tolerance;
       if (heldBy !== null && enclosedBy === null) enclosedBy = heldBy;
-      classified.push({ line, held: heldBy !== null, coverers: nested ? [...coverers] : [] });
+      classified.push({ line, held: heldBy !== null, nested, coverers: [...coverers] });
     }
     // Which nested records sit BESIDE this record's own lines rather than in their flow: the
     // outermost record covering a line (the earliest in collection order) decides, by what the
     // snapshot records about it — a float, an absolutely or fixed positioned box, or an
     // inline-level box leaves the record's own run whole; an in-flow block ends it.
     const isBeside = (coverers: number[]) => !inFlowBlock(snapshot.blocks[Math.min(...coverers)]!);
-    const marked: LineOwnership["lines"] = classified.map(({ line, held, coverers }) => {
-      const role: LineRole = held ? "enclosing"
-        : coverers.length === 0 ? "own"
-          : isBeside(coverers) ? "beside" : "nested";
+    const marked: LineOwnership["lines"] = classified.map(({ line, held, nested, coverers }) => {
+      let role: LineRole;
+      if (containers && boxed) {
+        // A block container's own line is the one the collector saw its own text on
+        // (`TextLine.ownText`), not one whose box geometry is left over: a line shared with a
+        // float on each side has the container's text in the middle and the floats' at the edges,
+        // and their union spans it. Otherwise the outermost nested record on the line decides
+        // whether the line ends the container's run; a line with none found ends it.
+        role = line.ownText ? "own" : coverers.length > 0 && isBeside(coverers) ? "beside" : "nested";
+      } else {
+        role = held ? "enclosing" : !nested ? "own" : isBeside(coverers) ? "beside" : "nested";
+      }
       return { line, owned: role === "own", role };
     });
     marked.sort((a, b) => a.line.index - b.line.index);

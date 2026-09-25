@@ -94,6 +94,13 @@ export interface TextLine {
   index: number;
   box: Box;
   visible: boolean;
+  /**
+   * Whether some text on this line has this record as its BLOCK CONTAINER (Snapshot 5): the text
+   * node's nearest source-block ancestor that is not `display: contents` or inline is this record.
+   * A record records its descendants' lines too; this says which of them are its own. Always false
+   * for a `display: contents` or inline record, whose text belongs to the container around it.
+   */
+  ownText: boolean;
   width: number;
   /** Always populated for justified blocks; measured at 4 221 bytes per page, so affordable. */
   wordBoxes: WordBox[] | null;

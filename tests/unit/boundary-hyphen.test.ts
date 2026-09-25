@@ -30,14 +30,40 @@ const bySid = (raw: RawSnapshot, sid: string) => raw.blocks.find((block) => bloc
 
 describe("the boundary-hyphen mark the collector records", () => {
   it("belongs to the nearest source block of the marked element: the block itself, or around an inline element", () => {
+    // Paged.js appends U+2011 to the text node it cut and marks that node's parent.
     const raw = collected(
-      `<p data-bl-sid="own" class="pagedjs_hyphen" data-test-box="20 20 200 20">cut wo-</p>` +
-      `<section data-bl-sid="wrap" data-test-box="20 40 200 40"><p data-bl-sid="inner" data-test-box="20 40 200 20">in <em class="pagedjs_hyphen" data-test-box="40 40 20 20">wo-</em></p></section>` +
+      `<p data-bl-sid="own" class="pagedjs_hyphen" data-test-box="20 20 200 20">cut wo\u2011</p>` +
+      `<section data-bl-sid="wrap" data-test-box="20 40 200 40"><p data-bl-sid="inner" data-test-box="20 40 200 20">in <em class="pagedjs_hyphen" data-test-box="40 40 20 20">wo\u2011</em></p></section>` +
       `<p data-bl-sid="plain" data-test-box="20 100 200 20">no mark</p>`,
     );
     assert.deepEqual(["own", "wrap", "inner", "plain"].map((sid) => bySid(raw, sid).boundaryHyphen), [true, false, true, false]);
     // classList stays the element's own class attribute.
     assert.deepEqual(bySid(raw, "inner").classList, []);
+  });
+
+  it("is not spoofed by an author class: the mark must hold the fragment's last text, which must end in the glyph", () => {
+    const raw = collected(
+      // the class on an inline element that does not hold the last text node;
+      `<p data-bl-sid="elsewhere" data-test-box="20 20 200 20">aaa <em class="pagedjs_hyphen" data-test-box="40 20 20 20">bbb</em> ccc\u2011</p>` +
+      // the class on the block, but no glyph at the end: no split was hyphenated;
+      `<p data-bl-sid="no-glyph" class="pagedjs_hyphen" data-test-box="20 40 200 20">aaa bbb</p>` +
+      // the class on the element holding the last text, with the glyph: the real mark.
+      `<p data-bl-sid="real" data-test-box="20 60 200 20">aaa <em class="pagedjs_hyphen" data-test-box="40 60 20 20">bb\u2011</em></p>`,
+    );
+    assert.deepEqual(["elsewhere", "no-glyph", "real"].map((sid) => bySid(raw, sid).boundaryHyphen), [false, false, true]);
+  });
+
+  it("records whose text a line carries: its block container's, recorded or not, and a float's container's", () => {
+    const raw = collected(
+      `<div data-bl-sid="w" data-test-box="20 20 200 60">own ` +
+      // an unrecorded block (a custom element): its own container, not the div's;
+      `<x-el data-test-box="20 40 200 20" style="display: block">custom</x-el>` +
+      // an unrecorded float: transparent, its text is in the div's run.
+      `<span data-test-box="20 60 200 20" style="display: block; float: right">side</span></div>`,
+    );
+    const w = bySid(raw, "w");
+    const lines = raw.textLines.filter((line) => line.blockKey === w.nodeKey).sort((a, b) => a.box.y - b.box.y);
+    assert.deepEqual(lines.map((line) => [line.box.y, line.ownText]), [[20, true], [40, false], [60, true]]);
   });
 
   it("records the computed float and position of every block", () => {

@@ -128,6 +128,71 @@ describe("the natural space the collector records", () => {
   });
 });
 
+describe("the layout samples of the natural space", () => {
+  // A font no canvas reproduces (an optical-size axis), so every block below is measured from the
+  // layout. In the fake a whitespace character is 4 px wide unless its element's `data-test-space`
+  // says otherwise: a "rendered space" of another width.
+  const OPSZ = "font-size: 12px; font-variation-settings: 'opsz' 12";
+  const p = (sid: string, style: string, slot: number, text = "aaa bbb ccc", space?: number) =>
+    `<p data-bl-sid="${sid}" data-test-box="20 ${20 + slot * 20} 200 20"${space === undefined ? "" : ` data-test-space="${space}"`} style="${style}">${text}</p>`;
+  const spaces = (content: string, sids: string[], pages: string[] = []) => {
+    const raw = evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, pagedDocument([
+      ...pages.map((page, i) => pagedPage({ pageBox: [0, i * 800, 500, 700], contentBox: [20, i * 800 + 20, 460, 660], content: page })),
+      pagedPage({ pageBox: [0, pages.length * 800, 500, 700], contentBox: [20, pages.length * 800 + 20, 460, 660], content }),
+    ]));
+    return sids.map((sid) => raw.blocks.filter((block) => block.sid === sid).map((block) => block.spaceWidth)).flat();
+  };
+  const justified = `text-align: justify; ${OPSZ}`;
+
+  it("takes the median of the samples, which must agree within 0.1 px or 3 %", () => {
+    assert.deepEqual(spaces(p("a", justified, 0, "aaa bbb ccc", 4) + p("b", justified, 1, "aaa bbb ccc", 4) +
+      p("c", justified, 2, "aaa bbb ccc", 4.1) + p("q", OPSZ, 3), ["q"]), [4]);
+    assert.deepEqual(spaces(p("a", justified, 0, "aaa bbb ccc", 4) + p("b", justified, 1, "aaa bbb ccc", 5) + p("q", OPSZ, 2), ["q"]), [0],
+      "samples 25 % apart are not one natural space");
+  });
+
+  it("pools by word-spacing, letter-spacing and zoom as well as by font", () => {
+    // a1: a justified paragraph set with word-spacing: 1em on purpose is no sample of the plain one.
+    assert.deepEqual(spaces(p("ws", `${justified}; word-spacing: 12px`, 0, "aaa bbb ccc", 16) + p("a", justified, 1) + p("q", OPSZ, 2), ["q"]), [4]);
+    assert.deepEqual(spaces(p("ls", `${justified}; letter-spacing: 2px`, 0, "aaa bbb ccc", 6) + p("a", justified, 1) +
+      p("q", OPSZ, 2) + p("qls", `${OPSZ}; letter-spacing: 2px`, 3), ["q", "qls"]), [4, 6]);
+    assert.deepEqual(spaces(`<div style="zoom: 2">${p("z", justified, 0, "aaa bbb ccc", 8)}</div>` + p("a", justified, 1) + p("q", OPSZ, 2), ["q", "z"]), [4, 8]);
+  });
+
+  it("samples only text set in the block's own font and spacing, between words of one text node", () => {
+    // a3: a <code> run in another font on the last line; its gaps are the code font's.
+    assert.deepEqual(spaces(`<p data-bl-sid="a" data-test-box="20 20 200 20" style="${justified}">aaa bbb <code data-test-box="60 20 60 20" data-test-space="9" style="font-family: monospace">x y z</code></p>` +
+      p("q", OPSZ, 1), ["q"]), [4]);
+    // &nbsp; and a preserved double space are not one collapsible space.
+    assert.deepEqual(spaces(p("n", justified, 0, "aaa\u00a0 bbb ccc") + p("q", OPSZ, 1), ["q"]), [4]);
+    assert.deepEqual(spaces(p("w", `${justified}; white-space: pre-wrap`, 0, "aaa  bbb ccc") + p("q", OPSZ, 1), ["q"]), [4]);
+    // A gap that is not positive is no space.
+    assert.deepEqual(spaces(p("neg", justified, 0, "aaa bbb ccc", -2) + p("a", justified, 1) + p("q", OPSZ, 2), ["q"]), [4]);
+  });
+
+  it("samples only the last line of a block's last fragment, where text-align-last does not justify it", () => {
+    // The first fragment of a split paragraph ends in a justified, stretched line.
+    assert.deepEqual(spaces(p("split", justified, 0, "aaa bbb ccc"), ["split"], [p("split", justified, 0, "aaa bbb ccc", 9)]), [4, 4]);
+    assert.deepEqual(spaces(p("last", `${justified}; text-align-last: justify`, 0, "aaa bbb ccc") + p("q", OPSZ, 1), ["q"]), [0]);
+  });
+
+  it("samples no block with nested source blocks, whose last line may be a nested block's", () => {
+    // The nested paragraph's last line is justified (text-align-last), the wrapper's would not be.
+    assert.deepEqual(spaces(`<div data-bl-sid="w" data-test-box="20 20 200 40" style="${justified}">aaa bbb ` +
+      `<p data-bl-sid="n" data-test-box="20 40 200 20" data-test-space="9" style="${justified}; text-align-last: justify">ccc ddd eee</p></div>` +
+      p("q", OPSZ, 3), ["q"]), [0]);
+  });
+
+  it("samples no display: contents or inline record, whose last line may be any line of its container", () => {
+    // a9 and a2: the record's last line is a line of the justified container around it.
+    assert.deepEqual(spaces(`<div style="text-align: justify; text-align-last: justify"><p data-bl-sid="c" data-test-box="20 20 200 20" style="display: contents; ${OPSZ}; text-align-last: auto">aaa bbb ccc</p></div>` +
+      p("q", OPSZ, 1), ["q"]), [0]);
+    // Its own text-align is the container's, inherited: justify.
+    assert.deepEqual(spaces(`<div style="text-align: justify"><p data-bl-sid="i" data-test-box="20 20 200 20" data-test-space="9" style="display: inline; text-align: justify; ${OPSZ}">aaa bbb ccc</p></div>` +
+      p("q", OPSZ, 1), ["q"]), [0]);
+  });
+});
+
 describe("the captured natural-space measurement over a fake canvas", () => {
   type Deps = {
     loaded: (font: string) => boolean; context: () => unknown; setFont: (context: unknown, value: string) => void;

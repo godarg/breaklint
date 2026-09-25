@@ -28,7 +28,10 @@ split. Measured on patched Chromium 141 with Paged.js 0.4.3 and now pinned by
 nested block, passing over a float's, positioned box's or inline-block's lines beside it, and it is
 judged only when the fragment after opens with own text: a wrapper's own line that ends the page
 with a paragraph that moved whole after it is complete, not split. A `display: contents` or inline
-element whose lines no recorded block holds is declined as `env/invalid-measurement`.
+element whose lines no recorded block holds is declined as `env/invalid-measurement`. A line counts
+as the block's own when the collector saw the block's own text on it (`TextLine.ownText`), so text
+between two floats is still the block's. A custom element's splits are not judged (see
+[`layout/widow`](layout-widow.md)).
 
 ## Calibration
 

@@ -9,7 +9,7 @@ are deliberately not exported. Document renderer peers remain optional for scree
 | Contract | Version | Boundary |
 |---|---:|---|
 | Document report | 5 | Findings, positive/declined evaluations, artifact/source/evidence identity; readers accept 4 and 5 |
-| Measured snapshot | 5 | Internal geometry input with source/evaluation prerequisites; 5 adds the computed `display`, `float` and `position`, `marginCopies` and `boundaryHyphen` on each block |
+| Measured snapshot | 5 | Internal geometry input with source/evaluation prerequisites; 5 adds the computed `display`, `float` and `position`, `marginCopies` and `boundaryHyphen` on each block, and `ownText` on each line |
 | Configuration | 1 | Existing generated `breaklint/config.schema.json` |
 | Producer record | `studio-producer-record-v1` | Host-launched producer, FD 3, captured bytes |
 | Declared source manifest | 1 | Matching-byte declaration; never producer authority |

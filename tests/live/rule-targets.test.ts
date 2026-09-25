@@ -40,9 +40,15 @@ const REPO = fileURLToPath(new URL("../..", import.meta.url));
 const WRAPPER_FIXTURE = "tests/fixtures/wrapper-fragmentation.html";
 const SPACE_FIXTURE = "tests/fixtures/natural-space.html";
 const NESTED_FIXTURE = "tests/fixtures/nested-flow.html";
-/** The font variants of natural-space.html whose natural space must match their unjustified last line. */
-const VARIANTS = ["v-serif", "v-sans", "v-bold", "v-italic", "v-letter-spacing", "v-size", "v-small-caps", "v-condensed",
-  "v-zoom", "v-weight-only", "v-optical-size", "v-all-small-caps"];
+/** The canvas-measured font variants of natural-space.html, checked against their unjustified last line. */
+const CANVAS_VARIANTS = ["v-serif", "v-sans", "v-bold", "v-italic", "v-letter-spacing", "v-size", "v-small-caps", "v-condensed",
+  "v-zoom", "v-weight-only"];
+/**
+ * The layout-measured variants, each checked against an independent control: a one-line nowrap
+ * paragraph in the same font that no justification stretches and the layout measurement does not
+ * sample — never against the last line the measurement itself reads.
+ */
+const LAYOUT_VARIANTS: Record<string, string> = { "v-optical-size": "ctl-optical-size", "v-all-small-caps": "ctl-all-small-caps" };
 const optional = process.env.BREAKLINT_LIVE_OPTIONAL === "1";
 const missing = [
   resolveBrowser().path ? null : "a browser",
@@ -153,16 +159,22 @@ describe("rule targets on wrapped and justified blocks, live", () => {
     for (const gap of gaps) assert.ok(Math.abs(gap - natural.spaceWidth) <= 0.05, `last-line gap ${gap} against recorded ${natural.spaceWidth}`);
     // One font, one natural space — whatever the first rendered space of each block looked like.
     for (const id of ["hanging", "inline", "wide", "wrapped"]) assert.equal(only(snapshot, id).spaceWidth, natural.spaceWidth, id);
-    // And each pinned font variant, canvas-measured or layout-measured, against its own last line.
+    // And each pinned font variant: canvas-measured ones against their own unjustified last line,
+    // layout-measured ones against their independent control.
     const off: Record<string, number[]> = {};
-    for (const id of VARIANTS) {
-      const block = only(snapshot, id);
-      const words = linesOfBlock(snapshot, block.nodeKey).at(-1)?.wordBoxes ?? [];
+    const lastGaps = (id: string) => {
+      const words = linesOfBlock(snapshot, only(snapshot, id).nodeKey).at(-1)?.wordBoxes ?? [];
       assert.ok(words.length >= 3, `${id}: the last line does not carry several words`);
-      const deltas = words.slice(1).map((box, i) => Math.abs(box.x - (words[i]!.x + words[i]!.width) - block.spaceWidth));
+      return words.slice(1).map((box, i) => box.x - (words[i]!.x + words[i]!.width));
+    };
+    for (const [id, reference] of [...CANVAS_VARIANTS.map((id) => [id, id]), ...Object.entries(LAYOUT_VARIANTS)] as [string, string][]) {
+      const deltas = lastGaps(reference).map((gap) => Math.abs(gap - only(snapshot, id).spaceWidth));
       if (deltas.some((delta) => delta > 0.05)) off[id] = deltas;
     }
-    assert.deepEqual(off, {}, "natural space against the unjustified last line, per variant");
+    assert.deepEqual(off, {}, "natural space against its reference gaps, per variant");
+    // The paragraphs that would pollute the layout measurement if it sampled them (one with its own
+    // word-spacing, one ending in <code>) share its font and leave it unchanged.
+    assert.equal(only(snapshot, "v-optical-size-code").spaceWidth, only(snapshot, "v-optical-size").spaceWidth);
   });
 
   it("reports the real wide gap and neither the collapsed nor the stretched first space", (t) => {
@@ -183,9 +195,10 @@ describe("rule targets on wrapped and justified blocks, live", () => {
     const factors = report.findings.map((finding) => finding.measurement.value);
     for (const factor of factors) assert.ok(Math.abs(factor - Math.round(factor)) <= 0.05 && factor >= 6, `worst gap factor ${factor}`);
     assert.equal(factors[0], factors[1]);
-    // Eighteen justified records: four paragraphs, the wrapped one, the div (measured with no line of
-    // its own) and the twelve font variants — every one measured, none declined.
-    assert.deepEqual([report.coverage["type/excessive-word-spacing"]?.candidates, report.coverage["type/excessive-word-spacing"]?.measured], [18, 18]);
+    // Twenty-one justified candidates: four paragraphs, the wrapped one, the div (measured with no
+    // line of its own), the twelve font variants, the <code> paragraph and the two controls — every
+    // one measured, none declined. The paragraph with its own word-spacing is no candidate.
+    assert.deepEqual([report.coverage["type/excessive-word-spacing"]?.candidates, report.coverage["type/excessive-word-spacing"]?.measured], [21, 21]);
   });
   it("ends a block's own run only at an in-flow nested block, and judges an own run only where the break split it", (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
@@ -206,6 +219,9 @@ describe("rule targets on wrapped and justified blocks, live", () => {
     // the float's div split 5+6 and the inline-block's div 2+4; the sections split no run of theirs.
     assert.deepEqual([lines(initial, "layout/orphan", "float-beside", 0), lines(initial, "layout/widow", "float-beside", 1)], [5, 6]);
     assert.deepEqual([lines(initial, "layout/orphan", "inline-block-line", 0), lines(initial, "layout/widow", "inline-block-line", 1)], [2, 4]);
+    // Floats on both sides at the top of the continuation: the div's own text between them is on
+    // those lines, and the run is 3+4.
+    assert.deepEqual([lines(initial, "layout/orphan", "floats-both-top", 0), lines(initial, "layout/widow", "floats-both-top", 1)], [3, 4]);
     assert.deepEqual(initial.findings, [], "no split here violates the initial widows and orphans");
     // One extra line: the inline-block's div keeps two lines at the foot where three are asked for.
     const stricter = judge(1);
@@ -224,6 +240,10 @@ describe("rule targets on wrapped and justified blocks, live", () => {
     assert.ok(paragraph, "the em-hyphen paragraph did not split");
     assert.equal(paragraph.classList.includes("pagedjs_hyphen"), false, "premise: the mark is on the <em>, not the paragraph");
     assert.equal(paragraph.boundaryHyphen, true);
+    // An author's class on an <em> that holds no cut word, in a paragraph split at a space, is no mark.
+    const spoof = fragmentsOf(snapshot, "hyphen-spoof").find((fragment) => fragment.fragmentIndex === 0);
+    assert.ok(spoof, "the hyphen-spoof paragraph did not split");
+    assert.equal(spoof.boundaryHyphen, false);
     const report = runDocument(document, { failOn: "never", activeRules: [hyphenAcrossPage], optionsByRule: {}, coverageFloors: {} }).report;
     assert.deepEqual(report.findings.map((finding) => finding.target.nodeKey), [paragraph.nodeKey]);
   });

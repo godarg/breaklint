@@ -29,6 +29,9 @@ widow of the section around it, measured on patched Chromium 141 with Paged.js 0
 by `tests/live/rule-targets.test.ts`. The paragraph is the one judged, and a wrapper only for a
 break that splits text of its own:
 
+- A line is the block's own when the collector saw the block's own text on it (`TextLine.ownText`):
+  text whose nearest block container is this block. A line shared with a float on each side, the
+  block's text between them, is its own although the floats' boxes together span it.
 - The run opening the continuation ends at the first line of an in-flow nested block. The lines of
   a float, a positioned box or an inline-block beside the wrapper's text are passed over; they
   neither count nor end the run. Which is which comes from each block's recorded `display`, `float`
@@ -42,10 +45,13 @@ break that splits text of its own:
   directly in `<body>` — they belong to a container the snapshot does not record, and the element is
   declined as `env/invalid-measurement`, counted against coverage.
 
+- Only elements the snapshot records are judged: the block-level HTML elements a source map
+  addresses (`p`, `div`, `section`, `li`, `td`, ...). A custom element or a
+  `<span style="display: block">` is a block container nobody records: its own splits are not
+  judged, and its lines are not counted for the block around it either.
+
 The ground truth these rules were checked against is a probe of the same documents with plain
-Paged.js and Range rectangles. Its one known limit is listed at `lineOwnership` in
-`src/rules/shared.ts`: text of the wrapper's own between two nested blocks on one line is taken for
-theirs.
+Paged.js and Range rectangles.
 
 ## Calibration
 

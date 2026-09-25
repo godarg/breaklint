@@ -437,6 +437,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -450,6 +451,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -463,6 +465,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -476,6 +479,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -489,6 +493,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -502,6 +507,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -515,6 +521,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -528,6 +535,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -541,6 +549,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 120,
         "wordBoxes": null
       },
@@ -554,6 +563,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       },
@@ -567,6 +577,7 @@
           "height": 15.4
         },
         "visible": true,
+        "ownText": true,
         "width": 399,
         "wordBoxes": null
       }

@@ -106,9 +106,15 @@ function line(blockKey: string, index: number, width = 399): TextLine {
     index,
     box: box(48, 48 + index * 15.4, width, 15.4),
     visible: true,
+    ownText: true,
     width,
     wordBoxes: null,
   };
+}
+
+/** A wrapper's copy of a nested block's line: recorded under the wrapper, not its own text. */
+function nestedLine(blockKey: string, index: number): TextLine {
+  return { ...line(blockKey, index), ownText: false };
 }
 
 function run(blockKey: string, text: string, over: Partial<TextRun> = {}): TextRun {
@@ -326,10 +332,10 @@ export function loadCorpus(): CorpusEntry[] {
           block("inner2", { fragmentIndex: 1, fragmentCount: 2, page: 2, box: box(48, 48, 399, 15.4), effectiveStyle: style({ widows: 1 }) }),
         ],
         textLines: [
-          ...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => line("sec1", i)),
+          ...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => nestedLine("sec1", i)),
           line("lead", 0),
           ...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => line("inner1", i)),
-          line("sec2", 0),
+          nestedLine("sec2", 0),
           line("inner2", 0),
         ],
       }),
@@ -383,9 +389,9 @@ export function loadCorpus(): CorpusEntry[] {
           block("inner", { page: 2, box: box(48, 48, 399, 138.6) }),
         ],
         textLines: [
-          line("sec1", 0),
+          nestedLine("sec1", 0),
           line("intro", 0),
-          ...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => line("sec2", i)),
+          ...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => nestedLine("sec2", i)),
           ...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => line("inner", i)),
         ],
       }),
@@ -604,6 +610,7 @@ export function loadCorpus(): CorpusEntry[] {
             index: i * 18 + k,
             box: box(48, 48 + k * 32.27 + 8.13, 399, 16),
             visible: true,
+            ownText: true,
             width: 399,
             wordBoxes: null,
           })),

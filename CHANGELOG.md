@@ -56,11 +56,14 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   stamp, `TextLine.visible` is true when any text on the line is visible — read from each text
   node's element — where it used to copy the block's visibility, so a hidden block's visible
   descendant (`p { visibility: hidden } span { visibility: visible }`) counts as printed.
-  The same stamp adds three more required block fields, before any release: `BlockRecord.float`
-  and `BlockRecord.position` (the computed values), with which `layout/widow` and
-  `layout/orphan` tell a nested block in the flow from one beside the block's text, and
-  `BlockRecord.boundaryHyphen`, where Paged.js marked a boundary hyphen in the block's own inline
-  content. The invariants check all three, and the demo snapshot and the corpus carry them.
+  The same stamp adds four more required fields, before any release: `BlockRecord.float` and
+  `BlockRecord.position` (the computed values), with which `layout/widow` and `layout/orphan` tell
+  a nested block in the flow from one beside the block's text; `TextLine.ownText`, whether text
+  whose nearest block container is the record is on the line; and `BlockRecord.boundaryHyphen`,
+  where Paged.js marked a boundary hyphen in the block's own inline content. The invariants check
+  all four, the demo snapshot and the corpus carry them, and the engine refuses (exit 3) a stamp-5
+  snapshot that lacks any field stamp 5 requires, naming it, rather than judge it: a stamp-5
+  snapshot written before these fields would otherwise be read as having no own text at all.
 - **A zero box no longer decides how a block is judged; its computed display does.** A
   `display: contents` block has no box of its own but prints its text and children:
   `type/excessive-word-spacing` measures it from its lines (a justified `display: contents`
@@ -188,7 +191,14 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   moved whole to the next page was reported as a `layout/orphan` for the one line its first
   fragment held — the intro paragraph's; the unwrapped controls reported neither. Both rules now
   count the run of the block's own container's lines next to the break:
-  - a line belongs to the latest block container in collection order that records it; a
+  - a line is a block's own when the collector saw text on it whose nearest block container is
+    that block (`TextLine.ownText`), so a line shared with a float on each side, the block's text
+    between them, is its own although the floats' boxes span it — a geometric version of this
+    test reported a false widow at the default values for floats at the top of a page; a
+    block container the snapshot does not record (a custom element) owns its own text, so its
+    splits are not judged and the block around it is not judged on those lines;
+  - a line nobody owns that way belongs to the latest block container in collection order that
+    records it; a
     `display: contents` or inline record never takes a line from the block around it, and one whose
     lines no recorded block holds is declined as `env/invalid-measurement` (newly declared by both
     rules, counted against coverage) instead of being judged by its own value;
@@ -207,8 +217,9 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   reported once, on the paragraph; a wrapper's own text split by the break is still judged, and a
   section whose own two-line text split 1+1 below a nested paragraph is now an orphan too, which
   the old count missed. For a block without nested blocks nothing changes. Checked against a
-  ground-truth probe (plain Paged.js and Range rectangles) on 24 layouts at two thresholds, all 48
-  judgements agreeing. On the first-party robustness document (`dargel-kleingewerbe`) all three
+  ground-truth probe (plain Paged.js and Range rectangles) at four thresholds: on 24 layouts all 96
+  judgements agree, and on a second set of 19 layouts 70 of 76, the six others being splits inside
+  the two custom-element layouts that no rule sees. On the first-party robustness document (`dargel-kleingewerbe`) all three
   `layout/orphan` findings and the one `layout/widow` finding were wrappers and are gone. Consumers
   see wrapper fragments measured with 0 lines where they carried findings, the applicability
   measurement false where the other side does not continue the run, and two informational
@@ -231,16 +242,26 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   - where a canvas cannot reproduce the font — `font-variation-settings` other than a `wght` equal to
     the computed weight, `font-size-adjust`, a non-keyword `font-stretch`, synthesised caps other
     than `small-caps` (`all-small-caps` read 46 % too wide from the canvas), a font not yet loaded —
-    the median gap on the unjustified last lines of justified blocks in exactly the same font. A
+    the rendered layout. Pooled over the document per layout key (font, caps, `letter-spacing`,
+    `word-spacing`, variation settings, `font-size-adjust`, `font-kerning`, zoom), the samples are
+    gaps between two consecutive words of one text node whose element computes that key, separated
+    by collapsible whitespace only, on the last line of the last fragment of a justified block
+    that is its own block container, has no nested source block and whose `text-align-last` does
+    not justify that line; the median is taken only when every sample lies within 0.1 px or 3 % of
+    it. A first version sampled every gap on such last lines: one paragraph set with
+    `word-spacing: 1em`, a `<code>` run or a `display: contents` paragraph under
+    `text-align-last: justify` could move the median and hide a real 6.41× gap. A
     first version declined all such blocks: a justified document setting `"wght" 400` or
     `"opsz" 11` on a font without those axes ended exit 4 with 0 of 12 blocks measured; it measures
     12 of 12 now, with the factors of the same document without the setting;
-  - 0 when neither exists. The rule then declines the block as `env/invalid-measurement` (newly
+  - 0 when neither exists or the samples disagree. The rule then declines the block as
+    `env/invalid-measurement` (newly
     declared), counted against coverage: a document in which more than half of the justified
     blocks decline falls below the 0.5 floor and ends `insufficient-coverage` (exit 4). It used to
     divide by a third of the font size.
-  Twelve font settings are pinned against their unjustified last lines (within 0.03 px on patched
-  Chromium 141, default fonts; no web font). Gaps inside an inline element with its own
+  Twelve font settings are pinned (within 0.05 px, measured within 0.03 px on patched Chromium 141,
+  default fonts; no web font): the ten canvas-measured ones against their unjustified last lines,
+  the two layout-measured ones against an independent one-line control each. Gaps inside an inline element with its own
   `word-spacing` are no longer judged (they are one unit in the word boxes), which removes a false
   finding; gaps set in an inline element in another font or size are still measured against the
   block's space (documented). Expect more findings on justified documents whose first spaces were
@@ -261,8 +282,11 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `pagedjs_hyphen` on the parent of the text node it cut; for a word cut inside `<em>`, `<a>` or
   `<span>` that is the inline element, and the rule, reading the block's own classes, missed it
   (patched Chromium 141: the same split reported without `<em>`, silent with it). The collector now
-  records `boundaryHyphen` per block — the mark on the block or on an inline element whose nearest
-  source block it is (Snapshot 5) — and the rule reads that. A wrapper further out does not carry it.
+  records `boundaryHyphen` per block (Snapshot 5) and the rule reads that: the fragment's last text
+  node ends in the glyph Paged.js appends (U+2011) and the element holding it, or one between it and
+  the block, carries the class; the mark belongs to the nearest source block, and a wrapper further
+  out does not carry it. An author's `pagedjs_hyphen` class on an element that holds no cut word is
+  no longer read as a boundary hyphen.
 
 ### Added
 

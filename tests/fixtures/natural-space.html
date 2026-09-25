@@ -26,12 +26,20 @@
   serif, sans-serif, bold, italic, 2px letter-spacing, 13.5px, small caps, condensed, zoom 1.25, a
   variation setting that only restates the weight (measured by the canvas), and two a canvas cannot
   reproduce and that are measured from the layout instead: an optical-size axis and all-small-caps.
+  Those two are checked against an independent control each (class "ctl"), not against their own
+  last line, which is what the layout measurement reads. Two more paragraphs in the optical-size
+  font would pollute the layout measurement if it sampled them: one set with word-spacing on
+  purpose, one whose last line is <code> in another font.
 -->
 <html lang="en"><head><meta charset="utf-8"><title>natural space</title><style>
 @page { size: 400px 300px; margin: 40px; }
 body { margin: 0; font-family: serif; font-size: 12px; line-height: 20px; }
 p { margin: 0 0 20px; font-family: monospace; font-size: 12px; width: 17ch; text-align: justify; }
 p.v { width: 30ch; break-inside: avoid; margin: 0 0 6px; line-height: 18px; }
+/* An independent control for the two layout-measured variants: one line that cannot wrap, wider
+   than its box, whose gaps no justification stretches; text-align-last: justify keeps it out of the
+   layout samples it is there to check. */
+p.ctl { width: 5ch; white-space: nowrap; text-align-last: justify; margin: 0 0 6px; line-height: 18px; }
 </style></head><body>
 <p id="hanging">aaaaaaaaaaaaaaa bbbbbbbbbbbbbbb cccc dddd eeeeee ffff</p>
 <p id="inline">aaaa aaaa aaaaaa bbbbbbbbbbbbbbb cccc dddd eeeeee ffff</p>
@@ -50,4 +58,8 @@ p.v { width: 30ch; break-inside: avoid; margin: 0 0 6px; line-height: 18px; }
 <p class="v" id="v-weight-only" style="font-family: serif; font-variation-settings: 'wght' 400">alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi</p>
 <p class="v" id="v-optical-size" style="font-family: serif; font-variation-settings: 'opsz' 12">alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi</p>
 <p class="v" id="v-all-small-caps" style="font-family: serif; font-variant-caps: all-small-caps">alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi</p>
+<p class="v" id="v-optical-size-spaced" style="font-family: serif; font-variation-settings: 'opsz' 12; word-spacing: 12px">alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi</p>
+<p class="v" id="v-optical-size-code" style="font-family: serif; font-variation-settings: 'opsz' 12">alpha beta gamma delta epsilon zeta eta theta iota kappa lambda <code>mu nu</code></p>
+<p class="ctl" id="ctl-optical-size" style="font-family: serif; font-variation-settings: 'opsz' 12">alpha beta gamma delta epsilon</p>
+<p class="ctl" id="ctl-all-small-caps" style="font-family: serif; font-variant-caps: all-small-caps">alpha beta gamma delta epsilon</p>
 </body></html>

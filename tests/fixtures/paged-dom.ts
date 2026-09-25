@@ -273,7 +273,18 @@ export function fakePrimitives(document: FakeNode, hooks: {
       if (box.width <= 0 || box.height <= 0) return [];
       // A sub-range is 4 px per character from the start of the text, on the one line: so the words
       // of a text node lie 4 px apart per space between them, which is its "rendered" space.
-      if (typeof start === "number" && typeof end === "number") return [rect(box.x + 4 * start, box.y, 4 * (end - start), box.height)];
+      // A parent's `data-test-space` sets the width of a whitespace character (a "rendered space"
+      // of another width: stretched, collapsed, or set by another font) for the tests that need it.
+      if (typeof start === "number" && typeof end === "number") {
+        const space = Number(parent.attributes.get("data-test-space") ?? 4);
+        const text = node.data ?? "";
+        const advance = (from: number, to: number) => {
+          let width = 0;
+          for (let at = from; at < to; at += 1) width += /\s/u.test(text[at] ?? "") ? space : 4;
+          return width;
+        };
+        return [rect(box.x + advance(0, start), box.y, advance(start, end), box.height)];
+      }
       return [box];
     },
     painted: () => true,

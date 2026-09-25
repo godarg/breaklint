@@ -17,6 +17,11 @@
       a new run — no finding;
     - em-hyphen: a page split inside a word set in <em>; Paged.js marks the <em>, and the finding
       belongs to the paragraph.
+    - floats-both-top: floats on both sides at the top of the continuation, the <div>'s own text
+      between them. The floats' line boxes span the div's line; its own text is still on it, and
+      the run is 3+4 — no finding at the initial values;
+    - hyphen-spoof: an author's pagedjs_hyphen class on an <em> that holds no cut word, in a
+      paragraph split at a space — no boundary hyphen.
   data-t names each owner of text for the ground-truth probe. Monospace at a fixed 12px/20px, so
   every split is decided by line counts.
 -->
@@ -41,4 +46,8 @@ own line
 <p data-t="B4">b1<br>b2<br>b3</p></section></div>
 <div class="case" id="case-em-hyphen"><p data-t="L5">label</p><div data-t="sp5" style="height:130px"></div>
 <p data-t="E5" id="em-hyphen" style="width: 23ch; widows: 1; orphans: 1">aaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbb cccccccccc <em>dddddddd&shy;eeeeeeeeee</em> fffffffffffffffffff ggggggggggggggggggg</p></div>
+<div class="case" id="case-floats-both-top"><div data-t="sp6" style="height:160px"></div>
+<div data-t="W6" id="floats-both-top">w1<br>w2<br>w3<br><div data-t="FL6" style="float: left; width: 60px">l1<br>l2<br>l3</div><div data-t="FR6" style="float: right; width: 60px">r1<br>r2<br>r3</div>x1<br>x2<br>x3<br>x4</div></div>
+<div class="case" id="case-hyphen-spoof"><p data-t="L7">label</p><div data-t="sp7" style="height:130px"></div>
+<p data-t="E7" id="hyphen-spoof" style="width: 23ch; widows: 1; orphans: 1">aaaaaaaaaaaaaaaaaaa <em class="pagedjs_hyphen">bbbbbbbbbbbbbbbbbbb</em> cccccccccc dddddddd eeeeeeeeee fffffffffffffffffff ggggggggggggggggggg</p></div>
 </body></html>

@@ -137,7 +137,7 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
   }
 
   // The rules read fields the snapshot stamp names (Snapshot 5: `BlockRecord.display`,
-  // `marginCopies`, `float`, `position` and `boundaryHyphen`). A snapshot of another stamp has another shape, and a rule reading an absent
+  // `marginCopies`, `float`, `position`, `boundaryHyphen` and `TextLine.ownText`). A snapshot of another stamp has another shape, and a rule reading an absent
   // field does not fail, it misjudges: an undefined `display` is not "contents", so every box-less
   // block would pass as unrendered. Such a snapshot is refused, not judged.
   const stampMatches = snapshot.schemaVersion === SNAPSHOT_SCHEMA_VERSION;
@@ -148,7 +148,19 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
       measured: { stage: "snapshot-schema", schemaVersion: snapshot.schemaVersion ?? null, expected: SNAPSHOT_SCHEMA_VERSION },
     });
   }
-  for (const rule of stampMatches ? config.activeRules : []) {
+  // The stamp alone is not the shape. Snapshot 5 grew required fields before its release (the
+  // flow facts, the boundary-hyphen mark, a line's own-text flag), and a stamp-5 snapshot written
+  // before them would be read as "float undefined, no own text": every wrapper silent, every
+  // hyphen missed. A snapshot that lacks a field its stamp requires is refused, not judged.
+  const missingFields = stampMatches ? missingSnapshotFields(snapshot) : [];
+  if (missingFields.length > 0) {
+    infrastructure.push({
+      kind: "checker-crashed",
+      detail: `the measurement snapshot is schema ${SNAPSHOT_SCHEMA_VERSION} but lacks required fields: ${missingFields.join(", ")}`,
+      measured: { stage: "snapshot-schema", schemaVersion: snapshot.schemaVersion ?? null, expected: SNAPSHOT_SCHEMA_VERSION },
+    });
+  }
+  for (const rule of stampMatches && missingFields.length === 0 ? config.activeRules : []) {
     let result;
     try {
       result = rule.run(snapshot, {
@@ -431,4 +443,26 @@ export function aggregateVerdict(documentVerdicts: readonly RunVerdict[], inputs
 
 export function exitCodeFor(verdict: RunVerdict): 0 | 1 | 2 | 3 | 4 {
   return EXIT_CODE_BY_VERDICT[verdict];
+}
+
+/**
+ * The Snapshot 5 fields a rule reads without which it would misjudge rather than fail, named once
+ * each: `BlockRecord.display`, `marginCopies`, `float`, `position`, `boundaryHyphen` and
+ * `TextLine.ownText`. The full invariants are `validateSnapshotInvariants` on the live path; this is
+ * the check every snapshot the engine judges passes, stored ones included.
+ */
+export function missingSnapshotFields(snapshot: Snapshot): string[] {
+  const missing = new Set<string>();
+  for (const block of snapshot.blocks ?? []) {
+    const b = block as unknown as Record<string, unknown>;
+    if (typeof b.display !== "string" || b.display === "") missing.add("BlockRecord.display");
+    if (!Number.isSafeInteger(b.marginCopies)) missing.add("BlockRecord.marginCopies");
+    if (typeof b.float !== "string" || b.float === "") missing.add("BlockRecord.float");
+    if (typeof b.position !== "string" || b.position === "") missing.add("BlockRecord.position");
+    if (typeof b.boundaryHyphen !== "boolean") missing.add("BlockRecord.boundaryHyphen");
+  }
+  for (const line of snapshot.textLines ?? []) {
+    if (typeof (line as unknown as Record<string, unknown>).ownText !== "boolean") missing.add("TextLine.ownText");
+  }
+  return [...missing].sort();
 }

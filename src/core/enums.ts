@@ -312,8 +312,8 @@ export const REPORT_SCHEMA_VERSION = 5;
 export const READABLE_REPORT_SCHEMA_VERSIONS: readonly number[] = [4, 5];
 /**
  * The measurement snapshot's own shape. 5 adds the required `BlockRecord.display`,
- * `BlockRecord.marginCopies`, `BlockRecord.float`, `BlockRecord.position` and
- * `BlockRecord.boundaryHyphen`. There is no reader for 4: a stored snapshot is only ever the demo's,
+ * `BlockRecord.marginCopies`, `BlockRecord.float`, `BlockRecord.position`,
+ * `BlockRecord.boundaryHyphen` and `TextLine.ownText`. There is no reader for 4: a stored snapshot is only ever the demo's,
  * migrated with this stamp, and the engine refuses a snapshot of any other stamp.
  */
 export const SNAPSHOT_SCHEMA_VERSION = 5;

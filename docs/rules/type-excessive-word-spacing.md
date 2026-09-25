@@ -25,12 +25,25 @@ six-space gap by itself, so a block with gaps of six and seven spaces was clean.
 `tests/live/rule-targets.test.ts`, against blocks whose unjustified last line shows the natural
 space, in twelve font settings.
 
-A font a canvas cannot reproduce is measured from the layout instead: the median gap on the
-unjustified last lines of justified blocks set in exactly the same font. That covers
+A font a canvas cannot reproduce is measured from the layout instead. That covers
 `font-variation-settings` other than a `wght` that restates the computed weight, `font-size-adjust`,
 a `font-stretch` that is not a keyword, synthesised caps other than `small-caps` (`all-small-caps`
 shrinks the space with the letters: the canvas read 46 % too wide) and a font not loaded when
-measured.
+measured. Exactly what is sampled, pooled over the whole document per layout key — font, caps,
+`letter-spacing`, `word-spacing`, variation settings, `font-size-adjust`, `font-kerning` and zoom:
+
+- only the last line of the last fragment of a justified block that is its own block container
+  (not `display: contents` or inline, whose last line can be any line of the container around it),
+  has no nested source block, and whose `text-align-last` does not justify that line;
+- only a gap between two consecutive words of ONE text node whose own element computes the
+  block's layout key — so no `<code>`, `<em>` or spaced `<span>` contributes — and separated by
+  collapsible whitespace only (no `&nbsp;`, no space kept by `white-space: pre-wrap`);
+- only a gap wider than zero.
+
+The natural space is the median of those gaps, and only when every gap lies within 0.1 px or 3 %
+of it, whichever is larger; samples that disagree are not one natural space, and the block is
+declined. The two layout-measured settings in the live pin are checked against an independent
+one-line control that nothing stretches, not against the lines the measurement reads.
 
 Word boxes are held for every line of every justified block; an earlier version limited them to a window around page boundaries, which contradicted the rule that needs them. Keeping them all costs a measured 4 221 bytes per page — about 8 MiB over 2 000 pages.
 
@@ -38,9 +51,9 @@ Word boxes are held for every line of every justified block; an earlier version 
 
 Blocks with an explicit `word-spacing` are out: the width is a stated intention. Table cells are out: a justified cell has no room to do better.
 
-A block whose natural space neither the canvas nor the layout gives — such a font with no justified
-block anywhere in the document whose last line carries two words, or whose last lines are justified
-too (`text-align-last: justify`) — is declined as `env/invalid-measurement`, counted against
+A block whose natural space neither the canvas nor the layout gives — such a font with no sample
+anywhere in the document, for instance because every such block ends in a one-word line or sets
+`text-align-last: justify`, or with samples that disagree — is declined as `env/invalid-measurement`, counted against
 coverage. That is the exit-4 consequence: where more than half of a document's justified blocks
 are declined, the rule falls below its 0.5 coverage floor and the run ends
 `insufficient-coverage` (exit 4) instead of clean. It used to divide by a third of the font size.
