@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Writes (or, with `--check`, verifies) the generated remediation block of every rule page.
+ * Writes (or, with `--check`, verifies) the generated remediation block of every rule page: the
+ * rule's advice and, for a rule that declares `remediation.interactions`, its precedence lines.
  *
  * The rule is the source, because it is the one under contract: `Finding.remediation` in report
  * schema 5 carries exactly this text to every consumer. A page may add context AROUND the block;
