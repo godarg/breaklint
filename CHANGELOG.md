@@ -32,8 +32,11 @@ that did not change, and those changes come first.
   a page whose first block is `display: none`, that used to be the same clone on every page, so
   several page findings shared one fingerprint; for a document wrapped in `<main>`, `<article>`,
   `<section>` or a long `<div>`, it was the wrapper on every page it covered. A page is now
-  anchored to the first visible in-flow block that starts on it, and only a page on which nothing
-  starts falls back to its first continuing block. Old page findings will read as gone and the
+  anchored to the first block of its content area that starts on it, skipping only blocks nothing
+  was printed from — a running element's `display: none` original, another `display: none` block,
+  or a box-less block whose recorded lines are all invisible; a block with a box anchors even when
+  it is `visibility: hidden`. Margin-box clones are not in the snapshot at all. Only a page on
+  which nothing starts falls back to its first continuing block. Old page findings will read as gone and the
   re-keyed ones as new in anything that keys on `Finding.fingerprint` or SARIF
   `properties.fingerprint`. `compareReports` does not match page findings by fingerprint and is
   not misled.
@@ -59,7 +62,9 @@ that did not change, and those changes come first.
   see new ones:
   - `layout/orphaned-continuation-page`: "Page N carries only content continued from an earlier
     page, which ends there, and its net fill is X %"; its evaluations carry a third measurement,
-    `ends-on-page`.
+    `ends-on-page`, **inserted at index 1**: `continuation-only` stays at index 0 and `net-fill`
+    moves from index 1 to index 2. A consumer that reads the measurements by position must read
+    them by `name`.
   - `layout/half-empty-page`: the message no longer states a "measured ceiling"; it says that net
     fill sums the glyph boxes of text, not its line boxes, so a page a reader calls full can read
     below the threshold.
@@ -354,7 +359,25 @@ that did not change, and those changes come first.
   evidence (exit 4 under evidence binding), that naming an off-by-default rule with only an options
   object enables it, what page fill counts, and the new margin-box and break-cause limits above.
 - `CONTRIBUTING.md` carries the complete local gate in `ci.yml`'s order, and `docs/releasing.md` is
-  version-neutral and complete.
+  version-neutral and complete, with the release as seven numbered steps and the human
+  report-surface review as a precondition of the tag.
+- **The security statements no longer overclaim.** `SECURITY.md`, the README and
+  `docs/limitations.md` said the network is blocked by default and that nothing about a document
+  leaves the machine, and that no flag turns the sandbox off. The offline policy is request
+  interception: it does not cover WebSocket, WebTransport or WebRTC connections a document opens,
+  nor the browser's own secure DNS and component updater traffic (measured on 0.7.0: a WebSocket to
+  another loopback port delivered, a WebRTC STUN request sent, verdict `clean`). And the
+  environment can turn the sandbox off: puppeteer-core adds `--no-sandbox` for
+  `PUPPETEER_DANGEROUS_NO_SANDBOX=true` and honours `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES`,
+  and the browser inherits variables such as `CHROME_EXTRA_FLAGS`. The documents now say so, tell
+  operators to keep those variables unset, and recommend a container or network namespace with no
+  egress for untrusted documents. Nothing in the code changed.
+- `docs/limitations.md` lists two known false-clean defects this release does not fix:
+  `body { column-count: 1 }` can end `clean` (exit 0) over a PDF missing most of the document, and
+  a `display: contents` heading split by a page break can lose its continuation at exit 0. Its
+  0.7.0 limits now have a section of their own instead of standing under the 0.6.0 heading.
+- The README's film poster is loaded from the `v0.7.0` tag instead of `main`, so the published
+  README shows the image it was released with.
 
 ### Tooling
 
@@ -396,7 +419,7 @@ These change how this repository is checked and released, not what the package d
   ordered in time and a review time in the future is refused; the render manifest declares the
   review environment (schema 4 → 5, artifact contract 3 → 4); the technical gate accepts any
   Chromium-based browser; and the verifier re-measures the print checks independently and proves
-  its own checks with red controls on broken copies of real evidence. `npm run test:report-surfaces`, the human gate, stays red on
+  its own checks with red controls on broken copies of real evidence. <!-- review-state --> `npm run test:report-surfaces`, the human gate, stays red on
   the recorded 2026-09-18 FAIL until a rostered human passes a new round.
 - **The live late-mutation test no longer depends on when a timer fires;** it requires what the
   product guarantees — an event, or neither the measured snapshot nor the delivered PDF carrying

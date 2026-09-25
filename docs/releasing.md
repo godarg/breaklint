@@ -63,6 +63,44 @@ workflow passes it as `NODE_AUTH_TOKEN` only to the publish step.
 
 ## Before creating the tag
 
+A release is these seven steps, in this order, each on the commit the step before it produced.
+None is skipped and none is reordered.
+
+1. **Merge the release-preparation pull request into `main`** (for 0.7.0: godarg/breaklint#18),
+   without rewriting history. Its commit carries `## X.Y.Z — TBD-at-tag` and must already satisfy
+   the checks under *Before step 7, also verify* below.
+2. **On that exact merge commit, a rostered human reviews the report surfaces.** One of `@Brand`,
+   `@Neo` or `@Founder` follows `docs/reporting.md`, *Review package*, steps 1–4: `npm ci`,
+   `npm run test:report-surfaces:technical`, the review itself, and ONE new round appended to
+   `tests/golden/report-surfaces/review-ledger.json` (for 0.7.0, round 3). Then
+   `npm run test:report-surfaces:local` must pass. Only a genuine passing human review turns this
+   gate green; there is no documented override and no dropping the gate (the owner's decision for
+   0.7.0). A `fail` or `pending` round is recorded as what it is, and the release stops here.
+   **From this step on, nothing under `REVIEW_INPUT_ROOTS` in
+   `tests/tools/report-surface-contract.mjs` may change** — among them `package.json`,
+   `package-lock.json`, `ci.yml`, `src/config`, `src/core`, `src/report`, `src/rules` and the four
+   surface tools. Any such change unbinds the review and sends the release back to this step.
+3. **The reviewer commits the ledger, and in the same commit updates every sentence marked
+   `<!-- review-state -->`.** Those sentences describe the gate's state as of the release
+   preparation, and a passing round makes them out of date:
+   - `README.md`, the paragraph on what is verified about the HTML report's surfaces;
+   - `docs/status.md`, the release record's *exact-environment human gate* paragraph and the
+     sentence on the strict local gate in the 0.6.0 section's surface figures;
+   - `docs/releasing.md`, the paragraph on the report-surface gate for the release in preparation
+     (under *The local gate*, below);
+   - `CHANGELOG.md`, the sentence on `npm run test:report-surfaces` under *Tooling*.
+
+   Whoever reviews that commit checks who made it and that its cells name the artifacts actually
+   rendered (see "What the roster check does not do" in `docs/reporting.md`).
+4. **`ci.yml` is green on `main` at the ledger commit**, and the local gate below passes on it.
+5. **Date the changelog:** replace `TBD-at-tag` with the release date, `## X.Y.Z — YYYY-MM-DD`, in
+   a final commit on `main` that changes nothing else. `CHANGELOG.md` is not a review input, so
+   the review stays bound.
+6. **`ci.yml` is green again, on exactly that dated commit.**
+7. **Create and push the annotated tag on that commit and no other** (see *Publishing*).
+
+### The local gate
+
 Run from a clean checkout on Node 24 with all live prerequisites present — Chrome, poppler's
 `pdftoppm`, python3 with `fontTools`, gitleaks 8.30.1 on `PATH` and network access — in this order,
 which is the order `.github/workflows/ci.yml` runs them in (`tests/unit/workflow-gates.test.ts` fails
@@ -132,9 +170,10 @@ authenticate a person. Whether a rostered human really reviewed rests on reposit
 and on reviewing the ledger diff before it merges — check who committed it and that the round's
 cells name the artifacts actually rendered — not on this gate.
 
-The ledger is bound to the 0.2.3 input fingerprint from 2026-08-29. It was therefore red for
-0.3.0, 0.3.1, 0.4.0 and 0.5.0 without anyone noticing, because CI runs the technical mode, which
-skips the comparison by design. A gate nobody reads is a gate that rots.
+Until the 2026-09-18 review the ledger was bound only to the 0.2.3 input fingerprint from
+2026-08-29. It was therefore red for 0.3.0, 0.3.1, 0.4.0 and 0.5.0 without anyone noticing,
+because CI runs the technical mode, which skips the comparison by design. A gate nobody reads is a
+gate that rots.
 
 **For 0.6.0 the review was actually carried out, on 2026-09-18, and it did not pass.** Two reviewers
 looked at the current surfaces — the rendered screens across four report states, two themes and
@@ -162,14 +201,16 @@ the same run in which it produced eight findings would remove the one assertion 
 proved its worth. It is recorded here as an override of a stop condition, not as a variant of
 meeting it.
 
-For the next release the choice is the original two, and it has to be made before the tag: either a
-review that passes and rebinds the ledger, or a documented decision to drop the gate and the
-paragraph above with it. `npm run test:report-surfaces`
-stays red for 0.6.0 — but it is now red with a date, two reviewers (whose handles this record does
-not name, so the ledger records them as `not-recorded`), an enumerated finding list and an owner,
-instead of red and unread. The findings and their addressees are carried in the
-release's follow-up register; they are surface work, and they are not repaired in a release that
-already changes what the rules report.
+For 0.6.0 `npm run test:report-surfaces` stayed red — but red with a date, two reviewers (whose
+handles this record does not name, so the ledger records them as `not-recorded`), an enumerated
+finding list and an owner, instead of red and unread. The findings and their addressees were
+carried in that release's follow-up register.
+
+<!-- review-state -->
+**For 0.7.0 the owner decided that only a genuine human review passes this gate.** The 0.6.0
+override is not repeated, and dropping the gate is not an option: step 2 above is a precondition
+of the tag. At the release-preparation commit the latest ledger round is still the 2026-09-18 FAIL
+and the gate is red; the ledger commit of step 3 replaces this sentence with the round it adds.
 
 The green real-document gate reads the rights/privacy-reviewed corpus manifest and binds exact
 artifact hashes, source evidence, page/rule counts and the positive independent geometry-oracle
@@ -205,7 +246,7 @@ step because it compiles a second tree. Without an artifact root it skips the co
 and refuses to pass with zero cases, so its green result is a statement about the public fixture
 only.
 
-Then verify:
+### Before step 7, also verify
 
 - `.github/workflows/release.yml` is pinned to this tag. The trigger is the literal
   `tags: ["vX.Y.Z"]`, not a wildcard — a wildcard would let any `v*` tag publish — and it is the
@@ -235,19 +276,16 @@ Then verify:
 - README, security policy, status and limitations make no future-tense success claim;
 - `git diff --check` is clean;
 - an independent verifier has no open Blocker/High finding;
+- `npm run test:report-surfaces:local` passes on the commit to be tagged (step 2), and nothing under
+  `REVIEW_INPUT_ROOTS` changed since the reviewed commit;
 - the exact pushed main SHA has a successful `ci.yml` run.
 
 ## Publishing
 
 The release-prep commit carries the heading `## X.Y.Z — TBD-at-tag`, because the release date is
-not known when it is written. Before tagging:
-
-1. replace `TBD-at-tag` with the date, `## X.Y.Z — YYYY-MM-DD`, in a final commit on main — the
-   only change in that commit;
-2. let `ci.yml` go green on exactly that commit;
-3. tag that commit, and no other.
-
-Create and push the annotated tag only after main CI is green on the dated commit:
+not known when it is written. Steps 5 to 7 of *Before creating the tag* date it, let CI go green
+on exactly the dated commit, and tag that commit and no other. Create and push the annotated tag
+only then:
 
 ```bash
 git tag -a vX.Y.Z -m "breaklint X.Y.Z"

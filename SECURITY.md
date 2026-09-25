@@ -17,20 +17,37 @@ There is no bounty programme.
 engineered away — it is the job. Whether a page works can only be decided after the renderer and
 the paginator have run, and both run the document's own code.
 
-What the tool does about it, and each of these is checked in the test suite rather than merely
-intended:
+What the tool does about it — each of these is checked in the test suite rather than merely
+intended, and each says what it does not cover:
 
 - **A fresh browser profile per run**, created with `mkdtemp` and removed afterwards. A run that
   cannot verify its own cleanup fails rather than reporting success.
-- **The browser sandbox stays on.** The one browser launch in `src/acquire/browser.ts` passes no
-  switch at all (`args: []`), no code path, tool, test or workflow passes `--no-sandbox` or any
-  other sandbox-disabling switch, and there is no flag that turns the sandbox off.
+- **breaklint never asks for the sandbox to be off — but the environment it runs in can.** The one
+  browser launch in `src/acquire/browser.ts` passes no switch at all (`args: []`), no code path,
+  tool, test or workflow of this repository passes `--no-sandbox` or any other sandbox-disabling
+  switch, and breaklint has no option or flag that turns the sandbox off.
   `tests/unit/sandbox-boundary.test.ts` holds both: it reads that launch call with the TypeScript
   parser and allows only named options that cannot touch the sandbox, with `args: []`, and it scans
-  `src/`, `tools/`, `tests/` and the workflows for the switches.
-- **The network is blocked by default.** Request interception is on, the default policy is
-  `offline`, and only the tool's own loopback origin plus `data:`, `blob:` and `about:` are let
-  through. `--allow-network <origin>` opens exactly one origin per use and nothing else.
+  `src/`, `tools/`, `tests/` and the workflows for the switches. What that test cannot see is the
+  process environment, which breaklint does not clear. The browser driver, puppeteer-core, reads
+  variables of its own: it adds `--no-sandbox` when `PUPPETEER_DANGEROUS_NO_SANDBOX=true`, and it
+  enables experimental Chrome features when `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES=true`. The
+  browser also inherits the whole environment, so a variable that a browser build or its wrapper
+  script reads as extra switches can reach it too; `CHROME_EXTRA_FLAGS` was reported to do so in
+  this project's own verification and is not ruled out. **Make sure `PUPPETEER_DANGEROUS_NO_SANDBOX`,
+  `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` and `CHROME_EXTRA_FLAGS` are unset** in the
+  environment that runs breaklint, CI included.
+- **The page's requests are intercepted, and the default policy is `offline`.** Request
+  interception is on, and only the tool's own loopback origin plus `data:`, `blob:` and `about:`
+  are let through; `--allow-network <origin>` lets one more origin through per use. **This is not
+  a network block.** Interception sees the requests the browser routes through it and nothing
+  else. Not covered, in the default mode or with `--allow-network`: WebSocket, WebTransport and
+  WebRTC connections a document opens, and the browser's own traffic — secure DNS (DNS over HTTPS)
+  and the component updater. Measured on 0.7.0 in the default offline mode with a self-authored
+  document: a WebSocket to a loopback port that was not the tool's was delivered, a WebRTC STUN
+  request was sent, and the run came back `clean`. **For a document you do not trust, run
+  breaklint in a container or network namespace with no egress;** that, not this policy, is what
+  keeps data on the machine.
 - **No browser-wide file-access switch.** The document is served from a loopback origin instead. A
   test measures that a document loaded this way cannot read a neighbouring file, because removing
   the reason for a switch and leaving the switch in place is a mistake that was actually made here
@@ -44,12 +61,16 @@ intended:
   crosses the browser-driver boundary only after authored loading. breaklint does not disable CSP
   browser-wide merely to install its own apparatus; its own CSP-bearing HTML report is the live
   regression for that boundary.
-- **No model, no network client, no telemetry.** The only runtime dependency is an HTML parser.
-  Nothing is uploaded, and nothing about your documents leaves the machine.
+- **No model, no network client, no telemetry in breaklint itself.** The only runtime dependency
+  is an HTML parser, and breaklint uploads nothing. That is a statement about breaklint's own code,
+  not about the document it runs: a document's scripts can still reach the network through the
+  channels named above unless the machine denies egress.
 
 **What this is not.** None of the above is protection against a determined attack on the browser
-sandbox itself. For untrusted third-party HTML, run this in a container, the same way you would run
-any other tool that executes code you did not write.
+sandbox itself, and the request policy above is not an egress control. For untrusted third-party
+HTML, run this in a container or network namespace with no network egress and with the variables
+named above unset, the same way you would run any other tool that executes code you did not
+write.
 
 ## Dependency-hygiene exception: Paged.js 0.4.3
 
