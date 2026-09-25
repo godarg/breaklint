@@ -1,7 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
-import { SNAPSHOT_ROUNDING_PX } from "../../core/enums.ts";
-import { overshootBeyond } from "../../measure/svg-viewport.ts";
+import { SVG_OVERSHOOT_EPSILON_PX, overshootBeyond } from "../../measure/svg-viewport.ts";
 
 /**
  * svg/text-overflows-viewport — a `<text>` sits outside the SVG's viewport and is clipped away.
@@ -19,8 +18,10 @@ import { overshootBeyond } from "../../measure/svg-viewport.ts";
  *
  * A nested `<svg>` is clipped by its own viewport and by every enclosing one, and the rule
  * measures against all of them. The exemption matters as much as the rule: where nothing clips —
- * `overflow: visible` on the SVG and every enclosing SVG — the text *is* drawn, and the rule
- * declines rather than reports.
+ * no clipping overflow on the SVG or any enclosing SVG, no paint containment, no clip-path or mask
+ * on the outermost SVG, no clipping HTML ancestor in the page area — the text *is* drawn, and the
+ * rule declines rather than reports. Anything that clips and is not rebuilt in the frame is a
+ * decline counted against coverage, never that exemption.
  */
 export const textOverflowsViewport = defineRule(
   {
@@ -70,8 +71,9 @@ export const textOverflowsViewport = defineRule(
       );
 
       // Not the SVG's own `overflow` string: a nested SVG with `overflow: visible` is still
-      // clipped by the SVG around it, and `overflow: visible clip` clips one axis. `clipped` is
-      // the collector's statement that anything in the chain clips.
+      // clipped by the SVG around it, `auto` clips an outermost SVG and not a nested one, and
+      // paint containment, a clip-path on the SVG or a clipping HTML ancestor clip whatever the
+      // overflow says. `clipped` is the collector's statement that anything in the chain may clip.
       const overflowVisible = !svg.clipped;
       // Text that did not render is explicitly outside this rule's observable target set. Keep
       // the unknown count visible so removing/hiding text cannot resemble a visible repair.
@@ -209,23 +211,21 @@ export const textOverflowsViewport = defineRule(
         // Frame px: CSS px of the outermost SVG before its CSS transforms and zoom. The screen box
         // stays the evidence and the position a reader looks at.
         const overshoot = overshootBeyond(text.boxLocal, clips);
-        const violated = overshoot > permitted + SNAPSHOT_ROUNDING_PX;
-        evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, status: "measured", measurements: [{ name: "viewport-overshoot", value: overshoot, unit: "px", operator: ">", threshold: permitted + SNAPSHOT_ROUNDING_PX }], violated }));
-        // The clip rectangles and the target box are derived separately — the clips from computed
-        // box values and viewport lengths, the target from CTM-transformed getBBox corners — and
-        // the collector stores both rounded to two decimals. Each value therefore carries up to
-        // 0.005 px of rounding, and a difference of two of them up to 0.01. SNAPSHOT_ROUNDING_PX
-        // is that granularity, read off the collector rather than chosen: it is what the stored
-        // numbers cannot resolve, not a tolerance somebody picked, and it does not make the
-        // threshold configurable. It also covers the frame: a stored overshoot above it is at
-        // least 0.02 on the 0.01 grid, so the unrounded one is at least 0.01, and the frame is
-        // proven to within half of that (SVG_FRAME_TOLERANCE_PX) — whatever the oracle admitted,
-        // the label still reaches past the edge.
+        const violated = overshoot > permitted + SVG_OVERSHOOT_EPSILON_PX;
+        evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, status: "measured", measurements: [{ name: "viewport-overshoot", value: overshoot, unit: "px", operator: ">", threshold: permitted + SVG_OVERSHOOT_EPSILON_PX }], violated }));
+        // Both sides are unrounded frame values: the clips from CDP's used boxes carried into the
+        // frame (plus the clip margin, or a nested viewport's lengths), the target from its getBBox
+        // corners through its CTM chain. SVG_OVERSHOOT_EPSILON_PX is the rule's stated resolution
+        // and the error budget of this one comparison. The collector declines every frame whose
+        // error bound (`uncertaintyPx`: CDP residual, float32 quantisation of the quads, the clip
+        // margin's serialisation) does not fit inside it beside the target's own residual. So
+        // `overshoot > permitted + epsilon` means the true overshoot exceeds `permitted`: no
+        // finding is an artefact of the frame. The price is a band of at most 2·epsilon above
+        // `permitted` in which a clipped label can come out clean — the resolution, documented in
+        // the rule page, not a tolerance of the author's layout, and not configurable.
         //
-        // Measured on the sharpest constructible case — textLength set to the full width of the
-        // viewBox, so the box ends on the edge by construction — the difference came out at
-        // exactly 0, so this guard changes no verdict in the corpus. It is here because "0.01 px
-        // outside" is not a statement this data can support.
+        // A flush label — textLength set to the full viewBox width, so its box ends on the edge by
+        // construction — measures 0 and stays clean, as it must.
         if (!violated) continue;
 
         findings.push(

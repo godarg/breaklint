@@ -967,23 +967,48 @@ async function svgBoxModels(page: PageLike, raw: RawSnapshot): Promise<(SvgBoxMo
   const wanted = raw.svg.flatMap((record, index) => (record.oracleIndex >= 0 ? [{ index, occurrence: record.oracleIndex }] : []));
   if (wanted.length === 0 || !page.createCDPSession) return out;
   const session = await page.createCDPSession();
+  interface CdpNode { nodeId: number; nodeType: number; children?: CdpNode[] }
   try {
     await session.send("DOM.enable");
-    const { root } = await session.send<{ root: { nodeId: number } }>("DOM.getDocument", { depth: -1, pierce: false });
+    const { root } = await session.send<{ root: CdpNode }>("DOM.getDocument", { depth: -1, pierce: false });
     const { nodeIds } = await session.send<{ nodeIds: number[] }>("DOM.querySelectorAll", { nodeId: root.nodeId, selector: ".pagedjs_page svg" });
     // The two sources must agree about which SVGs exist before an index means the same element.
     if (nodeIds.length !== raw.svgRendered) return out;
+    // The parent of every node in the tree CDP just returned, so that an ancestor the page named by
+    // its distance from the <svg> is found by walking the browser's own tree, not the page's.
+    const parentOf = new Map<number, number>();
+    const elements = new Set<number>();
+    const pending: CdpNode[] = [root];
+    while (pending.length > 0) {
+      const node = pending.pop()!;
+      for (const child of node.children ?? []) {
+        parentOf.set(child.nodeId, node.nodeId);
+        if (child.nodeType === 1) elements.add(child.nodeId);
+        pending.push(child);
+      }
+    }
+    const quadsOf = async (nodeId: number) => {
+      try {
+        const { model } = await session.send<{ model: { content?: number[]; padding?: number[]; border?: number[] } }>("DOM.getBoxModel", { nodeId });
+        return model;
+      } catch {
+        return null;
+      }
+    };
     for (const { index, occurrence } of wanted) {
       const nodeId = nodeIds[occurrence];
       if (!nodeId) continue;
-      try {
-        const { model } = await session.send<{ model: { content?: number[]; padding?: number[]; border?: number[] } }>("DOM.getBoxModel", { nodeId });
-        out[index] = Array.isArray(model.content) && Array.isArray(model.padding) && Array.isArray(model.border)
-          ? { content: model.content, padding: model.padding, border: model.border }
-          : null;
-      } catch {
-        // No box model: no proof, and the record declines.
+      const model = await quadsOf(nodeId);
+      // No box model: no proof, and the record declines.
+      if (!model || !Array.isArray(model.content) || !Array.isArray(model.padding) || !Array.isArray(model.border)) continue;
+      const ancestors: (number[] | null)[] = [];
+      for (const { up } of raw.svg[index]!.geometry.ancestors) {
+        let at: number | undefined = nodeId;
+        for (let step = 0; step < up && at !== undefined; step += 1) at = parentOf.get(at);
+        const quad = at !== undefined && elements.has(at) ? (await quadsOf(at))?.content : undefined;
+        ancestors.push(Array.isArray(quad) ? quad : null);
       }
+      out[index] = { content: model.content, padding: model.padding, border: model.border, ancestors };
     }
   } finally {
     await session.detach().catch(() => undefined);

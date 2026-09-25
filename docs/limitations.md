@@ -91,9 +91,11 @@ are not implemented in production. Version 0.3.1 therefore removes `svg/text-cli
 every user's coverage. The enum and the two modules remain for the frozen M3 validation lab; the
 released CLI, schema and SARIF catalogue never run them.
 
-**A question that does not arise** (`NON_APPLICABLE_ENV_IDS`). With `overflow: visible` an SVG's
-text is painted whether or not it leaves the viewport, so `svg/text-overflows-viewport` has
-nothing to decide about it — as with an SVG holding no text. One such figure would otherwise drive
+**A question that does not arise** (`NON_APPLICABLE_ENV_IDS`). Where nothing clips an SVG — no
+clipping overflow on it or on an enclosing SVG, no paint containment, no clip-path or mask on it, no
+clipping HTML ancestor in the page area — its text is painted whether or not it leaves the
+viewport, so `svg/text-overflows-viewport` has nothing to decide about it — as with an SVG holding
+no text. Anything that clips and is not rebuilt is a counted decline, never this exemption. One such figure would otherwise drive
 an error rule below its floor of 1 and end the whole run in exit 4.
 
 A third case is not a decline at all: a `<text>` that is not painted. Inside `<defs>`, `<symbol>`,
@@ -111,8 +113,8 @@ was found by building the fixture for the previous one.
 A `<text>` that IS laid out and still has no readable box declines with `env/svg-ctm-unavailable`
 and DOES count against coverage — that is a measurement this tool owed and did not deliver, per
 target rather than per SVG. The same fail-closed rule applies when a box exists but does not prove
-the painted result: `<use>`, visible stroke, paint servers, text decoration, clip paths, masks and
-filters decline with `env/svg-painted-bounds-unsupported`.
+the painted result: `<use>`, visible stroke, paint servers, text decoration, clip paths, masks,
+filters and per-glyph `rotate` decline with `env/svg-painted-bounds-unsupported`.
 
 Neither exemption leaves the report. Both keep their rule, reason and count in `notMeasured`, and
 each rule's own books are still checked first: `defineRule` requires measured plus declined to equal
@@ -172,17 +174,22 @@ padding, every `overflow-clip-margin` form, 2D transforms and zoom of the SVG or
 nested `<svg>` viewports are therefore measured; up to 0.6.0 the first five declined the whole SVG,
 a nested viewport was taken from its client rect (the union of its content, so a clipped label
 could never overshoot it: a false clean), and a keyword clip margin read as none (a false error).
-The frame is checked against CDP's box model of the SVG, read out of process, to 0.005 px. Still
-declined as `env/svg-viewport-geometry-unsupported`, counted against coverage: a rounded clip; a
-corner radius combined with a clip margin; 3D transforms, perspective and motion paths; differing
-`overflow-x`/`overflow-y`; a nested `<svg>` with a transform, a clip margin, a rotated or skewed
-placement, or computed `x`/`y`/`width`/`height` that disagree with its attributes (CSS such as a
-page-wide `svg { width: … }` sizes nested SVGs too); an `<svg>` inside `<foreignObject>`; and any
-SVG whose reconstructed content box — or the padding or border box a clip margin grows — CDP does
-not confirm. Computed padding is the specified length rather than the used one, so a clip margin
-grown from the padding box of an SVG with a fractional padding (`0.5em` at 11pt, say) declines.
-What the rule compares is still the text's typographic cell box rather than its ink, and HTML
-ancestors' own clipping (`overflow: hidden` on a `<div>`) is not part of its question.
+The clip is built from the USED boxes — CDP's box-model quads, read out of process and carried into
+the frame — because layout snaps to 1/64 px where computed style does not; the computed box is only
+a units check. What clips is the kind's own: `auto` clips an outermost SVG but not a nested one,
+paint containment clips an outermost SVG like overflow does. The rule resolves overshoots to
+0.01 px: a finding is a true overshoot, and a clipped label may come out clean only within 0.02 px
+of the permitted overshoot. Still declined as `env/svg-viewport-geometry-unsupported`, counted
+against coverage: a rounded clip; a corner radius combined with a clip margin; 3D transforms,
+perspective and motion paths; `overflow-x: visible` with `overflow-y: clip` on an outermost SVG
+and mixed axes on a nested one; a clip-path, mask or `url()` filter on the outermost SVG; an HTML
+ancestor clip in the page area not proven to contain the SVG's own (or above an SVG with no clip of
+its own); a nested `<svg>` with a transform, a clip margin, a rotated or skewed placement, or
+computed `x`/`y`/`width`/`height` that disagree with its attributes (CSS such as a page-wide
+`svg { width: … }` sizes nested SVGs too); an `<svg>` inside `<foreignObject>`; and any SVG whose
+frame CDP does not confirm, or whose error bound does not fit the resolution (CDP's float32 quads
+more than 262 144 px down a run). What the rule compares is still the text's typographic cell box
+rather than its ink; clipping by the page box itself is the block rules' question.
 
 **An SVG in a page margin box is not measured.** Paged.js clones a `position: running(...)`
 element into the margin box of every page (and a `position: fixed` one into every page box), and

@@ -29,10 +29,41 @@ it("the injected SVG collector ships raw frame facts through captured primitives
   assert.match(SNAPSHOT_SOURCE, /P\.nodeType\(ancestor\) === 1/u);
   assert.doesNotMatch(SNAPSHOT_SOURCE, /(?:viewportAncestor|ancestor|\bat)\.nodeType/u);
   // The facts for the 3D decline and the CDP oracle are collected at all.
-  for (const key of ["transform", "rotate", "scale", "translate", "perspective", "offsetPath"]) {
-    assert.match(SNAPSHOT_SOURCE, new RegExp(`SVG_TRANSFORM_KEYS = \\[[^\\]]*"${key}"`, "u"));
+  for (const key of ["transform", "rotate", "scale", "translate", "perspective", "offset-path"]) {
+    assert.match(SNAPSHOT_SOURCE, new RegExp(`SVG_TRANSFORM_PROPS = \\[[^;]*"${key}"\\]`, "u"));
   }
   assert.match(SNAPSHOT_SOURCE, /svgRendered: renderedSvgs\.length/u);
+});
+
+it("reads every computed value of the SVG section through the captured getPropertyValue", () => {
+  // A CSSStyleDeclaration property getter lives on the prototype: a document that shadowed
+  // overflowClipMargin (or overflowX) turned 570 clipped ink pixels into a clean run. The whole
+  // SVG section reads by CSS name through P.css, and no style object is dereferenced by property.
+  const start = SNAPSHOT_SOURCE.indexOf("const svg = [];");
+  const end = SNAPSHOT_SOURCE.indexOf("return { pages, blocks, textLines, svg");
+  assert.ok(start > 0 && end > start, "the SVG section moved");
+  const section = SNAPSHOT_SOURCE.slice(start, end);
+  assert.doesNotMatch(section, /\b(?:style|svgStyle|ancestorStyle|textStyle)\.[A-Za-z]/u, "a computed value read through a replaceable getter");
+  assert.match(section, /const pick = \(style, props\) => \{ const out = \{\}; for \(const \[key, name\] of props\) out\[key\] = P\.css\(style, name\); return out; \};/u);
+  for (const name of ["overflow-x", "overflow-y", "overflow-clip-margin", "contain", "content-visibility", "clip-path", "mask-image", "box-sizing"]) {
+    assert.match(section, new RegExp(`SVG_BOX_PROPS = \\[[^;]*"${name}"\\]`, "u"), name);
+  }
+  for (const name of ["fill", "stroke", "stroke-width", "fill-opacity", "text-shadow", "text-decoration-line", "clip-path", "filter"]) {
+    assert.ok(section.includes(`P.css(style, "${name}")`) || section.includes(`P.css(ancestorStyle, "${name}")`), name);
+  }
+  assert.ok(PRIMITIVES_SOURCE.includes("const getPropertyValueFn = CSSStyleDeclaration.prototype.getPropertyValue;"));
+  assert.ok(PRIMITIVES_SOURCE.includes("css: (style, name) => call.call(getPropertyValueFn, style, name),"));
+  assert.ok(PRIMITIVES_CHECK.includes('"css"'), "the integrity check does not require css");
+});
+
+it("ships the HTML ancestors that may clip, up to the page area, and declines per-glyph rotation", () => {
+  const start = SNAPSHOT_SOURCE.indexOf("const svg = [];");
+  const section = SNAPSHOT_SOURCE.slice(start);
+  assert.match(section, /for \(let at = parentEl; at && at !== flowArea && P\.nodeType\(at\) === 1; at = P\.parent\(at\), up \+= 1\)/u);
+  assert.match(section, /const flowArea = P\.closest\(el, SVG_FLOW_AREA_SELECTOR\);/u);
+  assert.match(section, /ancestors\.push\(\{ up, \.\.\.facts, radii: SVG_RADIUS_PROPS\.map/u);
+  assert.match(section, /style: pick\(svgStyle, SVG_BOX_PROPS\), transforms, ancestors,/u);
+  assert.match(section, /P\.hasAttr\(textEl, "rotate"\) \|\| P\.all\(textEl, "\[rotate\]"\)\.length > 0/u);
 });
 
 it("collects SVG only from the page content area, never from margin-box clones", () => {

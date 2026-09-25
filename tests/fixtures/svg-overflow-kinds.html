@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>What clips, per kind of SVG</title>
+<!--
+  Which overflow values clip depends on the kind of <svg>, and overflow is not the only clip.
+  Measured on Chromium 141 by painting a 10 000 px rectangle inside each viewport:
+
+  - A NESTED <svg> with overflow: auto — as property or as attribute — does not clip. It paints
+    like visible. Clipped like an outermost SVG's auto, the two `n*-in` labels below, which the
+    browser draws in full, are reported: a false error.
+  - A nested <svg> with overflow: scroll clips at its viewport.
+  - An OUTERMOST <svg> with overflow: auto clips at its content box.
+  - Paint containment clips an outermost SVG exactly where overflow would, with overflow: visible.
+    Read off the overflow alone the SVG is non-applicable and the clipped `paint-out` label goes
+    unreported: a false clean (0.6.0 did exactly that).
+  - overflow-x: visible; overflow-y: hidden computes to `auto hidden` and clips BOTH axes of an
+    outermost SVG; `axes-out` is clipped on the x axis.
+
+  Advances are fixed with textLength. Each `*-in` label ends at least 6 px inside every edge that
+  clips it (the nested `auto` labels run past their nested viewport, which does not clip, and end
+  far inside the outer one); each `*-out` label ends 6 px past the edge that clips it.
+  Pixel-verified on Chromium 141 when authored, raw and paginated. Expected: exactly the four
+  `*-out` labels reported, exit 1.
+-->
+<style>
+  @page { size: 420pt 720pt; margin: 24pt; }
+  body { font: 11pt/1.35 serif; margin: 0; }
+  figure { margin: 0 0 10pt; }
+  svg.f { display: block; box-sizing: content-box; width: 400px; height: 100px; overflow: hidden; }
+  svg text { font-family: "DejaVu Sans", sans-serif; font-size: 16px; }
+  figcaption { font-size: 8pt; }
+</style>
+</head>
+<body>
+<p>Six viewports, and which of them clip.</p>
+
+<figure>
+  <svg class="f" id="kind-nested-auto" viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="400" height="100" fill="#eeeeee"></rect>
+    <!-- nested viewport x 40..200: auto does not clip it; the outer SVG clips at 400 -->
+    <svg id="nested-auto" x="40" y="10" width="160" height="80" style="overflow: auto">
+      <text id="nauto-in" x="120" y="30" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    </svg>
+  </svg>
+  <figcaption>Nested overflow: auto (property). The label runs 60 px past the nested viewport and is drawn.</figcaption>
+</figure>
+
+<figure>
+  <svg class="f" id="kind-nested-auto-attribute" viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="400" height="100" fill="#eeeeee"></rect>
+    <svg id="nested-auto-attribute" x="40" y="10" width="160" height="80" overflow="auto">
+      <text id="nattr-in" x="120" y="30" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    </svg>
+  </svg>
+  <figcaption>Nested overflow="auto" (attribute): the same.</figcaption>
+</figure>
+
+<figure>
+  <svg class="f" id="kind-nested-scroll" viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="400" height="100" fill="#eeeeee"></rect>
+    <!-- nested viewport x 40..200; scroll clips there -->
+    <svg id="nested-scroll" x="40" y="10" width="160" height="80" style="overflow: scroll">
+      <text id="nscroll-in" x="54" y="25" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+      <text id="nscroll-out" x="66" y="60" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    </svg>
+  </svg>
+  <figcaption>Nested overflow: scroll clips at x = 200.</figcaption>
+</figure>
+
+<figure>
+  <svg class="f" id="kind-root-auto" viewBox="0 0 400 100" style="overflow: auto" xmlns="http://www.w3.org/2000/svg">
+    <rect width="400" height="100" fill="#eeeeee"></rect>
+    <text id="rauto-in" x="294" y="35" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="rauto-out" x="306" y="75" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>Outermost overflow: auto clips at x = 400.</figcaption>
+</figure>
+
+<figure>
+  <svg class="f" id="kind-root-paint" viewBox="0 0 400 100" style="overflow: visible; contain: paint" xmlns="http://www.w3.org/2000/svg">
+    <rect width="400" height="100" fill="#eeeeee"></rect>
+    <text id="paint-in" x="294" y="35" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="paint-out" x="306" y="75" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>overflow: visible with contain: paint clips at the content box, x = 400.</figcaption>
+</figure>
+
+<figure>
+  <svg class="f" id="kind-root-axes" viewBox="0 0 400 100" style="overflow-x: visible; overflow-y: hidden" xmlns="http://www.w3.org/2000/svg">
+    <rect width="400" height="100" fill="#eeeeee"></rect>
+    <text id="axes-in" x="294" y="35" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="axes-out" x="306" y="75" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>overflow-x: visible; overflow-y: hidden computes to auto hidden and clips x at 400 too.</figcaption>
+</figure>
+</body>
+</html>

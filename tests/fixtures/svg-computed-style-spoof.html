@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A document that answers a computed-style question for itself</title>
+<!--
+  The script below shadows the CSSStyleDeclaration property getters the SVG viewport decision rests
+  on: every clip margin reads 60 px wider than it is, and every overflow reads visible. The
+  browser's layout does not care; the label `spoof-out` ends 6 px past the clip edge and is cut.
+
+  A collector that reads computed values through those getters (style.overflowClipMargin,
+  style.overflowX, as 0.6.0 read style.overflow) measures the label inside a clip 60 px too wide
+  with the margin spoofed, and calls the SVG non-applicable with overflow spoofed. Both runs end
+  exit 0 over a clipped label. Every value is now read by name through the captured
+  getPropertyValue. Pixel-verified on Chromium 141 when authored, raw and paginated. Expected:
+  `spoof-out` reported, `spoof-in` clean, exit 1.
+-->
+<script>
+  (() => {
+    const shadow = (name, value) => Object.defineProperty(CSSStyleDeclaration.prototype, name, {
+      configurable: true,
+      get() { return typeof value === "function" ? value(this) : value; },
+    });
+    shadow("overflowClipMargin", (style) => {
+      const real = style.getPropertyValue("overflow-clip-margin");
+      return real === "content-box" ? "content-box 60px" : real;
+    });
+    shadow("overflowX", "visible");
+    shadow("overflowY", "visible");
+    shadow("overflow", "visible");
+  })();
+</script>
+<style>
+  @page { size: 420pt 400pt; margin: 24pt; }
+  body { font: 11pt/1.35 serif; margin: 0; }
+  svg.f { display: block; box-sizing: content-box; width: 400px; height: 100px; overflow: hidden; }
+  svg text { font-family: "DejaVu Sans", sans-serif; font-size: 16px; }
+</style>
+</head>
+<body>
+<p>The page's own getters say this SVG does not clip.</p>
+
+<svg class="f" id="spoofed" viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="100" fill="#eeeeee"></rect>
+  <text id="spoof-in" x="294" y="35" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  <text id="spoof-out" x="306" y="75" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+</svg>
+</body>
+</html>

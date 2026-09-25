@@ -187,6 +187,8 @@ function svgWith(texts: FixtureSvgText[], over: Partial<SvgRecord> = {}): SvgRec
       clips: clipped ? [viewport] : [],
       localToScreen: [1, 0, 0, 1, viewportScreen.x, viewportScreen.y],
       oracleDeltaPx: null,
+      modelDeltaPx: null,
+      uncertaintyPx: null,
     },
     viewportDiagnostic: null,
     textTargetCount: texts.length,
@@ -584,7 +586,7 @@ export function loadCorpus(): CorpusEntry[] {
               viewportScreen: box(44.24, 29.8, 213.9, 129.04),
               viewportLocal: {
                 viewport: box(0, 0, 200, 80), clips: [box(0, 0, 200, 80)],
-                localToScreen: [0.965926, 0.258819, -0.258819, 0.965926, 64.95, 29.8], oracleDeltaPx: 0.00002,
+                localToScreen: [0.965926, 0.258819, -0.258819, 0.965926, 64.95, 29.8], oracleDeltaPx: 0.00002, modelDeltaPx: null, uncertaintyPx: null,
               },
             },
           ),
@@ -608,7 +610,7 @@ export function loadCorpus(): CorpusEntry[] {
               viewportScreen: box(150, 130, 23, 14),
               viewportLocal: {
                 viewport: box(50, 50, 100, 60), clips: [box(50, 50, 100, 60), box(0, 0, 400, 200)],
-                localToScreen: [1, 0, 0, 1, 20, 20], oracleDeltaPx: 0,
+                localToScreen: [1, 0, 0, 1, 20, 20], oracleDeltaPx: 0, modelDeltaPx: null, uncertaintyPx: null,
               },
             },
           ),
@@ -634,7 +636,7 @@ export function loadCorpus(): CorpusEntry[] {
               viewportScreen: box(340, 90, 83, 14),
               viewportLocal: {
                 viewport: box(300, 50, 100, 60), clips: [box(0, 0, 400, 200)],
-                localToScreen: [1, 0, 0, 1, 20, 20], oracleDeltaPx: 0,
+                localToScreen: [1, 0, 0, 1, 20, 20], oracleDeltaPx: 0, modelDeltaPx: null, uncertaintyPx: null,
               },
             },
           ),
@@ -658,7 +660,7 @@ export function loadCorpus(): CorpusEntry[] {
               viewportScreen: box(62, 62, 200, 80),
               viewportLocal: {
                 viewport: box(0, 0, 200, 80), clips: [box(-10, -10, 220, 100)],
-                localToScreen: [1, 0, 0, 1, 62, 62], oracleDeltaPx: 0,
+                localToScreen: [1, 0, 0, 1, 62, 62], oracleDeltaPx: 0, modelDeltaPx: null, uncertaintyPx: null,
               },
             },
           ),

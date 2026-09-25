@@ -154,7 +154,7 @@ export interface SnapshotProjection {
  * interpretation those receipts always had explicit: the local frame IS the screen, the clip is
  * the receipt's viewport exactly when its overflow is not `visible` (the pre-0.7 rule's reading of
  * the same string), and each target's local box is its screen box. No oracle stands behind that
- * frame and `oracleDeltaPx` says so with null. Nothing here reaches the live collector.
+ * frame and `oracleDeltaPx`, `modelDeltaPx` and `uncertaintyPx` say so with null. Nothing here reaches the live collector.
  */
 export function snapshotRecordFromReceiptV1(record: ReceiptSvgRecordV1): SvgRecord {
   const { reason, texts, ...rest } = record;
@@ -165,7 +165,7 @@ export function snapshotRecordFromReceiptV1(record: ReceiptSvgRecordV1): SvgReco
     ...(reason === null || reason === undefined ? {} : { reason }),
     clipped,
     viewportLocal: record.measurable
-      ? { viewport: record.viewportScreen, clips: clipped ? [record.viewportScreen] : [], localToScreen: identity, oracleDeltaPx: null }
+      ? { viewport: record.viewportScreen, clips: clipped ? [record.viewportScreen] : [], localToScreen: identity, oracleDeltaPx: null, modelDeltaPx: null, uncertaintyPx: null }
       : null,
     viewportDiagnostic: null,
     texts: texts.map((text) => ({ ...text, boxLocal: text.boxScreen, bboxUser: text.boxScreen, userToLocal: identity })),
@@ -559,7 +559,7 @@ function metricValue(report: AcceptanceReport, metric: AcceptanceReport["gates"]
 export const PRODUCT_RULE_EXECUTABLE_CONTRACTS: Readonly<Record<RuleId, { moduleRelativePath: string; sourceSha256: string; executableContractVersion: "m3-0-real-rule-run-v1" }>> = Object.freeze({
   "svg/text-clipped": { moduleRelativePath: "src/rules/svg/text-clipped.ts", sourceSha256: "6e55541c82526ec89ee0d5b95574647399111e4a90c43ada849b0385a3c13307", executableContractVersion: "m3-0-real-rule-run-v1" },
   "svg/text-ink-collision": { moduleRelativePath: "src/rules/svg/text-ink-collision.ts", sourceSha256: "e6f3389c7df1ee5d3dd9cfc8dc8f8a218c63ce436c2e5e481e3640a3e560fe61", executableContractVersion: "m3-0-real-rule-run-v1" },
-  "svg/text-overflows-viewport": { moduleRelativePath: "src/rules/svg/text-overflows-viewport.ts", sourceSha256: "797ae67a5e415fa7e19abf0c93e59ddac9408d7dd2aebdd5c276d17b35936149", executableContractVersion: "m3-0-real-rule-run-v1" },
+  "svg/text-overflows-viewport": { moduleRelativePath: "src/rules/svg/text-overflows-viewport.ts", sourceSha256: "65a6d0b8a05107a3fcea0bb93bd57fcf28a93abe8acf3ada44c7386ee1d2ede5", executableContractVersion: "m3-0-real-rule-run-v1" },
 });
 
 export function producerSourceIdentitySha256(sourceIdentity: unknown): string { return sha256(canonicalJson(sourceIdentity)); }

@@ -150,6 +150,12 @@ const PRIMITIVES_TEMPLATE = `(() => {
   // document that replaced SVGMatrix.prototype.e would otherwise move every box without moving any
   // glyph. The walker falls back to the DOM geometry interfaces should a later browser alias them.
   const svgCtmFn = SVGGraphicsElement.prototype.getCTM;
+  // Every computed value the SVG viewport decision rests on is read through the captured
+  // getPropertyValue, never through a CSSStyleDeclaration property getter. Those getters live on
+  // the prototype, and a document that shadows CSSStyleDeclaration.prototype.overflowClipMargin
+  // (or overflowX) answers the question for itself: measured, a spoofed clip margin turned a
+  // label with 570 clipped ink pixels into a clean run.
+  const getPropertyValueFn = CSSStyleDeclaration.prototype.getPropertyValue;
   const svgMatrixProto = typeof SVGMatrix === "function" ? SVGMatrix.prototype : DOMMatrixReadOnly.prototype;
   const svgRectProto = typeof SVGRect === "function" ? SVGRect.prototype : DOMRectReadOnly.prototype;
   const matrixGets = ["a", "b", "c", "d", "e", "f"].map((name) => getter(svgMatrixProto, name));
@@ -375,6 +381,7 @@ const PRIMITIVES_TEMPLATE = `(() => {
           return null;
         }
       },
+      css: (style, name) => call.call(getPropertyValueFn, style, name),
       svgCtm: (el) => svgMatrixOf(svgCtmFn, el),
       svgScreenCtm: (el) => svgMatrixOf(svgScreenCtmFn, el),
       svgViewportLengths: (el) => {
@@ -525,7 +532,7 @@ export const PRIMITIVES_CHECK = `(() => {
     return { ok: false, reason: "the primitive references are replaceable, so they prove nothing" };
   }
   for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
-    "svgGeometry", "svgCtm", "svgScreenCtm", "svgViewportLengths", "outerHtml", "painted", "byId", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
+    "svgGeometry", "svgCtm", "svgScreenCtm", "svgViewportLengths", "css", "outerHtml", "painted", "byId", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
     "rects", "setAttr", "setText", "nodeType", "parent", "next", "create", "append", "remove", "setCssText",
     "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityRecordPreview",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",

@@ -249,26 +249,38 @@ export interface SvgShape {
  */
 export interface SvgViewportLocal {
   /**
-   * This SVG's own viewport rectangle. Outermost: `(0, 0, cw, ch)`, the content box from the
-   * computed width/height minus border and padding where `box-sizing` includes them. Nested: its
+   * This SVG's own viewport rectangle. Outermost: its used content box, CDP's content quad carried
+   * back into the frame — `(0, 0, cw, ch)` up to `oracleDeltaPx`. Nested: its
    * `x`/`y`/`width`/`height` mapped into the frame.
    */
   viewport: Box;
   /**
    * Every rectangle that clips this record's text, innermost first: this SVG's own clip when its
-   * overflow clips (for an outermost SVG the content box grown by `overflow-clip-margin` from its
-   * reference box, for a nested one the viewport), then each enclosing SVG's. Text is drawn in
-   * full only inside all of them.
+   * overflow or paint containment clips (for an outermost SVG the used reference box grown by
+   * `overflow-clip-margin`, for a nested one the viewport), then each enclosing SVG's. Text is drawn
+   * in full only inside all of them. Unrounded, like the targets' `boxLocal`.
    */
   clips: Box[];
   /** The frame → screen CSS px: `getScreenCTM() · getCTM()⁻¹` of the outermost SVG. */
   localToScreen: AffineMatrix;
   /**
-   * The independent proof of the frame: the largest distance, in frame px, between the
-   * outermost SVG's reconstructed content box and CDP `DOM.getBoxModel().content` mapped back
-   * into the frame. null only on externally supplied projections that carry no oracle.
+   * The independent proof of the frame: the largest disagreement, in frame px, between CDP's
+   * content, padding and border quads carried back into the frame and the frame's definition
+   * (rectangles, nested inside each other, the content corner at the origin). null only on
+   * externally supplied projections that carry no oracle.
    */
   oracleDeltaPx: number | null;
+  /**
+   * The units check: how far the computed-style content box is from the used one, in frame px.
+   * Layout snapping, never a decision input. null on projections.
+   */
+  modelDeltaPx: number | null;
+  /**
+   * The bound on how far a clip edge can sit from the browser's, in frame px: the residual, the
+   * float32 quantisation of the quads and the clip margin's serialisation, plus arithmetic noise.
+   * Never above `SVG_OVERSHOOT_EPSILON_PX` on a collected record. null on projections.
+   */
+  uncertaintyPx: number | null;
 }
 
 export interface SvgRecord {
@@ -298,9 +310,12 @@ export interface SvgRecord {
   /** The computed `overflow` of the SVG element itself, as the browser serialises it. */
   overflow: string;
   /**
-   * Whether anything clips this record's text: this SVG's own overflow or that of an enclosing
-   * `<svg>`. False means every enclosing viewport has `overflow: visible` on both axes, so the text
-   * is painted wherever it lies and `svg/text-overflows-viewport` has no question to answer.
+   * Whether anything may clip this record's text: this SVG's own overflow (per kind: `auto` clips
+   * an outermost SVG and not a nested one) or paint containment, an enclosing `<svg>`'s, a
+   * clip-path, mask or url() filter on the outermost SVG, or an HTML ancestor inside the page area
+   * that clips. False only when none of these applies, so the text is painted wherever it lies and
+   * `svg/text-overflows-viewport` has no question to answer. Conservative: a serialisation the
+   * collector does not know counts as clipping, and the record is declined rather than exempted.
    */
   clipped: boolean;
   /**

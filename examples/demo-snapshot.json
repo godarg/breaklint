@@ -620,7 +620,9 @@
             48,
             48
           ],
-          "oracleDeltaPx": null
+          "oracleDeltaPx": null,
+          "modelDeltaPx": null,
+          "uncertaintyPx": null
         },
         "viewportDiagnostic": null,
         "textTargetCount": 2,

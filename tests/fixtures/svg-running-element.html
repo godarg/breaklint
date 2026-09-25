@@ -15,7 +15,10 @@
   The complication is that the margin-box logo is itself clipped (its label runs past its 120-unit
   viewBox), so a collector that still read the margin boxes would also report it; the in-flow
   figure carries one label 6 px inside its viewport and one 6 px past it. Margin-box content is not
-  measured: the expected verdict is exit 1 with exactly the in-flow `figure-out` label.
+  measured: run with svg/text-overflows-viewport alone, as the live test does, the expected verdict
+  is exit 1 with exactly the in-flow `figure-out` label. The full CLI run ends exit 4 instead, for
+  a reason outside the SVG: layout/widow, layout/orphan and layout/orphaned-continuation-page
+  decline the targets at the two forced page breaks (env/forced-break).
 -->
 <style>
   @page { size: 150mm 120mm; margin: 18mm 15mm; }

@@ -23,8 +23,8 @@ import { textOverflowsViewport } from "../../src/rules/svg/text-overflows-viewpo
 import { textClipped } from "../../src/rules/svg/text-clipped.ts";
 import { blockKey } from "../../src/core/fingerprint.ts";
 import type { DocumentInput } from "../../src/core/engine.ts";
-import type { SvgRecord } from "../../src/core/types.ts";
-import { SVG_FRAME_TOLERANCE_PX } from "../../src/measure/svg-viewport.ts";
+import type { Box, SvgRecord } from "../../src/core/types.ts";
+import { SVG_FLOAT_NOISE_PX, SVG_FRAME_TOLERANCE_PX, SVG_MODEL_TOLERANCE_PX, SVG_OVERSHOOT_EPSILON_PX } from "../../src/measure/svg-viewport.ts";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 const FIXTURES = join(REPO, "tests", "fixtures");
@@ -134,6 +134,9 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "svg-viewport-nested.html"),
         join(FIXTURES, "svg-clip-margin-keyword.html"),
         join(FIXTURES, "svg-running-element.html"),
+        join(FIXTURES, "svg-overflow-kinds.html"),
+        join(FIXTURES, "svg-viewport-used-boxes.html"),
+        join(FIXTURES, "svg-computed-style-spoof.html"),
       ],
       options(join(root, "svg-frame-evidence")),
     );
@@ -844,6 +847,9 @@ describe("the M2d live production chain", () => {
       ["nested-transform", "nested-transform"],
       ["nested-css-sized", "nested-lengths-disagree"],
       ["inside-foreign-object", "inside-foreign-object"],
+      ["root-clip-path", "ancestor-clip"],
+      ["under-clipping-ancestor", "ancestor-clip"],
+      ["nested-mixed", "overflow-axes-differ"],
     ] as const) {
       const declined = exact(id);
       assert.equal(declined.measurable, false, `${id} was measured`);
@@ -852,9 +858,20 @@ describe("the M2d live production chain", () => {
       assert.deepEqual(declined.texts, [], `${id} kept a measured target`);
     }
     // The outer SVGs around the declined nested ones hold no text of their own: nothing to decline.
-    for (const id of ["nested-transform-outer", "nested-css-outer", "foreign-outer"]) {
+    for (const id of ["nested-transform-outer", "nested-css-outer", "foreign-outer", "nested-mixed-outer"]) {
       assert.equal(exact(id).measurable, true, id);
     }
+    // Declined, not exempt: a clip-path on the SVG, and a clipping ancestor above an SVG that does
+    // not clip, are clips whatever the SVG's own overflow says.
+    for (const id of ["root-clip-path", "under-clipping-ancestor"]) assert.equal(exact(id).clipped, true, id);
+    // An ancestor clip around the whole viewport is set aside, and that SVG is measured.
+    const contained = exact("inside-clipping-ancestor");
+    assert.equal(contained.measurable, true);
+    assert.equal(contained.viewportDiagnostic, null);
+    assert.equal(contained.texts.length, 1);
+    // Per-glyph rotation declines its target, not the SVG.
+    const rotated = exact("rotated-glyphs");
+    assert.deepEqual([rotated.measurable, rotated.unsupportedTargets, rotated.texts.length], [true, 1, 0]);
 
     const definitions = record("many-definitions");
     assert.equal(definitions.textTargetCount, 502);
@@ -870,13 +887,13 @@ describe("the M2d live production chain", () => {
     });
     assert.deepEqual(outcome.report.findings, [], "unsupported geometry produced a guessed error finding");
     const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
-    assert.equal(coverage?.candidates, 17);
-    assert.equal(coverage?.measured, 4);
+    assert.equal(coverage?.candidates, 22);
+    assert.equal(coverage?.measured, 5);
     assert.deepEqual(
       coverage?.notMeasured.map((entry) => ({ reason: entry.reason, count: entry.count })),
       [
-        { reason: "env/svg-painted-bounds-unsupported", count: 6 },
-        { reason: "env/svg-viewport-geometry-unsupported", count: 7 },
+        { reason: "env/svg-painted-bounds-unsupported", count: 7 },
+        { reason: "env/svg-viewport-geometry-unsupported", count: 10 },
       ],
     );
     assert.equal(outcome.report.verdict, "insufficient-coverage");
@@ -890,8 +907,8 @@ describe("the M2d live production chain", () => {
    * labels, the third exit 1 with two labels reported that are drawn.
    */
   const svgFrameDocument = (t: TestContext, index: number): DocumentInput | null => {
-    if (svgFrames?.documents.length !== 4) {
-      t.skip(`the SVG frame batch did not complete: ${svgFrames?.documents.length ?? 0} of 4 documents`);
+    if (svgFrames?.documents.length !== 7) {
+      t.skip(`the SVG frame batch did not complete: ${svgFrames?.documents.length ?? 0} of 7 documents`);
       return null;
     }
     const document = svgFrames.documents[index]!;
@@ -918,10 +935,23 @@ describe("the M2d live production chain", () => {
     for (const record of records) {
       assert.equal(record.measurable, true, `${record.sourceKey} declined: ${String(record.viewportDiagnostic)}`);
       assert.equal(record.viewportDiagnostic, null);
-      // The independent proof: CDP's content quad agrees with the reconstructed content box.
-      assert.ok(record.viewportLocal && record.viewportLocal.oracleDeltaPx !== null && record.viewportLocal.oracleDeltaPx <= SVG_FRAME_TOLERANCE_PX,
-        `${record.sourceKey}: CDP content quad disagreed by ${String(record.viewportLocal?.oracleDeltaPx)} px`);
+      // The independent proof: CDP's quads carried into the frame are the frame's rectangles, the
+      // computed content box is the used one in CSS px, and the error bound fits the resolution.
+      const frame = record.viewportLocal;
+      assert.ok(frame && frame.oracleDeltaPx !== null && frame.oracleDeltaPx <= SVG_FRAME_TOLERANCE_PX,
+        `${record.sourceKey}: CDP quads disagreed with the frame by ${String(frame?.oracleDeltaPx)} px`);
+      assert.ok(frame.modelDeltaPx !== null && frame.modelDeltaPx <= SVG_MODEL_TOLERANCE_PX, `${record.sourceKey}: units check ${String(frame.modelDeltaPx)}`);
+      assert.ok(frame.uncertaintyPx !== null && frame.uncertaintyPx + SVG_FLOAT_NOISE_PX <= SVG_OVERSHOOT_EPSILON_PX, `${record.sourceKey}: error bound ${String(frame.uncertaintyPx)}`);
     }
+  };
+  /** Clip rectangles as the frame holds them: unrounded, so compared to a micro-pixel. */
+  const assertClips = (actual: readonly Box[] | undefined, expected: readonly Box[], label: string) => {
+    assert.equal(actual?.length, expected.length, `${label}: ${JSON.stringify(actual)}`);
+    expected.forEach((clip, index) => {
+      for (const key of ["x", "y", "width", "height"] as const) {
+        assert.ok(Math.abs(actual![index]![key] - clip[key]) < 1e-6, `${label} clip ${index} ${key}: ${JSON.stringify(actual)}`);
+      }
+    });
   };
   const assertLabels = (overshoot: ReadonlyMap<string, number>, reported: readonly string[], ids: readonly string[]) => {
     assert.deepEqual([...overshoot.keys()].sort(), [...ids].sort(), "not every label was measured");
@@ -942,12 +972,12 @@ describe("the M2d live production chain", () => {
     assertFrame(records);
     // The clip rectangle each overflow-clip-margin form names (padding 8, border 4, content 200 x 60).
     const clip = (id: string) => records.find((record) => record.sourceKey === `svgid:${id}`)!.viewportLocal!.clips;
-    assert.deepEqual(clip("padded"), [{ x: 0, y: 0, width: 200, height: 60 }]);
-    assert.deepEqual(clip("margin-length"), [{ x: -18, y: -18, width: 236, height: 96 }]);
-    assert.deepEqual(clip("margin-content"), [{ x: -10, y: -10, width: 220, height: 80 }]);
-    assert.deepEqual(clip("margin-padding"), [{ x: -8, y: -8, width: 216, height: 76 }]);
-    assert.deepEqual(clip("margin-border-plain"), [{ x: -12, y: -12, width: 224, height: 84 }]);
-    assert.deepEqual(clip("margin-border"), [{ x: -17, y: -17, width: 234, height: 94 }]);
+    assertClips(clip("padded"), [{ x: 0, y: 0, width: 200, height: 60 }], "padded");
+    assertClips(clip("margin-length"), [{ x: -18, y: -18, width: 236, height: 96 }], "margin-length");
+    assertClips(clip("margin-content"), [{ x: -10, y: -10, width: 220, height: 80 }], "margin-content");
+    assertClips(clip("margin-padding"), [{ x: -8, y: -8, width: 216, height: 76 }], "margin-padding");
+    assertClips(clip("margin-border-plain"), [{ x: -12, y: -12, width: 224, height: 84 }], "margin-border-plain");
+    assertClips(clip("margin-border"), [{ x: -17, y: -17, width: 234, height: 94 }], "margin-border");
     const { outcome, overshoot, reported } = svgFrameVerdicts(document);
     const figures = ["padded", "bordered", "rotated", "zoomed", "margin-length", "margin-content", "margin-padding", "margin-border-plain", "margin-border"];
     assertLabels(overshoot, reported, figures.flatMap((id) => [`${id}-in`, `${id}-out`]));
@@ -964,11 +994,11 @@ describe("the M2d live production chain", () => {
     assert.equal(records.length, 4);
     assertFrame(records);
     const inner = records.find((record) => record.sourceKey === "svgid:nest-inner")!;
-    assert.deepEqual(inner.viewportLocal!.clips, [{ x: 40, y: 20, width: 160, height: 60 }, { x: 0, y: 0, width: 400, height: 160 }]);
+    assertClips(inner.viewportLocal!.clips, [{ x: 40, y: 20, width: 160, height: 60 }, { x: 0, y: 0, width: 400, height: 160 }], "nest-inner");
     const chain = records.find((record) => record.sourceKey === "svgid:chain-inner")!;
     assert.equal(chain.overflow, "visible");
     assert.equal(chain.clipped, true, "an enclosing SVG clips a nested SVG with overflow: visible");
-    assert.deepEqual(chain.viewportLocal!.clips, [{ x: 0, y: 0, width: 400, height: 160 }]);
+    assertClips(chain.viewportLocal!.clips, [{ x: 0, y: 0, width: 400, height: 160 }], "chain-inner");
     const { outcome, overshoot, reported } = svgFrameVerdicts(document);
     assertLabels(overshoot, reported, ["nested-in", "nested-out", "chain-in", "chain-out"]);
     assert.equal(exitCodeFor(outcome.report.verdict), 1);
@@ -981,7 +1011,7 @@ describe("the M2d live production chain", () => {
     const records = document.snapshot!.svg;
     assert.equal(records.length, 2);
     assertFrame(records);
-    for (const record of records) assert.deepEqual(record.viewportLocal!.clips, [{ x: -10, y: -10, width: 220, height: 80 }]);
+    for (const record of records) assertClips(record.viewportLocal!.clips, [{ x: -10, y: -10, width: 220, height: 80 }], String(record.sourceKey));
     const { outcome, overshoot, reported } = svgFrameVerdicts(document);
     assertLabels(overshoot, reported, ["keyword-hidden-in", "keyword-hidden-out", "keyword-clip-in", "keyword-clip-out"]);
     assert.equal(exitCodeFor(outcome.report.verdict), 1);
@@ -1001,6 +1031,62 @@ describe("the M2d live production chain", () => {
     const { outcome, overshoot, reported } = svgFrameVerdicts(document);
     assert.equal(outcome.report.infrastructure.some((event) => event.kind === "checker-crashed"), false);
     assertLabels(overshoot, reported, ["figure-in", "figure-out"]);
+    assert.equal(exitCodeFor(outcome.report.verdict), 1);
+  });
+
+  it("clips per kind of SVG: nested auto draws, nested scroll, root auto, paint containment and auto hidden clip", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = svgFrameDocument(t, 4);
+    if (!document) return;
+    const records = document.snapshot!.svg;
+    assert.equal(records.length, 9);
+    assertFrame(records);
+    const record = (id: string) => records.find((item) => item.sourceKey === `svgid:${id}`)!;
+    // Measured on Chromium 141 (pixel-verified with the fixture): a nested auto viewport clips
+    // nothing, so only the outer viewport stands in the chain.
+    for (const id of ["nested-auto", "nested-auto-attribute"]) assertClips(record(id).viewportLocal!.clips, [{ x: 0, y: 0, width: 400, height: 100 }], id);
+    assertClips(record("nested-scroll").viewportLocal!.clips, [{ x: 40, y: 10, width: 160, height: 80 }, { x: 0, y: 0, width: 400, height: 100 }], "nested-scroll");
+    for (const id of ["kind-root-auto", "kind-root-paint", "kind-root-axes"]) {
+      assert.equal(record(id).clipped, true, id);
+      assertClips(record(id).viewportLocal!.clips, [{ x: 0, y: 0, width: 400, height: 100 }], id);
+    }
+    const { outcome, overshoot, reported } = svgFrameVerdicts(document);
+    assertLabels(overshoot, reported, ["nauto-in", "nattr-in", "nscroll-in", "nscroll-out", "rauto-in", "rauto-out", "paint-in", "paint-out", "axes-in", "axes-out"]);
+    const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
+    assert.deepEqual([coverage?.candidates, coverage?.measured, coverage?.notMeasured.length], [10, 10, 0]);
+    assert.equal(exitCodeFor(outcome.report.verdict), 1);
+  });
+
+  it("clips at the used boxes when layout snaps fractional padding, border and zoom", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = svgFrameDocument(t, 5);
+    if (!document) return;
+    const records = document.snapshot!.svg;
+    assert.equal(records.length, 3);
+    assertFrame(records);
+    const clip = (id: string) => records.find((record) => record.sourceKey === `svgid:${id}`)!.viewportLocal!.clips;
+    // The used content box of a 317.389px border box with padding 2.7px: 312 wide, not 311.975.
+    assert.ok(Math.abs(clip("used-padding")[0]!.width - 312) < 1e-6, JSON.stringify(clip("used-padding")));
+    // The used padding box of a 300.3px border box with padding 2.3px ends 298 px right of the
+    // content corner: 2.296875 of used padding on each side.
+    const paddingBox = clip("used-padding-box")[0]!;
+    assert.ok(Math.abs(paddingBox.x + 2.296875) < 1e-6 && Math.abs(paddingBox.x + paddingBox.width - 298) < 1e-6, JSON.stringify(paddingBox));
+    const { outcome, overshoot, reported } = svgFrameVerdicts(document);
+    assertLabels(overshoot, reported, ["pad-in", "pad-out", "zoom-in", "zoom-out", "pb-in", "pb-out"]);
+    assert.equal(exitCodeFor(outcome.report.verdict), 1);
+  });
+
+  it("reads computed values past a page that shadows the style getters", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = svgFrameDocument(t, 6);
+    if (!document) return;
+    const records = document.snapshot!.svg;
+    assert.equal(records.length, 1);
+    assertFrame(records);
+    assert.equal(records[0]!.clipped, true, "the shadowed overflow getter must not exempt the SVG");
+    assertClips(records[0]!.viewportLocal!.clips, [{ x: 0, y: 0, width: 400, height: 100 }], "spoofed");
+    const { outcome, overshoot, reported } = svgFrameVerdicts(document);
+    assertLabels(overshoot, reported, ["spoof-in", "spoof-out"]);
     assert.equal(exitCodeFor(outcome.report.verdict), 1);
   });
 

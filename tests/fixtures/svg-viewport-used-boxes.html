@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SVG viewports laid out off the computed values</title>
+<!--
+  Layout snaps boxes to 1/64 px; computed style does not. A padding of 2.7px lays out as 2.6875,
+  so a border-box SVG 317.389px wide has a used content box 312 px wide against a computed
+  311.975. A collector that rebuilds the clip from computed values finds CDP's content quad
+  0.025 px away and must decline the SVG or misplace its clip; 0.6.0, which declined every padded
+  SVG, ended this document exit 4 without a verdict. The clip is now the used box itself, CDP's
+  quads carried back into the SVG's frame, and the computed values are only a units check.
+
+  Three SVGs, none with a viewBox, so user units are frame px from the content-box corner:
+  - fractional padding under box-sizing: border-box (Paged.js sets border-box on every element
+    of the page; the fixture states it so that the unpaginated render is the same);
+  - the same under zoom: 1.37 on the SVG itself, with a 2 px border that snaps in the zoomed box;
+  - a padding-box clip margin (serialised "0px") on a fractional padding: the clip is the USED
+    padding box, 298 px to the right of the content corner.
+  Each `*-in` label ends 6 px inside the clip edge, each `*-out` label 6 px past it (advances fixed
+  with textLength). Pixel-verified on Chromium 141 when authored, raw and paginated. Expected:
+  exactly the three `*-out` labels reported, exit 1, nothing declined.
+-->
+<style>
+  @page { size: 420pt 640pt; margin: 24pt; }
+  body { font: 11pt/1.35 serif; margin: 0; }
+  figure { margin: 0 0 10pt; }
+  svg text { font-family: "DejaVu Sans", sans-serif; font-size: 16px; }
+  figcaption { font-size: 8pt; }
+</style>
+</head>
+<body>
+<p>Three viewports whose used boxes are not their computed ones.</p>
+
+<figure>
+  <!-- used content box 312 x 89.09375 -->
+  <svg id="used-padding" xmlns="http://www.w3.org/2000/svg"
+       style="display: block; box-sizing: border-box; width: 317.389px; height: 91.7px; padding: 1.3px 2.7px; overflow: hidden">
+    <rect width="312" height="89" fill="#eeeeee"></rect>
+    <text id="pad-in" x="206" y="30" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="pad-out" x="218" y="70" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>Fractional padding under border-box: the clip is the used content box, x = 312.</figcaption>
+</figure>
+
+<figure>
+  <!-- used content box 209.774 x 73.78 in the SVG's own (unzoomed) frame -->
+  <svg id="used-zoom" xmlns="http://www.w3.org/2000/svg"
+       style="display: block; zoom: 1.37; box-sizing: border-box; width: 233.3px; height: 83.3px; padding: 3.3px 10.3px; border: 2px solid #333333; overflow: hidden">
+    <rect width="209" height="73" fill="#eeeeee"></rect>
+    <text id="zoom-in" x="103.77" y="25" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="zoom-out" x="115.77" y="60" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>The same under zoom 1.37 on the SVG itself: the clip is at x = 209.77 of its own frame.</figcaption>
+</figure>
+
+<figure>
+  <!-- used padding box: 300.296875 wide, 2.296875 left of the content corner, so its right edge is at 298 -->
+  <svg id="used-padding-box" xmlns="http://www.w3.org/2000/svg"
+       style="display: block; box-sizing: border-box; width: 300.3px; height: 80px; padding: 2.3px; overflow: hidden; overflow-clip-margin: padding-box">
+    <rect width="296" height="75" fill="#eeeeee"></rect>
+    <text id="pb-in" x="192" y="30" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+    <text id="pb-out" x="204" y="65" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+  </svg>
+  <figcaption>A padding-box clip on a fractional padding: the clip is the used padding box, x = 298.</figcaption>
+</figure>
+</body>
+</html>

@@ -177,9 +177,10 @@ acquisition does not yet collect. Version 0.3.1 therefore removes them from the 
 configuration schema, SARIF catalogue and demo instead of counting two rules that answer nothing.
 Their real-renderer lab remains explicitly research-only. `svg/text-overflows-viewport` needs only
 geometry and measures ordinary solid-fill text. When `getBBox()` cannot prove painted bounds
-(for example `<use>`, stroke, clip/mask/filter or a paint server), or CSS on the SVG or an ancestor
-makes its axis-aligned border box differ from the clipping viewport, the target declines coverage-relevantly and the error rule
-fails closed with exit 4 rather than guessing.
+(for example `<use>`, stroke, per-glyph `rotate`, clip/mask/filter or a paint server), or the clip
+that applies is one the collector does not rebuild in the SVG's own frame (a rounded or 3D-transformed
+viewport, a clip-path on the SVG, a clipping ancestor it cannot prove harmless), the target declines
+coverage-relevantly and the error rule fails closed with exit 4 rather than guessing.
 
 **Their validation foundation is real-renderer, not real-corpus.** M3-0 exercises the ink rules'
 known construction and boundary cases in Chrome/Paged.js; it does not establish population

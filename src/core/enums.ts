@@ -295,6 +295,10 @@ export const COVERAGE_FLOOR_BY_SEVERITY: Readonly<Record<Severity, number>> = {
  * not chosen, and it is the resolution of the stored data rather than a tolerance: a rule may
  * refuse to call 0.01 px an overshoot without weakening a structural threshold, because 0.01 px
  * is not something these numbers can distinguish from zero.
+ *
+ * It describes the SCREEN boxes. Since snapshot 5 the SVG local frame (`SvgViewportLocal`,
+ * `SvgTextTarget.boxLocal`) is stored unrounded, and `svg/text-overflows-viewport` decides against
+ * its own stated resolution, `SVG_OVERSHOOT_EPSILON_PX` in `src/measure/svg-viewport.ts`.
  */
 export const SNAPSHOT_ROUNDING_PX = 0.01;
 
@@ -328,12 +332,17 @@ export const SNAPSHOT_SCHEMA_VERSION = 5;
 export const SVG_VIEWPORT_DIAGNOSTICS = [
   /** Computed width, height, border or padding is not a plain px length, or box-sizing is unknown. */
   "box-unreadable",
-  /** overflow-x and overflow-y differ: measured on Chromium 141, a one-axis clip moves the edge. */
+  /**
+   * overflow-x and overflow-y differ in a way not modelled: `visible` with `clip` on an outermost
+   * SVG (measured: x unclipped, y clipped at the padding box), any mixed pair on a nested one.
+   */
   "overflow-axes-differ",
   /** An overflow keyword this collector does not model. */
   "overflow-unrecognised",
   /** An `overflow-clip-margin` serialisation outside `<visual-box>? <length>?`. */
   "clip-margin-unrecognised",
+  /** A `contain` or `content-visibility` serialisation this collector does not know. */
+  "containment-unrecognised",
   /** A nonzero inner corner radius: the clip is rounded, not the rectangle compared against. */
   "rounded-clip",
   /** Any corner radius together with a nonzero or non-content-box clip margin. */
@@ -346,8 +355,21 @@ export const SVG_VIEWPORT_DIAGNOSTICS = [
   "matrix-unavailable",
   /** CDP returned no content quad for the SVG, so the frame has no independent proof. */
   "oracle-unavailable",
-  /** The reconstructed content box and CDP's content quad disagree beyond the stated tolerance. */
+  /**
+   * CDP's quads, carried back into the frame, are not the frame's rectangles — off the origin, not
+   * rectangles, not nested — beyond SVG_FRAME_TOLERANCE_PX.
+   */
   "oracle-disagreed",
+  /** The computed-style content box and the used one differ beyond SVG_MODEL_TOLERANCE_PX. */
+  "box-model-disagreed",
+  /** The frame's error bound does not fit inside SVG_OVERSHOOT_EPSILON_PX (float32 quads far down a run). */
+  "frame-imprecise",
+  /**
+   * A clip-path, mask, url() filter or legacy clip on the outermost SVG or an HTML ancestor inside
+   * the page area; a rounded or unknown ancestor clip; or an ancestor clip not proven to contain
+   * the SVG's own — including an SVG with no clip of its own under a clipping ancestor.
+   */
+  "ancestor-clip",
   /** A nested `<svg>` with a non-identity transform. */
   "nested-transform",
   /** A nested `<svg>`'s x/y/width/height from its attributes disagree with its computed style. */

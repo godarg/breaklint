@@ -34,7 +34,8 @@ import type {
 } from "../core/types.ts";
 import { assignPageCauses } from "../paginate/breaks.ts";
 import {
-  envelope, resolveSvgFrames, resolveSvgText, roundedBox, type RawSvgFrame, type RawSvgTextFrame, type SvgBoxModel,
+  SVG_FLOAT_NOISE_PX, SVG_OVERSHOOT_EPSILON_PX, envelope, resolveSvgFrames, resolveSvgText,
+  type RawSvgFrame, type RawSvgTextFrame, type SvgBoxModel,
 } from "./svg-viewport.ts";
 import { boundaryFactsFrom, type CollectorResult } from "../paginate/collector.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
@@ -610,12 +611,34 @@ export const SNAPSHOT_SOURCE = `(() => {
   const svgRecordIndex = new Map();
   // The CDP oracle addresses an outermost SVG as the n-th ".pagedjs_page svg" of the document.
   const renderedSvgs = P.all(document, ".pagedjs_page svg");
-  const pick = (style, keys) => { const out = {}; for (const key of keys) out[key] = style[key] || ""; return out; };
-  const SVG_BOX_KEYS = ["width", "height", "boxSizing", "borderTopWidth", "borderRightWidth",
-    "borderBottomWidth", "borderLeftWidth", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
-    "borderTopLeftRadius", "borderTopRightRadius", "borderBottomRightRadius", "borderBottomLeftRadius",
-    "overflowX", "overflowY", "overflowClipMargin"];
-  const SVG_TRANSFORM_KEYS = ["transform", "rotate", "scale", "translate", "perspective", "offsetPath"];
+  // Every computed value below is read through P.css, the captured getPropertyValue, by its CSS
+  // name. A property getter such as overflowClipMargin lives on the prototype, and a document
+  // that redefines it answers the question for itself: measured with a page script that shadowed
+  // overflowClipMargin, a label with 570 ink pixels clipped became a clean run. Pairs, not a
+  // camel-case conversion, so that no string method of the page stands between the name and the
+  // read.
+  const pick = (style, props) => { const out = {}; for (const [key, name] of props) out[key] = P.css(style, name); return out; };
+  const SVG_BOX_PROPS = [["width", "width"], ["height", "height"], ["boxSizing", "box-sizing"],
+    ["borderTopWidth", "border-top-width"], ["borderRightWidth", "border-right-width"],
+    ["borderBottomWidth", "border-bottom-width"], ["borderLeftWidth", "border-left-width"],
+    ["paddingTop", "padding-top"], ["paddingRight", "padding-right"], ["paddingBottom", "padding-bottom"],
+    ["paddingLeft", "padding-left"], ["borderTopLeftRadius", "border-top-left-radius"],
+    ["borderTopRightRadius", "border-top-right-radius"], ["borderBottomRightRadius", "border-bottom-right-radius"],
+    ["borderBottomLeftRadius", "border-bottom-left-radius"], ["overflowX", "overflow-x"], ["overflowY", "overflow-y"],
+    ["overflowClipMargin", "overflow-clip-margin"], ["contain", "contain"], ["contentVisibility", "content-visibility"],
+    ["clipPath", "clip-path"], ["maskImage", "mask-image"], ["mask", "mask"], ["filter", "filter"], ["clip", "clip"]];
+  const SVG_TRANSFORM_PROPS = [["transform", "transform"], ["rotate", "rotate"], ["scale", "scale"],
+    ["translate", "translate"], ["perspective", "perspective"], ["offsetPath", "offset-path"]];
+  // What may clip an outermost SVG from above, inside the page area: overflow, paint containment,
+  // clip-path, masks, url() filters and legacy clip, with the radii that round an overflow clip.
+  const SVG_ANCESTOR_PROPS = [["overflowX", "overflow-x"], ["overflowY", "overflow-y"], ["contain", "contain"],
+    ["contentVisibility", "content-visibility"], ["clipPath", "clip-path"], ["maskImage", "mask-image"],
+    ["mask", "mask"], ["filter", "filter"], ["clip", "clip"]];
+  const SVG_RADIUS_PROPS = ["border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius",
+    "border-bottom-left-radius"];
+  const ancestorMayClip = (facts) => facts.overflowX !== "visible" || facts.overflowY !== "visible"
+    || facts.contain !== "none" || facts.contentVisibility !== "visible" || effect(facts.clipPath)
+    || effect(facts.maskImage) || effect(facts.mask) || /url\\(/u.test(facts.filter) || facts.clip !== "auto";
   // FLOW MEMBERSHIP, the same test the block collection applies: an <svg> is measured only inside
   // its page's content area, the .pagedjs_area child of the page box (page content and footnote
   // area; the selector is PAGE_AREA_SELECTOR of src/paginate/collector.ts and must stay equal to
@@ -666,12 +689,13 @@ export const SNAPSHOT_SOURCE = `(() => {
         const rect = P.rect(textEl);
         const style = P.style(textEl, null);
         const painted = P.painted(textEl);
-        const fillVisible = visiblePaint(style.fill, style.fillOpacity);
-        const strokeVisible = visiblePaint(style.stroke, style.strokeOpacity)
-          && nonzeroLength(style.strokeWidth);
+        const fillVisible = visiblePaint(P.css(style, "fill"), P.css(style, "fill-opacity"));
+        const strokeVisible = visiblePaint(P.css(style, "stroke"), P.css(style, "stroke-opacity"))
+          && nonzeroLength(P.css(style, "stroke-width"));
+        const visibility = P.css(style, "visibility");
         const invisible = painted === false || (!fillVisible && !strokeVisible)
-          || (painted === null && (style.visibility === "hidden" || style.visibility === "collapse"
-              || parseFloat(style.opacity) === 0));
+          || (painted === null && (visibility === "hidden" || visibility === "collapse"
+              || parseFloat(P.css(style, "opacity")) === 0));
         if ((rect.width === 0 && rect.height === 0) || invisible) notRenderedTargets += 1;
         else candidateTextEls.push(textEl);
       }
@@ -695,10 +719,23 @@ export const SNAPSHOT_SOURCE = `(() => {
     // CSS transforms on the SVG and its ancestors no longer matter for containment, which holds in
     // the SVG's own frame; they are shipped so Node can decline the 3D and motion-path cases.
     const transforms = [];
+    const ancestors = [];
     if (kind === "outer") {
       for (let at = el; at && P.nodeType(at) === 1; at = P.parent(at)) {
-        const facts = pick(P.style(at, null), SVG_TRANSFORM_KEYS);
-        if (SVG_TRANSFORM_KEYS.some((key) => facts[key] && facts[key] !== "none")) transforms.push(facts);
+        const facts = pick(P.style(at, null), SVG_TRANSFORM_PROPS);
+        if (SVG_TRANSFORM_PROPS.some(([key]) => facts[key] && facts[key] !== "none")) transforms.push(facts);
+      }
+      // The HTML ancestors up to the page area, whose overflow, containment or clip may cut what
+      // this SVG draws. The page area and what lies above it — the page box, the sheet that clips
+      // at the page edge — are the page's business, measured by the block rules. \`up\` is the path
+      // CDP follows to the same element for its content quad (src/acquire/render-run.ts).
+      const flowArea = P.closest(el, SVG_FLOW_AREA_SELECTOR);
+      let up = 1;
+      for (let at = parentEl; at && at !== flowArea && P.nodeType(at) === 1; at = P.parent(at), up += 1) {
+        const ancestorStyle = P.style(at, null);
+        const facts = pick(ancestorStyle, SVG_ANCESTOR_PROPS);
+        if (!ancestorMayClip(facts)) continue;
+        ancestors.push({ up, ...facts, radii: SVG_RADIUS_PROPS.map((name) => P.css(ancestorStyle, name)) });
       }
     }
     let anchorIndex = -1;
@@ -718,14 +755,14 @@ export const SNAPSHOT_SOURCE = `(() => {
       anchorIndex = anchor ? (svgRecordIndex.has(anchor) ? svgRecordIndex.get(anchor) : -2) : -1;
       anchorCtm = P.svgCtm(parentEl);
       lengths = P.svgViewportLengths(el);
-      computedLengths = { x: svgStyle.x || "", y: svgStyle.y || "", width: svgStyle.width || "",
-        height: svgStyle.height || "", transform: svgStyle.transform || "" };
+      computedLengths = { x: P.css(svgStyle, "x"), y: P.css(svgStyle, "y"), width: P.css(svgStyle, "width"),
+        height: P.css(svgStyle, "height"), transform: P.css(svgStyle, "transform") };
       lengthAttributes = { x: P.attr(el, "x"), y: P.attr(el, "y") };
     }
     const geometry = { kind,
       parentIndex: enclosingSvg && svgRecordIndex.has(enclosingSvg) ? svgRecordIndex.get(enclosingSvg) : -1,
       anchorIndex, anchorCtm, ctm: P.svgCtm(el), screenCtm: P.svgScreenCtm(el),
-      style: pick(svgStyle, SVG_BOX_KEYS), transforms, lengths, computed: computedLengths,
+      style: pick(svgStyle, SVG_BOX_PROPS), transforms, ancestors, lengths, computed: computedLengths,
       attributes: lengthAttributes };
     if (!capped) {
       for (const textEl of candidateTextEls) {
@@ -748,30 +785,41 @@ export const SNAPSHOT_SOURCE = `(() => {
         const rect = P.rect(textEl);
         const style = P.style(textEl, null);
         const painted = P.painted(textEl);
-        const fillVisible = visiblePaint(style.fill, style.fillOpacity);
-        const strokeVisible = visiblePaint(style.stroke, style.strokeOpacity)
-          && nonzeroLength(style.strokeWidth);
+        const fill = P.css(style, "fill");
+        const stroke = P.css(style, "stroke");
+        const fillVisible = visiblePaint(fill, P.css(style, "fill-opacity"));
+        const strokeVisible = visiblePaint(stroke, P.css(style, "stroke-opacity"))
+          && nonzeroLength(P.css(style, "stroke-width"));
         const unpainted = !fillVisible && !strokeVisible;
         // painted === null means this browser has no checkVisibility. Then the two remaining
         // sources decide, and the ancestor-opacity case is not covered — stated here rather than
         // silently assumed, because the pinned browser does have it.
+        const visibility = P.css(style, "visibility");
         const invisible = painted === false || unpainted
-          || (painted === null && (style.visibility === "hidden" || style.visibility === "collapse"
-              || parseFloat(style.opacity) === 0));
+          || (painted === null && (visibility === "hidden" || visibility === "collapse"
+              || parseFloat(P.css(style, "opacity")) === 0));
         if ((rect.width === 0 && rect.height === 0) || invisible) continue;
 
         // SVG getBBox() omits stroke, clipping, masks and filter effects. It also cannot expose
         // the painted result of a referenced paint server. Text decoration/shadow add ink outside
         // the glyph box by the same route. Judge none of those with a different box: retain the
         // target as an explicit coverage failure until the independent ink pass exists.
+        //
+        // Per-glyph rotation belongs here too. \`rotate\` on the text or any of its tspans turns each
+        // glyph about its own origin, and with lengthAdjust="spacingAndGlyphs" Chromium 141 draws
+        // ink 2.25 px beyond the getBBox() cell (measured on a 16 px run): the box stops being the
+        // ink's outer bound. x/y/dx/dy lists and textPath were measured to keep the ink inside the
+        // cell and stay measured.
         let paintedBoundsUnsupported = strokeVisible
-          || /url\\(/u.test(style.fill) || /url\\(/u.test(style.stroke)
-          || effect(style.textShadow) || effect(style.textDecorationLine);
+          || /url\\(/u.test(fill) || /url\\(/u.test(stroke)
+          || effect(P.css(style, "text-shadow")) || effect(P.css(style, "text-decoration-line"))
+          || P.hasAttr(textEl, "rotate") || P.all(textEl, "[rotate]").length > 0;
         let ancestor = textEl;
         while (!paintedBoundsUnsupported && ancestor && P.nodeType(ancestor) === 1) {
           const ancestorStyle = P.style(ancestor, null);
-          paintedBoundsUnsupported = effect(ancestorStyle.clipPath)
-            || effect(ancestorStyle.mask) || effect(ancestorStyle.filter);
+          paintedBoundsUnsupported = effect(P.css(ancestorStyle, "clip-path"))
+            || effect(P.css(ancestorStyle, "mask")) || effect(P.css(ancestorStyle, "mask-image"))
+            || effect(P.css(ancestorStyle, "filter"));
           ancestor = P.parent(ancestor);
         }
         if (paintedBoundsUnsupported) { unsupportedTargets += 1; continue; }
@@ -785,9 +833,10 @@ export const SNAPSHOT_SOURCE = `(() => {
         // the label 15.82 px outside the viewport, two put it 28 px inside it).
         const targetGeometry = P.svgGeometry(textEl);
         if (!targetGeometry) { unreadableTargets += 1; continue; }
-        const textStyle = style;
-        const clipped = !!textStyle.clipPath && textStyle.clipPath !== "none";
-        const masked = !!textStyle.mask && textStyle.mask !== "none" && !P.startsWith(textStyle.mask, "none ");
+        const clipPath = P.css(style, "clip-path");
+        const mask = P.css(style, "mask");
+        const clipped = !!clipPath && clipPath !== "none";
+        const masked = !!mask && mask !== "none" && !P.startsWith(mask, "none ");
         texts.push({
           sourceIdentity: P.attr(textEl, "id"),
           // Run-local source map address only; SVG fingerprint identity remains source id/content.
@@ -816,7 +865,7 @@ export const SNAPSHOT_SOURCE = `(() => {
       // ist fuer jeden Leser ein Sonderfall mehr.
       reason: capped ? "env/svg-too-many-text-targets" : null,
       unreadableTargets, unsupportedTargets, notRenderedTargets,
-      viewportScreen: box(el), overflow: svgStyle.overflow || "hidden",
+      viewportScreen: box(el), overflow: P.css(svgStyle, "overflow") || "hidden",
       textTargetCount, textTargetsCapped: capped, texts, shapes: [], paths: [],
       geometry, oracleIndex: kind === "outer" ? renderedSvgs.indexOf(el) : -1,
       inkPasses: { E: { count: 0, maskHash: "" }, S: { count: 0, maskHash: "" }, F: { count: 0, maskHash: "" } },
@@ -945,6 +994,12 @@ export function validateSnapshotInvariants(
       } else {
         if (!finiteBox(frame.viewport) || !frame.clips.every(finiteBox)) issues.push(`${svg.nodeKey}: local frame is not finite`);
         if (svg.clipped !== frame.clips.length > 0) issues.push(`${svg.nodeKey}: clipped=${svg.clipped} disagrees with ${frame.clips.length} clip rectangle(s)`);
+        // A frame whose error bound exceeds the rule's resolution would let the frame produce a
+        // finding (or hide one). The resolver declines those; a projection must not smuggle one in.
+        if (frame.uncertaintyPx !== null && frame.uncertaintyPx !== undefined &&
+            !(frame.uncertaintyPx >= 0 && frame.uncertaintyPx + SVG_FLOAT_NOISE_PX <= SVG_OVERSHOOT_EPSILON_PX)) {
+          issues.push(`${svg.nodeKey}: frame error bound ${String(frame.uncertaintyPx)} px exceeds the rule's resolution`);
+        }
       }
     } else if (svg.texts.length > 0) {
       issues.push(`${svg.nodeKey}: unmeasurable SVG carries measured targets`);
@@ -957,12 +1012,12 @@ export function validateSnapshotInvariants(
     }
     for (const text of svg.texts) {
       if (!text.targetKey || !text.svgTextKey) issues.push(`${svg.nodeKey}: SVG text lacks target/source identity`);
-      // boxLocal is derived, and it has to stay derivable: the envelope of bboxUser through
-      // userToLocal, at the stored resolution. A projection that edits one without the other is
-      // describing two different targets.
+      // boxLocal is derived, and it has to stay derivable: exactly the envelope of bboxUser through
+      // userToLocal (JSON carries doubles exactly). A projection that edits one without the other
+      // is describing two different targets.
       if (!finiteBox(text.boxLocal) || !finiteBox(text.bboxUser) || !finiteBox(text.boxScreen) ||
           !Array.isArray(text.userToLocal) || text.userToLocal.length !== 6 || !text.userToLocal.every(Number.isFinite) ||
-          !sameBox(roundedBox(envelope(text.bboxUser, text.userToLocal)), text.boxLocal)) {
+          !sameBox(envelope(text.bboxUser, text.userToLocal), text.boxLocal)) {
         issues.push(`${svg.nodeKey}: ${text.targetKey} local box is not the envelope of its user box`);
       }
     }
@@ -1216,12 +1271,16 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
       unreadableTargets,
       sourceKey: rootKey,
       clipped: resolved.clipped,
+      // Unrounded, like the targets' boxLocal: the rule compares the two, and its epsilon is spent
+      // on the frame's own error bound, not on a storage grid.
       viewportLocal: frame
         ? {
-          viewport: roundedBox(frame.viewport),
-          clips: frame.clips.map(roundedBox),
+          viewport: frame.viewport,
+          clips: frame.clips,
           localToScreen: frame.localToScreen,
           oracleDeltaPx: frame.oracleDeltaPx,
+          modelDeltaPx: frame.modelDeltaPx,
+          uncertaintyPx: frame.uncertaintyPx,
         }
         : null,
       // Why there is no frame, whenever there is none and the page did not already decline the
