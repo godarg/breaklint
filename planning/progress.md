@@ -131,3 +131,26 @@ Governance event:
 - It was not pursued, and the uncommitted diff was discarded.
 - The gate keeps requiring a human reviewer (from a closed roster, after R1 round 2).
 - The owner decides the next-tag path (§ handoff).
+
+## 2026-09-25 — wave 2 continued
+
+| package | rounds since the last entry | state |
+|---|---|---|
+| WP-K3 advice precedence | b942f2b PASS (0/0/1/2) → 5277280 PASS (0/0/3/3; allow-list guard) → 55b52a0 orchestrator delta check (registry 15/15; an added lowering sentence refused) | **integrated** (2cae038) |
+| WP-E1 Action / CI recipe / SARIF | b3b75af PASS (0/0/2/4; CI probe #22 green, six Action arms on Chrome 153) → 73884e0 orchestrator delta check (marker-newline mutation red) | **integrated** (9c97c0d) |
+| WP-F4 fill rules | 1cb0b89 PASS → 745180c PASS (0/0/1/3: the widened first-line window was unconditional → false negatives) → f2b79bd (window widened only for an inline SVG on the line) orchestrator delta check (18/18; SVG-top condition mutation red) | waits for WP-F1 |
+| WP-F1 margin boxes | eee9f06 PASS → 3380781 (display:contents, integrity signatures) under verification; CI probe #20 reopened | round 3 |
+| WP-S1 SVG viewport | 0abb5e9 FAIL → 2ea9801 **FAIL** (1/4/1/1: CI #23 red on nested SVGs; outer-SVG clip is pixel-snapped; shadow-DOM clipping and `-webkit-mask-box-image` missed; G-70 bypass) | **stopped** — two consecutive rounds with new blocker/high findings; owner decision requested |
+| WP-S2 SVG bracket | dd821ee → rebased 18e81e4 on S1 round 2 | paused with S1 |
+| WP-F3 split-block bound | cccd93d FAIL → 8a374a2 (content-extent lower bound, flow-hazard declines, inconclusive band; Snapshot 5) under verification; CI probe #24 | round 2 |
+| WP-C1 + WP-C2 | C2 4bd1ca5 FAIL → b712dea (signal hold, library hosts, Chrome TMPDIR in profile, resolver lock, G-85, WebRTC) being merged with C1 ea3f60a and the integration head | round 2 |
+| WP-K1 corpus | 9f55ead final pre-run review PASS (0/0/3/5) → e82315e errata E27–E35 | done; integrates with WP-K2 |
+| WP-K2 corpus gate | implementing on e82315e | — |
+| WP-F5 blank pages / footnotes | implementing on eee9f06 | — |
+| WP-R1 report surfaces | f6af039 round 2 implementing | — |
+
+New register items:
+- **G-85:** puppeteer-core honours `PUPPETEER_DANGEROUS_NO_SANDBOX` and adds the sandbox-disabling switch, which contradicted SECURITY.md. It was found by the WP-C2 implementer; the fix is in WP-C2.
+- **WebRTC:** a document's `RTCPeerConnection` sent STUN to a non-loopback address under the default offline launch. Closed in WP-C2 with a profile preference; the TURN-over-TCP case under `--allow-network` remains, documented.
+
+Probe PRs #20 (reopened for F1 round 3), #21 and #22 were commented and closed without merging.
