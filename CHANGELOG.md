@@ -56,18 +56,26 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   property, or applies it differently from what the published text says — and a red run lists the
   advice and page sentences the pin decides.
 - **The registry guard that banned `widows`/`orphans` from all advice is now an allow-list derived
-  from that pin.** It reads every rule's advice, every rule page outside its generated block,
-  `docs/agent-contract.md`, and `src/api/context.ts` including its comments. Every sentence there that
-  names `widows` or `orphans` must be one of the 19 reviewed sentences in
-  `APPROVED_FRAGMENTATION_SENTENCES`, at the place it is approved for; a sentence that says the
-  browser applies a property is approved only while the pin shows that. Any other sentence fails,
-  named with its place, and so does an approved sentence that is no longer published. Two vocabulary
-  checks sit on top and hold even for an approved sentence: never, in any pin state, a proposal to
-  lower an author's own value or set it to 0 or 1; and, while the pin says a property is not
-  applied, no proposal to set or raise it. A blacklist version of this guard was walked around by
-  eight phrasings in review ("disregards", "does not support", "set 'widows: 1'", ...); all eight,
-  and one more per direction, are kept in the unit suite as negative controls. Each sentence the pin
-  decides is also checked to be present and to agree with the pin.
+  from that pin.** It reads every rule's advice, summary and finding messages (sampled from the
+  corpus fixtures, numbers normalised), every rule page outside its generated block, README.md,
+  every `docs/*.md` page, and the comments of `src/api/context.ts`. The complete `layout/widow` and
+  `layout/orphan` advice texts must equal their approved texts exactly. Every other unit that names
+  `widows` or `orphans` (also spelled `widow-control`, "widow/orphan", "widow and orphan") must equal
+  one of the reviewed units in `APPROVED_FRAGMENTATION_TEXTS`, at the place it is approved for: a whole
+  advice, summary or message, otherwise a paragraph, heading, table row or list item — so a sentence
+  added to such a paragraph fails even if it does not name a property. A unit asserting that the
+  browser applies a property, including the measured 6+3 relaxation, is approved only while the pin
+  shows that; an approval for text that is no longer published also fails. Two checks hold even for
+  an approved unit, and also run on fenced code, HTML comments and inline `style=` attributes: in every
+  pin state, no proposal to lower an author's own value (a lowering verb or comparative such as lower,
+  smaller, reduce, decrease, remove, reset, drop or unset near the property, or a 0/1, `initial`,
+  `unset` or `revert` value given to it by `:`, `=`, `to`, `of` or "value of"); and, while the pin
+  says a property is not applied, no proposal to set or raise it, including any numeric value. A
+  numeric value above 1 is not treated as lowering, because it is how a measured case is named. Not
+  covered: a paragraph that neither names a property nor belongs to a pinned advice text. Two review
+  rounds walked around earlier versions of this guard with 22 phrasings; all of them, and more controls
+  per check, are kept in the unit suite. Each text the pin decides is also checked to be present and
+  to agree with the pin.
 - **`remediation.interactions` is validated.** A lever is one of `INTERACTION_LEVERS` (`hyphens`,
   `soft-hyphen`). `defineRule` refuses a malformed declaration (self reference, unknown relation,
   lever or scope, an advice that does not name its partner or never mentions the lever); the registry test
@@ -91,6 +99,8 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   flow, and each is also its rule's threshold, so changing it is not a fix. The comment on the repair
   map in `src/api/context.ts` said "Chromium does not honour them under Paged.js" and now says the same
   as the agent contract.
+- `docs/rules/layout-orphan.md` names the measured `orphans` 1 case without an `orphans: 1`
+  declaration, which the guard now reads as a lowering proposal.
 
 ## 0.6.0 — 2026-09-18
 

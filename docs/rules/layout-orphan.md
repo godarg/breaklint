@@ -35,9 +35,10 @@ A block fragment ENDS at a page break carrying fewer lines than the block's own 
 > [!NOTE]
 > Chromium applies `orphans` when Paged.js splits a paragraph. Paged.js 0.4.3 never reads the
 > property, but it cuts every page where the browser's own column fragmentation broke, and the
-> browser honours `orphans` there. With room for one line of a 9-line paragraph, `orphans: 1`
-> splits it 1+8 while the initial 2 and `orphans: 4` move it whole to the next page; with room
-> for three lines, `orphans: 1` and the initial value split it 3+6 and `orphans: 4` moves it.
+> browser honours `orphans` there. With room for one line of a 9-line paragraph, the fixture's
+> `orphans` 1 case splits it 1+8 while the initial 2 and `orphans: 4` move it whole to the next
+> page; with room for three lines, the 1 case and the initial value split it 3+6 and
+> `orphans: 4` moves it.
 > `tests/live/fragmentation-levers.test.ts` pins those splits and goes red when the browser stops
 > producing them. Earlier versions of this page and of the advice said the opposite without
 > having asked the browser.

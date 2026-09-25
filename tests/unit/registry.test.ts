@@ -10,11 +10,12 @@ import {
   type RuleMeta,
 } from "../../src/core/rule.ts";
 import {
-  APPROVED_FRAGMENTATION_SENTENCES, CLAIMS_DECIDED_BY_THE_PIN, leversApplied, SOFT_HYPHEN_BOUNDARY,
+  APPROVED_FRAGMENTATION_TEXTS, CLAIMS_DECIDED_BY_THE_PIN, leversApplied, SOFT_HYPHEN_BOUNDARY,
   WIDOWS_ORPHANS_SPLITS,
 } from "../fixtures/fragmentation-levers.ts";
 import {
-  approvedKeys, fragmentationProblems, guardedTexts, placeLabel, proseSentences, sentencesNamingProperties,
+  approvedKeys, codeSegments, fragmentationProblems, guardedUnits, isJudged, placeLabel, proseSentences,
+  type GuardedUnit,
 } from "../tools/fragmentation-guard.ts";
 
 /**
@@ -107,95 +108,134 @@ describe("rule registry", () => {
     }
   });
 
-  it("every sentence naming widows/orphans in advice, rule pages, the agent contract and the repair map is approved by the pin", () => {
+  it("every guarded unit naming widows/orphans, and the complete widow/orphan advice, is approved by the pin", () => {
     assert.deepEqual(Object.keys(APPLIED).sort(), ["orphans", "widows"], "the guard must have a pin to follow");
-    const sentences = sentencesNamingProperties(guardedTexts(ALL_RULES, REPO_ROOT));
-    assert.ok(sentences.length >= 15, `the guard reads too few sentences to be guarding anything (${sentences.length})`);
-    assert.deepEqual(fragmentationProblems(sentences, APPLIED), []);
-    // And the other way round: every sentence approved under this pin is still published, so the
-    // list cannot silently keep approvals for text that no longer exists.
-    const published = new Set(sentences.map(({ place, sentence }) => `${place}\u0000${sentence}`));
+    const units = guardedUnits(ALL_RULES, REPO_ROOT);
+    const judged = units.filter(isJudged);
+    assert.ok(judged.length >= 19, `the guard reads too few units to be guarding anything (${judged.length})`);
+    for (const place of ["layout/widow summary", "layout/widow finding message", "layout/orphan finding message", "README.md", "docs/agent-contract.md", "src/api/context.ts"]) {
+      assert.ok(judged.some((unit) => unit.place === place), `the guard no longer reads ${place}`);
+    }
+    assert.deepEqual(fragmentationProblems(units, APPLIED), []);
+    // And the other way round: every text approved under this pin is still published, so the list
+    // cannot silently keep approvals for text that no longer exists.
+    const published = new Set(judged.map(({ place, text }) => `${place}\u0000${text}`));
     const stale = [...approvedKeys(APPLIED)].filter((key) => !published.has(key)).map((key) => key.replace("\u0000", ": "));
-    assert.deepEqual(stale, [], "approved sentences that are no longer published — remove or update them");
+    assert.deepEqual(stale, [], "approved texts that are no longer published — remove or update them");
   });
 
   /**
-   * The negative controls, kept in the suite. The first eight are the phrasings an audit appended to
-   * the widow advice while the previous, blacklist version of this guard stayed green; the rest are
-   * one more per direction. Each is judged exactly where the real advice is judged.
+   * The negative controls, kept in the suite. They are the phrasings two review rounds used to walk
+   * around earlier versions of this guard, plus at least one more per check. Each is judged where
+   * the real text is judged, among the real units.
    */
-  it("refuses the phrasings that walked around the old guard, lowering in any pin state, and raising while not applied", () => {
-    const place = placeLabel({ ruleId: "layout/widow" });
-    const judge = (sentence: string, applied: typeof APPLIED) =>
-      fragmentationProblems(proseSentences(sentence).map((text) => ({ place, sentence: text })), applied);
-    const inertOrUnapproved = [
-      "Paged.js disregards 'widows' entirely.",
-      "The 'widows' property has no influence under Paged.js.",
-      "Paged.js does not support 'widows'.",
-      "'widows' is unsupported by the paginator.",
-      "Setting 'widows' does nothing here.",
-      "Paged.js 0.4.3 has no widows implementation, so it is ineffective.",
-      "Chromium overlooks 'orphans' in paginated output.",
-    ];
-    for (const sentence of inertOrUnapproved) {
-      assert.match(judge(sentence, APPLIED).join("\n"), /not in the approved set/u, `accepted: ${sentence}`);
-    }
-    const lowering = [
-      "Or set 'widows: 1' on the paragraph.",
-      "Lowering the paragraph's widows makes the finding disappear.",
-      "Reduce the block's orphans to 1 so the split conforms.",
-    ];
-    for (const sentence of lowering) {
-      for (const applied of [APPLIED, { widows: false, orphans: false }]) {
-        assert.match(judge(sentence, applied).join("\n"), /proposes lowering/u, `lowering accepted under ${JSON.stringify(applied)}: ${sentence}`);
-      }
-      // Pin-independent means approval-independent too: approving the sentence does not admit it.
-      const approvedAnyway = new Set([`${place}\u0000${sentence}`]);
-      assert.match(
-        fragmentationProblems([{ place, sentence }], APPLIED, approvedAnyway).join("\n"),
-        /proposes lowering/u,
-        `an approved lowering sentence was accepted: ${sentence}`,
-      );
-    }
+  it("refuses every phrasing that walked around earlier versions of the guard", () => {
+    const real = guardedUnits(ALL_RULES, REPO_ROOT);
     const notApplied = { widows: false, orphans: false };
-    for (const sentence of ["Raising the paragraph's 'widows' to 3 keeps more lines together.", "Try widows 3.", "Increase 'orphans' on the block."]) {
-      const approvedAnyway = new Set([`${place}\u0000${sentence}`]);
-      assert.match(
-        fragmentationProblems([{ place, sentence }], notApplied, approvedAnyway).join("\n"),
-        /proposes setting (widows|orphans), which the pinned measurement shows the browser NOT applying/u,
-        `raising accepted while the pin says not applied: ${sentence}`,
-      );
+    const widowAdvice = placeLabel({ ruleId: "layout/widow" });
+    const withUnit = (unit: GuardedUnit, replacing?: (other: GuardedUnit) => boolean) =>
+      [...real.filter((other) => !(replacing?.(other) ?? false)), unit];
+    const prose = (place: string, text: string): GuardedUnit => ({ place, text, kind: "prose" });
+    const problemsWith = (units: readonly GuardedUnit[], applied = APPLIED, approved?: ReadonlySet<string>) =>
+      fragmentationProblems(units, applied, approved).join("\n");
+
+    // 1. Appended to the widow advice: the complete text is pinned, so ANY addition fails — including
+    //    one that refers to the property without naming it.
+    const advice = real.find((unit) => unit.place === widowAdvice && unit.kind === "prose")!;
+    for (const sentence of [
+      "Paged.js disregards 'widows' entirely.", "The 'widows' property has no influence under Paged.js.",
+      "Paged.js does not support 'widows'.", "'widows' is unsupported by the paginator.", "Setting 'widows' does nothing here.",
+      "Paged.js 0.4.3 has no widows implementation, so it is ineffective.", "Chromium overlooks 'orphans' in paginated output.",
+      "Paged.js ignores it anyway.", "Both properties are inert under Paged.js.",
+    ]) {
+      const units = withUnit(prose(widowAdvice, `${advice.text} ${sentence}`), (other) => other === advice);
+      assert.match(problemsWith(units), /is not the approved complete advice text/u, `accepted in the widow advice: ${sentence}`);
     }
-    // Controls in the other direction: the real approved sentences pass, and under a pin that says
-    // "not applied" the sentences asserting application stop being approved.
-    const real = sentencesNamingProperties(guardedTexts(ALL_RULES, REPO_ROOT));
-    assert.deepEqual(fragmentationProblems(real, APPLIED), []);
-    const underInertPin = fragmentationProblems(real, notApplied).join("\n");
-    for (const entry of APPROVED_FRAGMENTATION_SENTENCES.filter((item) => item.requires.length > 0)) {
-      assert.ok(underInertPin.includes(entry.sentence), `still approved under a pin that says not applied: ${entry.sentence}`);
+
+    // 2. Lowering: refused in every pin state even when the unit is approved.
+    for (const sentence of [
+      "Or set 'widows: 1' on the paragraph.", "Lowering the paragraph's widows makes the finding disappear.",
+      "Reduce the block's orphans to 1 so the split conforms.", "Set widows to 1 to silence it.", "Set `widows` to `1`.",
+      "A widows value of 1 avoids this.", "Declare widows: 1", "Choose widows = 1", "A smaller widows value keeps the finding away.",
+      "Lower widow-control to 1.", "Remove the widows declaration from the paragraph.", "Reset widows on the paragraph.",
+    ]) {
+      const unit = prose("docs/rules/layout-widow.md", sentence);
+      const approvedAnyway = new Set([`${unit.place}\u0000${unit.text}`]);
+      for (const applied of [APPLIED, notApplied]) {
+        assert.match(problemsWith([unit], applied, approvedAnyway), /proposes lowering/u, `lowering accepted under ${JSON.stringify(applied)}: ${sentence}`);
+      }
+    }
+
+    // 3. Setting or raising while the pin says not applied, even when approved.
+    for (const sentence of ["Raising the paragraph's 'widows' to 3 keeps more lines together.", "Try widows 3.", "Increase 'orphans' on the block.", "Declare orphans: 4 on the paragraph."]) {
+      const unit = prose("docs/rules/layout-widow.md", sentence);
+      const approvedAnyway = new Set([`${unit.place}\u0000${unit.text}`]);
+      assert.match(problemsWith([unit], notApplied, approvedAnyway), /proposes setting (widows|orphans), which the pinned measurement shows the browser NOT applying/u, `raising accepted: ${sentence}`);
+    }
+
+    // 4. Code: fences, HTML comments and inline style attributes are not approvable prose, but the
+    //    lowering check always, and the setting check while not applied, run on them.
+    const page = "docs/rules/layout-widow.md";
+    const code = (markdown: string) => codeSegments(markdown).map((text): GuardedUnit => ({ place: page, text, kind: "code" }));
+    for (const markdown of [
+      "```css\np { widows: 1 }\n```",
+      "```html\n<p style=\"orphans: 1\">text</p>\n```",
+      "Remedied: <p style='widows:1'>short</p>.",
+      "<!-- remedied by lowering widows to one -->",
+      "```css\n.fix { orphans: initial; }\n```",
+    ]) {
+      const units = code(markdown);
+      assert.ok(units.length > 0, `no code segment was read from: ${markdown}`);
+      assert.match(problemsWith(units), /proposes lowering .*\(code\)/u, `code lowering accepted: ${markdown}`);
+    }
+    for (const markdown of ["```css\np { widows: 3 }\n```", "<p style=\"orphans: 4\">x</p>"]) {
+      assert.match(problemsWith(code(markdown), notApplied), /proposes setting (widows|orphans).*\(code\)/u, `code setting accepted while not applied: ${markdown}`);
+      assert.doesNotMatch(problemsWith(code(markdown)), /proposes/u, `a numeric value above 1 in code is not a lowering while applied: ${markdown}`);
+    }
+
+    // 5. A sentence added to a pinned paragraph fails although it names nothing; a paragraph that
+    //    names the properties by a looser spelling is judged too.
+    const note = real.find((unit) => unit.place === page && unit.text.startsWith("Chromium applies `widows`"))!;
+    assert.match(problemsWith(withUnit(prose(page, `${note.text} Both properties are inert under Paged.js.`), (other) => other === note)),
+      /names widows\/orphans in a unit that is not approved/u);
+    assert.match(problemsWith(withUnit(prose(page, "Widow/orphan handling is ignored by Paged.js."))), /not approved/u);
+
+    // 6. The newly guarded places: summary, finding message, README, docs/*.md.
+    for (const [place, text] of [
+      ["layout/widow summary", "The first fragment of a block on a page has fewer lines than its own widows value, which Paged.js ignores."],
+      ["layout/orphan finding message", "N line(s) of this block remain at the foot of page N; its own orphans value is inert here."],
+      ["README.md", "Paged.js makes widows and orphans inert, so breaklint only reports them."],
+      ["docs/configuration.md", "The orphans property has no effect under Paged.js."],
+    ] as const) {
+      assert.match(problemsWith(withUnit(prose(place, text))), /not approved/u, `accepted at ${place}: ${text}`);
+    }
+
+    // 7. Derived from the pin: under a pin that says "not applied", every text asserting
+    //    application — the 6+3 measured split included — loses its approval.
+    const underInertPin = problemsWith(real, notApplied);
+    const asserting = APPROVED_FRAGMENTATION_TEXTS.filter((item) => item.requires.length > 0);
+    assert.ok(asserting.some((item) => item.text.includes("splits 6+3")), "the measured 6+3 relaxation must require the pin");
+    for (const entry of asserting) {
+      assert.ok(underInertPin.includes(entry.text), `still approved under a pin that says not applied: ${entry.text}`);
     }
   });
 
-  /**
-   * The pin decides published sentences, and names them. Each named sentence must be where the pin
-   * says (so a red live run's list is accurate), and must agree with the pin (so changing the pin
-   * after a disagreeing CI run is red here until the sentences change with it).
-   */
   it("every published sentence the pinned measurement decides is present, and agrees with the pin", () => {
     assert.ok(CLAIMS_DECIDED_BY_THE_PIN.length >= 6, "the pin names too few of the sentences it decides");
     const softHyphenMarked =
       SOFT_HYPHEN_BOUNDARY.shy.boundaryHyphen && !SOFT_HYPHEN_BOUNDARY.space.boundaryHyphen;
     const wordLocalLeversWork =
       !SOFT_HYPHEN_BOUNDARY["span-none"].boundaryHyphen && !SOFT_HYPHEN_BOUNDARY.nowrap.boundaryHyphen;
+    const published = guardedUnits(ALL_RULES, REPO_ROOT);
     for (const claim of CLAIMS_DECIDED_BY_THE_PIN) {
       if ("ruleId" in claim.where) {
         const advice = RULES_BY_ID.get(claim.where.ruleId)?.remediation?.advice ?? "";
         assert.ok(advice.includes(claim.sentence), `${claim.where.ruleId} remediation.advice no longer says: ${claim.sentence}`);
       } else {
-        // Judged on the same normalised prose the sentence guard reads: a wrapped blockquote
-        // sentence is one sentence.
-        const text = proseSentences(readFileSync(new URL(`../../${claim.where.file}`, import.meta.url), "utf8")).join(" ");
-        assert.ok(text.includes(claim.sentence), `${claim.where.file} no longer says: ${claim.sentence}`);
+        // Judged on the same normalised units the guard reads (a wrapped blockquote paragraph is
+        // one unit; a source file's comment markers are removed).
+        const file = claim.where.file;
+        assert.ok(published.some((unit) => unit.place === file && unit.text.includes(claim.sentence)), `${file} no longer says: ${claim.sentence}`);
       }
       // Every decided sentence is affirmative today: it says the lever takes effect.
       const holds = claim.decidedBy === "soft-hyphen" ? softHyphenMarked && wordLocalLeversWork : APPLIED[claim.decidedBy];
@@ -285,7 +325,7 @@ describe("rule registry", () => {
     assert.match(source, /function repairOptions\(/u, "repairOptions is gone — this guard has lost its subject");
     assert.match(source, /repair:\s*\{[^}]*options:\s*repairOptions\(/u, "repairOptions is no longer reached from the finding card");
     assert.ok(
-      sentencesNamingProperties(guardedTexts(ALL_RULES, REPO_ROOT)).some(({ place }) => place === "src/api/context.ts"),
+      guardedUnits(ALL_RULES, REPO_ROOT).some((unit) => unit.place === "src/api/context.ts" && isJudged(unit)),
       "the repair map's comment no longer names the properties — check the guard still reads the file",
     );
   });
