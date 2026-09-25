@@ -149,8 +149,11 @@ function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(4)));
 }
 
+/** Count units read in the singular for exactly one: "1 line", "1 occurrence", not "1 lines". */
+const SINGULAR_UNITS: Readonly<Record<string, string>> = Object.freeze({ lines: "line", occurrences: "occurrence", pages: "page" });
+
 function formatMeasurement(value: number, unit: string): string {
-  return `${formatNumber(value)} ${unit}`;
+  return `${formatNumber(value)} ${value === 1 ? SINGULAR_UNITS[unit] ?? unit : unit}`;
 }
 
 /**

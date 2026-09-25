@@ -206,7 +206,7 @@ type HtmlCoverageRow = ReturnType<typeof buildHtmlReportModel>["coverage"][numbe
 
 const COVERAGE_COLUMNS = `<tr>
     <th scope="col" class="rule">Rule</th>
-    <th scope="col" class="num">Candi&shy;dates</th>
+    <th scope="col" class="num">Candidates</th>
     <th scope="col" class="num">Measured</th>
     <th scope="col" class="num">Not measured</th>
     <th scope="col" class="num">Coverage</th>

@@ -111,7 +111,7 @@ export const REPORT_HTML_STYLES = String.raw`
      fragment begins (its head and facts never part; see the print rules below). */
   .finding-continued { display: none; }
   .finding-remediation { margin-block: var(--bl-space-4) 0; padding: var(--bl-space-3); border-inline-start: var(--bl-border-strong) solid var(--bl-color-fg-primary); background: var(--bl-color-soft); font-size: var(--bl-font-size-sm); }
-  .finding-remediation p, .finding-frequency-note p { margin: 0; }
+  .finding-remediation p, .finding-frequency-note p { max-width: var(--bl-text-width); margin: 0; }
   .finding-frequency-note { margin-block: var(--bl-space-3) 0; padding: var(--bl-space-3); border-inline-start: var(--bl-border-strong) solid var(--bl-color-divider); background: var(--bl-color-soft); font-size: var(--bl-font-size-sm); color: var(--bl-color-fg-muted); }
   .coverage-shortfall-list { margin: var(--bl-space-3) 0 0; padding-inline-start: var(--bl-space-4); display: grid; gap: var(--bl-space-4); }
   .coverage-shortfall-item { margin-block-end: var(--bl-space-3); }
@@ -158,8 +158,9 @@ export const REPORT_HTML_STYLES = String.raw`
     .coverage-table thead tr { border-block-end: var(--bl-border-strong) solid var(--bl-color-fg-primary); }
     .coverage-table th, .coverage-table td, .coverage-table thead th { padding: 0; border: 0; }
     /* Five value columns share 366 CSS px: header labels must fit a 67 px column, or a right-aligned
-       label overflows past its column edge (measured: MEASURED at .75rem overran by 5.7 px). */
-    .coverage-table thead th { font-size: .6875rem; letter-spacing: .02em; }
+       label overflows past its column edge (measured: MEASURED at .75rem overran by 5.7 px, and
+       CANDIDATES, whole since the soft hyphen went, by 6.7 px at .6875rem). */
+    .coverage-table thead th { font-size: .625rem; letter-spacing: 0; }
     .coverage-table tbody th[scope="row"] { padding-inline-start: var(--bl-space-2); }
     .coverage-table thead .rule { padding-inline-start: var(--bl-space-2); }
     .coverage-table .rule { grid-column: 1 / 4; grid-row: 1; }
@@ -208,8 +209,14 @@ export const REPORT_HTML_STYLES = String.raw`
        printed document to fit (measured 736.6 px -> every page scaled to 95 %). */
     .coverage-table { font-size: .8125rem; }
     .coverage-table th, .coverage-table td { padding: var(--bl-space-1) .375rem; }
-    .coverage-table thead th { font-size: .6875rem; letter-spacing: .02em; }
+    /* CANDIDATES is one word now (a soft hyphen printed it as CANDI- / DATES); at .6875rem with
+       letter spacing the table grew 6.5 px past the content box. */
+    .coverage-table thead th { font-size: .625rem; letter-spacing: 0; }
     .coverage-table thead { display: table-header-group; }
+    /* Separate borders in print: with collapsed borders Blink painted the rule shared with the last
+       row of the previous page again under the repeated header, a double rule on every
+       continuation page. Each cell now owns its bottom rule; spacing 0 keeps the rules continuous. */
+    .coverage-table { border-collapse: separate; border-spacing: 0; }
     .coverage-table tr { break-inside: avoid; }
     /* Caption and column header never end a page: they introduce the first rows. Measured without
        it: caption and header alone at the foot of page 7, every row on page 8 (infrastructure). */

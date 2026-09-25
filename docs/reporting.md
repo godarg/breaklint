@@ -107,11 +107,16 @@ cell; `broken-untested-repeat` and `broken-untested-marker` are its red controls
   the normal vertical flow. A finding fragments between its units and never inside one: its head
   (severity, rule and message) kept with its facts (six facts in three columns, one unit under
   their rule), and its tail (remediation, note and evidence); a split card repeats its frame on
-  both pages. The tail opens with a print-only label, "Finding 07 · `artifact/local-uri` · remediation
+  both pages. Remediation and note text keep the 72ch measure inside their full-width boxes. The
+  tail opens with a print-only label, "Finding 07 · `artifact/local-uri` · remediation
   and evidence", so the fragment that begins a page says whose it is; the surface gate rejects any
   page that opens on a bare fact or tail line instead (`broken-continued-label`). Before, a split
   finding could leave its facts' top rule alone at the foot of a page and open the next on a bare
-  fact in an unlabelled frame. Whole, page-atomic findings (60–73 % of a page
+  fact in an unlabelled frame. The label prints on every finding, split or not, and it is worded to
+  be true either way (it names the part of the finding that follows, not "continued"): CSS cannot
+  show an element only on a fragment that begins a page, and the one trick that approaches it
+  (a negative margin that a break truncates, hiding the label under the facts otherwise) leaves the
+  hidden text in the PDF's text layer, which the gate and a copy-paste both read. Whole, page-atomic findings (60–73 % of a page
   each) meant one finding per printed page and pages filled to 29–45 % in 0.6.0. Boxed blocks —
   header, contents, summary, run facts, alert, checker card, empty state, finding, coverage table
   and footer — share one left and one right edge, and each is separated from the next by a gap; the
@@ -273,8 +278,9 @@ The report-surface gate has two explicit modes over the complete matrix in
 
 ### Review ledger and declared review environment
 
-`tests/golden/report-surfaces/review-ledger.json` is schema 5: a list of numbered review
-**rounds**, each `pass`, `fail` or `pending`. Schema 4 could hold only one all-pass record, and
+`tests/golden/report-surfaces/review-ledger.json` (ledger format version 5, its `schemaVersion`)
+is a list of numbered review **rounds**, each `pass`, `fail` or `pending`. Ledger format version 4
+could hold only one all-pass record, and
 technical mode rejected any cell that was not `pass`, so the one failed review this gate produced
 (2026-09-18) could not be written into it without turning CI red and existed only as prose. The
 migration kept the 0.2.3 review unchanged as round 1 (`historical`, pass, all 32 cell records as
@@ -347,10 +353,10 @@ Both modes cover:
 - one real A4 PDF per state and an independently rasterized page set for each PDF.
 
 That is 32 review cells. Each tablet and mobile screen cell is also written as viewport-height
-tiles (`<cell>--tile-NN.png`, 148 in the canonical matrix) cut from the same decoded pixels as its
-full-page PNG — a mobile strip (measured 390 × 4 097 px for the clean state and 390 × 11 073,
-11 578 and 11 692 px for findings, infrastructure and insufficient coverage) cannot be judged at
-fit-to-window scale; its five or fourteen 844 px tiles can. The verifier re-cuts every tile from the independently decoded full page and
+tiles (`<cell>--tile-NN.png`, 152 in the canonical matrix) cut from the same decoded pixels as its
+full-page PNG — a mobile strip (measured 390 × 4 092 px for the clean state and 390 × 11 341,
+11 846 and 11 960 px for findings, infrastructure and insufficient coverage) cannot be judged at
+fit-to-window scale; its five, fourteen or fifteen 844 px tiles can. The verifier re-cuts every tile from the independently decoded full page and
 requires the normalized RGBA to match, so tiles add no unbound pixel. `review-gallery.html` in the
 same directory presents every full page, tile and printed page per state; it is what a reviewer
 opens, and the verifier requires it to reference every artifact. A reviewed screen cell names its
@@ -505,7 +511,7 @@ this bound the findings heading carried the untested-advice caveat inside its he
 heading + caveat + the first finding's head and facts formed one 456–481 px chain (44–47 %); the
 heading group and caveat are now one unbreakable intro that does not keep with the first finding.
 Measured on Chromium 141 / linux the tallest unit is the report header (359.6–384.8 px, at most
-37.3 %), and every non-final page's text reaches 62.2–96.7 % (clean 3 pages, findings 7,
+37.3 %), and every non-final page's text reaches 64.0–97.6 % (clean 3 pages, findings 8,
 infrastructure 8, insufficient-coverage 8; 43 in 0.6.0). The only fill exemption is a deliberate
 section boundary, defined mechanically: the next page begins with an element whose computed
 `break-before` is `page`, `left`, `right`, `recto` or `verso` — the canonical report declares none.

@@ -380,7 +380,7 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   the navigation.
 - **Phone and tablet review cells come as viewport-height tiles plus a gallery.** A 390 × 15 000 px
   strip cannot be judged; each tablet and mobile cell now also ships tiles cut from the same decoded
-  pixels (148 in the matrix), and `review-gallery.html` presents every screen, tile and printed page.
+  pixels (152 in the matrix), and `review-gallery.html` presents every screen, tile and printed page.
   The surface gate checks the accessibility tree per cell (landmarks, link targets, table
   semantics on the phone grid, first Tab stop and its focus outline) and re-cuts every tile.
 
@@ -397,8 +397,8 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   alert box ended 62 px short of the card below it in print (527 px on a desktop) and touched it.
   Findings now split between their units — head, each fact, tail — never inside one, with the
   card frame repeated on both pages; boxed blocks share the column's edges with a real gap. Printed
-  reports drop from 43 pages in 0.6.0 to 26 (clean 3, findings 7, infrastructure 8,
-  insufficient-coverage 8) with every non-final page's text at 62.2–96.7 % of the content box.
+  reports drop from 43 pages in 0.6.0 to 27 (clean 3, findings 8, infrastructure 8,
+  insufficient-coverage 8) with every non-final page's text at 64.0–97.6 % of the content box.
   The surface gate fails any non-final page whose last text line is above 60 % of the content box
   (unless the next page starts with a declared forced break), any unbreakable unit taller than 40 %
   (keep-with-next chains counted as one unit, and the failure names it), any heading or caption
@@ -415,6 +415,11 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   tail opens with "Finding NN · rule · remediation and evidence"; the gate rejects a page that opens
   on a bare fact or tail line. A table's caption and column header no longer end a page without
   its first row.
+- **Print typography.** The coverage header prints CANDIDATES whole (a soft hyphen printed it as
+  CANDI- / DATES); the table uses separate borders in print, so a continuation page no longer shows
+  the previous page's last row rule again under the repeated header; remediation and note text
+  keep the 72ch measure inside their boxes; counts of one read "1 line" and "1 occurrence", and
+  the `layout/widow` and `layout/orphan` messages read "1 line of this block continues / remains".
 - **Printed coverage rows keep one pitch across pages.** Rows on a table's continuation page were
   stretched (21.7 pt on the first page, 24.8–26.3 pt after the break) with a second rule under the
   header, and the end mark's own rule sat under the last row rule like a double line: the coverage

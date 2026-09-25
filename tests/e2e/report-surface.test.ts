@@ -224,6 +224,17 @@ describe("HTML Report Surface v2", () => {
     assert.match(gating.options[1]!.after, /removes the gate, not the defect/u, "a gating rule keeps its stronger warning");
   });
 
+  it("counts in the singular for exactly one, in measurements and in the rule messages it shows", () => {
+    const html = renderHtml(findingsReportState());
+    assert.doesNotMatch(html, /\b1 (?:lines|occurrences|pages)\b/u, "a count of one reads in the singular");
+    assert.match(html, /<dd class="mono">1 line<\/dd>/u, "the widow finding measured one line");
+    assert.match(html, /<dd class="mono">1 occurrence<\/dd>/u, "a one-occurrence finding reads in the singular");
+    assert.match(html, /<dd class="mono">2 lines<\/dd>/u, "plural stays plural");
+    assert.match(html, /1 line of this block continues onto page 2;/u, "the widow message agrees with one line");
+    assert.doesNotMatch(html, /\b1 line of this block (?:continue|remain) /u);
+    assert.match(html, /<th scope="col" class="num">Candidates<\/th>/u, "the column header is one word, not a soft-hyphenated CANDI- / DATES");
+  });
+
   it("states the untested-advice caveat once per report and marks each untested finding compactly", () => {
     for (const [state, report] of Object.entries(canonicalReportStates())) {
       const html = renderHtml(report);

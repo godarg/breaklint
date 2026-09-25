@@ -121,7 +121,9 @@ export function namesFragmentationProperty(text: string): boolean {
 
 /** Sampled finding messages, with numbers normalised so that one template covers every run. */
 export function messageTemplate(message: string): string {
-  return message.replace(/\d+(\.\d+)?/gu, "N").replace(/\bN lines?\b/gu, "N line(s)");
+  return message.replace(/\d+(\.\d+)?/gu, "N")
+    .replace(/\bN lines? of this block (continue|remain)s?\b/gu, "N line(s) of this block $1")
+    .replace(/\bN lines?\b(?!\(s\))/gu, "N line(s)");
 }
 
 function sampledMessages(rules: readonly Rule[]): Map<string, Set<string>> {
