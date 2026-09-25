@@ -315,11 +315,12 @@ export const REPORT_SCHEMA_VERSION = 5;
 /** Document report shapes this build can read. A 4 simply carries no `remediation`. */
 export const READABLE_REPORT_SCHEMA_VERSIONS: readonly number[] = [4, 5];
 /**
- * The measurement snapshot's shape. 5 adds the SVG local frame: `SvgRecord.clipped`,
- * `viewportLocal` and `viewportDiagnostic`, and `SvgTextTarget.boxLocal`, `bboxUser` and
- * `userToLocal`. There is no reader for 4: a schema-4 snapshot carries no local geometry, the
- * viewport rule cannot be run on it without guessing, and the missing numbers cannot be derived
- * from what it does carry — only re-measured. The engine therefore refuses any other stamp.
+ * The measurement snapshot's own shape. 5 adds the required `BlockRecord.display` and
+ * `BlockRecord.marginCopies`, and the SVG local frame: `SvgRecord.clipped`, `viewportLocal` and
+ * `viewportDiagnostic`, and `SvgTextTarget.boxLocal`, `bboxUser` and `userToLocal`. There is no
+ * reader for 4: a stored snapshot is only ever the demo's, migrated with this stamp; a schema-4
+ * snapshot carries no local geometry, which cannot be derived from what it does carry, only
+ * re-measured. The engine refuses a snapshot of any other stamp.
  */
 export const SNAPSHOT_SCHEMA_VERSION = 5;
 

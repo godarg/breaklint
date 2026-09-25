@@ -84,24 +84,6 @@ export interface DocumentOutcome {
 }
 
 export function runDocument(input: DocumentInput, config: EngineConfig): DocumentOutcome {
-  // The engine is the one reader of a snapshot, so the stamp is checked here: a snapshot of any
-  // other shape is not measured, and says so as a fatal event rather than letting the rules read
-  // fields it does not carry. Nothing checked the stamp on read until schema 5; it only means
-  // something if a mismatch has a consequence. The live path cannot mismatch — it stamps and reads
-  // in one process — so this guards stored snapshots: the demo fixture, and anything like it.
-  if (input.snapshot && input.snapshot.schemaVersion !== SNAPSHOT_SCHEMA_VERSION) {
-    const schemaVersion = input.snapshot.schemaVersion;
-    input = {
-      ...input,
-      snapshot: null,
-      infrastructure: [...input.infrastructure, {
-        kind: "checker-crashed",
-        detail: `the snapshot has schema ${String(schemaVersion)} and this build reads only schema ` +
-          `${SNAPSHOT_SCHEMA_VERSION}; it is not measured. A stored snapshot must be re-measured, not relabelled.`,
-        measured: { stage: "snapshot-schema", schemaVersion: typeof schemaVersion === "number" ? schemaVersion : null, readable: [SNAPSHOT_SCHEMA_VERSION] },
-      }],
-    };
-  }
   const evidenceCoverage = evidenceCoverageFor(input);
   const findings: Finding[] = [];
   const evaluations: TargetEvaluation[] = [];
@@ -154,7 +136,20 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
     input.sourceIdentity = { bySid: {}, inventory: { complete: false, omittedCount: snapshot.svg.reduce((n, svg) => n + (svg.textTargetsCapped ? Math.max(1, svg.textTargetCount - svg.texts.length) : 0), 0), reason: "identity/target-enumeration-incomplete" } };
   }
 
-  for (const rule of config.activeRules) {
+  // The rules read fields the snapshot stamp names (Snapshot 5: `BlockRecord.display` and
+  // `marginCopies`, and the SVG local frame). A snapshot of another stamp has another shape, and a
+  // rule reading an absent field does not fail, it misjudges: an undefined `display` is not
+  // "contents", so every box-less block would pass as unrendered, and an SVG record without
+  // `viewportLocal` has no geometry to compare. Such a snapshot is refused, not judged.
+  const stampMatches = snapshot.schemaVersion === SNAPSHOT_SCHEMA_VERSION;
+  if (!stampMatches) {
+    infrastructure.push({
+      kind: "checker-crashed",
+      detail: `the measurement snapshot is schema ${String(snapshot.schemaVersion)}; this build's rules read schema ${SNAPSHOT_SCHEMA_VERSION} only`,
+      measured: { stage: "snapshot-schema", schemaVersion: snapshot.schemaVersion ?? null, expected: SNAPSHOT_SCHEMA_VERSION },
+    });
+  }
+  for (const rule of stampMatches ? config.activeRules : []) {
     let result;
     try {
       result = rule.run(snapshot, {
@@ -394,10 +389,10 @@ function exitReasonFor(
 /**
  * What the finding gate says. Returns the severity that tripped it, or null.
  *
- * Experimental findings never count. `layout/half-empty-page` sits 0.086 below the measured
- * ceiling of a full text page; breaking a build on that is a defect in the tool, not in the
- * document. `--fail-on warn` does not change this — it makes the *other* twelve heuristics
- * gate, deliberately and on request.
+ * Experimental findings never count. `layout/half-empty-page` has a threshold that full text
+ * pages straddle — they read 0.58–0.72 at line-height 1.5 against 0.60; breaking a build on that
+ * is a defect in the tool, not in the document. `--fail-on warn` does not change this — it makes
+ * the *other* twelve heuristics gate, deliberately and on request.
  */
 export function gateTriggeredBy(findings: readonly Finding[], failOn: FailOn): "error" | "warn" | null {
   if (failOn === "never") return null;

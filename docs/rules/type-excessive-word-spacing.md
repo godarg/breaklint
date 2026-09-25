@@ -19,6 +19,16 @@ The threshold is chosen. Word boxes are held for every line of every justified b
 
 Blocks with an explicit `word-spacing` are out: the width is a stated intention. Table cells are out: a justified cell has no room to do better.
 
+Gaps are read from a block's VISIBLE lines only, and no block is measured at a factor of 0 for
+lines nobody saw. The in-flow original of a running element is `excluded`
+(`rule/target-in-margin-box`), a block the author hid `excluded` (`rule/target-not-rendered`), a
+block whose lines are all invisible `excluded` (`rule/target-not-visible`) and a block with no line
+at all — empty, or image-only — `not-applicable` (`rule/no-text-lines`), all outside the coverage
+base; a block whose lines the snapshot did not record is declined as `env/invalid-measurement`,
+counted against coverage. A `display: contents` block has no box but prints its lines, and it is
+measured from them like any other block. Text inside a margin box is not measured. See
+`docs/limitations.md`.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with
@@ -29,7 +39,11 @@ also why this rule ships with the severity it has.
 ## Remediation
 
 <!-- begin generated remediation: type/excessive-word-spacing -->
-Justified text produces word spacing exceeding the uncalibrated threshold ('rivers' of whitespace). Enable hyphenation with 'hyphens: auto;' (specifying an HTML 'lang' attribute), use left alignment ('text-align: left;'), or insert soft hyphens ('&shy;') into long words. Note that enabling hyphenation can produce 'layout/hyphen-across-page' findings where a hyphenated word then falls on a page boundary; the two rules pull in opposite directions and neither threshold is calibrated.
+Justified text produces word spacing exceeding the uncalibrated threshold ('rivers' of whitespace). Use left alignment ('text-align: left;'), insert soft hyphens ('&shy;') into long words, or enable hyphenation with 'hyphens: auto;' together with an HTML 'lang' attribute. Automatic hyphenation happens only where the rendering browser has a hyphenation dictionary for that language; where it has none, 'hyphens: auto' changes nothing and soft hyphens are the lever that works. This rule owns the block-level 'hyphens' setting and the soft hyphens of justified text: where a hyphen, soft or automatic, then falls on a page boundary, 'layout/hyphen-across-page' changes only that word and neither turns hyphenation off nor removes soft hyphens for the block.
+
+**Precedence.** `hyphens` in justified blocks: this rule owns the block-level setting, and [`layout/hyphen-across-page`](layout-hyphen-across-page.md) defers to it, acting only on the affected word.
+
+**Precedence.** Soft hyphens (`&shy;`) in justified blocks: this rule owns where they are inserted, and [`layout/hyphen-across-page`](layout-hyphen-across-page.md) defers to it, acting only on the affected word.
 <!-- end generated remediation: type/excessive-word-spacing -->
 
 ## Examples

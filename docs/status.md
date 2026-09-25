@@ -126,7 +126,7 @@ it existed — under load the answer was `ENOENT`, which reads as a cleanup fail
 now registers synchronously from its parent, the budgets are sized for what they wrap, and a
 missing registration says so. A fourth test bounded a 5 s product wait at 8 s and failed at 8700 ms.
 
-Measured on `tests/unit/source-boundary-regressions.ts` before the change, three full runs at start
+Measured on `tests/unit/source-boundary-regressions.test.ts` before the change, three full runs at start
 loads 6.18, 5.06 and 6.37: **three red**. After, three full runs at 2.92, 4.30 and 8.63: **three
 green**, the last at a higher load than any of the three that failed. No test was excluded and no
 concurrency setting was changed.
@@ -166,7 +166,12 @@ one of the seven admitted artifacts still exists at its recorded digest; the sha
 five of the six documents have changed since the measurement of 2026-09-06. The digests were not
 re-recorded — the expectations beside them were measured on the old bytes. The manifest carries
 `binding.status: "historical"` with that measurement in it and the gate says so and makes no claim.
-Re-admitting the corpus is a follow-up with its own rights and privacy review.
+Re-admitting the corpus is a follow-up with its own rights and privacy review. Since then it is no
+longer a CI or release step either: it prints `NO CLAIM` and exits 0 having read none of the six
+documents, with or without an artifact root, and a step like that is a green light over nothing.
+The class is held in CI by the public `tests/fixtures/fragmentainer-residue.html` in the live
+suite, and `tests/unit/workflow-gates.test.ts` fails if the step returns while the record reads
+nothing.
 
 `test:secrets` is red in the development worktree used for this release and green on the published
 history. Measured 2026-09-18: scanning `origin/main` gives **no leaks over 143 commits**; scanning
@@ -238,10 +243,11 @@ unchanged.
 The six documents are recorded, not published. They are chapters of a paid product, so
 `corpus/public/pagination-residue-v1` carries their SHA-256 values, rights and privacy review and
 exact expected residue while the bytes stay outside this repository — the
-`private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. Without
-`BREAKLINT_RESIDUE_CORPUS_ROOT` that gate prints `SKIPPED` and claims nothing. What holds the class
-in CI is the public `tests/fixtures/fragmentainer-residue.html`, reduced from one of the six until
-no product text remained.
+`private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. At the time, without
+`BREAKLINT_RESIDUE_CORPUS_ROOT` that gate printed `SKIPPED` and claimed nothing; the record has since
+become historical and is no longer a CI step (see the current release above). What held the class
+in CI then, and still does, is the public `tests/fixtures/fragmentainer-residue.html`, reduced from
+one of the six until no product text remained.
 
 Two defects in this repository's own checks were found on the way and fixed in the same release. The
 secret-scanner canary planted a digit-heavy `AKIA` key beside a random secret and asserted only that
@@ -336,7 +342,7 @@ GitHub assets.
 | Mutation guard | 13/13 released rules kill every mutant, each on a fixture that actually triggers it |
 | False-alarm corpus | every clean fixture stays silent, every trigger fixture fires and is attributed correctly |
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
-| Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in report schema 3; generated schema drift and process-boundary exit 2 are tested |
+| Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in the canonical JSON report; generated schema drift and process-boundary exit 2 are tested |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
 | HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 60 physical artifacts with decoded-pixel, contrast, accessibility and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
 | Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |
@@ -373,7 +379,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=500 aggregateTests=616 liveTests=78 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=609 aggregateTests=740 liveTests=87 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -557,8 +563,8 @@ Node-22.13/Puppeteer-25 security migration. The annotated `v0.2.0` tag resolves 
 `ce7097b99beafcedc71b30ee0ed81451811532a0`. Registry SRI, signed SLSA source binding, npm
 signatures, byte-identical GitHub assets and a fresh registry consumer were independently checked.
 The minor-version change is intentional: unknown or formerly inert configuration now fails closed,
-`excludeSelectors` is corrected to `excludeTags`, and report schema moves to 3 while snapshot schema
-remains 2. This status paragraph is a later documentation commit and is not retroactively part of
+`excludeSelectors` is corrected to `excludeTags`, and in 0.2.0 report schema moves to 3 while
+snapshot schema remains 2. This status paragraph is a later documentation commit and is not retroactively part of
 the published tarball.
 
 **Released on 2026-08-25:** `breaklint@0.2.1` packages the open-community-QA documentation and the
@@ -614,7 +620,7 @@ What changed:
 | Two decline classes leave the coverage base | `TOOL_CAPABILITY_ENV_IDS` (this build cannot take the measurement) and `NON_APPLICABLE_ENV_IDS` (the question does not arise for that target). Both stay in `notMeasured` with rule, reason and count; only the ratio changes, and the subtraction happens after each rule's own books are checked |
 | The ink rules say which of two things is true | `inkCollected` separates "the passes do not exist in this build" from "the passes ran and disagreed". They reported the second while the first was the case |
 | The corpus holds an inline SVG at last | `tests/fixtures/svg-text-geometry.html`, seven figures, seven different answers, plus `svg-in-viewport.html` — the sound document that must end exit 0 — both in the live chain. Five of those cases exist because two independent reviews found the earlier ones insufficient |
-| Snapshot schema | 2 → 3, for the added `inkCollected`. Report schema stays 3 |
+| Snapshot schema | 2 → 3, for the added `inkCollected`. Report schema stays 3 in 0.2.3 |
 
 What did NOT change: no threshold, no severity, no `calibrated` flag, and no rule was added or
 removed. The SVG ink passes remain unimplemented — M3 — so `svg/text-clipped` and
@@ -663,7 +669,7 @@ them the `<defs>` class through a different door, and all now measured rather th
 | A nested `<svg>` | Its `<text>` was collected twice — once by the inner record and once by the outer one, where it was compared against the wrong viewport. Each record now takes only the targets whose nearest `<svg>` ancestor is itself |
 | Two structurally identical SVGs | They share one `svgRootKey` by design, so their labels share `svgTextKey` across records. The ambiguity group was counted inside a record and reported 1 for exactly the collision the field exists for. It is a property of the document and is counted across the document |
 
-Also from round two: the stored demo snapshot moved to schema 3 with the new fields, rather than
+Also from round two: the stored demo snapshot moved to schema 3 in 0.2.3 with the new fields, rather than
 leaving `docs/limitations.md` claiming a migration that had not happened; `reason` is `null`
 instead of absent so it survives a JSON round trip that the receipt schema requires; and every
 `reviewedAt` in the report-surface ledger is back to the date of the review that actually took

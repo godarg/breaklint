@@ -1,6 +1,9 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
+import {
+  boxlessDeclined, declined, hasLayoutBox, isNotRendered, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber, renderingOf, sourceOf,
+  targetEvaluation,
+} from "../shared.ts";
 
 /**
  * layout/unbreakable-block-too-tall — a block that promises not to break is taller than a page.
@@ -28,13 +31,19 @@ import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf, t
  *
  * TWO THINGS THE FIRST VERSION OF THIS SUM GOT WRONG, BOTH MEASURED BEFORE THEY SHIPPED.
  *
- * Same `sid` does not mean same flow. Paged.js implements `position: running(...)` by deep-cloning
+ * Same `sid` did not mean same flow. Paged.js implements `position: running(...)` by deep-cloning
  * the element into the page margin box of EVERY page, and the clone keeps the injected source id.
  * Measured on 2026-09-18: an ordinary twelve-page document whose only running header is three
  * lines tall reported this rule at 979.08 px against a 619.83 px page — 13 copies of an 81.59 px
- * header, summed, as `severity: error`. Nothing in that document was too tall for anything. A
- * fragment therefore only counts towards the flow when its box STARTS inside the content box of
- * its page: a margin box is by construction outside it, and a real fragment always begins inside.
+ * header, summed, as `severity: error`. Nothing in that document was too tall for anything. The
+ * first repair decided flow membership HERE, by coordinates: a fragment counted only when its box
+ * started inside the content box of its page. That excluded the margin boxes and, measured on
+ * 2026-09-24, every fragment of a full-bleed block as well — negative side margins put all six
+ * fragments of a five-and-a-half-page block left of the content box, and the document came back
+ * clean. Flow membership is now decided where the page structure is visible: the collector keeps
+ * only blocks inside a page's content area (`.pagedjs_pagebox > .pagedjs_area`), so margin-box
+ * clones never reach this rule, and every record carrying the element's sid is one of its
+ * fragments, wherever it lies.
  *
  * The boundary is the page the block was laid out on, and the sentence says so. It used to end
  * "It cannot fit on any page", which is an all-pages claim taken from one sample; the largest
@@ -54,8 +63,12 @@ import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf, t
  * two-fragment case is therefore a KNOWN gap, not a silent one: a block that really is too tall
  * and happens to split into exactly two pieces is not reported. `docs/limitations.md` says so.
  *
- * Fragments are correlated by `sid`, the authoring-source identity; a block whose fragments carry
- * no `sid` cannot be correlated and keeps the old first-fragment behaviour rather than guessing.
+ * Fragments are correlated by `sid`, the authoring-source identity. A split block whose fragments
+ * carry no `sid` — a `--no-source-map` run, or an element a script created — cannot be correlated,
+ * and neither can one whose sid does not account for exactly the fragments the snapshot counted.
+ * Such a block is DECLINED (`env/invalid-measurement`, charged to coverage). It used to be measured
+ * on its first fragment, which compares a piece with the page: a silent partial measurement is how
+ * the six-page block above came back clean, and a clean result must mean the block was judged.
  */
 export const unbreakableBlockTooTall = defineRule(
   {
@@ -67,7 +80,7 @@ export const unbreakableBlockTooTall = defineRule(
     unit: "px",
     defaultOptions: { toleranceRatio: 1.0 },
     summary: "A block with break-inside: avoid is taller than the page content box.",
-    declines: ["env/multicolumn", "env/vertical-writing"],
+    declines: ["env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],
     remediation: {
       advice:
         "A block with 'break-inside: avoid' is taller than the content box of the page it was laid out on, so the paginator could not keep it whole there. Where it had already been split into three or more fragments, the reported height is the sum of those fragments, which is the height its content needed. Make the block shorter — split it into smaller sections deliberately, or reduce container padding, font size or contained rows. Removing 'break-inside: avoid' also clears the finding, but only because the rule then has no candidate: the block is exactly as tall as before, and it will still be broken, just without having asked not to be.",
@@ -87,34 +100,63 @@ export const unbreakableBlockTooTall = defineRule(
     // Built over ALL blocks rather than only the avoiding ones, because a fragment is a fragment
     // of its element regardless of which fragment happens to carry the declaration in the tree.
     //
-    // A box only counts when it STARTS inside the content box of its page. Paged.js clones a
-    // `position: running(...)` element into the margin box of every page and the clone keeps the
-    // source id, so summing by id alone adds one copy of a running header per page — measured as a
-    // false `error` on a document with nothing too tall in it. A margin box lies outside the
-    // content box by construction; a real fragment always begins inside it.
-    const INSIDE_TOLERANCE_PX = 1;
+    // Every record with the element's sid counts, wherever its box lies. Flow membership is a
+    // property of the snapshot, not of this rule: the collector keeps only blocks inside a page's
+    // content area, so a `position: running(...)` clone in a margin box never reaches it. It used
+    // to be decided here, by coordinates — a fragment counted only when its box started inside
+    // the content box — and that test was wrong in the other direction: a full-bleed block with
+    // negative side margins has EVERY fragment left of the content box, the filter discarded all
+    // six of them, and a block five and a half pages tall was judged on one piece and came back
+    // clean. No coordinate can tell a margin box from a fragment that bleeds into the margin; the
+    // page structure can.
     const flowBySid = new Map<string, { height: number; fragments: number }>();
     for (const fragment of snapshot.blocks) {
       if (fragment.sid === null) continue;
-      const host = pageByNumber(snapshot, fragment.page);
-      if (!host) continue;
-      // Both axes. A top or bottom margin box is outside the content box vertically, but a
-      // `@left-middle` or `@right-middle` one is not — it starts at a content-box y and sits
-      // beside the column. Checking only y would let a running element in a side margin box back
-      // in, one copy per page, which is the same defect one axis at a time.
-      const top = host.contentBox.y - INSIDE_TOLERANCE_PX;
-      const bottom = host.contentBox.y + host.contentBox.height + INSIDE_TOLERANCE_PX;
-      const left = host.contentBox.x - INSIDE_TOLERANCE_PX;
-      const right = host.contentBox.x + host.contentBox.width + INSIDE_TOLERANCE_PX;
-      if (fragment.box.y < top || fragment.box.y > bottom) continue;
-      if (fragment.box.x < left || fragment.box.x > right) continue;
       const entry = flowBySid.get(fragment.sid) ?? { height: 0, fragments: 0 };
       entry.height += fragment.box.height;
       entry.fragments += 1;
       flowBySid.set(fragment.sid, entry);
     }
 
+    // Which fragment stands for a split block: the first one the paginator laid out with a box of
+    // its own and that is visible. Normally that is fragment 0. Deciding it per fragment instead —
+    // "fragment 0 is not rendered, so the block is not" — let a script that hid only the first
+    // fragment (`display: none` on it, or moving it where it has no box) hide the whole block: the
+    // later fragments were skipped as continuations of a candidate that no longer existed, and a
+    // block four pages tall came back clean (measured 2026-09-25: base exit 1, then exit 0). What is
+    // judged is what printed. A block none of whose fragments has a box is classified at each
+    // fragment below, as before.
+    const leadBySid = new Map<string, number>();
+    for (const fragment of snapshot.blocks) {
+      if (fragment.sid === null || renderingOf(snapshot, fragment) !== "box" || fragment.effectiveStyle.visibility !== "visible") continue;
+      const current = leadBySid.get(fragment.sid);
+      if (current === undefined || fragment.fragmentIndex < current) leadBySid.set(fragment.sid, fragment.fragmentIndex);
+    }
+
     for (const block of snapshot.blocks) {
+      const lead = block.sid === null ? undefined : leadBySid.get(block.sid);
+      // One evaluation per block, taken at its lead fragment. The other fragments are not separate
+      // candidates — but their heights are part of the height judged there. A fragment BEFORE the
+      // lead is one that did not print as a box; it says so.
+      if (lead !== undefined && block.fragmentIndex !== lead) {
+        const before = block.fragmentIndex < lead;
+        evaluations.push(targetEvaluation({
+          ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+          fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-applicable",
+          countsTowardCoverage: false,
+          reason: !before ? "rule/non-initial-fragment"
+            : isNotRendered(snapshot, block) ? "rule/fragment-not-rendered" : "rule/fragment-without-visible-box",
+          ...(before ? {
+            measurements: [
+              { name: "target-has-layout-box", value: hasLayoutBox(block.box), unit: null, operator: "=", threshold: true },
+              { name: "target-visible", value: block.effectiveStyle.visibility === "visible", unit: null, operator: "=", threshold: true },
+              { name: "judged-at-fragment", value: lead, unit: null, operator: null, threshold: null },
+            ],
+            connective: "all" as const, violated: null,
+          } : {}),
+        }));
+        continue;
+      }
       const avoids = /\bavoid(-page)?\b/u.test(block.effectiveStyle.breakInside);
       const visible = block.effectiveStyle.visibility === "visible";
       if (!visible || !avoids) {
@@ -132,9 +174,32 @@ export const unbreakableBlockTooTall = defineRule(
         }));
         continue;
       }
-      // One evaluation per block, taken at its first fragment. The later fragments are not
-      // separate candidates — but their heights are part of the height judged there.
-      if (block.fragmentIndex !== 0) {
+      const rendering = renderingOf(snapshot, block);
+      // `display: contents` generates no box for the element, and `break-inside` applies to boxes:
+      // the declaration does nothing, so "does this block fit the page unbroken" is not a question
+      // about it. Its children are laid out and are candidates in their own right. Not applicable,
+      // outside coverage — not a decline, which made a list of `display: contents` items with
+      // `break-inside: avoid` (a common grid pattern) end at exit 4 for a check that does not apply.
+      if (rendering === "contents") {
+        evaluations.push(targetEvaluation({
+          ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+          fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-applicable",
+          countsTowardCoverage: false, reason: "rule/target-generates-no-box",
+          measurements: [{ name: "display", value: block.display, unit: null, operator: null, threshold: null }],
+          connective: "single", violated: null,
+        }));
+        continue;
+      }
+      // A block that was not rendered at all was never placed by the paginator, so the question has
+      // no referent either. The case is the in-flow original of a `position: running(...)` element
+      // (`rule/target-in-margin-box`: Paged.js hides it with `display: none` while its clones print
+      // in the margin boxes); it was recorded as MEASURED at 0 px, and a document whose only avoid
+      // block was a running element reported full coverage for a check that looked at nothing.
+      if (rendering === "margin-box" || rendering === "not-rendered") {
+        evaluations.push(notRenderedEvaluation("layout/unbreakable-block-too-tall", block));
+        continue;
+      }
+      if (lead === undefined && block.fragmentIndex !== 0) {
         evaluations.push(targetEvaluation({
           ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
           fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-applicable",
@@ -143,6 +208,17 @@ export const unbreakableBlockTooTall = defineRule(
         continue;
       }
       candidates += 1;
+      // A box of zero by zero that printed lines (`width: 0; height: 0; overflow: visible`), or
+      // whose lines were not recorded: the box's height is not the height of what printed, and the
+      // lines' extent is not the height of a box that could have broken. Neither is this block's
+      // height. Declined, counted against coverage — never excluded, which turned such a document's
+      // `insufficient-coverage` into a clean run.
+      if (rendering === "zero-box") {
+        const decline = boxlessDeclined("layout/unbreakable-block-too-tall", snapshot, block);
+        notMeasured.push(decline.notMeasured);
+        evaluations.push(decline.evaluation);
+        continue;
+      }
 
       const outOfScope = layoutOutOfScope(block.effectiveStyle);
       if (outOfScope) {
@@ -162,13 +238,38 @@ export const unbreakableBlockTooTall = defineRule(
         evaluations.push(targetEvaluation({ ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: "env/multicolumn" }));
         continue;
       }
+      // A split block is judged on ALL of its fragments or not at all. Its fragments are joined by
+      // `sid`; a block without one (a `--no-source-map` run, or an element a script created) has
+      // nothing to join them by, and one whose sid does not account for exactly the fragments the
+      // snapshot counted cannot be summed either. Measuring the first fragment instead — what this
+      // rule used to fall back to — compares a PIECE with the page and can call a six-page block
+      // clean. That is declined, and the decline is charged to coverage, so the run says it could
+      // not judge the block instead of saying the block fits.
+      const flow = block.sid === null ? undefined : flowBySid.get(block.sid);
+      const correlated = block.fragmentCount <= 1
+        ? block.sid === null || flow?.fragments === 1
+        : flow?.fragments === block.fragmentCount;
+      if (!correlated) {
+        notMeasured.push(
+          declined({ scope: "block", ruleId: "layout/unbreakable-block-too-tall", reason: "env/invalid-measurement" }),
+        );
+        evaluations.push(targetEvaluation({
+          ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+          fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: "env/invalid-measurement",
+          measurements: [
+            { name: "fragment-count", value: block.fragmentCount, unit: null, operator: null, threshold: null },
+            { name: "fragments-joined-by-sid", value: flow?.fragments ?? 0, unit: null, operator: "=", threshold: block.fragmentCount },
+          ],
+          connective: "single", violated: null,
+        }));
+        continue;
+      }
       measured += 1;
 
       // The boundary is structural: taller than the page means it cannot fit. The ratio is
       // exposed so the threshold is a value rather than a hidden comparison — at 1.0 it is
       // exactly the arithmetic claim, and nothing else is defensible as an error.
       const limit = page.contentBox.height * num(ctx.options.toleranceRatio, 1.0);
-      const flow = block.sid === null ? undefined : flowBySid.get(block.sid);
       const fragmentCount = flow?.fragments ?? 1;
       // `block-height` keeps its name and its unit: it is still the height of this block. What
       // changed is that a split block's height is no longer read off one of its pieces — from the

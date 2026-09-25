@@ -572,7 +572,7 @@ function snapshotFromProjection(projection: SnapshotProjection): Snapshot {
     meta: { renderer: "m3-0-measurement-receipt", browserVersion: "receipt-bound", pagedjsVersion: "0.4.3", platform: "receipt-bound", locale: "en", inputIdentity: null, freezeSignature: "receipt-bound", freezeRetries: 0, epochCount: 1, interventions: [] },
     source: { map: {}, parser: "receipt-projection-v1", complete: true, injectedAttribute: "data-bl-sid", collisionChecked: true },
     pages: [],
-    blocks: [{ nodeKey: svg.nodeKey, sid: null, authorId: null, blockSignature: "receipt-svg", fragmentIndex: 0, fragmentCount: 1, page: projection.pageNumber, box: svg.viewportScreen, tag: "svg", classList: [], lineHeight: 20, spaceWidth: 4, effectiveStyle: style, lines: [], inertBreak: null }],
+    blocks: [{ nodeKey: svg.nodeKey, sid: null, authorId: null, blockSignature: "receipt-svg", fragmentIndex: 0, fragmentCount: 1, page: projection.pageNumber, box: svg.viewportScreen, tag: "svg", classList: [], lineHeight: 20, spaceWidth: 4, effectiveStyle: style, display: "inline", marginCopies: 0, lines: [], inertBreak: null }],
     textLines: [], textRuns: [], svg: [svg], uriRefs: [], resources: [], notMeasured: [],
   };
 }

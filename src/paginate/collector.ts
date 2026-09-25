@@ -97,6 +97,16 @@ export function silentHooks(hooks: Readonly<Record<string, number>>): string[] {
 }
 
 /**
+ * The content area of a Paged.js 0.4.3 page: the `.pagedjs_area` child of the page box, holding
+ * `.pagedjs_page_content` and `.pagedjs_footnote_area`. A source node is part of the flow if and
+ * only if it lies inside it. The rest of a page box is margin boxes, into which Paged.js clones
+ * every `position: running(...)` element on every page, and `position: fixed` clones, which it
+ * inserts as the first children of every page box. The collector and `SNAPSHOT_SOURCE` both
+ * interpolate this one constant, so the two payloads cannot disagree about what is in the flow.
+ */
+export const PAGE_AREA_SELECTOR = ".pagedjs_pagebox > .pagedjs_area";
+
+/**
  * The in-page collector.
  *
  * Registered BEFORE `new Paged.Previewer().preview()` runs, which the loader guarantees by
@@ -110,6 +120,7 @@ const COLLECTOR_NONCE_MARKER = "__BREAKLINT_COLLECTOR_NONCE__";
 const COLLECTOR_TEMPLATE = `(() => {
   const P = window.__blPrimitives;
   const A = { before: "data-break-before", prevAfter: "data-previous-break-after", page: "data-page" };
+  const PAGE_AREA_SELECTOR = ${JSON.stringify(PAGE_AREA_SELECTOR)};
   const SOURCE_BLOCK_SELECTOR = "[data-bl-sid],address[data-ref],article[data-ref],aside[data-ref],blockquote[data-ref],caption[data-ref],dd[data-ref],details[data-ref],div[data-ref],dl[data-ref],dt[data-ref],fieldset[data-ref],figcaption[data-ref],figure[data-ref],footer[data-ref],form[data-ref],h1[data-ref],h2[data-ref],h3[data-ref],h4[data-ref],h5[data-ref],h6[data-ref],header[data-ref],hgroup[data-ref],hr[data-ref],li[data-ref],main[data-ref],nav[data-ref],ol[data-ref],p[data-ref],pre[data-ref],section[data-ref],summary[data-ref],table[data-ref],tbody[data-ref],td[data-ref],tfoot[data-ref],th[data-ref],thead[data-ref],tr[data-ref],ul[data-ref]";
 
   const state = {
@@ -151,7 +162,13 @@ const COLLECTOR_TEMPLATE = `(() => {
    * finding fingerprint.
    */
   const edges = (pageEl) => {
-    const nodes = P.all(pageEl, SOURCE_BLOCK_SELECTOR);
+    // Only nodes inside the page's content area (.pagedjs_pagebox > .pagedjs_area: page content
+    // and footnote area) are edges of the flow. Paged.js clones a running element into the margin
+    // box of every page and a position: fixed element into every page box, and both clones keep
+    // the source id. Counted here, a clone made a parity-blank page look occupied, and the margin
+    // boxes precede the area in the page box, so it also became the FIRST node of every page.
+    // SNAPSHOT_SOURCE applies the same test and refuses a page that has no area at all.
+    const nodes = P.all(pageEl, SOURCE_BLOCK_SELECTOR).filter((el) => P.closest(el, PAGE_AREA_SELECTOR) !== null);
     const first = nodes[0] || null;
     const last = nodes.length ? nodes[nodes.length - 1] : null;
     // Every read below goes through the captured primitives. An audit found this function calling
@@ -181,9 +198,10 @@ const COLLECTOR_TEMPLATE = `(() => {
       lastNodePage: pageNameAt(last),
       // Blank means no author content: no source id AND no visible text. Both, because a page can
       // carry a paginator-generated wrapper with no sid while still showing text. Margin boxes sit
-      // OUTSIDE .pagedjs_page_content, so a running header does not make a parity page look
-      // occupied — which is intended: the blank page inserted by break-before: recto carries the
-      // same running header as every other page.
+      // OUTSIDE the content area, so a running header does not make a parity page look occupied —
+      // which is intended: the blank page inserted by break-before: recto carries the same running
+      // header as every other page. This comment said so before it was true: the text and the
+      // visual boxes were read from the content only, but the source nodes from the whole page.
       blank: nodes.length === 0 && text.length === 0 && visual.length === 0,
     };
   };

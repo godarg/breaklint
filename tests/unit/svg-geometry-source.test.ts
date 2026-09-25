@@ -3,6 +3,7 @@ import { it } from "node:test";
 
 import { PRIMITIVES_CHECK, PRIMITIVES_SOURCE } from "../../src/measure/primitives.ts";
 import { SNAPSHOT_SOURCE } from "../../src/measure/snapshot.ts";
+import { PAGE_AREA_SELECTOR } from "../../src/paginate/collector.ts";
 
 /**
  * The in-page half of the SVG frame ships facts and decides nothing. Up to 0.6.0 it decided in the
@@ -70,7 +71,9 @@ it("collects SVG only from the page content area, never from margin-box clones",
   // Up to 0.6.0 the SVG collector read the whole page, so a running element's SVG was collected
   // once per page under one target id and the viewport rule stopped the run (exit 3). The area
   // is the one the block collection keeps (PAGE_AREA_SELECTOR in the paginator's collector).
-  assert.match(SNAPSHOT_SOURCE, /const SVG_FLOW_AREA_SELECTOR = "\.pagedjs_pagebox > \.pagedjs_area";/u);
+  assert.match(SNAPSHOT_SOURCE, /const SVG_FLOW_AREA_SELECTOR = PAGE_AREA_SELECTOR;/u);
+  assert.ok(SNAPSHOT_SOURCE.includes(`const PAGE_AREA_SELECTOR = ${JSON.stringify(PAGE_AREA_SELECTOR)};`));
+  assert.equal(PAGE_AREA_SELECTOR, ".pagedjs_pagebox > .pagedjs_area");
   assert.match(SNAPSHOT_SOURCE, /const svgInFlow = \(el\) => P\.closest\(el, SVG_FLOW_AREA_SELECTOR\) !== null;/u);
   assert.match(SNAPSHOT_SOURCE, /P\.all\(page, "svg"\)\.filter\(svgInFlow\)\.forEach/u);
   assert.doesNotMatch(SNAPSHOT_SOURCE, /P\.all\(page, "svg"\)\.forEach/u, "an unfiltered page-wide SVG query is back");

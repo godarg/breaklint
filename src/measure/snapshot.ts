@@ -37,10 +37,11 @@ import {
   SVG_FLOAT_NOISE_PX, SVG_OVERSHOOT_EPSILON_PX, envelope, resolveSvgFrames, resolveSvgText,
   type RawSvgFrame, type RawSvgTextFrame, type SvgBoxModel,
 } from "./svg-viewport.ts";
-import { boundaryFactsFrom, type CollectorResult } from "../paginate/collector.ts";
+import { boundaryFactsFrom, PAGE_AREA_SELECTOR, type CollectorResult } from "../paginate/collector.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InjectionResult } from "../source/inject.ts";
 import { coordinateAtUtf8Byte } from "../source/bytes.ts";
+import { isNotRendered } from "../rules/shared.ts";
 
 type Node = DefaultTreeAdapterMap["node"];
 type Element = DefaultTreeAdapterMap["element"];
@@ -455,9 +456,47 @@ export const SNAPSHOT_SOURCE = `(() => {
     return count;
   };
   const pagesEls = P.all(document, ".pagedjs_page");
+  // FLOW MEMBERSHIP. A source block is part of the flow if and only if it lies inside its page's
+  // content area, the .pagedjs_area child of the page box: the page content and the footnote
+  // area. Everything else in a page box is a copy. Paged.js implements position: running(...) by
+  // deep-cloning the element into the margin box of EVERY page, and position: fixed by cloning it
+  // into every page box; both clones keep the injected source id and the paginator's data-ref.
+  // Querying the whole page counted each clone as one more fragment of its source block. Measured
+  // on 2026-09-24 (Paged.js 0.4.3) on a six-page document: a one-line running title became seven
+  // "fragments", which produced ten false widow and orphan warnings and anchored every page to
+  // the title. The running element's in-flow original (display: none, no box) stays in the page
+  // content and is kept.
+  //
+  // It is an INCLUSION test on the page structure, not an exclusion test on a class name, and
+  // that direction is chosen: an author element that happens to carry a margin-box class does not
+  // leave the flow, so no document can hide content from measurement by naming it. What the test
+  // cannot prevent is author markup inside a margin box that itself reproduces the page structure;
+  // that only brings back the old whole-page behaviour for that element, never a silent exclusion.
+  const PAGE_AREA_SELECTOR = ${JSON.stringify(PAGE_AREA_SELECTOR)};
+  const inFlow = (el) => P.closest(el, PAGE_AREA_SELECTOR) !== null;
+  // Without an area on a page, every block on it would be excluded and the rules would judge an
+  // empty document: a clean result about nothing. That is refused, never measured.
+  for (let index = 0; index < pagesEls.length; index += 1) {
+    if (P.all(pagesEls[index], PAGE_AREA_SELECTOR).length === 0) {
+      throw new Error("breaklint: page " + (index + 1) + " has no Paged.js content area (" + PAGE_AREA_SELECTOR +
+        "), so its flow content cannot be told apart from margin-box content");
+    }
+  }
+  // Margin-box copies per source id: the clones Paged.js prints of a position: running(...)
+  // element. They are not flow (see above), but that they exist is a fact about the in-flow
+  // original, which Paged.js hides with display: none: without the count, a running element's
+  // original cannot be told from an element the author hid. Only margin boxes count, never a
+  // margin-box class inside the page area.
+  const marginCopiesBySid = {};
+  for (const page of pagesEls) for (const el of P.all(page, ".pagedjs_margin [data-bl-sid]")) {
+    if (inFlow(el)) continue;
+    const sid = P.attr(el, "data-bl-sid");
+    if (sid) marginCopiesBySid[sid] = (marginCopiesBySid[sid] || 0) + 1;
+  }
   const fragments = [];
   const bySidCount = {};
   for (const page of pagesEls) for (const el of P.all(page, SOURCE_BLOCK_SELECTOR)) {
+    if (!inFlow(el)) continue;
     const sid = P.attr(el, "data-bl-sid");
     const sourceIdentity = sid || ("ref:" + (P.attr(el, "data-ref") || String(fragments.length)));
     bySidCount[sourceIdentity] = (bySidCount[sourceIdentity] || 0) + 1;
@@ -489,10 +528,16 @@ export const SNAPSHOT_SOURCE = `(() => {
     let spaceWidth = 0;
     for (const node of textNodes(el)) {
       const value = P.text(node) || "";
+      // A line is visible when any text on it is: visibility is read from each text node's own
+      // element, not from the block, because a hidden block may hold a visible descendant
+      // (p { visibility: hidden } span { visibility: visible } prints the span).
+      const parentStyle = P.style(P.parent(node), null);
+      const nodeVisible = (parentStyle && parentStyle.visibility) !== "hidden";
       for (const r of P.range(node)) {
         if (r.width <= 0 || r.height <= 0) continue;
         const existing = groups.find((g) => Math.abs(g.y - r.y) <= 0.5);
-        const entry = existing || { x: r.x, y: r.y, right: r.x + r.width, bottom: r.y + r.height, words: [] };
+        const entry = existing || { x: r.x, y: r.y, right: r.x + r.width, bottom: r.y + r.height, words: [], visible: false };
+        if (nodeVisible) entry.visible = true;
         entry.x = Math.min(entry.x, r.x); entry.right = Math.max(entry.right, r.x + r.width);
         entry.y = Math.min(entry.y, r.y); entry.bottom = Math.max(entry.bottom, r.y + r.height);
         if (!existing) groups.push(entry);
@@ -528,7 +573,7 @@ export const SNAPSHOT_SOURCE = `(() => {
       const lineWords = measured.words === null ? null : measured.words.filter((w) => Math.abs(w.y - line.y) <= 0.5);
       textLines.push({ blockKey: nodeKey, index: base + local,
         box: { x: round(line.x), y: round(line.y), width: round(line.right - line.x), height: round(line.bottom - line.y) },
-        visible: s.visibility !== "hidden", width: round(line.right - line.x), wordBoxes: lineWords });
+        visible: line.visible, width: round(line.right - line.x), wordBoxes: lineWords });
     });
     lineBaseBySid[sourceIdentity] = base + measured.groups.length;
     fonts.add(s.fontFamily);
@@ -542,6 +587,7 @@ export const SNAPSHOT_SOURCE = `(() => {
         visibility: s.visibility || "visible", widows: number(s.widows, 2), orphans: number(s.orphans, 2),
         textAlign: s.textAlign || "start", wordSpacing: s.wordSpacing || "normal", fontFamily: s.fontFamily || "",
         fontSize, lineHeight, lang: P.attr(el, "lang") || document.documentElement.lang || "" },
+      display: s.display || "", marginCopies: sid ? (marginCopiesBySid[sid] || 0) : 0,
       lines: measured.groups.map((_, i) => base + i), inertBreak: null,
     });
     seenBySid[sourceIdentity] = (seenBySid[sourceIdentity] || 0) + 1;
@@ -641,8 +687,7 @@ export const SNAPSHOT_SOURCE = `(() => {
     || effect(facts.maskImage) || effect(facts.mask) || /url\\(/u.test(facts.filter) || facts.clip !== "auto";
   // FLOW MEMBERSHIP, the same test the block collection applies: an <svg> is measured only inside
   // its page's content area, the .pagedjs_area child of the page box (page content and footnote
-  // area; the selector is PAGE_AREA_SELECTOR of src/paginate/collector.ts and must stay equal to
-  // it). Paged.js deep-clones a position: running(...) element into the margin box of every page
+  // area): PAGE_AREA_SELECTOR, the one constant the block collection above uses too. Paged.js deep-clones a position: running(...) element into the margin box of every page
   // and a position: fixed one into every page box, and each clone keeps the injected target ids.
   // Read from the whole page, a running logo with one <text> became one target per page under one
   // id, and the viewport rule's per-target accounting stopped the run: "duplicate target
@@ -650,7 +695,7 @@ export const SNAPSHOT_SOURCE = `(() => {
   // Margin-box SVG is unmeasured content, like everything else in a margin box. The running
   // element's in-flow original stays in the content area with display: none: its text is not
   // rendered, so it is kept and contributes no candidate.
-  const SVG_FLOW_AREA_SELECTOR = ".pagedjs_pagebox > .pagedjs_area";
+  const SVG_FLOW_AREA_SELECTOR = PAGE_AREA_SELECTOR;
   const svgInFlow = (el) => P.closest(el, SVG_FLOW_AREA_SELECTOR) !== null;
   pagesEls.forEach((page, pageIndex) => P.all(page, "svg").filter(svgInFlow).forEach((el, i) => {
     // querySelectorAll reaches <text> inside <defs>, <symbol>, <clipPath> and <pattern>, under
@@ -961,6 +1006,11 @@ export function validateSnapshotInvariants(
   }
   for (const block of snapshot.blocks) {
     if (block.lines === null && !block.notMeasuredReason) issues.push(`${block.nodeKey}: lines absent without reason`);
+    // Snapshot 5. A block without its computed display, or with a margin-copy count that is not a
+    // count, cannot be classified by the rules that ask whether it has a box of its own.
+    if (typeof block.display !== "string" || block.display.length === 0) issues.push(`${block.nodeKey}: computed display is absent`);
+    if (!Number.isSafeInteger(block.marginCopies) || block.marginCopies < 0) issues.push(`${block.nodeKey}: marginCopies is not a count`);
+    else if (block.marginCopies > 0 && block.sid === null) issues.push(`${block.nodeKey}: margin copies without a source id`);
     // The inspected input artefact's injection map is always complete. Producer provenance is
     // deliberately separate in originalMap, where generated/ambiguous output can be omitted.
     if (options.sourceMapInjection && block.sid !== null && !snapshot.source.map[block.sid]) {
@@ -1164,8 +1214,31 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
     boundaryFactsFrom(input.collector.pages, input.cascadeHints),
     input.collector.pages.map((p) => p.blank),
   );
+  // A page is anchored to the first source block a reader can SEE on it. A block that was not
+  // rendered — no box in either dimension and no line boxes, which is what display: none leaves —
+  // is skipped (`isNotRendered`); a display: contents block, which has no box but prints its
+  // lines, is not. The case that forced this is the in-flow original of a running element: Paged.js
+  // leaves it in the page content with an inline display: none while its clones print in the
+  // margin boxes, so it is the first block on its page in document order and would otherwise
+  // anchor that page, whose findings would then change fingerprint whenever the header is edited.
+  //
+  // And the first block that STARTS on the page (fragment 0) wins over continuations. A wrapper
+  // that spans pages — `<main>`, `<article>`, a section, a full-bleed block — has a fragment on
+  // every page it covers, and as an ancestor it comes first in document order, so it used to
+  // anchor all of them: four `layout/half-empty-page` findings on four pages of one `<article>`
+  // carried one fingerprint. A block starts on exactly one page. Only a page on which nothing
+  // starts — the middle of a single block taller than a page — falls back to its first
+  // continuing block, which is deterministic; two such pages of the same block share an anchor.
+  const anchorCandidates = new Map<number, BlockRecord[]>();
+  for (const block of blocks) {
+    if (!mappedNodeKeys.has(block.nodeKey) || isNotRendered({ textLines: input.raw.textLines }, block)) continue;
+    const list = anchorCandidates.get(block.page) ?? [];
+    list.push(block);
+    anchorCandidates.set(block.page, list);
+  }
   const pages: PageRecord[] = input.raw.pages.map((page, index) => {
-    const first = blocks.find((b) => b.page === page.pageNumber && mappedNodeKeys.has(b.nodeKey));
+    const onPage = anchorCandidates.get(page.pageNumber) ?? [];
+    const first = onPage.find((b) => b.fragmentIndex === 0) ?? onPage[0];
     const identity = first ? blockKey({ authorId: first.authorId, blockSignature: first.blockSignature }) : null;
     return {
       ...page,

@@ -79,7 +79,12 @@ import {
   type RawSnapshot,
 } from "../measure/snapshot.ts";
 import type { SvgBoxModel } from "../measure/svg-viewport.ts";
-import { boundaryFactsFrom, collectorSource, silentHooks, type CollectorResult } from "../paginate/collector.ts";
+import { boundaryFactsFrom, collectorSource, PAGE_AREA_SELECTOR, silentHooks, type CollectorResult } from "../paginate/collector.ts";
+
+/** A page's flow content: the content box inside the page area, without the footnote area. */
+const PAGE_CONTENT_SELECTOR = `${PAGE_AREA_SELECTOR} > .pagedjs_page_content`;
+/** A note Paged.js moved into the footnote area; it marks every footnote element in `afterParsed`. */
+const FOOTNOTE_NOTE_SELECTOR = `${PAGE_AREA_SELECTOR} > .pagedjs_footnote_area [data-note="footnote"]`;
 import { assignPageCauses } from "../paginate/breaks.ts";
 import { produceEvidence, type EvidenceOutcome } from "../render/evidence.ts";
 import { openRasterizer, type OpenRasterizerResult } from "../render/rasterizer.ts";
@@ -1177,7 +1182,25 @@ export interface RuntimeIntegrityStatus {
   sidMutations: number;
   mutationRecordsAfterRendered: number;
   paginationPreviewCalls: number;
+  /** Source ids in document order, outside any page or inside a page's content. */
   sids: string[];
+  /** Pages in the paginated document; what "every page box" is counted against. */
+  pageCount?: number;
+  /**
+   * Source ids in the footnote area inside an element Paged.js marked as a note
+   * (`data-note="footnote"`). They keep identity but not source order.
+   */
+  footnoteSids?: string[];
+  /**
+   * Source ids in a page box outside the page area and the margin boxes, with their page and
+   * whether they precede that page's area. Paged.js puts a `position: fixed` element's clone
+   * there, at the HEAD of every page box.
+   */
+  pageBoxSids?: { sid: string; page: number; beforeArea: boolean }[];
+  /** Source ids anywhere else on a page: inside the page area, outside the content and the notes. */
+  displacedSids?: string[];
+  /** Source ids inside margin boxes: `position: running(...)` clones of an in-flow original. */
+  marginSids?: string[];
 }
 
 export function validateRuntimeSidState(
@@ -1202,12 +1225,80 @@ export function validateRuntimeSidState(
     seen.add(sid);
     distinctObserved.push(sid);
   }
-  if (distinctObserved.length !== expectedSids.length) {
-    issues.push(`expected ${expectedSids.length} distinct source ids, found ${distinctObserved.length}`);
+  // Copies Paged.js places OUTSIDE the page content are checked for identity, presence and the
+  // signature of the Paged.js step that put them there, not for order, because the paginator
+  // itself puts them out of source order. The margin boxes come before the content area in every
+  // page box, so a running element's clone on page 1 used to precede everything the source puts
+  // before it, and an ordinary document whose running title was not its first element ended
+  // `checker-crashed` (exit 3). A block footnote is moved into the footnote area after the page's
+  // content, and a `position: fixed` element leaves the flow for a clone at the head of every
+  // page box.
+  //
+  // What this cannot hide. Every attribute mutation of a reserved id, anywhere, is still counted
+  // above; an unknown id in any list is still an issue; every expected id must still be present
+  // somewhere; and the order of the flow — which is all that the snapshot measures — is still
+  // compared exactly. Each out-of-flow place accepts only what Paged.js itself puts there:
+  //  - a margin box carries only clones of an element whose original stays in the flow, so an id
+  //    found ONLY in margin boxes is an element moved out of the flow;
+  //  - the footnote area carries only elements Paged.js marked `data-note="footnote"` (and their
+  //    descendants), and it is inside the page area, so the snapshot still measures them;
+  //  - the rest of a page box carries only `position: fixed` clones, which Paged.js removes from
+  //    the flow and inserts at the head of EVERY page box. A page-box id that has an in-flow
+  //    occurrence, is missing from some page, or sits after the page's area is an element a script
+  //    moved there — out of every measurement — and is an issue.
+  // Anything else on a page outside the content, the notes and the margins is an issue as well.
+  const moved = new Set<string>();
+  const known = (kind: string, list: readonly string[]): string[] => {
+    const out: string[] = [];
+    for (const [position, sid] of list.entries()) {
+      if (expectedIndex.has(sid)) out.push(sid);
+      else issues.push(`unknown ${kind} source id at ${position}: ${sid}`);
+    }
+    return out;
+  };
+  for (const sid of known("footnote", status.footnoteSids ?? [])) if (!seen.has(sid)) moved.add(sid);
+  const marginKnown = new Set(known("margin", status.marginSids ?? []));
+  for (const sid of new Set(known("displaced", status.displacedSids ?? []))) {
+    // The displaced bucket holds everything in the page area outside the page content that is not
+    // inside a Paged.js note: an element in the footnote area without `data-note="footnote"` lands
+    // here too, so the message may not say "outside the footnote area".
+    issues.push(`source id ${sid} is in the page area outside the page content and is not inside a Paged.js footnote (data-note="footnote")`);
   }
-  for (let index = 0; index < Math.max(distinctObserved.length, expectedSids.length); index += 1) {
-    if (distinctObserved[index] !== expectedSids[index]) {
-      issues.push(`source-id order mismatch at ${index}: ${distinctObserved[index] ?? "missing"} != ${expectedSids[index] ?? "missing"}`);
+  const pageBox = new Map<string, { pages: Set<number>; afterArea: boolean }>();
+  for (const [position, entry] of (status.pageBoxSids ?? []).entries()) {
+    if (!expectedIndex.has(entry.sid)) {
+      issues.push(`unknown page-box source id at ${position}: ${entry.sid}`);
+      continue;
+    }
+    const record = pageBox.get(entry.sid) ?? { pages: new Set<number>(), afterArea: false };
+    record.pages.add(entry.page);
+    if (!entry.beforeArea) record.afterArea = true;
+    pageBox.set(entry.sid, record);
+  }
+  const pageCount = status.pageCount ?? 0;
+  for (const [sid, record] of pageBox) {
+    const onEveryPage = pageCount > 0 && record.pages.size === pageCount;
+    if (seen.has(sid) || !onEveryPage || record.afterArea) {
+      const why = seen.has(sid) ? "it also has an in-flow occurrence"
+        : !onEveryPage ? `it is in ${record.pages.size} of ${pageCount} page boxes`
+          : "it follows the page area";
+      issues.push(`source id ${sid} is in a page box but is not a position: fixed clone: ${why}`);
+      continue;
+    }
+    moved.add(sid);
+  }
+  for (const sid of marginKnown) {
+    if (!seen.has(sid) && !moved.has(sid)) {
+      issues.push(`source id ${sid} exists only in margin boxes, without its in-flow original`);
+    }
+  }
+  const expectedInFlow = expectedSids.filter((sid) => !moved.has(sid));
+  if (distinctObserved.length + moved.size !== expectedSids.length) {
+    issues.push(`expected ${expectedSids.length} distinct source ids, found ${distinctObserved.length + moved.size}`);
+  }
+  for (let index = 0; index < Math.max(distinctObserved.length, expectedInFlow.length); index += 1) {
+    if (distinctObserved[index] !== expectedInFlow[index]) {
+      issues.push(`source-id order mismatch at ${index}: ${distinctObserved[index] ?? "missing"} != ${expectedInFlow[index] ?? "missing"}`);
       break;
     }
   }
@@ -1267,10 +1358,34 @@ function integritySourceWithCapability(expectedSids: readonly string[], capabili
     });
     observer.observe(document, { subtree: true, childList: true, attributes: true });
     const armLate = () => { if (late) return false; late = true; return true; };
+    // Where each source id sits: outside any page (the source before pagination) or in a page's
+    // content is the FLOW, whose order must be the source order; margin boxes hold running-element
+    // clones; the footnote area holds what Paged.js marked as a note; the rest of a page box holds
+    // position: fixed clones, recorded with their page and whether they precede its area (Paged.js
+    // inserts them at the head of the page box). Anything else on a page is DISPLACED. Classified by
+    // inclusion first, so author markup carrying a margin-box class inside the page content is
+    // still flow. One query in document order, over the ids and the page areas, tells which ids
+    // come before their page's area.
     const status = () => {
-      const sids = [], elements = P.all(document, "[data-bl-sid]");
-      for (let index = 0; index < elements.length; index += 1) sids[index] = P.attr(elements[index], "data-bl-sid") || "";
-      return { sidMutations, mutationRecordsAfterRendered, paginationPreviewCalls, sids, expected };
+      const sids = [], footnoteSids = [], pageBoxSids = [], displacedSids = [], marginSids = [];
+      const pages = P.all(document, ".pagedjs_page"), areaSeen = [];
+      const pageIndexOf = (page) => { for (let i = 0; i < pages.length; i += 1) if (pages[i] === page) return i; return -1; };
+      const nodes = P.all(document, "[data-bl-sid], " + ${JSON.stringify(PAGE_AREA_SELECTOR)});
+      for (let index = 0; index < nodes.length; index += 1) {
+        const el = nodes[index], page = P.closest(el, ".pagedjs_page");
+        if (!P.hasAttr(el, "data-bl-sid")) { if (page !== null) areaSeen[pageIndexOf(page)] = true; continue; }
+        const sid = P.attr(el, "data-bl-sid") || "";
+        const inArea = P.closest(el, ${JSON.stringify(PAGE_AREA_SELECTOR)}) !== null;
+        if (page === null || P.closest(el, ${JSON.stringify(PAGE_CONTENT_SELECTOR)}) !== null) sids[sids.length] = sid;
+        else if (!inArea && P.closest(el, ".pagedjs_margin") !== null) marginSids[marginSids.length] = sid;
+        else if (inArea && P.closest(el, ${JSON.stringify(FOOTNOTE_NOTE_SELECTOR)}) !== null) footnoteSids[footnoteSids.length] = sid;
+        else if (!inArea) {
+          const pageIndex = pageIndexOf(page);
+          pageBoxSids[pageBoxSids.length] = { sid, page: pageIndex + 1, beforeArea: areaSeen[pageIndex] !== true };
+        } else displacedSids[displacedSids.length] = sid;
+      }
+      return { sidMutations, mutationRecordsAfterRendered, paginationPreviewCalls, sids, pageCount: pages.length,
+        footnoteSids, pageBoxSids, displacedSids, marginSids, expected };
     };
     const recordPaginationPreview = () => { paginationPreviewCalls += 1; return paginationPreviewCalls; };
     P.installIntegrity(${JSON.stringify(capability)}, { armLate, recordPreview: recordPaginationPreview, status });
