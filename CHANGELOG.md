@@ -496,7 +496,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
 ### Tooling
 
 - **Every rule declares what its quantity belongs to (`RuleMeta.quantityScope`), and a gate holds
-  element-scope rules to it.** Internal and not emitted in any report.
+  element-scope rules to it.** Internal and not emitted in any report; the one declaration line is
+  the only change to `artifact/local-uri`, `svg/text-overflows-viewport`, `svg/text-clipped`,
+  `svg/text-ink-collision`, `type/short-last-line`, `type/spaced-hyphen` and
+  `type/straight-quotes` in this entry.
   `tests/unit/fragment-contract.test.ts` splits every corpus target of an `element` rule over two
   and three pages and requires the same findings and verdict — except that a clean element may
   become a declared decline (a split block that fits cannot be shown to fit); it may never gain or
