@@ -148,19 +148,25 @@ describe("layout/unbreakable-block-too-tall on a split block", () => {
     assert.equal(finding.severity, "error");
     assert.equal(finding.measurement.proofSource, "A");
     assert.match(finding.message, /is at least 503\.80 px tall across the 2 fragments the paginator split it into/u);
-    assert.match(finding.message, /counting only their text lines, not borders, padding or the space around them/u);
+    assert.match(finding.message, /counting only their text lines and replaced content, not borders, padding or the space around them/u);
     assert.match(finding.message, /content box of page 2 is 340\.16 px/u);
     assert.doesNotMatch(finding.message, /height its content needed/u);
     assert.equal(measurement(result, "big:0", "block-height-lower-bound"), 503.8);
     assert.equal(measurement(result, "big:0", "fragment-count"), 2);
+    assert.equal(measurement(result, "big:0", "fragments-left-out"), 0);
     assert.equal(result.measured, 1);
   });
 
-  it("stays silent on the measured decorated-ancestor split whose fragment boxes sum above the page", () => {
+  it("declines the measured decorated-ancestor split as inconclusive: no false error, and no clean pass", () => {
     const result = run(frameAncestor());
     assert.deepEqual(result.findings, [], "a block 301.19 px tall that fits an empty page was reported");
     const row = rowOf(result, "inner:0");
-    assert.equal(row.status, "measured");
+    // The bound is below the page, so it proves nothing; the fragment boxes (417.47 px) are no upper
+    // bound either. The block may well fit — the rule cannot show it, and says so.
+    assert.equal(row.status, "not-measured");
+    assert.equal(row.reason, "env/invalid-measurement");
+    assert.equal(result.measured, 0);
+    assert.deepEqual(result.notMeasured.map((entry) => [entry.reason, entry.count]), [["env/invalid-measurement", 1]]);
     // 11 lines on page 2 (917.69 to 1119.25) and 2 on page 3 (1717.69 to 1751.34), each less 0.01.
     assert.equal(measurement(result, "inner:0", "block-height-lower-bound"), 235.19);
     assert.ok(235.19 <= 301.19, "the bound is below the measured unsplit height");
@@ -200,6 +206,8 @@ describe("layout/unbreakable-block-too-tall on a split block", () => {
     const result = run(base);
     assert.deepEqual(result.findings, []);
     assert.equal(measurement(result, "big:0", "block-height-lower-bound"), 335.87);
+    assert.equal(measurement(result, "big:0", "fragments-left-out"), 1, "a fragment was dropped without a word");
+    assert.equal(rowOf(result, "big:0").status, "not-measured");
   });
 
   it("keeps the unsplit case exact, with the 0.5.0 message", () => {
@@ -290,12 +298,197 @@ describe("layout/unbreakable-block-too-tall declines a split block it cannot bou
       pages: [page(1), page(2), page(3), page(4)],
       blocks: [fixed(0), fixed(1), fixed(2)],
       textLines: [0, 1, 2].flatMap((i) => lines(`fixed:${i}`, 16, top(i + 2) + 1, 56.69)),
-    }), "fixed:0", "fragment-text-inside-its-box");
+    }), "fixed:0", "fragment-content-inside-its-box");
   });
 
   it("declines a split block with no text line at all rather than bounding it at zero", () => {
     const pictures = twoFragments();
     pictures.textLines = [];
-    declinedFor(pictures, "big:0", "fragment-text-lines");
+    pictures.blocks.forEach((block) => { block.atomicBoxes = []; });
+    declinedFor(pictures, "big:0", "fragment-content-items");
+  });
+});
+
+describe("layout/unbreakable-block-too-tall counts replaced content, and not the page it did not print on", () => {
+  /**
+   * A figure of five 200 px panels and a one-line caption (the verifier's c-figure-caption shape,
+   * 1018.66 px unsplit): one panel per page, the caption under the last. Counting text lines only,
+   * the bound was the caption — 14.99 px — and the block passed silently.
+   */
+  function figure(): Snapshot {
+    const panel = (pageNumber: number) => ({ tag: "svg", box: box(56.69, top(pageNumber), 300, 200) });
+    const blocks = [0, 1, 2, 3, 4].map((i) => avoid(`fig:${i}`, {
+      page: i + 2, fragmentIndex: i, fragmentCount: 5, tag: "figure",
+      box: box(56.69, top(i + 2), 453.53, i === 4 ? 200 + PITCH : 200), atomicBoxes: [panel(i + 2)],
+    }));
+    blocks.push(record("cap:0", { page: 6, tag: "figcaption", box: box(56.69, top(6) + 200, 453.53, PITCH) }));
+    const caption = lines("fig:4", 1, top(6) + 200 + (PITCH - GLYPH) / 2, 56.69);
+    return snapshot({
+      pages: [1, 2, 3, 4, 5, 6].map((n) => page(n)),
+      blocks,
+      textLines: [...caption, ...caption.map((line) => ({ ...line, blockKey: "cap:0" }))],
+    });
+  }
+
+  it("bounds a split figure by its panels as well as its caption", () => {
+    const result = run(figure());
+    assert.equal(result.findings.length, 1, "a split figure five pages of panels tall was not reported");
+    // 4 x (200 - 0.01) + (200 + 1.83 + 15 - 0.01): each panel, and the last with the caption under it.
+    assert.equal(result.findings[0]!.measurement.value, 1016.78);
+    assert.ok(1016.78 <= 1018.66, "the bound is below the measured unsplit height");
+    assert.match(result.findings[0]!.message, /at least 1016\.78 px tall across the 5 fragments/u);
+  });
+
+  it("bounds a split block of panels alone, without any text line", () => {
+    const panels = figure();
+    panels.textLines = [];
+    const result = run(panels);
+    assert.equal(result.findings.length, 1);
+    assert.equal(result.findings[0]!.measurement.value, 999.95);
+  });
+
+  it("does not count replaced content in the overflow column", () => {
+    const hidden = figure();
+    // Paged.js pushed the second panel into the hidden column beside page 3: printed nowhere.
+    hidden.blocks[1]!.atomicBoxes = [{ tag: "svg", box: box(1683.59, top(3), 300, 200) }];
+    assert.equal(run(hidden).findings[0]!.measurement.value, 816.79);
+  });
+
+  it("declines replaced content that reaches out of its record's box", () => {
+    const spilling = figure();
+    // A panel 30 px below its fragment's box: a fixed height the image overflows, repeated by the
+    // paginator on every piece. It would be counted apart from what follows it in the flow.
+    spilling.blocks[2]!.box = { ...spilling.blocks[2]!.box, height: 170 };
+    const result = run(spilling);
+    assert.deepEqual(result.findings, []);
+    assert.equal(rowOf(result, "fig:0").status, "not-measured");
+    assert.ok(rowOf(result, "fig:0").measurements.some((m) => m.name === "fragment-content-inside-its-box"));
+  });
+});
+
+describe("layout/unbreakable-block-too-tall declines what lays content out other than as one flow", () => {
+  const hazardRow = (s: Snapshot, nodeKey: string) => {
+    const result = run(s);
+    assert.deepEqual(result.findings, [], `${nodeKey}: reported although a flow hazard was recorded`);
+    assert.equal(result.measured, 0);
+    const row = rowOf(result, nodeKey);
+    assert.equal(row.status, "not-measured");
+    assert.equal(row.reason, "env/invalid-measurement");
+    return row.measurements.find((m) => m.name === "flow-hazards")?.value;
+  };
+
+  it("declines a split block with a relatively offset, a transformed, or a multi-column element inside it", () => {
+    // Measured on 2026-09-25 (Paged.js 0.4.3, patched Chromium 141): a block 301.19 px tall with one
+    // paragraph moved up 55 px and one down 70 px read 360.19 px of lines; a two-column paragraph
+    // inside a block 335.81 px tall read 347.13 px. Both would be a false error.
+    for (const inside of [["offset"], ["transformed"], ["multicol"], ["out-of-flow"], ["float"], ["negative-margin"], ["overflowing-content"]] as const) {
+      const s = twoFragments();
+      s.blocks[1]!.flowHazards = { inside: [...inside], self: [], around: [] };
+      assert.equal(hazardRow(s, "big:0"), `inside:${inside[0]}`);
+    }
+  });
+
+  it("declines a split block that is itself transformed, or sits in a flex, grid or transformed ancestor", () => {
+    const self = twoFragments();
+    self.blocks[0]!.flowHazards = { inside: [], self: ["transformed"], around: [] };
+    assert.equal(hazardRow(self, "big:0"), "self:transformed");
+    const around = twoFragments();
+    around.blocks[0]!.flowHazards = { inside: [], self: [], around: ["flex-or-grid", "transformed"] };
+    assert.equal(hazardRow(around, "big:0"), "around:flex-or-grid around:transformed");
+  });
+
+  it("declines a record that does not carry the Snapshot 5 field instead of reading it as empty", () => {
+    const s = twoFragments();
+    delete (s.blocks[1] as Partial<BlockRecord>).flowHazards;
+    assert.equal(hazardRow(s, "big:0"), "around:unrecorded inside:unrecorded self:unrecorded");
+  });
+
+  it("keeps an unsplit block exact whatever is inside it, and declines one drawn transformed", () => {
+    const trigger = structuredClone(loadCorpus().find((entry) => entry.name === "too-tall-trigger")!.snapshot);
+    trigger.blocks[0]!.flowHazards = { inside: ["multicol", "offset", "out-of-flow", "transformed"], self: [], around: ["flex-or-grid"] };
+    // The box of an unsplit block is its height, whatever its content does.
+    assert.equal(run(trigger).findings[0]!.measurement.value, 848);
+    trigger.blocks[0]!.flowHazards = { inside: [], self: [], around: ["transformed"] };
+    // getBoundingClientRect returns the transformed box, not the height that was laid out.
+    assert.equal(hazardRow(trigger, "t1"), "around:transformed");
+  });
+
+  it("declines an unsplit block whose box reaches past the sheet into the overflow column", () => {
+    const s = snapshot({
+      pages: [page(1), page(2)],
+      blocks: [avoid("union:0", { page: 2, box: box(96.69, top(2) - 1, 1940.44, 340.16) })],
+      textLines: lines("union:0", 16, top(2)),
+    });
+    const result = run(s);
+    assert.deepEqual(result.findings, []);
+    assert.equal(rowOf(result, "union:0").status, "not-measured");
+    assert.ok(rowOf(result, "union:0").measurements.some((m) => m.name === "box-within-the-sheet" && m.value === false));
+  });
+
+  it("declines, rather than excludes, a split block whose first piece has no box", () => {
+    // F1 excludes a record without a layout box as never placed. A split element with a laid-out
+    // later piece WAS placed; excluding its first piece would leave it judged nowhere, because the
+    // later pieces are not candidates.
+    const s = twoFragments();
+    s.blocks[0]!.box = box(0, 0, 0, 0);
+    const result = run(s);
+    assert.equal(result.candidates, 1, "a placed split element was dropped from the candidates");
+    assert.equal(result.measured, 0);
+    assert.equal(rowOf(result, "big:0").status, "not-measured");
+    assert.equal(rowOf(result, "big:0").reason, "env/invalid-measurement");
+  });
+});
+
+describe("layout/unbreakable-block-too-tall keeps every give-back of the bound", () => {
+  it("rounds the bound down, never to the nearest hundredth", () => {
+    // Line height 14.994 px under 15 px glyph boxes: 0.006 px of overhang per fragment. The extents
+    // are 332.22 and 164.28 px; less the overhang and the rounding they are 496.468, which rounds to
+    // 496.47 — a hundredth the block is not shown to have.
+    const s = twoFragments();
+    s.textLines = [...lines("big:0", 18, top(2)), ...lines("big:1", 9, top(3))];
+    for (const block of s.blocks) block.lineHeight = 14.994;
+    assert.equal(run(s).findings[0]!.measurement.value, 496.46);
+  });
+
+  it("gives the overhang back against the smallest line height of any element in the fragment", () => {
+    // A paragraph inside each fragment sets its lines at 12 px: the glyph boxes (18.66 px) overhang
+    // THOSE line boxes by 6.66 px, although the block's own line height would say none.
+    const s = twoFragments();
+    s.blocks.push(
+      record("pa:0", { page: 2, box: box(56.69, top(2), 453.53, 18 * PITCH), lineHeight: 12 }),
+      record("pb:0", { page: 3, box: box(56.69, top(3), 453.53, 9 * PITCH), lineHeight: 12 }),
+    );
+    s.textLines.push(...lines("pa:0", 18, top(2), 56.69, PITCH), ...lines("pb:0", 9, top(3), 56.69, PITCH));
+    assert.equal(run(s).findings[0]!.measurement.value, 490.48);
+  });
+
+  it("declines a line that reaches out of its own box by more than its overhang", () => {
+    // The last line runs 3 px below the fragment's box. Only an overhang of the glyph box over the
+    // line height may do that, and at 18.66 px on 18.66 px there is none.
+    const s = twoFragments();
+    s.blocks[1]!.box = { ...s.blocks[1]!.box, height: 9 * PITCH - 3 };
+    const result = run(s);
+    assert.deepEqual(result.findings, []);
+    assert.ok(rowOf(result, "big:0").measurements.some((m) => m.name === "fragment-content-inside-its-box"));
+  });
+
+  it("declines a piece of a split element that ends above the fragment's last line", () => {
+    // A split paragraph inside fragment 0 whose piece stops three lines (55.98 px) short of the
+    // fragment's end: after the break, everything in flow order is on the next page.
+    const s = twoFragments();
+    s.blocks.push(record("q:0", { page: 2, fragmentCount: 2, box: box(56.69, top(2), 453.53, 15 * PITCH) }));
+    s.textLines.push(...lines("q:0", 15, top(2), 56.69, PITCH));
+    const result = run(s);
+    assert.deepEqual(result.findings, []);
+    assert.ok(rowOf(result, "big:0").measurements.some((m) => m.name === "split-pieces-at-fragment-edges"));
+  });
+
+  it("declines a continued piece that does not begin the fragment", () => {
+    const s = twoFragments();
+    s.blocks.push(record("r:1", { page: 3, fragmentIndex: 1, fragmentCount: 2, box: box(56.69, top(3) + 4 * PITCH, 453.53, 5 * PITCH) }));
+    s.textLines.push(...lines("r:1", 5, top(3) + 4 * PITCH, 56.69, PITCH));
+    const result = run(s);
+    assert.deepEqual(result.findings, []);
+    assert.ok(rowOf(result, "big:0").measurements.some((m) => m.name === "split-pieces-at-fragment-edges"));
   });
 });

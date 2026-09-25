@@ -10,7 +10,9 @@
   fragment reads as a union box exactly one page tall, and the two fragment boxes sum to
   417.47 px — above the page. A rule that sums fragment boxes, or subtracts the block's own border
   from that sum, reports a block that would have fitted. The text lines on the pages are less than
-  a page, and nothing in this document is too tall for anything: it must come back clean.
+  a page, and nothing in this document is too tall for anything: it must never be reported. Nor can
+  the split geometry show that it fits (the fragment boxes are no upper bound), so the rule declines
+  it as inconclusive and the run ends 4 — it is not called clean either.
 
   The intro block comes first on purpose: the geometry cross-check samples the first eight boxes,
   and the union box of a bordered split piece disagrees with the browser's box model (measured on

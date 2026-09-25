@@ -10,6 +10,10 @@
  * registry decides per record, and nothing said which rules are allowed to. `RuleMeta.quantityScope`
  * says it now, the compiler requires it, and this test holds every `element` rule to it by
  * splitting each corpus target the rule measured over two and over three pages.
+ *
+ * "Must not change its answer" has one exception, and it only ever costs the run: a split may turn
+ * a clean element into a declined one (exit 4 on a proof-source-A rule), because a split block
+ * that fits has nothing in the snapshot that proves it fits. It may never add or lose a finding.
  */
 
 import { strict as assert } from "node:assert";
@@ -70,7 +74,12 @@ function fragmentContractFailures(rules: readonly Rule[], corpus: readonly Corpu
           const split = splitSnapshot(fixture.snapshot, nodeKey, k);
           splitCases += 1;
           const seen = observe(rule, fixture.name, split);
-          if (seen !== unsplit) {
+          // The one change a split may make: a clean element becomes a DECLARED decline. A block
+          // that fits cannot be shown to fit once split (the rule's inconclusive band), so the run
+          // then says it could not judge it and fails on coverage. A split may never add a finding,
+          // lose one, or turn a decline into a clean result.
+          const declaredDecline = unsplit === "clean []" && seen === "insufficient-coverage []";
+          if (seen !== unsplit && !declaredDecline) {
             failures.push(`${rule.id}: ${fixture.name} split into ${k} fragments at ${nodeKey} gives ${seen}; unsplit it gives ${unsplit}`);
           }
           if (observe(onlyFirstFragment(rule), fixture.name, split) !== seen) sensitive = true;

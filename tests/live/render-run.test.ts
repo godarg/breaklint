@@ -90,7 +90,7 @@ describe("the M2d live production chain", () => {
   let noSource: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
-    if (result?.documents.length === 31 && noSource?.documents.length === 4) return true;
+    if (result?.documents.length === 32 && noSource?.documents.length === 4) return true;
     t.skip(
       `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
       `no-source=${noSource?.documents.length ?? 0}`,
@@ -157,6 +157,7 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "margin-running-in-section.html"),
         join(FIXTURES, "too-tall-split-bounds.html"),
         join(FIXTURES, "too-tall-decorated-ancestor.html"),
+        join(FIXTURES, "too-tall-split-hazards.html"),
       ],
       options(join(root, "evidence")),
     );
@@ -184,7 +185,7 @@ describe("the M2d live production chain", () => {
     }));
     assert.equal(
       result?.documents.length,
-      31,
+      32,
       `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
     );
     assert.equal(
@@ -1144,6 +1145,7 @@ describe("the M2d live production chain", () => {
       assert.ok(finding.measurement.value > finding.measurement.threshold);
       assert.ok(finding.measurement.value <= unsplit, `${item.id}: ${finding.measurement.value} px is above its unsplit height ${unsplit.toFixed(2)} px — not a lower bound`);
       assert.match(finding.message, new RegExp(`is at least ${finding.measurement.value.toFixed(2)} px tall across the ${item.fragments} fragments`, "u"));
+      assert.match(finding.message, /counting only their text lines and replaced content/u);
       assert.equal(finding.severity, "error");
       // How far below: the block's own borders, a line in the overflow column beside the page
       // (printed nowhere, so not counted), and the half-leading at the ends of every fragment —
@@ -1162,12 +1164,14 @@ describe("the M2d live production chain", () => {
   });
 
   /**
-   * A block that fits an empty page is not reported because the paginator split it. Inside a
-   * 40 px-bordered wrapper it no longer fits the page it starts on and is split in two; measured on
-   * 2026-09-24, its first fragment reads as a union box exactly one page tall and the two boxes sum
-   * to 417.47 px against 340.16 px — a false `error` for any rule that sums boxes.
+   * A block that fits an empty page is not reported because the paginator split it — and it is not
+   * called clean either. Inside a 40 px-bordered wrapper it no longer fits the page it starts on and
+   * is split in two; measured on 2026-09-24, its first fragment reads as a union box exactly one
+   * page tall and the two boxes sum to 417.47 px against 340.16 px — a false `error` for any rule
+   * that sums boxes. Its lines bound it below the page, which proves nothing, and nothing in the
+   * snapshot proves it fits: it is declined as inconclusive, and the run ends 4.
    */
-  it("keeps a split block that fits an empty page silent although its fragment boxes sum above the page", (t) => {
+  it("declines a split block that fits an empty page as inconclusive, never as an error", (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     if (!completeChain(t)) return;
     const document = result!.documents[30]!;
@@ -1181,10 +1185,48 @@ describe("the M2d live production chain", () => {
     const outcome = withProfile(document);
     assert.deepEqual(outcome.report.findings.map((finding) => `${finding.ruleId}@${finding.page}`), []);
     const row = outcome.report.evaluations.find((evaluation) =>
-      evaluation.ruleId === "layout/unbreakable-block-too-tall" && evaluation.targetRef.sid === fragments[0]!.sid && evaluation.status === "measured");
-    assert.ok(row, "the split block was not measured");
+      evaluation.ruleId === "layout/unbreakable-block-too-tall" && evaluation.targetRef.sid === fragments[0]!.sid && evaluation.targetRef.fragmentIndex === 0);
+    assert.ok(row, "the split block has no evaluation");
+    assert.equal(row.status, "not-measured");
+    assert.equal(row.reason, "env/invalid-measurement");
     const bound = row.measurements.find((measurement) => measurement.name === "block-height-lower-bound")!.value as number;
+    assert.ok(bound <= page.contentBox.height, `premise: the bound ${bound} is below the page`);
     assert.ok(bound <= 14 * (10 * 4 / 3 * 1.4) + 40, `the bound ${bound} is above the block's unsplit height`);
-    assert.equal(exitCodeFor(outcome.report.verdict), 0);
+    assert.equal(exitCodeFor(outcome.report.verdict), 4);
+  });
+
+  /**
+   * What the lines of a split block cannot bound. Measured on Paged.js 0.4.3 (patched Chromium 141,
+   * 2026-09-25): relatively offset paragraphs and a two-column descendant made the lines of blocks
+   * that fit a page read above it. The snapshot records both as flow hazards and the rule declines
+   * those blocks. A figure whose only line is its caption is bounded by its panels and reported.
+   */
+  it("declines split blocks with offset or multi-column content, and counts a split figure's panels", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[31]!;
+    const snapshot = document.snapshot;
+    assert.ok(snapshot, `no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    const outcome = withProfile(document);
+    const firstOf = (id: string): BlockRecord => {
+      const fragments = snapshot.blocks.filter((block) => block.authorId === id);
+      assert.ok(fragments.length >= 2, `premise: ${id} is split (${fragments.length} fragment(s))`);
+      return fragments.find((block) => block.fragmentIndex === 0)!;
+    };
+    const rowOf = (id: string) => outcome.report.evaluations.find((evaluation) =>
+      evaluation.ruleId === "layout/unbreakable-block-too-tall" && evaluation.targetRef.sid === firstOf(id).sid && evaluation.targetRef.fragmentIndex === 0)!;
+    for (const [id, hazard] of [["offset-split", "inside:offset"], ["columns-split", "inside:multicol"]] as const) {
+      const row = rowOf(id);
+      assert.equal(row.status, "not-measured", `${id} was ${row.status}`);
+      assert.equal(row.reason, "env/invalid-measurement");
+      assert.match(String(row.measurements.find((measurement) => measurement.name === "flow-hazards")?.value), new RegExp(hazard, "u"));
+    }
+    const tooTall = outcome.report.findings.filter((finding) => finding.ruleId === "layout/unbreakable-block-too-tall");
+    assert.deepEqual(tooTall.map((finding) => finding.target.sid), [firstOf("panels").sid], "only the figure is reported");
+    const value = tooTall[0]!.measurement.value;
+    // Five 200 px panels and a caption line; the bound counts the panels and the caption's glyphs.
+    assert.ok(value > 1000 - 1 && value <= 1000 + 10 * 4 / 3 * 1.4, `the figure's bound ${value} is not its panels and caption`);
+    assert.match(tooTall[0]!.message, /at least [\d.]+ px tall across the 5 fragments/u);
+    assert.equal(exitCodeFor(outcome.report.verdict), 4);
   });
 });

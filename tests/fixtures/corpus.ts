@@ -394,7 +394,7 @@ export function loadCorpus(): CorpusEntry[] {
       kind: "clean",
       about: "layout/unbreakable-block-too-tall",
       complication:
-        "A table 594.4 px tall unsplit (36 lines and a 20 px border) — it fits the 606 px page — " +
+        "A one-column table 594.4 px tall unsplit (36 lines and a 20 px border) — it fits the 606 px page — " +
         "inside a wrapper with a 40 px border that is split across the same two pages, so a fresh " +
         "page inside the wrapper holds only 566 px and the paginator had to split the table too. " +
         "Paged.js repeats both borders at the split and pushes the table's 29th line into the hidden " +
@@ -402,7 +402,9 @@ export function loadCorpus(): CorpusEntry[] {
         "one page tall, and the two boxes sum to 753.8 px. That shape is what Paged.js 0.4.3 produced " +
         "for this construction on 2026-09-24, scaled to the corpus page. A rule that sums boxes " +
         "reports a block that fits; one that reads the overflow-column line as part of page 1 does " +
-        "too (711 px). The text lines on the pages add up to 539 px.",
+        "too (711 px). The text lines on the pages add up to 539 px — below the page, which proves " +
+        "nothing either way, so the rule declines the table as inconclusive: never a finding, and not " +
+        "a clean measurement either.",
       snapshot: snapshot({
         pages: [page(1), page(2)],
         blocks: [

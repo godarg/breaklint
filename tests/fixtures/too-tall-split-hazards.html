@@ -1,0 +1,97 @@
+<!doctype html>
+<!--
+  Split `break-inside: avoid` blocks whose fragments the rule cannot bound from their content
+  alone, and one it can only bound by counting its images.
+
+  #offset-split and #columns-split each FIT an empty page and are split anyway, the way
+  too-tall-decorated-ancestor.html is: a wrapper with a 40 px border no longer leaves them room on
+  the page they start on. Inside #offset-split two paragraphs are moved by `position: relative`
+  (one up 55 px, one down 70 px); inside #columns-split the text is set in two columns, which
+  Paged.js balances per fragment. Measured on Paged.js 0.4.3 (patched Chromium 141, 2026-09-25) in
+  documents of this shape: the text lines of such fragments read 360.19 px and 347.13 px, above the
+  340.16 px page, for blocks 301.19 px and 335.81 px tall. The snapshot records the offset and the
+  columns as flow hazards, and the rule declines both blocks: never an error.
+
+  #panels is a figure of five 200 px panels and a one-line caption, 1018 px unsplit, split one panel
+  per page. Its only text line is the caption: counted by text alone it was "at least 14.99 px" and
+  passed. Counting the panels, it is reported.
+
+  The intro comes first on purpose: the geometry cross-check samples the first eight boxes, and the
+  union box of a bordered split piece disagrees with the browser's box model (measured on
+  Chromium 141). This fixture is about the rule, not about that check.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 150mm 120mm; margin: 15mm; }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0; }
+figure { margin: 0; }
+.avoid { break-inside: avoid; }
+.fresh { break-before: page; }
+.frame { border: 40px solid #555; }
+.inner { border: 20px solid #999; }
+.up { position: relative; top: -55px; }
+.down { position: relative; top: 70px; }
+.two { columns: 2; column-gap: 20px; }
+</style></head><body>
+<div id="intro">
+  <p>Intro line 001.</p>
+  <p>Intro line 002.</p>
+  <p>Intro line 003.</p>
+  <p>Intro line 004.</p>
+  <p>Intro line 005.</p>
+  <p>Intro line 006.</p>
+  <p>Intro line 007.</p>
+  <p>Intro line 008.</p>
+  <p>Intro line 009.</p>
+  <p>Intro line 010.</p>
+  <p>Intro line 011.</p>
+  <p>Intro line 012.</p>
+  <p>Intro line 013.</p>
+</div>
+<div class="frame">
+<div class="avoid inner" id="offset-split">
+  <p class="up">Offset line 001.</p>
+  <p>Offset line 002.</p>
+  <p>Offset line 003.</p>
+  <p>Offset line 004.</p>
+  <p>Offset line 005.</p>
+  <p>Offset line 006.</p>
+  <p>Offset line 007.</p>
+  <p>Offset line 008.</p>
+  <p>Offset line 009.</p>
+  <p>Offset line 010.</p>
+  <p class="down">Offset line 011.</p>
+  <p>Offset line 012.</p>
+  <p>Offset line 013.</p>
+  <p>Offset line 014.</p>
+</div>
+</div>
+<div class="fresh" id="intro-two">
+  <p>Second intro line 001.</p>
+  <p>Second intro line 002.</p>
+  <p>Second intro line 003.</p>
+  <p>Second intro line 004.</p>
+  <p>Second intro line 005.</p>
+  <p>Second intro line 006.</p>
+  <p>Second intro line 007.</p>
+  <p>Second intro line 008.</p>
+  <p>Second intro line 009.</p>
+  <p>Second intro line 010.</p>
+  <p>Second intro line 011.</p>
+  <p>Second intro line 012.</p>
+  <p>Second intro line 013.</p>
+</div>
+<div class="frame">
+<div class="avoid" id="columns-split"><div class="two">Column line 01.<br>Column line 02.<br>Column line 03.<br>Column line 04.<br>Column line 05.<br>Column line 06.<br>Column line 07.<br>Column line 08.<br>Column line 09.<br>Column line 10.<br>Column line 11.<br>Column line 12.<br>Column line 13.<br>Column line 14.<br>Column line 15.<br>Column line 16.<br>Column line 17.<br>Column line 18.<br>Column line 19.<br>Column line 20.<br>Column line 21.<br>Column line 22.<br>Column line 23.<br>Column line 24.<br>Column line 25.<br>Column line 26.<br>Column line 27.<br>Column line 28.<br>Column line 29.<br>Column line 30.<br>Column line 31.<br>Column line 32.<br>Column line 33.<br>Column line 34.<br>Column line 35.<br>Column line 36.</div></div>
+</div>
+<p class="fresh">Before the figure.</p>
+<figure class="avoid" id="panels">
+<svg width="300" height="200" style="display:block"><rect width="300" height="200" fill="#ccc"/></svg>
+<svg width="300" height="200" style="display:block"><rect width="300" height="200" fill="#bbb"/></svg>
+<svg width="300" height="200" style="display:block"><rect width="300" height="200" fill="#aaa"/></svg>
+<svg width="300" height="200" style="display:block"><rect width="300" height="200" fill="#999"/></svg>
+<svg width="300" height="200" style="display:block"><rect width="300" height="200" fill="#888"/></svg>
+<figcaption>Figure 1. Five panels, one caption.</figcaption>
+</figure>
+<p>After the figure.</p>
+</body></html>

@@ -204,9 +204,19 @@ describe("target evaluation contract", () => {
     assert.equal(twoFragments.findings[0]!.measurement.value, 754.58);
     assert.match(twoFragments.findings[0]!.message, /at least 754\.58 px tall across the 2 fragments/u);
 
+    // A split block whose lines stay below the page is INCONCLUSIVE, not clean: the lower bound
+    // proves nothing, and nothing in the snapshot proves the block fits (the fragment boxes are no
+    // upper bound). Declined and charged to coverage, with the bound on the row. This used to be a
+    // silent `measured` row — a clean exit for a block the rule had not shown to fit.
     const short = run(fragmented(ofLines(13, 10)));
-    assert.deepEqual(short.findings, [], "a block shorter than the page must stay silent when it is split");
-    assert.equal(short.evaluations!.find((row) => row.status === "measured")!.measurements[0]!.value, 354.18);
+    assert.deepEqual(short.findings, [], "a lower bound below the page is not a finding");
+    assert.equal(short.measured, 0, "an inconclusive split block was counted as measured");
+    assert.equal(short.notMeasured.length, 1);
+    const shortRow = short.evaluations!.find((row) => row.targetRef.fragmentIndex === 0)!;
+    assert.equal(shortRow.status, "not-measured");
+    assert.equal(shortRow.reason, "env/invalid-measurement");
+    assert.equal(shortRow.measurements[0]!.name, "block-height-lower-bound");
+    assert.equal(shortRow.measurements[0]!.value, 354.18);
 
     const whole = run(fragmented(heights(848)));
     assert.equal(whole.findings.length, 1);
