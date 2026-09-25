@@ -129,6 +129,20 @@ export interface BlockRecord {
   lineHeight: number;
   spaceWidth: number;
   effectiveStyle: EffectiveStyle;
+  /**
+   * The element's computed `display` (Snapshot 5). It is recorded because a zero box does not say
+   * why there is no box: `none` generates none and prints nothing, while `contents` generates no box
+   * for the element itself but lays out its text and children, and properties that apply to a box
+   * (`break-inside`) do not apply to it. The rules read it; it is never inferred from geometry.
+   */
+  display: string;
+  /**
+   * How many copies of this element Paged.js printed in margin boxes (Snapshot 5): the clones of a
+   * `position: running(...)` element, counted over every page. Zero for everything else. The
+   * in-flow original of a running element is the record with `display: none` and a count above
+   * zero, which is how the rules tell it from an element the author hid.
+   */
+  marginCopies: number;
   /** Either populated, or `notMeasuredReason` says why not. Never silently empty. */
   lines: number[] | null;
   notMeasuredReason?: EnvId;
