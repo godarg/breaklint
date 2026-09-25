@@ -77,7 +77,7 @@
     "wide table on the landscape page",
     "horizontal bar chart with a value label clipped at the right edge (planted)",
     "oversized break-inside: avoid figure on the landscape page (planted)",
-    "caption pushed alone onto a page (orphaned continuation, consequence of the planted figure)"
+    "caption carried alone onto a page, which is not continuation-only because the caption begins there (control)"
   ],
   "runningElements": [
     {
@@ -321,7 +321,8 @@
       ]
     },
     "layout/orphaned-continuation-page": {
-      "mustFire": [
+      "mustFire": [],
+      "mustNotFire": [
         {
           "target": {
             "pageOf": {
@@ -344,8 +345,8 @@
               }
             }
           },
-          "why": "the caption of #fig-hourly is pushed alone onto a landscape page: the page holds nothing but the tail of a block that began earlier",
-          "construction": "the 700 px SVG fills the previous landscape page (680.31 px content box); the figcaption (one line) overflows onto the next page, which the section then leaves by a named-page break",
+          "why": "the page carries only the caption of #fig-hourly, carried over from the figure's SVG page. It is not continuation-only: its flow holds main#report, section#stops and figure#fig-hourly as continuations, but figcaption#cap-hourly, a recorded block, begins on this page (its only fragment). The rule reports a page only when every block of its flow is a continuation of a block that began earlier (erratum E42).",
+          "construction": "the 700 px SVG fills the previous landscape page (680.31 px content box); the figcaption (one line) overflows onto the next page, which the section then leaves by a named-page break. The placement of the caption on the page after the SVG is Paged.js 0.4.3 behaviour, measured on Chromium 141 under all three font stacks (page 6 with the reference fonts and FreeFont, page 7 with DejaVu, which needs one more portrait page before the landscape section).",
           "measured": {
             "fragments": [
               {
@@ -368,11 +369,9 @@
               }
             ]
           },
-          "observed": "the placement of the caption on the page after the SVG is Paged.js 0.4.3 behaviour, measured on Chromium 141 under all three font stacks (page 6 with the reference fonts and FreeFont, page 7 with DejaVu, which needs one more portrait page before the landscape section)",
-          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md; the incoming break is an overflow, not a forced break."
+          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md 'What is checked': continuation-only means 'every block of the page's flow is a continuation of a block that began on an earlier page'; figcaption is a recorded block (src/paginate/collector.ts SOURCE_BLOCK_SELECTOR). The caption's separation from its figure is a consequence of the planted #fig-hourly, which layout/unbreakable-block-too-tall reports."
         }
       ],
-      "mustNotFire": [],
       "allowed": [
         {
           "target": {

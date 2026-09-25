@@ -18,11 +18,20 @@
   "gate": {
     "normative": "README.md, section 'How a gate consumes this' (target, page and decline semantics: section 'Targets')",
     "steps": [
-      "Read `manifest.json` and verify the SHA-256 and byte length of every file in `files`. Zero documents read is a failure, never a skip.",
-      "Run each document in its own invocation under the default profile and read the canonical JSON report. The document's exit is that invocation's exit code, and its exit reason is `documents[0].exitReason`.",
+      "Read `manifest.json` and verify the SHA-256 and byte length of every file in `files`, cross-check each manifest document against its expected file (`documentId`, artifact and expected hashes and byte lengths, `pagesRange`, `expectedExit`), and check every expected file against the Field list; a malformed expected file fails the gate before any document runs (Field list, 'Malformed truth'). Zero documents read is a failure, never a skip.",
+      "Run each document in its own invocation under the default profile and the run conditions below, and read the canonical JSON report. The document's exit is that invocation's exit code, and its exit reason is `documents[0].exitReason`.",
       "If the document ended in exit 3, pass only if 3 is in `expectedExit.set` and the exit reason is `render-unstable`. A render-unstable run withholds its findings and reports no pages by design (`docs/limitations.md`), so the page and rule checks are skipped for that document. Any other exit 3 fails.",
       "Otherwise the exit code must be in `expectedExit.set` and the report's `pages` must lie in `pages.range`, both ends included.",
       "Then, per rule: every `mustFire` entry is matched by at least one finding; no finding matches a `mustNotFire` target; every finding is matched by a `mustFire` or `allowed` entry of its rule, or is on a measured target whose `ifMeasured` is `mustFire` (closed world); the decline counts hold as the paragraph 'Declines' under 'Targets' defines, and a measured target with `ifMeasured: mustNotFire` has no finding; no decline row of that rule carries a reason outside `permittedDeclineReasons` (rows with `ruleId: null` follow the paragraph 'Evidence-level declines'). `layout/half-empty-page` is not active in the default profile, so any finding of it fails."
+    ],
+    "runConditions": [
+      "the layout is exactly `documents/<id>.html` and `expected/<id>.expected.json`, directly in those directories, and each file belongs to exactly one manifest document;",
+      "the working directory holds no `breaklint.config.json`, so the default profile applies;",
+      "the report's schema version is 5, the version whose fields this README names;",
+      "the report's `exitCode` equals the process exit code;",
+      "the report holds exactly one document, and its `inputIdentity` is non-null and names the bytes the manifest lists for that document;",
+      "the rules the report lists as active, together with those it lists as disabled, are exactly the thirteen rule ids of the expected file;",
+      "a breaklint process that survives SIGKILL fails the document."
     ]
   },
   "documentCount": 20,
@@ -179,7 +188,7 @@
       },
       "expected": {
         "relativePath": "expected/sa03-transit-ridership-report.expected.json",
-        "sha256": "afc4b4f992abbdf616252dcf2834dab5f44fd9c4c07d8fefa276464716254f4c",
+        "sha256": "b8857e964285f758d0829753d6769fdca7fbe7cc35c6b2323b76415ab841054e",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -246,7 +255,7 @@
         "svg:plain-labels-inside",
         "planted:svg-plain-label-outside",
         "planted:avoid-too-tall-landscape",
-        "planted:orphaned-continuation-tail",
+        "control:caption-only-page",
         "widows-orphans-declared"
       ]
     },
@@ -1475,6 +1484,9 @@
     "control:break-after-avoid-heading": [
       "sa01-riverbank-survey-handbook"
     ],
+    "control:caption-only-page": [
+      "sa03-transit-ridership-report"
+    ],
     "control:clean-document": [
       "sa04-essay-chapter-footnotes"
     ],
@@ -1630,7 +1642,6 @@
       "sa19-release-notes"
     ],
     "planted:orphaned-continuation-tail": [
-      "sa03-transit-ridership-report",
       "sa13-planning-forum-transcript"
     ],
     "planted:short-last-line": [
@@ -1883,8 +1894,8 @@
     },
     {
       "path": "expected/sa03-transit-ridership-report.expected.json",
-      "sha256": "afc4b4f992abbdf616252dcf2834dab5f44fd9c4c07d8fefa276464716254f4c",
-      "byteLength": 29120
+      "sha256": "b8857e964285f758d0829753d6769fdca7fbe7cc35c6b2323b76415ab841054e",
+      "byteLength": 29688
     },
     {
       "path": "expected/sa04-essay-chapter-footnotes.expected.json",
@@ -1993,8 +2004,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "dd5d0f7d6d69efca883c3e3b84d0343848d7a8875b37e6183ff9340c305bbbff",
-      "byteLength": 29034
+      "sha256": "ae2274252446ae317b607ca0e99a23781289db86ee5504ee2b0ed4cfb403d953",
+      "byteLength": 31916
     },
     {
       "path": "PROVENANCE.md",
@@ -2699,6 +2710,30 @@
       "what": "Ruling: option (b), construction expectation. Every expected file gains the normative top-level object parityBlankPages {count, byFontStack, basis}. count is the number of pages Paged.js inserts blank for parity. The README paragraph 'Evidence-level declines' requires the rows with ruleId null and reason env/parity-blank-page to add up to that count, which is 0 in all twenty documents. No element has break-before or break-after right, left, recto or verso (nor page-break-before/after right or left), and the construction probe found no pagedjs_blank_page page under any of the three font stacks; byFontStack records this. A ruleId-null row is now accepted only with one of three reasons (the two of E37 plus this one), and the Field list names the new key. The rule-level env/parity-blank-page decline stays outside every permittedDeclineReasons for the same construction reason. No other truth value changed.",
       "why": "Unlike E37's rows, whether a document has a blank parity page is fixed by its construction: parity breaks, and the page count the probe measured. Emitting the row still depends on the five binding checks. But a row on a document whose construction inserts no parity page means the pagination or the classification differs from the construction, and the corpus can say so. Counting rather than naming pages avoids font-dependent page numbers. Option (a) would have let such a row pass unexamined.",
       "previous": "no field; E37 accepted two ruleId-null reasons",
+      "date": "2026-09-25",
+      "source": "gate author's specification questions (WP-K2), ruled from the specification's intent (no breaklint output seen)"
+    },
+    {
+      "id": "E42",
+      "question": "sa03 caption-only page",
+      "documents": [
+        "sa03-transit-ridership-report"
+      ],
+      "what": "sa03 layout/orphaned-continuation-page: the entry on {pageOf: {id: cap-hourly, fragment: first}} (resolvedPages [6, 7]) moves from mustFire to mustNotFire. Its why now cites the rule page's definition, and the renderer observation moved from 'observed' into 'construction'. features and the manifest tag change from planted:orphaned-continuation-tail to control:caption-only-page, and the README document table row changes to match. sa03's expectedExit is unchanged (the rule is warn).",
+      "why": "The documented definition is right for captions, and the entry was wrong. The rule reports a page that holds 'nothing but the tail of a block that began earlier', and pins that down as continuation-only: every block of the page's flow is a continuation of a block that began on an earlier page. figcaption is a recorded block (src/paginate/collector.ts SOURCE_BLOCK_SELECTOR) and begins on this page, so the page carries a block that begins there and is not continuation-only. That is the intent, not a gap. The rule is about text left over from an earlier block, and it deliberately does not ask which element the new block belongs to: a wrapper continuing while a child begins is new content by design. Treating a caption as its figure's tail would need a semantic exception the rule does not have and that no rule page states. The real defect, a caption separated from its figure, is a consequence of the planted oversized #fig-hourly, which layout/unbreakable-block-too-tall reports (mustFire). No rule change is requested. The G-99 forced-break misclassification that currently declines this page needs no truth change: a decline produces no finding.",
+      "previous": {
+        "list": "mustFire",
+        "why": "the caption of #fig-hourly is pushed alone onto a landscape page: the page holds nothing but the tail of a block that began earlier"
+      },
+      "date": "2026-09-25",
+      "source": "gate author's specification questions (WP-K2), ruled from the specification's intent (no breaklint output seen)"
+    },
+    {
+      "id": "E43",
+      "question": "gate stricter than the README (items 1 to 9)",
+      "documents": [],
+      "what": "All nine are ruled for the stricter reading, and the README now says it:\n1. Every listed key is required at every nesting level unless marked optional; all seven perText keys are required.\n2. pageOf's four keys, and the nested keys of pages, expectedExit, verification, the overflowColumnResidue items and parityBlankPages.byFontStack, are required; resolvedPagesByFontStack keys are the fontStacks labels.\n3. ruleId-null rows are accepted only as the exact pairs env/evidence-fragment-outside-page/page, env/evidence-overlay-removed/document and env/parity-blank-page/page (counted).\n4. measuredAlternative entries are required: true, with target {svg, texts} (perText in the same order) or {svg, use} (ifMeasured on the entry).\n5. U in {svg, use} is an SVG <use> whose nearest <svg> is X, with exactly one '#id' reference naming a <text>.\n6. An expectedDeclines reason is a member of ENV_IDS.\n7. Types are stated: residue id and cls are string or null, left, width and height are numbers, page numbers and counts are integers, and the literals of provenanceClass and calibrationEvidenceEligible are enforced.\n8. A malformed expected file (Field list, shapes, Identity, stated invariants) fails the whole gate before any document runs; 'fails its entry' is withdrawn in two places, and step 1 includes the Field-list check and the manifest cross-check.\n9. A 'Run conditions' list, repeated verbatim in manifest.json gate.runConditions, names: the file layout and one owner per file; no breaklint.config.json in the working directory; report schema 5; report exitCode equal to the process exit; exactly one document with a non-null inputIdentity naming the manifest bytes; active plus disabled rules equal to the thirteen rule ids; and failure of the document when a breaklint process survives SIGKILL.\nThe generator asserts 1, 2, 4, 6 and 7 over all twenty files; 5 was checked on the static HTML. No truth value changed.",
+      "why": "Each stricter reading matches the specification's intent: a clean pass must be evidence that the stated checks ran on well-formed truth, and a gate should never have to choose between two readings. The README had left these to inference.",
       "date": "2026-09-25",
       "source": "gate author's specification questions (WP-K2), ruled from the specification's intent (no breaklint output seen)"
     }
