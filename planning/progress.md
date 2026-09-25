@@ -88,3 +88,46 @@ Orchestrator decisions taken so far, each recorded so the owner can overturn it:
 - **G-30:** the residue CI step may not exit 0 having read zero documents. It is retired unless
   WP-D1 finds a reason to keep it.
 - **Windows:** support stays parked. An unsupported platform is refused before any browser starts.
+
+## 2026-09-24/25 — wave 1 and 2: implementation and independent verification
+
+Every package ran in its own worktree and on its own local branch. Each was then verified by a
+fresh verifier that had not written the change, at a frozen commit. Verifier verdicts (B/H/M/L =
+open blocker/high/medium/low at that round):
+
+| package | items | rounds (frozen commit → verdict) | state |
+|---|---|---|---|
+| WP-D1 docs truth / release plumbing | G-30 G-40 G-42–G-46 G-52 G-55 G-56 G-67 G-68 | 820ac07 PASS (0/0/2/7) → a696126 PASS (0/0/2/4) → 2351cfc PASS (0/0/1/3) → 8dde9b4 orchestrator delta check (mutations red) | **integrated** (ebf1c91) |
+| WP-F4 fill rules | G-15 G-14 | 5bd13fc PASS (0/0/1/3) → b92a309 PASS (0/0/2/4) → 1cb0b89 under verification | round 3 |
+| WP-F1 margin boxes | G-06 G-04 G-02 (+G-69 G-71 G-72) | 32c2272 **FAIL** (1/1/2/3) → eee9f06 under verification; CI probe #20 green on current Chrome with evidence binding | round 2 |
+| WP-C1 output drain / browser floor | G-01 G-59 G-48 (+G-77) | 0507b9f PASS (0/0/0/5; P-1 → G-70 registered) → 7868ef0 **FAIL** (0/1/0/3: CI red because Google Chrome 153 leaves component-updater temp dirs — a genuine leak caught by the new G-48 check; root cause assigned to WP-C2) | micro-round |
+| WP-C2 process lifecycle | G-23 G-50 G-51 G-49a/b | 4bd1ca5 **FAIL** (0/1/1/3: a delivered signal can be dropped → exit 0) | round 2 (+G-80) |
+| WP-S1 SVG viewport | G-10 G-62 G-63 | 0abb5e9 **FAIL** (0/2/3/4: nested svg overflow:auto false error; contain:paint false clean; style spoofing; rounding flush-label false errors) | round 2 |
+| WP-F3 fragment lower bound | G-08 G-03 G-07 | cccd93d **FAIL** (2/1/1/3: multicol descendant and positioned child false errors; figure+caption silent false negative) | round 2 (redesign) |
+| WP-R1 report surfaces | G-31a G-32–G-39 | e5b9fed **FAIL** (0/1/1/5: human-reviewer requirement self-declarable; fill metric counts the cloned frame) | round 2 |
+| WP-K1 self-authored corpus | G-29 | ee6c16c FAIL (0/2/8/5 ground-truth errors) → c24b677 FAIL (0/1/3/4) | errata round 2 |
+| WP-K3 advice precedence / widows probe | G-27 G-28 | b942f2b under verification; CI probe #21 | verifying |
+| WP-S2 SVG bracket + ink bound | G-09 G-61 G-66 | implementing on S1 | — |
+| WP-E1 CI recipe / Action / SARIF | pipeline | implementing | — |
+
+CI probes (draft PRs, never merged):
+- **#19 (C1).** The capability preflight passes on ubuntu-latest's Google Chrome 153: 595/595 tests.
+  The job then went red on the leak described above.
+- **#20 (F1 round 2).** Green, including the live suite with evidence binding on.
+
+New register items found during this work are G-69 … G-84, listed in `planning/open-work.md`. The
+highest-impact pre-existing ones:
+- **G-71:** with default settings, every document with a running header, a `position: fixed`
+  element or full-bleed content ended exit 4.
+- **G-78:** blank parity pages never bind evidence, so exit 4.
+- **G-79:** footnotes trip the injection-interference check, so exit 3.
+- **G-70:** a document can redirect captured primitives by replacing `Function.prototype.call`.
+- **G-80:** Chrome's component updater makes browser-level network requests during runs.
+
+Governance event:
+- WP-R1's follow-up was blocked by the session's permission system as weakening a gate. It would
+  have let a review round made only by agents (honestly labelled as such) pass the local
+  report-surface gate.
+- It was not pursued, and the uncommitted diff was discarded.
+- The gate keeps requiring a human reviewer (from a closed roster, after R1 round 2).
+- The owner decides the next-tag path (§ handoff).

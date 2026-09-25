@@ -200,3 +200,24 @@ release
 - G-25: calibration, parked by owner decision; `calibrated: false` stays everywhere.
 - G-58: needs outside users.
 - Windows support: parked. WP-C2 only moves the refusal before any browser start.
+
+## Items found after triage (during implementation and verification)
+
+| id | defect | found by | severity | package |
+|---|---|---|---|---|
+| G-69 | Page anchors from wrappers spanning pages: page findings share fingerprints | F1 impl / F1 verifier | medium | WP-F1 r2 |
+| G-70 | Replacing Function.prototype.call redirects every captured primitive (fonts, rects…) — tamper-resistance claim false | C1 verifier (P-1) | high | WP-P1 |
+| G-71 | Evidence overlay reads margin-box clones and bleeding fragments as unplaced → pages unbound → exit 4 for any document with running()/fixed/full-bleed under default settings (pre-existing on main) | F1 verifier | high | WP-F1 r2 |
+| G-72 | Post-pagination integrity check collects margin clones → sid order mismatch → exit 3 for common running layouts (heading before running element, running element in section, 16 margin boxes, string-set+element(), block footnotes) | F1 verifier | medium–high | WP-F1 r2 |
+| G-73 | SVG clip inputs read via style[key] spoofable by shadowing CSSStyleDeclaration.prototype | S1 verifier | medium | WP-S1 r2 |
+| G-74 | contain: paint / content-visibility / clip-path|mask on root / HTML-ancestor clipping with overflow visible → false clean | S1 verifier | high | WP-S1 r2 |
+| G-75 | SVG overshoot rounding: flush labels reported as errors 3–5 % of the time; float noise | S1 verifier | medium (false error class) | WP-S1 r2 |
+| G-76 | Per-glyph `rotate` attribute puts ink past getBBox → false clean | S1 verifier | low–medium | WP-S1 r2 |
+| G-77 | Event loop drains while main() pending → exit 0 | C2 impl | medium | WP-C1 |
+| G-78 | Parity-blank pages never bind evidence → every document with a blank page exits 4 with evidence binding on (pre-existing) | F1 impl r2 | high (real documents) | WP-F5 |
+| G-79 | Paged.js per-run random href on footnote references → injection-interference exit 3 for any document with footnotes (pre-existing) | F1 impl r2 | high (real documents) | WP-F5 |
+| G-80 | Chrome component updater: browser-level network egress during runs (not covered by page-level offline policy) + temp dirs left in TMPDIR (puppeteer-core 25.8 dropped --disable-component-update) | C1 verifier (CI Chrome 153) | medium (security claim) | WP-C2 r2 |
+| G-81 | ≥3-fragment structural sum can false-error via Paged.js duplication (302.53 px block, 4 fragments, 798.98 px error on base) | F3 impl | high (pre-existing false error) | WP-F3 |
+| G-82 | Wrapper block (section/div) crossing a page break judged by its own default widows/orphans against descendants' lines → false layout/widow / layout/orphan even when the inner paragraph sets widows: 1 | K3 impl | medium | open (after F1) |
+| G-83 | type/excessive-word-spacing measures the natural space at the block's first whitespace; a collapsed line-end space (~0.02 px) gives false gaps of 361× / 1082× | K3 impl | medium | open |
+| G-84 | Paged.js soft-hyphen split carries a letter back; the appended hyphen glyph can wrap into the overflow column → geometry cross-check refuses the document | K3 impl | low (upstream) | document |
