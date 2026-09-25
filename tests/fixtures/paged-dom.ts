@@ -336,7 +336,12 @@ export function evaluatePayload<T>(source: string, document: FakeNode): T {
  * order — every page reported, a break token on every page but the last — and return what
  * `collectorResult` answers afterwards.
  */
-export function runCollector<T>(source: string, document: FakeNode): T {
+export function runCollector<T>(
+  source: string,
+  document: FakeNode,
+  /** Runs after the last hook and before the result is read: an author script acting late. */
+  afterRendered?: () => void,
+): T {
   let handlerClass: (new () => Record<string, (...args: unknown[]) => void>) | null = null;
   let result: (() => T) | null = null;
   const window = {
@@ -357,6 +362,7 @@ export function runCollector<T>(source: string, document: FakeNode): T {
     handler.afterPageLayout!(page, {}, index < pages.length - 1 ? { token: index } : null);
   }
   handler.afterRendered!();
+  afterRendered?.();
   return (result as () => T)();
 }
 
@@ -424,6 +430,13 @@ export function pagedPage(input: {
    * `closest("[data-break-before]")` from any node on that page answers it.
    */
   pageAttributes?: string;
+  /**
+   * Extra classes on the `.pagedjs_page` element. Paged.js records a named page there and only
+   * there: `pagedjs_named_page pagedjs_<name>_page`, plus `pagedjs_<name>_first_page` on the page
+   * the region starts on (`atpage.js`, `layout.js`), next to `pagedjs_first_page`,
+   * `pagedjs_left_page`/`pagedjs_right_page` and `pagedjs_blank_page`.
+   */
+  pageClasses?: string;
 }): string {
   const box = (value: readonly number[]) => `data-test-box="${value.join(" ")}"`;
   const margins = MARGIN_LAYOUT.map(([holder, names]) =>
@@ -432,7 +445,7 @@ export function pagedPage(input: {
       return `<div class="pagedjs_margin pagedjs_margin-${name}${content ? " hasContent" : ""}">` +
         `<div class="pagedjs_margin-content">${content}</div></div>`;
     }).join("") + "</div>").join("");
-  return `<div class="pagedjs_page" ${input.pageAttributes ?? ""} ${box(input.pageBox)}><div class="pagedjs_sheet"><div class="pagedjs_pagebox">` +
+  return `<div class="pagedjs_page${input.pageClasses ? ` ${input.pageClasses}` : ""}" ${input.pageAttributes ?? ""} ${box(input.pageBox)}><div class="pagedjs_sheet"><div class="pagedjs_pagebox">` +
     (input.fixed ?? "") + margins +
     `<div class="pagedjs_area"><div class="pagedjs_page_content" ${box(input.contentBox)}><div>${input.content}</div></div>` +
     `<div class="pagedjs_footnote_area"><div class="pagedjs_footnote_content"><div class="pagedjs_footnote_inner_content">` +

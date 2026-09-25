@@ -19,10 +19,10 @@
  * THE OTHER HALF OF A4, AND WHY IT BECAME A CHECK INSTEAD OF A MOVE. A4 proposed reading the break
  * ATTRIBUTES at decision time too, closing the window in which an author script could alter them
  * between the layout decision and the reading. That cannot be done as proposed: the attributes
- * that classify the boundary after page `i` sit on the first node of page `i + 1`, which does not
- * exist yet when `afterPageLayout(i)` runs. So instead of moving the read, the collector takes a
- * SNAPSHOT of each page's first-node attributes at layout time and compares it with the values
- * read after pagination. A difference is not silently preferred one way or the other — it means
+ * that classify the boundary after page `i` sit on the node that starts page `i + 1`, which does
+ * not exist yet when `afterPageLayout(i)` runs. So instead of moving the read, the collector takes
+ * a SNAPSHOT of each page's start-node attributes and applied named pages at layout time and
+ * compares it with the values read after pagination. A difference is not silently preferred one way or the other — it means
  * the tree changed under the measurement, and the run reports `document-not-quiescent`. The window
  * is not closed; it is made observable, which is the honest version of the same intent.
  *
@@ -50,15 +50,38 @@ export interface CollectedPage {
   reconciled: boolean;
   /** True when `afterPageLayout` handed out a break token for this page. */
   hasBreakToken: boolean;
-  /** The break attributes of the page's first source-bearing node, read at layout time. */
+  /**
+   * The break attributes of the node that starts the page (`startSid`), and the named page the page
+   * starts in, read at layout time.
+   */
   attributesAtLayout: { breakBefore: string | null; previousBreakAfter: string | null; page: string | null };
   /** The same, read after pagination finished. A mismatch means the tree moved. */
   attributesAfterRender: { breakBefore: string | null; previousBreakAfter: string | null; page: string | null };
   /** Source id of the first and last source-bearing node on the page. */
   firstSid: string | null;
   lastSid: string | null;
-  /** `data-page` of the LAST source-bearing node, which is what the next boundary compares against. */
-  lastNodePage: string | null;
+  /**
+   * Source id of the first source-bearing node that STARTS on the page: the first one without
+   * `data-split-from`. The page's first node is often a wrapper continuing from the page before
+   * (`<main>`, `<article>`, a section), which is not what opened the page; the break attributes
+   * and the reason of a forced boundary are read from this node instead. Null when nothing starts
+   * on the page (the middle of one block taller than a page) or the node carries no source id.
+   */
+  startSid: string | null;
+  /**
+   * The named pages Paged.js APPLIED to this page, sorted: every `name` for which the page element
+   * carries the class `pagedjs_<name>_page` and the page area holds an element with
+   * `data-page="<name>"`. Usually zero or one. See `appliedNamedPages` in the payload.
+   */
+  namedPages: string[];
+  /**
+   * The named page the page ENDS in — what the next boundary compares its own starting named page
+   * against. The start is `attributesAfterRender.page`. Both are the single applied name when the
+   * page carries one; a page carrying several is resolved per side, and `namedPageResolved` says
+   * whether that worked.
+   */
+  pageAtEnd: string | null;
+  namedPageResolved: { start: boolean; end: boolean };
   /** No author content at all: no source id, no visible text. */
   blank: boolean;
   /** The generation this page belongs to, so a re-laid page is distinguishable from a kept one. */
@@ -135,22 +158,52 @@ const COLLECTOR_TEMPLATE = `(() => {
   const sidOf = (el) => P.attr(el, "data-bl-sid");
 
   /**
-   * The named page in force at a node — SELF OR NEAREST ANCESTOR.
+   * The named page in force at a node — SELF OR NEAREST ANCESTOR. Used only to choose between the
+   * names Paged.js applied to a page, never as a source of a name (see appliedNamedPages).
    *
    * Measured, and this cost a real defect: a named region is usually declared on a container
    * ('section.chapter { page: chapter }'), and Paged.js puts 'data-page' on the SECTION. The
-   * paragraphs inside it carry none. Reading the leaf node alone therefore sees null for every
-   * page in the middle of the region — so LEAVING the region reads null against null, no change is
-   * seen, and a boundary the paginator forced is reported as an overflow.
-   *
-   * Measured on a section spanning three pages: page 3's first node reported own: null and
-   * ancestor: "chapter". needsPageBreak in the paginator resolves the same way. Found by an
-   * adversarial cross-model audit and confirmed against the real paginator before it was fixed.
+   * paragraphs inside it carry none, so the leaf alone reads null in the middle of the region.
    */
   const pageNameAt = (el) => {
     if (!el) return null;
     const holder = P.closest(el, "[" + A.page + "]");
     return holder ? P.attr(holder, A.page) : null;
+  };
+
+  /**
+   * The named pages Paged.js APPLIED to a page, read from the page element.
+   *
+   * Paged.js 0.4.3 records a named page on the page element as classes, never as 'data-page':
+   * atpage.js (beforePageLayout) adds 'pagedjs_named_page' and 'pagedjs_<name>_page' for the
+   * innermost named ancestor of the element the page starts with, and layout.js adds the same two
+   * for every element with 'data-page' it lays out on the page. Those classes are what its '@page
+   * <name>' rules match, so they are the named page the page actually got.
+   *
+   * THE NODE-BASED READ THIS REPLACES WAS WRONG IN BOTH DIRECTIONS. It took the name from the
+   * page's first source-bearing node, which is very often a wrapper continuing from the page
+   * before ('<main>', '<article>'): a clone of an element that has no named ancestor. Every page
+   * inside a named region then read null against the previous page's named last node — a false
+   * 'forced' on each boundary inside the region — and the boundary INTO the region read null
+   * against null and was missed. Measured on a self-authored report with a landscape region.
+   *
+   * The class alone is not enough, because the class vocabulary is shared: a page named 'first',
+   * 'left', 'right', 'blank' or 'named' produces a class Paged.js also writes for other reasons
+   * ('pagedjs_named_page' is on EVERY named page). So a name counts only when the page area also
+   * holds an element carrying it in 'data-page' — the element Paged.js applied it from, or its
+   * rebuilt clone. The element is the evidence that the name exists; the class is the evidence
+   * that it was applied to THIS page.
+   */
+  const appliedNamedPages = (pageEl) => {
+    const classes = (P.attr(pageEl, "class") || "").split(/\\s+/u);
+    const names = [];
+    for (const el of P.all(pageEl, "[" + A.page + "]")) {
+      if (P.closest(el, PAGE_AREA_SELECTOR) === null) continue;
+      const name = P.attr(el, A.page);
+      if (!name || names.indexOf(name) !== -1) continue;
+      if (classes.indexOf("pagedjs_" + name + "_page") !== -1) names.push(name);
+    }
+    return names.sort();
   };
 
   /**
@@ -171,17 +224,38 @@ const COLLECTOR_TEMPLATE = `(() => {
     const nodes = P.all(pageEl, SOURCE_BLOCK_SELECTOR).filter((el) => P.closest(el, PAGE_AREA_SELECTOR) !== null);
     const first = nodes[0] || null;
     const last = nodes.length ? nodes[nodes.length - 1] : null;
+    // The node that STARTS the page: the first source-bearing node that is not a continuation.
+    // Paged.js rebuilds the ancestors of the element a page starts in and marks each rebuilt clone
+    // with data-split-from (and strips its break attributes), so a page inside '<main>' begins with
+    // a '<main>' clone. That clone did not open the page and carries none of the attributes that
+    // did: read from it, a break-after on a section inside the wrapper was missed, and the reason
+    // of every forced boundary named the wrapper. A page on which nothing starts falls back to its
+    // first node.
+    const start = nodes.find((el) => !P.hasAttr(el, "data-split-from")) || first;
     // Every read below goes through the captured primitives. An audit found this function calling
     // el.getAttribute and el.hasAttribute directly while the header of this file claimed
     // otherwise — and those two decide the break cause, so a replaced getAttribute returning
     // "page" would make every boundary in a document look forced.
+    const named = appliedNamedPages(pageEl);
+    // One applied name is the page's name at both edges. Several — a named element laid out at
+    // the top of a page inside another named region, before any content — are resolved per edge
+    // by the name in force at the edge node, and only among the names Paged.js applied; a name it
+    // did not apply never enters. If that fails the edge is unresolved, and the boundary is
+    // 'unknown' rather than guessed.
+    const resolve = (el) => {
+      if (named.length <= 1) return { name: named.length ? named[0] : null, resolved: true };
+      const name = pageNameAt(el);
+      return name !== null && named.indexOf(name) !== -1 ? { name, resolved: true } : { name: null, resolved: false };
+    };
+    const atStart = resolve(start);
+    const atEnd = resolve(last);
     const attrs = (el) => {
       const beforeHolder = el ? P.closest(el, "[" + A.before + "]") : null;
       const afterHolder = el ? P.closest(el, "[" + A.prevAfter + "]") : null;
       return {
       breakBefore: beforeHolder ? P.attr(beforeHolder, A.before) : null,
       previousBreakAfter: afterHolder ? P.attr(afterHolder, A.prevAfter) : null,
-      page: pageNameAt(el),
+      page: atStart.name,
       };
     };
     const content = P.all(pageEl, ".pagedjs_page_content")[0] || pageEl;
@@ -194,8 +268,11 @@ const COLLECTOR_TEMPLATE = `(() => {
     return {
       firstSid: sidOf(first),
       lastSid: sidOf(last),
-      attrs: attrs(first),
-      lastNodePage: pageNameAt(last),
+      startSid: sidOf(start),
+      attrs: attrs(start),
+      namedPages: named,
+      pageAtEnd: atEnd.name,
+      namedPageResolved: { start: atStart.resolved, end: atEnd.resolved },
       // Blank means no author content: no source id AND no visible text. Both, because a page can
       // carry a paginator-generated wrapper with no sid while still showing text. Margin boxes sit
       // OUTSIDE the content area, so a running header does not make a parity page look occupied —
@@ -205,6 +282,14 @@ const COLLECTOR_TEMPLATE = `(() => {
       blank: nodes.length === 0 && text.length === 0 && visual.length === 0,
     };
   };
+
+  // The edge fields the drift check compares, as scalars: the applied names joined, the resolution
+  // as two flags. Everything the classifier reads from a page is in here or in attrs.
+  const edgeFields = (e) => ({
+    pageAtEnd: e.pageAtEnd, firstSid: e.firstSid, lastSid: e.lastSid, startSid: e.startSid, blank: e.blank,
+    namedPages: e.namedPages.join(" "), namedPageStartResolved: e.namedPageResolved.start,
+    namedPageEndResolved: e.namedPageResolved.end,
+  });
 
   class BreaklintCollector extends Paged.Handler {
     beforePageLayout() { state.hooks.beforePageLayout++; }
@@ -227,7 +312,7 @@ const COLLECTOR_TEMPLATE = `(() => {
         // page's last node to data-page="spoofed" produced a false forced while
         // attributeDrift stayed empty — the mutated field had never been recorded to compare
         // against. Everything the classifier reads is now compared.
-        edgeAtLayout: { lastNodePage: e.lastNodePage, firstSid: e.firstSid, lastSid: e.lastSid, blank: e.blank },
+        edgeAtLayout: edgeFields(e),
         epoch: state.epoch,
       });
     }
@@ -266,9 +351,10 @@ const COLLECTOR_TEMPLATE = `(() => {
         }
       }
       if (rec && rec.edgeAtLayout) {
-        for (const field of ["lastNodePage", "firstSid", "lastSid", "blank"]) {
-          if (rec.edgeAtLayout[field] !== e[field]) {
-            drift.push({ index, field, atLayout: String(rec.edgeAtLayout[field]), afterRender: String(e[field]) });
+        const now = edgeFields(e);
+        for (const field of Object.keys(now)) {
+          if (rec.edgeAtLayout[field] !== now[field]) {
+            drift.push({ index, field, atLayout: String(rec.edgeAtLayout[field]), afterRender: String(now[field]) });
           }
         }
       }
@@ -280,7 +366,10 @@ const COLLECTOR_TEMPLATE = `(() => {
         attributesAfterRender: e.attrs,
         firstSid: e.firstSid,
         lastSid: e.lastSid,
-        lastNodePage: e.lastNodePage,
+        startSid: e.startSid,
+        namedPages: e.namedPages,
+        pageAtEnd: e.pageAtEnd,
+        namedPageResolved: e.namedPageResolved,
         blank: e.blank,
         epoch: rec ? rec.epoch : 0,
       };
@@ -323,6 +412,7 @@ export function boundaryFactsFrom(
   previousBreakAfter: string | null;
   pageBefore: string | null;
   pageAfter: string | null;
+  namedPageResolved: boolean;
   hasBreakToken: boolean;
   sidBefore: string | null;
   sidAfter: string | null;
@@ -341,12 +431,18 @@ export function boundaryFactsFrom(
       nextPageBlank: known ? after.blank : false,
       breakBefore: known ? after.attributesAfterRender.breakBefore : null,
       previousBreakAfter: known ? after.attributesAfterRender.previousBreakAfter : null,
-      pageBefore: known ? before.lastNodePage : null,
+      // The named page the page before ENDS in against the one the page after STARTS in, both
+      // from the names Paged.js applied to those pages (their page elements), never from the
+      // page's first node — which is often a wrapper continuing from the page before.
+      pageBefore: known ? before.pageAtEnd : null,
       pageAfter: known ? after.attributesAfterRender.page : null,
+      namedPageResolved: known ? before.namedPageResolved.end && after.namedPageResolved.start : true,
       // The token belongs to the page BEFORE the boundary: it is what that page could not fit.
       hasBreakToken: known ? before.hasBreakToken : false,
       sidBefore: before.lastSid,
-      sidAfter: after.firstSid,
+      // The node that opened the page, not a wrapper continuing onto it: it is what a reader of a
+      // forced boundary's reason has to find.
+      sidAfter: after.startSid ?? after.firstSid,
       cascadeHint: (after.firstSid ? cascadeHints[after.firstSid] : null) ?? null,
     });
   }

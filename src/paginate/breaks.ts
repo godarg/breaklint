@@ -31,7 +31,10 @@
  *   break-before: recto                    -> `data-break-before="recto"`, and a blank page appears
  *   break-after via CLASS, ID or `p.adj+p` -> `data-previous-break-after="page"` on the node AFTER
  *   a named page (`page: named`)           -> `data-page="named"`, and the boundary has NO other
- *                                             attribute — the third branch of `shouldBreak()`
+ *                                             attribute — the third branch of `shouldBreak()`.
+ *                                             The PAGE ELEMENT carries the classes
+ *                                             `pagedjs_named_page` and `pagedjs_<name>_page`;
+ *                                             those, not a node's `data-page`, are compared.
  *   break-before or break-after INLINE     -> NO attribute at all, and NO boundary. Inert.
  *
  * A FOURTH ATTRIBUTE EXISTS AND IS DELIBERATELY NOT READ. Paged.js also writes `data-break-after`
@@ -86,14 +89,28 @@ export function isForcingValue(value: string | null | undefined): boolean {
 export interface BoundaryFacts {
   /** The page AFTER the boundary carries no author content at all. */
   nextPageBlank: boolean;
-  /** `data-break-before` on the first source-bearing node of the page after the boundary. */
+  /**
+   * `data-break-before` in force at the node that STARTS the page after the boundary — the first
+   * source-bearing node there that is not a continuation clone (Paged.js also copies the value
+   * onto the page element, which the nearest-ancestor read reaches).
+   */
   breakBefore: string | null;
-  /** `data-previous-break-after` on that same node. */
+  /** `data-previous-break-after` in force at that same node. */
   previousBreakAfter: string | null;
-  /** `data-page` on the last source-bearing node BEFORE the boundary. */
+  /**
+   * The named page the page BEFORE the boundary ends in, and the one the page AFTER it starts in.
+   * Both come from the named pages Paged.js applied to those pages — the `pagedjs_<name>_page`
+   * classes on the page element — and null means the page carries no named page. Never read from
+   * a page's first node: that is often a wrapper continuing from the page before.
+   */
   pageBefore: string | null;
-  /** `data-page` on the first source-bearing node AFTER it. */
   pageAfter: string | null;
+  /**
+   * False when either page carries more than one applied named page and the side facing this
+   * boundary could not be resolved to one of them. The boundary is then `unknown` unless a break
+   * attribute forces it: a guessed name change would silence four rules.
+   */
+  namedPageResolved: boolean;
   /** Whether `afterPageLayout` handed out a break token for the page before the boundary. */
   hasBreakToken: boolean;
   /** Source ids, for the human-readable reason. Null when the node carries none. */
@@ -152,7 +169,11 @@ export function classifyBoundary(facts: BoundaryFacts): ClassifiedBoundary {
 
   // The third branch of `shouldBreak()`: a change of named page breaks, with no break-before and
   // no break-after anywhere. Measured firing on a real boundary, and a reader that knows only the
-  // two break attributes calls this boundary free.
+  // two break attributes calls this boundary free. It is a change only when the named pages
+  // Paged.js applied to the two pages differ; a side it could not resolve decides nothing.
+  if (!facts.namedPageResolved) {
+    return { kind: "unknown", determinedBy: "undetermined", cascadeHint: facts.cascadeHint, reason: "" };
+  }
   if (facts.pageBefore !== facts.pageAfter) {
     return {
       kind: "forced",

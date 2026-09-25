@@ -379,7 +379,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=609 aggregateTests=740 liveTests=87 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=618 aggregateTests=749 liveTests=93 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -551,7 +551,7 @@ The components below are now connected rather than isolated pieces:
 | Freeze signature | all seven components of §11.3, 250 ms window, 3 retries, and a drift report that names WHICH components moved; a real author-script inline-transform sabotage exhausts the budget (4 failed samples) and yields exit 3 with neither snapshot nor evidence |
 | Untouched primitives | references captured before any author script runs. Measured: a document that replaces `getBoundingClientRect`, `getComputedStyle` and `querySelectorAll` after pagination sees `x:999` and `"HIJACKED"`, and the probe reads values byte-identical to a clean run across all seven components. The positive control is in the same test — a naive collector under the same attack loses its boxes entirely, 5 097 characters to 0 |
 | Geometry cross-check | the product and live oracle share one sampler; selector plus rendered-fragment occurrence binds each in-page box to the exact CDP `DOM.getBoxModel` node. The two agree EXACTLY on this corpus, twice; a systematic 0.002 px disagreement fails the suite |
-| Break-cause collector | all five Paged.js hooks registered and each one verified to have fired; boundaries classified from the three attributes the paginator writes, on a document carrying six boundary kinds at once |
+| Break-cause collector | all five Paged.js hooks registered and each one verified to have fired; boundaries classified from the three attributes the paginator writes, on a document carrying six boundary kinds at once, and from the named page the paginator applied to each page element, on five named-page region documents inside a continuing wrapper |
 
 **Released:** `breaklint@0.1.0` is published on npm from the versioned release workflow with
 provenance, and the packed package is exercised from a clean consumer directory on Node 20 and 22.
@@ -838,14 +838,14 @@ Measured against Paged.js 0.4.3 for this build, on one document containing every
 | `break-before` via stylesheet class or id | `data-break-before="page"` | forced |
 | `break-before: recto` | `data-break-before="recto"`, plus a blank page | forced, and the blank page is `parity` |
 | `break-after` via class, id or `p.adj + p` | `data-previous-break-after="page"` on the node AFTER | forced |
-| `page: named` | `data-page="named"` and **no break attribute at all** | forced — the third branch of `shouldBreak()` |
+| `page: named` | `data-page="named"` on the element, the classes `pagedjs_named_page` and `pagedjs_<name>_page` on the page element, and **no break attribute at all** | forced where the named page applied to the two pages differs — the third branch of `shouldBreak()` |
 | `break-before` or `break-after` **inline** | nothing | **no boundary** — inert in 0.4.3 |
 | nothing | a break token from `afterPageLayout` | overflow |
 
 The named-page case is the one a partial implementation misses, and it is not hypothetical: a
 reader that knows only the two break attributes calls that boundary free, and a free boundary in
 front of a deliberately started page is exactly the false `layout/half-empty-page` finding this
-classification exists to prevent. Deleting that branch reddens two live cases.
+classification exists to prevent. Deleting that branch reddens eight live cases (patched Chromium 141).
 
 A fourth attribute exists and is deliberately not read. Paged.js also writes `data-break-after` on
 the node that CARRIES the declaration; reading it would answer a question about a different
@@ -856,13 +856,23 @@ handlers by bare method-name equality — no interface, no registration list, no
 does not recognise. A typo in `afterPageLayout` is a silent no-op, and a silent no-op there means
 no break tokens, every boundary classified `unknown`, and a report that looks clean.
 
-**A named page is resolved through the nearest ancestor, and reading the leaf alone was wrong in
-both directions.** A named region is normally declared on a container — `section.chapter { page:
+**A named page is the one the paginator applied to the page, and reading it from a node was
+wrong twice.** A named region is normally declared on a container — `section.chapter { page:
 chapter }` — and the paginator puts `data-page` on the SECTION, not on the paragraphs inside it.
-Measured on a section spanning three pages: the leaf reported `null`, the ancestor reported
-`chapter`. Reverting to the leaf-only read on the live fixture produces a **false `forced`** on a
-boundary inside the region and **misses the real `forced`** on the boundary leaving it — the second
-being the more expensive error, because a false `forced` silences four rules.
+Reading the leaf alone reported `null` in the middle of a section spanning three pages, which
+produced a **false `forced`** inside the region and **missed the real `forced`** leaving it; the
+nearest-ancestor read fixed that. It did not fix the next case: the first node of a page inside a
+region is, on a real document, a wrapper (`<main>`) continuing from the page before, with no named
+ancestor at all, so every boundary inside the region and the one after it came out `forced` and
+the one into it `overflow` — measured on a self-authored report with a landscape region, where it
+declined 9 of the 14 candidates of `layout/widow` and of `layout/orphan` and ended exit 4
+(patched Chromium 141). Paged.js records the named page it applied as classes on the page element
+(`pagedjs_<name>_page`); that is what is compared now, restricted to names an element on the page
+carries, and the break attributes and the reason are read from the node that starts the page
+rather than from the wrapper clone. The five live region documents check the result against the
+page geometry, which the classification does not read: each named page has its own size or
+margins, so a boundary is forced exactly where the content width changes. The remaining limits are
+in [limitations.md](limitations.md#the-break-cause-of-a-page-boundary).
 
 **A page the paginator never reported is `unknown`, not a page with default values.** A final page
 with no `afterPageLayout` record used to receive a fabricated record and be counted nowhere, so a

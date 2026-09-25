@@ -293,6 +293,38 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   area without the note marker; the message now names what is missing (`data-note="footnote"`).
   Exit 3 as before.
 
+- **A named-page region inside a wrapper no longer turns its boundaries into false forced
+  breaks, and `layout/widow`, `layout/orphan` and `layout/orphaned-continuation-page` measure
+  them.** The named page of a page (`page: <name>`) was taken from the page's first
+  source-bearing node. In a document wrapped in `<main>` or `<article>` that node is the wrapper's
+  continuation clone, which has no named ancestor, so every boundary inside a named region and the
+  one after it read as a change of named page — `forced`, with the reason `page@<the wrapper>` —
+  and the boundary into the region read as `overflow`. The three rules decline a fragment or page
+  at a forced boundary (`env/forced-break`), and those declines count against coverage: on a
+  self-authored report with a landscape region, 9 of 14 widow and orphan candidates were declined,
+  both rules fell below their floor and the run ended `insufficient-coverage`, exit 4 (patched
+  Chromium 141, no evidence binding; 13 declines each and widow coverage 8 of 21 on the corpus
+  gate's current Chrome). The named page is now the one Paged.js applied to the page — the
+  `pagedjs_<name>_page` class on the page element, counted only where an element on the page
+  carries that `data-page` — and a boundary is forced by it only where the two pages' named pages
+  differ. On the same report 2 candidates of each rule are declined, at the two boundaries the
+  region really forces, and widows and orphans that were hidden before can now be reported.
+  `layout/half-empty-page` says "likely intended" again for a last page inside a named region; the
+  false `forced` had withheld that note.
+- **A `break-after` on an element inside a continuing wrapper is classified forced, and a
+  forced boundary's reason names the element that opened the page.** The break attributes were read
+  from the same first node, and Paged.js strips them from continuation clones, so a
+  `break-after: page` on a section inside `<main>` read as `overflow`; a `break-before` was still
+  found through the page element, but its reason named the wrapper. Both are now read from the
+  first node that starts the page. A page on which Paged.js applied two named pages (a named
+  element nested at the top of another named region) is resolved edge by edge; an edge that
+  cannot be resolved makes the boundary `unknown` (`break-cause-undetermined`, not fatal) rather
+  than `forced`. Break-cause reasons in the snapshot change their named source id where they
+  named a wrapper; no schema stamp moves. See `docs/limitations.md`, *The break cause of a page
+  boundary*. Pinned by five live region documents in `tests/live/breaks.test.ts` checked against
+  the page geometry, a production-chain case in `tests/live/named-page-regions.test.ts` and
+  recorded page trees in `tests/unit/named-page-regions.test.ts`.
+
 ### Documentation
 
 - `docs/limitations.md` now states that a document with a page that carries no source block — the

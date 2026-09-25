@@ -272,6 +272,55 @@ mistakes and badly built documents, not against a deliberate attack on the brows
 The longer, measurement-by-measurement account of what has been established and what has not is in
 [status.md](status.md).
 
+## The break cause of a page boundary
+
+A `forced` boundary is a decision the author made, so `layout/widow` declines the fragment that
+opens the page after it, `layout/orphan` the fragment that closes the page before it and
+`layout/orphaned-continuation-page` the page after it (`env/forced-break`, counted against
+coverage), and `layout/half-empty-page` does not call a last page it opened "likely intended".
+The cause is read from what Paged.js 0.4.3 wrote, in this order: a blank next page is `parity`; a
+forcing `data-break-before` or `data-previous-break-after` in force at the node that **starts** the
+next page — its first source-bearing node that is not a `data-split-from` continuation clone — is
+`forced`; a change of named page is `forced`; a break token is `overflow`; anything else is
+`unknown`, which suppresses nothing.
+
+**The named page of a page is the one Paged.js applied to it, read from the page element.**
+Paged.js records it only as classes on `.pagedjs_page` — `pagedjs_named_page` and
+`pagedjs_<name>_page` — never as `data-page` on the page. A name counts when the page element
+carries its class **and** the page area holds an element with that `data-page`, because the class
+vocabulary is shared: `pagedjs_named_page` is on every named page and `pagedjs_first_page` on page
+1, so the class alone would give a page named `named` or `first` to pages that are not. Through
+0.6.0 the name was taken from the page's first source-bearing node instead, and on a real document
+that node is usually a wrapper — `<main>`, `<article>` — continuing from the page before, with no
+named ancestor. Every boundary inside a named region and the one after it then read as `forced`,
+and the boundary into the region as `overflow`. Measured on a self-authored report with a landscape
+region (patched Chromium 141, no evidence binding): 9 of 14 widow and 9 of 14 orphan candidates
+declined as `env/forced-break`, both below the coverage floor, exit 4; with the page-element read,
+2 of 14 each, at the two boundaries the region really forces. The same document on the corpus
+gate's current Chrome had 13 declines of each and widow coverage 8 of 21.
+
+The same first-node read hid a `break-after` on an element inside such a wrapper: Paged.js puts
+`data-previous-break-after` on the element after the declaring one and strips it from continuation
+clones, so the wrapper clone in front of it carried nothing and the boundary read as `overflow`.
+(`data-break-before` was found anyway, because Paged.js also copies it onto the page element; its
+reason named the wrapper.) Both are read from the node that starts the page now.
+
+What remains:
+
+- **A page carrying two named pages.** Paged.js applies both when a named element is laid out at
+  the top of a page inside another named region, before any content. Each edge of such a page is
+  resolved by the name in force at its edge node, and only among the names applied to it; an edge
+  that resolves to none of them makes the boundary `unknown`, reported as
+  `break-cause-undetermined`, rather than a guessed change.
+- **A `break-after` reason names the last source node before the boundary**, which is the element
+  that declared it only when that element ends its page itself — a paragraph, not a section
+  around it. The classification does not depend on it.
+- **A page on which nothing starts** — the middle of one block taller than a page — has no node
+  that opened it, and its attributes are read from its first node. Paged.js puts no break
+  attribute on such a page.
+- **All of it rests on names Paged.js does not guarantee** — the classes, the three attributes and
+  `data-split-from`. The version pin above is what bounds that.
+
 ## Raising the number of error rules
 
 The registry's literal `2` is not a constant to be updated when a sixteenth rule feels important. To

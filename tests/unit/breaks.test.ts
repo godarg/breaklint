@@ -32,6 +32,7 @@ function facts(overrides: Partial<BoundaryFacts> = {}): BoundaryFacts {
     previousBreakAfter: null,
     pageBefore: null,
     pageAfter: null,
+    namedPageResolved: true,
     hasBreakToken: false,
     sidBefore: "s0001",
     sidAfter: "s0002",
@@ -139,6 +140,25 @@ describe("classifying one boundary", () => {
     assert.equal(classifyBoundary(facts({ pageBefore: "named", pageAfter: null })).kind, "forced");
     // and the same named page on both sides is NOT a boundary cause
     assert.equal(classifyBoundary(facts({ pageBefore: "named", pageAfter: "named", hasBreakToken: true })).kind, "overflow");
+  });
+
+  /**
+   * A side that could not be resolved to one of the named pages Paged.js applied decides nothing:
+   * the boundary is `unknown`, never a guessed change — and never a guessed non-change either,
+   * because the break token alone would call it `overflow`. A break attribute still forces it,
+   * since that branch does not depend on the named page.
+   *
+   * Red condition: drop the resolution check and the first case is `forced` (the names differ).
+   */
+  it("an unresolved named page is unknown, while a break attribute still forces the boundary", () => {
+    const unresolved = { namedPageResolved: false, pageBefore: null, pageAfter: "wide", hasBreakToken: true };
+    const result = classifyBoundary(facts(unresolved));
+    assert.equal(result.kind, "unknown");
+    assert.equal(result.determinedBy, "undetermined");
+    assert.equal(classifyBoundary(facts({ ...unresolved, pageBefore: "wide" })).kind, "unknown", "not overflow on the token alone");
+    assert.equal(classifyBoundary(facts({ ...unresolved, breakBefore: "page", sidAfter: "s0012" })).reason, "break-before@s0012");
+    assert.equal(classifyBoundary(facts({ ...unresolved, previousBreakAfter: "page" })).kind, "forced");
+    assert.equal(classifyBoundary(facts({ ...unresolved, nextPageBlank: true })).kind, "parity");
   });
 
   it("a break token with no forcing attribute is overflow", () => {
@@ -267,7 +287,10 @@ describe("turning collected pages into boundary facts", () => {
     attributesAfterRender: { breakBefore: null, previousBreakAfter: null, page: null },
     firstSid: "s0000",
     lastSid: "s0001",
-    lastNodePage: null,
+    startSid: "s0000",
+    namedPages: [],
+    pageAtEnd: null,
+    namedPageResolved: { start: true, end: true },
     blank: false,
     epoch: 0,
     ...over,
@@ -287,6 +310,7 @@ describe("turning collected pages into boundary facts", () => {
         index: 1,
         hasBreakToken: false,
         firstSid: "s0010",
+        startSid: "s0010",
         attributesAfterRender: { breakBefore: "page", previousBreakAfter: null, page: null },
       }),
     ];
@@ -303,9 +327,37 @@ describe("turning collected pages into boundary facts", () => {
     assert.equal(boundaryFactsFrom([]).length, 0);
   });
 
+  /**
+   * The page before is read at its END, the page after at its START — the same page carries both,
+   * and they differ only on a page Paged.js applied two named pages to. Each side's resolution is
+   * its own: an unresolved END of the page after, or START of the page before, is not this
+   * boundary's business. And the reason names the node that STARTS the page after, not its first
+   * node, which is a continuing wrapper on most pages of a real document.
+   */
+  it("reads the end of the page before and the start of the page after, each with its own resolution", () => {
+    const pages = [
+      page({ namedPages: ["inner", "outer"], pageAtEnd: "inner", namedPageResolved: { start: false, end: true },
+        attributesAfterRender: { breakBefore: null, previousBreakAfter: null, page: null } }),
+      page({ namedPages: ["inner"], pageAtEnd: null, namedPageResolved: { start: true, end: false }, firstSid: "s0003", startSid: "s0020",
+        attributesAfterRender: { breakBefore: null, previousBreakAfter: null, page: "inner" } }),
+    ];
+    const [boundary] = boundaryFactsFrom(pages);
+    assert.equal(boundary!.pageBefore, "inner");
+    assert.equal(boundary!.pageAfter, "inner");
+    assert.equal(boundary!.namedPageResolved, true);
+    assert.equal(boundary!.sidAfter, "s0020", "the reason must name the node that opened the page");
+    const [unresolved] = boundaryFactsFrom([
+      page({ namedPageResolved: { start: true, end: false } }),
+      page(),
+    ]);
+    assert.equal(unresolved!.namedPageResolved, false);
+    assert.equal(boundaryFactsFrom([page(), page({ startSid: null, firstSid: "s0030" })])[0]!.sidAfter, "s0030",
+      "a page on which nothing starts falls back to its first node");
+  });
+
   it("compares data-page across the boundary, not within a page", () => {
     const pages = [
-      page({ lastNodePage: "named" }),
+      page({ namedPages: ["named"], pageAtEnd: "named" }),
       page({ attributesAfterRender: { breakBefore: null, previousBreakAfter: null, page: null } }),
     ];
     const [boundary] = boundaryFactsFrom(pages);

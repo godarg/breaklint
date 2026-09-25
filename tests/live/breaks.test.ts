@@ -184,6 +184,109 @@ const PAGEBOX_MOVE_HTML = FIXED_HTML.replace("</body>", `<script>
 </body>`);
 
 /**
+ * NAMED-PAGE REGIONS, each inside a wrapper that spans every page — the shape of a real report,
+ * and the one that broke the classification: Paged.js rebuilds the wrapper on every page it
+ * continues onto as a `data-split-from` clone, so the FIRST source-bearing node of those pages is
+ * a `<main>` with no named ancestor. The named page is read from the page element instead.
+ *
+ * The oracle is independent of that read. Each named page has its own page size and margins, and
+ * Paged.js lays a page out at the size of the named page it applied, so a page's CONTENT WIDTH
+ * says which named page it got. A boundary without a break declaration is forced exactly where
+ * the content width changes.
+ */
+const REGION_HEAD = (pages: string, rules: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@page{size:120mm 80mm;margin:10mm}
+${pages}
+body{font:9pt/1.4 Georgia,serif;margin:0} p,h2{margin:0 0 6px} h2{font-size:11pt}
+${rules}
+</style></head><body>`;
+const regionParagraphs = (prefix: string, count: number) => Array.from({ length: count }, (_, i) =>
+  `<p id="${prefix}${i}">${prefix.toUpperCase()}${i} paragraph with enough ordinary words to run over two lines of the page so that the region fills several pages.</p>`).join("\n");
+
+/** Complication: a named region in the MIDDLE of a wrapper, spanning three pages. */
+const REGION_WRAPPER_HTML = `${REGION_HEAD("@page wide{size:160mm 80mm;margin:10mm 4mm}", ".wide{page:wide}")}
+<main id="wrap">
+<section id="intro"><h2 id="intro-h">Introduction</h2>
+${regionParagraphs("i", 8)}
+</section>
+<section class="wide" id="wide"><h2 id="wide-h">Wide region</h2>
+${regionParagraphs("w", 20)}
+</section>
+<section id="outro"><h2 id="outro-h">After the region</h2>
+${regionParagraphs("o", 4)}
+</section>
+</main></body></html>`;
+
+/** Complication: two DIFFERENT named regions back to back, so a named page changes to another one, not to none. */
+const REGION_CONSECUTIVE_HTML = `${REGION_HEAD("@page ra{size:140mm 80mm;margin:10mm 7mm}\n@page rb{size:160mm 80mm;margin:10mm 4mm}", ".ra{page:ra} .rb{page:rb}")}
+<main id="wrap2">
+<p id="lead2">A lead paragraph outside both regions.</p>
+<section class="ra" id="ra"><h2 id="ra-h">Region A</h2>
+${regionParagraphs("a", 12)}
+</section>
+<section class="rb" id="rb"><h2 id="rb-h">Region B</h2>
+${regionParagraphs("b", 14)}
+</section>
+</main></body></html>`;
+
+/**
+ * Complication: the region opens the document, so page 1 starts in the unnamed wrapper and gets
+ * its named page from Paged.js' layout pass, not from the element it starts with.
+ */
+const REGION_START_HTML = `${REGION_HEAD("@page wide{size:160mm 80mm;margin:10mm 4mm}", ".wide{page:wide}")}
+<main id="wrap3">
+<section class="wide" id="sw"><h2 id="sw-h">Region at the start</h2>
+${regionParagraphs("s", 16)}
+</section>
+<section id="after3"><h2 id="after3-h">After</h2>
+${regionParagraphs("t", 6)}
+</section>
+</main></body></html>`;
+
+/**
+ * The control: REAL forced breaks inside the region, where the named page is the same on both
+ * sides. A nested `break-before: page` and a nested `break-after: page` must stay forced after
+ * the named-page comparison stops producing `forced` inside a region — and the break-after sits
+ * inside the wrapper, on a node the wrapper clone hides from a first-node read.
+ */
+const REGION_FORCED_HTML = `${REGION_HEAD("@page wide{size:160mm 80mm;margin:10mm 4mm}", ".wide{page:wide} .chap{break-before:page} .closer{break-after:page}")}
+<main id="wrap4">
+<p id="lead4">A lead paragraph outside the region.</p>
+<section class="wide" id="w4"><h2 id="w4-h">Region with its own breaks</h2>
+${regionParagraphs("u", 3)}
+<h2 class="chap" id="chap4">A chapter forced open inside the region</h2>
+${regionParagraphs("v", 8)}
+<p class="closer" id="closer4">This paragraph ends its page with a stylesheet break-after.</p>
+<p id="aftercloser4">This paragraph opens the page after the break-after.</p>
+${regionParagraphs("x", 2)}
+</section>
+<p id="out4">Out of the region.</p>
+</main></body></html>`;
+
+/**
+ * Complication: a named region NESTED at the top of another, so Paged.js applies two named pages
+ * to one page (`pagedjs_outer_page` and `pagedjs_inner_page`, both at the top of page 2 before any
+ * content). Compared as a whole, that page differs from the next one inside the inner region.
+ */
+const REGION_NESTED_HTML = `${REGION_HEAD("@page outer{size:140mm 80mm;margin:10mm}\n@page inner{size:160mm 80mm;margin:10mm}", ".outer{page:outer} .inner{page:inner}")}
+<main id="wrap5">
+<p id="lead5">A lead paragraph.</p>
+<section class="outer" id="outer"><div class="inner" id="inner">
+${regionParagraphs("n", 14)}
+</div>
+${regionParagraphs("m", 3)}
+</section>
+</main></body></html>`;
+
+const REGION_FIXTURES: Record<string, string> = {
+  "/region-wrapper.html": REGION_WRAPPER_HTML,
+  "/region-consecutive.html": REGION_CONSECUTIVE_HTML,
+  "/region-start.html": REGION_START_HTML,
+  "/region-forced.html": REGION_FORCED_HTML,
+  "/region-nested.html": REGION_NESTED_HTML,
+};
+
+/**
  * The pagination bootstrap breaklint owns: `paged.js`, never the auto-previewing polyfill.
  *
  * The replacement is a FUNCTION, and that is not style. `String.replace` interprets `$&`, `` $` ``,
@@ -213,6 +316,8 @@ describe("the collector, live", () => {
   let sidByAuthorId: Record<string, string> = {};
   const runningSidByAuthorId: Record<string, string> = {};
   const footnoteSidByAuthorId: Record<string, string> = {};
+  const servedRegions: Record<string, string> = {};
+  const regionSidByAuthorId: Record<string, Record<string, string>> = {};
 
   before(async () => {
     if (missing.length > 0) {
@@ -269,12 +374,23 @@ describe("the collector, live", () => {
     const moved = injectSourceIds(PAGEBOX_MOVE_HTML, "pagebox-move.html");
     pageboxMoveExpectedSids = orderedSourceSids(moved.map);
     servedPageboxMove = withPagination(moved.html, pagedjs, true);
+    for (const [path, html] of Object.entries(REGION_FIXTURES)) {
+      assert.equal(detectCollision([{ origin: "document", text: html }]).collided, false);
+      const region = injectSourceIds(html, path.slice(1));
+      const ids: Record<string, string> = {};
+      for (const [sid, ref] of Object.entries(region.map)) {
+        const id = /\bid="([^"]+)"/u.exec(html.slice(ref.offset, ref.offset + 200))?.[1];
+        if (id) ids[id] = sid;
+      }
+      regionSidByAuthorId[path] = ids;
+      servedRegions[path] = withPagination(region.html, pagedjs, true);
+    }
 
     server = createServer((req, res) => {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       const routes: Record<string, string> = {
         "/running.html": servedRunning, "/footnote.html": servedFootnote, "/fixed.html": servedFixed,
-        "/pagebox-move.html": servedPageboxMove, "/display.html": servedDisplay,
+        "/pagebox-move.html": servedPageboxMove, "/display.html": servedDisplay, ...servedRegions,
       };
       res.end(routes[req.url ?? ""] ?? served);
     });
@@ -595,6 +711,113 @@ describe("the collector, live", () => {
     assert.ok((only("dli1").lines ?? []).length > 0, "premise: a display: contents item's text is laid out in lines");
     assert.deepEqual(facts("d1"), { display: "block", marginCopies: 0, hasBox: true });
     await page.close();
+  });
+
+  /**
+   * One named-page fixture, collected, with the independent facts read off the paginated tree:
+   * each page's content width (which named page it was laid out at), the classes on its page
+   * element, and every boundary's kind and reason with the source ids mapped back to author ids.
+   */
+  async function region(path: string): Promise<{
+    result: CollectorResult; widths: number[]; classes: string[][]; kinds: string[]; reasons: string[]; sid: Record<string, string>;
+  }> {
+    const sid = regionSidByAuthorId[path]!;
+    const { page, result } = await collect(path);
+    const dom = await page.evaluate<{ width: number; classes: string[] }[]>(`[...document.querySelectorAll(".pagedjs_page")].map((pageEl) => ({
+      width: Math.round(pageEl.querySelector(".pagedjs_page_content").getBoundingClientRect().width),
+      classes: [...pageEl.classList].filter((name) => /^pagedjs_.+_page$/u.test(name) && !/^pagedjs_(first|left|right|blank|named)_page$/u.test(name) && !/_first_page$/u.test(name)),
+    }))`);
+    await page.close();
+    const byId = Object.fromEntries(Object.entries(sid).map(([id, s]) => [s, id]));
+    const causes = boundaryFactsFrom(result.pages).map((facts) => classifyBoundary(facts));
+    return {
+      result, sid,
+      widths: dom.map((entry) => entry.width),
+      classes: dom.map((entry) => entry.classes),
+      kinds: causes.map((cause) => cause.kind),
+      reasons: causes.map((cause) => cause.reason.replace(/@(.+)$/u, (_all, at: string) => `@${byId[at] ?? at}`)),
+    };
+  }
+
+  /** Where the content width changes between two pages — the oracle for a named-page change. */
+  const widthChanges = (widths: readonly number[]): boolean[] => widths.slice(1).map((width, i) => width !== widths[i]);
+
+  /**
+   * The first source-bearing node of every page after the first is the wrapper's continuation
+   * clone. Asserted so that each case below is known to carry the complication it names.
+   */
+  function assertWrapperContinues(result: CollectorResult, wrapperSid: string): void {
+    assert.ok(result.pages.length >= 3, `too few pages for a region to span: ${result.pages.length}`);
+    assert.deepEqual(result.pages.map((p) => p.firstSid), result.pages.map(() => wrapperSid),
+      "premise: the wrapper is the first source-bearing node of every page");
+    assert.ok(result.pages.slice(1).every((p) => p.startSid !== wrapperSid), "premise: the wrapper does not START any page after the first");
+  }
+
+  it("a named region inside a wrapper: forced into and out of it, overflow on every boundary inside it", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const { result, widths, classes, kinds, reasons, sid } = await region("/region-wrapper.html");
+    assertWrapperContinues(result, sid["wrap"]!);
+    assert.ok(classes.filter((names) => names.includes("pagedjs_wide_page")).length >= 3, `premise: the region spans at least three pages: ${JSON.stringify(classes)}`);
+    // The oracle: the kinds follow the content width, and nothing else, in a document without
+    // a single break declaration. Measured before this change: forced on every boundary from the
+    // region's second page on, overflow into the region.
+    assert.deepEqual(kinds.map((kind) => kind === "forced"), widthChanges(widths),
+      `forced must be exactly where the named page changes: widths ${JSON.stringify(widths)}, kinds ${JSON.stringify(kinds)}`);
+    assert.ok(kinds.every((kind) => kind === "forced" || kind === "overflow"), JSON.stringify(kinds));
+    assert.deepEqual(reasons.filter(Boolean), ["page@wide", "page@outro"], "a forced boundary names the element that opened the page, not the wrapper");
+    assert.deepEqual(result.pages.map((p) => p.namedPages), classes.map((names) => names.map((name) => name.slice("pagedjs_".length, -"_page".length))));
+    assert.deepEqual(result.attributeDrift, []);
+  });
+
+  it("two consecutive named regions: forced where one named page gives way to the other", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const { result, widths, classes, kinds, reasons, sid } = await region("/region-consecutive.html");
+    assertWrapperContinues(result, sid["wrap2"]!);
+    assert.ok(classes.filter((names) => names.includes("pagedjs_ra_page")).length >= 2, "premise: region A spans two pages or more");
+    assert.ok(classes.filter((names) => names.includes("pagedjs_rb_page")).length >= 2, "premise: region B spans two pages or more");
+    assert.deepEqual(kinds.map((kind) => kind === "forced"), widthChanges(widths), `widths ${JSON.stringify(widths)}, kinds ${JSON.stringify(kinds)}`);
+    assert.deepEqual(reasons.filter(Boolean), ["page@ra", "page@rb"]);
+    assert.deepEqual(result.attributeDrift, []);
+  });
+
+  it("a named region at the document start: page 1 carries it, and only leaving it is forced", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const { result, widths, classes, kinds, reasons, sid } = await region("/region-start.html");
+    assertWrapperContinues(result, sid["wrap3"]!);
+    assert.equal(result.pages[0]!.startSid, sid["wrap3"], "premise: page 1 starts with the unnamed wrapper, not with the region");
+    assert.deepEqual(classes[0], ["pagedjs_wide_page"], "premise: Paged.js applied the region's named page to page 1");
+    assert.deepEqual(kinds.map((kind) => kind === "forced"), widthChanges(widths), `widths ${JSON.stringify(widths)}, kinds ${JSON.stringify(kinds)}`);
+    assert.equal(kinds[0], "overflow", "the region's second page is not a named-page change");
+    assert.deepEqual(reasons.filter(Boolean), ["page@after3"]);
+    assert.deepEqual(result.attributeDrift, []);
+  });
+
+  it("the control: a nested break-before and break-after inside a region stay forced", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const { result, widths, kinds, reasons, sid } = await region("/region-forced.html");
+    assertWrapperContinues(result, sid["wrap4"]!);
+    const changes = widthChanges(widths);
+    // Every named-page change is forced; the two declared breaks are forced where the width does
+    // NOT change — so the named page cannot be what forced them.
+    for (const [i, changed] of changes.entries()) if (changed) assert.equal(kinds[i], "forced", `boundary ${i + 1} changes the named page`);
+    const declared = reasons.map((reason, i) => [reason, changes[i]] as const).filter(([reason]) => /^break-/u.test(reason));
+    assert.deepEqual(declared, [["break-before@chap4", false], ["break-after@closer4", false]],
+      `the declared breaks, with whether the named page changed there: ${JSON.stringify(reasons)}`);
+    assert.deepEqual(reasons.filter((reason) => reason.startsWith("page@")), ["page@w4", "page@out4"]);
+    assert.ok(kinds.every((kind) => kind === "forced" || kind === "overflow"), JSON.stringify(kinds));
+    assert.deepEqual(result.attributeDrift, []);
+  });
+
+  it("a region nested at the top of another: two named pages on one page, each edge resolved on its own", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const { result, widths, classes, kinds, reasons, sid } = await region("/region-nested.html");
+    assertWrapperContinues(result, sid["wrap5"]!);
+    assert.ok(classes.some((names) => names.includes("pagedjs_inner_page") && names.includes("pagedjs_outer_page")),
+      `premise: one page carries both named pages: ${JSON.stringify(classes)}`);
+    assert.deepEqual(kinds.map((kind) => kind === "forced"), widthChanges(widths), `widths ${JSON.stringify(widths)}, kinds ${JSON.stringify(kinds)}`);
+    assert.deepEqual(reasons.filter(Boolean), ["page@outer", "page@m0"]);
+    assert.ok(result.pages.every((p) => p.namedPageResolved.start && p.namedPageResolved.end), "every edge resolved to an applied name");
+    assert.deepEqual(result.attributeDrift, []);
   });
 
   /** The tokens are real: the pages that ran out of room have one, the last page does not. */
