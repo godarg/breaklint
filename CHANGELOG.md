@@ -86,6 +86,62 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   that worked. The order is declared in the new registry field `remediation.interactions`, which
   does not travel into reports: `Finding.remediation` still carries `advice` and `tested` only, and
   no report, snapshot or configuration schema stamp moves. Both advice strings change.
+- **`layout/orphaned-continuation-page` no longer reports pages whose text runs on to the next
+  page.** A page is judged only when what it carries ENDS on it: the next page does not open with
+  text running on from it — a text line of a block that continues there whose glyph box starts
+  less than one of that block's line heights below the top of the page's content, or that shares
+  its line with an inline SVG starting there (the window then reaches one line height past the
+  SVG's bottom), and that does not lie inside a block that starts there after it in document
+  order. The rule records this as a third measurement, `ends-on-page`, in its evaluations. All figures below were measured on Chromium 141 with
+  Paged.js 0.4.3.
+  - Until now every page between the first and the last page of a block was reported as soon as
+    its net fill read below 0.50. Such a page stopped because its next line did not fit, so it is
+    full; but net fill counts glyph boxes, not line boxes, and it reads 0.34–0.36 at
+    `line-height: 3`. A long paragraph with generous leading produced one warning per middle page
+    (five on the new live fixture); none now. The same holds for a full page whose last block is a
+    nested child that ends there while its wrapper's own text runs on, and for one followed by a
+    page whose top carries a positioned badge or a relatively offset aside beside the running
+    text, and for one whose next line carries a 70–100 px inline SVG: 0.6.0 reported those
+    pages, and they are no longer reported. The extra room is given for inline SVG only: the
+    snapshot records no box for an inline `<img>`, `<canvas>` or `<video>`, so the full page
+    before such a line (an 80 px image or canvas under 48 px lines) is still reported — this errs
+    toward reporting. The window uses the line height of the recorded block a line belongs to,
+    not the line's own. A snapshot field for replaced-element boxes, planned alongside the
+    line-box fill, is the follow-up.
+  - A page that ends early is still reported, whatever the shape of the wrapper: a `<section>`
+    whose own SVG, image or bare text was left high on a page because its next child, a
+    `break-inside: avoid` figure, did not fit (net fill 0.08–0.39), with or without a border on
+    the section and with the figure bleeding into the margins; and a section whose own SVG did not
+    fit (0.31). 0.6.0 reported these pages, and so does this rule.
+  - Only blocks of the page's flow count: a block with a box that lies at least partly inside the
+    content box vertically. A `display: none` original of a running element and an empty
+    positioned marker have no box, and a clone in a top or bottom margin box lies outside the
+    content box, so none of them decides anything. Measured, such blocks hid a two-line tail page
+    under a running header, which 0.6.0 did not report; it is reported now. The rule relies on
+    the collector keeping margin-box content out of the snapshot, as this release's collector
+    does: a clone in a side margin box lies inside the content box vertically.
+  - The message now says what the page is: "Page N carries only content continued from an earlier
+    page, which ends there, and its net fill is X %". Consumers that match the old message text,
+    or read the evaluation's measurements by position, will see the change.
+  - The decision reads the order in which the collector records a page's blocks, document order,
+    and the live suite now pins that order.
+  - Not fixed: at `line-height: 3` every page whose content ends on it is reported, however full
+    and whatever follows it (11 of 13 lines before a figure that did not fit: 0.29); a line-box
+    fill is the named follow-up (`docs/limitations.md`). A block that starts on the next page and
+    covers the running text takes that text for its own, and the page before it is judged; this
+    is pinned by a unit case and was not seen on a real document.
+  - No schema stamp moves.
+- **`layout/half-empty-page` no longer states a "measured ceiling" in its findings.** Every finding
+  said the threshold "sits 0.086 below the measured ceiling of a full text page". Net fill has no
+  ceiling: full, non-last prose pages at `line-height: 1.5` read 0.58–0.72 with this collector, and
+  6 of 16 such pages read below the 0.60 threshold. The message now says what the quantity is —
+  "net fill sums the glyph boxes of text, not its line boxes, so a page a reader calls full can
+  read below this threshold" — and quotes no number. The rule page, `docs/agent-contract.md` and
+  the source comments are corrected; the 0.6.0 entry below, which gives "about 0.686" as the
+  figure for a full page, is corrected by this entry rather than rewritten. The rule page also no
+  longer says the last page is "downgraded to a note": its finding keeps `warn`, and only the
+  message says the page is likely intended. The rule stays experimental and off by default, and
+  nothing here is a calibration.
 
 ### Added
 
@@ -302,6 +358,11 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   as the agent contract.
 - `docs/rules/layout-orphan.md` names the measured `orphans` 1 case without an `orphans: 1`
   declaration, which the guard now reads as a lowering proposal.
+- `docs/rules/layout-orphaned-continuation-page.md`: the remedied example changed the font size,
+  which is not a lever the rule's advice names; it now tightens the vertical margin above the
+  paragraph. The page also states when a page counts as ending, what was measured, and the
+  remaining limits, and `docs/limitations.md` says what page fill counts and what a line-box fill
+  would change.
 
 ### Reporting
 
