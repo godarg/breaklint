@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -690,6 +690,12 @@ const argv = process.argv.slice(2);
 const out = argv[argv.indexOf("--out") + 1];
 const input = argv[argv.length - 1];
 const spec = JSON.parse(readFileSync(process.env.FAKE_SPEC, "utf8"));
+// --demo: the stored-snapshot run the gate reads the rule registry from.
+if (argv.includes("--demo")) {
+  const active = spec.demoActiveRules ?? spec.activeRules;
+  writeFileSync(out, JSON.stringify({ schemaVersion: 5, mode: "demo", exitCode: 1, config: { profile: "default", activeRules: active, disabledRules: ["layout/half-empty-page"] }, documents: [] }));
+  process.exit(1);
+}
 const html = createHash("sha256").update(readFileSync(input)).digest("hex");
 // As the real report does for a path under the home directory, an absolute input is echoed
 // redacted, so a gate that passed absolute paths could not resolve any source to its document.
@@ -697,13 +703,19 @@ const file = isAbsolute(input) ? "~" + input.slice(input.indexOf("/", 1)) : inpu
 const findings = spec.findings.map((f, i) => ({ runFindingId: "f" + i, page: 1, message: "m", ...f,
   source: f.source ? { ...f.source, file, coordinateSystem: "utf8-bytes-unicode-codepoints-v1" } : null }));
 if (spec.leaderPid) writeFileSync(spec.leaderPid, String(process.pid));
-// A grandchild in the CLI's process group, as Chrome is: it records its pid and may ignore SIGTERM.
+// A grandchild modelled on Chrome: puppeteer starts the browser detached, so it leads a session and
+// process group of its own, outside the CLI's; it starts a child of its own in that session, passes
+// a --user-data-dir on its command line, records both pids and may ignore SIGTERM.
 if (spec.grandchild) {
-  const code = "process.on('SIGTERM', () => {" + (spec.grandchildIgnoresTerm ? "" : " process.exit(0);") + " });" +
-    "require('node:fs').writeFileSync(" + JSON.stringify(spec.grandchild) + ", String(process.pid)); setInterval(() => {}, 1000);";
-  spawn(process.execPath, ["-e", code], { stdio: "ignore" }).unref();
+  const term = "process.on('SIGTERM', () => {" + (spec.grandchildIgnoresTerm ? "" : " process.exit(0);") + " });";
+  const inner = term + "setInterval(() => {}, 1000);";
+  const code = term +
+    "const c = require('node:child_process').spawn(process.execPath, ['-e', " + JSON.stringify(inner) + "], { stdio: 'ignore' });" +
+    "require('node:fs').writeFileSync(" + JSON.stringify(spec.grandchild) + ", process.pid + ' ' + c.pid); setInterval(() => {}, 1000);";
+  const extra = spec.profile ? ["--", "--user-data-dir=" + spec.profile] : [];
+  spawn(process.execPath, ["-e", code, ...extra], { stdio: "ignore", detached: true }).unref();
   const deadline = Date.now() + 5000;
-  while (Date.now() < deadline) { try { readFileSync(spec.grandchild); break; } catch {} }
+  while (Date.now() < deadline) { try { if (readFileSync(spec.grandchild, "utf8").includes(" ")) break; } catch {} }
 }
 if (spec.hang) {
   if (spec.ignoreTerm) process.on("SIGTERM", () => {});
@@ -858,10 +870,11 @@ test("process outcome: a signal, a missing exit code or a timeout fails the docu
   assertFail(judge(raw, { ...outcome([]), signal: "SIGKILL" }), /terminated by SIGKILL/u);
   assertFail(judge(raw, { ...outcome([]), exitCode: null }), /produced no exit code/u);
   assertFail(judge(raw, { ...outcome([]), timedOutMs: 1234 }), /timed out after 1234 ms/u);
-  assertFail(judge(raw, { ...outcome([]), leftovers: { pids: [7], survivedSigkill: [7] } }), /survived SIGKILL: 7/u);
-  const leftover = judge(raw, { ...outcome([]), timedOutMs: null, leftovers: { pids: [7], survivedSigkill: [] } });
+  assertFail(judge(raw, { ...outcome([]), leftovers: { pids: [7], survivedSigkill: [7], removedProfiles: [] } }), /processes the CLI started survived SIGKILL: 7/u);
+  const leftover = judge(raw, { ...outcome([]), timedOutMs: null, leftovers: { pids: [7], survivedSigkill: [], removedProfiles: ["/tmp/breaklint-chrome-profile-x"] } });
   assertPass(leftover);
-  assert.match(leftover.notes.join("\n"), /left 1 process\(es\) in its group/u);
+  assert.match(leftover.notes.join("\n"), /left 1 process\(es\) it started; they were terminated/u);
+  assert.match(leftover.notes.join("\n"), /removed 1 browser profile\(s\) left behind/u);
 });
 
 test("decline rows: a malformed count and a rule the expected file does not name fail", () => {
@@ -974,24 +987,38 @@ function alive(pid: number): boolean {
   }
 }
 
-test("process boundary: on timeout the CLI's whole process group is terminated, and the failure says so", { skip: process.platform !== "linux" ? "reads /proc" : false }, () => {
+function pidsIn(file: string): number[] {
+  return readFileSync(file, "utf8").trim().split(" ").map(Number);
+}
+
+test("process boundary: on timeout everything the CLI started is terminated, including a browser in its own session", { skip: process.platform !== "linux" ? "reads /proc" : false }, () => {
   for (const ignoreTerm of [false, true]) {
     const { root, corpus } = makeCorpus();
     const pidFile = join(root, "grandchild.pid");
     const leaderFile = join(root, "leader.pid");
+    const profile = mkdtempSync(join(tmpdir(), "breaklint-chrome-profile-"));
     try {
-      const run = runGateProcess(root, corpus, { exit: 1, activeRules: ACTIVE, findings: [], hang: true, ignoreTerm, grandchild: pidFile, grandchildIgnoresTerm: ignoreTerm, leaderPid: leaderFile }, ["--timeout-ms", "1500", "--grace-ms", "500"]);
+      const run = runGateProcess(root, corpus, { exit: 1, activeRules: ACTIVE, findings: [], hang: true, ignoreTerm, grandchild: pidFile, grandchildIgnoresTerm: ignoreTerm, leaderPid: leaderFile, profile }, ["--timeout-ms", "1500", "--grace-ms", "500"]);
       assert.equal(run.status, 1, run.stdout + run.stderr);
-      assert.match(run.stdout, /FAIL syn: the CLI timed out after 1500 ms; its process group was sent SIGTERM, then SIGKILL/u);
+      assert.match(run.stdout, /FAIL syn: the CLI timed out after 1500 ms; it and every process it started were sent SIGTERM, then SIGKILL/u);
       // SIGTERM first: a CLI that honours it ends on SIGTERM; one that ignores it is killed after the grace period.
       assert.match(run.stdout, new RegExp(`FAIL syn: the CLI was terminated by ${ignoreTerm ? "SIGKILL" : "SIGTERM"}\n`, "u"));
-      const grandchild = Number(readFileSync(pidFile, "utf8"));
+      const [grandchild, greatGrandchild] = pidsIn(pidFile);
       const leader = Number(readFileSync(leaderFile, "utf8"));
-      assert.ok(grandchild > 0 && leader > 0 && grandchild !== leader);
-      assert.equal(alive(grandchild), false, `grandchild ${grandchild} survived (ignoreTerm=${ignoreTerm})`);
-      // The CLI's pid is its process group's id: nothing of the group is left.
+      assert.ok(grandchild! > 0 && greatGrandchild! > 0 && leader > 0);
+      // The grandchild leads its own group and session, as Chrome does: the CLI's group alone would miss it.
+      assert.notEqual(grandchild, leader);
+      assert.equal(alive(grandchild!), false, `the detached grandchild ${grandchild} survived (ignoreTerm=${ignoreTerm})`);
+      assert.equal(alive(greatGrandchild!), false, `the grandchild's child ${greatGrandchild} survived (ignoreTerm=${ignoreTerm})`);
       assert.deepEqual(processGroupMembers(leader), []);
+      assert.deepEqual(processGroupMembers(grandchild!), []);
+      assert.equal(existsSync(profile), false, "the browser profile was left behind");
+      assert.doesNotMatch(run.stdout, /survived SIGKILL/u);
     } finally {
+      for (const pid of existsSync(pidFile) ? pidsIn(pidFile) : []) {
+        try { process.kill(pid, "SIGKILL"); } catch { /* gone */ }
+      }
+      rmSync(profile, { recursive: true, force: true });
       rmSync(root, { recursive: true, force: true });
     }
   }
@@ -1025,14 +1052,14 @@ test("a zombie is not a live member of a process group", { skip: process.platfor
   }
 });
 
-test("process boundary: what the CLI leaves in its group after a normal exit is terminated and noted", { skip: process.platform !== "linux" ? "reads /proc" : false }, () => {
+test("process boundary: what the CLI leaves behind after a normal exit, in any session, is terminated and noted", { skip: process.platform !== "linux" ? "reads /proc" : false }, () => {
   const { root, corpus } = makeCorpus();
   const pidFile = join(root, "grandchild.pid");
   try {
     const run = runGateProcess(root, corpus, { exit: 1, activeRules: ACTIVE, findings: [{ ruleId: "layout/widow", source: { offset: p1.start, endOffset: p1.end } }], grandchild: pidFile }, ["--grace-ms", "500"]);
     assert.equal(run.status, 0, run.stdout + run.stderr);
-    assert.match(run.stdout, /note syn: the CLI exited and left 1 process\(es\) in its group; they were terminated/u);
-    assert.equal(alive(Number(readFileSync(pidFile, "utf8"))), false);
+    assert.match(run.stdout, /note syn: the CLI exited and left 2 process\(es\) it started; they were terminated/u);
+    for (const pid of pidsIn(pidFile)) assert.equal(alive(pid), false, `${pid} survived`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -1077,6 +1104,72 @@ test("E43: manifest gate.steps and gate.runConditions are the README's text verb
     assert.throws(() => verifyManifest(corpus), /gate\.runConditions has 7 items, README\.md has 6/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/** Rewrites README.md in a test corpus and rebinds its hash in the manifest. */
+function rewriteReadme(corpus: string, manifest: ReturnType<typeof makeCorpus>["manifest"], change: (text: string) => string, gate?: (copy: { steps: string[]; runConditions: string[] }) => void): void {
+  const readme = change(readFileSync(join(corpus, "README.md"), "utf8"));
+  writeFileSync(join(corpus, "README.md"), readme);
+  const copy = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
+  copy.files = copy.files.map((file) => file.path === "README.md" ? { ...file, sha256: createHash("sha256").update(readme).digest("hex"), byteLength: Buffer.byteLength(readme) } : file);
+  if (gate) gate(copy.gate);
+  writeFileSync(join(corpus, "manifest.json"), JSON.stringify(copy));
+}
+
+test("the README's gate text must be complete and numbered in order", () => {
+  const { root, corpus, manifest } = makeCorpus();
+  try {
+    // A README whose Run conditions list is empty, with a manifest copy that is empty too, agrees
+    // item by item and still defines no run conditions.
+    rewriteReadme(corpus, manifest, (text) => text.replace(/^- .*\n/gmu, (line) => (text.indexOf(line) > text.indexOf("Run conditions") ? "" : line)), (gate) => { gate.runConditions = []; });
+    assert.throws(() => verifyManifest(corpus), /README\.md has no gate runConditions/u);
+    // Steps renumbered 1, 3, 4, 5, 6: the texts still agree, the numbering does not.
+    writeFileSync(join(corpus, "README.md"), readFileSync(join(ROOT, "corpus/public/selfauthored-v1/README.md")));
+    rewriteReadme(corpus, manifest, (text) => text.replace(/^([2-5])\. /gmu, (_line, n: string) => `${Number(n) + 1}. `));
+    assert.throws(() => verifyManifest(corpus), /README\.md gate step 3 is out of order/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("process boundary: the expected files name one rule set, and it is the built CLI's registry, before any run", () => {
+  const spec = { exit: 1, activeRules: ACTIVE, findings: [{ ruleId: "layout/widow", source: { offset: p1.start, endOffset: p1.end } }] };
+  {
+    // The CLI registers one rule fewer than the expected file names.
+    const { root, corpus } = makeCorpus();
+    try {
+      const run = runGateProcess(root, corpus, { ...spec, demoActiveRules: ACTIVE.filter((ruleId) => ruleId !== "type/straight-quotes") });
+      assert.equal(run.status, 1);
+      assert.match(run.stderr, /the built CLI registers \[.*\]; the expected files name \[.*type\/straight-quotes.*\]/u);
+      assert.doesNotMatch(run.stdout, /\| syn /u, "a document was judged against a registry that does not match");
+      assert.doesNotMatch(run.stdout, /corpus gate: syn:/u, "a document ran before the registry was checked");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+  {
+    // Two documents whose expected files name different rule sets.
+    const { root, corpus, manifest } = makeCorpus();
+    try {
+      const other = expectedFile({ "layout/widow": { mustFire: [{ target: { id: "p1" } }] } }, { documentId: "syn2", artifact: "documents/syn2.html" });
+      delete (other.rules as Record<string, unknown>)["type/straight-quotes"];
+      const otherBytes = Buffer.from(JSON.stringify(other));
+      writeFileSync(join(corpus, "documents/syn2.html"), HTML_BYTES);
+      writeFileSync(join(corpus, "expected/syn2.expected.json"), otherBytes);
+      const digest = createHash("sha256").update(otherBytes).digest("hex");
+      const copy = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
+      copy.files.push({ path: "documents/syn2.html", sha256: HTML_SHA, byteLength: HTML_BYTES.length }, { path: "expected/syn2.expected.json", sha256: digest, byteLength: otherBytes.length });
+      copy.documents.push({ ...copy.documents[0]!, id: "syn2", artifact: { relativePath: "documents/syn2.html", sha256: HTML_SHA, byteLength: HTML_BYTES.length }, expected: { relativePath: "expected/syn2.expected.json", sha256: digest, schemaVersion: "selfauthored-expected-v1" } });
+      copy.documentCount = 2;
+      writeFileSync(join(corpus, "manifest.json"), JSON.stringify(copy));
+      const run = runGateProcess(root, corpus, spec);
+      assert.equal(run.status, 1);
+      assert.match(run.stderr, /the expected files do not name the same rule set/u);
+      assert.doesNotMatch(run.stdout, /corpus gate: syn:/u);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
 

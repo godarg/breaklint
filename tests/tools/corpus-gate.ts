@@ -27,7 +27,7 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, copyFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse, type DefaultTreeAdapterMap } from "parse5";
 import type { DocumentReport, Finding, NotMeasured, Report } from "../../src/core/types.ts";
@@ -1202,10 +1202,11 @@ export function evaluateDocument(expected: CompiledExpected, outcome: RunOutcome
   };
 
   // Step 2, harness integrity: the report must be the canonical JSON report of THIS invocation.
-  if (outcome.timedOutMs) failures.push(`the CLI timed out after ${outcome.timedOutMs} ms; its process group was sent SIGTERM, then SIGKILL`);
+  if (outcome.timedOutMs) failures.push(`the CLI timed out after ${outcome.timedOutMs} ms; it and every process it started were sent SIGTERM, then SIGKILL`);
   if (outcome.signal) failures.push(`the CLI was terminated by ${outcome.signal}`);
-  if (outcome.leftovers?.survivedSigkill.length) failures.push(`processes of the CLI's group survived SIGKILL: ${outcome.leftovers.survivedSigkill.join(", ")}`);
-  if (outcome.leftovers && outcome.timedOutMs === null) verdict.notes.push(`the CLI exited and left ${outcome.leftovers.pids.length} process(es) in its group; they were terminated`);
+  if (outcome.leftovers?.survivedSigkill.length) failures.push(`processes the CLI started survived SIGKILL: ${outcome.leftovers.survivedSigkill.join(", ")}`);
+  if (outcome.leftovers?.pids.length && !outcome.timedOutMs) verdict.notes.push(`the CLI exited and left ${outcome.leftovers.pids.length} process(es) it started; they were terminated`);
+  if (outcome.leftovers?.removedProfiles.length) verdict.notes.push(`removed ${outcome.leftovers.removedProfiles.length} browser profile(s) left behind: ${outcome.leftovers.removedProfiles.join(", ")}`);
   if (outcome.exitCode === null) failures.push("the CLI produced no exit code");
   if (outcome.reportProblem || !outcome.report) {
     failures.push(`no canonical JSON report: ${outcome.reportProblem ?? "missing"}`);
@@ -1378,24 +1379,42 @@ export interface GateResult {
   documentsRead: number;
 }
 
+/** One row of the Linux process table (`/proc/<pid>/stat`). */
+export interface ProcRow {
+  pid: number;
+  ppid: number;
+  pgid: number;
+  sid: number;
+  state: string;
+  /** Start time in clock ticks since boot: with the pid, an identity that survives pid reuse. */
+  start: string;
+}
+
+/** The process table, or null where there is no Linux `/proc` (the platform limit of this gate). */
+export function readProcTable(): Map<number, ProcRow> | null {
+  if (!existsSync("/proc/self/stat")) return null;
+  const rows = new Map<number, ProcRow>();
+  for (const name of readdirSync("/proc")) {
+    if (!/^\d+$/u.test(name)) continue;
+    let stat: string;
+    try {
+      stat = readFileSync(`/proc/${name}/stat`, "utf8");
+    } catch {
+      continue; // exited while we looked
+    }
+    // pid (comm) state ppid pgrp session ... starttime(22); comm may contain spaces and parentheses.
+    const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+    rows.set(Number(name), { pid: Number(name), ppid: Number(fields[1]), pgid: Number(fields[2]), sid: Number(fields[3]), state: fields[0]!, start: fields[19]! });
+  }
+  return rows;
+}
+
+const isLive = (row: ProcRow): boolean => row.state !== "Z" && row.state !== "X";
+
 /** Live members of a process group, zombies excluded. Linux reads /proc; elsewhere kill(-pgid, 0). */
 export function processGroupMembers(pgid: number): number[] {
-  if (existsSync("/proc/self/stat")) {
-    const members: number[] = [];
-    for (const name of readdirSync("/proc")) {
-      if (!/^\d+$/u.test(name)) continue;
-      let stat: string;
-      try {
-        stat = readFileSync(`/proc/${name}/stat`, "utf8");
-      } catch {
-        continue; // exited while we looked
-      }
-      // pid (comm) state ppid pgrp ...; comm may contain spaces and parentheses.
-      const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
-      if (Number(fields[2]) === pgid && fields[0] !== "Z" && fields[0] !== "X") members.push(Number(name));
-    }
-    return members;
-  }
+  const table = readProcTable();
+  if (table) return [...table.values()].filter((row) => row.pgid === pgid && isLive(row)).map((row) => row.pid);
   try {
     process.kill(-pgid, 0);
     return [pgid];
@@ -1404,41 +1423,158 @@ export function processGroupMembers(pgid: number): number[] {
   }
 }
 
-function signalGroup(pgid: number, signal: NodeJS.Signals): void {
-  try {
-    process.kill(-pgid, signal);
-  } catch {
-    // the group is already gone
+const PROFILE_PREFIX = "breaklint-chrome-profile-";
+
+/**
+ * Everything a CLI invocation started, as far as the process table can show it.
+ *
+ * The CLI runs in its own session and group, but it is not the only group: puppeteer starts
+ * Chrome detached (`src/acquire/browser.ts`), so Chrome leads a session and group of its own, and
+ * signalling the CLI's group alone orphans it. So the table is sampled while the CLI runs: every
+ * descendant of the CLI (by its ppid chain) is recorded by identity (pid and start time), and every
+ * group and session such a descendant leads is owned, with every member of it. A process reparented
+ * to init after its parent died is still recognised by its identity, and its group and session
+ * still by their leader. This is the ownership model of `ownershipFrom` in src/acquire/browser.ts
+ * (group members plus descendants), extended to the groups and sessions descendants create.
+ *
+ * Limit: it needs Linux `/proc`. Elsewhere only the CLI's own group is signalled and checked, and a
+ * browser in its own group can outlive a timeout unseen. A process born and moved to a new session
+ * between two samples, whose parent then dies before the next one, is not seen either; sampling
+ * runs every 50 ms and once more before every signal.
+ */
+export class ProcessOwnership {
+  readonly root: number;
+  private readonly identities = new Set<string>();
+  private readonly groups = new Set<number>();
+  private readonly sessions = new Set<number>();
+  /** Chrome `--user-data-dir` values of owned processes. */
+  readonly profiles = new Set<string>();
+  readonly procAvailable: boolean;
+
+  constructor(root: number) {
+    this.root = root;
+    // `detached: true` makes the CLI a session and group leader.
+    this.groups.add(root);
+    this.sessions.add(root);
+    this.procAvailable = readProcTable() !== null;
+  }
+
+  private owns(row: ProcRow, table: Map<number, ProcRow>): boolean {
+    if (this.identities.has(`${row.pid}:${row.start}`)) return true;
+    if (this.groups.has(row.pgid) || this.sessions.has(row.sid)) return true;
+    for (let parent = table.get(row.ppid), hops = 0; parent && hops < 4096; parent = table.get(parent.ppid), hops += 1) {
+      if (parent.pid === this.root || this.identities.has(`${parent.pid}:${parent.start}`)) return true;
+      if (parent.pid <= 1) break;
+    }
+    return false;
+  }
+
+  /** Samples the table and returns the live owned processes. */
+  observe(): number[] {
+    const table = readProcTable();
+    if (!table) return processGroupMembers(this.root);
+    // Ownership spreads (a new group leader makes its members owned), so repeat until stable.
+    let owned: ProcRow[] = [];
+    for (let size = -1; size !== this.identities.size;) {
+      size = this.identities.size;
+      owned = [...table.values()].filter((row) => this.owns(row, table));
+      for (const row of owned) {
+        this.identities.add(`${row.pid}:${row.start}`);
+        if (row.pid === row.pgid) this.groups.add(row.pgid);
+        if (row.pid === row.sid) this.sessions.add(row.sid);
+        this.readProfile(row.pid);
+      }
+    }
+    return owned.filter(isLive).map((row) => row.pid).sort((a, b) => a - b);
+  }
+
+  private readProfile(pid: number): void {
+    let argv: string[];
+    try {
+      argv = readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0");
+    } catch {
+      return;
+    }
+    for (const arg of argv) {
+      if (arg.startsWith("--user-data-dir=")) this.profiles.add(arg.slice("--user-data-dir=".length));
+    }
+  }
+
+  /** Signals every owned group and every owned live process. */
+  signal(signal: NodeJS.Signals): void {
+    const live = this.observe();
+    for (const pgid of [...this.groups]) {
+      try {
+        process.kill(-pgid, signal);
+      } catch {
+        // the group is gone
+      }
+    }
+    for (const pid of live) {
+      try {
+        process.kill(pid, signal);
+      } catch {
+        // the process is gone
+      }
+    }
+  }
+
+  async waitForNone(ms: number): Promise<boolean> {
+    const deadline = Date.now() + ms;
+    for (;;) {
+      if (this.observe().length === 0) return true;
+      if (Date.now() >= deadline) return false;
+      await sleep(50);
+    }
+  }
+
+  /** SIGTERM, the grace period, SIGKILL, then a bounded wait; returns the survivors. */
+  async terminate(graceMs: number): Promise<number[]> {
+    this.signal("SIGTERM");
+    if (!(await this.waitForNone(graceMs))) this.signal("SIGKILL");
+    await this.waitForNone(5_000);
+    return this.observe();
+  }
+
+  /**
+   * Removes the Chrome profiles of owned processes that are still on disk once nothing owned is
+   * alive. Only a directory directly in the temporary directory whose name has breaklint's profile
+   * prefix is touched.
+   */
+  removeProfiles(): string[] {
+    const removed: string[] = [];
+    for (const profile of this.profiles) {
+      const path = resolve(profile);
+      if (dirname(path) !== resolve(tmpdir()) || !basename(path).startsWith(PROFILE_PREFIX) || !existsSync(path)) continue;
+      rmSync(path, { recursive: true, force: true });
+      removed.push(path);
+    }
+    return removed;
   }
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 
-async function waitForGroupExit(pgid: number, ms: number): Promise<boolean> {
-  const deadline = Date.now() + ms;
-  for (;;) {
-    if (processGroupMembers(pgid).length === 0) return true;
-    if (Date.now() >= deadline) return false;
-    await sleep(50);
-  }
-}
-
 export interface CliRun {
   status: number | null;
   signal: string | null;
   stderr: string;
-  /** Set when the timeout fired: the group got SIGTERM, then SIGKILL after the grace period. */
+  /** Set when the timeout fired: everything owned got SIGTERM, then SIGKILL after the grace period. */
   timedOutMs: number | null;
-  /** Processes of the CLI's group still alive after it exited, and what became of them. */
-  leftovers: { pids: number[]; survivedSigkill: number[] } | null;
+  /**
+   * Owned processes (see `ProcessOwnership`) still alive once the CLI had exited or been
+   * terminated, the survivors of SIGKILL among them, and the Chrome profiles removed after them.
+   */
+  leftovers: { pids: number[]; survivedSigkill: number[]; removedProfiles: string[] } | null;
   error: Error | null;
 }
 
 /**
- * One CLI invocation in its own process group. On timeout the whole group (the CLI, its Chrome and
- * anything else it started) receives SIGTERM and, after `graceMs`, SIGKILL; killing only the CLI
- * would orphan the browser and leave its profile behind. Whatever the CLI leaves in its group
- * after it exits is terminated the same way and reported.
+ * One CLI invocation in its own session and process group, with everything it starts tracked by
+ * `ProcessOwnership`. On timeout every owned group and process receives SIGTERM and, after
+ * `graceMs`, SIGKILL; killing only the CLI, or only its group, would orphan the browser and leave
+ * its profile behind. Whatever is still alive after the CLI exits is terminated the same way and
+ * reported, and a process that survives SIGKILL fails the document.
  */
 export async function runCli(args: string[], cwd: string, timeoutMs: number, graceMs: number): Promise<CliRun> {
   const child = spawn(process.execPath, args, { cwd, stdio: ["ignore", "ignore", "pipe"], detached: true });
@@ -1451,29 +1587,60 @@ export async function runCli(args: string[], cwd: string, timeoutMs: number, gra
     child.once("error", (error) => resolveExit({ status: null, signal: null, error }));
     child.once("exit", (status, signal) => resolveExit({ status, signal, error: null }));
   });
-  const pgid = child.pid;
+  if (child.pid === undefined) {
+    const outcome = await exited;
+    return { status: outcome.status, signal: outcome.signal, stderr, timedOutMs: null, leftovers: null, error: outcome.error };
+  }
+  const owned = new ProcessOwnership(child.pid);
+  const sampler = setInterval(() => owned.observe(), 50);
   let timedOutMs: number | null = null;
-  let killTimer: NodeJS.Timeout | null = null;
+  let termination: Promise<number[]> | null = null;
   const timer = setTimeout(() => {
-    if (pgid === undefined) return;
     timedOutMs = timeoutMs;
-    signalGroup(pgid, "SIGTERM");
-    killTimer = setTimeout(() => signalGroup(pgid, "SIGKILL"), graceMs);
+    termination = owned.terminate(graceMs);
   }, timeoutMs);
   const outcome = await exited;
   clearTimeout(timer);
+  clearInterval(sampler);
   let leftovers: CliRun["leftovers"] = null;
-  if (pgid !== undefined) {
-    const pids = processGroupMembers(pgid);
-    if (pids.length) {
-      if (timedOutMs === null) signalGroup(pgid, "SIGTERM");
-      if (!(await waitForGroupExit(pgid, graceMs))) signalGroup(pgid, "SIGKILL");
-      await waitForGroupExit(pgid, 5_000);
-      leftovers = { pids, survivedSigkill: processGroupMembers(pgid) };
-    }
+  const pending = termination as Promise<number[]> | null;
+  if (pending) await pending;
+  const pids = owned.observe();
+  if (pids.length || timedOutMs !== null) {
+    const survivedSigkill = pids.length ? await owned.terminate(graceMs) : [];
+    leftovers = { pids, survivedSigkill, removedProfiles: survivedSigkill.length ? [] : owned.removeProfiles() };
   }
-  if (killTimer) clearTimeout(killTimer);
   return { status: outcome.status, signal: outcome.signal, stderr, timedOutMs, leftovers, error: outcome.error };
+}
+
+/**
+ * The rule ids the built CLI registers, read from the report of its `--demo` run: a stored snapshot
+ * through the real rule and reporter chain, with no document and no browser. Its configuration
+ * lists every registered rule as active or disabled under the default profile.
+ */
+export async function registeredRules(options: GateOptions, temporary: string): Promise<string[]> {
+  const reportPath = join(temporary, "registry.demo.json");
+  const run = await runCli([options.cli, "--demo", "--format", "json", "--out", reportPath], options.cwd, options.timeoutMs, options.graceMs);
+  const where = "the built CLI's --demo run";
+  if (run.error) fail(`${where} could not be started: ${run.error.message}`);
+  if (run.timedOutMs) fail(`${where} timed out after ${run.timedOutMs} ms`);
+  if (run.leftovers?.survivedSigkill.length) fail(`${where}: processes survived SIGKILL: ${run.leftovers.survivedSigkill.join(", ")}`);
+  if (!existsSync(reportPath)) fail(`${where} wrote no report (exit ${String(run.status)}; stderr: ${run.stderr.trim().slice(0, 400)})`);
+  let report: Report;
+  try {
+    report = JSON.parse(readFileSync(reportPath, "utf8")) as Report;
+  } catch (error) {
+    fail(`${where} wrote a report that is not JSON: ${(error as Error).message}`);
+  }
+  if (report.schemaVersion !== ACCEPTED_REPORT_SCHEMA_VERSION) fail(`${where}: report schemaVersion ${String(report.schemaVersion)}, this gate reads ${ACCEPTED_REPORT_SCHEMA_VERSION}`);
+  if (report.mode !== "demo") fail(`${where}: report mode ${String(report.mode)}, not demo`);
+  if (report.exitCode !== run.status) fail(`${where}: report exitCode ${String(report.exitCode)} differs from the process exit ${String(run.status)}`);
+  if (report.config?.profile !== "default") fail(`${where}: profile ${String(report.config?.profile)}, not default`);
+  const active = Array.isArray(report.config?.activeRules) ? report.config.activeRules : [];
+  const disabled = Array.isArray(report.config?.disabledRules) ? report.config.disabledRules : [];
+  const registered = [...new Set([...active, ...disabled])].sort();
+  if (registered.length === 0 || !registered.every((id) => typeof id === "string" && id.length > 0)) fail(`${where} reports no registered rules`);
+  return registered;
 }
 
 async function runOne(document: ManifestDocument, options: GateOptions, temporary: string): Promise<RunOutcome> {
@@ -1557,6 +1724,12 @@ export async function runGate(options: GateOptions): Promise<GateResult> {
   const temporary = mkdtempSync(join(tmpdir(), "breaklint-corpus-gate-"));
   const verdicts: DocumentVerdict[] = [];
   try {
+    // Field list: `rules` holds "exactly the thirteen registered rule ids". The registry is read
+    // from the built CLI itself, before any document runs, not imported from src/.
+    const registered = await registeredRules(options, temporary);
+    const named = [...ruleSets][0]!;
+    if (registered.join(",") !== named) fail(`the built CLI registers [${registered.join(", ")}]; the expected files name [${named.split(",").join(", ")}]`);
+    options.log(`corpus gate: the built CLI registers the ${registered.length} rules the expected files name`);
     for (const { document, expected } of compiled) {
       const started = Date.now();
       const outcome = await runOne(document, options, temporary);

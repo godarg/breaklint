@@ -144,6 +144,27 @@ describe("workflow gates", () => {
     assert.deepEqual(ci.filter((step) => !release.has(step)), [], "release.yml does not repeat these ci.yml gate steps");
   });
 
+  // Repeating a step is not running it: a step-level `if:` or `continue-on-error:` (or a job-level
+  // one) lets the release proceed past a red gate. So every release step that runs one of CI's
+  // gate steps, and its job, must be unconditional and must not ignore failure.
+  it("release.yml runs each of ci.yml's gate steps in a step that cannot be skipped or fail silently", () => {
+    const ci = new Set(gateSteps(runLinesOf(".github/workflows/ci.yml")));
+    const offending: string[] = [];
+    const covered = new Set<string>();
+    for (const job of jobsOf(readLines(".github/workflows/release.yml"))) {
+      const jobLevel = job.lines.filter(({ text }) => /^ {4}(if|continue-on-error)\s*:/u.test(executablePart(text)));
+      for (const step of stepsOf(job.lines)) {
+        const runs = gateSteps(workflowRunLines(step.map(({ text }) => text).join("\n"))).filter((gate) => ci.has(gate));
+        if (runs.length === 0) continue;
+        for (const gate of runs) covered.add(gate);
+        for (const { number, key } of conditionKeys(step)) offending.push(`release.yml:${number} ${key} on the step running ${runs.join(", ")}`);
+        for (const { number, text } of jobLevel) offending.push(`release.yml:${number} job ${job.name} ${text.trim()} (runs ${runs.join(", ")})`);
+      }
+    }
+    assert.deepEqual([...ci].filter((gate) => !covered.has(gate)), [], "no release step runs these ci.yml gate steps; this guard has lost its subject");
+    assert.deepEqual(offending, [], "a release step running a ci.yml gate step may be skipped or fail silently");
+  });
+
   /*
    * The checks that see the SHIPPED package — the README demo excerpt against the installed bin, and
    * the docs' schema stamps against the installed code — exist only as workflow lines. Deleting one

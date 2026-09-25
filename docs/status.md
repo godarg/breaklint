@@ -379,7 +379,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=651 aggregateTests=782 liveTests=87 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=654 aggregateTests=785 liveTests=87 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -964,9 +964,17 @@ a pass says nothing about evidence binding beyond the exit code. Element spans c
 parse5 pass over the source bytes, not from breaklint's source map, so a source attribution that
 breaklint's map gets wrong cannot agree with itself. They are not independent of the HTML parser:
 breaklint's source map and the gate both use parse5 8.0.1, so a tree-construction error in that
-parser would be shared by both sides. Each invocation runs in its own process group; on a timeout
-the whole group (the CLI and its browser) is terminated and the document fails with the timeout
-named.
+parser would be shared by both sides. Each invocation runs in its own session and process group,
+and the gate samples the Linux process table every 50 ms while it runs: every descendant is
+recorded by pid and start time, and every group and session a descendant leads is owned with all
+its members (Chrome runs in a session of its own). On a timeout all of it gets SIGTERM, then
+SIGKILL after the grace period, and the document fails with the timeout named; what is still
+owned after the CLI exits is terminated the same way, a survivor of SIGKILL fails the document, and
+once such a termination has left nothing alive, a `breaklint-chrome-profile-*` directory in the
+temporary directory that an owned process named on its command line is removed. A process that is
+started and moved to a new session between two samples, and whose parent dies before the next
+one, is not seen. Without Linux `/proc` only the CLI's own group is signalled and checked. The
+registry is read from the built CLI's `--demo` report before any document runs.
 
 **What it does not prove.** It is a regression corpus, not calibration evidence: the documents
 are `synthetic_first_party`, the expectations follow the rule pages of the admitting release, and a

@@ -66,9 +66,10 @@ corpus gates need to run locally.
   set, page range, `mustFire`, `mustNotFire`, the closed world (a finding no entry accounts for
   fails), declines by count and the `measuredAlternative` all-or-nothing rule, and every expected
   file against the README's closed field list. It prints one row
-  per document and exits 0 only when every document passed. Each invocation runs in its own process
-  group; on `--timeout-ms` (default 600000) the group gets SIGTERM and, after `--grace-ms` (default
-  10000), SIGKILL, and the document fails naming the timeout. In CI it is its own `corpus` job, so a
+  per document and exits 0 only when every document passed. Each invocation runs in its own session
+  and process group, and on Linux the gate tracks every process it starts, including Chrome in its
+  own session; on `--timeout-ms` (default 600000) all of them get SIGTERM and, after `--grace-ms`
+  (default 10000), SIGKILL, and the document fails naming the timeout. In CI it is its own `corpus` job, so a
   red corpus gate does not stop the gates of the `check` job, and the release workflow runs it too. Needs `npm run build` and a browser in
   which evidence binding works; `--no-evidence-binding` exists for local diagnosis on a renderer
   that cannot bind evidence, labels the run as not the gate, and is not used in CI. Its matcher and
