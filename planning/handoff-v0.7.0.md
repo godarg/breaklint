@@ -1,6 +1,6 @@
 # Handoff — breaklint 0.7.0 cycle
 
-Status: **DRAFT, not ready to tag.** This file records where the 0.7.0 cycle stands, what was
+Status: **cycle closed by the owner on 2026-09-25; not ready to tag.** This file records where the 0.7.0 cycle stands, what was
 proven and by whom, and which decisions the owner has to take before release preparation can
 finish. Nothing has been published, tagged, or merged to `main` from this session.
 
@@ -41,17 +41,28 @@ one final round.
 | WP-L1 local-uri absolute paths | G-86 G-88 | 48efb2f | `@import` without whitespace escapes discovery and the new guard (pre-existing mechanism) |
 | WP-X cross-check, multicol, residue | G-12 G-13 G-64 G-65 | 9750c5e | CI red (real-document manifest); clip exemption too broad; `body { column-count: 1 }` |
 
-### Work packages still in flight when this draft was written
+### Work packages stopped or unfinished at close
 
-| package | register items | state |
-|---|---|---|
-| WP-R2 wrapper widows/orphans, natural space, inline hyphen | G-82 G-83 | round 2 (c502ead) under verification; CI probe #30 |
-| WP-B1 named-page break cause | G-99 | round 1 (cae6d1a) under verification; CI probe #32 |
-| WP-K1 + WP-K2 self-authored corpus and closed-world gate | G-29 | corpus reviewed (errata E1–E43); gate round 2 (0cbf466) under verification. Locally 15/20 documents pass; the 5 failures need WP-F5 (sa04, sa17) and WP-L1 (sa06, sa15, sa19) |
+| package | register items | last frozen commit | state at close |
+|---|---|---|---|
+| WP-R2 wrapper widows/orphans, natural space, inline hyphen | G-82 G-83 (G-104 G-105) | c502ead | stopped: round 2 FAIL (the word-spacing layout fallback can sample non-natural gaps and hide findings); the wrapper fixes held (64/76 vs 40/76 on base) |
+| WP-B1 named-page break cause | G-99 (G-107) | cae6d1a | round 1 FAIL (false `forced` on leaving a nested named region); round 2 not finished at close |
+| WP-K1 + WP-K2 self-authored corpus and closed-world gate | G-29 (G-106) | corpus 6ffba2a, gate 0cbf466 | corpus reviewed (errata E1–E43). Gate round 2 FAIL: timeouts do not reach Chrome's own process group. Locally 15/20 pass; the 5 failures need WP-F5 and WP-L1 |
+
+### Where the unintegrated work lives
+
+Every unintegrated package branch is pushed as `claude/wp-<name>`:
+- b1-break-cause, c1-output-floor, c2-lifecycle, f3-fragment-bound, f5-real-documents;
+- k1-corpus, k2-corpus-gate, l1-local-uri, r1-surfaces, r2-rule-findings;
+- s1-svg-viewport, s2-svg-bracket, x-geometry.
+
+Each branch tip is the frozen commit in the tables above. The verifier findings for each final
+round are summarised in `planning/progress.md` and in the register (`planning/open-work.md`,
+G-85 … G-107).
 
 ## 2. Decisions the owner has to take
 
-1. **Stopped packages.** For S1, F3, R1, C1+C2, F5, L1 and X, choose one:
+1. **Stopped packages.** For S1, F3, R1, C1+C2, F5, L1, X, R2, K2 and B1, choose one:
    - one final round with a hard exit, meaning any new blocker or high finding drops the package from 0.7.0 (recommended);
    - drop the package from 0.7.0 and document the gap;
    - a conservative decline-only variant.
@@ -101,8 +112,8 @@ Exact test counts are in the machine-checked figures marker in `docs/status.md`,
   - the pipeline work of WP-E1;
   - G-87 (resolved: corpus erratum E42 plus G-99) and G-90 (test hardened in WP-F1b).
 - **Fixed but not integrated (stopped packages):** G-01, G-03, G-07, G-08, G-09, G-10, G-12, G-13, G-23, G-31–G-39, G-48–G-51, G-59, G-61–G-66, G-73–G-81, G-85, G-86, G-88 (each only partly, as the stop reasons in §1 say).
-- **In flight:** G-29 (corpus and gate), G-82, G-83 (WP-R2), G-99 (WP-B1).
-- **Open, found late, not yet fixed:** G-89, G-91–G-98, G-100–G-103 (see `planning/open-work.md`).
+- **Fixed but not integrated (later packages):** G-29 (corpus and gate), G-82, G-83 (WP-R2), G-99 (WP-B1).
+- **Open, found late, not yet fixed:** G-89, G-91–G-98, G-100–G-107 (see `planning/open-work.md`).
 - **Not attempted this cycle:**
   - G-05 and G-60 (WP-F2, `--no-source-map` join);
   - G-70 (WP-P1, `Function.prototype.call` hardening);
@@ -143,5 +154,5 @@ To be filled at release time from the release record. Until then, every public f
 
 ## 8. Housekeeping left for the owner
 
-- Probe branches `claude/ci-probe-*` on the remote belong to closed probe PRs #19–#32. They can be deleted; an earlier attempt to delete one through the git proxy failed.
-- Local worktrees of the stopped packages are kept, so that a final round can resume without rework.
+- The remote probe branches `claude/ci-probe-*` belong to closed probe PRs #19–#32. They can be deleted. Deleting them from the session was refused (HTTP 403 through the git proxy).
+- The session's local worktrees were removed at close. All work is on the pushed branches listed in §1.

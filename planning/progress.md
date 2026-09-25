@@ -187,3 +187,10 @@ Verdicts since the last entry (frozen commit → verdict, B/H/M/L open):
 Corpus errata E27–E43 were recorded by the corpus author from the reviewers' specification questions. None of them used breaklint output. E42 moved sa03's caption page from mustFire to mustNotFire, citing the rule page's definition.
 
 Every stop above is the brief's stop condition ("two verifier rounds that keep finding new blocker/high defects"). Each was reported to the owner with a recommendation: one final round with a hard exit rule. New register items are G-85 … G-103; see scratchpad REGISTER-ADDENDUM, to be copied into open-work.md at handoff.
+
+## 2026-09-25 — cycle closed by the owner
+
+Final verdicts: WP-R2 c502ead FAIL (0/1/1/4) → stopped. WP-K2 0cbf466 FAIL (0/1/0/3) → stopped. WP-B1 cae6d1a
+FAIL (0/1/1/3); round 2 was stopped unfinished when the cycle closed. The integration branch holds WP-D1, K3, E1, F1,
+F1b and F4, and it is green on CI. All unintegrated package branches are pushed as `claude/wp-*`. The handoff is
+`planning/handoff-v0.7.0.md`.
