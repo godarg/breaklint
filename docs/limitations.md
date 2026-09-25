@@ -310,16 +310,16 @@ reads `Z`, and still counts as alive). The deadlines did not move; a host that n
 cannot be out-waited.
 
 Measured on one machine, and these are data about that machine rather than promises: a Firecracker
-VM, Linux 6.18, 4 vCPUs, whose PID 1 is not an init system and collects exited orphans on a timer,
-after 1.02–1.96 s (n = 40); Chromium 141; Node 24. The three process-group unit tests (the browser
-tree, a producer descendant on the success path, a producer descendant after a timeout), 10
-isolated runs each under three parents — this VM's PID 1, a subreaper that collects at once (what
-`--init`, tini or systemd do) and a subreaper that never collects: before the change 30 of 30 red,
-30 of 30 green and 30 of 30 red; after it, 30 of 30 green in each of the three, and again on the
-committed code. The one-minute load average was 1.3–4.4 before and 1.8–9.7 after, because other
-work shared the machine. Under load one of the three tests also exposed a race of its own, a
-SIGTERM landing before the process under test had installed its handler (3 of 10); the test now
-arms the handler first. On macOS no process is marked a zombie, and the behaviour there is
+VM, Linux 6.18, 4 vCPUs, whose PID 1 is not an init system and collects exited processes it adopted
+on a timer, after 1.02–1.96 s (n = 40); Chromium 141; Node 24. The three process-group unit tests
+(the browser tree, a producer descendant on the success path, a producer descendant after a
+timeout), 10 isolated runs each under three parents — this VM's PID 1, a subreaper that collects at
+once (what `--init`, tini or systemd do) and a subreaper that never collects: before the change 30
+of 30 red, 30 of 30 green and 30 of 30 red; after it, 30 of 30 green in each of the three, and
+again on the committed code. The one-minute load average was 1.3–4.4 before and 1.8–9.7 after,
+because other work shared the machine. Under load one of the three tests also exposed a race of its
+own, a SIGTERM landing before the process under test had installed its handler (3 of 10); the test
+now arms the handler first. On macOS no process is marked a zombie, and the behaviour there is
 unchanged.
 
 **What an interrupted or killed run leaves behind, measured on the same machine.** The real CLI
@@ -384,7 +384,7 @@ the fatal message otherwise.
 profile (`TMPDIR` points there), so the profile's removal takes them too: Chromium's
 `.org.chromium.Chromium.*` socket directories and Google Chrome's component-download
 directories, which were observed accumulating in a shared temporary directory. A Unix socket path
-is limited to 107 bytes on Linux and 103 on macOS; where the profile path leaves less than 56
+is limited to 107 bytes on Linux and 103 on macOS; where the profile path leaves less than 50
 bytes, a short `breaklint-chrome-tmp-*` directory is used instead, recorded in the profile's owner
 record and removed with it. On macOS, whether the browser honours `TMPDIR` is not measured here.
 The browser also makes requests that page-level interception never sees. Measured on Chromium 141
@@ -425,21 +425,20 @@ budget — measured starts took 0.3–2.4 s even with twelve at once — and a s
 reports its elapsed time and the last lines of the browser's stderr.
 
 **What CI has to confirm, and how it can fail.** The `lifecycle-soak` CI job runs the close,
-document-timeout, SIGKILL, SIGINT, SIGTERM and SIGHUP paths 20 times each, first under the
-runner's own init and then under a parent that adopts orphans and never collects them
+document-timeout, SIGKILL, SIGINT, SIGTERM and SIGHUP paths 20 times each, first under the runner's
+own init and then under a parent that adopts re-parented processes and never collects them
 (`tests/tools/noreap.py`, the PID 1 of a container without `--init`), and runs the three
 process-group unit tests under that parent too. After every iteration it asserts, with a process
-reader of its own, that no process of that run's browser group is alive 2 s later, that no
-browser process still names the run's private profile root, that no profile directory remains (a
-SIGKILLed run's once the next run's browser is up), that an interrupted CLI ended by its signal,
-and — once per run, against a live CLI — that a sweep keeps a running breaklint's profile. On this
-machine, Chromium 141, both regimes were 120 of 120 green (load up to 17 and 23; 623 zombies held
-by the never-collecting parent at the end). On the tree before this change, three iterations
-each, it was red on all 18 path runs under the never-collecting parent, for the reasons the tables
-above give. Under this machine's own PID 1 the four signal paths were red 3 of 3; close and
-timeout passed in the first iteration and failed afterwards only because browsers that outlived
-earlier kills were still running. That CI reproduces the same on its current Chrome is the open
-part.
+reader of its own, that no process of that run's browser group is alive 2 s later, that no browser
+process still names the run's private profile root, that no profile directory remains (a SIGKILLed
+run's once the next run's browser is up), that an interrupted CLI ended by its signal, and — once
+per run, against a live CLI — that a sweep keeps a running breaklint's profile. On this machine,
+Chromium 141, both regimes were 120 of 120 green (load up to 17 and 23; 623 zombies held by the
+never-collecting parent at the end). On the tree before this change, three iterations each, it was
+red on all 18 path runs under the never-collecting parent, for the reasons the tables above give.
+Under this machine's own PID 1 the four signal paths were red 3 of 3; close and timeout passed in
+the first iteration and failed afterwards only because browsers that outlived earlier kills were
+still running. That CI reproduces the same on its current Chrome is the open part.
 
 **What is still unmeasured.** A real container without `--init` (the never-collecting subreaper
 reproduces its reparenting, not the container), and every interrupt, kill and sweep path on

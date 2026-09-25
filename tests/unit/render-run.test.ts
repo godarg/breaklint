@@ -1881,6 +1881,21 @@ describe("a real browser: its temporary files and its own network use", { concur
       const shortProfile = join(shortRoot, "p");
       mkdirSync(shortProfile);
       assert.deepEqual(browserTmpDirFor(shortProfile, "linux"), { path: join(shortProfile, "tmp"), separate: false });
+      // The shape `npm test` produces: its private TMPDIR, then a profile. The profile's `tmp` is
+      // 63 bytes there, too long for the socket, and the fallback must land in that same private
+      // directory, where the suite's leftover check sees it, not in /tmp. Mutation "margin 56": red.
+      const suite = mkdtempSync("/tmp/breaklint-suite-");
+      const saved = process.env.TMPDIR;
+      process.env.TMPDIR = suite;
+      try {
+        const suiteProfile = mkdtempSync(join(suite, "breaklint-chrome-profile-"));
+        const placed = browserTmpDirFor(suiteProfile, "linux");
+        assert.equal(dirname(placed.path), suite, `the fallback left the private temporary directory: ${placed.path}`);
+        assert.equal(removeBrowserTmpDir(placed.separate ? placed.path : null), null);
+      } finally {
+        if (saved === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = saved;
+        rmSync(suite, { recursive: true, force: true });
+      }
       const longProfile = join(shortRoot, "x".repeat(60));
       mkdirSync(longProfile);
       const fallback = browserTmpDirFor(longProfile, "darwin");

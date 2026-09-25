@@ -1095,11 +1095,15 @@ export function resolvePackageRoot(name: string, fromDir: string): string | null
  * (`com.google.Chrome.chrome_chrome_url_fetcher_*`), and it does not remove them when it is killed
  * — observed accumulating in a shared temporary directory. A Unix socket path is limited to 108
  * bytes on Linux and 104 on macOS including the terminator, and Chrome appends 46 bytes
- * (`/.org.chromium.Chromium.XXXXXX/SingletonSocket`; Google Chrome's name is shorter); with a
- * 10-byte margin, a directory path longer than the limit less 56 bytes gets a short dedicated
- * directory instead, recorded in the profile's owner record and removed with the profile.
+ * (`/.org.chromium.Chromium.XXXXXX/SingletonSocket`, measured; Google Chrome's name is shorter);
+ * with a 4-byte margin, a directory path longer than the limit less 50 bytes gets a short dedicated
+ * directory instead, recorded in the profile's owner record and removed with the profile. The
+ * margin is small on purpose: under `npm test`'s private temporary directory
+ * (`/tmp/breaklint-suite-XXXXXX`, 27 bytes) the profile's `tmp` is 63 bytes and does not fit, and
+ * the fallback (55 bytes) must still fit there rather than in `/tmp`, so that the suite's own
+ * leftover check sees the browser's files.
  */
-const CHROME_SOCKET_SUFFIX_BYTES = 56;
+const CHROME_SOCKET_SUFFIX_BYTES = 50;
 function socketPathLimit(platform: NodeJS.Platform = process.platform): number {
   return (platform === "darwin" ? 104 : 108) - 1;
 }
