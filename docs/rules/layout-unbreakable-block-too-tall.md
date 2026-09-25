@@ -19,6 +19,23 @@ One of two rules that carry `error`. Two directly measured heights, a structural
 
 Multi-column and vertical writing are declined rather than judged.
 
+A block the paginator split is judged on all of its fragments, joined by source id. A split block
+whose fragments cannot be joined — it has no source id (a `--no-source-map` run, or an element a
+script created), or its source id does not account for every fragment the snapshot counted — is
+declined as `env/invalid-measurement` rather than judged on one fragment, and the decline counts
+against the rule's coverage.
+
+Which records are fragments is decided by the page structure, not by coordinates. A fragment that
+bleeds into the page margin (negative margins, a full-bleed figure) still counts. Content in a page
+margin box is not part of the flow and is not measured: a `position: running(...)` element is
+represented only by its in-flow original, which Paged.js hides with `display: none`. A block that
+was not rendered — no layout box and no line boxes: that original, or anything else under
+`display: none` — was never placed by the paginator, so it is recorded as `excluded`
+(`rule/target-not-rendered`), outside the coverage base, and never as a measurement of 0 px. A
+`display: contents` block is rendered (its text has lines) but has no box whose height could be
+judged; it is declined as `env/invalid-measurement`, and the decline counts against coverage. See
+`docs/limitations.md`.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with

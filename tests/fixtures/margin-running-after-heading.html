@@ -1,0 +1,62 @@
+<!doctype html>
+<!--
+  A running title that is NOT the first element of the document.
+
+  COMPLICATION. Paged.js clones the running title into the top-center margin box of every page,
+  and the margin boxes come before the content area in each page box. Read in document order
+  over the whole page, the clone on page 1 therefore appears BEFORE the heading that precedes the
+  title in the source. The post-pagination source-id check compared that order with the source
+  order and ended the run `checker-crashed` (exit 3) on an ordinary document. With the title
+  first in the source, as in margin-running-elements.html, the same defect is invisible.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 150mm 120mm; margin: 15mm; }
+@page { @top-center { content: element(title); } }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p, h1 { margin: 0; }
+h1 { font-size: 14pt; margin: 0 0 6px; }
+.title { position: running(title); }
+</style></head><body>
+<h1 id="doc-title">Document title before the running title</h1>
+<p class="title" id="running-title">Running title on every page</p>
+<p id="a01">Body paragraph 01, one short line.</p>
+<p id="a02">Body paragraph 02, one short line.</p>
+<p id="a03">Body paragraph 03, one short line.</p>
+<p id="a04">Body paragraph 04, one short line.</p>
+<p id="a05">Body paragraph 05, one short line.</p>
+<p id="a06">Body paragraph 06, one short line.</p>
+<p id="a07">Body paragraph 07, one short line.</p>
+<p id="a08">Body paragraph 08, one short line.</p>
+<p id="a09">Body paragraph 09, one short line.</p>
+<p id="a10">Body paragraph 10, one short line.</p>
+<p id="a11">Body paragraph 11, one short line.</p>
+<p id="a12">Body paragraph 12, one short line.</p>
+<p id="a13">Body paragraph 13, one short line.</p>
+<p id="a14">Body paragraph 14, one short line.</p>
+<p id="a15">Body paragraph 15, one short line.</p>
+<p id="a16">Body paragraph 16, one short line.</p>
+<p id="a17">Body paragraph 17, one short line.</p>
+<p id="a18">Body paragraph 18, one short line.</p>
+<p id="a19">Body paragraph 19, one short line.</p>
+<p id="a20">Body paragraph 20, one short line.</p>
+<p id="a21">Body paragraph 21, one short line.</p>
+<p id="a22">Body paragraph 22, one short line.</p>
+<p id="a23">Body paragraph 23, one short line.</p>
+<p id="a24">Body paragraph 24, one short line.</p>
+<p id="a25">Body paragraph 25, one short line.</p>
+<p id="a26">Body paragraph 26, one short line.</p>
+<p id="a27">Body paragraph 27, one short line.</p>
+<p id="a28">Body paragraph 28, one short line.</p>
+<p id="a29">Body paragraph 29, one short line.</p>
+<p id="a30">Body paragraph 30, one short line.</p>
+<p id="a31">Body paragraph 31, one short line.</p>
+<p id="a32">Body paragraph 32, one short line.</p>
+<p id="a33">Body paragraph 33, one short line.</p>
+<p id="a34">Body paragraph 34, one short line.</p>
+<p id="a35">Body paragraph 35, one short line.</p>
+<p id="a36">Body paragraph 36, one short line.</p>
+<p id="a37">Body paragraph 37, one short line.</p>
+<p id="a38">Body paragraph 38, one short line.</p>
+<p id="a39">Body paragraph 39, one short line.</p>
+<p id="a40">Body paragraph 40, one short line.</p>
+</body></html>

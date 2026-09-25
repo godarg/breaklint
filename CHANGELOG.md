@@ -7,12 +7,54 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
 ### Rule behaviour
 
 - **`layout/unbreakable-block-too-tall`: a `position: running(...)` element placed in a side
-  margin box (`@left-middle`, `@right-middle`) is no longer summed into a false `error`.** In
-  0.6.0 the filter that keeps per-page margin-box clones out of the fragment sum tested only the
-  vertical axis. A side margin box starts at a content-box `y`, so its clones passed that test and
-  a short running element repeated on three or more pages could be reported as a block taller than
-  the page (e46a1bf). The 0.6.0 section below claimed this exclusion held "by construction"; it
-  held for the top and bottom margin boxes only.
+  margin box (`@left-middle`, `@right-middle`) is no longer summed into a false `error`, and a
+  full-bleed block is no longer judged on one piece.** In 0.6.0 the filter that keeps per-page
+  margin-box clones out of the fragment sum tested only the vertical axis. A side margin box starts
+  at a content-box `y`, so its clones passed that test and a short running element repeated on
+  three or more pages could be reported as a block taller than the page: the 0.6.0 rule reports
+  582.00 px against 340.16 px for a 97 px side element on six pages. The 0.6.0 section below claimed
+  this exclusion held "by construction"; it held for the top and bottom margin boxes only. The first
+  repair (e46a1bf) added the horizontal axis, and that coordinate test was wrong in the other
+  direction: a `break-inside: avoid` block with negative side margins has every fragment left of
+  the content box, so all six fragments of a 1865.61 px block were discarded, its first fragment
+  (335.81 px) was measured against the 340.16 px page, and the document came back `clean` at
+  exit 0 — a regression against 0.6.0, which reported it. **The coordinate filter is gone.** Flow
+  membership is now decided by the page structure, in the snapshot rather than in this rule (see
+  *Fixed* below), and the rule sums every fragment of the element wherever its box lies: the
+  full-bleed block is an `error` again at 1865.61 px, and the side-margin element is silent.
+  Measured on 2026-09-24 with Paged.js 0.4.3, with evidence binding off, on the live fixtures
+  `fullbleed-avoid.html` and `margin-running-elements.html`. With evidence binding on (the
+  default) the exit code also depends on the page evidence, which this first repair still refused
+  for both documents; see *Fixed* below.
+- **The same rule declines a split block whose fragments it cannot join, instead of measuring its
+  first fragment.** Fragments are joined by source id. A split block without one — every block of a
+  `--no-source-map` run, or an element a script created — or one whose id does not account for
+  exactly the fragments the snapshot counted used to be judged on its first fragment, which
+  compares a piece with the page and can call a six-page block clean. It is now declined as
+  `env/invalid-measurement` (newly listed in the rule's declared decline reasons). The decline
+  counts against the rule's coverage floor, so such a run ends `insufficient-coverage` at exit 4
+  where it could end `clean` before. An unsplit block without a source id is measured as before.
+- **Three rules no longer count a block with no layout box as measured.** A block the browser did
+  not lay out — width and height both zero, as under `display: none` — was a measured candidate of
+  `layout/unbreakable-block-too-tall` (at 0 px), `layout/heading-at-page-bottom` ("with content
+  below it") and `type/excessive-word-spacing` (with no lines). The case that matters is the
+  in-flow original of every `position: running(...)` element, which Paged.js hides with
+  `display: none`: a document whose only avoid block was a running element reported
+  `unbreakable-block-too-tall` coverage 1/1 and a clean run, also under `--profile strict`, for a
+  check that had looked at nothing. Such a block is now recorded as `excluded` with the reason
+  `rule/target-not-rendered`, outside the coverage base, and never as measured. Consumers see new
+  evaluation rows with that reason and smaller candidate and measured counts for these three
+  rules on documents with running elements or hidden blocks. Both dimensions decide: an empty
+  paragraph (full width, zero height) is laid out and still measured. And a zero box alone does not
+  decide: a block counts as not rendered only when it also has no line boxes. A
+  `display: contents` block has no box of its own but prints its text; `type/excessive-word-spacing`
+  measures it from its lines as before (a justified `display: contents` paragraph with a 3.74×
+  gap is still a finding); `layout/heading-at-page-bottom` now places such a heading by its line
+  boxes, where it used to read the zero box at the page origin and call every such heading
+  followed; `layout/unbreakable-block-too-tall`, which judges the height of a box the block does
+  not have, declines it as `env/invalid-measurement`, counted against coverage, where it used to
+  measure the zero box as a fit. The heading rule newly declares `env/invalid-measurement`, for a
+  heading with neither a box nor visible line boxes.
 - **The same rule's advice no longer claims the block "cannot fit unbroken on any page".** The
   finding message had already stopped making that all-pages claim from one measured page; the
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
@@ -44,6 +86,62 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   that worked. The order is declared in the new registry field `remediation.interactions`, which
   does not travel into reports: `Finding.remediation` still carries `advice` and `tested` only, and
   no report, snapshot or configuration schema stamp moves. Both advice strings change.
+- **`layout/orphaned-continuation-page` no longer reports pages whose text runs on to the next
+  page.** A page is judged only when what it carries ENDS on it: the next page does not open with
+  text running on from it — a text line of a block that continues there whose glyph box starts
+  less than one of that block's line heights below the top of the page's content, or that shares
+  its line with an inline SVG starting there (the window then reaches one line height past the
+  SVG's bottom), and that does not lie inside a block that starts there after it in document
+  order. The rule records this as a third measurement, `ends-on-page`, in its evaluations. All figures below were measured on Chromium 141 with
+  Paged.js 0.4.3.
+  - Until now every page between the first and the last page of a block was reported as soon as
+    its net fill read below 0.50. Such a page stopped because its next line did not fit, so it is
+    full; but net fill counts glyph boxes, not line boxes, and it reads 0.34–0.36 at
+    `line-height: 3`. A long paragraph with generous leading produced one warning per middle page
+    (five on the new live fixture); none now. The same holds for a full page whose last block is a
+    nested child that ends there while its wrapper's own text runs on, and for one followed by a
+    page whose top carries a positioned badge or a relatively offset aside beside the running
+    text, and for one whose next line carries a 70–100 px inline SVG: 0.6.0 reported those
+    pages, and they are no longer reported. The extra room is given for inline SVG only: the
+    snapshot records no box for an inline `<img>`, `<canvas>` or `<video>`, so the full page
+    before such a line (an 80 px image or canvas under 48 px lines) is still reported — this errs
+    toward reporting. The window uses the line height of the recorded block a line belongs to,
+    not the line's own. A snapshot field for replaced-element boxes, planned alongside the
+    line-box fill, is the follow-up.
+  - A page that ends early is still reported, whatever the shape of the wrapper: a `<section>`
+    whose own SVG, image or bare text was left high on a page because its next child, a
+    `break-inside: avoid` figure, did not fit (net fill 0.08–0.39), with or without a border on
+    the section and with the figure bleeding into the margins; and a section whose own SVG did not
+    fit (0.31). 0.6.0 reported these pages, and so does this rule.
+  - Only blocks of the page's flow count: a block with a box that lies at least partly inside the
+    content box vertically. A `display: none` original of a running element and an empty
+    positioned marker have no box, and a clone in a top or bottom margin box lies outside the
+    content box, so none of them decides anything. Measured, such blocks hid a two-line tail page
+    under a running header, which 0.6.0 did not report; it is reported now. The rule relies on
+    the collector keeping margin-box content out of the snapshot, as this release's collector
+    does: a clone in a side margin box lies inside the content box vertically.
+  - The message now says what the page is: "Page N carries only content continued from an earlier
+    page, which ends there, and its net fill is X %". Consumers that match the old message text,
+    or read the evaluation's measurements by position, will see the change.
+  - The decision reads the order in which the collector records a page's blocks, document order,
+    and the live suite now pins that order.
+  - Not fixed: at `line-height: 3` every page whose content ends on it is reported, however full
+    and whatever follows it (11 of 13 lines before a figure that did not fit: 0.29); a line-box
+    fill is the named follow-up (`docs/limitations.md`). A block that starts on the next page and
+    covers the running text takes that text for its own, and the page before it is judged; this
+    is pinned by a unit case and was not seen on a real document.
+  - No schema stamp moves.
+- **`layout/half-empty-page` no longer states a "measured ceiling" in its findings.** Every finding
+  said the threshold "sits 0.086 below the measured ceiling of a full text page". Net fill has no
+  ceiling: full, non-last prose pages at `line-height: 1.5` read 0.58–0.72 with this collector, and
+  6 of 16 such pages read below the 0.60 threshold. The message now says what the quantity is —
+  "net fill sums the glyph boxes of text, not its line boxes, so a page a reader calls full can
+  read below this threshold" — and quotes no number. The rule page, `docs/agent-contract.md` and
+  the source comments are corrected; the 0.6.0 entry below, which gives "about 0.686" as the
+  figure for a full page, is corrected by this entry rather than rewritten. The rule page also no
+  longer says the last page is "downgraded to a note": its finding keeps `warn`, and only the
+  message says the page is likely intended. The rule stays experimental and off by default, and
+  nothing here is a calibration.
 - **`artifact/local-uri` reports absolute and root-relative paths, as its page always said.** Its
   page and advice promise that EVERY absolute path is reported, inside the project or not; the rule
   reported `file:` URIs only. The snapshot stores the authored scheme, which is empty for
@@ -116,9 +214,91 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   missing `.md`, a directory named `.html` (also after a valid path) and a missing `.html`.
 - **`--help` described exit 4 as including "no input"**; a run without an input path is exit 2.
   The exit-2 line now names every usage case and says that no report is written.
+- **Margin-box content is no longer part of the flow: not in the snapshot, not in the collector's
+  page edges, not in the evidence overlay, not in page anchors.** Paged.js clones every
+  `position: running(...)` element into a
+  margin box of every page and every `position: fixed` element into every page box, and each clone
+  keeps the source id. Both in-page collectors read the whole `.pagedjs_page`, so every clone was
+  one more fragment of its source block. Measured on 2026-09-24 with Paged.js 0.4.3 before this
+  change: a six-page document with a one-line running title and an eight-line side running
+  element carried seven records per element and reported ten `layout/widow`/`layout/orphan`
+  warnings, all about clones (exit 1 under `--fail-on warn`); under a running header, the blank
+  page a `break-before: recto` inserts was not blank, its two boundaries were classified
+  `overflow` and `forced` instead of `parity`, `layout/orphaned-continuation-page` fired on it, and
+  every page was anchored to the header. The snapshot and the collector now keep only blocks
+  inside a page's content area (`.pagedjs_pagebox > .pagedjs_area`, which holds the page content
+  and the footnote area — footnotes stay in the flow). A page is anchored to its first rendered
+  block (a box, or line boxes), so the running element's in-flow original, which Paged.js hides with
+  `display: none`, no longer anchors page 1 either. A page with no content area stops the run at
+  exit 3 instead of being measured as empty. After the change both documents above have no
+  findings. **What this leaves unmeasured is new and is stated in `docs/limitations.md`**:
+  nothing printed in a margin box is judged by any block, line or page rule, and a
+  `position: fixed` element is not measured at all. Inline SVG in a margin box is not covered by
+  this change. Pure exclusion: no field is added or removed, and the Snapshot stamp stays 4 — but
+  `blocks`, `fragmentIndex`/`fragmentCount`, `blank`, the break causes and `firstSemanticBlockKey`
+  mean something different for every document with running elements. The exit codes quoted here
+  were measured with evidence binding off; the evidence side is the next entry.
+- **With evidence binding on — the default — a running element, a `position: fixed` element or a
+  fragment bleeding into the side margin no longer ends the run at exit 4 by itself.** The
+  evidence overlay was a third whole-page reader: it tried to mark every source element on the
+  page, including the clones, which lie outside the content box its marks hang in. Each clone was
+  recorded unplaced, and a page with an unplaced element that has no placed mark never binds, so
+  required evidence never completed. Measured on 2026-09-24 before this change (Paged.js 0.4.3,
+  evidence on): `margin-running-elements.html`, `margin-running-parity.html` and
+  `fullbleed-avoid.html` ended exit 4 with 24, 6 and 212 unplaced marks; after it, 0, 0 and 0. The
+  overlay now skips everything outside the content area, as the snapshot does, and places a mark
+  for an in-flow fragment in the side margin where it is printed, inside the page box; the
+  vertical bound stays the content box, as a conservative choice (on Chromium 141 a mark above or
+  below the content box was measured printing at its DOM position). Whether the PDF returns the new margin marks at
+  their DOM position is established by the live suite on current Chrome only: the Chromium 141
+  build used for this change writes no mark into its PDF at all. Still unbindable, so still exit 4
+  with evidence on, and now stated in `docs/limitations.md`: a fragment pulled above or below the
+  content box, a footnote-area block, and — unchanged, for every document — a page with no source
+  block at all, such as the blank page a `break-before: recto` inserts.
+- **A running title that is not the first element of the source no longer stops the run at exit 3.**
+  The post-pagination source-id check compared the order of every source id in the document with
+  the source order, and the margin boxes come before the content area in each page box, so the
+  page-1 clone of a running title preceded a heading written before it, or the section that
+  contains it: `checker-crashed`, measured on `margin-running-after-heading.html` and
+  `margin-running-in-section.html`. The order is now checked over the page content only; margin-box
+  clones, footnote-area blocks and `position: fixed` clones are checked for identity, presence and
+  the signature Paged.js leaves: a note carries `data-note="footnote"`, and a fixed clone is at the
+  head of every page box with no in-flow original. An attribute change of a reserved id, an unknown
+  id anywhere, a missing id, a reordered flow, an id found only in margin boxes, and an element a
+  script moved into the page box or the footnote area without that signature still fail the run
+  (exit 3). Block
+  footnotes now pass this check too, but still end the run at the paired control
+  (`injection-interference`, exit 3), because Paged.js gives each footnote call a per-run random
+  `href`; that is unchanged and recorded in `docs/limitations.md`.
+- **Page-finding fingerprints change for every document with running elements** (or
+  `position: fixed` elements, or a page whose first block is `display: none`). A page finding's
+  fingerprint is keyed to the page's first semantic block. The margin boxes and page-box clones
+  precede the content area in the page box, so for such a document that was, on EVERY page, that
+  page's clone of the same running element — one source block, one key: three
+  `layout/half-empty-page` findings on three pages carried one fingerprint, a collision the tool
+  manufactured. They are now keyed to each page's first visible in-flow block, and findings about
+  clones are gone. A baseline that keys
+  on `Finding.fingerprint` (or on SARIF `properties.fingerprint`) will show the old page findings as
+  gone and the re-keyed ones as new although the document did not change: take a new baseline
+  after upgrading. `compareReports` does not match by fingerprint and is not misled: page-only
+  findings are unmatchable there, and it never calls a finding `persisting` or `resolved` across
+  two tool versions.
+- **Page-finding fingerprints also change for every document whose content sits in a block that
+  spans pages** — a `<main>`, `<article>` or `<section>` wrapper, a long `<div>`, a full-bleed
+  block. As an ancestor it came first in document order on every page it covered, so it anchored
+  all of them, and their page findings shared one fingerprint: four `layout/half-empty-page`
+  findings on four pages of one `<article>` carried one fingerprint, measured on 2026-09-24; after
+  this change the four are distinct. A page is
+  now anchored to the first block that STARTS on it; only a page on which nothing starts falls back
+  to its first continuing block. Page 1 of a wrapped document is still anchored to the wrapper;
+  every later page moves to its first paragraph. The same baseline advice applies.
 
 ### Documentation
 
+- `docs/limitations.md` now states that a document with a page that carries no source block — the
+  blank page a `break-before: recto` inserts — cannot complete required evidence: a page binds only
+  on marks it carries, so such a run ends `insufficient-coverage` (exit 4) under evidence binding.
+  That was already the behaviour; it was not written down.
 - **`--out-dir <dir>` is documented and tested.** It was parsed, validated and applied — every
   live run writes its page PNGs and checked PDF there, by default into `./breaklint-report` in the
   working directory — and appeared in neither `--help`, the README nor `docs/configuration.md`, and
@@ -129,7 +309,6 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   than 12 characters, and candidates containing a character outside `A-Z a-z 0-9 + / _ = . : % -`
   — are pinned on both sides of each boundary by `tests/e2e/community-intake-limits.test.ts`, so a
   detector change cannot make `docs/community-testing.md` wrong unnoticed.
-
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as
   `true` does. This was always the behaviour; it is now written down in `docs/limitations.md` and
   pinned by a contract test.
@@ -217,6 +396,11 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   as the agent contract.
 - `docs/rules/layout-orphan.md` names the measured `orphans` 1 case without an `orphans: 1`
   declaration, which the guard now reads as a lowering proposal.
+- `docs/rules/layout-orphaned-continuation-page.md`: the remedied example changed the font size,
+  which is not a lever the rule's advice names; it now tightens the vertical margin above the
+  paragraph. The page also states when a page counts as ending, what was measured, and the
+  remaining limits, and `docs/limitations.md` says what page fill counts and what a line-box fill
+  would change.
 
 ### Reporting
 

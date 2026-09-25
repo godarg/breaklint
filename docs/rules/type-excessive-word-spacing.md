@@ -19,6 +19,12 @@ The threshold is chosen. Word boxes are held for every line of every justified b
 
 Blocks with an explicit `word-spacing` are out: the width is a stated intention. Table cells are out: a justified cell has no room to do better.
 
+A justified block that was not rendered — no layout box and no line boxes — has no gaps: the
+in-flow original of a running element, hidden with `display: none`, is recorded as `excluded`
+(`rule/target-not-rendered`), outside the coverage base. A `display: contents` block has no box but
+prints its lines, and it is measured from them like any other block. Text inside a margin box is not
+measured. See `docs/limitations.md`.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with
