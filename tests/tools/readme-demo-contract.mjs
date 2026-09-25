@@ -146,13 +146,15 @@ function isMain() {
 }
 
 if (isMain()) {
+  // Exactly these forms; anything else is exit 2, never a quieter run.
   const [mode, dir] = process.argv.slice(2);
-  if (mode === "--consumer" && dir && process.argv.length === 4) {
+  const directory = Boolean(dir) && !dir.startsWith("--") && process.argv.length === 4;
+  if (mode === "--consumer" && directory) {
     // A clean consumer: the README npm installed, and the `bin` symlink npm linked, run from the
     // consumer directory exactly as `npx breaklint --demo` resolves it.
     const consumer = resolve(dir);
     verify(join(consumer, "node_modules/breaklint/README.md"), join(consumer, "node_modules/.bin/breaklint"), consumer, "installed package");
-  } else if (mode === "--package" && dir && process.argv.length === 4) {
+  } else if (mode === "--package" && directory) {
     // An unpacked or staged package directory: its README and its own built bin entry.
     const root = resolve(dir);
     const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));

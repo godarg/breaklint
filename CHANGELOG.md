@@ -199,7 +199,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   code installed with them. In the release workflow it runs with `--release`, which refuses any
   pending entry: a tag must not ship a sentence the check knows is stale, so a non-empty pending
   list stops the release before anything is published and names the sentences to correct. A run
-  that finds no document to read fails instead of passing.
+  that finds no document to read fails instead of passing. The four tools this change adds to the workflows —
+  `docs-truth.mjs`, `changelog-contract.mjs`, `release-workflow-contract.mjs` and
+  `readme-demo-contract.mjs` — refuse any argument they do not know with exit 2, so a misspelt
+  `--release=no` or `--Release` cannot quietly run pull-request mode at a tag.
 - **`npm run docs:rules:check` is a CI step.** `AGENTS.md` says generated artifacts are checked
   with their generator; the rule-page remediation blocks written by `tools/write-rule-docs.ts`
   were checked in CI only by a unit test that re-derives the same assertion, and the generator's

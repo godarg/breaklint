@@ -321,16 +321,52 @@ function readPending(file) {
   return file ? readFileSync(file, "utf8").split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line)) : [];
 }
 
+const USAGE = "usage: docs-truth.mjs --package <package-dir> [--docs-root <dir>] [--extra <file> ...] [--pending <jsonl>] [--release]\n";
+
+/**
+ * Arguments are parsed strictly: `--release=no`, `--release-dry` or `--Release` are not a quieter
+ * release run, they are a mistake, and a mistake that silently ran pull-request mode at a tag would
+ * ship the stale sentences --release exists to stop. Anything unknown is exit 2.
+ */
+function parseArgs(args) {
+  const options = { extra: [], release: false };
+  const single = { "--package": "package", "--docs-root": "docsRoot", "--pending": "pending" };
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === "--release") {
+      if (options.release) return { error: "--release given twice" };
+      options.release = true;
+    } else if (arg === "--extra") {
+      if (args[i + 1] === undefined || args[i + 1].startsWith("--")) return { error: "--extra needs a file" };
+      options.extra.push(args[(i += 1)]);
+    } else if (arg in single) {
+      const key = single[arg];
+      if (options[key] !== undefined) return { error: `${arg} given twice` };
+      if (args[i + 1] === undefined || args[i + 1].startsWith("--")) return { error: `${arg} needs a value` };
+      options[key] = args[(i += 1)];
+    } else {
+      return { error: `unknown argument ${JSON.stringify(arg)}` };
+    }
+  }
+  if (!options.package) return { error: "--package is required" };
+  return { options };
+}
+
 function main(args) {
-  const valueOf = (flag) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
-  const packageDir = valueOf("--package");
-  if (!packageDir || !statSync(packageDir, { throwIfNoEntry: false })?.isDirectory()) {
-    process.stderr.write("usage: docs-truth.mjs --package <package-dir> [--docs-root <dir>] [--extra <file> ...] [--pending <jsonl>] [--release]\n");
+  const parsed = parseArgs(args);
+  if (parsed.error) {
+    process.stderr.write(`docs-truth.mjs: ${parsed.error}\n${USAGE}`);
     return 2;
   }
-  const pendingFile = valueOf("--pending");
+  const { options } = parsed;
+  const packageDir = options.package;
+  if (!statSync(packageDir, { throwIfNoEntry: false })?.isDirectory()) {
+    process.stderr.write(`docs-truth.mjs: --package ${packageDir} is not a directory\n${USAGE}`);
+    return 2;
+  }
+  const pendingFile = options.pending;
   const pending = readPending(pendingFile);
-  const release = args.includes("--release");
+  const release = options.release;
   if (release && pending.length > 0) {
     process.stderr.write(
       `docs truth: FAILED — a release must not ship documents this check knows are stale, and ${pendingFile} lists ${pending.length}:\n` +
@@ -339,8 +375,7 @@ function main(args) {
     );
     return 1;
   }
-  const extra = args.flatMap((arg, i) => (arg === "--extra" ? [args[i + 1]] : []));
-  const result = checkDocsTruth({ packageDir, docsRoot: valueOf("--docs-root") ?? packageDir, extra, pending: release ? [] : pending });
+  const result = checkDocsTruth({ packageDir, docsRoot: options.docsRoot ?? packageDir, extra: options.extra, pending: release ? [] : pending });
   const { stamps } = result;
   const summary = `report ${stamps.report} (reads ${stamps.readable.join(", ")}), snapshot ${stamps.snapshot}, context pack ${stamps.context}, comparison ${stamps.comparison}, configuration contract ${stamps.config}`;
   if (!result.valid) {

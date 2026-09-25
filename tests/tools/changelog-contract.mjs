@@ -361,13 +361,13 @@ function isMain() {
 }
 
 if (isMain()) {
+  // Exactly these forms; anything else is exit 2, never a quieter run.
   const args = process.argv.slice(2);
-  const rootIndex = args.indexOf("--root");
-  const root = resolve(rootIndex >= 0 && args[rootIndex + 1] ? args[rootIndex + 1] : process.cwd());
-  if (args[0] === "--check") runCheck(root);
-  else if (args[0] === "--self-test" && args.length === 1) runSelfTest();
+  if (args.length === 1 && args[0] === "--check") runCheck(process.cwd());
+  else if (args.length === 3 && args[0] === "--check" && args[1] === "--root" && args[2] && !args[2].startsWith("--")) runCheck(resolve(args[2]));
+  else if (args.length === 1 && args[0] === "--self-test") runSelfTest();
   else {
-    process.stderr.write("usage: changelog-contract.mjs --check [--root <dir>] | --self-test\n");
+    process.stderr.write(`changelog-contract.mjs: unknown arguments ${JSON.stringify(args)}\nusage: changelog-contract.mjs --check [--root <dir>] | --self-test\n`);
     process.exitCode = 2;
   }
 }
