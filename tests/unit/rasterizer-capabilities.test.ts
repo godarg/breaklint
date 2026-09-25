@@ -40,9 +40,18 @@ import {
   PDFJS_REQUIRED_CAPABILITIES,
   rasterizerCapabilityVerdict,
 } from "../../src/render/rasterizer.ts";
-import { platformInventory, REALM_OF, requiredFor, type PdfjsFile } from "../tools/pdfjs-platform-inventory.ts";
+import { platformGlobals, platformInventory, REALM_OF, requiredFor, type PdfjsFile } from "../tools/pdfjs-platform-inventory.ts";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
+const TYPESCRIPT_LIB = join(resolvePackageRoot("typescript", REPO) ?? join(REPO, "node_modules/typescript/"), "lib");
+/**
+ * How long the vm hand-off may take before the test fails instead of waiting forever. Measured:
+ * the whole page-to-worker exchange in these realms completes in 10-60 ms (under load too). The
+ * bound is not a start-up budget - no process starts here - it only has to beat "never": a
+ * worker half that is never started otherwise hangs the file indefinitely (a verifier's mutant ran
+ * 620 s). 10 s is two orders of magnitude above anything measured.
+ */
+const HAND_OFF_LIMIT_MS = 10_000;
 const PROBE = fileURLToPath(new URL("../tools/leak-probe.ts", import.meta.url));
 const OPTIONS = {
   outDir: ".tmp/rasterizer-capabilities-test",
@@ -145,7 +154,20 @@ async function runProbe(
     if (options.workerFails) setImmediate(resolve);
   });
   runInContext(capabilityProbeSource(), pageRealm);
-  await delivered;
+  let limit: NodeJS.Timeout | undefined;
+  try {
+    await Promise.race([
+      delivered,
+      new Promise<never>((_, reject) => {
+        limit = setTimeout(
+          () => reject(new Error(`the probe's worker half never answered within ${HAND_OFF_LIMIT_MS} ms`)),
+          HAND_OFF_LIMIT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(limit);
+  }
   published = pageGlobal.__blCapabilities;
   // Parsed into this realm, so the comparison is not tripped by the other realm's Array.
   return JSON.parse(JSON.stringify(published));
@@ -218,11 +240,16 @@ describe("the rasteriser's capability floor", () => {
 
   it("a browser below the floor ends the run with exit 3 before any document is opened", async () => {
     const opened = { pages: 0, contexts: 0, closed: 0, waitedForLibrary: 0 };
+    // The capability answer appears only once the page has been waited for, as the worker half of
+    // the real probe answers after load: a start-up that read it without waiting would read
+    // nothing and refuse for the wrong reason.
+    let answered = false;
     const rasteriserPage = {
       async goto() {},
       async setContent() {},
       async waitForFunction(expression: string) {
         if (expression.includes("__blReady")) opened.waitedForLibrary += 1;
+        if (expression.includes("__blCapabilities")) answered = true;
       },
       async emulateMediaType() {},
       async setViewport() {},
@@ -231,7 +258,7 @@ describe("the rasteriser's capability floor", () => {
       },
       on() {},
       async evaluate(expression: unknown) {
-        if (expression === "window.__blCapabilities") return CHROMIUM_141_MISSING;
+        if (expression === "window.__blCapabilities") return answered ? CHROMIUM_141_MISSING : undefined;
         if (expression === "window.__blVersion") return SUPPORTED_PDFJS_VERSION;
         throw new Error(`the rasteriser page was asked for more than its capabilities: ${String(expression).slice(0, 80)}`);
       },
@@ -282,8 +309,10 @@ describe("the rasteriser's capability floor", () => {
     assert.equal(declared, SUPPORTED_PDFJS_VERSION, "the scan and its classification belong to the pinned build");
     for (const file of ["pdf.mjs", "pdf.worker.mjs"] as PdfjsFile[]) {
       const source = readFileSync(join(root, "build", file), "utf8");
-      assert.ok(platformInventory(source).length > 100, `the scan of ${file} found almost nothing; it is broken`);
-      const { required, staleRules } = requiredFor(file, source);
+      const globals = platformGlobals(REALM_OF[file], TYPESCRIPT_LIB);
+      assert.ok(globals.size > 250, `only ${globals.size} platform globals were read for the ${REALM_OF[file]}; the lib scan is broken`);
+      assert.ok(platformInventory(source, globals).length > 100, `the scan of ${file} found almost nothing; it is broken`);
+      const { required, staleRules } = requiredFor(file, source, globals);
       assert.deepEqual(staleRules, [], `${file}: exemptions that no longer match the build — review them`);
       const checked = [...PDFJS_REQUIRED_CAPABILITIES[REALM_OF[file]]].sort();
       const unchecked = required.filter((name) => !checked.includes(name));
@@ -302,12 +331,21 @@ describe("the rasteriser's capability floor", () => {
     // one line using a web API nobody listed. It must come back as required and unchecked.
     const root = resolvePackageRoot("pdfjs-dist", REPO)!;
     const source = readFileSync(join(root, "build", "pdf.mjs"), "utf8");
-    const extended = `${source}\nconst entry = await FileSystemObserver.observe(scheduler.yield(), reportError(x));\n`;
-    const { required } = requiredFor("pdf.mjs", extended);
-    for (const name of ["FileSystemObserver.observe()", "scheduler.yield()", "reportError()"]) {
+    // `reportError` is never bound in the build: the unbound-call rule must find it. The file also
+    // gains a local function named `queueMicrotask`, the shape that hid the global fetch() once:
+    // only the realm's declared globals can still find the global call next to it.
+    const extended =
+      `${source}\nfunction queueMicrotask(task) { return task; }\n` +
+      "const entry = await FileSystemObserver.observe(scheduler.yield(), reportError(x), queueMicrotask(f));\n";
+    const { required } = requiredFor("pdf.mjs", extended, platformGlobals("page", TYPESCRIPT_LIB));
+    for (const name of ["FileSystemObserver.observe()", "scheduler.yield()", "reportError()", "queueMicrotask()"]) {
       assert.ok(required.includes(name), `${name} was not found by the scan`);
       assert.ok(!PDFJS_REQUIRED_CAPABILITIES.page.includes(name), `${name} would already be checked`);
     }
+    assert.ok(
+      !requiredFor("pdf.mjs", extended, new Map()).required.includes("queueMicrotask()"),
+      "the control is void: without the declared globals the shadowed call should have been hidden",
+    );
   });
 
   it("the documentation states the checked lists exactly", () => {

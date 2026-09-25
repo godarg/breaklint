@@ -226,21 +226,31 @@ resolved version stops the run with exit 3, and no flag overrides it.
 **The browser has a floor, and it is stated as capabilities, not as a version.** The pinned
 rasteriser, `pdfjs-dist` 6.2.108, uses recent JavaScript built-ins and web APIs without testing for
 them. A live run with `pdfjs-dist` installed therefore needs a browser that provides every name on
-the checked lists, `PDFJS_REQUIRED_CAPABILITIES` in `src/render/rasterizer.ts`: 159 names in the
-page and 127 in its worker. They are what a scan of the pinned build finds
-(`tests/tools/pdfjs-platform-inventory.ts`): every JavaScript and web-platform name that
-`build/pdf.mjs` (the page) or `build/pdf.worker.mjs` (the worker) reaches from the global scope
-without a feature test — `URL.parse`, `AbortSignal.any`, `Promise.try`, `structuredClone`,
-`document.createElement` and the like — plus the instance members of ECMAScript 2022 and later and
-the web members of the same period that either file calls, such as
-`Map.prototype.getOrInsertComputed`, `Blob.prototype.bytes`, `Response.prototype.bytes` and the
-async iteration of a `ReadableStream` (`ReadableStream.prototype[Symbol.asyncIterator]`). Uses
-that pdfjs itself feature-tests, and scan matches that are not platform names at all, are exempt,
-each with its reason in the scanner; older instance members (`replaceAll`, `flatMap` and the like)
-are not checked. The rasteriser page checks the page list in the page and the worker list in a
-module worker of its own, before it loads the library, and a browser that lacks anything ends the
-run with exit 3 before any document is opened; the message names what is missing and where, the
-browser version and `BREAKLINT_CHROME`.
+the checked lists, `PDFJS_REQUIRED_CAPABILITIES` in `src/render/rasterizer.ts`: 167 names in the
+page and 136 in its worker. They are what a scan of the pinned build finds
+(`tests/tools/pdfjs-platform-inventory.ts`) in `build/pdf.mjs` (the page) and
+`build/pdf.worker.mjs` (the worker), and they are exactly as complete as that scan. It reads six
+syntactic shapes: `Name.member` of a name the file does not declare, `new`/`instanceof`/`extends`
+of such a name, members of the lower-case global objects (`document`, `window`, `console`,
+`crypto` …), bare calls of the names the realm's platform declares according to TypeScript's own
+DOM, WebWorker and ECMAScript library files (so `fetch()` counts even though pdfjs also has methods
+called `fetch`), bare calls of names the file never binds, and — by pattern — the instance members
+of ECMAScript 2022 and later, the iterator helpers (`.values().some(…)`, `.toArray()`) and the web
+members of the same period, such as `Map.prototype.getOrInsertComputed`, `Blob.prototype.bytes`,
+`Response.prototype.bytes` and the async iteration of a `ReadableStream`
+(`ReadableStream.prototype[Symbol.asyncIterator]`). Uses that pdfjs itself feature-tests, and scan
+matches that are not platform names at all, are exempt, each with its reason in the scanner. What
+the scan does not see: an older instance member (`replaceAll`, `flatMap` and the like), an instance
+member of a type the text does not show and that is not on the pattern list, and a bare global
+that TypeScript does not declare and that the file also binds locally. The lists are deliberately
+conservative in one respect: they cover every unguarded use in the build, not only the paths a
+rasterisation reaches. `Blob.prototype.bytes` in the worker is the case where that matters — pdfjs
+calls it only when it saves or prints annotations that carry editor images, which this rasteriser
+never does, and the measured browser below lacks it — and it stays on the list because nothing
+here could keep a reachability argument true across pdfjs upgrades. The rasteriser page checks the
+page list in the page and the worker list in a module worker of its own, before it loads the
+library, and a browser that lacks anything ends the run with exit 3 before any document is opened;
+the message names what is missing and where, the browser version and `BREAKLINT_CHROME`.
 
 Measured on Chromium 141.0.7390.37 through the real start-up path: the page lacks
 `Map.prototype.getOrInsertComputed`, `WeakMap.prototype.getOrInsertComputed` and `Math.sumPrecise`;
@@ -251,9 +261,8 @@ with `--no-evidence-binding` too, because the evidence rasterisation is part of 
 is no polyfill and no transpiled pdfjs build to get below the floor: `Math.sumPrecise` has
 exact-summation semantics, and either would put an unvalidated component inside the evidence
 apparatus. A unit test repeats the scan and fails when the lists and the build disagree, so a pdfjs
-upgrade that moves the floor, or a new platform name in it, fails the suite rather than moving the
-floor silently. What the scan cannot see is stated in the scanner: an instance member of a type
-the text does not show, other than those on the pattern list. No minimum version number is stated,
+upgrade that adds a platform name in one of the scanned shapes fails the suite rather than moving
+the floor silently. No minimum version number is stated,
 because none has been measured; the live suite passes on the current Chrome of the CI runner.
 Without `pdfjs-dist` the check does not run and the run reports without evidence, as the README
 describes; `--demo` needs no browser at all.

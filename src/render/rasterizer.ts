@@ -144,13 +144,26 @@ export type OpenRasterizerResult = { rasterizer: Rasterizer; detail: "" } | Rast
  * WHAT THE LISTS ARE. Not a memory of which built-ins are recent: the first version of this list
  * was exactly that, and it missed every web API the build calls (`URL.parse`,
  * `Response.prototype.bytes`, `AbortSignal.any`, async iteration of a `ReadableStream`). They are
- * the scan of the pinned build (`tests/tools/pdfjs-platform-inventory.ts`): every JavaScript and
- * web-platform name either file reaches from the global scope, minus the uses that pdfjs itself
- * feature-tests and the matches that are not platform names at all (each with its reason), plus
- * the instance members of ECMAScript 2022 and later and the web members of the same period, found
- * by pattern. `tests/unit/rasterizer-capabilities.test.ts` fails if these lists and the scan
- * disagree, so a pdfjs upgrade cannot move the floor silently and a new platform name cannot go
- * unclassified. Older instance members (`replaceAll`, `flatMap` ...) are not checked.
+ * the scan of the pinned build (`tests/tools/pdfjs-platform-inventory.ts`), and they are exactly
+ * as good as that scan, which reads six syntactic shapes and nothing else: `Name.member`,
+ * `new|instanceof|extends Name`, members of the lower-case global objects, bare calls of names the
+ * realm's platform declares (as TypeScript's own DOM, WebWorker and ECMAScript library files name
+ * them), bare calls of names the file never binds, and - by pattern - the instance members of
+ * ECMAScript 2022 and later, the iterator helpers and the web members of the same period. Uses
+ * that pdfjs itself feature-tests, and matches that are not platform names at all, are exempt,
+ * each with its reason. `tests/unit/rasterizer-capabilities.test.ts` fails if these lists and the
+ * scan disagree, so a pdfjs upgrade cannot move the floor silently. What the scan cannot see: an
+ * instance member of a type the text does not show, other than those on the pattern list (older
+ * ones such as `replaceAll` or `flatMap` are not checked), and a bare global that TypeScript does
+ * not declare yet and that the file also binds locally.
+ *
+ * The lists are conservative in one deliberate way: they cover every unguarded use in the build,
+ * not only the code paths a rasterisation reaches. `Blob.prototype.bytes` is the one name where
+ * this matters on a measured browser: pdf.worker.mjs calls it only in
+ * `AnnotationFactory.generateImages`, when it saves or prints annotations that carry editor images,
+ * which this rasteriser never does, and Chromium 141 lacks it. It stays on the list, because a
+ * reachability argument would have to be re-made by hand for every pdfjs upgrade and nothing here
+ * could check it.
  *
  * Name forms: `new X` must be a constructor, `a.b()` must be a function, `a.b` must exist; a
  * `[Symbol.x]` segment is a well-known symbol. No polyfill is offered for anything missing:
@@ -163,11 +176,12 @@ export const PDFJS_REQUIRED_CAPABILITIES: { readonly page: readonly string[]; re
     "Array.prototype.filter", "Array.prototype.findIndex", "Array.prototype.findLast()",
     "Array.prototype.map", "ArrayBuffer.isView()", "Date.UTC()", "Date.now()",
     "Int16Array.BYTES_PER_ELEMENT", "Int32Array.BYTES_PER_ELEMENT", "Int8Array.BYTES_PER_ELEMENT",
-    "Iterator.prototype", "JSON.parse()", "JSON.stringify()",
-    "Map.prototype.getOrInsertComputed()", "Math.PI", "Math.abs()", "Math.atan()", "Math.atan2()",
-    "Math.ceil()", "Math.cos()", "Math.exp()", "Math.floor()", "Math.fround()", "Math.hypot()",
-    "Math.log2()", "Math.max", "Math.max()", "Math.min", "Math.min()", "Math.round()",
-    "Math.sign()", "Math.sin()", "Math.sqrt()", "Math.sumPrecise()",
+    "Iterator.prototype", "Iterator.prototype.filter()", "Iterator.prototype.find()",
+    "Iterator.prototype.some()", "Iterator.prototype.toArray()", "JSON.parse()",
+    "JSON.stringify()", "Map.prototype.getOrInsertComputed()", "Math.PI", "Math.abs()",
+    "Math.atan()", "Math.atan2()", "Math.ceil()", "Math.cos()", "Math.exp()", "Math.floor()",
+    "Math.fround()", "Math.hypot()", "Math.log2()", "Math.max", "Math.max()", "Math.min",
+    "Math.min()", "Math.round()", "Math.sign()", "Math.sin()", "Math.sqrt()", "Math.sumPrecise()",
     "Node.DOCUMENT_POSITION_FOLLOWING", "Node.DOCUMENT_POSITION_PRECEDING", "Node.ELEMENT_NODE",
     "Node.TEXT_NODE", "Number.isInteger()", "Object.assign()", "Object.create()",
     "Object.defineProperty()", "Object.entries()", "Object.freeze()", "Object.getPrototypeOf()",
@@ -178,32 +192,33 @@ export const PDFJS_REQUIRED_CAPABILITIES: { readonly page: readonly string[]; re
     "URL.createObjectURL()", "URL.parse()", "URL.revokeObjectURL()",
     "Uint32Array.BYTES_PER_ELEMENT", "Uint8Array.fromBase64()", "Uint8Array.prototype.at()",
     "Uint8Array.prototype.toBase64()", "WeakMap.prototype.getOrInsertComputed()",
-    "XMLHttpRequest.DONE", "atob()", "btoa()", "clearTimeout()", "createImageBitmap()",
-    "crypto.getRandomValues()", "decodeURIComponent()", "document.activeElement",
-    "document.addEventListener()", "document.baseURI", "document.body",
+    "XMLHttpRequest.DONE", "atob()", "btoa()", "clearTimeout()", "console.info()", "console.log()",
+    "console.warn()", "createImageBitmap()", "crypto.getRandomValues()", "decodeURIComponent()",
+    "document.activeElement", "document.addEventListener()", "document.baseURI", "document.body",
     "document.createDocumentFragment()", "document.createElement()", "document.createElementNS()",
     "document.createRange()", "document.createTextNode()", "document.documentElement",
     "document.elementsFromPoint()", "document.getElementsByName()", "document.getSelection()",
-    "document.querySelector()", "encodeURIComponent()", "escape()", "getComputedStyle()",
-    "globalThis.document", "isNaN()", "new AbortController", "new AbortSignal", "new Array",
-    "new ArrayBuffer", "new Blob", "new CompressionStream", "new DOMMatrix", "new DataView",
-    "new Date", "new DecompressionStream", "new Error", "new Event", "new File", "new FileReader",
-    "new Float32Array", "new Float64Array", "new FontFace", "new HTMLAnchorElement",
-    "new HTMLButtonElement", "new HTMLCanvasElement", "new HTMLInputElement", "new Headers",
-    "new Image", "new Int16Array", "new Int32Array", "new Int8Array", "new Map",
-    "new MutationObserver", "new OffscreenCanvas", "new Path2D", "new Promise", "new Range",
-    "new ReadableStream", "new RegExp", "new Response", "new Set", "new TextDecoder", "new URL",
-    "new Uint32Array", "new Uint8Array", "new Uint8ClampedArray", "new WeakMap", "new WeakRef",
-    "new WeakSet", "new Worker", "new XMLHttpRequest", "parseFloat()", "parseInt()",
-    "setTimeout()", "structuredClone()", "unescape()", "window.addEventListener()",
-    "window.cancelAnimationFrame()", "window.getComputedStyle()", "window.getSelection()",
-    "window.innerHeight", "window.innerWidth", "window.location", "window.matchMedia()",
-    "window.requestAnimationFrame()", "window.screen",
+    "document.querySelector()", "encodeURIComponent()", "escape()", "fetch()",
+    "getComputedStyle()", "globalThis.document", "isNaN()", "new AbortController",
+    "new AbortSignal", "new Array", "new ArrayBuffer", "new Blob", "new CompressionStream",
+    "new DOMMatrix", "new DataView", "new Date", "new DecompressionStream", "new Error",
+    "new Event", "new File", "new FileReader", "new Float32Array", "new Float64Array",
+    "new FontFace", "new HTMLAnchorElement", "new HTMLButtonElement", "new HTMLCanvasElement",
+    "new HTMLInputElement", "new Headers", "new Image", "new Int16Array", "new Int32Array",
+    "new Int8Array", "new Map", "new MutationObserver", "new OffscreenCanvas", "new Path2D",
+    "new Promise", "new Range", "new ReadableStream", "new RegExp", "new Response", "new Set",
+    "new TextDecoder", "new URL", "new Uint32Array", "new Uint8Array", "new Uint8ClampedArray",
+    "new WeakMap", "new WeakRef", "new WeakSet", "new Worker", "new XMLHttpRequest",
+    "parseFloat()", "parseInt()", "setTimeout()", "structuredClone()", "unescape()",
+    "window.addEventListener()", "window.cancelAnimationFrame()", "window.getComputedStyle()",
+    "window.getSelection()", "window.innerHeight", "window.innerWidth", "window.location",
+    "window.matchMedia()", "window.requestAnimationFrame()", "window.screen",
   ],
   worker: [
     "Array.from()", "Array.isArray()", "Array.prototype.at()", "ArrayBuffer.isView()",
     "ArrayBuffer.prototype.transferToFixedLength()", "Blob.prototype.bytes()", "Date.now()",
     "Float32Array.from()", "Int16Array.from()", "Int32Array.from()", "Iterator.prototype",
+    "Iterator.prototype.filter()", "Iterator.prototype.some()", "Iterator.prototype.toArray()",
     "JSON.stringify()", "Map.prototype.getOrInsert()", "Map.prototype.getOrInsertComputed()",
     "Math.PI", "Math.abs", "Math.abs()", "Math.atan2()", "Math.ceil()", "Math.cos()",
     "Math.floor()", "Math.hypot()", "Math.log()", "Math.log10()", "Math.log2()", "Math.max()",
@@ -221,18 +236,18 @@ export const PDFJS_REQUIRED_CAPABILITIES: { readonly page: readonly string[]; re
     "Uint8Array.fromBase64()", "Uint8Array.prototype.at()", "Uint8Array.prototype.toHex()",
     "WeakMap.prototype.getOrInsertComputed()", "WebAssembly.Instance", "WebAssembly.Instance()",
     "WebAssembly.Module", "WebAssembly.Module()", "WebAssembly.RuntimeError()",
-    "WebAssembly.instantiate", "WebAssembly.instantiate()", "clearTimeout()",
-    "createImageBitmap()", "crypto.getRandomValues()", "decodeURIComponent()",
-    "encodeURIComponent()", "escape()", "isFinite()", "isNaN()", "new AbortController",
-    "new Array", "new ArrayBuffer", "new BigInt64Array", "new BigUint64Array", "new Blob",
-    "new CompressionStream", "new DOMMatrix", "new DataView", "new Date",
-    "new DecompressionStream", "new Error", "new FinalizationRegistry", "new Float32Array",
-    "new Float64Array", "new ImageData", "new Int16Array", "new Int32Array", "new Int8Array",
-    "new Map", "new OffscreenCanvas", "new Promise", "new ReadableStream", "new RegExp",
-    "new Response", "new Set", "new TextDecoder", "new TextEncoder", "new URL", "new Uint16Array",
-    "new Uint32Array", "new Uint8Array", "new Uint8ClampedArray", "new WeakMap",
-    "new XMLHttpRequest", "parseFloat()", "parseInt()", "performance.now()", "setTimeout()",
-    "unescape()",
+    "WebAssembly.instantiate", "WebAssembly.instantiate()", "clearTimeout()", "console.error",
+    "console.info()", "console.log", "console.warn", "console.warn()", "createImageBitmap()",
+    "crypto.getRandomValues()", "decodeURIComponent()", "encodeURIComponent()", "escape()",
+    "fetch()", "isFinite()", "isNaN()", "new AbortController", "new Array", "new ArrayBuffer",
+    "new BigInt64Array", "new BigUint64Array", "new Blob", "new CompressionStream",
+    "new DOMMatrix", "new DataView", "new Date", "new DecompressionStream", "new Error",
+    "new FinalizationRegistry", "new Float32Array", "new Float64Array", "new ImageData",
+    "new Int16Array", "new Int32Array", "new Int8Array", "new Map", "new OffscreenCanvas",
+    "new Promise", "new ReadableStream", "new RegExp", "new Response", "new Set",
+    "new TextDecoder", "new TextEncoder", "new URL", "new Uint16Array", "new Uint32Array",
+    "new Uint8Array", "new Uint8ClampedArray", "new WeakMap", "new XMLHttpRequest", "parseFloat()",
+    "parseInt()", "performance.now()", "setTimeout()", "unescape()",
   ],
 };
 

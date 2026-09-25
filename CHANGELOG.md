@@ -64,19 +64,22 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `pdfjs-dist` 6.2.108 uses recent JavaScript built-ins and web APIs without testing for them. It
   loads without them and failed only when it rasterised — after pagination and measurement — with
   `this[#methodPromises].getOrInsertComputed is not a function` and exit 3, with
-  `--no-evidence-binding` too. Before it loads the library, the rasteriser page now checks every
-  platform name the pinned build uses without a feature test: 159 in the page (for `pdf.mjs`) and
-  127 in a module worker of its own (for `pdf.worker.mjs`). That covers every name either file
-  reaches from the global scope, web APIs included (`URL.parse`, `AbortSignal.any`), and the
-  recent instance members it calls, such as `Map.prototype.getOrInsertComputed`,
-  `Blob.prototype.bytes` and `ReadableStream` async iteration. A browser that lacks any of them ends
-  the run with exit 3 at startup; the message names what is missing and in which realm, the
-  browser version and `BREAKLINT_CHROME`. Measured on Chromium 141.0.7390.37: exit 3 after about
-  3 s. The page lacks `Map`/`WeakMap.prototype.getOrInsertComputed` and `Math.sumPrecise`; the
-  worker lacks those, `Map.prototype.getOrInsert` and `Blob.prototype.bytes`. Every other checked
-  name is present in both. Nothing is polyfilled and the pinned build is unchanged. The lists come
-  from a scan of the pinned build (`tests/tools/pdfjs-platform-inventory.ts`) that a unit test
-  repeats, so a pdfjs upgrade that adds a platform name fails the suite until the name is checked
+  `--no-evidence-binding` too. Before it loads the library, the rasteriser page now checks the
+  platform names a scan of the pinned build finds used without a feature test: 167 in the page
+  (for `pdf.mjs`) and 136 in a module worker of its own (for `pdf.worker.mjs`). That includes web
+  APIs such as `URL.parse`, `AbortSignal.any` and the global `fetch`, and recent instance members
+  such as `Map.prototype.getOrInsertComputed`, `Blob.prototype.bytes`, the iterator helpers and
+  `ReadableStream` async iteration. `docs/limitations.md` lists which syntactic shapes the scan
+  reads and what it cannot see. A browser that lacks any of the names ends the run with exit 3 at
+  startup; the message names what is missing and in which realm, the browser version and
+  `BREAKLINT_CHROME`. Measured on Chromium 141.0.7390.37: exit 3 after about 3 s. The page lacks
+  `Map`/`WeakMap.prototype.getOrInsertComputed` and `Math.sumPrecise`; the worker lacks those,
+  `Map.prototype.getOrInsert` and `Blob.prototype.bytes`. Every other checked name is present in
+  both. The lists are deliberately conservative: they cover unguarded uses on paths a
+  rasterisation never takes too. `Blob.prototype.bytes` in the worker is only used to save or print
+  annotations that carry editor images. Nothing is polyfilled and the pinned build is unchanged.
+  The scan (`tests/tools/pdfjs-platform-inventory.ts`) is repeated by a unit test, so a pdfjs
+  upgrade that adds a platform name in a scanned shape fails the suite until the name is checked
   or classified. The floor is documented as capabilities in the README's Requirements and in
   `docs/limitations.md`. Without `pdfjs-dist` installed the check does not run and the run
   reports without evidence, as before.

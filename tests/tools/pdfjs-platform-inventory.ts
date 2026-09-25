@@ -9,38 +9,81 @@
  * build does is the replacement, because every new name in it has to be classified before the
  * suite passes again.
  *
- * WHAT IS FOUND. Six shapes, each a use that needs the name to exist in the realm the file runs in:
+ * WHAT IS FOUND. These shapes, each a use that needs the name to exist in the realm the file
+ * runs in, and nothing else:
  *
  *   `Name.member(` / `Name.member`         a capitalised global and its static or prototype member
  *   `new Name`, `instanceof Name`,          a capitalised global used as a constructor
  *   `extends Name`
- *   `root.member(` / `root.member`          a member of one of the lower-case global objects below
- *   `name(`                                 a bare call of a name the file never binds
+ *   `root.member(` / `root.member`          a member of a lower-case global object: the fixed
+ *                                           roots below, plus every object the realm's platform
+ *                                           declares that the file does not bind itself
+ *   `name(`                                 a bare call of a function the realm's platform
+ *                                           declares (see `platformGlobals`), even where the file
+ *                                           also binds that name - or of a name it never binds
+ *   instance members, by pattern            `INSTANCE_MEMBER_WATCH` below
  *
  * A capitalised name the file itself declares (`class`, `function`, `const`, `let`, `var`,
- * `import`) is the file's own and is skipped; for bare calls the net of local names is wider
- * (parameters, destructuring, methods), because otherwise every parameter call would be noise.
- * Declarations are matched narrowly on purpose: a net that is too wide hides a real global behind
- * a local of the same name, and a hidden global is the failure this scanner exists to prevent.
- * Noise in the other direction — a name inside a string, shader source, an emscripten local — is
- * cheap: the test classifies it, with a reason, and it can never go unnoticed.
+ * `import`) is the file's own and is skipped; for bare calls of undeclared names the net of local
+ * names is wider (parameters, destructuring, methods), because otherwise every parameter call
+ * would be noise, and a method definition is never a call. Declarations are matched narrowly on
+ * purpose: a net that is too wide hides a real global behind a local of the same name, and a hidden
+ * global is the failure this scanner exists to prevent - it happened to the global `fetch()`,
+ * which pdfjs's own `fetch(…)` methods hid until bare calls were resolved against the realm's
+ * declared globals. Noise in the other direction - a name inside a string, shader source, an
+ * emscripten local - is cheap: the test classifies it, with a reason, and it can never go
+ * unnoticed.
  *
- * WHAT IS NOT FOUND, stated so nobody reads the inventory as more than it is: instance members
- * reached through a value whose type the text does not show (`response.bytes()`, `map.at(1)`,
- * `for await (… of stream)`). Those are the test's watch-list, by pattern.
+ * WHAT IS NOT FOUND, stated so nobody reads the inventory as more than it is: an instance member
+ * reached through a value whose type the text does not show and that is not on the pattern list
+ * (older ones such as `replaceAll` or `flatMap` are deliberately not on it), and a bare global that
+ * TypeScript's library files do not declare and that the file also binds locally.
  */
+
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 const KEYWORDS = new Set(
   ("if for while switch catch return typeof function new await yield super import export delete void in of do else " +
     "case throw try finally with class const let var instanceof async get set static").split(" "),
 );
 const IDENT = /[A-Za-z_$][\w$]*/gu;
-/** Lower-case names that are global objects in a window or a worker. */
+/** Lower-case names that are global objects in a window or a worker, counted even when shadowed. */
 export const LOWER_CASE_GLOBAL_ROOTS = [
-  "globalThis", "self", "window", "document", "navigator", "crypto", "performance", "location", "scheduler",
+  "globalThis", "self", "window", "document", "navigator", "crypto", "performance", "location", "scheduler", "console",
 ] as const;
 
-export function platformInventory(source: string): string[] {
+export type Realm = "page" | "worker";
+
+/**
+ * The global names a realm's platform declares, as TypeScript's own library declarations name
+ * them (`declare var|let|const|function|namespace` in `lib.es*.d.ts` and `lib.esnext*.d.ts`, plus
+ * `lib.dom*.d.ts` for the page or `lib.webworker*.d.ts` for the worker). TypeScript is pinned
+ * exactly in package.json, so this set is reproducible without a browser. It resolves the bare
+ * calls a file-wide local-name filter would hide: pdfjs defines methods called `fetch(…)`, and
+ * the filter, which cannot see scopes, then dropped the global `fetch()` the same files call.
+ */
+export function platformGlobals(realm: Realm, typescriptLib: string): Map<string, "function" | "value"> {
+  const files = readdirSync(typescriptLib).filter((name) =>
+    /^lib\.(?:es\d{4}|es5|es6|esnext|decorators)(?:\.[\w.]+)?\.d\.ts$/u.test(name) ||
+    (realm === "page" ? /^lib\.dom(?:\.[\w]+)?\.d\.ts$/u : /^lib\.webworker(?:\.[\w]+)?\.d\.ts$/u).test(name));
+  const names = new Map<string, "function" | "value">();
+  for (const file of files) {
+    for (const m of readFileSync(join(typescriptLib, file), "utf8").matchAll(/^declare (var|let|const|function|namespace) ([A-Za-z_$][\w$]*)/gmu)) {
+      if (m[1] === "function") names.set(m[2]!, "function");
+      else if (!names.has(m[2]!)) names.set(m[2]!, "value");
+    }
+  }
+  return names;
+}
+
+/**
+ * The inventory of one file. `globals`, when given, is the realm's platform global set
+ * (`platformGlobals`): a bare call of such a name is counted even where the file also binds that
+ * name locally, which over-counts harmlessly (the name exists) instead of hiding a real global; a
+ * lower-case global object the file does not bind is used as a member root too.
+ */
+export function platformInventory(source: string, globals: ReadonlyMap<string, "function" | "value"> = new Map()): string[] {
   const bindings = new Set<string>();
   for (const m of source.matchAll(/\b(?:class|function\*?|const|let|var)\s+([A-Za-z_$][\w$]*)/gu)) bindings.add(m[1]!);
   for (const m of source.matchAll(/\bimport\s*\{([^}]*)\}/gu)) {
@@ -66,6 +109,12 @@ export function platformInventory(source: string): string[] {
     addAll(m[2]!);
   }
 
+  // A method definition (`  fetch(ref) {` at the start of a line) is not a call.
+  const methodDefinitions = new Set<number>();
+  for (const m of source.matchAll(/^\s*(?:static\s+)?(?:async\s+)?(?:get\s+|set\s+|\*\s*)?#?([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{/gmu)) {
+    methodDefinitions.add(m.index! + m[0].indexOf(m[1]!));
+  }
+
   const names = new Set<string>();
   for (const m of source.matchAll(/(?<![\w$.#])([A-Z][\w$]*)\.((?:prototype\.)?[A-Za-z_$][\w$]*)(\s*\()?/gu)) {
     if (!bindings.has(m[1]!)) names.add(`${m[1]}.${m[2]}${m[3] ? "()" : ""}`);
@@ -73,13 +122,14 @@ export function platformInventory(source: string): string[] {
   for (const m of source.matchAll(/\b(?:new|instanceof|extends)\s+([A-Z][\w$]*)\b(?!\s*\.)/gu)) {
     if (!bindings.has(m[1]!)) names.add(`new ${m[1]}`);
   }
-  const roots = new RegExp(`(?<![\\w$.#])(${LOWER_CASE_GLOBAL_ROOTS.join("|")})\\.([A-Za-z_$][\\w$]*)(\\s*\\()?`, "gu");
+  const rootNames = new Set<string>(LOWER_CASE_GLOBAL_ROOTS);
+  for (const [name, kind] of globals) if (kind === "value" && /^[a-z]/u.test(name) && !locals.has(name)) rootNames.add(name);
+  const roots = new RegExp(`(?<![\\w$.#])(${[...rootNames].join("|")})\\.([A-Za-z_$][\\w$]*)(\\s*\\()?`, "gu");
   for (const m of source.matchAll(roots)) names.add(`${m[1]}.${m[2]}${m[3] ? "()" : ""}`);
   for (const m of source.matchAll(/(?<![\w$.#])([a-z_$][\w$]*)\s*\(/gu)) {
     const name = m[1]!;
-    if (!KEYWORDS.has(name) && !locals.has(name) && !(LOWER_CASE_GLOBAL_ROOTS as readonly string[]).includes(name)) {
-      names.add(`${name}()`);
-    }
+    if (KEYWORDS.has(name) || (LOWER_CASE_GLOBAL_ROOTS as readonly string[]).includes(name) || methodDefinitions.has(m.index!)) continue;
+    if (globals.get(name) === "function" || !locals.has(name)) names.add(`${name}()`);
   }
   return [...names].sort();
 }
@@ -134,7 +184,8 @@ export const NOT_CHECKED: Record<PdfjsFile, readonly NotChecked[]> = {
     { names: ["calc()", "grayscale()", "mix()", "preserveAspectRatio()", "round()"], reason: "CSS or SVG fragment inside a string" },
     { names: ["http()"], reason: "a URL inside the licence comment" },
     { names: ["checker()", "rescaleFn()", "RGB.every()", "WorkerMessageHandler.setup()"], reason: "local binding the narrow declaration scan does not see (parameter, let, destructured value)" },
-    { pattern: /^self\./u, reason: "self is an arrow-function parameter (self => …) in this file" },
+    { names: ["blur()"], reason: "text inside a string: the CSS value blur(1px) in a CSS.supports() probe" },
+    { pattern: /^self\./u, reason: "self is a local in this file: const self = this, and arrow-function parameters (self => …)" },
   ],
   "pdf.worker.mjs": [
     { names: ["CSS.supports()"], reason: "feature-tested: typeof CSS !== \"undefined\"" },
@@ -154,6 +205,7 @@ export const NOT_CHECKED: Record<PdfjsFile, readonly NotChecked[]> = {
     { names: ["be()", "blur()", "calc()", "exit()", "gradient()", "marker()", "scaleY()"], reason: "text inside a string (message, CSS or style mapping)" },
     { names: ["__emscripten_timeout()", "getRgb()", "getTextContent()", "itemDecode()", "itemEncode()", "document.getPage()", "document.numPages"], reason: "local binding the narrow declaration scan does not see (var list, method, a PDF document parameter named document)" },
     { pattern: /^CCITTOptions\./u, reason: "a parameter object of the CCITT decoder" },
+    { names: ["close()"], reason: "the Brotli decoder's own function close(s); the worker's global close() is never called" },
     { pattern: /^self\.(?!postMessage$)/u, reason: "self is a local alias (const self = this) in this file" },
   ],
 };
@@ -196,11 +248,22 @@ export const INSTANCE_MEMBER_WATCH: readonly { pattern: RegExp; receivers: reado
   { pattern: /\.bytes\(\)/gu, receivers: ["Response.prototype.bytes()", "Blob.prototype.bytes()"] },
   { pattern: /\bfor\s+await\s*\(/gu, receivers: ["ReadableStream.prototype[Symbol.asyncIterator]()"] },
   { pattern: /\.throwIfAborted\(/gu, receivers: ["AbortSignal.prototype.throwIfAborted()"] },
+  // Iterator helpers (ES2025), where the receiver is visibly an iterator: a method chained onto
+  // keys()/values()/entries(), and toArray(), which arrays do not have.
+  ...["map", "filter", "take", "drop", "flatMap", "reduce", "forEach", "some", "every", "find"].map((helper) => ({
+    pattern: new RegExp(`\\.(?:keys|values|entries)\\(\\)\\s*\\.${helper}\\(`, "gu"),
+    receivers: [`Iterator.prototype.${helper}()`],
+  })),
+  { pattern: /\.toArray\(\)/gu, receivers: ["Iterator.prototype.toArray()"] },
 ];
 
 /** What the classification says the run-time check must cover for one file, sorted. */
-export function requiredFor(file: PdfjsFile, source: string): { required: string[]; staleRules: string[] } {
-  const inventory = platformInventory(source);
+export function requiredFor(
+  file: PdfjsFile,
+  source: string,
+  globals: ReadonlyMap<string, "function" | "value">,
+): { required: string[]; staleRules: string[] } {
+  const inventory = platformInventory(source, globals);
   const rules = NOT_CHECKED[file];
   const used = new Set<object>();
   const required = new Set<string>();
