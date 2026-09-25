@@ -329,9 +329,6 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   each boundary checked against the paginator's own `shouldBreak()` answers, a production-chain
   case in `tests/live/named-page-regions.test.ts` and recorded page and source trees in
   `tests/unit/named-page-regions.test.ts`.
-
-### Fixed
-
 - **A report written to a pipe arrives whole.** Through 0.6.0 the CLI exited as soon as it had
   handed the report to stdout, which discarded everything the pipe had not taken yet: behind
   `| cat`, `| jq` or a slow uploader a report larger than the pipe buffer arrived cut at a
