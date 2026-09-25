@@ -40,12 +40,19 @@ function renderCoverageAlert(model: ReturnType<typeof buildHtmlReportModel>): st
   const shortfalls = model.coverage.flatMap((document) =>
     document.rows.filter((row) => !row.ok).map((row) => ({ document: document.path, ...row })),
   );
+  const withdrawn = model.withdrawn.map((line) => `<li class="coverage-shortfall-item">
+      <p><strong>Withdrawn pages:</strong> ${line.pages} page(s) of <span class="mono">${esc(line.document)}</span> were not measured</p>
+      <p><strong>Reason verbatim:</strong> <code>${esc(line.reasons.join(", "))}</code></p>
+      ${line.exitReason ? `<p><strong>Exit reason:</strong> <code>${esc(line.exitReason)}</code></p>` : ""}
+      <p><strong>Options:</strong> fix the layout that leaves content where the PDF does not print it, or that sets the page in columns this version does not measure. No <code>--disable</code> clears a withdrawn page.</p>
+    </li>`).join("\n");
   return `<section aria-labelledby="coverage-alert-heading">
 <h2 id="coverage-alert-heading">Coverage did not meet the contract</h2>
 <div class="state-alert">
   <p><strong>This is not a clean run.</strong> A rule without enough measurement cannot establish absence of a defect.</p>
+  ${withdrawn ? `<ul class="coverage-shortfall-list">${withdrawn}</ul>` : ""}
   ${shortfalls.length === 0
-    ? `<p>The run declared insufficient coverage without a per-rule shortfall. Inspect the canonical JSON report.</p>`
+    ? withdrawn ? "" : `<p>The run declared insufficient coverage without a per-rule shortfall. Inspect the canonical JSON report.</p>`
     : `<ul class="coverage-shortfall-list">${shortfalls.map((row) => `<li class="coverage-shortfall-item">
       <p><strong>Rule:</strong> <code>${esc(row.ruleId)}</code> in <span class="mono">${esc(row.document)}</span></p>
       <p><strong>Measurement:</strong> ${row.measured} of ${row.candidates} candidates measured (${esc(row.ratio)}); required floor ${esc(row.floor)}</p>

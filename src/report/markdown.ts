@@ -1,6 +1,6 @@
 import type { Report } from "../core/types.ts";
 import { LABELS, mandatoryFacts } from "./mandatory.ts";
-import { emptyStateSentence, infraLines } from "./infra.ts";
+import { emptyStateSentence, infraLines, withdrawnPageLines } from "./infra.ts";
 
 export function renderMarkdown(report: Report): string {
   const f = mandatoryFacts(report);
@@ -29,6 +29,19 @@ export function renderMarkdown(report: Report): string {
         `| ${line.level} | \`${line.kind}\` | ${line.document} | ${line.detail.replace(/\|/gu, "\\|")} | ` +
           `${line.measured.join("; ").replace(/\|/gu, "\\|") || "—"} |`,
       );
+    }
+    out.push("");
+  }
+
+  // Withdrawn pages decide an exit 4 without any rule below its floor; the coverage table below
+  // cannot show them, so they get their own table.
+  const withdrawn = withdrawnPageLines(report);
+  if (withdrawn.length > 0) {
+    out.push("## Withdrawn pages", "");
+    out.push("| document | pages | reason | exit reason |", "|---|---|---|---|");
+    for (const line of withdrawn) {
+      out.push(`| ${line.document} | ${line.pages} | ${line.reasons.map((r) => `\`${r}\``).join(", ")} | ` +
+        `${(line.exitReason ?? "—").replace(/\|/gu, "\\|")} |`);
     }
     out.push("");
   }

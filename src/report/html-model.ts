@@ -1,7 +1,7 @@
 import type { Finding, Report, RuleCoverage } from "../core/types.ts";
 import type { RunVerdict, Severity } from "../core/enums.ts";
 import { mandatoryFacts } from "./mandatory.ts";
-import { infraLines } from "./infra.ts";
+import { infraLines, withdrawnPageLines } from "./infra.ts";
 import { VALIDATION_RULES_BY_ID } from "../rules/index.ts";
 
 /** The two rules whose severity is `error`: disabling one removes the only default gate this tool has. */
@@ -78,6 +78,8 @@ export interface HtmlReportModel {
   findings: HtmlFinding[];
   infrastructure: ReturnType<typeof infraLines>;
   coverage: HtmlCoverageDocument[];
+  /** Documents with pages withdrawn from measurement; they need no rule below its floor. */
+  withdrawn: ReturnType<typeof withdrawnPageLines>;
 }
 
 const STATUS: Record<RunVerdict, Omit<HtmlStatus, "key">> = {
@@ -294,5 +296,6 @@ export function buildHtmlReportModel(report: Report): HtmlReportModel {
     // Presence is not equivalent to failure; `InfraLine.fatal` carries that engine decision.
     infrastructure: infraLines(report),
     coverage,
+    withdrawn: withdrawnPageLines(report),
   };
 }

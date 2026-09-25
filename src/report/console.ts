@@ -1,6 +1,6 @@
 import type { Finding, Report } from "../core/types.ts";
 import { summaryLine } from "./mandatory.ts";
-import { emptyStateSentence, infraLines } from "./infra.ts";
+import { emptyStateSentence, infraLines, withdrawnPageLines } from "./infra.ts";
 import { VALIDATION_RULES_BY_ID } from "../rules/index.ts";
 
 const ESC = "\u001b[";
@@ -128,6 +128,15 @@ export function renderConsole(report: Report, opts: { colour?: boolean } = {}): 
     out.push(paint("33", "coverage shortfall (exit 4):"));
     out.push("  A rule without enough measurement cannot establish absence of a defect.");
     let shortfallFound = false;
+    for (const line of withdrawnPageLines(report)) {
+      shortfallFound = true;
+      out.push(`  pages      ${line.pages} page(s) of ${line.document} withdrawn from measurement`);
+      out.push(`  reason     ${line.reasons.join(", ")}`);
+      if (line.exitReason) out.push(`  exit       ${line.exitReason}`);
+      out.push(`  options    - The paginator laid content out where the PDF does not print it, or the page is in columns`);
+      out.push(`               this version does not measure. Fix the layout; no --disable clears a withdrawn page.`);
+      out.push("");
+    }
     for (const doc of report.documents) {
       for (const [ruleId, cov] of Object.entries(doc.coverage)) {
         if (!cov.ok) {

@@ -393,6 +393,12 @@ export interface OverflowResidueCensus {
   textRects: number;
   /** Visible `img`, `svg`, `canvas` or `video` boxes with no pixel on the page. */
   replacedElements: number;
+  /**
+   * Boxes past the page box that are clipped away on purpose (inside a box that clips to at most
+   * one pixel, or through `clip` / `clip-path`): the visually-hidden idiom. Not residue; counted so
+   * the exemption is visible. Absent on raw input recorded before it existed.
+   */
+  clippedExempt?: number;
 }
 
 export interface RawSnapshot {
@@ -400,6 +406,11 @@ export interface RawSnapshot {
     /** Absent on raw input recorded before the census existed; read as no residue. */
     overflowResidue?: OverflowResidueCensus;
   })[];
+  /**
+   * Whether `html` or `body` establishes columns. Paged.js lays its pages into them, so every page
+   * and every block of the document is in columns. Absent on raw input recorded before it existed.
+   */
+  rootMulticol?: boolean;
   blocks: RawBlock[];
   textLines: TextLine[];
   svg: RawSvg[];
@@ -503,19 +514,36 @@ export const SNAPSHOT_SOURCE = `(() => {
   // unfloated DIRECT child of the container -- and then its subtree is judged by the containers
   // above. A deeper spanner may be honoured too; it is not recognised here and stays declined, which
   // costs coverage and never a verdict.
-  const PAGE_STRUCTURE = ".pagedjs_page_content,.pagedjs_area,.pagedjs_pagebox,.pagedjs_sheet,.pagedjs_page";
+  //
+  // The walk stops at the block's OWN page structure, found by identity -- the page content, the
+  // page area and the page element of the page the block was collected from -- never by a class
+  // name, so an author element called \`pagedjs_area\` cannot end it early. Columns on \`html\` or
+  // \`body\` lie above every page: Paged.js lays its pages into them, and the whole document is then
+  // in columns (see \`rootMulticol\`).
   const multicolContainer = (style) => {
     const count = style.columnCount || "auto";
     const width = style.columnWidth || "auto";
     return (count !== "auto" && count !== "1") || width !== "auto";
   };
+  const roots = P.all(document, "html,body");
+  const rootMulticol = roots.some((el) => multicolContainer(P.style(el, null)));
   const honouredSpanner = (style) => style.columnSpan === "all" && (style.float || "none") === "none" &&
     style.position !== "absolute" && style.position !== "fixed" &&
     !/^(inline|contents|none)/u.test(style.display || "block");
-  const inMulticol = (el) => {
+  const pageStructure = (page) => {
+    const stops = [page];
+    const area = P.all(page, PAGE_AREA_SELECTOR)[0];
+    const content = P.all(page, ".pagedjs_page_content")[0];
+    if (area) stops.push(area);
+    if (content) stops.push(content);
+    return stops;
+  };
+  const inMulticol = (el, page) => {
+    if (rootMulticol) return true;
+    const stops = pageStructure(page);
     let child = el;
     for (let at = P.parent(el); at && P.nodeType(at) === 1; child = at, at = P.parent(at)) {
-      if (P.closest(at, PAGE_STRUCTURE) === at) return false;
+      if (stops.indexOf(at) !== -1) return false;
       if (!multicolContainer(P.style(at, null))) continue;
       if (honouredSpanner(P.style(child, null))) continue;
       return true;
@@ -606,7 +634,8 @@ export const SNAPSHOT_SOURCE = `(() => {
       classList: (P.attr(el, "class") || "").split(/\\s+/u).filter(Boolean), lineHeight,
       spaceWidth: measured.spaceWidth || round(fontSize * 0.33),
       effectiveStyle: { breakInside: s.breakInside || "auto", breakBefore: s.breakBefore || "auto",
-        breakAfter: s.breakAfter || "auto", columns: s.columnCount || "auto", multicolAncestor: inMulticol(el),
+        breakAfter: s.breakAfter || "auto", columns: s.columnCount || "auto", columnWidth: s.columnWidth || "auto",
+        multicolAncestor: inMulticol(el, page),
         writingMode: s.writingMode || "horizontal-tb",
         visibility: s.visibility || "visible", widows: number(s.widows, 2), orphans: number(s.orphans, 2),
         textAlign: s.textAlign || "start", wordSpacing: s.wordSpacing || "normal", fontFamily: s.fontFamily || "",
@@ -653,28 +682,63 @@ export const SNAPSHOT_SOURCE = `(() => {
     // the column progression, which is past the page box and never printed. Measured on Chromium
     // 141 with the public residue fixture: 20 words of page 1 lay there, and exactly those 20 words
     // were absent from pdftotext's reading of the PDF. The census is structural: a visible text
-    // line box or replaced element lying ENTIRELY past the page box's edge in the column progression
-    // (right for ltr, left for rtl) has no pixel on the page. Content beyond the content box but
-    // inside the page box -- a margin note, a hanging figure -- prints, and is not counted.
+    // line box or replaced element lying ENTIRELY past the page box's edge on the side the columns
+    // progress to has no pixel on the page. That side follows the fragmentainer's writing mode, as
+    // measured on Chromium 141: horizontal-tb goes to the inline end (right for ltr, left for rtl);
+    // vertical-rl and sideways-rl to the left, vertical-lr and sideways-lr to the right (the block
+    // end), and with direction rtl also above the page (the inline end). Content beyond the content
+    // box but inside the page box -- a margin note, a hanging figure -- prints, and is not counted.
     const pageRect = P.rect(page);
-    const rtl = P.style(content, null).direction === "rtl";
-    const offPage = (r) => r.width > 0 && r.height > 0 &&
-      (rtl ? r.x + r.width <= pageRect.x : r.x >= pageRect.x + pageRect.width);
-    const overflowResidue = { textRects: 0, replacedElements: 0 };
+    const contentStyle = P.style(content, null);
+    const writingMode = contentStyle.writingMode || "horizontal-tb";
+    const rtl = contentStyle.direction === "rtl";
+    const leftOf = (r) => r.x + r.width <= pageRect.x;
+    const rightOf = (r) => r.x >= pageRect.x + pageRect.width;
+    const above = (r) => r.y + r.height <= pageRect.y;
+    const below = (r) => r.y >= pageRect.y + pageRect.height;
+    const vertical = writingMode !== "horizontal-tb";
+    const blockEnd = /-rl$/u.test(writingMode) ? leftOf : rightOf;
+    const offPage = (r) => r.width > 0 && r.height > 0 && (!vertical
+      ? (rtl ? leftOf(r) : rightOf(r))
+      : blockEnd(r) || (rtl ? above(r) : below(r)));
+    // DELIBERATELY CLIPPED CONTENT IS NOT RESIDUE. The visually-hidden idiom -- a 1 px box with
+    // overflow hidden, or clip / clip-path, moved off the page -- lays its text out past the page
+    // box on purpose; in a right-to-left document \`left: -10000px\` puts it exactly where residue
+    // would be. It is exempt, and counted as such: only an element or ancestor (up to the page
+    // content) that clips to at most one pixel, or through clip / clip-path, exempts. Content
+    // Paged.js strands is never inside such a box.
+    const clipsAway = (el) => {
+      const style = P.style(el, null);
+      if (style.clip && style.clip !== "auto") return true;
+      if (style.clipPath && style.clipPath !== "none") return true;
+      const hides = (value) => value === "hidden" || value === "clip";
+      if (!hides(style.overflow) && !hides(style.overflowX) && !hides(style.overflowY)) return false;
+      const b = P.rect(el);
+      return b.width <= 1 || b.height <= 1;
+    };
+    const deliberatelyClipped = (el) => {
+      for (let at = el; at && P.nodeType(at) === 1 && at !== content; at = P.parent(at)) if (clipsAway(at)) return true;
+      return false;
+    };
+    const overflowResidue = { textRects: 0, replacedElements: 0, clippedExempt: 0 };
     // Page fill is independent of source-block identity. Anonymous/inline-only authored text has
     // no BlockRecord, but its visible Range boxes still consume the page and must prevent blank.
     const rectangles = [];
     for (const node of textNodes(content)) {
       for (const rect of P.range(node)) {
         if (rect.width > 0 && rect.height > 0) rectangles.push(rect);
-        if (offPage(rect)) overflowResidue.textRects += 1;
+        if (!offPage(rect)) continue;
+        if (deliberatelyClipped(P.parent(node))) overflowResidue.clippedExempt += 1;
+        else overflowResidue.textRects += 1;
       }
     }
     for (const el of P.all(content, "img,svg,canvas,video,table")) {
       const style = P.style(el, null);
       if (style.display === "none" || style.visibility === "hidden") continue;
       rectangles.push(box(el));
-      if (el.tagName !== "TABLE" && offPage(P.rect(el))) overflowResidue.replacedElements += 1;
+      if (el.tagName === "TABLE" || !offPage(P.rect(el))) continue;
+      if (deliberatelyClipped(el)) overflowResidue.clippedExempt += 1;
+      else overflowResidue.replacedElements += 1;
     }
     const measuredRects = rectangles.map((rect) => clipped(rect, cb)).filter(Boolean);
     const merged = mergedBands(measuredRects);
@@ -863,7 +927,7 @@ export const SNAPSHOT_SOURCE = `(() => {
       inkPasses: { E: { count: 0, maskHash: "" }, S: { count: 0, maskHash: "" }, F: { count: 0, maskHash: "" } },
       inkCollected: false, inkStable: false });
   }));
-  return { pages, blocks, textLines, svg,
+  return { pages, blocks, textLines, svg, rootMulticol,
     requestedUrls: performance.getEntriesByType("resource").map((e) => e.name),
     fontFamilies: [...fonts].filter(Boolean).sort(),
     control: (${CONTROL_SIGNATURE_SOURCE}) };
@@ -947,6 +1011,10 @@ export function validateSnapshotInvariants(
   }
   for (const block of snapshot.blocks) {
     if (block.lines === null && !block.notMeasuredReason) issues.push(`${block.nodeKey}: lines absent without reason`);
+    // Whether a block is in columns cannot be read off its own column-count, and a missing answer
+    // must not read as "no": the rules would measure a block in the wrong frame.
+    if (typeof block.effectiveStyle.multicolAncestor !== "boolean") issues.push(`${block.nodeKey}: multicolAncestor is not recorded`);
+    if (typeof block.effectiveStyle.columnWidth !== "string") issues.push(`${block.nodeKey}: columnWidth is not recorded`);
     // The inspected input artefact's injection map is always complete. Producer provenance is
     // deliberately separate in originalMap, where generated/ambiguous output can be omitted.
     if (options.sourceMapInjection && block.sid !== null && !snapshot.source.map[block.sid]) {
@@ -997,6 +1065,25 @@ export function validateSnapshotInvariants(
  * engine refuses to call clean. Reporting the missing content itself would need a rule of its own;
  * this build only refuses to vouch for the page.
  */
+/**
+ * The withdrawal of every page of a document whose `html` or `body` establishes columns.
+ *
+ * Paged.js lays its pages into those columns: measured on Chromium 141 with `body { column-count:
+ * 2 }`, two pages were reported side by side while the PDF printed one, clipped. No page geometry of
+ * such a document describes the paper, so each page is withdrawn as `env/multicolumn` -- the same
+ * coverage-counted reason the block rules give -- and every block is marked `multicolAncestor`.
+ */
+export function rootColumnsWithdrawal(pageNumber: number, rootMulticol: boolean): NotMeasured[] {
+  if (!rootMulticol) return [];
+  return [{
+    scope: "page",
+    ruleId: null,
+    reason: "env/multicolumn",
+    target: { keyType: "page", nodeKey: `page:${pageNumber}`, sid: null },
+    count: 1,
+  }];
+}
+
 export function pageResidueWithdrawal(pageNumber: number, census: OverflowResidueCensus | undefined): NotMeasured[] {
   if (!census || census.textRects + census.replacedElements === 0) return [];
   return [{
@@ -1159,7 +1246,11 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
     const identity = first ? blockKey({ authorId: first.authorId, blockSignature: first.blockSignature }) : null;
     return {
       ...page,
-      notMeasured: [...page.notMeasured, ...pageResidueWithdrawal(page.pageNumber, overflowResidue)],
+      notMeasured: [
+        ...page.notMeasured,
+        ...pageResidueWithdrawal(page.pageNumber, overflowResidue),
+        ...rootColumnsWithdrawal(page.pageNumber, input.raw.rootMulticol === true),
+      ],
       epoch: input.collector.pages[index]?.epoch ?? 0,
       blank: page.blank,
       incomingBreakCause: causes[index]?.incoming ?? {

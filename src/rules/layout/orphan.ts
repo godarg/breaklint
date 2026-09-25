@@ -23,7 +23,7 @@ export const orphan = defineRule(
     unit: "lines",
     defaultOptions: { extraLines: 0 },
     summary: "The last fragment of a block on a page has fewer lines than its own orphans value.",
-    declines: ["env/pagination-residue", "env/multicolumn", "env/vertical-writing", "env/forced-break"],
+    declines: ["env/pagination-residue", "env/multicolumn", "env/vertical-writing", "env/forced-break", "env/invalid-measurement"],
     remediation: {
       advice:
         "A block fragment ENDS at a page break carrying fewer lines than the block's own 'orphans' value (plus any configured extra lines) asks for. Chromium applies a paragraph's 'widows' and 'orphans' when Paged.js splits it, and moves the whole paragraph to the next page when the page has room for fewer lines than 'orphans'; CSS Fragmentation Level 3 still permits a split that keeps fewer, so this rule is only a warning. Changing the block's 'orphans' moves the threshold with it and is not a fix. For paragraphs, move the block onto the next page with 'break-inside: avoid' or 'break-before: page', or reword/re-space the text. If this occurs inside a table row, keep the row together with 'tr { break-inside: avoid; }'.",

@@ -205,13 +205,28 @@ public fixture, whose page-4 table row the print reflow brings back. Nothing had
 — the residue probe skipped a box that straddles the column boundary — and once the cross-check no
 longer refused such a document, it came back measured. The collector therefore takes a census of
 every page: a visible text line box, `img`, `svg`, `canvas` or `video` lying ENTIRELY past the page
-box's edge in the column progression (right for left-to-right content, left for right-to-left) has no
-pixel on the paper. Such a page is withdrawn: one `env/pagination-residue` row in its
+box's edge on the side the fragmentainer's columns progress to has no pixel on the paper. That side
+follows the page content's writing mode, as measured on Chromium 141: the inline end in
+`horizontal-tb` (right for left-to-right, left for right-to-left); the block end in vertical writing
+(left for `vertical-rl` and `sideways-rl`, right for `vertical-lr` and `sideways-lr`), and with
+`direction: rtl` also above the page. Text the author clips away on purpose — the visually-hidden
+idiom, a box of at most one pixel with `overflow: hidden`, or `clip` / `clip-path`, moved off the page
+— is not residue and is not counted; measured: a right-to-left skip link at `left: -10000px` alone no
+longer withdraws its page, while a right-to-left document whose paragraphs Paged.js left past the
+page (156 of 366 words missing from the PDF) still does. Such a page is withdrawn: one `env/pagination-residue` row in its
 `pages[].notMeasured`, every rule that judges page geometry declines its candidates there (the
 matrix below), the report's `documents[].notMeasured` carries the page row, and the document cannot
 end clean whatever rules are active — `exitReason` reads `page(s) … withdrawn from measurement`, exit
 4. Content past the content box but inside the page box — a margin note, a hanging figure — is
 printed, and is not counted. `tests/fixtures/pagination-text-residue.html` is the live case.
+
+*What is still whole-document.* G-12 is only partly done in this release. Where the residue moves
+under print (a table row), the PDF reconciliation still compares the whole document and ends it in
+`render-unstable`, exit 3, although the drift is confined to the residue pages. Withdrawing just those
+pages and accepting their drift — page-scoped reconciliation — would need evidence bound per page,
+and is deferred. The `render-unstable` event now also names the pages the collector found content
+past the page box on (`strandedPages`), so on the public fixture it names page 1's stranded words as
+well as page 4's table.
 
 What this does not do is REPORT the missing content. The page is refused, not judged; which words
 are lost is not in the report, and no rule names them. A rule that does — the loss is a property of
@@ -252,7 +267,15 @@ other than `auto` or `1`, or any `column-width` (`columns: 12em` sets only the w
 lies across the columns and is judged with its subtree by the containers above; a spanner deeper
 down may also be honoured by the browser, but it is not recognised here and stays declined, which
 costs coverage and never a verdict. A container whose columns do not apply (a flex or grid
-container with `column-count` set) is declined all the same, on the same terms.
+container with `column-count` set) is declined all the same, on the same terms. A block that sets a
+column width of its own and leaves the count `auto` (`columns: 8em`) is in columns too; the
+collector records its own `column-width` beside its own `column-count`. The walk stops at the
+block's own page structure found by identity, not by a class name, so an author element called
+`pagedjs_area` does not end it. Columns on `html` or `body` lie above every page — Paged.js lays its
+pages into them; measured: two pages reported, one clipped page printed — so every block is in
+columns and every page is withdrawn as `env/multicolumn`. A snapshot that does not record
+`multicolAncestor` or `columnWidth` for a block is rejected by the snapshot invariants, and a rule
+that meets one declines the block as `env/invalid-measurement`: absence is not "single-column".
 
 Which rules decline, and on what ground. The same table covers a page withdrawn for pagination
 residue (above). `tests/unit/columns-and-residue.test.ts` runs every registered rule over one
@@ -277,7 +300,8 @@ rows marked `declined` below, read from this file.
 | `artifact/local-uri` | measured — reads references, not layout | measured — references; the engine still refuses clean |
 <!-- /breaklint-column-matrix-v1 -->
 
-Measuring the type rules inside columns would need line rects grouped per column (the collector
+The first column covers a block in columns; where `html` or `body` set columns, every page is
+withdrawn and the second column applies to all rules. Measuring the type rules inside columns would need line rects grouped per column (the collector
 groups lines by y alone) and is not in this release. Vertical writing is unchanged: `writing-mode`
 is inherited, and a block in vertical writing is declined as `env/vertical-writing` by the same seven
 rules.

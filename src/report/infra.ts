@@ -169,3 +169,35 @@ export function emptyStateSentence(report: Report): string {
     `${report.inputsFound} document${report.inputsFound === 1 ? "" : "s"}. No findings.`
   );
 }
+
+/** One document whose collector withdrew pages from measurement, as the reporters state it. */
+export interface WithdrawnPagesLine {
+  document: string;
+  /** How many pages were withdrawn, summed over the document's page rows. */
+  pages: number;
+  reasons: string[];
+  /** The document's exit reason, verbatim; it names the pages when withdrawal decided the verdict. */
+  exitReason: string | null;
+}
+
+/**
+ * Pages withdrawn from measurement: the document-level page rows (`scope: "page"`, no rule) with a
+ * coverage-counted reason. They make a document insufficient-coverage without any rule falling
+ * below its floor, and no `--disable` clears them, so every reporter that explains an exit 4 has
+ * to say so rather than print "without a per-rule shortfall".
+ */
+export function withdrawnPageLines(report: Report): WithdrawnPagesLine[] {
+  const out: WithdrawnPagesLine[] = [];
+  for (const document of report.documents) {
+    const rows = document.notMeasured.filter((row) => row.scope === "page" && row.ruleId === null &&
+      !IS.toolCapabilityEnvId.has(row.reason) && !IS.nonApplicableEnvId.has(row.reason));
+    if (rows.length === 0) continue;
+    out.push({
+      document: document.path,
+      pages: rows.reduce((sum, row) => sum + row.count, 0),
+      reasons: [...new Set(rows.map((row) => row.reason))].sort(),
+      exitReason: document.exitReason ?? null,
+    });
+  }
+  return out;
+}

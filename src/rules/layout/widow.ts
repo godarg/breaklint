@@ -36,7 +36,7 @@ export const widow = defineRule(
     unit: "lines",
     defaultOptions: { extraLines: 0 },
     summary: "The first fragment of a block on a page has fewer lines than its own widows value.",
-    declines: ["env/pagination-residue", "env/multicolumn", "env/vertical-writing", "env/forced-break"],
+    declines: ["env/pagination-residue", "env/multicolumn", "env/vertical-writing", "env/forced-break", "env/invalid-measurement"],
     remediation: {
       advice:
         "A block fragments across a page break and the fragment OPENING the next page carries fewer lines than the block's own 'widows' value (plus any configured extra lines) asks for. Chromium applies a paragraph's 'widows' and 'orphans' when Paged.js splits it; when the paragraph has too few lines at the break to satisfy both, the browser keeps 'orphans' and relaxes 'widows', as CSS Fragmentation Level 3 permits, so this rule is only a warning. Changing the block's 'widows' moves the threshold with it and is not a fix. For paragraphs, keep the block together with 'break-inside: avoid', force an earlier break with 'break-before: page', or reword/re-space the text. If this occurs inside a table row, keep the row together with 'tr { break-inside: avoid; }'.",

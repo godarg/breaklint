@@ -153,7 +153,13 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `layout/hyphen-across-page`, `layout/heading-at-page-bottom`,
   `layout/unbreakable-block-too-tall`, `type/excessive-word-spacing` and `type/short-last-line`
   decline such a block as `env/multicolumn`, counted against coverage. A `column-span: all` direct
-  child of the container, and its subtree, is measured; a deeper spanner stays declined. A document
+  child of the container, and its subtree, is measured; a deeper spanner stays declined. A block
+  that sets only its own `column-width` (`columns: 8em`) is declined too (it was measured: a
+  justified paragraph reported 4.28× word spacing across its columns). The walk stops at the block's
+  page structure by identity, not by class name, and columns on `html` or `body` put every block in
+  columns and withdraw every page as `env/multicolumn` (two pages were reported where the PDF
+  printed one, clipped). Widow, orphan, hyphen-across-page and excessive-word-spacing now also
+  declare `env/invalid-measurement`, for a block whose snapshot does not record these fields. A document
   whose error-rule candidate is in columns now ends exit 4 instead of 0 or 3. The rule-by-rule
   matrix, with the reason for each row, is in `docs/limitations.md` and is pinned against the
   registry by `tests/unit/columns-and-residue.test.ts`.
@@ -162,15 +168,19 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   the last 20 words of page 1 lie one column pitch to the right of the page and exactly those 20 of
   its 1136 words are missing from the PDF (pdftotext on the checked PDF). Nothing reported it. The
   collector now counts, per page, visible text line boxes and `img`/`svg`/`canvas`/`video` boxes
-  lying entirely past the page box in the column progression; such a page carries one
+  lying entirely past the page box on the side the columns progress to — the inline end in
+  horizontal writing, the block end in vertical writing (and above the page for vertical `rtl`),
+  measured per writing mode — except content the author clips away on purpose (a 1 px
+  `overflow: hidden` box, `clip`, `clip-path`: the visually-hidden idiom); such a page carries one
   `env/pagination-residue` row in `pages[].notMeasured`. The seven rules above and
   `layout/half-empty-page` decline their candidates on it (`layout/unbreakable-block-too-tall` when
   any fragment of a split block is on it, `layout/orphaned-continuation-page` also for the page
   before it), counted against coverage, and the engine refuses to call such a document clean
   whatever rules are active: exit 4, `exitReason` `page(s) … withdrawn from measurement
   (env/pagination-residue)`. The lost content itself is not reported; a rule for that is a later
-  step and not in this release. Where the PDF moves the residue instead (a table row), the document
-  still ends `render-unstable`, exit 3.
+  step and not in this release. G-12 is partial: where the PDF moves the residue instead (a table
+  row), the document still ends `render-unstable`, exit 3, for the whole document; page-scoped
+  reconciliation needs evidence bound per page and is deferred.
 
 ### Added
 
@@ -434,9 +444,15 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `ruleId: null` row (aggregated per reason) beside the rules' own declines, and in `exitReason`.
   `geometry-cross-check-passed` and `-failed` carry `fragmentedSamples`; the failed event also
   carries `failedPages`, and each `worst[]` entry its `fragment` and `page` where known. All
-  additions; Report schema stays 5. Snapshot: `effectiveStyle.multicolAncestor` is a new optional
-  field (absent on stored snapshots, read as false), and `pages[].notMeasured`, which was always
-  empty, is now populated; the Snapshot stamp is not moved by this change.
+  additions; Report schema stays 5. The console, Markdown and HTML reports state withdrawn pages
+  and the document's exit reason; the console used to say "insufficient coverage without a per-rule
+  shortfall" and offer no cause, and no `--disable` clears a withdrawn page. `render-unstable` also
+  names `strandedPages`, the pages the collector found content past the page box on. Snapshot:
+  `effectiveStyle.multicolAncestor` and `effectiveStyle.columnWidth` are new REQUIRED fields — the
+  snapshot invariants reject a block without them, and a rule that meets one declines the block as
+  `env/invalid-measurement` — and `pages[].notMeasured`, which was always empty, is now populated.
+  `examples/demo-snapshot.json` and the hand-authored corpus carry both fields explicitly. This
+  structure change travels with the Snapshot 4 → 5 move of this release.
 
 ### Tooling
 

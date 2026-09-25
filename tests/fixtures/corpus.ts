@@ -39,6 +39,8 @@ function style(over: Partial<BlockRecord["effectiveStyle"]> = {}): BlockRecord["
     breakBefore: "auto",
     breakAfter: "auto",
     columns: "auto",
+    columnWidth: "auto",
+    multicolAncestor: false,
     writingMode: "horizontal-tb",
     visibility: "visible",
     widows: 2,

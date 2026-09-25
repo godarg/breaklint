@@ -27,7 +27,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { crossCheckPage } from "../../src/acquire/render-run.ts";
+import { crossCheckPage, pdfReconciliationDetail } from "../../src/acquire/render-run.ts";
 import type { PageLike } from "../../src/acquire/browser.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import { fingerprint } from "../../src/core/fingerprint.ts";
@@ -38,14 +38,19 @@ import {
 } from "../../src/measure/cross-check.ts";
 import type { FragmentainerReport } from "../../src/measure/fragmentainer.ts";
 import {
-  assembleSnapshot, buildSourceModel, inputIdentity, pageResidueWithdrawal, SNAPSHOT_SOURCE,
+  assembleSnapshot, buildSourceModel, inputIdentity, pageResidueWithdrawal, rootColumnsWithdrawal, SNAPSHOT_SOURCE,
   validateSnapshotInvariants, type RawSnapshot,
 } from "../../src/measure/snapshot.ts";
 import { COLLECTOR_SOURCE, type CollectorResult } from "../../src/paginate/collector.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
 import { straightQuotes } from "../../src/rules/type/straight-quotes.ts";
+import { excessiveWordSpacing } from "../../src/rules/type/excessive-word-spacing.ts";
+import { blockOutOfScope, pageWithdrawal } from "../../src/rules/shared.ts";
+import { buildReport } from "../../src/core/build-report.ts";
+import { toReportConfig } from "../../src/config/resolve.ts";
+import { render } from "../../src/report/index.ts";
 import { injectSourceIds } from "../../src/source/inject.ts";
-import { evaluatePayload, pagedDocument, pagedPage, runCollector } from "../fixtures/paged-dom.ts";
+import { evaluatePayload, fakeDocument, pagedDocument, pagedPage, runCollector } from "../fixtures/paged-dom.ts";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 
@@ -334,13 +339,13 @@ describe("a page whose content lies past its page box is withdrawn", () => {
 
   it("counts text and replaced elements past the page box in the column progression, and nothing inside it", () => {
     assert.deepEqual(raw.pages.map((page) => page.overflowResidue), [
-      { textRects: 1, replacedElements: 0 },
+      { textRects: 1, replacedElements: 0, clippedExempt: 0 },
       // The margin note is past the content box and inside the page box: printed, not residue.
-      { textRects: 0, replacedElements: 0 },
-      { textRects: 0, replacedElements: 1 },
+      { textRects: 0, replacedElements: 0, clippedExempt: 0 },
+      { textRects: 0, replacedElements: 1, clippedExempt: 0 },
       // Right to left, the overflow column lies to the LEFT of the page.
-      { textRects: 1, replacedElements: 0 },
-      { textRects: 0, replacedElements: 0 },
+      { textRects: 1, replacedElements: 0, clippedExempt: 0 },
+      { textRects: 0, replacedElements: 0, clippedExempt: 0 },
     ]);
   });
 
@@ -406,7 +411,8 @@ function block(id: string, over: Partial<BlockRecord> & { style?: Partial<BlockR
     fragmentIndex: 0, fragmentCount: 1, page: 1, box: box(48, 60, 399, 60), tag: "p", classList: [],
     lineHeight: 15.4, spaceWidth: 4.2,
     effectiveStyle: {
-      breakInside: "auto", breakBefore: "auto", breakAfter: "auto", columns: "auto", writingMode: "horizontal-tb",
+      breakInside: "auto", breakBefore: "auto", breakAfter: "auto", columns: "auto", columnWidth: "auto",
+      multicolAncestor: false, writingMode: "horizontal-tb",
       visibility: "visible", widows: 2, orphans: 2, textAlign: "justify", wordSpacing: "normal", fontFamily: "serif",
       fontSize: 11, lineHeight: 15.4, lang: "en", ...style,
     },
@@ -551,5 +557,197 @@ describe("which rules decline, rule by rule, as published", () => {
       failOn: "never", activeRules: [straightQuotes], optionsByRule: {}, coverageFloors: {},
     });
     assert.equal(control.report.verdict, "clean");
+  });
+});
+
+// ---- round 2: writing modes, deliberate clipping, page edges, own and root columns ------------
+
+/** One page with the given page-content style and content, and the raw census of it. */
+function censusOf(content: string, contentStyle = ""): RawSnapshot["pages"][number]["overflowResidue"] {
+  let html = pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), content });
+  if (contentStyle) html = html.replace('class="pagedjs_page_content"', `class="pagedjs_page_content" style="${contentStyle}"`);
+  return evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, pagedDocument([html])).pages[0]!.overflowResidue;
+}
+const text = (box: string, style = "") => `<span data-test-box="${box}"${style ? ` style="${style}"` : ""}>stranded words</span>`;
+const PAGE_RIGHT = 566.93;
+
+describe("the residue census follows the fragmentainer's writing mode, and exempts deliberate clipping", () => {
+  // Measured on Chromium 141 with Paged.js 0.4.3 (the verifier's res-vertical fixture and three
+  // variants): vertical-rl and sideways-rl strand to the LEFT of the page, vertical-lr to the
+  // RIGHT, and vertical-rl with direction rtl also ABOVE it. RED BEFORE THIS ROUND: only x against
+  // the right edge (left for rtl) was tested, so the vertical-rl page was never withdrawn.
+  const LEFT = "-900 10 200 18.66";
+  const RIGHT = `${PAGE_RIGHT + 200} 10 200 18.66`;
+  const ABOVE = "56.69 -300 200 18.66";
+  const BELOW = "56.69 900 200 18.66";
+  for (const [mode, expected] of [
+    ["writing-mode: vertical-rl", { LEFT: 1, RIGHT: 0, ABOVE: 0, BELOW: 1 }],
+    ["writing-mode: sideways-rl", { LEFT: 1, RIGHT: 0, ABOVE: 0, BELOW: 1 }],
+    ["writing-mode: vertical-lr", { LEFT: 0, RIGHT: 1, ABOVE: 0, BELOW: 1 }],
+    ["writing-mode: vertical-rl; direction: rtl", { LEFT: 1, RIGHT: 0, ABOVE: 1, BELOW: 0 }],
+    ["", { LEFT: 0, RIGHT: 1, ABOVE: 0, BELOW: 0 }],
+    ["direction: rtl", { LEFT: 1, RIGHT: 0, ABOVE: 0, BELOW: 0 }],
+  ] as const) {
+    it(`counts the column-progression side for ${mode || "horizontal ltr"}`, () => {
+      for (const [side, box] of Object.entries({ LEFT, RIGHT, ABOVE, BELOW })) {
+        assert.equal(censusOf(text(box), mode)!.textRects, expected[side as keyof typeof expected], `${mode}: ${side}`);
+      }
+    });
+  }
+
+  it("counts a line box that starts exactly at the page edge, and not one that still overlaps the page by a pixel", () => {
+    // Pins the edge from both sides: `>` instead of `>=`, or any slack, moves one of the two.
+    assert.equal(censusOf(text(`${PAGE_RIGHT} 10 200 18.66`))!.textRects, 1, "a line starting at the edge has no pixel on the page");
+    assert.equal(censusOf(text(`${PAGE_RIGHT - 1} 10 200 18.66`))!.textRects, 0, "a line overlapping the page by 1 px prints");
+    assert.equal(censusOf(text(`-200 10 201 18.66`), "direction: rtl")!.textRects, 0, "rtl: 1 px on the page prints");
+    assert.equal(censusOf(text(`-200 10 200 18.66`), "direction: rtl")!.textRects, 1, "rtl: ending at the edge is off the page");
+  });
+
+  it("exempts the visually-hidden idiom, and only a box that really clips its content away", () => {
+    // The verifier's fp-sronly-rtl: a skip link at left: -10000px in a 1 px, overflow: hidden box.
+    const skip = (style: string, box = "-10000 10 1 1") =>
+      `<a data-test-box="0 10 30 18.66"><span data-test-box="${box}" style="${style}">Skip to content</span></a>`;
+    const sronly = censusOf(skip("position: absolute; width: 1px; height: 1px; overflow: hidden"), "direction: rtl")!;
+    assert.deepEqual(sronly, { textRects: 0, replacedElements: 0, clippedExempt: 1 }, "a skip link withdrew its page");
+    assert.equal(censusOf(skip("clip: rect(0px, 0px, 0px, 0px)", "-10000 10 120 18.66"), "direction: rtl")!.textRects, 0);
+    assert.equal(censusOf(skip("clip-path: inset(50%)", "-10000 10 120 18.66"), "direction: rtl")!.textRects, 0);
+    // Overflow hidden on a box that is NOT one pixel does not hide what lies outside it here: the
+    // residue of an ordinary scroll-less container is still residue.
+    const wide = censusOf(skip("overflow: hidden", "-10000 10 120 18.66"), "direction: rtl")!;
+    assert.deepEqual(wide, { textRects: 1, replacedElements: 0, clippedExempt: 0 }, "an ordinary box's residue was exempted");
+  });
+});
+
+describe("a block's own column width, an author class name and root columns", () => {
+  it("declines a block whose only column property is its own column-width", () => {
+    // The verifier's mc-own-width-only: `columns: 8em` on a justified paragraph, measured 4.28x.
+    assert.equal(blockOutOfScope({ pages: [] } as unknown as Snapshot, {
+      page: 1, sid: null, effectiveStyle: { columns: "auto", columnWidth: "128px", multicolAncestor: false, writingMode: "horizontal-tb" },
+    } as unknown as BlockRecord), "env/multicolumn");
+    const html = `<!doctype html><html lang="en"><body><p id="own">Own columns.</p></body></html>`;
+    const { sid } = sources(html);
+    const raw = evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, pagedDocument([pagedPage({
+      pageBox: pageBox(0), contentBox: contentBox(0),
+      content: `<p id="own" data-bl-sid="${sid.own}" data-ref="r" data-test-box="${at(0, 0)}" style="column-width: 8em">Own columns.</p>`,
+    })]));
+    assert.equal(raw.blocks[0]!.effectiveStyle.columnWidth, "8em", "the collector did not record the block's own column width");
+    assert.equal(raw.blocks[0]!.effectiveStyle.columns, "auto");
+  });
+
+  it("an author element named like the page structure does not end the walk", () => {
+    // The verifier's mc-fakeclass: <section class="pagedjs_area" style="column-count:2">.
+    const html = `<!doctype html><html lang="en"><body><section id="fake"><p id="inside">Inside.</p></section></body></html>`;
+    const { sid } = sources(html);
+    const raw = evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, pagedDocument([pagedPage({
+      pageBox: pageBox(0), contentBox: contentBox(0),
+      content: `<section class="pagedjs_area pagedjs_page_content" id="fake" data-bl-sid="${sid.fake}" data-ref="f" data-test-box="${at(0, 0)}" style="column-count: 2">` +
+        `<p id="inside" data-bl-sid="${sid.inside}" data-ref="i" data-test-box="${at(0, 0)}">Inside.</p></section>`,
+    })]));
+    assert.equal(raw.blocks.find((b) => b.sid === sid.inside)!.effectiveStyle.multicolAncestor, true,
+      "a class name stopped the multi-column walk");
+  });
+
+  it("columns on body put every block in columns and withdraw every page", () => {
+    // The verifier's mc-body: two pages reported, the PDF printed one, clipped.
+    const html = `<!doctype html><html lang="en"><body><p id="a">A.</p></body></html>`;
+    const { sid } = sources(html);
+    const page = pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0),
+      content: `<p id="a" data-bl-sid="${sid.a}" data-ref="a" data-test-box="${at(0, 0)}">A.</p>` });
+    const tree = fakeDocument(`<!doctype html><html lang="en"><body style="column-count: 2"><div class="pagedjs_pages">${page}</div></body></html>`);
+    const raw = evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, tree);
+    assert.equal(raw.rootMulticol, true);
+    assert.equal(raw.blocks[0]!.effectiveStyle.multicolAncestor, true);
+    assert.deepEqual(rootColumnsWithdrawal(1, true).map((row) => [row.scope, row.reason]), [["page", "env/multicolumn"]]);
+    assert.deepEqual(rootColumnsWithdrawal(1, false), []);
+    const control = evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, pagedDocument([page]));
+    assert.equal(control.rootMulticol, false);
+  });
+});
+
+describe("a snapshot that does not say whether a block is in columns is not read as single-column", () => {
+  it("the invariants reject a block without multicolAncestor or columnWidth", () => {
+    const snapshot = everyRuleSnapshot({ multicol: false, withdrawn: [] });
+    const without = (field: "multicolAncestor" | "columnWidth") => ({
+      ...snapshot, blocks: snapshot.blocks.map((b, i) => i === 0 ? { ...b, effectiveStyle: { ...b.effectiveStyle, [field]: undefined } } : b),
+    }) as Snapshot;
+    for (const field of ["multicolAncestor", "columnWidth"] as const) {
+      const result = validateSnapshotInvariants(without(field), { sourceMapInjection: false });
+      assert.ok(result.issues.some((issue) => issue.includes(field)), `${field}: ${result.issues.join("; ")}`);
+    }
+  });
+
+  it("a rule declines such a block as env/invalid-measurement instead of measuring it", () => {
+    const snapshot = everyRuleSnapshot({ multicol: false, withdrawn: [] });
+    const legacy = { ...snapshot, blocks: snapshot.blocks.map((b) => ({ ...b, effectiveStyle: { ...b.effectiveStyle, multicolAncestor: undefined } })) } as unknown as Snapshot;
+    const result = excessiveWordSpacing.run(legacy, { documentPath: "x.html", options: excessiveWordSpacing.defaultOptions, fingerprint });
+    assert.ok(result.candidates > 0);
+    assert.equal(result.measured, 0, "a block with no multicolAncestor was measured");
+    assert.ok(result.notMeasured.every((row) => row.reason === "env/invalid-measurement"));
+  });
+});
+
+describe("only a coverage-counted page row withdraws a page", () => {
+  const rowed = (reason: NotMeasured["reason"]): Snapshot => {
+    const snapshot = everyRuleSnapshot({ multicol: false, withdrawn: [] });
+    snapshot.pages[1]!.notMeasured = [{ ...withdrawnRow(2), reason }];
+    return snapshot;
+  };
+  it("a build-capability or not-applicable page row does not withdraw, in the rules or in the engine", () => {
+    for (const reason of ["env/pixel-oracle-unavailable", "env/svg-overflow-visible"] as const) {
+      const snapshot = rowed(reason);
+      assert.equal(pageWithdrawal(snapshot, 2), null, `${reason} withdrew the page`);
+      const outcome = runDocument({ path: "x.html", snapshot, infrastructure: [] }, {
+        failOn: "never", activeRules: [straightQuotes], optionsByRule: {}, coverageFloors: {},
+      });
+      assert.equal(outcome.report.verdict, "clean", `${reason} kept the document from ending clean`);
+    }
+    assert.equal(pageWithdrawal(rowed("env/pagination-residue"), 2), "env/pagination-residue");
+    assert.equal(pageWithdrawal(rowed("env/multicolumn"), 2), "env/multicolumn");
+  });
+});
+
+describe("the reporters say that pages were withdrawn", () => {
+  it("console, Markdown and HTML state the withdrawn pages and the exit reason, and do not offer --disable for them", () => {
+    const snapshot = everyRuleSnapshot({ multicol: false, withdrawn: [2] });
+    const outcome = runDocument({ path: "residue.html", snapshot, infrastructure: [] }, {
+      failOn: "never", activeRules: [straightQuotes], optionsByRule: {}, coverageFloors: {},
+    });
+    assert.equal(outcome.report.verdict, "insufficient-coverage");
+    const report = buildReport({
+      outcomes: [outcome], mode: "live", source: "rendered", toolVersion: "0.0.0", commit: null,
+      startedAt: new Date(0).toISOString(), durationMs: 0, rulesRun: 1, failOn: "never",
+      environment: {
+        browserVersion: "", platform: "test", rendererPath: null, rendererPresent: false, pagedjsVersion: "0.4.3",
+        rasterizer: null, rasterizerVersion: null, textPositionExtractor: null, fontFamiliesResolved: [], locale: "de-DE",
+      },
+      config: toReportConfig(resolveConfig({ file: undefined, cli: {} }), { interventions: [], networkBlocked: 0 }),
+    });
+    const exit = "page(s) 2 withdrawn from measurement (env/pagination-residue)";
+    const consoleText = render(report, "console", { colour: false });
+    // RED BEFORE THIS ROUND: "The run declared insufficient coverage without a per-rule shortfall."
+    assert.doesNotMatch(consoleText, /without a per-rule shortfall/u);
+    assert.match(consoleText, /1 page\(s\) of residue\.html withdrawn from measurement/u);
+    assert.ok(consoleText.includes(exit), consoleText);
+    assert.doesNotMatch(consoleText, /--disable type\/straight-quotes/u, "a --disable was offered for a rule that is not short");
+    const markdown = render(report, "markdown");
+    assert.match(markdown, /## Withdrawn pages/u);
+    assert.ok(markdown.includes(exit));
+    const html = render(report, "html");
+    assert.doesNotMatch(html, /without a per-rule shortfall/u);
+    assert.ok(html.includes(exit), "the HTML report does not state the exit reason");
+    assert.match(html, /Withdrawn pages/u);
+  });
+});
+
+describe("render-unstable names the pages the census withdrew", () => {
+  it("the sentence names page 1's stranded content beside page 4's table", () => {
+    const residue: FragmentainerReport = {
+      pages: [4], count: 4, atomicCount: 4, pitchPx: 1816,
+      sample: [{ page: 4, column: 1, tag: "TR", display: "table-row", sourceId: "s9", text: "Row 1" }],
+    };
+    const detail = pdfReconciliationDetail("baseline", ["boxes"], residue, [1, 4]);
+    assert.match(detail, /overflow column of page\(s\) 4/u);
+    assert.match(detail, /Page\(s\) 1, 4 also lay content out past the page box/u);
+    assert.doesNotMatch(pdfReconciliationDetail("baseline", ["boxes"], residue), /also lay content/u);
   });
 });

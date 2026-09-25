@@ -532,7 +532,7 @@ export const PRODUCT_RULE_EXECUTABLE_CONTRACTS: Readonly<Record<RuleId, { module
 export function producerSourceIdentitySha256(sourceIdentity: unknown): string { return sha256(canonicalJson(sourceIdentity)); }
 
 function snapshotFromProjection(projection: SnapshotProjection): Snapshot {
-  const style = { breakInside: "auto", breakBefore: "auto", breakAfter: "auto", columns: "auto", writingMode: "horizontal-tb", visibility: "visible", widows: 2, orphans: 2, textAlign: "start", wordSpacing: "normal", fontFamily: "sans-serif", fontSize: 16, lineHeight: 20, lang: "en" };
+  const style = { breakInside: "auto", breakBefore: "auto", breakAfter: "auto", columns: "auto", columnWidth: "auto", multicolAncestor: false, writingMode: "horizontal-tb", visibility: "visible", widows: 2, orphans: 2, textAlign: "start", wordSpacing: "normal", fontFamily: "sans-serif", fontSize: 16, lineHeight: 20, lang: "en" };
   const svg = structuredClone(projection.svg) as SvgRecord & { reason?: SvgRecord["reason"] };
   if (svg.reason === null) delete svg.reason;
   return {

@@ -920,8 +920,9 @@ async function configureNetwork(
 /**
  * The geometry cross-check of one paginated page: the in-page sample against CDP.
  *
- * Exported for the live negative control only (`tests/live/cross-check-fragments.test.ts`), which
- * changes the layout between the two reads and requires this function, unmodified, to fail.
+ * Exported for its tests: the live negative control in `tests/live/measure.test.ts`, which changes
+ * the layout between the two reads and requires this function, unmodified, to fail, and the fake-CDP
+ * cases in `tests/unit/columns-and-residue.test.ts`.
  */
 export async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compareGeometry>> {
   const batch = await page.evaluate<GeometrySampleBatch>(geometrySampleSource(CROSS_CHECK_SAMPLE_SIZE));
@@ -1422,6 +1423,7 @@ export function pdfReconciliationDetail(
   stage: string,
   drifted: readonly string[],
   residue: FragmentainerReport,
+  strandedPages: readonly number[] = [],
 ): string {
   const what = drifted.length > 0
     ? `freeze component(s) ${drifted.join(", ")} changed across ${stage} PDF production`
@@ -1430,7 +1432,13 @@ export function pdfReconciliationDetail(
     ? ` ${residueDetail(residue)} The PDF is rendered in print media, where Paged.js re-sizes the ` +
       "fragmentainer, so that content is laid out somewhere else than where it was measured."
     : "";
-  return `the PDF does not reproduce the state the rules measured: ${what}.${why}`;
+  // The collector's census, which sees what the element probe cannot: text lines past the page box
+  // inside a box that straddles the column boundary. On the public residue fixture that is page 1,
+  // whose stranded words are missing from the PDF, while the element probe names only page 4.
+  const stranded = strandedPages.length > 0
+    ? ` Page(s) ${strandedPages.join(", ")} also lay content out past the page box, which the PDF does not print.`
+    : "";
+  return `the PDF does not reproduce the state the rules measured: ${what}.${why}${stranded}`;
 }
 
 async function verifyAnimationIntervention(page: PageLike, stage: string): Promise<void> {
@@ -2179,6 +2187,11 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     }
     mkdirSync(context.options.outDir, { recursive: true });
     const documentKey = documentArtifactKey(path, ordinal, context.runId);
+    // Pages the collector withdrew because content lies past the page box (see snapshot.ts). Named
+    // in a render-unstable event, which withdraws the snapshot that would otherwise carry them.
+    const strandedPages = snapshot.pages
+      .filter((item) => item.notMeasured.some((row) => row.reason === "env/pagination-residue"))
+      .map((item) => item.pageNumber);
     const reconciledPdf = async (stage: "baseline" | "marked"): Promise<Uint8Array> => {
       await verifyAnimationIntervention(page, `${stage}-pdf-before`);
       const beforeParts = await sampleParts(page);
@@ -2215,7 +2228,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
         // re-wrapped as an anonymous crash by the catch in `renderOne`.
         throw new OperationalBoundaryFailure([{
           kind: "render-unstable",
-          detail: pdfReconciliationDetail(stage, drifted, residueBefore),
+          detail: pdfReconciliationDetail(stage, drifted, residueBefore, strandedPages),
           measured: {
             stage,
             driftedComponents: drifted,
@@ -2223,6 +2236,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
             // document this was written for, of which 22 differed -- all of them one table.
             driftSample: componentDeltas(beforeParts, afterParts),
             fragmentainerResidue: residueBefore,
+            strandedPages,
             mutationDelta: afterIntegrity.mutationRecordsAfterRendered - beforeIntegrity.mutationRecordsAfterRendered,
             sidMutationDelta: afterIntegrity.sidMutations - beforeIntegrity.sidMutations,
             sidIssues: afterSidIssues, pageErrors: opened.pageErrors,

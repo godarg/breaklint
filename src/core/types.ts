@@ -75,14 +75,21 @@ export interface EffectiveStyle {
   /** The block's OWN computed `column-count`. Not inherited: see `multicolAncestor`. */
   columns: string;
   /**
-   * Whether the block's content sits in the columns of an ancestor multi-column container (its
-   * `column-count` other than auto or 1, or any `column-width`), between the block and the
-   * Paged.js page structure, which is itself a multi-column fragmentainer and never counts. A
-   * `column-span: all` direct child of the container, and its subtree, is outside that container's
-   * columns. Absent on snapshots collected before the field existed; read as false there, which is
-   * what those snapshots were measured as.
+   * The block's OWN computed `column-width`. `columns: 12em` sets only the width and leaves
+   * `column-count` auto, so the count alone does not say whether the block is a multi-column
+   * container. Required: a snapshot without it is rejected by `validateSnapshotInvariants`.
    */
-  multicolAncestor?: boolean;
+  columnWidth: string;
+  /**
+   * Whether the block's content sits in the columns of an ancestor multi-column container (its
+   * `column-count` other than auto or 1, or any `column-width`) between the block and its page's
+   * Paged.js structure, which is itself a multi-column fragmentainer and never counts, or in
+   * columns that `html` or `body` establish. A `column-span: all` direct child of the container,
+   * and its subtree, is outside that container's columns. Required: a snapshot without it is
+   * rejected by `validateSnapshotInvariants`, and a rule that meets one declines the block
+   * (`env/invalid-measurement`) instead of guessing.
+   */
+  multicolAncestor: boolean;
   writingMode: string;
   visibility: string;
   widows: number;

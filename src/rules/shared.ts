@@ -149,12 +149,17 @@ export function linesOfBlock(snapshot: Snapshot, blockKey: string) {
  */
 export function layoutOutOfScope(style: {
   columns: string;
+  columnWidth?: string;
   writingMode: string;
 }): EnvId | null {
   const columns = style.columns.trim();
   const isSingleColumn =
     columns === "" || columns === "auto" || columns === "1" || /^(auto\s+)?1$|^1(\s+auto)?$/u.test(columns);
   if (!isSingleColumn) return "env/multicolumn";
+  // Any column width makes the block a multi-column container of its own: `columns: 8em` leaves
+  // the count auto and still sets the block's lines in columns.
+  const width = (style.columnWidth ?? "auto").trim();
+  if (width !== "" && width !== "auto") return "env/multicolumn";
   if (style.writingMode && style.writingMode !== "horizontal-tb") return "env/vertical-writing";
   return null;
 }
@@ -209,7 +214,11 @@ function fragmentsOf(snapshot: Snapshot, block: BlockRecord): readonly BlockReco
  *      lines are grouped across columns, so none of the seven questions has a single frame to be
  *      asked in. `column-count` is not inherited, so the block's own value used to miss exactly
  *      these blocks.
- *   3. Its own style is out of scope (`layoutOutOfScope`): its own columns, or vertical writing.
+ *   3. Its own style is out of scope (`layoutOutOfScope`): its own columns (a column count other
+ *      than auto or 1, or any column width), or vertical writing.
+ *
+ * A block whose snapshot does not record `multicolAncestor` or `columnWidth` is declined as
+ * `env/invalid-measurement` before (2): absence is not "not in columns".
  *
  * `allFragments` asks the three questions of every fragment of the block's source element (by
  * sid), for a rule whose judgement combines them: `layout/unbreakable-block-too-tall` sums the
@@ -227,7 +236,11 @@ export function blockOutOfScope(
     const withdrawn = pageWithdrawal(snapshot, fragment.page);
     if (withdrawn) return withdrawn;
   }
-  if (fragments.some((fragment) => fragment.effectiveStyle.multicolAncestor === true)) return "env/multicolumn";
+  // A snapshot that does not say whether a block is in columns (or what its own column width is)
+  // cannot be judged in a single-column frame: that would be the guess this field exists to end.
+  if (fragments.some((fragment) => typeof fragment.effectiveStyle.multicolAncestor !== "boolean" ||
+    typeof fragment.effectiveStyle.columnWidth !== "string")) return "env/invalid-measurement";
+  if (fragments.some((fragment) => fragment.effectiveStyle.multicolAncestor)) return "env/multicolumn";
   for (const fragment of fragments) {
     const own = layoutOutOfScope(fragment.effectiveStyle);
     if (own) return own;

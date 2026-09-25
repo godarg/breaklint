@@ -30,7 +30,7 @@ export const excessiveWordSpacing = defineRule(
     unit: "× natural space",
     defaultOptions: { maxSpaceFactor: 3.0 },
     summary: "Word gaps in a justified block are far wider than the natural space.",
-    declines: ["env/pagination-residue", "env/multicolumn", "env/vertical-writing"],
+    declines: ["env/pagination-residue", "env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],
     remediation: {
       advice:
         "Justified text produces word spacing exceeding the uncalibrated threshold ('rivers' of whitespace). Use left alignment ('text-align: left;'), insert soft hyphens ('&shy;') into long words, or enable hyphenation with 'hyphens: auto;' together with an HTML 'lang' attribute. Automatic hyphenation happens only where the rendering browser has a hyphenation dictionary for that language; where it has none, 'hyphens: auto' changes nothing and soft hyphens are the lever that works. This rule owns the block-level 'hyphens' setting and the soft hyphens of justified text: where a hyphen, soft or automatic, then falls on a page boundary, 'layout/hyphen-across-page' changes only that word and neither turns hyphenation off nor removes soft hyphens for the block.",

@@ -46,7 +46,7 @@ export const halfEmptyPage = defineRule(
     unit: "fill ratio",
     defaultOptions: { minNetFill: 0.6, maxTopGap: 0.5 },
     summary: "A page is filled well below what its content box allows.",
-    declines: ["env/parity-blank-page", "env/forced-break", "env/pagination-residue"],
+    declines: ["env/parity-blank-page", "env/forced-break", "env/pagination-residue", "env/multicolumn"],
     remediation: {
       advice:
         "This rule fires on either of two quantities: the page's net fill ratio fell below the uncalibrated threshold, or its content starts more than half a page down. Read the finding's measurement to see which. If the page naturally concludes a section, chapter or document, either is expected and may be disregarded. If unintended: for low fill, check whether a following block forced an early break with 'break-before: page' or an oversized 'break-inside: avoid' container; for a late start, look for a leading margin, an empty block or a float above the first line.",

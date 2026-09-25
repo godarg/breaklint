@@ -74,6 +74,21 @@ function unplacedMarks(document: DocumentInput): string[] {
     (page.unplacedMarks ?? []).map((mark) => `p${page.page}:${mark.sid}:${mark.side}`));
 }
 
+/**
+ * The checked PDF's text layer, as pdftotext reads it, with the evidence marks removed.
+ *
+ * Where the evidence binding holds, the delivered PDF carries the overlay's marks as text tokens
+ * (`BLSID008A`, `BLSID008E`) at the start and end of every marked block, and pdftotext interleaves
+ * them with the document's words: measured in CI, "Margin note printed beside the BLSID008A text".
+ * They are the apparatus's, not the document's, so they are removed before any document text is
+ * looked for; whitespace is collapsed after.
+ */
+function pdfText(pdf: string): string {
+  return execFileSync("pdftotext", ["-layout", pdf, "-"], { encoding: "utf8" })
+    .replace(/BLSID\d+[AE]/gu, " ")
+    .replace(/\s+/gu, " ");
+}
+
 function options(outDir: string, sourceMapInjection = true): RenderOptions {
   return {
     outDir,
@@ -723,7 +738,7 @@ describe("the M2d live production chain", () => {
 
     // The margin note is printed: the PDF's text layer has it.
     const pdf = join(root, "evidence", document.renderArtifact!.path);
-    const text = execFileSync("pdftotext", ["-layout", pdf, "-"], { encoding: "utf8" }).replace(/\s+/gu, " ");
+    const text = pdfText(pdf);
     assert.match(text, /Margin note printed beside the text/u, "the control note is not in the PDF, so it does not control anything");
   });
 
@@ -757,7 +772,7 @@ describe("the M2d live production chain", () => {
       if (past) strandedByCollector.set(/coda(\d\d)/u.exec(block.blockSignature)![1]!, block.page);
     }
     const pdf = join(root, "evidence", document.renderArtifact!.path);
-    const printed = new Set([...execFileSync("pdftotext", ["-layout", pdf, "-"], { encoding: "utf8" }).matchAll(/coda(\d\d)/gu)].map((m) => m[1]!));
+    const printed = new Set([...pdfText(pdf).matchAll(/coda(\d\d)/gu)].map((m) => m[1]!));
     const missingFromPdf = Array.from({ length: 40 }, (_, i) => String(i + 1).padStart(2, "0")).filter((coda) => !printed.has(coda));
 
     assert.ok(missingFromPdf.length > 0, "no paragraph lost its tail on this browser, so the case was not exercised");

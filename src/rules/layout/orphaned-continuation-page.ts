@@ -150,7 +150,7 @@ export const orphanedContinuationPage = defineRule(
     unit: "fill ratio",
     defaultOptions: { maxNetFill: 0.5 },
     summary: "A page holds nothing but the tail of a block that began earlier.",
-    declines: ["env/parity-blank-page", "env/forced-break", "env/pagination-residue"],
+    declines: ["env/parity-blank-page", "env/forced-break", "env/pagination-residue", "env/multicolumn"],
     remediation: {
       advice:
         "A continuation page holds only a tiny trailing fragment of an earlier block. Tighten preceding vertical margins, padding, or line-height on earlier pages to pull the remaining lines back, or insert 'break-before: page' earlier to balance content across pages.",
