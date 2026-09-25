@@ -458,7 +458,7 @@ export interface Finding {
   measurement: Measurement;
   ambiguity: { groupSize: number; resolvable: false } | null;
   evidence: { ref: string | null; bindsFinding: boolean };
-  /** Report4's source/actionability truth; scalar `source` remains the legacy projection. */
+  /** Source/actionability truth, present since report schema 4; scalar `source` remains the legacy projection. */
   originalSource: {
     status: "verified" | "declared" | "ambiguous" | "unavailable";
     role: "exact-original-range" | "verified-container-only" | "declared-matching-bytes" | "unknown";

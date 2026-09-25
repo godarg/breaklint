@@ -17,6 +17,7 @@ import {
   approvedKeys, codeSegments, fragmentationProblems, guardedUnits, isJudged, placeLabel, proseSentences,
   type GuardedUnit,
 } from "../tools/fragmentation-guard.ts";
+import { changedLevers, LEVERS, positiveLevers, proposedLevers } from "../tools/remediation-levers.ts";
 
 /**
  * Whether the browser applies `widows`/`orphans` under Paged.js is a MEASUREMENT, pinned in
@@ -259,14 +260,9 @@ describe("rule registry", () => {
    */
   it("every rule page carries its rule's remediation verbatim, and proposes no lever the rule does not", () => {
     const dir = new URL("../../docs/rules/", import.meta.url);
-    // Actionable levers only. A property named as a MEASUREMENT ("a page of prose at
-    // line-height: 1.5 reaches ...") is not a proposal, so the guard also requires an imperative
-    // nearby — the same shape the inert-property guard above uses, for the same reason.
-    const LEVERS = [
-      "break-inside", "break-before", "break-after", "page-break-before", "page-break-after",
-      "hyphens", "text-align", "text-wrap", "word-spacing", "overflow", "widows", "orphans",
-      "line-height", "font-size", "column-width", "columns", "quotes",
-    ];
+    // Actionable levers only (LEVERS, shared with the Examples guard below). A property named as a
+    // MEASUREMENT ("a page of prose at line-height: 1.5 reaches ...") is not a proposal, so the
+    // guard also requires an imperative nearby.
     const IMPERATIVE = /\b(set|use|apply|add|insert|enable|disable|remove|replace|increase|reduce|lower|raise|adjust|specify|configure|prevent|force|keep|try|wrap|mark)\b/iu;
     const WARNS_AGAINST = /\b(do not|does not|never|absent|not honour|not honor|ignored|inert|reaches at most)\b/iu;
 
@@ -304,6 +300,85 @@ describe("rule registry", () => {
           );
         }
       }
+    }
+  });
+
+  /*
+   * The Remediation section is not the only place a page proposes a cure. Its Examples section
+   * shows a trigger and a "remedied" document, and the difference between the two IS a repair
+   * recommendation — read by people and copied by agents. Until 0.7.0 that section was unguarded,
+   * and two pages used it to propose a lever their rule does not: `font-size` for
+   * `layout/orphaned-continuation-page`, and `break-inside: auto` for
+   * `layout/unbreakable-block-too-tall`, whose advice names removing `break-inside: avoid` only to
+   * warn that it clears the finding without shortening the block.
+   *
+   * The comparison is against the levers the advice PROPOSES (`positiveLevers`, derived from the
+   * advice text at run time), not merely names: that is the polarity a substring check misses.
+   */
+  it("every rule page's remedied example changes only levers its rule's advice proposes", () => {
+    const dir = new URL("../../docs/rules/", import.meta.url);
+    // A page another change of this release rewrites, with the EXACT foreign levers it is known to
+    // carry. Anything added to that example fails like on any other page, and once the page is
+    // corrected this test fails until the entry is deleted, so the list can only shrink.
+    const PENDING: Record<string, { foreign: string[]; reason: string }> = {
+      "layout/unbreakable-block-too-tall": {
+        foreign: ["break-inside"],
+        reason: "its page, including this example, is rewritten by another change of this release",
+      },
+    };
+    let compared = 0;
+    for (const rule of ALL_RULES) {
+      const page = pageNameFor(rule);
+      const text = readFileSync(new URL(page, dir), "utf8");
+      const block = (heading: string): string | null => {
+        const at = text.indexOf(`\n### ${heading}\n`);
+        if (at === -1) return null;
+        const open = text.indexOf("\n```", at);
+        const close = text.indexOf("\n```", open + 4);
+        return open === -1 || close === -1 ? null : text.slice(open, close);
+      };
+      const trigger = block("Firing case (trigger)");
+      const remedied = block("Non-firing case (remedied)");
+      if (trigger === null || remedied === null) continue;
+      compared += 1;
+      const positive = positiveLevers(rule.remediation!.advice);
+      const foreign = changedLevers(trigger, remedied).filter((lever) => !positive.has(lever));
+      const pending = PENDING[rule.id];
+      if (pending) {
+        assert.notDeepEqual(foreign, [], `docs/rules/${page} no longer needs its pending entry (${pending.reason}); delete it`);
+        assert.deepEqual(foreign, pending.foreign, `docs/rules/${page}: the remedied example changes ${foreign.join(", ")}; its pending entry covers only ${pending.foreign.join(", ")}`);
+        continue;
+      }
+      assert.deepEqual(
+        foreign,
+        [],
+        `docs/rules/${page}: the remedied example changes ${foreign.join(", ")}, which ${rule.id}'s advice does not propose (it proposes: ${[...positive].join(", ") || "no CSS lever"})`,
+      );
+    }
+    assert.ok(compared >= 10, `only ${compared} rule pages carry a trigger/remedied pair; the guard has lost its subject`);
+    assert.ok(LEVERS.length > 10);
+  });
+
+  /*
+   * The repair map in src/api/context.ts is a third restatement of the advice, and the one an
+   * agent receives in context.json and on the HTML bundle's cards. Its entry for
+   * `layout/unbreakable-block-too-tall` said "adjust the verified block's break constraint" —
+   * the lever the advice warns is a false repair. Each entry may propose only levers its rule's
+   * advice proposes; a clause that warns ("do not …") is not a proposal.
+   */
+  it("the agent-facing repair map proposes only levers its rule's advice proposes", () => {
+    const source = readFileSync(new URL("../../src/api/context.ts", import.meta.url), "utf8");
+    const start = source.indexOf("function repairOptions(");
+    const end = source.indexOf("return options[", start);
+    assert.ok(start !== -1 && end > start, "repairOptions is gone — this guard has lost its subject");
+    const entries = [...source.slice(start, end).matchAll(/"([a-z]+\/[a-z0-9-]+)":\s*"((?:[^"\\]|\\.)*)"/gu)];
+    const released = entries.filter(([, id]) => ALL_RULES.some((rule) => rule.id === id));
+    assert.ok(released.length >= 4, `only ${released.length} released-rule entries were read from repairOptions`);
+    for (const [, id, option] of released) {
+      const positive = positiveLevers(ALL_RULES.find((rule) => rule.id === id)!.remediation!.advice);
+      // A repair option is an instruction throughout: every clause that does not warn proposes.
+      const foreign = proposedLevers(option!, { requireImperative: false }).filter((lever) => !positive.has(lever));
+      assert.deepEqual(foreign, [], `src/api/context.ts repair option for ${id} proposes ${foreign.join(", ")}, which its advice does not: ${option}`);
     }
   });
 

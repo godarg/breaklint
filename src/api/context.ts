@@ -167,7 +167,9 @@ function sourceLabel(finding: Finding): string {
 function repairOptions(finding: Finding): readonly string[] {
   if (finding.actionability !== "actionable" || finding.originalSource.status !== "verified") return [];
   const options: Record<string, string> = {
-    "layout/unbreakable-block-too-tall": "Adjust the verified block's break constraint or split its content; expected effect: the block can fit a page fragment.",
+    // The advice's own lever: make the block shorter. Removing its 'break-inside: avoid' only
+    // removes the rule's candidate — the block stays as tall — so it is named here as what not to do.
+    "layout/unbreakable-block-too-tall": "Shorten the verified block or split its content into smaller sections deliberately; do not only remove its 'break-inside: avoid', which clears the finding without making the block fit; expected effect: the block no longer exceeds the content box of the page it is laid out on.",
     "layout/widow": "Keep the verified block together with 'break-inside: avoid', move it with 'break-before: page', or reword it; expected effect: the fragment opening the next page carries the required line count.",
     "layout/orphan": "Keep the verified block together with 'break-inside: avoid', move it with 'break-before: page', or reword it; expected effect: the fragment closing the page carries the required line count.",
     "type/short-last-line": "Adjust the verified text measure or wording; expected effect: increase the final-line ratio above the configured predicate.",

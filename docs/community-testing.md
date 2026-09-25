@@ -89,7 +89,9 @@ explicitly, because both are easy to trip over:
   is the larger of the two gaps.
 
 Neither limit is an oversight; both keep the false-positive rate low enough that the tripwire stays
-usable. They do mean the detector must not be relied on as a safety net.
+usable. They do mean the detector must not be relied on as a safety net. Both are pinned on each
+side of their boundary by `tests/e2e/community-intake-limits.test.ts`, so a detector change that
+closes either gap fails that test until this list is updated with it.
 
 ## What this can and cannot establish
 
