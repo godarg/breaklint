@@ -259,59 +259,100 @@ export function num(value: unknown, fallback: number): number {
  * height, and a zero-width block can still be tall; both are real boxes in the flow, and a
  * predicate on one dimension would declare them box-less.
  *
- * A box of zero by zero is NOT by itself evidence that nothing was laid out. `display: none`
- * produces one, and so does `display: contents`, which generates no box for the element while its
- * text is laid out, printed and recorded as lines. Whether a record was rendered at all is
- * `isNotRendered`'s question, which looks at the lines too.
+ * A box of zero by zero does not say WHY there is no box, and the rules need the reason; see
+ * `renderingOf`.
  */
 export function hasLayoutBox(box: Box): boolean {
   return box.width !== 0 || box.height !== 0;
 }
 
 /**
- * Whether a block record is provably not rendered: no box in either dimension AND measured lines,
- * of which there are none.
- *
- * That is the in-flow original of a `position: running(...)` element, which Paged.js leaves in the
- * page content with an inline `display: none` while its clones print in the margin boxes, and any
- * other `display: none` element. A `display: contents` element is not one of them: it has no box
- * but its text has line boxes, so the snapshot records lines for it, and a justified
- * `display: contents` paragraph really does print its gaps. A record whose lines were not measured
- * (`lines: null`) is not provably unrendered either; it is left to the rule, which must measure it
- * or decline it where coverage counts the decline.
+ * How a block record was rendered, from its box, its recorded lines and the facts Snapshot 5
+ * records about it:
+ * - `box`: laid out with a box of its own;
+ * - `contents`: `display: contents` — no box for the element, while its text and children are laid
+ *   out and printed (an image-only `display: contents` figure prints its image);
+ * - `margin-box`: no box in the flow, and printed as margin-box copies: the in-flow original of a
+ *   `position: running(...)` element, which Paged.js hides with `display: none`;
+ * - `not-rendered`: no box and nothing the snapshot shows printed from it — `display: none`, or
+ *   lines that were recorded and none of which is visible (an element inside a hidden subtree or a
+ *   closed `<details>` has no line box);
+ * - `zero-box`: a box of zero by zero that is NOT proof of nothing printed: a visible line was
+ *   recorded (`width: 0; height: 0; overflow: visible` prints its text outside its box), or the
+ *   lines were not recorded at all, so the question is open.
+ * The classification never reads "no box" alone as "not rendered". An earlier state of this change
+ * did, and a zero-size block whose seventeen lines printed was excluded, turning a counted decline
+ * (exit 4) into a clean run.
  */
-export function isNotRendered(block: { box: Box; lines: readonly number[] | null }): boolean {
-  return !hasLayoutBox(block.box) && block.lines !== null && block.lines.length === 0;
+export type Rendering = "box" | "contents" | "margin-box" | "not-rendered" | "zero-box";
+
+type RenderFacts = { nodeKey: string; box: Box; display: string; marginCopies: number; lines: readonly number[] | null };
+
+export function renderingOf(snapshot: Pick<Snapshot, "textLines">, block: RenderFacts): Rendering {
+  if (hasLayoutBox(block.box)) return "box";
+  if (block.display === "contents") return "contents";
+  if (block.marginCopies > 0) return "margin-box";
+  if (block.display === "none") return "not-rendered";
+  if (block.lines === null) return "zero-box";
+  const lines = snapshot.textLines.filter((line) => line.blockKey === block.nodeKey);
+  // A visible line printed. A referenced line the snapshot does not carry is not proof of anything.
+  if (lines.some((line) => line.visible) || lines.length < block.lines.length) return "zero-box";
+  return "not-rendered";
+}
+
+/** A record nothing in the flow was printed from: `margin-box` or `not-rendered`. */
+export function isNotRendered(snapshot: Pick<Snapshot, "textLines">, block: RenderFacts): boolean {
+  const rendering = renderingOf(snapshot, block);
+  return rendering === "margin-box" || rendering === "not-rendered";
 }
 
 /**
- * The evaluation a rule records for a candidate that is not rendered (see `isNotRendered`):
- * `excluded`, outside the coverage base, with the reason named. Not a decline — nothing failed to
- * be measured; the question the rule asks (how tall, how much space below, how wide the gaps) has
- * no referent for an element the paginator never laid out. And not `measured`: counting it as a
- * zero-height measurement let a document report full coverage for an element nobody looked at.
+ * The evaluation a rule records for a record that `isNotRendered`: `excluded`, outside the coverage
+ * base, with the reason named — `rule/target-in-margin-box` for a running element's in-flow
+ * original, `rule/target-not-rendered` for anything else. Not a decline — nothing failed to be
+ * measured; the question the rule asks has no referent in the flow. And not `measured`: counting it
+ * as a zero-height measurement let a document report full coverage for an element nobody looked at.
  */
 export function notRenderedEvaluation(ruleId: string, block: {
-  nodeKey: string; sid: string | null; fragmentIndex: number; box: Box;
+  nodeKey: string; sid: string | null; fragmentIndex: number; box: Box; display: string; marginCopies: number;
 }): TargetEvaluation {
+  // Called for a record `isNotRendered`; of those, exactly the ones with margin copies printed there.
+  const inMargin = block.marginCopies > 0;
   return targetEvaluation({
     ruleId, keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex,
-    boxScreen: block.box, status: "excluded", countsTowardCoverage: false, reason: "rule/target-not-rendered",
+    boxScreen: block.box, status: "excluded", countsTowardCoverage: false,
+    reason: inMargin ? "rule/target-in-margin-box" : "rule/target-not-rendered",
     measurements: [
       { name: "target-has-layout-box", value: false, unit: null, operator: "=", threshold: true },
-      { name: "target-has-rendered-lines", value: false, unit: null, operator: "=", threshold: true },
+      { name: "display", value: block.display, unit: null, operator: null, threshold: null },
+      { name: "margin-copies", value: block.marginCopies, unit: null, operator: null, threshold: null },
     ],
     connective: "all", violated: null,
   });
 }
 
 /**
+ * The lines of a block the snapshot recorded, and how many of them are visible. `recorded: false`
+ * when the snapshot did not measure the block's lines at all (`lines: null`, with its reason).
+ */
+export function lineStateOf(snapshot: Snapshot, block: { nodeKey: string; lines: readonly number[] | null }): {
+  recorded: boolean; total: number; visible: number;
+} {
+  if (block.lines === null) return { recorded: false, total: 0, visible: 0 };
+  const lines = snapshot.textLines.filter((line) => line.blockKey === block.nodeKey);
+  return { recorded: true, total: lines.length, visible: lines.filter((line) => line.visible).length };
+}
+
+/**
  * Where a block is printed: its own box, or — for a block with no box of its own, such as
  * `display: contents` — the union of its visible line boxes. `null` when neither exists, so a caller
- * cannot mistake the zero box at the origin for a position.
+ * cannot mistake the zero box at the origin for a position, and `null` for every record
+ * `isNotRendered` (a running element's in-flow original, an element the author hid): the two
+ * helpers agree, so no rule can put in the flow what the classification says printed nowhere.
  */
-export function renderedBox(snapshot: Snapshot, block: { nodeKey: string; box: Box }): Box | null {
+export function renderedBox(snapshot: Snapshot, block: RenderFacts): Box | null {
   if (hasLayoutBox(block.box)) return block.box;
+  if (isNotRendered(snapshot, block)) return null;
   const lines = linesOfBlock(snapshot, block.nodeKey);
   if (lines.length === 0) return null;
   const left = Math.min(...lines.map((line) => line.box.x));
@@ -322,15 +363,15 @@ export function renderedBox(snapshot: Snapshot, block: { nodeKey: string; box: B
 }
 
 /**
- * The decline a box-geometry rule records for a candidate that IS rendered but has no box of its
- * own — a `display: contents` block, whose text is on the page while its element box is zero by
- * zero at the origin. A rule that judges the block's box (how tall it is, what lies below it) has
- * nothing valid to read. Measuring the zero box called such a block clean; excluding it hid a
- * printed element from coverage. It is declined as `env/invalid-measurement` and counted.
+ * The decline a rule records for a printed candidate it cannot place: no box of its own and no
+ * visible line box to read a position from, or lines the snapshot did not measure. The
+ * measurements state what was there — the visible line count, or `null` when the lines were not
+ * recorded — and never claim rendered lines the snapshot does not show. Counted against coverage.
  */
-export function boxlessDeclined(ruleId: string, block: {
-  nodeKey: string; sid: string | null; fragmentIndex: number; box: Box;
+export function boxlessDeclined(ruleId: string, snapshot: Snapshot, block: {
+  nodeKey: string; sid: string | null; fragmentIndex: number; box: Box; display: string; lines: readonly number[] | null;
 }): { notMeasured: NotMeasured; evaluation: TargetEvaluation } {
+  const lines = lineStateOf(snapshot, block);
   return {
     notMeasured: declined({ scope: "block", ruleId, reason: "env/invalid-measurement" }),
     evaluation: targetEvaluation({
@@ -338,9 +379,10 @@ export function boxlessDeclined(ruleId: string, block: {
       boxScreen: block.box, status: "not-measured", reason: "env/invalid-measurement",
       measurements: [
         { name: "target-has-layout-box", value: false, unit: null, operator: "=", threshold: true },
-        { name: "target-has-rendered-lines", value: true, unit: null, operator: null, threshold: null },
+        { name: "display", value: block.display, unit: null, operator: null, threshold: null },
+        { name: "visible-line-count", value: lines.recorded ? lines.visible : null, unit: "lines", operator: ">", threshold: 0 },
       ],
-      connective: "single", violated: null,
+      connective: "all", violated: null,
     }),
   };
 }

@@ -404,6 +404,8 @@ const withdrawnRow = (n: number): NotMeasured => ({
   scope: "page", ruleId: null, reason: "env/pagination-residue", target: { keyType: "page", nodeKey: `page:${n}`, sid: null }, count: 1,
 });
 
+const tagDisplay = (_tag: string) => "block";
+
 function block(id: string, over: Partial<BlockRecord> & { style?: Partial<BlockRecord["effectiveStyle"]> } = {}): BlockRecord {
   const { style, ...rest } = over;
   return {
@@ -416,7 +418,7 @@ function block(id: string, over: Partial<BlockRecord> & { style?: Partial<BlockR
       visibility: "visible", widows: 2, orphans: 2, textAlign: "justify", wordSpacing: "normal", fontFamily: "serif",
       fontSize: 11, lineHeight: 15.4, lang: "en", ...style,
     },
-    lines: [0], ...rest,
+    lines: [0], display: tagDisplay(rest.tag ?? "p"), marginCopies: 0, ...rest,
   };
 }
 
@@ -448,7 +450,7 @@ function everyRuleSnapshot(input: { multicol: boolean; withdrawn: readonly numbe
     inkCollected: false, inkStable: false,
   };
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     meta: {
       renderer: null, browserVersion: "", pagedjsVersion: "0.4.3", platform: "", locale: "de-DE", inputIdentity: null,
       freezeSignature: "fixture", freezeRetries: 0, epochCount: 1, interventions: [],

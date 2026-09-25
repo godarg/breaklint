@@ -13,6 +13,7 @@
  */
 
 import type { BlockRecord, PageRecord, Snapshot, SvgRecord, TextLine, TextRun } from "../../src/core/types.ts";
+import { SNAPSHOT_SCHEMA_VERSION } from "../../src/core/enums.ts";
 
 export interface CorpusEntry {
   name: string;
@@ -91,6 +92,8 @@ function block(id: string, over: Partial<BlockRecord> = {}): BlockRecord {
     lineHeight: 15.4,
     spaceWidth: 4.2,
     effectiveStyle: style(),
+    display: "block",
+    marginCopies: 0,
     lines: [0],
     ...over,
   };
@@ -120,7 +123,7 @@ function snapshot(parts: {
   uriRefs?: Snapshot["uriRefs"];
 }): Snapshot {
   return {
-    schemaVersion: 2,
+    schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     meta: {
       renderer: null,
       browserVersion: "",

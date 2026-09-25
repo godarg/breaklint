@@ -12,13 +12,16 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSy
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { after, before, describe, it, type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { renderDocuments, type RenderOptions, type RenderResult } from "../../src/acquire/render-run.ts";
+import {
+  cleanupBrowserProfile, closeBrowserBounded, renderDocuments, type RenderOptions, type RenderResult,
+} from "../../src/acquire/render-run.ts";
+import { openRasterizer } from "../../src/render/rasterizer.ts";
 import { exitCodeFor, runDocument } from "../../src/core/engine.ts";
-import { resolveBrowser, resolvePackageRoot } from "../../src/acquire/browser.ts";
+import { launchBrowser, resolveBrowser, resolvePackageRoot } from "../../src/acquire/browser.ts";
 import { straightQuotes } from "../../src/rules/type/straight-quotes.ts";
 import { textOverflowsViewport } from "../../src/rules/svg/text-overflows-viewport.ts";
 import { textClipped } from "../../src/rules/svg/text-clipped.ts";
@@ -83,10 +86,33 @@ function unplacedMarks(document: DocumentInput): string[] {
  * They are the apparatus's, not the document's, so they are removed before any document text is
  * looked for; whitespace is collapsed after.
  */
-function pdfText(pdf: string): string {
+function pdftotextWithoutMarks(pdf: string): string {
   return execFileSync("pdftotext", ["-layout", pdf, "-"], { encoding: "utf8" })
     .replace(/BLSID\d+[AE]/gu, " ")
     .replace(/\s+/gu, " ");
+}
+
+/**
+ * The text layer of a delivered PDF, read with the production rasteriser in a browser of its own
+ * (no content page open, as the rasteriser requires). Used where a test must say what the PDF
+ * carries, not what the DOM carried.
+ */
+async function pdfText(path: string): Promise<string> {
+  const launched = await launchBrowser(REPO);
+  assert.ok(launched.browser, launched.detail);
+  try {
+    const opened = await openRasterizer(launched.browser, { fromDir: REPO, contentPagesOpen: () => 0 });
+    assert.ok(opened.rasterizer, opened.detail);
+    try {
+      const pages = await opened.rasterizer.textItems(readFileSync(path));
+      return pages.flatMap((page) => page.items.map((item) => item.text)).join(" ");
+    } finally {
+      await opened.rasterizer.close();
+    }
+  } finally {
+    assert.equal(await closeBrowserBounded(launched.browser), null);
+    assert.equal(cleanupBrowserProfile(launched.userDataDir ?? null), null);
+  }
 }
 
 function options(outDir: string, sourceMapInjection = true): RenderOptions {
@@ -577,13 +603,36 @@ describe("the M2d live production chain", () => {
     assert.equal(outcome.report.findings[0]!.evidence?.bindsFinding, true);
   });
 
-  it("rejects late scripted content through the paired control or pre-PDF reconciliation", (t) => {
+  /**
+   * The fixture appends a paragraph 600 ms after its first page appears, on a timer, so WHEN it
+   * lands relative to the snapshot and the PDF is a race the document cannot be made to win or lose
+   * deterministically: nothing it can observe marks the snapshot. Measured on 2026-09-25, 3 of 42
+   * runs on the base commit ended with no event at all, and this test, which required one, was
+   * flaky there too. What the product must guarantee is not an event, it is that late content
+   * never reaches the delivered PDF unmeasured: before the snapshot it is measured (and the paired
+   * control differs), between the snapshot and a PDF it is caught (`document-not-quiescent`,
+   * `render-unstable`), and after the last PDF it is in no delivered artifact. So: an event, or
+   * else neither the measured snapshot nor the delivered PDF carries the late text.
+   */
+  it("rejects late scripted content through the paired control or pre-PDF reconciliation", async (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     if (!completeChain(t)) return;
-    const event = result!.documents[11]!.infrastructure.find((item) =>
-      item.kind === "document-not-quiescent" || item.kind === "injection-interference");
-    assert.ok(event, "late DOM content reached the delivered state without invalidating measurement");
-    assert.ok(Number(event.measured?.mutationDelta ?? 0) > 0 || event.detail.includes("control quantities"));
+    const late = result!.documents[11]!;
+    assert.match(late.path, /late-mutation\.html$/u, "premise: document 11 is the late-mutation fixture");
+    const event = late.infrastructure.find((item) =>
+      item.kind === "document-not-quiescent" || item.kind === "injection-interference" || item.kind === "render-unstable");
+    if (event) {
+      assert.ok(Number(event.measured?.mutationDelta ?? 0) > 0 || event.detail.includes("control quantities") || event.kind === "render-unstable");
+      return;
+    }
+    assert.ok(late.snapshot, "no event and no measured snapshot");
+    assert.equal(JSON.stringify(late.snapshot).includes("Zu spaet"), false,
+      "late content is in the measured snapshot, yet the paired control did not differ");
+    assert.ok(late.renderArtifact, "no event, and no delivered PDF to check the late content against");
+    // The artifact path is relative to the run's evidence directory.
+    const text = await pdfText(isAbsolute(late.renderArtifact.path) ? late.renderArtifact.path : join(root, "evidence", late.renderArtifact.path));
+    assert.ok(text.includes("Der Snapshot"), `premise: the delivered PDF's text layer is readable: ${text.slice(0, 120)}`);
+    assert.equal(text.includes("Zu spaet"), false, "late DOM content reached the delivered PDF without invalidating measurement");
   });
 
   it("runs paired controls at one pathname in fresh storage-isolated contexts", (t) => {
@@ -738,7 +787,7 @@ describe("the M2d live production chain", () => {
 
     // The margin note is printed: the PDF's text layer has it.
     const pdf = join(root, "evidence", document.renderArtifact!.path);
-    const text = pdfText(pdf);
+    const text = pdftotextWithoutMarks(pdf);
     assert.match(text, /Margin note printed beside the text/u, "the control note is not in the PDF, so it does not control anything");
   });
 
@@ -772,7 +821,7 @@ describe("the M2d live production chain", () => {
       if (past) strandedByCollector.set(/coda(\d\d)/u.exec(block.blockSignature)![1]!, block.page);
     }
     const pdf = join(root, "evidence", document.renderArtifact!.path);
-    const printed = new Set([...pdfText(pdf).matchAll(/coda(\d\d)/gu)].map((m) => m[1]!));
+    const printed = new Set([...pdftotextWithoutMarks(pdf).matchAll(/coda(\d\d)/gu)].map((m) => m[1]!));
     const missingFromPdf = Array.from({ length: 40 }, (_, i) => String(i + 1).padStart(2, "0")).filter((coda) => !printed.has(coda));
 
     assert.ok(missingFromPdf.length > 0, "no paragraph lost its tail on this browser, so the case was not exercised");
@@ -1170,11 +1219,16 @@ describe("the M2d live production chain", () => {
     assert.equal(new Set(anchors).size, anchors.length, `pages share an anchor: ${JSON.stringify(anchors)}`);
     assert.equal(anchors.some((anchor) => /running-(title|side)/u.test(anchor ?? "")), false, `a page is anchored to a running element: ${JSON.stringify(anchors)}`);
 
-    // The hidden originals are not measured by the rules either: they have no layout box.
+    // The hidden originals are not measured by the rules either: they have no layout box, and
+    // Snapshot 5 records that they printed in the margin boxes (`display: none`, margin copies).
+    for (const id of ["running-title", "running-side"]) {
+      const original: BlockRecord[] = snapshot.blocks.filter((block) => block.authorId === id);
+      assert.deepEqual(original.map((block) => [block.display, block.marginCopies]), [["none", snapshot.pages.length]], `${id}: Snapshot 5 facts`);
+    }
     const tooTall = withProfile(document).report.evaluations.filter((row) =>
       row.ruleId === "layout/unbreakable-block-too-tall" && row.targetRef.sid !== null &&
       snapshot.blocks.some((block) => block.sid === row.targetRef.sid && /running-(title|side)/u.test(block.authorId ?? "")));
-    assert.deepEqual(tooTall.map((row) => [row.status, row.reason]), [["excluded", "rule/target-not-rendered"], ["excluded", "rule/target-not-rendered"]]);
+    assert.deepEqual(tooTall.map((row) => [row.status, row.reason]), [["excluded", "rule/target-in-margin-box"], ["excluded", "rule/target-in-margin-box"]]);
 
     const outcome = withProfile(document);
     assert.deepEqual(

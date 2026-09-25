@@ -125,6 +125,28 @@ body{font:9pt/1.4 Georgia,serif;margin:0} p{margin:0 0 6px}
 </body></html>`;
 
 /**
+ * What Snapshot 5 records per block, against the real paginator: a running title (Paged.js hides
+ * the in-flow original with `display: none` and clones it into a margin box of every page), a list
+ * whose items are flattened with `display: contents` and keep `break-inside: avoid`, an image-only
+ * `display: contents` figure, and a paragraph the author hid.
+ */
+const DISPLAY_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@page{size:120mm 80mm;margin:10mm; @top-center{ content: element(title) } }
+body{font:9pt/1.4 Georgia,serif;margin:0} p{margin:0 0 6px}
+.title{ position: running(title) }
+li{ break-inside: avoid } ul.flat, ul.flat > li { display: contents }
+figure{ margin: 0 } .contents{ display: contents }
+.gone{ display: none }
+</style></head><body>
+<p class="title" id="dtitle">Running title</p>
+<p id="d1">A paragraph before the flattened list.</p>
+<ul class="flat" id="dul"><li id="dli1">First flattened item.</li><li id="dli2">Second flattened item.</li></ul>
+<figure class="contents" id="dfig"><img alt="" width="40" height="30" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='30'%3E%3Crect width='40' height='30'/%3E%3C/svg%3E"></figure>
+<p class="gone" id="dgone">Hidden by the author.</p>
+${Array.from({ length: 12 }, (_, i) => `<p id="dp${i}">Filler paragraph ${i}, one line of running text.</p>`).join("\n")}
+</body></html>`;
+
+/**
  * A `position: fixed` stamp with a nested source block, on a document with a parity-blank page.
  * Paged.js removes the element from the flow and inserts a clone at the head of EVERY page box,
  * the blank page's included: the signature the source-id check accepts for a page-box id.
@@ -182,6 +204,8 @@ describe("the collector, live", () => {
   let servedFootnote = "";
   let footnoteExpectedSids: string[] = [];
   let servedFixed = "";
+  let servedDisplay = "";
+  const displaySidByAuthorId: Record<string, string> = {};
   let servedPageboxMove = "";
   let fixedExpectedSids: string[] = [];
   let pageboxMoveExpectedSids: string[] = [];
@@ -228,6 +252,13 @@ describe("the collector, live", () => {
     for (const html of [FIXED_HTML, PAGEBOX_MOVE_HTML]) {
       assert.equal(detectCollision([{ origin: "document", text: html }]).collided, false);
     }
+    assert.equal(detectCollision([{ origin: "document", text: DISPLAY_HTML }]).collided, false);
+    const display = injectSourceIds(DISPLAY_HTML, "display.html");
+    for (const [sid, ref] of Object.entries(display.map)) {
+      const id = /\bid="([^"]+)"/u.exec(DISPLAY_HTML.slice(ref.offset, ref.offset + 200))?.[1];
+      if (id) displaySidByAuthorId[id] = sid;
+    }
+    servedDisplay = withPagination(display.html, pagedjs, true);
     const fixed = injectSourceIds(FIXED_HTML, "fixed.html");
     for (const [sid, ref] of Object.entries(fixed.map)) {
       const id = /\bid="([^"]+)"/u.exec(FIXED_HTML.slice(ref.offset, ref.offset + 200))?.[1];
@@ -243,7 +274,7 @@ describe("the collector, live", () => {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       const routes: Record<string, string> = {
         "/running.html": servedRunning, "/footnote.html": servedFootnote, "/fixed.html": servedFixed,
-        "/pagebox-move.html": servedPageboxMove,
+        "/pagebox-move.html": servedPageboxMove, "/display.html": servedDisplay,
       };
       res.end(routes[req.url ?? ""] ?? served);
     });
@@ -537,6 +568,33 @@ describe("the collector, live", () => {
     assert.ok(issues.some((issue) => /page box but is not a position: fixed clone/u.test(issue)),
       `a paragraph moved into the page box passed the source-id check: ${JSON.stringify(issues)}`);
     await moved.page.close();
+  });
+
+  /**
+   * Snapshot 5's two block facts, read by the real snapshot payload over the real paginator. The
+   * rules decide by them: the running original is `rule/target-in-margin-box`, the author-hidden
+   * paragraph `rule/target-not-rendered`, and the `display: contents` items and figure are not
+   * judged as boxes at all (`break-inside` does not apply) — see tests/unit/margin-boxes.test.ts.
+   */
+  it("records the computed display and the margin-box copies of every block", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    for (const id of ["dtitle", "dli1", "dli2", "dfig", "dgone", "d1"]) assert.ok(displaySidByAuthorId[id], `no source id was mapped for #${id}`);
+    const { page } = await collect("/display.html");
+    const pages = await page.evaluate<number>(`document.querySelectorAll(".pagedjs_page").length`);
+    assert.ok(pages >= 2, `premise: the document spans pages (${pages})`);
+    const raw = await page.evaluate<RawSnapshot>(SNAPSHOT_SOURCE);
+    const only = (id: string) => {
+      const records = raw.blocks.filter((block) => block.sid === displaySidByAuthorId[id]);
+      assert.equal(records.length, 1, `#${id}: ${records.length} records`);
+      return records[0]!;
+    };
+    const facts = (id: string) => { const b = only(id); return { display: b.display, marginCopies: b.marginCopies, hasBox: b.box.width !== 0 || b.box.height !== 0 }; };
+    assert.deepEqual(facts("dtitle"), { display: "none", marginCopies: pages, hasBox: false }, "the running original");
+    assert.deepEqual(facts("dgone"), { display: "none", marginCopies: 0, hasBox: false }, "the author-hidden paragraph");
+    for (const id of ["dli1", "dli2", "dfig"]) assert.deepEqual(facts(id), { display: "contents", marginCopies: 0, hasBox: false }, `#${id}`);
+    assert.ok((only("dli1").lines ?? []).length > 0, "premise: a display: contents item's text is laid out in lines");
+    assert.deepEqual(facts("d1"), { display: "block", marginCopies: 0, hasBox: true });
+    await page.close();
   });
 
   /** The tokens are real: the pages that ran out of room have one, the last page does not. */
