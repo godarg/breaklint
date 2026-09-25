@@ -56,6 +56,7 @@ const FIXTURE_ORDER = [
   "footnotes-planted-call.html",
   "footnotes-sid-swap.html",
   "footnotes-named-page.html",
+  "footnotes-heading-in-note.html",
 ] as const;
 
 /** The whole registry under the default profile, as the CLI runs it. */
@@ -65,6 +66,30 @@ function withProfile(document: DocumentInput) {
     failOn: config.failOn, activeRules: config.activeRules, optionsByRule: config.optionsByRule,
     coverageFloors: coverageFloorMap(config),
   }).report;
+}
+
+/**
+ * Why each page did or did not bind, for the failure message: every page's evidence record, every
+ * mark's fate in the delivered PDF (found or not, merged into a neighbour or not, its offsets and
+ * its residual against the page's reference) and every refused mark with the bound that refused
+ * it. Only a browser whose PDF carries the marks can answer this, so it is printed where the
+ * assertion that needs one fails — in CI.
+ */
+function whyUnbound(document: DocumentInput): string {
+  const d = document.evidenceDiagnostics;
+  const lines = (document.evidence ?? []).map((page) =>
+    `page ${page.page}: bindsFinding=${page.bindsFinding} conformance=${JSON.stringify(page.conformance)}`);
+  if (!d) return [...lines, "no mark diagnostics (the PDF text layer was not read)"].join("\n");
+  for (const page of d.pages) {
+    lines.push(`page ${page.page}: targets ${page.targetsBound}/${page.targetsTotal} bound, reference ${page.referenceDyMm} mm from ${page.referenceFrom}` +
+      `${page.referenceOutOfRange ? " (out of range)" : ""}${page.divergent ? " DIVERGENT" : ""}, tolerance ${d.toleranceMm} mm`);
+  }
+  for (const mark of d.marks) {
+    lines.push(`  ${mark.token} p${mark.page} ${mark.sid} ${mark.side}: hits=${mark.hits} mergedInto=${mark.containedIn} ` +
+      `dx=${mark.dxMm} dy=${mark.dyMm} residual=${mark.residualDyMm} ${mark.bound ? "BOUND" : "unbound"}`);
+  }
+  for (const mark of d.unplaced) lines.push(`  refused p${mark.page} ${mark.sid} ${mark.side}: ${mark.detail ?? mark.reason}`);
+  return lines.join("\n");
 }
 
 const fatal = (document: DocumentInput) =>
@@ -133,7 +158,7 @@ describe("real-document structures, live", () => {
     // Everything below needs a browser whose PDF carries the marks (CI's current Chrome).
     assert.deepEqual(document.evidence?.map((page) => page.bindsFinding), [true, false, true]);
     assert.deepEqual(report.evidenceCoverage,
-      { required: true, expectedPages: 2, writtenPages: 2, boundPages: 2, status: "complete", reason: null });
+      { required: true, expectedPages: 2, writtenPages: 2, boundPages: 2, status: "complete", reason: null }, whyUnbound(document));
     assert.equal(exitCodeFor(report.verdict), 0, `${report.verdict}: ${report.exitReason}`);
   });
 
@@ -153,7 +178,7 @@ describe("real-document structures, live", () => {
     assert.equal(exitCodeFor(report.verdict), 4);
     // Needs a browser whose PDF carries the marks (CI's current Chrome): pages 1 and 3 bind.
     assert.deepEqual({ status: report.evidenceCoverage?.status, boundPages: report.evidenceCoverage?.boundPages, expectedPages: report.evidenceCoverage?.expectedPages },
-      { status: "partial", boundPages: 2, expectedPages: 3 });
+      { status: "partial", boundPages: 2, expectedPages: 3 }, whyUnbound(document));
   });
 
   it("measures block footnotes on the page they are printed on, and marks them in the footnote area", (t) => {
@@ -169,17 +194,15 @@ describe("real-document structures, live", () => {
       const box = snapshot.pages[record!.page - 1]!.contentBox;
       assert.ok(record!.box.y >= box.y + box.height - 0.5, `premise: ${record!.authorId} sits below the content box`);
     }
-    // Every unplaced mark is the END mark of a note that touches the bottom of the footnote area,
-    // which clips; its start mark is placed, so the note still binds. Before the repair both marks
-    // of every note were refused.
-    const unplaced = (document.evidence ?? []).flatMap((page) => page.unplacedMarks ?? []);
-    const noteSids = new Set(notes.flat().map((record) => record.sid));
-    assert.ok(unplaced.every((mark) => mark.side === "end" && noteSids.has(mark.sid)), `unplaced: ${JSON.stringify(unplaced)}`);
-    assert.ok(unplaced.length <= snapshot.pages.length, `more than one refused mark per page: ${JSON.stringify(unplaced)}`);
+    // Both marks of every note are placed, the end mark of the note that ends on the footnote
+    // area's bottom edge included: the footnote layer hangs in the page box, which does not clip.
+    // Before round 1 both marks of every note were refused; in round 1 (layer in the clipping
+    // footnote area) that end mark was refused.
+    assert.deepEqual((document.evidence ?? []).flatMap((page) => page.unplacedMarks ?? []), [], whyUnbound(document));
     const report = withProfile(document);
     assert.deepEqual(report.findings.map((finding) => `${finding.ruleId}@${finding.page}`), []);
     // Everything below needs a browser whose PDF carries the marks (CI's current Chrome).
-    assert.equal(report.evidenceCoverage?.status, "complete", `evidence: ${JSON.stringify(report.evidenceCoverage)}`);
+    assert.equal(report.evidenceCoverage?.status, "complete", `evidence: ${JSON.stringify(report.evidenceCoverage)}\n${whyUnbound(document)}`);
     assert.equal(exitCodeFor(report.verdict), 0, `${report.verdict}: ${report.exitReason}`);
   });
 
@@ -193,7 +216,7 @@ describe("real-document structures, live", () => {
     const report = withProfile(document);
     assert.deepEqual(report.findings.map((finding) => `${finding.ruleId}@${finding.page}`), []);
     // Everything below needs a browser whose PDF carries the marks (CI's current Chrome).
-    assert.equal(report.evidenceCoverage?.status, "complete", `evidence: ${JSON.stringify(report.evidenceCoverage)}`);
+    assert.equal(report.evidenceCoverage?.status, "complete", `evidence: ${JSON.stringify(report.evidenceCoverage)}\n${whyUnbound(document)}`);
     assert.equal(exitCodeFor(report.verdict), 0, `${report.verdict}: ${report.exitReason}`);
   });
 
@@ -233,7 +256,36 @@ describe("real-document structures, live", () => {
     assert.ok(report.coverage["layout/widow"]?.ok, `widow coverage: ${JSON.stringify(report.coverage["layout/widow"])}`);
     assert.deepEqual(report.findings.map((finding) => `${finding.ruleId}@${finding.page}`), []);
     // Needs a browser whose PDF carries the marks (CI's current Chrome).
-    assert.equal(report.evidenceCoverage?.status, "complete", `evidence: ${JSON.stringify(report.evidenceCoverage)}`);
+    assert.equal(report.evidenceCoverage?.status, "complete", `evidence: ${JSON.stringify(report.evidenceCoverage)}\n${whyUnbound(document)}`);
+    assert.equal(exitCodeFor(report.verdict), 0, `${report.verdict}: ${report.exitReason}`);
+  });
+
+  it("does not report a heading printed inside a block footnote as stranded", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = doc(t, "footnotes-heading-in-note.html");
+    if (!document) return;
+    assert.deepEqual(fatal(document).filter((event) => event.kind !== "break-cause-undetermined"), [], "the run did not reach the rules");
+    const snapshot = document.snapshot;
+    assert.ok(snapshot);
+    const headings = snapshot.blocks.filter((block) => block.authorId === "fn-heading");
+    assert.ok(headings.length > 0, "premise: the note's heading is recorded");
+    for (const heading of headings) {
+      const box = snapshot.pages[heading.page - 1]!.contentBox;
+      assert.ok(heading.box.y >= box.y + box.height - 0.5, `premise: the note's heading sits below the content box on page ${heading.page}`);
+    }
+    const report = withProfile(document);
+    assert.deepEqual(report.findings.map((finding) => `${finding.ruleId}@${finding.page}: ${finding.message.slice(0, 60)}`), []);
+    const rows = report.evaluations.filter((row) => row.ruleId === "layout/heading-at-page-bottom" &&
+      headings.some((heading) => heading.nodeKey === row.targetRef.nodeKey));
+    assert.deepEqual([...new Set(rows.map((row) => `${row.status}:${row.reason}`))], ["excluded:rule/target-outside-content-box"]);
+    // A page that prints only the carried-over note is declined by the fill rule, not measured.
+    for (const page of snapshot.pages.filter((p) => !snapshot.blocks.some((b) => b.page === p.pageNumber &&
+      b.box.y < p.contentBox.y + p.contentBox.height && b.box.y + b.box.height > p.contentBox.y) && snapshot.blocks.some((b) => b.page === p.pageNumber))) {
+      const row = report.evaluations.find((r) => r.ruleId === "layout/orphaned-continuation-page" && r.targetRef.nodeKey === page.nodeKey);
+      assert.equal(row?.reason, "env/invalid-measurement", `page ${page.pageNumber}: ${JSON.stringify(row)}`);
+    }
+    // Needs a browser whose PDF carries the marks (CI's current Chrome).
+    assert.equal(report.evidenceCoverage?.status, "complete", `evidence: ${JSON.stringify(report.evidenceCoverage)}\n${whyUnbound(document)}`);
     assert.equal(exitCodeFor(report.verdict), 0, `${report.verdict}: ${report.exitReason}`);
   });
 });

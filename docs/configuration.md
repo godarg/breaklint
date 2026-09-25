@@ -139,6 +139,33 @@ set-like values therefore does not change it; changing an effective option does.
 
 Report schema and snapshot schema evolve independently. The current source-bound report is schema 5, stored measurement snapshots are schema 4, and Configuration Contract remains v1. Each changes only when its own structure changes — including for an additive, optional field: an optional property does not let a schema-aware consumer tell the two shapes apart, and a strict decoder may reject it. Report schema 5 adds the optional `remediation` on a finding. Readers accept 4 and 5; only the emitter moved.
 
+### Required evidence: what `evidenceCoverage` counts
+
+With evidence binding on (the default), `documents[].evidenceCoverage` says whether every page
+that must carry evidence does. **Its meaning changed without a schema stamp, and a consumer must
+note it:** `expectedPages` is the number of pages that must bind — the document's pages less the
+pages excused as proven blank — not the document's page count, and `complete` means
+`boundPages === expectedPages`. **`complete` therefore no longer implies that every page has
+`bindsFinding: true`.** A page excused as blank keeps its `evidence[]` record with
+`bindsFinding: false`, and is listed explicitly: one `documents[].notMeasured` row per excused page,
+`{ scope: "page", ruleId: null, reason: "env/parity-blank-page", target: { keyType: "page",
+nodeKey: "page:N", sid: null }, count: 1 }`. These rows are never aggregated, so the excused page
+numbers are read from `target.nodeKey`, not inferred. When a page is excused, and when it is not,
+is stated in `docs/limitations.md`.
+
+`documents[].notMeasured` rows with `ruleId: null` are declines of the evidence apparatus, not of a
+rule, and do not count against any rule's coverage. The complete list:
+
+| reason | scope | meaning |
+|---|---|---|
+| `env/evidence-overlay-removed` | document | the overlay was installed but binding was not possible — the marked PDF differed from the unmarked one, a mark's style was overridden, or the comparison could not run — so the unmarked PDF is delivered and nothing binds |
+| `env/evidence-fragment-outside-page` | page | a mark was refused because it would lie outside the bound for its fragment; rows aggregate per reason |
+| `env/parity-blank-page` | page | the page is excused from required evidence as proven blank; one row per page, never aggregated |
+
+`env/parity-blank-page` also appears WITH a rule id (`layout/half-empty-page`,
+`layout/orphaned-continuation-page`), where it is that rule's decline of a blank page; those rows
+aggregate like every rule decline.
+
 ## Command-line output options
 
 `--format`, `--out` and `--out-dir` are command-line options only; a config file cannot set them,

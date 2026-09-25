@@ -21,6 +21,8 @@ What is measured is `netFill`, the summed height of semantic bands — not `vert
 
 A parity blank page is declined, not reported: it has `netFill` 0 and would fire under any threshold, and the author asked for it with `break-before: right`. The last page keeps its `warn` finding, but when it also carries no continuation and no forced break, the message says it is likely intended.
 
+A page whose content box holds nothing while it prints blocks elsewhere — a long footnote that Paged.js carried over to a page of its own — is declined as `env/invalid-measurement`, counted against coverage: `netFill` is the fill of the content box, which on such a page is empty (0 px tall under a full footnote area on a measured example), so "0 % filled" would describe a page full of footnote text.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with

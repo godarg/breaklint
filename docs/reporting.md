@@ -36,6 +36,15 @@ candidate is still `insufficient-coverage`. Its primary HTML summary says `Not e
 `Coverage met`. This preserves both truths instead of allowing a row-level arithmetic fact to
 overwrite the run verdict.
 
+### Evidence coverage and excused blank pages
+
+The canonical `evidenceCoverage.expectedPages` counts the pages that must carry evidence, which is
+the document's page count less the pages excused as proven blank; `complete` means every one of
+those binds, so a complete run can have an `evidence[]` record with `bindsFinding: false` — the
+excused page's. Each excused page is named in its own `notMeasured` row (`ruleId: null`,
+`env/parity-blank-page`, `target.nodeKey: "page:N"`). A reporter that says "every page evidenced"
+from `complete` alone overstates it; `docs/configuration.md` lists every `ruleId: null` decline.
+
 ## Finding grammar
 
 Each finding is a vertical `article`, in this order:

@@ -1012,6 +1012,7 @@ export function finalizeEvidenceAcquisition(
     evidence: evidence.evidence,
     boundSids: [...evidence.boundSids],
     notMeasured,
+    ...(evidence.diagnostics ? { evidenceDiagnostics: evidence.diagnostics } : {}),
   };
 }
 

@@ -39,6 +39,9 @@ import { boundaryFactsFrom, COLLECTOR_SOURCE, type CollectorResult } from "../..
 import { PAGED_FOOTNOTE_CALLS_SOURCE } from "../../src/paginate/pagedjs-structure.ts";
 import { produceEvidence } from "../../src/render/evidence.ts";
 import { faithfulRasterizer, OverlayPage } from "../fixtures/evidence-harness.ts";
+import { loadCorpus } from "../fixtures/corpus.ts";
+import { runDocument } from "../../src/core/engine.ts";
+import { VALIDATION_RULES_BY_ID } from "../../src/rules/index.ts";
 import { evaluatePayload, pagedDocument, pagedPage, runCollector, type FakeNode } from "../fixtures/paged-dom.ts";
 
 const STRIDE = 700;
@@ -182,6 +185,84 @@ describe("the evidence overlay marks a block footnote in the footnote area", () 
       assert.equal(installation.layers, 2, "one layer in the content box and one in the footnote area");
       assert.deepEqual(outcome.evidence.map((record) => record.bindsFinding), [true]);
       assert.ok(outcome.boundSids.has("fn1"), "the footnote itself did not bind");
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("round 2: what the page rules do with the footnote area", () => {
+  const run = (name: string, ruleId: string) => {
+    const entry = loadCorpus().find((item) => item.name === name)!;
+    const rule = VALIDATION_RULES_BY_ID.get(ruleId)!;
+    return runDocument({ path: name, snapshot: entry.snapshot, infrastructure: [] },
+      { failOn: "never", activeRules: [rule], optionsByRule: {}, coverageFloors: {} }).report;
+  };
+
+  it("a heading inside a block footnote is not a heading-at-page-bottom candidate", () => {
+    const report = run("heading-bottom-clean-heading-inside-footnote", "layout/heading-at-page-bottom");
+    assert.deepEqual(report.findings.map((finding) => finding.message), [], "a heading inside a footnote was reported as stranded");
+    const row = report.evaluations.find((evaluation) => evaluation.targetRef.nodeKey === "fnh");
+    assert.deepEqual([row?.status, row?.reason, row?.countsTowardCoverage], ["excluded", "rule/target-outside-content-box", false]);
+    assert.equal(report.coverage["layout/heading-at-page-bottom"]?.candidates, 0);
+  });
+
+  it("a page that prints only a footnote continuation is declined by both fill rules, not measured as fine", () => {
+    for (const ruleId of ["layout/orphaned-continuation-page", "layout/half-empty-page"]) {
+      const report = run("orphaned-continuation-clean-footnote-only-page", ruleId);
+      const row = report.evaluations.find((evaluation) => evaluation.targetRef.nodeKey === "pg2");
+      assert.deepEqual([row?.status, row?.reason], ["not-measured", "env/invalid-measurement"], `${ruleId}: ${JSON.stringify(row)}`);
+      assert.ok(report.notMeasured.some((n) => n.ruleId === ruleId && n.reason === "env/invalid-measurement"));
+      assert.equal(report.coverage[ruleId]?.measured, 1, `${ruleId}: the footnote-only page counted as measured`);
+      assert.deepEqual(report.findings.map((finding) => finding.page).filter((page) => page === 2), []);
+    }
+  });
+
+  it("marks both edges of a note that fills the footnote area, from a layer in the page box", async () => {
+    const outDir = mkdtempSync(join(tmpdir(), "breaklint-footnote-edges-"));
+    try {
+      // The only note fills the 30 px footnote area exactly: it starts on its top edge and ends on
+      // its bottom edge. Round 1 hung the layer in the (clipping) footnote area and refused the end
+      // mark; the page box does not clip, so both edges carry a mark.
+      const doc: FakeNode = pagedDocument([pagedPage({
+        pageBox: pageBox(0), contentBox: contentBox(0), footnoteBox: footnoteBox(0),
+        content: `<p data-bl-sid="p1" data-ref="ref-p1" data-test-box="${lineBox(0, 0)}">Text.</p>${call(REF_A)}`,
+        footnotes: note(REF_A, "aside", "A note that fills the area.", "fn1", "56.69 366.85 453.53 30"),
+      })]);
+      const page = new OverlayPage(doc);
+      await produceEvidence({
+        page, closePage: async () => page.close(), rasterizer: faithfulRasterizer(page, { pages: 1 }),
+        options: { outDir, documentKey: "footnote-edges", binding: true },
+      });
+      const installation = page.installation!;
+      assert.deepEqual(installation.unplacedMarks, []);
+      assert.deepEqual(installation.marks.filter((mark) => mark.sid === "fn1").map((mark) => [mark.side, mark.yPx]),
+        [["start", 366.85], ["end", 396.85]]);
+      const layers = evaluatePayload<string[]>(
+        `window.__blPrimitives.all(document, ".bl-overlay").map((layer) => window.__blPrimitives.attr(window.__blPrimitives.parent(layer), "class"))`, doc);
+      assert.deepEqual(layers.sort(), ["pagedjs_page_content", "pagedjs_pagebox"]);
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+
+  it("still refuses a footnote mark outside the footnote area, where the note is clipped away", async () => {
+    const outDir = mkdtempSync(join(tmpdir(), "breaklint-footnote-clipped-"));
+    try {
+      // The note overflows the area at the top (Paged.js packs notes to the bottom); its top is
+      // clipped and not printed, so no mark may stand there. Its end is inside and is marked.
+      const doc: FakeNode = pagedDocument([pagedPage({
+        pageBox: pageBox(0), contentBox: contentBox(0), footnoteBox: footnoteBox(0),
+        content: `<p data-bl-sid="p1" data-ref="ref-p1" data-test-box="${lineBox(0, 0)}">Text.</p>${call(REF_A)}`,
+        footnotes: note(REF_A, "aside", "A note taller than its area.", "fn1", "56.69 356.85 453.53 40"),
+      })]);
+      const page = new OverlayPage(doc);
+      await produceEvidence({
+        page, closePage: async () => page.close(), rasterizer: faithfulRasterizer(page, { pages: 1 }),
+        options: { outDir, documentKey: "footnote-clipped", binding: true },
+      });
+      assert.deepEqual(page.installation!.unplacedMarks, [{ sid: "fn1", page: 1, side: "start", reason: "fragment-outside-page" }]);
+      assert.deepEqual(page.installation!.refusals?.map((r) => r.detail.split(" (")[0]), ["above the footnote area"]);
     } finally {
       rmSync(outDir, { recursive: true, force: true });
     }

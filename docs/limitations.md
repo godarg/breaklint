@@ -369,18 +369,31 @@ reports it:
   footnote (`float: footnote` on a `<span>`) has no source id of its own: its text is judged by
   the type rules as part of the paragraph it was written in and attributed to that paragraph,
   including when Paged.js prints the note on a later page. The page rules measure the content
-  box, which Paged.js shortens by the footnote area's height: the fill of `layout/half-empty-page`
-  and `layout/orphaned-continuation-page` is the fill of that box, and a block counts as
-  following a heading (`layout/heading-at-page-bottom`) or as fresh content on a page
-  (`layout/orphaned-continuation-page`) only when it starts inside it — a footnote below the
-  content box used to hide a heading stranded above it and a continuation-only page, on exactly
-  the pages that carry footnotes. That test (`startsInContentBox`) is geometric, and it is the
-  rule's own quantity: a block that starts at or below the foot of the content box cannot occupy
-  the space these rules measure. A page's break edges are read from its page content: a footnote
-  is on the page, but it is neither where the page's flow ends nor inside the element it was
-  written in, and read as the last node it made an ordinary overflow inside a named-page chapter a
-  change of named page — a false `forced` break that silenced four layout rules (measured on
-  `footnotes-named-page.html`: `layout/widow` below its floor, exit 4).
+  box, which Paged.js shortens by the footnote area's height, and they read footnote-area content
+  as follows:
+  - `layout/heading-at-page-bottom`: a block counts as following a heading only when it starts
+    inside the content box, so a footnote below it no longer hides a heading stranded above it; and
+    a heading printed INSIDE a footnote (a structured note with its own `<h4>`) is not a candidate
+    at all — it is recorded `excluded` with `rule/target-outside-content-box`. Before, it was
+    reported as stranded with a negative remaining space (-1.01 line heights).
+  - `layout/orphaned-continuation-page` (F4's flow blocks) and `layout/half-empty-page`: a page
+    whose content box holds nothing while the page prints blocks elsewhere — a long footnote that
+    Paged.js continued onto a page of its own — is declined as `env/invalid-measurement`, counted
+    against coverage. Its fill quantities are the fill of an empty box (on a measured example the
+    box was 0 px tall under a full footnote area), so "0 % filled" and "continuation-only: false"
+    were both false measurements.
+  - These tests are geometric (`startsInContentBox`, `printsOnlyOutsideContentBox`, over each
+    block's `renderedBox`, never the zero box of a `display: contents` block). They use each rule's
+    own quantity — the content box — rather than guessing membership: flow content cannot start at
+    or below the foot of the content box, because Paged.js moves what does not fit to the next
+    page. Footnote membership is not recorded structurally in the snapshot; recording it (from the
+    `data-note="footnote"` ancestry the source-id check already reads) would change the snapshot's
+    shape and is left for a release that moves the snapshot stamp.
+  - A page's break edges are read from its page content: a footnote is on the page, but it is
+    neither where the page's flow ends nor inside the element it was written in, and read as the
+    last node it made an ordinary overflow inside a named-page chapter a change of named page — a
+    false `forced` break that silenced four layout rules (measured on `footnotes-named-page.html`:
+    `layout/widow` below its floor, exit 4).
 - **The footnote call's random `href` is recognised, narrowly.** Paged.js builds each footnote call
   as `<a data-footnote-call="R" data-ref="R" data-data-counter-footnote-increment="1"
   href="#note-R">`, where `R` is the note's `data-ref` — a random value drawn per run unless the
@@ -396,14 +409,19 @@ reports it:
   a note inside a footnote area — is recognised like a real footnote; what that buys it is that
   the spelling of `#note-R`, a same-document fragment that is never fetched, is not compared. The
   number of calls still is.
-- **Footnote evidence marks hang in the footnote area.** A block footnote lies below the content
-  box, where a mark in the content-box layer would be carried into an off-page column; its marks
-  hang from a second layer in the footnote area, which Paged.js positions and clips. The footnote
-  area's bottom edge clips, so the END mark of a note that touches it — usually the last note on
-  the page, because Paged.js packs the notes to the bottom — is refused and declared as
-  `env/evidence-fragment-outside-page`; its start mark binds the note. Whether the PDF text layer
-  returns the footnote marks at their position is established by the live suite on current Chrome
-  only (`tests/live/real-documents.test.ts`), for the reason given below.
+- **Footnote evidence marks hang in the page box, bounded by the footnote area.** A block footnote
+  lies below the content box, where the content-box layer refuses marks, so its marks hang from a
+  second layer. In round 1 that layer hung in the footnote area itself; on Chrome 153 in CI one
+  footnote page of `footnotes-block.html` and of `footnotes-named-page.html` then did not bind
+  (evidence `partial`, 1 of 2 pages), while inline footnotes, blank pages and the parity case bound.
+  The footnote area clips (`overflow: hidden`) and Paged.js packs the notes to its bottom, so a note
+  that fills the area has both edges on the clip edge, and the bottom one was refused. The layer now
+  hangs in the page box, which is positioned, does not clip inside the page and is not a
+  multi-column fragmentainer; a mark may lie ON the footnote area's edge but not outside it, where
+  a note is clipped away. **Whether this binds on Chrome 153 is not established on the build these
+  repairs were developed on** (its PDF carries no marks); the live suite prints every mark's fate —
+  found or not, merged into a neighbouring text item or not, its offsets and residual, and the bound
+  that refused it — when a footnote page does not bind, and asserts that it binds.
 
 **The source-id integrity check reads the order of the flow; copies outside it are checked for
 identity, presence and the signature of the Paged.js step that put them there, not for order.**
@@ -451,20 +469,24 @@ proven empty.** The blank page a `break-before: right`, `left`, `recto` or `vers
 source block and so no mark, and until this was decided every document with one ended exit 4
 under evidence binding (measured on `blank-right-running-header.html` and
 `margin-running-parity.html`). Such a page now leaves the binding requirement, with a page-scope
-`env/parity-blank-page` decline in `notMeasured` (`ruleId: null`; it names the page when a
-document has one such page and counts them when it has several), when five answers agree: Paged.js marked it `pagedjs_blank_page`; its page area in the DOM is
+`env/parity-blank-page` decline in `notMeasured` (`ruleId: null`; one row per excused page,
+naming it in `target.nodeKey`, never aggregated), when five answers agree: Paged.js marked it `pagedjs_blank_page`; its page area in the DOM is
 exactly Paged.js' empty page template — no element other than the template's containers, no text,
 no `::before`/`::after` content (a structural test: the margin boxes are outside the area, so the
 running header and the page number on a blank page are expected and do not count); the delivered
-PDF's text layer has no text item inside the page area's rectangle; the delivered PDF's raster of
-that rectangle, rounded inward to whole pixels, is one flat colour; and the snapshot,
+PDF's text layer has no text item that reaches into the page area's rectangle (its whole extent,
+so margin-box text that runs into the area counts); the delivered PDF's raster of that rectangle,
+rounded OUTWARD to whole pixels so that a hairline on the area's own edge is read, is one flat
+colour; and the snapshot,
 independently, calls the page blank and has no block on it. Its evidence record keeps
 `bindsFinding: false`, and `evidenceCoverage.expectedPages` counts the pages that must bind — the
 document's pages less the excused ones — so `complete` still means `boundPages ===
 expectedPages`. What is therefore NOT excused and still ends exit 4 under evidence binding: a
 blank-marked page that prints anything inside its page area — generated content such as
-"This page is intentionally left blank" (`blank-generated-content.html`), a background, a rule, a
-running element that reaches into the area; an empty page Paged.js did not insert as blank; and a
+"This page is intentionally left blank" (`blank-generated-content.html`), a gradient or an image
+background, a partial fill, a rule or outline, a running element or margin text that reaches into
+the area. A flat colour across the whole area — a page or area background — is not content: it is
+the paper, and such a page is excused like white paper; an empty page Paged.js did not insert as blank; and a
 page on which only the snapshot sees nothing. The PDF half of the decision reads the raster and
 the text layer, not the marks, so it is observable on the Chromium 141 build these repairs were
 developed on; whether the other pages of such a document then bind is not (see above).

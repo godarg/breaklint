@@ -1,0 +1,28 @@
+<!doctype html>
+<!--
+  A block footnote with a heading of its own inside it.
+
+  COMPLICATION. The heading is a source block, and Paged.js prints it in the footnote area, below
+  the content box. Measured against the content box, a heading there has nothing after it inside
+  the box and a NEGATIVE remaining space, so `layout/heading-at-page-bottom` reported it as
+  stranded ("-1.01 of its own line heights left") — a heading that does not end the page's text
+  at all. Paged.js also carries this structured note over to a page of its own whose content box
+  holds nothing; a fill rule must not call that page, full of footnote text, empty.
+
+  Nothing in this document should be reported under the default profile.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 130mm 100mm; margin: 12mm; }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0 0 5px; }
+h2 { margin: 0 0 6px; font-size: 12pt; }
+.fn { float: footnote; font-size: 8pt; }
+.fn h4 { margin: 0; font-size: 8pt; }
+.fn p { margin: 0; }
+</style></head><body>
+<h2 id="title">A chapter with a structured note</h2>
+<p id="p1">A paragraph whose footnote has a heading and a body.</p>
+<aside class="fn" id="fn-structured"><h4 id="fn-heading">The note's own heading</h4><p id="fn-body">The note's body, under its heading.</p></aside>
+<p id="p2">The second paragraph of the chapter.</p>
+<p id="p3">The third paragraph of the chapter.</p>
+</body></html>

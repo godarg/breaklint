@@ -84,6 +84,8 @@ export interface FaithfulPdf {
   ink?: Readonly<Record<number, number>>;
   /** Regions the evidence path asked about, for assertions. */
   asked?: { page: number; region: DeviceRegion }[];
+  /** A 1-based page whose PNG claims the wrong size, so the evidence of the document is incomplete. */
+  badPngPage?: number;
 }
 
 /** A PDF whose text layer holds every placed token exactly where the overlay recorded it. */
@@ -94,7 +96,12 @@ export function faithfulRasterizer(page: OverlayPage, pdf: FaithfulPdf): Rasteri
     async rasterise() { return dims; },
     async diff() { return { pagesA: pdf.pages, pagesB: pdf.pages, pixels: 0 }; },
     async dropPixels() {},
-    async encodePng() { return PNG; },
+    async encodePng(_key: string, pageIndex: number) {
+      if (pdf.badPngPage !== pageIndex + 1) return PNG;
+      const wrong = Uint8Array.from(PNG);
+      new DataView(wrong.buffer).setUint32(16, RASTER.width + 1);
+      return wrong;
+    },
     async textItems(): Promise<PdfTextPage[]> {
       const marks = page.installation?.marks ?? [];
       return Array.from({ length: pdf.pages }, (_, index) => ({

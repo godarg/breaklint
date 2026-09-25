@@ -32,7 +32,7 @@ const DEFAULT_SPECS = [
   { file: "tests/live/breaks.test.ts", suite: "the collector, live", leaves: 10 },
   { file: "tests/live/fragmentation-levers.test.ts", suite: "fragmentation levers under Paged.js, live", leaves: 6 },
   { file: "tests/live/render-run.test.ts", suite: "the M2d live production chain", leaves: 35 },
-  { file: "tests/live/real-documents.test.ts", suite: "real-document structures, live", leaves: 8 },
+  { file: "tests/live/real-documents.test.ts", suite: "real-document structures, live", leaves: 9 },
   { file: "tests/live/cli-out-dir.test.ts", suite: "the CLI evidence directory, live", leaves: 1 },
 ];
 

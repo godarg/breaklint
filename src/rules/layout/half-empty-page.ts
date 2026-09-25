@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { pageKey } from "../../core/fingerprint.ts";
-import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
+import { declined, makeFinding, num, outsideContentBoxPageDeclined, printsOnlyOutsideContentBox, targetEvaluation } from "../shared.ts";
 
 /**
  * layout/half-empty-page — a page carries far less content than it could.
@@ -46,7 +46,7 @@ export const halfEmptyPage = defineRule(
     unit: "fill ratio",
     defaultOptions: { minNetFill: 0.6, maxTopGap: 0.5 },
     summary: "A page is filled well below what its content box allows.",
-    declines: ["env/parity-blank-page", "env/forced-break"],
+    declines: ["env/parity-blank-page", "env/forced-break", "env/invalid-measurement"],
     remediation: {
       advice:
         "This rule fires on either of two quantities: the page's net fill ratio fell below the uncalibrated threshold, or its content starts more than half a page down. Read the finding's measurement to see which. If the page naturally concludes a section, chapter or document, either is expected and may be disregarded. If unintended: for low fill, check whether a following block forced an early break with 'break-before: page' or an oversized 'break-inside: avoid' container; for a late start, look for a leading margin, an empty block or a float above the first line.",
@@ -75,6 +75,14 @@ export const halfEmptyPage = defineRule(
           declined({ scope: "page", ruleId: "layout/half-empty-page", reason: "env/parity-blank-page" }),
         );
         evaluations.push(targetEvaluation({ ruleId: "layout/half-empty-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "not-measured", reason: "env/parity-blank-page" }));
+        continue;
+      }
+      // A page that prints only outside its content box (a long footnote continued onto a page of
+      // its own) is not 0 % filled; its fill quantities describe an empty, 0 px tall box.
+      if (printsOnlyOutsideContentBox(snapshot, page)) {
+        const decline = outsideContentBoxPageDeclined("layout/half-empty-page", page);
+        notMeasured.push(decline.notMeasured);
+        evaluations.push(decline.evaluation);
         continue;
       }
       measured += 1;

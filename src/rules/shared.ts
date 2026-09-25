@@ -277,3 +277,59 @@ export function startsInContentBox(box: Box, page: PageRecord): boolean {
   return box.y < page.contentBox.y + page.contentBox.height;
 }
 
+/**
+ * The evaluation a content-box rule records for a candidate printed below its page's content box,
+ * in the footnote area (see `startsInContentBox`): `excluded`, outside the coverage base. A
+ * heading inside a footnote does not end the page's text; the question has no referent there.
+ */
+export function outsideContentBoxEvaluation(ruleId: string, block: {
+  nodeKey: string; sid: string | null; fragmentIndex: number; box: Box;
+}, rendered: Box, page: PageRecord): TargetEvaluation {
+  return targetEvaluation({
+    ruleId, keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex,
+    boxScreen: block.box, status: "excluded", countsTowardCoverage: false, reason: "rule/target-outside-content-box",
+    measurements: [
+      { name: "target-top", value: rendered.y, unit: "px", operator: "<", threshold: page.contentBox.y + page.contentBox.height },
+    ],
+    connective: "single", violated: null,
+  });
+}
+
+/**
+ * A page whose content box holds nothing while the page prints blocks elsewhere: every printed
+ * block (`renderedBox`) lies wholly above or below the content box. The case is a long block
+ * footnote that Paged.js continued onto a page of its own, where the footnote area takes the whole
+ * page area and the content box is 0 px tall. The page is not blank — it prints the note — but
+ * every fill quantity of the snapshot is the fill of that empty box, so a rule that judges fill
+ * would call a page full of footnote text 0 % filled. Such a rule declines the page
+ * (`env/invalid-measurement`, counted against coverage) instead of measuring it.
+ */
+export function printsOnlyOutsideContentBox(snapshot: Snapshot, page: PageRecord): boolean {
+  const top = page.contentBox.y;
+  const bottom = page.contentBox.y + page.contentBox.height;
+  let printed = 0;
+  for (const block of snapshot.blocks) {
+    if (block.page !== page.pageNumber) continue;
+    const box = renderedBox(snapshot, block);
+    if (box === null) continue;
+    if (box.y < bottom && box.y + box.height > top) return false;
+    printed += 1;
+  }
+  return printed > 0;
+}
+
+/** The decline a fill rule records for a page that `printsOnlyOutsideContentBox`. */
+export function outsideContentBoxPageDeclined(ruleId: string, page: PageRecord): { notMeasured: NotMeasured; evaluation: TargetEvaluation } {
+  return {
+    notMeasured: declined({ scope: "page", ruleId, reason: "env/invalid-measurement" }),
+    evaluation: targetEvaluation({
+      ruleId, keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox,
+      status: "not-measured", reason: "env/invalid-measurement",
+      measurements: [
+        { name: "content-box-holds-a-block", value: false, unit: null, operator: "=", threshold: true },
+        { name: "content-box-height", value: page.contentBox.height, unit: "px", operator: null, threshold: null },
+      ],
+      connective: "single", violated: null,
+    }),
+  };
+}

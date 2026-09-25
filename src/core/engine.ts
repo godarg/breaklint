@@ -29,6 +29,7 @@ import type { FailOn, RunVerdict, Severity } from "./enums.ts";
 /** Whether this event alone makes the run exit 3. See `NON_FATAL_INFRA_EVENT_KINDS`. */
 const isFatalInfra = (event: InfraEvent): boolean => !IS.nonFatalInfraEventKind.has(event.kind);
 import { fingerprint } from "./fingerprint.ts";
+import type { EvidenceDiagnostics } from "../render/evidence.ts";
 import type { Rule, RuleOptions } from "./rule.ts";
 import { aggregateNotMeasured } from "./rule.ts";
 import type {
@@ -71,6 +72,12 @@ export interface DocumentInput {
   boundSids?: readonly string[];
   /** Document-level measurement declines emitted by acquisition/evidence apparatus. */
   notMeasured?: readonly NotMeasured[];
+  /**
+   * Per-mark and per-page evidence diagnostics (`src/render/evidence.ts`). Carried for callers
+   * that need to explain a page that did not bind — the live suite prints it — and deliberately
+   * NOT projected into the report: the engine never reads it.
+   */
+  evidenceDiagnostics?: EvidenceDiagnostics;
   /** Acquisition identity survives withdrawal of an invalid measured snapshot. */
   acquisition?: { inputIdentity: InputIdentity; resources: readonly ResourceRecord[] };
 }
@@ -127,7 +134,7 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
         pages: 0,
         coverage: {},
         findings: [],
-        notMeasured: aggregateNotMeasured(documentNotMeasured),
+        notMeasured: documentLevelNotMeasured(documentNotMeasured),
         infrastructure,
         evidence: input.evidence ?? [],
         evaluations: [],
@@ -310,13 +317,34 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
       pages: snapshot.pages.length,
       coverage,
       findings,
-      notMeasured: aggregateNotMeasured(documentNotMeasured),
+      notMeasured: documentLevelNotMeasured(documentNotMeasured),
       infrastructure,
       evidence: input.evidence ?? [],
       evaluations,
     },
     measuredRuleIds,
   };
+}
+
+/**
+ * A page excused from the evidence requirement as proven blank is the one document-level decline
+ * that is kept per page: each such row names its page (`target.nodeKey = "page:N"`, count 1), in
+ * page order, after the aggregated rows. Aggregated, several excused pages became one row with
+ * `target: null`, and a consumer could no longer read WHICH pages `evidenceCoverage.expectedPages`
+ * left out without inferring it from the evidence records.
+ */
+function isExcusedBlankPage(row: NotMeasured): boolean {
+  return row.scope === "page" && row.ruleId === null && row.reason === "env/parity-blank-page" &&
+    row.count === 1 && row.target?.keyType === "page";
+}
+
+function documentLevelNotMeasured(rows: readonly NotMeasured[]): NotMeasured[] {
+  const excused = rows.filter(isExcusedBlankPage);
+  const pageOf = (row: NotMeasured): number => Number((row.target?.nodeKey ?? "").replace(/^page:/u, ""));
+  return [
+    ...aggregateNotMeasured(rows.filter((row) => !isExcusedBlankPage(row))),
+    ...excused.map((row) => ({ ...row })).sort((a, b) => pageOf(a) - pageOf(b)),
+  ];
 }
 
 function evidenceCoverageFor(input: DocumentInput): DocumentEvidenceCoverage | undefined {

@@ -371,6 +371,24 @@ export function loadCorpus(): CorpusEntry[] {
       }),
     },
     {
+      name: "heading-bottom-clean-heading-inside-footnote",
+      kind: "clean",
+      about: "layout/heading-at-page-bottom",
+      complication:
+        "A heading INSIDE a block footnote. Paged.js prints it in the footnote area below the content " +
+        "box, so measured against the content box it has a negative remaining space and nothing " +
+        "after it inside the box: -1.01 line heights, reported as stranded. It does not end the " +
+        "page's text; it is not a candidate.",
+      snapshot: snapshot({
+        pages: [page(1, { contentBox: box(48, 48, 399, 560) })],
+        blocks: [
+          block("p1", { box: box(48, 48, 399, 300) }),
+          block("fn", { tag: "aside", box: box(48, 612, 399, 40) }),
+          block("fnh", { tag: "h3", box: box(48, 612, 399, 20), lineHeight: 20 }),
+        ],
+      }),
+    },
+    {
       name: "heading-bottom-trigger-above-footnotes",
       kind: "trigger",
       about: "layout/heading-at-page-bottom",
@@ -471,6 +489,29 @@ export function loadCorpus(): CorpusEntry[] {
         blocks: [
           block("c1", { fragmentIndex: 1, fragmentCount: 2 }),
           block("fn", { tag: "aside", box: box(48, 630, 399, 20) }),
+        ],
+      }),
+    },
+    {
+      name: "orphaned-continuation-clean-footnote-only-page",
+      kind: "clean",
+      about: "layout/orphaned-continuation-page",
+      complication:
+        "A long block footnote that Paged.js continued onto a page of its own: the footnote area " +
+        "takes the whole page area, the content box is 0 px tall, and the page prints only the " +
+        "note's second fragment. The rule's flow is empty and its fill quantity is the fill of an " +
+        "empty box, so it cannot judge the page; measured as continuation-only: false it read as a " +
+        "checked page. It is declined as env/invalid-measurement and counted.",
+      snapshot: snapshot({
+        pages: [
+          page(1, { fill: { vertical: 0.9, topGap: 0, net: 0.9, area: 1 } }),
+          page(2, { isLast: true, contentBox: box(48, 654, 399, 0), fill: { vertical: 0, topGap: 0, net: 0, area: 0 },
+            outgoingBreakCause: { kind: "document-end", determinedBy: "document-boundary", cascadeHint: null } }),
+        ],
+        blocks: [
+          block("p1", { page: 1, box: box(48, 48, 399, 300) }),
+          block("fn:0", { sid: "s-fn", tag: "aside", page: 1, fragmentIndex: 0, fragmentCount: 2, box: box(48, 600, 399, 40) }),
+          block("fn:1", { sid: "s-fn", tag: "aside", page: 2, fragmentIndex: 1, fragmentCount: 2, box: box(48, 655, 399, 300) }),
         ],
       }),
     },

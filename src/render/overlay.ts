@@ -62,6 +62,14 @@ export interface UnplacedMark {
   reason: "fragment-outside-page";
 }
 
+/** Which bound refused an unplaced mark, for diagnostics. Never copied into the report. */
+export interface MarkRefusal {
+  sid: string;
+  page: number;
+  side: "start" | "end";
+  detail: string;
+}
+
 export interface OverlayInstallation {
   marks: PlacedMark[];
   /**
@@ -72,12 +80,14 @@ export interface OverlayInstallation {
   unplacedMarks: UnplacedMark[];
   layers: number;
   /**
-   * Pages whose content area — or, when a footnote needs a mark, whose footnote area — was
+   * Pages whose content area — or, when a footnote needs a mark, whose page box — was
    * `static`: the case §11.4.1 treats as an infrastructure fault.
    */
   staticPageAreas: number;
   /** One per page, in page order: the DOM half of the blank-page decision in `evidence.ts`. */
   pageFacts?: OverlayPageFacts[];
+  /** For every mark refused by a bound, which bound and where (diagnostics only). */
+  refusals?: MarkRefusal[];
 }
 
 /** What the overlay read off one page before it attached anything to it. */
@@ -155,6 +165,7 @@ const OVERLAY_TEMPLATE = `(() => {
     let staticPageAreas = 0, ordinal = 0;
     state = { layers: [], marks: [], detached: [] };
     const pageFacts = [];
+    const refusals = [];
     const pages = P.all(document, ".pagedjs_page");
     for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
       const pageEl = pages[pageIndex];
@@ -179,20 +190,28 @@ const OVERLAY_TEMPLATE = `(() => {
       P.setCssText(layer, STYLE_LAYER);
       // A block footnote is moved into the footnote area, below the content box. The content-box
       // layer refuses a mark below the content box (the conservative vertical bound below), so a
-      // footnote-area fragment is marked from a second layer in the footnote area itself, which
-      // Paged.js positions (relative) and clips (overflow: hidden) and which is not a
-      // multi-column fragmentainer.
-      // The layer's own box, at left 0 / top 0 of that containing block, is the origin its marks
-      // are placed against, so a border an author puts on the footnote area cannot shift them.
+      // footnote-area fragment is marked from a second layer. It hangs in the PAGE BOX, not in the
+      // footnote area: the footnote area clips (overflow: hidden), and Paged.js packs the notes to
+      // its bottom, so a note that fills the area starts on its top edge and ends on its bottom
+      // edge — exactly where a mark inside a clipping box is at the mercy of how the browser culls
+      // a partly clipped glyph, and where the bottom one had to be refused. With the layer in the
+      // footnote area, one footnote page of each footnote fixture did not bind on Chrome 153 (CI);
+      // the cause is not established here (Chromium 141 prints no marks), and the live suite prints
+      // every mark's state when a page does not bind, so the next CI run says which mark was lost.
+      // The page box is positioned (relative), does not clip inside the page, and is not a
+      // multi-column fragmentainer. The layer's own box, at left 0 / top 0 of the page box, is the
+      // origin its marks are placed against. The bound is still the footnote area's box: a mark
+      // may lie on its edge, but never where the note is not printed.
       const footnoteArea = pageAreaEl ? (P.all(pageAreaEl, FOOTNOTE_AREA_SELECTOR)[0] || null) : null;
+      const footnoteHost = pageAreaEl ? P.parent(pageAreaEl) : null;
       let footnoteLayer = null, footnoteOrigin = null, footnoteBox = null;
       const footnoteHang = () => {
         if (footnoteLayer) return true;
-        if (P.style(footnoteArea, null).position === "static") { staticPageAreas++; return false; }
+        if (!footnoteHost || P.style(footnoteHost, null).position === "static") { staticPageAreas++; return false; }
         footnoteLayer = P.create("div");
         P.setAttr(footnoteLayer, "class", "bl-overlay");
         P.setCssText(footnoteLayer, STYLE_LAYER);
-        P.append(footnoteArea, footnoteLayer);
+        P.append(footnoteHost, footnoteLayer);
         state.layers.push(footnoteLayer);
         footnoteOrigin = P.rect(footnoteLayer);
         footnoteBox = P.rect(footnoteArea);
@@ -265,16 +284,21 @@ const OVERLAY_TEMPLATE = `(() => {
           // column height prints where the DOM puts it is a property of the browser, not of this
           // code. On Chromium 141 such marks were measured printing at their DOM position; no
           // browser was shown to move them. The bound refuses them rather than depend on that.
-          // A footnote-area fragment is bounded by the footnote area on both axes instead, because
-          // that area clips (overflow: hidden) and a mark outside it is not printed at all.
+          // A footnote-area fragment is bounded by the footnote area on both axes instead: its
+          // layer does not clip, so a mark may sit ON the area's bottom edge (where the last note
+          // ends), but not outside the area, where the note is clipped away and not printed.
           const relativeY = y - vertical.y;
           const maxAdvance = token.length * 1.2 + 2;
-          if (
-            x < pageBox.left || x + maxAdvance > pageBox.right || y < pageBox.top || y > pageBox.bottom ||
-            x < horizontal.left || x + maxAdvance > horizontal.right ||
-            relativeY < 0 || relativeY + 1 > vertical.height
-          ) {
+          const refusal =
+            x < pageBox.left || x + maxAdvance > pageBox.right ? "outside the page box horizontally" :
+            y < pageBox.top || y > pageBox.bottom ? "outside the page box vertically" :
+            x < horizontal.left || x + maxAdvance > horizontal.right ? "outside the footnote area horizontally" :
+            relativeY < 0 ? (inFootnotes ? "above the footnote area" : "above the content box") :
+            (inFootnotes ? relativeY > vertical.height : relativeY + 1 > vertical.height) ? (inFootnotes ? "below the footnote area" : "below the content box") :
+            null;
+          if (refusal !== null) {
             unplacedMarks.push({ sid, page: pageIndex + 1, side, reason: "fragment-outside-page" });
+            refusals.push({ sid, page: pageIndex + 1, side, detail: refusal + " (y " + relativeY.toFixed(2) + " of " + vertical.height.toFixed(2) + ")" });
             continue;
           }
           const mark = P.create("span");
@@ -303,7 +327,7 @@ const OVERLAY_TEMPLATE = `(() => {
       P.append(area, layer);
       state.layers.push(layer);
     }
-    return { marks, unplacedMarks, layers: state.layers.length, staticPageAreas, pageFacts };
+    return { marks, unplacedMarks, layers: state.layers.length, staticPageAreas, pageFacts, refusals };
   };
 
   // Stage 1: read the computed style of every mark back. Cheap, specific, and NOT conclusive —

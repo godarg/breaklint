@@ -142,15 +142,24 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   longer says the last page is "downgraded to a note": its finding keeps `warn`, and only the
   message says the page is likely intended. The rule stays experimental and off by default, and
   nothing here is a calibration.
-- **`layout/heading-at-page-bottom` and `layout/orphaned-continuation-page` no longer count a
-  block footnote as content on the page's text.** Paged.js lays a `float: footnote` block out in
-  the footnote area below the content box, and the snapshot records it on the page it is printed
-  on. The heading rule counted it as content following a heading, so a heading stranded at the
-  foot of the text above the page's footnotes was never reported; the continuation rule counted it
-  as fresh content, so a page carrying only the tail of a paragraph and that paragraph's footnote
-  was never reported. Both now count a block only when it starts inside the content box
-  (`startsInContentBox`, the space both rules measure). Consumers see these findings appear on
-  footnote pages. Until the footnote fix below, no document with a footnote reached these rules.
+- **`layout/heading-at-page-bottom` no longer reads a block footnote as page text, in either
+  direction.** Paged.js lays a `float: footnote` block out in the footnote area below the content
+  box, and the snapshot records it on the page it is printed on. The rule counted it as content
+  following a heading, so a heading stranded at the foot of the text above the page's footnotes was
+  never reported; and it judged a heading INSIDE a footnote (a structured note with its own heading)
+  against the content box, reporting it as stranded with -1.01 line heights left. A following block
+  now counts only when it starts inside the content box, and a heading printed below the content
+  box is not a candidate: it is recorded `excluded` with the new evaluation reason
+  `rule/target-outside-content-box`, outside the coverage base. Consumers see stranded headings
+  reported on footnote pages, and the false finding inside a footnote gone. Both tests read where
+  the block is printed (`renderedBox`), so a `display: contents` block is placed by its lines.
+- **`layout/orphaned-continuation-page` and `layout/half-empty-page` decline a page that prints only
+  outside its content box.** A long footnote that Paged.js carries over to a page of its own leaves
+  that page's content box empty (0 px tall on a measured example) while the page is full of
+  footnote text. The continuation rule measured it as "continuation-only: false" — a checked page
+  that was fine — and the half-empty rule as 0 % filled. Both now decline it as
+  `env/invalid-measurement`, newly listed in both rules' declared decline reasons, and the decline
+  counts against coverage, so such a page can lower a rule's coverage where it used to raise it.
 
 ### Added
 
@@ -275,13 +284,17 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   script that swaps source ids after pagination on a footnote page is still caught
   (`footnotes-sid-swap.html`, exit 3). This supersedes the statement in the entry above that block
   footnotes "still end the run at the paired control".
-- **A block footnote's evidence marks are placed.** They hang from a second overlay layer in the
-  footnote area, which Paged.js positions and clips; the content-box layer could not reach below
-  the content box, so both marks of every block footnote were refused and every page with one
-  stayed unbound (6 unplaced marks on the two pages of `footnotes-block.html` before; after, only
-  the end mark of a note touching the clipping bottom edge of the footnote area, whose start mark
-  binds it). Whether the PDF returns those marks at their position is established by the live
-  suite on current Chrome only.
+- **A block footnote's evidence marks are placed, from a layer in the page box.** The content-box
+  layer refuses marks below the content box, so both marks of every block footnote were refused and
+  every page with one stayed unbound (6 unplaced marks on the two pages of `footnotes-block.html`).
+  The first repair hung a second layer in the footnote area; on Chrome 153 in CI one footnote page
+  of `footnotes-block.html` and of `footnotes-named-page.html` still did not bind (evidence
+  `partial`, 1 of 2). The footnote area clips and Paged.js packs the notes to its bottom, so a note
+  filling the area has both edges on the clip edge. The layer now hangs in the page box, which does
+  not clip inside the page; a mark may lie on the footnote area's edge but not outside it. Whether
+  this binds on Chrome 153 is established by the live suite in CI, which now prints every mark's
+  fate when a page does not bind; it is not observable on the Chromium 141 build used here. This
+  supersedes the entry above that lists "a footnote-area block" as unbindable.
 - **A block footnote no longer makes an overflow boundary inside a named-page chapter `forced`.**
   The collector read the footnote — after the page content in document order, and outside the
   `page: chapter` section it was written in — as the last node of its page, so the page before the
@@ -296,15 +309,17 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   the binding requirement when it is proven empty by five answers that must agree: Paged.js marked
   it `pagedjs_blank_page`; its page area in the DOM is exactly Paged.js' empty page template (a
   structural test — the running header and page number in its margin boxes are expected and do
-  not count); the delivered PDF's text layer has no text inside the page area; the delivered PDF's
-  raster of the page area is one flat colour; and the snapshot calls the page blank. Its evidence
-  record keeps `bindsFinding: false`. Measured on 2026-09-25 (patched Chromium 141): on
-  `blank-right-running-header.html` the inserted page is proven blank (0 ink pixels of 153 567 in
-  its page area) and leaves the requirement, and on `blank-generated-content.html`, whose blank page
-  prints "This page is intentionally left blank." as generated content, it is not — that document
-  still ends exit 4, by design. The exit 0 of the first document needs the other pages to bind,
-  which only CI's current Chrome can show. This supersedes the entries above that list "a page with
-  no source block at all" as unbindable.
+  not count); the delivered PDF's text layer has no text item reaching into the page area (its
+  whole extent, so margin text running into the area counts); the delivered PDF's raster of the
+  page area, rounded outward to whole pixels so a hairline on its edge is read, is one flat colour
+  — a flat page or area background is paper, a gradient, image, partial fill or rule is not; and
+  the snapshot calls the page blank and has no block on it. Its evidence record keeps
+  `bindsFinding: false`. Measured on 2026-09-25 (patched Chromium 141): on
+  `blank-right-running-header.html` the inserted page is proven blank and leaves the requirement;
+  on `blank-generated-content.html`, whose blank page prints "This page is intentionally left
+  blank." as generated content, it is not — that document still ends exit 4, by design. The exit 0
+  of the first document is established on current Chrome in CI. This supersedes the entries above
+  that list "a page with no source block at all" as unbindable.
 
 ### Documentation
 
@@ -415,9 +430,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   remaining limits, and `docs/limitations.md` says what page fill counts and what a line-box fill
   would change.
 - `docs/limitations.md` states what the rules measure for footnote-area content, how the footnote
-  call is recognised and what that recognition does not cover, where footnote evidence marks hang
-  and which one is refused, and exactly when a parity-blank page is excused from binding and when
-  it is not. The entry above about blank pages ending exit 4 describes the state before this
+  call is recognised and what that recognition does not cover, where footnote evidence marks hang,
+  and exactly when a parity-blank page is excused from binding and when it is not (a flat
+  background colour is paper; a gradient, image, partial fill or rule is content).
+  `docs/configuration.md` ("What the JSON report proves") and `docs/reporting.md` state the new
+  meaning of `evidenceCoverage.expectedPages` and list every `ruleId: null` decline. The
+  Documentation entry above about blank pages ending exit 4 describes the state before this
   change.
 
 ### Reporting
@@ -433,13 +451,16 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   page it is laid out on." Context pack schema unchanged (2): the field and its type are the same.
   `tests/unit/registry.test.ts` now checks every entry of that map against the levers its rule's
   advice proposes.
-- **`evidenceCoverage.expectedPages` counts the pages that must bind.** It used to be the page
-  count of the document; a page excused as proven blank (see *Fixed*) now leaves it, so for a
-  document with such a page `expectedPages` is lower than `pages`, and `complete` still means
-  `boundPages === expectedPages`. Each excused page is declared as a page-scope `notMeasured` row
-  with `ruleId: null` and reason `env/parity-blank-page` — a reason that until now appeared only
-  with a rule id — naming the page when there is one and counting them when there are several. No
-  field is added or removed; the Report stamp stays 5 and the Snapshot stamp stays 4.
+- **Meaning change consumers must note: `evidenceCoverage.complete` no longer implies that every
+  page has `bindsFinding: true`.** `evidenceCoverage.expectedPages` used to be the document's page
+  count; it is now the number of pages that must bind — the pages less those excused as proven
+  blank (see *Fixed*) — and `complete` still means `boundPages === expectedPages`. Excused pages
+  are listed as `env/parity-blank-page` rows in `documents[].notMeasured`, with `ruleId: null` and
+  the page in `target.nodeKey` (`"page:N"`), one row per page and never aggregated; their
+  `evidence[]` records keep `bindsFinding: false`. `env/parity-blank-page` with `ruleId: null` is
+  new; the complete list of `ruleId: null` declines is in `docs/configuration.md`. No field is added
+  or removed: the Report stamp stays 5 and the Snapshot stamp stays 4, by decision for this
+  release.
 
 ### Tooling
 

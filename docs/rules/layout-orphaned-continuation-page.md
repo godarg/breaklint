@@ -39,9 +39,12 @@ Neither half of this needs a threshold or a calibration; it follows from how the
 ## Limits and known false alarms
 
 A block footnote printed on the page is not fresh content: it lies in the footnote area below
-the content box and belongs to a call in the text above it, so a page that carries only a
-continuation and the footnote of that continuation is still reported. Its fill is the fill of the
-content box, which Paged.js shortens by the footnote area's height.
+the content box and is not part of the page's flow, so a page that carries only a continuation and
+the footnote of that continuation is still reported. Its fill is the fill of the content box, which
+Paged.js shortens by the footnote area's height. A page whose content box holds nothing while it
+prints blocks elsewhere — a long footnote carried over to a page of its own — is declined as
+`env/invalid-measurement`, counted against coverage: its flow is empty and its fill is the fill of
+an empty box.
 
 Declined after a forced incoming break. Reading the break reason from the computed style is verifiably wrong in both directions: `break-before: page` from a stylesheet reads back as `auto`, while the same declaration written inline survives as `page` and is measured *not* to take effect.
 
@@ -57,7 +60,7 @@ Declined after a forced incoming break. Reading the break reason from the comput
 
 **The top of the next page is quantised.** Where the top comes from the first fill band, it is read from `topGap`, which the snapshot rounds to 0.01 of the content-box height — about ±3 px on an A5 page. A line whose glyph box starts within that distance of the one-line bound can fall on either side of it.
 
-**Document order matters.** It is the order in which the collector records the blocks of a page, and the rule relies on it: a wrapper comes before its children, so on the next page a continuation comes before any child of it that starts there, and only such a later block can own the continuation's lines. Blocks of the footnote area lie below the content box and are not part of the page's flow here; no document with footnotes was measured.
+**Document order matters.** It is the order in which the collector records the blocks of a page, and the rule relies on it: a wrapper comes before its children, so on the next page a continuation comes before any child of it that starts there, and only such a later block can own the continuation's lines. Blocks of the footnote area lie below the content box and are not part of the page's flow here; measured on the live fixtures `footnotes-block.html`, `footnotes-named-page.html` and `footnotes-heading-in-note.html`.
 
 ## Calibration
 

@@ -42,6 +42,7 @@ import { produceEvidence, verifyBlankPage, type BlankPageInput } from "../../src
 import type { OverlayPageFacts } from "../../src/render/overlay.ts";
 import { injectSourceIds } from "../../src/source/inject.ts";
 import { faithfulRasterizer, OverlayPage, RASTER, textAt, type FaithfulPdf } from "../fixtures/evidence-harness.ts";
+import type { PdfTextItem } from "../../src/render/rasterizer.ts";
 import { evaluatePayload, pagedDocument, pagedPage, runCollector, type FakeNode } from "../fixtures/paged-dom.ts";
 
 /** Page geometry measured for a 150 x 120 mm page with 15 mm margins, pages 700 px apart. */
@@ -157,9 +158,10 @@ describe("a parity-blank page is excused from binding only when it is proven emp
     assert.equal(installation.marks.some((mark) => mark.page === 2), false, "premise: page 2 carries no mark");
     assert.deepEqual(installation.pageFacts?.map((facts) => [facts.pagedBlank, facts.areaEmpty]),
       [[false, false], [true, true], [false, false]]);
-    // The raster was asked about the page AREA only — rounded inward to whole pixels — never about
-    // the margin boxes where the header and the page number are printed.
-    assert.deepEqual(asked, [{ page: 2, region: { x0: 57, y0: 57, x1: 510, y1: 396 } }]);
+    // The raster was asked about the page AREA only — rounded outward to whole pixels, so a pixel
+    // the area only partly covers is read too — never about the margin boxes where the header and
+    // the page number are printed. The area is 56.69..510.22 x 56.69..396.85 CSS px at 96 dpi.
+    assert.deepEqual(asked, [{ page: 2, region: { x0: 56, y0: 56, x1: 511, y1: 397 } }]);
     assert.deepEqual(evidence.verifiedBlankPages, [2]);
     // Not bound: the page's own record says it evidences nothing.
     assert.deepEqual(report.evidence.map((page: Evidence) => [page.bindsFinding, page.pdfConformance]),
@@ -323,5 +325,101 @@ describe("the evidence requirement's blank-page excuse, at the engine", () => {
     assert.deepEqual(input.notMeasured?.filter((row) => row.reason === "env/parity-blank-page").map((row) => row.target?.nodeKey), ["page:2"]);
     const off = finalizeEvidenceAcquisition("doc.html", snapshot, [], { ...outcome, verifiedBlankPages: [] }, true);
     assert.deepEqual(off.evidenceRequirement, { required: true, expectedPages: 3 });
+  });
+});
+
+describe("round-2 guards on the blank-page excuse", () => {
+  let outDir = "";
+  beforeEach(() => { outDir = mkdtempSync(join(tmpdir(), "breaklint-blank-pages-r2-")); });
+  afterEach(() => { rmSync(outDir, { recursive: true, force: true }); });
+
+  it("reads the pixels the area only partly covers: a hairline on the area's edge is ink", async () => {
+    // The area starts at x = 56.69 CSS px, so device column 56 is two thirds area, one third margin.
+    // A hairline outline painted there is ink in the area. Rounded inward (round 1), the region
+    // began at 57 and never read it.
+    const facts: OverlayPageFacts = { page: 2, pagedBlank: true, areaEmpty: true, areaPx: { x: 56.69, y: 56.69, width: 453.53, height: 340.16 } };
+    const hairline = async (region: { x0: number; y0: number; x1: number; y1: number }) =>
+      ({ pixels: (region.x1 - region.x0) * (region.y1 - region.y0), ink: region.x0 <= 56 ? 340 : 0 });
+    assert.equal(await verifyBlankPage({ facts, page: 2, dpi: 96, raster: RASTER, textPage: { heightPt: (RASTER.height / 96) * 72, items: [] }, ink: hairline }), false);
+  });
+
+  it("judges a text item by its whole extent: margin-box text that runs into the area is text in the area", async () => {
+    const facts: OverlayPageFacts = { page: 2, pagedBlank: true, areaEmpty: true, areaPx: { x: 56.69, y: 56.69, width: 453.53, height: 340.16 } };
+    const paper = async (region: { x0: number; y0: number; x1: number; y1: number }) =>
+      ({ pixels: (region.x1 - region.x0) * (region.y1 - region.y0), ink: 0 });
+    // Starts at 5 mm, in the left margin box, 40 pt wide: it runs 14 mm into the area.
+    const runsIn = { ...textAt("White text from @left-middle", 5, 60), width: 40 * 1.5, height: 8 };
+    const staysOut = { ...textAt("Margin note", 5, 60), width: 20, height: 8 };
+    const page = (items: PdfTextItem[]) => ({ heightPt: (RASTER.height / 96) * 72, items });
+    assert.equal(await verifyBlankPage({ facts, page: 2, dpi: 96, raster: RASTER, textPage: page([staysOut]), ink: paper }), true,
+      "premise: margin text that ends before the area is not text in the area");
+    assert.equal(await verifyBlankPage({ facts, page: 2, dpi: 96, raster: RASTER, textPage: page([runsIn]), ink: paper }), false);
+    // Above the area: a running header whose descent does not reach it.
+    const header = { ...textAt("Header", 36, 5), width: 200, height: 10 };
+    assert.equal(await verifyBlankPage({ facts, page: 2, dpi: 96, raster: RASTER, textPage: page([header]), ink: paper }), true);
+  });
+
+  it("does not excuse a listed page outside the document, even when an evidence record exists for it", () => {
+    const { injected, sid } = sids();
+    const snapshot = assemble(document(sid), injected);
+    const record = (page: number, bindsFinding: boolean): Evidence => ({
+      key: `doc#${page}`, page, path: `page-${page}.png`, origin: "pdf-raster",
+      pdfConformance: bindsFinding ? "verified" : "unverified", conformance: null, bindsFinding,
+      overlayCheck: { styleViolations: 0, rasterDiffPx: 0, removed: false },
+    });
+    // Page 2 is unbound and NOT listed; page 4 does not exist in a three-page document but has a
+    // stray record. Excusing page 4 lowered expectedPages to 2 and let two bound pages of three
+    // read as complete.
+    const coverage = runDocument({
+      path: "doc.html", snapshot, infrastructure: [],
+      evidence: [record(1, true), record(2, false), record(3, true), record(4, false)],
+      evidenceRequirement: { required: true, expectedPages: 3, blankPages: [4] },
+    }, { failOn: "error", activeRules: [], optionsByRule: {}, coverageFloors: {} }).report.evidenceCoverage;
+    assert.deepEqual({ expected: coverage?.expectedPages, bound: coverage?.boundPages, status: coverage?.status },
+      { expected: 3, bound: 2, status: "partial" });
+  });
+
+  it("finalizeEvidenceAcquisition does not excuse a page the snapshot calls blank while it records a block on it", () => {
+    // By construction the assembled snapshot never does this (`blank` requires no block on the
+    // page); the cross-check holds if a snapshot's two answers ever disagree.
+    const { injected, sid } = sids();
+    const snapshot = assemble(document(sid), injected);
+    const disagreeing: Snapshot = { ...snapshot, blocks: [...snapshot.blocks, { ...snapshot.blocks[1]!, nodeKey: "extra", page: 2 }] };
+    const outcome = { evidence: [], infrastructure: [], notMeasured: [], boundSids: new Set<string>(), marks: [],
+      ambiguousMarks: 0, deliveredPdf: new Uint8Array(), deliveredWithOverlay: true, overlayInstalled: true,
+      candidates: { marked: null, baseline: new Uint8Array() }, verifiedBlankPages: [2] };
+    assert.deepEqual(finalizeEvidenceAcquisition("doc.html", disagreeing, [], outcome, true).evidenceRequirement,
+      { required: true, expectedPages: 3 });
+  });
+
+  it("withdraws a blank-page proof together with every binding when the evidence of the document is incomplete", async () => {
+    const { injected, sid } = sids();
+    const doc = document(sid);
+    const snapshot = assemble(doc, injected);
+    const page = new OverlayPage(doc);
+    const evidence = await produceEvidence({
+      page, closePage: async () => page.close(),
+      rasterizer: faithfulRasterizer(page, { pages: snapshot.pages.length, extraText: MARGIN_TEXT(snapshot.pages.length), badPngPage: 3 }),
+      options: { outDir, documentKey: "blank-incomplete", binding: true },
+    });
+    assert.ok(evidence.infrastructure.some((event) => event.kind === "checker-crashed"), "premise: the evidence is incomplete");
+    assert.deepEqual(evidence.evidence.map((record) => record.bindsFinding), [false, false]);
+    assert.deepEqual(evidence.verifiedBlankPages, [], "a blank-page proof outlived the bindings it belongs with");
+  });
+
+  it("names every excused page in its own report row, however many there are", () => {
+    const { injected, sid } = sids();
+    const snapshot = assemble(document(sid), injected);
+    const row = (page: number) => ({ scope: "page" as const, ruleId: null, reason: "env/parity-blank-page" as const,
+      target: { keyType: "page" as const, nodeKey: `page:${page}`, sid: null }, count: 1 });
+    const fragment = (page: number) => ({ scope: "page" as const, ruleId: null, reason: "env/evidence-fragment-outside-page" as const,
+      target: { keyType: "page" as const, nodeKey: `page:${page}`, sid: "s1" }, count: 1 });
+    const report = runDocument({ path: "doc.html", snapshot, infrastructure: [], notMeasured: [row(3), fragment(1), row(2), fragment(3)] },
+      { failOn: "error", activeRules: [], optionsByRule: {}, coverageFloors: {} }).report;
+    assert.deepEqual(report.notMeasured.filter((r) => r.reason === "env/parity-blank-page").map((r) => [r.target?.nodeKey, r.count]),
+      [["page:2", 1], ["page:3", 1]], "several excused pages collapsed into one row without a page");
+    // Other document-level declines keep aggregating as before.
+    assert.deepEqual(report.notMeasured.filter((r) => r.reason === "env/evidence-fragment-outside-page").map((r) => [r.target, r.count]),
+      [[null, 2]]);
   });
 });

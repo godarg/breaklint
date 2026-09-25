@@ -2,7 +2,7 @@ import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
   boxlessDeclined, declined, isNotRendered, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber,
-  renderedBox, sourceOf, startsInContentBox, targetEvaluation,
+  outsideContentBoxEvaluation, renderedBox, sourceOf, startsInContentBox, targetEvaluation,
 } from "../shared.ts";
 
 const HEADINGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
@@ -63,6 +63,14 @@ export const headingAtPageBottom = defineRule(
       // box at the origin, which said "content below it" about every heading — but its text has
       // line boxes, and the heading ends where its last line does. With neither, it is declined.
       const box = renderedBox(snapshot, block);
+      // A heading inside a block footnote is printed in the footnote area, below the content box:
+      // it does not end the page's text, and measured against the content box it came out
+      // "stranded" with a negative remaining space (-1.01 line heights). Not a candidate.
+      const printedOn = pageByNumber(snapshot, block.page);
+      if (box !== null && printedOn && !startsInContentBox(box, printedOn)) {
+        evaluations.push(outsideContentBoxEvaluation("layout/heading-at-page-bottom", block, box, printedOn));
+        continue;
+      }
       candidates += 1;
       if (box === null) {
         const decline = boxlessDeclined("layout/heading-at-page-bottom", block);

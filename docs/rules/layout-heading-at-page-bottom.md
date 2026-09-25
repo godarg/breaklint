@@ -25,6 +25,12 @@ foot of the text, above the page's footnotes, is reported. Until this was decide
 hid it — on exactly the pages that carry footnotes. The remaining space is measured to the foot of
 the content box, which Paged.js shortens by the footnote area's height.
 
+A heading printed inside a block footnote (a structured note with its own heading) is not a
+candidate: it lies below the content box, does not end the page's text, and is recorded as
+`excluded` with `rule/target-outside-content-box`, outside the coverage base. Measured against the
+content box it came out stranded with a negative remaining space. Both tests read where the block
+is printed (its box, or the line boxes of a `display: contents` block), never the zero box.
+
 A heading that was not rendered — no layout box and no line boxes — does not end any page: the
 in-flow original of a running heading, which Paged.js hides with `display: none` while its clones
 print in the margin boxes, is recorded as `excluded` (`rule/target-not-rendered`), outside the

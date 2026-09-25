@@ -1,7 +1,7 @@
 import { defineRule } from "../../core/rule.ts";
 import { pageKey } from "../../core/fingerprint.ts";
 import type { BlockRecord, Box, PageRecord, Snapshot, TextLine } from "../../core/types.ts";
-import { declined, makeFinding, num, renderedBox, targetEvaluation } from "../shared.ts";
+import { declined, makeFinding, num, outsideContentBoxPageDeclined, printsOnlyOutsideContentBox, renderedBox, targetEvaluation } from "../shared.ts";
 
 /** Box-coordinate slack for rounded geometry, in CSS px. A tolerance, not a threshold. */
 const EDGE_TOLERANCE_PX = 1;
@@ -150,7 +150,7 @@ export const orphanedContinuationPage = defineRule(
     unit: "fill ratio",
     defaultOptions: { maxNetFill: 0.5 },
     summary: "A page holds nothing but the tail of a block that began earlier.",
-    declines: ["env/parity-blank-page", "env/forced-break"],
+    declines: ["env/parity-blank-page", "env/forced-break", "env/invalid-measurement"],
     remediation: {
       advice:
         "A continuation page holds only a tiny trailing fragment of an earlier block. Tighten preceding vertical margins, padding, or line-height on earlier pages to pull the remaining lines back, or insert 'break-before: page' earlier to balance content across pages.",
@@ -190,10 +190,20 @@ export const orphanedContinuationPage = defineRule(
         evaluations.push(targetEvaluation({ ruleId: "layout/orphaned-continuation-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "not-measured", reason: "env/forced-break" }));
         continue;
       }
-      measured += 1;
-
+      // A page whose content box holds nothing while it prints blocks elsewhere — a long footnote
+      // continued onto a page of its own — cannot be judged: this rule's question is about the
+      // flow and its quantity is the fill of that empty box. Measured as "continuation-only:
+      // false" it read as a checked page that was fine. Declined, and counted.
+      if (printsOnlyOutsideContentBox(snapshot, page)) {
+        const decline = outsideContentBoxPageDeclined("layout/orphaned-continuation-page", page);
+        notMeasured.push(decline.notMeasured);
+        evaluations.push(decline.evaluation);
+        continue;
+      }
       // Collection order: within a page, document order (see the invariant above).
       const onPage = flowBlocks(snapshot, page);
+      measured += 1;
+
       const continuationOnly = onPage.length > 0 && onPage.every((f) => f.block.fragmentIndex > 0);
       const endsOnPage = onPage.length > 0 && !nextPageOpensWithRunningText(snapshot, page, linesByBlock);
       const violated = continuationOnly && endsOnPage && page.fill.net < maxNetFill;

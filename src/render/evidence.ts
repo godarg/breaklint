@@ -46,7 +46,7 @@ import { writeFileSync } from "node:fs";
 
 import type { PageLike } from "../acquire/browser.ts";
 import type { Evidence, InfraEvent, NotMeasured } from "../core/types.ts";
-import type { OverlayPageFacts, PlacedMark, UnplacedMark } from "./overlay.ts";
+import type { MarkRefusal, OverlayPageFacts, PlacedMark, UnplacedMark } from "./overlay.ts";
 import { detachOverlay, installOverlay, readbackViolations, removeOverlay } from "./overlay.ts";
 import type { DeviceRegion, PdfTextPage, RasterPage, Rasterizer, RegionInk } from "./rasterizer.ts";
 import { readPngHeader, writeEvidencePng } from "./rasterizer.ts";
@@ -184,6 +184,8 @@ export interface EvidenceOutcome {
    * snapshot before it excuses any of them from the binding requirement.
    */
   verifiedBlankPages?: readonly number[];
+  /** Why each page did or did not bind; present when the PDF text layer was read. Never reported. */
+  diagnostics?: EvidenceDiagnostics;
   marks: PlacedMark[];
   /** Marks whose token was not found exactly once in the PDF text stream. Read, not just kept. */
   ambiguousMarks: number;
@@ -474,6 +476,7 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
       marks: installation.marks,
       unplacedMarks: installation.unplacedMarks ?? [],
       pageFacts: installation.pageFacts ?? [],
+      refusals: installation.refusals ?? [],
       textPages,
       ambiguousMarks: conformance?.ambiguous ?? 0,
       styleViolations: violations.length,
@@ -514,6 +517,8 @@ export interface MarkConformance {
   /** Pages that had their own reference and still bound nothing. See `PageConformance.divergent`. */
   divergentPages: number;
   documentMedianDyMm: number;
+  /** Per mark, for diagnostics only. */
+  marks?: MarkDiagnostic[];
 }
 
 export interface PageConformance {
@@ -584,6 +589,7 @@ export function matchMarks(marks: readonly PlacedMark[], pages: readonly PdfText
   const pairedByPage = new Map<number, Paired[]>();
   const totalByPage = new Map<number, number>();
   const targetsByPage = new Map<number, Set<string>>();
+  const diagnostics: MarkDiagnostic[] = [];
   let ambiguous = 0;
 
   for (const mark of marks) {
@@ -595,10 +601,16 @@ export function matchMarks(marks: readonly PlacedMark[], pages: readonly PdfText
     const page = pages[mark.page - 1];
     if (!page) {
       ambiguous++;
+      diagnostics.push({ token: mark.token, sid: mark.sid, page: mark.page, side: mark.side, hits: 0, containedIn: 0, dxMm: null, dyMm: null, residualDyMm: null, bound: false });
       continue;
     }
     const hits = page.items.filter((item) => item.text.replace(/\s+/gu, "") === mark.token);
     if (hits.length !== 1) {
+      diagnostics.push({
+        token: mark.token, sid: mark.sid, page: mark.page, side: mark.side, hits: hits.length,
+        containedIn: page.items.filter((item) => item.text.includes(mark.token) && item.text.replace(/\s+/gu, "") !== mark.token).length,
+        dxMm: null, dyMm: null, residualDyMm: null, bound: false,
+      });
       // Zero and two are the same answer here: the mark was not UNIQUELY refound, so it cannot
       // stand for a position. Counting a two-hit token as found would bind a finding to whichever
       // of the two the code happened to look at first.
@@ -638,16 +650,17 @@ export function matchMarks(marks: readonly PlacedMark[], pages: readonly PdfText
     const referenceOutOfRange = referenceUsable && Math.abs(reference) > MAX_REFERENCE_DY_MM;
 
     const boundHere = new Set<string>();
-    if (referenceUsable && !referenceOutOfRange) {
-      for (const p of paired) {
-        if (
-          Math.abs(p.dxMm) <= CONFORMANCE_TOLERANCE_MM &&
-          Math.abs(p.dyMm - reference) <= CONFORMANCE_TOLERANCE_MM
-        ) {
-          boundHere.add(p.mark.sid);
-          boundSids.add(p.mark.sid);
-        }
+    for (const p of paired) {
+      const bound = referenceUsable && !referenceOutOfRange &&
+        Math.abs(p.dxMm) <= CONFORMANCE_TOLERANCE_MM && Math.abs(p.dyMm - reference) <= CONFORMANCE_TOLERANCE_MM;
+      if (bound) {
+        boundHere.add(p.mark.sid);
+        boundSids.add(p.mark.sid);
       }
+      diagnostics.push({
+        token: p.mark.token, sid: p.mark.sid, page: pageNumber, side: p.mark.side, hits: 1, containedIn: 0,
+        dxMm: round4(p.dxMm), dyMm: round4(p.dyMm), residualDyMm: referenceUsable ? round4(p.dyMm - reference) : null, bound,
+      });
     }
 
     // A page that carried its OWN reference and still bound nothing is divergent, and the word
@@ -688,7 +701,36 @@ export function matchMarks(marks: readonly PlacedMark[], pages: readonly PdfText
       divergent,
     });
   }
-  return { boundSids, byPage, ambiguous, divergentPages, documentMedianDyMm: round4(documentMedian) };
+  diagnostics.sort((a, b) => a.page - b.page || a.token.localeCompare(b.token));
+  return { boundSids, byPage, ambiguous, divergentPages, documentMedianDyMm: round4(documentMedian), marks: diagnostics };
+}
+
+/**
+ * One mark's fate in the delivered PDF, for diagnosing a page that does not bind. Never part of
+ * the report: it names tokens and residuals, which are apparatus, not findings.
+ */
+export interface MarkDiagnostic {
+  token: string;
+  sid: string;
+  page: number;
+  side: "start" | "end";
+  /** Text items that are exactly the token. One is found; zero or two is not. */
+  hits: number;
+  /** Text items that CONTAIN the token without being it — a token merged with a neighbour. */
+  containedIn: number;
+  dxMm: number | null;
+  dyMm: number | null;
+  /** `dyMm` less the page's reference; null when there was no reference. */
+  residualDyMm: number | null;
+  bound: boolean;
+}
+
+/** Everything needed to say why a page did or did not bind. Internal; see `MarkDiagnostic`. */
+export interface EvidenceDiagnostics {
+  marks: MarkDiagnostic[];
+  pages: ({ page: number } & PageConformance)[];
+  unplaced: (UnplacedMark & { detail?: string })[];
+  toleranceMm: number;
 }
 
 const round4 = (v: number): number => Math.round(v * 10_000) / 10_000;
@@ -718,6 +760,8 @@ interface FinishInput {
   conformance?: MarkConformance | null;
   /** The overlay's per-page DOM facts, for the blank-page decision. */
   pageFacts?: readonly OverlayPageFacts[];
+  /** Which bound refused each unplaced mark, for diagnostics. */
+  refusals?: readonly MarkRefusal[];
   /** The delivered PDF's text layer, when it was extracted. */
   textPages?: readonly PdfTextPage[] | null;
 }
@@ -931,11 +975,14 @@ export interface BlankPageInput {
  *      element, no text, no generated content inside the area. Structural: margin boxes are
  *      outside the area, so the running header and the page number on a blank page are expected
  *      and do not count, and no coordinate is used to decide membership.
- *   3. The delivered PDF's text layer: no text item with a visible character starts inside the
- *      page area's rectangle. This sees text the DOM does not have, such as generated content.
- *   4. The delivered PDF's raster: the page area's rectangle, rounded inward to whole device
- *      pixels, is one flat colour. This sees what is painted without being text — a background,
- *      a rule, an image — and what reaches into the area from outside it.
+ *   3. The delivered PDF's text layer: no text item with a visible character reaches into the
+ *      page area's rectangle — its whole extent, not only its origin. This sees text the DOM does
+ *      not have, such as generated content, and margin-box text that runs into the area.
+ *   4. The delivered PDF's raster: the page area's rectangle, rounded OUTWARD to whole device
+ *      pixels, is one flat colour. This sees what is painted without being text — a gradient, an
+ *      image, a rule, a partial fill, a hairline on the area's edge — and what reaches into the
+ *      area from outside it. A flat colour across the whole area (a page or area background) is
+ *      not content: it is the paper, and it is excused like white paper.
  *
  * A page with content but without source ids fails 2 whenever the content is a DOM node, and 3
  * or 4 whenever it is printed; generated content on an otherwise empty area fails 3 and 4. The
@@ -951,14 +998,23 @@ export async function verifyBlankPage(input: BlankPageInput): Promise<boolean> {
   const pxPerPt = 96 / 72;
   for (const item of textPage.items) {
     if (item.text.replace(/\s+/gu, "") === "") continue;
-    const x = item.x * pxPerPt;
-    const y = (textPage.heightPt - item.y) * pxPerPt;
-    if (x >= area.x && x <= area.x + area.width && y >= area.y && y <= area.y + area.height) return false;
+    // The item's whole extent, not only where it starts: text set in a margin box can run into
+    // the area. From the baseline up by the font height, and down by a descent allowance of a
+    // third of it; an item without a reported size is its origin point.
+    const width = Math.max(0, item.width ?? 0) * pxPerPt;
+    const height = Math.max(0, item.height ?? 0) * pxPerPt;
+    const left = item.x * pxPerPt;
+    const baseline = (textPage.heightPt - item.y) * pxPerPt;
+    const top = baseline - height;
+    const bottom = baseline + height / 3;
+    if (left <= area.x + area.width && left + width >= area.x && top <= area.y + area.height && bottom >= area.y) return false;
   }
+  // Rounded OUTWARD to whole device pixels: a pixel the area only partly covers is still read,
+  // so a hairline on the area's own edge is ink. Round 1 rounded inward and did not see it.
   const scale = input.dpi / 96;
   const region = {
-    x0: Math.ceil(area.x * scale), y0: Math.ceil(area.y * scale),
-    x1: Math.floor((area.x + area.width) * scale), y1: Math.floor((area.y + area.height) * scale),
+    x0: Math.floor(area.x * scale), y0: Math.floor(area.y * scale),
+    x1: Math.ceil((area.x + area.width) * scale), y1: Math.ceil((area.y + area.height) * scale),
   };
   if (region.x0 < 0 || region.y0 < 0 || region.x1 > raster.width || region.y1 > raster.height) return false;
   if (region.x1 <= region.x0 || region.y1 <= region.y0) return false;
@@ -979,6 +1035,20 @@ function outcome(input: FinishInput, evidence: Evidence[], boundSids: Set<string
     notMeasured: input.notMeasured,
     boundSids,
     verifiedBlankPages,
+    ...(input.conformance ? {
+      diagnostics: {
+        marks: input.conformance.marks ?? [],
+        pages: [...input.conformance.byPage].map(([page, c]) => ({ page, ...c })).sort((a, b) => a.page - b.page),
+        unplaced: (input.unplacedMarks ?? []).map((mark) => ({
+          ...mark,
+          ...(() => {
+            const refusal = input.refusals?.find((r) => r.sid === mark.sid && r.page === mark.page && r.side === mark.side);
+            return refusal ? { detail: refusal.detail } : {};
+          })(),
+        })),
+        toleranceMm: CONFORMANCE_TOLERANCE_MM,
+      },
+    } : {}),
     marks: input.marks,
     ambiguousMarks: input.ambiguousMarks,
     deliveredPdf: input.pdf,
