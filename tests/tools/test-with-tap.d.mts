@@ -21,4 +21,19 @@ export function runTapSuite(
   testFiles: string[],
   outputTarget: string,
   mirrorStdout: boolean,
+  extraEnv?: Record<string, string>,
 ): Promise<{ code: number; testCount: number | null }>;
+
+export const SUITE_TEMPORARY_ALLOWLIST: Readonly<Record<string, string>>;
+
+export function strayTemporaryEntries(directory: string, allowlist?: Readonly<Record<string, string>>): string[];
+
+export function privateTemporaryEnvironment(directory: string): { TMPDIR: string; TMP: string; TEMP: string };
+
+export function runSuiteInPrivateTemporaryDirectory(
+  plan: {
+    aggregate: { testFiles: string[]; outputTarget: string; mirrorStdout: boolean };
+    unit: { testFiles: string[]; outputTarget: string; mirrorStdout: boolean };
+  },
+  options?: { temporaryParent?: string; report?: (text: string) => void },
+): Promise<number>;

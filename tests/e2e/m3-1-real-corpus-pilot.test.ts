@@ -1,9 +1,9 @@
 import { strict as assert } from "node:assert";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 
 import {
   buildBlindPacket,
@@ -15,9 +15,20 @@ import {
   validateStrictSplits,
 } from "../tools/calibration/m3-1-pilot.ts";
 
+/** Every temporary directory this file creates, removed once its tests are done. */
+const temporaryDirectories: string[] = [];
+function temporaryDirectory(prefix: string): string {
+  const directory = mkdtempSync(join(tmpdir(), prefix));
+  temporaryDirectories.push(directory);
+  return directory;
+}
+after(() => {
+  for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
+});
+
 describe("M3-1 public corpus pilot infrastructure", () => {
   it("runs an in-memory synthetic rehearsal while every external gate stays false", () => {
-    const artifactRoot = mkdtempSync(join(tmpdir(), "breaklint-m3-1-e2e-"));
+    const artifactRoot = temporaryDirectory("breaklint-m3-1-e2e-");
     writeFileSync(join(artifactRoot, "synthetic-untrusted.svg"), '<svg id="root"><text id="label">Synthetic rehearsal</text></svg>');
     const intake = ingestPublicArtifact({
       artifactRoot,
@@ -90,7 +101,7 @@ describe("M3-1 public corpus pilot infrastructure", () => {
       false,
       "the generic legacy SVG bundle writer must not be reintroduced",
     );
-    const root = mkdtempSync(join(tmpdir(), "breaklint-retired-pipeline-cli-"));
+    const root = temporaryDirectory("breaklint-retired-pipeline-cli-");
     const inputPath = join(root, "input.json");
     writeFileSync(inputPath, "{}\n");
     for (const [mode, issue] of [["pipeline-create", "legacy-svg-pipeline-create-retired"], ["pipeline-verify", "legacy-svg-pipeline-verify-retired"]] as const) {

@@ -67,7 +67,6 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `BROWSER_LAUNCH_TIMEOUT_MS`, 30 000 ms — the driver's previous implicit default, kept as a hang
   guard rather than tightened — and the exit-3 message names the elapsed time and the last lines
   of the browser's stderr (for example a missing shared library).
-
 - **A delivered SIGINT, SIGTERM or SIGHUP is never dropped, and the decision is taken when it
   arrives.** The signal handling above lost signals in review: Node discards a signal queued for a
   listener removed before the queue is read, and breaklint removed its listener synchronously at
@@ -125,6 +124,69 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   message that names the reason, and `checkProducedDocuments` returns `source/producer-incomplete`
   without running the producer. Exit 3 is the existing "infrastructure" class; no exit code
   changed meaning.
+- **A report written to a pipe arrives whole.** Through 0.6.0 the CLI exited as soon as it had
+  handed the report to stdout, which discarded everything the pipe had not taken yet: behind
+  `| cat`, `| jq` or a slow uploader a report larger than the pipe buffer arrived cut at a
+  multiple of the pipe buffer, usually 65 536 bytes, on Linux — in all six formats, on Node 22 and
+  24, from the source and from the built entry — while the exit code still stated the verdict, so
+  the loss was silent. The demo's own
+  JSON report (82 585 bytes) was already over that size. The CLI now exits only after every write
+  has been accepted. `--out` and a `> file` redirect were never affected.
+- **Output that cannot be delivered is exit 3, not a verdict.** When stdout cannot be written
+  completely — the reader closed early (`| head`), or the device is full — the run now ends with
+  exit 3 and one `breaklint: could not write to stdout (…)` line on stderr, whatever its verdict.
+  That covers every output written to stdout, `--help` and `--version` included. Before, a reader
+  that closed early left the run at exit 1 with no message, a verdict about a report nobody
+  received. With `--out` the report is in the file, complete, before stdout is touched, and stdout
+  carries only a confirmation line: if that line cannot be written, the run keeps its verdict's
+  exit code and says so on stderr (`could not write the confirmation line to stdout (…); the
+  report file was written in full`). The exit-code table in the README and in `--help` names both
+  cases. A
+  process-boundary test, `tests/e2e/cli-pipe-integrity.test.ts`, drives the real source entry and
+  a freshly built `dist/` entry (through a bin symlink) with a report of at least 256 KiB in every
+  format, through a kernel pipe into `cat`, a kernel pipe into a slow reader and a Node pipe, and
+  compares the bytes with the `--out` file; it fails on the previous entry point.
+- **A run that stops without an answer ends with exit 3, not 0.** If the work the CLI waits on
+  can no longer settle — a driver whose browser went away, a handle closed underneath it — the
+  event loop empties, and Node then ended the process with exit 0 and no output, which a gate
+  reads as a clean document. This was seen once, on a run under heavy load. The CLI now notices
+  the empty loop while it is still waiting and ends with exit 3 and one line:
+  `breaklint: the run stopped before it finished: nothing was left for it to wait on, so no report exists; exit 3.`
+  Its default exit code is also 3, so no other route past the explicit exit can end at 0.
+  `tests/e2e/cli-unsettled-run.test.ts` runs the real CLI source on the live path. Node's
+  module-customisation hooks replace only the acquisition module with one whose promise never
+  settles; that is harness, not a product option. It ended exit 0 before this change.
+- **A live run no longer depends on the browser exposing `FontFaceSet` as a global.** The
+  measuring primitives captured the font set's `ready` getter and iterator through that global
+  interface object, which a browser need not expose. Chromium 141 does not, and every live run
+  there ended with exit 3 (`FontFaceSet is not defined`) before anything was measured. The
+  primitives now take the prototype of the document's own `document.fonts`. They are still
+  captured on-new-document, before any author script runs, so what an author script can tamper
+  with is unchanged. A unit test runs the real payload in a realm without the global, and in one
+  whose global names a decoy prototype.
+- **A browser below the rasteriser's floor is refused before any document is opened.**
+  `pdfjs-dist` 6.2.108 uses recent JavaScript built-ins and web APIs without testing for them. It
+  loads without them and failed only when it rasterised — after pagination and measurement — with
+  `this[#methodPromises].getOrInsertComputed is not a function` and exit 3, with
+  `--no-evidence-binding` too. Before it loads the library, the rasteriser page now checks the
+  platform names a scan of the pinned build finds used without a feature test: 167 in the page
+  (for `pdf.mjs`) and 136 in a module worker of its own (for `pdf.worker.mjs`). That includes web
+  APIs such as `URL.parse`, `AbortSignal.any` and the global `fetch`, and recent instance members
+  such as `Map.prototype.getOrInsertComputed`, `Blob.prototype.bytes`, the iterator helpers and
+  `ReadableStream` async iteration. `docs/limitations.md` lists which syntactic shapes the scan
+  reads and what it cannot see. A browser that lacks any of the names ends the run with exit 3 at
+  startup; the message names what is missing and in which realm, the browser version and
+  `BREAKLINT_CHROME`. Measured on Chromium 141.0.7390.37: exit 3 after about 3 s. The page lacks
+  `Map`/`WeakMap.prototype.getOrInsertComputed` and `Math.sumPrecise`; the worker lacks those,
+  `Map.prototype.getOrInsert` and `Blob.prototype.bytes`. Every other checked name is present in
+  both. The lists are deliberately conservative: they cover unguarded uses on paths a
+  rasterisation never takes too. `Blob.prototype.bytes` in the worker is only used to save or print
+  annotations that carry editor images. Nothing is polyfilled and the pinned build is unchanged.
+  The scan (`tests/tools/pdfjs-platform-inventory.ts`) is repeated by a unit test, so a pdfjs
+  upgrade that adds a platform name in a scanned shape fails the suite until the name is checked
+  or classified. The floor is documented as capabilities in the README's Requirements and in
+  `docs/limitations.md`. Without `pdfjs-dist` installed the check does not run and the run
+  reports without evidence, as before.
 
 ### Tooling
 
@@ -135,6 +197,13 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   and no profile directory is left. It is its own job so that no other step's browser can confound
   it and the minutes it takes stay off the critical path. Measured locally: 120 of 120 green in
   both regimes; on the previous tree, red on every path. The job has `timeout-minutes: 30`.
+- **`npm test` fails when a test leaves a temporary entry behind.** Every run used to leave twelve
+  `breaklint-*` directories in the shared temporary directory (nine from
+  `tests/unit/m3-1-pilot.test.ts`, one from `tests/unit/m3-1-readiness-bridge.test.ts`, two from
+  `tests/e2e/m3-1-real-corpus-pilot.test.ts`); those files now remove what they create. The runner,
+  `tests/tools/test-with-tap.mjs`, gives both of its child runs one private `TMPDIR` (and `TMP`,
+  `TEMP`), and afterwards fails with the names of any entry in it that its allowlist does not
+  justify. The allowlist holds one entry, Node's own `node-compile-cache`.
 
 ### Documentation
 

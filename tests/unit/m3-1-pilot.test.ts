@@ -1,10 +1,10 @@
 import { strict as assert } from "node:assert";
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import { Ajv2020 } from "ajv/dist/2020.js";
 
 import {
@@ -35,6 +35,17 @@ import {
   type ExternalFreezeReceipt,
 } from "../tools/calibration/m3-1-pilot.ts";
 
+/** Every temporary directory this file creates, removed once its tests are done. */
+const temporaryDirectories: string[] = [];
+function temporaryDirectory(prefix: string): string {
+  const directory = mkdtempSync(join(tmpdir(), prefix));
+  temporaryDirectories.push(directory);
+  return directory;
+}
+after(() => {
+  for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
+});
+
 const SHA_A = "a".repeat(64);
 const SHA_B = "b".repeat(64);
 const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u;
@@ -46,7 +57,7 @@ function compileSchema(name: string) {
 }
 
 function fixtureRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "breaklint-m3-1-unit-"));
+  const root = temporaryDirectory("breaklint-m3-1-unit-");
   writeFileSync(join(root, "public.svg"), '<svg id="root"><text id="label">Public</text></svg>');
   return root;
 }
@@ -191,7 +202,7 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     assert.equal(JSON.stringify(first).includes("threshold"), false);
     const validate = compileSchema("blind-packet-v1");
     assert.equal(validate(first), true, JSON.stringify(validate.errors));
-    const cliRoot = mkdtempSync(join(tmpdir(), "breaklint-retired-blind-packet-cli-"));
+    const cliRoot = temporaryDirectory("breaklint-retired-blind-packet-cli-");
     const cliInput = join(cliRoot, "input.json");
     writeFileSync(cliInput, JSON.stringify({ packetId: "blind_packet_public_pilot_0001", orderSeed: "order_seed_public_pilot_0001", targets: boundTargets, contextsByTargetId }));
     const blockedCreate = spawnSync(process.execPath, ["--experimental-strip-types", "tests/tools/calibration/m3-1-pilot-cli.ts", "blind-packet", cliInput], { cwd: new URL("../../", import.meta.url), encoding: "utf8" });
@@ -576,7 +587,7 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     const missingMapping = validateAnnotationWorkflow({ packet, sessions, annotations, adjudications: [], ...workflowBindings, originGroupByBlindTargetId: {} });
     assert.equal(missingMapping.statistics, null);
     assert.ok(missingMapping.issues.includes("custodial-origin-mapping-incomplete-or-invalid"));
-    const cliRoot = mkdtempSync(join(tmpdir(), "breaklint-m3-1-annotation-cli-"));
+    const cliRoot = temporaryDirectory("breaklint-m3-1-annotation-cli-");
     const cliInput = join(cliRoot, "workflow.json");
     writeFileSync(cliInput, JSON.stringify({ packet, sessions, annotations, adjudications: green.statistics ? [{ blindTargetId: packet.targets[0]!.blindTargetId, adjudicatorOpaqueId: "adjudicator_c_0001", sourceSessionIds: [sessions[0]!.sessionId, sessions[1]!.sessionId], finalLabel: "abstain", rationale: "The frozen context remains insufficient.", createdAt: "2026-08-23T10:40:00Z", blinded: true, breaklintResultExposed: false }] : [], ...workflowBindings }));
     const cli = spawnSync(process.execPath, ["--experimental-strip-types", "tests/tools/calibration/m3-1-pilot-cli.ts", "annotation-check", cliInput], { cwd: new URL("../../", import.meta.url), encoding: "utf8" });
@@ -784,7 +795,7 @@ describe("M3-1 additive public-pilot infrastructure", () => {
   });
 
   it("observes a staged-private red control and a targeted ignored green correction", () => {
-    const repo = mkdtempSync(join(tmpdir(), "breaklint-m3-1-git-"));
+    const repo = temporaryDirectory("breaklint-m3-1-git-");
     execFileSync("git", ["init", "-q"], { cwd: repo });
     writeFileSync(join(repo, "private-document.svg"), "private bytes must never be staged");
     execFileSync("git", ["add", "private-document.svg"], { cwd: repo });
@@ -799,7 +810,7 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     assert.equal(green.valid, true);
     assert.deepEqual(green.disallowedPaths, []);
 
-    const classifiedRepo = mkdtempSync(join(tmpdir(), "breaklint-m3-1-content-classifier-"));
+    const classifiedRepo = temporaryDirectory("breaklint-m3-1-content-classifier-");
     execFileSync("git", ["init", "-q"], { cwd: classifiedRepo });
     const publicPath = join(classifiedRepo, "corpus/public/m3-1-pilot-v1");
     mkdirSync(publicPath, { recursive: true });
@@ -810,7 +821,7 @@ describe("M3-1 additive public-pilot infrastructure", () => {
     assert.deepEqual(classified.disallowedPaths, []);
     assert.deepEqual(classified.contentFindings, [{ path: "corpus/public/m3-1-pilot-v1/leaked.svg", code: "email-address" }]);
 
-    const alternateRepo = mkdtempSync(join(tmpdir(), "breaklint-m3-1-alternate-index-"));
+    const alternateRepo = temporaryDirectory("breaklint-m3-1-alternate-index-");
     execFileSync("git", ["init", "-q"], { cwd: alternateRepo });
     mkdirSync(join(alternateRepo, "tests/tools/calibration"), { recursive: true });
     writeFileSync(join(alternateRepo, "CHANGELOG.md"), "M3-1 public infrastructure only.\n");
@@ -880,7 +891,7 @@ describe("M3-1 additive public-pilot infrastructure", () => {
   });
 
   it("adapts full receipt/proof artifacts and rejects identity substitution, replay, rollback and untrusted evidence", () => {
-    const root = mkdtempSync(join(tmpdir(), "breaklint-m3-1-trust-"));
+    const root = temporaryDirectory("breaklint-m3-1-trust-");
     const subjectPath = join(root, "freeze.json");
     const bundlePath = join(root, "attestation.jsonl");
     writeFileSync(subjectPath, "frozen subject bytes");

@@ -230,7 +230,7 @@ are complete; the post-release trust work and remaining validation boundaries ar
 | 0 | checked, coverage met, nothing reached the threshold |
 | 1 | at least one non-experimental finding reached the threshold |
 | 2 | invalid invocation: unknown option, bad config, input path does not exist, or input is not `.html`/`.htm` |
-| 3 | infrastructure: no renderer, font failed, pagination aborted, checker crashed |
+| 3 | infrastructure: no renderer, font failed, pagination aborted, checker crashed, or the output could not be written completely (for example, the stdout reader closed early; with `--out`, a lost confirmation line keeps the verdict's code) |
 | 4 | nothing or too little was judged |
 
 Exit code 4 exists because of a measured case. A multi-column document with the widow rule
@@ -284,7 +284,10 @@ The information contract and the reproducible 32-cell screen/print review are do
 Node 22.13 or newer, on macOS or Linux. The floor is exact because `pdfjs-dist@6.2.108` requires
 Node 22.13 or Node 24, and the release gate installs the packed package on both Node 22.13 and 24.
 A live run additionally needs a Chromium-based browser, `puppeteer-core@25.8.x` and
-`pagedjs@0.4.3`. `pdfjs-dist` is what rasterises the produced PDF to bind evidence to findings; a
+`pagedjs@0.4.3`. With `pdfjs-dist` installed, the browser must also provide the JavaScript
+built-ins and web APIs the pinned rasteriser uses without testing for them; the run checks them
+before it opens a document and ends with exit 3 naming any that are missing (see
+[`docs/limitations.md`](docs/limitations.md)). `pdfjs-dist` is what rasterises the produced PDF to bind evidence to findings; a
 run without it still measures and still reports, but the findings carry no evidence and the report
 says so rather than pretending otherwise. Poppler's `pdftoppm` is **not** used by the tool at all: the live test suite uses
 it as an independent rasteriser, so that Chrome is not both the producer and the sole judge of

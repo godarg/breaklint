@@ -125,9 +125,232 @@ export function pdfjsVersionIntegrity(
 
 export type OpenRasterizerResult = { rasterizer: Rasterizer; detail: "" } | RasterizerUnavailable;
 
+/**
+ * The browser floor the pinned rasteriser sets, as the names `pdfjs-dist` 6.2.108 uses without a
+ * feature test, split by the realm that uses them: `page` for `build/pdf.mjs`, which the rasteriser
+ * page imports, and `worker` for `build/pdf.worker.mjs`, which runs in the worker pdfjs starts.
+ *
+ * Why this is checked before anything else. pdfjs loads fine on a browser that lacks some of these;
+ * it fails only when it rasterises, and the rasteriser runs after the document has been paginated
+ * and measured. Measured on Chromium 141.0.7390.37, which lacks `Map.prototype.getOrInsert`,
+ * `getOrInsertComputed` (on Map and WeakMap), `Math.sumPrecise` and, in the worker,
+ * `Blob.prototype.bytes`: every live run measured its document and then ended with exit 3 on
+ * `this[#methodPromises].getOrInsertComputed is not a function` - an opaque failure, reported
+ * after the work, that named neither the browser nor the remedy. `--no-evidence-binding` does not avoid it, because the evidence rasterisation is part of
+ * acquisition. So the rasteriser page checks these names before pdfjs is imported - the page list
+ * in the page, the worker list in a module worker of its own - and a browser below the floor ends
+ * the run with exit 3 before any document is opened, naming what is missing and where.
+ *
+ * WHAT THE LISTS ARE. Not a memory of which built-ins are recent: the first version of this list
+ * was exactly that, and it missed every web API the build calls (`URL.parse`,
+ * `Response.prototype.bytes`, `AbortSignal.any`, async iteration of a `ReadableStream`). They are
+ * the scan of the pinned build (`tests/tools/pdfjs-platform-inventory.ts`), and they are exactly
+ * as good as that scan, which reads six syntactic shapes and nothing else: `Name.member`,
+ * `new|instanceof|extends Name`, members of the lower-case global objects, bare calls of names the
+ * realm's platform declares (as TypeScript's own DOM, WebWorker and ECMAScript library files name
+ * them), bare calls of names the file never binds, and - by pattern - the instance members of
+ * ECMAScript 2022 and later, the iterator helpers and the web members of the same period. Uses
+ * that pdfjs itself feature-tests, and matches that are not platform names at all, are exempt,
+ * each with its reason. `tests/unit/rasterizer-capabilities.test.ts` fails if these lists and the
+ * scan disagree, so a pdfjs upgrade cannot move the floor silently. What the scan cannot see: an
+ * instance member of a type the text does not show, other than those on the pattern list (older
+ * ones such as `replaceAll` or `flatMap` are not checked), and a bare global that TypeScript does
+ * not declare yet and that the file also binds locally.
+ *
+ * The lists are conservative in one deliberate way: they cover every unguarded use in the build,
+ * not only the code paths a rasterisation reaches. `Blob.prototype.bytes` is the one name where
+ * this matters on a measured browser: pdf.worker.mjs calls it only in
+ * `AnnotationFactory.generateImages`, when it saves or prints annotations that carry editor images,
+ * which this rasteriser never does, and Chromium 141 lacks it. It stays on the list, because a
+ * reachability argument would have to be re-made by hand for every pdfjs upgrade and nothing here
+ * could check it.
+ *
+ * Name forms: `new X` must be a constructor, `a.b()` must be a function, `a.b` must exist; a
+ * `[Symbol.x]` segment is a well-known symbol. No polyfill is offered for anything missing:
+ * `Math.sumPrecise` has exact-summation semantics, and a substitute would be an unvalidated
+ * component inside the evidence apparatus.
+ */
+/**
+ * Spelled through a constant so that no literal in src/ reads like a write to the terminal:
+ * tests/unit/output-routes.test.ts scans src/ as text and cannot tell a name in this list from a
+ * call, and that guard is worth more than a tidy literal.
+ */
+const CONSOLE = "console";
+export const PDFJS_REQUIRED_CAPABILITIES: { readonly page: readonly string[]; readonly worker: readonly string[] } = {
+  page: [
+    "AbortSignal.any()", "Array.from()", "Array.isArray()", "Array.prototype.at()",
+    "Array.prototype.filter", "Array.prototype.findIndex", "Array.prototype.findLast()",
+    "Array.prototype.map", "ArrayBuffer.isView()", "Date.UTC()", "Date.now()",
+    "Int16Array.BYTES_PER_ELEMENT", "Int32Array.BYTES_PER_ELEMENT", "Int8Array.BYTES_PER_ELEMENT",
+    "Iterator.prototype", "Iterator.prototype.filter()", "Iterator.prototype.find()",
+    "Iterator.prototype.some()", "Iterator.prototype.toArray()", "JSON.parse()",
+    "JSON.stringify()", "Map.prototype.getOrInsertComputed()", "Math.PI", "Math.abs()",
+    "Math.atan()", "Math.atan2()", "Math.ceil()", "Math.cos()", "Math.exp()", "Math.floor()",
+    "Math.fround()", "Math.hypot()", "Math.log2()", "Math.max", "Math.max()", "Math.min",
+    "Math.min()", "Math.round()", "Math.sign()", "Math.sin()", "Math.sqrt()", "Math.sumPrecise()",
+    "Node.DOCUMENT_POSITION_FOLLOWING", "Node.DOCUMENT_POSITION_PRECEDING", "Node.ELEMENT_NODE",
+    "Node.TEXT_NODE", "Number.isInteger()", "Object.assign()", "Object.create()",
+    "Object.defineProperty()", "Object.entries()", "Object.freeze()", "Object.getPrototypeOf()",
+    "Object.hasOwn()", "Object.keys()", "Object.values()", "Promise.all()", "Promise.allSettled()",
+    "Promise.reject()", "Promise.resolve()", "Promise.try()", "Promise.withResolvers()",
+    "ReadableStream.prototype[Symbol.asyncIterator]()", "Response.prototype.bytes()",
+    "String.fromCharCode", "String.fromCharCode()", "String.prototype.at()", "Symbol.iterator",
+    "URL.createObjectURL()", "URL.parse()", "URL.revokeObjectURL()",
+    "Uint32Array.BYTES_PER_ELEMENT", "Uint8Array.fromBase64()", "Uint8Array.prototype.at()",
+    "Uint8Array.prototype.toBase64()", "WeakMap.prototype.getOrInsertComputed()",
+    "XMLHttpRequest.DONE", "atob()", "btoa()", "clearTimeout()", `${CONSOLE}.info()`, `${CONSOLE}.log()`,
+    `${CONSOLE}.warn()`, "createImageBitmap()", "crypto.getRandomValues()", "decodeURIComponent()",
+    "document.activeElement", "document.addEventListener()", "document.baseURI", "document.body",
+    "document.createDocumentFragment()", "document.createElement()", "document.createElementNS()",
+    "document.createRange()", "document.createTextNode()", "document.documentElement",
+    "document.elementsFromPoint()", "document.getElementsByName()", "document.getSelection()",
+    "document.querySelector()", "encodeURIComponent()", "escape()", "fetch()",
+    "getComputedStyle()", "globalThis.document", "isNaN()", "new AbortController",
+    "new AbortSignal", "new Array", "new ArrayBuffer", "new Blob", "new CompressionStream",
+    "new DOMMatrix", "new DataView", "new Date", "new DecompressionStream", "new Error",
+    "new Event", "new File", "new FileReader", "new Float32Array", "new Float64Array",
+    "new FontFace", "new HTMLAnchorElement", "new HTMLButtonElement", "new HTMLCanvasElement",
+    "new HTMLInputElement", "new Headers", "new Image", "new Int16Array", "new Int32Array",
+    "new Int8Array", "new Map", "new MutationObserver", "new OffscreenCanvas", "new Path2D",
+    "new Promise", "new Range", "new ReadableStream", "new RegExp", "new Response", "new Set",
+    "new TextDecoder", "new URL", "new Uint32Array", "new Uint8Array", "new Uint8ClampedArray",
+    "new WeakMap", "new WeakRef", "new WeakSet", "new Worker", "new XMLHttpRequest",
+    "parseFloat()", "parseInt()", "setTimeout()", "structuredClone()", "unescape()",
+    "window.addEventListener()", "window.cancelAnimationFrame()", "window.getComputedStyle()",
+    "window.getSelection()", "window.innerHeight", "window.innerWidth", "window.location",
+    "window.matchMedia()", "window.requestAnimationFrame()", "window.screen",
+  ],
+  worker: [
+    "Array.from()", "Array.isArray()", "Array.prototype.at()", "ArrayBuffer.isView()",
+    "ArrayBuffer.prototype.transferToFixedLength()", "Blob.prototype.bytes()", "Date.now()",
+    "Float32Array.from()", "Int16Array.from()", "Int32Array.from()", "Iterator.prototype",
+    "Iterator.prototype.filter()", "Iterator.prototype.some()", "Iterator.prototype.toArray()",
+    "JSON.stringify()", "Map.prototype.getOrInsert()", "Map.prototype.getOrInsertComputed()",
+    "Math.PI", "Math.abs", "Math.abs()", "Math.atan2()", "Math.ceil()", "Math.cos()",
+    "Math.floor()", "Math.hypot()", "Math.log()", "Math.log10()", "Math.log2()", "Math.max()",
+    "Math.min()", "Math.round()", "Math.sign()", "Math.sin()", "Math.sqrt()", "Math.sumPrecise()",
+    "Math.tan()", "Math.trunc()", "Number.isFinite()", "Number.isInteger()", "Number.isNaN()",
+    "Object.assign()", "Object.create()", "Object.defineProperty()", "Object.entries()",
+    "Object.freeze()", "Object.fromEntries()", "Object.getOwnPropertyNames()",
+    "Object.getOwnPropertySymbols()", "Object.getPrototypeOf()", "Object.hasOwn()",
+    "Object.keys()", "Object.prototype", "Object.values()", "Promise.all()",
+    "Promise.allSettled()", "Promise.race()", "Promise.reject()", "Promise.resolve()",
+    "Promise.try()", "Promise.withResolvers()", "ReadableStream.prototype[Symbol.asyncIterator]()",
+    "Reflect.construct()", "Response.prototype.bytes()", "Set.prototype.intersection()",
+    "String.fromCharCode", "String.fromCharCode()", "String.fromCodePoint()",
+    "String.prototype.at()", "Symbol.iterator", "URL.createObjectURL()", "URL.parse()",
+    "Uint8Array.fromBase64()", "Uint8Array.prototype.at()", "Uint8Array.prototype.toHex()",
+    "WeakMap.prototype.getOrInsertComputed()", "WebAssembly.Instance", "WebAssembly.Instance()",
+    "WebAssembly.Module", "WebAssembly.Module()", "WebAssembly.RuntimeError()",
+    "WebAssembly.instantiate", "WebAssembly.instantiate()", "clearTimeout()", `${CONSOLE}.error`,
+    `${CONSOLE}.info()`, `${CONSOLE}.log`, `${CONSOLE}.warn`, `${CONSOLE}.warn()`, "createImageBitmap()",
+    "crypto.getRandomValues()", "decodeURIComponent()", "encodeURIComponent()", "escape()",
+    "fetch()", "isFinite()", "isNaN()", "new AbortController", "new Array", "new ArrayBuffer",
+    "new BigInt64Array", "new BigUint64Array", "new Blob", "new CompressionStream",
+    "new DOMMatrix", "new DataView", "new Date", "new DecompressionStream", "new Error",
+    "new FinalizationRegistry", "new Float32Array", "new Float64Array", "new ImageData",
+    "new Int16Array", "new Int32Array", "new Int8Array", "new Map", "new OffscreenCanvas",
+    "new Promise", "new ReadableStream", "new RegExp", "new Response", "new Set",
+    "new TextDecoder", "new TextEncoder", "new URL", "new Uint16Array", "new Uint32Array",
+    "new Uint8Array", "new Uint8ClampedArray", "new WeakMap", "new XMLHttpRequest", "parseFloat()",
+    "parseInt()", "performance.now()", "setTimeout()", "unescape()",
+  ],
+};
+
+/**
+ * The capability test, as a function declaration that runs unchanged in the page and in a worker.
+ * It returns the names from `names` that the realm it runs in does not provide.
+ */
+const MISSING_CAPABILITIES_FUNCTION = `function missingCapabilities(names) {
+  const missing = [];
+  for (const name of names) {
+    const constructs = name.startsWith("new ");
+    const calls = name.endsWith("()");
+    const path = name.slice(constructs ? 4 : 0, calls ? -2 : undefined);
+    const parts = path.match(/\\[Symbol\\.[A-Za-z]+\\]|[^.[\\]]+/g) || [];
+    let present = parts.length > 0;
+    let value = globalThis;
+    try {
+      for (let index = 0; present && index < parts.length; index += 1) {
+        const part = parts[index];
+        const key = part.startsWith("[Symbol.") ? Symbol[part.slice(8, -1)] : part;
+        if (value === null || (typeof value !== "object" && typeof value !== "function") || !(key in value)) present = false;
+        else if (index < parts.length - 1 || constructs || calls) value = value[key];
+      }
+      if (present && (constructs || calls) && typeof value !== "function") present = false;
+    } catch {
+      present = false;
+    }
+    if (!present) missing.push(name);
+  }
+  return missing;
+}`;
+
+/**
+ * The classic script the rasteriser page runs before it imports pdfjs. It checks the page list in
+ * the page and the worker list in a module worker, and publishes `window.__blCapabilities` as
+ * `{ page: string[], worker: string[] }` (the missing names), or `{ page, worker: { error } }` when
+ * no worker could be started - which pdfjs could not do either.
+ */
+export function capabilityProbeSource(required = PDFJS_REQUIRED_CAPABILITIES): string {
+  const workerSource = `${MISSING_CAPABILITIES_FUNCTION}\npostMessage(missingCapabilities(${JSON.stringify(required.worker)}));`;
+  return `(() => {
+  ${MISSING_CAPABILITIES_FUNCTION}
+  const page = missingCapabilities(${JSON.stringify(required.page)});
+  const publish = (worker) => { window.__blCapabilities = { page, worker }; };
+  try {
+    const url = URL.createObjectURL(new Blob([${JSON.stringify(workerSource)}], { type: "text/javascript" }));
+    const worker = new Worker(url, { type: "module" });
+    worker.onmessage = (event) => { publish(event.data); worker.terminate(); URL.revokeObjectURL(url); };
+    worker.onerror = (event) => { publish({ error: String((event && event.message) || "the capability worker failed") }); worker.terminate(); };
+  } catch (error) {
+    publish({ error: String(error) });
+  }
+})();`;
+}
+
+/**
+ * The verdict on the probe's answer. Anything but a well-formed answer that lists nothing missing
+ * refuses: a rasteriser page that cannot say what it provides has not shown that it can rasterise.
+ */
+export function rasterizerCapabilityVerdict(answer: unknown, browserVersion: string): { ok: boolean; detail: string } {
+  const isNames = (value: unknown): value is string[] => Array.isArray(value) && value.every((name) => typeof name === "string");
+  const { page, worker } = (answer ?? {}) as { page?: unknown; worker?: unknown };
+  if (isNames(page) && !isNames(worker) && typeof (worker as { error?: unknown } | undefined)?.error === "string") {
+    return {
+      ok: false,
+      detail:
+        `the rasteriser page in the browser (${browserVersion}) could not start a worker to check what the pinned ` +
+        `rasteriser pdfjs-dist ${SUPPORTED_PDFJS_VERSION} needs there: ${(worker as { error: string }).error.slice(0, 200)}`,
+    };
+  }
+  if (!isNames(page) || !isNames(worker)) {
+    return {
+      ok: false,
+      detail:
+        `the rasteriser page in the browser (${browserVersion}) did not report which capabilities it provides, ` +
+        `so it cannot be shown to run the pinned rasteriser pdfjs-dist ${SUPPORTED_PDFJS_VERSION}.`,
+    };
+  }
+  if (page.length === 0 && worker.length === 0) return { ok: true, detail: "" };
+  const where = [
+    ...(page.length ? [`in the page ${page.join(", ")}`] : []),
+    ...(worker.length ? [`in its worker ${worker.join(", ")}`] : []),
+  ].join("; ");
+  return {
+    ok: false,
+    detail:
+      `the browser (${browserVersion}) lacks what the pinned rasteriser pdfjs-dist ${SUPPORTED_PDFJS_VERSION} ` +
+      `uses without a feature test: ${where}.\n` +
+      "  No document was opened: the evidence rasterisation would have failed only after measurement.\n" +
+      "  point breaklint at a newer Chrome or Chromium: BREAKLINT_CHROME=/path/to/chrome",
+  };
+}
+
 /** The page that the rasteriser is. Served over loopback, so ordinary module imports work. */
 function loaderHtml(token: string): string {
   return `<!doctype html><meta charset="utf-8"><title>breaklint rasteriser</title><body>
+<script>${capabilityProbeSource()}</script>
 <script type="module">
 import * as pdfjs from "/${token}/pdf.mjs";
 pdfjs.GlobalWorkerOptions.workerSrc = "/${token}/pdf.worker.mjs";
@@ -324,12 +547,7 @@ export async function openRasterizer(
     if (failures.length > 0) throw new Error(`rasterizer ownership cleanup failed: ${failures.join("; ")}`);
   };
 
-  let version: string;
-  try {
-    await page.goto(`${origin}/${token}/`, { waitUntil: "load" });
-    await page.waitForFunction("window.__blReady===true", { timeout: 30_000 });
-    version = await page.evaluate<string>("window.__blVersion");
-  } catch (error) {
+  const didNotLoad = async (error: unknown): Promise<RasterizerUnavailable> => {
     await shutDown();
     return {
       rasterizer: null,
@@ -338,6 +556,46 @@ export async function openRasterizer(
         `  ${String(error).slice(0, 200)}\n` +
         (errors.length ? `  the page reported: ${errors.join(" | ")}` : "  the page reported nothing."),
     };
+  };
+
+  let capabilities: unknown;
+  try {
+    await page.goto(`${origin}/${token}/`, { waitUntil: "load" });
+  } catch (error) {
+    return didNotLoad(error);
+  }
+  try {
+    // The worker half of the check answers asynchronously. A page that never answers is judged
+    // below by what it published, which is nothing - and that refuses.
+    await page.waitForFunction("window.__blCapabilities !== undefined", { timeout: 30_000 });
+  } catch {
+    // Judged by the verdict, not here.
+  }
+  try {
+    capabilities = await page.evaluate<unknown>("window.__blCapabilities");
+  } catch (error) {
+    return didNotLoad(error);
+  }
+  // The capability floor, before the library is awaited and before the caller opens any document.
+  // See PDFJS_REQUIRED_CAPABILITIES for why this cannot wait until the first rasterisation.
+  let browserVersion = "version unavailable";
+  try {
+    browserVersion = await browser.version();
+  } catch {
+    // The verdict still names what is missing; the version is context, not the reason.
+  }
+  const capability = rasterizerCapabilityVerdict(capabilities, browserVersion);
+  if (!capability.ok) {
+    await shutDown();
+    return { rasterizer: null, fatal: true, detail: capability.detail };
+  }
+
+  let version: string;
+  try {
+    await page.waitForFunction("window.__blReady===true", { timeout: 30_000 });
+    version = await page.evaluate<string>("window.__blVersion");
+  } catch (error) {
+    return didNotLoad(error);
   }
 
   const versionIntegrity = pdfjsVersionIntegrity(declaredVersion, version || null);

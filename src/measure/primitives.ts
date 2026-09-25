@@ -127,8 +127,18 @@ const PRIMITIVES_TEMPLATE = `(() => {
   };
   const styleGet = getter(HTMLElement.prototype, "style");
   const fontsGet = getter(Document.prototype, "fonts");
-  const fontReadyGet = getter(FontFaceSet.prototype, "ready");
-  const fontIteratorFn = FontFaceSet.prototype[Symbol.iterator];
+  // The font-set methods come from the prototype of THIS document's own set, never from the global
+  // 'FontFaceSet'. Browsers need not expose that interface object: measured, Chromium 141 does not
+  // ('typeof FontFaceSet' is "undefined"), and reading the global made the whole apparatus fail to
+  // install with a ReferenceError before anything was measured. The prototype is the object the
+  // global would have named, and taking it here is no weaker against tampering: this payload runs
+  // on-new-document, before any author script (render-run.ts installs it with
+  // evaluateOnNewDocument before page.goto), so no author code can have replaced the prototype,
+  // its 'ready' getter or its iterator yet. tests/unit/primitives-font-capture.test.ts fails if the
+  // global is read again.
+  const fontSetPrototype = Object.getPrototypeOf(call.call(fontsGet, document));
+  const fontReadyGet = getter(fontSetPrototype, "ready");
+  const fontIteratorFn = fontSetPrototype[Symbol.iterator];
   const fontIterator = call.call(fontIteratorFn, call.call(fontsGet, document));
   const fontIteratorNextFn = fontIterator.next;
   const fontStatusGet = getter(FontFace.prototype, "status");
