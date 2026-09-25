@@ -114,6 +114,7 @@ Top level (all keys required):
 | `runningElements` | I | array of `{id, marginBox, marginBoxCopies, pages}` with optional `zeroSizeCopyPages` and `zeroSizeCopyNote` |
 | `constructionFacts` | I | array of `{fact}` with optional `arithmetic` (string) and `measured` (opaque) |
 | `rules` | N | exactly the thirteen registered rule ids; each `{mustFire, mustNotFire, allowed, expectedDeclines}` (N, arrays) with optional `notes` (I, array of strings) |
+| `parityBlankPages` | N | object: `count` (N: pages Paged.js inserts blank for parity; the number of `env/parity-blank-page` rows with `ruleId: null` must add up to it), `byFontStack` (I: those pages per font stack), `basis` (I) |
 | `permittedDeclineReasons` | N | reasons a decline row of any rule of this document may carry |
 | `notActiveInDefaultProfile` | N | rule ids that must produce no finding |
 | `verification` | I | object: `method`, `browser`, `pagedjs`, `measuredOn`, `pageCount`, `pageCountByFontStack` (map from stack label to page count), `pdfPageCount`, `contentBoxHeightsPx`, `platformFonts` (opaque), `overflowColumnResidue` (array of `{page, kind, tag, id, cls, text, left, width, height}`), `fontStacks` (`{reference, dejavu, free}`) |
@@ -255,11 +256,20 @@ overlay was installed but binding was not possible). They say whether the eviden
 bound to the rendered PDF, which depends on the rasteriser, the evidence options and the environment,
 not on what a rule measured in the document's construction. The construction probe does not model
 evidence binding, so the corpus holds no truth about them and lists none. A gate therefore leaves
-rows with `ruleId: null` out of every per-rule check (the counts above and `permittedDeclineReasons`),
-but it fails a row with `ruleId: null` whose reason is not one of those two, or whose scope is not
-`page` or `document`. Their effect on the exit is not exempt: the exit must still be in
-`expectedExit.set` (`expectedExit.environmentNote` names the one environment outcome,
-`evidence/required-page-binding-incomplete`).
+rows with `ruleId: null` out of every per-rule check (the counts above and `permittedDeclineReasons`).
+A third evidence-level reason, `env/parity-blank-page` (scope `page`, added by WP-F5), excuses a page
+that Paged.js inserted blank for parity from the binding requirement, and only when five checks
+prove the page empty. Whether it is emitted still depends on the binding checks, but whether a
+document has such a page is a construction fact. So this row is checked by count against the
+normative `parityBlankPages.count` of the expected file: the sum of `count` over the rows with
+`ruleId: null` and this reason must equal it. In this corpus it is 0 for every document: no element
+has `break-before` or `break-after` `right`, `left`, `recto` or `verso`, and the probe found no
+`pagedjs_blank_page` under any font stack. A gate fails a row with `ruleId: null` whose reason is
+none of these three, or whose scope is not `page` or `document`. The effect of all three on the exit
+is not exempt: the exit must still be in `expectedExit.set` (`expectedExit.environmentNote` names
+the one environment outcome, `evidence/required-page-binding-incomplete`). The rule-level decline
+`env/parity-blank-page` (for example of `layout/orphaned-continuation-page`) is in no document's
+`permittedDeclineReasons`, for the same construction reason.
 
 Invariant, true in every expected file: for one rule and reason the entries are either all
 `required: true` or all `required: false`, and either all `measuredAlternative` or none; every
@@ -304,8 +314,9 @@ fact or an expectation turns out to be wrong, add a dated entry to `manifest.jso
 edits the expected file, and change the document's bytes only together with a new hash and a new
 entry. Errata E1 to E15 (2026-09-24), E16 to E26 and E27 to E35 (2026-09-25) came from three independent
 reviews before any breaklint run; E16 also applies an orchestrator decision, and E26 was found by
-the author during the second round. E36 to E40 (2026-09-25) are rulings on the gate author's
-specification questions; they change no truth value.
+the author during the second round. E36 to E41 (2026-09-25) are rulings on the gate author's
+specification questions; E41 adds the construction fact `parityBlankPages` and changes no other
+truth value.
 
 ## Reproducing the construction measurements
 

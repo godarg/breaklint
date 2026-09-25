@@ -39,7 +39,7 @@
       },
       "expected": {
         "relativePath": "expected/sa01-riverbank-survey-handbook.expected.json",
-        "sha256": "b9381af4095613d8aea3ea7f801aa225b6f5aacc46fdbc8ad2aa925abbe12e05",
+        "sha256": "63b145cfd86e263a1b32a972e4d30ca1d0260b3c0b036511bfd136a8ccd9938b",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -109,7 +109,7 @@
       },
       "expected": {
         "relativePath": "expected/sa02-pump-service-manual.expected.json",
-        "sha256": "8715edc7395e7e0c188f89987ae67a84d6f81a48a6fe3861e8b5a688589b0972",
+        "sha256": "dc20769f7dc62be55a98701e27a3702951b3b6030bf40ba19a58ebc0f1ebe49b",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -179,7 +179,7 @@
       },
       "expected": {
         "relativePath": "expected/sa03-transit-ridership-report.expected.json",
-        "sha256": "b6adfb573766cd1197c83273b5056db533ef24cb85a2de715999e06e18647b6c",
+        "sha256": "afc4b4f992abbdf616252dcf2834dab5f44fd9c4c07d8fefa276464716254f4c",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -262,7 +262,7 @@
       },
       "expected": {
         "relativePath": "expected/sa04-essay-chapter-footnotes.expected.json",
-        "sha256": "6f023cb20db1fe90c9b1ff4f76e3c35eb1f410dd4aa5779f1e725474bbc03529",
+        "sha256": "c37eee327ee84e9928bac59cfcdbbce494eaab4255ed46483008b473349bbc32",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -331,7 +331,7 @@
       },
       "expected": {
         "relativePath": "expected/sa05-kitchen-notebook.expected.json",
-        "sha256": "caef26a844c0187f64218e1892290a0b761fba7a831df90ac2b27fb8b341df83",
+        "sha256": "1d2c37a45449e1ed34bcdd649d8175209fb1c4ff14cb7d7ff116d0ba6b7d671f",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -398,7 +398,7 @@
       },
       "expected": {
         "relativePath": "expected/sa06-mobile-work-policy-de.expected.json",
-        "sha256": "7221ab3f8ea5a920f342493d62110dfd2233a0f824f4b3ef90b726070b6d5437",
+        "sha256": "acad7403873599c65755a9a847bf4900af6a4e8a5b1a423b89c7b6e706b7f187",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -468,7 +468,7 @@
       },
       "expected": {
         "relativePath": "expected/sa07-sensor-datasheet.expected.json",
-        "sha256": "9668cfb11112cf21c49a5d415695461ec0d971fe655423eaee4ced63a28464e8",
+        "sha256": "160b723e4a91856a4de8ff4e3fab971786e9900ae8b77f8ca3bd9222b22177b7",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -538,7 +538,7 @@
       },
       "expected": {
         "relativePath": "expected/sa08-tidewell-newsletter.expected.json",
-        "sha256": "f4d4f2885264eaac4cf55f91e679e7e6e08304f22412fd9f4466bc116d3f77ad",
+        "sha256": "fa7a600d8889c26401946be0eb5e90d9e63cc06546ffa19595ba67f2b595121a",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -610,7 +610,7 @@
       },
       "expected": {
         "relativePath": "expected/sa09-queue-worker-tutorial.expected.json",
-        "sha256": "8d6d22809ea3f5a475bdf804f9911aa31b2406d288a0ebd87fc06c57ce9a8541",
+        "sha256": "4c28f2503b1b4ddb950e6387bf4db2329bb1ff666e0da281ac36fc139f4b09ed",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -679,7 +679,7 @@
       },
       "expected": {
         "relativePath": "expected/sa10-lagoon-oxygen-report.expected.json",
-        "sha256": "93209b5da276af39e28de6489fb94d264ef4d9ee430274d50488f7c4cc214484",
+        "sha256": "6fc616db52927b14be2bfd493aa830701067917ceadc64253a0ab7100cbdfabb",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -751,7 +751,7 @@
       },
       "expected": {
         "relativePath": "expected/sa11-insect-chorus-survey.expected.json",
-        "sha256": "a8e7aaf59f99c772043443bb3b55deb3be1d98111b477c5fd3a863ebd1013183",
+        "sha256": "2043d75fe96af0f5ba74a6201977b16f5cafb413f10d5e781f4d6fee99b3a0cc",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -823,7 +823,7 @@
       },
       "expected": {
         "relativePath": "expected/sa12-library-annual-report.expected.json",
-        "sha256": "daec021b8c2d7de9f9fe14c0453c000c43faf0f490a31876b3648e03f9e67e63",
+        "sha256": "1cf76562ba581e9541c81c38046052d155972923ab28bdb63d5eab3cfeaaaa7d",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -904,7 +904,7 @@
       },
       "expected": {
         "relativePath": "expected/sa13-planning-forum-transcript.expected.json",
-        "sha256": "524e2f505e0a32862c9fd741c437c568c73a22d25bf5b1156f8954af81f63ec7",
+        "sha256": "2efaec8ccd8d4c66fea471ef0c6d0168cf5ceb659eaeec8daa475e1d5661adbe",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -973,7 +973,7 @@
       },
       "expected": {
         "relativePath": "expected/sa14-weather-station-install-guide.expected.json",
-        "sha256": "ea3dbaa783770087cecedec3daea9c4c626a970b58d78099002e428f395c50d7",
+        "sha256": "e4a7ef0fdb5e8ae275e0271c0eea96822303fcf6b29a077278c58db801ae73a8",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1044,7 +1044,7 @@
       },
       "expected": {
         "relativePath": "expected/sa15-hut-trail-guide-de.expected.json",
-        "sha256": "52588e75c5f0fb34d4520a26cdc369a4f6a01c56fcbc96207fdd403548951301",
+        "sha256": "344c26f505ed524eb8b03fdd4c00db0f4860ba3a47077490e4cd3b75940c9b93",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1117,7 +1117,7 @@
       },
       "expected": {
         "relativePath": "expected/sa16-lab-safety-manual.expected.json",
-        "sha256": "390bb2b383801c0e5bae14484937f0de6c669fda233d514691bbac8959264324",
+        "sha256": "6e0a91026d6f42bcee234c8600cee0d3128258229e158e29fee9aafcf061a040",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1190,7 +1190,7 @@
       },
       "expected": {
         "relativePath": "expected/sa17-seed-bank-grant-proposal.expected.json",
-        "sha256": "55e875580f64e0efc94a38305d92de09b02d32d73865a6972da85861ac3ae7da",
+        "sha256": "1d625f241806f9624b6c030bf92c2921ceea8c738e25f3eb9051dfefe739e2f2",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1261,7 +1261,7 @@
       },
       "expected": {
         "relativePath": "expected/sa18-hand-tools-catalogue.expected.json",
-        "sha256": "4f760302f8bf8d989018e2f29bc1cea48fa2546ff60ac85e80bbe7e93e05fd26",
+        "sha256": "d3b2e534b936810962c50b94f6cc74d4592bf57ce355c7873837ca137b2a6119",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1331,7 +1331,7 @@
       },
       "expected": {
         "relativePath": "expected/sa19-release-notes.expected.json",
-        "sha256": "3f0130f6453b43913b6aa55c93ccff84df9a163a60a470e2e2375a4af97f9c63",
+        "sha256": "9dfd2ea3b723e659856fb3217e7683ee9ab2f393f3b767f0be082359bb379cba",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1402,7 +1402,7 @@
       },
       "expected": {
         "relativePath": "expected/sa20-wiki-meeting-minutes.expected.json",
-        "sha256": "b7c0a1eed93816fdcd759db02f1dc4869cfdd9a5787b51b9c97365e9fab49547",
+        "sha256": "8cb9996ca8057720c1a5c49376d0bde4cbe0bdd702972d745287bcf261725b35",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1873,103 +1873,103 @@
     },
     {
       "path": "expected/sa01-riverbank-survey-handbook.expected.json",
-      "sha256": "b9381af4095613d8aea3ea7f801aa225b6f5aacc46fdbc8ad2aa925abbe12e05",
-      "byteLength": 27069
+      "sha256": "63b145cfd86e263a1b32a972e4d30ca1d0260b3c0b036511bfd136a8ccd9938b",
+      "byteLength": 27456
     },
     {
       "path": "expected/sa02-pump-service-manual.expected.json",
-      "sha256": "8715edc7395e7e0c188f89987ae67a84d6f81a48a6fe3861e8b5a688589b0972",
-      "byteLength": 20399
+      "sha256": "dc20769f7dc62be55a98701e27a3702951b3b6030bf40ba19a58ebc0f1ebe49b",
+      "byteLength": 20786
     },
     {
       "path": "expected/sa03-transit-ridership-report.expected.json",
-      "sha256": "b6adfb573766cd1197c83273b5056db533ef24cb85a2de715999e06e18647b6c",
-      "byteLength": 28733
+      "sha256": "afc4b4f992abbdf616252dcf2834dab5f44fd9c4c07d8fefa276464716254f4c",
+      "byteLength": 29120
     },
     {
       "path": "expected/sa04-essay-chapter-footnotes.expected.json",
-      "sha256": "6f023cb20db1fe90c9b1ff4f76e3c35eb1f410dd4aa5779f1e725474bbc03529",
-      "byteLength": 10957
+      "sha256": "c37eee327ee84e9928bac59cfcdbbce494eaab4255ed46483008b473349bbc32",
+      "byteLength": 11344
     },
     {
       "path": "expected/sa05-kitchen-notebook.expected.json",
-      "sha256": "caef26a844c0187f64218e1892290a0b761fba7a831df90ac2b27fb8b341df83",
-      "byteLength": 17737
+      "sha256": "1d2c37a45449e1ed34bcdd649d8175209fb1c4ff14cb7d7ff116d0ba6b7d671f",
+      "byteLength": 18124
     },
     {
       "path": "expected/sa06-mobile-work-policy-de.expected.json",
-      "sha256": "7221ab3f8ea5a920f342493d62110dfd2233a0f824f4b3ef90b726070b6d5437",
-      "byteLength": 20182
+      "sha256": "acad7403873599c65755a9a847bf4900af6a4e8a5b1a423b89c7b6e706b7f187",
+      "byteLength": 20569
     },
     {
       "path": "expected/sa07-sensor-datasheet.expected.json",
-      "sha256": "9668cfb11112cf21c49a5d415695461ec0d971fe655423eaee4ced63a28464e8",
-      "byteLength": 27484
+      "sha256": "160b723e4a91856a4de8ff4e3fab971786e9900ae8b77f8ca3bd9222b22177b7",
+      "byteLength": 27871
     },
     {
       "path": "expected/sa08-tidewell-newsletter.expected.json",
-      "sha256": "f4d4f2885264eaac4cf55f91e679e7e6e08304f22412fd9f4466bc116d3f77ad",
-      "byteLength": 24278
+      "sha256": "fa7a600d8889c26401946be0eb5e90d9e63cc06546ffa19595ba67f2b595121a",
+      "byteLength": 24665
     },
     {
       "path": "expected/sa09-queue-worker-tutorial.expected.json",
-      "sha256": "8d6d22809ea3f5a475bdf804f9911aa31b2406d288a0ebd87fc06c57ce9a8541",
-      "byteLength": 16137
+      "sha256": "4c28f2503b1b4ddb950e6387bf4db2329bb1ff666e0da281ac36fc139f4b09ed",
+      "byteLength": 16524
     },
     {
       "path": "expected/sa10-lagoon-oxygen-report.expected.json",
-      "sha256": "93209b5da276af39e28de6489fb94d264ef4d9ee430274d50488f7c4cc214484",
-      "byteLength": 36897
+      "sha256": "6fc616db52927b14be2bfd493aa830701067917ceadc64253a0ab7100cbdfabb",
+      "byteLength": 37284
     },
     {
       "path": "expected/sa11-insect-chorus-survey.expected.json",
-      "sha256": "a8e7aaf59f99c772043443bb3b55deb3be1d98111b477c5fd3a863ebd1013183",
-      "byteLength": 28411
+      "sha256": "2043d75fe96af0f5ba74a6201977b16f5cafb413f10d5e781f4d6fee99b3a0cc",
+      "byteLength": 28798
     },
     {
       "path": "expected/sa12-library-annual-report.expected.json",
-      "sha256": "daec021b8c2d7de9f9fe14c0453c000c43faf0f490a31876b3648e03f9e67e63",
-      "byteLength": 22885
+      "sha256": "1cf76562ba581e9541c81c38046052d155972923ab28bdb63d5eab3cfeaaaa7d",
+      "byteLength": 23272
     },
     {
       "path": "expected/sa13-planning-forum-transcript.expected.json",
-      "sha256": "524e2f505e0a32862c9fd741c437c568c73a22d25bf5b1156f8954af81f63ec7",
-      "byteLength": 19327
+      "sha256": "2efaec8ccd8d4c66fea471ef0c6d0168cf5ceb659eaeec8daa475e1d5661adbe",
+      "byteLength": 19714
     },
     {
       "path": "expected/sa14-weather-station-install-guide.expected.json",
-      "sha256": "ea3dbaa783770087cecedec3daea9c4c626a970b58d78099002e428f395c50d7",
-      "byteLength": 26991
+      "sha256": "e4a7ef0fdb5e8ae275e0271c0eea96822303fcf6b29a077278c58db801ae73a8",
+      "byteLength": 27378
     },
     {
       "path": "expected/sa15-hut-trail-guide-de.expected.json",
-      "sha256": "52588e75c5f0fb34d4520a26cdc369a4f6a01c56fcbc96207fdd403548951301",
-      "byteLength": 22246
+      "sha256": "344c26f505ed524eb8b03fdd4c00db0f4860ba3a47077490e4cd3b75940c9b93",
+      "byteLength": 22633
     },
     {
       "path": "expected/sa16-lab-safety-manual.expected.json",
-      "sha256": "390bb2b383801c0e5bae14484937f0de6c669fda233d514691bbac8959264324",
-      "byteLength": 27884
+      "sha256": "6e0a91026d6f42bcee234c8600cee0d3128258229e158e29fee9aafcf061a040",
+      "byteLength": 28271
     },
     {
       "path": "expected/sa17-seed-bank-grant-proposal.expected.json",
-      "sha256": "55e875580f64e0efc94a38305d92de09b02d32d73865a6972da85861ac3ae7da",
-      "byteLength": 19521
+      "sha256": "1d625f241806f9624b6c030bf92c2921ceea8c738e25f3eb9051dfefe739e2f2",
+      "byteLength": 19908
     },
     {
       "path": "expected/sa18-hand-tools-catalogue.expected.json",
-      "sha256": "4f760302f8bf8d989018e2f29bc1cea48fa2546ff60ac85e80bbe7e93e05fd26",
-      "byteLength": 24205
+      "sha256": "d3b2e534b936810962c50b94f6cc74d4592bf57ce355c7873837ca137b2a6119",
+      "byteLength": 24592
     },
     {
       "path": "expected/sa19-release-notes.expected.json",
-      "sha256": "3f0130f6453b43913b6aa55c93ccff84df9a163a60a470e2e2375a4af97f9c63",
-      "byteLength": 14429
+      "sha256": "9dfd2ea3b723e659856fb3217e7683ee9ab2f393f3b767f0be082359bb379cba",
+      "byteLength": 14816
     },
     {
       "path": "expected/sa20-wiki-meeting-minutes.expected.json",
-      "sha256": "b7c0a1eed93816fdcd759db02f1dc4869cfdd9a5787b51b9c97365e9fab49547",
-      "byteLength": 15232
+      "sha256": "8cb9996ca8057720c1a5c49376d0bde4cbe0bdd702972d745287bcf261725b35",
+      "byteLength": 15619
     },
     {
       "path": "probe/construction-measurements.json",
@@ -1993,8 +1993,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "e617311db080423ed8c80fcbfa4c52515de3cc28387d2630d7dfa696d312a603",
-      "byteLength": 27835
+      "sha256": "dd5d0f7d6d69efca883c3e3b84d0343848d7a8875b37e6183ff9340c305bbbff",
+      "byteLength": 29034
     },
     {
       "path": "PROVENANCE.md",
@@ -2687,6 +2687,18 @@
       "documents": [],
       "what": "README confirms three points and states them normatively. pages.range is inclusive at both ends (gate step 4 and the Field list). Every id a target names occurs exactly once in its document, and a target naming a duplicated or missing id fails its entry (checked: no document has a duplicate id; every targeted id exists). E17's rule applies per list: within one list of one rule no target repeats (in expectedDeclines, target together with reason). Across one rule's lists, mustFire, mustNotFire and allowed share no target (checked), and a mustFire or allowed target may also appear in expectedDeclines. No expected file and no document changed; no truth value changed.",
       "why": "The gate author had assumed these; the README did not state them.",
+      "date": "2026-09-25",
+      "source": "gate author's specification questions (WP-K2), ruled from the specification's intent (no breaklint output seen)"
+    },
+    {
+      "id": "E41",
+      "question": "env/parity-blank-page (WP-F5, 1fa776a)",
+      "documents": [
+        "all"
+      ],
+      "what": "Ruling: option (b), construction expectation. Every expected file gains the normative top-level object parityBlankPages {count, byFontStack, basis}. count is the number of pages Paged.js inserts blank for parity. The README paragraph 'Evidence-level declines' requires the rows with ruleId null and reason env/parity-blank-page to add up to that count, which is 0 in all twenty documents. No element has break-before or break-after right, left, recto or verso (nor page-break-before/after right or left), and the construction probe found no pagedjs_blank_page page under any of the three font stacks; byFontStack records this. A ruleId-null row is now accepted only with one of three reasons (the two of E37 plus this one), and the Field list names the new key. The rule-level env/parity-blank-page decline stays outside every permittedDeclineReasons for the same construction reason. No other truth value changed.",
+      "why": "Unlike E37's rows, whether a document has a blank parity page is fixed by its construction: parity breaks, and the page count the probe measured. Emitting the row still depends on the five binding checks. But a row on a document whose construction inserts no parity page means the pagination or the classification differs from the construction, and the corpus can say so. Counting rather than naming pages avoids font-dependent page numbers. Option (a) would have let such a row pass unexamined.",
+      "previous": "no field; E37 accepted two ruleId-null reasons",
       "date": "2026-09-25",
       "source": "gate author's specification questions (WP-K2), ruled from the specification's intent (no breaklint output seen)"
     }
