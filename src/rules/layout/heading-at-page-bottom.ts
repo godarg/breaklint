@@ -1,6 +1,8 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
+import {
+  declined, hasLayoutBox, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber, sourceOf, targetEvaluation,
+} from "../shared.ts";
 
 const HEADINGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
 
@@ -49,6 +51,13 @@ export const headingAtPageBottom = defineRule(
 
     for (const block of snapshot.blocks) {
       if (!HEADINGS.has(block.tag.toLowerCase())) continue;
+      // A heading with no layout box does not end any page: it is not on one. The case is a
+      // running heading, whose in-flow original Paged.js hides with `display: none`; it was
+      // counted as a measured candidate that "had content below it".
+      if (!hasLayoutBox(block.box)) {
+        evaluations.push(notRenderedEvaluation("layout/heading-at-page-bottom", block));
+        continue;
+      }
       candidates += 1;
 
       const outOfScope = layoutOutOfScope(block.effectiveStyle);

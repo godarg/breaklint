@@ -1,6 +1,8 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, sourceOf, targetEvaluation } from "../shared.ts";
+import {
+  declined, hasLayoutBox, layoutOutOfScope, linesOfBlock, makeFinding, notRenderedEvaluation, num, sourceOf, targetEvaluation,
+} from "../shared.ts";
 
 /**
  * type/excessive-word-spacing — justification has pulled the word gaps far apart.
@@ -48,6 +50,12 @@ export const excessiveWordSpacing = defineRule(
       if (ws && ws !== "normal" && ws !== "0px") continue;
       if (block.tag.toLowerCase() === "td" || block.tag.toLowerCase() === "th") continue;
       if (block.spaceWidth <= 0) continue;
+      // No layout box, no lines, no gaps: a justified running header's hidden in-flow original
+      // was counted as measured with nothing in it.
+      if (!hasLayoutBox(block.box)) {
+        evaluations.push(notRenderedEvaluation("type/excessive-word-spacing", block));
+        continue;
+      }
       candidates += 1;
 
       const outOfScope = layoutOutOfScope(block.effectiveStyle);

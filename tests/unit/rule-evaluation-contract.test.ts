@@ -214,12 +214,24 @@ describe("target evaluation contract", () => {
     // 2026-09-18, a twelve-page document with a three-line running header reported this `error`
     // rule at 979.08 px against a 619.83 px page, for a header 81.59 px tall. The clones are not
     // in the snapshot any more; what remains is the in-flow original Paged.js leaves in the page
-    // content with `display: none`: one record, no box, nothing to sum.
+    // content with `display: none`: one record, no box. The paginator never placed it, so the
+    // question does not arise: it is EXCLUDED, outside the coverage base, and not "measured at
+    // 0 px" — which is what it was, and a document whose only avoid block was a running element
+    // then reported full coverage for a check that had looked at nothing.
     const runningOriginal = run(fragmented([{ height: 0, width: 0, x: 0, y: 0 }]));
     assert.deepEqual(runningOriginal.findings, []);
+    assert.equal(runningOriginal.candidates, 0, "a block with no layout box was counted as a candidate");
+    assert.equal(runningOriginal.measured, 0, "a block with no layout box was counted as measured");
     const originalRow = runningOriginal.evaluations!.find((row) => row.targetRef.fragmentIndex === 0 && row.status !== "not-applicable");
-    assert.equal(originalRow?.status, "measured", "the in-flow original of a running element was not measured");
-    assert.equal(originalRow!.measurements[0]!.value, 0);
+    assert.equal(originalRow?.status, "excluded");
+    assert.equal(originalRow!.reason, "rule/target-not-rendered");
+    assert.equal(originalRow!.countsTowardCoverage, false);
+    // Both dimensions decide, never one: an EMPTY avoid block is laid out with the column width
+    // and no height, and it is measured — at 0 px, which fits. A predicate on the height alone
+    // would call it unrendered and drop a real candidate.
+    const emptyAvoid = run(fragmented([{ height: 0 }]));
+    assert.equal(emptyAvoid.measured, 1, "a zero-height block with a width was dropped as if it had no box");
+    assert.equal(emptyAvoid.evaluations!.find((row) => row.status === "measured")!.measurements[0]!.value, 0);
 
     // Fragments with nothing to join them by. Without a sid (a `--no-source-map` run, or an
     // element a script created) three records of one split block cannot be told from three

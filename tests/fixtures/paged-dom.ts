@@ -1,14 +1,15 @@
 /**
- * A hand-authored Paged.js 0.4.3 page tree, and the captured primitives over it, so that the two
- * in-page payloads that decide flow membership — `SNAPSHOT_SOURCE` and the collector — can run in
- * the unit suite without a browser.
+ * A hand-authored Paged.js 0.4.3 page tree, and the captured primitives over it, so that the
+ * in-page payloads that decide flow membership — `SNAPSHOT_SOURCE`, the collector, the evidence
+ * overlay's `install` and the source-id integrity `status()` — can run in the unit suite without a
+ * browser.
  *
  * WHAT THIS IS FOR. Both payloads are strings evaluated inside the document, and until now the only
  * thing that could observe them was the live suite. That left the unit suite unable to see the
  * margin-box defect at all: a hand-authored `Snapshot` can only model a running-element clone as a
  * record that is already there, which tests the rules, not the query that put it there. Running the
- * real payload text against a real page tree closes that gap: delete the flow test from either
- * payload and a unit test turns red.
+ * real payload text against a real page tree closes that gap: delete the flow test from any of the
+ * payloads and a unit test turns red.
  *
  * WHAT IT IS NOT. It is not a browser and it is not a layout engine. Geometry is authored, not
  * computed: an element's box is its `data-test-box="x y width height"` attribute, a text node's
@@ -188,6 +189,22 @@ const DEFAULT_STYLE: Record<string, string> = {
   wordSpacing: "0px", content: "normal",
 };
 
+/**
+ * The part of Paged.js' own stylesheet (`polisher/base.js`) that a payload reads back: the page
+ * content, the page box and the sheet are positioned, and the sheet clips.
+ */
+const CLASS_STYLE: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  pagedjs_page_content: { position: "relative" },
+  pagedjs_pagebox: { position: "relative", display: "grid" },
+  pagedjs_sheet: { position: "relative", overflow: "hidden", display: "grid" },
+};
+
+function classStyle(node: FakeNode): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const name of (node.attributes.get("class") ?? "").split(/\s+/u)) Object.assign(out, CLASS_STYLE[name] ?? {});
+  return out;
+}
+
 function inlineStyle(node: FakeNode): Record<string, string> {
   const declared: Record<string, string> = {};
   for (const declaration of (node.attributes.get("style") ?? "").split(";")) {
@@ -223,6 +240,8 @@ function textContent(node: FakeNode): string {
 export function fakePrimitives(document: FakeNode, hooks: {
   registerPagedHandler?: (handler: unknown) => void;
   installCollector?: (result: () => unknown) => void;
+  installIntegrity?: (value: unknown) => void;
+  publishOverlay?: (control: unknown) => void;
 } = {}): Record<string, unknown> {
   return {
     installed: true,
@@ -244,7 +263,7 @@ export function fakePrimitives(document: FakeNode, hooks: {
       const box = boxOf(node);
       return box.width > 0 || box.height > 0 ? [box] : [];
     },
-    style: (node: FakeNode) => ({ ...DEFAULT_STYLE, ...inlineStyle(node) }),
+    style: (node: FakeNode) => ({ ...DEFAULT_STYLE, ...classStyle(node), ...inlineStyle(node) }),
     // A text node's line box is its parent's box: one line per text node. A hidden text node has
     // none, which is what Range.getClientRects() answers under display: none.
     range: (node: FakeNode, start?: number, end?: number) => {
@@ -264,6 +283,37 @@ export function fakePrimitives(document: FakeNode, hooks: {
     integrityArmLate: () => undefined,
     registerPagedHandler: (_capability: string, handler: unknown) => hooks.registerPagedHandler?.(handler),
     installCollector: (_capability: string, _nonce: string, result: () => unknown) => hooks.installCollector?.(result),
+    installIntegrity: (_capability: string, value: unknown) => hooks.installIntegrity?.(value),
+    publishOverlay: (_capability: string, control: unknown) => hooks.publishOverlay?.(control),
+    randomToken: () => "fake-overlay-capability",
+    mutationType: () => "childList",
+    mutationAttributeName: () => null,
+    // The overlay builds its layer from these. New nodes live in the same fake tree, so a later
+    // query sees them exactly as it would see the real layer.
+    create: (tag: string): FakeNode => ({
+      nodeType: 1, nodeName: tag.toUpperCase(), tagName: tag.toUpperCase(), attributes: new Map(), childNodes: [],
+      parentNode: null, isConnected: false,
+    }),
+    setAttr: (node: FakeNode, name: string, value: string) => { node.attributes.set(name, String(value)); },
+    setCssText: (node: FakeNode, value: string) => { node.attributes.set("style", value); },
+    setStyle: (node: FakeNode, name: string, value: string, priority?: string) => {
+      node.attributes.set("style", `${node.attributes.get("style") ?? ""};${name}:${value}${priority ? " !" + priority : ""}`);
+    },
+    setText: (node: FakeNode, value: string) => {
+      node.childNodes = [{ nodeType: 3, nodeName: "#text", attributes: new Map(), childNodes: [], parentNode: node, data: value, isConnected: true }];
+    },
+    append: (parent: FakeNode, child: FakeNode) => { child.parentNode = parent; child.isConnected = true; parent.childNodes.push(child); return child; },
+    next: (node: FakeNode) => {
+      const siblings = node.parentNode?.childNodes ?? [];
+      return siblings[siblings.indexOf(node) + 1] ?? null;
+    },
+    remove: (node: FakeNode) => {
+      const parent = node.parentNode;
+      if (!parent) return null;
+      parent.childNodes = parent.childNodes.filter((child) => child !== node);
+      node.parentNode = null;
+      return node;
+    },
   };
 }
 
@@ -308,6 +358,34 @@ export function runCollector<T>(source: string, document: FakeNode): T {
   }
   handler.afterRendered!();
   return (result as () => T)();
+}
+
+/**
+ * Install the real source-id integrity payload over the fake tree and return what its `status()`
+ * answers now. No mutation is ever observed here: the tree does not change after installation.
+ */
+export function runIntegrityStatus<T>(source: string, document: FakeNode): T {
+  let integrity: { status: () => T } | null = null;
+  const window = { __blPrimitives: fakePrimitives(document, { installIntegrity: (value) => { integrity = value as { status: () => T }; } }) };
+  class Observer { observe(): void {} }
+  new Function("window", "document", "MutationObserver", source)(window, document, Observer);
+  if (!integrity) throw new Error("paged-dom: the integrity payload did not install itself");
+  return (integrity as { status: () => T }).status();
+}
+
+/**
+ * Evaluate the real evidence-overlay payload over the fake tree and return the capability-gated
+ * controller it publishes, so a caller can drive `install` exactly as `produceEvidence` does.
+ */
+export function overlayController(source: string, document: FakeNode): {
+  capability: string;
+  control: (capability: string, action: string) => { value: unknown; unauthorizedCalls: number };
+} {
+  let control: ((capability: string, action: string) => { value: unknown; unauthorizedCalls: number }) | null = null;
+  const window = { __blPrimitives: fakePrimitives(document, { publishOverlay: (value) => { control = value as typeof control; } }) };
+  const capability = new Function("window", "document", `return ${source};`)(window, document) as string;
+  if (!control) throw new Error("paged-dom: the overlay did not publish its controller");
+  return { capability, control };
 }
 
 // ---- building the page tree ----------------------------------------------------------------

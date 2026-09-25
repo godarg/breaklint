@@ -14,11 +14,14 @@
  * that page; every page anchored to the running header, so three `layout/half-empty-page` findings
  * on three different pages carried ONE fingerprint.
  *
- * WHAT IS UNDER TEST HERE is the real payload text — `SNAPSHOT_SOURCE` and the collector — run
- * over a hand-authored page tree in the structure Paged.js 0.4.3 produces (see
+ * WHAT IS UNDER TEST HERE is the real payload text — `SNAPSHOT_SOURCE`, the collector and the
+ * source-id integrity status — run over a hand-authored page tree in the structure Paged.js 0.4.3
+ * produces (see
  * `tests/fixtures/paged-dom.ts` for what that harness is and is not). The Node half after it is the
- * production one: `assembleSnapshot`, the break-cause classifier and `runDocument`. The live suite
- * runs the same fixtures through the real paginator.
+ * production one: `assembleSnapshot`, the break-cause classifier, `runDocument` and
+ * `validateRuntimeSidState`. The evidence overlay has its own file,
+ * `tests/unit/margin-boxes-evidence.test.ts`. The live suite runs the same cases through the real
+ * paginator.
  */
 
 import assert from "node:assert/strict";
@@ -32,8 +35,12 @@ import {
 } from "../../src/measure/snapshot.ts";
 import { COLLECTOR_SOURCE, type CollectorResult } from "../../src/paginate/collector.ts";
 import { injectSourceIds } from "../../src/source/inject.ts";
-import type { Finding, Snapshot } from "../../src/core/types.ts";
-import { evaluatePayload, pagedDocument, pagedPage, runCollector } from "../fixtures/paged-dom.ts";
+import type { BlockRecord, Finding, Snapshot } from "../../src/core/types.ts";
+import { fingerprint } from "../../src/core/fingerprint.ts";
+import { ALL_RULES } from "../../src/rules/index.ts";
+import { loadCorpus } from "../fixtures/corpus.ts";
+import { integritySource, orderedSourceSids, validateRuntimeSidState, type RuntimeIntegrityStatus } from "../../src/acquire/render-run.ts";
+import { evaluatePayload, pagedDocument, pagedPage, runCollector, runIntegrityStatus } from "../fixtures/paged-dom.ts";
 
 /** Page geometry as measured for a 150 x 120 mm page with 15 mm margins, pages 700 px apart. */
 const STRIDE = 700;
@@ -147,7 +154,7 @@ function parityPages(sid: Record<string, string>): string[] {
 
 const ELEMENTS_SOURCE = `<!doctype html><html lang="en"><body>
 <p class="title" id="running-title">Running title on every page</p>
-<div class="side" id="running-side">${Array.from({ length: 8 }, (_, i) => `<span>Side ${i + 1}</span>`).join("<br>")}</div>
+<div class="side" id="running-side">${Array.from({ length: 8 }, (_, i) => `<span>Side ${i + 1}</span>`).join("<br>")}<div class="pagedjs_area" id="side-spoof"><p id="side-spoof-p">Author markup borrowing the area class.</p></div></div>
 <div class="stamp" id="stamp"><p id="stamp-text">DRAFT</p></div>
 ${Array.from({ length: 12 }, (_, i) => `<p id="b${i + 1}">Body paragraph ${i + 1}.</p>`).join("\n")}
 <aside class="note" id="note">A footnote moved into the footnote area.</aside>
@@ -164,15 +171,21 @@ function elementsPages(sid: Record<string, string>): string[] {
   const s = (id: string) => `id="${id}" data-bl-sid="${sid[id]}" data-ref="ref-${id}"`;
   const title = (index: number) =>
     `<p class="title" ${s("running-title")} data-test-box="56.69 ${19.02 + index * STRIDE} 453.53 ${LINE}">Running title on every page</p>`;
+  // The side element carries author markup with the class name of the page AREA. Inside a margin
+  // box it is not the area of any page: only a `.pagedjs_area` that is a child of the page box is.
+  const spoof = (index: number) =>
+    `<div class="pagedjs_area" ${s("side-spoof")} data-test-box="0 ${275.27 + index * STRIDE} 56.69 12.13">` +
+    `<p ${s("side-spoof-p")} data-test-box="0 ${275.27 + index * STRIDE} 56.69 12.13">Author markup borrowing the area class.</p></div>`;
   const side = (index: number) =>
     `<div class="side" ${s("running-side")} style="break-inside: avoid;" data-test-box="0 ${178.27 + index * STRIDE} 56.69 97">` +
     Array.from({ length: 8 }, (_, i) => `<span data-test-box="0 ${178.27 + index * STRIDE + i * 12.13} 30 12.13">Side ${i + 1}</span>`).join("<br>") +
-    "</div>";
+    spoof(index) + "</div>";
   const stamp = (index: number) =>
     `<div class="stamp" ${s("stamp")} style="position: absolute;" data-test-box="523.22 ${index * STRIDE} 43.7 ${LINE}">` +
     `<p ${s("stamp-text")} data-test-box="523.22 ${index * STRIDE} 43.7 ${LINE}">DRAFT</p></div>`;
   const hidden = `<p class="title" ${s("running-title")} style="display: none;">Running title on every page</p>` +
-    `<div class="side" ${s("running-side")} style="display: none; break-inside: avoid;">${Array.from({ length: 8 }, (_, i) => `<span>Side ${i + 1}</span>`).join("<br>")}</div>`;
+    `<div class="side" ${s("running-side")} style="display: none; break-inside: avoid;">${Array.from({ length: 8 }, (_, i) => `<span>Side ${i + 1}</span>`).join("<br>")}` +
+    `<div class="pagedjs_area" ${s("side-spoof")}><p ${s("side-spoof-p")}>Author markup borrowing the area class.</p></div></div>`;
   const body = (index: number, from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) =>
     `<p ${s(`b${from + i}`)} data-test-box="${lineBox(index, i)}">Body paragraph ${from + i}.</p>`).join("");
   return [
@@ -212,8 +225,14 @@ describe("margin-box content is not part of the flow", () => {
     // flow and inserts a clone into every page box. It is therefore not measured anywhere.
     assert.equal(records("stamp").length, 0, "a position: fixed clone was recorded as flow content");
     assert.equal(records("stamp-text").length, 0, "the descendant of a position: fixed clone was recorded");
+    // Author markup inside the running element that carries the AREA class name: in the clones it
+    // is not a page's area, so it stays out; only the copy inside the hidden in-flow original is
+    // kept. A test on the class alone (".pagedjs_area") would count it once per page.
+    for (const id of ["side-spoof", "side-spoof-p"]) {
+      assert.equal(records(id).length, 1, `${id}: ${records(id).length} records — a margin-box clone was taken for flow by its class name`);
+    }
     // No text line belongs to any clone: every line lies inside a page's content area.
-    const cloneKeys = new Set(raw.blocks.filter((block) => ["running-title", "running-side", "stamp", "stamp-text"]
+    const cloneKeys = new Set(raw.blocks.filter((block) => ["running-title", "running-side", "stamp", "stamp-text", "side-spoof", "side-spoof-p"]
       .some((id) => block.sid === sid[id])).map((block) => block.nodeKey));
     assert.equal(raw.textLines.filter((line) => cloneKeys.has(line.blockKey)).length, 0, "a clone contributed text lines");
     for (const line of raw.textLines) {
@@ -305,7 +324,7 @@ describe("margin-box content is not part of the flow", () => {
       injected,
     );
     const findings = findingsOf(snapshot, { "layout/half-empty-page": true });
-    const clones = new Set(["running-title", "running-side", "stamp", "stamp-text"].map((id) => sid[id]));
+    const clones = new Set(["running-title", "running-side", "stamp", "stamp-text", "side-spoof", "side-spoof-p"].map((id) => sid[id]));
     assert.deepEqual(
       findings.filter((finding) => clones.has(finding.target.sid ?? "")).map((finding) => `${finding.ruleId}@${finding.page}`),
       [],
@@ -324,5 +343,184 @@ describe("margin-box content is not part of the flow", () => {
         `<p data-bl-sid="s0000" data-ref="r0" data-test-box="${lineBox(0, 0)}">Flow text.</p></div></div></div></div></div>`,
     ]);
     assert.throws(() => evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, document), /content area/u);
+  });
+});
+
+// ---- records with no layout box -----------------------------------------------------------
+
+describe("a record with no layout box is never measured, and never anchors a page", () => {
+  /**
+   * The metamorphic form of the claim, over the whole registry: adding a record the browser did
+   * not lay out — the in-flow original of a running element, hidden with `display: none` — may not
+   * change any rule's candidates, measurements or findings. The record is built to be a candidate
+   * for every rule that selects blocks by style: it avoids breaks, it is a heading, it is
+   * justified. Measured before this change: `layout/unbreakable-block-too-tall` counted it as
+   * measured at 0 px (a document whose only avoid block was a running element reported full
+   * coverage), `layout/heading-at-page-bottom` as a measured heading "with content below it", and
+   * `type/excessive-word-spacing` as a measured justified block with nothing in it.
+   */
+  it("changes no rule's candidates, measurements or findings", () => {
+    const base = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
+    const hidden: BlockRecord = {
+      ...structuredClone(base.blocks[0]!),
+      nodeKey: "bl:s9990:0", sid: "s9990", authorId: "running-heading", blockSignature: "Running heading",
+      tag: "h2", box: { x: 0, y: 0, width: 0, height: 0 }, lines: [], fragmentIndex: 0, fragmentCount: 1, spaceWidth: 3,
+    };
+    hidden.effectiveStyle = { ...hidden.effectiveStyle, breakInside: "avoid", textAlign: "justify", visibility: "visible" };
+    const withHidden = structuredClone(base);
+    withHidden.blocks = [hidden, ...withHidden.blocks];
+    const changed: string[] = [];
+    for (const rule of ALL_RULES) {
+      const ctx = { documentPath: "doc.html", options: rule.defaultOptions, fingerprint };
+      const before = rule.run(base, ctx);
+      const after = rule.run(withHidden, ctx);
+      if (after.candidates !== before.candidates || after.measured !== before.measured) {
+        changed.push(`${rule.id}: candidates ${before.candidates}->${after.candidates}, measured ${before.measured}->${after.measured}`);
+      }
+      if (after.findings.some((finding) => finding.target.nodeKey === hidden.nodeKey)) changed.push(`${rule.id}: a finding on the hidden record`);
+      const measuredHidden = (after.evaluations ?? []).filter((row) => row.targetRef.nodeKey === hidden.nodeKey && row.status === "measured");
+      if (measuredHidden.length > 0) changed.push(`${rule.id}: the hidden record was evaluated as measured`);
+      for (const row of (after.evaluations ?? []).filter((item) => item.targetRef.nodeKey === hidden.nodeKey)) {
+        assert.equal(row.reason, "rule/target-not-rendered", `${rule.id}: ${row.status} row for the hidden record without the not-rendered reason`);
+        assert.equal(row.countsTowardCoverage, false, `${rule.id}: the hidden record counts toward coverage`);
+      }
+    }
+    assert.deepEqual(changed, [], "a record with no layout box changed what the registry measured");
+  });
+
+  /**
+   * Both dimensions decide. An empty paragraph (full width, no height) and a zero-width block
+   * that is still tall are laid out; only width AND height zero is a record the browser did not
+   * lay out. Each case is the first block of its page, so each would lose its anchor to a
+   * predicate on one dimension — the two survivors a mutation run found.
+   */
+  it("anchors a page to its first block with a box in either dimension, and skips one with none", () => {
+    const html = `<!doctype html><html lang="en"><body>
+<p id="empty"></p><p id="p1">Page one text.</p>
+<div id="narrow">Narrow</div><p id="p2">Page two text.</p>
+<p id="gone">Hidden</p><p id="p3">Page three text.</p>
+</body></html>`;
+    const { injected, sid } = source(html);
+    const at = (id: string, box: string, text: string, extra = "") =>
+      `<${id === "narrow" ? "div" : "p"} id="${id}" data-bl-sid="${sid[id]}" data-ref="ref-${id}" ${extra} data-test-box="${box}">${text}</${id === "narrow" ? "div" : "p"}>`;
+    const document = pagedDocument([
+      pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), content: at("empty", `56.69 56.69 453.53 0`, "") + at("p1", lineBox(0, 0), "Page one text.") }),
+      pagedPage({ pageBox: pageBox(1), contentBox: contentBox(1), content: at("narrow", `56.69 ${56.69 + STRIDE} 0 ${LINE}`, "Narrow") + at("p2", lineBox(1, 1), "Page two text.") }),
+      pagedPage({ pageBox: pageBox(2), contentBox: contentBox(2), content: at("gone", "0 0 0 0", "Hidden", 'style="display: none;"') + at("p3", lineBox(2, 0), "Page three text.") }),
+    ]);
+    const snapshot = assemble(
+      evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, document), runCollector<CollectorResult>(COLLECTOR_SOURCE, document), injected);
+    assert.deepEqual(snapshot.pages.map((page) => page.firstSemanticBlockKey), ["id:empty", "id:narrow", "id:p3"]);
+  });
+});
+
+// ---- wrappers that span pages -------------------------------------------------------------
+
+const WRAPPER_SOURCE = `<!doctype html><html lang="en"><body>
+<article id="doc">
+${Array.from({ length: 12 }, (_, i) => `<p id="w${i + 1}">Wrapped paragraph ${i + 1}.</p>`).join("\n")}
+</article>
+</body></html>`;
+
+/** An `<article>` that spans four sparsely filled pages: a fragment of it on every page. */
+function wrapperPages(sid: Record<string, string>): string[] {
+  return Array.from({ length: 4 }, (_, page) => pagedPage({
+    pageBox: pageBox(page), contentBox: contentBox(page),
+    content: `<article id="doc" data-bl-sid="${sid["doc"]}" data-ref="ref-doc" data-test-box="56.69 ${56.69 + page * STRIDE} 453.53 ${3 * LINE}">` +
+      Array.from({ length: 3 }, (_, i) => {
+        const id = `w${page * 3 + i + 1}`;
+        return `<p id="${id}" data-bl-sid="${sid[id]}" data-ref="ref-${id}" data-test-box="${lineBox(page, i)}">Wrapped paragraph ${page * 3 + i + 1}.</p>`;
+      }).join("") + "</article>",
+  }));
+}
+
+describe("a block that spans pages anchors only the page it starts on", () => {
+  /**
+   * Register item G-69. Before this change every page of an `<article>` spanning four pages was
+   * anchored to the article, because an ancestor comes first in document order, so the page
+   * findings on all four pages carried one fingerprint. The fingerprint guard above now runs over
+   * a wrapper document too.
+   */
+  it("keys every page of a wrapped document to the first block that starts on it", () => {
+    const { injected, sid } = source(WRAPPER_SOURCE);
+    const document = pagedDocument(wrapperPages(sid));
+    const snapshot = assemble(
+      evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, document), runCollector<CollectorResult>(COLLECTOR_SOURCE, document), injected);
+    assert.equal(snapshot.blocks.filter((block) => block.sid === sid["doc"]).length, 4, "premise: the article has a fragment on every page");
+    assert.deepEqual(snapshot.pages.map((page) => page.firstSemanticBlockKey), ["id:doc", "id:w4", "id:w7", "id:w10"],
+      "page 1 is where the article starts; every later page is anchored to the first paragraph that starts on it");
+    const halfEmpty = findingsOf(snapshot, { "layout/half-empty-page": true });
+    assert.ok(halfEmpty.filter((finding) => finding.ruleId === "layout/half-empty-page").length >= 3,
+      "premise: the sparse pages produce page findings, or the guard checks nothing");
+    assertFingerprintsUnique(halfEmpty);
+  });
+});
+
+// ---- the source-id integrity check --------------------------------------------------------
+
+describe("the post-pagination source-id check reads the order of the flow, and still sees tampering", () => {
+  /** Run the real in-page status over a page tree built from `html`, and validate it. */
+  const check = (html: string, pages: (sid: Record<string, string>) => string[]): string[] => {
+    const { injected, sid } = source(html);
+    const expected = orderedSourceSids(injected.map);
+    const status = runIntegrityStatus<RuntimeIntegrityStatus>(integritySource(expected), pagedDocument(pages(sid)));
+    return validateRuntimeSidState(expected, status);
+  };
+  const s = (sid: Record<string, string>, id: string, box: string, text: string, extra = "") =>
+    `<p id="${id}" data-bl-sid="${sid[id]}" data-ref="ref-${id}" ${extra} data-test-box="${box}">${text}</p>`;
+  const clone = (sid: Record<string, string>, index: number) =>
+    s(sid, "rt", `56.69 ${19.02 + index * STRIDE} 453.53 ${LINE}`, "Running title", 'class="title"');
+
+  /**
+   * Measured before this change with the real paginator: a running title that is not the first
+   * element of the source, or that sits inside a section, ended the run `checker-crashed` at this
+   * check, because the page-1 clone in the margin box precedes everything in the content area.
+   */
+  it("accepts a running title after a heading: the margin-box clone is not in the flow", () => {
+    const html = `<!doctype html><html lang="en"><body><h1 id="h">Title</h1><p class="title" id="rt">Running title</p>
+<p id="b1">One.</p><p id="b2">Two.</p><p id="b3">Three.</p></body></html>`;
+    assert.deepEqual(check(html, (sid) => [
+      pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), margins: { "top-center": clone(sid, 0) },
+        content: `<h1 id="h" data-bl-sid="${sid["h"]}" data-ref="ref-h" data-test-box="${lineBox(0, 0)}">Title</h1>` +
+          s(sid, "rt", "0 0 0 0", "Running title", 'class="title" style="display: none;"') + s(sid, "b1", lineBox(0, 1), "One.") }),
+      pagedPage({ pageBox: pageBox(1), contentBox: contentBox(1), margins: { "top-center": clone(sid, 1) },
+        content: s(sid, "b2", lineBox(1, 0), "Two.") + s(sid, "b3", lineBox(1, 1), "Three.") }),
+    ]), []);
+  });
+
+  it("accepts a block footnote moved into the footnote area, and a position: fixed element cloned into every page box", () => {
+    const html = `<!doctype html><html lang="en"><body><p id="p1">One.</p><aside class="fn" id="fn">A footnote.</aside>
+<div class="stamp" id="stamp"><p id="stamp-text">DRAFT</p></div><p id="p2">Two.</p><p id="p3">Three.</p></body></html>`;
+    const stamp = (sid: Record<string, string>, index: number) =>
+      `<div class="stamp" id="stamp" data-bl-sid="${sid["stamp"]}" data-ref="ref-stamp" style="position: absolute;" data-test-box="523.22 ${index * STRIDE} 43.7 ${LINE}">` +
+      s(sid, "stamp-text", `523.22 ${index * STRIDE} 43.7 ${LINE}`, "DRAFT") + "</div>";
+    assert.deepEqual(check(html, (sid) => [
+      pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), fixed: stamp(sid, 0),
+        content: s(sid, "p1", lineBox(0, 0), "One.") + s(sid, "p2", lineBox(0, 1), "Two."),
+        footnotes: `<aside class="fn" id="fn" data-bl-sid="${sid["fn"]}" data-ref="ref-fn" data-test-box="56.69 378.5 453.53 ${LINE}">A footnote.</aside>` }),
+      pagedPage({ pageBox: pageBox(1), contentBox: contentBox(1), fixed: stamp(sid, 1), content: s(sid, "p3", lineBox(1, 0), "Three.") }),
+    ]), []);
+  });
+
+  /**
+   * The negative controls: what the check caught before, it still catches. None of these is a
+   * layout Paged.js produces; each is a tampered tree.
+   */
+  it("still refuses an element moved out of the flow into a margin box, an unknown id, a swap and a removal", () => {
+    const html = `<!doctype html><html lang="en"><body><p id="p1">One.</p><p id="p2">Two.</p><p id="p3">Three.</p></body></html>`;
+    const tree = (sid: Record<string, string>, margin: string, content: string) =>
+      [pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), margins: { "top-center": margin }, content })];
+    const moved = check(html, (sid) => tree(sid, s(sid, "p2", lineBox(0, 0), "Two."),
+      s(sid, "p1", lineBox(0, 1), "One.") + s(sid, "p3", lineBox(0, 2), "Three.")));
+    assert.ok(moved.length > 0, "an element moved out of the flow into a margin box passed");
+    assert.ok(moved.some((issue) => /only in margin boxes/u.test(issue)), `the move is not named: ${JSON.stringify(moved)}`);
+    const unknown = check(html, (sid) => tree(sid, `<p data-bl-sid="s9999" data-test-box="${lineBox(0, 0)}">Forged.</p>`,
+      s(sid, "p1", lineBox(0, 1), "One.") + s(sid, "p2", lineBox(0, 2), "Two.") + s(sid, "p3", lineBox(0, 3), "Three.")));
+    assert.ok(unknown.some((issue) => /unknown .*source id/u.test(issue)), `a forged id in a margin box passed: ${JSON.stringify(unknown)}`);
+    const swapped = check(html, (sid) => tree(sid, "",
+      s(sid, "p2", lineBox(0, 0), "Two.") + s(sid, "p1", lineBox(0, 1), "One.") + s(sid, "p3", lineBox(0, 2), "Three.")));
+    assert.ok(swapped.some((issue) => /order mismatch/u.test(issue)), `a swapped flow order passed: ${JSON.stringify(swapped)}`);
+    const removed = check(html, (sid) => tree(sid, "", s(sid, "p1", lineBox(0, 0), "One.") + s(sid, "p3", lineBox(0, 1), "Three.")));
+    assert.ok(removed.some((issue) => /distinct source ids/u.test(issue)), `a removed element passed: ${JSON.stringify(removed)}`);
   });
 });

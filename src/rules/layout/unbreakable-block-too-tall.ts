@@ -1,6 +1,8 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
+import {
+  declined, hasLayoutBox, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber, sourceOf, targetEvaluation,
+} from "../shared.ts";
 
 /**
  * layout/unbreakable-block-too-tall — a block that promises not to break is taller than a page.
@@ -131,6 +133,15 @@ export const unbreakableBlockTooTall = defineRule(
             { name: "target-visible", value: visible, unit: null, operator: "=", threshold: true },
           ], connective: "all", violated: null,
         }));
+        continue;
+      }
+      // A block with no layout box was never placed by the paginator, so "does it fit the page
+      // unbroken" has no referent. The case is the in-flow original of a `position: running(...)`
+      // element, which Paged.js hides with `display: none` while its clones print in the margin
+      // boxes: it was recorded as MEASURED at 0 px, and a document whose only avoid block was a
+      // running element reported full coverage for a check that looked at nothing.
+      if (!hasLayoutBox(block.box)) {
+        evaluations.push(notRenderedEvaluation("layout/unbreakable-block-too-tall", block));
         continue;
       }
       // One evaluation per block, taken at its first fragment. The later fragments are not

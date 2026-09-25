@@ -24,10 +24,11 @@ import {
   launchBrowser, ownServerLifecycle, resolveBrowser, resolvePackageRoot, type BrowserLike, type PageLike,
 } from "../../src/acquire/browser.ts";
 import {
-  cleanupBrowserProfile, closeBrowserBounded, integritySource, integrityStatusSource,
-  paginationApparatusSource, PAGINATION_PREVIEW_SOURCE, withPagination,
+  cleanupBrowserProfile, closeBrowserBounded, integritySource, integrityStatusSource, orderedSourceSids,
+  paginationApparatusSource, PAGINATION_PREVIEW_SOURCE, validateRuntimeSidState, withPagination,
   type RuntimeIntegrityStatus,
 } from "../../src/acquire/render-run.ts";
+import { SNAPSHOT_SOURCE, type RawSnapshot } from "../../src/measure/snapshot.ts";
 import { PRIMITIVES_SOURCE, TEST_PRIMITIVES_CAPABILITY } from "../../src/measure/primitives.ts";
 import { assignPageCauses, classifyBoundary } from "../../src/paginate/breaks.ts";
 import { boundaryFactsFrom, collectorSource, silentHooks, type CollectorResult } from "../../src/paginate/collector.ts";
@@ -108,6 +109,22 @@ body{font:9pt/1.4 Georgia,serif;margin:0} p,h2{margin:0 0 6px} h2{font-size:11pt
 </body></html>`;
 
 /**
+ * A block footnote (`float: footnote`). Paged.js moves it out of the page content into the
+ * footnote area of the same page: inside the page area, after the page's content in document
+ * order. It stays part of the flow for measurement, and its new position is out of source order,
+ * which the source-id integrity check must accept.
+ */
+const FOOTNOTE_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@page{size:120mm 80mm;margin:10mm}
+body{font:9pt/1.4 Georgia,serif;margin:0} p{margin:0 0 6px}
+.fn{ float: footnote }
+</style></head><body>
+<p id="fp1">A paragraph whose footnote follows it in the source.</p>
+<aside class="fn" id="fnote">A block footnote, moved into the footnote area.</aside>
+<p id="fp2">A paragraph after the footnote in the source, before it on the page.</p>
+</body></html>`;
+
+/**
  * The pagination bootstrap breaklint owns: `paged.js`, never the auto-previewing polyfill.
  *
  * The replacement is a FUNCTION, and that is not style. `String.replace` interprets `$&`, `` $` ``,
@@ -125,8 +142,11 @@ describe("the collector, live", () => {
   let origin = "";
   let served = "";
   let servedRunning = "";
+  let servedFootnote = "";
+  let footnoteExpectedSids: string[] = [];
   let sidByAuthorId: Record<string, string> = {};
   const runningSidByAuthorId: Record<string, string> = {};
+  const footnoteSidByAuthorId: Record<string, string> = {};
 
   before(async () => {
     if (missing.length > 0) {
@@ -156,10 +176,17 @@ describe("the collector, live", () => {
       if (id) runningSidByAuthorId[id] = sid;
     }
     servedRunning = withPagination(running.html, pagedjs, true);
+    const footnote = injectSourceIds(FOOTNOTE_HTML, "footnote.html");
+    for (const [sid, ref] of Object.entries(footnote.map)) {
+      const id = /\bid="([^"]+)"/u.exec(FOOTNOTE_HTML.slice(ref.offset, ref.offset + 200))?.[1];
+      if (id) footnoteSidByAuthorId[id] = sid;
+    }
+    footnoteExpectedSids = orderedSourceSids(footnote.map);
+    servedFootnote = withPagination(footnote.html, pagedjs, true);
 
     server = createServer((req, res) => {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(req.url === "/running.html" ? servedRunning : served);
+      res.end(req.url === "/running.html" ? servedRunning : req.url === "/footnote.html" ? servedFootnote : served);
     });
     serverLifecycle = ownServerLifecycle(server);
     await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", () => resolve()));
@@ -379,6 +406,34 @@ describe("the collector, live", () => {
     assert.equal(causes[1]!.outgoing.kind, "parity", "the boundary OUT of the blank page");
     assert.equal(causes[1]!.outgoing.determinedBy, "page-blank");
     assert.deepEqual(result.attributeDrift, []);
+    await page.close();
+  });
+
+  /**
+   * The footnote area is part of the page area, so a block footnote stays in the flow: in the
+   * snapshot and in the collector's page edges. Paged.js places it after the page content, out
+   * of source order, and the source-id check reads the order of the page content only. This is
+   * the real-paginator observation of what `tests/unit/margin-boxes.test.ts` checks on a
+   * hand-built tree. (The production chain does not get this far with a footnote: Paged.js gives
+   * the footnote call a per-run random `href`, which the paired control reads as a changed
+   * resource and refuses — see docs/limitations.md.)
+   */
+  it("keeps a block footnote in the flow and accepts its out-of-source-order position", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    for (const id of ["fp1", "fnote", "fp2"]) assert.ok(footnoteSidByAuthorId[id], `no source id was mapped for #${id}`);
+    const { page, result } = await collect("/footnote.html");
+    const note = footnoteSidByAuthorId["fnote"]!;
+    const placement = await page.evaluate<{ inFootnoteArea: boolean; pages: number }>(`(() => ({
+      inFootnoteArea: !!document.querySelector(".pagedjs_footnote_area [data-bl-sid='${note}']"),
+      pages: document.querySelectorAll(".pagedjs_page").length }))()`);
+    assert.equal(placement.inFootnoteArea, true, "premise: Paged.js moved the footnote into the footnote area");
+    const raw = await page.evaluate<RawSnapshot>(SNAPSHOT_SOURCE);
+    assert.deepEqual(raw.blocks.filter((block) => block.sid === note).map((block) => block.page), [1],
+      "the footnote was dropped from the flow, or recorded more than once");
+    assert.equal(result.pages[0]!.lastSid, note, "the footnote area is not an edge of the page's flow");
+    const integrity = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(TEST_PRIMITIVES_CAPABILITY));
+    assert.deepEqual(validateRuntimeSidState(footnoteExpectedSids, integrity), [],
+      "the footnote's position after the page content was read as a source-id order violation");
     await page.close();
   });
 

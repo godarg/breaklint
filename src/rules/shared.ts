@@ -162,3 +162,39 @@ export function layoutOutOfScope(style: {
 export function num(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
+
+/**
+ * Whether a block record has a laid-out box at all.
+ *
+ * A box that is zero in BOTH dimensions is what the browser reports for an element it did not lay
+ * out: `display: none`, an element inside a `display: none` ancestor, or `display: contents`,
+ * which has no box of its own. The case that forced the distinction is the in-flow original of a
+ * `position: running(...)` element: Paged.js leaves it in the page content with an inline
+ * `display: none` while its clones print in the margin boxes. Such a record is not something a
+ * layout rule can have measured, and it is not something a reader sees on the page.
+ *
+ * Both dimensions, never one. An empty paragraph is laid out with the full column width and no
+ * height, and a zero-width block can still be tall; both are real boxes in the flow, and a
+ * predicate on one dimension would declare them unrendered.
+ */
+export function hasLayoutBox(box: Box): boolean {
+  return box.width !== 0 || box.height !== 0;
+}
+
+/**
+ * The evaluation a rule records for a candidate that has no layout box (see `hasLayoutBox`):
+ * `excluded`, outside the coverage base, with the reason named. Not a decline — nothing failed to
+ * be measured; the question the rule asks (how tall, how much space below, how wide the gaps) has
+ * no referent for an element the paginator never laid out. And not `measured`: counting it as a
+ * zero-height measurement let a document report full coverage for an element nobody looked at.
+ */
+export function notRenderedEvaluation(ruleId: string, block: {
+  nodeKey: string; sid: string | null; fragmentIndex: number; box: Box;
+}): TargetEvaluation {
+  return targetEvaluation({
+    ruleId, keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex,
+    boxScreen: block.box, status: "excluded", countsTowardCoverage: false, reason: "rule/target-not-rendered",
+    measurements: [{ name: "target-has-layout-box", value: false, unit: null, operator: "=", threshold: true }],
+    connective: "single", violated: null,
+  });
+}

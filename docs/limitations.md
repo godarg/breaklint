@@ -307,23 +307,39 @@ shared one fingerprint. An earlier repair of the one symptom that could fail a b
 `layout/unbreakable-block-too-tall` summing the clones — decided flow membership in that rule by
 coordinates, and that test also discarded every fragment of a full-bleed block (see below).
 
-The snapshot and the collector now keep only blocks inside a page's content area,
-`.pagedjs_pagebox > .pagedjs_area`. That area holds the page content **and the footnote area**:
-footnotes stay part of the page they are printed on, as before. It is an inclusion test on the page
-structure rather than an exclusion by class name, so author markup that happens to carry a
-`pagedjs_margin` class does not leave the flow, and a page with no content area stops the run
-(exit 3) instead of being measured as empty. What that leaves unmeasured, stated because no rule
+The snapshot, the collector and the evidence overlay now all keep only source blocks inside a
+page's content area, `.pagedjs_pagebox > .pagedjs_area`. That area holds the page content **and the
+footnote area**: footnotes stay part of the page they are printed on, as before. It is an inclusion
+test on the page structure rather than an exclusion by class name, so author markup that happens to
+carry a `pagedjs_margin` class does not leave the flow, and a page with no content area stops the
+run (exit 3) instead of being measured as empty. What that leaves unmeasured, stated because no rule
 reports it:
 
 - **Margin-box content.** A widow, an oversized block or an unfilled band inside a running header or
   footer is not judged. Generated margin content (`@top-center { content: "…" }`) never was.
 - **A running element keeps exactly one record**: the in-flow original Paged.js leaves in the page
-  content with an inline `display: none`. It has no box and no lines, so the geometry rules measure
-  it as zero height; the type rules still read its source text once, attributed to that position,
-  where there is no box for evidence to mark. It never anchors a page: a page is anchored to its
-  first block that has a box.
+  content with an inline `display: none`. It has no layout box (width and height both zero), so the
+  block rules that could select it — `layout/unbreakable-block-too-tall`,
+  `layout/heading-at-page-bottom`, `type/excessive-word-spacing` — record it as `excluded` with the
+  reason `rule/target-not-rendered`, outside the coverage base, and never as measured. Until this
+  repair it counted as measured at 0 px, and a document whose only avoid block was a running
+  element reported full coverage for a check that looked at nothing. The same holds for any block
+  under `display: none`. The type rules still read a running element's source text once, attributed
+  to that hidden position, where there is no box for evidence to mark. A page is anchored to its
+  first block that has a box, so the hidden original never anchors one.
 - **A `position: fixed` element is not measured at all.** Paged.js removes it from the flow, so there
-  is no in-flow original, and its per-page clones are outside the content area.
+  is no in-flow original, and its per-page clones are outside the content area. (An element whose
+  `position: fixed` is an INLINE style is not recognised by Paged.js at all: it stays in the flow,
+  is measured there, and is painted at the viewport origin, where its evidence marks cannot be
+  placed.)
+- **Markup that reproduces the page structure inside a running element comes back into the flow.**
+  The test asks whether an element has an ancestor that is the area child of a page box. A running
+  element whose own markup contains `<div class="pagedjs_pagebox"><div class="pagedjs_area">` makes
+  its descendants pass that test in every margin-box clone, so they are measured once per page again
+  — the pre-repair behaviour, with its false widows and shared fingerprints, for that markup only.
+  It cannot hide flow content from measurement: that would need an element of the real content area
+  to lose the ancestor it has. A class name alone (`pagedjs_area` without the page-box parent) does
+  not pass the test.
 - **Inline SVG inside a margin box is still collected once per page, and SVG text there stops the
   run.** The SVG collector still reads the whole page, so a running element that contains an SVG
   contributes one SVG record per page, all with one key. When that SVG carries `<text>` and the
@@ -331,6 +347,62 @@ reports it:
   `svg/text-overflows-viewport` sees one target evaluated twice, and its accounting invariant ends
   the run `checker-crashed` (exit 3). Measured on 2026-09-24 on a three-page document with a
   running logo; it predates the flow repair above and is not changed by it.
+- **Footnotes are in the flow, but a document with footnotes does not reach the rules.** Measured on
+  2026-09-24 with the real paginator: a block footnote moved into the footnote area is recorded on
+  its page and is an edge of that page's flow, and the source-id check accepts its position after
+  the page content (`tests/live/breaks.test.ts`). The production run stops before any rule, though:
+  Paged.js gives each footnote call an `href` built from the paginator's per-run random `data-ref`,
+  the paired control run reads that as a changed resource, and the run ends
+  `injection-interference` (exit 3). That holds for block and inline footnotes alike, before this
+  repair and after it. Before it, a block footnote already stopped the run one step earlier, at
+  the source-id order check.
+
+**The source-id integrity check reads the order of the flow; copies outside it are checked for
+identity and presence, not order.** Paged.js puts three kinds of copies out of source order: a
+running element's clones in the margin boxes (which come before the content area in every page
+box), a block footnote in the footnote area (after the page content) and a `position: fixed` clone
+at the head of every page box. The check used to read every source id in the document in document
+order, so a running title that was not the first element of the source — a heading before it, or a
+section around it — ended the run `checker-crashed` (exit 3). What still fails the run: any
+attribute change of a reserved id, anywhere; an unknown id, in the flow or out of it; an expected id
+that is nowhere; a flow whose order differs from the source; and an id found only in margin boxes,
+without the in-flow original every running element keeps, which is an element moved out of the flow.
+
+**Evidence marks follow the same boundary, and three kinds of page still cannot bind.** The overlay
+places no mark on a margin-box or page-box clone: no finding can target one, and requiring a mark
+for it left every page of a document with a running header unbound, so that the default run
+(evidence binding on) ended exit 4 — measured on 2026-09-24 before this repair, with 24 unplaced
+marks on a six-page document with two running elements. A fragment that bleeds into the side margin
+is marked where it is printed, inside the page box; before this repair all 212 marks of a full-bleed
+document were refused; measured after it, every one of the 212 is laid out exactly where the overlay
+recorded it and inside the page box. Whether the PDF text layer then returns each mark at that
+position can only be checked on a browser whose PDF carries the marks: the Chromium 141 build these
+repairs were developed on writes a PDF with no mark in it at all, in the margin or not, so that
+half is established by the live suite on current Chrome in CI and nowhere else. What does not bind,
+and so ends a run with evidence binding on at `insufficient-coverage` (exit 4):
+
+- a page whose flow contains a fragment pulled ABOVE or below the content box (a negative top
+  margin, content hanging past the column): the content box is Paged.js' multi-column
+  fragmentainer, and a positioned mark outside its column height would be carried into another,
+  off-page column, so that mark is refused, and a fragment with no mark on its page leaves the page
+  unbound;
+- a page carrying a footnote-area block, for the same reason (the footnote area lies below the
+  content box) — moot today, because footnotes stop the run earlier;
+- **a page with no source block at all, such as the blank page a `break-before: recto` inserts.**
+  A page binds only on marks it carries (`src/render/evidence.ts`), and required evidence is
+  complete only when every page binds (`src/core/engine.ts`), so every document with a
+  parity-blank page ends exit 4 under evidence binding, with or without running elements. That is
+  the evidence contract as it stands, read from the code; the margin-box repair did not change it.
+
+**A page is anchored to the first block that starts on it.** A block that spans pages — `<main>`,
+`<article>`, a section, a full-bleed block — has a fragment on every page it covers, and as an
+ancestor it comes first in document order, so it used to anchor every one of those pages: the page
+findings on them shared one fingerprint. Now the first block whose first fragment is on the page
+anchors it. Only a page on which nothing starts — the middle of a single block taller than a page —
+falls back to its first continuing block, and two such pages of the same block share an anchor. A
+wrapper that starts on page 1 still anchors page 1, keyed by its author id or, without one, by the
+signature of all its text, so without an id that page's fingerprint follows any edit inside the
+wrapper.
 
 **How often oversized `break-inside: avoid` blocks occur in real documents is not measured.** The
 repair is arithmetically correct and conservative, but its frequency in the field is unknown, so

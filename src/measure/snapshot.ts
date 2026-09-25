@@ -36,6 +36,7 @@ import { boundaryFactsFrom, PAGE_AREA_SELECTOR, type CollectorResult } from "../
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InjectionResult } from "../source/inject.ts";
 import { coordinateAtUtf8Byte } from "../source/bytes.ts";
+import { hasLayoutBox } from "../rules/shared.ts";
 
 type Node = DefaultTreeAdapterMap["node"];
 type Element = DefaultTreeAdapterMap["element"];
@@ -1044,9 +1045,24 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
   // leaves it in the page content with an inline display: none while its clones print in the
   // margin boxes, so it is the first block on its page in document order and would otherwise
   // anchor that page, whose findings would then change fingerprint whenever the header is edited.
-  const hasBox = (block: BlockRecord): boolean => block.box.width !== 0 || block.box.height !== 0;
+  //
+  // And the first block that STARTS on the page (fragment 0) wins over continuations. A wrapper
+  // that spans pages — `<main>`, `<article>`, a section, a full-bleed block — has a fragment on
+  // every page it covers, and as an ancestor it comes first in document order, so it used to
+  // anchor all of them: four `layout/half-empty-page` findings on four pages of one `<article>`
+  // carried one fingerprint. A block starts on exactly one page. Only a page on which nothing
+  // starts — the middle of a single block taller than a page — falls back to its first
+  // continuing block, which is deterministic; two such pages of the same block share an anchor.
+  const anchorCandidates = new Map<number, BlockRecord[]>();
+  for (const block of blocks) {
+    if (!mappedNodeKeys.has(block.nodeKey) || !hasLayoutBox(block.box)) continue;
+    const list = anchorCandidates.get(block.page) ?? [];
+    list.push(block);
+    anchorCandidates.set(block.page, list);
+  }
   const pages: PageRecord[] = input.raw.pages.map((page, index) => {
-    const first = blocks.find((b) => b.page === page.pageNumber && mappedNodeKeys.has(b.nodeKey) && hasBox(b));
+    const onPage = anchorCandidates.get(page.pageNumber) ?? [];
+    const first = onPage.find((b) => b.fragmentIndex === 0) ?? onPage[0];
     const identity = first ? blockKey({ authorId: first.authorId, blockSignature: first.blockSignature }) : null;
     return {
       ...page,
