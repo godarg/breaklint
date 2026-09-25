@@ -45,13 +45,12 @@ with no source block cannot complete required evidence.
 ### The exact-environment human gate for 0.7.0
 
 <!-- review-state -->
-`npm run test:report-surfaces` is red: its latest ledger round is the 2026-09-18 FAIL, and no
-human has reviewed the surfaces this release renders. The technical gate
-(`test:report-surfaces:technical`), which CI and the release workflow run, makes no human-review
-claim. `docs/releasing.md` makes a rostered human review that passes and binds the current render
-a precondition of the tag (step 2 of its release sequence); only a genuine review passes the gate,
-by the owner's decision for 0.7.0. It has not happened at the time of this record, and the ledger
-commit that records it updates this paragraph.
+`npm run test:report-surfaces` is green: ledger round 3 records a rostered human review (`@Founder`)
+on 2026-09-25 that passed all 32 cells, bound to the review-input fingerprint and the exact render
+environment (macOS arm64, Google Chrome), with the three known residuals accepted in its note. The
+technical gate (`test:report-surfaces:technical`), which CI and the release workflow run, still
+makes no human-review claim. The roster check proves that a rostered handle was written, not who
+wrote it (`docs/reporting.md`).
 
 ## Current published release — 0.6.0 (2026-09-18) — remediation that says when nobody checked
 
@@ -221,8 +220,8 @@ infrastructure 8, insufficient-coverage 8; on every non-final page the last line
 presented in one review gallery. The technical gate passes 32 of 32 cells and all 207 files; 32
 renderer negative controls each fail it for their named reason, and the verifier breaks a copy of
 real evidence for each of its independent checks once per run. No human review of these surfaces
-is claimed, and <!-- review-state --> the strict local gate stays red on the recorded 2026-09-18
-FAIL until a new round passes. The resolved fonts were measured in the Linux development container only; the
+is claimed by that technical gate; <!-- review-state --> the strict local gate is green on ledger
+round 3 (2026-09-25, 32 of 32 cells passed by a rostered human). The resolved fonts were measured in the Linux development container only; the
 `ubuntu-latest` CI runner's font resolution is unmeasured (NEEDS-CI).
 
 ### Two records that no longer claim what they cannot

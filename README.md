@@ -288,8 +288,8 @@ cell for decoded pixels, contrast, accessibility and fragmentation. A human revi
 a passing round by a rostered reviewer in the review ledger, bound to the current inputs; see its
 latest round and [`docs/releasing.md`](docs/releasing.md).
 <!-- review-state -->
-At the release preparation of 0.7.0 the latest round was the review of the 0.6.0 surfaces, which
-did not pass. JSON remains canonical.
+For 0.7.0 the latest round is round 3: a rostered human review on 2026-09-25 passed all 32 cells,
+bound to the rendered inputs and environment (macOS, Google Chrome). JSON remains canonical.
 The information contract and the reproducible 32-cell screen/print review are documented in
 [`docs/reporting.md`](docs/reporting.md).
 

@@ -645,6 +645,735 @@
       ],
       "note": "Written after the fact, when ledger schema 5 made a failed round recordable. Schema 4 could hold only an all-pass record, so this outcome existed as prose in docs/releasing.md and docs/status.md alone. Only what that public record states is entered here: the date, the outcome, the finding counts by severity, the scope and the headline findings. Per-cell outcomes, reviewer handles, the rendered input fingerprint and the render environment were not recorded at the time and are not reconstructed.",
       "cells": null
+    },
+    {
+      "round": 3,
+      "record": "current",
+      "outcome": "pass",
+      "reviewedAt": "2026-09-25T11:27:01Z",
+      "reviewers": [
+        {
+          "kind": "human",
+          "handle": "@Founder"
+        }
+      ],
+      "binding": {
+        "reviewInputFingerprint": "02ea13cb8d21a8485684b48e885645487d403a5772eefb6ad05197ac22dccf14",
+        "renderManifestGeneratedAt": "2026-09-25T11:13:19.076Z",
+        "reviewEnvironment": {
+          "reviewArtifactContractVersion": 4,
+          "screenPixelContractVersion": 1,
+          "browser": "Google Chrome 153.0.8010.49",
+          "platform": "darwin",
+          "architecture": "arm64",
+          "nodeMajor": "22",
+          "deviceScaleFactor": 1,
+          "browserRenderArgs": [
+            "--deterministic-mode",
+            "--disable-gpu",
+            "--disable-lcd-text",
+            "--disable-skia-runtime-opts",
+            "--font-render-hinting=none",
+            "--force-color-profile=srgb",
+            "--hide-scrollbars"
+          ],
+          "viewports": {
+            "desktop": {
+              "width": 1440,
+              "height": 1000
+            },
+            "tablet": {
+              "width": 768,
+              "height": 1024
+            },
+            "mobile": {
+              "width": 390,
+              "height": 844
+            }
+          },
+          "themes": [
+            "light",
+            "dark"
+          ],
+          "print": {
+            "media": "print",
+            "format": "A4 from CSS @page",
+            "rasterDpi": 110,
+            "rasterizer": "pdftoppm version 25.11.0",
+            "contentViewportCssPx": {
+              "width": 703,
+              "height": 1123
+            }
+          }
+        }
+      },
+      "physicalArtifactsReviewed": {
+        "screens": 24,
+        "screenTiles": 152,
+        "pdfs": 4,
+        "rasterPages": 27
+      },
+      "findings": {
+        "blocker": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "note": "0.7.0 release review on macOS, rendered on the reviewer's machine at the merge commit of PR #18. All 32 cells passed. The three known residuals are accepted: the tail label prints on every finding, an over-long evidence name wraps inside itself, ubuntu-latest font resolution is unmeasured (NEEDS-CI). reviewedAt is the time the reviewer confirmed the outcome.",
+      "cells": {
+        "screen/clean/light/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "0c28af9d91cb3ec32545a6294d00617306fe8925e895965638b8189eb3a43264",
+          "reviewedArtifacts": [
+            "clean--light--desktop.png"
+          ],
+          "reviewedRawSha256": "18f3dc2d6e3fea98dfd85936dee3eaeba220eb18abdabc56558d7eaf7cf78a24",
+          "reviewedNormalizedRgbaSha256": "e02401e62e55c1d50ac4558243945ddb76dde840cf25a5308b949ba780bed1cf"
+        },
+        "screen/clean/light/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "d1bb62e5377a9819eaf7e5fc0282aaa2fd43032ec7711df6f3a0a50ec64284b7",
+          "reviewedArtifacts": [
+            "clean--light--tablet.png",
+            "clean--light--tablet--tile-01.png",
+            "clean--light--tablet--tile-02.png",
+            "clean--light--tablet--tile-03.png"
+          ],
+          "reviewedRawSha256": "968ed7098f43564cbcb95ff04a29d2de95f157bc418a8c9cf62bcd3c82698d4a",
+          "reviewedNormalizedRgbaSha256": "2a5eb985cc4383f9310400a0c1ad61d7132b7bf52827d8b01a0c75d0111fcd26"
+        },
+        "screen/clean/light/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "6ae43f6dc03f1b8b8d89ccd8ac92fa029b085312e0199869f43400f8d23e1d43",
+          "reviewedArtifacts": [
+            "clean--light--mobile.png",
+            "clean--light--mobile--tile-01.png",
+            "clean--light--mobile--tile-02.png",
+            "clean--light--mobile--tile-03.png",
+            "clean--light--mobile--tile-04.png",
+            "clean--light--mobile--tile-05.png"
+          ],
+          "reviewedRawSha256": "d3630e010169a9edafdbd45b6cdb3263c6867882bffcafc8bba01634f27e3cbd",
+          "reviewedNormalizedRgbaSha256": "fbcbad5f6f8fa25d79ac4b5cdaf26afd5a9780dd70dc06c0585208c9cb9872d5"
+        },
+        "screen/clean/dark/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "94c7990557d3d8da3326a12acac90c5a749979c0bea1d94a8c0494a70d571d7c",
+          "reviewedArtifacts": [
+            "clean--dark--desktop.png"
+          ],
+          "reviewedRawSha256": "16078fdc5b5a1a95c8e8a10f0f941de6a812918f917ade1542a25bf7e421f0a0",
+          "reviewedNormalizedRgbaSha256": "838da5ac8a7ce49ea96337546cfa1d350160ba80cfe09de6a7017a44e82dd0ef"
+        },
+        "screen/clean/dark/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "7f9b75e546e612acd9372da620880f76f720ae7a7ea4bcdb5b865cead965d242",
+          "reviewedArtifacts": [
+            "clean--dark--tablet.png",
+            "clean--dark--tablet--tile-01.png",
+            "clean--dark--tablet--tile-02.png",
+            "clean--dark--tablet--tile-03.png"
+          ],
+          "reviewedRawSha256": "99e3101599420bdb15cfe9f091bfe197e3c2979494a056af7e8cc2264e1bed6c",
+          "reviewedNormalizedRgbaSha256": "73e27fa3c04c39f13198d19d5886413ca7dec55e9579240036a74f999f8c6730"
+        },
+        "screen/clean/dark/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "675b535f23c908e98aad71d312329e2a4399f7197a9184937cac2c1958afc63f",
+          "reviewedArtifacts": [
+            "clean--dark--mobile.png",
+            "clean--dark--mobile--tile-01.png",
+            "clean--dark--mobile--tile-02.png",
+            "clean--dark--mobile--tile-03.png",
+            "clean--dark--mobile--tile-04.png",
+            "clean--dark--mobile--tile-05.png"
+          ],
+          "reviewedRawSha256": "33be3f0730c6257ed69354dbe9d2a5be069bf112765ac91bf2d0d79f6099de19",
+          "reviewedNormalizedRgbaSha256": "6fafe9856599e7160d6c5148244566327d1530e5cf8a0d64d95bea247adb0828"
+        },
+        "print/clean/pdf": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "81cb22da41eaaca75cd45dae3d13558464f2aaf0c53de1f2f96c10bf91dc9c69",
+          "reviewedArtifacts": [
+            "clean--a4.pdf"
+          ],
+          "reviewedRawSha256": "6903e66a9e890b578f2fb671338e2829ef70650f2605f0b6b8358e42c50fca98",
+          "reviewedPages": [
+            1,
+            2,
+            3
+          ]
+        },
+        "print/clean/raster-set": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "a7ee440fc6f81674ed9b167a8963d33fafc459e7cd805c35f906102644918dd7",
+          "reviewedArtifacts": [
+            "clean--a4-page-1.png",
+            "clean--a4-page-2.png",
+            "clean--a4-page-3.png"
+          ],
+          "reviewedRawSha256": [
+            "58215f95b35dc14be3b56cde1078967bb9d1399bdea0b27fdac3099c509a570b",
+            "a71e973cbf13da3124b8cdf23cd4a17db9247c9880471d584b49b2e4065396a4",
+            "2d84603006005114100ad8c7a678322b02590792bbdd15b06cb50a76c05f5add"
+          ],
+          "reviewedPages": [
+            1,
+            2,
+            3
+          ]
+        },
+        "screen/findings/light/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "09f0666f8a11a05f346a16e41fef8779e2d354f1710ccb739eb828ed431adabf",
+          "reviewedArtifacts": [
+            "findings--light--desktop.png"
+          ],
+          "reviewedRawSha256": "5840bb7fbc5746cdb2bf9924692077635fc6f6d8af41e3a7c467b1339070e361",
+          "reviewedNormalizedRgbaSha256": "51f77ee40cf9e54f468870cae81b5818b1ef56b3a6529221c19dae192cde5682"
+        },
+        "screen/findings/light/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "0be11a12671a7f37fcd06167f4ef69ba416882ae33b03d3ece9245119e2a09b8",
+          "reviewedArtifacts": [
+            "findings--light--tablet.png",
+            "findings--light--tablet--tile-01.png",
+            "findings--light--tablet--tile-02.png",
+            "findings--light--tablet--tile-03.png",
+            "findings--light--tablet--tile-04.png",
+            "findings--light--tablet--tile-05.png",
+            "findings--light--tablet--tile-06.png",
+            "findings--light--tablet--tile-07.png",
+            "findings--light--tablet--tile-08.png"
+          ],
+          "reviewedRawSha256": "392df8b13e756c6140a9b7230225e711540b6f4deda4e725d12f0b03484bff1e",
+          "reviewedNormalizedRgbaSha256": "b6092c46137a283d3da5f6ae2d864e0d7a290504ff1e3bde611bd1c3c5946897"
+        },
+        "screen/findings/light/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "cce3df7892b450a7a47a8cbc90693786b62d78028f6706b9a5fcc58b2673f950",
+          "reviewedArtifacts": [
+            "findings--light--mobile.png",
+            "findings--light--mobile--tile-01.png",
+            "findings--light--mobile--tile-02.png",
+            "findings--light--mobile--tile-03.png",
+            "findings--light--mobile--tile-04.png",
+            "findings--light--mobile--tile-05.png",
+            "findings--light--mobile--tile-06.png",
+            "findings--light--mobile--tile-07.png",
+            "findings--light--mobile--tile-08.png",
+            "findings--light--mobile--tile-09.png",
+            "findings--light--mobile--tile-10.png",
+            "findings--light--mobile--tile-11.png",
+            "findings--light--mobile--tile-12.png",
+            "findings--light--mobile--tile-13.png",
+            "findings--light--mobile--tile-14.png"
+          ],
+          "reviewedRawSha256": "3b0324c42b4f4804cb991cfa38a9f21713691a97f0dc15f572b4e4ebbacf7e6b",
+          "reviewedNormalizedRgbaSha256": "d58ce06840879ed3205e4f695624e9395b63d4c6999a6ecda62147682d73f7c0"
+        },
+        "screen/findings/dark/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "c999a0c93d1a14c312e59d2b373a927b6cd89670427cb4586fded49cdb765cd0",
+          "reviewedArtifacts": [
+            "findings--dark--desktop.png"
+          ],
+          "reviewedRawSha256": "478bf34a58abcc3c2f9cc8a858dfd6485ef0e47865d07a25d2d354a891ad8008",
+          "reviewedNormalizedRgbaSha256": "58b7443e2d1297af1e56d98e0b5bf036c6bcf8c5b9213e76c81f11282e76f9c4"
+        },
+        "screen/findings/dark/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "95f930bb5e555e5d73548b89d642cf65b9b734e4d65a776ee6cc1baec6bd64af",
+          "reviewedArtifacts": [
+            "findings--dark--tablet.png",
+            "findings--dark--tablet--tile-01.png",
+            "findings--dark--tablet--tile-02.png",
+            "findings--dark--tablet--tile-03.png",
+            "findings--dark--tablet--tile-04.png",
+            "findings--dark--tablet--tile-05.png",
+            "findings--dark--tablet--tile-06.png",
+            "findings--dark--tablet--tile-07.png",
+            "findings--dark--tablet--tile-08.png"
+          ],
+          "reviewedRawSha256": "99b5ecee6d9e95fa1a8c56e2baac19c8832fc3ab508dbb21d4f15cb26fb571db",
+          "reviewedNormalizedRgbaSha256": "c57d7e836d121624f03a8a0aa2971def81f72d05f11e025f30a148c4b97aaafb"
+        },
+        "screen/findings/dark/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "9a21f992ac3431de15cd19e6c9f4b119f11925e01ab6db4c62ff80f79883d7c1",
+          "reviewedArtifacts": [
+            "findings--dark--mobile.png",
+            "findings--dark--mobile--tile-01.png",
+            "findings--dark--mobile--tile-02.png",
+            "findings--dark--mobile--tile-03.png",
+            "findings--dark--mobile--tile-04.png",
+            "findings--dark--mobile--tile-05.png",
+            "findings--dark--mobile--tile-06.png",
+            "findings--dark--mobile--tile-07.png",
+            "findings--dark--mobile--tile-08.png",
+            "findings--dark--mobile--tile-09.png",
+            "findings--dark--mobile--tile-10.png",
+            "findings--dark--mobile--tile-11.png",
+            "findings--dark--mobile--tile-12.png",
+            "findings--dark--mobile--tile-13.png",
+            "findings--dark--mobile--tile-14.png"
+          ],
+          "reviewedRawSha256": "f4464698c5ba06f6f334870813182a247a114b0a7e17a78ea864f5c2449fce5e",
+          "reviewedNormalizedRgbaSha256": "73cdd55466e627abe3c58b5f08989fcb33a7776060fe0fccaec49eebdabd9ae3"
+        },
+        "print/findings/pdf": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "da8e77073a38a39173b0c341a5f4328712c616f36224acff0ef7fb23c05e4103",
+          "reviewedArtifacts": [
+            "findings--a4.pdf"
+          ],
+          "reviewedRawSha256": "9d9340faf753097418e3175245e403d2557d810327b754b74314107683e6b19c",
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "print/findings/raster-set": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "5fb607e8a5dd9b1dc50e9766b5738d6816996c9f03c9513d3eee53baf25aa096",
+          "reviewedArtifacts": [
+            "findings--a4-page-1.png",
+            "findings--a4-page-2.png",
+            "findings--a4-page-3.png",
+            "findings--a4-page-4.png",
+            "findings--a4-page-5.png",
+            "findings--a4-page-6.png",
+            "findings--a4-page-7.png",
+            "findings--a4-page-8.png"
+          ],
+          "reviewedRawSha256": [
+            "30c9f7251a78c144c2373060cdaec16a5c98c99a2de15208213d836607627f83",
+            "218bc57c285578c22e3e6569bcfec5ca6648cfb882d09581934606a4bb34ab71",
+            "c8c7b3319e332f39006f723700b768f5d010c301991b5e375f20f3ec32c59f15",
+            "867ef4ef47787d73ed5fbb9d0650f41114a5c5f049a7540dae012b66bc0d0293",
+            "84b13ddfef11e7340148f650b2b861875ce058fa02d1ff94e0caedf767664b5a",
+            "8a1e335f7d14260f140972f45777b2bec4351f46cc8c48689e6c27f087605fbb",
+            "98c61bfed2d6b11a62a4a638294fc4b623ab9d2bed8e5e29fe3ee0fe43f6e92b",
+            "94824a297e520e0d01ff8290dde3cdd6aed5e7ff5e46704cf4b73a51b4abecb4"
+          ],
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "screen/infrastructure/light/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "76e4a8691b172869e28dbda50591c6437a20337a7c868ee66bb7c5d50e08e41f",
+          "reviewedArtifacts": [
+            "infrastructure--light--desktop.png"
+          ],
+          "reviewedRawSha256": "13fc407d86b8a62128f34918e99cd40ead1bbb0c26b0a777b776bc58b77c4a8f",
+          "reviewedNormalizedRgbaSha256": "671ff6ff8dd7b82a5c1a735317cc681c58ffd1a7aad5017be79360796e624f21"
+        },
+        "screen/infrastructure/light/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "90c121d998602ed7ee6816c7ea5d84d9b469d6b527692781edf05eb98b36f58b",
+          "reviewedArtifacts": [
+            "infrastructure--light--tablet.png",
+            "infrastructure--light--tablet--tile-01.png",
+            "infrastructure--light--tablet--tile-02.png",
+            "infrastructure--light--tablet--tile-03.png",
+            "infrastructure--light--tablet--tile-04.png",
+            "infrastructure--light--tablet--tile-05.png",
+            "infrastructure--light--tablet--tile-06.png",
+            "infrastructure--light--tablet--tile-07.png",
+            "infrastructure--light--tablet--tile-08.png"
+          ],
+          "reviewedRawSha256": "838e5f26e2fca04f42ed3c2c2ba212b121fc5768849d661a74b85ac440fec4c8",
+          "reviewedNormalizedRgbaSha256": "35763cac44c457d8047d995e980768ac760f645509b2211f968fafbc6cc250ce"
+        },
+        "screen/infrastructure/light/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "3c807e8189515c598b1ff5bffbe4daa19de53e5004c6b8b6c08c9d88157fffa7",
+          "reviewedArtifacts": [
+            "infrastructure--light--mobile.png",
+            "infrastructure--light--mobile--tile-01.png",
+            "infrastructure--light--mobile--tile-02.png",
+            "infrastructure--light--mobile--tile-03.png",
+            "infrastructure--light--mobile--tile-04.png",
+            "infrastructure--light--mobile--tile-05.png",
+            "infrastructure--light--mobile--tile-06.png",
+            "infrastructure--light--mobile--tile-07.png",
+            "infrastructure--light--mobile--tile-08.png",
+            "infrastructure--light--mobile--tile-09.png",
+            "infrastructure--light--mobile--tile-10.png",
+            "infrastructure--light--mobile--tile-11.png",
+            "infrastructure--light--mobile--tile-12.png",
+            "infrastructure--light--mobile--tile-13.png",
+            "infrastructure--light--mobile--tile-14.png",
+            "infrastructure--light--mobile--tile-15.png"
+          ],
+          "reviewedRawSha256": "e52de2078a16ed9d73e6aa284db77ab97affb0ca85b1c31f7dfc2f8b9b9e4c0b",
+          "reviewedNormalizedRgbaSha256": "2893e151a863f030a7a202377c3ff131da4f2a7cc1f55c442106402e77f9a76e"
+        },
+        "screen/infrastructure/dark/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "785b24e59f4d6e8510ccb361021d808278c96fbd9efc5de706aee3fff51b6306",
+          "reviewedArtifacts": [
+            "infrastructure--dark--desktop.png"
+          ],
+          "reviewedRawSha256": "9dc2c616186c34b06a7c5b2d94243078d63bfa678a5e51c28f071992d0ececc1",
+          "reviewedNormalizedRgbaSha256": "418223aef74a093cd883e7ae2cfc5c48bfa8d3e8f60e717e0920f8950c439a60"
+        },
+        "screen/infrastructure/dark/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "a970d9cf33779d14446e0aeeeb4d12d2c39f30160ff68402afaee7de20f6e049",
+          "reviewedArtifacts": [
+            "infrastructure--dark--tablet.png",
+            "infrastructure--dark--tablet--tile-01.png",
+            "infrastructure--dark--tablet--tile-02.png",
+            "infrastructure--dark--tablet--tile-03.png",
+            "infrastructure--dark--tablet--tile-04.png",
+            "infrastructure--dark--tablet--tile-05.png",
+            "infrastructure--dark--tablet--tile-06.png",
+            "infrastructure--dark--tablet--tile-07.png",
+            "infrastructure--dark--tablet--tile-08.png"
+          ],
+          "reviewedRawSha256": "686b40877016f0a1ed8c1fb0de944e16eb6c63dd2c3a2ee5e21c131862803d86",
+          "reviewedNormalizedRgbaSha256": "9b2662e22c1929184bc123b198f47c92673661bc533e0eea4d33de8b8a8931c6"
+        },
+        "screen/infrastructure/dark/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "28e292d1e1671c8af65eeaef7941189b99d724414fa51ee498de22c256c33508",
+          "reviewedArtifacts": [
+            "infrastructure--dark--mobile.png",
+            "infrastructure--dark--mobile--tile-01.png",
+            "infrastructure--dark--mobile--tile-02.png",
+            "infrastructure--dark--mobile--tile-03.png",
+            "infrastructure--dark--mobile--tile-04.png",
+            "infrastructure--dark--mobile--tile-05.png",
+            "infrastructure--dark--mobile--tile-06.png",
+            "infrastructure--dark--mobile--tile-07.png",
+            "infrastructure--dark--mobile--tile-08.png",
+            "infrastructure--dark--mobile--tile-09.png",
+            "infrastructure--dark--mobile--tile-10.png",
+            "infrastructure--dark--mobile--tile-11.png",
+            "infrastructure--dark--mobile--tile-12.png",
+            "infrastructure--dark--mobile--tile-13.png",
+            "infrastructure--dark--mobile--tile-14.png",
+            "infrastructure--dark--mobile--tile-15.png"
+          ],
+          "reviewedRawSha256": "ed7175b5906a68fae9506db9a402e05d8caae808bdc04432bb40e3f9bdcbe4b4",
+          "reviewedNormalizedRgbaSha256": "8fec2f9a0e92e801f736a6563edd582205a5b14003ce5db4d1633b213d54bc37"
+        },
+        "print/infrastructure/pdf": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "2f414e2383bb61e6e19e8bf53abdddb77841fd78a58c890adaf6a01bfb59f2c8",
+          "reviewedArtifacts": [
+            "infrastructure--a4.pdf"
+          ],
+          "reviewedRawSha256": "4276142452bb6448ab94da7e9cbceff63d32af7110df4f3f3d25dc0e34506e41",
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "print/infrastructure/raster-set": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "08affc7c3356e79e6c9ebcf993b170c9e721f7aeacf8a2804400548c8b69d61f",
+          "reviewedArtifacts": [
+            "infrastructure--a4-page-1.png",
+            "infrastructure--a4-page-2.png",
+            "infrastructure--a4-page-3.png",
+            "infrastructure--a4-page-4.png",
+            "infrastructure--a4-page-5.png",
+            "infrastructure--a4-page-6.png",
+            "infrastructure--a4-page-7.png",
+            "infrastructure--a4-page-8.png"
+          ],
+          "reviewedRawSha256": [
+            "84d48b3e26f46318d511291e886462cf9b1add1739af5e169170b96985365f6b",
+            "31c8afdf48bc5ca445a40a3f1f903c3f0c517ee232f8b8f5ee01f30a41263c5e",
+            "270d45dc256c37d920aa1ac24ec06950c9af771524f5229174088c748450095d",
+            "c907641ad79a9d4218598479bf8d50e74f8b45881e9ddcf7223c6fa951bdb9b1",
+            "2c15c0afb543e02d670fbaeb2beb689afcd4f539b9b77d84e8d76121fedddde5",
+            "d6f57479660f4f2bd454100a6267015fbe1a5b58e14f13c12328bd8babc82cca",
+            "c33c08aaad9e38021f5d945124d3ba9af1e339c25f288a2a493982b27ae8c725",
+            "79085a09ea0b8d480860645911f88388b0e54c0da0558072fe3dffde30fea5fa"
+          ],
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "screen/insufficient-coverage/light/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "ae5c204dd1a45e26fac60b428375756e1b9399b8ad00fc57e775d87021d0c416",
+          "reviewedArtifacts": [
+            "insufficient-coverage--light--desktop.png"
+          ],
+          "reviewedRawSha256": "935bd5fc46b627f16810392600d81f102c0970b63a90743868f47e1dfd837a9a",
+          "reviewedNormalizedRgbaSha256": "f65d76b73a68ec0a66e1f535952531d8efb69bacc86676412535624f9b10ac2a"
+        },
+        "screen/insufficient-coverage/light/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "3c93a5a4fc51c41c3faa7c19f8e760026428c7f81b1d230fbb17e2da4e9c3323",
+          "reviewedArtifacts": [
+            "insufficient-coverage--light--tablet.png",
+            "insufficient-coverage--light--tablet--tile-01.png",
+            "insufficient-coverage--light--tablet--tile-02.png",
+            "insufficient-coverage--light--tablet--tile-03.png",
+            "insufficient-coverage--light--tablet--tile-04.png",
+            "insufficient-coverage--light--tablet--tile-05.png",
+            "insufficient-coverage--light--tablet--tile-06.png",
+            "insufficient-coverage--light--tablet--tile-07.png",
+            "insufficient-coverage--light--tablet--tile-08.png"
+          ],
+          "reviewedRawSha256": "c62604451498785b1df0331f73f318c698801278490c3d06e7a90a1ff3205315",
+          "reviewedNormalizedRgbaSha256": "97b5fcbc24d9c4ba82a5599cc9c895e1198c173f2e2cc799a33c038242f034bb"
+        },
+        "screen/insufficient-coverage/light/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "ed1d11ab4ce494746a2e78b1b4a2e3f0f2e9294db2f70726d7396cb2cef13af8",
+          "reviewedArtifacts": [
+            "insufficient-coverage--light--mobile.png",
+            "insufficient-coverage--light--mobile--tile-01.png",
+            "insufficient-coverage--light--mobile--tile-02.png",
+            "insufficient-coverage--light--mobile--tile-03.png",
+            "insufficient-coverage--light--mobile--tile-04.png",
+            "insufficient-coverage--light--mobile--tile-05.png",
+            "insufficient-coverage--light--mobile--tile-06.png",
+            "insufficient-coverage--light--mobile--tile-07.png",
+            "insufficient-coverage--light--mobile--tile-08.png",
+            "insufficient-coverage--light--mobile--tile-09.png",
+            "insufficient-coverage--light--mobile--tile-10.png",
+            "insufficient-coverage--light--mobile--tile-11.png",
+            "insufficient-coverage--light--mobile--tile-12.png",
+            "insufficient-coverage--light--mobile--tile-13.png",
+            "insufficient-coverage--light--mobile--tile-14.png",
+            "insufficient-coverage--light--mobile--tile-15.png"
+          ],
+          "reviewedRawSha256": "326bcfeddb3b7844ae5b368fbb3e39a789d559fdeb51f5b9ff0c74055fcfab03",
+          "reviewedNormalizedRgbaSha256": "f1a94e73f243e186dc825b9ea28fb01f1ed1efd36a42dce5f7427b3aac5b4f62"
+        },
+        "screen/insufficient-coverage/dark/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "39e2c23b322aef040a3c8e05990d169d97312260f481e3433d11c02dacd16dad",
+          "reviewedArtifacts": [
+            "insufficient-coverage--dark--desktop.png"
+          ],
+          "reviewedRawSha256": "7f66fb2e6ab1e57fcd19066347885930ab841242e33c75b8e1839b39e61f51b0",
+          "reviewedNormalizedRgbaSha256": "85573a900c5778a5787aa48c8c5a1abf4de67efcca72eb946c6aa71a273618fd"
+        },
+        "screen/insufficient-coverage/dark/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "57f7a08434893d3d10d1299cc3459432520814b5696ad8cd8f10ef82d23476bf",
+          "reviewedArtifacts": [
+            "insufficient-coverage--dark--tablet.png",
+            "insufficient-coverage--dark--tablet--tile-01.png",
+            "insufficient-coverage--dark--tablet--tile-02.png",
+            "insufficient-coverage--dark--tablet--tile-03.png",
+            "insufficient-coverage--dark--tablet--tile-04.png",
+            "insufficient-coverage--dark--tablet--tile-05.png",
+            "insufficient-coverage--dark--tablet--tile-06.png",
+            "insufficient-coverage--dark--tablet--tile-07.png",
+            "insufficient-coverage--dark--tablet--tile-08.png"
+          ],
+          "reviewedRawSha256": "dcacfd311b81bffd6bc257b93c0b831504811b3a09acba6e5ba8546ad72db30a",
+          "reviewedNormalizedRgbaSha256": "cffca0fc271dd4dacc2026562e821b7f13ba8b6ec19533065f43fb3c95dfc354"
+        },
+        "screen/insufficient-coverage/dark/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "16b3c4d88eee29bed295b5abd5288ae53fc97d792df7a49a570cb495607c6d11",
+          "reviewedArtifacts": [
+            "insufficient-coverage--dark--mobile.png",
+            "insufficient-coverage--dark--mobile--tile-01.png",
+            "insufficient-coverage--dark--mobile--tile-02.png",
+            "insufficient-coverage--dark--mobile--tile-03.png",
+            "insufficient-coverage--dark--mobile--tile-04.png",
+            "insufficient-coverage--dark--mobile--tile-05.png",
+            "insufficient-coverage--dark--mobile--tile-06.png",
+            "insufficient-coverage--dark--mobile--tile-07.png",
+            "insufficient-coverage--dark--mobile--tile-08.png",
+            "insufficient-coverage--dark--mobile--tile-09.png",
+            "insufficient-coverage--dark--mobile--tile-10.png",
+            "insufficient-coverage--dark--mobile--tile-11.png",
+            "insufficient-coverage--dark--mobile--tile-12.png",
+            "insufficient-coverage--dark--mobile--tile-13.png",
+            "insufficient-coverage--dark--mobile--tile-14.png",
+            "insufficient-coverage--dark--mobile--tile-15.png"
+          ],
+          "reviewedRawSha256": "3a107257c2d83691a31536320ee996f3f31243d785828e0370280117a53f3e70",
+          "reviewedNormalizedRgbaSha256": "617df4cdfa4ca8141a8348867ec2581412ae3132b4db11919447f6804e99b056"
+        },
+        "print/insufficient-coverage/pdf": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "2efd7b8ad30d8a1516a85f41fd5ed342ff73a10ae8f209a5afd19c3a0ddb05d3",
+          "reviewedArtifacts": [
+            "insufficient-coverage--a4.pdf"
+          ],
+          "reviewedRawSha256": "e19d15cfd16b2a9f5a2a46abfad5a50b3ad886363f7b695ee9240f682c69926d",
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "print/insufficient-coverage/raster-set": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-25T11:27:01Z",
+          "note": "Reviewed in the review gallery and PDF viewer; no defect found.",
+          "reviewArtifactFingerprint": "0ab980dfcb949c3837c87ad1323b9c9d30785f23ad154eaa8c0463727af34586",
+          "reviewedArtifacts": [
+            "insufficient-coverage--a4-page-1.png",
+            "insufficient-coverage--a4-page-2.png",
+            "insufficient-coverage--a4-page-3.png",
+            "insufficient-coverage--a4-page-4.png",
+            "insufficient-coverage--a4-page-5.png",
+            "insufficient-coverage--a4-page-6.png",
+            "insufficient-coverage--a4-page-7.png",
+            "insufficient-coverage--a4-page-8.png"
+          ],
+          "reviewedRawSha256": [
+            "423bb72b10b6af5854c4768eedb2c4618184bc78c43f8ef241f10a5a59f64e21",
+            "fbb992d3971be53d49491aeafeeb0b17dd53a952db56e1cef66b04e3a4e2cdbe",
+            "a7caef3aff066a281a1e257f587e166a4f1c3d4c564125b1a6738418555dc2cc",
+            "555756f635e999ca701bd4d9858158eb5a29e0923e6f421e6668f4110a2d2334",
+            "4a1761018e2c06d742ccc49869da7c3920e30c469996ab7c7fddc79a2b9af70e",
+            "34d6c8f08f4cb217a0a7fb32ab9544c396a66ea951c30f98acaaedad5642d9a6",
+            "63c3ebf5e505dbf5c60d03999f2eba8dafb1a6d9c5f3fba9f2f16dd5bd256144",
+            "fbe16eb1519f889b57e9f25665b6d44cb327665227010878924ef839d8516e72"
+          ],
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        }
+      }
     }
   ]
 }

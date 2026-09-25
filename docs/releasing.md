@@ -207,10 +207,10 @@ finding list and an owner, instead of red and unread. The findings and their add
 carried in that release's follow-up register.
 
 <!-- review-state -->
-**For 0.7.0 the owner decided that only a genuine human review passes this gate.** The 0.6.0
-override is not repeated, and dropping the gate is not an option: step 2 above is a precondition
-of the tag. At the release-preparation commit the latest ledger round is still the 2026-09-18 FAIL
-and the gate is red; the ledger commit of step 3 replaces this sentence with the round it adds.
+**For 0.7.0 the owner decided that only a genuine human review passes this gate, and one did.**
+The 0.6.0 override was not repeated and the gate was not dropped. Ledger round 3 (2026-09-25,
+`@Founder`) passed all 32 cells on the render of the PR #18 merge commit, and
+`npm run test:report-surfaces:local` passes on it.
 
 The green real-document gate reads the rights/privacy-reviewed corpus manifest and binds exact
 artifact hashes, source evidence, page/rule counts and the positive independent geometry-oracle

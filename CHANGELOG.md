@@ -420,8 +420,8 @@ These change how this repository is checked and released, not what the package d
   ordered in time and a review time in the future is refused; the render manifest declares the
   review environment (schema 4 → 5, artifact contract 3 → 4); the technical gate accepts any
   Chromium-based browser; and the verifier re-measures the print checks independently and proves
-  its own checks with red controls on broken copies of real evidence. <!-- review-state --> `npm run test:report-surfaces`, the human gate, stays red on
-  the recorded 2026-09-18 FAIL until a rostered human passes a new round.
+  its own checks with red controls on broken copies of real evidence. <!-- review-state --> `npm run test:report-surfaces`, the human gate, is green: ledger
+  round 3, a rostered human review on 2026-09-25, passed all 32 cells on the release commit's render.
 - **The live late-mutation test no longer depends on when a timer fires;** it requires what the
   product guarantees — an event, or neither the measured snapshot nor the delivered PDF carrying
   the late text.
