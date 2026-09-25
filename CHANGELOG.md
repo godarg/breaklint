@@ -49,22 +49,38 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   reported `file:` URIs only. The snapshot stores the authored scheme, which is empty for
   `/var/share/…`, `/opt/…` and `/docs/guide.html` exactly as for a relative path, and the rule
   skipped every empty scheme before its absolute-path test. It also missed Windows drive paths
-  (`C:\out\x.pdf`, which URL parsing reads as scheme `c`), share paths (`\\server\share\…`) and
-  a `file:` URI with a host (`file://host/share/…`), which the resolver cannot turn into a POSIX path
-  and so left with an empty scheme. All of these are now reported, CSS `url()` and `srcset`
-  candidates included. A document with root-relative links or assets gets new warnings — one per
-  reference, with the usual `attribute="value"` message; `maxOccurrences` permits deliberate ones.
-  Still not reported, each for a reason now in `docs/rules/artifact-local-uri.md`: relative paths,
-  fragments, `~/…` (a path segment in a URL), protocol-relative `//host/…`, and `data:`, `blob:`,
-  `about:` and other schemes.
-- **The same rule honours an http(s) `<base href>`.** The collector now resolves a scheme-less
-  reference against the document's first `<base href>` when that is an absolute `http:` or `https:`
-  URL, as the browser does — measured: an `<img src="/logo.png">` under such a base was requested
-  from the base host, not the document's directory. So `/docs/guide.html` under
-  `<base href="https://docs.example.org/">` is a URL on that host and is not reported; a `file:` URI
-  and a drive path stay reported under any base, and a `file:` or root-relative base is itself
-  reported. `UriRef.resolvedUri` for such references is the https URL, which is also what
-  `requested` is now matched against. No snapshot field was added; no report, snapshot or
+  (`C:\out\x.pdf`, which URL parsing reads as scheme `c`), share paths (`\\server\share\…`),
+  protocol-relative `//host/…` (from a local file it resolves to `file://host/…`, like a share path)
+  and a `file:` URI with a host (`file://host/share/…`), which the resolver cannot turn into a POSIX
+  path and so left with an empty scheme. All of these are now reported, CSS `url()`, linked style
+  sheets and `srcset` candidates included. Values are read as the URL parser reads them rather than
+  with `trim()`: `fi` + newline + `le:///x` and a leading control character are now `file:` URIs and
+  absolute paths, and a leading U+00A0 is no longer stripped into one.
+  **A document with root-relative links or assets gets new warnings** — one per reference, with the
+  usual `attribute="value"` message; `maxOccurrences` permits deliberate ones. Under the default
+  `--fail-on error` the exit code does not change; **with `--fail-on warn` such a document now ends
+  with exit 1 instead of 0.** Still not reported, each for a reason in
+  `docs/rules/artifact-local-uri.md`: relative paths, fragments, `~/…` (a path segment in a URL),
+  and `data:`, `blob:`, `about:` and other schemes.
+- **The same rule honours an http(s) `<base href>` where the browser does.** A hyperlink
+  (`<a>`, `<area>`, SVG `<a>`) resolves against the document's first `<base href>` wherever it
+  stands; a fetch (image, style sheet, `url()`, `@font-face`, `srcset`, …) only when the base comes
+  before it — measured in plain Chromium 141 on `file://` documents: fetches before a late https
+  base came from the local tree and were rendered into the PDF, links before it were printed with
+  the base host. So `/docs/guide.html` under `<base href="https://docs.example.org/">` is a URL on
+  that host and is not reported, an `<img src="/logo.png">` before that base is. A `file:` URI and a
+  drive path stay reported under any base, and a `file:`, root-relative or protocol-relative base is
+  itself no published origin. Local asset discovery follows the same order: a style sheet or other
+  fetch after an http(s) base is no longer captured from the document's directory, served on the
+  loopback origin or scanned, because the browser requests it from the base host (a run without an
+  allowlist for that host still ends with exit 3, as before). `UriRef.resolvedUri` for a governed
+  reference is the https URL, which is also what `requested` is matched against. A script-inserted
+  `<base>` is not seen; what it would govern is still reported (a conservative false alarm).
+- **Fingerprints of the newly reported values do not depend on the checkout directory.** A
+  scheme-less local reference is keyed on its own text resolved against `file:///`, not on
+  `resolvedUri`, which carried the checkout path (`file:///<checkout>/docs/a.html`). Values with a
+  scheme keep their key. The same resource named twice (`src` and a `srcset` candidate) gives two
+  findings under one fingerprint, as before. No snapshot field was added; no report, snapshot or
   configuration schema stamp moves. `Finding.remediation.advice` changes for the rule.
 
 ### Added

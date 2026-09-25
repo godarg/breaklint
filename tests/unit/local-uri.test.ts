@@ -13,15 +13,19 @@
  * Red condition: restore the `scheme === ""` skip in the rule, and the absolute-path, root-relative,
  * UNC and CSS cases go red; drop the drive-letter test and the Windows drive cases go red; derive
  * the scheme from the resolved URL again in the collector and the file: URI with a host goes red;
- * stop honouring an http(s) <base href> in the collector and the base cases go red.
+ * stop honouring an http(s) <base href> in the collector and the base cases go red; apply the base
+ * to fetches before it and the late-base cases go red; key on `resolvedUri` again and the
+ * two-checkout fingerprint case goes red; let asset discovery capture a stylesheet under the base
+ * and the linked-sheet case goes red; go back to `trim()` and the URL-whitespace cases go red.
  */
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { collisionSources, discoverLocalAssets } from "../../src/acquire/render-run.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import type { Finding, Snapshot, UriRef } from "../../src/core/types.ts";
 import { buildSourceModel } from "../../src/measure/snapshot.ts";
@@ -34,8 +38,12 @@ const baseSnapshot = loadCorpus().find((entry) => entry.name === "local-uri-trig
 const fixture = (name: string): string => fileURLToPath(new URL(`../fixtures/${name}`, import.meta.url));
 
 /** HTML -> real collector -> the uriRefs mapping of assembleSnapshot -> engine report. */
-function check(html: string, path: string): { findings: Finding[]; refs: UriRef[]; candidates: number } {
-  const model = buildSourceModel(html, path);
+function check(
+  html: string,
+  path: string,
+  additionalCss: readonly { origin: string; text: string }[] = [],
+): { findings: Finding[]; refs: UriRef[]; candidates: number } {
+  const model = buildSourceModel(html, path, additionalCss);
   // src/measure/snapshot.ts assembleSnapshot: nodeKey `uri:<index>`; nothing here is fetched.
   const refs: UriRef[] = model.uriRefs.map((ref, index) => ({ ...ref, nodeKey: `uri:${index}`, requested: false }));
   const snapshot: Snapshot = { ...structuredClone(baseSnapshot), uriRefs: refs };
@@ -80,9 +88,10 @@ describe("artifact/local-uri through the real collector", () => {
       'href="C:/build/out/report.pdf"',
       'href="\\\\fileserver\\share\\plan.pdf"',
       'href="\\docs\\winroot.html"',
+      'href="//cdn.example.org/lib/guide.html"',
     ]);
-    // Ten targets, ten distinct fingerprints: no two shapes collapse into one finding.
-    assert.equal(new Set(findings.map((finding) => finding.fingerprint)).size, 10);
+    // Eleven targets, eleven distinct fingerprints: no two shapes collapse into one finding.
+    assert.equal(new Set(findings.map((finding) => finding.fingerprint)).size, 11);
   });
 
   it("under an https <base href> a scheme-less path is a URL on that host; absolute URLs stay reported", () => {
@@ -93,7 +102,7 @@ describe("artifact/local-uri through the real collector", () => {
       'href="file:///srv/build/notes.txt"',
       'href="C:\\build\\out\\report.pdf"',
     ]);
-    // The <base> sits after the <style>; it still governs the CSS url() before it.
+    // The <style> follows the base, so its url() resolves on the base host too.
     const css = refs.find((ref) => ref.attribute === "style-sheet")!;
     assert.equal(css.resolvedUri, "https://docs.example.org/assets/unused-texture.png");
     assert.equal(refs.find((ref) => ref.rawValue === "notes/appendix.html")!.resolvedUri, "https://docs.example.org/manual/notes/appendix.html");
@@ -130,7 +139,13 @@ describe("artifact/local-uri, one authored shape at a time", () => {
     { html: '<a href="#top">x</a>', expected: [], complication: "fragment only" },
     { html: '<a href="?page=2">x</a>', expected: [], complication: "query only" },
     { html: '<a href="~/notes.txt">x</a>', expected: [], complication: "~ is a path segment in a URL, not a home directory" },
-    { html: '<a href="//cdn.example.org/a.css">x</a>', expected: [], complication: "protocol-relative: it names a host" },
+    { html: '<a href="//cdn.example.org/a.css">x</a>', expected: ['href="//cdn.example.org/a.css"'], complication: "protocol-relative: from a local file it resolves to file://host/…" },
+    { html: '<a href="fi\nle:///srv/x.txt">x</a>', expected: ['href="file:///srv/x.txt"'], complication: "a newline inside the scheme, which the URL parser removes" },
+    { html: '<a href="fi\tle:///srv/x.txt">x</a>', expected: ['href="file:///srv/x.txt"'], complication: "a tab inside the scheme, which the URL parser removes" },
+    { html: '<a href="&#1;/var/share/a.pdf">x</a>', expected: ['href="/var/share/a.pdf"'], complication: "a leading C0 control, which the URL parser strips and trim() keeps" },
+    { html: '<a href="\n/var/share/a.pdf">x</a>', expected: ['href="/var/share/a.pdf"'], complication: "a leading newline" },
+    { html: '<a href="/var/sh\tare/a.pdf">x</a>', expected: ['href="/var/share/a.pdf"'], complication: "a tab inside the path" },
+    { html: '<a href="&#xA0;/var/share/a.pdf">x</a>', expected: [], complication: "a leading U+00A0, which the URL parser keeps: a relative path" },
     { html: '<a href="https://example.org/a">x</a>', expected: [], complication: "https URL" },
     { html: '<a href="mailto:a@example.org">x</a>', expected: [], complication: "mailto: URL" },
     { html: '<img alt="" src="data:image/png;base64,iVBORw0K">', expected: [], complication: "data: carries its own content" },
@@ -161,7 +176,42 @@ describe("artifact/local-uri and the document base", () => {
     {
       html: '<a href="/docs/a.html">x</a><base href="https://docs.example.org/">',
       expected: [],
-      complication: "the base governs references that precede it in the source",
+      complication: "a hyperlink before the base is printed against the final base",
+    },
+    {
+      html: '<svg><a href="/docs/a.html"><text>x</text></a></svg><map name="m"><area href="/docs/b.html" alt="b"></map><base href="https://docs.example.org/">',
+      expected: [],
+      complication: "SVG <a> and <area> are hyperlinks too",
+    },
+    {
+      html: '<img alt="" src="/img/a.png"><base href="https://docs.example.org/">',
+      expected: ['src="/img/a.png"'],
+      complication: "an image before a late base is fetched from the local tree",
+    },
+    {
+      html: '<style>.x{background:url(/img/a.png)}</style><base href="https://docs.example.org/">',
+      expected: ['style-sheet="/img/a.png"'],
+      complication: "a <style> url() before a late base is fetched from the local tree",
+    },
+    {
+      html: '<div style="background:url(/img/a.png)">x</div><base href="https://docs.example.org/">',
+      expected: ['style="/img/a.png"'],
+      complication: "a style attribute before a late base is fetched from the local tree",
+    },
+    {
+      html: '<p>x</p><div><base href="https://docs.example.org/"></div><img alt="" src="/img/a.png"><a href="//cdn.example.org/a">y</a>',
+      expected: [],
+      complication: "a base in the body governs what follows it, protocol-relative included",
+    },
+    {
+      html: '<base href=" ht\ntps://docs.example.org/ "><a href="/docs/a.html">x</a>',
+      expected: [],
+      complication: "the base href is URL text too: spaces stripped, a newline removed",
+    },
+    {
+      html: '<base href="data:text/html,x"><a href="/docs/a.html">x</a>',
+      expected: ['href="/docs/a.html"'],
+      complication: "a data: base is refused by the browser and applied by nobody",
     },
     {
       html: '<base target="_blank"><base href="https://docs.example.org/"><a href="/docs/a.html">x</a>',
@@ -199,4 +249,77 @@ describe("artifact/local-uri and the document base", () => {
       assert.deepEqual(reported(check(item.html, scratchDoc).findings), item.expected);
     });
   }
+});
+
+describe("artifact/local-uri, linked style sheets, fingerprints and repeated resources", () => {
+  const fingerprintsAt = (html: string): string[] => {
+    const root = mkdtempSync(join(tmpdir(), "breaklint-local-uri-checkout-"));
+    try {
+      const doc = join(root, "deep", "checkout", "doc.html");
+      mkdirSync(join(root, "deep", "checkout"), { recursive: true });
+      writeFileSync(doc, html);
+      return check(html, doc).findings.map((finding) => finding.fingerprint);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+
+  it("gives the same fingerprints for the same document in two checkout directories", () => {
+    const html = '<a href="/docs/a.html">a</a><a href="\\\\srv\\share\\b.pdf">b</a><a href="//host/c">c</a>' +
+      '<a href="\\docs\\d.html">d</a><a href="C:\\out\\e.pdf">e</a><a href="file:///srv/f.txt">f</a>';
+    const first = fingerprintsAt(html);
+    const second = fingerprintsAt(html);
+    assert.equal(first.length, 6);
+    assert.deepEqual(first, second, "a fingerprint moved with the checkout directory");
+  });
+
+  it("reports the same resource in src and srcset twice, under one fingerprint", () => {
+    // Two references to fix, one resource: two findings with their own node keys, and the one
+    // fingerprint that groups them across runs. stableIdentity stays "unavailable", never unique.
+    const { findings } = check('<img alt="" src="/img/a.png" srcset="/img/a.png 2x">', scratchDoc);
+    assert.deepEqual(reported(findings), ['src="/img/a.png"', 'srcset="/img/a.png"']);
+    assert.equal(new Set(findings.map((finding) => finding.fingerprint)).size, 1);
+    assert.deepEqual(findings.map((finding) => finding.target.nodeKey), ["uri:0", "uri:1"]);
+    assert.ok(findings.every((finding) => finding.stableIdentity.status !== "unique"));
+  });
+
+  /** HTML with a linked sheet, through the real discovery the render path uses (render-run.ts). */
+  const linked = (html: string) => {
+    const root = mkdtempSync(join(tmpdir(), "breaklint-local-uri-css-"));
+    try {
+      mkdirSync(join(root, "css"));
+      const doc = join(root, "doc.html");
+      writeFileSync(doc, html);
+      writeFileSync(join(root, "css", "print.css"), ".x{background:url(/img/root.png)} .y{background:url(../img/rel.png)}");
+      const assets = discoverLocalAssets(html, doc);
+      const additionalCss = collisionSources(html, assets).slice(1).map((source) => ({ origin: source.origin, text: source.text }));
+      return { captured: assets.has("/css/print.css"), findings: check(html, doc, additionalCss).findings };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+
+  it("reports a root-relative url() inside a linked local style sheet, and not its relative one", () => {
+    const { captured, findings } = linked('<link rel="stylesheet" href="css/print.css"><p>x</p>');
+    assert.equal(captured, true);
+    assert.deepEqual(reported(findings), ['style-sheet="/img/root.png"']);
+  });
+
+  it("neither captures nor scans a linked sheet the browser loads from an https base", () => {
+    const { captured, findings } = linked('<base href="https://docs.example.org/"><link rel="stylesheet" href="css/print.css"><p>x</p>');
+    assert.equal(captured, false, "a sheet the browser requests from the base host was captured from the local tree");
+    assert.deepEqual(reported(findings), []);
+  });
+
+  it("still captures and scans a linked sheet that precedes a late base", () => {
+    const { captured, findings } = linked('<link rel="stylesheet" href="css/print.css"><base href="https://docs.example.org/"><p>x</p>');
+    assert.equal(captured, true);
+    assert.deepEqual(reported(findings), ['style-sheet="/img/root.png"']);
+  });
+
+  it("reports what the late-base fixture fetches locally, and neither of its links", () => {
+    const path = fixture("local-uri-late-base.html");
+    const { findings } = check(readFileSync(path, "utf8"), path);
+    assert.deepEqual(reported(findings), ['style-sheet="/changed.svg"', 'src="/baseline.svg"']);
+  });
 });

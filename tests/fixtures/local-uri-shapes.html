@@ -21,13 +21,14 @@
                             Windows drive paths, backslash and slash
     #a-unc                  Windows UNC share path
     #a-winroot              backslash root path, which URL parsing treats as /docs/…
+    #a-protocol-relative    `//host/x`: from a local file it resolves to file://host/x, exactly
+                            like the UNC path
     .never-applied          a root-relative CSS url() in a rule that matches nothing, so the
                             browser never requests it
   Not reported:
     #a-rel, #a-parent       relative paths travel with the document
     #a-frag                 fragment-only reference
     #a-tilde                `~/` is a relative path segment in a URL, not a home directory
-    #a-protocol-relative    `//host/x` names a host, not a path on this machine
     #a-https, #a-mailto     remote and non-file schemes
     #a-data, #a-blob, #a-about
                             data: carries its own content; blob: and about: name no file

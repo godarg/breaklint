@@ -1,0 +1,33 @@
+<!doctype html>
+<!--
+  A <base href> that arrives LATE: after an image, an applied <style> url() and a hyperlink.
+  tests/live/local-uri.test.ts renders it through the real chain and reads the snapshot and the
+  artifact/local-uri findings; tests/unit/local-uri.test.ts reads it through the collector alone.
+
+  THE COMPLICATION is that a base does not govern everything that precedes it. A fetch is
+  resolved when its element is parsed, so the image and the style sheet's url() before the base
+  are requested from the local tree — here the loopback root, which is this directory — and end up
+  in the PDF. A hyperlink is resolved when it is printed, against the final base, so the link
+  before the base points to docs.example.org like the one after it. A collector that applies the
+  base to the whole document calls both fetches remote and the rule reports this document clean,
+  although its PDF was built from two root-relative local files.
+
+  Reported: <img src="/baseline.svg"> and the .tile url(/changed.svg) — both fetched.
+  Not reported: both <a href> (on the base host), and the base's own https href.
+  The two SVGs are existing fixtures beside this file; nothing after the base is fetched, so an
+  offline run completes.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>local URI before a late base</title><style>
+@page { size: 400px 600px; margin: 40px; }
+body { font: 14px/20px serif; margin: 0; }
+p { margin: 0 0 4px; }
+.tile { width: 40px; height: 40px; background-image: url(/changed.svg); }
+</style></head>
+<body>
+<h1>Local URI before a late base</h1>
+<p id="p-img"><img id="img-early" src="/baseline.svg" width="40" height="40" alt="baseline figure"></p>
+<div id="tile" class="tile"></div>
+<p id="p-early-link"><a id="a-early" href="/docs/early.html">link before the base</a></p>
+<base href="https://docs.example.org/manual/">
+<p id="p-late-link"><a id="a-late" href="/docs/late.html">link after the base</a></p>
+</body></html>

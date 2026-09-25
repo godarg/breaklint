@@ -33,6 +33,7 @@ import {
 import { IS, SUPPORTED_PAGEDJS_VERSION } from "../core/enums.ts";
 import { measureCapturedFontIdentity, prepareCapturedFontIdentity, releaseCapturedFontIdentity } from "../source/font-identity.ts";
 import { sha256Short } from "../core/fingerprint.ts";
+import { publishedBaseUrl } from "../core/uri-text.ts";
 import type { DocumentInput } from "../core/engine.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InfraEvent, ReportEnvironment, ResourceRecord, SourceRef } from "../core/types.ts";
@@ -506,7 +507,15 @@ type HtmlResourceReference = {
 
 function htmlResourceReferences(html: string): HtmlResourceReference[] {
   const references: HtmlResourceReference[] = [];
+  // The document base is the first HTML <base> with an href. Once an http(s) base has been parsed,
+  // every later fetch resolves on that host — the browser requests it there, not from the local
+  // tree — so a later reference is no local asset: it is neither captured, served nor scanned
+  // (measured in Chromium 141: a <link rel=stylesheet> after such a base was requested from the
+  // base host). A fetch before the base still resolves against the document, as before.
+  let baseDecided = false;
+  let underPublishedBase = false;
   const add = (raw: string, requiredStylesheet = false, deploymentRequiredRole: "stylesheet" | "script" | null = null): void => {
+    if (underPublishedBase) return;
     references.push({ raw, requiredStylesheet, deploymentRequiredRole });
   };
   const document = parse(html);
@@ -514,6 +523,10 @@ function htmlResourceReferences(html: string): HtmlResourceReference[] {
     if (parsedElement(node)) {
       const tag = node.tagName.toLowerCase();
       const attrs = Object.fromEntries(node.attrs.map((attr) => [attr.name.toLowerCase(), attr.value]));
+      if (!baseDecided && tag === "base" && node.namespaceURI === "http://www.w3.org/1999/xhtml" && attrs.href !== undefined) {
+        baseDecided = true;
+        underPublishedBase = publishedBaseUrl(attrs.href) !== null;
+      }
       const linkRel = new Set((attrs.rel ?? "").toLowerCase().split(/\s+/u));
       const hrefIsResource = tag === "link" && ["stylesheet", "preload", "modulepreload", "icon", "manifest"].some((rel) => linkRel.has(rel));
       if (attrs.href && (hrefIsResource || tag === "image" || tag === "use")) {

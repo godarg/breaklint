@@ -12,6 +12,7 @@ import { dirname, resolve } from "node:path";
 
 import { blockKey, normaliseSignature, sha256, svgRootKey, svgTextKey } from "../core/fingerprint.ts";
 import { resolveDocumentUri } from "../acquire/browser.ts";
+import { authoredScheme, publishedBaseUrl, urlInputText } from "../core/uri-text.ts";
 import {
   BREAK_CAUSE_CASCADE_HINTS,
   BREAK_CAUSE_DETERMINED_BY,
@@ -146,18 +147,19 @@ function uriParts(
   distributionRoot: string,
   documentBase: URL | null = null,
 ): Omit<UriRef, "nodeKey" | "requested"> {
-  const trimmed = rawValue.trim();
+  // What the URL parser reads: C0 controls and spaces stripped at the ends, tab/LF/CR removed.
+  const trimmed = urlInputText(rawValue);
   // `scheme` is the AUTHORED scheme, read from the text itself so that a scheme the resolver
   // rejects is not lost: `file://build-host/share/x` is a valid URL that fileURLToPath refuses on
   // POSIX, and resolving it first left such a file: URI with scheme "".
-  const scheme = /^([A-Za-z][A-Za-z0-9+.-]*):/u.exec(trimmed)?.[1]?.toLowerCase() ?? "";
+  const scheme = authoredScheme(trimmed);
   let origin = "";
   let resolvedUri = trimmed;
   let insideDistributionRoot = false;
   try {
     if (scheme === "" && documentBase !== null) {
-      // An http(s) <base href> is the document base the browser, and a PDF printed from it,
-      // resolves every scheme-less reference against. It never reaches the local file tree.
+      // Under an http(s) <base href> that governs this reference (see `buildSourceModel`) the
+      // browser, and a PDF printed from it, resolve it on that host, never in the local tree.
       resolvedUri = new URL(trimmed, documentBase).href;
     } else {
       // `file` is the source document/stylesheet, not decorative metadata: relative references
@@ -192,7 +194,7 @@ function cssUriParts(
 ): SourceModel["uriRefs"] {
   const refs: SourceModel["uriRefs"] = [];
   const add = (raw: string): void => {
-    const value = raw.trim();
+    const value = urlInputText(raw);
     if (value.length > 0) refs.push({ ...uriParts(value, file, distributionRoot, documentBase), attribute });
   };
   // Quoted @import without url(). url(...) imports are covered exactly once by the second loop.
@@ -204,12 +206,10 @@ function cssUriParts(
 }
 
 /**
- * The document base, when it is a published origin. HTML takes the first `<base>` with an `href`
- * in tree order, wherever it sits, and it governs references before it as well as after. Only an
- * absolute http(s) base is applied: a relative or file: base still resolves into the local tree
- * (and a file: base is itself a reported reference), so resolution against the file stays right.
+ * The HTML document base element: the first `<base>` with an `href` in tree order. A `<base>` in
+ * SVG content is not one.
  */
-function publishedDocumentBase(document: Node): URL | null {
+function documentBaseElement(document: Node): Element | null {
   const find = (node: Node): Element | null => {
     if (isElement(node) && node.tagName.toLowerCase() === "base" && node.namespaceURI === "http://www.w3.org/1999/xhtml" &&
       node.attrs.some((attr) => attr.name.toLowerCase() === "href")) return node;
@@ -219,14 +219,14 @@ function publishedDocumentBase(document: Node): URL | null {
     }
     return null;
   };
-  const base = find(document);
-  if (!base) return null;
-  try {
-    const url = new URL(attrsOf(base).href!.trim());
-    return url.protocol === "http:" || url.protocol === "https:" ? url : null;
-  } catch {
-    return null;
-  }
+  return find(document);
+}
+
+/** A hyperlink: its href is resolved when it is followed or printed, against the final base. */
+function isHyperlink(node: Element): boolean {
+  const tag = node.tagName.toLowerCase();
+  if (node.namespaceURI === "http://www.w3.org/2000/svg") return tag === "a";
+  return tag === "a" || tag === "area";
 }
 
 /** Parse identities and type runs from the injected source text, never from paginated clones. */
@@ -241,7 +241,15 @@ export function buildSourceModel(
   const orderedBlocks: OrderedSourceBlockModel[] = [];
   const runs: SourceRunModel[] = [];
   const uriRefs: SourceModel["uriRefs"] = [];
-  const documentBase = publishedDocumentBase(document);
+  // A published (http(s)) document base governs a hyperlink wherever the link sits: the link is
+  // resolved when it is followed or printed. A FETCH is resolved when its element is parsed, so a
+  // base governs an image, a stylesheet, a style attribute or a <style> url() only when the base
+  // precedes it in tree order. Measured in Chromium 141: an <img>, a <link rel=stylesheet>, a
+  // <style> url(), a style="" url() and an @font-face src before a late https base were all fetched
+  // from the local file tree; only <a href> was re-resolved against the base.
+  const baseElement = documentBaseElement(document);
+  const publishedBase = baseElement ? publishedBaseUrl(attrsOf(baseElement).href ?? "") : null;
+  let passedBase = false;
   let scriptBearing = false;
 
   const walk = (
@@ -275,17 +283,20 @@ export function buildSourceModel(
           blockSignature: normaliseSignature(textOf(node)),
         };
       }
+      const fetchBase = passedBase ? publishedBase : null;
       for (const [attribute, value] of Object.entries(attrs)) {
         if (!URI_ATTRIBUTES.has(attribute)) continue;
         const values = attribute === "srcset"
           ? value.split(",").map((candidate) => candidate.trim().split(/\s+/u)[0] ?? "").filter(Boolean)
           : [value];
-        for (const raw of values) uriRefs.push({ ...uriParts(raw, file, distributionRoot, documentBase), attribute });
+        const base = attribute === "href" && isHyperlink(node) ? publishedBase : fetchBase;
+        for (const raw of values) uriRefs.push({ ...uriParts(raw, file, distributionRoot, base), attribute });
       }
-      if (attrs.style) uriRefs.push(...cssUriParts(attrs.style, file, distributionRoot, "style", documentBase));
+      if (attrs.style) uriRefs.push(...cssUriParts(attrs.style, file, distributionRoot, "style", fetchBase));
       if (node.tagName.toLowerCase() === "style") {
-        uriRefs.push(...cssUriParts(textOf(node), file, distributionRoot, "style-sheet", documentBase));
+        uriRefs.push(...cssUriParts(textOf(node), file, distributionRoot, "style-sheet", fetchBase));
       }
+      if (node === baseElement) passedBase = true;
       for (const child of (node as { childNodes?: Node[] }).childNodes ?? []) {
         walk(child, [node, ...ancestors], sid, ownSourceBlockIndex, lang);
       }

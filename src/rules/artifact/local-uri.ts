@@ -1,6 +1,7 @@
 import { defineRule } from "../../core/rule.ts";
 import { resourceKey } from "../../core/fingerprint.ts";
 import { makeFinding, targetEvaluation } from "../shared.ts";
+import { urlInputText } from "../../core/uri-text.ts";
 
 /**
  * artifact/local-uri — a reference that only resolves on the machine that built the document.
@@ -30,7 +31,7 @@ export const localUri = defineRule(
     declines: [],
     remediation: {
       advice:
-        "A resource points to a local filesystem URI ('file:') or an absolute machine path. The rule has no notion of a distribution root: EVERY absolute path is reported, inside the project or not, a root-relative '/docs/...' and a Windows drive or share path included, because without an http(s) <base href> an absolute path resolves against the file system of the machine that rendered the document. Replace it with a relative URL, an absolute URL on the host the document is published from, or embed the asset directly (e.g. a data URI for a small image).",
+        "A resource points to a local filesystem URI ('file:') or an absolute machine path. The rule has no notion of a distribution root: EVERY absolute path is reported, inside the project or not, a root-relative '/docs/...', a protocol-relative '//host/...' and a Windows drive or share path included, because unless an http(s) <base href> governs it, an absolute path resolves against the file system of the machine that rendered the document. Replace it with a relative URL, an absolute URL on the host the document is published from, or embed the asset directly (e.g. a data URI for a small image).",
       // No trigger/remedied pair ships with this package and no gate re-runs one, so this
       // advice is untested in the sense the field defines.
       tested: false,
@@ -65,7 +66,7 @@ export const localUri = defineRule(
             ` Heuristic: a local reference can be deliberate.`,
           page: 1,
           keyType: "resource",
-          key: resourceKey(ref.resolvedUri),
+          key: resourceKey(localKey(ref)),
           nodeKey: ref.nodeKey,
           sid: null,
           source: null,
@@ -83,26 +84,41 @@ export const localUri = defineRule(
  * Whether an authored reference names a place on some machine's filesystem.
  *
  * `scheme` is the AUTHORED scheme (see `uriParts` in `src/measure/snapshot.ts`), so every
- * absolute path has scheme "" exactly like a portable relative path, and the shape of the raw
- * value has to decide. `resolvedUri` says what the document base made of it: without a `<base>`
- * it is a file: URL into the local tree; under an http(s) `<base href>` it is a URL on that host.
+ * absolute path has scheme "" exactly like a portable relative path, and the shape of the value
+ * has to decide. `resolvedUri` says what the document base made of it: a file: URL into the local
+ * tree, or, under an http(s) `<base href>` that governs the reference, a URL on that host.
  */
 function isLocalReference(ref: { rawValue: string; scheme: string; resolvedUri: string }): boolean {
-  const raw = ref.rawValue.trim();
+  const text = urlInputText(ref.rawValue);
   const scheme = ref.scheme.toLowerCase();
-  if (scheme === "file" || /^file:/iu.test(raw)) return true;
+  if (scheme === "file") return true;
   // A Windows drive path. The URL parser reads `C:` as a one-letter scheme, so it is tested before
   // the scheme is trusted; no registered URI scheme has a single letter.
-  if (/^[A-Za-z]:[\\/]/u.test(raw)) return true;
+  if (/^[A-Za-z]:[\\/]/u.test(text)) return true;
   // Every other scheme names no local file: remote URLs, mailto:, data: (it carries its own
   // content), blob: (a browsing session's object), about:.
   if (scheme !== "") return false;
   // A scheme-less value resolved against an http(s) <base href> is a URL on the publishing host.
   if (/^https?:/iu.test(ref.resolvedUri)) return false;
-  // Two leading slashes name a host. `//host/x` is the URL form of that and is not reported; a
-  // backslash in the pair is a Windows UNC share path (`\\server\share`), which is.
-  if (/^[\\/]{2}/u.test(raw)) return raw.slice(0, 2).includes("\\");
-  // One leading slash or backslash: an absolute path. A root-relative path is one, inside the
-  // project or not; a relative path, a fragment and `~/` (a plain path segment in a URL) are not.
-  return /^[\\/]/u.test(raw);
+  // Any leading slash or backslash: an absolute path, a root-relative path, a Windows share
+  // (`\\server\share`) or a protocol-relative `//host/x`. From a document rendered out of a
+  // local file every one of them resolves to a file: URL — `//host/x` to file://host/x. A relative
+  // path, a fragment and `~/` (a plain path segment in a URL) are not local.
+  return /^[\\/]/u.test(text);
+}
+
+/**
+ * The fingerprint key of a local reference. A scheme-less value is keyed on its own text, resolved
+ * against `file:///`: that is where it points from a document opened as a local file, and it
+ * does not depend on where the checkout lives. Its `resolvedUri` does — `/docs/a.html` resolves to
+ * file:///<checkout>/docs/a.html — and a fingerprint must not move with the directory.
+ */
+function localKey(ref: { rawValue: string; scheme: string; resolvedUri: string }): string {
+  if (ref.scheme !== "") return ref.resolvedUri;
+  const text = urlInputText(ref.rawValue);
+  try {
+    return new URL(text, "file:///").href;
+  } catch {
+    return text;
+  }
 }

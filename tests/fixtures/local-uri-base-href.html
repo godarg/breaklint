@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  A document published from an http(s) origin, and declaring so with <base href>.
+  A document published from an http(s) origin, and declaring so with <base href> FIRST in <head>.
   tests/unit/local-uri.test.ts reads it through the real collector and runs artifact/local-uri.
 
   THE COMPLICATION is that the same authored value means two different things depending on the
@@ -16,17 +16,19 @@
   file: link stays reported, and so does the Windows drive path, which the URL parser reads as a
   scheme of its own. The <base> element itself carries an https URL and is not reported.
 
-  The <base> sits after the <style> element on purpose: the HTML document base is the first
-  <base href> in tree order, and it governs references that precede it as much as later ones.
-  Only links and a never-applied CSS rule: nothing here is fetched.
+  The <style> comes AFTER the base, so its url() resolves on the base host as well. Its rule
+  matches nothing on purpose: an applied rule would be fetched from docs.example.org, which an
+  offline run blocks. The fetch that a base does NOT govern — a reference before a late base — is
+  observed live in tests/fixtures/local-uri-late-base.html.
 -->
-<html lang="en"><head><meta charset="utf-8"><title>local URI under an https base</title><style>
+<html lang="en"><head><meta charset="utf-8">
+<base href="https://docs.example.org/manual/">
+<title>local URI under an https base</title><style>
 @page { size: 400px 600px; margin: 40px; }
 body { font: 14px/20px serif; margin: 0; }
 p { margin: 0 0 4px; }
 .never-applied { background-image: url(/assets/unused-texture.png); }
 </style>
-<base href="https://docs.example.org/manual/">
 </head>
 <body>
 <h1>Local URI under a base</h1>
