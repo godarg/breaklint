@@ -44,6 +44,28 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   that worked. The order is declared in the new registry field `remediation.interactions`, which
   does not travel into reports: `Finding.remediation` still carries `advice` and `tested` only, and
   no report, snapshot or configuration schema stamp moves. Both advice strings change.
+- **`artifact/local-uri` reports absolute and root-relative paths, as its page always said.** Its
+  page and advice promise that EVERY absolute path is reported, inside the project or not; the rule
+  reported `file:` URIs only. The snapshot stores the authored scheme, which is empty for
+  `/var/share/…`, `/opt/…` and `/docs/guide.html` exactly as for a relative path, and the rule
+  skipped every empty scheme before its absolute-path test. It also missed Windows drive paths
+  (`C:\out\x.pdf`, which URL parsing reads as scheme `c`), share paths (`\\server\share\…`) and
+  a `file:` URI with a host (`file://host/share/…`), which the resolver cannot turn into a POSIX path
+  and so left with an empty scheme. All of these are now reported, CSS `url()` and `srcset`
+  candidates included. A document with root-relative links or assets gets new warnings — one per
+  reference, with the usual `attribute="value"` message; `maxOccurrences` permits deliberate ones.
+  Still not reported, each for a reason now in `docs/rules/artifact-local-uri.md`: relative paths,
+  fragments, `~/…` (a path segment in a URL), protocol-relative `//host/…`, and `data:`, `blob:`,
+  `about:` and other schemes.
+- **The same rule honours an http(s) `<base href>`.** The collector now resolves a scheme-less
+  reference against the document's first `<base href>` when that is an absolute `http:` or `https:`
+  URL, as the browser does — measured: an `<img src="/logo.png">` under such a base was requested
+  from the base host, not the document's directory. So `/docs/guide.html` under
+  `<base href="https://docs.example.org/">` is a URL on that host and is not reported; a `file:` URI
+  and a drive path stay reported under any base, and a `file:` or root-relative base is itself
+  reported. `UriRef.resolvedUri` for such references is the https URL, which is also what
+  `requested` is now matched against. No snapshot field was added; no report, snapshot or
+  configuration schema stamp moves. `Finding.remediation.advice` changes for the rule.
 
 ### Added
 

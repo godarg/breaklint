@@ -1,0 +1,65 @@
+<!doctype html>
+<!--
+  Every authored URI shape artifact/local-uri has to classify, one link per shape, in a document
+  rendered from a local file. tests/unit/local-uri.test.ts reads this file through the real
+  collector (buildSourceModel) and runs the real rule over what it collects.
+
+  THE COMPLICATION is that the collector stores the AUTHORED scheme, and an absolute path has
+  none: `/var/share/…` and `/docs/…` carry scheme "" exactly like the portable relative path
+  `notes/appendix.html`. A rule that skips every scheme-less value before looking at its shape
+  reports neither absolute path, and this document then passes with only its two file: links
+  reported. The same trap holds a Windows drive path: the URL parser reads `C:` as a one-letter
+  scheme "c", which is neither "file" nor empty.
+
+  Reported (the page promises every absolute path, inside the project or not):
+    #a-file, #a-file-host   file: URIs, with and without a host
+    #a-abs                  absolute POSIX path
+    #a-rootrel, #a-rootrel-query
+                            root-relative paths; in a PDF printed from a local file they
+                            resolve to file:///docs/…, a path on the build machine
+    #a-drive-bs, #a-drive-fs
+                            Windows drive paths, backslash and slash
+    #a-unc                  Windows UNC share path
+    #a-winroot              backslash root path, which URL parsing treats as /docs/…
+    .never-applied          a root-relative CSS url() in a rule that matches nothing, so the
+                            browser never requests it
+  Not reported:
+    #a-rel, #a-parent       relative paths travel with the document
+    #a-frag                 fragment-only reference
+    #a-tilde                `~/` is a relative path segment in a URL, not a home directory
+    #a-protocol-relative    `//host/x` names a host, not a path on this machine
+    #a-https, #a-mailto     remote and non-file schemes
+    #a-data, #a-blob, #a-about
+                            data: carries its own content; blob: and about: name no file
+
+  Only links and a never-applied CSS rule: nothing here is fetched, so the live run has no
+  missing-resource leaves to account for.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>local URI shapes</title><style>
+@page { size: 400px 600px; margin: 40px; }
+body { font: 14px/20px serif; margin: 0; }
+p { margin: 0 0 4px; }
+.never-applied { background-image: url(/opt/build/assets/unused-texture.png); }
+</style></head>
+<body>
+<h1>Local URI shapes</h1>
+<p id="p-file"><a id="a-file" href="file:///srv/build/notes.txt">file URI</a></p>
+<p id="p-file-host"><a id="a-file-host" href="file://build-host/share/spec.pdf">file URI with host</a></p>
+<p id="p-abs"><a id="a-abs" href="/var/share/handbook.pdf">absolute path</a></p>
+<p id="p-rootrel"><a id="a-rootrel" href="/docs/migration/guide.html">root-relative path</a></p>
+<p id="p-rootrel-query"><a id="a-rootrel-query" href="/docs/guide.html?rev=2#part">root-relative with query</a></p>
+<p id="p-drive-bs"><a id="a-drive-bs" href="C:\build\out\report.pdf">drive path, backslash</a></p>
+<p id="p-drive-fs"><a id="a-drive-fs" href="C:/build/out/report.pdf">drive path, slash</a></p>
+<p id="p-unc"><a id="a-unc" href="\\fileserver\share\plan.pdf">UNC share</a></p>
+<p id="p-winroot"><a id="a-winroot" href="\docs\winroot.html">backslash root path</a></p>
+<p id="p-rel"><a id="a-rel" href="notes/appendix.html">relative path</a></p>
+<p id="p-parent"><a id="a-parent" href="../shared/overview.html">parent-relative path</a></p>
+<p id="p-frag"><a id="a-frag" href="#p-file">fragment</a></p>
+<p id="p-tilde"><a id="a-tilde" href="~/notes.txt">tilde segment</a></p>
+<p id="p-protocol-relative"><a id="a-protocol-relative" href="//cdn.example.org/lib/guide.html">protocol-relative</a></p>
+<p id="p-https"><a id="a-https" href="https://example.org/guide">https URL</a></p>
+<p id="p-mailto"><a id="a-mailto" href="mailto:docs@example.org">mail</a></p>
+<p id="p-data"><a id="a-data" href="data:text/plain,hello">data URI</a></p>
+<p id="p-blob"><a id="a-blob" href="blob:https://example.org/5d1c">blob URL</a></p>
+<p id="p-about"><a id="a-about" href="about:blank">about URL</a></p>
+</body></html>

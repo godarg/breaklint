@@ -833,6 +833,53 @@ export function loadCorpus(): CorpusEntry[] {
       }),
     },
     {
+      name: "local-uri-trigger-root-relative",
+      kind: "trigger",
+      about: "artifact/local-uri",
+      complication:
+        "A root-relative link, as the collector stores it: AUTHORED scheme \"\" — the same as the " +
+        "portable relative path below — and inside the distribution root. A rule that skips every " +
+        "scheme-less value, or that honours a distribution root, stays silent; the page promises " +
+        "every absolute path, inside the project or not.",
+      snapshot: snapshot({
+        uriRefs: [
+          {
+            nodeKey: "uri:0",
+            attribute: "href",
+            rawValue: "/docs/migration/guide.html",
+            resolvedUri: "file:///example/project/docs/migration/guide.html",
+            scheme: "",
+            origin: "",
+            requested: false,
+            insideDistributionRoot: true,
+          },
+        ],
+      }),
+    },
+    {
+      name: "local-uri-clean-https-base",
+      kind: "clean",
+      about: "artifact/local-uri",
+      complication:
+        "The same authored root-relative link under <base href=\"https://docs.example.org/…\">: " +
+        "the collector resolves it against that base, so it is a URL on the publishing host and " +
+        "not a local reference. A rule that reads only the authored shape fires here.",
+      snapshot: snapshot({
+        uriRefs: [
+          {
+            nodeKey: "uri:0",
+            attribute: "href",
+            rawValue: "/docs/migration/guide.html",
+            resolvedUri: "https://docs.example.org/docs/migration/guide.html",
+            scheme: "",
+            origin: "",
+            requested: false,
+            insideDistributionRoot: false,
+          },
+        ],
+      }),
+    },
+    {
       name: "local-uri-clean-relative",
       kind: "clean",
       about: "artifact/local-uri",

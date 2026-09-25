@@ -144,25 +144,31 @@ function uriParts(
   rawValue: string,
   file: string,
   distributionRoot: string,
+  documentBase: URL | null = null,
 ): Omit<UriRef, "nodeKey" | "requested"> {
   const trimmed = rawValue.trim();
-  const absolute = /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(trimmed);
-  let scheme = "";
+  // `scheme` is the AUTHORED scheme, read from the text itself so that a scheme the resolver
+  // rejects is not lost: `file://build-host/share/x` is a valid URL that fileURLToPath refuses on
+  // POSIX, and resolving it first left such a file: URI with scheme "".
+  const scheme = /^([A-Za-z][A-Za-z0-9+.-]*):/u.exec(trimmed)?.[1]?.toLowerCase() ?? "";
   let origin = "";
   let resolvedUri = trimmed;
   let insideDistributionRoot = false;
   try {
-    // `file` is the source document/stylesheet, not decorative metadata: relative references are
-    // resolved against its directory. `scheme` deliberately remains the AUTHORED scheme so a
-    // portable relative path does not become an artifact/local-uri finding merely because its
-    // canonical identity is a file URL during a local run.
-    const resolved = resolveDocumentUri(trimmed, file, distributionRoot);
-    const url = resolved.url;
-    resolvedUri = url.href;
-    insideDistributionRoot = resolved.insideDistributionRoot;
-    if (absolute) {
-      scheme = url.protocol.replace(/:$/u, "");
-      origin = url.origin === "null" ? `${scheme}://` : url.origin;
+    if (scheme === "" && documentBase !== null) {
+      // An http(s) <base href> is the document base the browser, and a PDF printed from it,
+      // resolves every scheme-less reference against. It never reaches the local file tree.
+      resolvedUri = new URL(trimmed, documentBase).href;
+    } else {
+      // `file` is the source document/stylesheet, not decorative metadata: relative references
+      // are resolved against its directory. `scheme` deliberately remains the AUTHORED scheme so
+      // a portable relative path does not become an artifact/local-uri finding merely because
+      // its canonical identity is a file URL during a local run.
+      const resolved = resolveDocumentUri(trimmed, file, distributionRoot);
+      const url = resolved.url;
+      resolvedUri = url.href;
+      insideDistributionRoot = resolved.insideDistributionRoot;
+      if (scheme !== "") origin = url.origin === "null" ? `${scheme}://` : url.origin;
     }
   } catch {
     // The rule still needs the authored value when URL parsing cannot make it canonical.
@@ -182,11 +188,12 @@ function cssUriParts(
   file: string,
   distributionRoot: string,
   attribute: string,
+  documentBase: URL | null = null,
 ): SourceModel["uriRefs"] {
   const refs: SourceModel["uriRefs"] = [];
   const add = (raw: string): void => {
     const value = raw.trim();
-    if (value.length > 0) refs.push({ ...uriParts(value, file, distributionRoot), attribute });
+    if (value.length > 0) refs.push({ ...uriParts(value, file, distributionRoot, documentBase), attribute });
   };
   // Quoted @import without url(). url(...) imports are covered exactly once by the second loop.
   for (const match of text.matchAll(/@import\s+["']([^"']+)["']/giu)) if (match[1]) add(match[1]);
@@ -194,6 +201,32 @@ function cssUriParts(
     add(match[1] ?? match[2] ?? match[3] ?? "");
   }
   return refs;
+}
+
+/**
+ * The document base, when it is a published origin. HTML takes the first `<base>` with an `href`
+ * in tree order, wherever it sits, and it governs references before it as well as after. Only an
+ * absolute http(s) base is applied: a relative or file: base still resolves into the local tree
+ * (and a file: base is itself a reported reference), so resolution against the file stays right.
+ */
+function publishedDocumentBase(document: Node): URL | null {
+  const find = (node: Node): Element | null => {
+    if (isElement(node) && node.tagName.toLowerCase() === "base" && node.namespaceURI === "http://www.w3.org/1999/xhtml" &&
+      node.attrs.some((attr) => attr.name.toLowerCase() === "href")) return node;
+    for (const child of (node as { childNodes?: Node[] }).childNodes ?? []) {
+      const found = find(child);
+      if (found) return found;
+    }
+    return null;
+  };
+  const base = find(document);
+  if (!base) return null;
+  try {
+    const url = new URL(attrsOf(base).href!.trim());
+    return url.protocol === "http:" || url.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Parse identities and type runs from the injected source text, never from paginated clones. */
@@ -208,6 +241,7 @@ export function buildSourceModel(
   const orderedBlocks: OrderedSourceBlockModel[] = [];
   const runs: SourceRunModel[] = [];
   const uriRefs: SourceModel["uriRefs"] = [];
+  const documentBase = publishedDocumentBase(document);
   let scriptBearing = false;
 
   const walk = (
@@ -246,11 +280,11 @@ export function buildSourceModel(
         const values = attribute === "srcset"
           ? value.split(",").map((candidate) => candidate.trim().split(/\s+/u)[0] ?? "").filter(Boolean)
           : [value];
-        for (const raw of values) uriRefs.push({ ...uriParts(raw, file, distributionRoot), attribute });
+        for (const raw of values) uriRefs.push({ ...uriParts(raw, file, distributionRoot, documentBase), attribute });
       }
-      if (attrs.style) uriRefs.push(...cssUriParts(attrs.style, file, distributionRoot, "style"));
+      if (attrs.style) uriRefs.push(...cssUriParts(attrs.style, file, distributionRoot, "style", documentBase));
       if (node.tagName.toLowerCase() === "style") {
-        uriRefs.push(...cssUriParts(textOf(node), file, distributionRoot, "style-sheet"));
+        uriRefs.push(...cssUriParts(textOf(node), file, distributionRoot, "style-sheet", documentBase));
       }
       for (const child of (node as { childNodes?: Node[] }).childNodes ?? []) {
         walk(child, [node, ...ancestors], sid, ownSourceBlockIndex, lang);

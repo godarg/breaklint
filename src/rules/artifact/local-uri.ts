@@ -30,7 +30,7 @@ export const localUri = defineRule(
     declines: [],
     remediation: {
       advice:
-        "A resource points to a local filesystem URI ('file:') or an absolute machine path. The rule has no notion of a distribution root: EVERY absolute path is reported, inside the project or not, because an absolute path resolves only on the machine that wrote it. Replace it with a relative URL, an absolute URL on the host the document is published from, or embed the asset directly (e.g. a data URI for a small image).",
+        "A resource points to a local filesystem URI ('file:') or an absolute machine path. The rule has no notion of a distribution root: EVERY absolute path is reported, inside the project or not, a root-relative '/docs/...' and a Windows drive or share path included, because without an http(s) <base href> an absolute path resolves against the file system of the machine that rendered the document. Replace it with a relative URL, an absolute URL on the host the document is published from, or embed the asset directly (e.g. a data URI for a small image).",
       // No trigger/remedied pair ships with this package and no gate re-runs one, so this
       // advice is untested in the sense the field defines.
       tested: false,
@@ -48,15 +48,7 @@ export const localUri = defineRule(
       candidates += 1;
       measured += 1;
 
-      const scheme = ref.scheme.toLowerCase();
-      // A data: URI carries its own content; a relative path travels with the document.
-      if (scheme === "data" || scheme === "") {
-        evaluations.push(targetEvaluation({ ruleId: "artifact/local-uri", keyType: "resource", nodeKey: ref.nodeKey, sid: null, occurrenceKey: String(refIndex), status: "measured", measurements: [{ name: "is-local-uri", value: false, unit: null, operator: "=", threshold: true }, { name: "local-uri-occurrence-index", value: seen, unit: "occurrences", operator: ">", threshold: permitted }], connective: "all", violated: false }));
-        continue;
-      }
-      const isFileScheme = scheme === "file";
-      const isAbsoluteLocalPath = /^\/(?!\/)/u.test(ref.rawValue) && !/^\/\//u.test(ref.rawValue);
-      const local = isFileScheme || isAbsoluteLocalPath;
+      const local = isLocalReference(ref);
       if (local) seen += 1;
       evaluations.push(targetEvaluation({ ruleId: "artifact/local-uri", keyType: "resource", nodeKey: ref.nodeKey, sid: null, occurrenceKey: String(refIndex), status: "measured", measurements: [{ name: "is-local-uri", value: local, unit: null, operator: "=", threshold: true }, { name: "local-uri-occurrence-index", value: seen, unit: "occurrences", operator: ">", threshold: permitted }], connective: "all", violated: local && seen > permitted }));
       if (!local || seen <= permitted) continue;
@@ -86,3 +78,31 @@ export const localUri = defineRule(
     return { findings, candidates, measured, notMeasured: [], evaluations };
   },
 );
+
+/**
+ * Whether an authored reference names a place on some machine's filesystem.
+ *
+ * `scheme` is the AUTHORED scheme (see `uriParts` in `src/measure/snapshot.ts`), so every
+ * absolute path has scheme "" exactly like a portable relative path, and the shape of the raw
+ * value has to decide. `resolvedUri` says what the document base made of it: without a `<base>`
+ * it is a file: URL into the local tree; under an http(s) `<base href>` it is a URL on that host.
+ */
+function isLocalReference(ref: { rawValue: string; scheme: string; resolvedUri: string }): boolean {
+  const raw = ref.rawValue.trim();
+  const scheme = ref.scheme.toLowerCase();
+  if (scheme === "file" || /^file:/iu.test(raw)) return true;
+  // A Windows drive path. The URL parser reads `C:` as a one-letter scheme, so it is tested before
+  // the scheme is trusted; no registered URI scheme has a single letter.
+  if (/^[A-Za-z]:[\\/]/u.test(raw)) return true;
+  // Every other scheme names no local file: remote URLs, mailto:, data: (it carries its own
+  // content), blob: (a browsing session's object), about:.
+  if (scheme !== "") return false;
+  // A scheme-less value resolved against an http(s) <base href> is a URL on the publishing host.
+  if (/^https?:/iu.test(ref.resolvedUri)) return false;
+  // Two leading slashes name a host. `//host/x` is the URL form of that and is not reported; a
+  // backslash in the pair is a Windows UNC share path (`\\server\share`), which is.
+  if (/^[\\/]{2}/u.test(raw)) return raw.slice(0, 2).includes("\\");
+  // One leading slash or backslash: an absolute path. A root-relative path is one, inside the
+  // project or not; a relative path, a fragment and `~/` (a plain path segment in a URL) are not.
+  return /^[\\/]/u.test(raw);
+}

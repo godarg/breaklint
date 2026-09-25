@@ -1,0 +1,38 @@
+<!doctype html>
+<!--
+  A document published from an http(s) origin, and declaring so with <base href>.
+  tests/unit/local-uri.test.ts reads it through the real collector and runs artifact/local-uri.
+
+  THE COMPLICATION is that the same authored value means two different things depending on the
+  document base. Without a base, `/docs/migration/guide.html` resolves against the local file the
+  document was rendered from and is reported. Under `<base href="https://docs.example.org/…">`
+  the browser, and every PDF link annotation printed from it, resolves the same value to
+  https://docs.example.org/docs/migration/guide.html: a published URL, not a local one. A rule
+  that looks only at the authored shape reports a false positive here. `/var/share/handbook.pdf`
+  looks like a build-machine path, but under this base it is a URL on the publishing host too: if
+  it is wrong, it is a broken link there, not a local reference, and this rule does not report it.
+
+  The base must not whitewash what it cannot reach: an absolute URL ignores the base, so the
+  file: link stays reported, and so does the Windows drive path, which the URL parser reads as a
+  scheme of its own. The <base> element itself carries an https URL and is not reported.
+
+  The <base> sits after the <style> element on purpose: the HTML document base is the first
+  <base href> in tree order, and it governs references that precede it as much as later ones.
+  Only links and a never-applied CSS rule: nothing here is fetched.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>local URI under an https base</title><style>
+@page { size: 400px 600px; margin: 40px; }
+body { font: 14px/20px serif; margin: 0; }
+p { margin: 0 0 4px; }
+.never-applied { background-image: url(/assets/unused-texture.png); }
+</style>
+<base href="https://docs.example.org/manual/">
+</head>
+<body>
+<h1>Local URI under a base</h1>
+<p id="p-rootrel"><a id="a-rootrel" href="/docs/migration/guide.html">root-relative path</a></p>
+<p id="p-abs"><a id="a-abs" href="/var/share/handbook.pdf">absolute path</a></p>
+<p id="p-rel"><a id="a-rel" href="notes/appendix.html">relative path</a></p>
+<p id="p-file"><a id="a-file" href="file:///srv/build/notes.txt">file URI</a></p>
+<p id="p-drive"><a id="a-drive" href="C:\build\out\report.pdf">drive path</a></p>
+</body></html>
