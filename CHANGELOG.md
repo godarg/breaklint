@@ -57,39 +57,70 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   between one and two pages tall — which Paged.js splits in exactly two — was never reported:
   measured on 2026-09-24 with Paged.js 0.4.3, a block 503.72 px tall split 335.81 + 167.91 px
   against a 340.16 px page came back `clean` at exit 0. The same block is now reported as at least
-  496.38 px tall across its 2 fragments. The value of a split block is the extent of the text lines
-  in its fragments, summed — never above the block's unsplit height and, by construction, below it
-  by the block's borders, padding, the half-leading at each fragment's ends and any line Paged.js
-  pushed into its hidden overflow column; the finding says "at least", and its evaluation records
-  `block-height-lower-bound` and `fragment-count` (an unsplit block keeps `block-height`, its exact
-  box and its 0.5.0 message). The fragment boxes are no longer summed: Paged.js repeats borders at
-  split edges, and a block 301.19 px tall that fits the page had boxes summing to 417.47 px. Split
+  496.38 px tall across its 2 fragments. The value of a split block is, per fragment, the extent of
+  its text lines and replaced content (images, outermost SVG, canvas, video, embedded frames, form
+  controls) in the page's own column, summed and rounded down; the finding says "at least", and its
+  evaluation records `block-height-lower-bound`, `fragment-count` and `fragments-left-out` (an
+  unsplit block keeps `block-height`, its exact box and its 0.5.0 message). It is at most the
+  block's unsplit height for content in one untransformed flow — the premise the rule now checks,
+  below — and is below it by the block's borders, padding, the half-leading at each fragment's ends
+  and any line Paged.js pushed into its hidden overflow column. The fragment boxes are no longer
+  summed: Paged.js repeats borders at split edges (a block 301.19 px tall that fits the page had
+  boxes summing to 417.47 px) and unsets margins (another sum was 12 px short of its block). Split
   blocks already reported change value — the full-bleed block of the first entry above now reads
-  1843.64 px instead of the 1865.61 px box sum. Declared assumptions and the cases the bound leaves
-  unjudged are in `docs/limitations.md` and on the rule page.
-- **The same rule declines split blocks it cannot bound, so a build can also newly end at exit 4.**
-  Where the snapshot shows the bound's premises failing, the block is declined as
-  `env/invalid-measurement` instead of measured, and the decline counts against the rule's full
-  coverage floor: a split block whose fragments carry two elements' text side by side (a table of
-  two or more columns — Paged.js re-lays out each table fragment on its own and moves cells after a
-  split cell to the next page whole; measured, 697.95 px of lines for a block 522.38 px tall — flex
-  or grid items, a float), a piece of a split element away from the fragment's edge (content laid
-  out twice), a text line out of its own box, or no text at all (a split block of images). In 0.6.0
-  such a block was reported from three fragments on, or passed at one or two.
+  1843.64 px instead of the 1865.61 px box sum. Measured on Paged.js 0.4.3 (patched Chromium 141).
+- **The same rule declines every split block it cannot bound, and every split block whose bound
+  does not exceed the page, so a build can also newly end at exit 4.** A first version of the bound
+  above counted text lines only and took them from any split block; measured on 2026-09-25 it
+  reported "at least 360.19 px" for a block 301.19 px tall with relatively offset paragraphs and
+  347.13 px for a block 335.81 px tall with a two-column descendant (false `error`s on a 340.16 px
+  page), and bounded a figure of five 200 px panels by its one-line caption at 14.99 px and passed
+  it. That version never shipped. Now a split block is declined as `env/invalid-measurement`, which
+  counts against the rule's full coverage floor, when the snapshot records a flow hazard inside it,
+  on it or around it (absolute, fixed, sticky or relatively offset positioning, a transform, a
+  float, multi-column, a flex or grid container, a table row of two or more cells, vertical writing,
+  and inside it a negative block margin or replaced content overflowing an ancestor that does not
+  clip it); when its fragments show the bound's premises failing (two elements' text side by side,
+  a piece of a split element away from the fragment's edge, content out of its own box by more than
+  its glyph overhang, nothing to count); and — **inconclusive** — when the bound is at or below the
+  page: nothing in the snapshot proves such a block fits, so it is neither reported nor called
+  clean. An unsplit block is declined when it or an ancestor is transformed or its box reaches past
+  the sheet into the overflow column; a split block whose first piece has no layout box but a later
+  piece does is declined rather than excluded. Every decline row names the premise in its
+  measurements (`flow-hazards`, `box-within-the-sheet`, `fragment-content-inside-its-box`, …). In
+  0.6.0 such blocks were reported from three fragments on, or passed at one or two.
 - **The same rule's advice no longer calls the reported height "the height its content needed".** It
-  says the height of a split block is a lower bound; the levers are unchanged. Consumers that stored
-  or compared advice text will see the new string.
+  says the height of a split block is a lower bound from its text lines and replaced content; the
+  levers are unchanged. Consumers that stored or compared advice text will see the new string.
+
+### Snapshot
+
+- **The measurement snapshot is schema 5.** Each block record gains two required fields:
+  `atomicBoxes` — `{ tag, box }` for every laid-out, visible, nonzero `img`, outermost `svg`,
+  `canvas`, `video`, `iframe`, `object`, `embed`, `audio`, `input`, `textarea` and `select` inside
+  the element (this fragment of it), clipped to any block-level ancestor inside the element whose
+  overflow is not visible — and `flowHazards`, `{ inside, self, around }`, each a sorted list of
+  `out-of-flow`, `offset`, `sticky`, `transformed`, `float`, `multicol`, `flex-or-grid`,
+  `table-columns`, `vertical-writing`, `negative-margin` and `overflowing-content` (the last two
+  inside only). `inside` is read over every element laid out inside the block, not only over block
+  records; `around` over its ancestors up to the page content. `validateSnapshotInvariants` refuses
+  a record without them, and the engine reads only schema 5: a schema-4 snapshot has neither field
+  and they cannot be derived from what it carries, so it is refused (`checker-crashed`), never read
+  as "no hazards". `examples/demo-snapshot.json` and the corpus are migrated.
 
 ### Tooling
 
 - **Every rule declares what its quantity belongs to (`RuleMeta.quantityScope`), and a gate holds
   element-scope rules to it.** Internal and not emitted in any report.
   `tests/unit/fragment-contract.test.ts` splits every corpus target of an `element` rule over two
-  and three pages and requires the same findings and verdict; `npm run test:mutants` gains a
-  `first-fragment-only` mutant for those rules (the too-tall rule now reports 6/6). The M3-0
-  calibration contract pins the source bytes of the three SVG rules; their only change is the one
-  declaration line, and the pins in `tests/tools/calibration/readiness-validator.ts` are
-  re-recorded from the new bytes.
+  and three pages and requires the same findings and verdict — except that a clean element may
+  become a declared decline (a split block that fits cannot be shown to fit); it may never gain or
+  lose a finding. `npm run test:mutants` gains a `first-fragment-only` mutant for those rules (the
+  too-tall rule now reports 6/6). The M3-0 calibration contract pins the source bytes of the three
+  SVG rules; their only change is the one declaration line, so the pins in
+  `tests/tools/calibration/readiness-validator.ts` are re-recorded from the new bytes and, as
+  `docs/validation/corpus-contract-v1.md` requires, the executable contract version moves with them
+  from `m3-0-real-rule-run-v1` to `m3-0-real-rule-run-v2` (validator and both calibration schemas).
 
 ### Fixed
 

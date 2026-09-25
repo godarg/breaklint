@@ -74,8 +74,8 @@ profile sets every floor to 1. The two proof-source-A thresholds are not configu
 turning a structural boundary into a caller preference would invalidate the reason those rules may
 gate by default. The effective floors and their origins appear in the report (schema 3 from 0.2.3,
 schema 4 from 0.5.0, schema 5 when the optional `remediation` was added to a finding); stored
-snapshot fixtures moved to schema 3 in 0.2.3, when `inkCollected` was added, and to schema 4 in
-0.5.0.
+snapshot fixtures moved to schema 3 in 0.2.3, when `inkCollected` was added, to schema 4 in
+0.5.0, and to schema 5 (unreleased) when `atomicBoxes` and `flowHazards` were added to a block record.
 
 ### What coverage is a ratio OF, and the two things it is not
 
@@ -410,52 +410,66 @@ wrapper that starts on page 1 still anchors page 1, keyed by its author id or, w
 signature of all its text, so without an id that page's fingerprint follows any edit inside the
 wrapper.
 
-**How often oversized `break-inside: avoid` blocks occur in real documents is not measured.** The
-measurement is a lower bound and errs toward silence (below), but its frequency in the field is
-unknown, so how much this changes in practice for a given project is unknown too. A project that
-sees a new `error` after upgrading is seeing a block that never fitted, within the assumptions
-stated below; that is all this version claims.
+**How often oversized `break-inside: avoid` blocks occur in real documents is not measured.** For
+a split block the measurement is a lower bound, and where it cannot be taken or proves nothing the
+block is declined (below); how often that happens in the field is unknown, so how much this changes
+in practice for a given project is unknown too. A project that sees a new `error` after upgrading is
+seeing a block that never fitted, within the assumptions stated below; a project that sees a new
+exit 4 is seeing a split block the rule could not judge.
 
-**A split `break-inside: avoid` block is reported as "at least" the height of its text lines — two
-fragments included — and some split blocks are not judged at all.** 0.6.0 believed a split block
-only from the third fragment on and judged one or two fragments on the first fragment's box, so a
-block split in exactly two was never reported. Two fragments is the usual outcome for a block
-between one and two pages tall, because Paged.js moves an avoid block that fits a fresh page onto
-one: measured on 2026-09-24 with Paged.js 0.4.3, a block 503.72 px tall split 335.81 + 167.91 px
-against a 340.16 px page came back `clean` at exit 0. Summing the fragment boxes is not the answer
-either: Paged.js repeats a block's border (and `!important` or inline padding) at every split
-edge, and because it ignores that repeated bottom edge when it picks the break, the last line
-before the split lands in a hidden overflow column beside the page and the fragment reads as a
-union box one page tall — a block 301.19 px tall, which fits, had fragment boxes summing to
-417.47 px. The 0.6.0 argument that three fragments cannot mislead ("a middle fragment fills a
-whole page") fails the same way: a middle fragment fills what a split ancestor's repeated border
-leaves of the page.
+**A split `break-inside: avoid` block is reported as "at least" the height of its text lines and
+replaced content — two fragments included — and many split blocks are declined instead of judged.**
+0.6.0 believed a split block only from the third fragment on and judged one or two fragments on the
+first fragment's box, so a block split in exactly two was never reported. Two fragments is the usual
+outcome for a block between one and two pages tall, because Paged.js moves an avoid block that fits
+a fresh page onto one: measured on 2026-09-24 with Paged.js 0.4.3, a block 503.72 px tall split
+335.81 + 167.91 px against a 340.16 px page came back `clean` at exit 0. Summing the fragment boxes
+is not the answer either, in either direction: Paged.js repeats a block's border (and `!important`
+or inline padding) at every split edge, and because it ignores that repeated bottom edge when it
+picks the break, the last line before the split lands in a hidden overflow column beside the page
+and the fragment reads as a union box one page tall — a block 301.19 px tall, which fits, had
+fragment boxes summing to 417.47 px — while a margin Paged.js unsets at a split made another sum
+12 px short of its block. The 0.6.0 argument that three fragments cannot mislead ("a middle fragment
+fills a whole page") fails the same way: a middle fragment fills what a split ancestor's repeated
+border leaves of the page.
 
-What is reported instead is a **lower bound**: per fragment, the extent of the text lines that
-start in the page's own column, clipped to the fragment's box, summed. The lines of each fragment
-are, in the unsplit block at the same width, a run of consecutive lines with the same spacing, and
-everything a split adds or removes lies outside them, so the sum cannot exceed the unsplit height.
-It is below it by the block's own borders and padding, by every line in the overflow column (which
-is printed nowhere), and by the half-leading at both ends of every fragment — measured: 7.33 px for
-a plain block split in two, 88.32 px for a 20 px-bordered block split in three. A split block whose
-bound does not exceed the page is not reported, whether or not the block would have fitted.
+What is reported instead is a **lower bound**: per fragment, the extent of the text lines and the
+replaced content (images, outermost SVG, canvas, video, embedded frames, form controls) that start
+in the page's own column, clipped to the fragment's box, less the snapshot's rounding and the
+overhang of glyph boxes taller than the line height, summed and rounded down. The argument: content
+in one untransformed block-direction flow keeps, inside a fragment, the offsets it has in the
+unsplit block at the same width, and Paged.js places each piece once, in order, so each extent is a
+piece of the unsplit block and the pieces follow one another; what a split adds lies outside them.
+The bound is below the unsplit height by the block's own borders and padding, by every line in the
+overflow column (printed nowhere) and by the half-leading at the fragment ends — measured on
+Paged.js 0.4.3 (patched Chromium 141): 7.34 px for a plain block split in two, 2.71 px for a figure
+of five panels and a caption, 88.33 px for a 20 px-bordered block split in three.
 
-Where the snapshot shows the argument's premises failing, the block is **declined** as
-`env/invalid-measurement`, which counts against the rule's full coverage floor and ends the run at
-exit 4: two elements' text side by side in one fragment (a table of two or more columns — Paged.js
-lays out each fragment of a table as a table of its own and moves the cells after a split cell to
-the next page whole; measured, 697.95 px of lines for a block 522.38 px tall — or flex or grid items,
-or a float), a piece of a split element away from the fragment's edge (content laid out twice:
-measured with an absolutely positioned caption at the foot of a split block), a line out of its own
-element's box by half its height (a fixed height, an offset, a transform), or no text line at all
-(a split block of images). **What the snapshot cannot see is assumed**: no absolutely positioned,
-fixed or transformed text that stays inside its box, no side-by-side content without an element of
-its own (inline blocks, anonymous flex items, text beside an image float), no content repeated
-outside an element of its own, a split-word hyphen (U+2011) no wider than the one it replaces, and
-line boxes at least as tall as the smallest `line-height` recorded in the fragment (a taller glyph
-box's overhang is given back). A document that breaks one of these can be reported although the
-block would have fitted. The snapshot records neither positioning, transforms nor display types; a
-proof-grade guard for them needs the page to record them.
+The argument needs its premises, and the version of this rule that took the lines of any split block
+broke on documents that violated them — measured on 2026-09-25 with the same stack, a false `error`
+at "at least 360.19 px" for a block 301.19 px tall with relatively offset paragraphs, 347.13 px for a
+block 335.81 px tall with a two-column descendant, and a figure of five 200 px panels bounded at
+14.99 px by its caption and passed. The snapshot (schema 5) therefore records, per block, the boxes
+of its replaced content (`atomicBoxes`) and its `flowHazards` — inside it, on it and around it up to
+the page content: absolute, fixed, sticky or relatively offset positioning, transforms, floats,
+multi-column, flex or grid containers, table rows of two or more cells, vertical writing, and inside
+it negative block margins and replaced content overflowing an ancestor that does not clip it. **A
+split block with any recorded hazard is declined** as `env/invalid-measurement`, which counts
+against the rule's full coverage floor and ends the run at exit 4; so is one whose fragments show a
+premise failing (two elements' text side by side, a piece of a split element away from the
+fragment's edge, content out of its own element's box by more than its glyph overhang, nothing to
+count). **A split block whose bound is at or below the page is declined as inconclusive**, never
+reported and never called clean: the fragment boxes are no upper bound, so nothing proves such a
+block fits. An unsplit block is judged on its box, and is declined only when it or an ancestor is
+transformed or its box reaches past the sheet into the overflow column.
+
+**What the snapshot cannot see is assumed**: no content repeated or moved by the paginator without
+an element of its own, no side-by-side content without an element of its own (inline blocks), a
+split-word hyphen (U+2011) no wider than the one it replaces and a continued paragraph piece that
+does not wrap into more lines than its text had unsplit, and line boxes at least as tall as the
+smallest `line-height` recorded in the fragment. A document that breaks one of these could be
+reported although the block would have fitted. A fragment on a page of another content width is
+left out of the bound, and the evaluation row says how many were (`fragments-left-out`).
 
 **The boundary is the content box of the page the block was laid out on.** Comparing against the
 largest content box in the document was tried and is worse: in a document with a named landscape
