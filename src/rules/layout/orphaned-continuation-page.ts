@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { pageKey } from "../../core/fingerprint.ts";
-import type { BlockRecord, PageRecord, Snapshot } from "../../core/types.ts";
+import type { BlockRecord, Box, PageRecord, Snapshot, TextLine } from "../../core/types.ts";
 import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
 
 /** Box-coordinate slack for rounded geometry, in CSS px. A tolerance, not a threshold. */
@@ -19,23 +19,42 @@ function flowBlocks(snapshot: Snapshot, page: PageRecord): BlockRecord[] {
     b.box.y < bottom && b.box.y + b.box.height > top);
 }
 
+/** Whether the centre of a line's box lies inside a block's box (within the tolerance). */
+function centreInside(line: Box, block: Box): boolean {
+  const cx = line.x + line.width / 2;
+  const cy = line.y + line.height / 2;
+  return cx >= block.x - EDGE_TOLERANCE_PX && cx <= block.x + block.width + EDGE_TOLERANCE_PX &&
+    cy >= block.y - EDGE_TOLERANCE_PX && cy <= block.y + block.height + EDGE_TOLERANCE_PX;
+}
+
 /**
- * Whether the page after `page` (the next one that is not a parity blank) opens with a block that
- * starts there. Every block before that fresh block in document order has to be a wrapper of it —
- * starting no higher, and spanning it horizontally — or the next page opens with continuing
- * content of its own, and the break fell inside that content.
+ * Whether the page after `page` opens with text running on: a text line of a continuing block that
+ * starts within one of that block's line heights of the top of the next page's content. The top is
+ * the higher of the first fill band and the first block that starts on that page. A line whose
+ * centre lies inside a block that starts there AND follows the continuing block in document order
+ * belongs to that block (a wrapper's lines include its children's), so it is not running text of
+ * the continuation. Visibility plays no part: hidden text that ran on filled the page as much as
+ * visible text. A parity blank page next carries no text, so the page before it — which a forced
+ * break ended — is judged.
  */
-function nextPageOpensWithFreshBlock(snapshot: Snapshot, page: PageRecord): boolean {
-  const next = snapshot.pages.find((p) => p.pageNumber > page.pageNumber && !p.blank);
+function nextPageOpensWithRunningText(
+  snapshot: Snapshot,
+  page: PageRecord,
+  linesByBlock: ReadonlyMap<string, readonly TextLine[]>,
+): boolean {
+  const next = snapshot.pages.find((p) => p.pageNumber === page.pageNumber + 1);
   if (!next) return false;
   const blocks = flowBlocks(snapshot, next);
-  const at = blocks.findIndex((b) => b.fragmentIndex === 0);
-  if (at < 0) return false;
-  const fresh = blocks[at]!;
-  return blocks.slice(0, at).every((wrapper) =>
-    wrapper.box.y >= fresh.box.y - EDGE_TOLERANCE_PX &&
-    wrapper.box.x <= fresh.box.x + EDGE_TOLERANCE_PX &&
-    wrapper.box.x + wrapper.box.width >= fresh.box.x + fresh.box.width - EDGE_TOLERANCE_PX);
+  const fresh = blocks.filter((b) => b.fragmentIndex === 0);
+  const firstBand = next.contentBox.y + next.fill.topGap * next.contentBox.height;
+  const top = Math.min(firstBand, ...fresh.map((b) => b.box.y));
+  return blocks.some((continuing, at) => {
+    if (continuing.fragmentIndex === 0) return false;
+    const ownedByLater = blocks.slice(at + 1).filter((b) => b.fragmentIndex === 0);
+    return (linesByBlock.get(continuing.nodeKey) ?? []).some((line) =>
+      !ownedByLater.some((b) => centreInside(line.box, b.box)) &&
+      line.box.y < top + continuing.lineHeight);
+  });
 }
 
 /**
@@ -51,40 +70,42 @@ function nextPageOpensWithFreshBlock(snapshot: Snapshot, page: PageRecord): bool
  * The second trap is the middle of a long block. "Every block here is a continuation" is also
  * true of every page between the first and the last fragment of a block that spans three pages
  * or more. When what goes on to the next page is running text, such a page is full: the text
- * stopped because the next line did not fit. Net fill counts glyph boxes, not line boxes, so a
+ * stopped because its next line did not fit. Net fill counts glyph boxes, not line boxes, so a
  * full page reads far below 1 — measured 0.34–0.36 at `line-height: 3` — and the rule reported
  * every middle page of a long paragraph set with generous leading.
  *
- * So a page is judged only when what it carries ENDS on it (`ends-on-page`), which is one of:
- *   - its last block in document order is that block's final fragment; or
- *   - the next page opens with a block that STARTS there: the break fell between blocks, so the
- *     page stopped because a fresh block did not fit (or was sent on), not because it was full.
- *     That is the case of a wrapper — `<section>`, `<article>` — whose own content (bare text,
- *     an image, an SVG) ends on the page while its next child is carried over; the wrapper then
- *     continues, and the first condition alone would not judge the page. "Opens with" means
- *     that every block before the fresh one on the next page, in document order, is a wrapper
- *     of it: it starts no higher than the fresh block and spans it horizontally. A continuation
- *     with content of its own above the fresh block (text running on, or a column beside it)
- *     means the break fell inside that content.
- * Neither condition needs a threshold; both follow from the break semantics. What is still not
- * judged: a wrapper whose own image or SVG did not fit and opens the next page (see the rule
- * page).
+ * So a page is judged only when what it carries ENDS on it (`ends-on-page`): the next page does
+ * not open with text running on from it. "Running on" is a text line of a block that continues
+ * onto the next page, starting within one of that block's line heights of the top of the next
+ * page's content, and not lying inside a block that starts there and follows it in document order
+ * (a wrapper's lines include its children's). Everything else ends the page: a block that starts
+ * on the next page and opens it (a wrapper — `<section>`, `<article>` — whose next child was
+ * carried over), an image or SVG that did not fit, a forced break, the end of the document. The
+ * decision needs no threshold, and it reads no box of the wrapper, so a border kept at the split
+ * or a full-bleed child changes nothing. It also ignores which block closes the page: a nested
+ * child that ends there while its wrapper's own text runs on leaves the page full.
  *
- * Only blocks of the page's flow count for `continuation-only` and `ends-on-page`: a block with a
- * box (the `display: none` original of a running element has none) that lies at least partly
- * inside the content box vertically (a running element's clone in a top or bottom margin box,
- * wherever the collector records one, lies above or below it; so does the footnote area).
- * Horizontal position is not tested, so a full-bleed block stays in.
+ * What it does not see: a block that starts on the next page and covers the running text (the
+ * line's centre inside it) takes that text for its own, so the page before it is judged; the
+ * rule page says so.
+ *
+ * Only blocks of the page's flow count, on this page and on the next: a block with a box (the
+ * `display: none` original of a running element has none; an empty positioned marker has a 0 x 0
+ * one) that lies at least partly inside the content box vertically (a running element's clone in
+ * a top or bottom margin box normally lies above or below it; so does the footnote area).
+ * Horizontal position is not tested, so a full-bleed block stays in — and so would a clone in a
+ * side margin box: this rule relies on the collector keeping margin-box content out of the
+ * snapshot, as the collector of this release does.
  *
  * It rests on one invariant of the snapshot, stated here because the rule reads it and nothing
  * else in the type says so: `snapshot.blocks` is in collection order — page by page, and within
  * a page in document (pre-)order of the paginated tree. The collector walks `querySelectorAll`
  * once per `.pagedjs_page` (document order by specification) and assembly maps without
- * reordering; `fragmentIndex` is itself counted in that order. A wrapper (`main`, `section`)
- * precedes its children, so the last block on a page is the innermost block the page ends in,
- * and on the next page a wrapper's continuation comes before the fresh child it holds. The
- * invariant is pinned from both sides: the live suite checks the order the real collector
- * produces, and the unit suite checks that this rule reads that order and nothing else.
+ * reordering; `fragmentIndex` is itself counted in that order. A wrapper precedes its children,
+ * so on the next page a continuation comes before any child of it that starts there, and only
+ * such a later block can own the continuation's lines. The invariant is pinned from both sides:
+ * the live suite checks the order the real collector produces, and the unit suite checks that
+ * this rule reads that order.
  */
 export const orphanedContinuationPage = defineRule(
   {
@@ -112,6 +133,12 @@ export const orphanedContinuationPage = defineRule(
     let candidates = 0;
     let measured = 0;
     const maxNetFill = num(ctx.options.maxNetFill, 0.5);
+    const linesByBlock = new Map<string, TextLine[]>();
+    for (const line of snapshot.textLines) {
+      const list = linesByBlock.get(line.blockKey);
+      if (list) list.push(line);
+      else linesByBlock.set(line.blockKey, [line]);
+    }
 
     for (const page of snapshot.pages) {
       candidates += 1;
@@ -135,9 +162,7 @@ export const orphanedContinuationPage = defineRule(
       // Collection order: within a page, document order (see the invariant above).
       const onPage = flowBlocks(snapshot, page);
       const continuationOnly = onPage.length > 0 && onPage.every((b) => b.fragmentIndex > 0);
-      const last = onPage.at(-1);
-      const endsOnPage = last !== undefined &&
-        (last.fragmentIndex === last.fragmentCount - 1 || nextPageOpensWithFreshBlock(snapshot, page));
+      const endsOnPage = onPage.length > 0 && !nextPageOpensWithRunningText(snapshot, page, linesByBlock);
       const violated = continuationOnly && endsOnPage && page.fill.net < maxNetFill;
       evaluations.push(targetEvaluation({ ruleId: "layout/orphaned-continuation-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "measured", measurements: [{ name: "continuation-only", value: continuationOnly, unit: null, operator: "=", threshold: true }, { name: "ends-on-page", value: endsOnPage, unit: null, operator: "=", threshold: true }, { name: "net-fill", value: page.fill.net, unit: "fill ratio", operator: "<", threshold: maxNetFill }], connective: "all", violated }));
       if (!violated) continue;

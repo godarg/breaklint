@@ -31,9 +31,9 @@
   its own 200 px SVG and a break-inside: avoid figure 500 px tall. The lines fill the page under
   the heading; the SVG does not fit and moves on, and the figure does not fit under it. So one page
   carries only the section's continuation, its SVG, and is two thirds empty, while the section goes
-  on: its last block does not end there. The next page opens with the figure, a block that starts
-  there, so the break fell between blocks and the page must be reported. A rule that only asks
-  whether the page's last block ends calls that page full.
+  on: its last block does not end there. The next page opens with the figure, not with text
+  running on, so the page ended early and must be reported. A rule that only asks whether the
+  page's last block ends calls that page full.
 -->
 <style>
 @page { size: 148mm 210mm; margin: 20mm; }

@@ -427,7 +427,8 @@ describe("the M2d live production chain", () => {
 
     // The carried-child control: a <section> whose own SVG sits alone on a page while its next
     // child, a break-inside: avoid figure, opens the page after. The section continues, but the
-    // break fell between blocks, and the page is two thirds empty: it must be reported.
+    // next page does not open with text running on, and the page is two thirds empty: it must be
+    // reported.
     const carried = snapshot.blocks.filter((block) => block.authorId === "carried");
     assert.equal(carried.length, 3, `the carried-child section split into ${carried.length} fragments`);
     const alone = carried[1]!;

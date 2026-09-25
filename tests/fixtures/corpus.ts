@@ -447,8 +447,8 @@ export function loadCorpus(): CorpusEntry[] {
         "A <section> whose paragraph ends on page 1 and whose own 200 px SVG fills a third of " +
         "page 2; its next child, a break-inside: avoid figure, did not fit and opens page 3. Page " +
         "2 carries only the section's continuation, net fill 0.31, and the section goes on — so a " +
-        "rule that only asks whether the page's last block ends there calls it full. It is not: the " +
-        "break fell between blocks, and page 3 opens with the fresh figure.",
+        "rule that only asks whether the page's last block ends there calls it full. It is not: page " +
+        "3 opens with the fresh figure, not with text running on.",
       alsoFires: ["layout/half-empty-page"],
       snapshot: snapshot({
         pages: [
@@ -506,8 +506,9 @@ export function loadCorpus(): CorpusEntry[] {
         "One paragraph over four pages. Pages 2 and 3 carry nothing but its continuation and read " +
         "a net fill of 0.49 against the 0.50 threshold — the numbers of a real full page at " +
         "line-height 2.2, where glyph boxes cover less than half the line pitch. But the paragraph " +
-        "goes on to the next page and opens it, so each page stopped because its next line did not " +
-        "fit: it is full. A rule that never asks whether what the page carries ENDS there reports both.",
+        "goes on to the next page and opens it with running text, so each page stopped because its " +
+        "next line did not fit: it is full. A rule that never asks whether the next page opens with " +
+        "text running on reports both.",
       alsoFires: ["layout/half-empty-page"],
       snapshot: snapshot({
         pages: [
@@ -526,9 +527,23 @@ export function loadCorpus(): CorpusEntry[] {
             fragmentIndex: i,
             fragmentCount: 4,
             page: i + 1,
+            box: box(48, 48, 399, 18 * 32.27),
             lineHeight: 32.27,
             effectiveStyle: style({ lineHeight: 32.27 }),
+            lines: Array.from({ length: 18 }, (_, k) => i * 18 + k),
           }),
+        ),
+        // Eighteen 32.27 px lines per page, glyph boxes 16 px tall and centred in each line box:
+        // every page after the first OPENS with the paragraph's running text.
+        textLines: [0, 1, 2, 3].flatMap((i) =>
+          Array.from({ length: 18 }, (_, k) => ({
+            blockKey: `long:${i}`,
+            index: i * 18 + k,
+            box: box(48, 48 + k * 32.27 + 8.13, 399, 16),
+            visible: true,
+            width: 399,
+            wordBoxes: null,
+          })),
         ),
       }),
     },

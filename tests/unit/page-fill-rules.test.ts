@@ -6,15 +6,14 @@
  * more, and when what goes on is running text such a page is full — its next line did not fit —
  * while its net fill, which counts glyph boxes and not line boxes, reads far below 1 at a
  * generous line height. The rule now judges a page only when what it carries ends on it
- * (`ends-on-page`): its last block in document order is that block's final fragment, or the next
- * page opens with a block that starts there, so the break fell between blocks. The second half is
- * what keeps a wrapper whose fresh child was carried over (a `<section>` with a tall
- * `break-inside: avoid` figure) from counting as full.
+ * (`ends-on-page`): the next page does not open with text running on from it. Anything else
+ * that opens the next page — a carried child, an image that did not fit, a forced break — ends it.
  *
- * Both halves rest on the order of `snapshot.blocks`: page by page, and within a page in the
- * document order of the paginated tree. The live suite checks that the real collector produces
- * that order (tests/live/render-run.test.ts); the cases here check that the rule reads that
- * order, and that blocks outside the page's flow — a margin-box clone, a `display: none` original
+ * The decision reads text lines, the blocks' fragment positions and their document order: a
+ * wrapper's lines include its children's, and only a block that starts on the next page AFTER a
+ * continuation, in document order, can own the continuation's lines. The live suite checks that
+ * the real collector produces that order (tests/live/render-run.test.ts); the cases here check
+ * that the rule reads it, and that blocks outside the page's flow — a margin-box clone, a block
  * with no box — move nothing.
  *
  * `layout/half-empty-page` stated in every finding that its threshold sat "0.086 below the
@@ -28,7 +27,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { runDocument } from "../../src/core/engine.ts";
-import type { BlockRecord, Snapshot, TargetEvaluation } from "../../src/core/types.ts";
+import type { BlockRecord, Snapshot, TargetEvaluation, TextLine } from "../../src/core/types.ts";
 import { halfEmptyPage } from "../../src/rules/layout/half-empty-page.ts";
 import { orphanedContinuationPage } from "../../src/rules/layout/orphaned-continuation-page.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
@@ -55,6 +54,11 @@ function measurementsOf(evaluations: readonly TargetEvaluation[], pageNodeKey: s
     values: Object.fromEntries(row.measurements.map((m) => [m.name, m.value])),
     violated: row.predicate.violated,
   };
+}
+
+/** One visible text line of a block, in page coordinates. */
+function textLine(blockKey: string, index: number, box: TextLine["box"]): TextLine {
+  return { blockKey, index, box, visible: true, width: box.width, wordBoxes: null };
 }
 
 /** A continuation fragment with an explicit source id and fragment position. */
@@ -91,40 +95,69 @@ describe("page-fill rules", () => {
     assert.equal(measurementsOf(tail.evaluations, "pg4").violated, true);
   });
 
-  it("reads the last block in document order, so a continuing wrapper does not hide the child that ends", () => {
-    const snapshot = corpusSnapshot("orphaned-continuation-trigger");
-    const template = snapshot.blocks[0]!;
-    // A <section> that continues past the page, and the paragraph inside it that ends on it.
-    // Document order puts the wrapper first; the page ends in the paragraph, so it is judged.
-    const section = fragment(template, { nodeKey: "section:1", sid: "s-section", tag: "section", page: 1, fragmentIndex: 1, fragmentCount: 3 });
-    const paragraph = fragment(template, { nodeKey: "p:1", sid: "s-p", page: 1, fragmentIndex: 1, fragmentCount: 2 });
-
-    snapshot.blocks = [section, paragraph];
-    const inOrder = run(snapshot);
-    assert.deepEqual(inOrder.findings.map((f) => f.page), [1]);
-    assert.equal(measurementsOf(inOrder.evaluations, "pg1").values["ends-on-page"], true);
-
-    // The same two blocks in the other order: the rule reads the LAST one and nothing else. This
-    // is what makes the collection order load-bearing, and why the live suite pins it.
-    snapshot.blocks = [paragraph, section];
-    const reversed = run(snapshot);
-    assert.deepEqual(reversed.findings, []);
-    assert.equal(measurementsOf(reversed.evaluations, "pg1").values["ends-on-page"], false);
-  });
-
-  it("judges a wrapper's page when its fresh child was carried over, and only then", () => {
+  it("judges a wrapper's page when its fresh child was carried over, whatever the wrapper's box", () => {
     // A <section>: its paragraph ends on page 1, its own 200 px SVG sits on page 2, and its next
-    // child, a break-inside: avoid figure, did not fit and opens page 3. The section continues, so
-    // the page's last block does not end — but the break fell between blocks, and page 2 is two
-    // thirds empty. Measured live with the same shape: net fill 0.31, and silent under the
-    // last-block condition alone.
+    // child, a break-inside: avoid figure, did not fit and opens page 3. The section continues, but
+    // page 3 opens with no running text, and page 2 is two thirds empty. Measured live with the
+    // same shape: net fill 0.31.
     const snapshot = corpusSnapshot("orphaned-continuation-trigger-carried-child");
     const report = run(snapshot);
     assert.deepEqual(report.findings.map((f) => f.page), [2]);
-    const row = measurementsOf(report.evaluations, "pg2");
-    assert.deepEqual(row.values, { "continuation-only": true, "ends-on-page": true, "net-fill": 0.31 });
+    assert.deepEqual(measurementsOf(report.evaluations, "pg2").values, { "continuation-only": true, "ends-on-page": true, "net-fill": 0.31 });
 
-    // A parity blank page between them changes nothing: the page that opens after it is read.
+    // The figure's caption opens page 3 — and is recorded twice, as the figure's line and as the
+    // section's, because a wrapper's lines include its children's. Neither is running text: the
+    // figure starts on page 3, and the section's copy lies inside it.
+    const captioned = structuredClone(snapshot);
+    captioned.textLines.push(
+      textLine("figure", 0, { x: 60, y: 56, width: 300, height: 16 }),
+      textLine("section:2", 0, { x: 60, y: 56, width: 300, height: 16 }),
+    );
+    assert.deepEqual(run(captioned).findings.map((f) => f.page), [2], "a caption of the carried figure counted as running text");
+
+    // The wrapper's box plays no part: a 2 px border that Paged.js keeps at the split puts the
+    // figure 2 px below the wrapper's continuation, and a full-bleed figure is wider than it.
+    // Both were measured live (0.6.0 reported them; a box-based wrapper test silenced them).
+    const bordered = structuredClone(snapshot);
+    for (const b of bordered.blocks.filter((b) => b.page === 3 && b.fragmentIndex === 0)) b.box = { ...b.box, y: b.box.y + 2 };
+    assert.deepEqual(run(bordered).findings.map((f) => f.page), [2]);
+    const bleed = structuredClone(snapshot);
+    const figure = bleed.blocks.find((b) => b.nodeKey === "figure")!;
+    figure.box = { ...figure.box, x: figure.box.x - 76, width: figure.box.width + 152 };
+    assert.deepEqual(run(bleed).findings.map((f) => f.page), [2]);
+
+    // So is the wrapper's own replaced content: its SVG opening page 3 above the figure means the
+    // break fell before an element that does not split, not inside running text.
+    const ownSvgFirst = structuredClone(snapshot);
+    for (const b of ownSvgFirst.blocks.filter((b) => b.page === 3 && b.fragmentIndex === 0)) b.box = { ...b.box, y: b.box.y + 200 };
+    assert.deepEqual(run(ownSvgFirst).findings.map((f) => f.page), [2]);
+
+    // Nor is the wrapper's own text when it RESUMES below the carried figure: it does not open
+    // the page, the figure does.
+    const resumes = structuredClone(snapshot);
+    resumes.blocks.find((b) => b.nodeKey === "figure")!.box.height = 400;
+    resumes.textLines.push(textLine("section:2", 0, { x: 48, y: 460, width: 380, height: 16 }));
+    assert.deepEqual(run(resumes).findings.map((f) => f.page), [2], "text below the carried figure counted as running on");
+
+    // The top of the next page is where its first block starts, even when that block paints
+    // nothing the fill bands see (an empty bordered box, carried over like the figure): text that
+    // resumes a whole line below it did not run on.
+    const spacer = structuredClone(snapshot);
+    const fig = spacer.blocks.find((b) => b.nodeKey === "figure")!;
+    fig.box = { ...fig.box, height: 100 };
+    spacer.pages[2]!.fill.topGap = 0.18;
+    spacer.textLines.push(textLine("section:2", 0, { x: 48, y: 156, width: 380, height: 16 }));
+    assert.deepEqual(run(spacer).findings.map((f) => f.page), [2], "the next page's top was read from its fill bands alone");
+
+    // With no block starting on page 3 at all, its top is its first fill band: the section's own
+    // 300 px image opens it and the section's text resumes below — the break fell before the image.
+    const ownImage = structuredClone(snapshot);
+    ownImage.blocks = ownImage.blocks.filter((b) => !(b.page === 3 && b.fragmentIndex === 0));
+    ownImage.pages[2]!.fill.topGap = 0;
+    ownImage.textLines.push(textLine("section:2", 0, { x: 48, y: 356, width: 380, height: 16 }));
+    assert.deepEqual(run(ownImage).findings.map((f) => f.page), [2], "text below the section's own image counted as running on");
+
+    // A parity blank page between them: it carries no text, so the page before it is judged.
     const withBlank = structuredClone(snapshot);
     const blank = structuredClone(withBlank.pages[2]!);
     Object.assign(blank, {
@@ -137,22 +170,63 @@ describe("page-fill rules", () => {
     withBlank.pages.splice(2, 0, blank);
     withBlank.blocks = withBlank.blocks.map((b) => b.page === 3 ? { ...b, page: 4 } : b);
     assert.deepEqual(run(withBlank).findings.map((f) => f.page), [2]);
+  });
 
-    // Not when the wrapper's continuation carries content of its own ABOVE the fresh child: then
-    // the break fell inside that content. This is the documented limit — the wrapper's own SVG
-    // that did not fit and opens the next page — and it keeps text running on from being judged.
-    const ownContentFirst = structuredClone(snapshot);
-    for (const b of ownContentFirst.blocks.filter((b) => b.page === 3 && b.fragmentIndex === 0)) b.box = { ...b.box, y: b.box.y + 200 };
-    assert.deepEqual(run(ownContentFirst).findings, []);
-    assert.equal(measurementsOf(run(ownContentFirst).evaluations, "pg2").values["ends-on-page"], false);
+  it("keeps a page silent when the next page opens with text running on", () => {
+    // The wrapper's OWN text at the top of page 3, above the figure: the section's text ran on.
+    const ownText = corpusSnapshot("orphaned-continuation-trigger-carried-child");
+    for (const b of ownText.blocks.filter((b) => b.page === 3 && b.fragmentIndex === 0)) b.box = { ...b.box, y: b.box.y + 64 };
+    ownText.textLines.push(textLine("section:2", 0, { x: 48, y: 56, width: 380, height: 16 }), textLine("section:2", 1, { x: 48, y: 88, width: 200, height: 16 }));
+    assert.deepEqual(run(ownText).findings, []);
+    assert.equal(measurementsOf(run(ownText).evaluations, "pg2").values["ends-on-page"], false);
 
-    // Not when the fresh block opens a second COLUMN beside continuing content: the continuation
-    // does not span it, so it is not its wrapper.
-    const columns = structuredClone(snapshot);
+    // The same text in a first column, with the figure opening a second one beside it.
+    const columns = corpusSnapshot("orphaned-continuation-trigger-carried-child");
     for (const b of columns.blocks.filter((b) => b.page === 3)) {
       b.box = b.fragmentIndex === 0 ? { ...b.box, x: 257, width: 190 } : { ...b.box, width: 190 };
     }
+    columns.textLines.push(textLine("section:2", 0, { x: 48, y: 56, width: 180, height: 16 }));
     assert.deepEqual(run(columns).findings, []);
+
+    // A wrapper whose own text follows a child that ENDS on the page and runs on to the next one:
+    // the page's last block in document order is that child's final fragment, but the page is full.
+    // Measured live (a <section> with bare text after its paragraph; and a float split into an
+    // empty first fragment): the last-block condition reported such pages.
+    const mixed = corpusSnapshot("orphaned-continuation-clean-full-middle-page");
+    const inner = fragment(mixed.blocks[0]!, { nodeKey: "inner:1", sid: "s-inner", page: 2, fragmentIndex: 1, fragmentCount: 2, box: { x: 48, y: 48, width: 399, height: 96 } });
+    mixed.blocks.splice(mixed.blocks.findIndex((b) => b.page === 2) + 1, 0, inner);
+    assert.deepEqual(run(mixed).findings, [], "the final fragment of a nested child hid the wrapper's running text");
+
+    // A fresh block positioned at the top of the next page — an absolutely positioned badge, a
+    // relatively offset aside — beside the paragraph's running text: measured live, the full page
+    // before it was reported by the box-based test. The running text still opens the page.
+    const badge = corpusSnapshot("orphaned-continuation-clean-full-middle-page");
+    badge.blocks.push(fragment(badge.blocks[0]!, {
+      nodeKey: "badge", sid: "s-badge", tag: "aside", page: 3, fragmentIndex: 0, fragmentCount: 1,
+      box: { x: 400, y: 48, width: 47, height: 14 },
+    }));
+    assert.deepEqual(run(badge).findings, []);
+  });
+
+  it("reads document order to decide which block owns a line", () => {
+    // A wrapper's lines include its children's. A line whose centre lies in a block that starts on
+    // the next page AND follows the continuation in document order is that block's (its child's),
+    // not text running on; a block that PRECEDES the continuation cannot own its lines.
+    const base = corpusSnapshot("orphaned-continuation-clean-full-middle-page");
+    const template = base.blocks[0]!;
+    const cover = fragment(template, {
+      nodeKey: "cover", sid: "s-cover", tag: "div", page: 3, fragmentIndex: 0, fragmentCount: 1,
+      box: { x: 48, y: 48, width: 399, height: 600 },
+    });
+    const at = base.blocks.findIndex((b) => b.page === 3);
+
+    const after = structuredClone(base);
+    after.blocks.splice(at + 1, 0, cover);
+    assert.deepEqual(run(after).findings.map((f) => f.page), [2], "a later block did not own the lines it contains");
+
+    const before = structuredClone(base);
+    before.blocks.splice(at, 0, cover);
+    assert.deepEqual(run(before).findings, [], "a block before the continuation took its running text");
   });
 
   it("keeps full middle pages silent when the next page opens with the continuation", () => {
@@ -189,10 +263,9 @@ describe("page-fill rules", () => {
         box: { x: 0, y: 0, width: 0, height: 0 },
       });
     base.pages[3]!.fill.net = 0.06;
-    // Pages 1–3: a clone first. Page 4, the two-line tail: the FIRST clone of a second running
-    // element (fragment 0, so the page would not be "continuation-only"), the paragraph's final
-    // fragment, and after it that element's box-less original, which is not its final fragment
-    // (so the page's last block would "continue"). Measured live in that order.
+    // Pages 1–3: a clone first. Page 4, the tail: the FIRST clone of a second running element
+    // (fragment 0, so the page would not be "continuation-only"), the paragraph's final fragment,
+    // and after it that element's box-less original. Measured live in that order.
     base.blocks = [
       clone(1, 0, 3), base.blocks[0]!,
       clone(2, 1, 3), base.blocks[1]!,
@@ -200,7 +273,7 @@ describe("page-fill rules", () => {
       { ...clone(4, 0, 3), sid: "s-header-2", nodeKey: "header-2:4" }, base.blocks[3]!, original(4, 1, 3),
     ];
     const report = run(base);
-    assert.deepEqual(report.findings.map((f) => f.page), [4], "the two-line tail page was hidden by blocks outside its flow");
+    assert.deepEqual(report.findings.map((f) => f.page), [4], "the tail page was hidden by blocks outside its flow");
     assert.deepEqual(
       ["pg2", "pg3", "pg4"].map((key) => measurementsOf(report.evaluations, key).values),
       [
@@ -209,6 +282,33 @@ describe("page-fill rules", () => {
         { "continuation-only": true, "ends-on-page": true, "net-fill": 0.06 },
       ],
     );
+
+    // A block with no box at all is not content even where the content box reaches it. Measured
+    // live on a page with `@page { margin: 0 }`: a running element's display: none original reads
+    // (0, 0, 0, 0), which the vertical test already excludes even with the content box starting at
+    // y = 0; an empty absolutely positioned marker reads (100, 20, 0, 0), inside the content box,
+    // and only the box test excludes it. Starting on the tail page, it would make that page look
+    // like one that does not carry continuations only.
+    const marker = structuredClone(base);
+    marker.blocks.push(fragment(template, {
+      nodeKey: "marker", sid: "s-marker", tag: "div", page: 4, fragmentIndex: 0, fragmentCount: 1,
+      box: { x: 200, y: 300, width: 0, height: 0 },
+    }));
+    assert.deepEqual(run(marker).findings.map((f) => f.page), [4], "a box-less marker hid the tail page");
+  });
+
+  it("gives the round-2 repro's answers in the shape this release's collector produces", () => {
+    // The collector of this release keeps margin-box content out of the snapshot (running and
+    // fixed-position clones); this rule relies on that for side margin boxes, which its own
+    // vertical test does not exclude. Without clones: the tail page of the long paragraph, the
+    // carried child, and the carried child under a 2 px wrapper border.
+    const tail = corpusSnapshot("orphaned-continuation-clean-full-middle-page");
+    tail.pages[3]!.fill.net = 0.06;
+    assert.deepEqual(run(tail).findings.map((f) => f.page), [4]);
+    const carried = corpusSnapshot("orphaned-continuation-trigger-carried-child");
+    assert.deepEqual(run(carried).findings.map((f) => f.page), [2]);
+    for (const b of carried.blocks.filter((b) => b.page === 3 && b.fragmentIndex === 0)) b.box = { ...b.box, y: b.box.y + 2 };
+    assert.deepEqual(run(carried).findings.map((f) => f.page), [2]);
   });
 
   it("half-empty-page says what net fill is and claims no ceiling", () => {
