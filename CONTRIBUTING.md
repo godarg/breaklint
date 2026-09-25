@@ -52,6 +52,27 @@ Run `npm run schema:write` after the registry changes and `npm run schema:check`
 Report and snapshot schema versions are separate: raise only the artifact whose structure changed,
 and add a migration assertion for that artifact.
 
+## Corpus gates
+
+`.github/workflows/ci.yml` is the executable gate inventory; this section only says what the two
+corpus gates need to run locally.
+
+- `npm run test:real-document` — the admitted robustness corpus (`corpus/public/robustness-v1`),
+  exact semantic reports of two published documents. Needs `npm run build` and a browser.
+- `npm run test:corpus` — the self-authored closed-world corpus (`corpus/public/selfauthored-v1`).
+  It verifies every file of the manifest by SHA-256 and length, runs each of the twenty documents
+  through the built CLI in its own invocation under the default profile, and judges the JSON report
+  against the frozen ground truth exactly as the corpus README's gate procedure defines it: exit
+  set, page range, `mustFire`, `mustNotFire`, the closed world (a finding no entry accounts for
+  fails), declines by count and the `measuredAlternative` all-or-nothing rule. It prints one row
+  per document and exits 0 only when every document passed. Needs `npm run build` and a browser in
+  which evidence binding works; `--no-evidence-binding` exists for local diagnosis on a renderer
+  that cannot bind evidence, labels the run as not the gate, and is not used in CI. Its matcher and
+  every fail-closed path are unit-tested on synthetic reports in `tests/unit/corpus-gate.test.ts`.
+
+The truth under `corpus/public/selfauthored-v1/expected/` is never edited to make the gate pass;
+the corpus README ("Changing the truth") says how an expectation that turns out to be wrong is
+corrected, with a dated `expectationHistory` entry.
 
 ## Public consumers and source contracts
 

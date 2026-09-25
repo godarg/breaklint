@@ -105,6 +105,15 @@ jobs:
           npm run build
           npm run test:real-document
 
+      - name: self-authored closed-world corpus gate
+        # Twenty self-authored documents with planted defects and clean controls, each judged
+        # against ground truth that was written before breaklint ever ran on it
+        # (corpus/public/selfauthored-v1). One document per invocation of the built CLI, default
+        # profile, evidence binding on. Closed world: a finding no entry accounts for fails, and
+        # so do zero documents, a hash mismatch or an unknown field in an expected file. It is a
+        # regression corpus, not calibration evidence.
+        run: npm run test:corpus
+
       - name: pagination-residue corpus record
         # The negative half of the same property: six real documents that must NOT measure, and
         # must say why. Their bytes are a paid product and are NOT in this repository, so here this

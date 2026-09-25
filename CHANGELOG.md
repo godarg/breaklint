@@ -35,8 +35,27 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   any of them; its construction facts were checked with an independent probe that uses Paged.js
   alone. Its expectations follow the documented semantics of the release that admits it (0.7.0),
   stated once as a class rule in its README rather than per entry. Provenance class
-  `synthetic_first_party`: regression truth only, never calibration evidence. No gate consumes it
-  yet.
+  `synthetic_first_party`: regression truth only, never calibration evidence. The corpus gate
+  below consumes it.
+
+### Tooling
+
+- **`npm run test:corpus`: a closed-world gate over `corpus/public/selfauthored-v1`, and a CI step
+  that runs it** (`tests/tools/corpus-gate.ts`; step "self-authored closed-world corpus gate" in
+  the `check` job, after the real-document gate). It implements the corpus README's five gate steps
+  and nothing else: every manifest file verified by SHA-256 and length; one built-CLI invocation
+  per document under the default profile; exit 3 passes only as `render-unstable` inside the
+  expected set; otherwise exit set and page range; then per rule `mustFire`, `mustNotFire`, the
+  closed world, declines checked by count per rule and reason, `measuredAlternative` entries all
+  or nothing, and no decline reason outside `permittedDeclineReasons`. Element spans are computed
+  by the gate itself with parse5 in UTF-8 bytes, not with breaklint's source map. Zero documents,
+  a hash mismatch, an unknown field in an expected file and an unaccounted finding are failures.
+  `tests/unit/corpus-gate.test.ts` exercises every matching rule and fail-closed path on synthetic
+  reports and through the gate's process boundary. **The step is expected to be red until the
+  0.7.0 packages it depends on are integrated**: on the commit that adds it, measured locally on
+  Chromium 141 with evidence binding off, 4 of 20 documents pass (`docs/status.md`). The corpus is
+  regression truth, not calibration: a green gate says the tool agrees with twenty constructions,
+  not that its thresholds are right for real documents.
 
 ## 0.6.0 — 2026-09-18
 

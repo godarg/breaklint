@@ -373,7 +373,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=455 aggregateTests=571 liveTests=71 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=474 aggregateTests=590 liveTests=71 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -936,6 +936,45 @@ the larger of the two.
 **What that meant at this checkpoint.** `--demo` showed the rule and reporter chain over its
 stored fixture. Passing HTML paths exercises the M2/M2d render path, and the report distinguishes
 those two cases in its own `mode` and `source` fields rather than leaving the reader to infer it.
+
+## Self-authored corpus gate (unreleased)
+
+`npm run test:corpus` judges the built CLI against `corpus/public/selfauthored-v1`: twenty
+self-authored documents with planted defects and clean controls, and ground truth that was written
+from the construction before breaklint ever ran on any of them. The gate is the corpus README's
+five-step procedure in code (`tests/tools/corpus-gate.ts`); it runs in the `check` job of `ci.yml`
+after the real-document gate.
+
+**What a pass proves.** For each of the twenty documents, under the default profile and one
+document per invocation: the exit code is in the document's expected set and the page count in its
+range; every planted defect (`mustFire`) is reported on the element, text or page it was planted
+on; no clean control (`mustNotFire`) is reported; every finding is accounted for by a `mustFire` or
+`allowed` entry (closed world); required declines have exactly the construction's count; and no
+decline carries a reason the document does not permit. Element spans come from the gate's own
+parse5 pass over the source bytes, not from breaklint's source map, so a source attribution the
+tool gets wrong cannot agree with itself.
+
+**What it does not prove.** It is a regression corpus, not calibration evidence: the documents
+are `synthetic_first_party`, the expectations follow the rule pages of the admitting release, and a
+threshold that is wrong for real documents but consistent with its own documentation passes here.
+"Verified" means the implementation agrees with twenty constructions; it does not mean "validated"
+against documents people actually print (see the next section). Font-dependent outcomes are
+`allowed`, never required, so the gate says nothing about them. `occurrences` is informational, so
+the number of findings per planted defect is not gated. The construction facts were measured on
+one renderer (Chromium 141 with three font stacks, `probe/`), not on every Chrome a consumer runs.
+
+**State on the commit that adds it.** The step is red there, and it has not yet run in CI.
+Measured locally on patched Chromium 141 with `--no-evidence-binding` (the only way a live run
+completes on this machine; CI uses the default evidence binding on current Chrome): 4 of 20
+documents pass (sa05, sa09, sa18, sa20). Three failure classes are dependencies the corpus README
+names in its tracing list: widow and orphan findings on running elements in margin boxes in
+thirteen documents, and a side-margin running element summed into an `error` in sa14 (margin-box
+content outside the flow); continuation-only middle pages reported in sa13 (continuation-page
+semantics); exit 3 with `injection-interference` for both footnoted documents, sa04 and sa17. Two
+are not on that list: `artifact/local-uri` does not report root-relative absolute paths in sa06,
+sa15 and sa19, although its rule page says every absolute path is reported, and the caption-only
+continuation page planted in sa03 is not reported. The step is meant to go green once those are
+fixed; it has no allow-failure and no expected-failures list, and it must not get one.
 
 ## What no amount of testing here establishes
 
