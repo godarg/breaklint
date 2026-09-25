@@ -35,9 +35,11 @@ also why this rule ships with the severity it has.
 ## Remediation
 
 <!-- begin generated remediation: layout/hyphen-across-page -->
-The last text line on a page ends in a hyphen that breaks a word across the page boundary. The rule reads the paginator's own hyphenation class, so it only reports a hyphen Paged.js introduced — a hard hyphen you typed is not reported. Paged.js marks a page split that falls inside a word, and a split right after a soft hyphen counts as one: do not insert soft hyphens ('&shy;') to cure this finding, and do not rely on 'hyphens: manual', under which soft hyphens still break. In justified text 'type/excessive-word-spacing' owns the block-level 'hyphens' setting, so change only the boundary word there: wrap it in '<span style="hyphens: none">' or 'white-space: nowrap', or reword slightly. In a block that is not justified, 'hyphens: none' on the paragraph is the direct fix.
+The last text line on a page ends in a hyphen that breaks a word across the page boundary. The rule reads the paginator's own hyphenation class, so it only reports a hyphen Paged.js introduced — a hard hyphen you typed is not reported. Paged.js marks a page split that falls inside a word, and a split right after a soft hyphen counts as one: do not insert soft hyphens ('&shy;') to cure this finding, and do not rely on 'hyphens: manual', under which soft hyphens still break. In justified text 'type/excessive-word-spacing' owns the block-level 'hyphens' setting and where soft hyphens go, so change only the boundary word there: wrap it in '<span style="hyphens: none">' or 'white-space: nowrap', or reword slightly. In a block that is not justified, 'hyphens: none' on the paragraph is the direct fix.
 
-**Precedence.** `hyphens` in justified blocks: [`type/excessive-word-spacing`](type-excessive-word-spacing.md) owns the block-level setting, and this rule defers to it, changing that property only locally.
+**Precedence.** `hyphens` in justified blocks: [`type/excessive-word-spacing`](type-excessive-word-spacing.md) owns the block-level setting, and this rule defers to it, acting only on the affected word.
+
+**Precedence.** Soft hyphens (`&shy;`) in justified blocks: [`type/excessive-word-spacing`](type-excessive-word-spacing.md) owns where they are inserted, and this rule defers to it, acting only on the affected word.
 <!-- end generated remediation: layout/hyphen-across-page -->
 
 ## Examples

@@ -20,9 +20,10 @@ const PAGEDJS_HYPHEN_CLASS = "pagedjs_hyphen";
  * and pinned by tests/live/fragmentation-levers.test.ts, with the word-local levers as controls.
  *
  * Precedence with `type/excessive-word-spacing`: that rule owns the block-level `hyphens` setting
- * of justified blocks, because word spacing touches every line of the block and a boundary hyphen
- * touches one word. In a justified block this advice changes only the boundary word. Both sides
- * are declared in `remediation.interactions`, and the registry test refuses a one-sided pair.
+ * and the soft hyphens of justified blocks, because word spacing touches every line of the block
+ * and a boundary hyphen touches one word. In a justified block this advice changes only the
+ * boundary word. Both levers are declared on both rules in `remediation.interactions`, and the
+ * registry test refuses a one-sided pair.
  */
 export const hyphenAcrossPage = defineRule(
   {
@@ -37,9 +38,10 @@ export const hyphenAcrossPage = defineRule(
     declines: ["env/multicolumn", "env/vertical-writing"],
     remediation: {
       advice:
-        "The last text line on a page ends in a hyphen that breaks a word across the page boundary. The rule reads the paginator's own hyphenation class, so it only reports a hyphen Paged.js introduced — a hard hyphen you typed is not reported. Paged.js marks a page split that falls inside a word, and a split right after a soft hyphen counts as one: do not insert soft hyphens ('&shy;') to cure this finding, and do not rely on 'hyphens: manual', under which soft hyphens still break. In justified text 'type/excessive-word-spacing' owns the block-level 'hyphens' setting, so change only the boundary word there: wrap it in '<span style=\"hyphens: none\">' or 'white-space: nowrap', or reword slightly. In a block that is not justified, 'hyphens: none' on the paragraph is the direct fix.",
+        "The last text line on a page ends in a hyphen that breaks a word across the page boundary. The rule reads the paginator's own hyphenation class, so it only reports a hyphen Paged.js introduced — a hard hyphen you typed is not reported. Paged.js marks a page split that falls inside a word, and a split right after a soft hyphen counts as one: do not insert soft hyphens ('&shy;') to cure this finding, and do not rely on 'hyphens: manual', under which soft hyphens still break. In justified text 'type/excessive-word-spacing' owns the block-level 'hyphens' setting and where soft hyphens go, so change only the boundary word there: wrap it in '<span style=\"hyphens: none\">' or 'white-space: nowrap', or reword slightly. In a block that is not justified, 'hyphens: none' on the paragraph is the direct fix.",
       interactions: [
         { ruleId: "type/excessive-word-spacing", lever: "hyphens", relation: "defers", scope: "justified" },
+        { ruleId: "type/excessive-word-spacing", lever: "soft-hyphen", relation: "defers", scope: "justified" },
       ],
       // No trigger/remedied pair ships with this package and no gate re-runs one, so this
       // advice is untested in the sense the field defines.

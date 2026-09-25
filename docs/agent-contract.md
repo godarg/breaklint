@@ -83,7 +83,7 @@ When iterating on document repairs:
    the configured locale — `&bdquo;`…`&ldquo;` for `de-DE`, `&ldquo;`…`&rdquo;` for `en-*`. The rule
    defaults to `de-DE`; check `--locale` before you substitute. Replace spaced hyphens ` - ` with
    `&mdash;` or `&ndash;`.
-2. **Table Pagination (`layout/widow`, `layout/orphan` in tables):** If an orphan or widow occurs inside a fractured table row, apply `tr { break-inside: avoid; }`. *(Note: Paged.js does not implement CSS `widows` or `orphans` on paragraphs).*
+2. **Table Pagination (`layout/widow`, `layout/orphan` in tables):** If an orphan or widow occurs inside a fractured table row, apply `tr { break-inside: avoid; }`. *(Note: CSS `widows` and `orphans` do take effect on paragraphs: Paged.js never reads them, but the browser applies them through its own fragmentation inside Paged.js's flow. Each value is also its rule's threshold, so changing it is not a fix.)*
 3. **Headings at Bottom (`layout/heading-at-page-bottom`):** Apply `h1, h2, h3, h4 { break-after: avoid; }` or force `break-before: page;`.
 4. **Oversized Blocks (`layout/unbreakable-block-too-tall`):** Remove `break-inside: avoid` from containers that exceed page height, or allow them to fragment.
 

@@ -10,11 +10,12 @@ import {
   type RuleMeta,
 } from "../../src/core/rule.ts";
 import {
-  CLAIMS_DECIDED_BY_THE_PIN, leversApplied, PIN_RECORDED_ON, SOFT_HYPHEN_BOUNDARY, WIDOWS_ORPHANS_SPLITS,
+  APPROVED_FRAGMENTATION_SENTENCES, CLAIMS_DECIDED_BY_THE_PIN, leversApplied, SOFT_HYPHEN_BOUNDARY,
+  WIDOWS_ORPHANS_SPLITS,
 } from "../fixtures/fragmentation-levers.ts";
-
-type FragmentationProperty = "widows" | "orphans";
-const FRAGMENTATION_PROPERTIES: readonly FragmentationProperty[] = ["widows", "orphans"];
+import {
+  approvedKeys, fragmentationProblems, guardedTexts, placeLabel, proseSentences, sentencesNamingProperties,
+} from "../tools/fragmentation-guard.ts";
 
 /**
  * Whether the browser applies `widows`/`orphans` under Paged.js is a MEASUREMENT, pinned in
@@ -22,62 +23,12 @@ const FRAGMENTATION_PROPERTIES: readonly FragmentationProperty[] = ["widows", "o
  *
  * This guard used to be a flat ban on both properties, written on the assumption that Paged.js
  * makes them inert. It was never measured, and on measurement it was wrong: the browser applies
- * both when Paged.js splits a paragraph, so the ban forbade an effective lever and protected a
- * false sentence ("ignored by Paged.js") in two advice texts. The guard now follows the pin in
- * both directions: while the pin says a property is applied, no advice or page may call it
- * inert; if the pin ever says it is not, no advice or page may propose it.
+ * both when Paged.js splits a paragraph. Its successor was a blacklist of ways to call them inert,
+ * and an audit walked around it eight times. It is now an allow-list derived from the pin; see
+ * tests/tools/fragmentation-guard.ts for why and how.
  */
 const APPLIED = leversApplied(WIDOWS_ORPHANS_SPLITS);
-
-/**
- * Proposing the property as CSS to set: the declaration form, and the three prose forms that got
- * past the narrow first version of this guard (measured: it caught 2 of 5 plausible phrasings).
- * It must NOT match the rules' own threshold source (`block.effectiveStyle.widows`) or a sentence
- * that warns AGAINST the property, so it requires an imperative or an explicit value nearby.
- */
-function proposes(property: FragmentationProperty): RegExp {
-  // Applied to ONE sentence at a time (see `proseSentences`), so the gaps may cross a dot: the
-  // earlier `[^.]` bound stopped at the dot in "Paged.js" and let the sentence after it through.
-  return new RegExp(
-    `\\b${property}\\s*:\\s*\\d|\\b(set|increase|raise|lower|use|apply|add|specify|configure)\\b.{0,60}\\b${property}\\b|` +
-      `\\b${property}\\b.{0,40}\\b(property|setting|value)\\b.{0,40}\\b(to|of)\\b\\s*\\S`,
-    "iu",
-  );
-}
-
-/** Calling the property inert, ignored or unimplemented, within one sentence. */
-function callsInert(property: FragmentationProperty): RegExp {
-  const inert = "ignored|inert|not honou?red|(do|does) not (honou?r|apply|implement)|not implemented|no effect";
-  return new RegExp(`\\b${property}\\b.{0,80}\\b(${inert})\\b|\\b(${inert})\\b.{0,80}\\b${property}\\b`, "iu");
-}
-
-/** A sentence that warns AGAINST a lever is the point of that sentence, not a proposal. */
-const WARNS_AGAINST_PROPERTY = /\b(do not|does not|never|absent|not honour|not honor|ignored)\b/iu;
-
-/**
- * Prose sentences of a Markdown page (or an advice text), with code fences removed and blockquote
- * markers dropped, so that a sentence wrapped over several lines is judged as one. A sentence ends
- * at `.`, `!` or `?` followed by whitespace; "Paged.js" does not end one.
- */
-function proseSentences(markdown: string): string[] {
-  const prose = markdown.replace(/```[\s\S]*?```/gu, " ").replace(/^>\s?/gmu, "").replace(/\s+/gu, " ");
-  return prose.split(/(?<=[.!?])\s+/u).filter((sentence) => sentence.trim().length > 0);
-}
-
-function fragmentationProblems(text: string, where: string): string[] {
-  const problems: string[] = [];
-  for (const sentence of proseSentences(text)) {
-    for (const property of FRAGMENTATION_PROPERTIES) {
-      if (APPLIED[property] && callsInert(property).test(sentence)) {
-        problems.push(`${where} calls ${property} inert, but the pinned measurement (${PIN_RECORDED_ON}) shows the browser applying it: ${sentence.trim()}`);
-      }
-      if (!APPLIED[property] && !WARNS_AGAINST_PROPERTY.test(sentence) && proposes(property).test(sentence)) {
-        problems.push(`${where} proposes ${property}, which the pinned measurement shows the browser NOT applying: ${sentence.trim()}`);
-      }
-    }
-  }
-  return problems;
-}
+const REPO_ROOT = new URL("../../", import.meta.url);
 
 /**
  * Block-level `hyphens: none` recommended for justified text. `type/excessive-word-spacing` owns
@@ -93,7 +44,7 @@ function justifiedHyphensNoneProblems(text: string, where: string): string[] {
     const notJustified = /\b(not justified|non-justified|unjustified)\b/iu.test(sentence);
     const warnsAgainst = /\b(do not|never)\b/iu.test(sentence);
     if (!wordLocal && !notJustified && !warnsAgainst) {
-      problems.push(`${where} names block-level 'hyphens: none' without excluding justified text: ${sentence.trim()}`);
+      problems.push(`${where} names block-level 'hyphens: none' without excluding justified text: ${sentence}`);
     }
   }
   for (const fence of text.match(/```[\s\S]*?```/gu) ?? []) {
@@ -149,25 +100,80 @@ describe("rule registry", () => {
     }
   });
 
-  it("every released rule declares an actionable remediation, and names widows/orphans only as the pinned measurement allows", () => {
-    // The guard must have something to follow: both properties are decided by the pin.
-    assert.deepEqual(Object.keys(APPLIED).sort(), ["orphans", "widows"]);
-    const problems: string[] = [];
+  it("every released rule declares an actionable remediation", () => {
     for (const rule of ALL_RULES) {
       assert.ok(rule.remediation && rule.remediation.advice.length > 20, `${rule.id}: missing remediation`);
       assert.equal(typeof rule.remediation!.tested, "boolean", `${rule.id}: remediation must state whether a proof pair backs it`);
-      problems.push(...fragmentationProblems(rule.remediation!.advice, `${rule.id} remediation.advice`));
     }
-    assert.deepEqual(problems, []);
   });
 
-  it("no rule documentation page contradicts the pinned widows/orphans measurement either", () => {
-    const dir = new URL("../../docs/rules/", import.meta.url);
-    const pages = readdirSync(dir).filter((name) => name.endsWith(".md"));
-    assert.ok(pages.length >= 13, `expected the rule pages to be present, found ${pages.length}`);
-    const problems = pages.flatMap((page) =>
-      fragmentationProblems(readFileSync(new URL(page, dir), "utf8"), `docs/rules/${page}`));
-    assert.deepEqual(problems, []);
+  it("every sentence naming widows/orphans in advice, rule pages, the agent contract and the repair map is approved by the pin", () => {
+    assert.deepEqual(Object.keys(APPLIED).sort(), ["orphans", "widows"], "the guard must have a pin to follow");
+    const sentences = sentencesNamingProperties(guardedTexts(ALL_RULES, REPO_ROOT));
+    assert.ok(sentences.length >= 15, `the guard reads too few sentences to be guarding anything (${sentences.length})`);
+    assert.deepEqual(fragmentationProblems(sentences, APPLIED), []);
+    // And the other way round: every sentence approved under this pin is still published, so the
+    // list cannot silently keep approvals for text that no longer exists.
+    const published = new Set(sentences.map(({ place, sentence }) => `${place}\u0000${sentence}`));
+    const stale = [...approvedKeys(APPLIED)].filter((key) => !published.has(key)).map((key) => key.replace("\u0000", ": "));
+    assert.deepEqual(stale, [], "approved sentences that are no longer published — remove or update them");
+  });
+
+  /**
+   * The negative controls, kept in the suite. The first eight are the phrasings an audit appended to
+   * the widow advice while the previous, blacklist version of this guard stayed green; the rest are
+   * one more per direction. Each is judged exactly where the real advice is judged.
+   */
+  it("refuses the phrasings that walked around the old guard, lowering in any pin state, and raising while not applied", () => {
+    const place = placeLabel({ ruleId: "layout/widow" });
+    const judge = (sentence: string, applied: typeof APPLIED) =>
+      fragmentationProblems(proseSentences(sentence).map((text) => ({ place, sentence: text })), applied);
+    const inertOrUnapproved = [
+      "Paged.js disregards 'widows' entirely.",
+      "The 'widows' property has no influence under Paged.js.",
+      "Paged.js does not support 'widows'.",
+      "'widows' is unsupported by the paginator.",
+      "Setting 'widows' does nothing here.",
+      "Paged.js 0.4.3 has no widows implementation, so it is ineffective.",
+      "Chromium overlooks 'orphans' in paginated output.",
+    ];
+    for (const sentence of inertOrUnapproved) {
+      assert.match(judge(sentence, APPLIED).join("\n"), /not in the approved set/u, `accepted: ${sentence}`);
+    }
+    const lowering = [
+      "Or set 'widows: 1' on the paragraph.",
+      "Lowering the paragraph's widows makes the finding disappear.",
+      "Reduce the block's orphans to 1 so the split conforms.",
+    ];
+    for (const sentence of lowering) {
+      for (const applied of [APPLIED, { widows: false, orphans: false }]) {
+        assert.match(judge(sentence, applied).join("\n"), /proposes lowering/u, `lowering accepted under ${JSON.stringify(applied)}: ${sentence}`);
+      }
+      // Pin-independent means approval-independent too: approving the sentence does not admit it.
+      const approvedAnyway = new Set([`${place}\u0000${sentence}`]);
+      assert.match(
+        fragmentationProblems([{ place, sentence }], APPLIED, approvedAnyway).join("\n"),
+        /proposes lowering/u,
+        `an approved lowering sentence was accepted: ${sentence}`,
+      );
+    }
+    const notApplied = { widows: false, orphans: false };
+    for (const sentence of ["Raising the paragraph's 'widows' to 3 keeps more lines together.", "Try widows 3.", "Increase 'orphans' on the block."]) {
+      const approvedAnyway = new Set([`${place}\u0000${sentence}`]);
+      assert.match(
+        fragmentationProblems([{ place, sentence }], notApplied, approvedAnyway).join("\n"),
+        /proposes setting (widows|orphans), which the pinned measurement shows the browser NOT applying/u,
+        `raising accepted while the pin says not applied: ${sentence}`,
+      );
+    }
+    // Controls in the other direction: the real approved sentences pass, and under a pin that says
+    // "not applied" the sentences asserting application stop being approved.
+    const real = sentencesNamingProperties(guardedTexts(ALL_RULES, REPO_ROOT));
+    assert.deepEqual(fragmentationProblems(real, APPLIED), []);
+    const underInertPin = fragmentationProblems(real, notApplied).join("\n");
+    for (const entry of APPROVED_FRAGMENTATION_SENTENCES.filter((item) => item.requires.length > 0)) {
+      assert.ok(underInertPin.includes(entry.sentence), `still approved under a pin that says not applied: ${entry.sentence}`);
+    }
   });
 
   /**
@@ -186,7 +192,9 @@ describe("rule registry", () => {
         const advice = RULES_BY_ID.get(claim.where.ruleId)?.remediation?.advice ?? "";
         assert.ok(advice.includes(claim.sentence), `${claim.where.ruleId} remediation.advice no longer says: ${claim.sentence}`);
       } else {
-        const text = readFileSync(new URL(`../../${claim.where.file}`, import.meta.url), "utf8");
+        // Judged on the same normalised prose the sentence guard reads: a wrapped blockquote
+        // sentence is one sentence.
+        const text = proseSentences(readFileSync(new URL(`../../${claim.where.file}`, import.meta.url), "utf8")).join(" ");
         assert.ok(text.includes(claim.sentence), `${claim.where.file} no longer says: ${claim.sentence}`);
       }
       // Every decided sentence is affirmative today: it says the lever takes effect.
@@ -270,25 +278,16 @@ describe("rule registry", () => {
    * inside a comment. It also asserts that the map is still reached from `card`, because a guard
    * over dead code is a guard over nothing.
    */
-  it("the agent-facing repair map follows the same pinned widows/orphans measurement", () => {
+  it("the agent-facing repair map is still reached, so the sentence guard above covers a live map", () => {
+    // The map's text, comments included, is judged by the sentence guard above; this keeps that
+    // from being a guard over dead code.
     const source = readFileSync(new URL("../../src/api/context.ts", import.meta.url), "utf8");
     assert.match(source, /function repairOptions\(/u, "repairOptions is gone — this guard has lost its subject");
     assert.match(source, /repair:\s*\{[^}]*options:\s*repairOptions\(/u, "repairOptions is no longer reached from the finding card");
-    for (const [index, line] of source.split("\n").entries()) {
-      const code = line.replace(/\/\*.*?\*\//gu, "");
-      if (/^\s*(\*|\/\/)/u.test(code)) continue;
-      for (const property of FRAGMENTATION_PROPERTIES) {
-        if (APPLIED[property]) {
-          assert.ok(!callsInert(property).test(code), `src/api/context.ts:${index + 1} calls ${property} inert against the pin: ${line.trim()}`);
-        } else {
-          assert.ok(
-            !new RegExp(`\\b${property}\\s*:\\s*\\d`, "iu").test(code) &&
-              !new RegExp(`\\b${property}\\s+(setting|property|value|declaration)`, "iu").test(code),
-            `src/api/context.ts:${index + 1} proposes ${property}, which the pin shows NOT applied: ${line.trim()}`,
-          );
-        }
-      }
-    }
+    assert.ok(
+      sentencesNamingProperties(guardedTexts(ALL_RULES, REPO_ROOT)).some(({ place }) => place === "src/api/context.ts"),
+      "the repair map's comment no longer names the properties — check the guard still reads the file",
+    );
   });
 
   /**
@@ -300,12 +299,14 @@ describe("rule registry", () => {
    */
   it("the hyphenation precedence is declared on both rules, as opposites, and each advice names the other rule", () => {
     assert.deepEqual(interactionProblems(ALL_RULES), []);
-    const hyphens = ALL_RULES.flatMap((rule) =>
-      (rule.remediation?.interactions ?? []).filter((interaction) => interaction.lever === "hyphens")
+    const hyphenation = ALL_RULES.flatMap((rule) =>
+      (rule.remediation?.interactions ?? []).filter((interaction) => interaction.lever === "hyphens" || interaction.lever === "soft-hyphen")
         .map((interaction) => ({ from: rule.id, ...interaction })));
-    assert.deepEqual(hyphens, [
+    assert.deepEqual(hyphenation, [
       { from: "layout/hyphen-across-page", ruleId: "type/excessive-word-spacing", lever: "hyphens", relation: "defers", scope: "justified" },
+      { from: "layout/hyphen-across-page", ruleId: "type/excessive-word-spacing", lever: "soft-hyphen", relation: "defers", scope: "justified" },
       { from: "type/excessive-word-spacing", ruleId: "layout/hyphen-across-page", lever: "hyphens", relation: "prevails", scope: "justified" },
+      { from: "type/excessive-word-spacing", ruleId: "layout/hyphen-across-page", lever: "soft-hyphen", relation: "prevails", scope: "justified" },
     ]);
   });
 
@@ -314,20 +315,22 @@ describe("rule registry", () => {
       ({ ruleId, lever: "hyphens", relation, scope: "justified", ...overrides });
     const meta = (id: string, advice: string, interactions: RemediationInteraction[]) =>
       ({ id, remediation: { advice, tested: false, interactions } });
-    const a = meta("layout/a", "Defers to 'type/b'.", [pair("defers", "type/b")]);
-    const b = meta("type/b", "Prevails over 'layout/a'.", [pair("prevails", "layout/a")]);
+    const a = meta("layout/a", "Defers to 'type/b' on hyphens.", [pair("defers", "type/b")]);
+    const b = meta("type/b", "Prevails over 'layout/a' on hyphens.", [pair("prevails", "layout/a")]);
     // The control first: a correct pair is accepted, so every rejection below is about its defect.
     assert.deepEqual(interactionProblems([a, b]), []);
 
     const cases: [string, Parameters<typeof interactionProblems>[0], RegExp][] = [
-      ["one-sided", [a, meta("type/b", "Names 'layout/a'.", [])], /type\/b declares no prevails in return/u],
-      ["same-sided", [a, meta("type/b", "Names 'layout/a'.", [pair("defers", "layout/a")])], /declares defers in return, not prevails/u],
-      ["other lever", [a, meta("type/b", "Names 'layout/a'.", [pair("prevails", "layout/a", { lever: "text-align" })])], /declares no prevails in return/u],
+      ["one-sided", [a, meta("type/b", "Names 'layout/a' and hyphens.", [])], /type\/b declares no prevails in return/u],
+      ["same-sided", [a, meta("type/b", "Names 'layout/a' and hyphens.", [pair("defers", "layout/a")])], /declares defers in return, not prevails/u],
+      ["other lever", [a, meta("type/b", "Names 'layout/a' and &shy;.", [pair("prevails", "layout/a", { lever: "soft-hyphen" })])], /declares no prevails in return/u],
       ["dangling", [a], /type\/b is not a registered rule/u],
-      ["silent advice", [meta("layout/a", "Says nothing about the other rule.", [pair("defers", "type/b")]), b], /does not name 'type\/b'/u],
-      ["self", [meta("layout/a", "Names 'layout/a'.", [pair("defers", "layout/a")])], /cannot take precedence over itself/u],
-      ["unknown relation", [meta("layout/a", "Names 'type/b'.", [pair("overrides" as InteractionRelation, "type/b")]), b], /relation "overrides"/u],
-      ["unknown scope", [meta("layout/a", "Names 'type/b'.", [pair("defers", "type/b", { scope: "everywhere" as InteractionScope })]), b], /scope "everywhere"/u],
+      ["silent advice", [meta("layout/a", "Says nothing about the other rule, only hyphens.", [pair("defers", "type/b")]), b], /does not name 'type\/b'/u],
+      ["self", [meta("layout/a", "Names 'layout/a' and hyphens.", [pair("defers", "layout/a")])], /cannot take precedence over itself/u],
+      ["unknown relation", [meta("layout/a", "Names 'type/b' and hyphens.", [pair("overrides" as InteractionRelation, "type/b")]), b], /relation "overrides"/u],
+      ["unknown lever", [meta("layout/a", "Names 'type/b' and hyphens.", [pair("defers", "type/b", { lever: "kerning" as RemediationInteraction["lever"] })]), b], /lever "kerning"/u],
+      ["lever never mentioned", [meta("layout/a", "Names 'type/b' and hyphens.", [pair("defers", "type/b", { lever: "soft-hyphen" })]), b], /never mentions &shy;/u],
+      ["unknown scope", [meta("layout/a", "Names 'type/b' and hyphens.", [pair("defers", "type/b", { scope: "everywhere" as InteractionScope })]), b], /scope "everywhere"/u],
     ];
     for (const [name, rules, expected] of cases) {
       assert.match(interactionProblems(rules).join("\n"), expected, `${name}: the validator did not name the defect`);
@@ -343,7 +346,7 @@ describe("rule registry", () => {
       () => defineRule({ ...base, remediation: { advice: "Names nobody.", tested: false, interactions: [pair("defers", "type/b")] } }, run),
       /invalid remediation\.interactions — .*does not name 'type\/b'/u,
     );
-    assert.doesNotThrow(() => defineRule({ ...base, remediation: { advice: "Defers to 'type/b'.", tested: false, interactions: [pair("defers", "type/b")] } }, run));
+    assert.doesNotThrow(() => defineRule({ ...base, remediation: { advice: "Defers to 'type/b' on hyphens.", tested: false, interactions: [pair("defers", "type/b")] } }, run));
   });
 
   it("each rule page renders its precedence from remediation.interactions, and no page carries one it does not declare", () => {

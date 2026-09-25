@@ -18,7 +18,7 @@
  * `write-rule-docs.ts`, which nothing under `tests/` imports.
  */
 
-import { INTERACTION_SCOPES, type Rule } from "../src/core/rule.ts";
+import { INTERACTION_LEVERS, INTERACTION_SCOPES, type Rule } from "../src/core/rule.ts";
 
 export const BEGIN = (id: string) => `<!-- begin generated remediation: ${id} -->`;
 export const END = (id: string) => `<!-- end generated remediation: ${id} -->`;
@@ -36,10 +36,11 @@ export function pageNameFor(rule: Pick<Rule, "id">): string {
 export function precedenceLines(rule: Rule): string[] {
   return (rule.remediation?.interactions ?? []).map((interaction) => {
     const other = `[\`${interaction.ruleId}\`](${pageNameFor({ id: interaction.ruleId })})`;
-    const where = `\`${interaction.lever}\` ${INTERACTION_SCOPES[interaction.scope]}`;
+    const lever = INTERACTION_LEVERS[interaction.lever];
+    const where = `${lever.subject} ${INTERACTION_SCOPES[interaction.scope]}`;
     return interaction.relation === "prevails"
-      ? `**Precedence.** ${where}: this rule owns the block-level setting, and ${other} defers to it, changing that property only locally.`
-      : `**Precedence.** ${where}: ${other} owns the block-level setting, and this rule defers to it, changing that property only locally.`;
+      ? `**Precedence.** ${where}: this rule owns ${lever.owned}, and ${other} defers to it, acting only on the affected word.`
+      : `**Precedence.** ${where}: ${other} owns ${lever.owned}, and this rule defers to it, acting only on the affected word.`;
   });
 }
 

@@ -89,38 +89,77 @@ export const SOFT_HYPHEN_BOUNDARY = Object.freeze({
 
 export type SoftHyphenCase = keyof typeof SOFT_HYPHEN_BOUNDARY;
 
+export type FragmentationProperty = "widows" | "orphans";
+
+/** Where a sentence is published: a rule's `remediation.advice`, or a file. */
+export type SentencePlace = { readonly ruleId: string } | { readonly file: string };
+
+/**
+ * EVERY sentence the guarded texts may contain that names `widows` or `orphans` — each rule's
+ * advice, each rule page outside its generated block, docs/agent-contract.md and the comments of
+ * src/api/context.ts (see tests/tools/fragmentation-guard.ts). Exact, whitespace-normalised
+ * sentences, each bound to one place.
+ *
+ * `requires` says what the sentence asserts about the browser. Empty: nothing (a threshold, a
+ * definition, a measured split that holds whatever the reason). Otherwise: that the browser applies
+ * each listed property, and the sentence is approved only while `leversApplied(WIDOWS_ORPHANS_SPLITS)`
+ * says so for all of them, which is what "derived from the pin" means. Adding a sentence here is a review decision, not a formality.
+ */
+export interface ApprovedSentence {
+  readonly where: SentencePlace;
+  readonly sentence: string;
+  readonly requires: readonly FragmentationProperty[];
+}
+
+const WIDOW_ADVICE = { ruleId: "layout/widow" } as const;
+const ORPHAN_ADVICE = { ruleId: "layout/orphan" } as const;
+const WIDOW_PAGE = { file: "docs/rules/layout-widow.md" } as const;
+const ORPHAN_PAGE = { file: "docs/rules/layout-orphan.md" } as const;
+
+export const APPROVED_FRAGMENTATION_SENTENCES: readonly ApprovedSentence[] = Object.freeze([
+  // layout/widow remediation.advice
+  { where: WIDOW_ADVICE, requires: [], sentence: "A block fragments across a page break and the fragment OPENING the next page carries fewer lines than the block's own 'widows' value (plus any configured extra lines) asks for." },
+  { where: WIDOW_ADVICE, requires: ["widows", "orphans"], sentence: "Chromium applies a paragraph's 'widows' and 'orphans' when Paged.js splits it; when the paragraph has too few lines at the break to satisfy both, the browser keeps 'orphans' and relaxes 'widows', as CSS Fragmentation Level 3 permits, so this rule is only a warning." },
+  { where: WIDOW_ADVICE, requires: [], sentence: "Changing the block's 'widows' moves the threshold with it and is not a fix." },
+  // layout/orphan remediation.advice
+  { where: ORPHAN_ADVICE, requires: [], sentence: "A block fragment ENDS at a page break carrying fewer lines than the block's own 'orphans' value (plus any configured extra lines) asks for." },
+  { where: ORPHAN_ADVICE, requires: ["widows", "orphans"], sentence: "Chromium applies a paragraph's 'widows' and 'orphans' when Paged.js splits it, and moves the whole paragraph to the next page when the page has room for fewer lines than 'orphans'; CSS Fragmentation Level 3 still permits a split that keeps fewer, so this rule is only a warning." },
+  { where: ORPHAN_ADVICE, requires: [], sentence: "Changing the block's 'orphans' moves the threshold with it and is not a fix." },
+  // docs/rules/layout-widow.md, outside the generated block
+  { where: WIDOW_PAGE, requires: [], sentence: "| threshold | the element's own `widows` value |" },
+  { where: WIDOW_PAGE, requires: [], sentence: "So `lines < widows` does not prove a defect — it may be exactly the relaxation the specification permits, and this version has no way to prove the relaxation was unwarranted." },
+  { where: WIDOW_PAGE, requires: [], sentence: "At `widows: 6; orphans: 6` a 9-line paragraph with room for 8 lines splits 6+3, which **is** a violation — a permitted one, because widows+orphans = 12 exceeds the 9 lines and no conforming split exists." },
+  { where: WIDOW_PAGE, requires: ["widows", "orphans"], sentence: "The browser kept `orphans` and relaxed `widows`." },
+  { where: WIDOW_PAGE, requires: ["widows"], sentence: "Chromium applies `widows` when Paged.js splits a paragraph." },
+  { where: WIDOW_PAGE, requires: ["widows"], sentence: "Paged.js 0.4.3 never reads the property, but it cuts every page where the browser's own column fragmentation broke, and the browser honours `widows` there: over one geometry, `widows` 1, the initial 2 and 5 split a 9-line paragraph 8+1, 7+2 and 4+5." },
+  // docs/rules/layout-orphan.md, outside the generated block
+  { where: ORPHAN_PAGE, requires: [], sentence: "| threshold | the element's own `orphans` value |" },
+  { where: ORPHAN_PAGE, requires: [], sentence: "The mirror of `layout/widow`, with the same permanent ceiling of `warn` for the same reason: CSS Fragmentation Level 3 §4.3 lets the browser drop the widow/orphan rule when no conforming split exists, so `lines < orphans` does not prove a defect." },
+  { where: ORPHAN_PAGE, requires: ["orphans"], sentence: "Chromium applies `orphans` when Paged.js splits a paragraph." },
+  { where: ORPHAN_PAGE, requires: ["orphans"], sentence: "Paged.js 0.4.3 never reads the property, but it cuts every page where the browser's own column fragmentation broke, and the browser honours `orphans` there." },
+  { where: ORPHAN_PAGE, requires: ["orphans"], sentence: "With room for one line of a 9-line paragraph, `orphans: 1` splits it 1+8 while the initial 2 and `orphans: 4` move it whole to the next page; with room for three lines, `orphans: 1` and the initial value split it 3+6 and `orphans: 4` moves it." },
+  // docs/agent-contract.md
+  { where: { file: "docs/agent-contract.md" }, requires: ["widows", "orphans"], sentence: "*(Note: CSS `widows` and `orphans` do take effect on paragraphs: Paged.js never reads them, but the browser applies them through its own fragmentation inside Paged.js's flow." },
+  // src/api/context.ts, the repair map's comment
+  { where: { file: "src/api/context.ts" }, requires: [], sentence: "The CSS `widows` and `orphans` values are deliberately not offered as repairs." },
+]);
+
 export interface DecidedClaim {
   /** Which part of the pin decides it. */
   readonly decidedBy: "widows" | "orphans" | "soft-hyphen";
-  /** Where it is published: a rule's `remediation.advice`, or a documentation file. */
-  readonly where: { readonly ruleId: string } | { readonly file: string };
+  /** Where it is published: a rule's `remediation.advice`, or a file. */
+  readonly where: SentencePlace;
   /** A verbatim excerpt; the unit suite checks it is present. */
   readonly sentence: string;
 }
 
+/**
+ * The published sentences the pin decides: every approved widows/orphans sentence that asserts the
+ * browser applies a property, and the two soft-hyphen claims of `layout/hyphen-across-page`.
+ */
 export const CLAIMS_DECIDED_BY_THE_PIN: readonly DecidedClaim[] = Object.freeze([
-  {
-    decidedBy: "widows",
-    where: { ruleId: "layout/widow" },
-    sentence:
-      "Chromium applies a paragraph's 'widows' and 'orphans' when Paged.js splits it; when the paragraph has too few lines at the break to satisfy both, the browser keeps 'orphans' and relaxes 'widows'",
-  },
-  {
-    decidedBy: "widows",
-    where: { file: "docs/rules/layout-widow.md" },
-    sentence: "Chromium applies `widows` when Paged.js splits a paragraph.",
-  },
-  {
-    decidedBy: "orphans",
-    where: { ruleId: "layout/orphan" },
-    sentence:
-      "Chromium applies a paragraph's 'widows' and 'orphans' when Paged.js splits it, and moves the whole paragraph to the next page when the page has room for fewer lines than 'orphans'",
-  },
-  {
-    decidedBy: "orphans",
-    where: { file: "docs/rules/layout-orphan.md" },
-    sentence: "Chromium applies `orphans` when Paged.js splits a paragraph.",
-  },
+  ...APPROVED_FRAGMENTATION_SENTENCES.flatMap((entry): DecidedClaim[] =>
+    entry.requires.map((property) => ({ decidedBy: property, where: entry.where, sentence: entry.sentence }))),
   {
     decidedBy: "soft-hyphen",
     where: { ruleId: "layout/hyphen-across-page" },

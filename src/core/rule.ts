@@ -100,8 +100,8 @@ export interface RuleMeta {
 export interface RemediationInteraction {
   /** The other rule. */
   readonly ruleId: string;
-  /** The CSS property both advices touch, spelled as in CSS. */
-  readonly lever: string;
+  /** What both advices touch: one of `INTERACTION_LEVERS`. */
+  readonly lever: InteractionLever;
   /**
    * `prevails`: this rule owns the block-level setting of `lever` in `scope`. `defers`: the other
    * rule owns it there, and this rule's advice changes the lever only locally.
@@ -116,6 +116,19 @@ export type InteractionRelation = (typeof INTERACTION_RELATIONS)[number];
 /** Where a precedence holds, with the phrase the rule pages render for it. */
 export const INTERACTION_SCOPES = Object.freeze({ justified: "in justified blocks" } as const);
 export type InteractionScope = keyof typeof INTERACTION_SCOPES;
+
+/**
+ * The levers a precedence can be declared on. A lever is not always a CSS property: a soft hyphen
+ * is markup, and it is the lever `type/excessive-word-spacing` proposes and the one that re-creates
+ * a `layout/hyphen-across-page` finding. Each lever names the token both advice texts must contain
+ * (a precedence about a lever an advice never mentions is not about that advice), the phrase the
+ * rule pages render, and what the owning rule owns.
+ */
+export const INTERACTION_LEVERS = Object.freeze({
+  "hyphens": { adviceToken: "hyphens", subject: "`hyphens`", owned: "the block-level setting" },
+  "soft-hyphen": { adviceToken: "&shy;", subject: "Soft hyphens (`&shy;`)", owned: "where they are inserted" },
+} as const);
+export type InteractionLever = keyof typeof INTERACTION_LEVERS;
 
 const OPPOSITE_RELATION: Readonly<Record<InteractionRelation, InteractionRelation>> = {
   defers: "prevails",
@@ -135,7 +148,11 @@ function ownInteractionProblems(meta: Pick<RuleMeta, "id" | "remediation">): str
     if (!Object.hasOwn(INTERACTION_SCOPES, interaction.scope)) {
       problems.push(`${label}: scope "${interaction.scope}" is not one of ${Object.keys(INTERACTION_SCOPES).join(", ")}`);
     }
-    if (!/^[a-z][a-z-]*$/u.test(interaction.lever)) problems.push(`${label}: lever is not a CSS property name`);
+    if (!Object.hasOwn(INTERACTION_LEVERS, interaction.lever)) {
+      problems.push(`${label}: lever "${interaction.lever}" is not one of ${Object.keys(INTERACTION_LEVERS).join(", ")}`);
+    } else if (!meta.remediation?.advice.includes(INTERACTION_LEVERS[interaction.lever].adviceToken)) {
+      problems.push(`${label}: the advice never mentions ${INTERACTION_LEVERS[interaction.lever].adviceToken}`);
+    }
     const key = `${interaction.ruleId}\u0000${interaction.lever}\u0000${interaction.scope}`;
     if (seen.has(key)) problems.push(`${label}: declared twice`);
     seen.add(key);

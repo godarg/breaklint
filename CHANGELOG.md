@@ -35,9 +35,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `white-space: nowrap` (both measured to leave no boundary hyphen), or rewording; `hyphens: none`
   on the paragraph remains the fix for a block that is not justified.
 - **`type/excessive-word-spacing` and `layout/hyphen-across-page` state which of them owns
-  `hyphens`.** Their two texts pulled the same lever in opposite directions and said only that they
-  did. The word-spacing rule now owns the block-level `hyphens` setting of justified blocks and the
-  hyphen rule defers to it there; both advice texts say so, and the word-spacing advice adds that
+  `hyphens` and soft hyphens.** Their two texts pulled the same levers in opposite directions and
+  said only that they did. The word-spacing rule now owns the block-level `hyphens` setting and the
+  soft hyphens (`&shy;`) of justified blocks, and the hyphen rule defers to it on both there,
+  changing only the boundary word; both advice texts say so, and the word-spacing advice adds that
   `hyphens: auto` hyphenates only where the rendering browser has a dictionary for the language —
   on the measured headless Chromium 141 it had none for English, so soft hyphens were the lever
   that worked. The order is declared in the new registry field `remediation.interactions`, which
@@ -54,12 +55,22 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   Chrome is the authority. The suite fails in both directions — a browser that stops applying a
   property, or applies it differently from what the published text says — and a red run lists the
   advice and page sentences the pin decides.
-- **The registry guard that banned `widows`/`orphans` from all advice now follows that pin.** While
-  the pin shows the browser applying a property, no advice, rule page or repair-map line may call it
-  inert; if the pin ever shows otherwise, none may propose it. Each sentence the pin decides is
-  checked to be present and to agree with the pin.
-- **`remediation.interactions` is validated.** `defineRule` refuses a malformed declaration (self
-  reference, unknown relation or scope, an advice that does not name its partner); the registry test
+- **The registry guard that banned `widows`/`orphans` from all advice is now an allow-list derived
+  from that pin.** It reads every rule's advice, every rule page outside its generated block,
+  `docs/agent-contract.md`, and `src/api/context.ts` including its comments. Every sentence there that
+  names `widows` or `orphans` must be one of the 19 reviewed sentences in
+  `APPROVED_FRAGMENTATION_SENTENCES`, at the place it is approved for; a sentence that says the
+  browser applies a property is approved only while the pin shows that. Any other sentence fails,
+  named with its place, and so does an approved sentence that is no longer published. Two vocabulary
+  checks sit on top and hold even for an approved sentence: never, in any pin state, a proposal to
+  lower an author's own value or set it to 0 or 1; and, while the pin says a property is not
+  applied, no proposal to set or raise it. A blacklist version of this guard was walked around by
+  eight phrasings in review ("disregards", "does not support", "set 'widows: 1'", ...); all eight,
+  and one more per direction, are kept in the unit suite as negative controls. Each sentence the pin
+  decides is also checked to be present and to agree with the pin.
+- **`remediation.interactions` is validated.** A lever is one of `INTERACTION_LEVERS` (`hyphens`,
+  `soft-hyphen`). `defineRule` refuses a malformed declaration (self reference, unknown relation,
+  lever or scope, an advice that does not name its partner or never mentions the lever); the registry test
   runs `interactionProblems` over all rules and refuses a pair declared on one side only or with
   both sides the same. `npm run docs:rules:write` renders a generated "Precedence" line into both
   rule pages from the field, and `docs:rules:check` keeps it current. A docs check refuses any advice
@@ -75,6 +86,11 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   the declaration that produces it (`widows: 6; orphans: 6`). `docs/rules/layout-hyphen-across-page.md`
   adds a justified remedied example and a measured limit: Paged.js sets its class only between ASCII
   word characters or after a soft hyphen, so a split next to a letter such as `ü` is not reported.
+- `docs/agent-contract.md` no longer says Paged.js "does not implement CSS `widows` or `orphans` on
+  paragraphs": the properties take effect through the browser's own fragmentation inside Paged.js's
+  flow, and each is also its rule's threshold, so changing it is not a fix. The comment on the repair
+  map in `src/api/context.ts` said "Chromium does not honour them under Paged.js" and now says the same
+  as the agent contract.
 
 ## 0.6.0 — 2026-09-18
 
