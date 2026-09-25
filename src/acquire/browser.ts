@@ -548,8 +548,13 @@ export async function terminateProcessTree(
  * arrived during synchronous work was lost when the listener went synchronously (all three event
  * loop phases) and after one `setImmediate` when the removal ran in the I/O phase, and delivered
  * after two in every phase. So listeners outlive the last hold by two `setImmediate` hops, a
- * signal that arrives when no hold is left is raised again at once, and a render drains pending
- * signals before it lets its hold go.
+ * signal that arrives when no hold is left is raised again at once, a render drains pending
+ * signals before it lets its hold go, and the CLI and the library API drain them once more before
+ * they exit or return (drainPendingSignals).
+ *
+ * A process that ends while a hold is live (a host's `process.exit()` in the middle of a run)
+ * runs no signal listener; an `exit` listener, installed with the signal listeners, forces every
+ * live hold on the way out. Each hold is forced at most once.
  */
 export type InterruptSignal = "SIGINT" | "SIGTERM" | "SIGHUP";
 export const INTERRUPT_SIGNALS: readonly InterruptSignal[] = ["SIGINT", "SIGTERM", "SIGHUP"];
@@ -589,6 +594,8 @@ export interface SignalHost {
   report(line: string): Promise<void>;
   /** Run `fn` after pending signal callbacks have been dispatched. */
   drain(fn: () => void): void;
+  /** Observe the process's `exit` event (synchronous listeners only); returns the unsubscribe. */
+  watchExit?(listener: () => void): () => void;
 }
 
 /** Two `setImmediate` hops: at least one complete poll phase, which dispatches queued signals. */
@@ -623,6 +630,10 @@ const PROCESS_SIGNAL_HOST: SignalHost = {
   },
   report: reportToStderr,
   drain: afterPendingSignals,
+  watchExit(listener) {
+    process.on("exit", listener);
+    return () => { process.off("exit", listener); };
+  },
 };
 
 export function createInterruptRegistry(host: SignalHost = PROCESS_SIGNAL_HOST, boundMs: number = INTERRUPT_CLEANUP_BOUND_MS): {
@@ -645,6 +656,9 @@ export function createInterruptRegistry(host: SignalHost = PROCESS_SIGNAL_HOST, 
   const entries = new Set<Entry>();
   const installed = new Set<InterruptSignal>();
   let stopWatching: (() => void) | null = null;
+  let stopWatchingExit: (() => void) | null = null;
+  /** Entries whose force() has run; forcing twice would only repeat a kill and a removal. */
+  const forcedEntries = new WeakSet<Entry>();
   /** Signals for which a foreign listener was removed in the current synchronous turn. */
   const removedThisTurn = new Set<InterruptSignal>();
   let uninstallScheduled = false;
@@ -661,6 +675,7 @@ export function createInterruptRegistry(host: SignalHost = PROCESS_SIGNAL_HOST, 
   const install = (): void => {
     uninstallScheduled = false;
     if (!stopWatching) stopWatching = host.watchRemovals(onRemoval);
+    if (!stopWatchingExit && host.watchExit) stopWatchingExit = host.watchExit(onExit);
     for (const signal of INTERRUPT_SIGNALS) {
       if (installed.has(signal)) continue;
       host.prependListener(signal, listener);
@@ -672,6 +687,8 @@ export function createInterruptRegistry(host: SignalHost = PROCESS_SIGNAL_HOST, 
     installed.clear();
     stopWatching?.();
     stopWatching = null;
+    stopWatchingExit?.();
+    stopWatchingExit = null;
   };
   /** Never synchronously: a signal already queued for this listener would be discarded. */
   const uninstallWhenIdle = (): void => {
@@ -689,8 +706,18 @@ export function createInterruptRegistry(host: SignalHost = PROCESS_SIGNAL_HOST, 
   };
   const force = (list: readonly Entry[]): void => {
     for (const entry of list) {
+      if (forcedEntries.has(entry)) continue;
+      forcedEntries.add(entry);
       try { entry.cleanup.force(); } catch { /* best effort; the next run's sweep remains */ }
     }
+  };
+  /**
+   * The process is ending while a hold is live: a host's `process.exit()` in the middle of a run,
+   * or any other exit that bypassed the release. Only synchronous work runs in an `exit` listener,
+   * so this is force(): SIGKILL of the owned process group and removal of the profile.
+   */
+  const onExit = (): void => {
+    if (entries.size > 0) force([...entries]);
   };
   const outcomes = (list: readonly Entry[]): string[] => list.flatMap((entry) => {
     try { const outcome = entry.cleanup.outcome?.() ?? null; return outcome ? [outcome] : []; } catch { return []; }
@@ -724,7 +751,7 @@ export function createInterruptRegistry(host: SignalHost = PROCESS_SIGNAL_HOST, 
     for (const entry of episode.entries) resolveEntry(entry, episode.signal);
     const unverified = outcomes(episode.entries);
     if (unverified.length > 0) {
-      try { await host.report(`breaklint: interrupted by ${episode.signal}; renderer cleanup not verified: ${unverified.join("; ")}\n`); } catch { /* the signal still ends the process */ }
+      try { await host.report(`breaklint: interrupted by ${episode.signal}; cleanup not verified: ${unverified.join("; ")}\n`); } catch { /* the signal still ends the process */ }
     }
     reraise(episode.signal);
   };
@@ -1003,10 +1030,26 @@ export function sweepStaleBrowserProfiles(environment: ProfileSweepEnvironment |
  */
 export const PROFILE_PREFERENCES = { webrtc: { ip_handling_policy: "disable_non_proxied_udp" } } as const;
 
+/**
+ * The browser-wide preferences every profile starts with (`<profile>/Local State`): secure DNS
+ * off. Secure DNS (DNS-over-HTTPS) sends its queries to a DoH server the browser addresses by IP
+ * literal from its own provider table, so the resolver lock in the launch switches, which maps
+ * host names, never sees them: on CI's Google Chrome 153 the offline net-log test recorded a
+ * connection to [2001:4860:4860::8888]:443 under the lock. Measured on Chromium 141 through this
+ * launch path, idle for 8 s: without this preference the net-log holds DOH_URL_REQUEST events (and,
+ * without the lock, a connection to 8.8.8.8:443 after resolving dns.google); with it, none. The
+ * browser's built-in ("async") DNS client needs no switch of its own: it resolves only names that
+ * reach the resolver, and the lock maps those first (no DNS packet in the offline net-log). There
+ * is no command-line switch for the secure DNS mode; an administrator's DnsOverHttpsMode policy
+ * overrides this preference, and the net-log test is what would show it.
+ */
+export const PROFILE_LOCAL_STATE = { dns_over_https: { mode: "off" } } as const;
+
 /** A fresh profile directory that carries its owner record before any browser uses it. */
 export function createBrowserProfile(): string {
   const userDataDir = mkdtempSync(join(tmpdir(), PROFILE_PREFIX));
   writeProfileOwner(userDataDir, null);
+  writeFileSync(join(userDataDir, "Local State"), JSON.stringify(PROFILE_LOCAL_STATE), { mode: 0o600 });
   mkdirSync(join(userDataDir, "Default"), { mode: 0o700 });
   writeFileSync(join(userDataDir, "Default", "Preferences"), JSON.stringify(PROFILE_PREFERENCES), { mode: 0o600 });
   return userDataDir;
@@ -1130,19 +1173,49 @@ export function browserTmpDirFor(userDataDir: string, platform: NodeJS.Platform 
  * CI's temporary directory) and `--disable-background-networking` (the driver passes it today;
  * breaklint's network posture should not depend on a default list that has just changed).
  *
- * In the default offline mode, additionally a lock that holds whatever the browser adds:
- * `--host-resolver-rules` maps every host name except the loopback address the document is served
- * from to "not found", before any DNS query, and `--no-proxy-server` stops a configured proxy
- * from resolving and forwarding on the browser's behalf. Measured on Chromium 141 through this
- * launch path, idle for 8 s: without the lock, DNS to the system resolver and connections to
- * Google hosts for network time, the account list, AI-mode eligibility, GCM check-in,
- * DNS-over-HTTPS and a search preconnect, with both disable switches present; with the lock, the
- * only connection was to the loopback page. With `--allow-network` the lock is off, because the
- * allowed origins must resolve and may need the host's proxy; those services can then reach the
- * network, which docs/limitations.md states.
+ * In every mode, too, a lock that holds whatever the browser or the document does outside request
+ * interception: `--host-resolver-rules` (see `hostResolverRules`) maps every host, name or IP
+ * literal, to "not found" before any DNS query, except the loopback address the document is served
+ * from and, with `--allow-network`, the allowed origins' hosts; `--no-proxy-server` stops a
+ * configured proxy from resolving and forwarding on the browser's behalf, which would bypass the
+ * map. Measured on Chromium 141 through this launch path, idle for 8 s: without the lock, DNS to
+ * the system resolver and connections to Google hosts for network time, the account list, AI-mode
+ * eligibility, GCM check-in, DNS-over-HTTPS and a search preconnect, with both disable switches
+ * present; with the lock, the only connection was to the loopback page. With `--allow-network`
+ * the map used to be off, and a document's WebSocket, WebTransport and cross-site iframe reached
+ * a host that was not allowed (measured: all three, to an IP literal on this machine's
+ * non-loopback interface); interception never sees them. Now they fail to resolve unless the host
+ * is an allowed one. What the map cannot see: the port and the scheme. A channel interception does
+ * not see may reach any port of an allowed host. Secure DNS is off through the profile
+ * (PROFILE_LOCAL_STATE), because its server is addressed by IP literal from the browser's own
+ * table and never reaches the map.
  */
 export const BROWSER_NETWORK_ARGS: readonly string[] = ["--disable-component-update", "--disable-background-networking"];
-export const OFFLINE_BROWSER_ARGS: readonly string[] = ["--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1", "--no-proxy-server"];
+
+/** A host the rules may name: a DNS name as `URL` normalises it (IDN already in punycode) or an IPv4 literal. */
+const RULE_HOST = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u;
+const RULE_IPV6 = /^\[[0-9a-f:.]+\]$/u;
+
+/**
+ * The value of `--host-resolver-rules`: every host maps to "not found", except 127.0.0.1 and the
+ * hosts of the allowed origins. An origin whose host is neither a plain DNS name nor an IP literal
+ * (a WHATWG URL admits, for instance, a comma, which separates rules) is left out: the browser then
+ * cannot reach it, and a document that needs it fails as it would under a closed network, rather
+ * than the value gaining a rule nobody wrote. An IPv6 literal is named in both of the forms the
+ * browser compares against (with and without brackets); it is not measured here, because this
+ * machine has no IPv6.
+ */
+export function hostResolverRules(allowedOrigins: readonly string[] = []): string {
+  const hosts = new Set<string>();
+  for (const origin of allowedOrigins) {
+    let host: string;
+    try { host = new URL(origin).hostname; } catch { continue; }
+    if (host === "127.0.0.1") continue;
+    if (RULE_HOST.test(host)) hosts.add(host);
+    else if (RULE_IPV6.test(host)) { hosts.add(host); hosts.add(host.slice(1, -1)); }
+  }
+  return ["MAP * ~NOTFOUND", "EXCLUDE 127.0.0.1", ...[...hosts].sort().map((host) => `EXCLUDE ${host}`)].join(" , ");
+}
 
 /**
  * The whole start of the browser, from spawn to its first page target.
@@ -1230,6 +1303,12 @@ export interface LaunchResult {
   executablePath: string | null;
   /** Explicit profile owned by the caller; never Puppeteer's implicit, untracked temp directory. */
   userDataDir?: string | null;
+  /**
+   * Set only when the launch was refused for the driver's environment: the refusal on one line.
+   * It names variables and nothing of the host, so an API may pass it on where it withholds
+   * other launch failures.
+   */
+  refusal?: string;
 }
 
 /**
@@ -1267,10 +1346,56 @@ export function driverEnvironmentRefusal(environment: NodeJS.ProcessEnv = proces
   );
 }
 
-/** Launch options. `network` follows the run's network policy; the rest are unit-only seams. */
+/**
+ * The environment the browser is started with: the host's values of these names only, and
+ * `TMPDIR` pointing into the profile. Everything else is left out, because the browser reads its
+ * own switches and state from the environment: measured on Chromium 141, an inherited
+ * `CHROME_EXTRA_FLAGS=--remote-debugging-port=9333` opened an unauthenticated DevTools port on a
+ * launch that passed `{ ...process.env }`, and the same variable carries the sandbox-disabling switch
+ * as easily.
+ * Chromium 141's binary also names `CHROME_DEVEL_SANDBOX`, `CHROME_USER_DATA_DIR`,
+ * `CHROME_CONFIG_HOME`, `CHROME_LOG_FILE`, `GOOGLE_API_KEY` and `SSLKEYLOGFILE` among the variables
+ * it can read, and the dynamic loader reads `LD_*`; a run needs none of them. Proxy variables are not passed either: the launch always carries
+ * `--no-proxy-server`. Nothing here edits the host's own environment.
+ *
+ * Kept, and why: `HOME`, `USER`, `LOGNAME` (the browser's per-user state and certificate store
+ * live under the home directory); `PATH` (a wrapper script such as `google-chrome` runs
+ * `readlink` and `dirname`); `LANG`, `LANGUAGE`, `LC_*`, `TZ`, `TZDIR` (locale and time zone, which
+ * a document's text and dates can depend on); the XDG base directories (where the browser keeps
+ * per-user configuration and caches); `FONTCONFIG_FILE`, `FONTCONFIG_PATH`, `FONTCONFIG_SYSROOT`
+ * (which fonts exist, which layout depends on). No display variable: the browser is headless.
+ * A browser that needs anything else to start (a custom build that needs `LD_LIBRARY_PATH`) must
+ * be started through its own wrapper script named by BREAKLINT_CHROME.
+ */
+export const BROWSER_ENVIRONMENT_NAMES: readonly string[] = [
+  "HOME", "USER", "LOGNAME", "PATH", "LANG", "LANGUAGE", "TZ", "TZDIR",
+  "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_RUNTIME_DIR", "XDG_CONFIG_DIRS", "XDG_DATA_DIRS",
+  "FONTCONFIG_FILE", "FONTCONFIG_PATH", "FONTCONFIG_SYSROOT",
+];
+/** Name prefixes kept as a family: the locale categories. */
+export const BROWSER_ENVIRONMENT_PREFIXES: readonly string[] = ["LC_"];
+
+export function browserEnvironment(host: NodeJS.ProcessEnv, browserTmpDir: string): Record<string, string> {
+  const kept: Record<string, string> = {};
+  for (const [name, value] of Object.entries(host)) {
+    if (value === undefined) continue;
+    if (BROWSER_ENVIRONMENT_NAMES.includes(name) || BROWSER_ENVIRONMENT_PREFIXES.some((prefix) => name.startsWith(prefix) && /^[A-Z_]+$/u.test(name))) kept[name] = value;
+  }
+  kept.TMPDIR = browserTmpDir;
+  return kept;
+}
+
+/** The refusal message on one line, for an API that reports a single-line reason. */
+export function oneLineRefusal(message: string): string {
+  return message.replace(/^breaklint: /u, "").replace(/\s*\n\s*/gu, " ").trim();
+}
+
+/** Launch options. `network` and `allowedOrigins` follow the run's network policy; the rest are unit-only seams. */
 export interface LaunchSeams {
-  /** "offline" (the default) adds the browser-level network lock; "allowlist" does not. */
+  /** The run's network mode. The browser-level lock is on in both; only its exceptions differ. */
   network?: "offline" | "allowlist";
+  /** With "allowlist": the allowed origins, whose hosts the lock lets resolve. Ignored offline. */
+  allowedOrigins?: readonly string[];
   /** Unit-only: write the browser's net-log to `<profile>/net-log.json`. */
   netLog?: boolean;
   launchTimeoutMs?: number;
@@ -1286,7 +1411,7 @@ export interface LaunchSeams {
 export async function launchBrowser(fromDir: string = process.cwd(), seams: LaunchSeams = {}): Promise<LaunchResult> {
   // Before anything is resolved or created: the driver would read these at launch.
   const refused = driverEnvironmentRefusal();
-  if (refused) return { browser: null, executablePath: null, userDataDir: null, detail: refused };
+  if (refused) return { browser: null, executablePath: null, userDataDir: null, detail: refused, refusal: oneLineRefusal(refused) };
   const found = resolveBrowser();
   if (!found.path) {
     return {
@@ -1375,11 +1500,12 @@ export async function launchBrowser(fromDir: string = process.cwd(), seams: Laun
     // Only network switches, and never one that touches the sandbox; see BROWSER_NETWORK_ARGS.
     args: [
       ...BROWSER_NETWORK_ARGS,
-      ...(seams.network === "allowlist" ? [] : OFFLINE_BROWSER_ARGS),
+      `--host-resolver-rules=${hostResolverRules(seams.network === "allowlist" ? seams.allowedOrigins ?? [] : [])}`,
+      "--no-proxy-server",
       ...(seams.netLog ? [`--log-net-log=${join(userDataDir, "net-log.json")}`] : []),
     ],
-    // The same environment, except that the browser's temporary files live in the profile.
-    env: { ...process.env, TMPDIR: browserTmp.path },
+    // Only the allow-listed variables of the host's environment; see browserEnvironment.
+    env: browserEnvironment(process.env, browserTmp.path),
     detached: process.platform !== "win32",
     // The control connection is a pair of pipes, not a DevTools port on loopback. A browser on
     // the websocket transport kept running when breaklint was killed (12–13 processes alive 30 s

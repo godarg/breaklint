@@ -1,9 +1,12 @@
 import { strict as assert } from "node:assert";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { once } from "node:events";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   acquireProducedDocuments, cleanupOwnedGroup, OWNED_GROUP_BUDGETS, ownedGroupProbeState, resolveProducedSourceOrigin,
@@ -11,6 +14,7 @@ import {
 } from "../../src/source/producer.ts";
 import { checkProducedDocuments } from "../../src/index.ts";
 import { CapturedResourceClosureError, capturedResourceClosure } from "../../src/acquire/render-run.ts";
+import { processIsDefunct } from "../../src/acquire/browser.ts";
 
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
 
@@ -340,5 +344,165 @@ describe("owned process group cleanup: retry, deadline and zombie paths", () => 
   it("reports any other delivery errno as a termination failure", { timeout: 2_000 }, async () => {
     const k = kernel({ probe: () => null, deliver: () => "EIO", members: [{ pid: 51_001, defunct: false }] });
     await assert.rejects(cleanupOwnedGroup(PGID, k.operations), /termination failed/u);
+  });
+});
+
+/*
+ * The producer runs detached in a process group of its own, so a signal to the host never reaches
+ * it. A real host process with the public API, a producer that records its pid and then waits,
+ * and a SIGTERM to the host once the producer runs. Measured before the hold: the host ended by
+ * SIGTERM and the producer was still running 2 s later.
+ */
+describe("a host interrupted while its producer runs", { concurrency: false }, () => {
+  const index = new URL("../../src/index.ts", import.meta.url).href;
+  const running = (pid: number): boolean => {
+    try { process.kill(pid, 0); } catch { return false; }
+    return !processIsDefunct(pid);
+  };
+  async function interruptedHost(mode: "none" | "listens") {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "breaklint-producer-signal-")));
+    const code = join(root, "producer.cjs");
+    writeFileSync(code, `require("node:fs").writeFileSync(${JSON.stringify(join(root, "pid"))}, String(process.pid)); setTimeout(() => process.exit(9), 30000);`);
+    const script = `
+      import { writeSync } from "node:fs";
+      const { checkProducedDocuments } = await import(${JSON.stringify(index)});
+      ${mode === "listens" ? 'process.on("SIGTERM", () => { writeSync(1, "host: SIGTERM\\n"); });' : ""}
+      const result = await checkProducedDocuments({ producer: { trust: "host-controlled-producer", id: "slow", executable: process.execPath, argv: [${JSON.stringify(code)}],
+        codeFiles: [{ id: "@producer/slow", path: ${JSON.stringify(code)} }], producerOptions: {} },
+        options: { outputPaths: ["build/print.html"], config: {}, evidenceBinding: false, runRoot: ${JSON.stringify(join(root, "run"))}, outDir: ${JSON.stringify(join(root, "report"))} } });
+      writeSync(1, "result " + JSON.stringify(result.ok ? { ok: true } : { ok: false, detail: result.detail }) + "\\n");
+      process.exit(0);`;
+    const child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", script], { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    const exited = once(child, "exit");
+    try {
+      const deadline = Date.now() + 30_000;
+      while (!existsSync(join(root, "pid")) && Date.now() < deadline) await new Promise((resolveWait) => setTimeout(resolveWait, 20));
+      assert.ok(existsSync(join(root, "pid")), `the producer never started; stderr: ${stderr}`);
+      const producer = Number(readFileSync(join(root, "pid"), "utf8"));
+      child.kill("SIGTERM");
+      const [code, signal] = await exited;
+      const alive = running(producer);
+      if (alive) process.kill(producer, "SIGKILL");
+      return { exit: { code, signal }, producerAlive: alive, stdout, stderr };
+    } finally {
+      child.kill("SIGKILL");
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  // Mutation "no hold around the producer": red, the producer outlives its host.
+  it("with no listener of its own, the host ends by the signal and its producer's group is gone first", { timeout: 60_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("POSIX signals and process groups");
+    const result = await interruptedHost("none");
+    assert.deepEqual(result.exit, { code: null, signal: "SIGTERM" }, `stdout: ${result.stdout} stderr: ${result.stderr}`);
+    assert.equal(result.producerAlive, false, "the producer outlived its interrupted host");
+  });
+
+  // Mutation "no hold around the producer": red, the producer runs on and the call waits for it.
+  it("with a listener of its own, the host decides; the producer's group is killed and the call reports the interrupt", { timeout: 60_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("POSIX signals and process groups");
+    const result = await interruptedHost("listens");
+    assert.deepEqual(result.exit, { code: 0, signal: null }, `stdout: ${result.stdout} stderr: ${result.stderr}`);
+    assert.match(result.stdout, /host: SIGTERM/u);
+    assert.match(result.stdout, /result \{"ok":false,"detail":"producer incomplete: interrupted by SIGTERM; record not accepted"\}/u);
+    assert.equal(result.producerAlive, false, "the producer outlived the interrupt");
+  });
+
+  /*
+   * A signal that arrives after the producer's hold is let go, during the synchronous validation
+   * that follows, is queued for breaklint's listener. A host that exits as soon as the call
+   * resolves would discard it; the API passes one turn of the event loop before it returns.
+   * Deterministic: the host's JSON.parse sends SIGTERM to the process as it parses the producer's
+   * record. Mutation "no drain before the API returns": red, exit 0 with a result.
+   */
+  it("a signal delivered while the call finishes still ends a host without a listener", { timeout: 60_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("POSIX signals");
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "breaklint-producer-late-")));
+    try {
+      const code = join(root, "producer.cjs");
+      writeFileSync(code, `require("node:fs").writeSync(3, '{"probe":"late-signal"}'); process.exit(0);`);
+      const script = `
+        import { writeSync } from "node:fs";
+        const parse = JSON.parse; let sent = false;
+        JSON.parse = function (text, ...rest) {
+          if (!sent && typeof text === "string" && text.includes("late-signal")) { sent = true; process.kill(process.pid, "SIGTERM"); }
+          return parse.call(this, text, ...rest);
+        };
+        const { checkProducedDocuments } = await import(${JSON.stringify(index)});
+        const result = await checkProducedDocuments({ producer: { trust: "host-controlled-producer", id: "late", executable: process.execPath, argv: [${JSON.stringify(code)}],
+          codeFiles: [{ id: "@producer/late", path: ${JSON.stringify(code)} }], producerOptions: {} },
+          options: { outputPaths: ["build/print.html"], config: {}, evidenceBinding: false, runRoot: ${JSON.stringify(join(root, "run"))}, outDir: ${JSON.stringify(join(root, "report"))} } });
+        writeSync(1, "result " + JSON.stringify(result.ok ? { ok: true } : { ok: false, detail: result.detail }) + "\\n");
+        process.exit(0);`;
+      const child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", script], { stdio: ["ignore", "pipe", "pipe"] });
+      let stdout = "";
+      child.stdout.on("data", (chunk) => { stdout += chunk; });
+      const [exitCode, signal] = await once(child, "exit");
+      assert.deepEqual({ code: exitCode, signal }, { code: null, signal: "SIGTERM" }, `the delivered SIGTERM was lost; stdout: ${stdout}`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  // Mutation "spawn even when the hold is already interrupted": red, the producer is started by a
+  // process that is about to end by the signal, and outlives it.
+  it("starts no producer while another hold's interrupt is being cleaned up", { timeout: 60_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("POSIX signals and process groups");
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "breaklint-producer-during-")));
+    const browserTs = new URL("../../src/acquire/browser.ts", import.meta.url).href;
+    try {
+      const code = join(root, "producer.cjs");
+      writeFileSync(code, `require("node:fs").writeFileSync(${JSON.stringify(join(root, "started"))}, String(process.pid)); setTimeout(() => process.exit(9), 30000);`);
+      const script = `
+        import { writeSync } from "node:fs";
+        const { holdForInterrupt } = await import(${JSON.stringify(browserTs)});
+        const { checkProducedDocuments } = await import(${JSON.stringify(index)});
+        // A second, concurrent call starts while the first hold's orderly cleanup (1.5 s here) runs.
+        holdForInterrupt({
+          async cleanup() {
+            void checkProducedDocuments({ producer: { trust: "host-controlled-producer", id: "during", executable: process.execPath, argv: [${JSON.stringify(code)}],
+              codeFiles: [{ id: "@producer/during", path: ${JSON.stringify(code)} }], producerOptions: {} },
+              options: { outputPaths: ["build/print.html"], config: {}, evidenceBinding: false, runRoot: ${JSON.stringify(join(root, "run"))}, outDir: ${JSON.stringify(join(root, "report"))} } })
+              .then((result) => { writeSync(1, "during " + JSON.stringify(result.ok ? { ok: true } : { ok: false, detail: result.detail }) + "\\n"); });
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+          },
+          force() {},
+        });
+        writeSync(1, "ready\\n");
+        setTimeout(() => {}, 30000);`;
+      const child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", script], { stdio: ["ignore", "pipe", "pipe"] });
+      let stdout = "";
+      let sent = false;
+      child.stdout.on("data", (chunk) => { stdout += chunk; if (!sent && stdout.includes("ready\n")) { sent = true; child.kill("SIGTERM"); } });
+      const [exitCode, signal] = await once(child, "exit");
+      assert.deepEqual({ code: exitCode, signal }, { code: null, signal: "SIGTERM" }, stdout);
+      assert.match(stdout, /during \{"ok":false,"detail":"producer incomplete: interrupted by SIGTERM; the producer was not started"\}/u);
+      assert.equal(existsSync(join(root, "started")), false, "a producer was started during an interrupt's cleanup");
+    } finally {
+      try { process.kill(Number(readFileSync(join(root, "started"), "utf8")), "SIGKILL"); } catch { /* not started, as asserted */ }
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Mutation "no early refusal": red, the producer runs and the reason is "private error details withheld".
+  it("names the driver's refused environment variable, and starts no producer", async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "breaklint-producer-refusal-")));
+    const saved = process.env.PUPPETEER_DANGEROUS_NO_SANDBOX;
+    process.env.PUPPETEER_DANGEROUS_NO_SANDBOX = "true";
+    try {
+      const code = join(root, "producer.cjs");
+      writeFileSync(code, `require("node:fs").writeFileSync(${JSON.stringify(join(root, "started"))}, "yes"); process.exit(1);`);
+      const result = await checkProducedDocuments({ producer: { trust: "host-controlled-producer", id: "refused", executable: process.execPath, argv: [code],
+        codeFiles: [{ id: "@producer/refused", path: code }], producerOptions: {} },
+        options: { outputPaths: ["build/print.html"], config: {}, evidenceBinding: false, runRoot: join(root, "run"), outDir: join(root, "report") } });
+      assert.equal(result.ok, false);
+      assert.match(result.ok ? "" : result.detail, /^producer not started: refusing to start the browser\. PUPPETEER_DANGEROUS_NO_SANDBOX is set: it makes puppeteer-core start the browser with its sandbox off\./u);
+      assert.equal(existsSync(join(root, "started")), false, "the producer was started for a run whose renderer is refused");
+    } finally {
+      if (saved === undefined) delete process.env.PUPPETEER_DANGEROUS_NO_SANDBOX; else process.env.PUPPETEER_DANGEROUS_NO_SANDBOX = saved;
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

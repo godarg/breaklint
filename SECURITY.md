@@ -28,32 +28,53 @@ intended:
   The driver itself would add one when the environment variable `PUPPETEER_DANGEROUS_NO_SANDBOX`
   is set, so a launch with that variable set (or `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES`,
   which changes the browser's feature switches) does not start: it ends with exit 3 and names
-  the variable. breaklint does not edit a host's environment to get around it.
-  `tests/unit/sandbox-boundary.test.ts` holds all of it: it reads the launch call with the
-  TypeScript parser and allows only named options and named, allow-listed switches, requires the
-  environment refusal before the launch, runs the CLI with the variable set against a fake
-  browser that records its switches, and scans `src/`, `tools/`, `tests/` and the workflows for
-  sandbox-disabling switches.
+  the variable, and the library API returns that reason and starts no producer. breaklint does
+  not edit a host's environment to get around it. The browser reads switches from its own
+  environment as well (`CHROME_EXTRA_FLAGS` carried a DevTools port, and would carry the
+  sandbox-disabling switch, into a launch that passed the host's environment through), so the
+  browser is started with an allow-listed environment only: `HOME`, `USER`, `LOGNAME`, `PATH`,
+  `LANG`, `LANGUAGE`, `LC_*`, `TZ`, `TZDIR`, the XDG base directories and `FONTCONFIG_FILE`,
+  `FONTCONFIG_PATH`, `FONTCONFIG_SYSROOT`, as the host set them, and `TMPDIR` pointing into the
+  profile. Nothing else of the host's environment, `CHROME_*`, `LD_*` and proxy variables
+  included, reaches it. `tests/unit/sandbox-boundary.test.ts` holds all of it: it reads the launch
+  call with the TypeScript parser and allows only named options, named, allow-listed switches and
+  the allow-list builder as the environment, requires the environment refusal before the launch,
+  runs the CLI with the variable set against a fake browser that records its switches, runs it
+  with `CHROME_EXTRA_FLAGS` and other switch-carrying variables set against a fake browser that
+  records its environment (with a control that passes the environment through and sees them),
+  and scans `src/`, `tools/`, `tests/` and the workflows for sandbox-disabling switches. A real
+  browser test holds that an inherited `CHROME_EXTRA_FLAGS=--remote-debugging-port=…` opens no
+  port and is absent from the browser's `/proc/<pid>/environ`; its control, the driver with the
+  environment passed through, opens the port on Chromium 141 (a browser that does not read the
+  variable leaves the environ check alone).
 - **The network is blocked by default, for the document and for the browser itself.** Request
   interception is on, the default policy is `offline`, and only the tool's own loopback origin
   plus `data:`, `blob:` and `about:` are let through. Interception sees only the document's
-  requests, and the browser makes requests of its own: measured on Chromium 141 through this
-  tool's launch path, within seconds of starting, DNS queries and connections to Google hosts for
-  network time, the account list, AI-mode eligibility, GCM check-in, DNS-over-HTTPS and a search
-  preconnect, and in CI Google Chrome's component updater downloaded files. So the browser is
-  started with `--disable-component-update` and `--disable-background-networking`, and in the
-  default offline mode also with `--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1` and
-  `--no-proxy-server`: every host name except the loopback address resolves to nothing before any
-  DNS query, and no proxy forwards on the browser's behalf. A unit test reads the browser's own
-  net-log and requires that it connected nowhere but loopback. `--allow-network <origin>` opens
-  exactly one origin per use for the document; in that mode the browser-level lock is off,
-  because allowed origins must resolve and may need the host's proxy, and the browser's own
-  services can then reach the network. A document's WebRTC is neither a request interception
-  sees nor a host name to resolve: measured on Chromium 141, its STUN packets reached an IP
-  address on a non-loopback interface under the offline launch. Every profile is therefore
-  created with the WebRTC preference `disable_non_proxied_udp`; with no proxy in offline mode, a
-  test then counts no UDP and no TCP from the same document. With `--allow-network`, a WebRTC
-  TURN connection over TCP was still observed and is not blocked.
+  ordinary requests, and the browser makes requests of its own: measured on Chromium 141 through
+  this tool's launch path, within seconds of starting, DNS queries and connections to Google hosts
+  for network time, the account list, AI-mode eligibility, GCM check-in, DNS-over-HTTPS and a
+  search preconnect, and in CI Google Chrome's component updater downloaded files. So the browser
+  is started with `--disable-component-update` and `--disable-background-networking`, and in
+  every mode also with `--host-resolver-rules` and `--no-proxy-server`: every host, name or IP
+  literal, resolves to nothing before any DNS query except the loopback address
+  (`MAP * ~NOTFOUND , EXCLUDE 127.0.0.1`) and, with `--allow-network`, the allowed origins' hosts
+  (`, EXCLUDE <host>` each); no proxy forwards on the browser's behalf, so `--allow-network`
+  origins must be reachable without one. Secure DNS is off in every profile (`Local State`:
+  `dns_over_https.mode` `off`), because it addresses its server by IP literal and so bypasses
+  the resolver map: on CI's Google Chrome 153 it connected to `[2001:4860:4860::8888]:443` under
+  the map. An administrator's `DnsOverHttpsMode` policy overrides that preference. A unit test
+  reads the browser's own net-log and requires, in both modes, that it connected nowhere but
+  loopback and used no secure DNS, against a control browser without the lock and profile that
+  shows both. `--allow-network <origin>` lets the document's intercepted requests reach exactly
+  that origin. Below interception the lock works by host, not by origin: channels interception
+  does not see — a WebSocket, WebTransport, a worker's requests, a cross-site iframe, WebRTC —
+  reach no host that is not allowed (a test counts none from a WebSocket, WebTransport and an
+  iframe, against a control with the host allowed), but they can reach any port or scheme of an
+  allowed host. A document's WebRTC is neither a request interception sees nor always a host
+  name to resolve: measured on Chromium 141, its STUN packets reached an IP address on a
+  non-loopback interface under the earlier offline launch. Every profile is therefore created
+  with the WebRTC preference `disable_non_proxied_udp`; with no proxy, a test counts no UDP and
+  no TCP from the same document, offline and with `--allow-network`.
 - **No browser-wide file-access switch.** The document is served from a loopback origin instead. A
   test measures that a document loaded this way cannot read a neighbouring file, because removing
   the reason for a switch and leaving the switch in place is a mistake that was actually made here

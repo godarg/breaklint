@@ -28,6 +28,7 @@ import { render } from "../report/index.ts";
 import { parseArgs } from "./args.ts";
 import type { Snapshot } from "../core/types.ts";
 import type { RenderEnvironment } from "../acquire/render-run.ts";
+import { drainPendingSignals } from "../acquire/browser.ts";
 import { err, flushOutput, notice, out } from "./out.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -311,6 +312,14 @@ function isSameFile(a: string, b: string): boolean {
  * and complete before stdout is touched, and stdout carries only a confirmation line; losing that
  * line loses nothing the verdict rests on, so the verdict's code stands and stderr says what was
  * lost.
+ *
+ * Before the exit, one turn of the event loop for signals already delivered. A SIGINT, SIGTERM or
+ * SIGHUP that arrived while the report was being built and written is queued for the listener
+ * the render installed, and `process.exit` would discard it: measured with Chromium 141 and the
+ * local measurement shims, SIGTERM sent 0–15 ms after the browser's profile was removed ended the
+ * run with exit 0 in 8 of 9 runs; with the drain, by SIGTERM in 9 of 9. Drained, the listener sees
+ * it with no hold left and ends the process by that signal, as it would have ended without
+ * breaklint.
  */
 async function exitAfterOutput(code: number): Promise<never> {
   const failure = await flushOutput();
@@ -320,6 +329,7 @@ async function exitAfterOutput(code: number): Promise<never> {
         "arrive complete, so this run ends with exit 3 whatever its verdict.\n",
     );
     await flushOutput();
+    await drainPendingSignals();
     process.exit(3);
   }
   if (failure.notice) {
@@ -329,6 +339,7 @@ async function exitAfterOutput(code: number): Promise<never> {
     );
     await flushOutput();
   }
+  await drainPendingSignals();
   process.exit(code);
 }
 

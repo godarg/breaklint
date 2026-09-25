@@ -41,7 +41,7 @@ import {
   cleanupBrowserProfile,
 } from "../../src/acquire/render-run.ts";
 import {
-  alive, BROWSER_TMP_PREFIX, resolveBrowser, browserTmpDirFor, captureProcessTreeOwnership, createBrowserProfile, readProfileOwner, removeBrowserTmpDir, createInterruptRegistry, defaultSweepEnvironment, processGroupHasLiveMember, INTERRUPT_SIGNALS, launchBrowser, linuxProcessTable,
+  alive, BROWSER_NETWORK_ARGS, BROWSER_TMP_PREFIX, hostResolverRules, PROFILE_LOCAL_STATE, resolveBrowser, browserTmpDirFor, captureProcessTreeOwnership, createBrowserProfile, readProfileOwner, removeBrowserTmpDir, createInterruptRegistry, defaultSweepEnvironment, processGroupHasLiveMember, INTERRUPT_SIGNALS, launchBrowser, linuxProcessTable,
   ownServerLifecycle, processIsDefunct, profileOwnerIdentity, PROFILE_OWNER_FILE, PROFILE_PREFIX,
   STALE_PROFILE_MIN_AGE_MS, sweepStaleBrowserProfiles, terminateProcessTree, TERMINATION_GRACE_MS,
   type InterruptSignal, type PageLike, type ProcessRow, type ProfileOwnerRecord, type ProfileSweepEnvironment,
@@ -1441,6 +1441,7 @@ describe("breaklint's own interrupt handling while it owns a browser", () => {
   function fakeHost() {
     const lists = new Map<InterruptSignal, Array<(signal: InterruptSignal) => void>>();
     const watchers = new Set<(event: string | symbol, listener: unknown) => void>();
+    const exitWatchers = new Set<() => void>();
     const events: string[] = [];
     const list = (signal: InterruptSignal) => lists.get(signal) ?? lists.set(signal, []).get(signal)!;
     const remove = (signal: InterruptSignal, listener: (signal: InterruptSignal) => void) => {
@@ -1459,7 +1460,9 @@ describe("breaklint's own interrupt handling while it owns a browser", () => {
       watchRemovals(watcher) { watchers.add(watcher); return () => { watchers.delete(watcher); }; },
       async report(line) { events.push(`report ${line.trim()}`); },
       drain(fn) { setImmediate(() => setImmediate(fn)); },
+      watchExit(watcher) { exitWatchers.add(watcher); return () => { exitWatchers.delete(watcher); }; },
     };
+    const exit = () => { for (const watcher of [...exitWatchers]) watcher(); };
     const on = (signal: InterruptSignal, listener: (signal: InterruptSignal) => void) => { list(signal).push(listener); };
     const once = (signal: InterruptSignal, listener: (signal: InterruptSignal) => void, prepend = false) => {
       const wrapper = (received: InterruptSignal) => { remove(signal, wrapper); listener(received); };
@@ -1467,7 +1470,7 @@ describe("breaklint's own interrupt handling while it owns a browser", () => {
     };
     const emit = (signal: InterruptSignal) => { for (const listener of [...list(signal)]) listener(signal); };
     const installed = () => INTERRUPT_SIGNALS.map((signal) => list(signal).length);
-    return { host, on, once, emit, events, installed, remove, list };
+    return { host, on, once, emit, events, installed, remove, list, exit, exitWatchers };
   }
   const tick = () => new Promise((resolve) => setImmediate(resolve));
   const drained = () => new Promise((resolve) => setImmediate(() => setImmediate(() => setImmediate(resolve))));
@@ -1561,9 +1564,32 @@ describe("breaklint's own interrupt handling while it owns a browser", () => {
     await drained();
     assert.deepEqual(events, [
       "force",
-      "report breaklint: interrupted by SIGHUP; renderer cleanup not verified: forced: SIGKILL of the browser process group; termination not verified",
+      "report breaklint: interrupted by SIGHUP; cleanup not verified: forced: SIGKILL of the browser process group; termination not verified",
       "kill 4242 SIGHUP listeners=0",
     ]);
+  });
+
+  // Mutation "no exit listener": red, a process that ends while a browser is owned forces nothing.
+  // Mutation "force twice": red on the count after a signal already forced.
+  it("forces a live hold when the process exits under it, once, and never after the release", async () => {
+    const { host, emit, events, exit, exitWatchers, on } = fakeHost();
+    const registry = createInterruptRegistry(host, 1_000);
+    const hold = registry.hold({ async cleanup() { events.push("cleanup"); }, force() { events.push("force"); } });
+    assert.equal(exitWatchers.size, 1, "no exit listener while a browser is owned");
+    exit();
+    assert.deepEqual(events, ["force"], "a process exit during a live hold left the browser to the next run's sweep");
+    // The host listens; the signal forces; a later exit does not force again.
+    const second = registry.hold({ async cleanup() {}, force() { events.push("force 2"); } });
+    on("SIGTERM", () => { events.push("host"); });
+    emit("SIGTERM");
+    exit();
+    assert.deepEqual(events, ["force", "force 2", "host"], "an entry was forced twice");
+    hold.release();
+    second.release();
+    await drained();
+    assert.equal(exitWatchers.size, 0, "the exit listener outlived the last hold");
+    exit();
+    assert.deepEqual(events, ["force", "force 2", "host"]);
   });
 
   // Mutation "uninstall synchronously on the last release": red, the listeners are gone at once and
@@ -1643,6 +1669,103 @@ describe("a delivered interrupt is never lost", { concurrency: false }, () => {
       writeSync(1, "render finished\\n"); render.release(); process.exit(0);`, "SIGTERM");
     assert.deepEqual(exit, { code: null, signal: "SIGTERM" }, `the delivered SIGTERM was lost; stdout: ${stdout}`);
     assert.match(stdout, /render cleanup/u, "the render's hold never saw the signal");
+  });
+
+  // Mutation "no exit listener in the registry": red, "forced" is never written.
+  it("a process that exits while a hold is live forces that hold's cleanup on the way out", { timeout: 60_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("POSIX");
+    const child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", `
+      import { writeSync } from "node:fs";
+      const { holdForInterrupt } = await import(${JSON.stringify(browserTs)});
+      holdForInterrupt({ async cleanup() {}, force() { writeSync(1, "forced\\n"); } });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      process.exit(0);`], { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    const [code] = await once(child, "exit");
+    assert.equal(code, 0);
+    assert.equal(stdout, "forced\n", "a host's process.exit() during a live hold left its browser and profile behind");
+  });
+
+  /*
+   * The CLI's own last stretch: after the render has let its hold go, the report is written and the
+   * process exits. A signal that lands there is queued for breaklint's listener, and an immediate
+   * process.exit() discarded it (measured with the real CLI and browser: SIGTERM 0–15 ms after the
+   * profile was removed, exit 0 in 8 of 9 runs). Deterministic here: a fake browser that fails
+   * to start (exit 3 path), and a preload that sends SIGTERM to the process as the CLI writes its
+   * error line, i.e. after the release and before the exit. Mutation "no drain before
+   * process.exit in exitAfterOutput": red, exit 3.
+   */
+  it("the CLI ends by a signal that arrived between the render's release and its exit", { timeout: 60_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("POSIX signals");
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "breaklint-exit-signal-")));
+    try {
+      const tmp = join(root, "tmp");
+      mkdirSync(tmp);
+      const exe = join(root, "fake-chrome");
+      writeFileSync(exe, "#!/bin/sh\nexit 1\n");
+      chmodSync(exe, 0o755);
+      const preload = join(root, "preload.mjs");
+      writeFileSync(preload, `const write = process.stderr.write.bind(process.stderr); let sent = false;
+        process.stderr.write = (chunk, ...rest) => { const result = write(chunk, ...rest);
+          if (!sent && String(chunk).includes("renderer startup failed")) { sent = true; process.kill(process.pid, "SIGTERM"); }
+          return result; };`);
+      const doc = join(root, "doc.html");
+      writeFileSync(doc, "<!doctype html><p>late</p>");
+      const child = spawn(process.execPath, ["--experimental-strip-types", "--import", preload, fileURLToPath(new URL("../../src/cli/index.ts", import.meta.url)), "--format", "json", doc], {
+        stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, BREAKLINT_CHROME: exe, TMPDIR: tmp },
+      });
+      let stderr = "";
+      child.stderr.on("data", (chunk) => { stderr += chunk; });
+      const [code, signal] = await once(child, "exit");
+      assert.match(stderr, /renderer startup failed/u, "the CLI did not reach the path under test");
+      assert.deepEqual({ code, signal }, { code: null, signal: "SIGTERM" }, `the delivered SIGTERM was lost; stderr: ${stderr}`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  /*
+   * A host that listens decides; breaklint forces the cleanup (SIGKILL of the browser's group,
+   * profile removal) and reports what it did. The profile here is one the removal must refuse
+   * (outside the temporary directory), and the report must say so, not "profile removed".
+   * Mutation "the verified-termination detail overwrites the forced one" (the previous shape):
+   * red, "profile removed".
+   */
+  it("an interrupted render reports a profile it could not remove, even after verifying the forced kill", { timeout: 60_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("POSIX signals");
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "breaklint-forced-profile-")));
+    const profile = join(root, "not-a-profile");
+    mkdirSync(profile);
+    try {
+      const doc = join(root, "doc.html");
+      writeFileSync(doc, "<!doctype html><p>forced</p>");
+      const { exit, stdout } = await signalDuringBusy(`
+        import { spawn } from "node:child_process";
+        import { writeSync } from "node:fs";
+        const { renderDocuments } = await import(${JSON.stringify(renderRun)});
+        process.on("SIGTERM", () => { writeSync(1, "host: SIGTERM\\n"); });
+        const sleeper = spawn("sleep", ["30"], { detached: true, stdio: "ignore" });
+        let reject;
+        const browser = {
+          process: () => ({ pid: sleeper.pid }),
+          version: () => { writeSync(1, "busy\\n"); return new Promise((_resolve, fail) => { reject = fail; }); },
+          async newPage() { throw new Error("unused"); },
+          async close() { reject?.(new Error("closed")); },
+        };
+        const result = await renderDocuments([${JSON.stringify(doc)}], {
+          outDir: ${JSON.stringify(join(root, "out"))}, evidenceBinding: false, sourceMapInjection: true,
+          network: { mode: "offline", allowed: [] }, locale: "de-DE",
+        }, {
+          async launchBrowser() { return { executablePath: "/fake", userDataDir: ${JSON.stringify(profile)}, detail: "", browser }; },
+          async openRasterizer() { return { rasterizer: null, detail: "unit" }; },
+        });
+        writeSync(1, "result " + JSON.stringify(result.fatal) + "\\n");
+        process.exit(0);`, "SIGTERM");
+      assert.equal(exit.code, 0, stdout);
+      const line = stdout.split("\n").find((entry) => entry.startsWith("result ")) ?? "";
+      assert.match(line, /interrupted by SIGTERM/u, stdout);
+      assert.match(line, /then verified terminated; refused to remove an unowned profile path/u, `the forced cleanup's profile outcome was lost: ${line}`);
+      assert.doesNotMatch(line, /profile removed/u);
+    } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
   // The consumer-visible path: renderDocuments in its own process, with a SIGTERM that lands while
@@ -1816,16 +1939,18 @@ describe("browser launch: pipe transport, one bound for the whole start, a diagn
 
 /*
  * A real browser (the one `BREAKLINT_CHROME` or the platform names; CI's Google Chrome), launched
- * through the product path. Two properties the fakes above cannot show: the browser's own
- * temporary files live in the profile, and in the default offline mode the browser itself makes
- * no network connection other than to the loopback document origin. The observation is the
- * browser's own net-log (unit-only seam), and it is shown to see browser-level traffic by the
- * control: the same launch without the offline lock, which on Chromium 141 resolved and
- * connected to Google hosts within a second.
+ * through the product path. Properties the fakes above cannot show: the browser's own temporary
+ * files live in the profile; in both network modes the browser itself makes no network connection
+ * other than to the loopback document origin and uses no secure DNS; what interception never sees
+ * (WebSocket, WebTransport, iframe, WebRTC) reaches no host that is not allowed; and an inherited
+ * CHROME_EXTRA_FLAGS changes nothing. The network observation is the browser's own net-log
+ * (unit-only seam), shown to see browser-level traffic and secure DNS by the control: a browser
+ * without breaklint's lock and profile, which on Chromium 141 resolved and connected to Google
+ * hosts within a second and made DoH requests within 5 s.
  */
 describe("a real browser: its temporary files and its own network use", { concurrency: false }, () => {
   const REPO = fileURLToPath(new URL("../..", import.meta.url));
-  type NetUse = { connects: string[]; hosts: string[] };
+  type NetUse = { connects: string[]; hosts: string[]; secureDns: string[] };
   function netUse(file: string): NetUse {
     const text = readFileSync(file, "utf8").trim();
     let log: { constants: { logEventTypes: Record<string, number> }; events: Array<{ type: number; params?: Record<string, unknown> }> };
@@ -1833,16 +1958,19 @@ describe("a real browser: its temporary files and its own network use", { concur
     const names = Object.fromEntries(Object.entries(log.constants.logEventTypes).map(([name, id]) => [id, name]));
     const connects = new Set<string>();
     const hosts = new Set<string>();
+    const secureDns = new Set<string>();
     for (const event of log.events) {
       const name = names[event.type];
       const params = event.params ?? {};
       if ((name === "TCP_CONNECT_ATTEMPT" || name === "UDP_CONNECT") && typeof params.address === "string") connects.add(params.address);
       if (name === "HOST_RESOLVER_MANAGER_REQUEST" && typeof params.host === "string") hosts.add(params.host);
+      // Secure DNS at work: its requests to a DoH server, which never pass the resolver lock.
+      if (name?.startsWith("DOH_")) secureDns.add(name);
     }
-    return { connects: [...connects].sort(), hosts: [...hosts].sort() };
+    return { connects: [...connects].sort(), hosts: [...hosts].sort(), secureDns: [...secureDns].sort() };
   }
   const loopback = (value: string) => /^(https?:\/\/)?127\.0\.0\.1(:\d+)?\/?$/u.test(value) || value.startsWith("127.0.0.1:");
-  async function run(network: "offline" | "allowlist", idleMs: number) {
+  async function run(network: "offline" | "allowlist", idleMs: number, allowedOrigins: readonly string[] = []) {
     // A short root, so the ordinary case (temporary files inside the profile) is the one exercised.
     const root = realpathSync(mkdtempSync(join(tmpdir(), "b-")));
     const saved = process.env.TMPDIR;
@@ -1850,7 +1978,7 @@ describe("a real browser: its temporary files and its own network use", { concur
     const server = createServer((_request, response) => { response.end("<p>loopback document</p>"); });
     await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
     try {
-      const launched = await launchBrowser(REPO, { network, netLog: true });
+      const launched = await launchBrowser(REPO, { network, allowedOrigins, netLog: true });
       assert.ok(launched.browser && launched.userDataDir, launched.detail);
       const profile = launched.userDataDir;
       // Where the browser was told to keep its temporary files: the profile, or a recorded short
@@ -1922,22 +2050,42 @@ describe("a real browser: its temporary files and its own network use", { concur
     } finally { rmSync(profile, { recursive: true, force: true }); rmSync(fallback, { recursive: true, force: true }); }
   });
 
+  // Mutation "no publicDetail on a refused launch": red. Needs no browser: the refusal comes first.
+  it("a launch refused for the driver's environment carries its reason for an API to report", async () => {
+    const saved = process.env.PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES;
+    process.env.PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES = "true";
+    try {
+      const result = await renderDocuments([], OPTIONS);
+      assert.equal(result.fatal?.exitCode, 3);
+      assert.equal(result.fatal?.publicDetail,
+        "refusing to start the browser. PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES is set: it makes puppeteer-core change the browser's feature switches. Unset it for this run; breaklint keeps the browser sandbox on and has no way to turn it off.");
+    } finally {
+      if (saved === undefined) delete process.env.PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES; else process.env.PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES = saved;
+    }
+  });
+
   it("launches with the run's network mode, offline unless an origin is allowed", async () => {
     const seen: unknown[] = [];
     for (const network of [OPTIONS.network, { mode: "allowlist" as const, allowed: ["https://example.invalid"] }]) {
       await renderDocuments([], { ...OPTIONS, network }, {
-        async launchBrowser(_fromDir?: string, options?: { network?: string }) { seen.push(options?.network); throw new Error("stop after launch options"); },
+        async launchBrowser(_fromDir?: string, options?: { network?: string; allowedOrigins?: readonly string[] }) { seen.push([options?.network, options?.allowedOrigins]); throw new Error("stop after launch options"); },
         async openRasterizer() { return { rasterizer: null, detail: "not reached" }; },
       });
     }
-    assert.deepEqual(seen, ["offline", "allowlist"], "the browser-level network lock does not follow the run's network policy");
+    assert.deepEqual(seen, [["offline", []], ["allowlist", ["https://example.invalid"]]], "the browser-level network lock does not follow the run's network policy");
   });
 
   // Mutation "no TMPDIR for the browser": red, the socket directory sits beside the profile.
-  // Mutation "no offline lock": red on connects. Mutation "lock without --no-proxy-server": not
-  // observable here without a proxy; the probe in docs/limitations.md covers it.
+  // Mutation "no offline lock": red on connects. Mutation "no secure-DNS preference in the
+  // profile's Local State": red on secureDns (Chromium 141 here: DOH_URL_REQUEST; CI's Chrome 153:
+  // a connection to [2001:4860:4860::8888]:443 as well). Mutation "lock without
+  // --no-proxy-server": not observable here without a proxy; the probe in docs/limitations.md
+  // covers it.
   it("in the default offline mode, keeps its temporary files in the profile and connects nowhere but loopback", { timeout: 90_000 }, async () => {
-    const result = await run("offline", 3_000);
+    // 6 s idle: on Chromium 141 secure DNS started between 3 s and 5 s after launch (2 of 2 at
+    // 3 s without, 3 of 3 at 5–6 s with DOH_URL_REQUEST, when the preference was absent).
+    const result = await run("offline", 6_000);
+    assert.deepEqual(result.use.secureDns, [], "the browser used secure DNS, which the resolver lock does not see");
     assert.equal(result.text, "loopback document", "the offline lock broke the loopback document origin");
     assert.deepEqual(result.beside, [], "the browser created temporary files beside its profile");
     if (result.socket !== null) assert.ok(result.socket.startsWith(`${result.browserTmp}/`), `singleton socket outside the browser's directory: ${result.socket}`);
@@ -1983,19 +2131,23 @@ describe("a real browser: its temporary files and its own network use", { concur
     } finally { udp.close(); tcp.close(); server.close(); }
   }
 
-  it("a document's WebRTC reaches no address beyond loopback in the default offline mode", { timeout: 90_000 }, async (t) => {
+  // Mutation "the lock only offline" (the previous shape): red in the allow-list mode, TURN over
+  // TCP. ("--no-proxy-server only offline" alone is not observable here without a proxy.)
+  it("a document's WebRTC reaches no address beyond loopback, offline and with --allow-network", { timeout: 90_000 }, async (t) => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), "b-")));
     const saved = process.env.TMPDIR;
     process.env.TMPDIR = root;
     try {
-      const received = await webRtcProbe(async () => {
-        const launched = await launchBrowser(REPO);
-        assert.ok(launched.browser, launched.detail);
-        const browser = launched.browser;
-        return { page: await browser.newPage(), close: async () => { await closeBrowserBounded(browser); cleanupBrowserProfile(launched.userDataDir); } };
-      });
-      if (received === null) return t.skip("this machine has no non-loopback IPv4 interface; there is nowhere for the probe to go");
-      assert.deepEqual(received, { udp: 0, tcp: 0 }, "a document's WebRTC reached a non-loopback address");
+      for (const network of ["offline", "allowlist"] as const) {
+        const received = await webRtcProbe(async () => {
+          const launched = await launchBrowser(REPO, { network, allowedOrigins: ["https://allowed.invalid"] });
+          assert.ok(launched.browser, launched.detail);
+          const browser = launched.browser;
+          return { page: await browser.newPage(), close: async () => { await closeBrowserBounded(browser); cleanupBrowserProfile(launched.userDataDir); } };
+        });
+        if (received === null) return t.skip("this machine has no non-loopback IPv4 interface; there is nowhere for the probe to go");
+        assert.deepEqual(received, { udp: 0, tcp: 0 }, `a document's WebRTC reached a non-loopback address (${network})`);
+      }
     } finally {
       if (saved === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = saved;
       rmSync(root, { recursive: true, force: true });
@@ -2017,11 +2169,170 @@ describe("a real browser: its temporary files and its own network use", { concur
     } finally { rmSync(profile, { recursive: true, force: true }); }
   });
 
-  it("control: without the offline lock the same observation sees the browser's own traffic", { timeout: 90_000 }, async () => {
-    const result = await run("allowlist", 6_000);
-    const beyond = [...result.use.connects.filter((address) => !loopback(address)), ...result.use.hosts.filter((host) => !loopback(host))];
-    assert.ok(beyond.length > 0, "the net-log showed no browser-level traffic even without the lock; the offline test above would prove nothing");
+  // Mutation "the lock only offline" (the previous shape): red on connects and hosts.
+  it("with --allow-network, the browser's own services stay locked and secure DNS stays off", { timeout: 90_000 }, async () => {
+    const result = await run("allowlist", 6_000, ["https://allowed.invalid"]);
+    assert.equal(result.text, "loopback document");
+    assert.deepEqual(result.use.secureDns, [], "the browser used secure DNS");
+    assert.deepEqual(result.use.connects.filter((address) => !loopback(address)), [], "the browser connected beyond loopback");
+    assert.deepEqual(result.use.hosts.filter((host) => !loopback(host) && !host.includes("~notfound") && !host.includes("allowed.invalid")), [], "a host name other than loopback or the allowed one was resolved");
     assert.deepEqual(result.after, []);
+  });
+
+  it("the resolver lock names 127.0.0.1 and each allowed host, and nothing a host name could smuggle in", () => {
+    assert.equal(hostResolverRules([]), "MAP * ~NOTFOUND , EXCLUDE 127.0.0.1");
+    assert.equal(hostResolverRules(["https://b.example:8443", "http://a.example", "https://b.example", "http://127.0.0.1:9"]),
+      "MAP * ~NOTFOUND , EXCLUDE 127.0.0.1 , EXCLUDE a.example , EXCLUDE b.example");
+    assert.equal(hostResolverRules(["https://bücher.example"]), "MAP * ~NOTFOUND , EXCLUDE 127.0.0.1 , EXCLUDE xn--bcher-kva.example");
+    assert.equal(hostResolverRules(["http://[::1]:8080"]), "MAP * ~NOTFOUND , EXCLUDE 127.0.0.1 , EXCLUDE ::1 , EXCLUDE [::1]");
+    // A WHATWG URL admits a comma in a host; as a rule it would start a second rule. Left out.
+    assert.equal(hostResolverRules(["https://a,MAP * 1.2.3.4", "https://x.example,EXCLUDE *", "not a url"]), "MAP * ~NOTFOUND , EXCLUDE 127.0.0.1");
+    assert.deepEqual(PROFILE_LOCAL_STATE, { dns_over_https: { mode: "off" } });
+  });
+
+  it("control: a browser without breaklint's lock and profile shows its own traffic to the same observation", { timeout: 90_000 }, async () => {
+    const found = resolveBrowser();
+    assert.ok(found.path, `no browser: ${found.searched.join(", ")}`);
+    const puppeteer = (await import("puppeteer-core")).default;
+    const profile = realpathSync(mkdtempSync(join(tmpdir(), "b-")));
+    const server = createServer((_request, response) => { response.end("<p>loopback document</p>"); });
+    await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+    try {
+      const browser = await puppeteer.launch({ executablePath: found.path, headless: true, userDataDir: profile, pipe: true, handleSIGINT: false, handleSIGTERM: false, handleSIGHUP: false,
+        args: [...BROWSER_NETWORK_ARGS, `--log-net-log=${join(profile, "net-log.json")}`] });
+      try {
+        const page = await browser.newPage();
+        await page.goto(`http://127.0.0.1:${(server.address() as AddressInfo).port}/`);
+        await new Promise((resolveIdle) => setTimeout(resolveIdle, 6_000));
+      } finally { await browser.close(); }
+      const use = netUse(join(profile, "net-log.json"));
+      const beyond = [...use.connects.filter((address) => !loopback(address)), ...use.hosts.filter((host) => !loopback(host))];
+      assert.ok(beyond.length > 0, "the net-log showed no browser-level traffic without the lock; the tests above would prove nothing");
+      assert.ok(use.secureDns.length > 0, "the net-log showed no secure DNS without the profile preference; the secure-DNS assertions above would prove nothing");
+    } finally { server.close(); rmSync(profile, { recursive: true, force: true }); }
+  });
+
+  /*
+   * The browser reads switches from its environment: CHROME_EXTRA_FLAGS. Inherited by a launch
+   * that passed the host's environment through, `--remote-debugging-port` opened an
+   * unauthenticated DevTools port (measured on Chromium 141). The browser's own /proc environ is
+   * read as well. Control: the driver with the host's environment passed through opens the port.
+   * Mutation "env: { ...process.env, TMPDIR }": red.
+   */
+  async function devtoolsAnswers(port: number): Promise<boolean> {
+    try { const response = await fetch(`http://127.0.0.1:${port}/json/version`); return response.ok; } catch { return false; }
+  }
+  async function freePort(): Promise<number> {
+    const probe = createTcpServer();
+    await new Promise<void>((resolveListen) => probe.listen(0, "127.0.0.1", resolveListen));
+    const { port } = probe.address() as AddressInfo;
+    await new Promise<void>((resolveClose) => probe.close(() => resolveClose()));
+    return port;
+  }
+  it("an inherited CHROME_EXTRA_FLAGS opens no DevTools port and is not in the browser's environment; control: passed through, it does", { timeout: 90_000 }, async (t) => {
+    if (process.platform !== "linux") return t.skip("reads /proc");
+    const found = resolveBrowser();
+    assert.ok(found.path, `no browser: ${found.searched.join(", ")}`);
+    const saved = process.env.CHROME_EXTRA_FLAGS;
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "b-")));
+    const savedTmp = process.env.TMPDIR;
+    process.env.TMPDIR = root;
+    try {
+      const port = await freePort();
+      process.env.CHROME_EXTRA_FLAGS = `--remote-debugging-port=${port}`;
+      const launched = await launchBrowser(REPO);
+      assert.ok(launched.browser, launched.detail);
+      let environ = "";
+      try {
+        const pid = launched.browser.process?.()?.pid;
+        assert.ok(pid, "no browser pid");
+        environ = readFileSync(`/proc/${pid}/environ`, "utf8");
+        await new Promise((resolveIdle) => setTimeout(resolveIdle, 1_000));
+        assert.equal(await devtoolsAnswers(port), false, "an inherited CHROME_EXTRA_FLAGS opened a DevTools port");
+      } finally {
+        assert.equal(await closeBrowserBounded(launched.browser), null);
+        assert.equal(cleanupBrowserProfile(launched.userDataDir), null);
+      }
+      const names = environ.split("\0").filter(Boolean).map((entry) => entry.split("=", 1)[0]!);
+      assert.ok(!names.includes("CHROME_EXTRA_FLAGS"), "CHROME_EXTRA_FLAGS is in the browser's environment");
+      assert.ok(names.includes("TMPDIR"), `the browser's environment was not read: ${names.join(",")}`);
+
+      const controlPort = await freePort();
+      process.env.CHROME_EXTRA_FLAGS = `--remote-debugging-port=${controlPort}`;
+      const puppeteer = (await import("puppeteer-core")).default;
+      const browser = await puppeteer.launch({ executablePath: found.path, headless: true, userDataDir: join(root, "control"), pipe: true, env: { ...process.env },
+        handleSIGINT: false, handleSIGTERM: false, handleSIGHUP: false });
+      let controlOpened = false;
+      try {
+        await new Promise((resolveIdle) => setTimeout(resolveIdle, 1_000));
+        controlOpened = await devtoolsAnswers(controlPort);
+      } finally { await browser.close(); }
+      // Chromium 141 reads the variable (the port opens); a build that does not read it at all
+      // leaves only the /proc check above, which does not depend on the browser.
+      if (!controlOpened) t.diagnostic(`this browser (${found.path}) did not act on CHROME_EXTRA_FLAGS; the port check is vacuous here, the environ check stands`);
+    } finally {
+      if (saved === undefined) delete process.env.CHROME_EXTRA_FLAGS; else process.env.CHROME_EXTRA_FLAGS = saved;
+      if (savedTmp === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = savedTmp;
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  /*
+   * What request interception never sees: a document's WebSocket, WebTransport (QUIC over UDP)
+   * and cross-site iframe. Measured on Chromium 141 through the real CLI with --allow-network and
+   * the previous launch (no lock in that mode): all three reached a host that was not allowed.
+   * The target is 127.0.0.2, a loopback address that is not 127.0.0.1, so the lock treats it as
+   * any other host. Control: the same document with that host allowed reaches it, so a clean count
+   * is not a deaf listener. Mutation "the lock only offline": red.
+   */
+  async function unseenChannels(allowedOrigins: readonly string[]) {
+    const target = "127.0.0.2";
+    const received = { websocket: 0, iframe: 0, webtransport: 0 };
+    const ws = createTcpServer((socket) => { received.websocket += 1; socket.destroy(); });
+    const frame = createTcpServer((socket) => { received.iframe += 1; socket.destroy(); });
+    const quic = createUdpSocket("udp4");
+    quic.on("message", () => { received.webtransport += 1; });
+    await new Promise<void>((resolveListen) => ws.listen(0, target, resolveListen));
+    await new Promise<void>((resolveListen) => frame.listen(0, target, resolveListen));
+    await new Promise<void>((resolveBind) => quic.bind(0, target, resolveBind));
+    const port = (server: { address(): unknown }) => (server.address() as AddressInfo).port;
+    const doc = `<!doctype html><p>channels</p><iframe src="http://${target}:${port(frame)}/"></iframe><script>
+      try { new WebSocket("ws://${target}:${port(ws)}/"); } catch {}
+      try { const wt = new WebTransport("https://${target}:${quic.address().port}/"); wt.ready.catch(() => {}); wt.closed.catch(() => {}); } catch {}
+    </script>`;
+    const server = createServer((_request, response) => { response.setHeader("content-type", "text/html"); response.end(doc); });
+    await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "b-")));
+    const saved = process.env.TMPDIR;
+    process.env.TMPDIR = root;
+    try {
+      const launched = await launchBrowser(REPO, { network: "allowlist", allowedOrigins });
+      assert.ok(launched.browser, launched.detail);
+      try {
+        const page = await launched.browser.newPage();
+        await page.goto(`http://127.0.0.1:${port(server)}/`);
+        await new Promise((resolveIdle) => setTimeout(resolveIdle, 3_000));
+      } finally {
+        assert.equal(await closeBrowserBounded(launched.browser), null);
+        assert.equal(cleanupBrowserProfile(launched.userDataDir), null);
+      }
+      return received;
+    } finally {
+      ws.close(); frame.close(); quic.close(); server.close();
+      if (saved === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = saved;
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  it("with --allow-network, a document's WebSocket, WebTransport and iframe reach no host that is not allowed", { timeout: 90_000 }, async (t) => {
+    if (process.platform !== "linux") return t.skip("127.0.0.2 is a loopback address only on Linux");
+    assert.deepEqual(await unseenChannels(["https://allowed.invalid"]), { websocket: 0, iframe: 0, webtransport: 0 });
+  });
+
+  it("control: the same channels reach that host once it is allowed", { timeout: 90_000 }, async (t) => {
+    if (process.platform !== "linux") return t.skip("127.0.0.2 is a loopback address only on Linux");
+    const received = await unseenChannels(["http://127.0.0.2"]);
+    assert.ok(received.websocket > 0 && received.iframe > 0, `an allowed host was not reached: ${JSON.stringify(received)}; the test above proves nothing`);
   });
 });
 

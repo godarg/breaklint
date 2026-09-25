@@ -15,7 +15,9 @@
  * question is not only about the code: puppeteer-core adds the sandbox-disabling switch itself when
  * PUPPETEER_DANGEROUS_NO_SANDBOX is set in the environment. That is checked twice — statically,
  * that the launch path refuses before it launches, and at runtime, through the real CLI and a fake
- * browser executable that records the switches it was given (no Chrome needed).
+ * browser executable that records the switches it was given (no Chrome needed). The browser also
+ * reads switches from its own environment (CHROME_EXTRA_FLAGS), so the launch's `env` must be the
+ * allow-list builder, and a fake browser that records its environment shows what reaches it.
  *
  * KNOWN LIMITS, accepted: check 1 recognises a call whose callee is the name `launch` or a
  * property access ending in `.launch`. A launch reached any other way — `launch.call(…)`,
@@ -36,7 +38,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-import { driverEnvironmentRefusal, REFUSED_DRIVER_ENVIRONMENT } from "../../src/acquire/browser.ts";
+import { BROWSER_ENVIRONMENT_NAMES, browserEnvironment, driverEnvironmentRefusal, REFUSED_DRIVER_ENVIRONMENT } from "../../src/acquire/browser.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const SELF = fileURLToPath(import.meta.url);
@@ -99,7 +101,7 @@ const ALLOWED_SWITCHES: Record<string, string> = {
   "--log-net-log": "unit-only: the browser's net-log, written into the profile",
 };
 /** The named switch lists `args` may spread; their elements are read from their declarations. */
-const SWITCH_LISTS = ["BROWSER_NETWORK_ARGS", "OFFLINE_BROWSER_ARGS"];
+const SWITCH_LISTS = ["BROWSER_NETWORK_ARGS"];
 
 function switchName(value: string): string { return value.split("=", 1)[0]!; }
 
@@ -153,12 +155,15 @@ function argsIssues(value: ts.Expression, file: ts.SourceFile, fileName: string)
   return issues;
 }
 
-/** `env` must be exactly `{ ...process.env, TMPDIR: <anything> }`. */
+/**
+ * `env` must be exactly `browserEnvironment(process.env, <temporary directory>)`: the allow-list
+ * builder, never the host's environment spread or passed through. The browser reads switches from
+ * its environment (CHROME_EXTRA_FLAGS), so an inherited variable is a switch nobody allowed.
+ */
 function envIssues(value: ts.Expression | null, file: ts.SourceFile, fileName: string): string[] {
-  const shape = value && ts.isObjectLiteralExpression(value) && value.properties.length === 2
-    && ts.isSpreadAssignment(value.properties[0]!) && value.properties[0].expression.getText(file) === "process.env"
-    && ts.isPropertyAssignment(value.properties[1]!) && value.properties[1].name.getText(file) === "TMPDIR";
-  return shape ? [] : [`${fileName}: env must be exactly { ...process.env, TMPDIR: … } — it is ${value ? value.getText(file) : "a shorthand"}`];
+  const shape = value && ts.isCallExpression(value) && ts.isIdentifier(value.expression) && value.expression.text === "browserEnvironment"
+    && value.arguments.length === 2 && value.arguments[0]!.getText(file) === "process.env" && !ts.isSpreadElement(value.arguments[1]!);
+  return shape ? [] : [`${fileName}: env must be exactly browserEnvironment(process.env, …) — it is ${value ? value.getText(file) : "a shorthand"}`];
 }
 
 /**
@@ -250,8 +255,7 @@ describe("the browser sandbox", () => {
 
   it("accepts the launch shape of the lifecycle change, and refuses every way around the pin", () => {
     // The shape src/acquire/browser.ts has (its lists, its refusal, its launch), reduced.
-    const lists = `export const BROWSER_NETWORK_ARGS: readonly string[] = ["--disable-component-update", "--disable-background-networking"];
-      export const OFFLINE_BROWSER_ARGS: readonly string[] = ["--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1", "--no-proxy-server"];`;
+    const lists = `export const BROWSER_NETWORK_ARGS: readonly string[] = ["--disable-component-update", "--disable-background-networking"];`;
     const launchWith = (options: string, refusal = "const refused = driverEnvironmentRefusal(); if (refused) return refused;") =>
       `${lists}\nasync function start() { ${refusal}\n browser = await launch({ ${options} }); }`;
     const lifecycleOptions = `
@@ -260,10 +264,11 @@ describe("the browser sandbox", () => {
       userDataDir,
       args: [
         ...BROWSER_NETWORK_ARGS,
-        ...(seams.network === "allowlist" ? [] : OFFLINE_BROWSER_ARGS),
+        \`--host-resolver-rules=\${hostResolverRules(seams.network === "allowlist" ? seams.allowedOrigins ?? [] : [])}\`,
+        "--no-proxy-server",
         ...(seams.netLog ? [\`--log-net-log=\${join(userDataDir, "net-log.json")}\`] : []),
       ],
-      env: { ...process.env, TMPDIR: browserTmp.path },
+      env: browserEnvironment(process.env, browserTmp.path),
       detached: process.platform !== "win32",
       pipe: true,
       handleSIGINT: false,
@@ -284,6 +289,10 @@ describe("the browser sandbox", () => {
       ["args: [...(cond ? [] : moreArgs)],", /not an allow-listed switch list/u],
       ["args: [`${flag}`],", /not an allowed switch/u],
       ["args: [], env: { ...process.env, TMPDIR: t, PUPPETEER_DANGEROUS_NO_SANDBOX: 'true' },", /env must be exactly/u],
+      ["args: [], env: { ...process.env, TMPDIR: t },", /env must be exactly/u],
+      ["args: [], env: { ...browserEnvironment(process.env, t), CHROME_EXTRA_FLAGS: f },", /env must be exactly/u],
+      ["args: [], env: browserEnvironment({ ...process.env }, t),", /env must be exactly/u],
+      ["args: [], env: process.env,", /env must be exactly/u],
       ["args: [], env: hostEnv,", /env must be exactly/u],
       ["args: [], ignoreDefaultArgs: true,", /ignoreDefaultArgs is not an allowed launch option/u],
       ["args: [], pipe: usePipe,", /pipe must be the literal true/u],
@@ -343,6 +352,70 @@ describe("the browser sandbox", () => {
       assert.equal(run.status, 3, `exit ${run.status}; stderr: ${run.stderr}`);
       assert.match(run.stderr, /PUPPETEER_DANGEROUS_NO_SANDBOX is set/u);
       assert.deepEqual(readdirSync(tmp), [], "a profile was created for a refused launch");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  // Mutation "env: { ...process.env, TMPDIR }" (the previous shape): red, CHROME_EXTRA_FLAGS kept.
+  it("the browser's environment is the allow-list and TMPDIR, whatever the host carries", () => {
+    const host = {
+      HOME: "/var/empty", PATH: "/usr/bin", LANG: "de_DE.UTF-8", LC_ALL: "C", LC_TIME: "de_DE", TZ: "Europe/Berlin", XDG_CONFIG_HOME: "/x", FONTCONFIG_FILE: "/f",
+      TMPDIR: "/host-tmp",
+      CHROME_EXTRA_FLAGS: "--remote-debugging-port=9333", CHROME_DEVEL_SANDBOX: "/tmp/sb", CHROME_USER_DATA_DIR: "/tmp/u", CHROME_CONFIG_HOME: "/tmp/c",
+      CHROMIUM_FLAGS: "--x", GOOGLE_API_KEY: "k", SSLKEYLOGFILE: "/tmp/keys", LD_PRELOAD: "/tmp/p.so", LD_LIBRARY_PATH: "/tmp/l",
+      http_proxy: "http://p:1", HTTPS_PROXY: "http://p:1", NODE_OPTIONS: "--require x", PUPPETEER_EXECUTABLE_PATH: "/x", DISPLAY: ":0", LC_: "odd", LC_lower: "odd",
+    };
+    const env = browserEnvironment(host, "/profile/tmp");
+    assert.deepEqual(Object.keys(env).sort(), ["FONTCONFIG_FILE", "HOME", "LANG", "LC_ALL", "LC_TIME", "LC_", "PATH", "TMPDIR", "TZ", "XDG_CONFIG_HOME"].sort());
+    assert.equal(env.TMPDIR, "/profile/tmp");
+    for (const name of Object.keys(env)) {
+      assert.ok(name === "TMPDIR" || BROWSER_ENVIRONMENT_NAMES.includes(name) || /^LC_[A-Z_]*$/u.test(name), `${name} reached the browser's environment`);
+    }
+    assert.deepEqual(host.CHROME_EXTRA_FLAGS, "--remote-debugging-port=9333", "the host's own environment was edited");
+  });
+
+  /*
+   * The real CLI, with switch-carrying variables in its environment and a fake browser (a shell
+   * script) that records the environment it was started with. Control: the same recorder, started
+   * by the driver with the host's environment passed through, records the variable, so a clean
+   * record is not an unobservant recorder. No Chrome; a real browser's DevTools port is the
+   * live test in tests/unit/render-run.test.ts.
+   */
+  it("an inherited CHROME_EXTRA_FLAGS never reaches the browser; control: it does when the host environment is passed through", { timeout: 60_000 }, async (t) => {
+    if (process.platform === "win32") return t.skip("the fake browser is a POSIX shell script; Windows is refused before any launch anyway");
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "breaklint-browser-env-")));
+    try {
+      const tmp = join(root, "tmp");
+      mkdirSync(tmp);
+      const exe = join(root, "fake-chrome");
+      writeFileSync(exe, `#!/bin/sh\nenv > '${root}/env'\nprintf '%s\\n' "$@" > '${root}/argv'\nexit 1\n`);
+      chmodSync(exe, 0o755);
+      const doc = join(root, "doc.html");
+      writeFileSync(doc, "<!doctype html><p>env</p>");
+      const planted = { CHROME_EXTRA_FLAGS: "--remote-debugging-port=9333", CHROME_DEVEL_SANDBOX: join(root, "sandbox"), LD_PRELOAD: join(root, "preload.so"), SSLKEYLOGFILE: join(root, "keys") };
+      const run = spawnSync(process.execPath, ["--experimental-strip-types", join(ROOT, "src/cli/index.ts"), "--format", "json", doc], {
+        cwd: ROOT, encoding: "utf8", timeout: 50_000,
+        env: { ...process.env, BREAKLINT_CHROME: exe, TMPDIR: tmp, ...planted },
+      });
+      assert.equal(run.status, 3, `exit ${run.status}; stderr: ${run.stderr}`);
+      assert.ok(existsSync(join(root, "env")), `the fake browser was not started: ${run.stderr}`);
+      const recorded = readFileSync(join(root, "env"), "utf8").split("\n").filter(Boolean).map((line) => line.split("=", 1)[0]!);
+      for (const name of Object.keys(planted)) assert.ok(!recorded.includes(name), `${name} reached the browser`);
+      const unexpected = recorded.filter((name) => !(name === "TMPDIR" || BROWSER_ENVIRONMENT_NAMES.includes(name) || /^LC_[A-Z_]*$/u.test(name) || ["PWD", "SHLVL", "_", "OLDPWD"].includes(name)));
+      assert.deepEqual(unexpected, [], "the browser saw variables outside the allow-list (PWD, SHLVL and _ are the shell's own)");
+      assert.equal(readFileSync(join(root, "argv"), "utf8").includes("remote-debugging-port"), false);
+
+      // Control: the same recorder, the host's environment passed through by the driver.
+      rmSync(join(root, "env"), { force: true });
+      const puppeteer = (await import("puppeteer-core")).default;
+      const saved = { ...process.env };
+      Object.assign(process.env, planted);
+      try {
+        await puppeteer.launch({ executablePath: exe, headless: true, pipe: true, userDataDir: join(root, "control-profile"), env: { ...process.env }, timeout: 10_000, handleSIGINT: false, handleSIGTERM: false, handleSIGHUP: false }).then((browser) => browser.close(), () => undefined);
+      } finally {
+        for (const name of Object.keys(planted)) { if (saved[name] === undefined) delete process.env[name]; else process.env[name] = saved[name]; }
+      }
+      const control = readFileSync(join(root, "env"), "utf8");
+      assert.match(control, /^CHROME_EXTRA_FLAGS=--remote-debugging-port=9333$/mu, "control: the recorder did not see a passed-through variable; the check above proves nothing");
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 

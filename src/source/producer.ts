@@ -28,7 +28,7 @@ import type { ConfigFile } from "../config/contract.ts";
 import type { Report } from "../core/types.ts";
 import type { DocumentRevision } from "../core/types.ts";
 import { identitiesForProducedOutput } from "./identity.ts";
-import { processGroupMembers, unsupportedPlatformRefusal } from "../acquire/browser.ts";
+import { drainPendingSignals, driverEnvironmentRefusal, holdForInterrupt, oneLineRefusal, processGroupMembers, unsupportedPlatformRefusal } from "../acquire/browser.ts";
 import { captureHostGit, bindCapturedRevision, type HostGitRevisionOptions } from "./revision.ts";
 
 export const PRODUCER_RECORD_PROTOCOL = "studio-producer-record-v1" as const;
@@ -656,6 +656,65 @@ function waitForResult(child: ReturnType<typeof spawn>, timeoutMs: number): Prom
   });
 }
 
+/**
+ * The producer runs detached, in a process group of its own, so a signal to the host does not
+ * reach it: measured, SIGTERM to an API host with no listener of its own ended the host by the
+ * signal and left the producer running (1 of 1). From before the spawn until its group is verified
+ * gone, the producer is therefore held against SIGINT, SIGTERM and SIGHUP like the browser
+ * (holdForInterrupt): with no host listener, the signal first runs the same bounded group cleanup
+ * the normal path runs, then ends the process by that signal; with a host listener, the group is
+ * killed at once (SIGKILL) and the host decides, and the acquisition returns an interrupted
+ * failure once the group has been verified gone.
+ */
+async function runProducerUnderInterruptHold(
+  start: () => ReturnType<typeof spawn>,
+  timeoutMs: number,
+): Promise<{ exitCode: number | null; recordBytes: Buffer; stderrPresent: boolean }> {
+  let child: ReturnType<typeof spawn> | null = null;
+  let unverified: string | null = null;
+  const hold = holdForInterrupt({
+    async cleanup() {
+      if (!child?.pid) return;
+      try { await cleanupOwnedGroup(child.pid); unverified = null; }
+      catch (error) { unverified = `producer: ${error instanceof Error ? error.message : String(error)}`; }
+    },
+    force() {
+      if (!child?.pid || process.platform === "win32") return;
+      try { process.kill(-child.pid, "SIGKILL"); } catch { /* already gone */ }
+      unverified = "producer: forced SIGKILL of its process group; termination not verified";
+    },
+    outcome: () => unverified,
+  });
+  // Registered while another hold's interrupt is being cleaned up: this hold is interrupted
+  // already, and a producer started now would outlive the process that is about to end. Nothing
+  // was started, so there is nothing to wait for either.
+  const early = hold.interrupted();
+  if (early) {
+    hold.release();
+    throw new PublicProducerError(`producer incomplete: interrupted by ${early}; the producer was not started`);
+  }
+  try {
+    child = start();
+    const result = await waitForResult(child, timeoutMs);
+    await drainPendingSignals();
+    const signal = hold.interrupted();
+    if (signal) throw new PublicProducerError(`producer incomplete: interrupted by ${signal}; record not accepted`);
+    return result;
+  } catch (error) {
+    await drainPendingSignals();
+    const signal = hold.interrupted();
+    if (signal) {
+      await hold.settled();
+      if (!(error instanceof PublicProducerError && /interrupted by/u.test(error.message))) {
+        throw new PublicProducerError(`producer incomplete: interrupted by ${signal}; record not accepted`);
+      }
+    }
+    throw error;
+  } finally {
+    hold.release();
+  }
+}
+
 /** Executes only host-selected code and returns an internal receipt after complete validation. */
 export async function acquireProducedDocuments(
   input: { producer: HostControlledProducer; manifest?: unknown; options?: Omit<CheckProducedDocumentsOptions, "manifest"> },
@@ -679,10 +738,9 @@ export async function acquireProducedDocuments(
     mkdirSync(join(runRoot, "blobs"), { recursive: true, mode: 0o700 });
     const captured = captureCode(producer.codeFiles);
     const expectedCode = captured.map((item) => item.record);
-    const child = spawn(producer.executable, [...producer.argv, "--record-fd", "3", "--run-id", runId, "--run-root", runRoot], {
+    const result = await runProducerUnderInterruptHold(() => spawn(producer.executable, [...producer.argv, "--record-fd", "3", "--run-id", runId, "--run-root", runRoot], {
       shell: false, stdio: ["ignore", "pipe", "pipe", "pipe"], windowsHide: true, detached: process.platform !== "win32",
-    });
-    const result = await waitForResult(child, options.timeoutMs ?? PRODUCER_TIMEOUT_MS);
+    }), options.timeoutMs ?? PRODUCER_TIMEOUT_MS);
     if (result.exitCode !== 0) throw new PublicProducerError(`producer exited ${result.exitCode ?? "by signal"}; record not accepted${result.stderrPresent ? "; private stderr withheld" : ""}`);
     let raw: unknown;
     try { raw = JSON.parse(decodeUtf8Strict(result.recordBytes, "producer FD3 record")); } catch { throw new PublicProducerError("FD3 did not contain one JSON object"); }
@@ -766,8 +824,26 @@ export type ProducedDocumentsResult =
   | { ok: true; report: Report }
   | { ok: false; code: ProducerFailure["code"]; detail: string };
 
-/** The single public producer entry point: produce, render captured bytes, evaluate and report. */
+/**
+ * The single public producer entry point: produce, render captured bytes, evaluate and report.
+ *
+ * Every return passes one turn of the event loop first, while breaklint's signal listener may
+ * still be installed: a signal that arrived during the synchronous report work at the end is then
+ * dispatched now, and not discarded by a host that calls `process.exit` as soon as this resolves.
+ */
 export async function checkProducedDocuments(input: {
+  producer: HostControlledProducer;
+  manifest?: unknown;
+  options: ProducedCheckOptions;
+}): Promise<ProducedDocumentsResult> {
+  try {
+    return await checkProducedDocumentsUndrained(input);
+  } finally {
+    await drainPendingSignals();
+  }
+}
+
+async function checkProducedDocumentsUndrained(input: {
   producer: HostControlledProducer;
   manifest?: unknown;
   options: ProducedCheckOptions;
@@ -790,6 +866,12 @@ export async function checkProducedDocuments(input: {
   const requested = [...new Set(checked.options.outputPaths)];
   if (requested.length === 0 || requested.length !== checked.options.outputPaths.length) {
     return { ok: false, code: "source/producer-record-mismatch", detail: "outputPaths must be a non-empty unique list" };
+  }
+  // The renderer would refuse to start for the driver's environment (see driverEnvironmentRefusal);
+  // say so now, by name, and start nothing. The reason names variables only, nothing of the host.
+  const refused = driverEnvironmentRefusal();
+  if (refused) {
+    return { ok: false, code: "source/producer-incomplete", detail: `producer not started: ${oneLineRefusal(refused)}` };
   }
   const startedAt = new Date().toISOString(); const started = Date.now();
   const acquired = await acquireProducedDocuments({ producer: checked.producer, manifest: checked.manifest, options: checked.options });
@@ -825,7 +907,10 @@ export async function checkProducedDocuments(input: {
     });
     const renderOptions: RenderOptions = { outDir: resolved.outDir, evidenceBinding: resolved.evidenceBinding, sourceMapInjection: resolved.sourceMapInjection, network: resolved.network, locale: resolved.locale };
     const rendered = await renderCapturedDocuments(inputs, renderOptions);
-    if (rendered.fatal || !rendered.environment) return { ok: false, code: "source/producer-incomplete", detail: "captured renderer setup failed; private error details withheld" };
+    if (rendered.fatal || !rendered.environment) {
+      const reason = rendered.fatal?.publicDetail;
+      return { ok: false, code: "source/producer-incomplete", detail: reason ? `captured renderer refused to start: ${reason}` : "captured renderer setup failed; private error details withheld" };
+    }
     const outcomes = rendered.documents.map((document) => {
       const output = state.outputs.get(document.path);
       const identity = output ? identitiesForProducedOutput({ outputPath: document.path, output,

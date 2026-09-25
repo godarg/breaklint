@@ -111,7 +111,7 @@ export interface RenderEnvironment extends ReportEnvironment {
 
 export interface RenderResult {
   documents: DocumentInput[];
-  fatal: { message: string; exitCode: 2 | 3 } | null;
+  fatal: { message: string; exitCode: 2 | 3; /** A reason an API may report as is; see LaunchResult.refusal. */ publicDetail?: string } | null;
   environment: RenderEnvironment | null;
 }
 
@@ -254,7 +254,7 @@ function holdRenderForInterrupts(terminate: typeof terminateProcessTree | undefi
   let browser: BrowserLike | null = null;
   let profile: string | null | undefined = null;
   let unverified: string | null = null;
-  let forced: { pid: number; ownership: ReturnType<typeof captureProcessTreeOwnership> } | null = null;
+  let forced: { pid: number; ownership: ReturnType<typeof captureProcessTreeOwnership>; profileError: string | null } | null = null;
   const hold = holdForInterrupt({
     async cleanup() {
       if (!browser) return; // still launching: the launch's own hold stops and cleans it
@@ -273,12 +273,13 @@ function holdRenderForInterrupts(terminate: typeof terminateProcessTree | undefi
         for (const owned of ownership?.initialPids ?? []) {
           try { process.kill(owned, "SIGKILL"); } catch { /* already gone */ }
         }
-        forced = { pid, ownership };
+        forced = { pid, ownership, profileError: null };
       }
       // Disconnect the driver too, without waiting: pending protocol calls then fail at once
       // instead of waiting on a browser that is gone (or, for a driver without a pid, going).
       try { void browser.close().catch(() => undefined); } catch { /* the kill above decides */ }
       const profileError = cleanupBrowserProfile(profile);
+      if (forced) forced.profileError = profileError;
       unverified = `forced: SIGKILL of the browser process group${profileError ? `; ${profileError}` : ", profile removed"}; termination not verified`;
     },
     outcome: () => unverified,
@@ -293,11 +294,13 @@ function holdRenderForInterrupts(terminate: typeof terminateProcessTree | undefi
       await hold.settled();
       let detail = !browser ? (launchDetail ?? "no browser had been started") : unverified ?? "browser closed and verified, profile removed";
       if (browser && forced) {
-        const { pid, ownership } = forced;
+        const { pid, ownership, profileError } = forced;
         const termination = await (terminate ?? terminateProcessTree)(pid, undefined, undefined, ownership);
+        // The profile's own outcome, as force() recorded it: a failed removal is never reported as done.
+        const profilePart = profileError ? `; ${profileError}` : "; profile removed";
         detail = termination.verified
-          ? "forced: SIGKILL of the browser process group, then verified terminated; profile removed"
-          : `forced: SIGKILL of the browser process group, termination NOT verified (survivors=${termination.survivingPids.join(",") || "unknown"})`;
+          ? `forced: SIGKILL of the browser process group, then verified terminated${profilePart}`
+          : `forced: SIGKILL of the browser process group, termination NOT verified (survivors=${termination.survivingPids.join(",") || "unknown"})${profilePart}`;
       }
       return {
         documents: [],
@@ -2416,7 +2419,7 @@ export async function renderDocuments(
   const interrupt = holdRenderForInterrupts(dependencies.terminateBrowserProcessTree);
   let launched: Awaited<ReturnType<typeof launchBrowser>>;
   try {
-    launched = await dependencies.launchBrowser(peerResolutionDir, { network: options.network.mode });
+    launched = await dependencies.launchBrowser(peerResolutionDir, { network: options.network.mode, allowedOrigins: options.network.allowed });
   } catch (error) {
     const message = `breaklint: renderer startup failed at launch: ${error instanceof Error ? error.message : String(error)}`;
     const interrupted = await interrupt.end(message);
@@ -2426,7 +2429,7 @@ export async function renderDocuments(
   if (!launched.browser || !launched.executablePath) {
     const interrupted = await interrupt.end(launched.detail);
     if (interrupted) return interrupted;
-    return { documents: [], fatal: { exitCode: 3, message: launched.detail }, environment: null };
+    return { documents: [], fatal: { exitCode: 3, message: launched.detail, ...(launched.refusal ? { publicDetail: launched.refusal } : {}) }, environment: null };
   }
   const browser = launched.browser;
   interrupt.attach(browser, launched.userDataDir);

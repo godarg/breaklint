@@ -375,10 +375,29 @@ graceful shutdown, while a signal-exit style listener (it re-raises only when it
 breaklint each waited for the other and the host survived its SIGINT. breaklint's listener is now
 prepended and counts the host's listeners when the signal arrives. With none, the orderly cleanup
 runs and the signal is raised again; with any, breaklint kills its browser's process group and
-removes its profile synchronously, before the host's listeners run, removes its own listener so
-they see what they would see without it, and the render reports exit 3 with what it could verify.
-In both cases a cleanup that could not be verified is reported: on stderr before the re-raise, in
-the fatal message otherwise.
+removes its profile synchronously, before the host's listeners run, removes its own listener so they
+see what they would see without it, and the render reports exit 3 with what it could verify. In both
+cases a cleanup that could not be verified is reported: on stderr before the re-raise, in the fatal
+message otherwise. A forced cleanup whose profile removal failed says so even after the browser's
+group was verified gone; it used to report "profile removed" regardless.
+
+A second review found three more ways out. A signal that arrived after the render had let its hold
+go, while the report was built and written, was queued for breaklint's listener and then discarded
+by the CLI's `process.exit`: SIGTERM 0–15 ms after the profile was removed ended the run with exit 0
+in 8 of 9 runs (patched Chromium 141). The CLI now passes one event-loop turn before it exits, and
+the library API before it returns, so such a signal ends the process by that signal: afterwards 9
+runs under the same conditions all ended by SIGTERM, and in a series of 12 at 20–35 ms each of the 6
+that ended with exit 0 had been sent its signal after it had already called `process.exit`, per a
+timestamped trace. A process that exits while a hold is live — a library host calling
+`process.exit()` in the middle of a run — now forces that hold on the way out (SIGKILL of the
+browser's group, profile removal), where it used to leave both to the next run's sweep. And the
+library API's producer runs detached, in a process group of its own that a signal to the host never
+reaches: SIGTERM to a host without a listener ended the host and left the producer running. The
+producer is now held like the browser, from before its spawn until its group is verified gone:
+without a host listener its group is cleaned up with the usual bounds before the host ends by the
+signal; with one, its group is killed at once and the call returns `producer incomplete: interrupted
+by SIGTERM`. A producer is not started at all while another call's interrupt is being cleaned up,
+because it would outlive the process that is about to end.
 
 **The browser's own files and its own network.** The browser now keeps its temporary files in the
 profile (`TMPDIR` points there), so the profile's removal takes them too: Chromium's
@@ -391,32 +410,67 @@ The browser also makes requests that page-level interception never sees. Measure
 through this launch path, idle for 8 s: DNS queries and connections to Google hosts for network
 time, the account list, AI-mode eligibility, GCM check-in, DNS-over-HTTPS and a search preconnect —
 with `--disable-background-networking` already set by the driver. The component updater is off in
-every mode now (`--disable-component-update`), and the default offline mode adds a lock: every host
-name except `127.0.0.1` resolves to "not found" before any DNS query, and no proxy is used. With it
-the browser's net-log showed one connection, to the loopback document; a unit test requires that,
-against a control run without the lock that must show browser-level traffic. With
-`--allow-network` the lock is off, and those services can reach the network; that is the
-remaining boundary, stated rather than closed, because allowed origins must resolve and may need
-the host's proxy. A document's WebRTC is not a request that interception sees and needs no host
-name, so neither of those stops it: measured on Chromium 141 under the offline launch, a STUN
-server at an IP address on this machine's non-loopback interface received 5 UDP packets within
-5 s. Every profile is now created with the WebRTC preference `ip_handling_policy:
-disable_non_proxied_udp` (the command-line switch for it no longer exists in Chromium 141); with
-no proxy in offline mode, the same document sent no UDP and no TCP, and a unit test holds that
-against a control browser without the preference. With `--allow-network` the preference still
-stops UDP, but a TURN connection over TCP to the same address was observed (1 of 1 runs), and it
-is not blocked in that mode.
+every mode (`--disable-component-update`), and every mode adds a lock: every host, a name or an IP
+literal, resolves to "not found" before any DNS query except `127.0.0.1` and, with
+`--allow-network`, the hosts of the allowed origins; and no proxy is used. With it the browser's
+net-log showed one connection, to the loopback document; a unit test requires that in both modes,
+against a control browser without the lock that must show browser-level traffic. Two consequences of
+the lock in the `--allow-network` mode, where it used to be off: the browser's own services no
+longer reach the network there either, and an allowed origin must be reachable without a proxy,
+because a proxy resolves and forwards on the browser's behalf and would bypass the lock.
+
+Secure DNS needed its own measure. Its server is addressed by IP literal from the browser's own
+provider table, so its queries never reach the resolver lock: CI's Google Chrome 153 connected to
+`[2001:4860:4860::8888]:443` under the lock (the net-log test above caught it), and Chromium 141
+here logged DoH requests starting between 3 and 5 s after launch. Every profile is therefore created
+with the browser-wide preference `dns_over_https.mode: off` in its `Local State`, and the net-log
+test now also requires that no DoH request was made, idle for 6 s, against the control without the
+preference, which makes them. An administrator's `DnsOverHttpsMode` policy overrides a profile's
+preference; on such a host the test is what would show it. The browser's built-in DNS client needs
+nothing of its own: it resolves only names that reach the resolver, and the lock maps those first
+(no DNS packet in the offline net-log).
+
+The lock works by host, not by origin. Request interception holds the document's ordinary requests
+to the allowed origins exactly; what interception never sees — a WebSocket, WebTransport, a worker's
+requests, a cross-site iframe, WebRTC — used to reach any host in the `--allow-network` mode, where
+the lock was off: on that launch a document's WebSocket, WebTransport and iframe reached 127.0.0.2,
+a loopback address that was not allowed, and a WebRTC TURN connection over TCP reached an address on
+this machine's non-loopback interface (the unit tests below, each red on it). Now they fail to
+resolve unless the host is an allowed one, and a unit test counts no WebSocket, WebTransport or
+iframe connection to a host that is not allowed, against a control with that host allowed. They can
+still reach any port and scheme of an allowed host: through the real CLI with `--allow-network
+http://192.0.2.2:7008`, a WebSocket to port 7007 and a worker's fetch to port 7014 of the same
+address connected, while with an allowed host elsewhere none of 23 probe channels reached 192.0.2.2
+(patched Chromium 141). An origin whose host is neither a plain DNS name nor an IP literal is left
+out of the lock and is then unreachable; an IPv6-literal origin is written into the lock in both
+forms the browser compares, which is not measured here (this machine has no IPv6).
+
+A document's WebRTC is not a request that interception sees and needs no host name, so neither of
+those stops it on its own: measured on Chromium 141 under the earlier offline launch, a STUN server
+at an IP address on this machine's non-loopback interface received 5 UDP packets within 5 s. Every
+profile is created with the WebRTC preference `ip_handling_policy: disable_non_proxied_udp` (the
+command-line switch for it no longer exists in Chromium 141); with no proxy, the same document sent
+no UDP and no TCP, offline and with `--allow-network`, and a unit test holds that against a control
+browser without the preference.
 
 A launch also refuses the driver's environment switches that would change the browser's own
 switches: `PUPPETEER_DANGEROUS_NO_SANDBOX` (puppeteer-core adds the sandbox-disabling switch) and
 `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` (it changes the feature switches). Either set, with
-any value, ends the run with exit 3 before any browser or profile exists, naming the variable;
-breaklint does not remove it from a library host's environment. The other switches puppeteer-core
-25.8 reads are harmless here: `PUPPETEER_WEBDRIVER_BIDI_ONLY` only on a protocol breaklint does
-not use, `PUPPETEER_EXECUTABLE_PATH` not at all (breaklint always passes the executable itself,
-from `BREAKLINT_CHROME` or its candidate list, so that wins), `NODE_DEBUG` for logging. The browser
-itself also reads its environment, which breaklint passes on as the host set it, apart from
-`TMPDIR`; that surface is not audited here.
+any value, ends the run with exit 3 before any browser or profile exists, naming the variable; the
+library API returns the same reason, and starts no producer, instead of withholding it as a private
+renderer error. breaklint does not remove it from a library host's environment. The other switches
+puppeteer-core 25.8 reads are harmless here: `PUPPETEER_WEBDRIVER_BIDI_ONLY` only on a protocol
+breaklint does not use, `PUPPETEER_EXECUTABLE_PATH` not at all (breaklint always passes the
+executable itself, from `BREAKLINT_CHROME` or its candidate list, so that wins), `NODE_DEBUG` for
+logging. The browser itself reads switches from its environment too — measured on Chromium 141,
+`CHROME_EXTRA_FLAGS=--remote-debugging-port=9333` opened an unauthenticated DevTools port on the
+earlier launch, which passed the host's environment on — so the browser now gets an allow-listed
+environment: `HOME`, `USER`, `LOGNAME`, `PATH`, `LANG`, `LANGUAGE`, `LC_*`, `TZ`, `TZDIR`, the XDG
+base directories and the three `FONTCONFIG_*` locations, as the host set them, plus `TMPDIR` in the
+profile. Nothing else passes, `CHROME_*`, `LD_*` and the proxy variables included. A browser that
+needs another variable to start (a custom build that needs `LD_LIBRARY_PATH`) has to be started
+through its own wrapper script named by `BREAKLINT_CHROME`; on macOS, whether the browser needs
+anything else is not measured here.
 
 Two things this does not cover. A browser crash writes its dump into `~/.config/chromium/Crash
 Reports`, outside the temporary profile, and nothing here changes that. And the browser start is

@@ -145,7 +145,7 @@ older than breaklint's `engines`, a `BREAKLINT_CHROME` that points nowhere), or 
 | `fail-on` | breaklint's | `--fail-on`: `error`, `warn` or `never` |
 | `profile` | breaklint's | `--profile`: `default` or `strict` |
 | `config` | `./breaklint.config.json` if present | `--config`: path to a JSON config ([configuration](configuration.md)) |
-| `allow-network` | none (offline) | `--allow-network`: one origin per line, e.g. a font host |
+| `allow-network` | none (offline) | `--allow-network`: one origin per line, e.g. a font host; reached directly, never through a proxy |
 | `output-dir` | `$RUNNER_TEMP/breaklint-report` | where the reports and `evidence/` go |
 | `chrome-path` | `$BREAKLINT_CHROME`, then `google-chrome` on `PATH` | absolute path to Chrome |
 | `use-project-install` | `false` | `true` uses `node_modules/breaklint` from your own lockfile |
