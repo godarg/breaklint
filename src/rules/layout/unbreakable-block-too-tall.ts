@@ -1,8 +1,8 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  boxlessDeclined, declined, hasLayoutBox, isNotRendered, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber,
-  sourceOf, targetEvaluation,
+  boxlessDeclined, declined, hasLayoutBox, isNotRendered, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber, renderingOf, sourceOf,
+  targetEvaluation,
 } from "../shared.ts";
 
 /**
@@ -118,7 +118,45 @@ export const unbreakableBlockTooTall = defineRule(
       flowBySid.set(fragment.sid, entry);
     }
 
+    // Which fragment stands for a split block: the first one the paginator laid out with a box of
+    // its own and that is visible. Normally that is fragment 0. Deciding it per fragment instead —
+    // "fragment 0 is not rendered, so the block is not" — let a script that hid only the first
+    // fragment (`display: none` on it, or moving it where it has no box) hide the whole block: the
+    // later fragments were skipped as continuations of a candidate that no longer existed, and a
+    // block four pages tall came back clean (measured 2026-09-25: base exit 1, then exit 0). What is
+    // judged is what printed. A block none of whose fragments has a box is classified at each
+    // fragment below, as before.
+    const leadBySid = new Map<string, number>();
+    for (const fragment of snapshot.blocks) {
+      if (fragment.sid === null || renderingOf(snapshot, fragment) !== "box" || fragment.effectiveStyle.visibility !== "visible") continue;
+      const current = leadBySid.get(fragment.sid);
+      if (current === undefined || fragment.fragmentIndex < current) leadBySid.set(fragment.sid, fragment.fragmentIndex);
+    }
+
     for (const block of snapshot.blocks) {
+      const lead = block.sid === null ? undefined : leadBySid.get(block.sid);
+      // One evaluation per block, taken at its lead fragment. The other fragments are not separate
+      // candidates — but their heights are part of the height judged there. A fragment BEFORE the
+      // lead is one that did not print as a box; it says so.
+      if (lead !== undefined && block.fragmentIndex !== lead) {
+        const before = block.fragmentIndex < lead;
+        evaluations.push(targetEvaluation({
+          ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+          fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-applicable",
+          countsTowardCoverage: false,
+          reason: !before ? "rule/non-initial-fragment"
+            : isNotRendered(snapshot, block) ? "rule/fragment-not-rendered" : "rule/fragment-without-visible-box",
+          ...(before ? {
+            measurements: [
+              { name: "target-has-layout-box", value: hasLayoutBox(block.box), unit: null, operator: "=", threshold: true },
+              { name: "target-visible", value: block.effectiveStyle.visibility === "visible", unit: null, operator: "=", threshold: true },
+              { name: "judged-at-fragment", value: lead, unit: null, operator: null, threshold: null },
+            ],
+            connective: "all" as const, violated: null,
+          } : {}),
+        }));
+        continue;
+      }
       const avoids = /\bavoid(-page)?\b/u.test(block.effectiveStyle.breakInside);
       const visible = block.effectiveStyle.visibility === "visible";
       if (!visible || !avoids) {
@@ -136,19 +174,32 @@ export const unbreakableBlockTooTall = defineRule(
         }));
         continue;
       }
-      // A block that was not rendered — no box and no lines — was never placed by the paginator,
-      // so "does it fit the page unbroken" has no referent. The case is the in-flow original of a
-      // `position: running(...)` element, which Paged.js hides with `display: none` while its
-      // clones print in the margin boxes: it was recorded as MEASURED at 0 px, and a document whose
-      // only avoid block was a running element reported full coverage for a check that looked at
-      // nothing.
-      if (isNotRendered(block)) {
+      const rendering = renderingOf(snapshot, block);
+      // `display: contents` generates no box for the element, and `break-inside` applies to boxes:
+      // the declaration does nothing, so "does this block fit the page unbroken" is not a question
+      // about it. Its children are laid out and are candidates in their own right. Not applicable,
+      // outside coverage — not a decline, which made a list of `display: contents` items with
+      // `break-inside: avoid` (a common grid pattern) end at exit 4 for a check that does not apply.
+      if (rendering === "contents") {
+        evaluations.push(targetEvaluation({
+          ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+          fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-applicable",
+          countsTowardCoverage: false, reason: "rule/target-generates-no-box",
+          measurements: [{ name: "display", value: block.display, unit: null, operator: null, threshold: null }],
+          connective: "single", violated: null,
+        }));
+        continue;
+      }
+      // A block that was not rendered at all was never placed by the paginator, so the question has
+      // no referent either. The case is the in-flow original of a `position: running(...)` element
+      // (`rule/target-in-margin-box`: Paged.js hides it with `display: none` while its clones print
+      // in the margin boxes); it was recorded as MEASURED at 0 px, and a document whose only avoid
+      // block was a running element reported full coverage for a check that looked at nothing.
+      if (rendering === "margin-box" || rendering === "not-rendered") {
         evaluations.push(notRenderedEvaluation("layout/unbreakable-block-too-tall", block));
         continue;
       }
-      // One evaluation per block, taken at its first fragment. The later fragments are not
-      // separate candidates — but their heights are part of the height judged there.
-      if (block.fragmentIndex !== 0) {
+      if (lead === undefined && block.fragmentIndex !== 0) {
         evaluations.push(targetEvaluation({
           ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
           fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-applicable",
@@ -157,9 +208,13 @@ export const unbreakableBlockTooTall = defineRule(
         continue;
       }
       candidates += 1;
-      // Rendered, but without a box of its own (`display: contents`): there is no height to judge.
-      if (!hasLayoutBox(block.box)) {
-        const decline = boxlessDeclined("layout/unbreakable-block-too-tall", block);
+      // A box of zero by zero that printed lines (`width: 0; height: 0; overflow: visible`), or
+      // whose lines were not recorded: the box's height is not the height of what printed, and the
+      // lines' extent is not the height of a box that could have broken. Neither is this block's
+      // height. Declined, counted against coverage — never excluded, which turned such a document's
+      // `insufficient-coverage` into a clean run.
+      if (rendering === "zero-box") {
+        const decline = boxlessDeclined("layout/unbreakable-block-too-tall", snapshot, block);
         notMeasured.push(decline.notMeasured);
         evaluations.push(decline.evaluation);
         continue;

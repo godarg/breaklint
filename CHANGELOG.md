@@ -34,27 +34,59 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `env/invalid-measurement` (newly listed in the rule's declared decline reasons). The decline
   counts against the rule's coverage floor, so such a run ends `insufficient-coverage` at exit 4
   where it could end `clean` before. An unsplit block without a source id is measured as before.
-- **Three rules no longer count a block with no layout box as measured.** A block the browser did
-  not lay out — width and height both zero, as under `display: none` — was a measured candidate of
-  `layout/unbreakable-block-too-tall` (at 0 px), `layout/heading-at-page-bottom` ("with content
-  below it") and `type/excessive-word-spacing` (with no lines). The case that matters is the
-  in-flow original of every `position: running(...)` element, which Paged.js hides with
-  `display: none`: a document whose only avoid block was a running element reported
-  `unbreakable-block-too-tall` coverage 1/1 and a clean run, also under `--profile strict`, for a
-  check that had looked at nothing. Such a block is now recorded as `excluded` with the reason
-  `rule/target-not-rendered`, outside the coverage base, and never as measured. Consumers see new
-  evaluation rows with that reason and smaller candidate and measured counts for these three
-  rules on documents with running elements or hidden blocks. Both dimensions decide: an empty
-  paragraph (full width, zero height) is laid out and still measured. And a zero box alone does not
-  decide: a block counts as not rendered only when it also has no line boxes. A
-  `display: contents` block has no box of its own but prints its text; `type/excessive-word-spacing`
-  measures it from its lines as before (a justified `display: contents` paragraph with a 3.74×
-  gap is still a finding); `layout/heading-at-page-bottom` now places such a heading by its line
-  boxes, where it used to read the zero box at the page origin and call every such heading
-  followed; `layout/unbreakable-block-too-tall`, which judges the height of a box the block does
-  not have, declines it as `env/invalid-measurement`, counted against coverage, where it used to
-  measure the zero box as a fit. The heading rule newly declares `env/invalid-measurement`, for a
-  heading with neither a box nor visible line boxes.
+- **Three rules no longer count a block nothing was printed from as measured.** A block the
+  browser did not lay out was a measured candidate of `layout/unbreakable-block-too-tall` (at 0 px),
+  `layout/heading-at-page-bottom` ("with content below it") and `type/excessive-word-spacing` (with
+  no lines). The case that matters is the in-flow original of every `position: running(...)`
+  element, which Paged.js hides with `display: none`: a document whose only avoid block was a
+  running element reported `unbreakable-block-too-tall` coverage 1/1 and a clean run, also under
+  `--profile strict`, for a check that had looked at nothing. Such a block is now `excluded`,
+  outside the coverage base, never measured, with the reason `rule/target-in-margin-box` for a
+  running element's original and `rule/target-not-rendered` for a block the author hid (or one in
+  a hidden subtree or a closed `<details>`). The two are told apart by the fields Snapshot 5 adds
+  (next entry). Consumers see new evaluation rows with these reasons and smaller candidate and
+  measured counts for these three rules on documents with running elements or hidden blocks. An
+  empty paragraph (full width, zero height) has a box and is still measured.
+- **Snapshot schema 5: every block records its computed `display` and its margin-box copies.**
+  `BlockRecord.display` (the computed value) and `BlockRecord.marginCopies` (how many copies
+  Paged.js printed in margin boxes, the clones of a running element) are required fields, checked
+  by the snapshot invariants; the engine judges only a snapshot of its own stamp and refuses any
+  other with `checker-crashed` (exit 3). The only stored snapshot, `examples/demo-snapshot.json`,
+  is migrated; the demo's findings do not change. The report schema does not move. In the same
+  stamp, `TextLine.visible` is true when any text on the line is visible — read from each text
+  node's element — where it used to copy the block's visibility, so a hidden block's visible
+  descendant (`p { visibility: hidden } span { visibility: visible }`) counts as printed.
+- **A zero box no longer decides how a block is judged; its computed display does.** A
+  `display: contents` block has no box of its own but prints its text and children:
+  `type/excessive-word-spacing` measures it from its lines (a justified `display: contents`
+  paragraph with a 3.74× gap is a finding, as on 0.6.0); `layout/heading-at-page-bottom` places such
+  a heading, and a block below it, by its visible line boxes, where it used to read the zero box at
+  the page origin and call every such heading followed; `layout/unbreakable-block-too-tall`
+  records it as `not-applicable` (`rule/target-generates-no-box`, outside coverage), because
+  `break-inside` does not apply to an element that generates no box. An intermediate state of this
+  change declined it against coverage instead, and a key/value grid whose items were flattened
+  with `display: contents` under `li { break-inside: avoid }` ended exit 4 with twelve declines
+  where 0.6.0 ended exit 0; it ends exit 0 again. An image-only `display: contents` figure is no
+  longer called unrendered. Where a box-less block has no line to read,
+  `layout/heading-at-page-bottom` excludes it when its lines are all invisible
+  (`rule/target-not-visible`, so a hidden `display: contents` heading no longer ends a run at exit
+  4) and declines it as `env/invalid-measurement` when it has no line or unrecorded lines. A box
+  of zero by zero is not read as "not rendered" by itself: only `display: none` or recorded lines
+  none of which is visible are. A zero-size block that printed its text outside its box
+  (`width: 0; height: 0; overflow: visible`) is placed by its lines by the heading rule, measured
+  by the word-spacing rule, and declined, counted, by `layout/unbreakable-block-too-tall` (an
+  unreleased intermediate state excluded it, which turned a counted decline into a clean run).
+  `type/excessive-word-spacing` no longer measures a factor of 0 from lines nobody saw: all lines
+  invisible is `rule/target-not-visible`, no line at all (an empty or image-only justified block)
+  is `rule/no-text-lines` (both outside coverage), and unrecorded lines are declined as
+  `env/invalid-measurement`, counted. Both rules newly declare `env/invalid-measurement`.
+- **A split block whose first fragment did not print is still judged.**
+  `layout/unbreakable-block-too-tall` judged a split block at fragment 0, so a script that set
+  `display: none` on only the first fragment, or moved it where it has no box, hid the whole
+  block: measured on 2026-09-25, a four-page avoid block went from a finding (exit 1) to a clean
+  run (exit 0). The block is now judged at its first fragment laid out with a visible box of its
+  own, over the sum of all its fragments; the earlier fragments are recorded `not-applicable`
+  (`rule/fragment-not-rendered`). Both hostile documents report the block again (exit 1).
 - **The same rule's advice no longer claims the block "cannot fit unbroken on any page".** The
   finding message had already stopped making that all-pages claim from one measured page; the
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
@@ -248,7 +280,7 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   findings. **What this leaves unmeasured is new and is stated in `docs/limitations.md`**:
   nothing printed in a margin box is judged by any block, line or page rule, and a
   `position: fixed` element is not measured at all. Inline SVG in a margin box is not covered by
-  this change. Pure exclusion: no field is added or removed, and the Snapshot stamp stays 4 — but
+  this change. This change itself is pure exclusion (the fields Snapshot 5 adds are a separate entry) — but
   `blocks`, `fragmentIndex`/`fragmentCount`, `blank`, the break causes and `firstSemanticBlockKey`
   mean something different for every document with running elements. The exit codes quoted here
   were measured with evidence binding off; the evidence side is the next entry.
@@ -306,6 +338,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   now anchored to the first block that STARTS on it; only a page on which nothing starts falls back
   to its first continuing block. Page 1 of a wrapped document is still anchored to the wrapper;
   every later page moves to its first paragraph. The same baseline advice applies.
+
+- **The source-id check's refusal for an element moved into the footnote area no longer says it
+  was found outside the footnote area.** Every element in the page area outside the page content
+  that is not inside a Paged.js note lands in one refusal, including one moved INTO the footnote
+  area without the note marker; the message now names what is missing (`data-note="footnote"`).
+  Exit 3 as before.
 
 ### Documentation
 
@@ -431,6 +469,13 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   advice proposes.
 
 ### Tooling
+
+- **The live late-mutation test no longer depends on when a timer fires.** Its fixture appends a
+  paragraph on a 600 ms timer, so whether that lands before the snapshot, between the snapshot and
+  a PDF, or after the last PDF is a race: 3 of 42 runs on the base commit produced no event, and the
+  test, which required one, failed there. It now requires what the product guarantees: an event,
+  or else neither the measured snapshot nor the delivered PDF (read with the production
+  rasteriser) carries the late text.
 
 - **The release workflow names its version once, and CI checks that it is the right one.**
   `release.yml` carried the release version as a literal 28 times; the literal tag trigger is now
