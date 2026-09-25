@@ -160,9 +160,9 @@ function sourceLabel(finding: Finding): string {
  * Generic per-rule advice travels in `ContextFinding.remediation` instead: an agent must be able
  * to tell "edit this verified range" from "here is what this rule usually means".
  *
- * `widows`/`orphans` are deliberately absent. Measured: neither property occurs anywhere in
- * pagedjs 0.4.3, and Chromium does not honour them under Paged.js. Naming an inert property as a
- * repair is worse than naming none.
+ * The CSS `widows` and `orphans` values are deliberately not offered as repairs. The browser applies
+ * both when Paged.js splits a paragraph (pinned by tests/live/fragmentation-levers.test.ts), but
+ * each value is also its rule's threshold: changing it moves the threshold and repairs nothing.
  */
 function repairOptions(finding: Finding): readonly string[] {
   if (finding.actionability !== "actionable" || finding.originalSource.status !== "verified") return [];

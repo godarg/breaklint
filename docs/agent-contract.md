@@ -91,7 +91,9 @@ Each item names only levers its rule's own `remediation.advice` proposes; the ad
 3. **Split paragraphs and table rows (`layout/widow`, `layout/orphan`):** inside a table row, keep
    the row together with `tr { break-inside: avoid; }`. For a paragraph, prevent the split with
    `break-inside: avoid`, force an earlier break with `break-before: page`, or reword the text.
-   *(Paged.js does not implement the CSS `widows` and `orphans` properties; they are inert here.)*
+   *(Note: CSS `widows` and `orphans` do take effect on paragraphs: Paged.js never reads them, but the
+   browser applies them through its own fragmentation inside Paged.js's flow. Each value is also its
+   rule's threshold, so changing it is not a fix.)*
 4. **Headings at the bottom (`layout/heading-at-page-bottom`):** add `break-after: avoid` to the
    heading, or insert `break-before: page` before it.
 5. **Oversized blocks (`layout/unbreakable-block-too-tall`):** make the block shorter — split its

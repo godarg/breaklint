@@ -2,19 +2,62 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 
-import { ALL_RULES, VALIDATION_RULES_BY_ID } from "../../src/rules/index.ts";
-import { generatedBlock, markerPairCount, pageNameFor } from "../../tools/rule-docs.ts";
+import { ALL_RULES, RULES_BY_ID, VALIDATION_RULES_BY_ID } from "../../src/rules/index.ts";
+import { generatedBlock, markerPairCount, pageNameFor, precedenceLines } from "../../tools/rule-docs.ts";
 import { IS, SEVERITIES } from "../../src/core/enums.ts";
+import {
+  defineRule, interactionProblems, type InteractionRelation, type InteractionScope, type RemediationInteraction,
+  type RuleMeta,
+} from "../../src/core/rule.ts";
+import {
+  APPROVED_FRAGMENTATION_TEXTS, CLAIMS_DECIDED_BY_THE_PIN, leversApplied, SOFT_HYPHEN_BOUNDARY,
+  WIDOWS_ORPHANS_SPLITS,
+} from "../fixtures/fragmentation-levers.ts";
+import {
+  approvedKeys, codeSegments, fragmentationProblems, guardedUnits, isJudged, placeLabel, proseSentences,
+  type GuardedUnit,
+} from "../tools/fragmentation-guard.ts";
 import { changedLevers, LEVERS, positiveLevers, proposedLevers } from "../tools/remediation-levers.ts";
 
 /**
- * The declaration form, and the three prose forms that got past the narrow first version of this
- * guard (measured: it caught 2 of 5 plausible phrasings). It must NOT match the rules' own
- * threshold source (`block.effectiveStyle.widows`) or a sentence that warns AGAINST the property,
- * so it requires an imperative or an explicit value nearby.
+ * Whether the browser applies `widows`/`orphans` under Paged.js is a MEASUREMENT, pinned in
+ * tests/fixtures/fragmentation-levers.ts and re-taken in CI by tests/live/fragmentation-levers.test.ts.
+ *
+ * This guard used to be a flat ban on both properties, written on the assumption that Paged.js
+ * makes them inert. It was never measured, and on measurement it was wrong: the browser applies
+ * both when Paged.js splits a paragraph. Its successor was a blacklist of ways to call them inert,
+ * and an audit walked around it eight times. It is now an allow-list derived from the pin; see
+ * tests/tools/fragmentation-guard.ts for why and how.
  */
-const INERT_PROPERTY_ADVICE =
-  /\b(widows|orphans)\s*:\s*\d|\b(set|increase|raise|lower|use|apply|add|specify|configure)\b[^.]{0,60}\b(widows|orphans)\b|\b(widows|orphans)\b[^.]{0,40}\b(property|setting|value)\b[^.]{0,40}\b(to|of)\b\s*\S/iu;
+const APPLIED = leversApplied(WIDOWS_ORPHANS_SPLITS);
+const REPO_ROOT = new URL("../../", import.meta.url);
+
+/**
+ * Block-level `hyphens: none` recommended for justified text. `type/excessive-word-spacing` owns
+ * the block-level `hyphens` setting of justified blocks (declared in `remediation.interactions`),
+ * so a sentence naming `hyphens: none` must either be word-local markup or say that it is for a
+ * block that is not justified; a warning against it is allowed.
+ */
+function justifiedHyphensNoneProblems(text: string, where: string): string[] {
+  const problems: string[] = [];
+  for (const sentence of proseSentences(text)) {
+    if (!/hyphens:\s*none/iu.test(sentence)) continue;
+    const wordLocal = /<span\b[^>]*hyphens:\s*none/iu.test(sentence);
+    const notJustified = /\b(not justified|non-justified|unjustified)\b/iu.test(sentence);
+    const warnsAgainst = /\b(do not|never)\b/iu.test(sentence);
+    if (!wordLocal && !notJustified && !warnsAgainst) {
+      problems.push(`${where} names block-level 'hyphens: none' without excluding justified text: ${sentence}`);
+    }
+  }
+  for (const fence of text.match(/```[\s\S]*?```/gu) ?? []) {
+    for (const style of fence.match(/style="[^"]*"/gu) ?? []) {
+      if (/text-align:\s*justify/iu.test(style) && /hyphens:\s*none/iu.test(style)) {
+        problems.push(`${where} shows a justified element with block-level 'hyphens: none': ${style}`);
+      }
+    }
+  }
+  return problems;
+}
 
 describe("rule registry", () => {
   it("every rule declares a valid severity and a consistent proof source", () => {
@@ -59,32 +102,145 @@ describe("rule registry", () => {
     }
   });
 
-  it("every released rule declares an actionable remediation without proposing inert widows/orphans CSS", () => {
+  it("every released rule declares an actionable remediation", () => {
     for (const rule of ALL_RULES) {
       assert.ok(rule.remediation && rule.remediation.advice.length > 20, `${rule.id}: missing remediation`);
       assert.equal(typeof rule.remediation!.tested, "boolean", `${rule.id}: remediation must state whether a proof pair backs it`);
-      // Never recommend widows: N or orphans: N as a fix — Paged.js 0.4.3 does not implement them.
-      assert.ok(
-        !INERT_PROPERTY_ADVICE.test(rule.remediation!.advice),
-        `${rule.id}: proposes inert widows/orphans CSS property in remediation`,
-      );
     }
   });
 
-  it("no rule documentation page proposes the inert widows/orphans CSS property either", () => {
-    const dir = new URL("../../docs/rules/", import.meta.url);
-    const pages = readdirSync(dir).filter((name) => name.endsWith(".md"));
-    assert.ok(pages.length >= 13, `expected the rule pages to be present, found ${pages.length}`);
-    for (const page of pages) {
-      const text = readFileSync(new URL(page, dir), "utf8");
-      for (const [index, line] of text.split("\n").entries()) {
-        // A sentence that warns AGAINST the property is the point, not a violation.
-        if (/\b(do not|does not|never|absent|not honour|not honor|ignored)\b/iu.test(line)) continue;
-        assert.ok(
-          !INERT_PROPERTY_ADVICE.test(line),
-          `docs/rules/${page}:${index + 1} proposes the inert widows/orphans CSS property: ${line.trim()}`,
-        );
+  it("every guarded unit naming widows/orphans, and the complete widow/orphan advice, is approved by the pin", () => {
+    assert.deepEqual(Object.keys(APPLIED).sort(), ["orphans", "widows"], "the guard must have a pin to follow");
+    const units = guardedUnits(ALL_RULES, REPO_ROOT);
+    const judged = units.filter(isJudged);
+    assert.ok(judged.length >= 19, `the guard reads too few units to be guarding anything (${judged.length})`);
+    for (const place of ["layout/widow summary", "layout/widow finding message", "layout/orphan finding message", "README.md", "docs/agent-contract.md", "src/api/context.ts"]) {
+      assert.ok(judged.some((unit) => unit.place === place), `the guard no longer reads ${place}`);
+    }
+    assert.deepEqual(fragmentationProblems(units, APPLIED), []);
+    // And the other way round: every text approved under this pin is still published, so the list
+    // cannot silently keep approvals for text that no longer exists.
+    const published = new Set(judged.map(({ place, text }) => `${place}\u0000${text}`));
+    const stale = [...approvedKeys(APPLIED)].filter((key) => !published.has(key)).map((key) => key.replace("\u0000", ": "));
+    assert.deepEqual(stale, [], "approved texts that are no longer published — remove or update them");
+  });
+
+  /**
+   * The negative controls, kept in the suite. They are the phrasings two review rounds used to walk
+   * around earlier versions of this guard, plus at least one more per check. Each is judged where
+   * the real text is judged, among the real units.
+   */
+  it("refuses every phrasing that walked around earlier versions of the guard", () => {
+    const real = guardedUnits(ALL_RULES, REPO_ROOT);
+    const notApplied = { widows: false, orphans: false };
+    const widowAdvice = placeLabel({ ruleId: "layout/widow" });
+    const withUnit = (unit: GuardedUnit, replacing?: (other: GuardedUnit) => boolean) =>
+      [...real.filter((other) => !(replacing?.(other) ?? false)), unit];
+    const prose = (place: string, text: string): GuardedUnit => ({ place, text, kind: "prose" });
+    const problemsWith = (units: readonly GuardedUnit[], applied = APPLIED, approved?: ReadonlySet<string>) =>
+      fragmentationProblems(units, applied, approved).join("\n");
+
+    // 1. Appended to the widow advice: the complete text is pinned, so ANY addition fails — including
+    //    one that refers to the property without naming it.
+    const advice = real.find((unit) => unit.place === widowAdvice && unit.kind === "prose")!;
+    for (const sentence of [
+      "Paged.js disregards 'widows' entirely.", "The 'widows' property has no influence under Paged.js.",
+      "Paged.js does not support 'widows'.", "'widows' is unsupported by the paginator.", "Setting 'widows' does nothing here.",
+      "Paged.js 0.4.3 has no widows implementation, so it is ineffective.", "Chromium overlooks 'orphans' in paginated output.",
+      "Paged.js ignores it anyway.", "Both properties are inert under Paged.js.",
+    ]) {
+      const units = withUnit(prose(widowAdvice, `${advice.text} ${sentence}`), (other) => other === advice);
+      assert.match(problemsWith(units), /is not the approved complete advice text/u, `accepted in the widow advice: ${sentence}`);
+    }
+
+    // 2. Lowering: refused in every pin state even when the unit is approved.
+    for (const sentence of [
+      "Or set 'widows: 1' on the paragraph.", "Lowering the paragraph's widows makes the finding disappear.",
+      "Reduce the block's orphans to 1 so the split conforms.", "Set widows to 1 to silence it.", "Set `widows` to `1`.",
+      "A widows value of 1 avoids this.", "Declare widows: 1", "Choose widows = 1", "A smaller widows value keeps the finding away.",
+      "Lower widow-control to 1.", "Remove the widows declaration from the paragraph.", "Reset widows on the paragraph.",
+    ]) {
+      const unit = prose("docs/rules/layout-widow.md", sentence);
+      const approvedAnyway = new Set([`${unit.place}\u0000${unit.text}`]);
+      for (const applied of [APPLIED, notApplied]) {
+        assert.match(problemsWith([unit], applied, approvedAnyway), /proposes lowering/u, `lowering accepted under ${JSON.stringify(applied)}: ${sentence}`);
       }
+    }
+
+    // 3. Setting or raising while the pin says not applied, even when approved.
+    for (const sentence of ["Raising the paragraph's 'widows' to 3 keeps more lines together.", "Try widows 3.", "Increase 'orphans' on the block.", "Declare orphans: 4 on the paragraph."]) {
+      const unit = prose("docs/rules/layout-widow.md", sentence);
+      const approvedAnyway = new Set([`${unit.place}\u0000${unit.text}`]);
+      assert.match(problemsWith([unit], notApplied, approvedAnyway), /proposes setting (widows|orphans), which the pinned measurement shows the browser NOT applying/u, `raising accepted: ${sentence}`);
+    }
+
+    // 4. Code: fences, HTML comments and inline style attributes are not approvable prose, but the
+    //    lowering check always, and the setting check while not applied, run on them.
+    const page = "docs/rules/layout-widow.md";
+    const code = (markdown: string) => codeSegments(markdown).map((text): GuardedUnit => ({ place: page, text, kind: "code" }));
+    for (const markdown of [
+      "```css\np { widows: 1 }\n```",
+      "```html\n<p style=\"orphans: 1\">text</p>\n```",
+      "Remedied: <p style='widows:1'>short</p>.",
+      "<!-- remedied by lowering widows to one -->",
+      "```css\n.fix { orphans: initial; }\n```",
+    ]) {
+      const units = code(markdown);
+      assert.ok(units.length > 0, `no code segment was read from: ${markdown}`);
+      assert.match(problemsWith(units), /proposes lowering .*\(code\)/u, `code lowering accepted: ${markdown}`);
+    }
+    for (const markdown of ["```css\np { widows: 3 }\n```", "<p style=\"orphans: 4\">x</p>"]) {
+      assert.match(problemsWith(code(markdown), notApplied), /proposes setting (widows|orphans).*\(code\)/u, `code setting accepted while not applied: ${markdown}`);
+      assert.doesNotMatch(problemsWith(code(markdown)), /proposes/u, `a numeric value above 1 in code is not a lowering while applied: ${markdown}`);
+    }
+
+    // 5. A sentence added to a pinned paragraph fails although it names nothing; a paragraph that
+    //    names the properties by a looser spelling is judged too.
+    const note = real.find((unit) => unit.place === page && unit.text.startsWith("Chromium applies `widows`"))!;
+    assert.match(problemsWith(withUnit(prose(page, `${note.text} Both properties are inert under Paged.js.`), (other) => other === note)),
+      /names widows\/orphans in a unit that is not approved/u);
+    assert.match(problemsWith(withUnit(prose(page, "Widow/orphan handling is ignored by Paged.js."))), /not approved/u);
+
+    // 6. The newly guarded places: summary, finding message, README, docs/*.md.
+    for (const [place, text] of [
+      ["layout/widow summary", "The first fragment of a block on a page has fewer lines than its own widows value, which Paged.js ignores."],
+      ["layout/orphan finding message", "N line(s) of this block remain at the foot of page N; its own orphans value is inert here."],
+      ["README.md", "Paged.js makes widows and orphans inert, so breaklint only reports them."],
+      ["docs/configuration.md", "The orphans property has no effect under Paged.js."],
+    ] as const) {
+      assert.match(problemsWith(withUnit(prose(place, text))), /not approved/u, `accepted at ${place}: ${text}`);
+    }
+
+    // 7. Derived from the pin: under a pin that says "not applied", every text asserting
+    //    application — the 6+3 measured split included — loses its approval.
+    const underInertPin = problemsWith(real, notApplied);
+    const asserting = APPROVED_FRAGMENTATION_TEXTS.filter((item) => item.requires.length > 0);
+    assert.ok(asserting.some((item) => item.text.includes("splits 6+3")), "the measured 6+3 relaxation must require the pin");
+    for (const entry of asserting) {
+      assert.ok(underInertPin.includes(entry.text), `still approved under a pin that says not applied: ${entry.text}`);
+    }
+  });
+
+  it("every published sentence the pinned measurement decides is present, and agrees with the pin", () => {
+    assert.ok(CLAIMS_DECIDED_BY_THE_PIN.length >= 6, "the pin names too few of the sentences it decides");
+    const softHyphenMarked =
+      SOFT_HYPHEN_BOUNDARY.shy.boundaryHyphen && !SOFT_HYPHEN_BOUNDARY.space.boundaryHyphen;
+    const wordLocalLeversWork =
+      !SOFT_HYPHEN_BOUNDARY["span-none"].boundaryHyphen && !SOFT_HYPHEN_BOUNDARY.nowrap.boundaryHyphen;
+    const published = guardedUnits(ALL_RULES, REPO_ROOT);
+    for (const claim of CLAIMS_DECIDED_BY_THE_PIN) {
+      if ("ruleId" in claim.where) {
+        const advice = RULES_BY_ID.get(claim.where.ruleId)?.remediation?.advice ?? "";
+        assert.ok(advice.includes(claim.sentence), `${claim.where.ruleId} remediation.advice no longer says: ${claim.sentence}`);
+      } else {
+        // Judged on the same normalised units the guard reads (a wrapped blockquote paragraph is
+        // one unit; a source file's comment markers are removed).
+        const file = claim.where.file;
+        assert.ok(published.some((unit) => unit.place === file && unit.text.includes(claim.sentence)), `${file} no longer says: ${claim.sentence}`);
+      }
+      // Every decided sentence is affirmative today: it says the lever takes effect.
+      const holds = claim.decidedBy === "soft-hyphen" ? softHyphenMarked && wordLocalLeversWork : APPLIED[claim.decidedBy];
+      assert.ok(holds, `the pin no longer supports "${claim.sentence}" (${"ruleId" in claim.where ? claim.where.ruleId : claim.where.file}); change the sentence with the pin`);
     }
   });
 
@@ -106,8 +262,7 @@ describe("rule registry", () => {
     const dir = new URL("../../docs/rules/", import.meta.url);
     // Actionable levers only (LEVERS, shared with the Examples guard below). A property named as a
     // MEASUREMENT ("a page of prose at line-height: 1.5 reaches ...") is not a proposal, so the
-    // guard also requires an imperative nearby — the same shape the inert-property guard above
-    // uses, for the same reason.
+    // guard also requires an imperative nearby.
     const IMPERATIVE = /\b(set|use|apply|add|insert|enable|disable|remove|replace|increase|reduce|lower|raise|adjust|specify|configure|prevent|force|keep|try|wrap|mark)\b/iu;
     const WARNS_AGAINST = /\b(do not|does not|never|absent|not honour|not honor|ignored|inert|reaches at most)\b/iu;
 
@@ -238,17 +393,100 @@ describe("rule registry", () => {
    * inside a comment. It also asserts that the map is still reached from `card`, because a guard
    * over dead code is a guard over nothing.
    */
-  it("the agent-facing repair map proposes no inert widows/orphans CSS either", () => {
+  it("the agent-facing repair map is still reached, so the sentence guard above covers a live map", () => {
+    // The map's text, comments included, is judged by the sentence guard above; this keeps that
+    // from being a guard over dead code.
     const source = readFileSync(new URL("../../src/api/context.ts", import.meta.url), "utf8");
     assert.match(source, /function repairOptions\(/u, "repairOptions is gone — this guard has lost its subject");
     assert.match(source, /repair:\s*\{[^}]*options:\s*repairOptions\(/u, "repairOptions is no longer reached from the finding card");
-    for (const [index, line] of source.split("\n").entries()) {
-      const code = line.replace(/\/\*.*?\*\//gu, "");
-      if (/^\s*(\*|\/\/)/u.test(code)) continue;
-      assert.ok(
-        !/\b(widows|orphans)\s*:\s*\d/iu.test(code) && !/\b(widows|orphans)\s+(setting|property|value|declaration)/iu.test(code),
-        `src/api/context.ts:${index + 1} proposes an inert widows/orphans CSS property: ${line.trim()}`,
-      );
+    assert.ok(
+      guardedUnits(ALL_RULES, REPO_ROOT).some((unit) => unit.place === "src/api/context.ts" && isJudged(unit)),
+      "the repair map's comment no longer names the properties — check the guard still reads the file",
+    );
+  });
+
+  /**
+   * The hyphenation pair, measured before this existed: `layout/hyphen-across-page` advised turning
+   * hyphenation off for the paragraph and `type/excessive-word-spacing` advised turning it on, and
+   * each text said only that the two "pull in opposite directions". An agent obeying both loops.
+   * The order is now declared once, on both rules, and this is where "on both" is enforced: delete
+   * either side and the validator names the missing half.
+   */
+  it("the hyphenation precedence is declared on both rules, as opposites, and each advice names the other rule", () => {
+    assert.deepEqual(interactionProblems(ALL_RULES), []);
+    const hyphenation = ALL_RULES.flatMap((rule) =>
+      (rule.remediation?.interactions ?? []).filter((interaction) => interaction.lever === "hyphens" || interaction.lever === "soft-hyphen")
+        .map((interaction) => ({ from: rule.id, ...interaction })));
+    assert.deepEqual(hyphenation, [
+      { from: "layout/hyphen-across-page", ruleId: "type/excessive-word-spacing", lever: "hyphens", relation: "defers", scope: "justified" },
+      { from: "layout/hyphen-across-page", ruleId: "type/excessive-word-spacing", lever: "soft-hyphen", relation: "defers", scope: "justified" },
+      { from: "type/excessive-word-spacing", ruleId: "layout/hyphen-across-page", lever: "hyphens", relation: "prevails", scope: "justified" },
+      { from: "type/excessive-word-spacing", ruleId: "layout/hyphen-across-page", lever: "soft-hyphen", relation: "prevails", scope: "justified" },
+    ]);
+  });
+
+  it("the precedence validator refuses a one-sided, same-sided or dangling pair and an advice that does not name its partner", () => {
+    const pair = (relation: InteractionRelation, ruleId: string, overrides: Partial<RemediationInteraction> = {}): RemediationInteraction =>
+      ({ ruleId, lever: "hyphens", relation, scope: "justified", ...overrides });
+    const meta = (id: string, advice: string, interactions: RemediationInteraction[]) =>
+      ({ id, remediation: { advice, tested: false, interactions } });
+    const a = meta("layout/a", "Defers to 'type/b' on hyphens.", [pair("defers", "type/b")]);
+    const b = meta("type/b", "Prevails over 'layout/a' on hyphens.", [pair("prevails", "layout/a")]);
+    // The control first: a correct pair is accepted, so every rejection below is about its defect.
+    assert.deepEqual(interactionProblems([a, b]), []);
+
+    const cases: [string, Parameters<typeof interactionProblems>[0], RegExp][] = [
+      ["one-sided", [a, meta("type/b", "Names 'layout/a' and hyphens.", [])], /type\/b declares no prevails in return/u],
+      ["same-sided", [a, meta("type/b", "Names 'layout/a' and hyphens.", [pair("defers", "layout/a")])], /declares defers in return, not prevails/u],
+      ["other lever", [a, meta("type/b", "Names 'layout/a' and &shy;.", [pair("prevails", "layout/a", { lever: "soft-hyphen" })])], /declares no prevails in return/u],
+      ["dangling", [a], /type\/b is not a registered rule/u],
+      ["silent advice", [meta("layout/a", "Says nothing about the other rule, only hyphens.", [pair("defers", "type/b")]), b], /does not name 'type\/b'/u],
+      ["self", [meta("layout/a", "Names 'layout/a' and hyphens.", [pair("defers", "layout/a")])], /cannot take precedence over itself/u],
+      ["unknown relation", [meta("layout/a", "Names 'type/b' and hyphens.", [pair("overrides" as InteractionRelation, "type/b")]), b], /relation "overrides"/u],
+      ["unknown lever", [meta("layout/a", "Names 'type/b' and hyphens.", [pair("defers", "type/b", { lever: "kerning" as RemediationInteraction["lever"] })]), b], /lever "kerning"/u],
+      ["lever never mentioned", [meta("layout/a", "Names 'type/b' and hyphens.", [pair("defers", "type/b", { lever: "soft-hyphen" })]), b], /never mentions &shy;/u],
+      ["unknown scope", [meta("layout/a", "Names 'type/b' and hyphens.", [pair("defers", "type/b", { scope: "everywhere" as InteractionScope })]), b], /scope "everywhere"/u],
+    ];
+    for (const [name, rules, expected] of cases) {
+      assert.match(interactionProblems(rules).join("\n"), expected, `${name}: the validator did not name the defect`);
     }
+
+    // defineRule refuses a malformed declaration at load, before any registry exists.
+    const base: RuleMeta = {
+      id: "layout/a", severity: "warn", proofSource: null, calibrated: false, experimental: false, unit: "x",
+      defaultOptions: {}, summary: "A synthetic rule used only by this test case.", declines: [],
+    };
+    const run = () => ({ findings: [], candidates: 0, measured: 0, notMeasured: [], evaluations: [] });
+    assert.throws(
+      () => defineRule({ ...base, remediation: { advice: "Names nobody.", tested: false, interactions: [pair("defers", "type/b")] } }, run),
+      /invalid remediation\.interactions — .*does not name 'type\/b'/u,
+    );
+    assert.doesNotThrow(() => defineRule({ ...base, remediation: { advice: "Defers to 'type/b' on hyphens.", tested: false, interactions: [pair("defers", "type/b")] } }, run));
+  });
+
+  it("each rule page renders its precedence from remediation.interactions, and no page carries one it does not declare", () => {
+    const dir = new URL("../../docs/rules/", import.meta.url);
+    for (const rule of ALL_RULES) {
+      const text = readFileSync(new URL(pageNameFor(rule), dir), "utf8");
+      const lines = precedenceLines(rule);
+      assert.equal(
+        text.split("**Precedence.**").length - 1,
+        lines.length,
+        `docs/rules/${pageNameFor(rule)} carries a precedence line its rule does not declare, or lacks one it does`,
+      );
+      for (const line of lines) assert.ok(text.includes(line), `docs/rules/${pageNameFor(rule)} lacks: ${line}`);
+    }
+  });
+
+  it("no advice and no rule page recommends block-level 'hyphens: none' for justified text", () => {
+    const dir = new URL("../../docs/rules/", import.meta.url);
+    const problems = [
+      ...ALL_RULES.flatMap((rule) => justifiedHyphensNoneProblems(rule.remediation?.advice ?? "", `${rule.id} remediation.advice`)),
+      ...readdirSync(dir).filter((name) => name.endsWith(".md"))
+        .flatMap((page) => justifiedHyphensNoneProblems(readFileSync(new URL(page, dir), "utf8"), `docs/rules/${page}`)),
+    ];
+    assert.deepEqual(problems, []);
+    // Not vacuous: the pair's advice does name 'hyphens: none', word-local and non-justified.
+    assert.match(RULES_BY_ID.get("layout/hyphen-across-page")?.remediation?.advice ?? "", /hyphens: none/u);
   });
 });
