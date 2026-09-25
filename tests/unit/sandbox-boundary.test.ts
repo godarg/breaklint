@@ -11,6 +11,15 @@
  *
  * It reads the real files. It is static on purpose: a unit test must not need Chrome, and the
  * question "does any code path ask for the sandbox to be off" is a question about the code.
+ *
+ * KNOWN LIMITS, accepted: check 1 recognises a call whose callee is the name `launch` or a
+ * property access ending in `.launch`. A launch reached any other way — `launch.call(…)`,
+ * `launch.apply(…)`, `launch.bind(…)(…)`, an element access such as `puppeteer["launch"](…)`, or
+ * an alias (`const start = puppeteer.launch`) — is not read, and its options are not checked.
+ * Check 1 also parses only the `.ts` files under `src`; a `.mts` or `.cts` source there is not
+ * read. Check 2 does read every text file, `.mts` and `.cts` included, so such a launch still
+ * cannot spell out a sandbox-disabling switch, `ignoreDefaultArgs` or `chromiumSandbox` without
+ * failing here; only its other options go unchecked.
  */
 
 import { strict as assert } from "node:assert";
