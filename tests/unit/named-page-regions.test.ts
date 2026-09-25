@@ -1,25 +1,28 @@
 /**
- * The named page of a page is the one Paged.js APPLIED to it — read from the page element — and a
- * boundary is forced by a named page only when the two pages' named pages differ.
+ * The cause of a page boundary is the decision Paged.js' `shouldBreak()` took at the node the next
+ * page starts at — re-evaluated by the collector at the break token, in the paginator's source.
  *
- * THE DEFECT. The collector took a page's named page from its first source-bearing node. On a real
- * document that node is very often a wrapper continuing from the page before — `<main>`,
- * `<article>` — rebuilt by Paged.js as a clone with no named ancestor. Every page inside a named
- * region then read `null` against the previous page's last node, which sits inside the region:
- * a false `forced` on every boundary in the region, and on the page after it, which silences the
- * widow, orphan, half-empty and continuation-page rules there. The boundary INTO the region read
- * `null` against `null` and was missed. Measured on a self-authored report with a landscape
- * region (patched Chromium 141, no evidence binding): every boundary from the region's second page
- * on was `forced` with the reason `page@<the main wrapper>`, the region's first page `overflow`,
- * and 13 widow and 13 orphan candidates declined as `env/forced-break`, which put the document
- * below the widow coverage floor (exit 4).
+ * THE DEFECT, TWICE. The collector first took a page's named page from its first source-bearing
+ * node. On a real document that node is a wrapper continuing from the page before — `<main>`,
+ * `<article>` — rebuilt by Paged.js as a clone with no named ancestor, so every boundary inside a
+ * named region and the one after it read as a named-page change (`forced`) and the boundary into
+ * it read as `overflow`: 9 of 14 widow and orphan candidates declined, exit 4, on a self-authored
+ * report (patched Chromium 141, no evidence binding). The first repair compared the named pages the
+ * two PAGES were styled with (`pagedjs_<name>_page` on the page element). That is not Paged.js'
+ * rule either: `needsPageBreak()` compares the named page in force at a node with the one in force
+ * at the node BEFORE it — a previous sibling, whose named page comes from itself and its ancestors,
+ * never from its descendants. `<div><section style="page: chap">…</section></div><p>` does not
+ * break on leaving the section, the paragraph is laid out on the `chap` page, and the next
+ * overflow boundary was read as a change of named page: a false `forced`, found by an independent
+ * probe that recorded Paged.js' own `shouldBreak()` answers.
  *
- * The page trees below are hand-authored in the structure Paged.js 0.4.3 builds — continuation
- * clones carry `data-split-from`, a named element's clones carry its `data-page`, and the page
- * element carries `pagedjs_named_page pagedjs_<name>_page` — as read back from real paginated
- * documents on 2026-09-25 (`tests/live/breaks.test.ts` runs the same shapes through the real
- * paginator). What runs over them is the real collector payload and, for the consumer path, the
- * real snapshot payload, `assembleSnapshot`, the classifier and `runDocument`.
+ * WHAT IS UNDER TEST. The real collector payload over hand-authored trees in the structure
+ * Paged.js 0.4.3 builds: the rendered pages (continuation clones carry `data-split-from`) and the
+ * paginator's parsed source, whose elements carry the attributes `shouldBreak()` reads
+ * (`data-break-before`, `data-previous-break-after`, `data-page`), with the break tokens
+ * `afterPageLayout` hands out. For the consumer path, the real snapshot payload,
+ * `assembleSnapshot`, the classifier and `runDocument`. `tests/live/breaks.test.ts` compares the
+ * same classification with Paged.js' own answers on real paginations.
  */
 
 import assert from "node:assert/strict";
@@ -35,7 +38,7 @@ import { assignPageCauses, classifyBoundary } from "../../src/paginate/breaks.ts
 import { boundaryFactsFrom, COLLECTOR_SOURCE, type CollectorResult } from "../../src/paginate/collector.ts";
 import { injectSourceIds } from "../../src/source/inject.ts";
 import type { Snapshot } from "../../src/core/types.ts";
-import { evaluatePayload, pagedDocument, pagedPage, runCollector, type FakeNode } from "../fixtures/paged-dom.ts";
+import { evaluatePayload, fakeDocument, pagedDocument, pagedPage, runCollector, type FakeBreakToken, type FakeNode } from "../fixtures/paged-dom.ts";
 
 const STRIDE = 700;
 const LINE = 18.66;
@@ -75,6 +78,28 @@ const kindsAndReasons = (result: CollectorResult, sid: Record<string, string>): 
     return cause.reason ? `${cause.kind} ${what}@${byId[at ?? ""] ?? at}` : cause.kind;
   });
 };
+
+/**
+ * The paginator's parsed source for an injected document: the `<body>` of the injected HTML, with
+ * `data-page` (and any other attribute Paged.js writes) added the way `breaks.js` writes it.
+ * Returns the body, whose first child is where page 1's layout starts, and a lookup by author id.
+ */
+function pagedSource(html: string): { body: FakeNode; byId: (id: string) => FakeNode; text: (id: string, index?: number) => FakeNode } {
+  const tree = fakeDocument(html);
+  const all: FakeNode[] = [];
+  const visit = (node: FakeNode): void => { all.push(node); node.childNodes.forEach(visit); };
+  visit(tree);
+  const body = all.find((node) => node.tagName === "BODY")!;
+  const byId = (id: string) => {
+    const hit = all.find((node) => node.attributes.get("id") === id);
+    if (!hit) throw new Error(`no source element #${id}`);
+    return hit;
+  };
+  const text = (id: string, index = 0) => byId(id).childNodes.filter((node) => node.nodeType === 3)[index]!;
+  return { body, byId, text };
+}
+
+const token = (node: FakeNode, offset = 0): FakeBreakToken => ({ node, offset });
 
 // ---- a named region inside a wrapper that spans every page ---------------------------------
 
@@ -135,142 +160,151 @@ function assemble(raw: RawSnapshot, collector: CollectorResult, injected: Return
   return snapshot;
 }
 
-describe("named pages are read from the page element", () => {
+/** The source of `WRAPPER_SOURCE` as Paged.js holds it, and the three tokens it hands out. */
+function wrapperRun(sid: Record<string, string>, injectedHtml: string): { contents: FakeNode; tokens: FakeBreakToken[] } {
+  const src = pagedSource(injectedHtml.replace('class="wide"', 'class="wide" data-page="wide"'));
+  return {
+    contents: src.body,
+    // Page 1 ends where the region starts (forced); page 2 inside `w1` (offset: overflow);
+    // page 3 where the outro starts (forced, leaving the region).
+    tokens: [token(src.byId("wide")), token(src.text("w1"), "Wide two runs".length), token(src.byId("outro"))],
+  };
+}
+
+describe("the break decision is Paged.js' own, evaluated at the break token", () => {
   it("a region inside a wrapper: forced into and out of it, overflow inside it", () => {
-    const { sid } = source(WRAPPER_SOURCE);
-    const result = runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(wrapperPages(sid)));
+    const { injected, sid } = source(WRAPPER_SOURCE);
+    const result = runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(wrapperPages(sid)), wrapperRun(sid, injected.html));
     // The complication, checked before the answer: pages 2-4 begin with the continuing wrapper.
     assert.deepEqual(result.pages.map((page) => page.firstSid), [sid["wrap"], sid["wrap"], sid["wrap"], sid["wrap"]]);
-    assert.deepEqual(result.pages.map((page) => page.startSid), [sid["wrap"], sid["wide"], sid["w2"], sid["outro"]],
-      "the node that starts a page is the first one that is not a continuation clone");
-    assert.deepEqual(result.pages.map((page) => page.namedPages), [[], ["wide"], ["wide"], []]);
     assert.deepEqual(kindsAndReasons(result, sid), ["forced page@wide", "overflow", "forced page@outro"]);
+    assert.deepEqual(result.pages[0]!.decisionAfterRender, {
+      known: true, breakBefore: null, previousBreakAfter: null, pageBefore: null, pageAfter: "wide", sid: sid["wide"],
+    });
     assert.deepEqual(result.attributeDrift, []);
   });
 
   /**
-   * The class vocabulary is shared. Paged.js writes `pagedjs_first_page` on page 1 and
-   * `pagedjs_named_page` on EVERY named page, so a region named `first` or `named` would be seen
-   * everywhere if the class alone counted. It counts only with an element carrying that name in
-   * the page area.
+   * Leaving a named region that is NOT the previous sibling of what follows. Paged.js compares the
+   * paragraph with the `<div>` around the section, whose named page (self or ancestors) is none, so
+   * it does not break: the page after the region is not forced even when an overflow puts the
+   * boundary exactly there, and even though that page is no longer styled `chap`. Both the
+   * page-style comparison and a comparison of the leaves on either side call this boundary forced.
    */
-  it("a class Paged.js also writes for other reasons does not name a page by itself", () => {
-    const html = `<!doctype html><html lang="en"><body><p id="a">One.</p><div id="n">Two.</div><section id="r"><p id="r0">Three.</p></section></body></html>`;
-    const { sid } = source(html);
-    const pages = [
-      pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), pageClasses: "pagedjs_first_page pagedjs_right_page",
-        content: el(sid, "p", "a", "One.", { box: lineBox(0, 0) }) }),
-      pagedPage({ pageBox: pageBox(1), contentBox: contentBox(1), pageClasses: "pagedjs_left_page pagedjs_named_page pagedjs_named_first_page",
-        content: el(sid, "div", "n", "Two.", { page: "named", box: lineBox(1, 0) }) }),
-      pagedPage({ pageBox: pageBox(2), contentBox: contentBox(2), pageClasses: "pagedjs_right_page pagedjs_named_page pagedjs_region_page pagedjs_region_first_page",
-        content: el(sid, "section", "r", el(sid, "p", "r0", "Three.", { box: lineBox(2, 0) }), { page: "region", box: lineBox(2, 0) }) }),
-    ];
-    const result = runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(pages));
-    assert.deepEqual(result.pages.map((page) => page.namedPages), [[], ["named"], ["region"]],
-      "page 3 carries pagedjs_named_page because it is a named page, not because it is the page named 'named'");
-    assert.deepEqual(kindsAndReasons(result, sid), ["forced page@n", "forced page@r"]);
-  });
-
-  /**
-   * And an element carrying a name counts only where the page element carries the class: the
-   * rebuilt clone of an OUTER named region continues onto a page Paged.js gave the INNER name.
-   * Measured: a page inside `div.inner` nested in `section.outer` carries `pagedjs_inner_page`
-   * only, while the page area holds the clones of both.
-   */
-  it("a nested region: the name in force at each edge, and only among the names applied", () => {
-    const html = `<!doctype html><html lang="en"><body><main id="wrap"><p id="lead">Lead.</p>` +
-      `<section class="outer" id="outer"><div class="inner" id="inner"><p id="n0">N0.</p><p id="n1">N1.</p></div><p id="m0">M0.</p></section>` +
-      `</main></body></html>`;
-    const { sid } = source(html);
-    const inner = (page: number, content: string, split = false) =>
-      el(sid, "div", "inner", content, { page: "inner", split, attrs: 'class="inner"', box: lineBox(page, 0) });
-    const outer = (page: number, content: string, split = false) =>
-      el(sid, "section", "outer", content, { page: "outer", split, attrs: 'class="outer"', box: lineBox(page, 0) });
+  it("leaving a nested region is not a break, even where an overflow ends the page right after it", () => {
+    const html = `<!doctype html><html lang="en"><body><main id="wrap"><p id="lead">Lead.</p>
+<div id="holder"><section class="chap" id="chap"><p id="c0">C0.</p></section></div>
+<!-- a comment and whitespace between siblings are not significant -->
+<p id="o0">O0.</p><p id="o1">O1.</p></main></body></html>`;
+    const { injected, sid } = source(html);
+    const src = pagedSource(injected.html.replace('class="chap"', 'class="chap" data-page="chap"'));
     const main = (page: number, content: string, split: boolean) => el(sid, "main", "wrap", content, { split, box: lineBox(page, 0) });
     const pages = [
       pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), pageClasses: "pagedjs_first_page pagedjs_right_page",
         content: main(0, el(sid, "p", "lead", "Lead.", { box: lineBox(0, 0) }), false) }),
-      // Both regions start at the top of page 2, before any content, so both classes are applied.
-      pagedPage({ pageBox: pageBox(1), contentBox: contentBox(1),
-        pageClasses: "pagedjs_left_page pagedjs_named_page pagedjs_outer_page pagedjs_outer_first_page pagedjs_inner_page pagedjs_inner_first_page",
-        content: main(1, outer(1, inner(1, el(sid, "p", "n0", "N0.", { box: lineBox(1, 0) }))), true) }),
-      pagedPage({ pageBox: pageBox(2), contentBox: contentBox(2), pageClasses: "pagedjs_right_page pagedjs_named_page pagedjs_inner_page",
-        content: main(2, outer(2, inner(2, el(sid, "p", "n1", "N1.", { box: lineBox(2, 0) }), true), true), true) }),
-      pagedPage({ pageBox: pageBox(3), contentBox: contentBox(3), pageClasses: "pagedjs_left_page pagedjs_named_page pagedjs_outer_page",
-        content: main(3, outer(3, el(sid, "p", "m0", "M0.", { box: lineBox(3, 0) }), true), true) }),
+      pagedPage({ pageBox: pageBox(1), contentBox: contentBox(1), pageClasses: "pagedjs_left_page pagedjs_named_page pagedjs_chap_page pagedjs_chap_first_page",
+        content: main(1, el(sid, "div", "holder", el(sid, "section", "chap", el(sid, "p", "c0", "C0.", { box: lineBox(1, 0) }),
+          { page: "chap", attrs: 'class="chap"', box: lineBox(1, 0) }), { box: lineBox(1, 0) }), true) }),
+      pagedPage({ pageBox: pageBox(2), contentBox: contentBox(2), pageClasses: "pagedjs_right_page",
+        content: main(2, el(sid, "p", "o0", "O0.", { box: lineBox(2, 0) }) + el(sid, "p", "o1", "O1.", { box: lineBox(2, 1) }), true) }),
     ];
-    const result = runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(pages));
-    assert.deepEqual(result.pages.map((page) => page.namedPages), [[], ["inner", "outer"], ["inner"], ["outer"]]);
-    assert.deepEqual(result.pages.map((page) => [page.attributesAfterRender.page, page.pageAtEnd]),
-      [[null, null], ["outer", "inner"], ["inner", "inner"], ["outer", "outer"]]);
-    assert.deepEqual(kindsAndReasons(result, sid), ["forced page@outer", "overflow", "forced page@m0"]);
+    const result = runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(pages),
+      { contents: src.body, tokens: [token(src.byId("chap")), token(src.byId("o0"))] });
+    assert.deepEqual(kindsAndReasons(result, sid), ["forced page@chap", "overflow"]);
+    assert.deepEqual([result.pages[1]!.decisionAfterRender!.pageBefore, result.pages[1]!.decisionAfterRender!.pageAfter], [null, null],
+      "the node before o0 is the div around the region, whose named page is none");
   });
 
   /**
-   * A page carrying several applied names whose edge node is in force under none of them cannot be
-   * compared. The boundary is `unknown` — which suppresses nothing — rather than a guessed change.
+   * A `page:` on an inline element whose text crosses a page break. Paged.js asks `shouldBreak()`
+   * of text nodes too: the text inside the span is under the span's named page, the text before it
+   * is not, so it breaks at the start of the span's text. Where the span's text is split by an
+   * overflow instead, the token has an offset into it and nothing is forced.
    */
-  it("an edge that cannot be resolved to an applied name makes the boundary unknown", () => {
-    const html = `<!doctype html><html lang="en"><body><p id="a">A.</p><section id="s"><p id="s0">S0.</p></section><p id="z">Z.</p></body></html>`;
-    const { sid } = source(html);
+  it("an inline named page: forced at the start of its text, not where an overflow splits it", () => {
+    const html = `<!doctype html><html lang="en"><body><p id="host">Before <span class="x" id="span">inside the span</span> after.</p></body></html>`;
+    const { injected, sid } = source(html);
+    const src = pagedSource(injected.html.replace('class="x"', 'class="x" data-page="x"'));
+    const pages = [0, 1, 2].map((page) => pagedPage({ pageBox: pageBox(page), contentBox: contentBox(page),
+      pageClasses: page === 0 ? "pagedjs_first_page pagedjs_right_page" : "pagedjs_left_page pagedjs_named_page pagedjs_x_page",
+      content: el(sid, "p", "host", ["Before", "inside", "the span after."][page]!, { split: page > 0, box: lineBox(page, 0) }) }));
+    const inside = src.byId("span").childNodes[0]!;
+    const result = runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(pages),
+      { contents: src.body, tokens: [token(inside), token(inside, "inside ".length)] });
+    // An inline element carries no source id, so the reason names the block the text is in.
+    assert.equal(sid["span"], undefined, "premise: the span has no source id of its own");
+    assert.deepEqual(kindsAndReasons(result, sid), ["forced page@host", "overflow"]);
+    // The second token is also the node page 3's layout started at, which alone stops the
+    // comparison. The offset decides by itself too: a token inside a node on a page whose layout
+    // started elsewhere is not forced, because shouldBreak() was asked of that node where it began.
+    const [inner] = runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(pages.slice(0, 2)),
+      { contents: src.body, tokens: [token(inside, "inside ".length), null] }).pages;
+    assert.deepEqual([inner!.decisionAfterRender!.pageBefore, inner!.decisionAfterRender!.pageAfter], [null, null]);
+  });
+
+  /**
+   * `data-previous-break-after` sits on the element after the declaring one, and that can be an
+   * inline element at the head of a page inside a continuing wrapper. It is read on the token node.
+   */
+  it("a break-after whose following element is inline content inside a continuing wrapper is forced", () => {
+    const html = `<!doctype html><html lang="en"><body><main id="wrap"><section id="s1"><p class="ba" id="ba">Declares.</p><em id="em">loose</em> text</section></main></body></html>`;
+    const { injected, sid } = source(html);
+    const src = pagedSource(injected.html.replace('class="ba"', 'class="ba" data-break-after="page"').replace('<em ', '<em data-previous-break-after="page" '));
+    const main = (page: number, content: string, split: boolean) => el(sid, "main", "wrap", content, { split, box: lineBox(page, 0) });
     const pages = [
-      pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), pageClasses: "pagedjs_first_page pagedjs_right_page pagedjs_named_page pagedjs_a_page pagedjs_b_page",
-        content: el(sid, "p", "a", "A.", { page: "a", box: lineBox(0, 0) }) +
-          el(sid, "section", "s", el(sid, "p", "s0", "S0.", { box: lineBox(0, 2) }), { page: "b", box: lineBox(0, 1) }) +
-          // The last node is in force under a name the page element does not carry.
-          el(sid, "p", "z", "Z.", { page: "c", box: lineBox(0, 3) }) }),
-      pagedPage({ pageBox: pageBox(1), contentBox: contentBox(1), pageClasses: "pagedjs_left_page pagedjs_named_page pagedjs_b_page",
-        content: el(sid, "section", "s", el(sid, "p", "s0", "S0.", { box: lineBox(1, 0) }), { page: "b", split: true, box: lineBox(1, 0) }) }),
+      pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), content: main(0, el(sid, "section", "s1", el(sid, "p", "ba", "Declares.", { box: lineBox(0, 0) }), { box: lineBox(0, 0) }), false) }),
+      pagedPage({ pageBox: pageBox(1), contentBox: contentBox(1), content: main(1, el(sid, "section", "s1", "<em>loose</em> text", { split: true, box: lineBox(1, 0) }), true) }),
     ];
-    const result = runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(pages));
-    assert.deepEqual(result.pages[0]!.namedPages, ["a", "b"]);
-    assert.deepEqual(result.pages[0]!.namedPageResolved, { start: true, end: false });
-    const [facts] = boundaryFactsFrom(result.pages);
-    assert.equal(facts!.namedPageResolved, false);
+    const result = runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(pages), { contents: src.body, tokens: [token(src.byId("em"))] });
+    assert.deepEqual(result.pages.map((page) => page.startSid), [sid["wrap"], sid["wrap"]], "premise: nothing source-bearing starts on page 2");
+    assert.deepEqual(kindsAndReasons(result, sid), ["forced break-after@ba"]);
+  });
+
+  /** The rest of `shouldBreak()`, clause by clause, on one source tree. */
+  it("mirrors the doubled break-before, the limiter, an undisplayed node and a missing node", () => {
+    const html = `<!doctype html><html lang="en"><body><p id="lead">Lead.</p>` +
+      `<section class="chap" id="chap"><h2 class="h" id="h">Heading</h2><p id="c0">C0.</p></section>` +
+      `<p class="gone" id="gone">Hidden.</p></body></html>`;
+    const { injected, sid } = source(html);
+    const src = pagedSource(injected.html
+      .replace('class="chap"', 'class="chap" data-page="chap" data-break-before="page"')
+      .replace('class="h"', 'class="h" data-break-before="page"')
+      .replace('class="gone"', 'class="gone" data-page="other" data-undisplayed="undisplayed"'));
+    const two = [0, 1].map((page) => pagedPage({ pageBox: pageBox(page), contentBox: contentBox(page),
+      content: el(sid, "p", page === 0 ? "lead" : "c0", "x", { box: lineBox(page, 0) }) }));
+    const decisionAt = (tok: FakeBreakToken | null, layoutStartsAt?: FakeBreakToken) => runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(two),
+      { contents: src.body, tokens: layoutStartsAt ? [layoutStartsAt, tok] : [tok, null] }).pages[layoutStartsAt ? 1 : 0]!.decisionAfterRender;
+    assert.equal(decisionAt(token(src.byId("chap")))!.breakBefore, "page");
+    // The heading's node before is `lead`, reached through the section, so its own break-before
+    // counts and the named pages differ.
+    const free = decisionAt(token(src.byId("h")))!;
+    assert.deepEqual([free.breakBefore, free.pageBefore, free.pageAfter], ["page", null, "chap"]);
+    // If the page's layout started at the section, the walk stops at that limiter: no node before,
+    // so the heading's break-before is the section's own (a doubled break) and no names compare.
+    const limited = decisionAt(token(src.byId("h")), token(src.byId("chap")))!;
+    assert.deepEqual([limited.breakBefore, limited.pageBefore, limited.pageAfter], [null, null, null],
+      "nodeBefore() stops at the node the page started at");
+    // An undisplayed node is never a named-page break.
+    const gone = decisionAt(token(src.byId("gone")))!;
+    assert.deepEqual([gone.pageBefore, gone.pageAfter], [null, null]);
+    // A token without a node cannot be evaluated: unknown, not overflow.
+    const [facts] = boundaryFactsFrom(runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(two),
+      { contents: src.body, tokens: [{ node: null }, null] }).pages);
+    assert.equal(facts!.decisionKnown, false);
     assert.equal(classifyBoundary(facts!).kind, "unknown");
   });
 
-  /**
-   * The break attributes are read from the node that STARTS the page, not the wrapper clone in
-   * front of it. Paged.js strips break attributes from rebuilt clones and puts
-   * `data-previous-break-after` on the element after the declaring one — here a section inside
-   * `<main>`, so a read from the first node missed it. (`data-break-before` was found anyway,
-   * because Paged.js also copies it onto the page element; its reason named the wrapper.)
-   */
-  it("a break-after and a break-before inside a continuing wrapper are forced, and the break-before names the element that opens the page", () => {
-    const html = `<!doctype html><html lang="en"><body><main id="wrap"><section id="a"><p id="a0">A0.</p></section>` +
-      `<section id="b"><p id="b0">B0.</p></section><h2 class="chap" id="c">C.</h2><p id="c0">C0.</p></main></body></html>`;
-    const { sid } = source(html);
-    const main = (page: number, content: string, split: boolean) => el(sid, "main", "wrap", content, { split, box: lineBox(page, 0) });
-    const pages = [
-      pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), pageClasses: "pagedjs_first_page pagedjs_right_page",
-        content: main(0, el(sid, "section", "a", el(sid, "p", "a0", "A0.", { box: lineBox(0, 0) }), { attrs: 'data-break-after="page"', box: lineBox(0, 0) }), false) }),
-      pagedPage({ pageBox: pageBox(1), contentBox: contentBox(1), pageClasses: "pagedjs_left_page",
-        content: main(1, el(sid, "section", "b", el(sid, "p", "b0", "B0.", { box: lineBox(1, 0) }), { attrs: 'data-previous-break-after="page"', box: lineBox(1, 0) }), true) }),
-      pagedPage({ pageBox: pageBox(2), contentBox: contentBox(2), pageClasses: "pagedjs_right_page", pageAttributes: 'data-break-before="page"',
-        content: main(2, el(sid, "h2", "c", "C.", { attrs: 'class="chap" data-break-before="page"', box: lineBox(2, 0) }) +
-          el(sid, "p", "c0", "C0.", { box: lineBox(2, 1) }), true) }),
-    ];
-    const result = runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(pages));
-    assert.deepEqual(result.pages.map((page) => page.firstSid), [sid["wrap"], sid["wrap"], sid["wrap"]], "premise: the wrapper is every page's first node");
-    // A break-after names the last node before the boundary, as before this change; the
-    // break-before names the heading, where it used to name the wrapper.
-    assert.deepEqual(kindsAndReasons(result, sid), ["forced break-after@a0", "forced break-before@c"]);
-  });
-
-  it("a page element re-classed after layout is reported as drift, not silently re-read", () => {
-    const { sid } = source(WRAPPER_SOURCE);
-    const document = pagedDocument(wrapperPages(sid));
-    const result = runCollector<CollectorResult>(COLLECTOR_SOURCE, document, () => {
-      const find = (node: FakeNode): FakeNode | null => {
-        if (node.attributes.get("class")?.includes("pagedjs_wide_first_page")) return node;
-        for (const child of node.childNodes) { const hit = find(child); if (hit) return hit; }
-        return null;
-      };
-      const page = find(document)!;
-      page.attributes.set("class", "pagedjs_page pagedjs_left_page");
+  it("a source attribute changed after layout is reported as drift, not silently re-read", () => {
+    const { injected, sid } = source(WRAPPER_SOURCE);
+    const run = wrapperRun(sid, injected.html);
+    const result = runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(wrapperPages(sid)), {
+      ...run,
+      afterRendered: () => { run.tokens[0]!.node!.attributes.set("data-page", "spoofed"); },
     });
-    assert.deepEqual(result.attributeDrift.map((row) => `${row.index}:${row.field}`).sort(), ["1:namedPages", "1:page", "1:pageAtEnd"]);
+    // The section is the node Paged.js compares at both boundaries: entering it (page 1's token is
+    // the section) and leaving it (the section is the node before the outro).
+    assert.deepEqual(result.attributeDrift.map((row) => `${row.index}:${row.field}:${row.afterRender}`),
+      ["0:decision.pageAfter:spoofed", "2:decision.pageBefore:spoofed"]);
   });
 });
 
@@ -278,7 +312,7 @@ describe("the consumer path: snapshot causes and the rules that decline on a for
   it("a region inside a wrapper declines widows and orphans only at the two boundaries its named page forced", () => {
     const { injected, sid } = source(WRAPPER_SOURCE);
     const document = pagedDocument(wrapperPages(sid));
-    const collector = runCollector<CollectorResult>(COLLECTOR_SOURCE, document);
+    const collector = runCollector<CollectorResult>(COLLECTOR_SOURCE, document, wrapperRun(sid, injected.html));
     const snapshot = assemble(evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, document), collector, injected);
     assert.deepEqual(snapshot.pages.map((page) => page.incomingBreakCause.kind), ["document-start", "forced", "overflow", "forced"]);
     assert.deepEqual(snapshot.pages.map((page) => page.outgoingBreakCause.kind), ["forced", "overflow", "forced", "document-end"]);

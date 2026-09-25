@@ -331,16 +331,31 @@ export function evaluatePayload<T>(source: string, document: FakeNode): T {
   ) as T;
 }
 
+/** A Paged.js break token: the source node the next page starts at, and an offset into it. */
+export interface FakeBreakToken { node: FakeNode | null; offset?: number }
+
 /**
  * Install the real collector over the fake tree, replay the Paged.js hooks once per page in
  * order — every page reported, a break token on every page but the last — and return what
  * `collectorResult` answers afterwards.
+ *
+ * The collector evaluates Paged.js' break decision at each token's node, in the paginator's
+ * parsed SOURCE (`BreakDecision` in `src/paginate/collector.ts`). A test that is about the break
+ * cause passes that source (`contents`, a tree built with `fakeDocument`) and the tokens Paged.js
+ * would hand out. Without them each page's token points INTO the first source-bearing element of
+ * the next page (offset 1) — a page that ran out of room inside a node, which is never forced.
  */
 export function runCollector<T>(
   source: string,
   document: FakeNode,
-  /** Runs after the last hook and before the result is read: an author script acting late. */
-  afterRendered?: () => void,
+  options: {
+    /** Runs after the last hook and before the result is read: an author script acting late. */
+    afterRendered?: () => void;
+    /** The paginator's parsed source, whose first child is where page 1's layout starts. */
+    contents?: FakeNode;
+    /** The token `afterPageLayout` hands out for page `i`; `null` for none. */
+    tokens?: readonly (FakeBreakToken | null)[];
+  } = {},
 ): T {
   let handlerClass: (new () => Record<string, (...args: unknown[]) => void>) | null = null;
   let result: (() => T) | null = null;
@@ -354,15 +369,23 @@ export function runCollector<T>(
   new Function("window", "Paged", "document", source)(window, { Handler }, document);
   if (!handlerClass || !result) throw new Error("paged-dom: the collector did not register itself");
   const handler = new (handlerClass as new () => Record<string, (...args: unknown[]) => void>)();
-  const pages = (window.__blPrimitives.all as (root: FakeNode, selector: string) => FakeNode[])(document, ".pagedjs_page");
+  const all = window.__blPrimitives.all as (root: FakeNode, selector: string) => FakeNode[];
+  const pages = all(document, ".pagedjs_page");
+  const defaultToken = (index: number): FakeBreakToken | null => {
+    if (index >= pages.length - 1) return null;
+    return { node: all(pages[index + 1]!, ".pagedjs_page_content [data-bl-sid]")[0] ?? null, offset: 1 };
+  };
+  let incoming: FakeBreakToken | null = null;
   for (const [index, page] of pages.entries()) {
-    handler.beforePageLayout!();
+    handler.beforePageLayout!({}, options.contents, incoming ?? undefined);
     handler.layoutNode!();
     handler.renderNode!();
-    handler.afterPageLayout!(page, {}, index < pages.length - 1 ? { token: index } : null);
+    const token = options.tokens ? options.tokens[index] ?? null : defaultToken(index);
+    handler.afterPageLayout!(page, {}, token ?? undefined);
+    incoming = token;
   }
   handler.afterRendered!();
-  afterRendered?.();
+  options.afterRendered?.();
   return (result as () => T)();
 }
 
@@ -431,10 +454,11 @@ export function pagedPage(input: {
    */
   pageAttributes?: string;
   /**
-   * Extra classes on the `.pagedjs_page` element. Paged.js records a named page there and only
-   * there: `pagedjs_named_page pagedjs_<name>_page`, plus `pagedjs_<name>_first_page` on the page
-   * the region starts on (`atpage.js`, `layout.js`), next to `pagedjs_first_page`,
-   * `pagedjs_left_page`/`pagedjs_right_page` and `pagedjs_blank_page`.
+   * Extra classes on the `.pagedjs_page` element. Paged.js records there which named `@page`
+   * rule the page is styled with — `pagedjs_named_page pagedjs_<name>_page`, plus
+   * `pagedjs_<name>_first_page` on the page the region starts on (`atpage.js`, `layout.js`) — next
+   * to `pagedjs_first_page`, `pagedjs_left_page`/`pagedjs_right_page` and `pagedjs_blank_page`.
+   * It is not the break decision: the collector does not read these classes.
    */
   pageClasses?: string;
 }): string {

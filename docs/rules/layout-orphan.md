@@ -17,7 +17,7 @@ The mirror of `layout/widow`, with the same permanent ceiling of `warn` for the 
 
 ## Limits and known false alarms
 
-Skipped after a forced outgoing break, and on blocks with no visible text line. A boundary counts as forced by a named page (`page: <name>`) only where the named page Paged.js applied to the two pages differs; a page inside a named region is not forced open because a wrapper such as `<main>` continues onto it. See [the break cause](../limitations.md#the-break-cause-of-a-page-boundary).
+Skipped after a forced outgoing break, and on blocks with no visible text line. A boundary counts as forced only where the paginator's own break decision forced it: a break declaration, or a change of named page (`page: <name>`) between the element the next page starts with and the one before it. A page is not forced open because a wrapper such as `<main>` continues onto it, nor because its page style changed. See [the break cause](../limitations.md#the-break-cause-of-a-page-boundary).
 
 ## Calibration
 

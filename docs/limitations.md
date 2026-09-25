@@ -278,48 +278,56 @@ A `forced` boundary is a decision the author made, so `layout/widow` declines th
 opens the page after it, `layout/orphan` the fragment that closes the page before it and
 `layout/orphaned-continuation-page` the page after it (`env/forced-break`, counted against
 coverage), and `layout/half-empty-page` does not call a last page it opened "likely intended".
-The cause is read from what Paged.js 0.4.3 wrote, in this order: a blank next page is `parity`; a
-forcing `data-break-before` or `data-previous-break-after` in force at the node that **starts** the
-next page — its first source-bearing node that is not a `data-split-from` continuation clone — is
-`forced`; a change of named page is `forced`; a break token is `overflow`; anything else is
-`unknown`, which suppresses nothing.
 
-**The named page of a page is the one Paged.js applied to it, read from the page element.**
-Paged.js records it only as classes on `.pagedjs_page` — `pagedjs_named_page` and
-`pagedjs_<name>_page` — never as `data-page` on the page. A name counts when the page element
-carries its class **and** the page area holds an element with that `data-page`, because the class
-vocabulary is shared: `pagedjs_named_page` is on every named page and `pagedjs_first_page` on page
-1, so the class alone would give a page named `named` or `first` to pages that are not. Through
-0.6.0 the name was taken from the page's first source-bearing node instead, and on a real document
-that node is usually a wrapper — `<main>`, `<article>` — continuing from the page before, with no
-named ancestor. Every boundary inside a named region and the one after it then read as `forced`,
-and the boundary into the region as `overflow`. Measured on a self-authored report with a landscape
-region (patched Chromium 141, no evidence binding): 9 of 14 widow and 9 of 14 orphan candidates
-declined as `env/forced-break`, both below the coverage floor, exit 4; with the page-element read,
-2 of 14 each, at the two boundaries the region really forces. A corpus-gate run of the same
-document, also on Chromium 141, recorded 13 declines of each and widow coverage 8 of 21.
+**The cause is the decision Paged.js' `shouldBreak()` took, evaluated again at the break token.**
+When a page is laid out, Paged.js 0.4.3 hands the collector a break token naming the node of its
+parsed source at which the next page starts. The collector evaluates the three clauses of
+`shouldBreak()` there, with the paginator's own rules: the node's `data-break-before` (unless it
+repeats its parent's and no node precedes it), its `data-previous-break-after`, and
+`needsPageBreak()`, which compares the named page in force at the node (its own `data-page`, else
+its nearest ancestor's) with the one in force at the node **before** it — a previous sibling, or an
+ancestor's previous sibling, whose named page comes from itself and its ancestors, never from its
+descendants. A token that points into a node (an offset) was not forced: `shouldBreak()` was asked
+of that node where it started. The boundary is then, in this order: `parity` when the next page is
+blank; `unknown` when there was no token or it carried no node; `forced` by a forcing break-before,
+break-after or named-page difference; `overflow` otherwise. `unknown` suppresses nothing.
 
-The same first-node read hid a `break-after` on an element inside such a wrapper: Paged.js puts
-`data-previous-break-after` on the element after the declaring one and strips it from continuation
-clones, so the wrapper clone in front of it carried nothing and the boundary read as `overflow`.
-(`data-break-before` was found anyway, because Paged.js also copies it onto the page element; its
-reason named the wrapper.) Both are read from the node that starts the page now.
+**Two readings of the finished pages were measured wrong, and neither is used.** Through 0.6.0 the
+named page was taken from each page's first source-bearing node, which on a real document is
+usually a wrapper — `<main>`, `<article>` — continuing from the page before, with no named
+ancestor: every boundary inside a named region and the one after it read as `forced`, and the
+boundary into the region as `overflow`. Measured on a self-authored report with a landscape region
+(patched Chromium 141, no evidence binding): 9 of 14 widow and 9 of 14 orphan candidates declined
+as `env/forced-break`, both below the coverage floor, exit 4; now 2 of 14 each, at the two
+boundaries the paginator forced. A corpus-gate run of the same document, also on Chromium 141,
+recorded 13 declines of each and widow coverage 8 of 21. A first repair compared the named pages
+the two pages were **styled** with — the `pagedjs_<name>_page` classes on the page element — and
+that is not the paginator's rule either: the classes record which `@page` rule a page got, not
+whether a break was forced. `<div><section style="page: chap">…</section></div><p>` does not break
+on leaving the section, because the paragraph is compared with the `<div>`, and it is laid out on
+the `chap` page; the next overflow boundary, where the page style changes, was then called
+`forced`. The same first-node read also missed a `break-after` whose following element sits inside
+a continuing wrapper, and one followed by loose inline content: Paged.js puts
+`data-previous-break-after` on that following element, which may be an `<em>` at the head of the
+page. The live suite checks every boundary of its named-region documents against Paged.js' own
+`shouldBreak()` answers, recorded by a test-only wrapper around it.
 
 What remains:
 
-- **A page carrying two named pages.** Paged.js applies both when a named element is laid out at
-  the top of a page inside another named region, before any content. Each edge of such a page is
-  resolved by the name in force at its edge node, and only among the names applied to it; an edge
-  that resolves to none of them makes the boundary `unknown`, reported as
-  `break-cause-undetermined`, rather than a guessed change.
+- **It reads Paged.js internals.** The token's node, the three attributes Paged.js writes into its
+  parsed source and the shape of `shouldBreak()` are not an interface; the version pin above is
+  what bounds that.
+- **A page Paged.js inserts for parity has no token**, so the boundary out of it has no decision
+  of its own; both edges of a blank page are `parity` by the page rule.
+- **An element hidden with `display: none` and carrying `page:` still breaks.** Paged.js compares
+  its named page like any other element's, so the page it would have started is forced although
+  nothing visible starts there, and the tool reports the break as `forced` because that is what
+  the paginator did.
 - **A `break-after` reason names the last source node before the boundary**, which is the element
   that declared it only when that element ends its page itself — a paragraph, not a section
-  around it. The classification does not depend on it.
-- **A page on which nothing starts** — the middle of one block taller than a page — has no node
-  that opened it, and its attributes are read from its first node. Paged.js puts no break
-  attribute on such a page.
-- **All of it rests on names Paged.js does not guarantee** — the classes, the three attributes and
-  `data-split-from`. The version pin above is what bounds that.
+  around it. A forced boundary's reason otherwise names the nearest source-bearing element at the
+  token's node: an inline element carries no source id, so a break at an inline named page names
+  the paragraph it is in. The classification does not depend on the reason.
 
 ## Raising the number of error rules
 

@@ -19,7 +19,7 @@ The earlier justification for the downgrade was itself unmeasured: *in 230 runs 
 
 ## Limits and known false alarms
 
-Skipped after a forced incoming break: the page was opened on purpose, and its first lines are the author's decision. A boundary counts as forced by a named page (`page: <name>`) only where the named page Paged.js applied to the two pages differs; a page inside a named region is not forced open because a wrapper such as `<main>` continues onto it. See [the break cause](../limitations.md#the-break-cause-of-a-page-boundary).
+Skipped after a forced incoming break: the page was opened on purpose, and its first lines are the author's decision. A boundary counts as forced only where the paginator's own break decision forced it: a break declaration, or a change of named page (`page: <name>`) between the element the next page starts with and the one before it. A page is not forced open because a wrapper such as `<main>` continues onto it, nor because its page style changed. See [the break cause](../limitations.md#the-break-cause-of-a-page-boundary).
 
 A block with no visible text line is skipped: there is no text to strand. Without that, a fragment carrying only a figure was reported as a widow with *0 lines* — found by the corpus cross-check, not by review.
 
