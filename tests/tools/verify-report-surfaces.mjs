@@ -3,7 +3,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -216,8 +217,8 @@ const CONTENT_HEIGHT_CSS_PX = (297 - 2 * 12) / 25.4 * 96;
  * longer than 36 CSS px each. A horizontal rule is one long run, a vertical border or accent bar is
  * one short run, a tinted background is not dark: none of them is read as a line of text.
  */
-function rasterTextDepth(path, rasterDpi) {
-  const decoded = PNG.sync.read(readFileSync(path), { checkCRC: true });
+function rasterTextDepth(source, rasterDpi) {
+  const decoded = typeof source === "string" ? PNG.sync.read(readFileSync(source), { checkCRC: true }) : source;
   const cssToRaster = rasterDpi / 96;
   const marginPx = 12 / 25.4 * rasterDpi;
   const top = Math.ceil(marginPx);
@@ -255,6 +256,81 @@ const SECTION_FIRST_UNITS = {
 };
 
 /**
+ * Independent of the renderer's recorded keeps: every documented section heading shares its page
+ * with the first line of its first unit, and every coverage caption with the table's first row.
+ * Section headings follow the banner: the h1 may wrap so that its first line reads "Findings".
+ */
+function assertSectionKeeps(lines, label) {
+  let inBody = false;
+  let checked = 0;
+  for (const [pageIndex, pageLines] of lines.entries()) {
+    for (const [lineIndex, line] of pageLines.entries()) {
+      inBody ||= line === "Run summary";
+      const unit = inBody ? SECTION_FIRST_UNITS[line] : undefined;
+      if (unit) {
+        checked += 1;
+        assert.ok(pageLines.slice(lineIndex + 1).some((candidate) => unit.test(candidate)), `${label}: section heading "${line}" is stranded on page ${pageIndex + 1}`);
+      }
+      if (/Document verdict:/u.test(line)) {
+        checked += 1;
+        assert.ok(pageLines.slice(lineIndex + 1).some((candidate) => COVERAGE_ROW_LINE.test(candidate)), `${label}: coverage caption is stranded on page ${pageIndex + 1}`);
+      }
+    }
+  }
+  assert.ok(checked >= 4, `${label}: only ${checked} section openings were found to check`);
+}
+
+/**
+ * The verifier's own red controls. Each independent check above is also run once on a copy of
+ * real evidence that has been broken in exactly the way the check exists for, and must reject it;
+ * a check that accepts the broken copy is not a check (the same reasoning as the pixel and font
+ * controls). They run on the first printed state whose evidence allows them.
+ */
+const verifierSelfControls = {};
+function runVerifierSelfControlsOnce(lines, rasterPages, label) {
+  const rasterDpi = manifest.reviewEnvironment.print.rasterDpi;
+  // Stranded heading: move everything after the "Findings" heading to the next page.
+  if (!verifierSelfControls.strandedHeading) {
+    const pageIndex = lines.findIndex((pageLines, index) => index + 1 < lines.length && pageLines.includes("Findings") &&
+      lines.slice(0, index + 1).flat().includes("Run summary"));
+    if (pageIndex >= 0) {
+      const broken = structuredClone(lines);
+      const at = broken[pageIndex].lastIndexOf("Findings");
+      broken[pageIndex + 1] = [...broken[pageIndex].splice(at + 1), ...broken[pageIndex + 1]];
+      assert.throws(() => assertSectionKeeps(broken, `${label} (stranded-heading control)`), /section heading "Findings" is stranded/u,
+        `${label}: moving the findings lead to the next page did not fail the verifier's keep check`);
+      verifierSelfControls.strandedHeading = { label, page: pageIndex + 1 };
+    }
+  }
+  // Fill: keep the top 45 % of a page's content box and replace the rest with what an empty cloned
+  // frame and a box inside it leave: a tinted background, a dark border on both column edges, a
+  // 4 px accent bar inside the frame and a rule in two long segments. Ink reaches the bottom; the text reading
+  // must not (each part defeats one simplification: no inset, one run is text, no run limit).
+  if (!verifierSelfControls.fill && rasterPages.length > 1) {
+    const decoded = PNG.sync.read(readFileSync(resolve(output, rasterPages[0].path)), { checkCRC: true });
+    const marginPx = 12 / 25.4 * rasterDpi;
+    const top = Math.ceil(marginPx);
+    const bottom = Math.floor(decoded.height - marginPx);
+    const cut = Math.round(top + 0.45 * (bottom - top));
+    const left = Math.ceil(marginPx);
+    const right = Math.floor(decoded.width - marginPx) - 1;
+    for (let y = cut; y < bottom; y += 1) {
+      for (let x = left; x <= right; x += 1) {
+        const offset = (y * decoded.width + x) * 4;
+        const border = x - left < 2 || right - x < 2;
+        const accent = x - left >= 18 && x - left < 22;
+        // Two long segments with a column gap between them, as a rule under a two-column grid.
+        const rule = y === bottom - 20 && x - left >= 30 && right - x >= 30 && Math.abs(x - (left + right) / 2) >= 10;
+        decoded.data.set(border || accent || rule ? [14, 14, 15, 255] : [239, 239, 232, 255], offset);
+      }
+    }
+    const depth = rasterTextDepth(decoded, rasterDpi);
+    assert.ok(depth < MINIMUM_PAGE_FILL, `${label}: an empty cloned frame below 45 % of the page read as text to ${(depth * 100).toFixed(1)} %`);
+    verifierSelfControls.fill = { label, textDepth: depth };
+  }
+}
+
+/**
  * Independent of the renderer's DOM: fill is re-measured from each raster's content box, and a
  * short page is exempt only when the next page's first content line begins with a forced break the
  * renderer recorded; every documented section heading must share its page with the first line of its
@@ -280,20 +356,8 @@ function independentlyCheckPageFlow(pdfPath, rasterPages, recorded, label) {
     assert.ok(!/^(?:(?:DOCUMENT|SOURCE|MEASURED|THRESHOLD|CALIBRATION|PROOF SOURCE)\b|Remediation\b|Note:|Evidence:|Ambiguity:)/u.test(pageLines[0] ?? ""),
       `${label}: page ${pageIndex + 1} starts inside a finding without its label: ${JSON.stringify(pageLines[0])}`);
   }
-  // Section headings follow the banner: the h1 may wrap so that its first line reads "Findings".
-  let inBody = false;
-  for (const [pageIndex, pageLines] of lines.entries()) {
-    for (const [lineIndex, line] of pageLines.entries()) {
-      inBody ||= line === "Run summary";
-      const unit = inBody ? SECTION_FIRST_UNITS[line] : undefined;
-      if (unit) {
-        assert.ok(pageLines.slice(lineIndex + 1).some((candidate) => unit.test(candidate)), `${label}: section heading "${line}" is stranded on page ${pageIndex + 1}`);
-      }
-      if (/Document verdict:/u.test(line)) {
-        assert.ok(pageLines.slice(lineIndex + 1).some((candidate) => COVERAGE_ROW_LINE.test(candidate)), `${label}: coverage caption is stranded on page ${pageIndex + 1}`);
-      }
-    }
-  }
+  assertSectionKeeps(lines, label);
+  runVerifierSelfControlsOnce(lines, rasterPages, label);
   assert.equal(recorded.minimumPageFill, MINIMUM_PAGE_FILL, `${label}: page fill threshold drift`);
   for (const page of fill) {
     const other = recorded.fill.find((candidate) => candidate.page === page.page);
@@ -504,7 +568,7 @@ function independentlyNormalizeScreenPixels(bytes) {
  * decoded full page and must match byte for byte in normalized RGBA: a tile can add no pixel the
  * fingerprinted full page does not already bind.
  */
-function independentlyCheckTiles(artifact, decodedFullPage) {
+function independentlyCheckTiles(artifact, decodedFullPage, tilePath = (tile) => resolve(output, tile.path)) {
   const viewport = artifact.cell.split("/")[3];
   const viewportHeight = manifest.reviewEnvironment.viewports[viewport].height;
   const expected = viewport === "desktop" ? 0 : Math.ceil(artifact.dimensions.height / viewportHeight);
@@ -515,7 +579,7 @@ function independentlyCheckTiles(artifact, decodedFullPage) {
     const height = Math.min(viewportHeight, artifact.dimensions.height - top);
     assert.equal(tile.top, top, `${artifact.cell}: tile ${index + 1} offset drift`);
     assert.equal(tile.height, height, `${artifact.cell}: tile ${index + 1} height drift`);
-    const path = resolve(output, tile.path);
+    const path = tilePath(tile);
     assert.equal(existsSync(path), true, `${artifact.cell}: missing tile ${tile.path}`);
     assert.equal(hash(path), tile.sha256, `${artifact.cell}: tile hash drift ${tile.path}`);
     const recut = createHash("sha256").update(decodedFullPage.rgba.subarray(top * width * 4, (top + height) * width * 4)).digest("hex");
@@ -523,6 +587,39 @@ function independentlyCheckTiles(artifact, decodedFullPage) {
     assert.equal(tilePixels.contract.width, width, `${artifact.cell}: tile ${index + 1} width drift`);
     assert.equal(tilePixels.contract.normalizedRgbaSha256, recut, `${artifact.cell}: tile ${index + 1} is not a crop of the fingerprinted full page`);
     assert.equal(tile.normalizedRgbaSha256, recut, `${artifact.cell}: tile ${index + 1} manifest hash drift`);
+  }
+}
+
+/**
+ * Red control for the tile re-cut, once: one visible pixel of one tile changes, and the manifest
+ * entry is rewritten to that tile's new hashes, exactly as an edited tile with a doctored manifest
+ * would look (the verifier's round-2 experiment). Only the re-cut from the full page can see it.
+ */
+let tileMutationControl = null;
+function runTileMutationControl(artifact, decodedFullPage) {
+  if (tileMutationControl || artifact.tiles.length < 2) return;
+  const index = Math.min(5, artifact.tiles.length - 1);
+  const tile = artifact.tiles[index];
+  const decoded = PNG.sync.read(readFileSync(resolve(output, tile.path)), { checkCRC: true });
+  let offset = 0;
+  while (offset < decoded.data.length && decoded.data[offset + 3] === 0) offset += 4;
+  decoded.data[offset] = decoded.data[offset] === 0 ? 1 : decoded.data[offset] - 1;
+  const bytes = PNG.sync.write(decoded);
+  const directory = mkdtempSync(resolve(tmpdir(), "breaklint-tile-control-"));
+  try {
+    const mutatedPath = resolve(directory, "tile.png");
+    writeFileSync(mutatedPath, bytes);
+    const doctored = structuredClone(artifact);
+    doctored.tiles[index].sha256 = createHash("sha256").update(bytes).digest("hex");
+    doctored.tiles[index].normalizedRgbaSha256 = independentlyNormalizeScreenPixels(bytes).contract.normalizedRgbaSha256;
+    assert.throws(
+      () => independentlyCheckTiles(doctored, decodedFullPage, (candidate) => (candidate.path === tile.path ? mutatedPath : resolve(output, candidate.path))),
+      new RegExp(`tile ${index + 1} is not a crop of the fingerprinted full page`, "u"),
+      `${artifact.cell}: a one-channel edit of tile ${index + 1} with a rewritten manifest hash passed the re-cut check`,
+    );
+    tileMutationControl = { cell: artifact.cell, tile: index + 1 };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 }
 
@@ -721,6 +818,7 @@ for (const artifact of manifest.artifacts) {
     assert.deepEqual(artifact.dimensions, { width: independentlyDecoded.contract.width, height: independentlyDecoded.contract.height }, `${artifact.cell}: PNG dimensions disagree with decoded pixels`);
     visibleContract = { dimensions: artifact.dimensions, semantics: artifact.semantics, pixels: independentlyDecoded.contract };
     independentlyCheckTiles(artifact, independentlyDecoded);
+    runTileMutationControl(artifact, independentlyDecoded);
   } else {
     visibleContract = printVisibleContract(state);
   }
@@ -780,9 +878,17 @@ assert.ok(pixelMutationControl, "screen pixel mutation control did not run");
   const presented = manifest.artifacts.flatMap((artifact) => artifact.kind === "screen"
     ? [artifact.path, ...artifact.tiles.map((tile) => tile.path)]
     : artifact.kind === "raster-set" ? artifact.pages.map((page) => page.path) : [artifact.path]);
-  const missing = presented.filter((path) => !gallery.includes(`"${path}"`));
-  assert.deepEqual(missing, [], "review gallery omits artifacts");
+  const galleryOmissions = (html) => presented.filter((path) => !html.includes(`"${path}"`));
+  assert.deepEqual(galleryOmissions(gallery), [], "review gallery omits artifacts");
+  // Red control: the same gallery without one tile must be rejected, naming that tile.
+  const droppedTile = manifest.artifacts.find((artifact) => artifact.kind === "screen" && artifact.tiles.length > 0).tiles.at(-1).path;
+  assert.deepEqual(galleryOmissions(gallery.replaceAll(`"${droppedTile}"`, `""`)), [droppedTile],
+    `review gallery completeness control: dropping ${droppedTile} was not detected`);
+  verifierSelfControls.gallery = { dropped: droppedTile };
 }
+assert.ok(tileMutationControl, "tile re-cut mutation control did not run");
+assert.ok(verifierSelfControls.strandedHeading, "verifier stranded-heading control did not run");
+assert.ok(verifierSelfControls.fill, "verifier text-depth control did not run");
 assert.ok(fontMutationControl, "PDF font mutation control did not run");
 
 // The printed inventory is pinned rather than derived, so that a report which silently doubles in
@@ -809,7 +915,7 @@ if (mode === "technical") {
   process.stdout.write(
     `report surfaces: technical gate passed 32/32 current cells and ${Object.values(manifest.physicalArtifacts).reduce((sum, count) => sum + count, 0)} physical artifacts; ` +
       `no human-review claim is made; ${latestRound} ` +
-      `(current inputs ${manifest.reviewInputFingerprint}; pixel and font mutations rejected)\n`,
+      `(current inputs ${manifest.reviewInputFingerprint}; pixel, font, tile re-cut, gallery, stranded-heading and text-depth mutations rejected)\n`,
   );
 } else {
   process.stdout.write(

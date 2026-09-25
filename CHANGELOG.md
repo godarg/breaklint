@@ -143,6 +143,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   list was a grid, and a fragmenting grid item is stretched to its unfragmented area. Print lays it
   out as block flow and drops the end mark's rule; the gate rejects any row pitch more than 8 % off
   the table's median, measured independently by the verifier.
+- **The verifier proves its own independent checks.** Beside its pixel, font and input
+  controls it now breaks, once per run, a copy of real evidence for its tile re-cut (a doctored tile
+  with rewritten manifest hashes), its gallery completeness (one tile reference removed), its
+  stranded-heading check (the findings lead moved to the next page) and its text-depth reading (an
+  empty cloned frame with borders, an accent bar and a split rule), and fails when a check accepts
+  the broken copy.
 
 ### Documentation
 

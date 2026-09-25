@@ -358,9 +358,25 @@ The review gate deliberately keeps two distinct bindings:
 
 The verifier independently reconstructs the current source/input fingerprint, every stable artifact
 fingerprint and every screen RGBA hash. A local human PASS transfers only when those fingerprints,
-pixels and the complete declared review environment are identical. It also runs two negative
-controls: changing one bound input in a temporary tree must invalidate the source fingerprint, and
-changing one visible RGBA channel must invalidate the screen fingerprint. A new or changed bound
+pixels and the complete declared review environment are identical. It also runs its own negative
+controls, each once per run on a copy of real evidence broken in exactly the way its check exists
+for, and fails if a check accepts the copy:
+
+- changing one bound input in a temporary tree must invalidate the source fingerprint;
+- changing one visible RGBA channel must invalidate the screen fingerprint;
+- a PDF font list without its display faces must fail the font check;
+- a tile with one channel of one visible pixel changed, and its manifest entry rewritten to the
+  edited tile's hashes (the verifier's round-2 experiment), must fail the re-cut from the full page;
+- the review gallery with one tile reference removed must be reported as omitting that tile;
+- a printed state's page text with the findings lead moved to the next page must fail the
+  stranded-heading check;
+- a page raster whose lower 55 % is replaced by an empty cloned frame — tinted background, dark
+  borders on both column edges, a 4 px accent bar and a rule in two long segments — must read below
+  the 60 % text depth. Each element defeats one simplification of the text reading (no inset from
+  the column edges, a single run counted as text, no limit on run length); each simplification was
+  made in turn and the control failed on it.
+
+Removing any of these checks turns the technical gate red on its control. A new or changed bound
 source therefore leaves the latest round unbound until the complete local matrix has been rendered
 and reviewed again in a new round. Technical CI still fails on malformed historical review evidence or any technical
 defect in its own current matrix; changed source is reported as different rather than mislabeled as
