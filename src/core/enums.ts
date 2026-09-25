@@ -347,7 +347,7 @@ export const FLOW_HAZARDS = [
   "multicol",
   /** A flex or grid container (inline or not): items side by side, sized from their neighbours. */
   "flex-or-grid",
-  /** A table row with two or more cells: column widths are recomputed per fragment, and later cells can move whole. */
+  /** A table row with two or more cells in a table the paginator split: column widths are recomputed per fragment, and later cells can move whole. A table wholly inside one fragment is not a hazard. */
   "table-columns",
   /** A vertical `writing-mode`. */
   "vertical-writing",
@@ -355,6 +355,12 @@ export const FLOW_HAZARDS = [
   "negative-margin",
   /** Inside only: replaced content reaching out of a block-level ancestor that does not clip it, over whatever follows that ancestor. */
   "overflowing-content",
+  /** An inline-block, inline-table, or table cell outside a table row, holding text: a text column of its own, beside others, that no block record describes. */
+  "atomic-inline",
+  /** An open shadow root, a `<slot>`, or an autonomous custom element (which may carry a closed shadow root): content laid out where the light-DOM walk cannot see it. */
+  "shadow-tree",
+  /** A split piece whose pseudo-elements change what it carries: generated `::before` on a continuation or `::after` before the break (an author `!important` beats Paged.js' unset), or `::first-line` / `::first-letter` styling on a continuation, which Paged.js does not unset. */
+  "split-pseudo",
 ] as const;
 export type FlowHazard = (typeof FLOW_HAZARDS)[number];
 

@@ -71,14 +71,131 @@ describe("Snapshot 5 records what a block holds besides text, and what takes it 
     assert.deepEqual(blockOf(raw, "g").flowHazards, { inside: ["transformed"], self: ["flex-or-grid"], around: [] });
   });
 
-  it("records a table row of two cells as table-columns", () => {
-    const raw = capture(
-      `<table data-bl-sid="tb" style="display: table" ${at(56.69, 56.69, 453.53, 40)}><tbody data-bl-sid="bd" style="display: table-row-group" ${at(56.69, 56.69, 453.53, 40)}>` +
-        `<tr data-bl-sid="tr" style="display: table-row" ${at(56.69, 56.69, 453.53, 20)}><td data-bl-sid="a" style="display: table-cell" ${at(56.69, 56.69, 200, 20)}>A</td>` +
+  /**
+   * One trigger per hazard (and per property where a hazard has several), each inside an otherwise
+   * plain block, and its control: the same element without the trigger records nothing.
+   */
+  it("records every FLOW_HAZARDS trigger inside a block, each alone", () => {
+    const inside = (child: string) => blockOf(capture(
+      `<div data-bl-sid="s1" ${at(56.69, 56.69, 453.53, 200)}>${child}</div>`,
+    ), "s1").flowHazards.inside;
+    const p = (style: string, extra = "") => `<p data-bl-sid="s2" style="${style}" ${extra} ${at(56.69, 56.69, 453.53, 18.66)}>Text.</p>`;
+    const cases: [string, string][] = [
+      ["position: absolute", "out-of-flow"],
+      ["position: fixed", "out-of-flow"],
+      ["position: sticky", "sticky"],
+      ["position: relative; top: 3px", "offset"],
+      ["position: relative; bottom: -3px", "offset"],
+      ["position: relative; left: 3px", "offset"],
+      ["position: relative; right: 3px", "offset"],
+      ["transform: rotate(1deg)", "transformed"],
+      ["translate: 0px 4px", "transformed"],
+      ["rotate: 2deg", "transformed"],
+      ["scale: 0.5", "transformed"],
+      ["offset-path: path('M 0 0 L 10 10')", "transformed"],
+      ["float: left", "float"],
+      ["float: inline-end", "float"],
+      ["column-count: 2", "multicol"],
+      ["column-width: 10em", "multicol"],
+      ["display: flex", "flex-or-grid"],
+      ["display: inline-flex", "flex-or-grid"],
+      ["display: grid", "flex-or-grid"],
+      ["display: inline-grid", "flex-or-grid"],
+      ["display: -webkit-box", "flex-or-grid"],
+      ["display: -webkit-inline-box", "flex-or-grid"],
+      ["writing-mode: vertical-rl", "vertical-writing"],
+      ["writing-mode: sideways-lr", "vertical-writing"],
+      ["margin-top: -4px", "negative-margin"],
+      ["margin-bottom: -1px", "negative-margin"],
+      ["display: inline-block", "atomic-inline"],
+      ["display: inline-table", "atomic-inline"],
+      ["display: table-cell", "atomic-inline"],
+    ];
+    for (const [style, hazard] of cases) assert.deepEqual(inside(p(style)), [hazard], style);
+    // Controls: the property at its initial value, or a value that moves nothing.
+    for (const style of ["position: static", "position: relative; top: 0px", "transform: none", "translate: none", "float: none",
+      "column-count: auto", "display: block", "writing-mode: horizontal-tb", "margin-top: 4px", "display: inline"]) {
+      assert.deepEqual(inside(p(style)), [], style);
+    }
+    // An inline-level box holding no text is not a text column.
+    assert.deepEqual(inside(`<span style="display: inline-block" ${at(56.69, 56.69, 10, 10)}></span>`), []);
+    // A shadow tree: an open shadow root, a slot, or an autonomous custom element.
+    assert.deepEqual(inside(`<span data-test-shadow-root ${at(56.69, 56.69, 10, 10)}>x</span>`), ["shadow-tree"]);
+    assert.deepEqual(inside(`<slot ${at(56.69, 56.69, 10, 10)}>x</slot>`), ["shadow-tree"]);
+    assert.deepEqual(inside(`<my-column ${at(56.69, 56.69, 10, 10)}>x</my-column>`), ["shadow-tree"]);
+    // Overflowing replaced content is recorded with the atoms (below).
+  });
+
+  it("records a table row of two cells only when its table is split", () => {
+    const table = (tableAttrs: string, rowAttrs = "", cellAttrs = "") => capture(
+      `<table data-bl-sid="tb" style="display: table" ${tableAttrs} ${at(56.69, 56.69, 453.53, 40)}><tbody data-bl-sid="bd" style="display: table-row-group" ${at(56.69, 56.69, 453.53, 40)}>` +
+        `<tr data-bl-sid="tr" style="display: table-row" ${rowAttrs} ${at(56.69, 56.69, 453.53, 20)}><td data-bl-sid="a" style="display: table-cell" ${cellAttrs} ${at(56.69, 56.69, 200, 20)}>A</td>` +
         `<td data-bl-sid="b" style="display: table-cell" ${at(260, 56.69, 200, 20)}>B</td></tr></tbody></table>`,
     );
-    assert.deepEqual(blockOf(raw, "tb").flowHazards.inside, ["table-columns"]);
-    assert.deepEqual(blockOf(raw, "tr").flowHazards.self, ["table-columns"]);
+    // A table wholly inside one fragment is laid out as it would be unsplit.
+    assert.deepEqual(blockOf(table(""), "tb").flowHazards.inside, []);
+    // Split: the table piece, a row, or a cell carries the paginator's split marker.
+    assert.deepEqual(blockOf(table('data-split-from="r1"'), "tb").flowHazards.inside, ["table-columns"]);
+    assert.deepEqual(blockOf(table("", 'data-split-to="r2"'), "tb").flowHazards.inside, ["table-columns"]);
+    assert.deepEqual(blockOf(table("", "", 'data-split-from="r3"'), "tb").flowHazards.inside, ["table-columns"]);
+    assert.deepEqual(blockOf(table('data-split-to="r1"'), "tr").flowHazards.self, ["table-columns"]);
+  });
+
+  it("records a split piece whose pseudo-elements change what it carries", () => {
+    const piece = (attrs: string) => blockOf(capture(
+      `<div data-bl-sid="s1" ${at(56.69, 56.69, 453.53, 200)}><p data-bl-sid="s2" ${attrs} ${at(56.69, 56.69, 453.53, 18.66)}>Text.</p></div>`,
+    ), "s1").flowHazards.inside;
+    // Measured by the verifier (Paged.js 0.4.3): ::first-line is not unset on a continuation, so its
+    // first line is set in the first line's font; an author !important ::before repeats on it.
+    assert.deepEqual(piece('data-split-from="r" data-test-first-line="font-size: 20px"'), ["split-pseudo"]);
+    assert.deepEqual(piece('data-split-from="r" data-test-first-line="letter-spacing: 2px"'), ["split-pseudo"]);
+    assert.deepEqual(piece('data-split-from="r" data-test-first-letter="float: left"'), ["split-pseudo"]);
+    assert.deepEqual(piece('data-split-from="r" data-test-first-letter="font-size: 40px"'), ["split-pseudo"]);
+    assert.deepEqual(piece('data-split-from="r" data-test-before="content: &quot;x&quot;"'), ["split-pseudo"]);
+    assert.deepEqual(piece('data-split-to="r" data-test-after="content: &quot;x&quot;"'), ["split-pseudo"]);
+    // Controls: the same styling on a piece that is not a continuation is laid out as unsplit, and
+    // a continuation whose pseudo-elements change nothing is not a hazard.
+    assert.deepEqual(piece('data-test-first-line="font-size: 20px" data-test-before="content: &quot;x&quot;"'), []);
+    assert.deepEqual(piece('data-split-from="r"'), []);
+    // A continuation whose text starts inside a larger span: its first letter is set in the span's
+    // font without any first-letter styling (measured in quirks mode, 34 px), and that is no hazard.
+    assert.deepEqual(blockOf(capture(
+      `<div data-bl-sid="s1" ${at(56.69, 56.69, 453.53, 200)}><p data-bl-sid="s2" data-split-from="r" ${at(56.69, 56.69, 453.53, 18.66)}>` +
+        `<span style="font-size: 34px; line-height: 4px">Big</span> text.</p></div>`,
+    ), "s1").flowHazards.inside, []);
+    assert.deepEqual(piece('data-split-to="r" data-test-before="content: &quot;x&quot;"'), []);
+  });
+
+  it("reads every hazard through the captured getPropertyValue, not a property getter", () => {
+    // A document can shadow CSSStyleDeclaration.prototype.transform (or position, display, …) and
+    // answer for itself. Here every property read answers the initial value; getPropertyValue
+    // answers the truth, and the hazards must still be recorded.
+    const lying = (primitives: Record<string, unknown>) => {
+      const style = primitives.style as (node: unknown, pseudo?: string | null) => Record<string, string>;
+      const initial: Record<string, string> = { display: "block", position: "static", float: "none", transform: "none",
+        translate: "none", rotate: "none", scale: "none", offsetPath: "none", columnCount: "auto", columnWidth: "auto",
+        writingMode: "horizontal-tb", marginTop: "0px", marginBottom: "0px", overflowY: "visible", content: "none" };
+      const truthful = primitives.css as (s: Record<string, string>, name: string) => string;
+      const hidden = new WeakMap<object, Record<string, string>>();
+      return {
+        ...primitives,
+        style: (node: unknown, pseudo?: string | null) => {
+          const real = style(node, pseudo);
+          const spoofed = new Proxy(real, { get: (target, key) => (typeof key === "string" && key in initial ? initial[key] : target[key as string]) });
+          hidden.set(spoofed, real);
+          return spoofed;
+        },
+        css: (s: Record<string, string>, name: string) => truthful(hidden.get(s) ?? s, name),
+      };
+    };
+    const raw = evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, pagedDocument([pagedPage({
+      pageBox: [0, 0, 566.93, 453.54], contentBox: [56.69, 56.69, 453.53, 340.16],
+      content: `<div data-bl-sid="s1" ${at(56.69, 56.69, 453.53, 200)}>` +
+        `<p data-bl-sid="s2" style="position: absolute" ${at(56.69, 56.69, 453.53, 18.66)}>A.</p>` +
+        `<p data-bl-sid="s3" style="transform: rotate(1deg)" ${at(56.69, 76, 453.53, 18.66)}>B.</p>` +
+        `<p data-bl-sid="s4" style="display: grid" ${at(56.69, 95, 453.53, 18.66)}>C.</p></div>`,
+    })]), lying);
+    assert.deepEqual(blockOf(raw, "s1").flowHazards.inside, ["flex-or-grid", "out-of-flow", "transformed"]);
   });
 
   it("records replaced content, clipped by an ancestor that clips it, and flags one that overflows", () => {
@@ -137,6 +254,21 @@ describe("Snapshot 5 migration", () => {
     const issues = validateSnapshotInvariants(snapshot, { sourceMapInjection: false }).issues;
     assert.ok(issues.some((issue) => /t1: atomicBoxes absent/u.test(issue)), issues.join("; "));
     assert.ok(issues.some((issue) => /t1: flowHazards\.self absent, unknown or repeated/u.test(issue)), issues.join("; "));
+
+    // The engine refuses the same snapshot, stamp 5 and all: a stored file is not re-validated by
+    // the live path, and an absent list would be read as "no replaced content, no hazard".
+    const stored = runDocument(
+      { path: "stored.html", snapshot, infrastructure: [] },
+      { failOn: "error", activeRules: [...ALL_RULES], optionsByRule: {}, coverageFloors: {} },
+    );
+    assert.equal(stored.report.verdict, "infrastructure");
+    assert.ok(stored.report.infrastructure.some((event) => event.kind === "checker-crashed" && /lacks its fields: t1: atomicBoxes absent/u.test(event.detail ?? "")),
+      JSON.stringify(stored.report.infrastructure));
+    assert.deepEqual(stored.report.findings, []);
+    const noHazards = structuredClone(loadCorpus().find((entry) => entry.name === "too-tall-trigger")!.snapshot);
+    delete (noHazards.blocks[0] as Partial<(typeof noHazards.blocks)[number]>).flowHazards;
+    assert.equal(runDocument({ path: "stored.html", snapshot: noHazards, infrastructure: [] },
+      { failOn: "error", activeRules: [...ALL_RULES], optionsByRule: {}, coverageFloors: {} }).report.verdict, "infrastructure");
 
     const old = structuredClone(loadCorpus().find((entry) => entry.name === "too-tall-trigger")!.snapshot);
     old.schemaVersion = 4;

@@ -12,9 +12,9 @@ import { dirname, resolve } from "node:path";
 
 import { blockKey, normaliseSignature, sha256, svgRootKey, svgTextKey } from "../core/fingerprint.ts";
 import { resolveDocumentUri } from "../acquire/browser.ts";
+import { snapshotShapeIssues } from "../core/snapshot-shape.ts";
 import {
   BREAK_CAUSE_CASCADE_HINTS,
-  FLOW_HAZARDS,
   BREAK_CAUSE_DETERMINED_BY,
   BREAK_CAUSE_KINDS,
   SNAPSHOT_SCHEMA_VERSION,
@@ -520,9 +520,12 @@ export const SNAPSHOT_SOURCE = `(() => {
   // 0.4.3, patched Chromium 141) with a bound from text lines alone: a split figure of five panels
   // and a one-line caption was bounded at 14.99 px, a two-column descendant made the lines of a
   // block 335.81 px tall read 347.13 px, and relatively positioned paragraphs made those of a block
-  // 301.19 px tall read 360.19 px — both above the 340.16 px page. The hazards are read over EVERY
+  // 301.19 px tall read 360.20 px — both above the 340.16 px page. The hazards are read over EVERY
   // element laid out inside the block, not only over block records: a <span> or an <img> can be
   // positioned, transformed or floated as well as a <div>.
+  // Every computed value below is read through the captured getPropertyValue (P.css), never a
+  // CSSStyleDeclaration property getter a document can shadow.
+  const cssOf = (style, name) => { const value = P.css(style, name); return value === undefined || value === null ? "" : String(value); };
   const ATOMIC_SELECTOR = "img,svg,canvas,video,iframe,object,embed,audio,input,textarea,select";
   // Each atomic box is recorded as much of it as its block-level ancestors inside the element let
   // show (an ancestor whose overflow is not visible clips it to its own box, and that box is in the
@@ -536,63 +539,122 @@ export const SNAPSHOT_SOURCE = `(() => {
       // outer svg's box, which is recorded itself; recording it again would count it twice.
       if (P.closest(P.parent(atom), "svg") !== null) continue;
       const atomStyle = P.style(atom, null);
-      if (atomStyle.display === "none" || atomStyle.visibility === "hidden" || atomStyle.visibility === "collapse") continue;
+      const atomVisibility = cssOf(atomStyle, "visibility");
+      if (cssOf(atomStyle, "display") === "none" || atomVisibility === "hidden" || atomVisibility === "collapse") continue;
       const atomBox = box(atom);
       if (!(atomBox.width > 0 && atomBox.height > 0)) continue;
       let top = atomBox.y;
       let bottom = atomBox.y + atomBox.height;
       for (let at = P.parent(atom); at && P.nodeType(at) === 1; at = P.parent(at)) {
         const atStyle = P.style(at, null);
-        if (!/^(inline|contents)$/u.test(atStyle.display || "")) {
+        if (!/^(inline|contents)$/u.test(cssOf(atStyle, "display"))) {
           const outer = box(at);
-          const clips = (atStyle.overflowY || atStyle.overflow || "visible") !== "visible";
+          const clips = (cssOf(atStyle, "overflow-y") || "visible") !== "visible";
           if (clips) { top = Math.max(top, outer.y); bottom = Math.min(bottom, outer.y + outer.height); }
           else if (top < outer.y - 1 || bottom > outer.y + outer.height + 1) overflowing = true;
         }
         if (at === el) break;
       }
       if (!(bottom > top)) continue;
-      atoms.push({ tag: String(atom.tagName || "").toLowerCase(), box: { x: atomBox.x, y: round(top), width: atomBox.width, height: round(bottom - top) } });
+      atoms.push({ tag: String(P.tagName(atom) || "").toLowerCase(), box: { x: atomBox.x, y: round(top), width: atomBox.width, height: round(bottom - top) } });
     }
     return { atoms, overflowing };
   };
-  const setTo = (value) => value !== undefined && value !== null && value !== "" && value !== "none";
-  const notAuto = (value) => value !== undefined && value !== null && value !== "" && value !== "auto";
+  const setTo = (value) => value !== "" && value !== "none";
+  const notAuto = (value) => value !== "" && value !== "auto";
   const offsetBy = (value) => notAuto(value) && Math.abs(number(value, 0)) > 0.001;
+  // Paged.js marks the two pieces of an element it split: data-split-to on the piece before the
+  // break, data-split-from on the continuation.
+  const splitPiece = (el) => P.hasAttr(el, "data-split-from") || P.hasAttr(el, "data-split-to");
+  // A table row's column widths are recomputed per fragment only when the table itself is split:
+  // a table wholly inside one fragment is laid out as it would be unsplit.
+  const tableIsSplit = (row, cells) => {
+    if (cells.some(splitPiece)) return true;
+    for (let at = row; at && P.nodeType(at) === 1; at = P.parent(at)) {
+      if (splitPiece(at)) return true;
+      if (/^(inline-)?table$/u.test(cssOf(P.style(at, null), "display"))) return false;
+    }
+    return false;
+  };
+  const holdsText = (el) => /\\S/u.test(P.text(el) || "");
   // What an element does to the layout of its own content.
   const contentHazards = (el, style, out) => {
-    if (setTo(style.transform) || setTo(style.translate) || setTo(style.rotate) || setTo(style.scale) || setTo(style.offsetPath)) out.add("transformed");
-    if (notAuto(style.columnCount) || notAuto(style.columnWidth)) out.add("multicol");
-    if (/^(inline-)?(flex|grid)$|^-webkit-(inline-)?box$/u.test(style.display || "")) out.add("flex-or-grid");
-    if (style.display === "table-row") {
-      let cells = 0;
-      for (const cell of P.children(el)) if (P.nodeType(cell) === 1 && P.style(cell, null).display === "table-cell") cells += 1;
-      if (cells >= 2) out.add("table-columns");
+    if (["transform", "translate", "rotate", "scale", "offset-path"].some((name) => setTo(cssOf(style, name)))) out.add("transformed");
+    if (notAuto(cssOf(style, "column-count")) || notAuto(cssOf(style, "column-width"))) out.add("multicol");
+    const display = cssOf(style, "display");
+    if (/^(inline-)?(flex|grid)$|^-webkit-(inline-)?box$/u.test(display)) out.add("flex-or-grid");
+    if (display === "table-row") {
+      const cells = P.children(el).filter((cell) => P.nodeType(cell) === 1 && cssOf(P.style(cell, null), "display") === "table-cell");
+      if (cells.length >= 2 && tableIsSplit(el, cells)) out.add("table-columns");
     }
   };
-  // Where an element is drawn, and what flows beside it.
-  const placementHazards = (style, out) => {
-    const position = style.position || "static";
+  // Where an element is drawn, what flows beside it, and whether it is a text column of its own.
+  const placementHazards = (el, style, parentDisplay, out) => {
+    const position = cssOf(style, "position") || "static";
     if (position === "absolute" || position === "fixed") out.add("out-of-flow");
     else if (position === "sticky") out.add("sticky");
-    else if (position === "relative" && (offsetBy(style.top) || offsetBy(style.bottom) || offsetBy(style.left) || offsetBy(style.right))) out.add("offset");
-    if (setTo(style.float)) out.add("float");
-    if (style.writingMode && style.writingMode !== "horizontal-tb") out.add("vertical-writing");
+    else if (position === "relative" && ["top", "bottom", "left", "right"].some((side) => offsetBy(cssOf(style, side)))) out.add("offset");
+    if (setTo(cssOf(style, "float"))) out.add("float");
+    const writing = cssOf(style, "writing-mode");
+    if (writing !== "" && writing !== "horizontal-tb") out.add("vertical-writing");
+    // An atomic inline-level box — inline-block, inline-table, or a table cell outside a table row
+    // (an anonymous table) — that holds text is a text column of its own: set beside others,
+    // sized from its content, and not a block record, so nothing else in the snapshot sees it.
+    const display = cssOf(style, "display");
+    if ((display === "inline-block" || display === "inline-table" || (display === "table-cell" && parentDisplay !== "table-row")) && holdsText(el)) out.add("atomic-inline");
+    // A shadow tree lays out content the light-DOM walk cannot see; an autonomous custom element
+    // may carry a closed one, which cannot be seen at all.
+    const tag = String(P.tagName(el) || "");
+    if (P.shadowRoot(el) || /-/u.test(tag) || tag === "SLOT") out.add("shadow-tree");
+  };
+  // The pieces of a split element must carry exactly the content they carried unsplit. Paged.js
+  // unsets ::before on the continuation and ::after on the piece before the break, but an author
+  // !important beats that, and it does not unset ::first-line or ::first-letter at all: the
+  // continuation's first line is then set in the first line's font. Either rewraps the text.
+  const PSEUDO_METRICS = ["font-size", "line-height", "font-family", "font-weight", "font-style", "font-stretch",
+    "letter-spacing", "word-spacing", "font-variant", "text-transform"];
+  const contentOf = (el, pseudo) => cssOf(P.style(el, pseudo), "content");
+  const generates = (value) => value !== "" && value !== "none" && value !== "normal";
+  // The element the first letter is set in: ::first-letter inherits from it, not from the block
+  // (a block whose text starts inside a <span style="font-size: 34px"> reports a 34 px first
+  // letter without any first-letter styling).
+  const firstTextParent = (el) => {
+    for (const child of P.children(el)) {
+      if (P.nodeType(child) === 3) { if (/\\S/u.test(P.text(child) || "")) return el; continue; }
+      if (P.nodeType(child) !== 1) continue;
+      const found = firstTextParent(child);
+      if (found) return found;
+    }
+    return null;
+  };
+  const differs = (pseudoStyle, ownStyle) => PSEUDO_METRICS.some((name) => cssOf(pseudoStyle, name) !== cssOf(ownStyle, name));
+  const pseudoHazards = (el, style, out) => {
+    if (P.hasAttr(el, "data-split-from")) {
+      if (generates(contentOf(el, "::before"))) out.add("split-pseudo");
+      if (differs(P.style(el, "::first-line"), style)) out.add("split-pseudo");
+      const letterIn = firstTextParent(el);
+      const letter = P.style(el, "::first-letter");
+      if (letterIn && differs(letter, letterIn === el ? style : P.style(letterIn, null))) out.add("split-pseudo");
+      if (setTo(cssOf(letter, "float"))) out.add("split-pseudo");
+    }
+    if (P.hasAttr(el, "data-split-to") && generates(contentOf(el, "::after"))) out.add("split-pseudo");
   };
   const insideHazardCache = new Map();
   const insideHazards = (el) => {
     const cached = insideHazardCache.get(el);
     if (cached) return cached;
     const out = new Set();
+    const display = cssOf(P.style(el, null), "display");
     for (const child of P.children(el)) {
-      if (P.nodeType(child) !== 1 || /^(SCRIPT|STYLE)$/u.test(child.tagName)) continue;
+      if (P.nodeType(child) !== 1 || /^(SCRIPT|STYLE)$/u.test(String(P.tagName(child) || ""))) continue;
       const childStyle = P.style(child, null);
-      if (childStyle.display === "none") continue;
-      placementHazards(childStyle, out);
+      if (cssOf(childStyle, "display") === "none") continue;
+      placementHazards(child, childStyle, display, out);
       contentHazards(child, childStyle, out);
+      pseudoHazards(child, childStyle, out);
       // A negative block-direction margin pulls what follows over what precedes it; at a split the
       // two would be counted apart. Only inside: on the element itself it moves all of it alike.
-      if (number(childStyle.marginTop, 0) < 0 || number(childStyle.marginBottom, 0) < 0) out.add("negative-margin");
+      if (number(cssOf(childStyle, "margin-top"), 0) < 0 || number(cssOf(childStyle, "margin-bottom"), 0) < 0) out.add("negative-margin");
       for (const hazard of insideHazards(child)) out.add(hazard);
     }
     insideHazardCache.set(el, out);
@@ -603,15 +665,17 @@ export const SNAPSHOT_SOURCE = `(() => {
   // can transform or place it. The page content element itself is Paged.js' own multi-column
   // fragmentainer (the overflow column) and is where the walk stops.
   const PAGE_CONTENT_SELECTOR = ".pagedjs_page_content, .pagedjs_area";
+  const displayOf = (el) => { const parent = P.parent(el); return parent && P.nodeType(parent) === 1 ? cssOf(P.style(parent, null), "display") : ""; };
   const flowHazardsFor = (el, style, overflowing) => {
     const self = new Set();
     contentHazards(el, style, self);
-    placementHazards(style, self);
+    placementHazards(el, style, displayOf(el), self);
+    pseudoHazards(el, style, self);
     const around = new Set();
     for (let at = P.parent(el); at && P.nodeType(at) === 1 && P.closest(at, PAGE_CONTENT_SELECTOR) !== at; at = P.parent(at)) {
       const atStyle = P.style(at, null);
       contentHazards(at, atStyle, around);
-      placementHazards(atStyle, around);
+      placementHazards(at, atStyle, displayOf(at), around);
     }
     const inside = new Set(insideHazards(el));
     if (overflowing) inside.add("overflowing-content");
@@ -1001,28 +1065,10 @@ export function validateSnapshotInvariants(
     if (previous !== undefined && previous !== page.epoch) issues.push(`${page.nodeKey}: appears in multiple epochs`);
     epochByNodeKey.set(page.nodeKey, page.epoch);
   }
+  // Snapshot 5 block fields: one check, shared with the engine (src/core/snapshot-shape.ts).
+  issues.push(...snapshotShapeIssues(snapshot));
   for (const block of snapshot.blocks) {
     if (block.lines === null && !block.notMeasuredReason) issues.push(`${block.nodeKey}: lines absent without reason`);
-    // Snapshot 5. A block without its computed display, or with a margin-copy count that is not a
-    // count, cannot be classified by the rules that ask whether it has a box of its own.
-    if (typeof block.display !== "string" || block.display.length === 0) issues.push(`${block.nodeKey}: computed display is absent`);
-    if (!Number.isSafeInteger(block.marginCopies) || block.marginCopies < 0) issues.push(`${block.nodeKey}: marginCopies is not a count`);
-    else if (block.marginCopies > 0 && block.sid === null) issues.push(`${block.nodeKey}: margin copies without a source id`);
-    // Snapshot 5. A record without these fields is a schema-4 record, and the split-block bound of
-    // layout/unbreakable-block-too-tall would read an absent list as "nothing inside": no replaced
-    // content, no hazard. That is the silent pass the fields exist to prevent.
-    if (!Array.isArray(block.atomicBoxes) || block.atomicBoxes.some((atom) =>
-      !atom || typeof atom.tag !== "string" || !atom.box || ![atom.box.x, atom.box.y, atom.box.width, atom.box.height].every(Number.isFinite))) {
-      issues.push(`${block.nodeKey}: atomicBoxes absent or not finite`);
-    }
-    const hazards = block.flowHazards as Partial<Record<"inside" | "self" | "around", unknown>> | undefined;
-    for (const scope of ["inside", "self", "around"] as const) {
-      const list = hazards?.[scope];
-      if (!Array.isArray(list) || list.some((hazard) => !(FLOW_HAZARDS as readonly string[]).includes(hazard)) ||
-        new Set(list).size !== list.length) {
-        issues.push(`${block.nodeKey}: flowHazards.${scope} absent, unknown or repeated`);
-      }
-    }
     // The inspected input artefact's injection map is always complete. Producer provenance is
     // deliberately separate in originalMap, where generated/ambiguous output can be omitted.
     if (options.sourceMapInjection && block.sid !== null && !snapshot.source.map[block.sid]) {

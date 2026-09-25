@@ -23,6 +23,7 @@
  * is where a reader looks for what was not judged and why.
  */
 
+import { snapshotShapeIssues } from "./snapshot-shape.ts";
 import { COVERAGE_FLOOR_BY_SEVERITY, EXIT_CODE_BY_VERDICT, IS, SNAPSHOT_SCHEMA_VERSION, VERDICT_PRECEDENCE } from "./enums.ts";
 import type { FailOn, RunVerdict, Severity } from "./enums.ts";
 
@@ -148,7 +149,19 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
       measured: { stage: "snapshot-schema", schemaVersion: snapshot.schemaVersion ?? null, expected: SNAPSHOT_SCHEMA_VERSION },
     });
   }
-  for (const rule of stampMatches ? config.activeRules : []) {
+  // The stamp says which shape a snapshot claims; the fields say whether it has it. A stored or
+  // hand-edited snapshot stamped 5 without them would be misjudged, not failed (an absent list
+  // read as empty), so it is refused the same way. One check, shared with the live path.
+  const shapeIssues = stampMatches ? snapshotShapeIssues(snapshot) : [];
+  if (shapeIssues.length > 0) {
+    infrastructure.push({
+      kind: "checker-crashed",
+      detail: `the measurement snapshot is stamped ${SNAPSHOT_SCHEMA_VERSION} but lacks its fields: ${shapeIssues.slice(0, 5).join("; ")}` +
+        (shapeIssues.length > 5 ? `; and ${shapeIssues.length - 5} more` : ""),
+      measured: { stage: "snapshot-shape", issues: shapeIssues.length },
+    });
+  }
+  for (const rule of stampMatches && shapeIssues.length === 0 ? config.activeRules : []) {
     let result;
     try {
       result = rule.run(snapshot, {

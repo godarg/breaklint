@@ -182,6 +182,15 @@ const PRIMITIVES_TEMPLATE = `(() => {
         enumerable: true,
       });
   };
+  // Computed values a proof rests on are read through the captured getPropertyValue, never through
+  // a CSSStyleDeclaration property getter: those getters live on the prototype, and a document that
+  // shadows CSSStyleDeclaration.prototype.transform (or position, or display) answers for itself.
+  // Same name and shape as the SVG viewport package's primitive.
+  const getPropertyValueFn = CSSStyleDeclaration.prototype.getPropertyValue;
+  // An open shadow root hides a subtree from querySelectorAll and childNodes; the flow-hazard walk
+  // records one rather than pretending the host is a leaf.
+  const shadowRootOf = Object.getOwnPropertyDescriptor(Element.prototype, "shadowRoot").get;
+  const tagNameOf = Object.getOwnPropertyDescriptor(Element.prototype, "tagName").get;
   const requireCapability = (candidate) => {
     if (candidate !== apparatusCapability) throw new Error("breaklint apparatus capability rejected");
   };
@@ -191,6 +200,9 @@ const PRIMITIVES_TEMPLATE = `(() => {
       rect: (el) => rectValue(call.call(rectFn, el)),
       rects: (el) => rectValues(call.call(rectsFn, el)),
       style: (el, pseudo) => call.call(styleFn, window, el, pseudo),
+      css: (style, name) => call.call(getPropertyValueFn, style, name),
+      shadowRoot: (el) => call.call(shadowRootOf, el),
+      tagName: (el) => call.call(tagNameOf, el),
       all: (root, selector) => {
         const fn = root === document ? docQsaFn : qsaFn;
         return call.call(sliceFn, call.call(fn, root, selector));
@@ -466,7 +478,7 @@ export const PRIMITIVES_CHECK = `(() => {
   }
   for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
     "outerHtml", "painted", "byId", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
-    "rects", "setAttr", "setText", "nodeType", "parent", "next", "create", "append", "remove", "setCssText",
+    "rects", "css", "shadowRoot", "tagName", "setAttr", "setText", "nodeType", "parent", "next", "create", "append", "remove", "setCssText",
     "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityRecordPreview",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",
     "publishFreeze", "publishOverlay", "mutationType", "mutationAttributeName", "randomToken", "startsWith"]) {

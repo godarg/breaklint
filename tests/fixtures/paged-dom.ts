@@ -190,6 +190,7 @@ const DEFAULT_STYLE: Record<string, string> = {
   // Snapshot 5 reads these for a block's flow hazards; Chromium's computed defaults.
   transform: "none", translate: "none", rotate: "none", scale: "none", offsetPath: "none", float: "none",
   columnWidth: "auto", top: "auto", bottom: "auto", left: "auto", right: "auto", marginTop: "0px", marginBottom: "0px",
+  fontStyle: "normal", fontStretch: "100%", letterSpacing: "normal", fontVariant: "normal", textTransform: "none",
   overflowX: "visible", overflowY: "visible",
 };
 
@@ -209,9 +210,9 @@ function classStyle(node: FakeNode): Record<string, string> {
   return out;
 }
 
-function inlineStyle(node: FakeNode): Record<string, string> {
+function inlineStyle(node: FakeNode, attribute = "style"): Record<string, string> {
   const declared: Record<string, string> = {};
-  for (const declaration of (node.attributes.get("style") ?? "").split(";")) {
+  for (const declaration of (node.attributes.get(attribute) ?? "").split(";")) {
     const at = declaration.indexOf(":");
     if (at < 0) continue;
     const name = declaration.slice(0, at).trim().replace(/-([a-z])/gu, (_all, c: string) => c.toUpperCase());
@@ -267,7 +268,31 @@ export function fakePrimitives(document: FakeNode, hooks: {
       const box = boxOf(node);
       return box.width > 0 || box.height > 0 ? [box] : [];
     },
-    style: (node: FakeNode) => ({ ...DEFAULT_STYLE, ...classStyle(node), ...inlineStyle(node) }),
+    // A pseudo-element's computed style: `data-test-first-line`, `data-test-first-letter`,
+    // `data-test-before` and `data-test-after` hold its declarations. ::first-line and
+    // ::first-letter inherit the element's style; ::before and ::after generate nothing unless told.
+    style: (node: FakeNode, pseudo?: string | null) => {
+      const styleOf = (at: FakeNode) => ({ ...DEFAULT_STYLE, ...classStyle(at), ...inlineStyle(at) });
+      const own = styleOf(node);
+      if (!pseudo) return own;
+      const name = pseudo.replace(/^:+/u, "");
+      const declared = inlineStyle(node, `data-test-${name}`);
+      if (name === "before" || name === "after") return { ...own, content: "none", ...declared };
+      // ::first-letter inherits from the element its letter is set in, as Chromium reports it.
+      const firstTextParent = (at: FakeNode): FakeNode | null => {
+        for (const child of at.childNodes) {
+          if (child.nodeType === 3 && /\S/u.test(child.data ?? "")) return at;
+          if (child.nodeType === 1) { const found = firstTextParent(child); if (found) return found; }
+        }
+        return null;
+      };
+      const base = name === "first-letter" ? styleOf(firstTextParent(node) ?? node) : own;
+      return { ...base, ...declared };
+    },
+    // getPropertyValue: the hyphenated property name, read off the camel-cased fake declaration.
+    css: (style: Record<string, string>, name: string) => style[name.replace(/-([a-z])/gu, (_all, c: string) => c.toUpperCase())] ?? "",
+    shadowRoot: (node: FakeNode) => (node.attributes.has("data-test-shadow-root") ? {} : null),
+    tagName: (node: FakeNode) => node.tagName ?? "",
     // A text node's line box is its parent's box: one line per text node. A hidden text node has
     // none, which is what Range.getClientRects() answers under display: none.
     range: (node: FakeNode, start?: number, end?: number) => {
@@ -324,8 +349,12 @@ export function fakePrimitives(document: FakeNode, hooks: {
 // ---- running the real payloads -------------------------------------------------------------
 
 /** Evaluate `SNAPSHOT_SOURCE` (or any payload of that shape) over the fake tree. */
-export function evaluatePayload<T>(source: string, document: FakeNode): T {
-  const window = { __blPrimitives: fakePrimitives(document) };
+export function evaluatePayload<T>(
+  source: string,
+  document: FakeNode,
+  wrap: (primitives: Record<string, unknown>) => Record<string, unknown> = (primitives) => primitives,
+): T {
+  const window = { __blPrimitives: wrap(fakePrimitives(document)) };
   const performance = { getEntriesByType: () => [] };
   const location = { origin: "http://127.0.0.1:0" };
   // The payload is a string by design — it is evaluated inside the document in production — so
