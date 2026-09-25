@@ -208,6 +208,52 @@ describe("page-fill rules", () => {
     assert.deepEqual(run(badge).findings, []);
   });
 
+  it("counts an inline image on the first line as part of that line", () => {
+    // Measured live (Chromium 141, Paged.js 0.4.3) on a paragraph at 12pt/3 whose line at the top of
+    // page 3 carries an 80 px inline image — canvas, <img> and SVG alike: the page's first fill
+    // band is the image's top, the line's glyph box starts 66 px below it and is 17 px tall, and
+    // the line height is 48 px. The line did not fit on page 2, which is full.
+    const snapshot = corpusSnapshot("orphaned-continuation-clean-full-middle-page");
+    const long2 = snapshot.blocks.find((b) => b.nodeKey === "long:2")!;
+    long2.lineHeight = 48;
+    snapshot.pages[2]!.fill.topGap = 0;
+    snapshot.textLines = snapshot.textLines.filter((l) => l.blockKey !== "long:2");
+    for (let k = 0; k < 12; k++) snapshot.textLines.push(textLine("long:2", 36 + k, { x: 48, y: 48 + 66 + k * 48, width: 399, height: 17 }));
+    assert.deepEqual(run(snapshot).findings, [], "a full page was judged because the next line carried an image");
+
+    // Two line heights is the bound: a glyph box ending just past it is text below something else.
+    const below = structuredClone(snapshot);
+    const first = below.textLines.find((l) => l.blockKey === "long:2")!;
+    first.box = { ...first.box, y: 48 + 2 * 48 - 17 + 1 };
+    for (const l of below.textLines.filter((l) => l.blockKey === "long:2" && l !== first)) l.box = { ...l.box, y: l.box.y + 200 };
+    assert.deepEqual(run(below).findings.map((f) => f.page), [2]);
+  });
+
+  it("lets only a block that STARTS on the next page own a continuation's line", () => {
+    // A later block in document order that itself continues there — a split panel, fragment 1 of
+    // 2 — and covers the paragraph's first line: the paragraph's text still runs on.
+    const snapshot = corpusSnapshot("orphaned-continuation-clean-full-middle-page");
+    const template = snapshot.blocks[0]!;
+    const at = snapshot.blocks.findIndex((b) => b.page === 3);
+    snapshot.blocks.splice(at + 1, 0, fragment(template, {
+      nodeKey: "panel:1", sid: "s-panel", tag: "aside", page: 3, fragmentIndex: 1, fragmentCount: 2,
+      box: { x: 48, y: 48, width: 399, height: 200 }, lines: [],
+    }));
+    snapshot.blocks.splice(0, 0, fragment(template, {
+      nodeKey: "panel:0", sid: "s-panel", tag: "aside", page: 1, fragmentIndex: 0, fragmentCount: 2,
+      box: { x: 48, y: 600, width: 399, height: 40 }, lines: [],
+    }));
+    assert.deepEqual(run(snapshot).findings, []);
+  });
+
+  it("gives a line's centre 1 px of slack against the box that owns it", () => {
+    // Rounded geometry: the section's copy of the carried figure's caption, its centre 0.5 px above
+    // the figure's box, is still the figure's line.
+    const snapshot = corpusSnapshot("orphaned-continuation-trigger-carried-child");
+    snapshot.textLines.push(textLine("section:2", 0, { x: 60, y: 39.5, width: 300, height: 16 }));
+    assert.deepEqual(run(snapshot).findings.map((f) => f.page), [2]);
+  });
+
   it("reads document order to decide which block owns a line", () => {
     // A wrapper's lines include its children's. A line whose centre lies in a block that starts on
     // the next page AND follows the continuation in document order is that block's (its child's),
@@ -297,8 +343,8 @@ describe("page-fill rules", () => {
     assert.deepEqual(run(marker).findings.map((f) => f.page), [4], "a box-less marker hid the tail page");
   });
 
-  it("gives the round-2 repro's answers in the shape this release's collector produces", () => {
-    // The collector of this release keeps margin-box content out of the snapshot (running and
+  it("gives the round-2 repro's answers in the shape WP-F1's collector produces", () => {
+    // WP-F1's collector change keeps margin-box content out of the snapshot (running and
     // fixed-position clones); this rule relies on that for side margin boxes, which its own
     // vertical test does not exclude. Without clones: the tail page of the long paragraph, the
     // carried child, and the carried child under a 2 px wrapper border.

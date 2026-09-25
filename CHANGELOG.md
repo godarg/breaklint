@@ -19,9 +19,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   compared advice text will see the new string.
 - **`layout/orphaned-continuation-page` no longer reports pages whose text runs on to the next
   page.** A page is judged only when what it carries ENDS on it: the next page does not open with
-  text running on from it — a text line of a block that continues there, starting within one of
-  that block's line heights of the top of the page's content, and not lying inside a block that
-  starts there after it in document order. The rule records this as a third measurement,
+  text running on from it — a text line of a block that continues there, whose glyph box ends
+  less than two of that block's line heights below the top of the page's content (room for the
+  line and an inline image on it), and not lying inside a block that starts there after it in
+  document order. The rule records this as a third measurement,
   `ends-on-page`, in its evaluations. All figures below were measured on Chromium 141 with
   Paged.js 0.4.3.
   - Until now every page between the first and the last page of a block was reported as soon as
@@ -31,7 +32,8 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
     (five on the new live fixture); none now. The same holds for a full page whose last block is a
     nested child that ends there while its wrapper's own text runs on, and for one followed by a
     page whose top carries a positioned badge or a relatively offset aside beside the running
-    text: 0.6.0 reported those pages, and they are no longer reported.
+    text, and for one whose next line carries a 64–80 px inline image, SVG or canvas: 0.6.0
+    reported those pages, and they are no longer reported.
   - A page that ends early is still reported, whatever the shape of the wrapper: a `<section>`
     whose own SVG, image or bare text was left high on a page because its next child, a
     `break-inside: avoid` figure, did not fit (net fill 0.08–0.39), with or without a border on

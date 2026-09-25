@@ -28,14 +28,29 @@ function centreInside(line: Box, block: Box): boolean {
 }
 
 /**
- * Whether the page after `page` opens with text running on: a text line of a continuing block that
- * starts within one of that block's line heights of the top of the next page's content. The top is
- * the higher of the first fill band and the first block that starts on that page. A line whose
- * centre lies inside a block that starts there AND follows the continuing block in document order
- * belongs to that block (a wrapper's lines include its children's), so it is not running text of
- * the continuation. Visibility plays no part: hidden text that ran on filled the page as much as
- * visible text. A parity blank page next carries no text, so the page before it — which a forced
- * break ended — is judged.
+ * Whether a text line opens the page whose content starts at `top`: the space from `top` to the
+ * foot of its glyph box is less than two of its block's line heights — one for the line itself,
+ * one for what sits on it. A plain line's glyph box ends half a leading above its line box's foot,
+ * well inside the first. A line that also carries an inline image, SVG or canvas on its baseline is
+ * taller than one line height, and the fill band that marks the page's top is that element's, not
+ * the glyphs': measured with 64-80 px images, SVGs and canvases under 48 px lines, the glyph box
+ * ended 67-83 px below it.
+ * Text that resumes below a block of its own — an image or an SVG two lines tall or more — does
+ * not open the page.
+ */
+function opensPage(glyph: Box, top: number, lineHeight: number): boolean {
+  return glyph.y + glyph.height < top + 2 * lineHeight;
+}
+
+/**
+ * Whether the page after `page` opens with text running on: a text line of a continuing block
+ * that opens that page (see `opensPage`). The top of the page's content is the higher of the first
+ * fill band and the first block that starts on that page. A line whose centre lies inside a block
+ * that starts there AND follows the continuing block in document order belongs to that block (a
+ * wrapper's lines include its children's), so it is not running text of the continuation.
+ * Visibility plays no part: hidden text that ran on filled the page as much as visible text. A
+ * parity blank page next carries no text, so the page before it — which a forced break ended — is
+ * judged.
  */
 function nextPageOpensWithRunningText(
   snapshot: Snapshot,
@@ -53,7 +68,7 @@ function nextPageOpensWithRunningText(
     const ownedByLater = blocks.slice(at + 1).filter((b) => b.fragmentIndex === 0);
     return (linesByBlock.get(continuing.nodeKey) ?? []).some((line) =>
       !ownedByLater.some((b) => centreInside(line.box, b.box)) &&
-      line.box.y < top + continuing.lineHeight);
+      opensPage(line.box, top, continuing.lineHeight));
   });
 }
 
@@ -76,9 +91,10 @@ function nextPageOpensWithRunningText(
  *
  * So a page is judged only when what it carries ENDS on it (`ends-on-page`): the next page does
  * not open with text running on from it. "Running on" is a text line of a block that continues
- * onto the next page, starting within one of that block's line heights of the top of the next
- * page's content, and not lying inside a block that starts there and follows it in document order
- * (a wrapper's lines include its children's). Everything else ends the page: a block that starts
+ * onto the next page, whose glyph box ends less than two of that block's line heights below the
+ * top of the next page's content (room for the line and for an inline image on it), and that does
+ * not lie inside a block that starts there and follows it in document order (a wrapper's lines
+ * include its children's). Everything else ends the page: a block that starts
  * on the next page and opens it (a wrapper — `<section>`, `<article>` — whose next child was
  * carried over), an image or SVG that did not fit, a forced break, the end of the document. The
  * decision needs no threshold, and it reads no box of the wrapper, so a border kept at the split
@@ -94,8 +110,8 @@ function nextPageOpensWithRunningText(
  * one) that lies at least partly inside the content box vertically (a running element's clone in
  * a top or bottom margin box normally lies above or below it; so does the footnote area).
  * Horizontal position is not tested, so a full-bleed block stays in — and so would a clone in a
- * side margin box: this rule relies on the collector keeping margin-box content out of the
- * snapshot, as the collector of this release does.
+ * side margin box: this rule relies on the collector excluding margin-box content from the
+ * snapshot (WP-F1's collector change).
  *
  * It rests on one invariant of the snapshot, stated here because the rule reads it and nothing
  * else in the type says so: `snapshot.blocks` is in collection order — page by page, and within
