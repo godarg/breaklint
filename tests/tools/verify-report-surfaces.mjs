@@ -106,12 +106,16 @@ function independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, repo
       }
       return { coverage: Math.round(hits / (to - from + 1) * 1_000) / 1_000, maximumGapPx };
     };
+    // A mono rule id and a sans count on one line share a baseline, not a box top: on macOS the two
+    // faces' yMin differ by more than 1 pt while their yMax agree. Either edge within 1 pt is one line;
+    // table rows are more than 10 pt apart, so this cannot join two rows.
+    const sameLine = (a, b) => Math.abs(a.yMin - b.yMin) < 1 || Math.abs(a.yMax - b.yMax) < 1;
     const used = new Set();
     const anchors = rowIds.map((id) => {
       // The rule id of a table row is followed on its line by the candidate count; the same id in a
       // finding head or tail label on the same page is not.
       const word = words.find((candidate, index) => candidate.text === id && !used.has(index) &&
-        /^\d+$/u.test(words[index + 1]?.text ?? "") && Math.abs(words[index + 1].yMin - candidate.yMin) < 1 && used.add(index));
+        /^\d+$/u.test(words[index + 1]?.text ?? "") && sameLine(words[index + 1], candidate) && used.add(index));
       assert.ok(word, `${label}: page ${page} row ${id} has no positioned word`);
       return { id, top: Math.ceil(word.yMax * rasterDpi / 72), start: Math.floor(word.yMin * rasterDpi / 72) };
     }).sort((a, b) => a.top - b.top);
