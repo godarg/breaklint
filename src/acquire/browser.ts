@@ -989,10 +989,26 @@ export function sweepStaleBrowserProfiles(environment: ProfileSweepEnvironment |
   return result;
 }
 
+/**
+ * The profile's preferences before the browser first reads them.
+ *
+ * `webrtc.ip_handling_policy: disable_non_proxied_udp`: a document's RTCPeerConnection may use
+ * UDP only through a proxy, and TCP only through a proxy. WebRTC is not a request that
+ * interception sees, and it needs no host name, so neither the offline policy nor the browser-level
+ * resolver lock stops it: measured on Chromium 141, a document's STUN server at an IP literal on a
+ * non-loopback interface received 5 UDP packets within 5 s under the default offline launch. With
+ * this preference and `--no-proxy-server` (offline mode) there is no proxy, so there is no UDP at
+ * all. The switch that used to set this (`--force-webrtc-ip-handling-policy`) is absent from
+ * Chromium 141, so the preference is the mechanism.
+ */
+export const PROFILE_PREFERENCES = { webrtc: { ip_handling_policy: "disable_non_proxied_udp" } } as const;
+
 /** A fresh profile directory that carries its owner record before any browser uses it. */
 export function createBrowserProfile(): string {
   const userDataDir = mkdtempSync(join(tmpdir(), PROFILE_PREFIX));
   writeProfileOwner(userDataDir, null);
+  mkdirSync(join(userDataDir, "Default"), { mode: 0o700 });
+  writeFileSync(join(userDataDir, "Default", "Preferences"), JSON.stringify(PROFILE_PREFERENCES), { mode: 0o600 });
   return userDataDir;
 }
 
@@ -1212,6 +1228,41 @@ export interface LaunchResult {
   userDataDir?: string | null;
 }
 
+/**
+ * Environment switches the driver reads at launch, from puppeteer-core 25.8's own source, and
+ * breaklint's decision for each. The driver reads them from `process.env`, not from the `env`
+ * launch option, so breaklint cannot neutralise them for the browser, and it does not edit a
+ * library host's environment either. A launch with one of the REFUSED ones set does not start.
+ *
+ * Refused (they change the browser's switches):
+ *   PUPPETEER_DANGEROUS_NO_SANDBOX  — the driver then adds the switch that turns the browser's
+ *     sandbox off (ChromeLauncher.defaultArgs), which SECURITY.md says nothing can do.
+ *   PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES — changes the `--disable-features` list the
+ *     driver passes (site-isolation related features); an unmeasured browser configuration.
+ * Harmless here, and why:
+ *   PUPPETEER_WEBDRIVER_BIDI_ONLY   — read only on the WebDriver BiDi path; breaklint speaks CDP.
+ *   PUPPETEER_EXECUTABLE_PATH       — not read by puppeteer-core 25.8 at all (only the full
+ *     `puppeteer` package's configuration and @puppeteer/browsers' CLI text name it); breaklint
+ *     always passes `executablePath` itself, from BREAKLINT_CHROME or its candidate list.
+ *   NODE_DEBUG / DEBUG              — driver logging only.
+ * Refused when present with any value: "set" is what a reader of the environment sees.
+ */
+export const REFUSED_DRIVER_ENVIRONMENT: Readonly<Record<string, string>> = {
+  PUPPETEER_DANGEROUS_NO_SANDBOX: "it makes puppeteer-core start the browser with its sandbox off",
+  PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES: "it makes puppeteer-core change the browser's feature switches",
+};
+
+/** `null`, or the exit-3 message naming every refused variable that is set. */
+export function driverEnvironmentRefusal(environment: NodeJS.ProcessEnv = process.env): string | null {
+  const set = Object.keys(REFUSED_DRIVER_ENVIRONMENT).filter((name) => environment[name] !== undefined);
+  if (set.length === 0) return null;
+  return (
+    "breaklint: refusing to start the browser.\n" +
+    set.map((name) => `  ${name} is set: ${REFUSED_DRIVER_ENVIRONMENT[name]}.\n`).join("") +
+    "  Unset it for this run; breaklint keeps the browser sandbox on and has no way to turn it off."
+  );
+}
+
 /** Launch options. `network` follows the run's network policy; the rest are unit-only seams. */
 export interface LaunchSeams {
   /** "offline" (the default) adds the browser-level network lock; "allowlist" does not. */
@@ -1229,6 +1280,9 @@ export interface LaunchSeams {
  * crash and a missing renderer are different things for the person reading the output.
  */
 export async function launchBrowser(fromDir: string = process.cwd(), seams: LaunchSeams = {}): Promise<LaunchResult> {
+  // Before anything is resolved or created: the driver would read these at launch.
+  const refused = driverEnvironmentRefusal();
+  if (refused) return { browser: null, executablePath: null, userDataDir: null, detail: refused };
   const found = resolveBrowser();
   if (!found.path) {
     return {

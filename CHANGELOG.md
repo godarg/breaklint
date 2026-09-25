@@ -104,6 +104,19 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   preconnect) — requests page-level interception never saw, although README and SECURITY.md said
   every request was blocked; with it, its net-log shows only the loopback document. With
   `--allow-network` the lock is off, and SECURITY.md says so.
+- **A launch refuses the driver's sandbox environment switch.** puppeteer-core adds the
+  sandbox-disabling switch itself when `PUPPETEER_DANGEROUS_NO_SANDBOX` is set, which made
+  SECURITY.md's "no flag turns it off" false for any host with that variable in its environment.
+  With it (or `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES`, which changes the browser's feature
+  switches) set to any value, a run now ends with exit 3 before a browser or profile exists and
+  names the variable; a library host's environment is not edited. Shown through the real CLI with
+  a fake browser that records its switches: without the refusal it was started with the
+  sandbox-disabling switch.
+- **A document's WebRTC no longer reaches the network in the default offline mode.** It was never
+  covered: measured on Chromium 141, a document's STUN packets reached an IP address on a
+  non-loopback interface under the offline launch (5 in 5 s). Profiles are now created with the
+  WebRTC preference `disable_non_proxied_udp`; with no proxy in offline mode, the same document
+  sends no UDP and no TCP. With `--allow-network`, a TURN connection over TCP was still observed.
 - **On Windows a live run now stops before anything is started.** Windows remains unsupported
   (process cleanup rests on POSIX process groups). Before — read from the code, not run on
   Windows — a run with `BREAKLINT_CHROME` set started the browser and rendered the whole document

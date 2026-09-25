@@ -344,8 +344,26 @@ the browser's net-log showed one connection, to the loopback document; a unit te
 against a control run without the lock that must show browser-level traffic. With
 `--allow-network` the lock is off, and those services can reach the network; that is the
 remaining boundary, stated rather than closed, because allowed origins must resolve and may need
-the host's proxy. Not claimed either, and not measured here: a document's WebRTC traffic to an
-IP address, which is not a request that interception sees and needs no host name.
+the host's proxy. A document's WebRTC is not a request that interception sees and needs no host
+name, so neither of those stops it: measured on Chromium 141 under the offline launch, a STUN
+server at an IP address on this machine's non-loopback interface received 5 UDP packets within
+5 s. Every profile is now created with the WebRTC preference `ip_handling_policy:
+disable_non_proxied_udp` (the command-line switch for it no longer exists in Chromium 141); with
+no proxy in offline mode, the same document sent no UDP and no TCP, and a unit test holds that
+against a control browser without the preference. With `--allow-network` the preference still
+stops UDP, but a TURN connection over TCP to the same address was observed (1 of 1 runs), and it
+is not blocked in that mode.
+
+A launch also refuses the driver's environment switches that would change the browser's own
+switches: `PUPPETEER_DANGEROUS_NO_SANDBOX` (puppeteer-core adds the sandbox-disabling switch) and
+`PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` (it changes the feature switches). Either set, with
+any value, ends the run with exit 3 before any browser or profile exists, naming the variable;
+breaklint does not remove it from a library host's environment. The other switches puppeteer-core
+25.8 reads are harmless here: `PUPPETEER_WEBDRIVER_BIDI_ONLY` only on a protocol breaklint does
+not use, `PUPPETEER_EXECUTABLE_PATH` not at all (breaklint always passes the executable itself,
+from `BREAKLINT_CHROME` or its candidate list, so that wins), `NODE_DEBUG` for logging. The browser
+itself also reads its environment, which breaklint passes on as the host set it, apart from
+`TMPDIR`; that surface is not audited here.
 
 Two things this does not cover. A browser crash writes its dump into `~/.config/chromium/Crash
 Reports`, outside the temporary profile, and nothing here changes that. And the browser start is

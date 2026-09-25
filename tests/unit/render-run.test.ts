@@ -10,9 +10,10 @@ import { strict as assert } from "node:assert";
 import { spawn } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
-import { createConnection, type AddressInfo } from "node:net";
+import { createConnection, createServer as createTcpServer, type AddressInfo } from "node:net";
+import { createSocket as createUdpSocket } from "node:dgram";
 import { once } from "node:events";
-import { hostname, tmpdir } from "node:os";
+import { hostname, networkInterfaces, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -40,7 +41,7 @@ import {
   cleanupBrowserProfile,
 } from "../../src/acquire/render-run.ts";
 import {
-  alive, BROWSER_TMP_PREFIX, browserTmpDirFor, captureProcessTreeOwnership, createBrowserProfile, readProfileOwner, removeBrowserTmpDir, createInterruptRegistry, defaultSweepEnvironment, processGroupHasLiveMember, INTERRUPT_SIGNALS, launchBrowser, linuxProcessTable,
+  alive, BROWSER_TMP_PREFIX, resolveBrowser, browserTmpDirFor, captureProcessTreeOwnership, createBrowserProfile, readProfileOwner, removeBrowserTmpDir, createInterruptRegistry, defaultSweepEnvironment, processGroupHasLiveMember, INTERRUPT_SIGNALS, launchBrowser, linuxProcessTable,
   ownServerLifecycle, processIsDefunct, profileOwnerIdentity, PROFILE_OWNER_FILE, PROFILE_PREFIX,
   STALE_PROFILE_MIN_AGE_MS, sweepStaleBrowserProfiles, terminateProcessTree, TERMINATION_GRACE_MS,
   type InterruptSignal, type PageLike, type ProcessRow, type ProfileOwnerRecord, type ProfileSweepEnvironment,
@@ -1931,6 +1932,74 @@ describe("a real browser: its temporary files and its own network use", { concur
     assert.deepEqual(result.after, [], "something of the run was left in the temporary directory");
     assert.deepEqual(result.use.connects.filter((address) => !loopback(address)), [], "the browser connected beyond loopback");
     assert.deepEqual(result.use.hosts.filter((host) => !loopback(host) && !host.includes("~notfound")), [], "a host name other than loopback was resolved");
+  });
+
+  /*
+   * A document's WebRTC: not a request that interception sees, and no host name to resolve.
+   * Complication: the STUN and TURN servers are IP literals on this machine's own non-loopback
+   * interface, so a packet that reaches them is a packet that could have left the machine.
+   * Measured on Chromium 141: 5 STUN packets within 5 s from a browser without breaklint's profile
+   * preference, none with it. Mutation "no WebRTC preference in the profile": red.
+   */
+  async function webRtcProbe(launch: () => Promise<{ page: PageLike; close: () => Promise<void> }>) {
+    const address = Object.values(networkInterfaces()).flat().find((entry) => entry && entry.family === "IPv4" && !entry.internal)?.address;
+    if (!address) return null;
+    const received = { udp: 0, tcp: 0 };
+    const udp = createUdpSocket("udp4");
+    udp.on("message", () => { received.udp += 1; });
+    await new Promise<void>((resolveBind) => udp.bind(0, address, resolveBind));
+    const tcp = createTcpServer((socket) => { received.tcp += 1; socket.destroy(); });
+    await new Promise<void>((resolveListen) => tcp.listen(0, address, resolveListen));
+    const doc = `<!doctype html><p>webrtc</p><script>
+      const pc = new RTCPeerConnection({ iceServers: [
+        { urls: "stun:${address}:${udp.address().port}" },
+        { urls: "turn:${address}:${(tcp.address() as AddressInfo).port}?transport=tcp", username: "u", credential: "p" } ] });
+      pc.createDataChannel("probe");
+      pc.createOffer().then((offer) => pc.setLocalDescription(offer));
+    </script>`;
+    const server = createServer((_request, response) => { response.setHeader("content-type", "text/html"); response.end(doc); });
+    await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+    try {
+      const { page, close } = await launch();
+      await page.goto(`http://127.0.0.1:${(server.address() as AddressInfo).port}/`);
+      await new Promise((resolveIdle) => setTimeout(resolveIdle, 5_000));
+      await close();
+      return received;
+    } finally { udp.close(); tcp.close(); server.close(); }
+  }
+
+  it("a document's WebRTC reaches no address beyond loopback in the default offline mode", { timeout: 90_000 }, async (t) => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "b-")));
+    const saved = process.env.TMPDIR;
+    process.env.TMPDIR = root;
+    try {
+      const received = await webRtcProbe(async () => {
+        const launched = await launchBrowser(REPO);
+        assert.ok(launched.browser, launched.detail);
+        const browser = launched.browser;
+        return { page: await browser.newPage(), close: async () => { await closeBrowserBounded(browser); cleanupBrowserProfile(launched.userDataDir); } };
+      });
+      if (received === null) return t.skip("this machine has no non-loopback IPv4 interface; there is nowhere for the probe to go");
+      assert.deepEqual(received, { udp: 0, tcp: 0 }, "a document's WebRTC reached a non-loopback address");
+    } finally {
+      if (saved === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = saved;
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("control: a browser without breaklint's profile preference sends the same document's STUN", { timeout: 90_000 }, async (t) => {
+    const found = resolveBrowser();
+    assert.ok(found.path, `no browser: ${found.searched.join(", ")}`);
+    const puppeteer = (await import("puppeteer-core")).default;
+    const profile = mkdtempSync(join(tmpdir(), "b-"));
+    try {
+      const received = await webRtcProbe(async () => {
+        const browser = await puppeteer.launch({ executablePath: found.path!, headless: true, userDataDir: profile, pipe: true, handleSIGINT: false, handleSIGTERM: false, handleSIGHUP: false });
+        return { page: await browser.newPage() as unknown as PageLike, close: () => browser.close() };
+      });
+      if (received === null) return t.skip("this machine has no non-loopback IPv4 interface");
+      assert.ok(received.udp > 0, `the probe saw no STUN from a browser without the preference: ${JSON.stringify(received)}; the offline test proves nothing`);
+    } finally { rmSync(profile, { recursive: true, force: true }); }
   });
 
   it("control: without the offline lock the same observation sees the browser's own traffic", { timeout: 90_000 }, async () => {

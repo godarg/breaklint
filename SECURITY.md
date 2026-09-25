@@ -22,8 +22,18 @@ intended:
 
 - **A fresh browser profile per run**, created with `mkdtemp` and removed afterwards. A run that
   cannot verify its own cleanup fails rather than reporting success.
-- **The browser sandbox stays on.** There is no `--no-sandbox` anywhere in this repository and no
-  flag that turns it off.
+- **The browser sandbox stays on.** The one browser launch in `src/acquire/browser.ts` passes only
+  network and diagnostics switches, none of which touches the sandbox; no code path, tool, test
+  or workflow passes a sandbox-disabling switch; and there is no flag that turns the sandbox off.
+  The driver itself would add one when the environment variable `PUPPETEER_DANGEROUS_NO_SANDBOX`
+  is set, so a launch with that variable set (or `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES`,
+  which changes the browser's feature switches) does not start: it ends with exit 3 and names
+  the variable. breaklint does not edit a host's environment to get around it.
+  `tests/unit/sandbox-boundary.test.ts` holds all of it: it reads the launch call with the
+  TypeScript parser and allows only named options and named, allow-listed switches, requires the
+  environment refusal before the launch, runs the CLI with the variable set against a fake
+  browser that records its switches, and scans `src/`, `tools/`, `tests/` and the workflows for
+  sandbox-disabling switches.
 - **The network is blocked by default, for the document and for the browser itself.** Request
   interception is on, the default policy is `offline`, and only the tool's own loopback origin
   plus `data:`, `blob:` and `about:` are let through. Interception sees only the document's
@@ -38,7 +48,12 @@ intended:
   net-log and requires that it connected nowhere but loopback. `--allow-network <origin>` opens
   exactly one origin per use for the document; in that mode the browser-level lock is off,
   because allowed origins must resolve and may need the host's proxy, and the browser's own
-  services can then reach the network.
+  services can then reach the network. A document's WebRTC is neither a request interception
+  sees nor a host name to resolve: measured on Chromium 141, its STUN packets reached an IP
+  address on a non-loopback interface under the offline launch. Every profile is therefore
+  created with the WebRTC preference `disable_non_proxied_udp`; with no proxy in offline mode, a
+  test then counts no UDP and no TCP from the same document. With `--allow-network`, a WebRTC
+  TURN connection over TCP was still observed and is not blocked.
 - **No browser-wide file-access switch.** The document is served from a loopback origin instead. A
   test measures that a document loaded this way cannot read a neighbouring file, because removing
   the reason for a switch and leaving the switch in place is a mistake that was actually made here
