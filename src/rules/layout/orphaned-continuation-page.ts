@@ -1,30 +1,10 @@
 import { defineRule } from "../../core/rule.ts";
 import { pageKey } from "../../core/fingerprint.ts";
-import type { BlockRecord, Box, PageRecord, Snapshot, TextLine } from "../../core/types.ts";
-import { declined, makeFinding, num, outsideContentBoxPageDeclined, printsOnlyOutsideContentBox, renderedBox, targetEvaluation } from "../shared.ts";
+import type { Box, PageRecord, Snapshot, TextLine } from "../../core/types.ts";
+import { declined, flowBlocks, makeFinding, num, outsideContentBoxPageDeclined, printsOnlyOutsideContentBox, targetEvaluation } from "../shared.ts";
 
 /** Box-coordinate slack for rounded geometry, in CSS px. A tolerance, not a threshold. */
 const EDGE_TOLERANCE_PX = 1;
-
-/**
- * The blocks of a page's flow, in document order, each with where it is printed: its own box or,
- * for a block with no box of its own (`display: contents`), the union of its line boxes — the
- * shared `renderedBox`. A block printed nowhere (a `display: none` original of a running element,
- * an empty positioned marker, anything with neither a box nor lines) is not part of the flow, and
- * neither is one that lies wholly above or below the content box.
- */
-type FlowBlock = { block: BlockRecord; box: Box };
-function flowBlocks(snapshot: Snapshot, page: PageRecord): FlowBlock[] {
-  const top = page.contentBox.y;
-  const bottom = page.contentBox.y + page.contentBox.height;
-  const flow: FlowBlock[] = [];
-  for (const block of snapshot.blocks) {
-    if (block.page !== page.pageNumber) continue;
-    const box = renderedBox(snapshot, block);
-    if (box !== null && box.y < bottom && box.y + box.height > top) flow.push({ block, box });
-  }
-  return flow;
-}
 
 /** Whether the centre of a line's box lies inside a block's box (within the tolerance). */
 function centreInside(line: Box, block: Box): boolean {

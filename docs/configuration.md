@@ -159,7 +159,7 @@ rule, and do not count against any rule's coverage. The complete list:
 | reason | scope | meaning |
 |---|---|---|
 | `env/evidence-overlay-removed` | document | the overlay was installed but binding was not possible — the marked PDF differed from the unmarked one, a mark's style was overridden, or the comparison could not run — so the unmarked PDF is delivered and nothing binds |
-| `env/evidence-fragment-outside-page` | page | a mark was refused because it would lie outside the bound for its fragment; rows aggregate per reason |
+| `env/evidence-fragment-outside-page` | page | a mark was refused because it would lie outside the bound for its fragment; for a footnote-area fragment that also keeps its page from binding (its refused edge is clipped away); rows aggregate per reason |
 | `env/parity-blank-page` | page | the page is excused from required evidence as proven blank; one row per page, never aggregated |
 
 `env/parity-blank-page` also appears WITH a rule id (`layout/half-empty-page`,

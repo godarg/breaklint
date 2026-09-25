@@ -354,6 +354,10 @@ describe("round-2 guards on the blank-page excuse", () => {
     assert.equal(await verifyBlankPage({ facts, page: 2, dpi: 96, raster: RASTER, textPage: page([staysOut]), ink: paper }), true,
       "premise: margin text that ends before the area is not text in the area");
     assert.equal(await verifyBlankPage({ facts, page: 2, dpi: 96, raster: RASTER, textPage: page([runsIn]), ink: paper }), false);
+    // Its baseline 1 px above the area, its descent (a third of its 8 pt height) reaches into it.
+    const descends = { ...textAt("Descender", 36, (56.69 - 1) / (96 / 25.4)), width: 60, height: 8 };
+    assert.equal(await verifyBlankPage({ facts, page: 2, dpi: 96, raster: RASTER, textPage: page([descends]), ink: paper }), false,
+      "a text item whose descent reaches into the area was not read as text in the area");
     // Above the area: a running header whose descent does not reach it.
     const header = { ...textAt("Header", 36, 5), width: 200, height: 10 };
     assert.equal(await verifyBlankPage({ facts, page: 2, dpi: 96, raster: RASTER, textPage: page([header]), ink: paper }), true);
@@ -414,12 +418,36 @@ describe("round-2 guards on the blank-page excuse", () => {
       target: { keyType: "page" as const, nodeKey: `page:${page}`, sid: null }, count: 1 });
     const fragment = (page: number) => ({ scope: "page" as const, ruleId: null, reason: "env/evidence-fragment-outside-page" as const,
       target: { keyType: "page" as const, nodeKey: `page:${page}`, sid: "s1" }, count: 1 });
-    const report = runDocument({ path: "doc.html", snapshot, infrastructure: [], notMeasured: [row(3), fragment(1), row(2), fragment(3)] },
+    // A page-scope parity row that is not a single page's excuse (count 2) aggregates like any
+    // other decline and is not listed as an excused page.
+    const notAnExcuse = { ...row(5), count: 2 };
+    const report = runDocument({ path: "doc.html", snapshot, infrastructure: [], notMeasured: [row(3), fragment(1), row(1), notAnExcuse, row(2), fragment(3)] },
       { failOn: "error", activeRules: [], optionsByRule: {}, coverageFloors: {} }).report;
     assert.deepEqual(report.notMeasured.filter((r) => r.reason === "env/parity-blank-page").map((r) => [r.target?.nodeKey, r.count]),
-      [["page:2", 1], ["page:3", 1]], "several excused pages collapsed into one row without a page");
+      [["page:5", 2], ["page:1", 1], ["page:2", 1], ["page:3", 1]],
+      "excused pages not listed one row each, in page order, after the aggregated rows");
     // Other document-level declines keep aggregating as before.
     assert.deepEqual(report.notMeasured.filter((r) => r.reason === "env/evidence-fragment-outside-page").map((r) => [r.target, r.count]),
       [[null, 2]]);
+  });
+});
+
+describe("final round: a flat area background and whole pixels", () => {
+  const paperExceptEdges = async (region: { x0: number; y0: number; x1: number; y1: number }, area: { x: number; y: number; width: number; height: number }) => {
+    // A flat area colour: every pixel the area fully covers has it. A pixel it covers only in
+    // part blends it with the margin, so it differs — exactly what the raster reads.
+    const fractional = !Number.isInteger(area.x) || !Number.isInteger(area.y) ||
+      !Number.isInteger(area.x + area.width) || !Number.isInteger(area.y + area.height);
+    return { pixels: (region.x1 - region.x0) * (region.y1 - region.y0), ink: fractional ? 1 : 0 };
+  };
+  const check = (area: { x: number; y: number; width: number; height: number }) => verifyBlankPage({
+    facts: { page: 2, pagedBlank: true, areaEmpty: true, areaPx: area }, page: 2, dpi: 96, raster: RASTER,
+    textPage: { heightPt: (RASTER.height / 96) * 72, items: [] }, ink: (region) => paperExceptEdges(region, area),
+  });
+  it("is excused when the area's edges fall on whole device pixels", async () => {
+    assert.equal(await check({ x: 57, y: 57, width: 453, height: 340 }), true);
+  });
+  it("is NOT excused when they do not: the partly covered edge pixels are read and blend (documented limit)", async () => {
+    assert.equal(await check({ x: 56.69, y: 56.69, width: 453.53, height: 340.16 }), false);
   });
 });

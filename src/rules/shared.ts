@@ -1,7 +1,7 @@
 /** Helpers shared by rules. Nothing here reaches outside the snapshot. */
 
 import type { EnvId, KeyType, Severity } from "../core/enums.ts";
-import type { Box, Finding, NotMeasured, PageRecord, Snapshot, SourceRef, TargetEvaluation } from "../core/types.ts";
+import type { BlockRecord, Box, Finding, NotMeasured, PageRecord, Snapshot, SourceRef, TargetEvaluation } from "../core/types.ts";
 import type { RuleContext } from "../core/rule.ts";
 
 export function sourceOf(snapshot: Snapshot, sid: string | null): SourceRef | null {
@@ -313,7 +313,7 @@ export function boxlessDeclined(ruleId: string, snapshot: Snapshot, block: {
  * with a negative remaining space. Flow content cannot start at or below the foot of the content
  * box — Paged.js moves what does not fit to the next page — so the test is the rule's own
  * quantity rather than a membership guess; it is geometric because the snapshot records no
- * footnote membership (a structural field would change the snapshot's shape).
+ * footnote membership (recording it would add a snapshot field, which this release does not).
  */
 export function startsInContentBox(box: Box, page: PageRecord): boolean {
   return box.y < page.contentBox.y + page.contentBox.height;
@@ -338,26 +338,38 @@ export function outsideContentBoxEvaluation(ruleId: string, block: {
 }
 
 /**
- * A page whose content box holds nothing while the page prints blocks elsewhere: every printed
- * block (`renderedBox`) lies wholly above or below the content box. The case is a long block
- * footnote that Paged.js continued onto a page of its own, where the footnote area takes the whole
- * page area and the content box is 0 px tall. The page is not blank — it prints the note — but
- * every fill quantity of the snapshot is the fill of that empty box, so a rule that judges fill
- * would call a page full of footnote text 0 % filled. Such a rule declines the page
- * (`env/invalid-measurement`, counted against coverage) instead of measuring it.
+ * The blocks of a page's flow, in document order, each with where it is printed: its own box or,
+ * for a block with no box of its own (`display: contents`), the union of its line boxes — the
+ * shared `renderedBox`. A block printed nowhere (a `display: none` original of a running element,
+ * an empty positioned marker, anything with neither a box nor lines) is not part of the flow, and
+ * neither is one that lies wholly above or below the content box — the footnote area lies below
+ * it. The one source of that overlap test: `printsOnlyOutsideContentBox` reads this list.
  */
-export function printsOnlyOutsideContentBox(snapshot: Snapshot, page: PageRecord): boolean {
+export type FlowBlock = { block: BlockRecord; box: Box };
+export function flowBlocks(snapshot: Snapshot, page: PageRecord): FlowBlock[] {
   const top = page.contentBox.y;
   const bottom = page.contentBox.y + page.contentBox.height;
-  let printed = 0;
+  const flow: FlowBlock[] = [];
   for (const block of snapshot.blocks) {
     if (block.page !== page.pageNumber) continue;
     const box = renderedBox(snapshot, block);
-    if (box === null) continue;
-    if (box.y < bottom && box.y + box.height > top) return false;
-    printed += 1;
+    if (box !== null && box.y < bottom && box.y + box.height > top) flow.push({ block, box });
   }
-  return printed > 0;
+  return flow;
+}
+
+/**
+ * A page whose content box holds nothing while the page prints blocks elsewhere: `flowBlocks` is
+ * empty and at least one block of the page is printed (`renderedBox`). The case is a long block
+ * footnote that Paged.js continued onto a page of its own, where the footnote area takes the page
+ * area and the content box holds nothing. The page is not blank — it prints the note — but every
+ * fill quantity of the snapshot is the fill of that empty box, so a rule that judges fill would
+ * call a page full of footnote text 0 % filled. Such a rule declines the page
+ * (`env/invalid-measurement`, counted against coverage) instead of measuring it.
+ */
+export function printsOnlyOutsideContentBox(snapshot: Snapshot, page: PageRecord): boolean {
+  return flowBlocks(snapshot, page).length === 0 &&
+    snapshot.blocks.some((block) => block.page === page.pageNumber && renderedBox(snapshot, block) !== null);
 }
 
 /** The decline a fill rule records for a page that `printsOnlyOutsideContentBox`. */

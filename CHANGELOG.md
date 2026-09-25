@@ -316,17 +316,22 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   script that swaps source ids after pagination on a footnote page is still caught
   (`footnotes-sid-swap.html`, exit 3). This supersedes the statement in the entry above that block
   footnotes "still end the run at the paired control".
-- **A block footnote's evidence marks are placed, from a layer in the page box.** The content-box
+- **A block footnote's evidence marks are placed, and a footnote page binds.** The content-box
   layer refuses marks below the content box, so both marks of every block footnote were refused and
   every page with one stayed unbound (6 unplaced marks on the two pages of `footnotes-block.html`).
-  The first repair hung a second layer in the footnote area; on Chrome 153 in CI one footnote page
-  of `footnotes-block.html` and of `footnotes-named-page.html` still did not bind (evidence
-  `partial`, 1 of 2). The footnote area clips and Paged.js packs the notes to its bottom, so a note
-  filling the area has both edges on the clip edge. The layer now hangs in the page box, which does
-  not clip inside the page; a mark may lie on the footnote area's edge but not outside it. Whether
-  this binds on Chrome 153 is established by the live suite in CI, which now prints every mark's
-  fate when a page does not bind; it is not observable on the Chromium 141 build used here. This
-  supersedes the entry above that lists "a footnote-area block" as unbindable.
+  Footnote marks now hang from a second layer in the page box, which does not clip inside the page,
+  bounded by the footnote area: an end mark may lie on the area's bottom edge, a start mark must
+  fit inside it. The live suite asserts, on current Chrome in CI, that `footnotes-block.html`,
+  `footnotes-named-page.html` and `footnotes-heading-in-note.html` bind every page. This supersedes
+  the entry above that lists "a footnote-area block" as unbindable.
+- **A page on which a footnote fragment is clipped away does not bind.** The footnote area clips,
+  and Paged.js can start a note on or just above its bottom edge, or print a note taller than an
+  `@footnote { max-height }` area, so part of the fragment is printed nowhere. A footnote fragment
+  binds by both of its marks or not at all: a page with any refused footnote mark stays unbound, and
+  a run with evidence binding on ends `insufficient-coverage` (exit 4). Measured on
+  `footnotes-clipped-max-height.html`: a note fragment that starts 0.19 px above the bottom edge of
+  a 45 px area refuses both marks, and its page stays unbound. A content-box fragment keeps binding
+  on one placed mark.
 - **A block footnote no longer makes an overflow boundary inside a named-page chapter `forced`.**
   The collector read the footnote — after the page content in document order, and outside the
   `page: chapter` section it was written in — as the last node of its page, so the page before the
@@ -344,7 +349,9 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   not count); the delivered PDF's text layer has no text item reaching into the page area (its
   whole extent, so margin text running into the area counts); the delivered PDF's raster of the
   page area, rounded outward to whole pixels so a hairline on its edge is read, is one flat colour
-  — a flat page or area background is paper, a gradient, image, partial fill or rule is not; and
+  — a flat page background is paper; a flat background on the page area alone is paper only when
+  the area's edges fall on whole pixels (otherwise its edge pixels blend with the margin and the
+  page stays unbound); a gradient, image, partial fill or rule is content; and
   the snapshot calls the page blank and has no block on it. Its evidence record keeps
   `bindsFinding: false`. Measured on 2026-09-25 (patched Chromium 141): on
   `blank-right-running-header.html` the inserted page is proven blank and leaves the requirement;
@@ -469,8 +476,9 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   would change.
 - `docs/limitations.md` states what the rules measure for footnote-area content, how the footnote
   call is recognised and what that recognition does not cover, where footnote evidence marks hang,
-  and exactly when a parity-blank page is excused from binding and when it is not (a flat
-  background colour is paper; a gradient, image, partial fill or rule is content).
+  and exactly when a parity-blank page is excused from binding and when it is not (a flat page
+  background is paper, a flat area-only background only on whole-pixel edges; a gradient, image,
+  partial fill or rule is content), and that a footnote fragment binds by both marks or not at all.
   `docs/configuration.md` ("What the JSON report proves") and `docs/reporting.md` state the new
   meaning of `evidenceCoverage.expectedPages` and list every `ruleId: null` decline. The
   Documentation entry above about blank pages ending exit 4 describes the state before this

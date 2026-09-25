@@ -1,0 +1,28 @@
+<!doctype html>
+<!--
+  Long block footnotes under `@footnote { max-height: 45px }`.
+
+  COMPLICATION. The footnote area is capped at 45 px, and it clips (`overflow: hidden`). Paged.js
+  still starts a note that no longer fits on the page it is called from, and continues it on the
+  next: measured on 2026-09-25 (Paged.js 0.4.3), the fourth note's page-1 fragment starts 0.19 px
+  above the area's bottom edge, so almost all of it is clipped away and printed nowhere, and the
+  note is printed on page 2. A mark on that sliver would bind a fragment nobody can read. A
+  footnote fragment therefore binds by both of its marks or not at all: page 1, on which both
+  marks of that fragment were refused, stays unbound, and the document ends exit 4 under
+  evidence binding — the honest answer for a page whose footnote text is partly not printed.
+  Page 2 has no refused mark; that it binds is asserted by the live suite on current Chrome.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 130mm 100mm; margin: 12mm; }
+@page { @footnote { max-height: 45px; } }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0 0 5px; }
+.fn { float: footnote; font-size: 8pt; }
+</style></head><body>
+<p id="b1">The first paragraph calls a note.</p><aside class="fn" id="n1">The first note runs over more than one line of the narrow footnote area, and on, and on.</aside>
+<p id="b2">The second paragraph calls a note.</p><aside class="fn" id="n2">The second note runs over more than one line of the narrow footnote area, and on, and on.</aside>
+<p id="b3">The third paragraph calls a note.</p><aside class="fn" id="n3">The third note runs over more than one line of the narrow footnote area, and on, and on.</aside>
+<p id="b4">The fourth paragraph calls a note.</p><aside class="fn" id="n4">The fourth note runs over more than one line of the narrow footnote area, and on, and on.</aside>
+<p id="b5">The fifth paragraph calls a note.</p><aside class="fn" id="n5">The fifth note runs over more than one line of the narrow footnote area, and on, and on.</aside>
+<p id="b6">The sixth paragraph calls a note.</p><aside class="fn" id="n6">The sixth note runs over more than one line of the narrow footnote area, and on, and on.</aside>
+</body></html>

@@ -62,11 +62,16 @@ export interface UnplacedMark {
   reason: "fragment-outside-page";
 }
 
-/** Which bound refused an unplaced mark, for diagnostics. Never copied into the report. */
+/** Which bound refused an unplaced mark. Never copied into the report. */
 export interface MarkRefusal {
   sid: string;
   page: number;
   side: "start" | "end";
+  /**
+   * The fragment lies in the footnote area. A footnote fragment with ANY refused mark keeps its
+   * page from binding (`evidence.ts`): its refused edge is clipped away, not merely unmarkable.
+   */
+  footnote: boolean;
   detail: string;
 }
 
@@ -191,17 +196,12 @@ const OVERLAY_TEMPLATE = `(() => {
       // A block footnote is moved into the footnote area, below the content box. The content-box
       // layer refuses a mark below the content box (the conservative vertical bound below), so a
       // footnote-area fragment is marked from a second layer. It hangs in the PAGE BOX, not in the
-      // footnote area: the footnote area clips (overflow: hidden), and Paged.js packs the notes to
-      // its bottom, so a note that fills the area starts on its top edge and ends on its bottom
-      // edge — exactly where a mark inside a clipping box is at the mercy of how the browser culls
-      // a partly clipped glyph, and where the bottom one had to be refused. With the layer in the
-      // footnote area, one footnote page of each footnote fixture did not bind on Chrome 153 (CI);
-      // the cause is not established here (Chromium 141 prints no marks), and the live suite prints
-      // every mark's state when a page does not bind, so the next CI run says which mark was lost.
+      // footnote area: the footnote area clips (overflow: hidden) and Paged.js packs the notes to
+      // its bottom, so a note that fills the area has both edges on the clip edge, where a mark
+      // inside the clipping box is at the mercy of how the browser culls a partly clipped glyph.
       // The page box is positioned (relative), does not clip inside the page, and is not a
       // multi-column fragmentainer. The layer's own box, at left 0 / top 0 of the page box, is the
-      // origin its marks are placed against. The bound is still the footnote area's box: a mark
-      // may lie on its edge, but never where the note is not printed.
+      // origin its marks are placed against. The bound is still the footnote area's box (below).
       const footnoteArea = pageAreaEl ? (P.all(pageAreaEl, FOOTNOTE_AREA_SELECTOR)[0] || null) : null;
       const footnoteHost = pageAreaEl ? P.parent(pageAreaEl) : null;
       let footnoteLayer = null, footnoteOrigin = null, footnoteBox = null;
@@ -252,6 +252,9 @@ const OVERLAY_TEMPLATE = `(() => {
             { sid, page: pageIndex + 1, side: "start", reason: "fragment-outside-page" },
             { sid, page: pageIndex + 1, side: "end", reason: "fragment-outside-page" },
           );
+          for (const side of ["start", "end"]) {
+            refusals.push({ sid, page: pageIndex + 1, side, footnote: true, detail: "the page box is position: static" });
+          }
           continue;
         }
         // Where this fragment's marks hang: its layer, the origin its offsets are taken from, and
@@ -294,11 +297,15 @@ const OVERLAY_TEMPLATE = `(() => {
             y < pageBox.top || y > pageBox.bottom ? "outside the page box vertically" :
             x < horizontal.left || x + maxAdvance > horizontal.right ? "outside the footnote area horizontally" :
             relativeY < 0 ? (inFootnotes ? "above the footnote area" : "above the content box") :
-            (inFootnotes ? relativeY > vertical.height : relativeY + 1 > vertical.height) ? (inFootnotes ? "below the footnote area" : "below the content box") :
+            // Only an END mark may sit on the footnote area's bottom edge, where the last note
+            // ends. A START mark must fit inside the area with the glyph's own pixel below it, as
+            // in the content box: a note that starts on (or a sliver above) the bottom edge is
+            // clipped away, and a mark there would stand for text that is not printed.
+            (inFootnotes && side === "end" ? relativeY > vertical.height : relativeY + 1 > vertical.height) ? (inFootnotes ? "below the footnote area" : "below the content box") :
             null;
           if (refusal !== null) {
             unplacedMarks.push({ sid, page: pageIndex + 1, side, reason: "fragment-outside-page" });
-            refusals.push({ sid, page: pageIndex + 1, side, detail: refusal + " (y " + relativeY.toFixed(2) + " of " + vertical.height.toFixed(2) + ")" });
+            refusals.push({ sid, page: pageIndex + 1, side, footnote: inFootnotes, detail: refusal + " (y " + relativeY.toFixed(2) + " of " + vertical.height.toFixed(2) + ")" });
             continue;
           }
           const mark = P.create("span");

@@ -729,7 +729,7 @@ export interface MarkDiagnostic {
 export interface EvidenceDiagnostics {
   marks: MarkDiagnostic[];
   pages: ({ page: number } & PageConformance)[];
-  unplaced: (UnplacedMark & { detail?: string })[];
+  unplaced: (UnplacedMark & { detail?: string; footnote?: boolean })[];
   toleranceMm: number;
 }
 
@@ -844,9 +844,15 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
         // A SID bound on another page cannot lend its evidence to an entirely unplaced fragment.
         const hasUnplacedTarget = unplacedHere.some(mark =>
           !input.marks.some(placed => placed.page === i + 1 && placed.sid === mark.sid));
+        // A footnote fragment is bound by BOTH of its marks or not at all. The footnote area
+        // clips: a refused footnote mark marks an edge of the note that is not printed, so the
+        // placed mark would bind a fragment part of which nobody can see. A content-box fragment
+        // keeps the one-mark rule above (the multicol bound is conservative, not a clip).
+        const hasClippedFootnote = (input.refusals ?? []).some(refusal => refusal.page === i + 1 && refusal.footnote);
         const pageBound =
           input.bindingPossible &&
           !hasUnplacedTarget &&
+          !hasClippedFootnote &&
           perPage !== null &&
           perPage.referenceFrom !== "none" &&
           !perPage.divergent &&
@@ -981,8 +987,10 @@ export interface BlankPageInput {
  *   4. The delivered PDF's raster: the page area's rectangle, rounded OUTWARD to whole device
  *      pixels, is one flat colour. This sees what is painted without being text — a gradient, an
  *      image, a rule, a partial fill, a hairline on the area's edge — and what reaches into the
- *      area from outside it. A flat colour across the whole area (a page or area background) is
- *      not content: it is the paper, and it is excused like white paper.
+ *      area from outside it. A flat page background is not content: it is the paper, and it is
+ *      excused like white paper. A flat background on the page area alone is excused only when
+ *      the area's edges fall on whole device pixels; otherwise the partly covered edge pixels
+ *      blend it with the margin and read as ink (the conservative direction).
  *
  * A page with content but without source ids fails 2 whenever the content is a DOM node, and 3
  * or 4 whenever it is printed; generated content on an otherwise empty area fails 3 and 4. The
@@ -1010,7 +1018,9 @@ export async function verifyBlankPage(input: BlankPageInput): Promise<boolean> {
     if (left <= area.x + area.width && left + width >= area.x && top <= area.y + area.height && bottom >= area.y) return false;
   }
   // Rounded OUTWARD to whole device pixels: a pixel the area only partly covers is still read,
-  // so a hairline on the area's own edge is ink. Round 1 rounded inward and did not see it.
+  // so a hairline on the area's own edge is ink (rounded inward, it would not be seen). The price
+  // is stated in docs/limitations.md: a flat background on the page area ALONE blends with the
+  // margin in those pixels, so it is excused only when the area's edges fall on whole pixels.
   const scale = input.dpi / 96;
   const region = {
     x0: Math.floor(area.x * scale), y0: Math.floor(area.y * scale),
@@ -1043,7 +1053,7 @@ function outcome(input: FinishInput, evidence: Evidence[], boundSids: Set<string
           ...mark,
           ...(() => {
             const refusal = input.refusals?.find((r) => r.sid === mark.sid && r.page === mark.page && r.side === mark.side);
-            return refusal ? { detail: refusal.detail } : {};
+            return refusal ? { detail: refusal.detail, footnote: refusal.footnote } : {};
           })(),
         })),
         toleranceMm: CONFORMANCE_TOLERANCE_MM,

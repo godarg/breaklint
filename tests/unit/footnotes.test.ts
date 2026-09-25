@@ -42,6 +42,7 @@ import { faithfulRasterizer, OverlayPage } from "../fixtures/evidence-harness.ts
 import { loadCorpus } from "../fixtures/corpus.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import { VALIDATION_RULES_BY_ID } from "../../src/rules/index.ts";
+import { printsOnlyOutsideContentBox, startsInContentBox } from "../../src/rules/shared.ts";
 import { evaluatePayload, pagedDocument, pagedPage, runCollector, type FakeNode } from "../fixtures/paged-dom.ts";
 
 const STRIDE = 700;
@@ -266,5 +267,103 @@ describe("round 2: what the page rules do with the footnote area", () => {
     } finally {
       rmSync(outDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("final round: a footnote fragment binds by both of its marks or not at all", () => {
+  // Two notes: the first fills the 30 px footnote area (366.85-396.85), the second starts at `y`.
+  const twoNotes = (y: number, height = 30) => pagedDocument([pagedPage({
+    pageBox: pageBox(0), contentBox: contentBox(0), footnoteBox: footnoteBox(0),
+    content: `<p data-bl-sid="p1" data-ref="ref-p1" data-test-box="${lineBox(0, 0)}">Text.</p>${call(REF_A)}${call(REF_B)}`,
+    footnotes: note(REF_A, "aside", "First note.", "fn1", "56.69 366.85 453.53 30") +
+      note(REF_B, "aside", "Clipped note.", "fn2", `56.69 ${y} 453.53 ${height}`),
+  })]);
+  const oneNote = (y: number, height: number) => pagedDocument([pagedPage({
+    pageBox: pageBox(0), contentBox: contentBox(0), footnoteBox: footnoteBox(0),
+    content: `<p data-bl-sid="p1" data-ref="ref-p1" data-test-box="${lineBox(0, 0)}">Text.</p>${call(REF_A)}`,
+    footnotes: note(REF_A, "aside", "A note.", "fn1", `56.69 ${y} 453.53 ${height}`),
+  })]);
+  const evidenceOf = async (doc: FakeNode) => {
+    const outDir = mkdtempSync(join(tmpdir(), "breaklint-footnote-final-"));
+    try {
+      const page = new OverlayPage(doc);
+      const outcome = await produceEvidence({
+        page, closePage: async () => page.close(), rasterizer: faithfulRasterizer(page, { pages: 1 }),
+        options: { outDir, documentKey: "footnote-final", binding: true },
+      });
+      return { outcome, installation: page.installation! };
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  };
+
+  for (const [label, y] of [["exactly on the bottom edge", 396.85], ["0.12 px inside the bottom edge", 396.73]] as const) {
+    it(`does not bind a page whose second note starts ${label} and is clipped away`, async () => {
+      const { outcome, installation } = await evidenceOf(twoNotes(y));
+      assert.deepEqual(installation.marks.filter((mark) => mark.sid === "fn2"), [], "a mark was placed for a clipped-away note");
+      assert.deepEqual(installation.refusals?.filter((r) => r.sid === "fn2").map((r) => [r.side, r.footnote]), [["start", true], ["end", true]]);
+      assert.deepEqual(outcome.evidence.map((record) => record.bindsFinding), [false]);
+    });
+  }
+
+  it("does not bind a page whose note is clipped at the bottom, although its start mark is placed", async () => {
+    // Starts 13 px into the area, ends 13 px below it: the lower part is not printed.
+    const { outcome, installation } = await evidenceOf(oneNote(380, 30));
+    assert.deepEqual(installation.marks.filter((mark) => mark.sid === "fn1").map((mark) => mark.side), ["start"]);
+    assert.deepEqual(installation.refusals?.map((r) => [r.sid, r.side, r.detail.split(" (")[0]]), [["fn1", "end", "below the footnote area"]]);
+    assert.deepEqual(outcome.evidence.map((record) => record.bindsFinding), [false]);
+  });
+
+  it("does not bind a page whose note is clipped at the top, although its end mark is placed", async () => {
+    const { outcome } = await evidenceOf(oneNote(356.85, 40));
+    assert.deepEqual(outcome.evidence.map((record) => record.bindsFinding), [false]);
+  });
+
+  it("binds a page whose note fills the footnote area exactly, edge to edge", async () => {
+    const { outcome, installation } = await evidenceOf(oneNote(366.85, 30));
+    assert.deepEqual(installation.refusals, []);
+    assert.deepEqual(outcome.evidence.map((record) => record.bindsFinding), [true]);
+  });
+
+  it("keeps the one-mark rule for a content-box fragment: a block pulled above the content box still binds", async () => {
+    const doc = pagedDocument([pagedPage({
+      pageBox: pageBox(0), contentBox: contentBox(0),
+      content: `<div data-bl-sid="up" data-ref="ref-up" data-test-box="56.69 40 453.53 200">Pulled up.</div>` +
+        `<p data-bl-sid="p2" data-ref="ref-p2" data-test-box="${lineBox(0, 12)}">A second block, so the page has a reference.</p>`,
+    })]);
+    const { outcome, installation } = await evidenceOf(doc);
+    assert.deepEqual(installation.refusals?.map((r) => [r.sid, r.side, r.footnote]), [["up", "start", false]]);
+    assert.deepEqual(outcome.evidence.map((record) => record.bindsFinding), [true]);
+  });
+
+  it("refuses every footnote mark, and reports the fault, when the page box is not positioned", async () => {
+    const doc = pagedDocument([pagedPage({
+      pageBox: pageBox(0), contentBox: contentBox(0), footnoteBox: footnoteBox(0),
+      content: `<p data-bl-sid="p1" data-ref="ref-p1" data-test-box="${lineBox(0, 0)}">Text.</p>${call(REF_A)}`,
+      footnotes: note(REF_A, "aside", "A note.", "fn1", "56.69 370 453.53 15"),
+    }).replace('<div class="pagedjs_pagebox">', '<div class="pagedjs_pagebox" style="position: static">')]);
+    const { outcome, installation } = await evidenceOf(doc);
+    assert.equal(installation.staticPageAreas, 1);
+    assert.deepEqual(installation.marks.filter((mark) => mark.sid === "fn1"), []);
+    assert.ok(outcome.infrastructure.some((event) => event.kind === "checker-crashed"));
+  });
+});
+
+describe("final round: content-box boundaries", () => {
+  const page = { contentBox: { x: 48, y: 48, width: 399, height: 560 } } as unknown as Parameters<typeof startsInContentBox>[1];
+  it("a block starting exactly at the foot of the content box does not start inside it", () => {
+    assert.equal(startsInContentBox({ x: 48, y: 607.99, width: 10, height: 10 }, page), true);
+    assert.equal(startsInContentBox({ x: 48, y: 608, width: 10, height: 10 }, page), false);
+  });
+  it("a page whose only block lies wholly above its content box prints only outside it", () => {
+    const entry = loadCorpus().find((item) => item.name === "orphaned-continuation-clean-footnote-only-page")!;
+    const snapshot = entry.snapshot;
+    const pg2 = snapshot.pages[1]!;
+    const above = { ...snapshot, blocks: [{ ...snapshot.blocks[2]!, box: { x: 48, y: pg2.contentBox.y - 40, width: 399, height: 40 } }] };
+    assert.equal(printsOnlyOutsideContentBox(above, pg2), true);
+    const touching = { ...snapshot, blocks: [{ ...snapshot.blocks[2]!, box: { x: 48, y: pg2.contentBox.y - 40, width: 399, height: 40.5 } }] };
+    const pgTall = { ...pg2, contentBox: { ...pg2.contentBox, height: 10 } };
+    assert.equal(printsOnlyOutsideContentBox({ ...touching, pages: [snapshot.pages[0]!, pgTall] }, pgTall), false,
+      "a block that reaches half a pixel into the content box is part of its flow");
   });
 });

@@ -57,6 +57,7 @@ const FIXTURE_ORDER = [
   "footnotes-sid-swap.html",
   "footnotes-named-page.html",
   "footnotes-heading-in-note.html",
+  "footnotes-clipped-max-height.html",
 ] as const;
 
 /** The whole registry under the default profile, as the CLI runs it. */
@@ -287,5 +288,30 @@ describe("real-document structures, live", () => {
     // Needs a browser whose PDF carries the marks (CI's current Chrome).
     assert.equal(report.evidenceCoverage?.status, "complete", `evidence: ${JSON.stringify(report.evidenceCoverage)}\n${whyUnbound(document)}`);
     assert.equal(exitCodeFor(report.verdict), 0, `${report.verdict}: ${report.exitReason}`);
+  });
+
+  it("does not bind a page on which a footnote fragment is clipped away at the footnote area's edge", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = doc(t, "footnotes-clipped-max-height.html");
+    if (!document) return;
+    assert.deepEqual(fatal(document).filter((event) => event.kind !== "break-cause-undetermined"), [], "the run did not reach the rules");
+    const snapshot = document.snapshot;
+    assert.ok(snapshot);
+    // Premise, observable on any browser: some footnote fragment starts inside the capped area's
+    // last pixel, so its start mark is refused as well as its end mark.
+    const refused = document.evidenceDiagnostics?.unplaced.filter((mark) => mark.footnote === true) ?? [];
+    assert.ok(refused.some((mark) => mark.side === "start"), `no clipped footnote start: ${whyUnbound(document)}`);
+    const clippedPages = [...new Set(refused.map((mark) => mark.page))];
+    for (const page of clippedPages) {
+      assert.equal(document.evidence?.find((record) => record.page === page)?.bindsFinding, false,
+        `page ${page} bound a footnote fragment that is partly not printed`);
+    }
+    const report = withProfile(document);
+    assert.equal(report.exitReason, "evidence/required-page-binding-incomplete");
+    assert.equal(exitCodeFor(report.verdict), 4);
+    // Needs a browser whose PDF carries the marks (CI's current Chrome): every page without a
+    // refused footnote mark binds.
+    assert.deepEqual({ status: report.evidenceCoverage?.status, boundPages: report.evidenceCoverage?.boundPages },
+      { status: "partial", boundPages: snapshot.pages.length - clippedPages.length }, whyUnbound(document));
   });
 });
