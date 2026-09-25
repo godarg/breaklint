@@ -259,6 +259,10 @@ describe("page-fill rules", () => {
     const elsewhere = nextPageShape(48, 56, 17, [{ x: 0, y: 0, width: 60, height: 70 }]);
     elsewhere.svg[0]!.page = 2;
     assert.deepEqual(pagesOf(elsewhere), [2], "SVG on another page");
+    // The collector records SVGs in margin boxes too (WP-F1 excludes margin-box BLOCKS only): a
+    // running header's SVG in the top margin box of page 3 lies above the content box and shares
+    // no line with the paragraph's first line.
+    assert.deepEqual(pagesOf(nextPageShape(48, 66, 17, [{ x: 150, y: -40, width: 100, height: 30 }])), [2], "running-header SVG");
   });
 
   it("reports the page before an inline img or canvas line: only SVGs are recorded with a box", () => {
@@ -357,7 +361,7 @@ describe("page-fill rules", () => {
     const original = (page: number, fragmentIndex: number, fragmentCount: number) =>
       fragment(template, {
         nodeKey: `header-original:${page}`, sid: "s-header-2", tag: "header", page, fragmentIndex, fragmentCount,
-        box: { x: 0, y: 0, width: 0, height: 0 },
+        box: { x: 0, y: 0, width: 0, height: 0 }, lines: [],
       });
     base.pages[3]!.fill.net = 0.06;
     // Pages 1–3: a clone first. Page 4, the tail: the FIRST clone of a second running element
@@ -389,7 +393,7 @@ describe("page-fill rules", () => {
     const marker = structuredClone(base);
     marker.blocks.push(fragment(template, {
       nodeKey: "marker", sid: "s-marker", tag: "div", page: 4, fragmentIndex: 0, fragmentCount: 1,
-      box: { x: 200, y: 300, width: 0, height: 0 },
+      box: { x: 200, y: 300, width: 0, height: 0 }, lines: [],
     }));
     assert.deepEqual(run(marker).findings.map((f) => f.page), [4], "a box-less marker hid the tail page");
   });
@@ -406,6 +410,31 @@ describe("page-fill rules", () => {
     assert.deepEqual(run(carried).findings.map((f) => f.page), [2]);
     for (const b of carried.blocks.filter((b) => b.page === 3 && b.fragmentIndex === 0)) b.box = { ...b.box, y: b.box.y + 2 };
     assert.deepEqual(run(carried).findings.map((f) => f.page), [2]);
+
+    // What WP-F1's collector keeps of a running element: its in-flow original, `display: none`,
+    // a 0 x 0 box and no lines, in the page content where the source puts it. Here, the last
+    // block on the tail page. It moves nothing.
+    const withOriginal = corpusSnapshot("orphaned-continuation-clean-full-middle-page");
+    withOriginal.pages[3]!.fill.net = 0.06;
+    withOriginal.blocks.push(fragment(withOriginal.blocks[0]!, {
+      nodeKey: "running-original", sid: "s-running", tag: "header", page: 4, fragmentIndex: 0, fragmentCount: 1,
+      box: { x: 0, y: 0, width: 0, height: 0 }, lines: [],
+    }));
+    assert.deepEqual(run(withOriginal).findings.map((f) => f.page), [4]);
+  });
+
+  it("counts a display: contents block by its lines", () => {
+    // No box of its own, but printed: its text is recorded as lines (the shared renderedBox).
+    // Starting on the tail page, it is content that does not continue from an earlier page.
+    const snapshot = corpusSnapshot("orphaned-continuation-clean-full-middle-page");
+    snapshot.pages[3]!.fill.net = 0.06;
+    snapshot.blocks.push(fragment(snapshot.blocks[0]!, {
+      nodeKey: "contents", sid: "s-contents", tag: "div", page: 4, fragmentIndex: 0, fragmentCount: 1,
+      box: { x: 0, y: 0, width: 0, height: 0 }, lines: [99],
+    }));
+    snapshot.textLines.push(textLine("contents", 99, { x: 48, y: 400, width: 200, height: 16 }));
+    assert.deepEqual(run(snapshot).findings, [], "a printed display: contents block was not counted");
+    assert.equal(measurementsOf(run(snapshot).evaluations, "pg4").values["continuation-only"], false);
   });
 
   it("half-empty-page says what net fill is and claims no ceiling", () => {

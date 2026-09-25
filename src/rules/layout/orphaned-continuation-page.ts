@@ -1,22 +1,29 @@
 import { defineRule } from "../../core/rule.ts";
 import { pageKey } from "../../core/fingerprint.ts";
 import type { BlockRecord, Box, PageRecord, Snapshot, TextLine } from "../../core/types.ts";
-import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
+import { declined, makeFinding, num, renderedBox, targetEvaluation } from "../shared.ts";
 
 /** Box-coordinate slack for rounded geometry, in CSS px. A tolerance, not a threshold. */
 const EDGE_TOLERANCE_PX = 1;
 
 /**
- * The blocks of a page's flow, in document order: those with a box that lie at least partly inside
- * the content box vertically.
+ * The blocks of a page's flow, in document order, each with where it is printed: its own box or,
+ * for a block with no box of its own (`display: contents`), the union of its line boxes — the
+ * shared `renderedBox`. A block printed nowhere (a `display: none` original of a running element,
+ * an empty positioned marker, anything with neither a box nor lines) is not part of the flow, and
+ * neither is one that lies wholly above or below the content box.
  */
-function flowBlocks(snapshot: Snapshot, page: PageRecord): BlockRecord[] {
+type FlowBlock = { block: BlockRecord; box: Box };
+function flowBlocks(snapshot: Snapshot, page: PageRecord): FlowBlock[] {
   const top = page.contentBox.y;
   const bottom = page.contentBox.y + page.contentBox.height;
-  return snapshot.blocks.filter((b) =>
-    b.page === page.pageNumber &&
-    (b.box.width !== 0 || b.box.height !== 0) &&
-    b.box.y < bottom && b.box.y + b.box.height > top);
+  const flow: FlowBlock[] = [];
+  for (const block of snapshot.blocks) {
+    if (block.page !== page.pageNumber) continue;
+    const box = renderedBox(snapshot, block);
+    if (box !== null && box.y < bottom && box.y + box.height > top) flow.push({ block, box });
+  }
+  return flow;
 }
 
 /** Whether the centre of a line's box lies inside a block's box (within the tolerance). */
@@ -67,16 +74,16 @@ function nextPageOpensWithRunningText(
   const next = snapshot.pages.find((p) => p.pageNumber === page.pageNumber + 1);
   if (!next) return false;
   const blocks = flowBlocks(snapshot, next);
-  const fresh = blocks.filter((b) => b.fragmentIndex === 0);
+  const fresh = blocks.filter((f) => f.block.fragmentIndex === 0);
   const firstBand = next.contentBox.y + next.fill.topGap * next.contentBox.height;
-  const top = Math.min(firstBand, ...fresh.map((b) => b.box.y));
+  const top = Math.min(firstBand, ...fresh.map((f) => f.box.y));
   const svgs = snapshot.svg.filter((svg) => svg.page === next.pageNumber).map((svg) => svg.viewportScreen);
-  return blocks.some((continuing, at) => {
+  return blocks.some(({ block: continuing, box: continuingBox }, at) => {
     if (continuing.fragmentIndex === 0) return false;
-    const ownedByLater = blocks.slice(at + 1).filter((b) => b.fragmentIndex === 0);
+    const ownedByLater = blocks.slice(at + 1).filter((f) => f.block.fragmentIndex === 0);
     return (linesByBlock.get(continuing.nodeKey) ?? []).some((line) =>
-      !ownedByLater.some((b) => centreInside(line.box, b.box)) &&
-      opensPage(line.box, top, continuing.lineHeight, svgs, continuing.box));
+      !ownedByLater.some((f) => centreInside(line.box, f.box)) &&
+      opensPage(line.box, top, continuing.lineHeight, svgs, continuingBox));
   });
 }
 
@@ -113,13 +120,15 @@ function nextPageOpensWithRunningText(
  * line's centre inside it) takes that text for its own, so the page before it is judged; the
  * rule page says so.
  *
- * Only blocks of the page's flow count, on this page and on the next: a block with a box (the
- * `display: none` original of a running element has none; an empty positioned marker has a 0 x 0
- * one) that lies at least partly inside the content box vertically (a running element's clone in
- * a top or bottom margin box normally lies above or below it; so does the footnote area).
- * Horizontal position is not tested, so a full-bleed block stays in — and so would a clone in a
- * side margin box: this rule relies on the collector excluding margin-box content from the
- * snapshot (WP-F1's collector change).
+ * Only blocks of the page's flow count, on this page and on the next: a block printed somewhere —
+ * its own box, or for `display: contents` its line boxes (`renderedBox`) — that lies at least
+ * partly inside the content box vertically. The `display: none` original of a running element and
+ * an empty positioned marker are printed nowhere; the footnote area lies below the content box.
+ * Horizontal position is not tested, so a full-bleed block stays in — and so would a running
+ * element's clone in a side margin box: this rule relies on the collector excluding margin-box
+ * content from the snapshot (WP-F1's collector change). SVG records are not filtered that way —
+ * the collector records SVGs in margin boxes too — so an SVG only counts where it shares a line
+ * vertically and lies across that line's block horizontally, which a margin-box SVG does not.
  *
  * It rests on one invariant of the snapshot, stated here because the rule reads it and nothing
  * else in the type says so: `snapshot.blocks` is in collection order — page by page, and within
@@ -185,7 +194,7 @@ export const orphanedContinuationPage = defineRule(
 
       // Collection order: within a page, document order (see the invariant above).
       const onPage = flowBlocks(snapshot, page);
-      const continuationOnly = onPage.length > 0 && onPage.every((b) => b.fragmentIndex > 0);
+      const continuationOnly = onPage.length > 0 && onPage.every((f) => f.block.fragmentIndex > 0);
       const endsOnPage = onPage.length > 0 && !nextPageOpensWithRunningText(snapshot, page, linesByBlock);
       const violated = continuationOnly && endsOnPage && page.fill.net < maxNetFill;
       evaluations.push(targetEvaluation({ ruleId: "layout/orphaned-continuation-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "measured", measurements: [{ name: "continuation-only", value: continuationOnly, unit: null, operator: "=", threshold: true }, { name: "ends-on-page", value: endsOnPage, unit: null, operator: "=", threshold: true }, { name: "net-fill", value: page.fill.net, unit: "fill ratio", operator: "<", threshold: maxNetFill }], connective: "all", violated }));

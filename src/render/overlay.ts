@@ -116,6 +116,7 @@ const STYLE_MARK =
  * to a function that does not exist, and only the live suite would notice.
  */
 import { MARK_FONT_FAMILY } from "./mark-font.ts";
+import { PAGE_AREA_SELECTOR } from "../paginate/collector.ts";
 
 const OVERLAY_CAPABILITY_MARKER = "__BREAKLINT_NODE_CAPABILITY__";
 
@@ -124,6 +125,7 @@ const OVERLAY_TEMPLATE = `(() => {
   const STYLE_LAYER = ${JSON.stringify(STYLE_LAYER)};
   const STYLE_MARK = ${JSON.stringify(STYLE_MARK)};
   const FONT_FAMILY = ${JSON.stringify(MARK_FONT_FAMILY)};
+  const PAGE_AREA_SELECTOR = ${JSON.stringify(PAGE_AREA_SELECTOR)};
   const capability = P.randomToken();
   let stage = 0, unauthorizedCalls = 0;
   let state = { layers: [], marks: [], detached: [] };
@@ -144,6 +146,14 @@ const OVERLAY_TEMPLATE = `(() => {
       P.setAttr(layer, "class", "bl-overlay");
       P.setCssText(layer, STYLE_LAYER);
       for (const el of P.all(pageEl, "[data-bl-sid]")) {
+        // Marks go where findings can go: on the flow, the page's content area. Paged.js clones a
+        // position: running(...) element into a margin box of every page and a position: fixed
+        // element into every page box; the clones keep the source id but are not in the snapshot,
+        // so no finding can target them. Marking them anyway could never succeed — a margin box
+        // lies outside the content box the marks hang in — and one unplaceable clone left its
+        // page unbound, so every page of a document with a running header came back without
+        // evidence and the run ended at exit 4. The same test as the snapshot and the collector.
+        if (P.closest(el, PAGE_AREA_SELECTOR) === null) continue;
         const sid = P.attr(el, "data-bl-sid");
         // Paged.js may retain the next page's box in a node reached from this page clone.  The
         // next rect is physically elsewhere in the spread, so using it for this layer expands
@@ -175,11 +185,23 @@ const OVERLAY_TEMPLATE = `(() => {
           // Marks use a verified one-pixel glyph font, but before readback we reserve the whole
           // tolerance envelope that would still be accepted there.  If it cannot fit, a clamp
           // would create a false location and an overflow can make Chrome shrink every page.
-          const relativeX = x - areaBox.x, relativeY = y - areaBox.y;
+          //
+          // The two axes are bounded differently, and on purpose. Across the page the bound is the
+          // PAGE box: an in-flow fragment that bleeds into the side margin (negative margins, a
+          // full-bleed figure) is printed there, the mark hangs at the same place, and the
+          // absolutely positioned mark stays inside the sheet, which clips at the page edge, so it
+          // cannot widen the print area. Bounding it by the content box instead left every
+          // fragment of a full-bleed block unmarked and its pages unbound. Down the page the bound
+          // stays the content box, as a conservative choice and nothing more: the layer hangs in
+          // Paged.js' multi-column fragmentainer, and whether a mark positioned above or below its
+          // column height prints where the DOM puts it is a property of the browser, not of this
+          // code. On Chromium 141 such marks were measured printing at their DOM position; no
+          // browser was shown to move them. The bound refuses them rather than depend on that.
+          const relativeY = y - areaBox.y;
           const maxAdvance = token.length * 1.2 + 2;
           if (
-            x < pageBox.left || x > pageBox.right || y < pageBox.top || y > pageBox.bottom ||
-            relativeX < 0 || relativeY < 0 || relativeX + maxAdvance > areaBox.width || relativeY + 1 > areaBox.height
+            x < pageBox.left || x + maxAdvance > pageBox.right || y < pageBox.top || y > pageBox.bottom ||
+            relativeY < 0 || relativeY + 1 > areaBox.height
           ) {
             unplacedMarks.push({ sid, page: pageIndex + 1, side, reason: "fragment-outside-page" });
             continue;

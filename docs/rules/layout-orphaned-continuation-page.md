@@ -120,3 +120,9 @@ A continuation page holds only a tiny trailing fragment of an earlier block. Tig
 <p style="line-height: 3">…five pages of text…</p>
 ```
 
+Illustrative, like every example on these pages: the advice ships `tested: false`, and no
+trigger/remedied pair in this package demonstrates it. The remedied example changes a preceding
+vertical margin, which the advice names. `tests/unit/registry.test.ts` compares
+every CSS lever it tracks between trigger and remedied example against the levers the advice
+proposes; `line-height` is one of them, margins are not.
+

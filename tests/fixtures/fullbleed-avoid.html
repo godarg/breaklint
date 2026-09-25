@@ -1,0 +1,131 @@
+<!doctype html>
+<!--
+  A six-page `break-inside: avoid` block that bleeds into the page margins.
+
+  COMPLICATION. The block asks not to be broken and is about five and a half content boxes tall,
+  so it is a genuine `layout/unbreakable-block-too-tall` error. Its negative left and right
+  margins place every one of its fragments LEFT of the page content box. A rule that decides
+  flow membership by coordinates ("a real fragment starts inside the content box") discards all
+  six fragments, falls back to measuring one piece, and the document comes back clean.
+
+  The eight plain paragraphs come first on purpose: the geometry cross-check samples the first
+  eight boxes, and this fixture is about the rule, not about that check.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 150mm 120mm; margin: 15mm; }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0; }
+.bleed { break-inside: avoid; margin-left: -10mm; margin-right: -10mm; background: #eee; }
+</style></head><body>
+<p id="i1">Introductory paragraph 1, one short line.</p>
+<p id="i2">Introductory paragraph 2, one short line.</p>
+<p id="i3">Introductory paragraph 3, one short line.</p>
+<p id="i4">Introductory paragraph 4, one short line.</p>
+<p id="i5">Introductory paragraph 5, one short line.</p>
+<p id="i6">Introductory paragraph 6, one short line.</p>
+<p id="i7">Introductory paragraph 7, one short line.</p>
+<p id="i8">Introductory paragraph 8, one short line.</p>
+<div class="bleed" id="full-bleed">
+  <p>Full-bleed line 001.</p>
+  <p>Full-bleed line 002.</p>
+  <p>Full-bleed line 003.</p>
+  <p>Full-bleed line 004.</p>
+  <p>Full-bleed line 005.</p>
+  <p>Full-bleed line 006.</p>
+  <p>Full-bleed line 007.</p>
+  <p>Full-bleed line 008.</p>
+  <p>Full-bleed line 009.</p>
+  <p>Full-bleed line 010.</p>
+  <p>Full-bleed line 011.</p>
+  <p>Full-bleed line 012.</p>
+  <p>Full-bleed line 013.</p>
+  <p>Full-bleed line 014.</p>
+  <p>Full-bleed line 015.</p>
+  <p>Full-bleed line 016.</p>
+  <p>Full-bleed line 017.</p>
+  <p>Full-bleed line 018.</p>
+  <p>Full-bleed line 019.</p>
+  <p>Full-bleed line 020.</p>
+  <p>Full-bleed line 021.</p>
+  <p>Full-bleed line 022.</p>
+  <p>Full-bleed line 023.</p>
+  <p>Full-bleed line 024.</p>
+  <p>Full-bleed line 025.</p>
+  <p>Full-bleed line 026.</p>
+  <p>Full-bleed line 027.</p>
+  <p>Full-bleed line 028.</p>
+  <p>Full-bleed line 029.</p>
+  <p>Full-bleed line 030.</p>
+  <p>Full-bleed line 031.</p>
+  <p>Full-bleed line 032.</p>
+  <p>Full-bleed line 033.</p>
+  <p>Full-bleed line 034.</p>
+  <p>Full-bleed line 035.</p>
+  <p>Full-bleed line 036.</p>
+  <p>Full-bleed line 037.</p>
+  <p>Full-bleed line 038.</p>
+  <p>Full-bleed line 039.</p>
+  <p>Full-bleed line 040.</p>
+  <p>Full-bleed line 041.</p>
+  <p>Full-bleed line 042.</p>
+  <p>Full-bleed line 043.</p>
+  <p>Full-bleed line 044.</p>
+  <p>Full-bleed line 045.</p>
+  <p>Full-bleed line 046.</p>
+  <p>Full-bleed line 047.</p>
+  <p>Full-bleed line 048.</p>
+  <p>Full-bleed line 049.</p>
+  <p>Full-bleed line 050.</p>
+  <p>Full-bleed line 051.</p>
+  <p>Full-bleed line 052.</p>
+  <p>Full-bleed line 053.</p>
+  <p>Full-bleed line 054.</p>
+  <p>Full-bleed line 055.</p>
+  <p>Full-bleed line 056.</p>
+  <p>Full-bleed line 057.</p>
+  <p>Full-bleed line 058.</p>
+  <p>Full-bleed line 059.</p>
+  <p>Full-bleed line 060.</p>
+  <p>Full-bleed line 061.</p>
+  <p>Full-bleed line 062.</p>
+  <p>Full-bleed line 063.</p>
+  <p>Full-bleed line 064.</p>
+  <p>Full-bleed line 065.</p>
+  <p>Full-bleed line 066.</p>
+  <p>Full-bleed line 067.</p>
+  <p>Full-bleed line 068.</p>
+  <p>Full-bleed line 069.</p>
+  <p>Full-bleed line 070.</p>
+  <p>Full-bleed line 071.</p>
+  <p>Full-bleed line 072.</p>
+  <p>Full-bleed line 073.</p>
+  <p>Full-bleed line 074.</p>
+  <p>Full-bleed line 075.</p>
+  <p>Full-bleed line 076.</p>
+  <p>Full-bleed line 077.</p>
+  <p>Full-bleed line 078.</p>
+  <p>Full-bleed line 079.</p>
+  <p>Full-bleed line 080.</p>
+  <p>Full-bleed line 081.</p>
+  <p>Full-bleed line 082.</p>
+  <p>Full-bleed line 083.</p>
+  <p>Full-bleed line 084.</p>
+  <p>Full-bleed line 085.</p>
+  <p>Full-bleed line 086.</p>
+  <p>Full-bleed line 087.</p>
+  <p>Full-bleed line 088.</p>
+  <p>Full-bleed line 089.</p>
+  <p>Full-bleed line 090.</p>
+  <p>Full-bleed line 091.</p>
+  <p>Full-bleed line 092.</p>
+  <p>Full-bleed line 093.</p>
+  <p>Full-bleed line 094.</p>
+  <p>Full-bleed line 095.</p>
+  <p>Full-bleed line 096.</p>
+  <p>Full-bleed line 097.</p>
+  <p>Full-bleed line 098.</p>
+  <p>Full-bleed line 099.</p>
+  <p>Full-bleed line 100.</p>
+</div>
+<p id="closing">Closing paragraph after the block.</p>
+</body></html>
