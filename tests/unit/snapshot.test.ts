@@ -20,6 +20,7 @@ import { loadCorpus } from "../fixtures/corpus.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import { coverageFloorMap, resolveConfig } from "../../src/config/resolve.ts";
 import { SNAPSHOT_SCHEMA_VERSION } from "../../src/core/enums.ts";
+import type { Snapshot } from "../../src/core/types.ts";
 
 describe("the live snapshot seam", () => {
   it("takes author identity and the whole signature from source text", () => {
@@ -171,13 +172,29 @@ describe("the live snapshot seam", () => {
     const sidlessCopies = structuredClone(base);
     Object.assign(sidlessCopies.blocks[0]!, { sid: null, marginCopies: 2 });
     mutations.push({ name: "margin-copies-without-sid", snapshot: sidlessCopies });
+    // Also Snapshot 5: the flow facts (`float`, `position`) that tell a nested block in the flow from
+    // one beside it, and the boundary-hyphen mark.
+    const noFloat = structuredClone(base);
+    delete (noFloat.blocks[0] as { float?: string }).float;
+    mutations.push({ name: "float-missing", snapshot: noFloat });
+    const noPosition = structuredClone(base);
+    (noPosition.blocks[0] as { position?: string }).position = "";
+    mutations.push({ name: "position-absent", snapshot: noPosition });
+    const badHyphen = structuredClone(base);
+    (badHyphen.blocks[0] as unknown as { boundaryHyphen: unknown }).boundaryHyphen = "yes";
+    mutations.push({ name: "boundary-hyphen-not-boolean", snapshot: badHyphen });
+    const noOwnText = structuredClone(base);
+    delete (noOwnText.textLines[0] as { ownText?: boolean }).ownText;
+    mutations.push({ name: "own-text-missing", snapshot: noOwnText });
 
     // The corpus snapshot is not free of issues itself, so "not ok" alone would not show that
     // these checks exist: each Snapshot 5 mutation must produce its own issue.
     for (const [snapshot, issue] of [
       [noDisplay, "computed display is absent"], [missingDisplay, "computed display is absent"],
       [badCopies, "marginCopies is not a count"], [fractionalCopies, "marginCopies is not a count"],
-      [sidlessCopies, "margin copies without a source id"],
+      [sidlessCopies, "margin copies without a source id"], [noFloat, "computed float is absent"],
+      [noPosition, "computed position is absent"], [badHyphen, "boundaryHyphen is not a boolean"],
+      [noOwnText, "ownText is not a boolean"],
     ] as const) {
       const issues = validateSnapshotInvariants(snapshot, { sourceMapInjection: true }).issues;
       assert.ok(issues.some((item) => item.endsWith(issue)), `the invariant gate does not name "${issue}": ${JSON.stringify(issues.slice(0, 3))}`);
@@ -343,6 +360,35 @@ describe("the live snapshot seam", () => {
 });
 
 describe("the engine judges only a snapshot of its own stamp", () => {
+  /**
+   * Snapshot 5 grew required fields before its release. A stamp-5 snapshot written before them —
+   * without `float`, `position`, `boundaryHyphen` or a line's `ownText` — carries the right stamp and
+   * the wrong shape, and read as it is it misjudges: no own text anywhere, so no widow or orphan is
+   * ever measured on it. It is refused (exit 3), naming the fields.
+   */
+  it("refuses a stamp-5 snapshot that lacks a field stamp 5 requires, and names it", () => {
+    const config = resolveConfig({ file: {}, cli: {} });
+    const engine = { failOn: config.failOn, activeRules: config.activeRules, optionsByRule: config.optionsByRule, coverageFloors: coverageFloorMap(config) };
+    const current = structuredClone(loadCorpus().find((item) => item.name === "widow-trigger")!.snapshot);
+    const judged = runDocument({ path: "doc.html", snapshot: current, infrastructure: [] }, engine).report;
+    assert.ok(judged.findings.some((finding) => finding.ruleId === "layout/widow"), "premise: the complete snapshot is judged");
+    const strip: [string, (snapshot: Snapshot) => void][] = [
+      ["BlockRecord.float", (snapshot) => { delete (snapshot.blocks[0] as { float?: string }).float; }],
+      ["BlockRecord.position", (snapshot) => { delete (snapshot.blocks[1] as { position?: string }).position; }],
+      ["BlockRecord.boundaryHyphen", (snapshot) => { delete (snapshot.blocks[0] as { boundaryHyphen?: boolean }).boundaryHyphen; }],
+      ["TextLine.ownText", (snapshot) => { for (const line of snapshot.textLines) delete (line as { ownText?: boolean }).ownText; }],
+      ["BlockRecord.display", (snapshot) => { delete (snapshot.blocks[0] as { display?: string }).display; }],
+    ];
+    for (const [field, remove] of strip) {
+      const old = structuredClone(current);
+      remove(old);
+      const report = runDocument({ path: "doc.html", snapshot: old, infrastructure: [] }, engine).report;
+      assert.equal(report.verdict, "infrastructure", `a snapshot without ${field} was judged`);
+      assert.deepEqual(report.findings, []);
+      assert.ok(report.infrastructure.some((event) => event.kind === "checker-crashed" && event.detail.includes(field)), field);
+    }
+  });
+
   /**
    * The rules read fields Snapshot 5 added (`BlockRecord.display`, `marginCopies`). A snapshot of
    * another stamp lacks them, and a rule reading an absent field misjudges rather than fails: an

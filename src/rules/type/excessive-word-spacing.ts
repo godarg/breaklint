@@ -1,8 +1,8 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  declined, isNotRendered, layoutOutOfScope, lineStateOf, linesOfBlock, makeFinding, notRenderedEvaluation, num, sourceOf,
-  targetEvaluation,
+  declined, isBlockContainer, isNotRendered, layoutOutOfScope, lineOwnership, lineStateOf, makeFinding, notRenderedEvaluation, num,
+  sourceOf, targetEvaluation,
 } from "../shared.ts";
 
 /**
@@ -16,6 +16,12 @@ import {
  * to a window around page boundaries, which contradicted the rule that needs them; the cost of
  * keeping them all was measured at 4 221 bytes per page, about 8 MiB over 2 000 pages, and that
  * is affordable. The limit was not a trade-off, it was an unmeasured assumption.
+ *
+ * The divisor is the block's NATURAL space: its own font's advance for one space, measured by the
+ * collector (`spaceWidth`), never a space rendered on the page — a justified space is stretched,
+ * and a space at a line end collapses to almost nothing, which once reported an ordinary gap as
+ * 540 times the natural one. A block whose natural space could not be measured is declined as
+ * `env/invalid-measurement`.
  *
  * This rule owns the block-level `hyphens` setting and the soft hyphens of justified blocks;
  * `layout/hyphen-across-page` defers to it on both and changes only the boundary word
@@ -51,14 +57,29 @@ export const excessiveWordSpacing = defineRule(
     let candidates = 0;
     let measured = 0;
     const maxFactor = num(ctx.options.maxSpaceFactor, 3.0);
+    // The text, not its container: a line's gaps are set in the font of the deepest record that
+    // records it, and are that record's to judge. A justified wrapper records its paragraphs'
+    // lines too; divided by the wrapper's own natural space they reported its paragraph's gaps a
+    // second time, and in the wrapper's font (see `lineOwnership`).
+    const ownership = lineOwnership(snapshot, { containers: false });
+    // Whether a line is justified is the block CONTAINER's text-align, not the element's: a
+    // `display: contents` paragraph with `text-align: left` inside a justified `<div>` prints
+    // justified lines, and its gaps are real (L3). The container is the recorded block that holds
+    // the record's lines; without one the record's own value is all there is.
+    const containerOwnership = lineOwnership(snapshot, { containers: true });
+    const byKey = new Map(snapshot.blocks.map((block) => [block.nodeKey, block]));
+    const justifiedBy = (block: (typeof snapshot.blocks)[number]) => {
+      if (isBlockContainer(snapshot, block)) return block;
+      const enclosing = containerOwnership(block).enclosedBy;
+      return (enclosing === null ? undefined : byKey.get(enclosing)) ?? block;
+    };
 
     for (const block of snapshot.blocks) {
-      if (!/justify/u.test(block.effectiveStyle.textAlign)) continue;
+      if (!/justify/u.test(justifiedBy(block).effectiveStyle.textAlign)) continue;
       // An explicit word-spacing is a decision. Reporting it back is reporting the author.
       const ws = block.effectiveStyle.wordSpacing.trim();
       if (ws && ws !== "normal" && ws !== "0px") continue;
       if (block.tag.toLowerCase() === "td" || block.tag.toLowerCase() === "th") continue;
-      if (block.spaceWidth <= 0) continue;
       // Nothing printed, no gaps: a justified running header's hidden in-flow original was counted
       // as measured with nothing in it. A `display: contents` block has no box but has lines, and
       // its gaps are printed; it is measured from them like any other block.
@@ -105,11 +126,24 @@ export const excessiveWordSpacing = defineRule(
         evaluations.push(targetEvaluation({ ruleId: "type/excessive-word-spacing", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: outOfScope }));
         continue;
       }
+      // Every factor is divided by the natural space. Without one there is no factor, and a
+      // guessed divisor is a guessed finding: the block is declined and counted, never skipped
+      // (it used to leave the rule silently, outside the candidates).
+      if (!(block.spaceWidth > 0)) {
+        notMeasured.push(declined({ scope: "block", ruleId: "type/excessive-word-spacing", reason: "env/invalid-measurement" }));
+        evaluations.push(targetEvaluation({
+          ruleId: "type/excessive-word-spacing", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+          fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: "env/invalid-measurement",
+          measurements: [{ name: "natural-space-width", value: block.spaceWidth, unit: "px", operator: ">", threshold: 0 }],
+        }));
+        continue;
+      }
       measured += 1;
 
       let worst = 0;
       let worstLine = 0;
-      for (const line of linesOfBlock(snapshot, block.nodeKey)) {
+      const owned = ownership(block);
+      for (const { line } of owned.lines.filter((entry) => entry.owned)) {
         const boxes = line.wordBoxes;
         if (!boxes || boxes.length < 2) continue;
         for (let i = 1; i < boxes.length; i += 1) {
@@ -125,7 +159,10 @@ export const excessiveWordSpacing = defineRule(
           }
         }
       }
-      evaluations.push(targetEvaluation({ ruleId: "type/excessive-word-spacing", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured", measurements: [{ name: "largest-word-gap-factor", value: worst, unit: "× natural space", operator: ">", threshold: maxFactor }], violated: worst > maxFactor }));
+      evaluations.push(targetEvaluation({ ruleId: "type/excessive-word-spacing", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured", measurements: [
+        { name: "largest-word-gap-factor", value: worst, unit: "× natural space", operator: ">", threshold: maxFactor },
+        { name: "lines-of-nested-blocks", value: owned.delegated, unit: "lines", operator: null, threshold: null },
+      ], violated: worst > maxFactor }));
       if (worst <= maxFactor) continue;
 
       findings.push(

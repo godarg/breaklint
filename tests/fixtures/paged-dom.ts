@@ -271,10 +271,33 @@ export function fakePrimitives(document: FakeNode, hooks: {
       if (!parent || !displayedChain(parent)) return [];
       const box = boxOf(parent);
       if (box.width <= 0 || box.height <= 0) return [];
-      if (typeof start === "number" && typeof end === "number") return [rect(box.x, box.y, 4 * (end - start), box.height)];
+      // A sub-range is 4 px per character from the start of the text, on the one line: so the words
+      // of a text node lie 4 px apart per space between them, which is its "rendered" space.
+      // A parent's `data-test-space` sets the width of a whitespace character (a "rendered space"
+      // of another width: stretched, collapsed, or set by another font) for the tests that need it.
+      if (typeof start === "number" && typeof end === "number") {
+        const space = Number(parent.attributes.get("data-test-space") ?? 4);
+        const text = node.data ?? "";
+        const advance = (from: number, to: number) => {
+          let width = 0;
+          for (let at = from; at < to; at += 1) width += /\s/u.test(text[at] ?? "") ? space : 4;
+          return width;
+        };
+        return [rect(box.x + advance(0, start), box.y, advance(start, end), box.height)];
+      }
       return [box];
     },
     painted: () => true,
+    // The font's own space advance, as the canvas answers it in production: here a quarter of the
+    // shorthand's pixel size plus the letter-spacing, so a test can tell it from any rendered range
+    // (4 px per character above). Only a well-formed shorthand is answered — style, caps, weight,
+    // stretch keyword, size, family, in that order — and the family `unloaded-face` stands for a
+    // font that is not loaded yet, which the production primitive answers with null.
+    spaceAdvance: (font: string, letterSpacing: string) => {
+      const match = /^(normal|italic|oblique(?: \S+)?) (normal|small-caps) (\d+) ([a-z-]+) ([\d.]+)px (.+)$/u.exec(font);
+      if (!match || match[6] === "unloaded-face" || !/^-?[\d.]+px$/u.test(letterSpacing)) return null;
+      return Number(match[5]) / 4 + Number.parseFloat(letterSpacing);
+    },
     styleSheets: () => [],
     sheetHref: () => null,
     sheetRules: () => [],

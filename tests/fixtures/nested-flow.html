@@ -1,0 +1,53 @@
+<!doctype html>
+<!--
+  Where a block's OWN run of lines ends when blocks are nested in it, and where a boundary hyphen
+  inside an inline element belongs (layout/widow, layout/orphan, layout/hyphen-across-page;
+  tests/live/rule-targets.test.ts).
+
+  THE COMPLICATIONS, one case per page pair, each opening a fresh page with a forced break:
+    - float-beside: a float with a top padding beside the continuation of a <div>'s own text. Its
+      lines are recorded under the div as rows of their own, between the div's; they do not end the
+      div's run, which the break split 5+6 — no finding;
+    - inline-block-line: an inline-block alone on a full line of a <div>'s text. Geometrically it is
+      a block child; by its recorded display it is on the div's run, which the break split 2+4 — no
+      finding at the initial orphans, an orphan of 2 lines when one extra line is configured;
+    - own-then-moved: a <section>'s own line ends the page and its next paragraph moved whole. The own
+      line is a complete run — no finding;
+    - nested-ends-own-opens: a paragraph ends the page and the section's own line opens the next one,
+      a new run — no finding;
+    - em-hyphen: a page split inside a word set in <em>; Paged.js marks the <em>, and the finding
+      belongs to the paragraph.
+    - floats-both-top: floats on both sides at the top of the continuation, the <div>'s own text
+      between them. The floats' line boxes span the div's line; its own text is still on it, and
+      the run is 3+4 — no finding at the initial values;
+    - hyphen-spoof: an author's pagedjs_hyphen class on an <em> that holds no cut word, in a
+      paragraph split at a space — no boundary hyphen.
+  data-t names each owner of text for the ground-truth probe. Monospace at a fixed 12px/20px, so
+  every split is decided by line counts.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>nested flow under Paged.js</title><style>
+@page { size: 400px 300px; margin: 40px; }
+body { margin: 0; font-family: monospace; font-size: 12px; line-height: 20px; }
+p, section { margin: 0; padding: 0; }
+.case { break-before: page; }
+.case.first { break-before: auto; }
+</style></head><body>
+<div class="case first" id="case-float-beside"><div data-t="sp1" style="height:120px"></div>
+<div data-t="W1" id="float-beside">w1<br>w2<br>w3<br>w4<br>w5<br><div data-t="F1" id="float-beside-float" style="float: right; width: 100px; padding-top: 6px">f1<br>f2<br>f3</div>x1<br>x2<br>x3<br>x4<br>x5<br>x6</div></div>
+<div class="case" id="case-inline-block-line"><div data-t="sp2" style="height:160px"></div>
+<div data-t="W2" id="inline-block-line">w1<br>w2<br><div data-t="IB2" style="display:inline-block; width:100%">ib1</div><br>x1<br>x2<br>x3<br>x4</div></div>
+<div class="case" id="case-own-then-moved"><section data-t="S3" id="own-then-moved">
+<p data-t="A3">a1<br>a2<br>a3<br>a4<br>a5</p>
+own line
+<p data-t="B3" style="break-inside: avoid">b1<br>b2<br>b3<br>b4<br>b5<br>b6<br>b7<br>b8</p></section></div>
+<div class="case" id="case-nested-ends-own-opens"><section data-t="S4" id="nested-ends-own-opens">
+<p data-t="A4">a1<br>a2<br>a3<br>a4<br>a5<br>a6<br>a7<br>a8<br>a9<br>a10<br>a11</p>
+own line
+<p data-t="B4">b1<br>b2<br>b3</p></section></div>
+<div class="case" id="case-em-hyphen"><p data-t="L5">label</p><div data-t="sp5" style="height:130px"></div>
+<p data-t="E5" id="em-hyphen" style="width: 23ch; widows: 1; orphans: 1">aaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbb cccccccccc <em>dddddddd&shy;eeeeeeeeee</em> fffffffffffffffffff ggggggggggggggggggg</p></div>
+<div class="case" id="case-floats-both-top"><div data-t="sp6" style="height:160px"></div>
+<div data-t="W6" id="floats-both-top">w1<br>w2<br>w3<br><div data-t="FL6" style="float: left; width: 60px">l1<br>l2<br>l3</div><div data-t="FR6" style="float: right; width: 60px">r1<br>r2<br>r3</div>x1<br>x2<br>x3<br>x4</div></div>
+<div class="case" id="case-hyphen-spoof"><p data-t="L7">label</p><div data-t="sp7" style="height:130px"></div>
+<p data-t="E7" id="hyphen-spoof" style="width: 23ch; widows: 1; orphans: 1">aaaaaaaaaaaaaaaaaaa <em class="pagedjs_hyphen">bbbbbbbbbbbbbbbbbbb</em> cccccccccc dddddddd eeeeeeeeee fffffffffffffffffff ggggggggggggggggggg</p></div>
+</body></html>

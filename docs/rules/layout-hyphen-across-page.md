@@ -25,6 +25,17 @@ such as `ü` or `ß` therefore carries neither the class nor a hyphen and is not
 measured on Chromium 141 with a page split between `ü` and `ß` in an `overflow-wrap: anywhere`
 paragraph.
 
+A boundary hyphen inside an inline element is reported on the block that holds it. Paged.js puts its
+class on the parent of the text node it cut, so when the cut word sits inside `<em>`, `<a>` or
+`<span>` the class is on that element. The rule used to read the block's own classes and missed it
+(measured on patched Chromium 141: the same split reported without `<em>` and silent with it). The
+collector now records the mark per block (`boundaryHyphen`, Snapshot 5), on the nearest source block
+around the marked element; a wrapper further out does not carry it. The mark is what Paged.js
+does, not the class alone: the fragment's LAST text node must end in the hyphen glyph Paged.js
+appends (U+2011; breaklint never configures another), and the element holding that text node, or
+one between it and the block, must carry the class. An author's `pagedjs_hyphen` class on an element
+that holds no cut word is not a boundary hyphen.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with

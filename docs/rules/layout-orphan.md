@@ -19,6 +19,23 @@ The mirror of `layout/widow`, with the same permanent ceiling of `warn` for the 
 
 Skipped after a forced outgoing break, and on blocks with no visible text line. A boundary counts as forced only where the paginator's own break decision forced it: a break declaration, or a change of named page (`page: <name>`) between the element the next page starts with and the one before it. A page is not forced open because a wrapper such as `<main>` continues onto it, nor because its page style changed. See [the break cause](../limitations.md#the-break-cause-of-a-page-boundary).
 
+Only the lines of the block's own container count, and only the run of them that the break split,
+exactly as for [`layout/widow`](layout-widow.md). A wrapper records its paragraphs' line boxes too,
+and a `<section>` whose second paragraph moved whole to the next page used to be reported as an
+orphan for the one line its first fragment held — the intro paragraph's, which the break did not
+split. Measured on patched Chromium 141 with Paged.js 0.4.3 and now pinned by
+`tests/live/rule-targets.test.ts`. The run closing a fragment ends at the last line of an in-flow
+nested block, passing over a float's, positioned box's or inline-block's lines beside it, and it is
+judged only when the fragment after opens with own text: a wrapper's own line that ends the page
+with a paragraph that moved whole after it is complete, not split. A `display: contents` or inline
+element whose lines no recorded block holds is declined as `env/invalid-measurement`. A line counts
+as the block's own when the collector saw the block's own text on it (`TextLine.ownText`), so text
+between two floats is still the block's. A custom element's splits are not judged (see
+[`layout/widow`](layout-widow.md)). The known limits listed there apply here too: a recorded block
+inside an unrecorded inline-block or inline-flex box ends the run and can give a false finding;
+text in an unrecorded floated or absolutely positioned box counts as the block's own lines; and an
+inline `<code>` or `<sup>` at another height than its line counts as a line of its own.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with

@@ -23,8 +23,9 @@
   spacer leaves half a line of slack so that no split depends on sub-pixel rounding. Each case
   starts on a fresh page with a forced break before its label.
 
-  No wrapper element spans a page break: a wrapper is a block record of its own, judged by its
-  own `widows`/`orphans` against its descendants' lines, which is not what this fixture measures.
+  No wrapper element spans a page break: a wrapper is a block record of its own that records its
+  descendants' lines too, which is tests/fixtures/wrapper-fragmentation.html's subject, not this
+  fixture's.
 -->
 <html lang="en"><head><meta charset="utf-8"><title>widows and orphans under Paged.js</title><style>
 @page { size: 400px 300px; margin: 40px; }

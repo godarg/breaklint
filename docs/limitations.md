@@ -619,3 +619,67 @@ it is not admitted here, not hashed here and not reproducible from this reposito
 cites the number says "a corpus constructed for this purpose"; this paragraph says the rest of it.
 The decision it supports is reversible by configuration and moves no exit code either way, which is
 why it was taken on that evidence — the same standard would not have been enough for a gating rule.
+
+
+
+**Which block a split belongs to is read from four recorded facts and line geometry.** The
+snapshot records a block's lines from every text node beneath it and carries no parent link, so a
+wrapper and the paragraph inside it hold the same line boxes. `layout/widow` and `layout/orphan`
+count a line as a block's own when the collector saw text on it whose nearest block container is
+that block (`TextLine.ownText`, Snapshot 5), and count only the run of the block's own lines next to
+the break. The run ends at an in-flow nested block and passes over a float, a positioned box or an
+inline-level box beside the block's text, which the recorded `display`, `float` and `position` tell
+apart; and a run is judged only when the run on the other side of the break, in the block's
+fragment joined by source id, is own text too. Checked against a probe of the same documents with
+plain Paged.js and Range rectangles, at four thresholds each, on patched Chromium 141: 24 layouts,
+all 96 judgements agreeing, and a second set of 19 layouts, 70 of 76 agreeing, where the six
+disagreements are the two custom-element layouts at the three stricter thresholds — splits no rule
+sees, and none reported wrongly. Pinned in `tests/live/rule-targets.test.ts`. On the first-party
+robustness document (`dargel-kleingewerbe`) three `layout/orphan` findings and one `layout/widow`
+finding were wrappers around nested blocks and are gone. What remains unseen: a block container the
+snapshot does not record — a custom element, a `<span style="display: block">` — owns its text, so
+its splits are not judged and the block around it is not judged on those lines; a split block
+without a source id is judged on its own side of the break only; and a `display: contents` element
+whose lines no recorded block holds is declined (`env/invalid-measurement`), not judged by its own
+value. `type/excessive-word-spacing` asks about the text rather than its container: it gives a line
+to the deepest record that records it, by geometry, because that element's font set the gaps, and
+takes whether the line is justified from its block container; there, text of a block's own lying
+between two nested blocks on one line (between two floats) is taken for theirs. Three more limits
+of the fragmentation rules, found by an independent verification and not fixed in this release: a
+recorded block inside an UNRECORDED inline-level box (a `<p>` in a `<span style="display:
+inline-block">` or `inline-flex`) is taken for an in-flow block, so its lines end the surrounding
+block's run and can give a false `layout/orphan` or `layout/widow` — the pass-over of inline-level
+boxes holds only for boxes the snapshot records; text in an unrecorded absolutely positioned or
+floated box counts as the surrounding block's own lines; and lines are grouped by the top edge of
+their text rectangles within 0.5 px, so an inline `<code>`, `<sup>` or badge at another height
+than its line forms a line of its own, which both these rules and `type/excessive-word-spacing`
+count as one (the last predates this release).
+
+**The natural space comes from the font, or from the layout where a canvas cannot reproduce the
+font.** `type/excessive-word-spacing` divides by the advance of one space in the block's computed
+font plus its `letter-spacing`, times its effective `zoom`, measured with a canvas inside the page
+once `document.fonts` reports the font loaded. Where a canvas cannot reproduce the font —
+`font-variation-settings` beyond a `wght` that restates the weight, `font-size-adjust`, a
+non-keyword `font-stretch`, synthesised caps other than `small-caps`, a font not yet loaded — the
+layout is sampled instead, pooled over the document per layout key (font, caps, `letter-spacing`,
+`word-spacing`, variation settings, `font-size-adjust`, `font-kerning`, zoom): gaps between two
+consecutive words of one text node (in left-to-right text; in right-to-left text the words are
+paired in visual order and a gap between two text nodes can be sampled, which pollutes the divisor
+only if every sample of the key is polluted alike, since samples that disagree decline the block)
+whose element computes that key, separated by collapsible
+whitespace only, on the last line of the last fragment of a justified block that is its own block
+container, has no nested source block and whose `text-align-last` does not justify that line. The
+median is taken only when every sample lies within 0.1 px or 3 % of it. A block for which neither
+source gives a value is declined as `env/invalid-measurement` and counted against coverage, so a
+document in which more than half of the justified blocks are declined ends `insufficient-coverage`
+(exit 4). Gaps set in an inline element in another font or size are still measured against the
+block's own space (a monospace `<span>` in serif read 2.41× on natural spaces); an inline element's
+own `word-spacing` is not judged. `tests/live/rule-targets.test.ts` pins ten canvas-measured font
+settings against their unjustified last lines and the two layout-measured ones against an
+independent one-line control each (within 0.05 px; measured within 0.03 px on patched Chromium 141
+with the machine's default fonts), and CI re-takes exactly those. No web font (`@font-face`) is
+among them: on the Chromium 141 these changes were developed on, a document loading one does not
+reach a quiescent state, so the pin could not be recorded there. Right-to-left text is not judged
+at all, and this predates the release: word gaps are read in text order, which in right-to-left
+text runs against their positions, so every gap reads negative and is skipped, and the block is
+reported as measured with a largest factor of 0.
