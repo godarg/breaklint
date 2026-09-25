@@ -197,10 +197,14 @@ stylesheet, no `break-inside` and no script are needed, only a table that crosse
 The six documents are recorded, not published. They are chapters of a paid product, and this
 repository is public and MIT, so `corpus/public/pagination-residue-v1` keeps their SHA-256 values,
 rights and privacy review and exact expected residue while their bytes stay outside it —
-the `private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. Without
-`BREAKLINT_RESIDUE_CORPUS_ROOT` the gate says `SKIPPED` and claims nothing about them. What holds
-this class in CI is the public `tests/fixtures/fragmentainer-residue.html`, reduced from one of the
-six until no product text remained; the reduction is itself the measurement that nothing exotic is
+the `private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. That record is
+now historical: re-measured on 2026-09-18, five of the six documents and their shared stylesheet no
+longer exist at the recorded digests, so nobody can run its private half. `npm run
+test:pagination-residue` prints `NO CLAIM` and reads none of the six, with or without
+`BREAKLINT_RESIDUE_CORPUS_ROOT`, and it is no longer a CI or release step — a step that exits 0
+having read zero documents would be a green light over nothing. What holds this class in CI is the
+public `tests/fixtures/fragmentainer-residue.html` in the live suite, reduced from one of the six
+until no product text remained; the reduction is itself the measurement that nothing exotic is
 required.
 
 **Rendering is not reproducible across machines.** Browser rendering varies with the host operating
@@ -245,15 +249,20 @@ chain need no browser and no process group, so they work there. What does not wo
 your own HTML. Blocking the install would take away the part that functions in order to prevent
 the part that does not, and the part that does not already fails loudly rather than quietly.
 
-**A file that is not HTML gets an unhelpful error.** Point the tool at a Markdown file and the
-run ends with exit 3 and `pagination aborted: TypeError: node.getAttribute is not a function` —
-which is Paged.js throwing on a document that has none of the structure it expects, caught at the
-boundary and reported fail-closed. The behaviour is safe: nothing is measured and nothing is
-claimed. The message is not: it names an internal function rather than the mistake, and the
-mistake is one a first-time user makes. Found by a CI step whose own premise had quietly become
-false. Not fixed in 0.1.0, because a clean answer means deciding whether a non-HTML input is an
-infrastructure fault (exit 3) or an invalid invocation (exit 2), and that decision changes the
-exit matrix rather than a message.
+**Non-HTML input is refused by its name, not by its content.** An input path that does not end in
+`.html` or `.htm` — Markdown, PDF, a standalone SVG — ends with exit 2 and `unsupported input type`
+before any renderer starts and before the path is even opened; measured for a `.md` file, existing
+or missing: exit 2, nothing on stdout. A path that is not a regular file — a directory called
+`chapter.html`, for instance — is refused the same way with `input is not a regular file`; through
+0.6.0 it passed both checks, started Chrome and ended exit 3 with "resource byte limit exceeded".
+The content of a `.html` file is not sniffed. Markdown text
+saved under a `.html` name is served and parsed as HTML: one run of body text with no element in
+it. Such a run then ends with exit 3 and `geometry-cross-check-failed` ("measured no elements"),
+because a cross-check over zero elements is not a passed cross-check (`src/measure/cross-check.ts`)
+— measured locally on Chromium 141 with the evidence binding off; the zero-sample rule itself does
+not depend on the browser. A converter's HTML output is ordinary HTML and is measured as such. The
+paragraph that stood here through 0.6.0 described a Paged.js `pagination aborted` exit 3 for a
+Markdown file; that path is gone, because the name check runs first.
 
 **Foreign HTML is executed.** The run uses a fresh browser profile, keeps the sandbox on, has no
 flag that disables it, and blocks every network request by default. That is protection against
@@ -299,7 +308,7 @@ and `position: fixed` by cloning it into every page box; both clones keep the in
 The collector used to gather blocks from the whole `.pagedjs_page`, so every clone became one more
 "fragment" of its source block. Measured on 2026-09-24 with Paged.js 0.4.3: a six-page document
 with a one-line running title and an eight-line side running element carried seven records per
-element and reported ten widow/orphan warnings, every one about a clone; under a running header,
+element and reported ten `layout/widow` and `layout/orphan` warnings, every one about a clone; under a running header,
 the blank page a `break-before: recto` inserts was not blank, both of its boundaries came out
 `overflow`/`forced` instead of `parity`, it drew a `layout/orphaned-continuation-page` finding, and
 every page was anchored to the header, so three `layout/half-empty-page` findings on three pages
@@ -318,15 +327,22 @@ reports it:
 - **Margin-box content.** A widow, an oversized block or an unfilled band inside a running header or
   footer is not judged. Generated margin content (`@top-center { content: "…" }`) never was.
 - **A running element keeps exactly one record**: the in-flow original Paged.js leaves in the page
-  content with an inline `display: none`. It has no layout box (width and height both zero), so the
-  block rules that could select it — `layout/unbreakable-block-too-tall`,
-  `layout/heading-at-page-bottom`, `type/excessive-word-spacing` — record it as `excluded` with the
-  reason `rule/target-not-rendered`, outside the coverage base, and never as measured. Until this
-  repair it counted as measured at 0 px, and a document whose only avoid block was a running
-  element reported full coverage for a check that looked at nothing. The same holds for any block
-  under `display: none`. The type rules still read a running element's source text once, attributed
-  to that hidden position, where there is no box for evidence to mark. A page is anchored to its
-  first block that has a box, so the hidden original never anchors one.
+  content with an inline `display: none`. It was not rendered — no layout box (width and height
+  both zero) and no line boxes — so the block rules that could select it —
+  `layout/unbreakable-block-too-tall`, `layout/heading-at-page-bottom`,
+  `type/excessive-word-spacing` — record it as `excluded` with the reason
+  `rule/target-not-rendered`, outside the coverage base, and never as measured. Until this repair it
+  counted as measured at 0 px, and a document whose only avoid block was a running element reported
+  full coverage for a check that looked at nothing. The same holds for any block under
+  `display: none`; the snapshot does not record which hidden original has margin-box clones, so the
+  reason does not say "running element". A zero box alone does not decide it: a `display: contents`
+  block has no box of its own but prints its text, so it is measured from its lines by
+  `type/excessive-word-spacing` (the gaps) and `layout/heading-at-page-bottom` (where the heading
+  ends), and declined as `env/invalid-measurement` — counted against coverage — by
+  `layout/unbreakable-block-too-tall`, which judges the height of a box it does not have. The type
+  rules still read a running element's source text once, attributed to that hidden position, where
+  there is no box for evidence to mark. A page is anchored to its first rendered block, so the hidden original never
+  anchors one.
 - **A `position: fixed` element is not measured at all.** Paged.js removes it from the flow, so there
   is no in-flow original, and its per-page clones are outside the content area. (An element whose
   `position: fixed` is an INLINE style is not recognised by Paged.js at all: it stays in the flow,
@@ -336,7 +352,7 @@ reports it:
   The test asks whether an element has an ancestor that is the area child of a page box. A running
   element whose own markup contains `<div class="pagedjs_pagebox"><div class="pagedjs_area">` makes
   its descendants pass that test in every margin-box clone, so they are measured once per page again
-  — the pre-repair behaviour, with its false widows and shared fingerprints, for that markup only.
+  — the pre-repair behaviour, with its false `layout/widow` findings and shared fingerprints, for that markup only.
   It cannot hide flow content from measurement: that would need an element of the real content area
   to lose the ancestor it has. A class name alone (`pagedjs_area` without the page-box parent) does
   not pass the test.
@@ -390,15 +406,21 @@ reports it:
   only (`tests/live/real-documents.test.ts`), for the reason given below.
 
 **The source-id integrity check reads the order of the flow; copies outside it are checked for
-identity and presence, not order.** Paged.js puts three kinds of copies out of source order: a
-running element's clones in the margin boxes (which come before the content area in every page
-box), a block footnote in the footnote area (after the page content) and a `position: fixed` clone
-at the head of every page box. The check used to read every source id in the document in document
-order, so a running title that was not the first element of the source — a heading before it, or a
-section around it — ended the run `checker-crashed` (exit 3). What still fails the run: any
-attribute change of a reserved id, anywhere; an unknown id, in the flow or out of it; an expected id
-that is nowhere; a flow whose order differs from the source; and an id found only in margin boxes,
-without the in-flow original every running element keeps, which is an element moved out of the flow.
+identity, presence and the signature of the Paged.js step that put them there, not for order.**
+Paged.js puts three kinds of copies out of source order: a running element's clones in the margin
+boxes (which come before the content area in every page box), a block footnote in the footnote area
+(after the page content) and a `position: fixed` clone at the head of every page box. The check used
+to read every source id in the document in document order, so a running title that was not the
+first element of the source — a heading before it, or a section around it — ended the run
+`checker-crashed` (exit 3). What still fails the run: any attribute change of a reserved id,
+anywhere; an unknown id, in the flow or out of it; an expected id that is nowhere; a flow whose
+order differs from the source; an id found only in margin boxes, without the in-flow original every
+running element keeps; an id in the footnote area outside an element Paged.js marked as a note
+(`data-note="footnote"`); and an id in a page box that is not on every page, sits after the page's
+content area, or also occurs in the flow — none of which Paged.js produces for a `position: fixed`
+element. Each of those is an element a script moved out of the flow. What the signature cannot
+tell apart is a script that reproduces it exactly — marks an element as a note before Paged.js moves
+it, or clones it into the head of every page box and removes the original.
 
 **Evidence marks follow the same boundary, and two kinds of page still cannot bind.** The overlay
 places no mark on a margin-box or page-box clone: no finding can target one, and requiring a mark
@@ -414,10 +436,11 @@ half is established by the live suite on current Chrome in CI and nowhere else. 
 and so ends a run with evidence binding on at `insufficient-coverage` (exit 4):
 
 - a page whose flow contains a fragment pulled ABOVE or below the content box (a negative top
-  margin, content hanging past the column): the content box is Paged.js' multi-column
-  fragmentainer, and a positioned mark outside its column height would be carried into another,
-  off-page column, so that mark is refused, and a fragment with no mark on its page leaves the page
-  unbound;
+  margin, content hanging past the column): down the page a mark must lie inside the content box,
+  so that mark is refused, and a fragment with no mark on its page leaves the page unbound. The
+  bound is a conservative choice, not a measured necessity: the marks hang in Paged.js'
+  multi-column fragmentainer, and on Chromium 141 a mark positioned above or below it printed at
+  its DOM position; the vertical bound was kept rather than rely on that for every browser;
 - **a page with content but no source block** — a page whose only content is an element that is
   not a block element (a full-page `<img>` or `<svg>` without a block around it), or text that no
   block owns. A page binds only on marks it carries (`src/render/evidence.ts`) and required
@@ -521,6 +544,27 @@ for the answer; the behaviour is measured, not explained, and it was measured on
 one version. An `EPERM` that outlives the deadline still fails the acquisition. The retry itself
 and the deadline-expiry failure have **no test**: both live in closures that only run when the
 environment produces `EPERM`, which is not deterministic. What is pinned is the errno truth table.
+
+**Page fill counts glyph boxes, not line boxes, and has no ceiling.** `netFill` merges the
+vertical bands of every text run's client rectangles — the glyph content area, not the line box —
+and of replaced elements, and divides by the content box height. Half-leading and block margins
+never enter it, so a page no further line would fit on reads roughly glyph height over line pitch,
+which the font and the leading set. Measured on full pages that are not the last of their document
+(Chromium 141 on Linux, Paged.js 0.4.3, the machine's default serif and sans-serif; not re-measured
+on the current Chrome that CI runs): 0.58–0.72 at `line-height: 1.5`, 0.51–0.54 at 2, 0.34–0.36 at
+3 (12 pt on A5 and 11 pt on A4). Both page-fill rules read this quantity. `layout/half-empty-page`
+cannot separate a full page from a sparse one near its 0.60 threshold, and stays experimental and
+off by default. `layout/orphaned-continuation-page` judges only a page whose content ends on it:
+the next page does not open with its text running on, because a page whose text runs on and opens
+the next page stopped for want of room. On a page it does judge it still reads net fill, so at
+`line-height: 3` every such page falls below its 0.50 threshold however full it is and whatever
+follows it: measured, 11 of 13 lines before a figure that did not fit read 0.29, and a tail page
+filled to its last line 0.34. The "running on" test relies on the collector keeping margin-box
+content out of the snapshot, as this release's collector does: a clone in a side margin box lies
+inside the content box and would count as running text. A line-box fill, each text rectangle
+widened to its line height, is the named next step for the net fill. It changes the snapshot shape and the quantity
+behind the public options `minNetFill` and `maxNetFill`, which needs an owner decision, and it is
+not in this release. None of these readings is a calibration.
 
 **The 40-document corpus behind the `layout/half-empty-page` default is not in this repository.**
 The 37-of-40 figure was measured on a corpus constructed for that purpose during the same work, and

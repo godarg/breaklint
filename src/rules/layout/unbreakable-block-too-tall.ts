@@ -1,7 +1,8 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  declined, hasLayoutBox, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber, sourceOf, targetEvaluation,
+  boxlessDeclined, declined, hasLayoutBox, isNotRendered, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber,
+  sourceOf, targetEvaluation,
 } from "../shared.ts";
 
 /**
@@ -135,12 +136,13 @@ export const unbreakableBlockTooTall = defineRule(
         }));
         continue;
       }
-      // A block with no layout box was never placed by the paginator, so "does it fit the page
-      // unbroken" has no referent. The case is the in-flow original of a `position: running(...)`
-      // element, which Paged.js hides with `display: none` while its clones print in the margin
-      // boxes: it was recorded as MEASURED at 0 px, and a document whose only avoid block was a
-      // running element reported full coverage for a check that looked at nothing.
-      if (!hasLayoutBox(block.box)) {
+      // A block that was not rendered — no box and no lines — was never placed by the paginator,
+      // so "does it fit the page unbroken" has no referent. The case is the in-flow original of a
+      // `position: running(...)` element, which Paged.js hides with `display: none` while its
+      // clones print in the margin boxes: it was recorded as MEASURED at 0 px, and a document whose
+      // only avoid block was a running element reported full coverage for a check that looked at
+      // nothing.
+      if (isNotRendered(block)) {
         evaluations.push(notRenderedEvaluation("layout/unbreakable-block-too-tall", block));
         continue;
       }
@@ -155,6 +157,13 @@ export const unbreakableBlockTooTall = defineRule(
         continue;
       }
       candidates += 1;
+      // Rendered, but without a box of its own (`display: contents`): there is no height to judge.
+      if (!hasLayoutBox(block.box)) {
+        const decline = boxlessDeclined("layout/unbreakable-block-too-tall", block);
+        notMeasured.push(decline.notMeasured);
+        evaluations.push(decline.evaluation);
+        continue;
+      }
 
       const outOfScope = layoutOutOfScope(block.effectiveStyle);
       if (outOfScope) {

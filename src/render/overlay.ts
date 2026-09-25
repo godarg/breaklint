@@ -177,11 +177,11 @@ const OVERLAY_TEMPLATE = `(() => {
       const layer = P.create("div");
       P.setAttr(layer, "class", "bl-overlay");
       P.setCssText(layer, STYLE_LAYER);
-      // A block footnote is moved into the footnote area, below the content box. A mark hanging in
-      // the content-box layer cannot reach it: that layer's containing block is the multi-column
-      // fragmentainer, and a mark below its column height is carried into an off-page column. So a
+      // A block footnote is moved into the footnote area, below the content box. The content-box
+      // layer refuses a mark below the content box (the conservative vertical bound below), so a
       // footnote-area fragment is marked from a second layer in the footnote area itself, which
-      // Paged.js positions (relative) and clips (overflow: hidden) and which is not fragmented.
+      // Paged.js positions (relative) and clips (overflow: hidden) and which is not a
+      // multi-column fragmentainer.
       // The layer's own box, at left 0 / top 0 of that containing block, is the origin its marks
       // are placed against, so a border an author puts on the footnote area cannot shift them.
       const footnoteArea = pageAreaEl ? (P.all(pageAreaEl, FOOTNOTE_AREA_SELECTOR)[0] || null) : null;
@@ -260,9 +260,13 @@ const OVERLAY_TEMPLATE = `(() => {
           // absolutely positioned mark stays inside the sheet, which clips at the page edge, so it
           // cannot widen the print area. Bounding it by the content box instead left every
           // fragment of a full-bleed block unmarked and its pages unbound. Down the page the bound
-          // stays the content box: the content box is Paged.js' multi-column fragmentainer, and a
-          // positioned box below its column height is carried into the next, off-page column —
-          // exactly the overflow that made Chrome shrink every page.
+          // stays the content box, as a conservative choice and nothing more: the layer hangs in
+          // Paged.js' multi-column fragmentainer, and whether a mark positioned above or below its
+          // column height prints where the DOM puts it is a property of the browser, not of this
+          // code. On Chromium 141 such marks were measured printing at their DOM position; no
+          // browser was shown to move them. The bound refuses them rather than depend on that.
+          // A footnote-area fragment is bounded by the footnote area on both axes instead, because
+          // that area clips (overflow: hidden) and a mark outside it is not printed at all.
           const relativeY = y - vertical.y;
           const maxAdvance = token.length * 1.2 + 2;
           if (

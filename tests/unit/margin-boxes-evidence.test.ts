@@ -190,11 +190,12 @@ describe("evidence on margin-box content and on fragments that bleed into the ma
       "the pages of a full-bleed block did not bind");
   });
 
-  it("still refuses a mark above the content box, where the fragmentainer would carry it off the page", async () => {
-    // The vertical bound is kept: the content box is Paged.js' multi-column fragmentainer, and a
-    // positioned box outside its column height lands in another, off-page column. A block whose
-    // top was pulled above the content box keeps its start mark unplaced and says so; its end
-    // mark is inside and placed, so the page can still bind on it.
+  it("still refuses a mark above the content box: the vertical bound is kept, conservatively", async () => {
+    // Down the page the bound stays the content box. That is a conservative choice, not a
+    // measured necessity — the marks hang in Paged.js' multi-column fragmentainer, and on Chromium
+    // 141 a mark above or below it was measured printing at its DOM position. A block whose top
+    // was pulled above the content box keeps its start mark unplaced and says so; its end mark is
+    // inside and placed, so the page can still bind on it.
     const { installation } = await evidenceFor(pulledUpDocument(), 1);
     assert.deepEqual(installation.unplacedMarks, [{ sid: "up", page: 1, side: "start", reason: "fragment-outside-page" }]);
     assert.equal(installation.marks.filter((mark) => mark.sid === "up").length, 1);
