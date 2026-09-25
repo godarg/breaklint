@@ -317,15 +317,10 @@ describe("rule registry", () => {
    */
   it("every rule page's remedied example changes only levers its rule's advice proposes", () => {
     const dir = new URL("../../docs/rules/", import.meta.url);
-    // A page another change of this release rewrites, with the EXACT foreign levers it is known to
+    // A page another change is still correcting, with the EXACT foreign levers it is known to
     // carry. Anything added to that example fails like on any other page, and once the page is
-    // corrected this test fails until the entry is deleted, so the list can only shrink.
-    const PENDING: Record<string, { foreign: string[]; reason: string }> = {
-      "layout/unbreakable-block-too-tall": {
-        foreign: ["break-inside"],
-        reason: "its page, including this example, is rewritten by another change of this release",
-      },
-    };
+    // corrected this test fails until the entry is deleted, so the list can only shrink. Empty.
+    const PENDING: Record<string, { foreign: string[]; reason: string }> = {};
     let compared = 0;
     for (const rule of ALL_RULES) {
       const page = pageNameFor(rule);

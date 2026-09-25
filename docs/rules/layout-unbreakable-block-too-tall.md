@@ -70,9 +70,12 @@ A block with 'break-inside: avoid' is taller than the content box of the page it
 ### Non-firing case (remedied)
 
 ```html
-<!-- Allow the tall block to paginate naturally -->
-<div style="break-inside: auto; height: 300mm; background: #eee;">
-  Content splits across pages cleanly.
+<!-- Split the content deliberately into sections that each fit a page -->
+<div style="break-inside: avoid; height: 150mm; background: #eee;">
+  First part of the content.
+</div>
+<div style="break-inside: avoid; height: 150mm; background: #eee;">
+  Second part of the content.
 </div>
 ```
 

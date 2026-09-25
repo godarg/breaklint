@@ -25,6 +25,15 @@ published repair from this change set and binds the child CLI to the actual cons
 run `33320332110` completed the Node 22.13/24 consumer matrix, npm provenance verification and
 GitHub Release creation on 2026-08-30.
 
+0.7.0 is a minor pre-1.0 release by the same test: the measurement snapshot changes structure, so
+its stamp moves, Snapshot 4 → 5. It gains six required fields — `BlockRecord.display`,
+`marginCopies`, `float`, `position`, `boundaryHyphen` and `TextLine.ownText` — and the engine
+refuses, with exit 3, to judge a snapshot of any other stamp or one that lacks a field its stamp
+requires; no reader accepts the previous stamp. The one stored snapshot the package ships,
+`examples/demo-snapshot.json`, is migrated. The document report, the agent context pack, the
+report comparison and Configuration Contract 1 keep their stamps. Rules also change what they
+report on unchanged documents; `CHANGELOG.md` lists those changes first.
+
 0.6.0 is a minor pre-1.0 release by the same test this document applied to 0.5.0: the canonical
 document report changes structure, so its stamp moves. In 0.6.0 Report 4 becomes Report 5 with the
 optional `Finding.remediation`, and the agent context pack becomes 2 with one new required key and three new
