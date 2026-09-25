@@ -80,8 +80,9 @@ Snapshot 5 `flowHazards`:
 - the block itself or an ancestor up to the page content being any of those, except the
   inside-only negative margin and overflow.
 
-The hazards are read through the browser's captured `getPropertyValue`, so a document that replaces
-the `CSSStyleDeclaration` property getters cannot hide one.
+The styles the hazards and the replaced-content boxes are built from are read through the browser's
+captured `getPropertyValue`, so a document that replaces the `CSSStyleDeclaration` property getters
+cannot hide a hazard that way.
 
 It is declined too where the fragments themselves show a premise failing: text of two elements side
 by side; a piece of a split element that does not end or begin its fragment (the paginator repeated

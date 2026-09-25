@@ -66,8 +66,8 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `negative-margin`, `overflowing-content`, `atomic-inline`, `shadow-tree` and `split-pseudo`
   (`negative-margin` and `overflowing-content` inside only). `inside` is read over every element
   laid out inside the block, not only over block records; `around` over its ancestors up to the page
-  content. Every computed value is read through the browser's captured `getPropertyValue`, not a
-  `CSSStyleDeclaration` property getter a document can replace. The snapshot invariants and the
+  content. Every computed value these two fields are built from is read through the browser's
+  captured `getPropertyValue`, not a `CSSStyleDeclaration` property getter a document can replace. The snapshot invariants and the
   engine share one check of all four Snapshot 5 block fields (`display`, `marginCopies`,
   `atomicBoxes`, `flowHazards`): a snapshot stamped 5 that lacks any of them — a stored or
   hand-edited one — is refused with `checker-crashed` (exit 3), never judged with an absent list
