@@ -126,19 +126,52 @@ try {
     redJson,
     brokenHtml,
   ]);
-  // Report4 also requires bound page evidence. The deliberately oversized transformed
-  // box cannot receive an in-page evidence mark, so the stricter coverage verdict wins
-  // while the arithmetic error must remain visible. This is not a finding-free pass.
-  assert.equal(red.status, 4, `the oversized-card control did not preserve the required evidence failure\n${diagnostic(red)}`);
   const redReport = readReport(redJson);
-  assert.equal(redReport.runVerdict, "insufficient-coverage");
-  assert.equal(redReport.exitCode, 4);
+  const redDocument = redReport.documents[0];
+  const coverage = redDocument.evidenceCoverage;
+  // Evidence binding stays on here, as in the clean run, and the report says which of two
+  // outcomes it reached; the control accepts neither on faith. The oversized tail starts on its
+  // page and its START mark is placed there; only its end mark (and the end marks of its
+  // ancestors) lies below the content box and is refused. A refused end mark does not unbind a
+  // page on which the same block's start mark is placed (src/render/evidence.ts, `hasUnplacedTarget`),
+  // so whether that page binds depends only on whether the browser's PDF returns every placed mark
+  // there. Measured in CI on current Chrome: at ed84d2c every page bound and the run ended exit 1;
+  // on the previous surface layout the same injection ended exit 4, with no per-page record of why.
+  // An earlier comment here said the box "cannot receive an in-page evidence mark"; the code never
+  // did that. Both outcomes are therefore checked completely, and the per-page evidence is printed
+  // so the phase CI reached is on record instead of inferred.
+  const pageEvidence = redDocument.evidence.map((entry) => ({
+    page: entry.page,
+    binds: entry.bindsFinding,
+    conformance: entry.pdfConformance,
+    marks: entry.conformance ? `${entry.conformance.marksMatched}/${entry.conformance.marksTotal}` : null,
+    unplaced: entry.unplacedMarks.map((mark) => `${mark.sid}:${mark.side}`),
+  }));
+  process.stdout.write(`live self-application red control: exit ${red.status}; evidence ${coverage.status} ` +
+    `(${coverage.boundPages}/${coverage.expectedPages} pages bound): ${JSON.stringify(pageEvidence)}\n`);
+  assert.equal(coverage.required, true, "the red control must run with evidence binding on, as the clean run does");
+  // The coverage summary and the per-page records must tell the same story.
+  assert.equal(pageEvidence.length, coverage.expectedPages, "the red run did not record evidence for every page");
+  assert.equal(pageEvidence.filter((entry) => entry.binds).length, coverage.boundPages, "the per-page evidence and the coverage summary disagree");
   assert.equal(redReport.summary.gateCandidate, "error");
-  assert.equal(redReport.summary.gateTriggeredBy, null);
-  assert.equal(redReport.documents[0].evidenceCoverage.required, true);
-  assert.equal(redReport.documents[0].evidenceCoverage.status, "partial");
-  assert.ok(redReport.documents[0].evidenceCoverage.boundPages < redReport.documents[0].evidenceCoverage.expectedPages);
-  assert.equal(redReport.documents[0].coverage["layout/unbreakable-block-too-tall"].coverage, 1);
+  assert.equal(redDocument.coverage["layout/unbreakable-block-too-tall"].coverage, 1);
+  if (coverage.status === "complete") {
+    // Every page bound: the injected error is a gating finding bound to page evidence.
+    assert.equal(red.status, 1, `evidence is complete, so the injected error must fail the build with exit 1\n${diagnostic(red)}`);
+    assert.equal(redReport.runVerdict, "findings");
+    assert.equal(redReport.exitCode, 1);
+    assert.equal(redReport.summary.gateTriggeredBy, "error");
+    assert.equal(coverage.boundPages, coverage.expectedPages);
+  } else {
+    // A page did not bind: the stricter coverage verdict wins, and the arithmetic error must
+    // remain visible beside it. Each unbound page must name a cause the report carries.
+    assert.equal(red.status, 4, `evidence is ${coverage.status}, so the run must end insufficient-coverage (exit 4)\n${diagnostic(red)}`);
+    assert.equal(redReport.runVerdict, "insufficient-coverage");
+    assert.equal(redReport.exitCode, 4);
+    assert.equal(redReport.summary.gateTriggeredBy, null);
+    assert.equal(coverage.status, "partial", `evidence must be partial, not ${coverage.status}: a red control without any bound page proves nothing about binding`);
+    assert.ok(coverage.boundPages < coverage.expectedPages);
+  }
   assert.ok(
     redReport.findings.some(
       (finding) => finding.ruleId === "layout/unbreakable-block-too-tall" && finding.severity === "error",

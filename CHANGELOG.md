@@ -421,6 +421,13 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   list was a grid, and a fragmenting grid item is stretched to its unfragmented area. Print lays it
   out as block flow and drops the end mark's rule; the gate rejects any row pitch more than 8 % off
   the table's median, measured independently by the verifier.
+- **The live self-application red control checks the evidence outcome it gets, instead of assuming
+  one.** It required exit 4 because the injected oversized tail supposedly could receive no
+  evidence mark; its start mark is placed, so the page binds whenever the browser's PDF returns its
+  marks, and CI on current Chrome ended exit 1 once the tail gained its print label. The control
+  now prints the per-page evidence and checks either outcome completely (complete evidence: exit 1,
+  the error gates; partial evidence: exit 4, the error still reported), always requiring the
+  injected 1600 px block to be the one measured.
 - **The verifier proves its own independent checks.** Beside its pixel, font and input
   controls it now breaks, once per run, a copy of real evidence for its tile re-cut (a doctored tile
   with rewritten manifest hashes), its gallery completeness (one tile reference removed), its

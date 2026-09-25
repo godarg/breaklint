@@ -492,6 +492,19 @@ and gaps are checked in the DOM of every screen cell and in print. Red controls:
 block that promises not to break and cannot keep the promise. That control used to inject into a
 whole finding card; since findings fragment between units, the card is no longer a candidate of the
 rule (measured: the old injection now ends clean, exit 0), so the control injects into a finding's
-tail, which still asks not to be broken.
+tail, which still asks not to be broken. The control runs with evidence binding on, as the clean
+run does, and it used to require exit 4 on the ground that the oversized box "cannot receive an
+in-page evidence mark". The evidence code never did that: the box starts on its page and its start
+mark is placed there; only its end mark, below the content box, is refused, and a refused end mark
+does not unbind a page on which the same block's start mark is placed (`hasUnplacedTarget` in
+`src/render/evidence.ts`). Whether that page binds therefore depends only on whether the browser's
+PDF returns every placed mark on it. Measured in CI on current Chrome, the same injection ended
+exit 4 on the layout before the round-2 surface changes and exit 1 at `ed84d2c` (CI run 82), where
+the tail gained its print label; the earlier exit-4 run left no per-page record of which mark
+failed to return. The control now prints the per-page evidence of its run (marks matched, marks
+placed, refused marks) and checks whichever outcome the evidence summary reports, completely:
+complete evidence must end exit 1 with the error gating the run; partial evidence must end exit 4
+with the error still reported. Both require the injected 1600 px block itself to be measured, and
+the per-page records to agree with the summary.
 
 The portable bundle keeps `report.json` as the historical capture record. `context.json` adds `bundleEvidence` contract version 1 with current per-finding asset availability; `bundle.json` lists every copied PNG/PDF and its SHA-256 and byte length. A missing or tampered local asset remains `missing-or-integrity-failed` in both HTML and AI context. A historical report comparison is not a fresh verification of local bundle assets. Overflow crops show the visible intersection while preserving the original target coordinates.
