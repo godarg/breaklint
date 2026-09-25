@@ -25,9 +25,17 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   one all-pass record, so the failed 2026-09-18 review existed as prose only. The file was migrated:
   the 0.2.3 review is round 1 unchanged, the 2026-09-18 FAIL is round 2, marked as a historical
   reconstruction and carrying only what the release record states. `npm run test:report-surfaces`
-  stays red and now says why ("latest human review round 2 is FAIL"); the technical mode prints the
-  same line and whether the latest round is bound to the current inputs. Reviewers are `human`,
-  `agent` (named by model or tool, never counted as human) or `not-recorded`.
+  stays red and now says why ("latest review round 2 is FAIL"); the technical mode prints the
+  same line, the reviewers by kind, and whether the latest round is bound to the current inputs.
+  Reviewers are `human`, `agent` (named by model or tool) or `not-recorded`.
+- **A human review pass is recorded only by a closed roster of human roles.** `human` reviewers are
+  limited to `@Brand`, `@Neo` and `@Founder` (one code constant, changed only by a reviewed code
+  change); every cell that passed must name one of them as a `human` reviewer of its round. An
+  agent may be recorded, with its model label, and may record a failed cell, but a cell it passed
+  is rejected; a handle listed as both agent and human, an agent carrying a human role handle and
+  any extra reviewer field are rejected too. The ledger line and the GitHub job summary
+  ("Report-surface review ledger") name each reviewer's kind and say "human review … PASS" only
+  when a rostered human passed every cell.
 - **The technical surface gate accepts every Chromium-based browser.** It required the string
   `Chrome` in `--version`, so `Chromium 141.0.7390.37` failed the gate after a complete render and
   no review on a Chromium build could ever be bound. It now requires a product name and a four-part

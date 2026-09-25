@@ -741,9 +741,11 @@ assert.deepEqual(manifest.physicalArtifacts, { screens: 24, screenTiles: 148, pd
   "the report-surface inventory must be exactly 24 screens with 148 viewport tiles, 4 PDFs and 26 PDF page rasters");
 
 const latestRound = describeLatestRound(ledger, currentReviewInput.fingerprint);
-// The human gate's state belongs where a release reader looks, not only in a log line.
+// The review ledger's state belongs where a release reader looks, not only in a log line. The line
+// names every reviewer by kind; it says "human review ... PASS" only when a rostered human passed
+// every cell of the latest round (describeLatestRound), and never for an agent-recorded round.
 if (process.env.GITHUB_STEP_SUMMARY) {
-  appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Report-surface human review\n\n${latestRound}.\n\n`);
+  appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Report-surface review ledger\n\n${latestRound}.\n\n`);
 }
 if (mode === "local") assessHumanGate(ledger, manifest, currentReviewInput.fingerprint);
 

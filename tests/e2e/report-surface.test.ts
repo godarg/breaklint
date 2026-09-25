@@ -28,9 +28,11 @@ import {
 import {
   BROWSER_VERSION_PATTERN,
   DECLARED_ENVIRONMENT_FIELDS,
+  HUMAN_REVIEW_ROLES,
   REQUIRED_BROWSER_RENDER_ARGS,
   REVIEW_ARTIFACT_CONTRACT_VERSION,
   assessHumanGate,
+  describeLatestRound,
   isMeasurableBrowserVersion,
   validateReviewLedger,
   type ReviewLedger,
@@ -386,16 +388,16 @@ function boundPassingFixture(): { ledger: ReviewLedger; manifest: Record<string,
         const path = `${state}--${theme}--${viewport}.png`;
         const tiles = viewport === "desktop" ? [] : [{ path: `${state}--${theme}--${viewport}--tile-01.png` }];
         artifacts.push({ cell, kind: "screen", path, tiles, reviewArtifactFingerprint: hex(++index), pixels: { normalizedRgbaSha256: hex(++index) } });
-        cells[cell] = { status: "pass", reviewer: "@Reviewer", reviewedAt: "2026-10-01T10:00:00.000Z", note: "Looked at the full page and every tile.", reviewArtifactFingerprint: hex(index - 1), reviewedRawSha256: hex(900), reviewedNormalizedRgbaSha256: hex(index), reviewedArtifacts: [path, ...tiles.map((tile) => tile.path)] };
+        cells[cell] = { status: "pass", reviewer: "@Neo", reviewedAt: "2026-10-01T10:00:00.000Z", note: "Looked at the full page and every tile.", reviewArtifactFingerprint: hex(index - 1), reviewedRawSha256: hex(900), reviewedNormalizedRgbaSha256: hex(index), reviewedArtifacts: [path, ...tiles.map((tile) => tile.path)] };
       }
     }
     const pdfCell = `print/${state}/pdf`;
     artifacts.push({ cell: pdfCell, kind: "pdf", path: `${state}--a4.pdf`, pages: 2, reviewArtifactFingerprint: hex(++index) });
-    cells[pdfCell] = { status: "pass", reviewer: "@Reviewer", reviewedAt: "2026-10-01T10:00:00.000Z", note: "Read both pages of the PDF.", reviewArtifactFingerprint: hex(index), reviewedRawSha256: hex(901), reviewedPages: [1, 2], reviewedArtifacts: [`${state}--a4.pdf`] };
+    cells[pdfCell] = { status: "pass", reviewer: "@Neo", reviewedAt: "2026-10-01T10:00:00.000Z", note: "Read both pages of the PDF.", reviewArtifactFingerprint: hex(index), reviewedRawSha256: hex(901), reviewedPages: [1, 2], reviewedArtifacts: [`${state}--a4.pdf`] };
     const rasterCell = `print/${state}/raster-set`;
     const pages = [{ path: `${state}--a4-page-1.png` }, { path: `${state}--a4-page-2.png` }];
     artifacts.push({ cell: rasterCell, kind: "raster-set", pages, reviewArtifactFingerprint: hex(++index) });
-    cells[rasterCell] = { status: "pass", reviewer: "@Reviewer", reviewedAt: "2026-10-01T10:00:00.000Z", note: "Compared both rasters with the PDF.", reviewArtifactFingerprint: hex(index), reviewedRawSha256: [hex(902), hex(903)], reviewedPages: [1, 2], reviewedArtifacts: pages.map((page) => page.path) };
+    cells[rasterCell] = { status: "pass", reviewer: "@Neo", reviewedAt: "2026-10-01T10:00:00.000Z", note: "Compared both rasters with the PDF.", reviewArtifactFingerprint: hex(index), reviewedRawSha256: [hex(902), hex(903)], reviewedPages: [1, 2], reviewedArtifacts: pages.map((page) => page.path) };
   }
   const physicalArtifacts = { screens: 24, pdfs: 4, rasterPages: 8 };
   const manifest = { reviewEnvironment, observedEnvironment: { platformRelease: "6.18.44", node: "v24.21.0" }, artifacts, physicalArtifacts };
@@ -405,7 +407,7 @@ function boundPassingFixture(): { ledger: ReviewLedger; manifest: Record<string,
     record: "current",
     outcome: "pass",
     reviewedAt: "2026-10-01T10:00:00.000Z",
-    reviewers: [{ handle: "@Reviewer", kind: "human" }],
+    reviewers: [{ handle: "@Neo", kind: "human" }],
     binding: { reviewInputFingerprint: fingerprint, renderManifestGeneratedAt: "2026-10-01T09:00:00.000Z", reviewEnvironment: structuredClone(reviewEnvironment) },
     physicalArtifactsReviewed: { ...physicalArtifacts },
     findings: { blocker: 0, high: 0, medium: 0, low: 0 },
@@ -447,7 +449,8 @@ describe("report-surface human review gate", () => {
     assert.ok(latest.reviewers.every((reviewer) => reviewer.kind === "not-recorded" && reviewer.handle === null),
       "the public record names no reviewer handle, so the ledger names none");
     const { manifest, fingerprint } = boundPassingFixture();
-    assert.throws(() => assessHumanGate(committedLedger(), manifest, fingerprint), /latest human review round 2 is FAIL \(2026-09-18/u);
+    assert.throws(() => assessHumanGate(committedLedger(), manifest, fingerprint), /latest review round 2 is FAIL \(2026-09-18/u);
+    assert.match(describeLatestRound(committedLedger(), fingerprint), /reviewers: not recorded, not recorded; cells passed by a rostered human: 0 of 0 passing\); bound to the current inputs: no$/u);
   });
 
   it("passes only a latest human round bound to the current inputs, environment and cells", () => {
@@ -476,15 +479,67 @@ describe("report-surface human review gate", () => {
     missingTile.rounds.at(-1)!.cells!["screen/clean/light/mobile"]!.reviewedArtifacts = ["clean--light--mobile.png"];
     assert.throws(() => assessHumanGate(missingTile, manifest, fingerprint), /reviewed screen artifacts are not named exactly/u);
 
-    // An agent review is recorded honestly and does not pass the human gate.
-    const agentOnly = structuredClone(ledger);
-    agentOnly.rounds.at(-1)!.reviewers = [{ handle: "@Reviewer", kind: "agent", model: "example-review-model" }];
-    assert.throws(() => assessHumanGate(agentOnly, manifest, fingerprint), /has no human reviewer/u);
-
     // An earlier pass never carries forward over a later failed round.
     const laterFail = structuredClone(ledger);
     laterFail.rounds.push({ ...structuredClone(ledger.rounds[1]!), round: 4, record: "current", reviewedAt: "2026-10-02" });
-    assert.throws(() => assessHumanGate(laterFail, manifest, fingerprint), /latest human review round 4 is FAIL/u);
+    assert.throws(() => assessHumanGate(laterFail, manifest, fingerprint), /latest review round 4 is FAIL/u);
+  });
+
+  it("admits only the closed human roster, and an agent never passes a cell (bypasses A-I)", () => {
+    assert.deepEqual([...HUMAN_REVIEW_ROLES], ["@Brand", "@Neo", "@Founder"], "the roster changes only by a reviewed code change");
+    assert.ok(Object.isFrozen(HUMAN_REVIEW_ROLES), "the roster cannot be extended at run time");
+    const agent = { handle: "@Bot", kind: "agent" as const, model: "example-review-model" };
+    /** The bound fixture with the latest round's reviewers and every cell's reviewer replaced. */
+    const probe = (reviewers: unknown[], cellReviewer: string, only?: string) => {
+      const { ledger, manifest, fingerprint } = boundPassingFixture();
+      const round = ledger.rounds.at(-1)!;
+      round.reviewers = reviewers as ReviewRound["reviewers"];
+      for (const [cellId, cell] of Object.entries(round.cells!)) if (!only || cellId === only) cell.reviewer = cellReviewer;
+      return () => assessHumanGate(ledger, manifest, fingerprint);
+    };
+    // A: an agent labels itself human under a handle of its own.
+    assert.throws(probe([{ kind: "human", handle: "@review-model-5" }], "@review-model-5"), /"@review-model-5" is not a rostered human review role \(@Brand, @Neo, @Founder\)/u);
+    // B: the same with the model label moved into a field of its own, under an unrostered and a rostered handle.
+    assert.throws(probe([{ kind: "human", handle: "@Agent", tool: "example-review-model" }], "@Agent"), /human reviewer carries only handle and kind; unknown field tool/u);
+    assert.throws(probe([{ kind: "human", handle: "@Neo", tool: "example-review-model" }], "@Neo"), /human reviewer carries only handle and kind; unknown field tool/u);
+    // C: a rostered human is named, but an agent passed every cell, or just one of them.
+    assert.throws(probe([{ kind: "human", handle: "@Neo" }, agent], "@Bot"), /screen\/clean\/light\/desktop passed under @Bot, an agent reviewer; a pass is recorded only by a rostered human/u);
+    assert.throws(probe([{ kind: "human", handle: "@Neo" }, agent], "@Bot", "print/findings/raster-set"), /print\/findings\/raster-set passed under @Bot, an agent reviewer/u);
+    // D: one handle listed as both agent and human, and an agent borrowing a human role on its own.
+    assert.throws(probe([{ kind: "agent", handle: "@Neo", model: "example-review-model" }, { kind: "human", handle: "@Neo" }], "@Neo"), /reviewer handle @Neo is listed more than once \(agent and human\)/u);
+    assert.throws(probe([{ kind: "human", handle: "@Neo" }, { kind: "human", handle: "@Neo" }], "@Neo"), /reviewer handle @Neo is listed more than once \(human and human\)/u);
+    assert.throws(probe([{ kind: "human", handle: "@Founder" }, { kind: "agent", handle: "@Neo", model: "example-review-model" }], "@Founder"), /an agent cannot carry the human review role @Neo/u);
+    // E-I: agent only, nobody, no kind, a null model on a human, not-recorded beside an agent.
+    assert.throws(probe([agent], "@Bot"), /passed under @Bot, an agent reviewer/u);
+    assert.throws(probe([], "@Bot"), /reviewer @Bot is not a reviewer of this round/u);
+    assert.throws(probe([{ handle: "@Neo" }], "@Neo"), /reviewer kind must be human, agent or not-recorded/u);
+    assert.throws(probe([{ kind: "human", handle: "@Neo", model: null }], "@Neo"), /does not carry a model label/u);
+    assert.throws(probe([{ kind: "not-recorded", handle: null }, agent], "@Bot"), /passed under @Bot, an agent reviewer/u);
+
+    // Positive controls: an agent may be recorded beside the humans who passed the cells, and may
+    // record a failed cell; the summary line names every reviewer by kind.
+    const recorded = probe([{ kind: "human", handle: "@Neo" }, agent], "@Neo");
+    assert.equal(recorded().round, 3, "an agent recorded beside the rostered human who passed every cell does not block the gate");
+    const { ledger, fingerprint } = boundPassingFixture();
+    ledger.rounds.at(-1)!.reviewers = [{ kind: "human", handle: "@Neo" }, agent];
+    assert.equal(describeLatestRound(ledger, fingerprint),
+      "latest human review round 3 is PASS (2026-10-01T10:00:00.000Z; 0 blocker, 0 high, 0 medium, 0 low; current record; " +
+        "reviewers: @Neo (human), @Bot (agent: example-review-model); cells passed by a rostered human: 32 of 32 passing); bound to the current inputs: yes");
+    const agentFail = structuredClone(ledger);
+    const failRound = agentFail.rounds.at(-1)!;
+    Object.assign(failRound, { outcome: "fail", findings: { blocker: 0, high: 0, medium: 1, low: 0 } });
+    Object.assign(failRound.cells!["screen/findings/dark/mobile"]!, { status: "fail", reviewer: "@Bot" });
+    assert.equal(validateReviewLedger(agentFail).latest.outcome, "fail", "an agent may record a failed cell");
+
+    // The summary never calls a round a human PASS unless a rostered human passed every cell, even
+    // when it is handed a ledger that skipped validation.
+    const unvalidated = structuredClone(ledger);
+    unvalidated.rounds.at(-1)!.reviewers = [agent];
+    for (const cell of Object.values(unvalidated.rounds.at(-1)!.cells!)) cell.reviewer = "@Bot";
+    const line = describeLatestRound(unvalidated, fingerprint);
+    assert.doesNotMatch(line, /human review/u);
+    assert.match(line, /^latest review round 3 is PASS but NOT a human pass \(.*reviewers: @Bot \(agent: example-review-model\); cells passed by a rostered human: 0 of 32 passing\)/u);
+    assert.throws(() => validateReviewLedger(unvalidated), /passed under @Bot, an agent reviewer/u);
   });
 
   it("rejects a ledger round whose record contradicts its outcome", () => {
@@ -496,7 +551,7 @@ describe("report-surface human review gate", () => {
     failed((ledger) => { ledger.rounds.at(-1)!.cells!["screen/clean/dark/tablet"]!.status = "fail"; }, /contains a cell that did not pass/u);
     failed((ledger) => { ledger.rounds.at(-1)!.findings.high = 1; }, /cannot carry a blocker or high finding/u);
     failed((ledger) => { ledger.rounds.at(-1)!.reviewers = [{ handle: null, kind: "agent" }]; }, /must name its model or tool/u);
-    failed((ledger) => { ledger.rounds.at(-1)!.reviewers = [{ handle: "@Reviewer", kind: "human", model: "example-review-model" }]; }, /does not carry a model label/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.reviewers = [{ handle: "@Neo", kind: "human", model: "example-review-model" }]; }, /does not carry a model label/u);
     failed((ledger) => { ledger.rounds.at(-1)!.round = 7; }, /numbered in order/u);
     failed((ledger) => { ledger.rounds.at(-1)!.binding = null; }, /must bind inputs and environment/u);
     failed((ledger) => { delete ledger.rounds.at(-1)!.cells!["print/clean/raster-set"]; }, /must cover all 32 cells/u);

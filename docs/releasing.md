@@ -85,8 +85,10 @@ The technical surface gate reconstructs and verifies every current cell without 
 look. `npm run test:report-surfaces` is the separate exact-environment human gate. It must stay red
 when the bound inputs changed and no person reviewed the new artifacts; never refresh its ledger as
 release ceremony. A real later review is recorded as a new round with its actual reviewers, date and
-outcome — `pass` or `fail` — and only a passing latest round with a human reviewer, bound to the
-exact current inputs, turns the gate green.
+outcome — `pass` or `fail` — and only a passing latest round in which a rostered human role
+(`@Brand`, `@Neo` or `@Founder`) passed every cell, bound to the exact current inputs, turns the
+gate green. An agent's review may be recorded in a round, by kind and model, and never passes a
+cell; the roster itself changes only by a reviewed code change (`docs/reporting.md`).
 
 The ledger is bound to the 0.2.3 input fingerprint from 2026-08-29. It was therefore red for
 0.3.0, 0.3.1, 0.4.0 and 0.5.0 without anyone noticing, because CI runs the technical mode, which
@@ -121,8 +123,9 @@ meeting it.
 For the next release the choice is the original two, and it has to be made before the tag: either a
 review that passes and rebinds the ledger, or a documented decision to drop the gate and the
 paragraph above with it. `npm run test:report-surfaces`
-stays red for 0.6.0 — but it is now red with a date, two named reviewers, an enumerated finding list
-and an owner, instead of red and unread. The findings and their addressees are carried in the
+stays red for 0.6.0 — but it is now red with a date, two reviewers (whose handles this record does
+not name, so the ledger records them as `not-recorded`), an enumerated finding list and an owner,
+instead of red and unread. The findings and their addressees are carried in the
 release's follow-up register; they are surface work, and they are not repaired in a release that
 already changes what the rules report.
 

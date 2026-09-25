@@ -229,24 +229,65 @@ export function assertObservedEnvironment(observed, label) {
   }
 }
 
-const HUMAN_HANDLE = /^@[A-Za-z0-9][A-Za-z0-9_.-]{0,38}$/u;
+/**
+ * The closed roster of human review roles. A cell counts toward the human gate only when it passed
+ * under one of these handles AND its round lists that handle as `kind: "human"`. The roster is a
+ * code constant on purpose: a role is added or removed by a reviewed change to this file, never by
+ * a ledger edit, so a reviewer (human or agent) cannot admit itself by writing the very ledger its
+ * review is recorded in. `docs/reporting.md` names the roster and this procedure.
+ */
+export const HUMAN_REVIEW_ROLES = Object.freeze(["@Brand", "@Neo", "@Founder"]);
+
+const AGENT_HANDLE = /^@[A-Za-z0-9][A-Za-z0-9_.-]{0,38}$/u;
+const REVIEWER_FIELDS = Object.freeze({
+  human: Object.freeze(["handle", "kind"]),
+  agent: Object.freeze(["handle", "kind", "model"]),
+  "not-recorded": Object.freeze(["handle", "kind"]),
+});
+
+/** True only for a reviewer entry that is a rostered human role. */
+export function isRosteredHuman(reviewer) {
+  return reviewer?.kind === "human" && HUMAN_REVIEW_ROLES.includes(reviewer.handle);
+}
 
 /**
- * A reviewer is named for what it is. `human` carries a role handle; `agent` carries the label of
- * the model or tool that reviewed and is never counted as a human; `not-recorded` states that the
- * record of the time did not name the reviewer, instead of inventing a name afterwards.
+ * A reviewer is named for what it is. `human` is one of the rostered role handles and nothing else;
+ * `agent` carries the label of the model or tool that reviewed (and, optionally, a handle that is
+ * not a human role) and is never counted as a human; `not-recorded` states that the record of the
+ * time did not name the reviewer, instead of inventing a name afterwards. No other field is
+ * accepted, so an agent cannot pass as a human by moving its model label into a field of its own.
  */
 function assertReviewer(reviewer, label) {
   assert.ok(reviewer && typeof reviewer === "object", `${label}: reviewer entry missing`);
-  assert.ok(["human", "agent", "not-recorded"].includes(reviewer.kind), `${label}: reviewer kind must be human, agent or not-recorded`);
+  assert.ok(Object.hasOwn(REVIEWER_FIELDS, reviewer.kind ?? ""), `${label}: reviewer kind must be human, agent or not-recorded`);
+  const allowed = REVIEWER_FIELDS[reviewer.kind];
+  const unknown = Object.keys(reviewer).filter((field) => !allowed.includes(field));
+  assert.deepEqual(unknown, [], `${label}: a ${reviewer.kind} reviewer carries only ${allowed.join(" and ")}; unknown field ${unknown.join(", ")}` +
+    (reviewer.kind === "human" && unknown.includes("model") ? " (a human reviewer does not carry a model label)" : ""));
   if (reviewer.kind === "human") {
-    assert.match(reviewer.handle ?? "", HUMAN_HANDLE, `${label}: a human reviewer needs a role handle`);
-    assert.equal(reviewer.model, undefined, `${label}: a human reviewer does not carry a model label`);
+    assert.ok(HUMAN_REVIEW_ROLES.includes(reviewer.handle),
+      `${label}: ${JSON.stringify(reviewer.handle)} is not a rostered human review role (${HUMAN_REVIEW_ROLES.join(", ")}); ` +
+        "the roster changes only by a reviewed code change to tests/tools/report-surface-contract.mjs");
   } else if (reviewer.kind === "agent") {
     assert.ok(typeof reviewer.model === "string" && reviewer.model.trim().length > 0, `${label}: an agent reviewer must name its model or tool`);
-    if (reviewer.handle !== undefined && reviewer.handle !== null) assert.match(reviewer.handle, HUMAN_HANDLE, `${label}: agent handle is malformed`);
+    if (reviewer.handle !== undefined && reviewer.handle !== null) {
+      assert.match(reviewer.handle, AGENT_HANDLE, `${label}: agent handle is malformed`);
+      assert.ok(!HUMAN_REVIEW_ROLES.includes(reviewer.handle), `${label}: an agent cannot carry the human review role ${reviewer.handle}`);
+    }
   } else {
     assert.equal(reviewer.handle, null, `${label}: a not-recorded reviewer has no handle`);
+  }
+}
+
+/** One handle names one reviewer of one kind within a round. */
+function assertDistinctReviewers(reviewers, label) {
+  const seen = new Map();
+  for (const reviewer of reviewers) {
+    const handle = reviewer?.handle;
+    if (handle === undefined || handle === null) continue;
+    assert.ok(!seen.has(handle),
+      `${label}: reviewer handle ${handle} is listed more than once (${seen.get(handle)} and ${reviewer.kind}); one handle is one reviewer of one kind`);
+    seen.set(handle, reviewer.kind);
   }
 }
 
@@ -257,8 +298,13 @@ function findingTotal(findings) {
 function assertReviewCell(cellId, cell, round, label) {
   assert.ok(["pass", "fail", "not-reviewed"].includes(cell?.status), `${label}: ${cellId} status must be pass, fail or not-reviewed`);
   if (cell.status === "not-reviewed") return;
-  const handles = round.reviewers.map((reviewer) => reviewer.handle).filter(Boolean);
-  assert.ok(handles.includes(cell.reviewer), `${label}: ${cellId} reviewer ${cell.reviewer} is not a reviewer of this round`);
+  const reviewer = round.reviewers.find((entry) => entry.handle && entry.handle === cell.reviewer);
+  assert.ok(reviewer, `${label}: ${cellId} reviewer ${cell.reviewer} is not a reviewer of this round`);
+  if (cell.status === "pass") {
+    assert.ok(isRosteredHuman(reviewer),
+      `${label}: ${cellId} passed under ${cell.reviewer}, ${reviewer.kind === "human" ? "a human" : reviewer.kind === "agent" ? "an agent" : "a not-recorded"} reviewer; a pass is recorded only by a rostered human ` +
+        `(${HUMAN_REVIEW_ROLES.join(", ")}), and an agent may record a failed cell or a round note but never a pass`);
+  }
   assert.match(cell.reviewArtifactFingerprint ?? "", SHA256, `${label}: ${cellId} stable review fingerprint missing`);
   assertUtc(cell.reviewedAt, `${label}: ${cellId} reviewedAt is not an exact UTC timestamp`);
   assert.ok(typeof cell.note === "string" && cell.note.trim().length >= 12, `${label}: ${cellId} review note is missing`);
@@ -285,7 +331,10 @@ function assertReviewCell(cellId, cell, round, label) {
  *
  * Structural rules, all fail-closed:
  * - rounds are numbered 1..n in order; the last one is the current state of the human gate;
- * - a `pass` round names at least one reviewer with a handle, binds an input fingerprint, a render
+ * - within a round one handle names one reviewer of one kind;
+ * - a cell that passed names a reviewer of its round who is a rostered human (HUMAN_REVIEW_ROLES);
+ *   an agent may be recorded as a reviewer and may record a failed cell, never a passed one;
+ * - a `pass` round names a rostered human reviewer, binds an input fingerprint, a render
  *   timestamp and an environment, records no blocker or high finding and carries a complete cell
  *   set in which every cell passed;
  * - a `fail` round records at least one finding or one failed cell;
@@ -305,6 +354,7 @@ export function validateReviewLedger(ledger, { cellCount = 32 } = {}) {
       assert.ok(typeof round.source === "string" && round.source.length > 0, `${label}: a reconstructed round must name its source record`);
     }
     assert.ok(Array.isArray(round.reviewers), `${label}: reviewers missing`);
+    assertDistinctReviewers(round.reviewers, label);
     round.reviewers.forEach((reviewer, reviewerIndex) => assertReviewer(reviewer, `${label} reviewer ${reviewerIndex + 1}`));
     assert.ok(typeof round.note === "string" && round.note.trim().length >= 12, `${label}: note missing`);
     for (const key of ["blocker", "high", "medium", "low"]) {
@@ -321,7 +371,7 @@ export function validateReviewLedger(ledger, { cellCount = 32 } = {}) {
     assert.ok(cells === null || cells.length > 0, `${label}: cells must be a record or null`);
     for (const [cellId, cell] of cells ?? []) assertReviewCell(cellId, cell, round, label);
     if (round.outcome === "pass") {
-      assert.ok(round.reviewers.some((reviewer) => reviewer.handle), `${label}: a passing round must name its reviewers`);
+      assert.ok(round.reviewers.some(isRosteredHuman), `${label}: a passing round must name a rostered human reviewer`);
       assert.ok(round.binding, `${label}: a passing round must bind inputs and environment`);
       assert.equal(round.findings.blocker + round.findings.high, 0, `${label}: a passing round cannot carry a blocker or high finding`);
       assert.ok(cells && cells.length === cellCount, `${label}: a passing round must cover all ${cellCount} cells`);
@@ -340,19 +390,49 @@ export function validateReviewLedger(ledger, { cellCount = 32 } = {}) {
   return { rounds: ledger.rounds.length, latest: ledger.rounds.at(-1) };
 }
 
-/** One line for logs and job summaries: what the human gate currently says, and why. */
-export function describeLatestRound(ledger, currentFingerprint) {
+function describeReviewer(reviewer) {
+  if (reviewer.kind === "not-recorded") return "not recorded";
+  if (reviewer.kind === "agent") return `${reviewer.handle ?? "unnamed"} (agent: ${reviewer.model})`;
+  return `${reviewer.handle} (${isRosteredHuman(reviewer) ? "human" : "unrostered, not a human role"})`;
+}
+
+/**
+ * Who reviewed the latest round, by kind, and how many of its passing cells a rostered human
+ * passed. `humanPass` is true only when the round passed and every cell passed under a rostered
+ * human; nothing else may be reported as a human PASS.
+ */
+export function summarizeLatestRound(ledger) {
   const latest = ledger.rounds.at(-1);
+  const byHandle = new Map(latest.reviewers.filter((reviewer) => reviewer.handle).map((reviewer) => [reviewer.handle, reviewer]));
+  const cells = Object.values(latest.cells ?? {});
+  const passing = cells.filter((cell) => cell.status === "pass");
+  const humanPassing = passing.filter((cell) => isRosteredHuman(byHandle.get(cell.reviewer)));
+  const humanPass = latest.outcome === "pass" && cells.length > 0 && humanPassing.length === cells.length;
+  return {
+    latest,
+    reviewers: latest.reviewers.map(describeReviewer),
+    passingCells: passing.length,
+    humanPassingCells: humanPassing.length,
+    humanPass,
+  };
+}
+
+/** One line for logs and job summaries: what the review ledger currently says, by whom, and why. */
+export function describeLatestRound(ledger, currentFingerprint) {
+  const { latest, reviewers, passingCells, humanPassingCells, humanPass } = summarizeLatestRound(ledger);
   const counts = `${latest.findings.blocker} blocker, ${latest.findings.high} high, ${latest.findings.medium} medium, ${latest.findings.low} low`;
   const bound = latest.binding?.reviewInputFingerprint === currentFingerprint;
-  return `latest human review round ${latest.round} is ${latest.outcome.toUpperCase()} ` +
-    `(${latest.reviewedAt ?? "not yet reviewed"}; ${counts}; ${latest.record} record); ` +
+  const who = reviewers.length > 0 ? reviewers.join(", ") : "none named";
+  return `latest ${humanPass ? "human " : ""}review round ${latest.round} is ${latest.outcome.toUpperCase()}` +
+    `${latest.outcome === "pass" && !humanPass ? " but NOT a human pass" : ""} ` +
+    `(${latest.reviewedAt ?? "not yet reviewed"}; ${counts}; ${latest.record} record; reviewers: ${who}; ` +
+    `cells passed by a rostered human: ${humanPassingCells} of ${passingCells} passing); ` +
     `bound to the current inputs: ${bound ? "yes" : "no"}`;
 }
 
 /**
- * The strict local human gate. It passes only when the LATEST round passed, at least one of its
- * reviewers is a human, and that round is bound to exactly the current inputs, the current declared
+ * The strict local human gate. It passes only when the LATEST round passed, every one of its cells
+ * passed under a rostered human reviewer, and that round is bound to exactly the current inputs, the current declared
  * environment, the current physical inventory and every current cell fingerprint. An earlier
  * passing round never carries forward over a later failed or pending one.
  */
@@ -360,8 +440,8 @@ export function assessHumanGate(ledger, manifest, currentFingerprint) {
   validateReviewLedger(ledger, { cellCount: manifest.artifacts.length });
   const latest = ledger.rounds.at(-1);
   assert.equal(latest.outcome, "pass", describeLatestRound(ledger, currentFingerprint));
-  assert.ok(latest.reviewers.some((reviewer) => reviewer.kind === "human"),
-    `latest human review round ${latest.round} has no human reviewer; an agent review is recorded as such and does not pass the human gate`);
+  // validateReviewLedger above already refused a passing round in which any cell passed under
+  // anyone but a rostered human, so reaching this line means every cell is a human pass.
   assert.equal(latest.binding.reviewInputFingerprint, currentFingerprint, "human review ledger is bound to a different source/input revision");
   assertReviewEnvironment(latest.binding.reviewEnvironment, "latest human review environment");
   assert.deepEqual(latest.binding.reviewEnvironment, manifest.reviewEnvironment,

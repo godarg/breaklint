@@ -151,9 +151,10 @@ cannot be judged at all.
 The ledger was **not** rebound. Recording `pass` for 32 cells after a review that failed would be
 exactly the false claim this gate exists to prevent. Since ledger schema 5 the failed review is a
 round of the ledger itself — round 2, `fail`, marked as a historical reconstruction from the release
-record — instead of prose only; `npm run test:report-surfaces` now fails on it by name ("latest human
+record — instead of prose only; `npm run test:report-surfaces` now fails on it by name ("latest
 review round 2 is FAIL"), and the technical mode prints the same line. The gate stays red for 0.6.0 — with a date,
-two named reviewers, an enumerated finding list and an owner, which is the difference that mattered.
+two reviewers (recorded as `not-recorded`, because the release record does not name their handles),
+an enumerated finding list and an owner, which is the difference that mattered.
 What is honestly established about these surfaces is the technical half: `test:report-surfaces:technical`
 passes 32 of 32 cells and all 71 artifacts, and makes no human-review claim.
 

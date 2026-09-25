@@ -240,8 +240,8 @@ The report-surface gate has two explicit modes over the complete matrix in
 `.artifacts/report-surfaces/`:
 
 - `npm run test:report-surfaces` and `npm run test:report-surfaces:local` are the strict local
-  human gate. They pass only when the **latest** review round in the ledger passed, names at least
-  one human reviewer, and is bound to exactly the current source fingerprint, declared review
+  human gate. They pass only when the **latest** review round in the ledger passed, every one of
+  its 32 cells passed under a rostered human reviewer, and it is bound to exactly the current source fingerprint, declared review
   environment, stable artifact fingerprints, visible screen-pixel hashes and physical inventory.
 - `npm run test:report-surfaces:technical` is the release/CI technical gate. It renders and
   validates the current platform's complete matrix, validates every round of the separately
@@ -263,13 +263,33 @@ states; per-cell outcomes, reviewer handles, the render fingerprint and the envi
 recorded at the time, so its `binding` and `cells` are `null` and its two reviewers are
 `not-recorded` instead of named after the fact.
 
-A round is validated fail-closed: a `pass` round names its reviewers, binds an input fingerprint,
-a render timestamp and an environment, covers all 32 cells with every cell `pass`, and records no
-blocker or high finding; a `fail` round records at least one finding or one failed cell; a
-`pending` round carries no outcome. A reviewer is `human` (with a role handle), `agent` (with the
-label of the model or tool that reviewed; an agent is never counted as a human, and an agent-only
-round does not pass the human gate) or `not-recorded`. An earlier passing round never carries
-forward over a later failed or pending one.
+A round is validated fail-closed: a `pass` round names a rostered human reviewer, binds an input
+fingerprint, a render timestamp and an environment, covers all 32 cells with every cell `pass`, and
+records no blocker or high finding; a `fail` round records at least one finding or one failed cell;
+a `pending` round carries no outcome. An earlier passing round never carries forward over a later
+failed or pending one.
+
+Reviewers are named for what they are, and the human roster is closed:
+
+- `human` is one of the **human review roles `@Brand`, `@Neo` and `@Founder`** and carries nothing
+  but `kind` and `handle`. The roster is the constant `HUMAN_REVIEW_ROLES` in
+  `tests/tools/report-surface-contract.mjs`; a role is added or removed only by a reviewed change to
+  that file, never by editing the ledger, so no reviewer can admit itself by writing the record its
+  review is kept in. A self-chosen handle such as `@some-model` labelled `human` is rejected.
+- `agent` carries the label of the model or tool that reviewed (`model`) and optionally a handle
+  that is not a human role. An agent may be recorded as a reviewer of a round and may record a
+  failed cell; a cell it marks `pass` is rejected, so an agent's review never satisfies the human
+  requirement, whether it is the only reviewer or listed beside a human.
+- `not-recorded` states that the record of the time did not name the reviewer (`handle: null`).
+- Within a round one handle is one reviewer of one kind: a handle listed as both `agent` and
+  `human` is rejected, and every reviewer entry is closed over its fields, so a model label cannot
+  move into a field of its own.
+
+Every cell that passed must name a `human` reviewer of its round from the roster. The line the
+verifier prints and appends to the GitHub job summary ("Report-surface review ledger") names every
+reviewer of the latest round with its kind and counts the cells a rostered human passed; it says
+"latest human review round N is PASS" only when that count is all 32 cells, and "latest review
+round N is …" otherwise.
 
 The render manifest (schema 5) splits the environment in two. `reviewEnvironment` is the
 **declared** review environment and is what a review binds: artifact and pixel contract versions,

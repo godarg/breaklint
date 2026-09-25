@@ -9,6 +9,7 @@ export const REVIEW_LEDGER_SCHEMA_VERSION: number;
 export const REQUIRED_BROWSER_RENDER_ARGS: readonly string[];
 export const DECLARED_ENVIRONMENT_FIELDS: readonly string[];
 export const OBSERVED_ENVIRONMENT_FIELDS: readonly string[];
+export const HUMAN_REVIEW_ROLES: readonly string[];
 
 export interface ReviewInput {
   fingerprint: string;
@@ -23,6 +24,14 @@ export function isMeasurableBrowserVersion(value: unknown): boolean;
 export function assertReviewEnvironment(environment: unknown, label: string, options?: { historical?: boolean }): void;
 export function assertObservedEnvironment(observed: unknown, label: string): void;
 export function validateReviewLedger(ledger: unknown, options?: { cellCount?: number }): { rounds: number; latest: ReviewRound };
+export function isRosteredHuman(reviewer: unknown): boolean;
+export function summarizeLatestRound(ledger: ReviewLedger): {
+  latest: ReviewRound;
+  reviewers: string[];
+  passingCells: number;
+  humanPassingCells: number;
+  humanPass: boolean;
+};
 export function describeLatestRound(ledger: ReviewLedger, currentFingerprint: string): string;
 export function assessHumanGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): ReviewRound;
 
