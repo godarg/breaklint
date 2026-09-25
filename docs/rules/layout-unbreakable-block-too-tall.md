@@ -45,9 +45,9 @@ fragment boxes summing to 417.47 px, and a margin Paged.js unset at a split made
 short of its block. What the rule adds up instead is, per fragment, the extent of its text lines
 and replaced content that start in the page's own column, clipped to the fragment box, less the
 snapshot's rounding and any overhang of glyph boxes taller than the line height; the sum is rounded
-down. Measured on Paged.js 0.4.3 (patched Chromium 141): a plain block split in two reads 7.34 px
+down. Measured with the real CLI on Paged.js 0.4.3 (patched Chromium 141): a plain block split in two reads 7.33 px
 below its unsplit height; a figure of five 200 px panels and a caption 2.71 px below; a block with a
-20 px border split in three 88.33 px below (40 px of border, two lines in the overflow column, the
+20 px border split in three 88.32 px below (40 px of border, two lines in the overflow column, the
 half-leading at the fragment ends).
 
 Why the sum is at most the unsplit height: inside one fragment, content in a single untransformed
@@ -58,16 +58,30 @@ bottom edge) lies outside every extent. That argument holds only for content in 
 block is **declined** when the snapshot records anything else inside it, on it or around it — the
 Snapshot 5 `flowHazards`:
 
-- an element inside it that is absolutely or fixed positioned, relatively offset, sticky,
-  transformed, floated, multi-column, a flex or grid container, a table row of two or more cells, in
-  vertical writing, or pulled up by a negative block margin; replaced content that overflows a
-  block-level ancestor that does not clip it. Measured on 2026-09-25 (Paged.js 0.4.3, patched
-  Chromium 141): paragraphs moved 55 px up and 70 px down by `position: relative` made the lines of a
-  block 301.19 px tall read 360.19 px, a two-column descendant made a block 335.81 px tall read
-  347.13 px — both above the 340.16 px page. **A split block containing a table of two or more
-  columns, or a multi-column, flex or grid layout, is not judged.**
+- an element inside it that is absolutely or fixed positioned, relatively offset (any of `top`,
+  `bottom`, `left`, `right`), sticky, transformed (`transform`, `translate`, `rotate`, `scale`,
+  `offset-path`), floated, multi-column, a flex or grid container (inline or not, and
+  `-webkit-box`), in vertical writing, or pulled up by a negative block margin; replaced content that
+  overflows a block-level ancestor that does not clip it; an inline-block, inline-table, or table cell
+  outside a table row that holds text (`atomic-inline`: a text column of its own that no block
+  record describes); an open shadow root, a `<slot>` or an autonomous custom element
+  (`shadow-tree`); a table row of two or more cells **in a table the paginator split** (a table
+  wholly inside one fragment is laid out as unsplit and is not a hazard); a split piece whose
+  pseudo-elements change what it carries (`split-pseudo`: generated `::before` on a continuation or
+  `::after` before the break, or `::first-line` / `::first-letter` styling on a continuation).
+  Measured on 2026-09-25 (Paged.js 0.4.3, patched Chromium 141) with bounds that did not decline
+  these: paragraphs moved 55 px up and 70 px down by `position: relative` read "at least 360.20 px"
+  for a block 301.19 px tall, a two-column descendant 347.13 px for one 335.81 px tall, two
+  inline-block text columns 567.35 px for one 298.50 px tall, and a `::first-line` rule on a
+  continued paragraph 317.85 px for one 307.84 px tall — each above the height of its block, and a
+  false error wherever that block fits the page.
+  **A split block containing a split table of two or more columns, or a multi-column, flex, grid or
+  inline-block layout, is not judged.**
 - the block itself or an ancestor up to the page content being any of those, except the
   inside-only negative margin and overflow.
+
+The hazards are read through the browser's captured `getPropertyValue`, so a document that replaces
+the `CSSStyleDeclaration` property getters cannot hide one.
 
 It is declined too where the fragments themselves show a premise failing: text of two elements side
 by side; a piece of a split element that does not end or begin its fragment (the paginator repeated
@@ -81,16 +95,24 @@ there, and nothing in the snapshot proves such a block fits — the fragment box
 This is the case of a block that fits an empty page but was split because an ancestor's border took
 the room, and of a block barely taller than a page whose borders and padding the bound leaves out.
 
-What the snapshot cannot see is assumed, and a document that breaks one of these assumptions could be
-reported although the block would have fitted:
+What the snapshot does not check is ASSUMED. A document that breaks one of these could be reported
+although the block would have fitted:
 
 - the hyphen Paged.js appends at a split inside a word (U+2011) is no wider than the one the browser
   drew there, and a continued piece of a paragraph does not wrap into more lines than the same text
-  had unsplit (Paged.js unsets `text-indent` on it);
+  had unsplit (Paged.js unsets `text-indent` on it; pseudo-element styling is checked, above);
 - every line box is at least as tall as the smallest `line-height` of the elements recorded in its
   fragment;
+- the block has the same width in every fragment as unsplit: fragments on a page of another content
+  width are left out, and positioned, floated, inline-block and flex or grid ancestors are hazards,
+  but an ancestor otherwise sized from its content (`width: fit-content`, an unsplit table) is not
+  recorded;
 - no content is repeated or moved by the paginator without an element of its own, and nothing sits
-  side by side without an element of its own (inline blocks).
+  side by side without an element of its own;
+- Paged.js marks the pieces of an element it split (`data-split-from`, `data-split-to`): a split
+  table and a continuation's pseudo-elements are recognised only by those marks;
+- no closed shadow root is attached to a standard element (a custom element is declined, an open
+  shadow root is seen; a closed one on a `<div>` is invisible to the page).
 
 Content the bound does not count — borders, padding, margins, backgrounds, generated content, list
 markers, empty boxes, a line in the overflow column — only makes the bound smaller. A fragment on a

@@ -57,18 +57,22 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   node's element — where it used to copy the block's visibility, so a hidden block's visible
   descendant (`p { visibility: hidden } span { visibility: visible }`) counts as printed.
 - **Snapshot schema 5 also records, per block, its replaced content and its flow hazards.** Two
-  more required fields:
-  `atomicBoxes` — `{ tag, box }` for every laid-out, visible, nonzero `img`, outermost `svg`,
-  `canvas`, `video`, `iframe`, `object`, `embed`, `audio`, `input`, `textarea` and `select` inside
-  the element (this fragment of it), clipped to any block-level ancestor inside the element whose
-  overflow is not visible — and `flowHazards`, `{ inside, self, around }`, each a sorted list of
-  `out-of-flow`, `offset`, `sticky`, `transformed`, `float`, `multicol`, `flex-or-grid`,
-  `table-columns`, `vertical-writing`, `negative-margin` and `overflowing-content` (the last two
-  inside only). `inside` is read over every element laid out inside the block, not only over block
-  records; `around` over its ancestors up to the page content. `validateSnapshotInvariants` refuses
-  a record without them, and the engine reads only schema 5: a schema-4 snapshot has neither field
-  and they cannot be derived from what it carries, so it is refused (`checker-crashed`), never read
-  as "no hazards". `examples/demo-snapshot.json` and the corpus are migrated.
+  more required fields, under the same stamp: `atomicBoxes` — `{ tag, box }` for every laid-out,
+  visible, nonzero `img`, outermost `svg`, `canvas`, `video`, `iframe`, `object`, `embed`, `audio`,
+  `input`, `textarea` and `select` inside the element (this fragment of it), clipped to any
+  block-level ancestor inside the element whose overflow is not visible — and `flowHazards`,
+  `{ inside, self, around }`, each a sorted list of `out-of-flow`, `offset`, `sticky`,
+  `transformed`, `float`, `multicol`, `flex-or-grid`, `table-columns`, `vertical-writing`,
+  `negative-margin`, `overflowing-content`, `atomic-inline`, `shadow-tree` and `split-pseudo`
+  (`negative-margin` and `overflowing-content` inside only). `inside` is read over every element
+  laid out inside the block, not only over block records; `around` over its ancestors up to the page
+  content. Every computed value is read through the browser's captured `getPropertyValue`, not a
+  `CSSStyleDeclaration` property getter a document can replace. The snapshot invariants and the
+  engine share one check of all four Snapshot 5 block fields (`display`, `marginCopies`,
+  `atomicBoxes`, `flowHazards`): a snapshot stamped 5 that lacks any of them — a stored or
+  hand-edited one — is refused with `checker-crashed` (exit 3), never judged with an absent list
+  read as empty. `examples/demo-snapshot.json`, the corpus builder and the calibration projection
+  carry the fields.
 - **A zero box no longer decides how a block is judged; its computed display does.** A
   `display: contents` block has no box of its own but prints its text and children:
   `type/excessive-word-spacing` measures it from its lines (a justified `display: contents`
@@ -195,7 +199,7 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   between one and two pages tall — which Paged.js splits in exactly two — was never reported:
   measured on 2026-09-24 with Paged.js 0.4.3, a block 503.72 px tall split 335.81 + 167.91 px
   against a 340.16 px page came back `clean` at exit 0. The same block is now reported as at least
-  496.38 px tall across its 2 fragments. The value of a split block is, per fragment, the extent of
+  496.39 px tall across its 2 fragments. The value of a split block is, per fragment, the extent of
   its text lines and replaced content (images, outermost SVG, canvas, video, embedded frames, form
   controls) in the page's own column, summed and rounded down; the finding says "at least", and its
   evaluation records `block-height-lower-bound`, `fragment-count` and `fragments-left-out` (an
@@ -208,25 +212,42 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   blocks already reported change value — the full-bleed block of the first entry above now reads
   1843.64 px instead of the 1865.61 px box sum. Measured on Paged.js 0.4.3 (patched Chromium 141).
 - **The same rule declines every split block it cannot bound, and every split block whose bound
-  does not exceed the page, so a build can also newly end at exit 4.** A first version of the bound
-  above counted text lines only and took them from any split block; measured on 2026-09-25 it
-  reported "at least 360.19 px" for a block 301.19 px tall with relatively offset paragraphs and
-  347.13 px for a block 335.81 px tall with a two-column descendant (false `error`s on a 340.16 px
-  page), and bounded a figure of five 200 px panels by its one-line caption at 14.99 px and passed
-  it. That version never shipped. Now a split block is declined as `env/invalid-measurement`, which
-  counts against the rule's full coverage floor, when the snapshot records a flow hazard inside it,
-  on it or around it (absolute, fixed, sticky or relatively offset positioning, a transform, a
-  float, multi-column, a flex or grid container, a table row of two or more cells, vertical writing,
-  and inside it a negative block margin or replaced content overflowing an ancestor that does not
-  clip it); when its fragments show the bound's premises failing (two elements' text side by side,
-  a piece of a split element away from the fragment's edge, content out of its own box by more than
-  its glyph overhang, nothing to count); and — **inconclusive** — when the bound is at or below the
-  page: nothing in the snapshot proves such a block fits, so it is neither reported nor called
-  clean. An unsplit block is declined when it or an ancestor is transformed or its box reaches past
-  the sheet into the overflow column; a split block whose first piece has no layout box but a later
-  piece does is declined rather than excluded. Every decline row names the premise in its
-  measurements (`flow-hazards`, `box-within-the-sheet`, `fragment-content-inside-its-box`, …). In
-  0.6.0 such blocks were reported from three fragments on, or passed at one or two.
+  does not exceed the page, so a build can also newly end at exit 4.** Earlier versions of the bound
+  above, which never shipped, did not check its premises; measured with the real CLI on
+  2026-09-25 (Paged.js 0.4.3, patched Chromium 141) they reported "at least 360.20 px" for a block
+  301.19 px tall with relatively offset paragraphs, 347.13 px for a block 335.81 px tall with a
+  two-column descendant, 567.35 px for a block 298.50 px tall of two inline-block text columns and
+  317.85 px for a block 307.84 px tall whose continued paragraph took a `::first-line` rule, and
+  bounded a figure of five 200 px panels by its caption at 14.99 px and passed it. Now a split block
+  is declined as `env/invalid-measurement`, which counts against the rule's full coverage floor,
+  when the snapshot records a flow hazard inside it, on it or around it: absolute, fixed, sticky or
+  relatively offset positioning; a transform, `translate`, `rotate`, `scale` or `offset-path`; a
+  float; multi-column; a flex, grid or `-webkit-box` container; vertical writing; an inline-block,
+  inline-table or anonymous table cell holding text; an open shadow root, a slot or an autonomous
+  custom element; a table row of two or more cells in a table the paginator split (a table wholly
+  inside one fragment is not a hazard); a split piece with generated `::before`/`::after` or
+  `::first-line`/`::first-letter` styling on its continuation; and, inside it, a negative block
+  margin or replaced content overflowing an ancestor that does not clip it. It is declined as well
+  when its fragments show a premise failing (two elements' text side by side, a piece of a split
+  element away from the fragment's edge, content out of its own box by more than its glyph overhang,
+  nothing to count), and — **inconclusive** — when the bound is at or below the page: nothing in the
+  snapshot proves such a block fits, so it is neither reported nor called clean. An unsplit block is
+  declined when it or an ancestor is transformed or its box reaches past the sheet into the overflow
+  column. A split block whose first piece printed no box is judged at its first printed piece over
+  all its fragments, as WP-F1b judges one. Every decline row names the premise in its measurements
+  (`flow-hazards`, `box-within-the-sheet`, `fragment-content-inside-its-box`, …). In 0.6.0 such
+  blocks were reported from three fragments on, or passed at one or two. **Not checked, and assumed
+  (docs/limitations.md):** a split-word hyphen no wider than the one it replaces and a continued
+  paragraph piece that wraps into no more lines than unsplit; line boxes at least the smallest
+  recorded `line-height`; the same block width in every fragment where no hazard is recorded (an
+  ancestor sized by `width: fit-content` or an unsplit table is not); no content repeated or moved
+  without an element of its own; Paged.js marking every split piece; no closed shadow root on a
+  standard element.
+- **With evidence binding on, a document whose split piece pushes content into the overflow column
+  ends at exit 4, even when this rule reports the block.** The piece's last line lies in the column
+  Paged.js hides beside the page, so the overlay cannot place its mark and that page cannot bind
+  (`env/evidence-fragment-outside-page`); measured on CI (Chrome 153) for a 20 px-bordered split
+  block. A plain split block binds and ends at exit 1.
 - **The same rule's advice no longer calls the reported height "the height its content needed".** It
   says the height of a split block is a lower bound from its text lines and replaced content; the
   levers are unchanged. Consumers that stored or compared advice text will see the new string.

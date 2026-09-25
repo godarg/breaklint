@@ -499,34 +499,55 @@ unsplit block at the same width, and Paged.js places each piece once, in order, 
 piece of the unsplit block and the pieces follow one another; what a split adds lies outside them.
 The bound is below the unsplit height by the block's own borders and padding, by every line in the
 overflow column (printed nowhere) and by the half-leading at the fragment ends — measured on
-Paged.js 0.4.3 (patched Chromium 141): 7.34 px for a plain block split in two, 2.71 px for a figure
-of five panels and a caption, 88.33 px for a 20 px-bordered block split in three.
+Paged.js 0.4.3 (real CLI, patched Chromium 141): 7.33 px for a plain block split in two, 2.71 px for a figure
+of five panels and a caption, 88.32 px for a 20 px-bordered block split in three.
 
-The argument needs its premises, and the version of this rule that took the lines of any split block
-broke on documents that violated them — measured on 2026-09-25 with the same stack, a false `error`
-at "at least 360.19 px" for a block 301.19 px tall with relatively offset paragraphs, 347.13 px for a
-block 335.81 px tall with a two-column descendant, and a figure of five 200 px panels bounded at
+The argument needs its premises, and the versions of this rule that did not check them broke on
+documents that violated them — measured with the real CLI on Paged.js 0.4.3 (patched Chromium 141,
+2026-09-25), false `error`s at "at least 360.20 px" for a block 301.19 px tall with relatively offset
+paragraphs, 347.13 px for a block 335.81 px tall with a two-column descendant, 567.35 px for a block
+298.50 px tall of two inline-block text columns, and 317.85 px for a block 307.84 px tall whose
+continued paragraph took a `::first-line` rule; and a figure of five 200 px panels bounded at
 14.99 px by its caption and passed. The snapshot (schema 5) therefore records, per block, the boxes
 of its replaced content (`atomicBoxes`) and its `flowHazards` — inside it, on it and around it up to
-the page content: absolute, fixed, sticky or relatively offset positioning, transforms, floats,
-multi-column, flex or grid containers, table rows of two or more cells, vertical writing, and inside
-it negative block margins and replaced content overflowing an ancestor that does not clip it. **A
-split block with any recorded hazard is declined** as `env/invalid-measurement`, which counts
-against the rule's full coverage floor and ends the run at exit 4; so is one whose fragments show a
-premise failing (two elements' text side by side, a piece of a split element away from the
-fragment's edge, content out of its own element's box by more than its glyph overhang, nothing to
-count). **A split block whose bound is at or below the page is declined as inconclusive**, never
-reported and never called clean: the fragment boxes are no upper bound, so nothing proves such a
-block fits. An unsplit block is judged on its box, and is declined only when it or an ancestor is
-transformed or its box reaches past the sheet into the overflow column.
+the page content, read through the browser's captured `getPropertyValue`: absolute, fixed, sticky or
+relatively offset positioning, transforms (including `translate`, `rotate`, `scale`,
+`offset-path`), floats, multi-column, flex or grid containers (and `-webkit-box`), vertical writing,
+inline-blocks, inline-tables and anonymous table cells holding text, shadow trees (an open shadow
+root, a slot, an autonomous custom element), table rows of two or more cells in a table the
+paginator split, split pieces whose pseudo-elements change what they carry, and inside it negative
+block margins and replaced content overflowing an ancestor that does not clip it. **A split block
+with any recorded hazard is declined** as `env/invalid-measurement`, which counts against the rule's
+full coverage floor and ends the run at exit 4; so is one whose fragments show a premise failing
+(two elements' text side by side, a piece of a split element away from the fragment's edge, content
+out of its own element's box by more than its glyph overhang, nothing to count). **A split block
+whose bound is at or below the page is declined as inconclusive**, never reported and never called
+clean: the fragment boxes are no upper bound, so nothing proves such a block fits. An unsplit block
+is judged on its box, and is declined only when it or an ancestor is transformed or its box reaches
+past the sheet into the overflow column. A stored snapshot stamped 5 without these fields is refused
+by the engine (exit 3), never read as "no hazards".
 
-**What the snapshot cannot see is assumed**: no content repeated or moved by the paginator without
-an element of its own, no side-by-side content without an element of its own (inline blocks), a
-split-word hyphen (U+2011) no wider than the one it replaces and a continued paragraph piece that
-does not wrap into more lines than its text had unsplit, and line boxes at least as tall as the
-smallest `line-height` recorded in the fragment. A document that breaks one of these could be
-reported although the block would have fitted. A fragment on a page of another content width is
-left out of the bound, and the evaluation row says how many were (`fragments-left-out`).
+**What the snapshot does not check is assumed**, and a document that breaks one of these could be
+reported although the block would have fitted: a split-word hyphen (U+2011) no wider than the one it
+replaces, and a continued paragraph piece that does not wrap into more lines than its text had
+unsplit; line boxes at least as tall as the smallest `line-height` recorded in the fragment; the
+same block width in every fragment (an ancestor sized from its content — `width: fit-content`, an
+unsplit table — is not recorded); no content repeated or moved by the paginator without an element
+of its own, and no side-by-side content without one; Paged.js marking every piece it split
+(`data-split-from`, `data-split-to`), which is how a split table and a continuation's
+pseudo-elements are recognised; and no closed shadow root on a standard element. A fragment on a
+page of another content width is left out of the bound, and the evaluation row says how many were
+(`fragments-left-out`).
+
+**A document whose split piece pushes content into the overflow column cannot bind its evidence
+there.** A bordered split piece reaches the bottom of its page's column, and its last line lands in
+the column Paged.js hides beside the page, which prints nowhere; the evidence overlay cannot place
+that piece's end mark or either mark of an element wholly in that column, and such a page cannot
+bind. With evidence binding on (the default) the run then ends `insufficient-coverage`
+(`env/evidence-fragment-outside-page`, exit 4) even when the rule reported the block: measured on CI
+(Chrome 153) for `tests/fixtures/too-tall-split-bounds.html`, and with the overlay alone on patched
+Chromium 141, 9 marks refused on pages 4, 6 and 7. A plain split block puts nothing there and ends at
+exit 1 (`tests/fixtures/too-tall-two-fragments.html`).
 
 **The boundary is the content box of the page the block was laid out on.** Comparing against the
 largest content box in the document was tried and is worse: in a document with a named landscape

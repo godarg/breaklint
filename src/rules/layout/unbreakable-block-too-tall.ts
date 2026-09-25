@@ -73,11 +73,14 @@ import {
  * DECLINED as `env/invalid-measurement` (charged to coverage) where they fail:
  *   - A flow hazard recorded inside the block, on it or around it (`flowHazards`, see FLOW_HAZARDS).
  *     Measured on 2026-09-25 (Paged.js 0.4.3, patched Chromium 141) with the lines-only bound this
- *     replaced: relatively offset paragraphs made a block 301.19 px tall read 360.19 px, a
+ *     replaced: relatively offset paragraphs made a block 301.19 px tall read 360.20 px, a
  *     two-column descendant made one 335.81 px tall read 347.13 px — false errors on a 340.16 px
  *     page — and a table row split inside its first cell gave 697.95 px for a block 522.38 px tall.
- *   - Two text-carrying records inside one fragment stand side by side (what the hazards miss:
- *     inline blocks).
+ *     With the hazards of round 2 only, two inline-block text columns (not block records) read
+ *     567.35 px for a block 298.50 px tall and a `::first-line` rule on a continued paragraph
+ *     317.85 px for one 307.84 px tall (real CLI, 2026-09-25); `atomic-inline` and `split-pseudo`
+ *     record those now.
+ *   - Two text-carrying records inside one fragment stand side by side.
  *   - A piece of a split element inside a fragment does not end the fragment's content (if the
  *     element continues) or begin it (if it continued): after a break everything in flow order is
  *     on the next page, so anything else is content the paginator repeated or moved. Measured on
@@ -92,11 +95,14 @@ import {
  * An unsplit block is declined when it or an ancestor is transformed (its box is not its laid-out
  * height) or its box reaches past the sheet (a union with the overflow column, one page tall).
  *
- * What the snapshot cannot see is assumed, and stated in docs/limitations.md: no content repeated or
- * moved by the paginator without an element of its own, nothing side by side without an element of
- * its own, the hyphen Paged.js appends at a split inside a word (U+2011) no wider than the one the
- * browser drew, a continued piece of a paragraph not wrapping into more lines than its text had
- * unsplit, and every line box at least as tall as the smallest line height recorded in its fragment.
+ * What the snapshot does not check is assumed, and stated in docs/limitations.md: no content
+ * repeated or moved by the paginator without an element of its own, nothing side by side without an
+ * element of its own, the hyphen Paged.js appends at a split inside a word (U+2011) no wider than the
+ * one the browser drew, a continued piece of a paragraph not wrapping into more lines than its text
+ * had unsplit, every line box at least as tall as the smallest line height recorded in its fragment,
+ * the same block width in every fragment where no hazard is recorded (an ancestor sized by
+ * `width: fit-content` or an unsplit table is not recorded), Paged.js marking every piece it split
+ * (`data-split-from` / `data-split-to`), and no closed shadow root on a standard element.
  *
  * Flow membership is a property of the snapshot, not of this rule: the collector keeps only blocks
  * inside a page's content area (`.pagedjs_pagebox > .pagedjs_area`), so a `position: running(...)`
