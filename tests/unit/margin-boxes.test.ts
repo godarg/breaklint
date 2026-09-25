@@ -328,7 +328,7 @@ describe("margin-box content is not part of the flow", () => {
     assert.equal(collector.pages[1]!.firstSid, null);
     assert.equal(collector.pages[1]!.lastSid, null);
     assert.equal(collector.pages[2]!.firstSid, sid["chapter-two"], "page 3 opens with the recto heading, not the header clone");
-    assert.equal(collector.pages[2]!.attributesAfterRender.breakBefore, "recto");
+    assert.equal(collector.pages[2]!.startSid, sid["chapter-two"], "and it is the node that starts it");
 
     const raw = evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, document);
     const snapshot = assemble(raw, collector, injected);

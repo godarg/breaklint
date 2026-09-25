@@ -406,6 +406,75 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   area without the note marker; the message now names what is missing (`data-note="footnote"`).
   Exit 3 as before.
 
+- **A page boundary is `forced` only where Paged.js' own break decision forced it, so a named-page
+  region inside a wrapper no longer declines `layout/widow`, `layout/orphan` and
+  `layout/orphaned-continuation-page` across the whole region.** The named page of a page
+  (`page: <name>`) was taken from the page's first source-bearing node. In a document wrapped in
+  `<main>` or `<article>` that node is the wrapper's continuation clone, which has no named
+  ancestor, so every boundary inside a named region and the one after it read as a change of named
+  page — `forced`, with the reason `page@<the wrapper>` — and the boundary into the region read as
+  `overflow`. The three rules decline a fragment or page at a forced boundary (`env/forced-break`),
+  and those declines count against coverage: on a self-authored report with a landscape region, 9
+  of 14 widow and orphan candidates were declined, both rules fell below their floor and the run
+  ended `insufficient-coverage`, exit 4 (patched Chromium 141, no evidence binding; a corpus-gate
+  run of the same document recorded 13 declines each and widow coverage 8 of 21). The collector now
+  evaluates `shouldBreak()` — its break-before, break-after and named-page clauses — at the node
+  the break token names, in the paginator's parsed source, with the paginator's own previous-node
+  walk, and only for a token at the node the layout walker handed out last on the page: a named
+  page forces a break only where the element the next page starts with is under a different named
+  page than the element before it, and a `break-before` or `page:` on a block inside an element
+  Paged.js deep-clones (`li`, `td`, `dd`, `p`, …) forces nothing, because the paginator never
+  evaluates it. Comparing the page styles of the two pages is
+  not that rule: a named region nested in a `<div>` ends without a break, so the page after it
+  changes style by overflow. On the same report 2 candidates of each rule are declined, at the two
+  boundaries the paginator forced, and widows and orphans that were hidden before can now be
+  reported.
+- **A `break-after` whose following element sits inside a continuing wrapper, or is loose inline
+  content, is `forced`; a `page:` on an inline element breaks where its text starts; and a forced
+  boundary's reason names the element at the break, not the wrapper.** These three were read from
+  the page's first node too. Paged.js puts `data-previous-break-after` on the element after the
+  declaring one — which may be a section inside `<main>` or an `<em>` at the head of the page — so
+  those boundaries read as `overflow`; it also breaks for a named page at a text node, which the
+  first-node read called `overflow`. A token with no node to evaluate makes the boundary `unknown`
+  (`break-cause-undetermined`, not fatal). Snapshot break-cause reasons change their named source
+  id where they named a wrapper; no schema stamp moves. See `docs/limitations.md`, *The break cause
+  of a page boundary*. Pinned by eleven live named-region documents in `tests/live/breaks.test.ts`,
+  each boundary checked against the paginator's own `shouldBreak()` answers, a production-chain
+  case in `tests/live/named-page-regions.test.ts` and recorded page and source trees in
+  `tests/unit/named-page-regions.test.ts`.
+- **A report written to a pipe arrives whole.** Through 0.6.0 the CLI exited as soon as it had
+  handed the report to stdout, which discarded everything the pipe had not taken yet: behind
+  `| cat`, `| jq` or a slow uploader a report larger than the pipe buffer arrived cut at a
+  multiple of the pipe buffer, usually 65 536 bytes, on Linux — in all six formats, on Node 22 and
+  24, from the source and from the built entry — while the exit code still stated the verdict, so
+  the loss was silent. The demo's own
+  JSON report (82 585 bytes) was already over that size. The CLI now exits only after every write
+  has been accepted. `--out` and a `> file` redirect were never affected.
+- **Output that cannot be delivered is exit 3, not a verdict.** When stdout cannot be written
+  completely — the reader closed early (`| head`), or the device is full — the run now ends with
+  exit 3 and one `breaklint: could not write to stdout (…)` line on stderr, whatever its verdict.
+  That covers every output written to stdout, `--help` and `--version` included. Before, a reader
+  that closed early left the run at exit 1 with no message, a verdict about a report nobody
+  received. With `--out` the report is in the file, complete, before stdout is touched, and stdout
+  carries only a confirmation line: if that line cannot be written, the run keeps its verdict's
+  exit code and says so on stderr (`could not write the confirmation line to stdout (…); the
+  report file was written in full`). The exit-code table in the README and in `--help` names both
+  cases. A
+  process-boundary test, `tests/e2e/cli-pipe-integrity.test.ts`, drives the real source entry and
+  a freshly built `dist/` entry (through a bin symlink) with a report of at least 256 KiB in every
+  format, through a kernel pipe into `cat`, a kernel pipe into a slow reader and a Node pipe, and
+  compares the bytes with the `--out` file; it fails on the previous entry point.
+- **A run that stops without an answer ends with exit 3, not 0.** If the work the CLI waits on
+  can no longer settle — a driver whose browser went away, a handle closed underneath it — the
+  event loop empties, and Node then ended the process with exit 0 and no output, which a gate
+  reads as a clean document. This was seen once, on a run under heavy load. The CLI now notices
+  the empty loop while it is still waiting and ends with exit 3 and one line:
+  `breaklint: the run stopped before it finished: nothing was left for it to wait on, so no report exists; exit 3.`
+  Its default exit code is also 3, so no other route past the explicit exit can end at 0.
+  `tests/e2e/cli-unsettled-run.test.ts` runs the real CLI source on the live path. Node's
+  module-customisation hooks replace only the acquisition module with one whose promise never
+  settles; that is harness, not a product option. It ended exit 0 before this change.
+
 ### Documentation
 
 - `docs/limitations.md` now states that a document with a page that carries no source block — the
