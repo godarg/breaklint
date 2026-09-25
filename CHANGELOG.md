@@ -437,6 +437,13 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   now prints the per-page evidence and checks either outcome completely (complete evidence: exit 1,
   the error gates; partial evidence: exit 4, the error still reported), always requiring the
   injected 1600 px block to be the one measured.
+- **The verifier measures the 40 % unit bound itself and proves four more of its checks.** It
+  finds the allowed break opportunities of the canonical states' print layout in its own browser
+  process (a different formulation from the renderer's unit chains) and requires the tallest
+  stretch between two of them to stay under 40 % of the content box and above the renderer's
+  figure. Its fill application, continuation-label, row-rule and row-pitch checks now each have a
+  red control on a broken copy of real evidence, as the tile, gallery, keep and text-depth checks
+  already did.
 - **The verifier proves its own independent checks.** Beside its pixel, font and input
   controls it now breaks, once per run, a copy of real evidence for its tile re-cut (a doctored tile
   with rewritten manifest hashes), its gallery completeness (one tile reference removed), its

@@ -6,11 +6,13 @@ import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { PNG } from "pngjs";
 
 import {
+  REQUIRED_BROWSER_RENDER_ARGS,
   REVIEWER_AUTHENTICATION_NOTE,
   REVIEW_ARTIFACT_CONTRACT_VERSION,
   SCREEN_PIXEL_CONTRACT_VERSION,
@@ -60,7 +62,7 @@ const COVERAGE_ROW_LINE = /^\s*([a-z0-9]+\/[a-z0-9-]+)\s+\d+\s+\d+\s+\d+\s+(?:\d
  * the projected A4 content box, and each row's closing rule is looked for in the raster between the
  * row's own text and the next row's. The renderer's report is then cross-checked against this.
  */
-function independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, reported, label) {
+function independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, reported, label, { decodedPages = new Map() } = {}) {
   const rasterDpi = manifest.reviewEnvironment.print.rasterDpi;
   const contentWidthCssPx = manifest.reviewEnvironment.print.contentViewportCssPx.width;
   const minimumEdgeCoverage = 0.98;
@@ -75,7 +77,7 @@ function independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, repo
     const xml = run("pdftotext", ["-f", String(page), "-l", String(page), "-bbox-layout", pdfPath, "-"]);
     const words = [...xml.matchAll(/<word xMin="[0-9.]+" yMin="([0-9.]+)" xMax="[0-9.]+" yMax="([0-9.]+)">([^<]+)<\/word>/gu)]
       .map((match) => ({ yMin: Number(match[1]), yMax: Number(match[2]), text: match[3] }));
-    const decoded = PNG.sync.read(readFileSync(resolve(output, pageArtifact.path)), { checkCRC: true });
+    const decoded = decodedPages.get(pageIndex) ?? PNG.sync.read(readFileSync(resolve(output, pageArtifact.path)), { checkCRC: true });
     const contentWidthRasterPx = contentWidthCssPx * rasterDpi / 96;
     const left = Math.round((decoded.width - contentWidthRasterPx) / 2);
     const right = Math.round(decoded.width - (decoded.width - contentWidthRasterPx) / 2 - 1);
@@ -135,15 +137,7 @@ function independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, repo
     });
     return { page, rows, header, caption };
   });
-  // Every printed row is one line: consecutive rule positions on a page lie within 8 % of the
-  // table's median pitch. A stretched continuation page does not.
-  const pitches = pages.flatMap((page) => page.rows.slice(1).map((row, index) => ({ page: page.page, ruleId: row.ruleId, pitchPx: row.ruleY - page.rows[index].ruleY })));
-  const sortedPitches = pitches.map((pitch) => pitch.pitchPx).sort((a, b) => a - b);
-  const medianPitchPx = sortedPitches[Math.floor(sortedPitches.length / 2)];
-  for (const pitch of pitches) {
-    assert.ok(Math.abs(pitch.pitchPx - medianPitchPx) <= 0.08 * medianPitchPx,
-      `${label}: page ${pitch.page} row ${pitch.ruleId} pitch ${pitch.pitchPx} px is irregular (median ${medianPitchPx} px)`);
-  }
+  const { medianPitchPx, sortedPitches } = assertRowPitch(pages, label);
   if (sortedPitches.length > 0) {
     assert.ok(Math.abs(reported.medianPitchPx - medianPitchPx) <= 2, `${label}: renderer row pitch ${reported.medianPitchPx} px disagrees with the independent ${medianPitchPx} px`);
     assert.equal(reported.maximumPitchDeviation, 0.08, `${label}: row pitch threshold drift`);
@@ -170,7 +164,48 @@ function independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, repo
         `${label}: renderer reported an open row rule`);
     }
   }
-  return { pagesWithRows: pages.filter((page) => page.rows.length > 0).map((page) => page.page) };
+  return { pagesWithRows: pages.filter((page) => page.rows.length > 0).map((page) => page.page), pages };
+}
+
+/**
+ * Every printed row is one line: consecutive rule positions on a page lie within 8 % of the
+ * table's median pitch. A stretched continuation page does not.
+ */
+function assertRowPitch(pages, label) {
+  const pitches = pages.flatMap((page) => page.rows.slice(1).map((row, index) => ({ page: page.page, ruleId: row.ruleId, pitchPx: row.ruleY - page.rows[index].ruleY })));
+  const sortedPitches = pitches.map((pitch) => pitch.pitchPx).sort((a, b) => a - b);
+  const medianPitchPx = sortedPitches[Math.floor(sortedPitches.length / 2)];
+  for (const pitch of pitches) {
+    assert.ok(Math.abs(pitch.pitchPx - medianPitchPx) <= 0.08 * medianPitchPx,
+      `${label}: page ${pitch.page} row ${pitch.ruleId} pitch ${pitch.pitchPx} px is irregular (median ${medianPitchPx} px)`);
+  }
+  return { medianPitchPx, sortedPitches };
+}
+
+/**
+ * Red controls for the row checks, once: the same evidence with one row rule painted out must
+ * fail the rule check, and the same row positions with one row pushed down by a fifth of the
+ * median pitch must fail the pitch check.
+ */
+function runRowSelfControls(pdfPath, rasterPages, expectedRows, reported, label, result) {
+  if (verifierSelfControls.rowRule) return;
+  const pageWithRows = result.pages.find((page) => page.rows.length >= 3);
+  if (!pageWithRows) return;
+  const row = pageWithRows.rows[1];
+  const decoded = PNG.sync.read(readFileSync(resolve(output, rasterPages[pageWithRows.page - 1].path)), { checkCRC: true });
+  for (let y = row.ruleY - 2; y <= row.ruleY + 2; y += 1) {
+    for (let x = row.left; x <= row.right; x += 1) decoded.data.set([255, 255, 255, 255], (y * decoded.width + x) * 4);
+  }
+  assert.throws(() => independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, reported, `${label} (row-rule control)`,
+    { decodedPages: new Map([[pageWithRows.page - 1, decoded]]) }), new RegExp(`row ${row.ruleId.replace("/", "\\/")} rule is open`, "u"),
+  `${label}: painting out the rule under ${row.ruleId} did not fail the verifier's row-rule check`);
+  const shifted = structuredClone(result.pages);
+  const { medianPitchPx } = assertRowPitch(result.pages, label);
+  shifted.find((page) => page.page === pageWithRows.page).rows[1].ruleY += Math.ceil(medianPitchPx / 5);
+  assert.throws(() => assertRowPitch(shifted, `${label} (pitch control)`), /pitch \d+ px is irregular/u,
+    `${label}: a row pushed down by a fifth of the pitch did not fail the verifier's pitch check`);
+  verifierSelfControls.rowRule = { label, row: row.ruleId };
+  verifierSelfControls.rowPitch = { label, row: row.ruleId };
 }
 
 function independentlyCheckPageContent(pdf, raster) {
@@ -288,8 +323,42 @@ function assertSectionKeeps(lines, label) {
  * controls). They run on the first printed state whose evidence allows them.
  */
 const verifierSelfControls = {};
-function runVerifierSelfControlsOnce(lines, rasterPages, label) {
+/** Every non-final page's text reaches MINIMUM_PAGE_FILL unless a declared forced break follows it. */
+function assertPageFill(fill, label) {
+  for (const page of fill) {
+    assert.ok(page.final || page.forcedBreakFollows || page.contentDepth >= MINIMUM_PAGE_FILL,
+      `${label}: page ${page.page} content text depth ${(page.contentDepth * 100).toFixed(1)} % is below ${MINIMUM_PAGE_FILL * 100} %`);
+  }
+}
+
+/** A page that opens inside a finding opens at its labelled tail, never on a bare fact or tail line. */
+const BARE_FINDING_CONTINUATION = /^(?:(?:DOCUMENT|SOURCE|MEASURED|THRESHOLD|CALIBRATION|PROOF SOURCE)\b|Remediation\b|Note:|Evidence:|Ambiguity:)/u;
+function assertLabelledContinuations(lines, label) {
+  for (const [pageIndex, pageLines] of lines.entries()) {
+    if (pageIndex === 0) continue;
+    assert.ok(!BARE_FINDING_CONTINUATION.test(pageLines[0] ?? ""),
+      `${label}: page ${pageIndex + 1} starts inside a finding without its label: ${JSON.stringify(pageLines[0])}`);
+  }
+}
+
+function runVerifierSelfControlsOnce(lines, rasterPages, label, fill) {
   const rasterDpi = manifest.reviewEnvironment.print.rasterDpi;
+  // Fill application: a non-final page below the bound, with no forced break after it, must fail.
+  if (!verifierSelfControls.fillApplication && fill.length > 1) {
+    const broken = structuredClone(fill);
+    Object.assign(broken[0], { contentDepth: MINIMUM_PAGE_FILL - 0.05, final: false, forcedBreakFollows: false });
+    assert.throws(() => assertPageFill(broken, `${label} (fill-application control)`), /page 1 content text depth 55\.0 % is below 60 %/u,
+      `${label}: a page at 55 % text depth did not fail the verifier's fill check`);
+    verifierSelfControls.fillApplication = { label };
+  }
+  // Bare continuation: page 2 opening on a bare remediation line must fail.
+  if (!verifierSelfControls.bareContinuation && lines.length > 1) {
+    const broken = structuredClone(lines);
+    broken[1] = ["Remediation untested A block fragments across a page break.", ...broken[1]];
+    assert.throws(() => assertLabelledContinuations(broken, `${label} (continuation control)`), /page 2 starts inside a finding without its label/u,
+      `${label}: a page opening on a bare remediation line did not fail the verifier's continuation check`);
+    verifierSelfControls.bareContinuation = { label };
+  }
   // Stranded heading: move everything after the "Findings" heading to the next page.
   if (!verifierSelfControls.strandedHeading) {
     const pageIndex = lines.findIndex((pageLines, index) => index + 1 < lines.length && pageLines.includes("Findings") &&
@@ -347,18 +416,12 @@ function independentlyCheckPageFlow(pdfPath, rasterPages, recorded, label) {
     const nextFirst = lines[index + 1]?.[0] ?? "";
     const exempt = recorded.forcedBreaks.some((text) => text.length > 0 && nextFirst.startsWith(text.slice(0, 16)));
     const final = index === rasterPages.length - 1;
-    assert.ok(final || exempt || depth >= MINIMUM_PAGE_FILL, `${label}: page ${index + 1} content text depth ${(depth * 100).toFixed(1)} % is below ${MINIMUM_PAGE_FILL * 100} %`);
     return { page: index + 1, contentDepth: depth, final, forcedBreakFollows: exempt };
   });
-  // A page that opens inside a finding opens at its labelled tail ("FINDING NN · ..."), never on a
-  // bare fact or remediation box.
-  for (const [pageIndex, pageLines] of lines.entries()) {
-    if (pageIndex === 0) continue;
-    assert.ok(!/^(?:(?:DOCUMENT|SOURCE|MEASURED|THRESHOLD|CALIBRATION|PROOF SOURCE)\b|Remediation\b|Note:|Evidence:|Ambiguity:)/u.test(pageLines[0] ?? ""),
-      `${label}: page ${pageIndex + 1} starts inside a finding without its label: ${JSON.stringify(pageLines[0])}`);
-  }
+  assertPageFill(fill, label);
+  assertLabelledContinuations(lines, label);
   assertSectionKeeps(lines, label);
-  runVerifierSelfControlsOnce(lines, rasterPages, label);
+  runVerifierSelfControlsOnce(lines, rasterPages, label, fill);
   assert.equal(recorded.minimumPageFill, MINIMUM_PAGE_FILL, `${label}: page fill threshold drift`);
   for (const page of fill) {
     const other = recorded.fill.find((candidate) => candidate.page === page.page);
@@ -468,6 +531,90 @@ function readDeclaredFontRoles() {
   return JSON.parse(result.stdout);
 }
 const DECLARED_FONT_ROLES = readDeclaredFontRoles();
+
+/**
+ * The 40 % unit bound, measured again here with a different formulation from the renderer's. The
+ * renderer builds chains of units; this finds the BREAK OPPORTUNITIES instead: every boundary
+ * between two adjacent in-flow block siblings anywhere in the print layout, allowed unless a
+ * computed break-after/break-before of avoid sits on either side of it (on the element or down its
+ * last/first-child edge), an ancestor has break-inside: avoid, or the two share a grid or flex row.
+ * The tallest stretch between consecutive allowed breaks — from the top of the box after one break
+ * to the bottom of the box before the next — is what the browser must move whole. It runs in its
+ * own browser process over the canonical states' HTML, at the A4 content width in print media,
+ * with the declared deterministic launch arguments.
+ */
+function independentlyMeasureBreakRuns(extraCss = "") {
+  const directory = mkdtempSync(resolve(tmpdir(), "breaklint-break-runs-"));
+  try {
+    const script = resolve(directory, "break-runs.mjs");
+    const root = pathToFileURL(`${reviewInputRoot}/`).href;
+    writeFileSync(script, `
+import puppeteer from ${JSON.stringify(pathToFileURL(createRequire(resolve(reviewInputRoot, "package.json")).resolve("puppeteer-core")).href)};
+import { resolveBrowser } from ${JSON.stringify(new URL("src/acquire/browser.ts", root).href)};
+import { render } from ${JSON.stringify(new URL("src/report/index.ts", root).href)};
+import { canonicalReportStates } from ${JSON.stringify(new URL("tests/fixtures/report-states.ts", root).href)};
+const browser = await puppeteer.launch({ executablePath: resolveBrowser().path, headless: true, args: ${JSON.stringify(REQUIRED_BROWSER_RENDER_ARGS)} });
+try {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 703, height: 1123, deviceScaleFactor: 1 });
+  const result = {};
+  for (const [state, report] of Object.entries(canonicalReportStates())) {
+    await page.setContent(render(report, "html"), { waitUntil: "load" });
+    await page.emulateMediaType("print");
+    if (process.argv[2]) await page.addStyleTag({ content: process.argv[2] });
+    await page.evaluate(() => document.fonts.ready);
+    result[state] = await page.evaluate(() => {
+      const avoid = (value) => value === "avoid" || value === "avoid-page";
+      const style = (element) => getComputedStyle(element);
+      const inFlowBlock = (element) => {
+        const s = style(element);
+        return s.display !== "none" && !s.display.startsWith("inline") && s.display !== "contents" &&
+          s.position !== "absolute" && s.position !== "fixed" && s.float === "none" && element.getClientRects().length > 0;
+      };
+      const edgeAvoids = (element, property, child) => {
+        for (let node = element; node; node = node[child]) if (avoid(style(node)[property])) return true;
+        return false;
+      };
+      const breaks = [];
+      for (const parent of document.querySelectorAll("body, body *")) {
+        const children = [...parent.children].filter(inFlowBlock);
+        for (let index = 1; index < children.length; index += 1) {
+          const before = children[index - 1], after = children[index];
+          const a = before.getBoundingClientRect(), b = after.getBoundingClientRect();
+          if (Math.abs(a.top - b.top) < 1 && ["grid", "flex", "inline-grid", "inline-flex"].includes(style(parent).display)) continue;
+          if (edgeAvoids(before, "breakAfter", "lastElementChild") || edgeAvoids(after, "breakBefore", "firstElementChild")) continue;
+          let inside = false;
+          for (let node = parent; node && node !== document.documentElement; node = node.parentElement) if (avoid(style(node).breakInside)) inside = true;
+          if (inside) continue;
+          breaks.push({ endY: a.bottom, startY: b.top, after: (after.className || after.tagName).toString().slice(0, 40) });
+        }
+      }
+      breaks.sort((x, y) => x.startY - y.startY);
+      const flow = [...document.body.querySelectorAll("*")].filter(inFlowBlock).map((element) => element.getBoundingClientRect());
+      const first = Math.min(...flow.map((rect) => rect.top));
+      const last = Math.max(...flow.map((rect) => rect.bottom));
+      let best = { px: 0, from: "document start", to: null };
+      let start = first, from = "document start";
+      for (const entry of [...breaks, { endY: last, startY: Infinity, after: "document end" }]) {
+        const px = entry.endY - start;
+        if (px > best.px) best = { px: Math.round(px * 100) / 100, from, to: entry.after };
+        if (entry.startY !== Infinity && entry.startY > start) { start = entry.startY; from = entry.after; }
+      }
+      return best;
+    });
+  }
+  process.stdout.write(JSON.stringify(result));
+} finally {
+  await browser.close();
+}
+`);
+    const child = spawnSync(process.execPath, ["--experimental-strip-types", "--no-warnings", script, ...(extraCss ? [extraCss] : [])], { cwd: reviewInputRoot, encoding: "utf8", env: process.env, timeout: 300_000 });
+    assert.equal(child.status, 0, `independent break-run measurement failed: ${child.stderr}${child.stdout}`);
+    return JSON.parse(child.stdout);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
 
 function declaredFamilies(role) {
   const families = DECLARED_FONT_ROLES[role]?.resolvesOn?.[manifest.reviewEnvironment.platform];
@@ -715,6 +862,7 @@ function printVisibleContract(state) {
     assert.ok(caveat.markersInBodyTextColour && (caveat.markers === 0 || caveat.smallestMarkerToAdviceRatio >= 1), `print/${state}: untested marker below body-text salience`);
   }
   const rows = independentlyCheckCoverageRows(resolve(output, pdf.path), raster.pages, pdf.printSemantics.coverageRowCount, pdf.rowChecks, `print/${state}`);
+  runRowSelfControls(resolve(output, pdf.path), raster.pages, pdf.printSemantics.coverageRowCount, pdf.rowChecks, `print/${state}`, rows);
   assert.ok(rows.pagesWithRows.length <= 2, `print/${state}: 13 coverage rows span ${rows.pagesWithRows.length} pages`);
   if (state === "clean") independentlyCheckPositiveApparatusGrouping(pdf);
   return {
@@ -899,6 +1047,28 @@ for (const artifact of manifest.artifacts) {
   }
 }
 assert.ok(pixelMutationControl, "screen pixel mutation control did not run");
+const breakRunLimitPx = MAXIMUM_UNBREAKABLE_SHARE * CONTENT_HEIGHT_CSS_PX;
+function assertBreakRuns(runs, label) {
+  for (const pdf of manifest.artifacts.filter((artifact) => artifact.kind === "pdf")) {
+    const state = pdf.cell.split("/")[1];
+    const own = runs[state];
+    const recorded = pdf.pageContentChecks.flow;
+    assert.ok(own && own.px > 0 && own.px <= breakRunLimitPx,
+      `${label}/${state}: the tallest stretch between allowed breaks, measured independently, is ${own?.px} px (from ${own?.from} to ${own?.to}), over ${MAXIMUM_UNBREAKABLE_SHARE * 100} % of the content box`);
+    // The stretch between two allowed breaks contains every chain the renderer can form, so the
+    // renderer's tallest unit cannot exceed it; a larger renderer figure means one of the two is wrong.
+    assert.ok(recorded.largestUnbreakableUnitPx <= own.px + 1,
+      `${label}/${state}: the renderer's tallest unit (${recorded.largestUnbreakableUnitPx} px) exceeds the independent break-to-break stretch (${own.px} px)`);
+  }
+}
+const breakRuns = independentlyMeasureBreakRuns();
+assertBreakRuns(breakRuns, "print");
+// Red control, once: every fact keeps with the next unit, so head, facts and tail become one run
+// the height of a finding. The independent measurement must reject it.
+assert.throws(() => assertBreakRuns(independentlyMeasureBreakRuns(".finding-facts > div, .finding-facts { break-after: avoid !important; }"), "break-run control"),
+  /break-run control\/[a-z-]+: the tallest stretch between allowed breaks, measured independently, is \d+(?:\.\d+)? px/u,
+  "gluing every fact to the next unit did not fail the independent break-run measurement");
+verifierSelfControls.breakRuns = Object.fromEntries(Object.entries(breakRuns).map(([state, run]) => [state, run.px]));
 {
   // The gallery is what a reviewer opens: it must present every screen, tile and printed page.
   const galleryPath = resolve(output, manifest.reviewGallery ?? "");
@@ -918,6 +1088,9 @@ assert.ok(pixelMutationControl, "screen pixel mutation control did not run");
 assert.ok(tileMutationControl, "tile re-cut mutation control did not run");
 assert.ok(verifierSelfControls.strandedHeading, "verifier stranded-heading control did not run");
 assert.ok(verifierSelfControls.fill, "verifier text-depth control did not run");
+for (const control of ["rowRule", "rowPitch", "fillApplication", "bareContinuation"]) {
+  assert.ok(verifierSelfControls[control], `verifier ${control} control did not run`);
+}
 assert.ok(fontMutationControl, "PDF font mutation control did not run");
 
 // The printed inventory is pinned rather than derived, so that a report which silently doubles in
@@ -946,7 +1119,7 @@ if (mode === "technical") {
   process.stdout.write(
     `report surfaces: technical gate passed 32/32 current cells and ${Object.values(manifest.physicalArtifacts).reduce((sum, count) => sum + count, 0)} physical artifacts; ` +
       `no human-review claim is made; ${latestRound} ` +
-      `(current inputs ${manifest.reviewInputFingerprint}; pixel, font, tile re-cut, gallery, stranded-heading and text-depth mutations rejected)\n`,
+      `(current inputs ${manifest.reviewInputFingerprint}; verifier self-controls rejected: pixel, font, tile re-cut, gallery, stranded heading, text depth, fill application, bare continuation, row rule, row pitch, break runs)\n`,
   );
 } else {
   process.stdout.write(

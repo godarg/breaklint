@@ -402,9 +402,31 @@ for, and fails if a check accepts the copy:
   borders on both column edges, a 4 px accent bar and a rule in two long segments — must read below
   the 60 % text depth. Each element defeats one simplification of the text reading (no inset from
   the column edges, a single run counted as text, no limit on run length); each simplification was
-  made in turn and the control failed on it.
+  made in turn and the control failed on it;
+- a fill record with a non-final page at 55 % text depth and no forced break after it must fail
+  the fill check (the threshold's application, not only its reading);
+- page text in which page 2 opens on a bare "Remediation …" line must fail the continuation check;
+- a page raster with the rule under one coverage row painted out must fail the row-rule check;
+- the verifier's own row positions with one row pushed down by a fifth of the median pitch must
+  fail the pitch check;
+- the independent break-run measurement (below) of a layout in which every fact keeps with the next
+  unit must exceed the 40 % bound.
 
-Removing any of these checks turns the technical gate red on its control. A new or changed bound
+Removing any of these checks turns the technical gate red on its control (each was removed in turn
+and measured red).
+
+**The 40 % unit bound is measured twice, differently.** The renderer builds chains of unbreakable
+units. The verifier opens the canonical states' HTML in its own browser process, at the A4 content
+width in print media with the declared launch arguments, and finds the break opportunities
+instead: every boundary between two adjacent in-flow block siblings, allowed unless a computed
+`break-after`/`break-before: avoid` sits on either side of it (on the element or down its last or
+first child), an ancestor has `break-inside: avoid`, or the two share a grid or flex row. The
+tallest stretch between consecutive allowed breaks must be at most 40 % of the content box, and the
+renderer's tallest unit may not exceed it (measured: 359.6–384.8 px against the renderer's
+359.6–384.8 px; for infrastructure the stretch includes the finding frame's top border and padding,
+383.3 against 364.3 px). The largest empty interval inside a page is not bounded separately: the
+fill check bounds the empty space below the last line, and the unit bound bounds what a break can
+move, but a tall gap between two lines in the middle of a page would pass both. A new or changed bound
 source therefore leaves the latest round unbound until the complete local matrix has been rendered
 and reviewed again in a new round. Technical CI still fails on malformed historical review evidence or any technical
 defect in its own current matrix; changed source is reported as different rather than mislabeled as
