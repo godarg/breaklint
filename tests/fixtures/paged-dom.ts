@@ -414,6 +414,11 @@ export function pagedPage(input: {
   /** Clones Paged.js inserts as the first children of the page box (`position: fixed`). */
   fixed?: string;
   /**
+   * Page-box children AFTER the page area. Paged.js never puts anything there; this exists for the
+   * negative controls, where a script has appended an element to the page box.
+   */
+  afterArea?: string;
+  /**
    * Attributes on the `.pagedjs_page` element itself. Paged.js copies the break attribute of the
    * first breaking node on a page onto the page element (`breaks.js`, `addBreakAttributes`), so a
    * `closest("[data-break-before]")` from any node on that page answers it.
@@ -431,7 +436,7 @@ export function pagedPage(input: {
     (input.fixed ?? "") + margins +
     `<div class="pagedjs_area"><div class="pagedjs_page_content" ${box(input.contentBox)}><div>${input.content}</div></div>` +
     `<div class="pagedjs_footnote_area"><div class="pagedjs_footnote_content"><div class="pagedjs_footnote_inner_content">` +
-    `${input.footnotes ?? ""}</div></div></div></div></div></div></div>`;
+    `${input.footnotes ?? ""}</div></div></div></div>${input.afterArea ?? ""}</div></div></div>`;
 }
 
 /** A whole paginated document: `<div class="pagedjs_pages">` around the pages. */

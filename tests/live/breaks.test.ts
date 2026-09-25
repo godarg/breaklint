@@ -125,6 +125,43 @@ body{font:9pt/1.4 Georgia,serif;margin:0} p{margin:0 0 6px}
 </body></html>`;
 
 /**
+ * A `position: fixed` stamp with a nested source block, on a document with a parity-blank page.
+ * Paged.js removes the element from the flow and inserts a clone at the head of EVERY page box,
+ * the blank page's included: the signature the source-id check accepts for a page-box id.
+ */
+const FIXED_BODY = Array.from({ length: 5 }, (_, i) => `<p id="fx${i}">Fixed-stamp document, paragraph ${i}, one line.</p>`).join("\n");
+const FIXED_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@page{size:120mm 80mm;margin:10mm}
+body{font:9pt/1.4 Georgia,serif;margin:0} p,h2{margin:0 0 6px}
+.stamp{ position: fixed; top: 2mm; right: 2mm; font-size: 7pt }
+.recto{ break-before: recto }
+</style></head><body>
+<div class="stamp" id="stamp"><p id="stamp-text">DRAFT</p></div>
+${FIXED_BODY}
+<h2 class="recto" id="fxh">After the blank page</h2>
+<p id="fxlast">The last paragraph.</p>
+</body></html>`;
+
+/**
+ * The negative control, reproduced from the round-2 verification: a script that moves an in-flow
+ * paragraph into the page box once Paged.js has laid it out. It is then outside every measurement;
+ * the source-id check must refuse it.
+ */
+const PAGEBOX_MOVE_HTML = FIXED_HTML.replace("</body>", `<script>
+(() => {
+  let done = false;
+  new MutationObserver(() => {
+    if (done) return;
+    const el = document.querySelector(".pagedjs_page_content #fx3");
+    if (!el) return;
+    done = true;
+    el.closest(".pagedjs_page").querySelector(".pagedjs_pagebox").appendChild(el);
+  }).observe(document.documentElement, { subtree: true, childList: true });
+})();
+</script>
+</body>`);
+
+/**
  * The pagination bootstrap breaklint owns: `paged.js`, never the auto-previewing polyfill.
  *
  * The replacement is a FUNCTION, and that is not style. `String.replace` interprets `$&`, `` $` ``,
@@ -144,6 +181,11 @@ describe("the collector, live", () => {
   let servedRunning = "";
   let servedFootnote = "";
   let footnoteExpectedSids: string[] = [];
+  let servedFixed = "";
+  let servedPageboxMove = "";
+  let fixedExpectedSids: string[] = [];
+  let pageboxMoveExpectedSids: string[] = [];
+  const fixedSidByAuthorId: Record<string, string> = {};
   let sidByAuthorId: Record<string, string> = {};
   const runningSidByAuthorId: Record<string, string> = {};
   const footnoteSidByAuthorId: Record<string, string> = {};
@@ -183,10 +225,27 @@ describe("the collector, live", () => {
     }
     footnoteExpectedSids = orderedSourceSids(footnote.map);
     servedFootnote = withPagination(footnote.html, pagedjs, true);
+    for (const html of [FIXED_HTML, PAGEBOX_MOVE_HTML]) {
+      assert.equal(detectCollision([{ origin: "document", text: html }]).collided, false);
+    }
+    const fixed = injectSourceIds(FIXED_HTML, "fixed.html");
+    for (const [sid, ref] of Object.entries(fixed.map)) {
+      const id = /\bid="([^"]+)"/u.exec(FIXED_HTML.slice(ref.offset, ref.offset + 200))?.[1];
+      if (id) fixedSidByAuthorId[id] = sid;
+    }
+    fixedExpectedSids = orderedSourceSids(fixed.map);
+    servedFixed = withPagination(fixed.html, pagedjs, true);
+    const moved = injectSourceIds(PAGEBOX_MOVE_HTML, "pagebox-move.html");
+    pageboxMoveExpectedSids = orderedSourceSids(moved.map);
+    servedPageboxMove = withPagination(moved.html, pagedjs, true);
 
     server = createServer((req, res) => {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(req.url === "/running.html" ? servedRunning : req.url === "/footnote.html" ? servedFootnote : served);
+      const routes: Record<string, string> = {
+        "/running.html": servedRunning, "/footnote.html": servedFootnote, "/fixed.html": servedFixed,
+        "/pagebox-move.html": servedPageboxMove,
+      };
+      res.end(routes[req.url ?? ""] ?? served);
     });
     serverLifecycle = ownServerLifecycle(server);
     await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", () => resolve()));
@@ -435,6 +494,49 @@ describe("the collector, live", () => {
     assert.deepEqual(validateRuntimeSidState(footnoteExpectedSids, integrity), [],
       "the footnote's position after the page content was read as a source-id order violation");
     await page.close();
+  });
+
+  /**
+   * The page box accepts only a `position: fixed` clone, observed with the real paginator: the
+   * stamp and its nested paragraph are at the head of every page box, the parity-blank page's
+   * included, and nowhere in the flow, and the check accepts them. The paired control moves an
+   * in-flow paragraph into one page box after layout — on the round-2 code that ended exit 0 with
+   * the paragraph unmeasured — and the check names it.
+   */
+  it("accepts a position: fixed clone in every page box and refuses a paragraph a script moved there", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const stamp = fixedSidByAuthorId["stamp"]!, stampText = fixedSidByAuthorId["stamp-text"]!;
+    assert.ok(stamp && stampText, "no source id was mapped for the stamp");
+    const fixed = await collect("/fixed.html");
+    const layout = await fixed.page.evaluate<{ pages: number; blank: number; stamps: number; headOfBox: number; inFlow: number }>(`(() => {
+      const pages = [...document.querySelectorAll(".pagedjs_page")];
+      const boxes = pages.map((page) => page.querySelector(".pagedjs_pagebox"));
+      return {
+        pages: pages.length,
+        blank: pages.filter((page) => page.classList.contains("pagedjs_blank_page")).length,
+        stamps: boxes.filter((box) => box.querySelector(":scope > [data-bl-sid='${stamp}'] [data-bl-sid='${stampText}']")).length,
+        headOfBox: boxes.filter((box) => box.firstElementChild && box.firstElementChild.getAttribute("data-bl-sid") === "${stamp}").length,
+        inFlow: document.querySelectorAll(".pagedjs_page_content [data-bl-sid='${stamp}']").length,
+      };
+    })()`);
+    assert.ok(layout.pages >= 3 && layout.blank >= 1, `premise: a multi-page document with a blank page, got ${JSON.stringify(layout)}`);
+    assert.equal(layout.stamps, layout.pages, "premise: Paged.js put the stamp with its paragraph in every page box");
+    assert.equal(layout.headOfBox, layout.pages, "premise: the clone is the first child of every page box");
+    assert.equal(layout.inFlow, 0, "premise: the fixed element left the flow");
+    const fixedStatus = await fixed.page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(TEST_PRIMITIVES_CAPABILITY));
+    assert.deepEqual(validateRuntimeSidState(fixedExpectedSids, fixedStatus), [],
+      "a position: fixed clone in every page box was read as a moved element");
+    await fixed.page.close();
+
+    const moved = await collect("/pagebox-move.html");
+    const premise = await moved.page.evaluate<number>(
+      `document.querySelectorAll(".pagedjs_pagebox > p[data-bl-sid]").length`);
+    assert.equal(premise, 1, "premise: the script moved the paragraph into a page box");
+    const movedStatus = await moved.page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(TEST_PRIMITIVES_CAPABILITY));
+    const issues = validateRuntimeSidState(pageboxMoveExpectedSids, movedStatus);
+    assert.ok(issues.some((issue) => /page box but is not a position: fixed clone/u.test(issue)),
+      `a paragraph moved into the page box passed the source-id check: ${JSON.stringify(issues)}`);
+    await moved.page.close();
   });
 
   /** The tokens are real: the pages that ran out of room have one, the last page does not. */

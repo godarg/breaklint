@@ -36,7 +36,7 @@ import { boundaryFactsFrom, PAGE_AREA_SELECTOR, type CollectorResult } from "../
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InjectionResult } from "../source/inject.ts";
 import { coordinateAtUtf8Byte } from "../source/bytes.ts";
-import { hasLayoutBox } from "../rules/shared.ts";
+import { isNotRendered } from "../rules/shared.ts";
 
 type Node = DefaultTreeAdapterMap["node"];
 type Element = DefaultTreeAdapterMap["element"];
@@ -1039,9 +1039,10 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
     boundaryFactsFrom(input.collector.pages, input.cascadeHints),
     input.collector.pages.map((p) => p.blank),
   );
-  // A page is anchored to the first source block a reader can SEE on it. A block with no box at
-  // all — width and height both zero, which is what the browser reports under display: none — is
-  // skipped. The case that forced this is the in-flow original of a running element: Paged.js
+  // A page is anchored to the first source block a reader can SEE on it. A block that was not
+  // rendered — no box in either dimension and no line boxes, which is what display: none leaves —
+  // is skipped (`isNotRendered`); a display: contents block, which has no box but prints its
+  // lines, is not. The case that forced this is the in-flow original of a running element: Paged.js
   // leaves it in the page content with an inline display: none while its clones print in the
   // margin boxes, so it is the first block on its page in document order and would otherwise
   // anchor that page, whose findings would then change fingerprint whenever the header is edited.
@@ -1055,7 +1056,7 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
   // continuing block, which is deterministic; two such pages of the same block share an anchor.
   const anchorCandidates = new Map<number, BlockRecord[]>();
   for (const block of blocks) {
-    if (!mappedNodeKeys.has(block.nodeKey) || !hasLayoutBox(block.box)) continue;
+    if (!mappedNodeKeys.has(block.nodeKey) || isNotRendered(block)) continue;
     const list = anchorCandidates.get(block.page) ?? [];
     list.push(block);
     anchorCandidates.set(block.page, list);

@@ -19,10 +19,13 @@ The threshold is chosen. Using the heading's own line height rather than a fixed
 
 A heading with anything under it on the same page is not stranded and is not reported.
 
-A heading with no layout box does not end any page: the in-flow original of a running heading,
-which Paged.js hides with `display: none` while its clones print in the margin boxes, is recorded as
-`excluded` (`rule/target-not-rendered`), outside the coverage base. Headings inside a margin box are
-not measured. See `docs/limitations.md`.
+A heading that was not rendered — no layout box and no line boxes — does not end any page: the
+in-flow original of a running heading, which Paged.js hides with `display: none` while its clones
+print in the margin boxes, is recorded as `excluded` (`rule/target-not-rendered`), outside the
+coverage base. A `display: contents` heading has no box of its own but prints its text; it is
+placed by its line boxes and ends where its last line does. A heading with neither a box nor
+visible line boxes is declined as `env/invalid-measurement`, and the decline counts against
+coverage. Headings inside a margin box are not measured. See `docs/limitations.md`.
 
 ## Calibration
 

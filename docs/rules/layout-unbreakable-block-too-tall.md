@@ -28,10 +28,13 @@ against the rule's coverage.
 Which records are fragments is decided by the page structure, not by coordinates. A fragment that
 bleeds into the page margin (negative margins, a full-bleed figure) still counts. Content in a page
 margin box is not part of the flow and is not measured: a `position: running(...)` element is
-represented only by its in-flow original, which Paged.js hides with `display: none`. A block with
-no layout box — that original, or anything else under `display: none` — was never placed by the
-paginator, so it is recorded as `excluded` (`rule/target-not-rendered`), outside the coverage base,
-and never as a measurement of 0 px. See `docs/limitations.md`.
+represented only by its in-flow original, which Paged.js hides with `display: none`. A block that
+was not rendered — no layout box and no line boxes: that original, or anything else under
+`display: none` — was never placed by the paginator, so it is recorded as `excluded`
+(`rule/target-not-rendered`), outside the coverage base, and never as a measurement of 0 px. A
+`display: contents` block is rendered (its text has lines) but has no box whose height could be
+judged; it is declined as `env/invalid-measurement`, and the decline counts against coverage. See
+`docs/limitations.md`.
 
 ## Calibration
 

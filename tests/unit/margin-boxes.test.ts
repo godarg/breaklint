@@ -389,16 +389,116 @@ describe("a record with no layout box is never measured, and never anchors a pag
   });
 
   /**
+   * The converse, over the same registry: a record with no box of its own that DOES print — a
+   * `display: contents` block, whose text is laid out and recorded as lines — is not "not rendered".
+   * Measured on 2026-09-25: a justified `<p style="display: contents">` with a word gap of 3.74× the
+   * natural space was a `type/excessive-word-spacing` finding on the base and was excluded as
+   * `rule/target-not-rendered` on the round-2 code, so `--fail-on warn` went from exit 1 to exit 0.
+   * A rule that reads lines measures it (the word gaps; where a heading ends, from its last line);
+   * a rule that needs the block's own box declines it, and the decline is counted against coverage.
+   * No rule may exclude it as unrendered.
+   */
+  it("measures a box-less record that has rendered lines, or declines it where coverage counts", () => {
+    const base = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
+    const contents: BlockRecord = {
+      ...structuredClone(base.blocks[0]!),
+      nodeKey: "bl:s9991:0", sid: "s9991", authorId: "contents-paragraph", blockSignature: "Aa Bb Cc",
+      tag: "h2", box: { x: 0, y: 0, width: 0, height: 0 }, lines: [9991], fragmentIndex: 0, fragmentCount: 1, spaceWidth: 3,
+    };
+    contents.effectiveStyle = { ...contents.effectiveStyle, breakInside: "avoid", textAlign: "justify", visibility: "visible", wordSpacing: "normal" };
+    const withContents = structuredClone(base);
+    withContents.blocks = [...withContents.blocks, contents];
+    const y = base.pages[0]!.contentBox.y + 40;
+    withContents.textLines = [...withContents.textLines, {
+      blockKey: contents.nodeKey, index: 9991, box: { x: 60, y, width: 60, height: 12 }, visible: true, width: 60,
+      wordBoxes: [
+        { text: "Aa", x: 60, y, width: 12, height: 12 },
+        { text: "Bb", x: 60 + 12 + 11.22, y, width: 12, height: 12 },
+        { text: "Cc", x: 60 + 24 + 14.44, y, width: 12, height: 12 },
+      ],
+    }];
+    const boxRules = new Set(["layout/unbreakable-block-too-tall"]);
+    const problems: string[] = [];
+    for (const rule of ALL_RULES) {
+      const ctx = { documentPath: "doc.html", options: rule.defaultOptions, fingerprint };
+      const before = rule.run(base, ctx);
+      const after = rule.run(withContents, ctx);
+      const rows = (after.evaluations ?? []).filter((row) => row.targetRef.nodeKey === contents.nodeKey);
+      for (const row of rows) {
+        if (row.reason === "rule/target-not-rendered") problems.push(`${rule.id}: excluded a printed record as not rendered`);
+      }
+      if (rule.id === "type/excessive-word-spacing") {
+        const measured = rows.find((row) => row.status === "measured");
+        if (!measured) problems.push(`${rule.id}: the printed record was not measured from its lines`);
+        else if (Math.abs(Number(measured.measurements[0]!.value) - 3.74) > 0.01) problems.push(`${rule.id}: measured ${measured.measurements[0]!.value}, not 3.74`);
+        if (!after.findings.some((finding) => finding.target.nodeKey === contents.nodeKey)) problems.push(`${rule.id}: no finding on the 3.74× gap`);
+      }
+      if (rule.id === "layout/heading-at-page-bottom") {
+        if (after.candidates !== before.candidates + 1 || after.measured !== before.measured + 1) {
+          problems.push(`${rule.id}: not measured (${before.candidates}/${before.measured} -> ${after.candidates}/${after.measured})`);
+        }
+        const page = base.pages.find((item) => item.pageNumber === contents.page)!;
+        const expected = (page.contentBox.y + page.contentBox.height - (y + 12)) / contents.lineHeight;
+        const remaining = rows.find((row) => row.status === "measured")?.measurements.find((item) => item.name === "remaining-line-heights");
+        if (!remaining || Math.abs(Number(remaining.value) - expected) > 1e-6) {
+          problems.push(`${rule.id}: the heading was not placed at its line box (remaining ${remaining?.value}, expected ${expected})`);
+        }
+      }
+      if (boxRules.has(rule.id)) {
+        if (after.candidates !== before.candidates + 1) problems.push(`${rule.id}: not a candidate (${before.candidates}->${after.candidates})`);
+        if (after.measured !== before.measured) problems.push(`${rule.id}: its zero box was measured`);
+        const declines = after.notMeasured.filter((row) => row.reason === "env/invalid-measurement").reduce((n, row) => n + row.count, 0)
+          - before.notMeasured.filter((row) => row.reason === "env/invalid-measurement").reduce((n, row) => n + row.count, 0);
+        if (declines !== 1) problems.push(`${rule.id}: the decline is not in the coverage account (${declines})`);
+        if (!rows.some((row) => row.status === "not-measured" && row.countsTowardCoverage !== false)) problems.push(`${rule.id}: no counted not-measured row`);
+      }
+    }
+    assert.deepEqual(problems, [], "a box-less record with rendered lines was dropped, or measured by its zero box");
+  });
+
+  /**
+   * What lies below a heading is read the same way: a `display: contents` paragraph under the last
+   * heading of a page is printed below it, by its line box, and the heading is not stranded. Read
+   * by its zero box at the page origin, the paragraph would be "above" every heading.
+   */
+  it("counts a display: contents block printed below a heading as content below it", () => {
+    const base = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
+    const page = base.pages[0]!;
+    const bottom = page.contentBox.y + page.contentBox.height;
+    const template = structuredClone(base.blocks[0]!);
+    const style = { ...template.effectiveStyle, breakInside: "auto", textAlign: "start", visibility: "visible" };
+    const heading: BlockRecord = { ...structuredClone(template), nodeKey: "bl:s9992:0", sid: "s9992", authorId: "late-heading",
+      blockSignature: "Late heading", tag: "h2", page: page.pageNumber, lineHeight: 16, lines: [9992], fragmentIndex: 0, fragmentCount: 1,
+      box: { x: page.contentBox.x, y: bottom - 40, width: page.contentBox.width, height: 16 }, effectiveStyle: style };
+    const after: BlockRecord = { ...structuredClone(template), nodeKey: "bl:s9993:0", sid: "s9993", authorId: "contents-after",
+      blockSignature: "Printed below", tag: "p", page: page.pageNumber, lineHeight: 16, lines: [9993], fragmentIndex: 0, fragmentCount: 1,
+      box: { x: 0, y: 0, width: 0, height: 0 }, effectiveStyle: style };
+    const snapshot = structuredClone(base);
+    // Only the two records on this page, so nothing else can be the content below the heading.
+    snapshot.blocks = [...snapshot.blocks.filter((block) => block.page !== page.pageNumber), heading, after];
+    snapshot.textLines = [...snapshot.textLines, {
+      blockKey: after.nodeKey, index: 9993, box: { x: page.contentBox.x, y: bottom - 22, width: 120, height: 16 }, visible: true, width: 120, wordBoxes: null,
+    }];
+    const rule = ALL_RULES.find((item) => item.id === "layout/heading-at-page-bottom")!;
+    const result = rule.run(snapshot, { documentPath: "doc.html", options: rule.defaultOptions, fingerprint });
+    const row = (result.evaluations ?? []).find((item) => item.targetRef.nodeKey === heading.nodeKey && item.status === "measured");
+    assert.equal(row?.measurements.find((item) => item.name === "following-block-count")?.value, 1,
+      "a display: contents paragraph printed below the heading was not counted as content below it");
+    assert.deepEqual(result.findings.filter((finding) => finding.target.nodeKey === heading.nodeKey), []);
+  });
+
+  /**
    * Both dimensions decide. An empty paragraph (full width, no height) and a zero-width block
    * that is still tall are laid out; only width AND height zero is a record the browser did not
    * lay out. Each case is the first block of its page, so each would lose its anchor to a
    * predicate on one dimension — the two survivors a mutation run found.
    */
-  it("anchors a page to its first block with a box in either dimension, and skips one with none", () => {
+  it("anchors a page to its first rendered block: a box in either dimension, or line boxes", () => {
     const html = `<!doctype html><html lang="en"><body>
 <p id="empty"></p><p id="p1">Page one text.</p>
 <div id="narrow">Narrow</div><p id="p2">Page two text.</p>
 <p id="gone">Hidden</p><p id="p3">Page three text.</p>
+<p id="contents"><span>Contents text</span></p><p id="p4">Page four text.</p>
 </body></html>`;
     const { injected, sid } = source(html);
     const at = (id: string, box: string, text: string, extra = "") =>
@@ -407,10 +507,14 @@ describe("a record with no layout box is never measured, and never anchors a pag
       pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), content: at("empty", `56.69 56.69 453.53 0`, "") + at("p1", lineBox(0, 0), "Page one text.") }),
       pagedPage({ pageBox: pageBox(1), contentBox: contentBox(1), content: at("narrow", `56.69 ${56.69 + STRIDE} 0 ${LINE}`, "Narrow") + at("p2", lineBox(1, 1), "Page two text.") }),
       pagedPage({ pageBox: pageBox(2), contentBox: contentBox(2), content: at("gone", "0 0 0 0", "Hidden", 'style="display: none;"') + at("p3", lineBox(2, 0), "Page three text.") }),
+      // `display: contents`: the element's own box is zero, its text is laid out in a line box.
+      pagedPage({ pageBox: pageBox(3), contentBox: contentBox(3), content:
+        at("contents", "0 0 0 0", `<span data-test-box="${lineBox(3, 0)}">Contents text</span>`, 'style="display: contents;"') + at("p4", lineBox(3, 1), "Page four text.") }),
     ]);
     const snapshot = assemble(
       evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, document), runCollector<CollectorResult>(COLLECTOR_SOURCE, document), injected);
-    assert.deepEqual(snapshot.pages.map((page) => page.firstSemanticBlockKey), ["id:empty", "id:narrow", "id:p3"]);
+    assert.deepEqual(snapshot.pages.map((page) => page.firstSemanticBlockKey), ["id:empty", "id:narrow", "id:p3", "id:contents"]);
+    assert.ok((snapshot.blocks.find((block) => block.authorId === "contents")?.lines ?? []).length > 0, "premise: the display: contents block has lines");
   });
 });
 
@@ -497,7 +601,7 @@ describe("the post-pagination source-id check reads the order of the flow, and s
     assert.deepEqual(check(html, (sid) => [
       pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), fixed: stamp(sid, 0),
         content: s(sid, "p1", lineBox(0, 0), "One.") + s(sid, "p2", lineBox(0, 1), "Two."),
-        footnotes: `<aside class="fn" id="fn" data-bl-sid="${sid["fn"]}" data-ref="ref-fn" data-test-box="56.69 378.5 453.53 ${LINE}">A footnote.</aside>` }),
+        footnotes: `<aside class="fn" id="fn" data-bl-sid="${sid["fn"]}" data-ref="ref-fn" data-note="footnote" data-test-box="56.69 378.5 453.53 ${LINE}">A footnote.</aside>` }),
       pagedPage({ pageBox: pageBox(1), contentBox: contentBox(1), fixed: stamp(sid, 1), content: s(sid, "p3", lineBox(1, 0), "Three.") }),
     ]), []);
   });
@@ -522,5 +626,40 @@ describe("the post-pagination source-id check reads the order of the flow, and s
     assert.ok(swapped.some((issue) => /order mismatch/u.test(issue)), `a swapped flow order passed: ${JSON.stringify(swapped)}`);
     const removed = check(html, (sid) => tree(sid, "", s(sid, "p1", lineBox(0, 0), "One.") + s(sid, "p3", lineBox(0, 1), "Three.")));
     assert.ok(removed.some((issue) => /distinct source ids/u.test(issue)), `a removed element passed: ${JSON.stringify(removed)}`);
+  });
+
+  /**
+   * The page box and the footnote area accept only what Paged.js puts there. Measured on
+   * 2026-09-25 on the frozen round-2 code: a script that appended an in-flow paragraph to the page
+   * box, or moved it into the footnote area, ended exit 0 with the paragraph absent from every
+   * evaluation, where the base refused it at this check (exit 3). A `position: fixed` clone is
+   * inserted at the HEAD of EVERY page box and has no in-flow original; a note carries
+   * `data-note="footnote"`, which Paged.js sets on every footnote element before it moves it.
+   */
+  it("refuses an element moved into the page box or the footnote area without the Paged.js signature", () => {
+    const html = `<!doctype html><html lang="en"><body><p id="p1">One.</p><p id="p2">Two.</p><p id="p3">Three.</p><p id="p4">Four.</p></body></html>`;
+    const two = (sid: Record<string, string>, first: Partial<Parameters<typeof pagedPage>[0]>, second: Partial<Parameters<typeof pagedPage>[0]> = {}) => [
+      pagedPage({ pageBox: pageBox(0), contentBox: contentBox(0), content: s(sid, "p1", lineBox(0, 0), "One."), ...first }),
+      pagedPage({ pageBox: pageBox(1), contentBox: contentBox(1), content: s(sid, "p3", lineBox(1, 0), "Three.") + s(sid, "p4", lineBox(1, 1), "Four."), ...second }),
+    ];
+    const p2 = (sid: Record<string, string>, extra = "") => s(sid, "p2", lineBox(0, 1), "Two.", extra);
+    const refused = (name: string, issues: string[], pattern: RegExp) => {
+      assert.ok(issues.length > 0, `${name}: passed the check`);
+      assert.ok(issues.some((issue) => pattern.test(issue)), `${name}: not named: ${JSON.stringify(issues)}`);
+    };
+    // Appended to the page box, as the verifier's control does: after the area, on one page.
+    refused("appended to the page box", check(html, (sid) => two(sid, { afterArea: p2(sid) })), /page box but is not a position: fixed clone/u);
+    // At the head of the page box, where a fixed clone goes, but on one page of two.
+    refused("at the head of one page box", check(html, (sid) => two(sid, { fixed: p2(sid) })), /in 1 of 2 page boxes/u);
+    // In every page box, but appended after the area: Paged.js inserts a fixed clone at the head.
+    refused("after the area of every page box", check(html, (sid) => two(sid, { afterArea: p2(sid) }, { afterArea: p2(sid) })), /follows the page area/u);
+    // At the head of every page box, but also still in the flow.
+    refused("in every page box and in the flow", check(html, (sid) => two(sid,
+      { fixed: p2(sid), content: s(sid, "p1", lineBox(0, 0), "One.") + p2(sid) }, { fixed: p2(sid) })), /in-flow occurrence/u);
+    // Into the footnote area without being a note.
+    refused("moved into the footnote area", check(html, (sid) => two(sid, { footnotes: p2(sid) })), /outside the page content and the footnote area/u);
+    // The same two places with the signature pass: a fixed clone on every page, a marked note.
+    assert.deepEqual(check(html, (sid) => two(sid, { fixed: p2(sid) }, { fixed: p2(sid) })), []);
+    assert.deepEqual(check(html, (sid) => two(sid, { footnotes: p2(sid, 'data-note="footnote"') })), []);
   });
 });

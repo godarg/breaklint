@@ -214,11 +214,13 @@ describe("target evaluation contract", () => {
     // 2026-09-18, a twelve-page document with a three-line running header reported this `error`
     // rule at 979.08 px against a 619.83 px page, for a header 81.59 px tall. The clones are not
     // in the snapshot any more; what remains is the in-flow original Paged.js leaves in the page
-    // content with `display: none`: one record, no box. The paginator never placed it, so the
-    // question does not arise: it is EXCLUDED, outside the coverage base, and not "measured at
-    // 0 px" — which is what it was, and a document whose only avoid block was a running element
-    // then reported full coverage for a check that had looked at nothing.
-    const runningOriginal = run(fragmented([{ height: 0, width: 0, x: 0, y: 0 }]));
+    // content with `display: none`: one record, no box and no line boxes. The paginator never
+    // placed it, so the question does not arise: it is EXCLUDED, outside the coverage base, and
+    // not "measured at 0 px" — which is what it was, and a document whose only avoid block was a
+    // running element then reported full coverage for a check that had looked at nothing.
+    const hiddenSnapshot = fragmented([{ height: 0, width: 0, x: 0, y: 0 }]);
+    hiddenSnapshot.blocks[0]!.lines = [];
+    const runningOriginal = run(hiddenSnapshot);
     assert.deepEqual(runningOriginal.findings, []);
     assert.equal(runningOriginal.candidates, 0, "a block with no layout box was counted as a candidate");
     assert.equal(runningOriginal.measured, 0, "a block with no layout box was counted as measured");
@@ -232,6 +234,29 @@ describe("target evaluation contract", () => {
     const emptyAvoid = run(fragmented([{ height: 0 }]));
     assert.equal(emptyAvoid.measured, 1, "a zero-height block with a width was dropped as if it had no box");
     assert.equal(emptyAvoid.evaluations!.find((row) => row.status === "measured")!.measurements[0]!.value, 0);
+    // A zero box is not the same as nothing rendered. A `display: contents` block has no box of its
+    // own while its text is laid out and recorded as lines; the regression this guards: such a
+    // block was excluded as not rendered, and a justified `display: contents` paragraph lost a real
+    // word-spacing finding. This rule judges the BOX, which such a block does not have, so it
+    // declines — counted against coverage — and never measures the zero box as a fit.
+    const contentsSnapshot = fragmented([{ height: 0, width: 0, x: 0, y: 0 }]);
+    assert.ok((contentsSnapshot.blocks[0]!.lines ?? []).length > 0, "premise: the template block has lines");
+    const contents = run(contentsSnapshot);
+    assert.deepEqual(contents.findings, []);
+    assert.equal(contents.candidates, 1, "a display: contents block with printed lines was dropped from the candidates");
+    assert.equal(contents.measured, 0, "a box-less block was measured at 0 px");
+    assert.deepEqual(contents.notMeasured.map((row) => [row.reason, row.count]), [["env/invalid-measurement", 1]]);
+    const contentsRow = contents.evaluations!.find((row) => row.targetRef.fragmentIndex === 0 && row.status !== "not-applicable")!;
+    assert.equal(contentsRow.status, "not-measured");
+    assert.notEqual(contentsRow.countsTowardCoverage, false);
+    // Lines not measured at all (`lines: null`, with the snapshot's reason) is not proof that
+    // nothing was rendered either: the same counted decline, never an exclusion.
+    const unknownSnapshot = fragmented([{ height: 0, width: 0, x: 0, y: 0 }]);
+    unknownSnapshot.blocks[0]!.lines = null;
+    unknownSnapshot.blocks[0]!.notMeasuredReason = "env/invalid-measurement";
+    const unknown = run(unknownSnapshot);
+    assert.equal(unknown.candidates, 1, "a box-less block whose lines were not measured was dropped as not rendered");
+    assert.deepEqual(unknown.notMeasured.map((row) => [row.reason, row.count]), [["env/invalid-measurement", 1]]);
 
     // Fragments with nothing to join them by. Without a sid (a `--no-source-map` run, or an
     // element a script created) three records of one split block cannot be told from three

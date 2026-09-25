@@ -1,7 +1,7 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  declined, hasLayoutBox, layoutOutOfScope, linesOfBlock, makeFinding, notRenderedEvaluation, num, sourceOf, targetEvaluation,
+  declined, isNotRendered, layoutOutOfScope, linesOfBlock, makeFinding, notRenderedEvaluation, num, sourceOf, targetEvaluation,
 } from "../shared.ts";
 
 /**
@@ -51,8 +51,9 @@ export const excessiveWordSpacing = defineRule(
       if (block.tag.toLowerCase() === "td" || block.tag.toLowerCase() === "th") continue;
       if (block.spaceWidth <= 0) continue;
       // No layout box, no lines, no gaps: a justified running header's hidden in-flow original
-      // was counted as measured with nothing in it.
-      if (!hasLayoutBox(block.box)) {
+      // was counted as measured with nothing in it. A `display: contents` block has no box but has
+      // lines, and its gaps are printed; it is measured from them like any other block.
+      if (isNotRendered(block)) {
         evaluations.push(notRenderedEvaluation("type/excessive-word-spacing", block));
         continue;
       }

@@ -45,7 +45,16 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `rule/target-not-rendered`, outside the coverage base, and never as measured. Consumers see new
   evaluation rows with that reason and smaller candidate and measured counts for these three
   rules on documents with running elements or hidden blocks. Both dimensions decide: an empty
-  paragraph (full width, zero height) is laid out and still measured.
+  paragraph (full width, zero height) is laid out and still measured. And a zero box alone does not
+  decide: a block counts as not rendered only when it also has no line boxes. A
+  `display: contents` block has no box of its own but prints its text; `type/excessive-word-spacing`
+  measures it from its lines as before (a justified `display: contents` paragraph with a 3.74×
+  gap is still a finding); `layout/heading-at-page-bottom` now places such a heading by its line
+  boxes, where it used to read the zero box at the page origin and call every such heading
+  followed; `layout/unbreakable-block-too-tall`, which judges the height of a box the block does
+  not have, declines it as `env/invalid-measurement`, counted against coverage, where it used to
+  measure the zero box as a fit. The heading rule newly declares `env/invalid-measurement`, for a
+  heading with neither a box nor visible line boxes.
 - **The same rule's advice no longer claims the block "cannot fit unbroken on any page".** The
   finding message had already stopped making that all-pages claim from one measured page; the
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
@@ -66,8 +75,8 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `overflow` and `forced` instead of `parity`, `layout/orphaned-continuation-page` fired on it, and
   every page was anchored to the header. The snapshot and the collector now keep only blocks
   inside a page's content area (`.pagedjs_pagebox > .pagedjs_area`, which holds the page content
-  and the footnote area — footnotes stay in the flow). A page is anchored to its first block that
-  has a box, so the running element's in-flow original, which Paged.js hides with
+  and the footnote area — footnotes stay in the flow). A page is anchored to its first rendered
+  block (a box, or line boxes), so the running element's in-flow original, which Paged.js hides with
   `display: none`, no longer anchors page 1 either. A page with no content area stops the run at
   exit 3 instead of being measured as empty. After the change both documents above have no
   findings. **What this leaves unmeasured is new and is stated in `docs/limitations.md`**:
@@ -87,8 +96,8 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `fullbleed-avoid.html` ended exit 4 with 24, 6 and 212 unplaced marks; after it, 0, 0 and 0. The
   overlay now skips everything outside the content area, as the snapshot does, and places a mark
   for an in-flow fragment in the side margin where it is printed, inside the page box; the
-  vertical bound stays the content box, because Paged.js' fragmentainer would carry a mark below
-  its column height into an off-page column. Whether the PDF returns the new margin marks at
+  vertical bound stays the content box, as a conservative choice (on Chromium 141 a mark above or
+  below the content box was measured printing at its DOM position). Whether the PDF returns the new margin marks at
   their DOM position is established by the live suite on current Chrome only: the Chromium 141
   build used for this change writes no mark into its PDF at all. Still unbindable, so still exit 4
   with evidence on, and now stated in `docs/limitations.md`: a fragment pulled above or below the
@@ -100,9 +109,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   page-1 clone of a running title preceded a heading written before it, or the section that
   contains it: `checker-crashed`, measured on `margin-running-after-heading.html` and
   `margin-running-in-section.html`. The order is now checked over the page content only; margin-box
-  clones, footnote-area blocks and `position: fixed` clones are checked for identity and presence.
-  An attribute change of a reserved id, an unknown id anywhere, a missing id, a reordered flow and an
-  id found only in margin boxes (an element moved out of the flow) still fail the run. Block
+  clones, footnote-area blocks and `position: fixed` clones are checked for identity, presence and
+  the signature Paged.js leaves: a note carries `data-note="footnote"`, and a fixed clone is at the
+  head of every page box with no in-flow original. An attribute change of a reserved id, an unknown
+  id anywhere, a missing id, a reordered flow, an id found only in margin boxes, and an element a
+  script moved into the page box or the footnote area without that signature still fail the run
+  (exit 3). Block
   footnotes now pass this check too, but still end the run at the paired control
   (`injection-interference`, exit 3), because Paged.js gives each footnote call a per-run random
   `href`; that is unchanged and recorded in `docs/limitations.md`.

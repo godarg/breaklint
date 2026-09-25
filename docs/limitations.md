@@ -318,15 +318,22 @@ reports it:
 - **Margin-box content.** A widow, an oversized block or an unfilled band inside a running header or
   footer is not judged. Generated margin content (`@top-center { content: "…" }`) never was.
 - **A running element keeps exactly one record**: the in-flow original Paged.js leaves in the page
-  content with an inline `display: none`. It has no layout box (width and height both zero), so the
-  block rules that could select it — `layout/unbreakable-block-too-tall`,
-  `layout/heading-at-page-bottom`, `type/excessive-word-spacing` — record it as `excluded` with the
-  reason `rule/target-not-rendered`, outside the coverage base, and never as measured. Until this
-  repair it counted as measured at 0 px, and a document whose only avoid block was a running
-  element reported full coverage for a check that looked at nothing. The same holds for any block
-  under `display: none`. The type rules still read a running element's source text once, attributed
-  to that hidden position, where there is no box for evidence to mark. A page is anchored to its
-  first block that has a box, so the hidden original never anchors one.
+  content with an inline `display: none`. It was not rendered — no layout box (width and height
+  both zero) and no line boxes — so the block rules that could select it —
+  `layout/unbreakable-block-too-tall`, `layout/heading-at-page-bottom`,
+  `type/excessive-word-spacing` — record it as `excluded` with the reason
+  `rule/target-not-rendered`, outside the coverage base, and never as measured. Until this repair it
+  counted as measured at 0 px, and a document whose only avoid block was a running element reported
+  full coverage for a check that looked at nothing. The same holds for any block under
+  `display: none`; the snapshot does not record which hidden original has margin-box clones, so the
+  reason does not say "running element". A zero box alone does not decide it: a `display: contents`
+  block has no box of its own but prints its text, so it is measured from its lines by
+  `type/excessive-word-spacing` (the gaps) and `layout/heading-at-page-bottom` (where the heading
+  ends), and declined as `env/invalid-measurement` — counted against coverage — by
+  `layout/unbreakable-block-too-tall`, which judges the height of a box it does not have. The type
+  rules still read a running element's source text once, attributed to that hidden position, where
+  there is no box for evidence to mark. A page is anchored to its first rendered block, so the hidden original never
+  anchors one.
 - **A `position: fixed` element is not measured at all.** Paged.js removes it from the flow, so there
   is no in-flow original, and its per-page clones are outside the content area. (An element whose
   `position: fixed` is an INLINE style is not recognised by Paged.js at all: it stays in the flow,
@@ -358,15 +365,21 @@ reports it:
   the source-id order check.
 
 **The source-id integrity check reads the order of the flow; copies outside it are checked for
-identity and presence, not order.** Paged.js puts three kinds of copies out of source order: a
-running element's clones in the margin boxes (which come before the content area in every page
-box), a block footnote in the footnote area (after the page content) and a `position: fixed` clone
-at the head of every page box. The check used to read every source id in the document in document
-order, so a running title that was not the first element of the source — a heading before it, or a
-section around it — ended the run `checker-crashed` (exit 3). What still fails the run: any
-attribute change of a reserved id, anywhere; an unknown id, in the flow or out of it; an expected id
-that is nowhere; a flow whose order differs from the source; and an id found only in margin boxes,
-without the in-flow original every running element keeps, which is an element moved out of the flow.
+identity, presence and the signature of the Paged.js step that put them there, not for order.**
+Paged.js puts three kinds of copies out of source order: a running element's clones in the margin
+boxes (which come before the content area in every page box), a block footnote in the footnote area
+(after the page content) and a `position: fixed` clone at the head of every page box. The check used
+to read every source id in the document in document order, so a running title that was not the
+first element of the source — a heading before it, or a section around it — ended the run
+`checker-crashed` (exit 3). What still fails the run: any attribute change of a reserved id,
+anywhere; an unknown id, in the flow or out of it; an expected id that is nowhere; a flow whose
+order differs from the source; an id found only in margin boxes, without the in-flow original every
+running element keeps; an id in the footnote area outside an element Paged.js marked as a note
+(`data-note="footnote"`); and an id in a page box that is not on every page, sits after the page's
+content area, or also occurs in the flow — none of which Paged.js produces for a `position: fixed`
+element. Each of those is an element a script moved out of the flow. What the signature cannot
+tell apart is a script that reproduces it exactly — marks an element as a note before Paged.js moves
+it, or clones it into the head of every page box and removes the original.
 
 **Evidence marks follow the same boundary, and three kinds of page still cannot bind.** The overlay
 places no mark on a margin-box or page-box clone: no finding can target one, and requiring a mark
@@ -382,10 +395,11 @@ half is established by the live suite on current Chrome in CI and nowhere else. 
 and so ends a run with evidence binding on at `insufficient-coverage` (exit 4):
 
 - a page whose flow contains a fragment pulled ABOVE or below the content box (a negative top
-  margin, content hanging past the column): the content box is Paged.js' multi-column
-  fragmentainer, and a positioned mark outside its column height would be carried into another,
-  off-page column, so that mark is refused, and a fragment with no mark on its page leaves the page
-  unbound;
+  margin, content hanging past the column): down the page a mark must lie inside the content box,
+  so that mark is refused, and a fragment with no mark on its page leaves the page unbound. The
+  bound is a conservative choice, not a measured necessity: the marks hang in Paged.js'
+  multi-column fragmentainer, and on Chromium 141 a mark positioned above or below it printed at
+  its DOM position; the vertical bound was kept rather than rely on that for every browser;
 - a page carrying a footnote-area block, for the same reason (the footnote area lies below the
   content box) — moot today, because footnotes stop the run earlier;
 - **a page with no source block at all, such as the blank page a `break-before: recto` inserts.**

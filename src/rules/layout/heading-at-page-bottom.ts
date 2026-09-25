@@ -1,7 +1,8 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  declined, hasLayoutBox, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber, sourceOf, targetEvaluation,
+  boxlessDeclined, declined, isNotRendered, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber,
+  renderedBox, sourceOf, targetEvaluation,
 } from "../shared.ts";
 
 const HEADINGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
@@ -25,7 +26,7 @@ export const headingAtPageBottom = defineRule(
     unit: "line heights",
     defaultOptions: { minTrailingLineHeights: 2 },
     summary: "A heading is the last thing on a page; what it introduces begins on the next.",
-    declines: ["env/multicolumn", "env/vertical-writing"],
+    declines: ["env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],
     remediation: {
       advice:
         "A heading sits at the bottom of the page with less room than the uncalibrated threshold following it. Add 'break-after: avoid;' to the heading style rule so it advances with its following content, or insert an explicit 'break-before: page;' before the heading.",
@@ -51,14 +52,24 @@ export const headingAtPageBottom = defineRule(
 
     for (const block of snapshot.blocks) {
       if (!HEADINGS.has(block.tag.toLowerCase())) continue;
-      // A heading with no layout box does not end any page: it is not on one. The case is a
-      // running heading, whose in-flow original Paged.js hides with `display: none`; it was
-      // counted as a measured candidate that "had content below it".
-      if (!hasLayoutBox(block.box)) {
+      // A heading that was not rendered — no box and no lines — does not end any page: it is not
+      // on one. The case is a running heading, whose in-flow original Paged.js hides with
+      // `display: none`; it was counted as a measured candidate that "had content below it".
+      if (isNotRendered(block)) {
         evaluations.push(notRenderedEvaluation("layout/heading-at-page-bottom", block));
         continue;
       }
       candidates += 1;
+      // Where the heading is printed. A `display: contents` heading has no box of its own — a zero
+      // box at the origin, which said "content below it" about every heading — but its text has
+      // line boxes, and the heading ends where its last line does. With neither, it is declined.
+      const box = renderedBox(snapshot, block);
+      if (box === null) {
+        const decline = boxlessDeclined("layout/heading-at-page-bottom", block);
+        notMeasured.push(decline.notMeasured);
+        evaluations.push(decline.evaluation);
+        continue;
+      }
 
       const outOfScope = layoutOutOfScope(block.effectiveStyle);
       if (outOfScope) {
@@ -79,9 +90,13 @@ export const headingAtPageBottom = defineRule(
       // The heading is only stranded if nothing else follows it on this page. A heading with
       // three lines of text under it is exactly what the author wanted.
       const onPage = byPage.get(block.page) ?? [];
-      const below = onPage.filter((b) => b.nodeKey !== block.nodeKey && b.box.y >= block.box.y + block.box.height - 0.5);
+      const below = onPage.filter((b) => {
+        if (b.nodeKey === block.nodeKey) return false;
+        const other = renderedBox(snapshot, b);
+        return other !== null && other.y >= box.y + box.height - 0.5;
+      });
       const pageBottom = page.contentBox.y + page.contentBox.height;
-      const remaining = pageBottom - (block.box.y + block.box.height);
+      const remaining = pageBottom - (box.y + box.height);
       const lineHeight = block.lineHeight > 0 ? block.lineHeight : block.effectiveStyle.fontSize * 1.2;
       const remainingInLines = lineHeight > 0 ? remaining / lineHeight : 0;
       const violated = below.length === 0 && remainingInLines < minLineHeights;
