@@ -1,6 +1,6 @@
 {
   "name": "breaklint",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Source-bound layout diagnostics for paginated HTML documents and existing Playwright pages.",
   "keywords": [
     "pagedjs",

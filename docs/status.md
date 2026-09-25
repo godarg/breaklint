@@ -4,6 +4,53 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
+## Release in preparation — 0.7.0 — the rules judge what printed
+
+This is the release-preparation record. Nothing about 0.7.0 is published: there is no tag, no npm
+version and no GitHub Release for it, and the 0.6.0 record below stays the current published
+record until the release workflow has run. The changelog heading carries `TBD-at-tag`
+until the final dated commit.
+
+| | |
+|---|---|
+| version | `0.7.0` in `package.json`, both root fields of `package-lock.json` and the `release.yml` trigger |
+| document report | 5, unchanged; readers accept Report 4 and 5 |
+| measurement snapshot | **4 → 5**; the engine refuses any other stamp, and a stamp-5 snapshot missing a required field, with exit 3 |
+| agent context pack · comparison · Configuration Contract | 2 · 1 · 1, unchanged |
+
+### What 0.7.0 changes
+
+Most of it changes what the rules report about documents that did not change, and the changelog
+lists those changes first. Margin-box content — the per-page clones Paged.js makes of
+`position: running(...)` and `position: fixed` elements — is no longer part of the flow, so it no
+longer produces widow, orphan and block-height findings about clones, no longer anchors every page,
+and no longer keeps required evidence from completing. Snapshot 5 records each block's computed
+`display`, `float` and `position`, its margin-box copies, its own boundary hyphen and which lines
+carry its own text, and the rules read those instead of inferring them from a zero box or from a
+wrapper's lines. `layout/widow` and `layout/orphan` judge the block whose own lines a break split;
+`type/excessive-word-spacing` divides by the font's natural space; `layout/orphaned-continuation-page`
+judges only pages whose content ends on them; a page boundary is `forced` only where the paginator
+forced it. The CLI delivers a report through a pipe whole and ends with exit 3 when it cannot, or
+when a run stops without an answer. The printed HTML report is numbered, carries a running head and
+drops from 43 pages to 27 across the four canonical states.
+
+**What this release does not establish.** No rule is calibrated, and all thirteen still declare
+`tested: false`. Every measurement quoted in the changelog as "patched Chromium 141" was taken on a
+local build with measurement shims and without evidence binding; the live suite on current Chrome
+in CI is the authority for the live path. Several limits are new and are stated in
+`docs/limitations.md` rather than hidden: nothing printed in a margin box is judged, a
+`position: fixed` element is not measured, block footnotes still end a run at exit 3, and a page
+with no source block cannot complete required evidence.
+
+### The exact-environment human gate for 0.7.0
+
+`npm run test:report-surfaces` is red: its latest ledger round is the 2026-09-18 FAIL, and no
+human has reviewed the surfaces this release renders. The technical gate
+(`test:report-surfaces:technical`), which CI and the release workflow run, makes no human-review
+claim. `docs/releasing.md` requires one of two outcomes before the tag — a rostered human review
+that passes and binds the current render, or a documented decision to drop the gate — and neither
+has happened at the time of this record.
+
 ## Current published release — 0.6.0 (2026-09-18) — remediation that says when nobody checked
 
 | | |
@@ -163,7 +210,7 @@ print PDF and raster-set cells) containing **71 physical artifacts** — 24 scre
 43 PDF page rasters. `test:report-surfaces:technical`, which makes no human-review claim, passes
 32 of 32 cells and all 71 artifacts.
 
-**On `main` since 0.6.0 (unreleased), re-measured on Chromium 141 / linux:** the surface work on the
+**In 0.7.0, re-measured on Chromium 141 / linux:** the surface work on the
 eight review findings changes these figures. The matrix is still 32 cells; it now contains
 **55 primary artifacts** — 24 screen PNGs, 4 PDFs and 27 PDF page rasters (clean 3, findings 8,
 infrastructure 8, insufficient-coverage 8; on every non-final page the last line of text sits at
@@ -361,7 +408,7 @@ GitHub assets.
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
 | Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in the canonical JSON report; generated schema drift and process-boundary exit 2 are tested |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
-| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 55 primary artifacts and 152 viewport tiles (unreleased `main`; 71 artifacts in 0.6.0) with decoded-pixel, contrast, font-role, table-alignment, accessibility-tree and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
+| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 55 primary artifacts and 152 viewport tiles (0.7.0; 71 artifacts in 0.6.0) with decoded-pixel, contrast, font-role, table-alignment, accessibility-tree and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
 | Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
 | `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 5 findings across 5 rules |
