@@ -1,0 +1,105 @@
+# The breaklint GitHub Action: a page-layout gate for documents printed from HTML.
+#
+# Copy-paste recipe, permissions, exit codes and caching: docs/ci-recipe.md.
+#
+# This file is deliberately thin. Every input reaches `action/run.mjs` as ONE environment
+# variable holding `toJSON(inputs)`; no `${{ inputs.* }}` expression is ever pasted into a shell
+# script, so an input cannot become a command. The file is at the repository root so that
+# `uses: godarg/breaklint@<ref>` works; package.json `files` keeps it (and `action/`) out of the
+# npm package.
+name: breaklint
+description: Layout checks for HTML-to-PDF documents, as a CI gate with SARIF, JUnit and Markdown output.
+branding:
+  icon: book-open
+  color: orange
+
+inputs:
+  paths:
+    description: >-
+      Required. The HTML files to check, one path or bash glob per line, relative to the
+      workspace. `**` matches across directories. The tool itself never recurses; a pattern that
+      matches nothing is passed on literally and ends with exit 2, exactly as in bash.
+    required: true
+  fail-on-exit:
+    description: >-
+      Which breaklint exit codes fail this step, comma-separated. 2, 3 and 4 are mandatory
+      (invalid invocation, infrastructure, nothing or too little judged); only 1 (findings) may
+      be left out, as in `2,3,4`.
+    required: false
+    default: "1,2,3,4"
+  fail-on:
+    description: breaklint `--fail-on`, one of error, warn, never. Empty keeps breaklint's own default (error) or the config file's value.
+    required: false
+    default: ""
+  profile:
+    description: breaklint `--profile`, one of default, strict. Empty keeps the default.
+    required: false
+    default: ""
+  config:
+    description: Path to a breaklint JSON config file (`--config`). Empty uses ./breaklint.config.json when it exists.
+    required: false
+    default: ""
+  allow-network:
+    description: Origins the document may load from, one per line (`--allow-network`). Empty keeps the run fully offline.
+    required: false
+    default: ""
+  output-dir:
+    description: >-
+      Directory for breaklint.json, breaklint.sarif, breaklint.junit.xml, breaklint.md and the
+      evidence/ folder. Defaults to $RUNNER_TEMP/breaklint-report. Set a distinct one for each
+      call when a job calls the Action more than once.
+    required: false
+    default: ""
+  chrome-path:
+    description: Absolute path to the Chrome executable. Empty uses $BREAKLINT_CHROME, then google-chrome on PATH (present on GitHub's Ubuntu runners), then breaklint's own lookup.
+    required: false
+    default: ""
+  use-project-install:
+    description: "`true` runs the breaklint (and peers) your own lockfile installed in node_modules, instead of installing the version this Action ref pins."
+    required: false
+    default: "false"
+  breaklint-tarball:
+    description: Path to an `npm pack` tarball of breaklint to install instead of the pinned registry version, e.g. to gate on a release candidate.
+    required: false
+    default: ""
+
+outputs:
+  exit-code:
+    description: breaklint's exit code (0 clean, 1 findings, 2 invalid invocation, 3 infrastructure, 4 nothing or too little judged). Set on every run, including a failed one.
+    value: ${{ steps.breaklint.outputs.exit-code }}
+  verdict:
+    description: The report's runVerdict, or usage / infrastructure / not-run when no report was written.
+    value: ${{ steps.breaklint.outputs.verdict }}
+  report-json:
+    description: The canonical JSON report. Empty when breaklint wrote no report.
+    value: ${{ steps.breaklint.outputs.report-json }}
+  sarif-file:
+    description: SARIF 2.1.0, for github/codeql-action/upload-sarif. Empty when breaklint wrote no report.
+    value: ${{ steps.breaklint.outputs.sarif-file }}
+  junit-file:
+    description: JUnit XML. Empty when breaklint wrote no report.
+    value: ${{ steps.breaklint.outputs.junit-file }}
+  markdown-file:
+    description: The Markdown report that was appended to the step summary, uncut. Empty when breaklint wrote no report.
+    value: ${{ steps.breaklint.outputs.markdown-file }}
+  evidence-dir:
+    description: Evidence images and PDFs, when the run produced any.
+    value: ${{ steps.breaklint.outputs.evidence-dir }}
+  output-dir:
+    description: The directory all of the above were written to.
+    value: ${{ steps.breaklint.outputs.output-dir }}
+  breaklint-version:
+    description: The breaklint version that ran.
+    value: ${{ steps.breaklint.outputs.breaklint-version }}
+  chrome-path:
+    description: The Chrome executable handed to breaklint, when the Action chose one.
+    value: ${{ steps.breaklint.outputs.chrome-path }}
+
+runs:
+  using: composite
+  steps:
+    - id: breaklint
+      shell: bash
+      env:
+        BREAKLINT_ACTION_INPUTS: ${{ toJSON(inputs) }}
+      run: node "$GITHUB_ACTION_PATH/action/run.mjs"
