@@ -514,6 +514,27 @@ one version. An `EPERM` that outlives the deadline still fails the acquisition. 
 and the deadline-expiry failure have **no test**: both live in closures that only run when the
 environment produces `EPERM`, which is not deterministic. What is pinned is the errno truth table.
 
+**Page fill counts glyph boxes, not line boxes, and has no ceiling.** `netFill` merges the
+vertical bands of every text run's client rectangles — the glyph content area, not the line box —
+and of replaced elements, and divides by the content box height. Half-leading and block margins
+never enter it, so a page no further line would fit on reads roughly glyph height over line pitch,
+which the font and the leading set. Measured on full pages that are not the last of their document
+(Chromium 141 on Linux, Paged.js 0.4.3, the machine's default serif and sans-serif; not re-measured
+on the current Chrome that CI runs): 0.58–0.72 at `line-height: 1.5`, 0.51–0.54 at 2, 0.34–0.36 at
+3 (12 pt on A5 and 11 pt on A4). Both page-fill rules read this quantity. `layout/half-empty-page`
+cannot separate a full page from a sparse one near its 0.60 threshold, and stays experimental and
+off by default. `layout/orphaned-continuation-page` judges only a page whose content ends on it:
+the next page does not open with its text running on, because a page whose text runs on and opens
+the next page stopped for want of room. On a page it does judge it still reads net fill, so at
+`line-height: 3` every such page falls below its 0.50 threshold however full it is and whatever
+follows it: measured, 11 of 13 lines before a figure that did not fit read 0.29, and a tail page
+filled to its last line 0.34. The "running on" test relies on the collector keeping margin-box
+content out of the snapshot, as this release's collector does: a clone in a side margin box lies
+inside the content box and would count as running text. A line-box fill, each text rectangle
+widened to its line height, is the named next step for the net fill. It changes the snapshot shape and the quantity
+behind the public options `minNetFill` and `maxNetFill`, which needs an owner decision, and it is
+not in this release. None of these readings is a calibration.
+
 **The 40-document corpus behind the `layout/half-empty-page` default is not in this repository.**
 The 37-of-40 figure was measured on a corpus constructed for that purpose during the same work, and
 it is not admitted here, not hashed here and not reproducible from this repository. Every place that

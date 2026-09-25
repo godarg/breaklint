@@ -244,10 +244,13 @@ export function lineStateOf(snapshot: Snapshot, block: { nodeKey: string; lines:
 /**
  * Where a block is printed: its own box, or — for a block with no box of its own, such as
  * `display: contents` — the union of its visible line boxes. `null` when neither exists, so a caller
- * cannot mistake the zero box at the origin for a position.
+ * cannot mistake the zero box at the origin for a position, and `null` for every record
+ * `isNotRendered` (a running element's in-flow original, an element the author hid): the two
+ * helpers agree, so no rule can put in the flow what the classification says printed nowhere.
  */
-export function renderedBox(snapshot: Snapshot, block: { nodeKey: string; box: Box }): Box | null {
+export function renderedBox(snapshot: Snapshot, block: { nodeKey: string; box: Box; display: string; marginCopies: number }): Box | null {
   if (hasLayoutBox(block.box)) return block.box;
+  if (isNotRendered(block)) return null;
   const lines = linesOfBlock(snapshot, block.nodeKey);
   if (lines.length === 0) return null;
   const left = Math.min(...lines.map((line) => line.box.x));

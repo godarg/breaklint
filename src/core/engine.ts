@@ -388,10 +388,10 @@ function exitReasonFor(
 /**
  * What the finding gate says. Returns the severity that tripped it, or null.
  *
- * Experimental findings never count. `layout/half-empty-page` sits 0.086 below the measured
- * ceiling of a full text page; breaking a build on that is a defect in the tool, not in the
- * document. `--fail-on warn` does not change this — it makes the *other* twelve heuristics
- * gate, deliberately and on request.
+ * Experimental findings never count. `layout/half-empty-page` has a threshold that full text
+ * pages straddle — they read 0.58–0.72 at line-height 1.5 against 0.60; breaking a build on that
+ * is a defect in the tool, not in the document. `--fail-on warn` does not change this — it makes
+ * the *other* twelve heuristics gate, deliberately and on request.
  */
 export function gateTriggeredBy(findings: readonly Finding[], failOn: FailOn): "error" | "warn" | null {
   if (failOn === "never") return null;

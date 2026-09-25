@@ -62,8 +62,9 @@ are the only rules that gate by default. See `docs/limitations.md` for what "unc
   replaced elements (`img`, `svg`, `canvas`, `video`, `table`), clips them to the content box, and
   divides the summed band height by the content box height (`src/measure/snapshot.ts`). Half-leading
   falls between the bands and no element margin ever enters the rectangles, so the quantity is
-  systematically smaller than the fill a reader perceives. A page of prose at `line-height: 1.5`
-  reaches at most about 0.686 — against a threshold of 0.60.
+  systematically smaller than the fill a reader perceives. Full pages of prose at
+  `line-height: 1.5` read 0.58–0.72 with this collector, and less with more leading — against a
+  threshold of 0.60, so some full pages fall below it. There is no fixed ceiling to reason from.
 - **Consequence:** the rule fires on pages a reader would call full — measured on a 40-document
   corpus built to exercise it, 37 of 40. It is `experimental`, never gates, and since 0.6.0 is not
   active in the default profile, so a default run does not emit it at all. The name promises a

@@ -37,6 +37,7 @@ import { COLLECTOR_SOURCE, type CollectorResult } from "../../src/paginate/colle
 import { injectSourceIds } from "../../src/source/inject.ts";
 import type { BlockRecord, Finding, Snapshot } from "../../src/core/types.ts";
 import { fingerprint } from "../../src/core/fingerprint.ts";
+import { renderedBox } from "../../src/rules/shared.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
 import { integritySource, orderedSourceSids, validateRuntimeSidState, type RuntimeIntegrityStatus } from "../../src/acquire/render-run.ts";
@@ -506,6 +507,29 @@ describe("a record with no layout box is never measured, and never anchors a pag
     assert.equal(reasons.get("type/excessive-word-spacing"), "rule/no-text-lines");
     assert.deepEqual([...reasons].filter(([, reason]) => reason === "rule/target-not-rendered"), [],
       "an element whose image prints was labelled not rendered");
+  });
+
+  /**
+   * `renderedBox`, which the heading rule and WP-F4's continuation rule use to place a block in the
+   * flow, agrees with the classification: a record `isNotRendered` is placed nowhere, even if it
+   * carried a visible line (which a running element's `display: none` original never does, so the
+   * line here is constructed). A `display: contents` record is placed by its lines.
+   */
+  it("places in the flow only what the classification says printed", () => {
+    const snapshot = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
+    const template = structuredClone(snapshot.blocks[0]!);
+    const zero = { x: 0, y: 0, width: 0, height: 0 };
+    const make = (nodeKey: string, over: Partial<BlockRecord>): BlockRecord => ({ ...structuredClone(template), nodeKey, box: zero, lines: [7], ...over });
+    const records = [
+      make("margin-original", { display: "none", marginCopies: 3 }),
+      make("author-hidden", { display: "none", marginCopies: 0 }),
+      make("contents", { display: "contents", marginCopies: 0 }),
+    ];
+    snapshot.textLines = [...snapshot.textLines, ...records.map((record) => ({
+      blockKey: record.nodeKey, index: 7, box: { x: 60, y: 100, width: 50, height: 12 }, visible: true, width: 50, wordBoxes: null,
+    }))];
+    assert.deepEqual(records.map((record) => renderedBox(snapshot, record)),
+      [null, null, { x: 60, y: 100, width: 50, height: 12 }]);
   });
 
   /**
