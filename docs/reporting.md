@@ -610,8 +610,9 @@ heading group and caveat are now one unbreakable intro that does not keep with t
 Measured on Chromium 141 / linux the tallest unit is the report header (359.6–384.8 px, at most
 37.3 %), and every non-final page's text reaches 64.0–97.6 % (clean 3 pages, findings 8,
 infrastructure 8, insufficient-coverage 8; 43 in 0.6.0). The only fill exemption is a deliberate
-section boundary, defined mechanically: the next page begins with an element whose computed
-`break-before` is `page`, `left`, `right`, `recto` or `verso` — the canonical report declares none.
+section boundary, defined mechanically: the next page begins — past a repeated coverage header,
+which a continued table prints first — with an element whose computed `break-before` is `page`,
+`left`, `right`, `recto` or `verso`; the canonical report declares none.
 
 Keep-with-next is checked from the PDF text: every section heading shares its page with the first
 line of the unit it introduces, and every coverage caption with its table's first row (the verifier

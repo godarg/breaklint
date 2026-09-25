@@ -996,7 +996,9 @@ function pageFlowChecks(pdfPath, rasterPages, layout, label) {
   const contentLines = pageLines.map((lines, index) => lines.filter((line) =>
     !/^Page \d+ of \d+$/u.test(line) && !(index > 0 && /^breaklint · /u.test(line))));
   const fill = rasterPages.map((raster, index) => {
-    const nextFirst = contentLines[index + 1]?.[0] ?? "";
+    // A table continued across the break repeats its column header first; the forced break, if
+    // any, is on the row after it.
+    const nextFirst = (contentLines[index + 1] ?? []).find((line) => !/^RULE\b.*\bRESULT$/u.test(line)) ?? "";
     const forcedBreakFollows = layout.forcedBreaks.some((text) => text.length > 0 && nextFirst.replace(/\s+/gu, " ").startsWith(text.slice(0, 16)));
     return {
       page: index + 1,

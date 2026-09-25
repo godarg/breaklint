@@ -413,7 +413,8 @@ function independentlyCheckPageFlow(pdfPath, rasterPages, recorded, label) {
   const rasterDpi = manifest.reviewEnvironment.print.rasterDpi;
   const fill = rasterPages.map((pageArtifact, index) => {
     const depth = rasterTextDepth(resolve(output, pageArtifact.path), rasterDpi);
-    const nextFirst = lines[index + 1]?.[0] ?? "";
+    // Past a repeated coverage header: a forced break inside a continued table lands on the row after it.
+    const nextFirst = (lines[index + 1] ?? []).find((line) => !/^RULE\b.*\bRESULT$/u.test(line)) ?? "";
     const exempt = recorded.forcedBreaks.some((text) => text.length > 0 && nextFirst.startsWith(text.slice(0, 16)));
     const final = index === rasterPages.length - 1;
     return { page: index + 1, contentDepth: depth, final, forcedBreakFollows: exempt };
