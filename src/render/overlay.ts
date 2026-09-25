@@ -192,9 +192,11 @@ const OVERLAY_TEMPLATE = `(() => {
           // absolutely positioned mark stays inside the sheet, which clips at the page edge, so it
           // cannot widen the print area. Bounding it by the content box instead left every
           // fragment of a full-bleed block unmarked and its pages unbound. Down the page the bound
-          // stays the content box: the content box is Paged.js' multi-column fragmentainer, and a
-          // positioned box below its column height is carried into the next, off-page column —
-          // exactly the overflow that made Chrome shrink every page.
+          // stays the content box, as a conservative choice and nothing more: the layer hangs in
+          // Paged.js' multi-column fragmentainer, and whether a mark positioned above or below its
+          // column height prints where the DOM puts it is a property of the browser, not of this
+          // code. On Chromium 141 such marks were measured printing at their DOM position; no
+          // browser was shown to move them. The bound refuses them rather than depend on that.
           const relativeY = y - areaBox.y;
           const maxAdvance = token.length * 1.2 + 2;
           if (

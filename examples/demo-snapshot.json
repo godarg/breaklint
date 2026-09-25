@@ -240,6 +240,8 @@
           "lineHeight": 15.4,
           "lang": "de"
         },
+        "display": "block",
+        "marginCopies": 0,
         "lines": [
           0,
           1,
@@ -291,6 +293,8 @@
           "lineHeight": 15.4,
           "lang": "de"
         },
+        "display": "block",
+        "marginCopies": 0,
         "lines": [
           8
         ],
@@ -335,6 +339,8 @@
           "lineHeight": 15.4,
           "lang": "de"
         },
+        "display": "table",
+        "marginCopies": 0,
         "lines": [],
         "atomicBoxes": [],
         "flowHazards": {
@@ -377,6 +383,8 @@
           "lineHeight": 15.4,
           "lang": "de"
         },
+        "display": "block",
+        "marginCopies": 0,
         "lines": [
           0,
           1
@@ -422,6 +430,8 @@
           "lineHeight": 15.4,
           "lang": "de"
         },
+        "display": "block",
+        "marginCopies": 0,
         "lines": [],
         "atomicBoxes": [],
         "flowHazards": {

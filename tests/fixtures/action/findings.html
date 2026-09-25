@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  Action e2e fixture, findings arm. Complication: exit 1 has to come from a GATING finding. Under
+  the default `--fail-on error` a warning does not move the exit code, so a fixture that only
+  produced heuristic warnings would end with exit 0 and the "the step fails on exit 1" arm would
+  test nothing. The figure's label is placed far below its SVG viewport, which is the
+  proof-source-A boundary of `svg/text-overflows-viewport`: what lies outside the viewport is not
+  drawn. The overshoot is hundreds of user units on purpose, so the verdict does not depend on
+  the metrics of whichever serif font the runner has. A second figure keeps its label inside the
+  viewport, so the rule also measures a candidate that must stay silent.
+  Self-authored text; no third-party content.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>breaklint Action fixture: findings</title>
+  <style>
+    @page { size: 120mm 90mm; margin: 12mm; }
+    body { margin: 0; font: 10pt/1.45 Georgia, serif; text-align: left; hyphens: manual; }
+    h1 { font-size: 14pt; font-weight: bold; margin: 0 0 6px; break-after: avoid; }
+    p { margin: 0 0 6px; widows: 2; orphans: 2; }
+    figure { margin: 0 0 8px; }
+    svg { display: block; width: 80mm; height: 30mm; }
+    figcaption { font-size: 8pt; }
+  </style>
+</head>
+<body>
+  <h1>A short guide that should fail</h1>
+  <p>The first figure carries its label well inside the drawing area. The second figure places its label far below the area that is drawn, so that label is clipped away in the printed page.</p>
+  <figure>
+    <svg id="label-inside" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="400" height="150" fill="#eeeeee"></rect>
+      <text x="30" y="80" font-size="16" font-family="serif">A label that is drawn</text>
+    </svg>
+    <figcaption>Silent: the label sits inside the viewport.</figcaption>
+  </figure>
+  <figure>
+    <svg id="label-outside" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="400" height="150" fill="#eeeeee"></rect>
+      <text x="30" y="600" font-size="16" font-family="serif">A label that is clipped</text>
+    </svg>
+    <figcaption>One error finding: the label lies far outside the viewport.</figcaption>
+  </figure>
+  <p>Text after the figures continues normally, so that the report has ordinary running text to measure as well.</p>
+</body>
+</html>

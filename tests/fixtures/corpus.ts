@@ -5,15 +5,15 @@
  * that makes exactly one rule fire — a corpus in which the breaking case is missing is not a
  * corpus. The `clean` fixtures contain the cases most likely to produce a false alarm: the
  * formula minus, the inch mark, the parity blank page, the deliberate chapter break, the
- * fully-set page at its measured ceiling of 0.686.
+ * fully set page whose net fill reads far below 1.
  *
  * A false alarm on a clean fixture is a release blocker, not a note. A rule that cries wolf on
  * a correct document gets switched off after the second time, and a switched-off rule finds
  * nothing at all.
  */
 
-import { SNAPSHOT_SCHEMA_VERSION } from "../../src/core/enums.ts";
 import type { BlockRecord, PageRecord, Snapshot, SvgRecord, TextLine, TextRun } from "../../src/core/types.ts";
+import { SNAPSHOT_SCHEMA_VERSION } from "../../src/core/enums.ts";
 
 export interface CorpusEntry {
   name: string;
@@ -90,6 +90,8 @@ function block(id: string, over: Partial<BlockRecord> = {}): BlockRecord {
     lineHeight: 15.4,
     spaceWidth: 4.2,
     effectiveStyle: style(),
+    display: "block",
+    marginCopies: 0,
     lines: [0],
     atomicBoxes: [],
     flowHazards: { inside: [], self: [], around: [] },
@@ -133,9 +135,6 @@ function snapshot(parts: {
   uriRefs?: Snapshot["uriRefs"];
 }): Snapshot {
   return {
-    // The current stamp, not a literal: these are hand-authored snapshots of the current shape,
-    // and the engine refuses any other stamp. A literal 2 stood here through schemas 3 and 4,
-    // which is the claim-without-migration the stamp exists to prevent.
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     meta: {
       renderer: null,
@@ -467,9 +466,12 @@ export function loadCorpus(): CorpusEntry[] {
       kind: "clean",
       about: "layout/half-empty-page",
       complication:
-        "A fully set text page at netFill 0.686 — the measured ceiling, because line boxes do " +
-        "not cover leading. Only 0.086 above the threshold, which is why the rule is experimental.",
-      snapshot: snapshot({ pages: [page(1, { fill: { vertical: 0.98, topGap: 0.01, net: 0.686, area: 1 } })] }),
+        "A full page of one long paragraph: netFill 0.72, measured on a middle page set at " +
+        "11pt/1.5 serif on A4 with 20 mm margins (Chromium 141, Paged.js 0.4.3). Net fill sums " +
+        "glyph boxes, not line boxes, so a full page reads far below 1; full prose pages at that " +
+        "line height measured 0.58–0.72, some below the 0.60 threshold, which is why the rule is " +
+        "experimental.",
+      snapshot: snapshot({ pages: [page(1, { fill: { vertical: 0.99, topGap: 0, net: 0.72, area: 1 } })] }),
     },
     {
       name: "half-empty-clean-parity-blank",
@@ -504,6 +506,37 @@ export function loadCorpus(): CorpusEntry[] {
       }),
     },
     {
+      name: "orphaned-continuation-trigger-carried-child",
+      kind: "trigger",
+      about: "layout/orphaned-continuation-page",
+      complication:
+        "A <section> whose paragraph ends on page 1 and whose own 200 px SVG fills a third of " +
+        "page 2; its next child, a break-inside: avoid figure, did not fit and opens page 3. Page " +
+        "2 carries only the section's continuation, net fill 0.31, and the section goes on — so a " +
+        "rule that only asks whether the page's last block ends there calls it full. It is not: page " +
+        "3 opens with the fresh figure, not with text running on.",
+      alsoFires: ["layout/half-empty-page"],
+      snapshot: snapshot({
+        pages: [
+          page(1, { fill: { vertical: 0.99, topGap: 0, net: 0.34, area: 1 } }),
+          page(2, { fill: { vertical: 0.33, topGap: 0, net: 0.31, area: 1 } }),
+          page(3, {
+            isLast: true,
+            fill: { vertical: 0.9, topGap: 0, net: 0.8, area: 1 },
+            outgoingBreakCause: { kind: "document-end", determinedBy: "document-boundary", cascadeHint: null },
+          }),
+        ],
+        blocks: [
+          block("section:0", { sid: "s-section", tag: "section", fragmentIndex: 0, fragmentCount: 3, page: 1, box: box(48, 48, 399, 600) }),
+          block("lines", { page: 1, box: box(48, 48, 399, 600) }),
+          block("section:1", { sid: "s-section", tag: "section", fragmentIndex: 1, fragmentCount: 3, page: 2, box: box(48, 48, 399, 200) }),
+          block("section:2", { sid: "s-section", tag: "section", fragmentIndex: 2, fragmentCount: 3, page: 3, box: box(48, 48, 399, 500) }),
+          block("figure", { tag: "figure", page: 3, box: box(48, 48, 399, 500) }),
+          block("after", { page: 3, box: box(48, 548, 399, 48) }),
+        ],
+      }),
+    },
+    {
       name: "orphaned-continuation-clean-forced",
       kind: "clean",
       about: "layout/orphaned-continuation-page",
@@ -529,6 +562,55 @@ export function loadCorpus(): CorpusEntry[] {
       snapshot: snapshot({
         pages: [page(1, { fill: { vertical: 0.9, topGap: 0.02, net: 0.62, area: 1 } })],
         blocks: [block("c1", { fragmentIndex: 1, fragmentCount: 2 }), block("c2"), block("c3")],
+      }),
+    },
+    {
+      name: "orphaned-continuation-clean-full-middle-page",
+      kind: "clean",
+      about: "layout/orphaned-continuation-page",
+      complication:
+        "One paragraph over four pages. Pages 2 and 3 carry nothing but its continuation and read " +
+        "a net fill of 0.49 against the 0.50 threshold — the numbers of a real full page at " +
+        "line-height 2.2, where glyph boxes cover less than half the line pitch. But the paragraph " +
+        "goes on to the next page and opens it with running text, so each page stopped because its " +
+        "next line did not fit: it is full. A rule that never asks whether the next page opens with " +
+        "text running on reports both.",
+      alsoFires: ["layout/half-empty-page"],
+      snapshot: snapshot({
+        pages: [
+          page(1, { fill: { vertical: 0.99, topGap: 0, net: 0.46, area: 1 } }),
+          page(2, { fill: { vertical: 0.99, topGap: 0, net: 0.49, area: 1 } }),
+          page(3, { fill: { vertical: 0.99, topGap: 0, net: 0.49, area: 1 } }),
+          page(4, {
+            isLast: true,
+            fill: { vertical: 0.99, topGap: 0, net: 0.73, area: 1 },
+            outgoingBreakCause: { kind: "document-end", determinedBy: "document-boundary", cascadeHint: null },
+          }),
+        ],
+        blocks: [0, 1, 2, 3].map((i) =>
+          block(`long:${i}`, {
+            sid: "s-long",
+            fragmentIndex: i,
+            fragmentCount: 4,
+            page: i + 1,
+            box: box(48, 48, 399, 18 * 32.27),
+            lineHeight: 32.27,
+            effectiveStyle: style({ lineHeight: 32.27 }),
+            lines: Array.from({ length: 18 }, (_, k) => i * 18 + k),
+          }),
+        ),
+        // Eighteen 32.27 px lines per page, glyph boxes 16 px tall and centred in each line box:
+        // every page after the first OPENS with the paragraph's running text.
+        textLines: [0, 1, 2, 3].flatMap((i) =>
+          Array.from({ length: 18 }, (_, k) => ({
+            blockKey: `long:${i}`,
+            index: i * 18 + k,
+            box: box(48, 48 + k * 32.27 + 8.13, 399, 16),
+            visible: true,
+            width: 399,
+            wordBoxes: null,
+          })),
+        ),
       }),
     },
 

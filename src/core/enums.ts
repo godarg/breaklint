@@ -311,14 +311,12 @@ export const REPORT_SCHEMA_VERSION = 5;
 /** Document report shapes this build can read. A 4 simply carries no `remediation`. */
 export const READABLE_REPORT_SCHEMA_VERSIONS: readonly number[] = [4, 5];
 /**
- * The measurement snapshot's shape. 5 adds, per block record, `atomicBoxes` (the boxes of replaced
- * and other atomic content inside the element) and `flowHazards` (`inside`, `self` and `around`:
- * what lays the element's content out other than as one untransformed block-direction flow; see
- * FLOW_HAZARDS). There is no reader
- * for 4: a schema-4 snapshot carries neither, the split-block bound of
- * `layout/unbreakable-block-too-tall` cannot be taken without them, and they cannot be derived from
- * what a schema-4 snapshot does carry — only re-measured. The engine therefore refuses any other
- * stamp.
+ * The measurement snapshot's own shape. 5 adds, per block record, the required `display` and
+ * `marginCopies`, and `atomicBoxes` (the boxes of replaced and other atomic content inside the
+ * element) and `flowHazards` (`inside`, `self` and `around`: what lays the element's content out
+ * other than as one untransformed block-direction flow; see FLOW_HAZARDS). There is no reader for
+ * 4: a schema-4 snapshot carries none of them, they cannot be derived from what it does carry —
+ * only re-measured — and the engine refuses a snapshot of any other stamp.
  */
 export const SNAPSHOT_SCHEMA_VERSION = 5;
 

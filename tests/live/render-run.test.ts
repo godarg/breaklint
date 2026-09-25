@@ -11,16 +11,20 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSy
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { after, before, describe, it, type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { renderDocuments, type RenderOptions, type RenderResult } from "../../src/acquire/render-run.ts";
+import {
+  cleanupBrowserProfile, closeBrowserBounded, renderDocuments, type RenderOptions, type RenderResult,
+} from "../../src/acquire/render-run.ts";
+import { openRasterizer } from "../../src/render/rasterizer.ts";
 import { exitCodeFor, runDocument } from "../../src/core/engine.ts";
-import { resolveBrowser, resolvePackageRoot } from "../../src/acquire/browser.ts";
+import { launchBrowser, resolveBrowser, resolvePackageRoot } from "../../src/acquire/browser.ts";
 import { straightQuotes } from "../../src/rules/type/straight-quotes.ts";
 import { textOverflowsViewport } from "../../src/rules/svg/text-overflows-viewport.ts";
 import { textClipped } from "../../src/rules/svg/text-clipped.ts";
+import { orphanedContinuationPage } from "../../src/rules/layout/orphaned-continuation-page.ts";
 import { blockKey } from "../../src/core/fingerprint.ts";
 import { coverageFloorMap, resolveConfig } from "../../src/config/resolve.ts";
 import type { DocumentInput } from "../../src/core/engine.ts";
@@ -70,6 +74,29 @@ function fingerprintCollisions(findings: readonly Finding[]): string[] {
 function unplacedMarks(document: DocumentInput): string[] {
   return (document.evidence ?? []).flatMap((page) =>
     (page.unplacedMarks ?? []).map((mark) => `p${page.page}:${mark.sid}:${mark.side}`));
+}
+
+/**
+ * The text layer of a delivered PDF, read with the production rasteriser in a browser of its own
+ * (no content page open, as the rasteriser requires). Used where a test must say what the PDF
+ * carries, not what the DOM carried.
+ */
+async function pdfText(path: string): Promise<string> {
+  const launched = await launchBrowser(REPO);
+  assert.ok(launched.browser, launched.detail);
+  try {
+    const opened = await openRasterizer(launched.browser, { fromDir: REPO, contentPagesOpen: () => 0 });
+    assert.ok(opened.rasterizer, opened.detail);
+    try {
+      const pages = await opened.rasterizer.textItems(readFileSync(path));
+      return pages.flatMap((page) => page.items.map((item) => item.text)).join(" ");
+    } finally {
+      await opened.rasterizer.close();
+    }
+  } finally {
+    assert.equal(await closeBrowserBounded(launched.browser), null);
+    assert.equal(cleanupBrowserProfile(launched.userDataDir ?? null), null);
+  }
 }
 
 function options(outDir: string, sourceMapInjection = true): RenderOptions {
@@ -408,6 +435,91 @@ describe("the M2d live production chain", () => {
     assert.deepEqual(hiddenPage.fill, { vertical: 0, topGap: 0, net: 0, area: 0 });
   });
 
+  it("judges a continuation page only where what it carries ends, and keeps the collector's document order", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    // Its own render: the fixture's pages are the measurement, and the shared batch's indices
+    // stay where the other cases expect them.
+    const run = await renderDocuments(
+      [join(FIXTURES, "continuation-full-pages.html")],
+      options(join(root, "continuation-evidence")),
+    );
+    const document = run.documents[0];
+    assert.ok(document?.snapshot, `no snapshot: ${JSON.stringify(document?.infrastructure)}`);
+    const snapshot = document.snapshot;
+
+    // The order the rule relies on. Source ids are assigned in document order, so within every
+    // page they must rise strictly — `main` before `section` before `p` — and pages never go back.
+    const blockPages = snapshot.blocks.map((block) => block.page);
+    assert.deepEqual(blockPages, [...blockPages].sort((a, b) => a - b), "blocks are not in page order");
+    for (const page of snapshot.pages) {
+      const sids = snapshot.blocks.filter((block) => block.page === page.pageNumber).map((block) => block.sid ?? "");
+      assert.ok(sids.every((sid, i) => sid !== "" && (i === 0 || sids[i - 1]! < sid)), `page ${page.pageNumber} blocks out of document order: ${sids.join(",")}`);
+    }
+
+    const report = runDocument(document, {
+      failOn: "never",
+      activeRules: [orphanedContinuationPage],
+      optionsByRule: {},
+      coverageFloors: {},
+    }).report;
+    const firedOn = report.findings.map((finding) => finding.page);
+    const row = (pageNumber: number) => {
+      const evaluation = report.evaluations.find((item) => item.targetRef.nodeKey === `page:${pageNumber}`);
+      assert.ok(evaluation && evaluation.status === "measured", `page ${pageNumber} was not measured`);
+      return {
+        values: Object.fromEntries(evaluation.measurements.map((m) => [m.name, m.value])),
+        violated: evaluation.predicate.violated,
+      };
+    };
+
+    // One paragraph at 12pt/3 over at least four pages. Every page strictly between its first and
+    // its last carries nothing but its continuation and reads a net fill below the threshold —
+    // the complication — and the paragraph goes on from every one of them, so none is judged.
+    const long = snapshot.blocks.filter((block) => block.authorId === "long");
+    const first = long[0]!.page;
+    const last = long.at(-1)!.page;
+    assert.ok(last - first + 1 >= 4, `the long paragraph spans ${last - first + 1} pages, not at least four`);
+    for (let pageNumber = first + 1; pageNumber < last; pageNumber++) {
+      const middle = row(pageNumber);
+      assert.equal(middle.values["continuation-only"], true, `page ${pageNumber} is not continuation-only`);
+      assert.ok((middle.values["net-fill"] as number) < 0.5, `page ${pageNumber} net=${middle.values["net-fill"]}: the complication is missing`);
+      assert.equal(firedOn.includes(pageNumber), false, `a full middle page ${pageNumber} was reported`);
+      assert.equal(middle.values["ends-on-page"], false, `page ${pageNumber}: the paragraph did not continue from it`);
+      assert.equal(middle.violated, false);
+    }
+
+    // The control: fourteen explicit lines under a heading, the last two alone on the next page,
+    // then a forced break. That page carries only the end of an earlier block and must be reported.
+    const tail = snapshot.blocks.filter((block) => block.authorId === "tail");
+    assert.equal(tail.length, 2, `the tail control split into ${tail.length} fragments`);
+    const end = tail[1]!;
+    assert.equal(snapshot.textLines.filter((line) => line.blockKey === end.nodeKey).length, 2);
+    assert.equal(snapshot.pages[end.page - 1]!.outgoingBreakCause.kind, "forced");
+    assert.equal(row(end.page).values["ends-on-page"], true);
+    assert.equal(row(end.page).violated, true);
+    assert.ok(firedOn.includes(end.page), `the tail page ${end.page} was not reported; fired on ${firedOn.join(",")}`);
+
+    // The carried-child control: a <section> whose own SVG sits alone on a page while its next
+    // child, a break-inside: avoid figure, opens the page after. The section continues, but the
+    // next page does not open with text running on, and the page is two thirds empty: it must be
+    // reported.
+    const carried = snapshot.blocks.filter((block) => block.authorId === "carried");
+    assert.equal(carried.length, 3, `the carried-child section split into ${carried.length} fragments`);
+    const alone = carried[1]!;
+    assert.deepEqual(
+      snapshot.blocks.filter((block) => block.page === alone.page).map((block) => block.authorId),
+      ["carried"],
+      "the carried-child page holds more than the section's continuation",
+    );
+    const figure = snapshot.blocks.find((block) => block.authorId === "carried-figure");
+    assert.ok(figure && figure.page === alone.page + 1 && figure.fragmentIndex === 0, "the figure does not open the next page");
+    assert.equal(row(alone.page).values["continuation-only"], true);
+    assert.ok((row(alone.page).values["net-fill"] as number) < 0.5, `carried-child net=${row(alone.page).values["net-fill"]}`);
+    assert.ok(firedOn.includes(alone.page), `the carried-child page ${alone.page} was not reported; fired on ${firedOn.join(",")}`);
+    assert.equal(row(alone.page).values["ends-on-page"], true);
+    assert.ok(report.findings.every((finding) => finding.ruleId === "layout/orphaned-continuation-page"));
+  });
+
   it("fails closed when inline-only visible text leaves the geometry oracle without an addressable box", (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     if (!completeChain(t)) return;
@@ -476,13 +588,36 @@ describe("the M2d live production chain", () => {
     assert.equal(outcome.report.findings[0]!.evidence?.bindsFinding, true);
   });
 
-  it("rejects late scripted content through the paired control or pre-PDF reconciliation", (t) => {
+  /**
+   * The fixture appends a paragraph 600 ms after its first page appears, on a timer, so WHEN it
+   * lands relative to the snapshot and the PDF is a race the document cannot be made to win or lose
+   * deterministically: nothing it can observe marks the snapshot. Measured on 2026-09-25, 3 of 42
+   * runs on the base commit ended with no event at all, and this test, which required one, was
+   * flaky there too. What the product must guarantee is not an event, it is that late content
+   * never reaches the delivered PDF unmeasured: before the snapshot it is measured (and the paired
+   * control differs), between the snapshot and a PDF it is caught (`document-not-quiescent`,
+   * `render-unstable`), and after the last PDF it is in no delivered artifact. So: an event, or
+   * else neither the measured snapshot nor the delivered PDF carries the late text.
+   */
+  it("rejects late scripted content through the paired control or pre-PDF reconciliation", async (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
     if (!completeChain(t)) return;
-    const event = result!.documents[11]!.infrastructure.find((item) =>
-      item.kind === "document-not-quiescent" || item.kind === "injection-interference");
-    assert.ok(event, "late DOM content reached the delivered state without invalidating measurement");
-    assert.ok(Number(event.measured?.mutationDelta ?? 0) > 0 || event.detail.includes("control quantities"));
+    const late = result!.documents[11]!;
+    assert.match(late.path, /late-mutation\.html$/u, "premise: document 11 is the late-mutation fixture");
+    const event = late.infrastructure.find((item) =>
+      item.kind === "document-not-quiescent" || item.kind === "injection-interference" || item.kind === "render-unstable");
+    if (event) {
+      assert.ok(Number(event.measured?.mutationDelta ?? 0) > 0 || event.detail.includes("control quantities") || event.kind === "render-unstable");
+      return;
+    }
+    assert.ok(late.snapshot, "no event and no measured snapshot");
+    assert.equal(JSON.stringify(late.snapshot).includes("Zu spaet"), false,
+      "late content is in the measured snapshot, yet the paired control did not differ");
+    assert.ok(late.renderArtifact, "no event, and no delivered PDF to check the late content against");
+    // The artifact path is relative to the run's evidence directory.
+    const text = await pdfText(isAbsolute(late.renderArtifact.path) ? late.renderArtifact.path : join(root, "evidence", late.renderArtifact.path));
+    assert.ok(text.includes("Der Snapshot"), `premise: the delivered PDF's text layer is readable: ${text.slice(0, 120)}`);
+    assert.equal(text.includes("Zu spaet"), false, "late DOM content reached the delivered PDF without invalidating measurement");
   });
 
   it("runs paired controls at one pathname in fresh storage-isolated contexts", (t) => {
@@ -952,11 +1087,16 @@ describe("the M2d live production chain", () => {
     assert.equal(new Set(anchors).size, anchors.length, `pages share an anchor: ${JSON.stringify(anchors)}`);
     assert.equal(anchors.some((anchor) => /running-(title|side)/u.test(anchor ?? "")), false, `a page is anchored to a running element: ${JSON.stringify(anchors)}`);
 
-    // The hidden originals are not measured by the rules either: they have no layout box.
+    // The hidden originals are not measured by the rules either: they have no layout box, and
+    // Snapshot 5 records that they printed in the margin boxes (`display: none`, margin copies).
+    for (const id of ["running-title", "running-side"]) {
+      const original: BlockRecord[] = snapshot.blocks.filter((block) => block.authorId === id);
+      assert.deepEqual(original.map((block) => [block.display, block.marginCopies]), [["none", snapshot.pages.length]], `${id}: Snapshot 5 facts`);
+    }
     const tooTall = withProfile(document).report.evaluations.filter((row) =>
       row.ruleId === "layout/unbreakable-block-too-tall" && row.targetRef.sid !== null &&
       snapshot.blocks.some((block) => block.sid === row.targetRef.sid && /running-(title|side)/u.test(block.authorId ?? "")));
-    assert.deepEqual(tooTall.map((row) => [row.status, row.reason]), [["excluded", "rule/target-not-rendered"], ["excluded", "rule/target-not-rendered"]]);
+    assert.deepEqual(tooTall.map((row) => [row.status, row.reason]), [["excluded", "rule/target-in-margin-box"], ["excluded", "rule/target-in-margin-box"]]);
 
     const outcome = withProfile(document);
     assert.deepEqual(

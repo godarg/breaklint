@@ -379,7 +379,7 @@ describe("layout/unbreakable-block-too-tall declines what lays content out other
 
   it("declines a split block with a relatively offset, a transformed, or a multi-column element inside it", () => {
     // Measured on 2026-09-25 (Paged.js 0.4.3, patched Chromium 141): a block 301.19 px tall with one
-    // paragraph moved up 55 px and one down 70 px read 360.19 px of lines; a two-column paragraph
+    // paragraph moved up 55 px and one down 70 px read 360.20 px of lines; a two-column paragraph
     // inside a block 335.81 px tall read 347.13 px. Both would be a false error.
     for (const inside of [["offset"], ["transformed"], ["multicol"], ["out-of-flow"], ["float"], ["negative-margin"], ["overflowing-content"]] as const) {
       const s = twoFragments();
@@ -425,17 +425,23 @@ describe("layout/unbreakable-block-too-tall declines what lays content out other
     assert.ok(rowOf(result, "union:0").measurements.some((m) => m.name === "box-within-the-sheet" && m.value === false));
   });
 
-  it("declines, rather than excludes, a split block whose first piece has no box", () => {
-    // F1 excludes a record without a layout box as never placed. A split element with a laid-out
-    // later piece WAS placed; excluding its first piece would leave it judged nowhere, because the
-    // later pieces are not candidates.
+  it("judges a split block whose first piece has no box at its first printed piece, never nowhere", () => {
+    // A split element with a laid-out later piece WAS placed. It is judged at its lead fragment
+    // (the first that printed as a visible box, WP-F1b) over all its fragments; the piece without a
+    // box carries nothing to count. Here the printed piece alone is 9 lines, below the page: the
+    // block is declined as inconclusive — never excluded, which would leave it judged nowhere.
     const s = twoFragments();
     s.blocks[0]!.box = box(0, 0, 0, 0);
+    s.blocks[0]!.display = "none";
+    s.blocks[0]!.lines = [];
+    s.textLines = s.textLines.filter((line) => line.blockKey !== "big:0");
     const result = run(s);
     assert.equal(result.candidates, 1, "a placed split element was dropped from the candidates");
     assert.equal(result.measured, 0);
-    assert.equal(rowOf(result, "big:0").status, "not-measured");
-    assert.equal(rowOf(result, "big:0").reason, "env/invalid-measurement");
+    assert.equal(rowOf(result, "big:0").reason, "rule/fragment-not-rendered");
+    assert.equal(rowOf(result, "big:1").status, "not-measured");
+    assert.equal(rowOf(result, "big:1").reason, "env/invalid-measurement");
+    assert.equal(measurement(result, "big:1", "block-height-lower-bound"), 167.93);
   });
 });
 
