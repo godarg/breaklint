@@ -379,7 +379,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=609 aggregateTests=740 liveTests=87 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=651 aggregateTests=782 liveTests=87 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -982,16 +982,12 @@ not on every Chrome a consumer runs.
 **State on this branch.** The `corpus` job has not yet run in CI. Measured locally on patched
 Chromium 141 with `--no-evidence-binding` (the only way a live run completes on this machine; CI
 uses the default evidence binding on current Chrome), on the branch merged with the integration
-head that carries the margin-box and continuation-page packages: 14 of 20 documents pass. The six
-that fail: sa04 and sa17 exit 3 with `injection-interference` (footnotes; a named dependency of the
-corpus, pending); sa06, sa15 and sa19, where `artifact/local-uri` does not report root-relative
-absolute paths although its rule page says every absolute path is reported (pending); and sa03,
-where the caption-only continuation page planted on the landscape section is not reported. For
-sa03 the break into that page is classified `forced` (`page@s0001`) because the named page is read
-from the continuing `<main>` wrapper, and by the rule page's definition the page would not count
-as continuation-only anyway, since the caption itself starts there; that is routed to the corpus
-author and to a fix of the break-cause classification. The job is meant to go green once those
-are resolved; it has no allow-failure and no expected-failures list, and it must not get one.
+head that carries the margin-box, continuation-page and Snapshot 5 packages: 15 of 20 documents
+pass. The five that fail: sa04 and sa17 exit 3 with `injection-interference` (footnotes; a named
+dependency of the corpus, pending); sa06, sa15 and sa19, where `artifact/local-uri` does not report
+root-relative absolute paths although its rule page says every absolute path is reported
+(pending). The job is meant to go green once those are integrated; it has no allow-failure and no
+expected-failures list, and it must not get one.
 
 ## What no amount of testing here establishes
 
