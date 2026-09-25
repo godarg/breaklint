@@ -111,8 +111,8 @@
           "target": {
             "id": "runhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
-          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by block, line or page rules, so no finding of this rule may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md, the 'Margin-box content.' bullet (WP-F1, eee9f06); docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -142,8 +142,8 @@
           "target": {
             "id": "runhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
-          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by block, line or page rules, so no finding of this rule may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md, the 'Margin-box content.' bullet (WP-F1, eee9f06); docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -173,8 +173,8 @@
           "target": {
             "id": "runhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
-          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by block, line or page rules, so no finding of this rule may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md, the 'Margin-box content.' bullet (WP-F1, eee9f06); docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
@@ -259,8 +259,8 @@
           "target": {
             "id": "runhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
-          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by block, line or page rules, so no finding of this rule may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md, the 'Margin-box content.' bullet (WP-F1, eee9f06); docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
@@ -326,8 +326,8 @@
           "target": {
             "id": "runhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
-          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by block, line or page rules, so no finding of this rule may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md, the 'Margin-box content.' bullet (WP-F1, eee9f06); docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [

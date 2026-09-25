@@ -57,12 +57,14 @@
   "expectedExit": {
     "set": [
       1,
-      3
+      3,
+      4
     ],
-    "derivation": "Error finding on #members-roll (exit 1). Tables cross page boundaries (#tbl-ledger, #members-roll) and a landscape page is drawn on a portrait sheet, so exit 3 render-unstable is admitted as 'declined as unmeasurable' (docs/limitations.md); the plain probe saw no table residue.",
+    "derivation": "Error finding on #members-roll under the structural sum (exit 1). Under WP-F3 round 2 the split table and the landscape budget rows are declined as env/invalid-measurement, and a decline of the error rule leaves its coverage below 1 (exit 4, which outranks findings). Tables cross page boundaries (#tbl-ledger, #members-roll) and a landscape page is drawn on a portrait sheet, so exit 3 render-unstable is admitted as 'declined as unmeasurable' (docs/limitations.md); the plain probe saw no table residue.",
     "byCode": {
-      "1": "error finding on #members-roll",
-      "3": "render-unstable (table residue or landscape PDF divergence)"
+      "1": "error finding on #members-roll (structural sum)",
+      "3": "render-unstable (table residue or landscape PDF divergence)",
+      "4": "insufficient-coverage: layout/unbreakable-block-too-tall declines under WP-F3 round 2"
     },
     "environmentNote": "Exit 4 with exitReason evidence/required-page-binding-incomplete is an environment failure (evidence binding not supported by the renderer), not an outcome of these documents; run the gate where the live path binds evidence (CI)."
   },
@@ -153,8 +155,8 @@
           "target": {
             "id": "annualhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
-          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by block, line or page rules, so no finding of this rule may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md, the 'Margin-box content.' bullet (WP-F1, eee9f06); docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -184,8 +186,8 @@
           "target": {
             "id": "annualhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
-          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by block, line or page rules, so no finding of this rule may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md, the 'Margin-box content.' bullet (WP-F1, eee9f06); docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -209,12 +211,45 @@
       ]
     },
     "layout/unbreakable-block-too-tall": {
-      "mustFire": [
+      "mustFire": [],
+      "mustNotFire": [
+        {
+          "target": {
+            "id": "annualhead"
+          },
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by block, line or page rules, so no finding of this rule may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md, the 'Margin-box content.' bullet (WP-F1, eee9f06); docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
+        },
+        {
+          "target": {
+            "ids": [
+              "fig-donut"
+            ]
+          },
+          "why": "break-inside: avoid blocks that are shorter than the page content box (912.0 px) and are laid out in one piece",
+          "measured": {
+            "fig-donut": {
+              "maxFragmentPx": 316,
+              "fragments": 1,
+              "naturalPx": 316
+            }
+          }
+        },
+        {
+          "target": {
+            "selector": "#tbl-ledger tr, #members-roll tr, #tbl-budget tr"
+          },
+          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 912 portrait / 700.8 landscape px content box"
+        }
+      ],
+      "allowed": [
         {
           "target": {
             "id": "members-roll"
           },
-          "why": "a register table with break-inside: avoid that is 2.56 content boxes tall",
+          "class": "documented-gap",
+          "constructionTruth": "defect",
+          "why": "a register table with break-inside: avoid that is 2.56 content boxes tall. Under the structural sum over three or more fragments (0.6.0, with flow membership from WP-F1) it is reported, exit 1. WP-F3 round 2 (G-03/G-81; README 'Release semantics', tracing) replaces the structural sum over three or more fragments with a lower bound from the content extent of each fragment (text lines and replaced content), and declines with env/invalid-measurement, charged to the rule's coverage floor of 1, a split block whose snapshot records a flow hazard (out-of-flow, offset, sticky, transformed, float, multicol, flex-or-grid, table-columns, vertical-writing, negative-margin, overflowing-content), a split block whose bound stays at or below the page (inconclusive), and an unsplit block that is transformed or reaches past the sheet; this table has six columns, so its rows carry the hazard table-columns and the block is declined, exit 4. Which of the two the admitting release documents was not settled when this was written, so the finding is allowed rather than required (erratum E30); the exit set admits both.",
           "construction": "header row + 110 body rows of fixed 20 px cells (21 px per row with the collapsed border) = 2331 px measured against 912 px (Letter, 0.75 in): pushed to a fresh page and split 903 + 903 + 525 px",
           "measured": {
             "naturalPx": 2331,
@@ -242,38 +277,30 @@
           "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md"
         }
       ],
-      "mustNotFire": [
+      "expectedDeclines": [
         {
           "target": {
-            "id": "annualhead"
+            "id": "members-roll"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
-          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
+          "reason": "env/invalid-measurement",
+          "required": false,
+          "count": 1,
+          "countsTowardCoverage": true,
+          "why": "split table with six columns (flow hazard table-columns)",
+          "docsBasis": "WP-F3 round 2 (G-03/G-81; README 'Release semantics', tracing) replaces the structural sum over three or more fragments with a lower bound from the content extent of each fragment (text lines and replaced content), and declines with env/invalid-measurement, charged to the rule's coverage floor of 1, a split block whose snapshot records a flow hazard (out-of-flow, offset, sticky, transformed, float, multicol, flex-or-grid, table-columns, vertical-writing, negative-margin, overflowing-content), a split block whose bound stays at or below the page (inconclusive), and an unsplit block that is transformed or reaches past the sheet. Not on a rule page when this was written, so required: false."
         },
         {
           "target": {
-            "ids": [
-              "fig-donut"
-            ]
+            "selector": "#tbl-budget tr"
           },
-          "why": "break-inside: avoid blocks that are shorter than the page content box (912.0 px) and are laid out in one piece",
-          "measured": {
-            "fig-donut": {
-              "maxFragmentPx": 316,
-              "fragments": 1,
-              "naturalPx": 316
-            }
-          }
-        },
-        {
-          "target": {
-            "selector": "#tbl-ledger tr, #members-roll tr, #tbl-budget tr"
-          },
-          "why": "table rows carry break-inside: avoid; every row is a single short line of cells, far below the 912 portrait / 700.8 landscape px content box"
+          "reason": "env/invalid-measurement",
+          "required": false,
+          "count": 11,
+          "countsTowardCoverage": true,
+          "why": "the eleven break-inside: avoid rows of the budget table on the landscape page reach past the portrait sheet (right edge 998.4 px against 816 px, measured under all three font stacks; see paper[1].observed)",
+          "docsBasis": "WP-F3 round 2 (G-03/G-81; README 'Release semantics', tracing) replaces the structural sum over three or more fragments with a lower bound from the content extent of each fragment (text lines and replaced content), and declines with env/invalid-measurement, charged to the rule's coverage floor of 1, a split block whose snapshot records a flow hazard (out-of-flow, offset, sticky, transformed, float, multicol, flex-or-grid, table-columns, vertical-writing, negative-margin, overflowing-content), a split block whose bound stays at or below the page (inconclusive), and an unsplit block that is transformed or reaches past the sheet. Not on a rule page when this was written, so required: false."
         }
-      ],
-      "allowed": [],
-      "expectedDeclines": []
+      ]
     },
     "layout/heading-at-page-bottom": {
       "mustFire": [],
@@ -282,8 +309,8 @@
           "target": {
             "id": "annualhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
-          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by block, line or page rules, so no finding of this rule may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md, the 'Margin-box content.' bullet (WP-F1, eee9f06); docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
@@ -337,8 +364,8 @@
           "target": {
             "id": "annualhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
-          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by block, line or page rules, so no finding of this rule may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md, the 'Margin-box content.' bullet (WP-F1, eee9f06); docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -463,7 +490,8 @@
     }
   },
   "permittedDeclineReasons": [
-    "env/forced-break"
+    "env/forced-break",
+    "env/invalid-measurement"
   ],
   "notActiveInDefaultProfile": [
     "layout/half-empty-page"

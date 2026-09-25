@@ -180,7 +180,8 @@
               }
             ]
           },
-          "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md; three or more fragments are summed."
+          "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md; three or more fragments are summed.",
+          "underContentExtentLowerBound": "holds. WP-F3 round 2 (G-03/G-81; README 'Release semantics', tracing) replaces the structural sum over three or more fragments with a lower bound from the content extent of each fragment (text lines and replaced content), and declines with env/invalid-measurement, charged to the rule's coverage floor of 1, a split block whose snapshot records a flow hazard (out-of-flow, offset, sticky, transformed, float, multicol, flex-or-grid, table-columns, vertical-writing, negative-margin, overflowing-content), a split block whose bound stays at or below the page (inconclusive), and an unsplit block that is transformed or reaches past the sheet. The listing has no flow hazard inside, on itself or around it (a figure with a caption and a pre of one display: block span per line, no float, table, positioning or transform). Its 131 lines sit on a fixed 18 px pitch or more; a fragment's text extent is at least (lines in it - 1) x 18 px, and at most one line per split can be pushed into the overflow column, so the bound is at least (131 - 2 - 3) x 18 = 2268 px against 971.34 px."
         }
       ],
       "mustNotFire": [
