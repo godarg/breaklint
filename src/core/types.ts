@@ -94,6 +94,13 @@ export interface TextLine {
   index: number;
   box: Box;
   visible: boolean;
+  /**
+   * Whether some text on this line has this record as its BLOCK CONTAINER (Snapshot 5): the text
+   * node's nearest source-block ancestor that is not `display: contents` or inline is this record.
+   * A record records its descendants' lines too; this says which of them are its own. Always false
+   * for a `display: contents` or inline record, whose text belongs to the container around it.
+   */
+  ownText: boolean;
   width: number;
   /** Always populated for justified blocks; measured at 4 221 bytes per page, so affordable. */
   wordBoxes: WordBox[] | null;
@@ -143,6 +150,22 @@ export interface BlockRecord {
    * zero, which is how the rules tell it from an element the author hid.
    */
   marginCopies: number;
+  /**
+   * The element's computed `float` and `position` (Snapshot 5). With `display` they say whether a
+   * nested block sits IN the flow of the block around it, where its lines end that block's own run
+   * of lines, or beside it — a float, an absolutely or fixed positioned box, an inline-block —
+   * where the lines on either side of it are still one run. Geometry cannot tell a full-line
+   * inline-block from a block child; these fields can.
+   */
+  float: string;
+  position: string;
+  /**
+   * Whether Paged.js marked a hyphen at a page split in this block's own inline content (Snapshot
+   * 5): the block, or an inline element inside it that is not inside a nested source block,
+   * carries `pagedjs_hyphen`. Paged.js marks the parent of the text node it cut, so the class alone
+   * in `classList` misses a word cut inside `<em>`.
+   */
+  boundaryHyphen: boolean;
   /** Either populated, or `notMeasuredReason` says why not. Never silently empty. */
   lines: number[] | null;
   notMeasuredReason?: EnvId;

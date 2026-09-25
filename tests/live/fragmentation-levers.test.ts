@@ -15,7 +15,9 @@
  *
  * The chain is the production one: `renderDocuments` with the real source injector, loopback
  * server, primitives, Paged.js bundle and collector, then the real rules through `runDocument`.
- * Line counts are read with `linesOfBlock`, the function the rules themselves read them with.
+ * Line counts are read with `linesOfBlock`. The probe paragraphs contain no nested block and no
+ * wrapper crosses a break, so every recorded line is the paragraph's own and that is also the count
+ * the rules judge (`lineOwnership`; tests/live/rule-targets.test.ts covers the wrapped case).
  *
  * FAILS BOTH WAYS by construction. Every case is compared against a literal split, so a browser
  * that stops applying a property is red, and so is one that applies it differently from what the

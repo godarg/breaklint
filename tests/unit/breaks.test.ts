@@ -23,7 +23,7 @@ import {
   isForcingValue,
   type BoundaryFacts,
 } from "../../src/paginate/breaks.ts";
-import { boundaryFactsFrom, silentHooks, REQUIRED_HOOKS, type CollectedPage } from "../../src/paginate/collector.ts";
+import { boundaryFactsFrom, silentHooks, REQUIRED_HOOKS, type BreakDecision, type CollectedPage } from "../../src/paginate/collector.ts";
 
 function facts(overrides: Partial<BoundaryFacts> = {}): BoundaryFacts {
   return {
@@ -32,6 +32,7 @@ function facts(overrides: Partial<BoundaryFacts> = {}): BoundaryFacts {
     previousBreakAfter: null,
     pageBefore: null,
     pageAfter: null,
+    decisionKnown: true,
     hasBreakToken: false,
     sidBefore: "s0001",
     sidAfter: "s0002",
@@ -139,6 +140,23 @@ describe("classifying one boundary", () => {
     assert.equal(classifyBoundary(facts({ pageBefore: "named", pageAfter: null })).kind, "forced");
     // and the same named page on both sides is NOT a boundary cause
     assert.equal(classifyBoundary(facts({ pageBefore: "named", pageAfter: "named", hasBreakToken: true })).kind, "overflow");
+  });
+
+  /**
+   * A decision that could not be evaluated — no break token, or one without a node — decides
+   * nothing: the boundary is `unknown`, never a guessed change, and never `overflow` on the
+   * strength of the token alone. Only a blank next page outranks it.
+   *
+   * Red condition: drop the check and the first case is `forced` (the names differ).
+   */
+  it("an unevaluated decision is unknown, whatever else the facts say", () => {
+    const unevaluated = { decisionKnown: false, pageBefore: null, pageAfter: "wide", hasBreakToken: true };
+    const result = classifyBoundary(facts(unevaluated));
+    assert.equal(result.kind, "unknown");
+    assert.equal(result.determinedBy, "undetermined");
+    assert.equal(classifyBoundary(facts({ ...unevaluated, pageAfter: null })).kind, "unknown", "not overflow on the token alone");
+    assert.equal(classifyBoundary(facts({ ...unevaluated, breakBefore: "page" })).kind, "unknown");
+    assert.equal(classifyBoundary(facts({ ...unevaluated, nextPageBlank: true })).kind, "parity");
   });
 
   it("a break token with no forcing attribute is overflow", () => {
@@ -259,15 +277,18 @@ describe("assigning causes to pages", () => {
 });
 
 describe("turning collected pages into boundary facts", () => {
+  const decision = (over: Partial<BreakDecision> = {}): BreakDecision => ({
+    known: true, breakBefore: null, previousBreakAfter: null, pageBefore: null, pageAfter: null, sid: null, ...over,
+  });
   const page = (over: Partial<CollectedPage> = {}): CollectedPage => ({
     index: 0,
     reconciled: true,
     hasBreakToken: false,
-    attributesAtLayout: { breakBefore: null, previousBreakAfter: null, page: null },
-    attributesAfterRender: { breakBefore: null, previousBreakAfter: null, page: null },
+    decisionAtLayout: null,
+    decisionAfterRender: null,
     firstSid: "s0000",
     lastSid: "s0001",
-    lastNodePage: null,
+    startSid: "s0000",
     blank: false,
     epoch: 0,
     ...over,
@@ -276,25 +297,27 @@ describe("turning collected pages into boundary facts", () => {
   /**
    * The off-by-one that would classify every document plausibly and wrongly.
    *
-   * Boundary `i` reads the NEXT page's attributes with the PREVIOUS page's token. Swapping those
-   * produces sensible-looking output on every document and correct output on none, which is why it
-   * gets its own case rather than being trusted to the shape of the loop.
+   * Boundary `i` is decided at the break token of page `i` — the node page `i + 1` starts at — and
+   * the blank flag is page `i + 1`'s. Swapping those produces sensible-looking output on every
+   * document and correct output on none, which is why it gets its own case rather than being
+   * trusted to the shape of the loop.
    */
-  it("takes the token from the page before and the attributes from the page after", () => {
+  it("takes the token and its decision from the page before, and the blank flag from the page after", () => {
     const pages = [
-      page({ index: 0, hasBreakToken: true, lastSid: "s0009" }),
-      page({
-        index: 1,
-        hasBreakToken: false,
-        firstSid: "s0010",
-        attributesAfterRender: { breakBefore: "page", previousBreakAfter: null, page: null },
-      }),
+      page({ index: 0, hasBreakToken: true, lastSid: "s0009", decisionAfterRender: decision({ breakBefore: "page", sid: "s0010" }) }),
+      page({ index: 1, hasBreakToken: false, firstSid: "s0003", startSid: "s0011", blank: false,
+        decisionAfterRender: decision({ previousBreakAfter: "page" }) }),
     ];
     const [boundary] = boundaryFactsFrom(pages);
     assert.equal(boundary!.hasBreakToken, true, "the token belongs to the page BEFORE the boundary");
-    assert.equal(boundary!.breakBefore, "page", "the attributes belong to the page AFTER it");
+    assert.equal(boundary!.breakBefore, "page", "so does the decision evaluated at it");
+    assert.equal(boundary!.previousBreakAfter, null, "the page after's decision is about the NEXT boundary");
     assert.equal(boundary!.sidBefore, "s0009");
-    assert.equal(boundary!.sidAfter, "s0010");
+    assert.equal(boundary!.sidAfter, "s0010", "the reason names the node the decision was taken at");
+    assert.equal(boundaryFactsFrom([page({ decisionAfterRender: decision() }), page({ startSid: "s0020", firstSid: "s0003" })])[0]!.sidAfter, "s0020",
+      "a decision node without a source id falls back to the node that starts the page, not the wrapper");
+    assert.equal(boundaryFactsFrom([page({ decisionAfterRender: decision() }), page({ startSid: null, firstSid: "s0030" })])[0]!.sidAfter, "s0030",
+      "a page on which nothing starts falls back to its first node");
   });
 
   it("produces exactly one boundary fewer than there are pages", () => {
@@ -303,12 +326,14 @@ describe("turning collected pages into boundary facts", () => {
     assert.equal(boundaryFactsFrom([]).length, 0);
   });
 
-  it("compares data-page across the boundary, not within a page", () => {
-    const pages = [
-      page({ lastNodePage: "named" }),
-      page({ attributesAfterRender: { breakBefore: null, previousBreakAfter: null, page: null } }),
-    ];
-    const [boundary] = boundaryFactsFrom(pages);
+  it("a page with no decision, or a decision without a node, leaves the boundary unevaluated", () => {
+    assert.equal(boundaryFactsFrom([page(), page()])[0]!.decisionKnown, false);
+    assert.equal(boundaryFactsFrom([page({ decisionAfterRender: decision({ known: false }) }), page()])[0]!.decisionKnown, false);
+    assert.equal(boundaryFactsFrom([page({ decisionAfterRender: decision() }), page()])[0]!.decisionKnown, true);
+  });
+
+  it("passes on the named pages needsPageBreak() compared, and a difference is forced", () => {
+    const [boundary] = boundaryFactsFrom([page({ hasBreakToken: true, decisionAfterRender: decision({ pageBefore: "named", pageAfter: null }) }), page()]);
     assert.equal(boundary!.pageBefore, "named");
     assert.equal(boundary!.pageAfter, null);
     assert.equal(classifyBoundary({ ...boundary! }).kind, "forced");
@@ -327,15 +352,11 @@ describe("turning collected pages into boundary facts", () => {
    */
   it("a boundary touching an unreported page is unknown, not inferred from its attributes", () => {
     const pages = [
-      page({ index: 0, hasBreakToken: true }),
-      page({
-        index: 1,
-        reconciled: false,
-        attributesAfterRender: { breakBefore: "page", previousBreakAfter: null, page: null },
-      }),
+      page({ index: 0, hasBreakToken: true, decisionAfterRender: decision({ breakBefore: "page" }) }),
+      page({ index: 1, reconciled: false }),
     ];
     const [boundary] = boundaryFactsFrom(pages);
-    assert.equal(boundary!.breakBefore, null, "an unreported page's attributes must not be read");
+    assert.equal(boundary!.breakBefore, null, "a decision next to an unreported page must not be read");
     assert.equal(boundary!.hasBreakToken, false);
     assert.equal(classifyBoundary(boundary!).kind, "unknown");
 

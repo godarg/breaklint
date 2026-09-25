@@ -56,6 +56,14 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   stamp, `TextLine.visible` is true when any text on the line is visible — read from each text
   node's element — where it used to copy the block's visibility, so a hidden block's visible
   descendant (`p { visibility: hidden } span { visibility: visible }`) counts as printed.
+  The same stamp adds four more required fields, before any release: `BlockRecord.float` and
+  `BlockRecord.position` (the computed values), with which `layout/widow` and `layout/orphan` tell
+  a nested block in the flow from one beside the block's text; `TextLine.ownText`, whether text
+  whose nearest block container is the record is on the line; and `BlockRecord.boundaryHyphen`,
+  where Paged.js marked a boundary hyphen in the block's own inline content. The invariants check
+  all four, the demo snapshot and the corpus carry them, and the engine refuses (exit 3) a stamp-5
+  snapshot that lacks any field stamp 5 requires, naming it, rather than judge it: a stamp-5
+  snapshot written before these fields would otherwise be read as having no own text at all.
 - **A zero box no longer decides how a block is judged; its computed display does.** A
   `display: contents` block has no box of its own but prints its text and children:
   `type/excessive-word-spacing` measures it from its lines (a justified `display: contents`
@@ -174,6 +182,122 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   longer says the last page is "downgraded to a note": its finding keeps `warn`, and only the
   message says the page is likely intended. The rule stays experimental and off by default, and
   nothing here is a calibration.
+- **`layout/widow` and `layout/orphan` judge a split at the block whose own lines it split, not at
+  a wrapper around it.** The collector records a block's lines from every text node beneath it, so a
+  `<section>` or `<div>` that crosses a page break carries its paragraphs' line boxes as well, and
+  both rules judged those lines by the WRAPPER's own value. Measured on patched Chromium 141 with
+  Paged.js 0.4.3, no evidence binding: a paragraph that asked for single-line widows and split 8+1
+  was reported as a `layout/widow` of the section around it, and a section whose second paragraph
+  moved whole to the next page was reported as a `layout/orphan` for the one line its first
+  fragment held — the intro paragraph's; the unwrapped controls reported neither. Both rules now
+  count the run of the block's own container's lines next to the break:
+  - a line is a block's own when the collector saw text on it whose nearest block container is
+    that block (`TextLine.ownText`), so a line shared with a float on each side, the block's text
+    between them, is its own although the floats' boxes span it — a geometric version of this
+    test reported a false widow at the default values for floats at the top of a page; a
+    block container the snapshot does not record (a custom element) owns its own text, so its
+    splits are not judged and the block around it is not judged on those lines;
+  - a line nobody owns that way belongs to the latest block container in collection order that
+    records it; a
+    `display: contents` or inline record never takes a line from the block around it, and one whose
+    lines no recorded block holds is declined as `env/invalid-measurement` (newly declared by both
+    rules, counted against coverage) instead of being judged by its own value;
+  - the run ends at an in-flow nested block's line and passes over the lines of a float, a
+    positioned box or an inline-block beside the block's own text, told apart by the recorded
+    `display`, `float` and `position` (Snapshot 5, below). A first version ended it at any nested
+    line, which turned a float with a top padding into a false widow and silenced a split beside an
+    inline-block;
+  - the run is judged only when the break split it: the block's fragment on the other side of the
+    break, joined by source id, must meet the break with own text too. A wrapper's own line that ends
+    a page with a paragraph that moved whole after it, or opens a page after a paragraph ended the
+    previous one, is a complete run and is no longer reported (a list item with its sublist on the
+    next page, a table cell whose lines all moved). A split block without a source id keeps the
+    one-sided count.
+  The nested paragraph is judged as before, by its own value, and a real widow inside a wrapper is
+  reported once, on the paragraph; a wrapper's own text split by the break is still judged, and a
+  section whose own two-line text split 1+1 below a nested paragraph is now an orphan too, which
+  the old count missed. For a block without nested blocks nothing changes. Checked against a
+  ground-truth probe (plain Paged.js and Range rectangles) at four thresholds: on 24 layouts all 96
+  judgements agree, and on a second set of 19 layouts 70 of 76, the six others being splits inside
+  the two custom-element layouts that no rule sees. Known limits, documented and not fixed: a
+  recorded block inside an UNRECORDED inline-block or inline-flex box is taken for an in-flow block
+  and ends the surrounding block's run, which can give a false `layout/orphan` (0.6.0 counted every
+  recorded line and did not have this); text in an unrecorded floated or absolutely positioned box
+  counts as the surrounding block's own lines; and, as in 0.6.0, lines are grouped by the top edge
+  of their text within 0.5 px, so an inline `<code>` or `<sup>` at another height counts as a line
+  of its own. On the first-party robustness document (`dargel-kleingewerbe`) all three
+  `layout/orphan` findings and the one `layout/widow` finding were wrappers and are gone. Consumers
+  see wrapper fragments measured with 0 lines where they carried findings, the applicability
+  measurement false where the other side does not continue the run, and two informational
+  measurements in both rules' evaluations (`opening-`/`closing-fragment-lines-of-nested-blocks`,
+  `previous-fragment-closing-lines`/`next-fragment-opening-lines`). Advice and message texts are
+  unchanged. Pinned by `tests/live/rule-targets.test.ts` over `wrapper-fragmentation.html` and
+  `nested-flow.html`.
+- **`type/excessive-word-spacing` divides by the font's natural space, not by the block's first
+  rendered space.** In justified text no rendered space is natural. At a line end it collapses: a
+  justified monospace block whose first space fell there recorded 0.02 px and reported an ordinary
+  gap as "540.50× the natural space" (patched Chromium 141, Paged.js 0.4.3). Inside a justified line
+  it is stretched with that line, which divided a real six-space gap by itself: a block with gaps of
+  six and seven spaces was clean, and every other block's factors were deflated. The collector now
+  records, in the existing `spaceWidth`:
+  - the block's own font's advance for one space plus its `letter-spacing`, times its effective
+    CSS `zoom`, measured in the page with a canvas that is never inserted into the document, through
+    a new captured primitive, and only once `document.fonts` reports the font loaded, so the
+    measurement cannot start a font load after the measured state. Without the zoom factor
+    `zoom: 1.25` made two false findings and `zoom: 0.8` deflated real gaps;
+  - where a canvas cannot reproduce the font — `font-variation-settings` other than a `wght` equal to
+    the computed weight, `font-size-adjust`, a non-keyword `font-stretch`, synthesised caps other
+    than `small-caps` (`all-small-caps` read 46 % too wide from the canvas), a font not yet loaded —
+    the rendered layout. Pooled over the document per layout key (font, caps, `letter-spacing`,
+    `word-spacing`, variation settings, `font-size-adjust`, `font-kerning`, zoom), the samples are
+    gaps between two consecutive words of one text node whose element computes that key, separated
+    by collapsible whitespace only, on the last line of the last fragment of a justified block
+    that is its own block container, has no nested source block and whose `text-align-last` does
+    not justify that line; the median is taken only when every sample lies within 0.1 px or 3 % of
+    it. A first version sampled every gap on such last lines: one paragraph set with
+    `word-spacing: 1em`, a `<code>` run or a `display: contents` paragraph under
+    `text-align-last: justify` could move the median and hide a real 6.41× gap. A
+    first version declined all such blocks: a justified document setting `"wght" 400` or
+    `"opsz" 11` on a font without those axes ended exit 4 with 0 of 12 blocks measured; it measures
+    12 of 12 now, with the factors of the same document without the setting;
+  - 0 when neither exists or the samples disagree. The rule then declines the block as
+    `env/invalid-measurement` (newly
+    declared), counted against coverage: a document in which more than half of the justified
+    blocks decline falls below the 0.5 floor and ends `insufficient-coverage` (exit 4). It used to
+    divide by a third of the font size.
+  In right-to-left text the sampler pairs words in visual order and can take a gap between two
+  text nodes; a divisor polluted that way needs every sample of its key polluted alike, since
+  samples that disagree decline the block. Right-to-left text is not judged at all, as in 0.6.0:
+  its gaps read negative in text order and are skipped, and the block is reported as measured
+  with a largest factor of 0 (documented).
+  Twelve font settings are pinned (within 0.05 px, measured within 0.03 px on patched Chromium 141,
+  default fonts; no web font): the ten canvas-measured ones against their unjustified last lines,
+  the two layout-measured ones against an independent one-line control each. Gaps inside an inline element with its own
+  `word-spacing` are no longer judged (they are one unit in the word boxes), which removes a false
+  finding; gaps set in an inline element in another font or size are still measured against the
+  block's space (documented). Expect more findings on justified documents whose first spaces were
+  stretched and fewer where they were collapsed. The snapshot field keeps its shape; its value
+  source changed.
+- **`type/excessive-word-spacing` judges a line at the block whose font sets it, justified by its
+  block container.** A justified wrapper records its paragraphs' lines too. With the natural space
+  now the font's own, a serif `<div style="text-align: justify">` around a monospace paragraph
+  reported the paragraph's seven-space gap a second time, on the div, as 16.84 of the div's spaces
+  (patched Chromium 141); before, both read the paragraph's stretched first space and the wrapper
+  duplicated whatever the paragraph showed. A line now belongs to the deepest record that records
+  it, with or without a box of its own (a `display: contents` paragraph's text is set in its font),
+  and a wrapper is measured on its own text only. Whether its lines are justified is its block
+  container's `text-align`: a `display: contents` paragraph with `text-align: left` inside a
+  justified `<div>` prints justified lines and its seven-space gap is reported, where it was hidden.
+  Its evaluations carry an informational `lines-of-nested-blocks` measurement.
+- **`layout/hyphen-across-page` reports a boundary hyphen inside an inline element.** Paged.js puts
+  `pagedjs_hyphen` on the parent of the text node it cut; for a word cut inside `<em>`, `<a>` or
+  `<span>` that is the inline element, and the rule, reading the block's own classes, missed it
+  (patched Chromium 141: the same split reported without `<em>`, silent with it). The collector now
+  records `boundaryHyphen` per block (Snapshot 5) and the rule reads that: the fragment's last text
+  node ends in the glyph Paged.js appends (U+2011) and the element holding it, or one between it and
+  the block, carries the class; the mark belongs to the nearest source block, and a wrapper further
+  out does not carry it. An author's `pagedjs_hyphen` class on an element that holds no cut word is
+  no longer read as a boundary hyphen.
 
 ### Added
 
@@ -292,6 +416,75 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   that is not inside a Paged.js note lands in one refusal, including one moved INTO the footnote
   area without the note marker; the message now names what is missing (`data-note="footnote"`).
   Exit 3 as before.
+
+- **A page boundary is `forced` only where Paged.js' own break decision forced it, so a named-page
+  region inside a wrapper no longer declines `layout/widow`, `layout/orphan` and
+  `layout/orphaned-continuation-page` across the whole region.** The named page of a page
+  (`page: <name>`) was taken from the page's first source-bearing node. In a document wrapped in
+  `<main>` or `<article>` that node is the wrapper's continuation clone, which has no named
+  ancestor, so every boundary inside a named region and the one after it read as a change of named
+  page — `forced`, with the reason `page@<the wrapper>` — and the boundary into the region read as
+  `overflow`. The three rules decline a fragment or page at a forced boundary (`env/forced-break`),
+  and those declines count against coverage: on a self-authored report with a landscape region, 9
+  of 14 widow and orphan candidates were declined, both rules fell below their floor and the run
+  ended `insufficient-coverage`, exit 4 (patched Chromium 141, no evidence binding; a corpus-gate
+  run of the same document recorded 13 declines each and widow coverage 8 of 21). The collector now
+  evaluates `shouldBreak()` — its break-before, break-after and named-page clauses — at the node
+  the break token names, in the paginator's parsed source, with the paginator's own previous-node
+  walk, and only for a token at the node the layout walker handed out last on the page: a named
+  page forces a break only where the element the next page starts with is under a different named
+  page than the element before it, and a `break-before` or `page:` on a block inside an element
+  Paged.js deep-clones (`li`, `td`, `dd`, `p`, …) forces nothing, because the paginator never
+  evaluates it. Comparing the page styles of the two pages is
+  not that rule: a named region nested in a `<div>` ends without a break, so the page after it
+  changes style by overflow. On the same report 2 candidates of each rule are declined, at the two
+  boundaries the paginator forced, and widows and orphans that were hidden before can now be
+  reported.
+- **A `break-after` whose following element sits inside a continuing wrapper, or is loose inline
+  content, is `forced`; a `page:` on an inline element breaks where its text starts; and a forced
+  boundary's reason names the element at the break, not the wrapper.** These three were read from
+  the page's first node too. Paged.js puts `data-previous-break-after` on the element after the
+  declaring one — which may be a section inside `<main>` or an `<em>` at the head of the page — so
+  those boundaries read as `overflow`; it also breaks for a named page at a text node, which the
+  first-node read called `overflow`. A token with no node to evaluate makes the boundary `unknown`
+  (`break-cause-undetermined`, not fatal). Snapshot break-cause reasons change their named source
+  id where they named a wrapper; no schema stamp moves. See `docs/limitations.md`, *The break cause
+  of a page boundary*. Pinned by eleven live named-region documents in `tests/live/breaks.test.ts`,
+  each boundary checked against the paginator's own `shouldBreak()` answers, a production-chain
+  case in `tests/live/named-page-regions.test.ts` and recorded page and source trees in
+  `tests/unit/named-page-regions.test.ts`.
+- **A report written to a pipe arrives whole.** Through 0.6.0 the CLI exited as soon as it had
+  handed the report to stdout, which discarded everything the pipe had not taken yet: behind
+  `| cat`, `| jq` or a slow uploader a report larger than the pipe buffer arrived cut at a
+  multiple of the pipe buffer, usually 65 536 bytes, on Linux — in all six formats, on Node 22 and
+  24, from the source and from the built entry — while the exit code still stated the verdict, so
+  the loss was silent. The demo's own
+  JSON report (82 585 bytes) was already over that size. The CLI now exits only after every write
+  has been accepted. `--out` and a `> file` redirect were never affected.
+- **Output that cannot be delivered is exit 3, not a verdict.** When stdout cannot be written
+  completely — the reader closed early (`| head`), or the device is full — the run now ends with
+  exit 3 and one `breaklint: could not write to stdout (…)` line on stderr, whatever its verdict.
+  That covers every output written to stdout, `--help` and `--version` included. Before, a reader
+  that closed early left the run at exit 1 with no message, a verdict about a report nobody
+  received. With `--out` the report is in the file, complete, before stdout is touched, and stdout
+  carries only a confirmation line: if that line cannot be written, the run keeps its verdict's
+  exit code and says so on stderr (`could not write the confirmation line to stdout (…); the
+  report file was written in full`). The exit-code table in the README and in `--help` names both
+  cases. A
+  process-boundary test, `tests/e2e/cli-pipe-integrity.test.ts`, drives the real source entry and
+  a freshly built `dist/` entry (through a bin symlink) with a report of at least 256 KiB in every
+  format, through a kernel pipe into `cat`, a kernel pipe into a slow reader and a Node pipe, and
+  compares the bytes with the `--out` file; it fails on the previous entry point.
+- **A run that stops without an answer ends with exit 3, not 0.** If the work the CLI waits on
+  can no longer settle — a driver whose browser went away, a handle closed underneath it — the
+  event loop empties, and Node then ended the process with exit 0 and no output, which a gate
+  reads as a clean document. This was seen once, on a run under heavy load. The CLI now notices
+  the empty loop while it is still waiting and ends with exit 3 and one line:
+  `breaklint: the run stopped before it finished: nothing was left for it to wait on, so no report exists; exit 3.`
+  Its default exit code is also 3, so no other route past the explicit exit can end at 0.
+  `tests/e2e/cli-unsettled-run.test.ts` runs the real CLI source on the live path. Node's
+  module-customisation hooks replace only the acquisition module with one whose promise never
+  settles; that is harness, not a product option. It ended exit 0 before this change.
 
 ### Reporting
 

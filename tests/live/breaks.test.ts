@@ -184,6 +184,228 @@ const PAGEBOX_MOVE_HTML = FIXED_HTML.replace("</body>", `<script>
 </body>`);
 
 /**
+ * NAMED-PAGE REGIONS, each inside a wrapper that spans every page — the shape of a real report,
+ * and the one that broke the classification: Paged.js rebuilds the wrapper on every page it
+ * continues onto as a `data-split-from` clone, so the FIRST source-bearing node of those pages is
+ * a `<main>` with no named ancestor.
+ *
+ * THE ORACLE IS PAGED.JS ITSELF. Each case wraps `shouldBreak()` on the paginator's own layout
+ * prototype (`PAGINATOR_DECISIONS`, registered as a second handler, observing only) and records,
+ * per page, whether the break token it handed out is the node `shouldBreak()` answered true for —
+ * and for which clause. breaklint's collector does not use that wrapper: it re-evaluates the same
+ * rule at the token from the paginator's source. The page geometry is NOT an oracle — a page can
+ * change its `@page` style without a forced break (`REGION_NESTED_EXIT_*`) — and appears below
+ * only as a premise that a region spans the pages it should.
+ */
+const REGION_HEAD = (pages: string, rules: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@page{size:120mm 80mm;margin:10mm}
+${pages}
+body{font:9pt/1.4 Georgia,serif;margin:0} p,h2{margin:0 0 6px} h2{font-size:11pt}
+${rules}
+</style></head><body>`;
+const regionParagraphs = (prefix: string, count: number) => Array.from({ length: count }, (_, i) =>
+  `<p id="${prefix}${i}">${prefix.toUpperCase()}${i} paragraph with enough ordinary words to run over two lines of the page so that the region fills several pages.</p>`).join("\n");
+
+/** Complication: a named region in the MIDDLE of a wrapper, spanning three pages. */
+const REGION_WRAPPER_HTML = `${REGION_HEAD("@page wide{size:160mm 80mm;margin:10mm 4mm}", ".wide{page:wide}")}
+<main id="wrap">
+<section id="intro"><h2 id="intro-h">Introduction</h2>
+${regionParagraphs("i", 8)}
+</section>
+<section class="wide" id="wide"><h2 id="wide-h">Wide region</h2>
+${regionParagraphs("w", 20)}
+</section>
+<section id="outro"><h2 id="outro-h">After the region</h2>
+${regionParagraphs("o", 4)}
+</section>
+</main></body></html>`;
+
+/** Complication: two DIFFERENT named regions back to back, so a named page changes to another one, not to none. */
+const REGION_CONSECUTIVE_HTML = `${REGION_HEAD("@page ra{size:140mm 80mm;margin:10mm 7mm}\n@page rb{size:160mm 80mm;margin:10mm 4mm}", ".ra{page:ra} .rb{page:rb}")}
+<main id="wrap2">
+<p id="lead2">A lead paragraph outside both regions.</p>
+<section class="ra" id="ra"><h2 id="ra-h">Region A</h2>
+${regionParagraphs("a", 12)}
+</section>
+<section class="rb" id="rb"><h2 id="rb-h">Region B</h2>
+${regionParagraphs("b", 14)}
+</section>
+</main></body></html>`;
+
+/**
+ * Complication: the region opens the document, so page 1 starts in the unnamed wrapper and gets
+ * its named page from Paged.js' layout pass, not from the element it starts with.
+ */
+const REGION_START_HTML = `${REGION_HEAD("@page wide{size:160mm 80mm;margin:10mm 4mm}", ".wide{page:wide}")}
+<main id="wrap3">
+<section class="wide" id="sw"><h2 id="sw-h">Region at the start</h2>
+${regionParagraphs("s", 16)}
+</section>
+<section id="after3"><h2 id="after3-h">After</h2>
+${regionParagraphs("t", 6)}
+</section>
+</main></body></html>`;
+
+/**
+ * The control: REAL forced breaks inside the region, where the named page is the same on both
+ * sides. A nested `break-before: page` and a nested `break-after: page` must stay forced after
+ * the named-page comparison stops producing `forced` inside a region — and the break-after sits
+ * inside the wrapper, on a node the wrapper clone hides from a first-node read.
+ */
+const REGION_FORCED_HTML = `${REGION_HEAD("@page wide{size:160mm 80mm;margin:10mm 4mm}", ".wide{page:wide} .chap{break-before:page} .closer{break-after:page}")}
+<main id="wrap4">
+<p id="lead4">A lead paragraph outside the region.</p>
+<section class="wide" id="w4"><h2 id="w4-h">Region with its own breaks</h2>
+${regionParagraphs("u", 3)}
+<h2 class="chap" id="chap4">A chapter forced open inside the region</h2>
+${regionParagraphs("v", 8)}
+<p class="closer" id="closer4">This paragraph ends its page with a stylesheet break-after.</p>
+<p id="aftercloser4">This paragraph opens the page after the break-after.</p>
+${regionParagraphs("x", 2)}
+</section>
+<p id="out4">Out of the region.</p>
+</main></body></html>`;
+
+/**
+ * Complication: a named region NESTED at the top of another, so Paged.js applies two named pages
+ * to one page (`pagedjs_outer_page` and `pagedjs_inner_page`, both at the top of page 2 before any
+ * content). Compared as a whole, that page differs from the next one inside the inner region.
+ */
+const REGION_NESTED_HTML = `${REGION_HEAD("@page outer{size:140mm 80mm;margin:10mm}\n@page inner{size:160mm 80mm;margin:10mm}", ".outer{page:outer} .inner{page:inner}")}
+<main id="wrap5">
+<p id="lead5">A lead paragraph.</p>
+<section class="outer" id="outer"><div class="inner" id="inner">
+${regionParagraphs("n", 14)}
+</div>
+${regionParagraphs("m", 3)}
+</section>
+</main></body></html>`;
+
+/**
+ * Complication: a named region NOT a sibling of what follows it — `<div><section page:chap>` —
+ * so Paged.js compares the paragraph after it with the `<div>`, whose named page is none, and does
+ * NOT break on leaving the region: the next paragraphs are laid out on `chap` pages. Twice, once
+ * with a named page of the same size (only its name differs) and once with a different size.
+ */
+const nestedExit = (chapPage: string, after = "") => `${REGION_HEAD(chapPage, ".chap{page:chap} .tall{break-inside:avoid;height:55mm}")}
+<main id="wrap6">
+<p id="lead6">A lead paragraph before the region.</p>
+<div id="holder6"><section class="chap" id="chap6"><h2 id="chap6-h">Region inside a div</h2>
+${regionParagraphs("c", 6)}
+</section></div>
+${after}${regionParagraphs("q", 10)}
+</main></body></html>`;
+const REGION_NESTED_EXIT_SAME_HTML = nestedExit("@page chap{size:120mm 80mm;margin:10mm}");
+const REGION_NESTED_EXIT_DIFF_HTML = nestedExit("@page chap{size:160mm 80mm;margin:10mm 4mm}");
+/**
+ * The same exit where the page ends EXACTLY after the region: an unbreakable block too tall for
+ * what is left of the page follows the `<div>`, so the paginator moves it to the next page as an
+ * overflow. A reading of the leaves on either side of that boundary sees `chap` against none.
+ */
+const REGION_NESTED_EXIT_AT_BOUNDARY_HTML = nestedExit("@page chap{size:160mm 80mm;margin:10mm 4mm}",
+  `<div class="tall" id="tall6">An unbreakable block, taller than what the region leaves of its last page.</div>\n`);
+
+/**
+ * Complication: `page:` on an INLINE element whose text runs over several pages. Paged.js asks
+ * `shouldBreak()` of text nodes too, so it breaks where the span's text starts and again where the
+ * text after it starts; where an overflow splits the span's text, nothing is forced.
+ */
+const REGION_INLINE_HTML = `${REGION_HEAD("@page x{size:160mm 80mm;margin:10mm 4mm}", ".x{page:x}")}
+<main id="wrap7">
+${regionParagraphs("k", 2)}
+<p id="host7">Text before the span. <span class="x" id="span7">${Array.from({ length: 60 }, (_, i) => `inside${i} words of the named inline span`).join(" ")}</span> text after the span.</p>
+${regionParagraphs("z", 2)}
+</main></body></html>`;
+
+/**
+ * Complication: a break-after followed by LOOSE INLINE content in the same parent. Paged.js puts
+ * `data-previous-break-after` on the next displayed element — an `<em>` with no source id of its
+ * own — and the page after starts inside the wrapper and the section's continuation clones.
+ */
+const REGION_BREAK_AFTER_INLINE_HTML = `${REGION_HEAD("", ".closer{break-after:page}")}
+<main id="wrap8"><section id="s8">
+${regionParagraphs("g", 3)}
+<p class="closer" id="closer8">This paragraph ends its page with a stylesheet break-after.</p>
+<em id="em8">Loose emphasised text</em> follows it in the same section, with more words after it.
+</section>
+${regionParagraphs("h", 2)}
+</main></body></html>`;
+
+/**
+ * Complication: forcing declarations Paged.js NEVER EVALUATES. Its walker deep-clones `li` and
+ * `td` (layout.js `isContainer`), so a `break-before: page` or a `page:` on a block inside one is
+ * never handed to `shouldBreak()`. An overflow can still end a page exactly at such a block, and
+ * the token then names it with offset 0: its attributes say "forced", the paginator did not force.
+ */
+const deepCloneItem = (i: number) =>
+  `<li id="li9-${i}"><p id="lp9-${i}">Item ${i}: ${"words in the list item before its box ".repeat(1 + (i % 4))}</p><div class="bb box" id="bx9-${i}">box ${i}</div></li>`;
+const deepCloneCell = (i: number) =>
+  `<tr id="tr9-${i}"><td id="td9-${i}"><p id="tp9-${i}">Cell ${i}: ${"words in the table cell before its box ".repeat(1 + (i % 3))}</p><div class="named box" id="tb9-${i}">cell box ${i}</div></td></tr>`;
+const REGION_DEEP_CLONE_HTML = `${REGION_HEAD("@page other{size:120mm 80mm;margin:10mm}", ".bb{break-before:page} .named{page:other} .box{height:22mm;background:#ddd;break-inside:avoid}")}
+<main id="wrap9">
+${regionParagraphs("e", 1)}
+<ul id="ul9">
+${Array.from({ length: 14 }, (_, i) => deepCloneItem(i)).join("\n")}
+</ul>
+<table id="table9"><tbody>
+${Array.from({ length: 10 }, (_, i) => deepCloneCell(i)).join("\n")}
+</tbody></table>
+${regionParagraphs("f", 2)}
+</main></body></html>`;
+
+const REGION_FIXTURES: Record<string, string> = {
+  "/region-wrapper.html": REGION_WRAPPER_HTML,
+  "/region-consecutive.html": REGION_CONSECUTIVE_HTML,
+  "/region-start.html": REGION_START_HTML,
+  "/region-forced.html": REGION_FORCED_HTML,
+  "/region-nested.html": REGION_NESTED_HTML,
+  "/region-nested-exit-same.html": REGION_NESTED_EXIT_SAME_HTML,
+  "/region-nested-exit-diff.html": REGION_NESTED_EXIT_DIFF_HTML,
+  "/region-nested-exit-at-boundary.html": REGION_NESTED_EXIT_AT_BOUNDARY_HTML,
+  "/region-inline.html": REGION_INLINE_HTML,
+  "/region-break-after-inline.html": REGION_BREAK_AFTER_INLINE_HTML,
+  "/region-deep-clone.html": REGION_DEEP_CLONE_HTML,
+};
+
+/**
+ * The paginator's own decisions, observed. Wraps `shouldBreak()` on Paged.js' layout prototype
+ * (it returns what the original returns) and records, per `afterPageLayout`, whether the break
+ * token is the node `shouldBreak()` last answered true for, and by which clause. Test-only: it is
+ * the independent side of the comparison, so nothing in `src/` may read it.
+ */
+const PAGINATOR_DECISIONS = (capability: string) => `(() => {
+  const forcing = ["always", "page", "left", "right", "recto", "verso"];
+  const state = { pages: [], last: null };
+  window.__paginatorDecisions = state;
+  const describe = (n) => !n ? null : n.nodeType === 1 ? n.tagName.toLowerCase() + (n.id ? "#" + n.id : "") : "#text";
+  class PaginatorDecisions extends Paged.Handler {
+    onPageLayout(wrapper, token, layout) {
+      state.last = null;
+      const proto = Object.getPrototypeOf(layout);
+      if (proto.__decisionsObserved) return;
+      const original = proto.shouldBreak;
+      proto.shouldBreak = function (node, limiter) {
+        const answer = original.call(this, node, limiter);
+        if (answer) {
+          const ds = node.dataset || {};
+          const clause = forcing.includes(ds.breakBefore) ? "break-before" : forcing.includes(ds.previousBreakAfter) ? "break-after" : "page";
+          state.last = { node, clause };
+        }
+        return answer;
+      };
+      proto.__decisionsObserved = true;
+    }
+    afterPageLayout(pageElement, page, token) {
+      const last = state.last;
+      state.pages.push(!token ? { kind: "none", at: null } : last && token.node === last.node
+        ? { kind: "forced", clause: last.clause, at: describe(token.node) } : { kind: "overflow", at: describe(token.node) });
+      state.last = null;
+    }
+  }
+  window.__blPrimitives.registerPagedHandler(${JSON.stringify(capability)}, PaginatorDecisions);
+})()`;
+
+/**
  * The pagination bootstrap breaklint owns: `paged.js`, never the auto-previewing polyfill.
  *
  * The replacement is a FUNCTION, and that is not style. `String.replace` interprets `$&`, `` $` ``,
@@ -213,6 +435,8 @@ describe("the collector, live", () => {
   let sidByAuthorId: Record<string, string> = {};
   const runningSidByAuthorId: Record<string, string> = {};
   const footnoteSidByAuthorId: Record<string, string> = {};
+  const servedRegions: Record<string, string> = {};
+  const regionSidByAuthorId: Record<string, Record<string, string>> = {};
 
   before(async () => {
     if (missing.length > 0) {
@@ -269,12 +493,23 @@ describe("the collector, live", () => {
     const moved = injectSourceIds(PAGEBOX_MOVE_HTML, "pagebox-move.html");
     pageboxMoveExpectedSids = orderedSourceSids(moved.map);
     servedPageboxMove = withPagination(moved.html, pagedjs, true);
+    for (const [path, html] of Object.entries(REGION_FIXTURES)) {
+      assert.equal(detectCollision([{ origin: "document", text: html }]).collided, false);
+      const region = injectSourceIds(html, path.slice(1));
+      const ids: Record<string, string> = {};
+      for (const [sid, ref] of Object.entries(region.map)) {
+        const id = /\bid="([^"]+)"/u.exec(html.slice(ref.offset, ref.offset + 200))?.[1];
+        if (id) ids[id] = sid;
+      }
+      regionSidByAuthorId[path] = ids;
+      servedRegions[path] = withPagination(region.html, pagedjs, true);
+    }
 
     server = createServer((req, res) => {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       const routes: Record<string, string> = {
         "/running.html": servedRunning, "/footnote.html": servedFootnote, "/fixed.html": servedFixed,
-        "/pagebox-move.html": servedPageboxMove, "/display.html": servedDisplay,
+        "/pagebox-move.html": servedPageboxMove, "/display.html": servedDisplay, ...servedRegions,
       };
       res.end(routes[req.url ?? ""] ?? served);
     });
@@ -305,7 +540,9 @@ describe("the collector, live", () => {
     assert.equal(browserProfile ? existsSync(browserProfile) : false, false);
   });
 
-  async function collect(path = "/doc.html"): Promise<{ page: PageLike; result: CollectorResult }> {
+  async function collect(path = "/doc.html", observePaginator = false): Promise<{
+    page: PageLike; result: CollectorResult; paginator: { kind: string; clause?: string; at: string | null }[];
+  }> {
     const collectorNonce = "breaks-live-collector";
     const page = await browser!.newPage();
     await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(
@@ -319,6 +556,7 @@ describe("the collector, live", () => {
     await page.goto(`${origin}${path}`, { waitUntil: "load", timeout: 30_000 });
     await page.evaluate<void>(collectorSource(TEST_PRIMITIVES_CAPABILITY, collectorNonce));
     await page.evaluate<void>(paginationApparatusSource(TEST_PRIMITIVES_CAPABILITY));
+    if (observePaginator) await page.evaluate<void>(PAGINATOR_DECISIONS(TEST_PRIMITIVES_CAPABILITY));
     const pagination = await page.evaluate<{ paginationError: string | null }>(PAGINATION_PREVIEW_SOURCE);
     assert.equal(pagination.paginationError, null);
     const epoch = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(TEST_PRIMITIVES_CAPABILITY));
@@ -326,7 +564,10 @@ describe("the collector, live", () => {
     const result = await page.evaluate<CollectorResult>(
       `window.__blPrimitives.collectorResult(${JSON.stringify(TEST_PRIMITIVES_CAPABILITY)}, ${JSON.stringify(collectorNonce)})`,
     );
-    return { page, result };
+    const paginator = observePaginator
+      ? await page.evaluate<{ kind: string; clause?: string; at: string | null }[]>("window.__paginatorDecisions.pages")
+      : [];
+    return { page, result, paginator };
   }
 
   it("every registered hook fired", async (t) => {
@@ -379,7 +620,11 @@ describe("the collector, live", () => {
         "overflow", // inside the section: both sides resolve to the same name via the ancestor
         "forced",   // OUT of the named section - resolved through the ancestor, not the leaf
         "parity",   // the blank page the recto declaration inserted
-        "forced",   // break-before: recto
+        // Out of the blank page. Paged.js hands out no break token for a page it inserts for
+        // parity, so there is no decision to read here; assignPageCauses makes both edges of the
+        // blank page `parity` (see the recto case below). The recto break itself was decided at
+        // the token of the page BEFORE the blank one, which the parity branch outranks.
+        "unknown",
       ],
       `boundary kinds changed: ${JSON.stringify(causes.map((c) => [c.kind, c.reason]))}`,
     );
@@ -404,7 +649,9 @@ describe("the collector, live", () => {
       "LEAVING a named section. The name lives on the SECTION, not on the leaf paragraphs, so a " +
         "reader that looks only at the leaf sees null against null and calls this an overflow.",
     );
-    assert.equal(reasonFor(11), `break-before@${sidByAuthorId["rectochap"]}`, "the recto-forced break");
+    // The recto break's own decision, before the parity branch overrides it for the blank page.
+    const recto = boundaryFactsFrom(result.pages)[10]!;
+    assert.deepEqual([recto.nextPageBlank, recto.breakBefore, recto.sidAfter], [true, "recto", sidByAuthorId["rectochap"]], "the recto-forced break");
 
     // The inline break-after is inert: no boundary anywhere names it.
     assert.ok(
@@ -595,6 +842,182 @@ describe("the collector, live", () => {
     assert.ok((only("dli1").lines ?? []).length > 0, "premise: a display: contents item's text is laid out in lines");
     assert.deepEqual(facts("d1"), { display: "block", marginCopies: 0, hasBox: true });
     await page.close();
+  });
+
+  /**
+   * One named-page fixture, collected with the paginator's own decisions observed, plus premise
+   * facts read off the paginated tree: each page's content width and its named-page classes.
+   */
+  async function region(path: string): Promise<{
+    result: CollectorResult; widths: number[]; classes: string[][]; kinds: string[]; reasons: string[];
+    paginator: { kind: string; clause?: string; at: string | null }[]; sid: Record<string, string>;
+  }> {
+    const sid = regionSidByAuthorId[path]!;
+    const { page, result, paginator } = await collect(path, true);
+    const dom = await page.evaluate<{ width: number; classes: string[] }[]>(`[...document.querySelectorAll(".pagedjs_page")].map((pageEl) => ({
+      width: Math.round(pageEl.querySelector(".pagedjs_page_content").getBoundingClientRect().width),
+      classes: [...pageEl.classList].filter((name) => /^pagedjs_.+_page$/u.test(name) && !/^pagedjs_(first|left|right|blank|named)_page$/u.test(name) && !/_first_page$/u.test(name)),
+    }))`);
+    await page.close();
+    const byId = Object.fromEntries(Object.entries(sid).map(([id, s]) => [s, id]));
+    const causes = assignPageCauses(result.pages.length, boundaryFactsFrom(result.pages), result.pages.map((p) => p.blank));
+    return {
+      result, sid, paginator,
+      widths: dom.map((entry) => entry.width),
+      classes: dom.map((entry) => entry.classes),
+      kinds: causes.slice(0, -1).map((cause) => cause.outgoing.kind),
+      reasons: causes.slice(0, -1).map((cause) => (cause.outgoing as { reason: string }).reason.replace(/@(.+)$/u, (_all, at: string) => `@${byId[at] ?? at}`)),
+    };
+  }
+
+  /**
+   * breaklint's classification against the paginator's own decision, boundary by boundary: forced
+   * exactly where `shouldBreak()` broke, by the same clause, and overflow wherever the paginator
+   * ran out of room. A boundary into a blank page is `parity` by design and is left out.
+   */
+  function assertAgreesWithPaginator(r: Awaited<ReturnType<typeof region>>): void {
+    assert.equal(r.paginator.length, r.result.pages.length, "premise: the paginator reported every page");
+    const mismatches = r.kinds.flatMap((kind, i) => {
+      if (r.result.pages[i + 1]!.blank) return [];
+      const truth = r.paginator[i]!;
+      const expected = truth.kind === "forced" ? `forced ${truth.clause}` : truth.kind;
+      const actual = kind === "forced" ? `forced ${r.reasons[i]!.split("@")[0]}` : kind;
+      return expected === actual ? [] : [`boundary ${i + 1}->${i + 2}: paged.js ${expected} at ${truth.at}, breaklint ${actual} ${r.reasons[i]}`];
+    });
+    assert.deepEqual(mismatches, [], "breaklint and the paginator disagree about why a page ended");
+  }
+
+  /**
+   * The first source-bearing node of every page after the first is the wrapper's continuation
+   * clone. Asserted so that each case below is known to carry the complication it names.
+   */
+  function assertWrapperContinues(result: CollectorResult, wrapperSid: string): void {
+    assert.ok(result.pages.length >= 3, `too few pages for a region to span: ${result.pages.length}`);
+    assert.deepEqual(result.pages.map((p) => p.firstSid), result.pages.map(() => wrapperSid),
+      "premise: the wrapper is the first source-bearing node of every page");
+    assert.ok(result.pages.slice(1).every((p) => p.startSid !== wrapperSid), "premise: the wrapper does not START any page after the first");
+  }
+
+  it("a named region inside a wrapper: forced into and out of it, overflow on every boundary inside it", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const r = await region("/region-wrapper.html");
+    assertWrapperContinues(r.result, r.sid["wrap"]!);
+    assert.ok(r.classes.filter((names) => names.includes("pagedjs_wide_page")).length >= 3, `premise: the region spans at least three pages: ${JSON.stringify(r.classes)}`);
+    assertAgreesWithPaginator(r);
+    // Measured before the change: forced on every boundary from the region's second page on,
+    // overflow into the region.
+    assert.deepEqual(r.reasons.filter(Boolean), ["page@wide", "page@outro"], "a forced boundary names the element that opened the page, not the wrapper");
+    assert.deepEqual(r.result.attributeDrift, []);
+  });
+
+  it("two consecutive named regions: forced where one named page gives way to the other", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const r = await region("/region-consecutive.html");
+    assertWrapperContinues(r.result, r.sid["wrap2"]!);
+    assert.ok(r.classes.filter((names) => names.includes("pagedjs_ra_page")).length >= 2, "premise: region A spans two pages or more");
+    assert.ok(r.classes.filter((names) => names.includes("pagedjs_rb_page")).length >= 2, "premise: region B spans two pages or more");
+    assertAgreesWithPaginator(r);
+    assert.deepEqual(r.reasons.filter(Boolean), ["page@ra", "page@rb"]);
+    assert.deepEqual(r.result.attributeDrift, []);
+  });
+
+  it("a named region at the document start: page 1 carries it, and only leaving it is forced", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const r = await region("/region-start.html");
+    assertWrapperContinues(r.result, r.sid["wrap3"]!);
+    assert.equal(r.result.pages[0]!.startSid, r.sid["wrap3"], "premise: page 1 starts with the unnamed wrapper, not with the region");
+    assert.deepEqual(r.classes[0], ["pagedjs_wide_page"], "premise: Paged.js applied the region's named page to page 1");
+    assertAgreesWithPaginator(r);
+    assert.equal(r.kinds[0], "overflow", "the region's second page is not a named-page change");
+    assert.deepEqual(r.reasons.filter(Boolean), ["page@after3"]);
+    assert.deepEqual(r.result.attributeDrift, []);
+  });
+
+  it("the control: a nested break-before and break-after inside a region stay forced", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const r = await region("/region-forced.html");
+    assertWrapperContinues(r.result, r.sid["wrap4"]!);
+    assertAgreesWithPaginator(r);
+    assert.deepEqual(r.reasons.filter(Boolean), ["page@w4", "break-before@chap4", "break-after@closer4", "page@out4"]);
+    assert.deepEqual(r.result.attributeDrift, []);
+  });
+
+  it("a region nested at the top of another: two named pages on one page, and the paginator's breaks", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const r = await region("/region-nested.html");
+    assertWrapperContinues(r.result, r.sid["wrap5"]!);
+    assert.ok(r.classes.some((names) => names.includes("pagedjs_inner_page") && names.includes("pagedjs_outer_page")),
+      `premise: one page carries both named pages: ${JSON.stringify(r.classes)}`);
+    assertAgreesWithPaginator(r);
+    assert.deepEqual(r.reasons.filter(Boolean), ["page@outer", "page@m0"]);
+    assert.deepEqual(r.result.attributeDrift, []);
+  });
+
+  /**
+   * The page style changes at a boundary the paginator did not force. Measured before this case
+   * existed: the page-style comparison called that boundary forced — declining a widow and an
+   * orphan there — on both fixtures, and a geometry oracle agreed with the wrong answer.
+   */
+  for (const [path, label] of [["/region-nested-exit-same.html", "same size"], ["/region-nested-exit-diff.html", "different size"]] as const) {
+    it(`leaving a region nested in a div is not a break, though the page style changes (${label})`, async (t) => {
+      if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+      const r = await region(path);
+      assertWrapperContinues(r.result, r.sid["wrap6"]!);
+      const styleChangedWithoutBreak = r.kinds.some((_, i) =>
+        r.paginator[i]!.kind === "overflow" && r.classes[i]!.includes("pagedjs_chap_page") && !r.classes[i + 1]!.includes("pagedjs_chap_page"));
+      assert.ok(styleChangedWithoutBreak, `premise: a boundary where the page stops being styled chap without a forced break: ${JSON.stringify(r.classes)} ${JSON.stringify(r.paginator)}`);
+      assertAgreesWithPaginator(r);
+      assert.deepEqual(r.reasons.filter(Boolean), ["page@chap6"], "only entering the region is forced");
+      assert.deepEqual(r.result.attributeDrift, []);
+    });
+  }
+
+  it("leaving a region nested in a div is not a break where an overflow ends the page exactly there", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const r = await region("/region-nested-exit-at-boundary.html");
+    assertWrapperContinues(r.result, r.sid["wrap6"]!);
+    const at = r.paginator.findIndex((d) => d.at === "div#tall6");
+    assert.ok(at >= 0 && r.paginator[at]!.kind === "overflow", `premise: the tall block opens a page by overflow: ${JSON.stringify(r.paginator)}`);
+    assert.ok(r.classes[at]!.includes("pagedjs_chap_page") && !r.classes[at + 1]!.includes("pagedjs_chap_page"),
+      `premise: the region ends on the page before the tall block: ${JSON.stringify(r.classes)}`);
+    assertAgreesWithPaginator(r);
+    assert.equal(r.kinds[at], "overflow");
+    assert.deepEqual(r.result.attributeDrift, []);
+  });
+
+  it("an inline named page: forced where its text starts and where the text after it starts, not where an overflow splits it", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const r = await region("/region-inline.html");
+    const textBreaks = r.paginator.filter((d) => d.kind === "forced" && d.at === "#text").length;
+    assert.ok(textBreaks >= 1, `premise: the paginator broke at a text node: ${JSON.stringify(r.paginator)}`);
+    const insideSpan = r.kinds.some((_, i) => r.paginator[i]!.kind === "overflow" && r.classes[i]!.includes("pagedjs_x_page") && r.classes[i + 1]!.includes("pagedjs_x_page"));
+    assert.ok(insideSpan, `premise: an overflow inside the span's text: ${JSON.stringify(r.classes)} ${JSON.stringify(r.paginator)}`);
+    assertAgreesWithPaginator(r);
+    assert.ok(r.reasons.filter((reason) => reason.startsWith("page@")).every((reason) => reason === "page@host7"),
+      `an inline element has no source id, so the reason names the paragraph: ${JSON.stringify(r.reasons)}`);
+    assert.deepEqual(r.result.attributeDrift, []);
+  });
+
+  it("a break-after followed by loose inline content inside a wrapper is forced", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const r = await region("/region-break-after-inline.html");
+    assert.ok(r.paginator.some((d) => d.kind === "forced" && d.clause === "break-after" && d.at === "em#em8"),
+      `premise: the paginator broke at the inline element after the declaring one: ${JSON.stringify(r.paginator)}`);
+    assertAgreesWithPaginator(r);
+    assert.deepEqual(r.reasons.filter(Boolean), ["break-after@closer8"]);
+    assert.deepEqual(r.result.attributeDrift, []);
+  });
+
+  it("a forcing block inside a deep-cloned li or td is never evaluated, so an overflow at it is not forced", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const r = await region("/region-deep-clone.html");
+    assertWrapperContinues(r.result, r.sid["wrap9"]!);
+    const atBoxes = r.paginator.filter((d) => d.kind === "overflow" && /^div#(bx|tb)9-/u.test(d.at ?? ""));
+    assert.ok(atBoxes.length >= 1, `premise: an overflow token at a forcing block inside an li or td: ${JSON.stringify(r.paginator)}`);
+    assert.equal(r.paginator.some((d) => d.kind === "forced"), false, "premise: the paginator forced no break in this document");
+    assertAgreesWithPaginator(r);
+    assert.ok(r.kinds.every((kind) => kind === "overflow"), JSON.stringify(r.kinds));
+    assert.deepEqual(r.result.attributeDrift, []);
   });
 
   /** The tokens are real: the pages that ran out of room have one, the last page does not. */

@@ -1,7 +1,7 @@
 /** Helpers shared by rules. Nothing here reaches outside the snapshot. */
 
 import type { EnvId, KeyType, Severity } from "../core/enums.ts";
-import type { Box, Finding, NotMeasured, PageRecord, Snapshot, SourceRef, TargetEvaluation } from "../core/types.ts";
+import type { BlockRecord, Box, Finding, NotMeasured, PageRecord, Snapshot, SourceRef, TargetEvaluation, TextLine } from "../core/types.ts";
 import type { RuleContext } from "../core/rule.ts";
 
 export function sourceOf(snapshot: Snapshot, sid: string | null): SourceRef | null {
@@ -138,6 +138,279 @@ export function pageByNumber(snapshot: Snapshot, pageNumber: number): PageRecord
 
 export function linesOfBlock(snapshot: Snapshot, blockKey: string) {
   return snapshot.textLines.filter((l) => l.blockKey === blockKey && l.visible);
+}
+
+/** Edge tolerance of line ownership: the collector's own line-grouping tolerance, in CSS px. */
+export const LINE_OWNERSHIP_TOLERANCE_PX = 0.5;
+
+/**
+ * What a recorded line is to the record that records it.
+ *   - `own`: the record's own container holds it.
+ *   - `beside`: a nested record holds it, and that record sits BESIDE the record's own lines — a
+ *     float or an inline-block, whose lines share or overlap the record's own lines. Its lines do
+ *     not interrupt the record's own run: a break across them still splits that run.
+ *   - `nested`: an in-flow nested block holds it; its lines end the record's own run.
+ *   - `enclosing`: the record has no box of its own (`display: contents`) and the block around it
+ *     holds the line (containers mode only).
+ */
+export type LineRole = "own" | "beside" | "nested" | "enclosing";
+
+export interface LineOwnership {
+  /** The record's visible lines in line order, each with its role; `owned` is `role === "own"`. */
+  lines: { line: TextLine; owned: boolean; role: LineRole }[];
+  /** How many of them belong to a nested block or to the container around it. */
+  delegated: number;
+  /** For a record without a box of its own: the boxed record that holds its lines, if any. */
+  enclosedBy: string | null;
+}
+
+/**
+ * The lines of a fragment's own container that OPEN it: its own lines up to the first line of an
+ * in-flow nested block. Lines of a float or an inline-block beside them are passed over, neither
+ * counted nor ending the run. That run is what a break before this fragment split, and it is what
+ * `widows` governs. A fragment that opens with an in-flow nested block's line has none: the break
+ * fell inside the nested block, which is judged as a candidate of its own.
+ */
+export function openingOwnLines(ownership: LineOwnership): number {
+  let count = 0;
+  for (const entry of ownership.lines) {
+    if (entry.role === "beside") continue;
+    if (entry.role !== "own") break;
+    count += 1;
+  }
+  return count;
+}
+
+/** The mirror of `openingOwnLines`: the own run that CLOSES the fragment, which `orphans` governs. */
+export function closingOwnLines(ownership: LineOwnership): number {
+  let count = 0;
+  for (let at = ownership.lines.length - 1; at >= 0; at -= 1) {
+    const role = ownership.lines[at]!.role;
+    if (role === "beside") continue;
+    if (role !== "own") break;
+    count += 1;
+  }
+  return count;
+}
+
+/**
+ * The fragment before and after a record, joined by authoring-source id — the only join key a
+ * snapshot has. `joined` is false when the record has no sid, or its sid does not account for
+ * exactly `fragmentCount` records with distinct indices; the neighbours are then unknown, not
+ * absent.
+ */
+export function fragmentNeighbours(snapshot: Snapshot): (block: BlockRecord) => {
+  joined: boolean; previous: BlockRecord | null; next: BlockRecord | null;
+} {
+  const bySid = new Map<string, BlockRecord[]>();
+  for (const block of snapshot.blocks) {
+    if (block.sid === null) continue;
+    const list = bySid.get(block.sid) ?? [];
+    list.push(block);
+    bySid.set(block.sid, list);
+  }
+  return (block) => {
+    const group = block.sid === null ? undefined : bySid.get(block.sid);
+    const indices = new Set(group?.map((item) => item.fragmentIndex));
+    const joined = group !== undefined && group.length === block.fragmentCount && indices.size === group.length &&
+      group.every((item) => item.fragmentCount === block.fragmentCount && item.fragmentIndex >= 0 && item.fragmentIndex < block.fragmentCount);
+    if (!joined) return { joined: false, previous: null, next: null };
+    return {
+      joined: true,
+      previous: group!.find((item) => item.fragmentIndex === block.fragmentIndex - 1) ?? null,
+      next: group!.find((item) => item.fragmentIndex === block.fragmentIndex + 1) ?? null,
+    };
+  };
+}
+
+/**
+ * Whether a record is a BLOCK CONTAINER, whose own line boxes `widows` and `orphans` govern: laid
+ * out (`renderingOf` is `box` or `zero-box`) and not `display: inline`. A `display: contents`
+ * element generates no box and an inline element no block, so their text is in the lines of the
+ * block container around them; a record nothing was printed from has no lines at all.
+ */
+export function isBlockContainer(snapshot: Pick<Snapshot, "textLines">, block: BlockRecord): boolean {
+  const rendering = renderingOf(snapshot, block);
+  return (rendering === "box" || rendering === "zero-box") && block.display !== "inline" && block.display !== "contents";
+}
+
+/**
+ * Whether a nested record sits IN the flow of the block around it, as a block: block-level display,
+ * not floated, not absolutely or fixed positioned. Its lines end that block's own run of lines. A
+ * float, a positioned box or an inline-level box (`inline-block`, `inline-flex`, ...) sits beside
+ * the lines around it, which stay one run across it.
+ */
+export function inFlowBlock(block: Pick<BlockRecord, "display" | "float" | "position">): boolean {
+  const display = block.display.trim();
+  if (display.startsWith("inline") || display === "contents" || display === "none") return false;
+  if (block.float !== "none") return false;
+  return block.position !== "absolute" && block.position !== "fixed";
+}
+
+function within(inner: Box, outer: Box, tolerance: number): boolean {
+  return inner.x >= outer.x - tolerance && inner.y >= outer.y - tolerance &&
+    inner.x + inner.width <= outer.x + outer.width + tolerance &&
+    inner.y + inner.height <= outer.y + outer.height + tolerance;
+}
+
+/**
+ * The lines a block record's OWN block container holds, as opposed to lines the record merely
+ * contains.
+ *
+ * WHY THIS EXISTS. The collector records a block's lines from every text node beneath it, so a
+ * `<section>` around a paragraph carries the paragraph's line boxes too — the same boxes, recorded
+ * once under each block. `widows` and `orphans` apply to the line boxes of one block container, and
+ * a rule that counted the wrapper's recorded lines judged the paragraph's lines by the wrapper's own
+ * value: a paragraph split 8+1 under an author's explicit request for single-line widows was
+ * reported as a widow of the section around it, and a paragraph moved whole left the section's
+ * one intro line reported as an orphan. Measured on patched Chromium 141 with Paged.js 0.4.3.
+ *
+ * Counting only the OWNED lines of a fragment is not the answer either, and `openingOwnLines` /
+ * `closingOwnLines` say why: a section with one line of its own text above a paragraph that splits
+ * owns one line on the first page, but that line is nowhere near the break. What a break splits is
+ * the run of a container's own lines next to it, so that run is what the rules count; a fragment
+ * that meets the break with a nested block's line has none.
+ *
+ * WHICH BLOCK OWNS A LINE: the nearest block container of it, read from geometry the snapshot
+ * already has, with the collection order as the tiebreak.
+ *   - `snapshot.blocks` is in collection order: pages ascending, document order within a page. Every
+ *     record that contains a text node is an ancestor of it, so the records recording one line form
+ *     an ancestor chain and the LATEST of them in that order is the deepest.
+ *   - In `containers` mode a block container's line is its own exactly when the collector saw text
+ *     of its own on it (`TextLine.ownText`: text whose nearest block container is this record). A
+ *     line shared with a float on each side carries the container's text between the floats'
+ *     although their boxes together span it, so geometry cannot say this; the flag can.
+ *   - Otherwise — `containers: false`, and for a non-container record — a line box of record B is a
+ *     nested block's when later records on the same page record line boxes inside it that together
+ *     span it, edge for edge within `LINE_OWNERSHIP_TOLERANCE_PX` (the collector's own line-grouping
+ *     tolerance). Spanning, not touching: a line that also carries text of B's own beyond the nested
+ *     boxes stays B's.
+ *   - A record that is not a block container (`isBlockContainer`: `display: contents` or inline,
+ *     agreeing with `renderingOf`) cannot take a line from the record around it, and a line of it
+ *     that an EARLIER block container also holds — equal or larger, on the same line — is that
+ *     container's line (`enclosing`), not its own.
+ *   - A nested block's line is `nested` when the outermost record covering it sits in the flow as a
+ *     block (`inFlowBlock`, from the recorded `display`, `float` and `position`), and `beside` when
+ *     it is a float, a positioned box or an inline-level box: those lines do not end B's own run.
+ *     Geometry alone cannot tell a full-line inline-block from a block child; the fields can.
+ *
+ * THE BLOCK-CONTAINER TEST IS THE `containers` MODE, the one the fragmentation rules need: `widows`
+ * and `orphans` are properties of block containers. A rule that asks about the TEXT rather than its
+ * container — whose font set a gap, for `type/excessive-word-spacing` — passes `containers: false`:
+ * then every record counts alike, and a line belongs to the deepest record that records it, which is
+ * the element whose computed font the text is set in. (Measured on patched Chromium 141: a justified
+ * `<div>` in the default serif around a monospace paragraph read the paragraph's 7-space gap as 16.84
+ * spaces of its own font once the natural space was the font's own.)
+ *
+ * WHETHER A RUN WAS SPLIT needs both sides of the break, which this helper does not join: the rules
+ * join a record's fragments by source id (`fragmentNeighbours`) and judge a run only when the run on
+ * the other side is own text too.
+ *
+ * KNOWN LIMITS, stated because they are real: in `containers: false` mode, text of a block's own
+ * that sits BETWEEN nested blocks' line boxes on one line (between two floats) is inside their span
+ * and is taken for theirs; a block container the snapshot does not record (a custom element) owns
+ * its text, so neither it nor the record around it is judged on those lines; a recorded block
+ * inside an UNRECORDED inline-level box is taken for an in-flow block, because the outermost
+ * RECORD covering the line decides, so its lines end the run; text in an unrecorded float or
+ * positioned box counts as the record's own; and a hand-written snapshot that does not follow
+ * collection order gets the ownership that order implies.
+ *
+ * Computed once per call, over the whole snapshot. The function returned answers for a record of
+ * that snapshot; a record it has not seen owns nothing.
+ */
+export function lineOwnership(
+  snapshot: Snapshot,
+  { containers }: { containers: boolean },
+): (block: Pick<BlockRecord, "nodeKey">) => LineOwnership {
+  const tolerance = LINE_OWNERSHIP_TOLERANCE_PX;
+  // In `containers: false` mode every record takes part alike. In `containers` mode only a block
+  // container does: see `isBlockContainer`.
+  const counts = (block: BlockRecord) => !containers || isBlockContainer(snapshot, block);
+  const linesByKey = new Map<string, TextLine[]>();
+  for (const line of snapshot.textLines) {
+    if (!line.visible) continue;
+    const list = linesByKey.get(line.blockKey) ?? [];
+    list.push(line);
+    linesByKey.set(line.blockKey, list);
+  }
+  interface Entry { order: number; boxed: boolean; box: Box }
+  const entriesByPage = new Map<number, Entry[]>();
+  snapshot.blocks.forEach((block, order) => {
+    const entries = entriesByPage.get(block.page) ?? [];
+    for (const line of linesByKey.get(block.nodeKey) ?? []) entries.push({ order, boxed: counts(block), box: line.box });
+    entriesByPage.set(block.page, entries);
+  });
+  for (const entries of entriesByPage.values()) entries.sort((a, b) => a.box.y - b.box.y || a.order - b.order);
+
+  const result = new Map<string, LineOwnership>();
+  snapshot.blocks.forEach((block, order) => {
+    const lines = linesByKey.get(block.nodeKey) ?? [];
+    const entries = entriesByPage.get(block.page) ?? [];
+    const boxed = counts(block);
+    const classified: { line: TextLine; held: boolean; nested: boolean; coverers: number[] }[] = [];
+    let enclosedBy: number | null = null;
+    for (const line of lines) {
+      const row = line.box;
+      // Entries sorted by top edge: the first one that can lie inside this row, by binary search.
+      let low = 0;
+      let high = entries.length;
+      while (low < high) {
+        const mid = (low + high) >> 1;
+        if (entries[mid]!.box.y < row.y - tolerance) low = mid + 1;
+        else high = mid;
+      }
+      let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+      let heldBy: number | null = null;
+      const coverers = new Set<number>();
+      // A boxless record also looks for an enclosing line, which starts at or above its own, so it
+      // scans from the page's first line; a boxed record only for lines inside its own.
+      for (let at = boxed ? low : 0; at < entries.length; at += 1) {
+        const entry = entries[at]!;
+        if (entry.box.y > row.y + row.height + tolerance) break;
+        if (entry.order === order) continue;
+        if (!boxed && entry.boxed && entry.order < order && within(row, entry.box, tolerance)) {
+          heldBy = entry.order;
+          break;
+        }
+        if (at < low || entry.order < order || !entry.boxed || !within(entry.box, row, tolerance)) continue;
+        coverers.add(entry.order);
+        left = Math.min(left, entry.box.x);
+        top = Math.min(top, entry.box.y);
+        right = Math.max(right, entry.box.x + entry.box.width);
+        bottom = Math.max(bottom, entry.box.y + entry.box.height);
+      }
+      const nested = left <= row.x + tolerance && top <= row.y + tolerance &&
+        right >= row.x + row.width - tolerance && bottom >= row.y + row.height - tolerance;
+      if (heldBy !== null && enclosedBy === null) enclosedBy = heldBy;
+      classified.push({ line, held: heldBy !== null, nested, coverers: [...coverers] });
+    }
+    // Which nested records sit BESIDE this record's own lines rather than in their flow: the
+    // outermost record covering a line (the earliest in collection order) decides, by what the
+    // snapshot records about it — a float, an absolutely or fixed positioned box, or an
+    // inline-level box leaves the record's own run whole; an in-flow block ends it.
+    const isBeside = (coverers: number[]) => !inFlowBlock(snapshot.blocks[Math.min(...coverers)]!);
+    const marked: LineOwnership["lines"] = classified.map(({ line, held, nested, coverers }) => {
+      let role: LineRole;
+      if (containers && boxed) {
+        // A block container's own line is the one the collector saw its own text on
+        // (`TextLine.ownText`), not one whose box geometry is left over: a line shared with a
+        // float on each side has the container's text in the middle and the floats' at the edges,
+        // and their union spans it. Otherwise the outermost nested record on the line decides
+        // whether the line ends the container's run; a line with none found ends it.
+        role = line.ownText ? "own" : coverers.length > 0 && isBeside(coverers) ? "beside" : "nested";
+      } else {
+        role = held ? "enclosing" : !nested ? "own" : isBeside(coverers) ? "beside" : "nested";
+      }
+      return { line, owned: role === "own", role };
+    });
+    marked.sort((a, b) => a.line.index - b.line.index);
+    result.set(block.nodeKey, {
+      lines: marked,
+      delegated: marked.filter((entry) => !entry.owned).length,
+      enclosedBy: enclosedBy === null ? null : snapshot.blocks[enclosedBy]!.nodeKey,
+    });
+  });
+  return (block) => result.get(block.nodeKey) ?? { lines: [], delegated: 0, enclosedBy: null };
 }
 
 /**

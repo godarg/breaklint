@@ -512,12 +512,131 @@ export const SNAPSHOT_SOURCE = `(() => {
     visit(root);
     return out;
   };
-  const linesFor = (el, justify) => {
+  // The natural space of a block: the advance of one U+0020 in its own computed font, plus its
+  // letter-spacing, scaled by its effective CSS zoom. It used to be read from the block's FIRST
+  // rendered whitespace, and neither kind of rendered space is natural: in a justified line every
+  // space is stretched, which hid wide gaps, and a space at a line end is collapsed — 0.02 px
+  // measured on patched Chromium 141 — which turned an ordinary justified gap into "540.50x the
+  // natural space".
+  //
+  // TWO SOURCES, in this order:
+  //   1. the font's own advance from the captured canvas measurement (P.spaceAdvance), where a
+  //      canvas font can reproduce the element's font: a keyword font-stretch, no
+  //      font-size-adjust, caps that are normal or small-caps (all-small-caps and the other
+  //      synthesised caps shrink the space with the letters), variation settings that are normal or
+  //      only restate the computed weight, and a font that is loaded. The canvas knows nothing of
+  //      zoom: computed font sizes are unzoomed while every rendered box is zoomed, so the advance
+  //      is multiplied by the product of the element's and its ancestors' zoom;
+  //   2. otherwise the rendered layout itself, pooled over the document by layout key (font, caps,
+  //      letter-spacing, word-spacing, variation settings, size-adjust, kerning, zoom): a gap
+  //      between two consecutive words of one text node, separated by collapsible whitespace only,
+  //      whose parent element has the block's layout key, on the last line of the last fragment of
+  //      a justified block that is its own block container, has no nested source block, and whose
+  //      text-align-last does not justify that line. The median, provided every sample lies within
+  //      0.1 px or 3 % of it (whichever is larger); rendered gaps are already zoomed.
+  // 0 when neither exists, or the samples disagree; the rule then declines the block
+  // (env/invalid-measurement) instead of dividing by a guess, as it used to (a third of the font
+  // size).
+  const STRETCH_KEYWORDS = { "50%": "ultra-condensed", "62.5%": "extra-condensed", "75%": "condensed",
+    "87.5%": "semi-condensed", "100%": "normal", "112.5%": "semi-expanded", "125%": "expanded",
+    "150%": "extra-expanded", "200%": "ultra-expanded" };
+  const effectiveZoom = (el) => {
+    let zoom = 1;
+    for (let at = el; at && P.nodeType(at) === 1; at = P.parent(at)) zoom *= number(P.style(at, null).zoom, 1);
+    return zoom;
+  };
+  // Variation settings a canvas reproduces: none, or only "wght" at the computed weight, which
+  // says nothing the weight did not say. Any other axis (opsz, wdth, a custom one) or another
+  // weight may or may not exist in the font, and whether it does cannot be asked.
+  const variationReproducible = (settings, weight) => {
+    const value = (settings || "normal").trim();
+    if (value === "normal") return true;
+    const axes = value.split(",").map((part) => part.trim());
+    return axes.every((axis) => {
+      const match = /^["']wght["']\\s+(-?[\\d.]+)$/u.exec(axis);
+      return match !== null && Number(match[1]) === number(weight, NaN);
+    });
+  };
+  const spaceFacts = (s, el) => {
+    const stretch = STRETCH_KEYWORDS[s.fontStretch || "100%"] || null;
+    const caps = s.fontVariantCaps || "normal";
+    const letterSpacing = !s.letterSpacing || s.letterSpacing === "normal" ? "0px" : s.letterSpacing;
+    const zoom = effectiveZoom(el);
+    const font = [s.fontStyle || "normal", caps === "small-caps" ? "small-caps" : "normal",
+      s.fontWeight || "400", stretch || (s.fontStretch || ""), s.fontSize, s.fontFamily].join(" ");
+    // Every value that decides a rendered space, for pooling layout samples: two blocks share a
+    // natural space only if all of it agrees.
+    const layoutKey = [font, caps, letterSpacing, s.wordSpacing || "normal", s.fontVariationSettings || "normal",
+      s.fontSizeAdjust || "none", s.fontKerning || "auto", String(zoom)].join("|");
+    const canvas = stretch !== null && (caps === "normal" || caps === "small-caps")
+      && (s.fontSizeAdjust || "none") === "none" && variationReproducible(s.fontVariationSettings, s.fontWeight);
+    return { font, letterSpacing, zoom, layoutKey, canvas };
+  };
+  const canvasCache = {};
+  const canvasSpace = (facts) => {
+    // Every cache key contains "|", and every STRETCH_KEYWORDS key "%", so no inherited property
+    // can answer a lookup.
+    const key = facts.font + "|" + facts.letterSpacing;
+    if (canvasCache[key] === undefined) {
+      const advance = P.spaceAdvance(facts.font, facts.letterSpacing);
+      canvasCache[key] = advance === null ? 0 : advance;
+    }
+    return canvasCache[key] > 0 ? round(canvasCache[key] * facts.zoom) : 0;
+  };
+  const layoutSamples = {};
+  const median = (values) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = sorted.length >> 1;
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+  // The nearest ancestor that is a block container (not display: contents, not inline): its
+  // text-align decides whether the lines of a display: contents or inline record are justified.
+  const containerStyle = (el, s) => {
+    if (s.display !== "contents" && s.display !== "inline") return s;
+    for (let at = P.parent(el); at && P.nodeType(at) === 1; at = P.parent(at)) {
+      const style = P.style(at, null);
+      if (style.display !== "contents" && style.display !== "inline") return style;
+    }
+    return s;
+  };
+  // The BLOCK CONTAINER whose own run of lines a text node's line belongs to: its nearest ancestor
+  // that is either a recorded source block that is a block container (not display: contents or
+  // inline), or an element the snapshot does not record that sits in the flow as a block (a custom
+  // element, a <span style="display: block">). A line is a record's own (TextLine.ownText) when
+  // some text on it has that record as its container — the fact the fragmentation rules need,
+  // recorded here because a line box shared with floats on both sides cannot be told from theirs
+  // by geometry. An unrecorded float, positioned box or inline-block is transparent: its text is in
+  // the run of the container around it. An unrecorded in-flow block owns its text: its splits are
+  // not judged, and no record is judged on its lines.
+  const containerOf = (node) => {
+    for (let at = P.parent(node); at && P.nodeType(at) === 1; at = P.parent(at)) {
+      const style = P.style(at, null);
+      const display = style.display;
+      if (display === "contents" || display === "inline") continue;
+      if (P.closest(at, SOURCE_BLOCK_SELECTOR) === at) return at;
+      const inFlowBlock = !/^inline/u.test(display) && (style.float || style.cssFloat || "none") === "none"
+        && style.position !== "absolute" && style.position !== "fixed";
+      if (inFlowBlock) return at;
+    }
+    return null;
+  };
+  // Whitespace that collapses to one space where the text node's white-space collapses it.
+  const COLLAPSING_WHITE_SPACE = { normal: true, nowrap: true };
+  const linesFor = (el, justify, blockWordSpacing, blockFacts) => {
     const groups = [];
     const words = [];
-    let spaceWidth = 0;
+    // Candidate natural-space samples: consecutive words of ONE text node whose own computed font,
+    // spacing and zoom are the block's (so no <code>, <em> or spaced <span> contributes), separated
+    // only by collapsible whitespace (so no &nbsp;, no preserved double space).
+    const sampleWords = [];
     for (const node of textNodes(el)) {
       const value = P.text(node) || "";
+      const own = containerOf(node) === el;
+      // Text set with a word-spacing of its own — an inline element's, not the block's — was
+      // widened by the author on purpose. Its gaps are not judged: each of its line pieces is one
+      // unit in the word boxes, so no gap falls inside it (the block-level rule already leaves a
+      // block with its own word-spacing alone).
+      const ownSpacing = justify && P.style(P.parent(node), null).wordSpacing !== blockWordSpacing;
       // A line is visible when any text on it is: visibility is read from each text node's own
       // element, not from the block, because a hidden block may hold a visible descendant
       // (p { visibility: hidden } span { visibility: visible } prints the span).
@@ -526,44 +645,96 @@ export const SNAPSHOT_SOURCE = `(() => {
       for (const r of P.range(node)) {
         if (r.width <= 0 || r.height <= 0) continue;
         const existing = groups.find((g) => Math.abs(g.y - r.y) <= 0.5);
-        const entry = existing || { x: r.x, y: r.y, right: r.x + r.width, bottom: r.y + r.height, words: [], visible: false };
+        const entry = existing || { x: r.x, y: r.y, right: r.x + r.width, bottom: r.y + r.height, words: [], visible: false, own: false };
         if (nodeVisible) entry.visible = true;
+        if (own) entry.own = true;
         entry.x = Math.min(entry.x, r.x); entry.right = Math.max(entry.right, r.x + r.width);
         entry.y = Math.min(entry.y, r.y); entry.bottom = Math.max(entry.bottom, r.y + r.height);
         if (!existing) groups.push(entry);
       }
+      if (ownSpacing) {
+        for (const r of P.range(node)) {
+          if (r.width > 0 && r.height > 0) words.push({ text: value.trim(), x: round(r.x), y: round(r.y), width: round(r.width), height: round(r.height) });
+        }
+        continue;
+      }
+      const parent = P.parent(node);
+      const eligible = justify && spaceFacts(parentStyle, parent).layoutKey === blockFacts.layoutKey;
+      const collapses = COLLAPSING_WHITE_SPACE[parentStyle.whiteSpace || "normal"] === true;
+      let previousEnd = -1;
       for (const match of value.matchAll(/\\S+/gu)) {
         const start = match.index || 0;
         const end = start + match[0].length;
+        const separator = previousEnd < 0 ? null : value.slice(previousEnd, start);
+        const sepOk = separator !== null && (separator === " " || (collapses && /^[ \\t\\n\\r\\f]+$/u.test(separator)));
+        previousEnd = end;
         const rs = P.range(node, start, end);
-        for (const r of rs) words.push({ text: match[0], x: round(r.x), y: round(r.y), width: round(r.width), height: round(r.height) });
-      }
-      if (spaceWidth === 0) {
-        const at = value.search(/\\s/u);
-        if (at >= 0) {
-          const rs = P.range(node, at, at + 1);
-          if (rs[0] && rs[0].width > 0) spaceWidth = round(rs[0].width);
+        for (const r of rs) {
+          words.push({ text: match[0], x: round(r.x), y: round(r.y), width: round(r.width), height: round(r.height) });
+          if (eligible) sampleWords.push({ sepOk, x: r.x, right: r.x + r.width, y: r.y });
         }
       }
     }
     groups.sort((a, b) => a.y - b.y || a.x - b.x);
-    return { groups, words: justify ? words : null, spaceWidth };
+    return { groups, words: justify ? words : null, sampleWords };
   };
 
+  // Paged.js 0.4.3 marks a hyphen at a page split by appending its glyph (U+2011 unless configured;
+  // breaklint never configures it) to the text node it cut and adding pagedjs_hyphen to that node's
+  // PARENT: the block itself or an inline element in it. A fragment carries a boundary hyphen when
+  // its LAST text node ends with the glyph and the element holding that node, or an element between
+  // it and the block, carries the class — an author class elsewhere in the block is no mark. The
+  // mark belongs to the nearest source block, never to a wrapper further out.
+  const HYPHEN_GLYPH = "\\u2011";
+  const boundaryHyphenOf = (el) => {
+    const nodes = textNodes(el);
+    const last = nodes[nodes.length - 1];
+    if (!last || !(P.text(last) || "").replace(/\\s+$/u, "").endsWith(HYPHEN_GLYPH)) return false;
+    if (P.closest(P.parent(last), SOURCE_BLOCK_SELECTOR) !== el) return false;
+    for (let at = P.parent(last); at; at = P.parent(at)) {
+      if ((P.attr(at, "class") || "").split(/\\s+/u).includes("pagedjs_hyphen")) return true;
+      if (at === el) break;
+    }
+    return false;
+  };
   fragments.forEach((item, sourceOrder) => {
     const { page, el, sid, sourceIdentity } = item;
     const s = P.style(el, null);
     const fontSize = number(s.fontSize, 0);
     const lineHeight = number(s.lineHeight, fontSize * 1.2);
-    const justify = /justify/u.test(s.textAlign);
-    const measured = linesFor(el, justify);
+    // Word boxes where the lines are justified, which for a display: contents or inline record is
+    // decided by the block container around it, not by its own text-align.
+    const container = containerStyle(el, s);
+    const justify = /justify/u.test(s.textAlign) || /justify/u.test(container.textAlign);
+    const facts = spaceFacts(s, el);
+    const measured = linesFor(el, justify, s.wordSpacing, facts);
+    const isLastFragment = (seenBySid[sourceIdentity] || 0) === (bySidCount[sourceIdentity] || 1) - 1;
+    // A layout sample: a gap on the last line of the last fragment of a justified leaf block that
+    // is its own block container (not display: contents or inline, whose last line may be any line
+    // of the container around it), where text-align-last does not justify that line; only between
+    // consecutive words of one text node that qualifies (see linesFor). A block with nested source
+    // blocks is no sample: its last line may be a nested block's.
+    if (measured.words !== null && isLastFragment && container === s && /justify/u.test(s.textAlign)
+        && !/justify/u.test(container.textAlignLast || "auto") && P.all(el, SOURCE_BLOCK_SELECTOR).length === 0
+        && measured.groups.length > 0) {
+      const last = measured.groups[measured.groups.length - 1];
+      const onLast = measured.sampleWords.filter((w) => Math.abs(w.y - last.y) <= 0.5).sort((a, b) => a.x - b.x);
+      for (let i = 1; i < onLast.length; i += 1) {
+        // sepOk is false for the first word of a text node, so in left-to-right text no gap across
+        // two nodes is sampled. Words are paired in visual order, so in right-to-left text one can
+        // be; the agreement check below declines unless every sample is polluted alike.
+        if (!onLast[i].sepOk) continue;
+        const gap = onLast[i].x - onLast[i - 1].right;
+        if (gap > 0) (layoutSamples[facts.layoutKey] = layoutSamples[facts.layoutKey] || []).push(gap);
+      }
+    }
     const nodeKey = "bl:" + sourceIdentity + ":" + String(seenBySid[sourceIdentity] || 0);
     const base = lineBaseBySid[sourceIdentity] || 0;
     measured.groups.forEach((line, local) => {
       const lineWords = measured.words === null ? null : measured.words.filter((w) => Math.abs(w.y - line.y) <= 0.5);
       textLines.push({ blockKey: nodeKey, index: base + local,
         box: { x: round(line.x), y: round(line.y), width: round(line.right - line.x), height: round(line.bottom - line.y) },
-        visible: line.visible, width: round(line.right - line.x), wordBoxes: lineWords });
+        visible: line.visible, ownText: line.own, width: round(line.right - line.x), wordBoxes: lineWords });
     });
     lineBaseBySid[sourceIdentity] = base + measured.groups.length;
     fonts.add(s.fontFamily);
@@ -571,17 +742,30 @@ export const SNAPSHOT_SOURCE = `(() => {
       nodeKey, sid, sourceIdentity, sourceOrder, plainText: (P.text(el) || "").replace(/\\s+/g, " ").trim(),
       page: pagesEls.indexOf(page) + 1, box: box(el), tag: el.tagName.toLowerCase(),
       classList: (P.attr(el, "class") || "").split(/\\s+/u).filter(Boolean), lineHeight,
-      spaceWidth: measured.spaceWidth || round(fontSize * 0.33),
+      spaceWidth: 0, spaceFacts: facts,
       effectiveStyle: { breakInside: s.breakInside || "auto", breakBefore: s.breakBefore || "auto",
         breakAfter: s.breakAfter || "auto", columns: s.columnCount || "auto", writingMode: s.writingMode || "horizontal-tb",
         visibility: s.visibility || "visible", widows: number(s.widows, 2), orphans: number(s.orphans, 2),
         textAlign: s.textAlign || "start", wordSpacing: s.wordSpacing || "normal", fontFamily: s.fontFamily || "",
         fontSize, lineHeight, lang: P.attr(el, "lang") || document.documentElement.lang || "" },
       display: s.display || "", marginCopies: sid ? (marginCopiesBySid[sid] || 0) : 0,
+      float: s.float || s.cssFloat || "none", position: s.position || "static",
+      boundaryHyphen: boundaryHyphenOf(el),
       lines: measured.groups.map((_, i) => base + i), inertBreak: null,
     });
     seenBySid[sourceIdentity] = (seenBySid[sourceIdentity] || 0) + 1;
   });
+  for (const block of blocks) {
+    const facts = block.spaceFacts;
+    delete block.spaceFacts;
+    const fromCanvas = facts.canvas ? canvasSpace(facts) : 0;
+    const samples = layoutSamples[facts.layoutKey];
+    // The layout samples must agree: every one within 0.1 px or 3 % of their median, whichever is
+    // larger. Samples that disagree are not one natural space, and no divisor is taken from them.
+    const typical = samples && samples.length > 0 ? median(samples) : 0;
+    const agree = typical > 0 && samples.every((gap) => Math.abs(gap - typical) <= Math.max(0.1, 0.03 * typical));
+    block.spaceWidth = fromCanvas > 0 ? fromCanvas : agree ? round(typical) : 0;
+  }
 
   const clipped = (r, cb) => {
     const x = Math.max(cb.x, r.x), y = Math.max(cb.y, r.y);
@@ -901,6 +1085,17 @@ export function validateSnapshotInvariants(
     if (typeof block.display !== "string" || block.display.length === 0) issues.push(`${block.nodeKey}: computed display is absent`);
     if (!Number.isSafeInteger(block.marginCopies) || block.marginCopies < 0) issues.push(`${block.nodeKey}: marginCopies is not a count`);
     else if (block.marginCopies > 0 && block.sid === null) issues.push(`${block.nodeKey}: margin copies without a source id`);
+    // Snapshot 5, too: without them a nested block cannot be told in the flow or beside it, and a
+    // boundary hyphen inside an inline element cannot be read.
+    if (typeof block.float !== "string" || block.float.length === 0) issues.push(`${block.nodeKey}: computed float is absent`);
+    if (typeof block.position !== "string" || block.position.length === 0) issues.push(`${block.nodeKey}: computed position is absent`);
+    if (typeof block.boundaryHyphen !== "boolean") issues.push(`${block.nodeKey}: boundaryHyphen is not a boolean`);
+    for (const line of snapshot.textLines) {
+      if (line.blockKey === block.nodeKey && typeof line.ownText !== "boolean") {
+        issues.push(`${block.nodeKey}: line ${line.index} ownText is not a boolean`);
+        break;
+      }
+    }
     // The inspected input artefact's injection map is always complete. Producer provenance is
     // deliberately separate in originalMap, where generated/ambiguous output can be omitted.
     if (options.sourceMapInjection && block.sid !== null && !snapshot.source.map[block.sid]) {

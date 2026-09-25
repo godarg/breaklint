@@ -23,16 +23,89 @@
  * is no longer a judgement: `tests/unit/output-routes.test.ts` scans `src/` and fails if a write
  * to stdout or stderr exists anywhere outside this file. A fourth route cannot be added without
  * the suite saying so, which is a property nobody has to remember.
+ *
+ * A WRITE IS NOT DELIVERED WHEN `write()` RETURNS. On a pipe the operating system takes what fits
+ * into the pipe buffer and Node queues the rest, so the process has to stay alive until the queue
+ * has drained. The entry point used to call `process.exit()` straight after handing the report
+ * over, which threw the queue away: measured, a reader behind `| cat` received a multiple of the
+ * pipe buffer, usually the first 65 536 bytes, of a 340 000-byte report in every format while the
+ * exit code still said 1, so the loss was silent. Every write therefore records a promise that
+ * settles in its write callback, and `flushOutput()` is what the entry point waits for before it
+ * exits.
+ *
+ * A reader that closes early (`| head`) makes the next write fail with EPIPE. The failure also
+ * arrives as an `'error'` event on the stream, and an unheard `'error'` event is an uncaught
+ * exception: Node then exits 1, which reads as "findings" for a run whose report nobody received.
+ * The listeners below hear it, and every stdout write records its own failure by what it carried:
+ * the output the run was asked for (`out`), or a notice beside a report that went to a file
+ * (`notice`). The entry point turns the first into exit 3 and only reports the second, because the
+ * report itself is complete on disk. A listener is not a write, so this file is still the only
+ * place that writes.
  */
 
 import { redactPaths } from "../report/redact.ts";
 
-/** Everything the tool prints to stdout. */
+/** Writes handed to a stream whose callback has not run yet. */
+const pending = new Set<Promise<void>>();
+/** The first failed stdout write of each kind. */
+const stdoutFailure: { output: NodeJS.ErrnoException | null; notice: NodeJS.ErrnoException | null } = {
+  output: null,
+  notice: null,
+};
+let listening = false;
+
+function listen(): void {
+  if (listening) return;
+  listening = true;
+  // Heard so that it cannot crash the process. The failure itself is recorded by the write whose
+  // callback receives it, which is how it is known what the failed write carried.
+  process.stdout.on("error", () => {});
+  // A failing stderr has nowhere left to report itself. It is heard only so that it cannot crash
+  // the process and replace the exit code the run actually earned.
+  process.stderr.on("error", () => {});
+}
+
+function write(stream: NodeJS.WriteStream, text: string, onFailure: (error: NodeJS.ErrnoException) => void): void {
+  listen();
+  const settled = new Promise<void>((resolve) => {
+    try {
+      stream.write(text, (error) => {
+        if (error) onFailure(error as NodeJS.ErrnoException);
+        resolve();
+      });
+    } catch (error) {
+      onFailure(error as NodeJS.ErrnoException);
+      resolve();
+    }
+  });
+  pending.add(settled);
+  void settled.then(() => pending.delete(settled));
+}
+
+/** Everything the tool prints to stdout as the output it was asked for: a report, help, version. */
 export function out(text: string): void {
-  process.stdout.write(redactPaths(text));
+  write(process.stdout, redactPaths(text), (error) => {
+    stdoutFailure.output ??= error;
+  });
+}
+
+/** A line on stdout beside a report that went to a file. Its loss does not lose the report. */
+export function notice(text: string): void {
+  write(process.stdout, redactPaths(text), (error) => {
+    stdoutFailure.notice ??= error;
+  });
 }
 
 /** Everything the tool prints to stderr. */
 export function err(text: string): void {
-  process.stderr.write(redactPaths(text));
+  write(process.stderr, redactPaths(text), () => {});
+}
+
+/**
+ * Settles once every write so far has been accepted by the operating system or has failed, and
+ * returns the first stdout failure of each kind. The entry point calls this before it exits.
+ */
+export async function flushOutput(): Promise<{ output: NodeJS.ErrnoException | null; notice: NodeJS.ErrnoException | null }> {
+  while (pending.size > 0) await Promise.all([...pending]);
+  return { ...stdoutFailure };
 }

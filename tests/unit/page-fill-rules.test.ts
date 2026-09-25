@@ -58,7 +58,7 @@ function measurementsOf(evaluations: readonly TargetEvaluation[], pageNodeKey: s
 
 /** One visible text line of a block, in page coordinates. */
 function textLine(blockKey: string, index: number, box: TextLine["box"]): TextLine {
-  return { blockKey, index, box, visible: true, width: box.width, wordBoxes: null };
+  return { blockKey, index, box, visible: true, ownText: true, width: box.width, wordBoxes: null };
 }
 
 /** A continuation fragment with an explicit source id and fragment position. */

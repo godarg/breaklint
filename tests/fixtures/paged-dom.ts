@@ -271,10 +271,33 @@ export function fakePrimitives(document: FakeNode, hooks: {
       if (!parent || !displayedChain(parent)) return [];
       const box = boxOf(parent);
       if (box.width <= 0 || box.height <= 0) return [];
-      if (typeof start === "number" && typeof end === "number") return [rect(box.x, box.y, 4 * (end - start), box.height)];
+      // A sub-range is 4 px per character from the start of the text, on the one line: so the words
+      // of a text node lie 4 px apart per space between them, which is its "rendered" space.
+      // A parent's `data-test-space` sets the width of a whitespace character (a "rendered space"
+      // of another width: stretched, collapsed, or set by another font) for the tests that need it.
+      if (typeof start === "number" && typeof end === "number") {
+        const space = Number(parent.attributes.get("data-test-space") ?? 4);
+        const text = node.data ?? "";
+        const advance = (from: number, to: number) => {
+          let width = 0;
+          for (let at = from; at < to; at += 1) width += /\s/u.test(text[at] ?? "") ? space : 4;
+          return width;
+        };
+        return [rect(box.x + advance(0, start), box.y, advance(start, end), box.height)];
+      }
       return [box];
     },
     painted: () => true,
+    // The font's own space advance, as the canvas answers it in production: here a quarter of the
+    // shorthand's pixel size plus the letter-spacing, so a test can tell it from any rendered range
+    // (4 px per character above). Only a well-formed shorthand is answered — style, caps, weight,
+    // stretch keyword, size, family, in that order — and the family `unloaded-face` stands for a
+    // font that is not loaded yet, which the production primitive answers with null.
+    spaceAdvance: (font: string, letterSpacing: string) => {
+      const match = /^(normal|italic|oblique(?: \S+)?) (normal|small-caps) (\d+) ([a-z-]+) ([\d.]+)px (.+)$/u.exec(font);
+      if (!match || match[6] === "unloaded-face" || !/^-?[\d.]+px$/u.test(letterSpacing)) return null;
+      return Number(match[5]) / 4 + Number.parseFloat(letterSpacing);
+    },
     styleSheets: () => [],
     sheetHref: () => null,
     sheetRules: () => [],
@@ -331,12 +354,38 @@ export function evaluatePayload<T>(source: string, document: FakeNode): T {
   ) as T;
 }
 
+/** A Paged.js break token: the source node the next page starts at, and an offset into it. */
+export interface FakeBreakToken { node: FakeNode | null; offset?: number }
+
 /**
  * Install the real collector over the fake tree, replay the Paged.js hooks once per page in
  * order — every page reported, a break token on every page but the last — and return what
  * `collectorResult` answers afterwards.
+ *
+ * The collector evaluates Paged.js' break decision at each token's node, in the paginator's
+ * parsed SOURCE (`BreakDecision` in `src/paginate/collector.ts`). A test that is about the break
+ * cause passes that source (`contents`, a tree built with `fakeDocument`) and the tokens Paged.js
+ * would hand out. Without them each page's token points INTO the first source-bearing element of
+ * the next page (offset 1) — a page that ran out of room inside a node, which is never forced.
  */
-export function runCollector<T>(source: string, document: FakeNode): T {
+export function runCollector<T>(
+  source: string,
+  document: FakeNode,
+  options: {
+    /** Runs after the last hook and before the result is read: an author script acting late. */
+    afterRendered?: () => void;
+    /** The paginator's parsed source, whose first child is where page 1's layout starts. */
+    contents?: FakeNode;
+    /** The token `afterPageLayout` hands out for page `i`; `null` for none. */
+    tokens?: readonly (FakeBreakToken | null)[];
+    /**
+     * The last node the layout walker handed out on page `i` (the `layoutNode` hook). Defaults to
+     * the page's token node — the shape of a break `shouldBreak()` decided. A different node models
+     * an overflow token at a node the walker never visited.
+     */
+    walked?: readonly (FakeNode | null)[];
+  } = {},
+): T {
   let handlerClass: (new () => Record<string, (...args: unknown[]) => void>) | null = null;
   let result: (() => T) | null = null;
   const window = {
@@ -349,14 +398,23 @@ export function runCollector<T>(source: string, document: FakeNode): T {
   new Function("window", "Paged", "document", source)(window, { Handler }, document);
   if (!handlerClass || !result) throw new Error("paged-dom: the collector did not register itself");
   const handler = new (handlerClass as new () => Record<string, (...args: unknown[]) => void>)();
-  const pages = (window.__blPrimitives.all as (root: FakeNode, selector: string) => FakeNode[])(document, ".pagedjs_page");
+  const all = window.__blPrimitives.all as (root: FakeNode, selector: string) => FakeNode[];
+  const pages = all(document, ".pagedjs_page");
+  const defaultToken = (index: number): FakeBreakToken | null => {
+    if (index >= pages.length - 1) return null;
+    return { node: all(pages[index + 1]!, ".pagedjs_page_content [data-bl-sid]")[0] ?? null, offset: 1 };
+  };
+  let incoming: FakeBreakToken | null = null;
   for (const [index, page] of pages.entries()) {
-    handler.beforePageLayout!();
-    handler.layoutNode!();
+    handler.beforePageLayout!({}, options.contents, incoming ?? undefined);
+    const token = options.tokens ? options.tokens[index] ?? null : defaultToken(index);
+    handler.layoutNode!(options.walked ? options.walked[index] ?? null : token?.node ?? null);
     handler.renderNode!();
-    handler.afterPageLayout!(page, {}, index < pages.length - 1 ? { token: index } : null);
+    handler.afterPageLayout!(page, {}, token ?? undefined);
+    incoming = token;
   }
   handler.afterRendered!();
+  options.afterRendered?.();
   return (result as () => T)();
 }
 
@@ -424,6 +482,14 @@ export function pagedPage(input: {
    * `closest("[data-break-before]")` from any node on that page answers it.
    */
   pageAttributes?: string;
+  /**
+   * Extra classes on the `.pagedjs_page` element. Paged.js records there which named `@page`
+   * rule the page is styled with — `pagedjs_named_page pagedjs_<name>_page`, plus
+   * `pagedjs_<name>_first_page` on the page the region starts on (`atpage.js`, `layout.js`) — next
+   * to `pagedjs_first_page`, `pagedjs_left_page`/`pagedjs_right_page` and `pagedjs_blank_page`.
+   * It is not the break decision: the collector does not read these classes.
+   */
+  pageClasses?: string;
 }): string {
   const box = (value: readonly number[]) => `data-test-box="${value.join(" ")}"`;
   const margins = MARGIN_LAYOUT.map(([holder, names]) =>
@@ -432,7 +498,7 @@ export function pagedPage(input: {
       return `<div class="pagedjs_margin pagedjs_margin-${name}${content ? " hasContent" : ""}">` +
         `<div class="pagedjs_margin-content">${content}</div></div>`;
     }).join("") + "</div>").join("");
-  return `<div class="pagedjs_page" ${input.pageAttributes ?? ""} ${box(input.pageBox)}><div class="pagedjs_sheet"><div class="pagedjs_pagebox">` +
+  return `<div class="pagedjs_page${input.pageClasses ? ` ${input.pageClasses}` : ""}" ${input.pageAttributes ?? ""} ${box(input.pageBox)}><div class="pagedjs_sheet"><div class="pagedjs_pagebox">` +
     (input.fixed ?? "") + margins +
     `<div class="pagedjs_area"><div class="pagedjs_page_content" ${box(input.contentBox)}><div>${input.content}</div></div>` +
     `<div class="pagedjs_footnote_area"><div class="pagedjs_footnote_content"><div class="pagedjs_footnote_inner_content">` +

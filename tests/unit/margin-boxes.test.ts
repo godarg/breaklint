@@ -328,7 +328,7 @@ describe("margin-box content is not part of the flow", () => {
     assert.equal(collector.pages[1]!.firstSid, null);
     assert.equal(collector.pages[1]!.lastSid, null);
     assert.equal(collector.pages[2]!.firstSid, sid["chapter-two"], "page 3 opens with the recto heading, not the header clone");
-    assert.equal(collector.pages[2]!.attributesAfterRender.breakBefore, "recto");
+    assert.equal(collector.pages[2]!.startSid, sid["chapter-two"], "and it is the node that starts it");
 
     const raw = evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, document);
     const snapshot = assemble(raw, collector, injected);
@@ -480,7 +480,7 @@ describe("a record with no layout box is never measured, and never anchors a pag
     withContents.blocks = [...withContents.blocks, contents];
     const y = base.pages[0]!.contentBox.y + 40;
     withContents.textLines = [...withContents.textLines, {
-      blockKey: contents.nodeKey, index: 9991, box: { x: 60, y, width: 60, height: 12 }, visible: true, width: 60,
+      blockKey: contents.nodeKey, index: 9991, box: { x: 60, y, width: 60, height: 12 }, visible: true, ownText: true, width: 60,
       wordBoxes: [
         { text: "Aa", x: 60, y, width: 12, height: 12 },
         { text: "Bb", x: 60 + 12 + 11.22, y, width: 12, height: 12 },
@@ -572,7 +572,7 @@ describe("a record with no layout box is never measured, and never anchors a pag
       make("contents", { display: "contents", marginCopies: 0 }),
     ];
     snapshot.textLines = [...snapshot.textLines, ...records.map((record) => ({
-      blockKey: record.nodeKey, index: 7, box: { x: 60, y: 100, width: 50, height: 12 }, visible: true, width: 50, wordBoxes: null,
+      blockKey: record.nodeKey, index: 7, box: { x: 60, y: 100, width: 50, height: 12 }, visible: true, ownText: true, width: 50, wordBoxes: null,
     }))];
     assert.deepEqual(records.map((record) => renderedBox(snapshot, record)),
       [null, null, { x: 60, y: 100, width: 50, height: 12 }]);
@@ -603,7 +603,7 @@ describe("a record with no layout box is never measured, and never anchors a pag
       // (The corpus snapshot references the lines without carrying their geometry.)
       if (!snapshot.textLines.some((line) => line.blockKey === target.nodeKey)) {
         snapshot.textLines = [...snapshot.textLines, ...(target.lines ?? []).map((index) => ({
-          blockKey: target.nodeKey, index, box: { ...target.box }, visible: true, width: target.box.width, wordBoxes: null,
+          blockKey: target.nodeKey, index, box: { ...target.box }, visible: true, ownText: true, width: target.box.width, wordBoxes: null,
         }))];
       }
       target.box = { ...target.box, width: 0, height: 0 };
@@ -629,8 +629,8 @@ describe("a record with no layout box is never measured, and never anchors a pag
     const zero = { x: 0, y: 0, width: 0, height: 0 };
     const make = (nodeKey: string, over: Partial<BlockRecord>): BlockRecord => ({ ...structuredClone(snapshot.blocks[0]!), nodeKey, box: zero, ...over });
     snapshot.textLines = [...snapshot.textLines,
-      { blockKey: "visible-line", index: 1, box: { x: 60, y: 100, width: 50, height: 12 }, visible: true, width: 50, wordBoxes: null },
-      { blockKey: "hidden-line", index: 1, box: { x: 60, y: 100, width: 50, height: 12 }, visible: false, width: 50, wordBoxes: null }];
+      { blockKey: "visible-line", index: 1, box: { x: 60, y: 100, width: 50, height: 12 }, visible: true, ownText: true, width: 50, wordBoxes: null },
+      { blockKey: "hidden-line", index: 1, box: { x: 60, y: 100, width: 50, height: 12 }, visible: false, ownText: true, width: 50, wordBoxes: null }];
     const cases: [BlockRecord, string][] = [
       [make("display-none", { display: "none", lines: [] }), "not-rendered"],
       [make("display-none-unrecorded", { display: "none", lines: null, notMeasuredReason: "env/invalid-measurement" }), "not-rendered"],
@@ -665,7 +665,7 @@ describe("a record with no layout box is never measured, and never anchors a pag
     // Only the two records on this page, so nothing else can be the content below the heading.
     snapshot.blocks = [...snapshot.blocks.filter((block) => block.page !== page.pageNumber), heading, after];
     snapshot.textLines = [...snapshot.textLines, {
-      blockKey: after.nodeKey, index: 9993, box: { x: page.contentBox.x, y: bottom - 22, width: 120, height: 16 }, visible: true, width: 120, wordBoxes: null,
+      blockKey: after.nodeKey, index: 9993, box: { x: page.contentBox.x, y: bottom - 22, width: 120, height: 16 }, visible: true, ownText: true, width: 120, wordBoxes: null,
     }];
     const rule = ALL_RULES.find((item) => item.id === "layout/heading-at-page-bottom")!;
     const result = rule.run(snapshot, { documentPath: "doc.html", options: rule.defaultOptions, fingerprint });
@@ -723,7 +723,7 @@ describe("a line-reading rule measures only lines that printed, and says why it 
     if (probe.lines && probe.lines.length > 0) {
       const y = snapshot.pages[0]!.contentBox.y + 40;
       snapshot.textLines = [...snapshot.textLines, { blockKey: probe.nodeKey, index: probe.lines[0]!, box: { x: 60, y, width: 60, height: 12 },
-        visible: visible !== false, width: 60, wordBoxes: [{ text: "Aa", x: 60, y, width: 12, height: 12 }, { text: "Bb", x: 90, y, width: 12, height: 12 }] }];
+        visible: visible !== false, ownText: true, width: 60, wordBoxes: [{ text: "Aa", x: 60, y, width: 12, height: 12 }, { text: "Bb", x: 90, y, width: 12, height: 12 }] }];
     }
     return { snapshot, probe };
   };

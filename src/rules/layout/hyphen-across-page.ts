@@ -2,13 +2,11 @@ import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import { declined, layoutOutOfScope, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
 
-/** The class the paginator sets on a block it hyphenated at a page boundary. */
-const PAGEDJS_HYPHEN_CLASS = "pagedjs_hyphen";
-
 /**
  * layout/hyphen-across-page — a word was hyphenated across a page boundary.
  *
- * Detection is by the paginator's own class, never by comparing characters. The hyphen glyph is
+ * Detection is by the paginator's own class (`pagedjs_hyphen`, recorded per block as
+ * `boundaryHyphen`, on the block or an inline element in it), never by comparing characters. The hyphen glyph is
  * configurable, so a character comparison would miss a document that changed it and would fire
  * on a compound word that legitimately ends a line with a hyphen ("Ein- und Ausgang"). The
  * class says the paginator did it; the character says nothing about who did.
@@ -68,7 +66,10 @@ export const hyphenAcrossPage = defineRule(
       }
       measured += 1;
 
-      const occurrences = block.classList.includes(PAGEDJS_HYPHEN_CLASS) ? 1 : 0;
+      // Recorded by the collector (Snapshot 5): the class on the block or on an inline element
+      // inside it. Paged.js marks the parent of the text node it cut, so a word cut inside `<em>`
+      // carries the class on the `<em>`, and the block's own classes missed it.
+      const occurrences = block.boundaryHyphen ? 1 : 0;
       const permitted = num(ctx.options.maxOccurrences, 0);
       evaluations.push(targetEvaluation({ ruleId: "layout/hyphen-across-page", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured", measurements: [{ name: "boundary-hyphens", value: occurrences, unit: "occurrences", operator: ">", threshold: permitted }], violated: occurrences > permitted }));
       if (occurrences <= permitted) continue;

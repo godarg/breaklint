@@ -19,7 +19,54 @@ The earlier justification for the downgrade was itself unmeasured: *in 230 runs 
 
 ## Limits and known false alarms
 
+Skipped after a forced incoming break: the page was opened on purpose, and its first lines are the author's decision. A boundary counts as forced only where the paginator's own break decision forced it: a break declaration, or a change of named page (`page: <name>`) between the element the next page starts with and the one before it. A page is not forced open because a wrapper such as `<main>` continues onto it, nor because its page style changed. See [the break cause](../limitations.md#the-break-cause-of-a-page-boundary).
+
 A block with no visible text line is skipped: there is no text to strand. Without that, a fragment carrying only a figure was reported as a widow with *0 lines* — found by the corpus cross-check, not by review.
+
+Only the lines of the block's own container count, and only the run of them that the break split.
+The collector records a block's lines from every text node beneath it, so a `<section>` or `<div>`
+around a paragraph carries the paragraph's line boxes too. Such a wrapper used to be judged by its
+own threshold against its paragraph's lines: a paragraph split exactly as it asked was reported as a
+widow of the section around it, measured on patched Chromium 141 with Paged.js 0.4.3 and now pinned
+by `tests/live/rule-targets.test.ts`. The paragraph is the one judged, and a wrapper only for a
+break that splits text of its own:
+
+- A line is the block's own when the collector saw the block's own text on it (`TextLine.ownText`):
+  text whose nearest block container is this block. A line shared with a float on each side, the
+  block's text between them, is its own although the floats' boxes together span it.
+- The run opening the continuation ends at the first line of an in-flow nested block. The lines of
+  a float, a positioned box or an inline-block beside the wrapper's text are passed over; they
+  neither count nor end the run. Which is which comes from each block's recorded `display`, `float`
+  and `position`, never from geometry: a full-line inline-block and a block child look the same.
+- The run must continue on the other side. When the fragment before ends on a nested block's line —
+  a paragraph ended the page and the wrapper's own text opens the next — the own text is a new run
+  and is not reported. The fragments are joined by source id; without one, the continuation is
+  judged on its own side, and the evaluation says so (`previous-fragment-closing-lines` is `null`).
+- A `display: contents` or inline element is no block container: a line that a block around it
+  holds is that block's. Where no recorded block holds its lines — a `display: contents` element
+  directly in `<body>` — they belong to a container the snapshot does not record, and the element is
+  declined as `env/invalid-measurement`, counted against coverage.
+
+- Only elements the snapshot records are judged: the block-level HTML elements a source map
+  addresses (`p`, `div`, `section`, `li`, `td`, ...). A custom element or a
+  `<span style="display: block">` is a block container nobody records: its own splits are not
+  judged, and its lines are not counted for the block around it either.
+
+Known limits, found by an independent verification and not fixed in this release:
+
+- A recorded block inside an UNRECORDED inline-level box — a `<p>` in a
+  `<span style="display: inline-block">` or `inline-flex` — is taken for an in-flow block: its lines
+  end the surrounding block's run, which can report a false `layout/orphan` or `layout/widow`
+  there. The pass-over above holds for inline-level boxes the snapshot records, not for this case.
+- Text in an unrecorded absolutely positioned or floated box (a `<span style="float: right">`)
+  counts as the surrounding block's own lines, so the run can be counted longer than the block's
+  own line boxes are.
+- Lines are grouped by the top edge of their text rectangles, within 0.5 px. An inline `<code>`,
+  `<sup>` or badge whose text sits at another height than the rest of its line forms a line of its
+  own, and a fragment's line count includes it.
+
+The ground truth these rules were checked against is a probe of the same documents with plain
+Paged.js and Range rectangles.
 
 ## Calibration
 
