@@ -68,6 +68,42 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   guard rather than tightened — and the exit-3 message names the elapsed time and the last lines
   of the browser's stderr (for example a missing shared library).
 
+- **A delivered SIGINT, SIGTERM or SIGHUP is never dropped, and the decision is taken when it
+  arrives.** The signal handling above lost signals in review: Node discards a signal queued for a
+  listener removed before the queue is read, and breaklint removed its listener synchronously at
+  the end of a render and when the launch handed over to the render. A SIGTERM delivered while the
+  render removed a large profile then let the run finish with a complete report and exit 0. The
+  render's hold now spans the launch, listeners outlive the last hold by two `setImmediate` hops
+  (measured: with none or one, a queued signal was lost in at least one event loop phase), a signal
+  that finds no hold ends the process by that signal, and a render drains pending signals before it
+  lets go. A cleanup that could not be verified is now reported: one stderr line before the signal
+  is raised again, or in the fatal message.
+- **What this means for a library host** (`checkProducedDocuments`, and `renderDocuments` in-tree):
+  from just before the browser is launched until the render's cleanup, the process carries
+  breaklint's prepended listeners for SIGINT, SIGTERM and SIGHUP, in place of the listeners the
+  driver used to install for the browser's lifetime. A host with no listener of its own is now
+  ended by the signal, after breaklint's bounded cleanup. Before, the driver ended it on SIGINT
+  (exit 130, without removing the profile) but swallowed SIGTERM and SIGHUP: the host kept
+  running, and the render went on against a closed browser. That change is intended — a process
+  that does not handle SIGTERM is being asked to terminate, and the driver's listener turned the
+  request into a continued, failing run. A host that listens itself decides: breaklint counts the
+  host's listeners when the signal arrives (a `process.once` listener that already ran in the same
+  emit counts), kills its browser's process group and removes its profile synchronously before the
+  host's listeners run, removes its own listener for that signal so they see what they would see
+  without it (a signal-exit style listener then re-raises), and the render returns exit 3.
+- **The browser keeps its temporary files in its profile, and in the default offline mode it
+  reaches no network.** `TMPDIR` for the browser points into the profile, so Chromium's
+  `.org.chromium.Chromium.*` and Google Chrome's `com.google.Chrome.*` directories (component
+  downloads left 6 per `npm test` in CI) go with the profile; a path too long for the browser's
+  Unix socket gets a short `breaklint-chrome-tmp-*` directory, removed with the profile. The
+  browser now starts with `--disable-component-update` (puppeteer-core 25.8 stopped passing it)
+  and an explicit `--disable-background-networking`, and in the default offline mode with
+  `--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1` and `--no-proxy-server`. Measured on
+  Chromium 141: without the lock the browser resolved and connected to Google hosts within a
+  second (network time, account list, AI-mode eligibility, GCM check-in, DNS-over-HTTPS,
+  preconnect) — requests page-level interception never saw, although README and SECURITY.md said
+  every request was blocked; with it, its net-log shows only the loopback document. With
+  `--allow-network` the lock is off, and SECURITY.md says so.
 - **On Windows a live run now stops before anything is started.** Windows remains unsupported
   (process cleanup rests on POSIX process groups). Before — read from the code, not run on
   Windows — a run with `BREAKLINT_CHROME` set started the browser and rendered the whole document
@@ -85,7 +121,7 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   them, and asserts after every iteration that no browser process of that run is alive 2 s later
   and no profile directory is left. It is its own job so that no other step's browser can confound
   it and the minutes it takes stay off the critical path. Measured locally: 120 of 120 green in
-  both regimes; on the previous tree, red on every path.
+  both regimes; on the previous tree, red on every path. The job has `timeout-minutes: 30`.
 
 ### Documentation
 

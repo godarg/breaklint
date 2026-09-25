@@ -293,8 +293,8 @@ its own cleanup (`renderer-not-terminated` in 10 of 18 SIGTERM and SIGHUP runs a
 and a second series of six each). The exit 0 is the one clean exit in the table and it is the worst
 entry in it: an interrupted run that printed nothing and measured nothing; it appeared once in nine
 SIGHUP runs, at load 19, and its mechanism was not isolated. breaklint now handles the three
-signals itself: it runs the same bounded, verified close and profile removal, then raises the
-signal again, so the process ends by it. A SIGKILL cannot be handled; the next launch's sweep
+signals itself (how, and for a library host, below): it runs the same bounded, verified close and
+profile removal, then raises the signal again, so the process ends by it. A SIGKILL cannot be handled; the next launch's sweep
 removes that run's profile, and only such a profile. It removes a `breaklint-chrome-profile-*`
 directory only when the owner record written into every profile names this host, this boot and this
 PID namespace, the breaklint process it names is gone, and the browser it started is gone (its
@@ -302,6 +302,50 @@ process group has no live member, or, without a recorded browser, Chrome's `Sing
 dead pid on this host, or, without either, the directory has not changed for a minute). A running
 breaklint's profile is kept by the second condition, which a unit test checks against a real
 running process.
+
+**An interrupt is decided when it arrives, and a delivered one is never dropped.** The first
+version of this handling, in review, lost signals: Node discards a signal that is queued for a
+listener removed before the queue is read, and the listener was removed synchronously at the end
+of a render and when the launch handed over to the render. A SIGTERM delivered while the render
+removed a large profile then let the run finish with a complete report and exit 0 (3 of 3 in a
+reviewer's probe, and 2 of 180 signal iterations of the soak below under a never-collecting
+parent). Measured, such a signal was lost when the listener went synchronously, in every event
+loop phase, and after one `setImmediate` when the removal ran in the I/O phase; it was delivered
+after two, in every phase, on Node 24 and 22.13. The render's hold is now taken before the
+browser is launched, the listeners outlive the last hold by two `setImmediate` hops, a signal that
+finds no hold ends the process by that signal, and the render drains pending signals before it
+lets go. Three process-level tests pin it; each is red on the previous version.
+
+The same review found the decision taken at the wrong moment: after the cleanup, when a host's
+`process.once` listener had already removed itself, so a host was killed in the middle of its own
+graceful shutdown, while a signal-exit style listener (it re-raises only when it is alone) and
+breaklint each waited for the other and the host survived its SIGINT. breaklint's listener is now
+prepended and counts the host's listeners when the signal arrives. With none, the orderly cleanup
+runs and the signal is raised again; with any, breaklint kills its browser's process group and
+removes its profile synchronously, before the host's listeners run, removes its own listener so
+they see what they would see without it, and the render reports exit 3 with what it could verify.
+In both cases a cleanup that could not be verified is reported: on stderr before the re-raise, in
+the fatal message otherwise.
+
+**The browser's own files and its own network.** The browser now keeps its temporary files in the
+profile (`TMPDIR` points there), so the profile's removal takes them too: Chromium's
+`.org.chromium.Chromium.*` socket directories and Google Chrome's component-download
+directories, which were observed accumulating in a shared temporary directory. A Unix socket path
+is limited to 107 bytes on Linux and 103 on macOS; where the profile path leaves less than 56
+bytes, a short `breaklint-chrome-tmp-*` directory is used instead, recorded in the profile's owner
+record and removed with it. On macOS, whether the browser honours `TMPDIR` is not measured here.
+The browser also makes requests that page-level interception never sees. Measured on Chromium 141
+through this launch path, idle for 8 s: DNS queries and connections to Google hosts for network
+time, the account list, AI-mode eligibility, GCM check-in, DNS-over-HTTPS and a search preconnect —
+with `--disable-background-networking` already set by the driver. The component updater is off in
+every mode now (`--disable-component-update`), and the default offline mode adds a lock: every host
+name except `127.0.0.1` resolves to "not found" before any DNS query, and no proxy is used. With it
+the browser's net-log showed one connection, to the loopback document; a unit test requires that,
+against a control run without the lock that must show browser-level traffic. With
+`--allow-network` the lock is off, and those services can reach the network; that is the
+remaining boundary, stated rather than closed, because allowed origins must resolve and may need
+the host's proxy. Not claimed either, and not measured here: a document's WebRTC traffic to an
+IP address, which is not a request that interception sees and needs no host name.
 
 Two things this does not cover. A browser crash writes its dump into `~/.config/chromium/Crash
 Reports`, outside the temporary profile, and nothing here changes that. And the browser start is

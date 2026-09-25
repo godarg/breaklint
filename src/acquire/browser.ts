@@ -9,15 +9,17 @@
  * document.
  */
 
-import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync, type ChildProcess } from "node:child_process";
 import { subscribe, unsubscribe } from "node:diagnostics_channel";
 import type { Server } from "node:http";
 import { createRequire } from "node:module";
 import type { Socket } from "node:net";
 import { hostname, tmpdir } from "node:os";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { err } from "../cli/out.ts";
 
 /** Only the members this project actually calls. Anything else is the driver's business. */
 export interface PageLike {
@@ -523,16 +525,31 @@ export async function terminateProcessTree(
  * reported `renderer-not-terminated` (10 of 18 runs); and one of nine SIGHUP runs, at load 19,
  * ended with exit 0 and no output at all — a clean exit for a run that measured nothing.
  *
- * What happens instead. While at least one hold is registered, one listener per signal is
- * installed. The first signal runs every hold's `cleanup()` (for a render: the bounded, verified
- * browser close and the profile removal) under an overall bound; a hold still busy at the bound,
- * or at a second signal, is forced (`force()`: SIGKILL of the browser group, profile removal).
- * Then, if no other listener for that signal exists in the process, the listeners are removed and
- * the signal is raised again, so the process ends BY that signal exactly as it would have without
- * breaklint (a shell sees 130, 143 or 129, and a script loop stops on Ctrl-C). If the host process
- * listens for the signal itself, breaklint does not end the host: it cleans up, every hold's
- * `settled()` resolves, and the interrupted render reports exit 3. In neither case can an
- * interrupted run end with exit 0.
+ * The decision is taken when the signal arrives, not after the cleanup. breaklint's listener is
+ * prepended, so it normally runs before any listener of the host process, and it counts those
+ * listeners at that moment (a `process.once` listener that ran before it in the same emit counts
+ * too: its removal is observed). Then:
+ *
+ *   - Nobody else listens (the CLI, or a host without a handler): what the signal means is
+ *     "terminate". breaklint runs every hold's orderly `cleanup()` (for a render: the bounded,
+ *     verified browser close and the profile removal) under INTERRUPT_CLEANUP_BOUND_MS, forcing a
+ *     hold still busy at the bound or at a second signal, reports on stderr whatever was not
+ *     verified, removes its listeners and raises the signal again — the process ends BY that
+ *     signal, as it would have without breaklint (a shell sees 130, 143 or 129).
+ *   - The host listens too: the host decides what the signal means. breaklint cleans up at once
+ *     and synchronously (`force()`: SIGKILL of the browser's process group, profile removal), so
+ *     the cleanup is done even when the host's listener exits the process on the spot, and removes
+ *     its own listener for that signal before the host's listeners run, so they see exactly what
+ *     they would see without breaklint — a signal-exit style listener that re-raises only when it
+ *     is alone does re-raise. The interrupted render then reports exit 3.
+ *
+ * A delivered signal is never dropped. Node queues a signal for the listener's handle and
+ * discards it if the last listener is removed before the queue is read; measured, a signal that
+ * arrived during synchronous work was lost when the listener went synchronously (all three event
+ * loop phases) and after one `setImmediate` when the removal ran in the I/O phase, and delivered
+ * after two in every phase. So listeners outlive the last hold by two `setImmediate` hops, a
+ * signal that arrives when no hold is left is raised again at once, and a render drains pending
+ * signals before it lets its hold go.
  */
 export type InterruptSignal = "SIGINT" | "SIGTERM" | "SIGHUP";
 export const INTERRUPT_SIGNALS: readonly InterruptSignal[] = ["SIGINT", "SIGTERM", "SIGHUP"];
@@ -540,8 +557,12 @@ export const INTERRUPT_SIGNALS: readonly InterruptSignal[] = ["SIGINT", "SIGTERM
 export const INTERRUPT_CLEANUP_BOUND_MS = 10_000;
 
 export interface InterruptCleanup {
+  /** Orderly, bounded cleanup; used when breaklint decides what the signal means. */
   cleanup(): Promise<void>;
+  /** Synchronous: no protocol, no wait. Used when the host decides, at a second signal, at the bound. */
   force(): void;
+  /** After cleanup or force: null when everything was verified, else what was not. */
+  outcome?(): string | null;
 }
 
 export interface InterruptHold {
@@ -552,25 +573,69 @@ export interface InterruptHold {
   release(): void;
 }
 
+type SignalListener = (signal: InterruptSignal) => void;
+type RemovalListener = (event: string | symbol, listener: unknown) => void;
+
 /** The part of `process` the registry uses; a test passes a fake. */
 export interface SignalHost {
   readonly pid: number;
-  on(signal: InterruptSignal, listener: (signal: InterruptSignal) => void): unknown;
-  off(signal: InterruptSignal, listener: (signal: InterruptSignal) => void): unknown;
+  prependListener(signal: InterruptSignal, listener: SignalListener): unknown;
+  off(signal: InterruptSignal, listener: SignalListener): unknown;
   listenerCount(signal: InterruptSignal): number;
   kill(pid: number, signal: InterruptSignal): unknown;
+  /** Observe listener removals (`process.on("removeListener")`); returns the unsubscribe. */
+  watchRemovals(listener: RemovalListener): () => void;
+  /** One line to stderr, flushed as far as the stream allows, before the process ends. */
+  report(line: string): Promise<void>;
+  /** Run `fn` after pending signal callbacks have been dispatched. */
+  drain(fn: () => void): void;
 }
 
-export function createInterruptRegistry(host: SignalHost = process, boundMs: number = INTERRUPT_CLEANUP_BOUND_MS): {
+/** Two `setImmediate` hops: at least one complete poll phase, which dispatches queued signals. */
+export function afterPendingSignals(fn: () => void): void {
+  setImmediate(() => setImmediate(fn));
+}
+
+/** Resolve once every signal that was already queued has reached its listeners. */
+export function drainPendingSignals(): Promise<void> {
+  return new Promise((resolveDrain) => afterPendingSignals(resolveDrain));
+}
+
+async function reportToStderr(line: string): Promise<void> {
+  err(line);
+  // Pipes are asynchronous on macOS; give a queued line a bounded chance to leave.
+  if (process.stderr.writableLength === 0) return;
+  await new Promise<void>((resolveFlush) => {
+    const timer = setTimeout(resolveFlush, 1_000);
+    process.stderr.once("drain", () => { clearTimeout(timer); resolveFlush(); });
+  });
+}
+
+const PROCESS_SIGNAL_HOST: SignalHost = {
+  get pid() { return process.pid; },
+  prependListener: (signal, listener) => process.prependListener(signal, listener as NodeJS.SignalsListener),
+  off: (signal, listener) => process.off(signal, listener as NodeJS.SignalsListener),
+  listenerCount: (signal) => process.listenerCount(signal),
+  kill: (pid, signal) => process.kill(pid, signal),
+  watchRemovals(listener) {
+    process.on("removeListener", listener);
+    return () => { process.off("removeListener", listener); };
+  },
+  report: reportToStderr,
+  drain: afterPendingSignals,
+};
+
+export function createInterruptRegistry(host: SignalHost = PROCESS_SIGNAL_HOST, boundMs: number = INTERRUPT_CLEANUP_BOUND_MS): {
   hold(cleanup: InterruptCleanup): InterruptHold;
 } {
   interface Entry {
     cleanup: InterruptCleanup;
     signal: InterruptSignal | null;
+    resolved: boolean;
     resolve(signal: InterruptSignal): void;
     settled: Promise<InterruptSignal>;
   }
-  /** One interrupt, from its first signal until it ends the process or hands back to the host. */
+  /** An orderly interrupt, from its first signal until it ends the process. */
   interface Episode {
     signal: InterruptSignal;
     entries: Entry[];
@@ -578,90 +643,140 @@ export function createInterruptRegistry(host: SignalHost = process, boundMs: num
     ended: boolean;
   }
   const entries = new Set<Entry>();
-  let installed = false;
+  const installed = new Set<InterruptSignal>();
+  let stopWatching: (() => void) | null = null;
+  /** Signals for which a foreign listener was removed in the current synchronous turn. */
+  const removedThisTurn = new Set<InterruptSignal>();
+  let uninstallScheduled = false;
   let current: Episode | null = null;
-  const listener = (signal: InterruptSignal): void => { onSignal(signal); };
+  const listener: SignalListener = (signal) => { onSignal(signal); };
+  const onRemoval: RemovalListener = (event, removed) => {
+    if (removed === listener || !INTERRUPT_SIGNALS.includes(event as InterruptSignal)) return;
+    // A `once` listener removes itself as it is called; if that happens in the emit that is about
+    // to call breaklint, the host had a listener when the signal arrived.
+    const signal = event as InterruptSignal;
+    if (removedThisTurn.size === 0) queueMicrotask(() => removedThisTurn.clear());
+    removedThisTurn.add(signal);
+  };
   const install = (): void => {
-    if (installed) return;
-    for (const signal of INTERRUPT_SIGNALS) host.on(signal, listener);
-    installed = true;
+    uninstallScheduled = false;
+    if (!stopWatching) stopWatching = host.watchRemovals(onRemoval);
+    for (const signal of INTERRUPT_SIGNALS) {
+      if (installed.has(signal)) continue;
+      host.prependListener(signal, listener);
+      installed.add(signal);
+    }
   };
   const uninstall = (): void => {
-    if (!installed) return;
-    for (const signal of INTERRUPT_SIGNALS) host.off(signal, listener);
-    installed = false;
+    for (const signal of installed) host.off(signal, listener);
+    installed.clear();
+    stopWatching?.();
+    stopWatching = null;
+  };
+  /** Never synchronously: a signal already queued for this listener would be discarded. */
+  const uninstallWhenIdle = (): void => {
+    if (uninstallScheduled || entries.size > 0 || current !== null) return;
+    uninstallScheduled = true;
+    host.drain(() => {
+      if (uninstallScheduled && entries.size === 0 && current === null) uninstall();
+      uninstallScheduled = false;
+    });
+  };
+  const resolveEntry = (entry: Entry, signal: InterruptSignal): void => {
+    if (entry.resolved) return;
+    entry.resolved = true;
+    entry.resolve(signal);
   };
   const force = (list: readonly Entry[]): void => {
     for (const entry of list) {
       try { entry.cleanup.force(); } catch { /* best effort; the next run's sweep remains */ }
     }
   };
+  const outcomes = (list: readonly Entry[]): string[] => list.flatMap((entry) => {
+    try { const outcome = entry.cleanup.outcome?.() ?? null; return outcome ? [outcome] : []; } catch { return []; }
+  });
+  /** The signal is ours to act on: end by it, as the process would without breaklint. */
+  const reraise = (signal: InterruptSignal): void => {
+    uninstall();
+    host.kill(host.pid, signal);
+  };
   /**
-   * Orderly cleanup under the bound. The bound's timer is deliberately NOT unref'd: a cleanup
-   * that waits on something holding no handle would otherwise let the event loop drain, and a
-   * drained loop ends the process with exit 0.
+   * Orderly cleanup under the bound. The bound's timer is deliberately NOT unref'd: a cleanup that
+   * waits on something holding no handle would otherwise let the event loop drain, and a drained
+   * loop ends the process with exit 0.
    */
-  const clean = (episode: Episode, list: readonly Entry[]): Promise<void> => new Promise<void>((resolveClean) => {
+  const clean = (episode: Episode): Promise<void> => new Promise<void>((resolveClean) => {
     let done = false;
     const complete = (forced: boolean): void => {
       if (done) return;
       done = true;
-      if (forced) force(list);
+      if (forced) force(episode.entries);
       resolveClean();
     };
     episode.timer = setTimeout(() => complete(true), boundMs);
-    void Promise.allSettled(list.map((entry) => Promise.resolve().then(() => entry.cleanup.cleanup())))
+    void Promise.allSettled(episode.entries.map((entry) => Promise.resolve().then(() => entry.cleanup.cleanup())))
       .then(() => complete(false));
   });
-  const end = (episode: Episode): void => {
+  const end = async (episode: Episode): Promise<void> => {
     if (episode.ended) return;
     episode.ended = true;
     if (episode.timer) clearTimeout(episode.timer);
-    for (const entry of episode.entries) entry.resolve(episode.signal);
-    const others = host.listenerCount(episode.signal) - (installed ? 1 : 0);
-    if (others <= 0) {
-      // Nobody else in this process decides what the signal means: end by it, as without breaklint.
-      uninstall();
-      host.kill(host.pid, episode.signal);
-      return;
+    for (const entry of episode.entries) resolveEntry(entry, episode.signal);
+    const unverified = outcomes(episode.entries);
+    if (unverified.length > 0) {
+      try { await host.report(`breaklint: interrupted by ${episode.signal}; renderer cleanup not verified: ${unverified.join("; ")}\n`); } catch { /* the signal still ends the process */ }
     }
-    // The host handles this signal itself. Hand back: the interrupted holds settle, and the next
-    // signal starts a new episode.
-    if (current === episode) current = null;
-    if (entries.size === 0) uninstall();
+    reraise(episode.signal);
   };
   const onSignal = (signal: InterruptSignal): void => {
+    const hostListens = host.listenerCount(signal) - (installed.has(signal) ? 1 : 0) > 0 || removedThisTurn.has(signal);
     if (current !== null) {
-      // A second signal while the first is being handled: stop waiting, force, and end.
+      // A second signal while the first is being cleaned up: stop waiting, force, and end.
       const episode = current;
       force(episode.entries);
-      end(episode);
+      void end(episode);
       return;
     }
-    const episode: Episode = { signal, entries: [...entries], timer: null, ended: false };
+    const list = [...entries];
+    if (hostListens) {
+      // The host decides what this signal means. Clean up now, synchronously, then step aside for
+      // this signal so the host's own listeners see what they would see without breaklint.
+      for (const entry of list) entry.signal = signal;
+      force(list);
+      host.off(signal, listener);
+      installed.delete(signal);
+      for (const entry of list) resolveEntry(entry, signal);
+      return;
+    }
+    if (list.length === 0) {
+      // No hold left, the deferred removal had not run yet: behave as if nobody had listened.
+      reraise(signal);
+      return;
+    }
+    const episode: Episode = { signal, entries: list, timer: null, ended: false };
     current = episode;
-    for (const entry of episode.entries) entry.signal = signal;
-    void clean(episode, episode.entries).then(() => end(episode));
+    for (const entry of list) entry.signal = signal;
+    void clean(episode).then(() => end(episode));
   };
   return {
     hold(cleanup: InterruptCleanup): InterruptHold {
       let resolve!: (signal: InterruptSignal) => void;
       const settled = new Promise<InterruptSignal>((resolveSettled) => { resolve = resolveSettled; });
-      const entry: Entry = { cleanup, signal: null, resolve, settled };
+      const entry: Entry = { cleanup, signal: null, resolved: false, resolve, settled };
       entries.add(entry);
       install();
       if (current !== null) {
-        // Registered while an interrupt is being handled: interrupted too, and cleaned at once.
-        const signal = current.signal;
-        entry.signal = signal;
-        void Promise.resolve().then(() => cleanup.cleanup()).catch(() => undefined).then(() => entry.resolve(signal));
+        // Registered while an interrupt is being cleaned up: interrupted too, forced at once.
+        entry.signal = current.signal;
+        current.entries.push(entry);
+        force([entry]);
       }
       return {
         interrupted: () => entry.signal,
         settled: () => settled,
         release(): void {
           entries.delete(entry);
-          if (entries.size === 0 && current === null) uninstall();
+          uninstallWhenIdle();
         },
       };
     },
@@ -715,6 +830,8 @@ export interface ProfileOwnerRecord {
   bootId: string | null;
   pidNamespace: string | null;
   browserPid: number | null;
+  /** The browser's own temporary directory when it could not live inside the profile. */
+  browserTmpDir?: string | null;
 }
 
 export interface ProfileSweepEnvironment {
@@ -751,7 +868,8 @@ export function profileOwnerIdentity(platform: NodeJS.Platform = process.platfor
   };
 }
 
-function groupHasLiveMember(pgid: number): boolean {
+/** Does process group `pgid` still have a member that can run code? Zombies do not count. */
+export function processGroupHasLiveMember(pgid: number): boolean {
   try { process.kill(-pgid, 0); } catch (error) {
     return (error as NodeJS.ErrnoException).code !== "ESRCH";
   }
@@ -759,17 +877,20 @@ function groupHasLiveMember(pgid: number): boolean {
   return !(members !== null && members.length > 0 && members.every((member) => member.defunct));
 }
 
-function defaultSweepEnvironment(): ProfileSweepEnvironment | null {
-  if (process.platform === "win32") return null;
-  const identity = profileOwnerIdentity();
+/** The environment the start-up sweep compares against; `null` means "sweep nothing". */
+export function defaultSweepEnvironment(
+  platform: NodeJS.Platform = process.platform,
+  identity: ReturnType<typeof profileOwnerIdentity> = profileOwnerIdentity(platform),
+): ProfileSweepEnvironment | null {
+  if (platform === "win32") return null;
   // On Linux a pid is meaningful only inside its PID namespace and its boot. Without both, no
   // record can be compared, so nothing is swept.
-  if (process.platform === "linux" && (!identity.bootId || !identity.pidNamespace)) return null;
+  if (platform === "linux" && (!identity.bootId || !identity.pidNamespace)) return null;
   let tmp: string;
   try { tmp = realpathSync(tmpdir()); } catch { return null; }
   return {
     tmp, ...identity, uid: typeof process.getuid === "function" ? process.getuid() : null,
-    alive, groupAlive: groupHasLiveMember, now: Date.now,
+    alive, groupAlive: processGroupHasLiveMember, now: Date.now,
   };
 }
 
@@ -782,8 +903,40 @@ function ownerRecord(text: string | null): ProfileOwnerRecord | null {
   const nullableString = (candidate: unknown): candidate is string | null => candidate === null || typeof candidate === "string";
   if (!record || record.tool !== "breaklint" || !pid(record.pid) || typeof record.hostname !== "string"
     || !nullableString(record.bootId) || !nullableString(record.pidNamespace)
-    || !(record.browserPid === null || pid(record.browserPid))) return null;
+    || !(record.browserPid === null || pid(record.browserPid))
+    || !(record.browserTmpDir === undefined || nullableString(record.browserTmpDir))) return null;
   return record as ProfileOwnerRecord;
+}
+
+/** The owner record of a profile directory, or null when it has none or it is unreadable. */
+export function readProfileOwner(userDataDir: string): ProfileOwnerRecord | null {
+  return ownerRecord(readOptional(join(userDataDir, PROFILE_OWNER_FILE)));
+}
+
+export const BROWSER_TMP_PREFIX = "breaklint-chrome-tmp-";
+
+/**
+ * Remove a browser temporary directory created outside the profile, with the same guards as the
+ * profile's own removal: our prefix, a real directory owned by this user, directly inside the
+ * temporary directory or `/tmp`. `null` = removed or absent; otherwise why not.
+ */
+export function removeBrowserTmpDir(path: string | null | undefined): string | null {
+  if (!path) return null;
+  let entry: ReturnType<typeof lstatSync>;
+  try { entry = lstatSync(path); } catch { return null; }
+  const uid = typeof process.getuid === "function" ? process.getuid() : null;
+  let real: string;
+  try { real = realpathSync(path); } catch { return null; }
+  const bases = new Set<string>();
+  for (const base of [tmpdir(), "/tmp"]) { try { bases.add(realpathSync(base)); } catch { /* absent */ } }
+  if (!entry.isDirectory() || entry.isSymbolicLink() || (uid !== null && entry.uid !== uid)
+    || !basename(real).startsWith(BROWSER_TMP_PREFIX) || !bases.has(dirname(real))) {
+    return `refused to remove an unowned browser temporary directory: ${path}`;
+  }
+  try { rmSync(real, { recursive: true, force: true }); } catch (error) {
+    return `browser temporary directory removal threw: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  return existsSync(real) ? `browser temporary directory still exists after removal: ${real}` : null;
 }
 
 function sweepVerdict(path: string, environment: ProfileSweepEnvironment): string | null {
@@ -828,6 +981,7 @@ export function sweepStaleBrowserProfiles(environment: ProfileSweepEnvironment |
       result.kept.push({ path, reason });
       continue;
     }
+    removeBrowserTmpDir(readProfileOwner(path)?.browserTmpDir);
     try { rmSync(path, { recursive: true, force: true }); } catch { /* checked below */ }
     if (existsSync(path)) result.kept.push({ path, reason: "removal failed" });
     else result.removed.push(path);
@@ -835,8 +989,15 @@ export function sweepStaleBrowserProfiles(environment: ProfileSweepEnvironment |
   return result;
 }
 
-function writeProfileOwner(userDataDir: string, browserPid: number | null): void {
-  const record: ProfileOwnerRecord = { tool: "breaklint", pid: process.pid, ...profileOwnerIdentity(), browserPid };
+/** A fresh profile directory that carries its owner record before any browser uses it. */
+export function createBrowserProfile(): string {
+  const userDataDir = mkdtempSync(join(tmpdir(), PROFILE_PREFIX));
+  writeProfileOwner(userDataDir, null);
+  return userDataDir;
+}
+
+function writeProfileOwner(userDataDir: string, browserPid: number | null, browserTmpDir: string | null = readProfileOwner(userDataDir)?.browserTmpDir ?? null): void {
+  const record: ProfileOwnerRecord = { tool: "breaklint", pid: process.pid, ...profileOwnerIdentity(), browserPid, ...(browserTmpDir ? { browserTmpDir } : {}) };
   try {
     writeFileSync(join(userDataDir, PROFILE_OWNER_FILE), `${JSON.stringify(record)}\n`, { mode: 0o600 });
   } catch {
@@ -910,6 +1071,58 @@ export function resolvePackageRoot(name: string, fromDir: string): string | null
     return null;
   }
 }
+
+/**
+ * Where the browser keeps its own temporary files: inside the profile, so the profile's removal
+ * takes them too. Chrome creates its singleton socket directory there (`.org.chromium.Chromium.*`
+ * for Chromium, `com.google.Chrome.*` for Google Chrome) and its component-download directories
+ * (`com.google.Chrome.chrome_chrome_url_fetcher_*`), and it does not remove them when it is killed
+ * — observed accumulating in a shared temporary directory. A Unix socket path is limited to 108
+ * bytes on Linux and 104 on macOS including the terminator, and Chrome appends 46 bytes
+ * (`/.org.chromium.Chromium.XXXXXX/SingletonSocket`; Google Chrome's name is shorter); with a
+ * 10-byte margin, a directory path longer than the limit less 56 bytes gets a short dedicated
+ * directory instead, recorded in the profile's owner record and removed with the profile.
+ */
+const CHROME_SOCKET_SUFFIX_BYTES = 56;
+function socketPathLimit(platform: NodeJS.Platform = process.platform): number {
+  return (platform === "darwin" ? 104 : 108) - 1;
+}
+
+export function browserTmpDirFor(userDataDir: string, platform: NodeJS.Platform = process.platform): { path: string; separate: boolean } {
+  const inside = join(userDataDir, "tmp");
+  if (Buffer.byteLength(inside) + CHROME_SOCKET_SUFFIX_BYTES <= socketPathLimit(platform)) {
+    mkdirSync(inside, { mode: 0o700 });
+    return { path: inside, separate: false };
+  }
+  let base = "/tmp";
+  try {
+    const temp = realpathSync(tmpdir());
+    if (Buffer.byteLength(join(temp, `${BROWSER_TMP_PREFIX}XXXXXX`)) + CHROME_SOCKET_SUFFIX_BYTES <= socketPathLimit(platform)) base = temp;
+  } catch { /* /tmp */ }
+  return { path: mkdtempSync(join(base, BROWSER_TMP_PREFIX)), separate: true };
+}
+
+/**
+ * Browser-level network switches. None of them touches the sandbox.
+ *
+ * In every mode: `--disable-component-update` (Chrome's component updater downloads at browser
+ * level; puppeteer-core 25.8 no longer passes this switch, and the downloads left directories in
+ * CI's temporary directory) and `--disable-background-networking` (the driver passes it today;
+ * breaklint's network posture should not depend on a default list that has just changed).
+ *
+ * In the default offline mode, additionally a lock that holds whatever the browser adds:
+ * `--host-resolver-rules` maps every host name except the loopback address the document is served
+ * from to "not found", before any DNS query, and `--no-proxy-server` stops a configured proxy
+ * from resolving and forwarding on the browser's behalf. Measured on Chromium 141 through this
+ * launch path, idle for 8 s: without the lock, DNS to the system resolver and connections to
+ * Google hosts for network time, the account list, AI-mode eligibility, GCM check-in,
+ * DNS-over-HTTPS and a search preconnect, with both disable switches present; with the lock, the
+ * only connection was to the loopback page. With `--allow-network` the lock is off, because the
+ * allowed origins must resolve and may need the host's proxy; those services can then reach the
+ * network, which docs/limitations.md states.
+ */
+export const BROWSER_NETWORK_ARGS: readonly string[] = ["--disable-component-update", "--disable-background-networking"];
+export const OFFLINE_BROWSER_ARGS: readonly string[] = ["--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1", "--no-proxy-server"];
 
 /**
  * The whole start of the browser, from spawn to its first page target.
@@ -999,8 +1212,12 @@ export interface LaunchResult {
   userDataDir?: string | null;
 }
 
-/** Unit-only seams. Production passes none and keeps BROWSER_LAUNCH_TIMEOUT_MS. */
+/** Launch options. `network` follows the run's network policy; the rest are unit-only seams. */
 export interface LaunchSeams {
+  /** "offline" (the default) adds the browser-level network lock; "allowlist" does not. */
+  network?: "offline" | "allowlist";
+  /** Unit-only: write the browser's net-log to `<profile>/net-log.json`. */
+  netLog?: boolean;
   launchTimeoutMs?: number;
 }
 
@@ -1055,8 +1272,13 @@ export async function launchBrowser(fromDir: string = process.cwd(), seams: Laun
 
   // Profiles of earlier runs that were killed before they could clean up; see the sweep's rules.
   sweepStaleBrowserProfiles();
-  const userDataDir = mkdtempSync(join(tmpdir(), PROFILE_PREFIX));
-  writeProfileOwner(userDataDir, null);
+  const userDataDir = createBrowserProfile();
+  const browserTmp = browserTmpDirFor(userDataDir);
+  if (browserTmp.separate) writeProfileOwner(userDataDir, null, browserTmp.path);
+  const removeProfile = (): void => {
+    removeBrowserTmpDir(browserTmp.separate ? browserTmp.path : null);
+    rmSync(userDataDir, { recursive: true, force: true });
+  };
   const executablePath = found.path;
   const boundMs = seams.launchTimeoutMs ?? BROWSER_LAUNCH_TIMEOUT_MS;
   const abort = new AbortController();
@@ -1066,14 +1288,17 @@ export async function launchBrowser(fromDir: string = process.cwd(), seams: Laun
   const watch = watchBrowserSpawn(executablePath, userDataDir, (pid) => writeProfileOwner(userDataDir, pid));
   // An interrupt during start-up: stop the launch (the driver then kills the browser group), and
   // let the failure path below verify the group and remove the profile.
+  let launchUnverified: string | null = null;
   const interrupt = holdForInterrupt({
     async cleanup() { abort.abort(); await settled; },
     force() {
       abort.abort();
       const pid = watch.pid();
       if (pid !== null) { try { process.kill(-pid, "SIGKILL"); } catch { /* already gone */ } }
-      rmSync(userDataDir, { recursive: true, force: true });
+      removeProfile();
+      launchUnverified ??= "browser start-up forced: SIGKILL of the starting browser's group; termination not verified";
     },
+    outcome: () => launchUnverified,
   });
   const started = Date.now();
   const timer = setTimeout(() => { timedOut = true; abort.abort(); }, boundMs);
@@ -1089,7 +1314,14 @@ export async function launchBrowser(fromDir: string = process.cwd(), seams: Laun
     // rasteriser is served over a loopback origin instead, which removes the need entirely.
     // Removing the reason for a switch and leaving the switch is not removing the switch; that
     // mistake was made here once and caught by an audit, not by a test.
-    args: [],
+    // Only network switches, and never one that touches the sandbox; see BROWSER_NETWORK_ARGS.
+    args: [
+      ...BROWSER_NETWORK_ARGS,
+      ...(seams.network === "allowlist" ? [] : OFFLINE_BROWSER_ARGS),
+      ...(seams.netLog ? [`--log-net-log=${join(userDataDir, "net-log.json")}`] : []),
+    ],
+    // The same environment, except that the browser's temporary files live in the profile.
+    env: { ...process.env, TMPDIR: browserTmp.path },
     detached: process.platform !== "win32",
     // The control connection is a pair of pipes, not a DevTools port on loopback. A browser on
     // the websocket transport kept running when breaklint was killed (12–13 processes alive 30 s
@@ -1126,9 +1358,10 @@ export async function launchBrowser(fromDir: string = process.cwd(), seams: Laun
       const termination = await terminateProcessTree(pid, undefined, undefined, { pgid: pid, groupSafe: true, initialPids: [pid] });
       if (!termination.verified) {
         tree = `; its process group could not be verified terminated (survivors=${termination.survivingPids.join(",") || "none"})`;
-      }
+        launchUnverified = `browser start-up: ${tree.slice(2)}`;
+      } else launchUnverified = null;
     }
-    rmSync(userDataDir, { recursive: true, force: true });
+    removeProfile();
     const tail = watch.tail();
     watch.stop();
     launchSettled();

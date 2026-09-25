@@ -24,9 +24,21 @@ intended:
   cannot verify its own cleanup fails rather than reporting success.
 - **The browser sandbox stays on.** There is no `--no-sandbox` anywhere in this repository and no
   flag that turns it off.
-- **The network is blocked by default.** Request interception is on, the default policy is
-  `offline`, and only the tool's own loopback origin plus `data:`, `blob:` and `about:` are let
-  through. `--allow-network <origin>` opens exactly one origin per use and nothing else.
+- **The network is blocked by default, for the document and for the browser itself.** Request
+  interception is on, the default policy is `offline`, and only the tool's own loopback origin
+  plus `data:`, `blob:` and `about:` are let through. Interception sees only the document's
+  requests, and the browser makes requests of its own: measured on Chromium 141 through this
+  tool's launch path, within seconds of starting, DNS queries and connections to Google hosts for
+  network time, the account list, AI-mode eligibility, GCM check-in, DNS-over-HTTPS and a search
+  preconnect, and in CI Google Chrome's component updater downloaded files. So the browser is
+  started with `--disable-component-update` and `--disable-background-networking`, and in the
+  default offline mode also with `--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1` and
+  `--no-proxy-server`: every host name except the loopback address resolves to nothing before any
+  DNS query, and no proxy forwards on the browser's behalf. A unit test reads the browser's own
+  net-log and requires that it connected nowhere but loopback. `--allow-network <origin>` opens
+  exactly one origin per use for the document; in that mode the browser-level lock is off,
+  because allowed origins must resolve and may need the host's proxy, and the browser's own
+  services can then reach the network.
 - **No browser-wide file-access switch.** The document is served from a loopback origin instead. A
   test measures that a document loaded this way cannot read a neighbouring file, because removing
   the reason for a switch and leaving the switch in place is a mistake that was actually made here

@@ -20,9 +20,11 @@ import { parse, type DefaultTreeAdapterMap } from "parse5";
 import {
   launchBrowser,
   captureProcessTreeOwnership,
+  drainPendingSignals,
   holdForInterrupt,
+  readProfileOwner,
+  removeBrowserTmpDir,
   unsupportedPlatformRefusal,
-  type InterruptHold,
   ownServerLifecycle,
   resolvePackageRoot,
   terminateProcessTree,
@@ -227,37 +229,87 @@ export async function closeRasterizerBounded(rasterizer: OpenRasterizerResult["r
   }
 }
 
-/** Second signal or exhausted bound: no protocol, no wait. SIGKILL the group, remove the profile. */
-function forceBrowserCleanup(browser: BrowserLike, userDataDir: string | null | undefined): void {
-  let pid: number | undefined;
-  try { pid = browser.process?.()?.pid; } catch { pid = undefined; }
-  if (pid && process.platform !== "win32") {
-    try { process.kill(-pid, "SIGKILL"); } catch { /* already gone */ }
-  }
-  cleanupBrowserProfile(userDataDir);
-}
-
 /**
- * The end of a render that held its browser for interrupts. An interrupted render never returns
- * its documents: by the time the host could read them the browser was closed underneath it. In a
- * process that ends by the signal this result is never seen; in a host that handles the signal
- * itself it is exit 3.
+ * The render's interrupt hold (browser.ts, holdForInterrupt). It is taken BEFORE the browser is
+ * launched and let go only after the render's own cleanup, so SIGINT, SIGTERM and SIGHUP have a
+ * listener for the whole run: the launch's own hold overlaps it, and there is no instant between
+ * the two at which a delivered signal could meet no listener and be discarded.
+ *
+ * `end()` drains pending signals while the hold is still held — a signal that arrived during
+ * synchronous cleanup (a large profile's removal) is dispatched then, instead of being discarded
+ * with the listener — and turns an interrupted render into a fatal result. An interrupted render
+ * never returns its documents: by the time the host could read them the browser was closed
+ * underneath it. In a process that ends by the signal this result is never seen; in a host that
+ * handles the signal itself it is exit 3, with what the cleanup verified.
  */
-async function endInterruptHold(hold: InterruptHold, cleanupOutcome: () => string): Promise<RenderResult | null> {
-  hold.release();
-  const signal = hold.interrupted();
-  if (!signal) return null;
-  await hold.settled();
+function holdRenderForInterrupts(terminate: typeof terminateProcessTree | undefined): {
+  attach(browser: BrowserLike, userDataDir: string | null | undefined): void;
+  end(launchDetail?: string): Promise<RenderResult | null>;
+} {
+  let browser: BrowserLike | null = null;
+  let profile: string | null | undefined = null;
+  let unverified: string | null = null;
+  let forced: { pid: number; ownership: ReturnType<typeof captureProcessTreeOwnership> } | null = null;
+  const hold = holdForInterrupt({
+    async cleanup() {
+      if (!browser) return; // still launching: the launch's own hold stops and cleans it
+      const closeError = await closeBrowserBounded(browser, terminate);
+      const profileError = cleanupBrowserProfile(profile);
+      unverified = [closeError, profileError].filter(Boolean).join("; ") || null;
+    },
+    force() {
+      if (!browser) return;
+      let pid: number | undefined;
+      try { pid = browser.process?.()?.pid; } catch { pid = undefined; }
+      if (pid && process.platform !== "win32") {
+        // Ownership first, while the root still exists; SIGKILL cannot be caught or delayed.
+        const ownership = captureProcessTreeOwnership(pid);
+        try { process.kill(-pid, "SIGKILL"); } catch { /* already gone */ }
+        for (const owned of ownership?.initialPids ?? []) {
+          try { process.kill(owned, "SIGKILL"); } catch { /* already gone */ }
+        }
+        forced = { pid, ownership };
+      }
+      // Disconnect the driver too, without waiting: pending protocol calls then fail at once
+      // instead of waiting on a browser that is gone (or, for a driver without a pid, going).
+      try { void browser.close().catch(() => undefined); } catch { /* the kill above decides */ }
+      const profileError = cleanupBrowserProfile(profile);
+      unverified = `forced: SIGKILL of the browser process group${profileError ? `; ${profileError}` : ", profile removed"}; termination not verified`;
+    },
+    outcome: () => unverified,
+  });
   return {
-    documents: [],
-    fatal: { exitCode: 3, message: `breaklint: interrupted by ${signal}; no result is reported. Renderer cleanup: ${cleanupOutcome()}.` },
-    environment: null,
+    attach(attached, userDataDir) { browser = attached; profile = userDataDir; },
+    async end(launchDetail) {
+      await drainPendingSignals();
+      const signal = hold.interrupted();
+      hold.release();
+      if (!signal) return null;
+      await hold.settled();
+      let detail = !browser ? (launchDetail ?? "no browser had been started") : unverified ?? "browser closed and verified, profile removed";
+      if (browser && forced) {
+        const { pid, ownership } = forced;
+        const termination = await (terminate ?? terminateProcessTree)(pid, undefined, undefined, ownership);
+        detail = termination.verified
+          ? "forced: SIGKILL of the browser process group, then verified terminated; profile removed"
+          : `forced: SIGKILL of the browser process group, termination NOT verified (survivors=${termination.survivingPids.join(",") || "unknown"})`;
+      }
+      return {
+        documents: [],
+        fatal: { exitCode: 3, message: `breaklint: interrupted by ${signal}; no result is reported. Renderer cleanup: ${detail}.` },
+        environment: null,
+      };
+    },
   };
 }
 
 export function cleanupBrowserProfile(path: string | null | undefined): string | null {
   if (!path) return null;
   if (!existsSync(path)) return null;
+  // A browser temporary directory outside the profile (a profile path too long for the browser's
+  // socket) is recorded in the profile and goes with it.
+  const tmpError = removeBrowserTmpDir(readProfileOwner(path)?.browserTmpDir);
+  if (tmpError) return tmpError;
   let tempRoot: string;
   let realProfile: string;
   try {
@@ -2244,38 +2296,25 @@ export async function renderDocuments(
       environment: null,
     };
   }
+  // From before the launch until the browser is closed and its profile removed, SIGINT, SIGTERM
+  // and SIGHUP run that same cleanup before the process ends.
+  const interrupt = holdRenderForInterrupts(dependencies.terminateBrowserProcessTree);
   let launched: Awaited<ReturnType<typeof launchBrowser>>;
   try {
-    launched = await dependencies.launchBrowser(peerResolutionDir);
+    launched = await dependencies.launchBrowser(peerResolutionDir, { network: options.network.mode });
   } catch (error) {
-    return {
-      documents: [],
-      fatal: {
-        exitCode: 3,
-        message: `breaklint: renderer startup failed at launch: ${error instanceof Error ? error.message : String(error)}`,
-      },
-      environment: null,
-    };
+    const message = `breaklint: renderer startup failed at launch: ${error instanceof Error ? error.message : String(error)}`;
+    const interrupted = await interrupt.end(message);
+    if (interrupted) return interrupted;
+    return { documents: [], fatal: { exitCode: 3, message }, environment: null };
   }
   if (!launched.browser || !launched.executablePath) {
+    const interrupted = await interrupt.end(launched.detail);
+    if (interrupted) return interrupted;
     return { documents: [], fatal: { exitCode: 3, message: launched.detail }, environment: null };
   }
   const browser = launched.browser;
-  // From here until the browser is closed and its profile removed, SIGINT/SIGTERM/SIGHUP run that
-  // same cleanup before the process ends (browser.ts, holdForInterrupt).
-  let interruptCleanup = "not completed";
-  const interrupt = holdForInterrupt({
-    async cleanup() {
-      const closeError = await closeBrowserBounded(browser, dependencies.terminateBrowserProcessTree);
-      const profileError = cleanupBrowserProfile(launched.userDataDir);
-      interruptCleanup = [closeError, profileError].filter(Boolean).join("; ") || "browser closed and verified, profile removed";
-    },
-    force() {
-      forceBrowserCleanup(browser, launched.userDataDir);
-      interruptCleanup = "forced (SIGKILL of the browser group, profile removal) without verification";
-    },
-  });
-  const interruptCleanupOutcome = (): string => interruptCleanup;
+  interrupt.attach(browser, launched.userDataDir);
   const blocked = { count: 0 };
   const contentPages = new Set<PageLike>();
   let startupStage = "browser.version";
@@ -2297,7 +2336,7 @@ export async function renderDocuments(
     if (closeError) cleanup = `; browser cleanup also failed: ${closeError}`;
     const profileError = cleanupBrowserProfile(launched.userDataDir);
     if (profileError) cleanup += `; profile cleanup also failed: ${profileError}`;
-    const interrupted = await endInterruptHold(interrupt, interruptCleanupOutcome);
+    const interrupted = await interrupt.end();
     if (interrupted) return interrupted;
     return {
       documents: [],
@@ -2395,7 +2434,7 @@ export async function renderDocuments(
     }
     profileCleanupError = cleanupBrowserProfile(launched.userDataDir);
   }
-  const interrupted = await endInterruptHold(interrupt, interruptCleanupOutcome);
+  const interrupted = await interrupt.end();
   if (interrupted) return interrupted;
   if (browserTerminationError) {
     for (const document of documents) {
