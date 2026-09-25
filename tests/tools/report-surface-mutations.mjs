@@ -45,7 +45,20 @@ const controls = [
   { name: "broken-header-repeat", state: "clean", expect: /(?:clean|long coverage table): continuation page lacks the table header/u },
   { name: "broken-flag-wrap", state: "insufficient-coverage", expect: /print\/insufficient-coverage: flag --disable layout\/widow split across [2-9] lines/u },
   { name: "broken-rule-id-wrap", state: "findings", expect: /rule id layout\/[a-z-]+ split across [2-9] lines/u },
-  { name: "broken-page-fill", state: "findings", expect: /findings: page \d+ content ink depth \d+\.\d % is below 60 %/u },
+  {
+    name: "broken-page-fill",
+    state: "findings",
+    expect: /findings: page \d+ content text depth \d+\.\d % is below 60 %/u,
+    // The margin the control is worth: at least 15 points under the bound, not a hair.
+    phase: /findings: page \d+ content text depth (?:[0-3]?\d|4[0-5])\.\d % is below 60 %/u,
+    phaseHint: "the control no longer drives a page's text depth to 45 % or less; it no longer proves the fill gate with a margin",
+  },
+  {
+    name: "broken-long-remediation",
+    state: "findings",
+    expect: /findings: page \d+ content text depth \d+\.\d % is below 60 % \(ink incl\. frames \d+\.\d %\)[^\n]*the tallest unbreakable unit, finding 01 tail, is \d+(?:\.\d+)? px/u,
+  },
+  { name: "broken-keep-chain", state: "findings", expect: /findings: [^\n]*the tallest unbreakable unit, [^\n]*finding 0\d head \+ finding 0\d fact "[A-Za-z ]+" \+ [^\n]*finding 0\d tail, is \d+(?:\.\d+)? px/u },
   { name: "broken-alert-width", state: "infrastructure", expect: /boxed blocks do not share the column's edges \(left spread 0 px, right spread [1-9]\d*(?:\.\d+)? px/u },
   { name: "broken-alert-gap", state: "infrastructure", expect: /boxed blocks abut: \{"after":"state-alert","before":"checker-event","gapPx":0\}/u },
   { name: "broken-heading-keep", state: "findings", expect: /findings: heading stranded from what it introduces: \[\{"heading":"examples\/demo\.html Document verdict: findings"/u },

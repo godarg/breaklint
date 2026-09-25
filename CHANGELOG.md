@@ -119,10 +119,17 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   Findings now split between their units — head, each fact, tail — never inside one, with the
   card frame repeated on both pages; boxed blocks share the column's edges with a real gap. Printed
   reports drop from 43 pages in 0.6.0 to 26 (clean 3, findings 7, infrastructure 8,
-  insufficient-coverage 8) with every non-final page at 80–100 %. The surface gate fails any
-  non-final page below 60 % of the content box (unless the next page starts with a declared forced
-  break), any heading or caption stranded from what it introduces, and any boxed block off the
-  column edge or abutting its neighbour.
+  insufficient-coverage 8) with every non-final page's text at 71.8–98.7 % of the content box.
+  The surface gate fails any non-final page whose last text line is above 60 % of the content box
+  (unless the next page starts with a declared forced break), any unbreakable unit taller than 40 %
+  (keep-with-next chains counted as one unit, and the failure names it), any heading or caption
+  stranded from what it introduces, and any boxed block off the column edge or abutting its
+  neighbour. Fill is the depth of the last line of text, read from the PDF's text layer and
+  cross-checked against a raster reading that ignores frames and backgrounds: the first version
+  measured ink, and a split finding's repeated frame, stretched to the page end, made a page 44 %
+  empty inside that frame read as 99.9 % full. The findings heading and its untested-advice caveat
+  are one unbreakable intro; inside the heading group they had formed a 44–47 % keep-with-next
+  chain with the first finding.
 
 ### Documentation
 

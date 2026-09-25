@@ -189,6 +189,44 @@ function independentlyRasterInkBounds(path) {
 }
 
 const MINIMUM_PAGE_FILL = 0.6;
+const MAXIMUM_UNBREAKABLE_SHARE = 0.4;
+const CONTENT_HEIGHT_CSS_PX = (297 - 2 * 12) / 25.4 * 96;
+
+/**
+ * Independent of the PDF text layer the renderer reads: the last raster row inside the content box
+ * that carries TEXT, as a share of the content-box height. A row carries text when, inside the
+ * content box inset by 8 CSS px (which leaves out the column-edge frame borders and accent bars
+ * every boxed block shares), its dark pixels (luminance < 100) form at least two separate runs no
+ * longer than 36 CSS px each. A horizontal rule is one long run, a vertical border or accent bar is
+ * one short run, a tinted background is not dark: none of them is read as a line of text.
+ */
+function rasterTextDepth(path, rasterDpi) {
+  const decoded = PNG.sync.read(readFileSync(path), { checkCRC: true });
+  const cssToRaster = rasterDpi / 96;
+  const marginPx = 12 / 25.4 * rasterDpi;
+  const top = Math.ceil(marginPx);
+  const bottom = Math.floor(decoded.height - marginPx);
+  const left = Math.ceil(marginPx + 8 * cssToRaster);
+  const right = Math.floor(decoded.width - marginPx - 8 * cssToRaster);
+  const longestGlyphRun = 36 * cssToRaster;
+  let last = top;
+  for (let y = top; y < bottom; y += 1) {
+    let runs = 0;
+    let length = 0;
+    for (let x = left; x <= right; x += 1) {
+      const offset = (y * decoded.width + x) * 4;
+      const dark = x < right && 0.2126 * decoded.data[offset] + 0.7152 * decoded.data[offset + 1] + 0.0722 * decoded.data[offset + 2] < 100;
+      if (dark) {
+        length += 1;
+      } else if (length > 0) {
+        if (length <= longestGlyphRun) runs += 1;
+        length = 0;
+      }
+    }
+    if (runs >= 2) last = y + 1;
+  }
+  return Math.round((last - top) / (bottom - top) * 1_000) / 1_000;
+}
 
 /** The first line of each section's first unit, as documented, per section heading. */
 const SECTION_FIRST_UNITS = {
@@ -211,26 +249,12 @@ function independentlyCheckPageFlow(pdfPath, rasterPages, recorded, label) {
     .split("\n").map((line) => line.replace(/\s+/gu, " ").trim()).filter(Boolean)
     .filter((line) => !/^Page \d+ of \d+$/u.test(line) && !(index > 0 && /^breaklint · /u.test(line))));
   const rasterDpi = manifest.reviewEnvironment.print.rasterDpi;
-  const marginPx = 12 / 25.4 * rasterDpi;
   const fill = rasterPages.map((pageArtifact, index) => {
-    const decoded = PNG.sync.read(readFileSync(resolve(output, pageArtifact.path)), { checkCRC: true });
-    const top = Math.ceil(marginPx);
-    const bottom = Math.floor(decoded.height - marginPx);
-    let last = top;
-    for (let y = bottom - 1; y >= top && last === top; y -= 1) {
-      for (let x = 0; x < decoded.width; x += 1) {
-        const offset = (y * decoded.width + x) * 4;
-        if (decoded.data[offset] < 248 || decoded.data[offset + 1] < 248 || decoded.data[offset + 2] < 248) {
-          last = y + 1;
-          break;
-        }
-      }
-    }
-    const depth = Math.round((last - top) / (bottom - top) * 1_000) / 1_000;
+    const depth = rasterTextDepth(resolve(output, pageArtifact.path), rasterDpi);
     const nextFirst = lines[index + 1]?.[0] ?? "";
     const exempt = recorded.forcedBreaks.some((text) => text.length > 0 && nextFirst.startsWith(text.slice(0, 16)));
     const final = index === rasterPages.length - 1;
-    assert.ok(final || exempt || depth >= MINIMUM_PAGE_FILL, `${label}: page ${index + 1} content ink depth ${(depth * 100).toFixed(1)} % is below ${MINIMUM_PAGE_FILL * 100} %`);
+    assert.ok(final || exempt || depth >= MINIMUM_PAGE_FILL, `${label}: page ${index + 1} content text depth ${(depth * 100).toFixed(1)} % is below ${MINIMUM_PAGE_FILL * 100} %`);
     return { page: index + 1, contentDepth: depth, final, forcedBreakFollows: exempt };
   });
   // Section headings follow the banner: the h1 may wrap so that its first line reads "Findings".
@@ -250,8 +274,15 @@ function independentlyCheckPageFlow(pdfPath, rasterPages, recorded, label) {
   assert.equal(recorded.minimumPageFill, MINIMUM_PAGE_FILL, `${label}: page fill threshold drift`);
   for (const page of fill) {
     const other = recorded.fill.find((candidate) => candidate.page === page.page);
-    assert.ok(other && Math.abs(other.contentDepth - page.contentDepth) <= 0.002, `${label}: renderer fill of page ${page.page} disagrees with the independent raster reading`);
+    // The PDF text layer's line box reaches the font's descent; the raster reaches the lowest
+    // glyph ink. Measured apart by at most 0.5 % of the content box; 1 % is the tolerance.
+    assert.ok(other && Math.abs(other.contentDepth - page.contentDepth) <= 0.01,
+      `${label}: renderer text depth of page ${page.page} (${other?.contentDepth}) disagrees with the independent raster text reading (${page.contentDepth})`);
   }
+  assert.equal(recorded.maximumUnbreakableShare, MAXIMUM_UNBREAKABLE_SHARE, `${label}: unbreakable-unit bound drift`);
+  assert.ok(typeof recorded.largestUnbreakableUnit === "string" && recorded.largestUnbreakableUnit.length > 0, `${label}: the tallest unbreakable unit is not named`);
+  assert.ok(recorded.largestUnbreakableUnitPx > 0 && recorded.largestUnbreakableUnitPx <= MAXIMUM_UNBREAKABLE_SHARE * CONTENT_HEIGHT_CSS_PX,
+    `${label}: the tallest unbreakable unit, ${recorded.largestUnbreakableUnit}, is ${recorded.largestUnbreakableUnitPx} px, over ${MAXIMUM_UNBREAKABLE_SHARE * 100} % of the content box`);
   assert.ok(recorded.keeps.length >= 4 && recorded.keeps.every((keep) => keep.headingPage !== null && keep.headingPage === keep.unitPage), `${label}: renderer recorded a stranded heading`);
   return fill;
 }

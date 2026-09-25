@@ -200,7 +200,7 @@ export const REPORT_HTML_STYLES = String.raw`
     .rule-id wbr, .cli-flag wbr { display: none; }
     /* The last two rows never part: see renderCoverageTable in html.ts. */
     .coverage-tail { break-inside: avoid; }
-    .report-header, .summary-grid > div, .checker-event, .state-alert, .empty-state { break-inside: avoid; }
+    .report-header, .summary-grid > div, .checker-event, .state-alert, .empty-state, .findings-intro { break-inside: avoid; }
     /* A finding is 60-73 % of an A4 content box, so whole findings meant one finding per page and
        pages filled to 29-45 % (measured on 0.6.0). A finding now fragments BETWEEN its units and
        never inside one: its head (severity, rule, message), each fact, and its tail (remediation,

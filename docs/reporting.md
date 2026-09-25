@@ -394,24 +394,53 @@ whole rule, its right half, its left half and both (`broken-row-rule`, `broken-r
 side) — and, new with the table, a numeric column losing its alignment (`broken-column-alignment`)
 and a header that stops repeating (`broken-header-repeat`, on the long-table probe).
 
-Page content checks reject empty non-cover pages. Page fill is checked from the rasters: every
-page except the last must carry ink to at least **60 %** of the content box's height (measured
-between the 12 mm margins, so the running head and folio cannot make a short page look full). The
-threshold is derived, not chosen: the tallest unit the print layout may not break is measured and
-recorded per PDF (at most 384.8 CSS px, 37 % of the 1031.8 px content box, in the canonical
-states), so a page that ends early because its next unit did not fit is still at least 63 % full;
-anything shorter means a unit is larger than it has to be or a break is in the wrong place. The only
-exemption is a deliberate section boundary, defined mechanically: the next page begins with an
-element whose computed `break-before` is `page`, `left`, `right`, `recto` or `verso` — the canonical
-report declares none. Measured on Chromium 141 / linux, every non-final page reaches 80–100 %
-(clean 3 pages, findings 7, infrastructure 8, insufficient-coverage 8; 43 in 0.6.0). Keep-with-next
-is checked from the PDF text: every section heading shares its page with the first line of the unit
-it introduces, and every coverage caption with its table's first row (the verifier holds its own
-table of documented section openings). Boxed-block edges and gaps are checked in the DOM of every
-screen cell and in print. Red controls: `broken-page-fill` restores page-atomic findings ("page 6
-content ink depth 57.5 % is below 60 %"), `broken-alert-width` restores the narrow alert ("right
-spread 527.31 px" on a desktop), `broken-alert-gap` removes its gap, and `broken-heading-keep`
-forces the first coverage row away from its caption.
+Page content checks reject empty non-cover pages. **Page fill** is the depth of a page's last
+line of text: the bottom of the lowest text line whose box lies between the 12 mm top and bottom
+margins, as a share of the content-box height (1031.8 CSS px), read by the renderer from the PDF's
+own text layer (`pdftotext -bbox-layout`). The verifier reads it independently from the raster: the
+last row inside the content box, inset 8 CSS px from its edges, in which dark pixels (luminance
+below 100) form at least two runs no longer than 36 CSS px each; the two readings must agree within
+1 % of the content box. Frame borders, accent bars, tinted backgrounds and the running head and
+folio are not text and do not count. That is the point of the definition: a split finding repeats
+its frame on the next page (`box-decoration-break: clone`) and a fragment that breaks is stretched
+to the end of its page, so an ink reading counted an empty frame as content — the verifier's
+`x-longer-remediation` experiment left 44 % of a page empty inside finding 01's frame and measured
+99.9 % "full". Ink depth, frames included, is still recorded beside each text depth.
+
+Every page except the last must reach **60 %**. The bound is paired with a second one: the tallest
+run of content that may not break is at most **40 %** of the content box (412.7 CSS px), and the
+failure names it. A unit is every outermost element with a computed `break-inside: avoid` and every
+heading outside one; units on one row (grid cells) are one unit; and consecutive units glued by a
+computed `break-after: avoid` on the first (or an ancestor it ends) or `break-before: avoid` on the
+second (or an ancestor it starts) are one unit, because the browser has to move them together — a
+section heading, a finding's head and its first row of facts leave the same hole as one element of
+their combined height. With no such unit taller than 40 %, a page that ends early because its next
+unit did not fit is still 60 % full; the fill gate catches whatever the unit bound cannot see. Before
+this bound the findings heading carried the untested-advice caveat inside its heading group, and
+heading + caveat + the first finding's head and facts formed one 456–481 px chain (44–47 %); the
+heading group and caveat are now one unbreakable intro that does not keep with the first finding.
+Measured on Chromium 141 / linux the tallest unit is the report header (359.6–384.8 px, at most
+37.3 %), and every non-final page's text reaches 71.8–98.7 % (clean 3 pages, findings 7,
+infrastructure 8, insufficient-coverage 8; 43 in 0.6.0). The only fill exemption is a deliberate
+section boundary, defined mechanically: the next page begins with an element whose computed
+`break-before` is `page`, `left`, `right`, `recto` or `verso` — the canonical report declares none.
+
+Keep-with-next is checked from the PDF text: every section heading shares its page with the first
+line of the unit it introduces, and every coverage caption with its table's first row (the verifier
+holds its own table of documented section openings; both start looking at the "Run summary"
+heading, because the banner's h1 may wrap so that a line reads just "Findings"). Boxed-block edges
+and gaps are checked in the DOM of every screen cell and in print. Red controls:
+
+- `broken-page-fill` prints page-atomic findings with a gap the next one cannot fit beside (shortest
+  page 32.4 %; the runner requires 45 % or less, so the control proves the bound with a margin);
+- `broken-long-remediation` grows finding 01's remediation to about 46 % of a page: the text depth
+  of page 2 falls to 56.0 % while its ink depth stays 99.9 %, and the unit bound names "finding 01
+  tail" (473.8 px);
+- `broken-keep-chain` glues every fact to the next unit: no element grows, but the head, facts and
+  tail become one 690.8 px chain that only a chain-aware bound sees;
+- `broken-alert-width` restores the narrow alert ("right spread 527.31 px" on a desktop),
+  `broken-alert-gap` removes its gap, and `broken-heading-keep` forces the first coverage row away
+  from its caption.
 
 `selfcheck:live` runs the report's own HTML through the real paginator and must catch an injected
 block that promises not to break and cannot keep the promise. That control used to inject into a

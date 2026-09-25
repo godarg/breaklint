@@ -89,7 +89,22 @@ const SURFACE_CONTROLS = {
   // Rule ids may break at a hyphen inside the name again.
   "broken-rule-id-wrap": { screen: `.rule-id > span { white-space: normal !important; } .finding h3 { max-inline-size: 12ch !important; }` },
   // Page fill, alignment and keep-with-next controls.
-  "broken-page-fill": { print: `@media print { .finding, .finding-list > li { break-inside: avoid-page !important; } }` },
+  // Page-atomic findings, each well under half a page, with a gap after each that the next one
+  // cannot fit beside: one finding per page, text to about 40 % of the content box. (Page-atomic
+  // full findings alone measured 55.5 %, too close to the 60 % bound to prove much.)
+  "broken-page-fill": { print: `@media print {
+    .finding, .finding-list > li { break-inside: avoid-page !important; }
+    .finding-facts { display: none !important; }
+    .finding-list > li + li { margin-block-start: 640px !important; }
+  }` },
+  // One remediation grows to about 55 % of a page (the verifier's x-longer-remediation experiment):
+  // the tail cannot break, moves whole to the next page and leaves the cloned frame of finding 01
+  // empty below its facts. Ink depth read that frame as a full page; text depth and the unit bound
+  // must both reject it.
+  "broken-long-remediation": { print: `@media print { .finding-list > li:first-child .finding-remediation p::after { content: "${" Check the block in its own context and compare the measured value with the threshold before changing layout rules.".repeat(12)}"; } }` },
+  // Every fact keeps with the next unit: no element grows, but head, facts and tail become one
+  // keep-with-next chain as tall as the whole finding. Only a chain-aware unit bound sees it.
+  "broken-keep-chain": { print: `@media print { .finding-facts > div { break-after: avoid !important; } }` },
   "broken-alert-width": {
     screen: `.state-alert { max-width: 72ch !important; }`,
     print: `.state-alert { max-width: 72ch !important; }`,
@@ -694,11 +709,40 @@ function rasterInkBounds(path) {
 
 /** Fill threshold for every non-final printed page, as a share of the A4 content box's height. */
 const MINIMUM_PAGE_FILL = 0.6;
+/**
+ * The tallest unit that may not break, as a share of the content box. The two bounds belong
+ * together: when nothing that must stay in one piece is taller than 40 % of a page, a page can end
+ * at most 40 % short, so every non-final page fills to 60 %. A unit taller than this leaves a hole
+ * the fill gate has to catch after the fact; this names the cause.
+ */
+const MAXIMUM_UNBREAKABLE_SHARE = 0.4;
+const CONTENT_HEIGHT_CSS_PX = (297 - 2 * PRINT_MARGIN_MM) / 25.4 * 96;
 
 /**
- * Ink depth inside the content box only: the last raster row with ink, between the 12 mm top and
- * bottom margins, as a share of the content-box height. The running head and folio live in the
- * margins and cannot make a short page look full.
+ * Fill is measured to the last line of TEXT inside the content box, read from the PDF's own text
+ * layer (pdftotext -bbox-layout, in PDF points): the bottom of the lowest text line whose box lies
+ * between the 12 mm top and bottom margins, as a share of the content-box height. A split finding
+ * repeats its frame (box-decoration-break: clone) and Blink stretches a fragment that breaks to the
+ * end of its page, so frame borders and backgrounds reach the page bottom however little text sits
+ * inside them; measuring ink counted that empty frame as content (a 44 % hole measured 99.9 %
+ * full). The running head and folio live in the margins and are outside the measured band.
+ */
+function contentBoxTextDepth(pdfPath, page) {
+  const xml = run("pdftotext", ["-f", String(page), "-l", String(page), "-bbox-layout", pdfPath, "-"]);
+  const height = Number(/<page width="[\d.]+" height="([\d.]+)"/u.exec(xml)?.[1]);
+  if (!Number.isFinite(height)) throw new Error(`${pdfPath}: page ${page} has no measurable text layer`);
+  const top = PRINT_MARGIN_MM / 25.4 * 72;
+  const bottom = height - top;
+  let last = top;
+  for (const [, yMin, yMax] of xml.matchAll(/<line xMin="[\d.]+" yMin="([\d.]+)" xMax="[\d.]+" yMax="([\d.]+)">/gu)) {
+    if (Number(yMin) >= top - 1 && Number(yMax) <= bottom + 1) last = Math.max(last, Number(yMax));
+  }
+  return Math.round((last - top) / (bottom - top) * 1_000) / 1_000;
+}
+
+/**
+ * Ink depth inside the content box, frames and backgrounds included: recorded beside the text
+ * depth so a reader can see how far a stretched frame reaches past its last line. Not a gate.
  */
 function contentBoxInkDepth(path) {
   const decoded = PNG.sync.read(readFileSync(path), { checkCRC: true });
@@ -726,7 +770,12 @@ function contentBoxInkDepth(path) {
  *   "deliberate section boundary" a short page may end at, recorded with their first text;
  * - every section heading and table caption is paired with the first text of the unit it
  *   introduces;
- * - the tallest unit that may not break, which bounds how short a page can honestly end.
+ * - the tallest run of content that may not break. A unit is every outermost element whose
+ *   computed break-inside is avoid, and every heading outside one; units that share a row (grid
+ *   cells) are one unit; and consecutive units glued by a computed break-after: avoid on the first
+ *   (or an ancestor it ends) or break-before: avoid on the second (or an ancestor it starts) are
+ *   ONE unit, because the browser has to move them together: a section heading, a finding's head
+ *   and its first row of facts leave the same hole as one element of their combined height.
  */
 function printLayoutInPage() {
   const round = (value) => Math.round(value * 100) / 100;
@@ -740,8 +789,13 @@ function printLayoutInPage() {
   const keeps = [];
   for (const heading of document.querySelectorAll("main h2")) {
     if (!visible(heading)) continue;
-    const group = heading.closest(".section-heading") ?? heading;
+    let group = heading.closest(".section-heading") ?? heading;
     let next = group.nextElementSibling;
+    // A heading group may be wrapped (the findings intro): what it introduces follows the wrapper.
+    while (!next && group.parentElement && !group.parentElement.matches("section, main")) {
+      group = group.parentElement;
+      next = group.nextElementSibling;
+    }
     while (next && (!visible(next) || firstText(next) === "")) next = next.nextElementSibling;
     if (next) keeps.push({ heading: heading.textContent.trim(), unit: firstText(next.matches(".coverage-documents") ? next.querySelector("caption") : next) });
   }
@@ -749,9 +803,63 @@ function printLayoutInPage() {
     const row = caption.closest("table").querySelector("tbody th[scope=row]");
     if (row) keeps.push({ heading: caption.innerText.replace(/\s+/gu, " ").trim(), unit: firstText(row) });
   }
-  const units = [...document.querySelectorAll(".report-header, .apparatus-section, .checker-event, .state-alert, .empty-state, .section-heading, .finding-head, .finding-facts > div, .finding-tail, .coverage-tail, .coverage-table tr")]
-    .filter(visible).map((element) => element.getBoundingClientRect().height);
-  return { forcedBreaks, keeps, largestUnbreakableUnitPx: round(Math.max(0, ...units)) };
+
+  const avoid = (value) => value === "avoid" || value === "avoid-page";
+  const candidates = [...document.querySelectorAll("body *")].filter((element) => visible(element) &&
+    (avoid(getComputedStyle(element).breakInside) || /^H[1-3]$/u.test(element.tagName)));
+  const units = candidates.filter((element) => !candidates.some((other) => other !== element && other.contains(element)));
+  const findingNumber = (element) => {
+    const item = element.closest(".finding-list > li");
+    return item ? String([...item.parentElement.children].indexOf(item) + 1).padStart(2, "0") : "??";
+  };
+  const name = (element) => {
+    const text = (selector) => (element.querySelector(selector)?.textContent ?? "").replace(/\s+/gu, " ").trim();
+    if (element.matches(".report-header")) return "report header";
+    if (element.matches(".section-heading")) return `section heading "${text("h2")}"`;
+    if (element.matches(".findings-intro")) return `findings intro "${text("h2")}"`;
+    if (element.matches(".apparatus-section")) return `apparatus section "${text("h2")}"`;
+    if (element.matches(".finding-head")) return `finding ${findingNumber(element)} head`;
+    if (element.matches(".finding-facts > div")) return `finding ${findingNumber(element)} fact "${text("dt")}"`;
+    if (element.matches(".finding-tail")) return `finding ${findingNumber(element)} tail`;
+    if (element.matches(".coverage-tail")) return `coverage table tail (${[...element.querySelectorAll("th[scope=row]")].map((cell) => cell.textContent.trim()).join(", ")})`;
+    if (element.matches("thead tr")) return "coverage header row";
+    if (element.matches("tr")) return `coverage row ${text("th[scope=row]")}`;
+    if (element.matches(".summary-grid > div")) return `summary "${text("dt")}"`;
+    if (element.matches(".report-footer")) return "report footer";
+    if (element.matches(".remediation-caveat")) return "untested-advice caveat";
+    if (/^H[1-3]$/u.test(element.tagName)) return `heading "${element.textContent.replace(/\s+/gu, " ").trim().slice(0, 40)}"`;
+    return element.classList[0] ?? element.tagName.toLowerCase();
+  };
+  const gluedAfter = (first, second) => {
+    for (let element = first; element && !element.contains(second); element = element.parentElement) {
+      if (avoid(getComputedStyle(element).breakAfter)) return true;
+    }
+    for (let element = second; element && !element.contains(first); element = element.parentElement) {
+      if (avoid(getComputedStyle(element).breakBefore)) return true;
+    }
+    return false;
+  };
+  const chains = [];
+  for (const unit of units) {
+    const rect = unit.getBoundingClientRect();
+    const previous = chains.at(-1);
+    const last = previous?.members.at(-1);
+    const sameRow = last && Math.abs(last.getBoundingClientRect().top - rect.top) < 1;
+    if (previous && (sameRow || gluedAfter(last, unit))) {
+      previous.members.push(unit);
+      previous.bottom = Math.max(previous.bottom, rect.bottom);
+      if (!sameRow) previous.names.push(name(unit));
+    } else {
+      chains.push({ members: [unit], names: [name(unit)], top: rect.top, bottom: rect.bottom });
+    }
+  }
+  const largest = chains.reduce((best, chain) => (chain.bottom - chain.top > (best ? best.bottom - best.top : -1) ? chain : best), null);
+  return {
+    forcedBreaks,
+    keeps,
+    largestUnbreakableUnitPx: round(largest ? largest.bottom - largest.top : 0),
+    largestUnbreakableUnit: largest ? largest.names.join(" + ") : null,
+  };
 }
 
 function boxedBlocksInPage() {
@@ -787,10 +895,13 @@ function assertBoxedBlocks(boxes, label) {
 }
 
 /**
- * Page fill and keep-with-next, read from the PDF and its rasters.
- * - every non-final page reaches MINIMUM_PAGE_FILL of the content box, unless the page after it
- *   begins with a declared forced break;
- * - no heading or caption ends up on a different page from the first text of what it introduces.
+ * Page fill, keep-with-next and unit height, read from the PDF, its rasters and the print layout.
+ * - no heading or caption ends up on a different page from the first text of what it introduces;
+ * - every non-final page's text reaches MINIMUM_PAGE_FILL of the content box (contentBoxTextDepth),
+ *   unless the page after it begins with a declared forced break;
+ * - the tallest unbreakable unit, keep-with-next chains included, is at most
+ *   MAXIMUM_UNBREAKABLE_SHARE of the content box, and the failure names it.
+ * All three are evaluated before anything is thrown, so a red run states every broken bound.
  */
 function pageFlowChecks(pdfPath, rasterPages, layout, label) {
   const pageLines = rasterPages.map((_, index) => run("pdftotext", ["-f", String(index + 1), "-l", String(index + 1), "-layout", pdfPath, "-"])
@@ -798,10 +909,15 @@ function pageFlowChecks(pdfPath, rasterPages, layout, label) {
   const contentLines = pageLines.map((lines, index) => lines.filter((line) =>
     !/^Page \d+ of \d+$/u.test(line) && !(index > 0 && /^breaklint · /u.test(line))));
   const fill = rasterPages.map((raster, index) => {
-    const depth = contentBoxInkDepth(join(OUTPUT, raster.path));
     const nextFirst = contentLines[index + 1]?.[0] ?? "";
     const forcedBreakFollows = layout.forcedBreaks.some((text) => text.length > 0 && nextFirst.replace(/\s+/gu, " ").startsWith(text.slice(0, 16)));
-    return { page: index + 1, contentDepth: depth, final: index === rasterPages.length - 1, forcedBreakFollows };
+    return {
+      page: index + 1,
+      contentDepth: contentBoxTextDepth(pdfPath, index + 1),
+      inkDepth: contentBoxInkDepth(join(OUTPUT, raster.path)),
+      final: index === rasterPages.length - 1,
+      forcedBreakFollows,
+    };
   });
   const locate = (text, from) => {
     for (let page = from.page; page < contentLines.length; page += 1) {
@@ -811,22 +927,44 @@ function pageFlowChecks(pdfPath, rasterPages, layout, label) {
     }
     return null;
   };
+  // Section headings follow the banner, whose h1 may wrap so that a line reads just "Findings":
+  // a heading is searched for from the "Run summary" heading on.
+  const bodyStartPage = Math.max(0, contentLines.findIndex((lines) => lines.includes("Run summary")));
+  const bodyStartLine = Math.max(0, contentLines[bodyStartPage]?.indexOf("Run summary") ?? 0);
   const keeps = layout.keeps.map((keep) => {
     let heading = null;
-    for (let page = 0; page < contentLines.length && !heading; page += 1) {
-      const line = contentLines[page].findIndex((candidate) => candidate === keep.heading);
+    for (let page = bodyStartPage; page < contentLines.length && !heading; page += 1) {
+      const line = contentLines[page].findIndex((candidate, index) => (page > bodyStartPage || index >= bodyStartLine) && candidate === keep.heading);
       if (line >= 0) heading = { page, line };
     }
     const unit = heading ? locate(keep.unit.slice(0, 24), heading) : null;
     return { heading: keep.heading, unit: keep.unit, headingPage: heading ? heading.page + 1 : null, unitPage: unit ? unit.page + 1 : null };
   });
+  const failures = [];
   const stranded = keeps.filter((keep) => keep.headingPage === null || keep.unitPage === null || keep.headingPage !== keep.unitPage);
-  if (stranded.length > 0) throw new Error(`${label}: heading stranded from what it introduces: ${JSON.stringify(stranded)}`);
-  const short = fill.filter((page) => !page.final && !page.forcedBreakFollows && page.contentDepth < MINIMUM_PAGE_FILL);
+  if (stranded.length > 0) failures.push(`heading stranded from what it introduces: ${JSON.stringify(stranded)}`);
+  // Shortest first: the message names the worst page, the list carries every short one.
+  const short = fill.filter((page) => !page.final && !page.forcedBreakFollows && page.contentDepth < MINIMUM_PAGE_FILL)
+    .sort((left, right) => left.contentDepth - right.contentDepth || left.page - right.page);
   if (short.length > 0) {
-    throw new Error(`${label}: page ${short[0].page} content ink depth ${(short[0].contentDepth * 100).toFixed(1)} % is below ${MINIMUM_PAGE_FILL * 100} %: ${JSON.stringify(short)}`);
+    failures.push(`page ${short[0].page} content text depth ${(short[0].contentDepth * 100).toFixed(1)} % is below ${MINIMUM_PAGE_FILL * 100} % ` +
+      `(ink incl. frames ${(short[0].inkDepth * 100).toFixed(1)} %): ${JSON.stringify(short)}`);
   }
-  return { minimumPageFill: MINIMUM_PAGE_FILL, fill, keeps, forcedBreaks: layout.forcedBreaks, largestUnbreakableUnitPx: layout.largestUnbreakableUnitPx };
+  const unitLimitPx = Math.round(MAXIMUM_UNBREAKABLE_SHARE * CONTENT_HEIGHT_CSS_PX * 100) / 100;
+  if (!(layout.largestUnbreakableUnitPx > 0) || layout.largestUnbreakableUnitPx > unitLimitPx) {
+    failures.push(`the tallest unbreakable unit, ${layout.largestUnbreakableUnit}, is ${layout.largestUnbreakableUnitPx} px ` +
+      `(${(layout.largestUnbreakableUnitPx / CONTENT_HEIGHT_CSS_PX * 100).toFixed(1)} % of the content box; at most ${MAXIMUM_UNBREAKABLE_SHARE * 100} %, ${unitLimitPx} px)`);
+  }
+  if (failures.length > 0) throw new Error(`${label}: ${failures.join("; ")}`);
+  return {
+    minimumPageFill: MINIMUM_PAGE_FILL,
+    fill,
+    keeps,
+    forcedBreaks: layout.forcedBreaks,
+    maximumUnbreakableShare: MAXIMUM_UNBREAKABLE_SHARE,
+    largestUnbreakableUnitPx: layout.largestUnbreakableUnitPx,
+    largestUnbreakableUnit: layout.largestUnbreakableUnit,
+  };
 }
 
 function pageContentChecks(pdfPath, rasterPages) {
@@ -1101,8 +1239,7 @@ try {
       }
       // 13 rules in one table: at most half an A4 content box (1032 CSS px). The cards it replaced
       // took 3.19 content boxes.
-      const contentHeightCssPx = (297 - 2 * PRINT_MARGIN_MM) / 25.4 * 96;
-      if (printSemantics.coverageTables.some((table) => table.heightPx > contentHeightCssPx / 2)) {
+      if (printSemantics.coverageTables.some((table) => table.heightPx > CONTENT_HEIGHT_CSS_PX / 2)) {
         throw new Error(`${state}: coverage table taller than half a page: ${JSON.stringify(printSemantics.coverageTables.map((table) => table.heightPx))}`);
       }
       const tableEdges = { left: printSemantics.coverageTables[0].leftPx, right: printSemantics.coverageTables[0].rightPx };

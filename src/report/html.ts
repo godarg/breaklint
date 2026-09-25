@@ -170,14 +170,20 @@ ${model.findings.map((finding) => `<li>
 
   const { untested, withAdvice } = model.remediationSummary;
   // Stated once, at body size and colour, where the reader meets the findings; each finding then
-  // carries only a compact marker.
+  // carries only a compact marker. Heading group and caveat form one unbreakable intro that does
+  // not keep with the first finding: inside the heading group (break-after: avoid), heading +
+  // caveat + the first finding's head and first facts formed one 456-481 px keep-with-next chain
+  // (44-47 % of an A4 content box) that left a hole that size; a sibling caveat outside any
+  // wrapper was measured separated from its heading (Blink does not honour avoid there).
   const caveat = untested === 0
     ? ""
     : `\n  <p class="remediation-caveat"><strong>Remediation advice in this report is untested.</strong> No trigger/remedied pair in this package shows it removing its finding; this applies to ${untested} of ${withAdvice} finding${withAdvice === 1 ? "" : "s"} with advice, each marked <span class="untested-marker">untested</span> in its remediation box.</p>`;
   return `<section class="findings-section${model.findings.length === 0 ? " findings-empty" : ""}" aria-labelledby="findings-heading">
+<div class="findings-intro">
 <div class="section-heading">
   <h2 id="findings-heading">Findings</h2>
-  <p class="section-lead">${esc(model.findingsLead)}</p>${caveat}
+  <p class="section-lead">${esc(model.findingsLead)}</p>
+</div>${caveat}
 </div>
 ${list}
 </section>`;
