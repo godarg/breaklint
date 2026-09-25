@@ -1,0 +1,66 @@
+<!doctype html>
+<!--
+  Whether the browser applies CSS `widows` and `orphans` when Paged.js 0.4.3 splits a paragraph.
+
+  Paged.js itself never reads either property. It lays each page out in a CSS multi-column
+  fragmentainer and splits content where the browser's column break fell, so what decides the
+  split is the browser's own fragmentation. This document asks the browser, one case per page
+  pair, and tests/live/fragmentation-levers.test.ts pins each answer.
+
+  THE COMPLICATION is the question itself: a case that asserts only "some split happened" passes
+  for a browser that ignores both properties. Each property is therefore set to three values over
+  the SAME geometry, so that honouring and ignoring produce different splits:
+
+    - widows 1 / initial / 5 with 8 of 9 lines of room: 8+1, 7+2, 4+5 if applied; 8+1 three times
+      if ignored;
+    - orphans 1 / initial / 4 with 1 line of room, and again with 3 lines of room: the first
+      geometry separates orphans 1 from the initial 2, the second separates 4 from the initial 2;
+    - widows 6 + orphans 6 on 9 lines, where no conforming split exists at all: CSS Fragmentation
+      Level 3 then lets the browser drop the rule, and this case records which half it dropped.
+
+  Geometry is font-independent on purpose: every line is a short `<br>`-separated line that
+  cannot wrap, the line height is a fixed 20px, the page content box is 220px tall, and every
+  spacer leaves half a line of slack so that no split depends on sub-pixel rounding. Each case
+  starts on a fresh page with a forced break before its label.
+
+  No wrapper element spans a page break: a wrapper is a block record of its own, judged by its
+  own `widows`/`orphans` against its descendants' lines, which is not what this fixture measures.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>widows and orphans under Paged.js</title><style>
+@page { size: 400px 300px; margin: 40px; }
+body { margin: 0; font-family: serif; font-size: 12px; line-height: 20px; }
+p { margin: 0; }
+.label { break-before: page; }
+.label.first { break-before: auto; }
+</style></head><body>
+<!-- w1: 8 of 9 lines fit; widows 1 lets the browser strand one line. -->
+<p class="label first" id="label-w1">case w1</p><div class="spacer" style="height: 30px"></div>
+<p class="probe" id="probe-w1" style="widows: 1">w1 line 1 of 9<br>w1 line 2 of 9<br>w1 line 3 of 9<br>w1 line 4 of 9<br>w1 line 5 of 9<br>w1 line 6 of 9<br>w1 line 7 of 9<br>w1 line 8 of 9<br>w1 line 9 of 9</p>
+<!-- w-default: 8 of 9 lines fit; the initial widows 2 pulls a second line forward. -->
+<p class="label" id="label-w-default">case w-default</p><div class="spacer" style="height: 30px"></div>
+<p class="probe" id="probe-w-default">w-default line 1 of 9<br>w-default line 2 of 9<br>w-default line 3 of 9<br>w-default line 4 of 9<br>w-default line 5 of 9<br>w-default line 6 of 9<br>w-default line 7 of 9<br>w-default line 8 of 9<br>w-default line 9 of 9</p>
+<!-- w5: 8 of 9 lines fit; widows 5 pulls five lines forward. -->
+<p class="label" id="label-w5">case w5</p><div class="spacer" style="height: 30px"></div>
+<p class="probe" id="probe-w5" style="widows: 5">w5 line 1 of 9<br>w5 line 2 of 9<br>w5 line 3 of 9<br>w5 line 4 of 9<br>w5 line 5 of 9<br>w5 line 6 of 9<br>w5 line 7 of 9<br>w5 line 8 of 9<br>w5 line 9 of 9</p>
+<!-- o1-a: 1 of 9 lines fits; orphans 1 lets the browser leave one line behind. -->
+<p class="label" id="label-o1-a">case o1-a</p><div class="spacer" style="height: 170px"></div>
+<p class="probe" id="probe-o1-a" style="orphans: 1">o1-a line 1 of 9<br>o1-a line 2 of 9<br>o1-a line 3 of 9<br>o1-a line 4 of 9<br>o1-a line 5 of 9<br>o1-a line 6 of 9<br>o1-a line 7 of 9<br>o1-a line 8 of 9<br>o1-a line 9 of 9</p>
+<!-- o-default-a: 1 of 9 lines fits; the initial orphans 2 moves the paragraph. -->
+<p class="label" id="label-o-default-a">case o-default-a</p><div class="spacer" style="height: 170px"></div>
+<p class="probe" id="probe-o-default-a">o-default-a line 1 of 9<br>o-default-a line 2 of 9<br>o-default-a line 3 of 9<br>o-default-a line 4 of 9<br>o-default-a line 5 of 9<br>o-default-a line 6 of 9<br>o-default-a line 7 of 9<br>o-default-a line 8 of 9<br>o-default-a line 9 of 9</p>
+<!-- o4-a: 1 of 9 lines fits; orphans 4 moves the paragraph. -->
+<p class="label" id="label-o4-a">case o4-a</p><div class="spacer" style="height: 170px"></div>
+<p class="probe" id="probe-o4-a" style="orphans: 4">o4-a line 1 of 9<br>o4-a line 2 of 9<br>o4-a line 3 of 9<br>o4-a line 4 of 9<br>o4-a line 5 of 9<br>o4-a line 6 of 9<br>o4-a line 7 of 9<br>o4-a line 8 of 9<br>o4-a line 9 of 9</p>
+<!-- o1-b: 3 of 9 lines fit; orphans 1 keeps three lines. -->
+<p class="label" id="label-o1-b">case o1-b</p><div class="spacer" style="height: 130px"></div>
+<p class="probe" id="probe-o1-b" style="orphans: 1">o1-b line 1 of 9<br>o1-b line 2 of 9<br>o1-b line 3 of 9<br>o1-b line 4 of 9<br>o1-b line 5 of 9<br>o1-b line 6 of 9<br>o1-b line 7 of 9<br>o1-b line 8 of 9<br>o1-b line 9 of 9</p>
+<!-- o-default-b: 3 of 9 lines fit; the initial orphans 2 keeps three lines. -->
+<p class="label" id="label-o-default-b">case o-default-b</p><div class="spacer" style="height: 130px"></div>
+<p class="probe" id="probe-o-default-b">o-default-b line 1 of 9<br>o-default-b line 2 of 9<br>o-default-b line 3 of 9<br>o-default-b line 4 of 9<br>o-default-b line 5 of 9<br>o-default-b line 6 of 9<br>o-default-b line 7 of 9<br>o-default-b line 8 of 9<br>o-default-b line 9 of 9</p>
+<!-- o4-b: 3 of 9 lines fit; orphans 4 moves the paragraph. -->
+<p class="label" id="label-o4-b">case o4-b</p><div class="spacer" style="height: 130px"></div>
+<p class="probe" id="probe-o4-b" style="orphans: 4">o4-b line 1 of 9<br>o4-b line 2 of 9<br>o4-b line 3 of 9<br>o4-b line 4 of 9<br>o4-b line 5 of 9<br>o4-b line 6 of 9<br>o4-b line 7 of 9<br>o4-b line 8 of 9<br>o4-b line 9 of 9</p>
+<!-- relaxed: 8 of 9 lines fit; widows 6 + orphans 6 = 12 > 9, so no conforming split exists. -->
+<p class="label" id="label-relaxed">case relaxed</p><div class="spacer" style="height: 30px"></div>
+<p class="probe" id="probe-relaxed" style="widows: 6; orphans: 6">relaxed line 1 of 9<br>relaxed line 2 of 9<br>relaxed line 3 of 9<br>relaxed line 4 of 9<br>relaxed line 5 of 9<br>relaxed line 6 of 9<br>relaxed line 7 of 9<br>relaxed line 8 of 9<br>relaxed line 9 of 9</p>
+</body></html>

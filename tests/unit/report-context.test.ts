@@ -201,7 +201,7 @@ describe("bounded public report views", () => {
     assert.ok(card && "originalSource" in card);
     assert.equal(card.originalSource.location?.endOffset, 99);
     assert.equal(card.evaluation?.predicate.violated, matching.predicate.violated);
-    assert.match(card.repair.options[0]!, /break constraint/u);
+    assert.match(card.repair.options[0]!, /Shorten the verified block or split its content/u);
     assert.deepEqual(context.comparison, comparison);
     const html = renderReport(report, { comparison });
     assert.match(html, /Original source range/u);

@@ -40,10 +40,11 @@ that hides that is worse than no number.
 
 One thing about that output, since the demo invites the assumption: the rule and reporter chain
 running there is the real one, but the page it judges is a **hand-written snapshot**, built so
-that every rule path is reachable in a command that needs no browser. `examples/demo.html` is
-the document that snapshot describes; it is not shipped, and the run says which kind of fixture
-it used in its own `source` field rather than leaving you to guess. Point the tool at your own
-HTML and the same chain measures a real page.
+that every rule path is reachable in a command that needs no browser. No HTML document stands
+behind it: the snapshot names `examples/demo.html` as its document path, but that file does not
+exist and never did, which is why the demo's findings carry no source location. The run says which
+kind of fixture it used in its own `source` field rather than leaving you to guess. Point the tool
+at your own HTML and the same chain measures a real page.
 
 ## Install
 
@@ -57,8 +58,9 @@ needs a browser and the paginator; see [Requirements](#requirements).
 ## Source-bound findings and existing web pages
 
 The installed package now exposes `checkProducedDocuments`, `checkPage`, `compareReports`,
-`createContextPack`, `renderReport` and `writeReportBundle`. Live document reports use Report 4;
-the screen profile has a separate contract and checks visible geometry without pagination.
+`createContextPack`, `renderReport` and `writeReportBundle`. Live document reports use Report 5, and
+the report readers accept Report 4 and 5; the screen profile has a separate contract and checks
+visible geometry without pagination.
 
 ```js
 import { checkPage, writeReportBundle } from 'breaklint';
@@ -217,7 +219,7 @@ are complete; the post-release trust work and remaining validation boundaries ar
 |---|---|
 | 0 | checked, coverage met, nothing reached the threshold |
 | 1 | at least one non-experimental finding reached the threshold |
-| 2 | invalid invocation: unknown option, bad config, input path does not exist, or input is not `.html`/`.htm` |
+| 2 | invalid invocation: unknown option, bad config, no input, or an input path that does not exist, is not a regular file or is not `.html`/`.htm`; no report is written |
 | 3 | infrastructure: no renderer, font failed, pagination aborted, checker crashed |
 | 4 | nothing or too little was judged |
 
@@ -237,7 +239,12 @@ breaklint --profile strict manual.html   # warnings gate; every rule requires fu
 breaklint --only layout/widow,layout/orphan book.html
 breaklint --only layout/half-empty-page report.html   # ask for the one rule that is off by default
 breaklint --disable layout/hyphen-across-page report.html
+breaklint --out-dir build/evidence book.html   # where the page PNGs and the checked PDF go
 ```
+
+A live run writes its evidence — one PNG per page and the PDF it checked — into
+`./breaklint-report` in the working directory unless `--out-dir <dir>` names another; the report's
+`evidence[].path` entries are relative to that directory. `--demo` writes none.
 
 A rule you disagree with can be switched off for the whole run — `--disable <rule,...>`, or
 `{"rules": {"layout/hyphen-across-page": false}}` in the config file; the same two switches turn
@@ -258,8 +265,10 @@ the permissions it needs and what each exit code does to the job.
 There is no directory recursion and no glob expansion inside the tool. The shell has done this
 correctly for fifty years, including symlink cycles.
 
-Input is HTML only (`.html` or `.htm`). A standalone `.svg`, PDF, Markdown file or directory is
-rejected with exit 2 before Chrome starts. Inline SVG inside HTML is supported by the released SVG
+Input is HTML only (`.html` or `.htm`), and the name decides: a standalone `.svg`, PDF or Markdown
+file is rejected by its extension, and anything that is not a regular file — a directory called
+`chapter.html` included — is rejected too, each with exit 2 before Chrome starts. The content of a
+`.html` file is not sniffed. Inline SVG inside HTML is supported by the released SVG
 geometry rule; treating a standalone SVG asset as a paged HTML document would require a separate
 MIME, page-size and embedding contract that this version does not claim.
 
@@ -273,7 +282,11 @@ code from a foreign repository inside CI, so it is intentionally unsupported.
 
 The HTML reporter is a self-contained evidence view, not a second source of truth. Its header
 distinguishes clean, findings, checker failure and insufficient coverage in words; findings reflow
-without a horizontal table on mobile; print uses a verified A4 layout. JSON remains canonical.
+without a horizontal table on mobile; print uses an A4 layout. What is verified about these surfaces
+is technical — `test:report-surfaces:technical` checks every current screen and print cell for
+decoded pixels, contrast, accessibility and fragmentation — and the most recent human review, of
+the 0.6.0 surfaces, did not pass (see [`docs/releasing.md`](docs/releasing.md)). JSON remains
+canonical.
 The information contract and the reproducible 32-cell screen/print review are documented in
 [`docs/reporting.md`](docs/reporting.md).
 
@@ -281,8 +294,8 @@ The information contract and the reproducible 32-cell screen/print review are do
 
 Node 22.13 or newer, on macOS or Linux. The floor is exact because `pdfjs-dist@6.2.108` requires
 Node 22.13 or Node 24, and the release gate installs the packed package on both Node 22.13 and 24.
-A live run additionally needs a Chromium-based browser, `puppeteer-core@25.8.x` and
-`pagedjs@0.4.3`. `pdfjs-dist` is what rasterises the produced PDF to bind evidence to findings; a
+A live run additionally needs a Chromium-based browser, `puppeteer-core` at `>=25.8.0 <26` (the
+declared peer range) and `pagedjs@0.4.3`. `pdfjs-dist` is what rasterises the produced PDF to bind evidence to findings; a
 run without it still measures and still reports, but the findings carry no evidence and the report
 says so rather than pretending otherwise. Poppler's `pdftoppm` is **not** used by the tool at all: the live test suite uses
 it as an independent rasteriser, so that Chrome is not both the producer and the sole judge of
