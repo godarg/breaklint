@@ -264,10 +264,18 @@ not depend on the browser. A converter's HTML output is ordinary HTML and is mea
 paragraph that stood here through 0.6.0 described a Paged.js `pagination aborted` exit 3 for a
 Markdown file; that path is gone, because the name check runs first.
 
-**Foreign HTML is executed.** The run uses a fresh browser profile, keeps the sandbox on, has no
-flag that disables it, and blocks every network request by default. That is protection against
-mistakes and badly built documents, not against a deliberate attack on the browser sandbox. See
-[SECURITY.md](../SECURITY.md).
+**Foreign HTML is executed, and the offline policy is not an egress control.** The run uses a
+fresh browser profile, never asks for the sandbox to be off, and intercepts the page's requests,
+letting through only its own loopback origin (plus `data:`, `blob:`, `about:` and any
+`--allow-network` origin). Interception does not cover WebSocket, WebTransport or WebRTC
+connections a document opens, nor the browser's own traffic — secure DNS (DNS over HTTPS) and the
+component updater. Measured on 0.7.0 in the default offline mode with a self-authored document: a
+WebSocket to a loopback port that was not the tool's was delivered, a WebRTC STUN request was sent,
+and the run came back `clean`. The sandbox can be turned off from the environment, which breaklint
+does not clear: puppeteer-core adds `--no-sandbox` when `PUPPETEER_DANGEROUS_NO_SANDBOX=true`,
+honours `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES`, and the browser inherits variables such as
+`CHROME_EXTRA_FLAGS`; keep them unset. For a document you do not trust, run breaklint in a
+container or network namespace with no egress. See [SECURITY.md](../SECURITY.md).
 
 The longer, measurement-by-measurement account of what has been established and what has not is in
 [status.md](status.md).
@@ -307,8 +315,7 @@ ancestor: every boundary inside a named region and the one after it read as `for
 boundary into the region as `overflow`. Measured on a self-authored report with a landscape region
 (patched Chromium 141, no evidence binding): 9 of 14 widow and 9 of 14 orphan candidates declined
 as `env/forced-break`, both below the coverage floor, exit 4; now 2 of 14 each, at the two
-boundaries the paginator forced. A corpus-gate run of the same document, also on Chromium 141,
-recorded 13 declines of each and widow coverage 8 of 21. A first repair compared the named pages
+boundaries the paginator forced. A first repair compared the named pages
 the two pages were **styled** with — the `pagedjs_<name>_page` classes on the page element — and
 that is not the paginator's rule either: the classes record which `@page` rule a page got, not
 whether a break was forced. `<div><section style="page: chap">…</section></div><p>` does not break
@@ -358,6 +365,7 @@ The real Studio repair attempt was performed by an independent agent. No fresh h
 
 ## 0.6.0 limits
 
+
 **A per-fragment applicability decision can be silent about a property of the whole element.**
 `layout/unbreakable-block-too-tall` skipped every fragment after the first and therefore compared
 the height of a *piece* against the page. Measured on 2026-09-18: a six-page `break-inside: avoid`
@@ -366,6 +374,67 @@ particular rule now sums its fragments. The **class** is not closed: every rule 
 decides applicability per fragment, and any future rule whose quantity belongs to the element
 rather than to the piece can repeat this. There is no gate that detects the shape; what caught this
 one was a red control that had quietly stopped being red.
+
+**How often oversized `break-inside: avoid` blocks occur in real documents is not measured.** The
+repair is arithmetically correct and conservative, but its frequency in the field is unknown, so
+how much this changes in practice for a given project is unknown too. A project that sees a new
+`error` after upgrading is seeing a block that never fitted; that is all this version claims.
+
+**A two-fragment split is measured but never reported, and that is a proof obligation.** Paged.js
+does not fragment natively — it produces two DOM elements — so `box-decoration-break` does not
+apply here at all. What strips decoration at a split is Paged.js' own stylesheet, and it unsets
+`margin` and `padding` on `[data-split-from]`/`[data-split-to]` but **not** `border`, and without
+`!important`. A bordered block that is split therefore carries its border height once per fragment,
+and an author rule with `!important` padding does the same — so two fragments can sum above the
+page for a block that fitted unsplit. From three fragments on that cannot happen: an intermediate
+fragment fills an entire content box and there is content before and after it, so the block is
+taller than one page by construction. **The residual gap is a block split into exactly two
+fragments whose real height does exceed the page: it is not reported, and the value recorded for it
+is the first fragment's box rather than the sum** — exactly as in 0.5.0, and stated here because a
+reader of the summed-height paragraph above would otherwise assume the sum is recorded everywhere. The residual risk
+in the other direction is a block with borders thicker than the content of its own outer fragments,
+which would have to be several tens of pixels per edge.
+
+**The boundary is the content box of the page the block was laid out on.** Comparing against the
+largest content box in the document was tried and is worse: in a document with a named landscape
+page it raises the bar for every block on the portrait pages and hides real ones. What is observed
+is that this block did not fit unbroken on this page, and that is what the finding says — it no
+longer claims anything about pages it did not measure. A block that would have fitted on a
+differently sized page elsewhere in the document is still reported, because it still broke its own
+`break-inside: avoid` where it was.
+
+**`kill(pgid, 0)` answering `EPERM` is read as indeterminate, not as failure.** Measured on darwin
+25.6.0, macOS answers `EPERM` transiently for a process group this process created and owns while
+that group is being torn down — 8 of 20 acquisitions, every one followed within 10 ms by `ESRCH`
+with the descendant dead. The producer cleanup therefore retries inside its existing bounded
+deadline instead of failing on the first sample. What this does NOT establish is the kernel reason
+for the answer; the behaviour is measured, not explained, and it was measured on one platform and
+one version. An `EPERM` that outlives the deadline still fails the acquisition. The retry itself
+and the deadline-expiry failure have **no test**: both live in closures that only run when the
+environment produces `EPERM`, which is not deterministic. What is pinned is the errno truth table.
+
+**The 40-document corpus behind the `layout/half-empty-page` default is not in this repository.**
+The 37-of-40 figure was measured on a corpus constructed for that purpose during the same work, and
+it is not admitted here, not hashed here and not reproducible from this repository. Every place that
+cites the number says "a corpus constructed for this purpose"; this paragraph says the rest of it.
+The decision it supports is reversible by configuration and moves no exit code either way, which is
+why it was taken on that evidence — the same standard would not have been enough for a gating rule.
+
+## 0.7.0 limits
+
+**`body { column-count: 1 }` can end `clean` over a PDF that lost most of its content — a known
+false-clean defect, not fixed in 0.7.0.** `column-count: 1` or `columns: 1` on `body` makes the
+body a multi-column container, and Paged.js then lays its pages out inside it. Measured by
+independent verifications of this release cycle: the produced PDF was missing most of the
+document's content — in one run it held one page and about half the words — while the run
+reported its pages as measured and ended `clean`, exit 0. No check in this release catches it; the `env/multicolumn` decline applies to multi-column blocks
+the rules measure, not to a paginated body.
+
+**A `display: contents` heading that a page break splits can lose its continuation — a known
+false-clean defect, not fixed in 0.7.0.** Paged.js does not carry the rest of such a heading to
+the next page: measured by an independent verification of this release cycle, 17 of the heading's
+89 words were printed, and the run ended exit 0. No rule or cross-check in this release sees the
+missing text. Avoid `display: contents` on headings long enough to break, or check the PDF.
 
 **Nothing printed in a page margin box is measured by any block, line or page rule.** Paged.js
 implements `position: running(...)` by deep-cloning the element into the margin box of every page,
@@ -526,34 +595,6 @@ wrapper that starts on page 1 still anchors page 1, keyed by its author id or, w
 signature of all its text, so without an id that page's fingerprint follows any edit inside the
 wrapper.
 
-**How often oversized `break-inside: avoid` blocks occur in real documents is not measured.** The
-repair is arithmetically correct and conservative, but its frequency in the field is unknown, so
-how much this changes in practice for a given project is unknown too. A project that sees a new
-`error` after upgrading is seeing a block that never fitted; that is all this version claims.
-
-**A two-fragment split is measured but never reported, and that is a proof obligation.** Paged.js
-does not fragment natively — it produces two DOM elements — so `box-decoration-break` does not
-apply here at all. What strips decoration at a split is Paged.js' own stylesheet, and it unsets
-`margin` and `padding` on `[data-split-from]`/`[data-split-to]` but **not** `border`, and without
-`!important`. A bordered block that is split therefore carries its border height once per fragment,
-and an author rule with `!important` padding does the same — so two fragments can sum above the
-page for a block that fitted unsplit. From three fragments on that cannot happen: an intermediate
-fragment fills an entire content box and there is content before and after it, so the block is
-taller than one page by construction. **The residual gap is a block split into exactly two
-fragments whose real height does exceed the page: it is not reported, and the value recorded for it
-is the first fragment's box rather than the sum** — exactly as in 0.5.0, and stated here because a
-reader of the summed-height paragraph above would otherwise assume the sum is recorded everywhere. The residual risk
-in the other direction is a block with borders thicker than the content of its own outer fragments,
-which would have to be several tens of pixels per edge.
-
-**The boundary is the content box of the page the block was laid out on.** Comparing against the
-largest content box in the document was tried and is worse: in a document with a named landscape
-page it raises the bar for every block on the portrait pages and hides real ones. What is observed
-is that this block did not fit unbroken on this page, and that is what the finding says — it no
-longer claims anything about pages it did not measure. A block that would have fitted on a
-differently sized page elsewhere in the document is still reported, because it still broke its own
-`break-inside: avoid` where it was.
-
 **Flow membership is decided by page structure, never by coordinates, so a fragment that bleeds
 into the margin still counts.** `layout/unbreakable-block-too-tall` sums every record carrying the
 element's source id. A coordinate test ("a real fragment starts inside the content box") cannot tell
@@ -582,16 +623,6 @@ the twelve rules that are on anyway this is invisible; for the one that is not, 
 also activates it. That is the intended reading — configuring a rule you do not want is not a
 thing anyone does — but it is not obvious, so it is written down.
 
-**`kill(pgid, 0)` answering `EPERM` is read as indeterminate, not as failure.** Measured on darwin
-25.6.0, macOS answers `EPERM` transiently for a process group this process created and owns while
-that group is being torn down — 8 of 20 acquisitions, every one followed within 10 ms by `ESRCH`
-with the descendant dead. The producer cleanup therefore retries inside its existing bounded
-deadline instead of failing on the first sample. What this does NOT establish is the kernel reason
-for the answer; the behaviour is measured, not explained, and it was measured on one platform and
-one version. An `EPERM` that outlives the deadline still fails the acquisition. The retry itself
-and the deadline-expiry failure have **no test**: both live in closures that only run when the
-environment produces `EPERM`, which is not deterministic. What is pinned is the errno truth table.
-
 **Page fill counts glyph boxes, not line boxes, and has no ceiling.** `netFill` merges the
 vertical bands of every text run's client rectangles — the glyph content area, not the line box —
 and of replaced elements, and divides by the content box height. Half-leading and block margins
@@ -612,15 +643,6 @@ inside the content box and would count as running text. A line-box fill, each te
 widened to its line height, is the named next step for the net fill. It changes the snapshot shape and the quantity
 behind the public options `minNetFill` and `maxNetFill`, which needs an owner decision, and it is
 not in this release. None of these readings is a calibration.
-
-**The 40-document corpus behind the `layout/half-empty-page` default is not in this repository.**
-The 37-of-40 figure was measured on a corpus constructed for that purpose during the same work, and
-it is not admitted here, not hashed here and not reproducible from this repository. Every place that
-cites the number says "a corpus constructed for this purpose"; this paragraph says the rest of it.
-The decision it supports is reversible by configuration and moves no exit code either way, which is
-why it was taken on that evidence — the same standard would not have been enough for a gating rule.
-
-
 
 **Which block a split belongs to is read from four recorded facts and line geometry.** The
 snapshot records a block's lines from every text node beneath it and carries no parent link, so a

@@ -282,11 +282,14 @@ code from a foreign repository inside CI, so it is intentionally unsupported.
 
 The HTML reporter is a self-contained evidence view, not a second source of truth. Its header
 distinguishes clean, findings, checker failure and insufficient coverage in words; findings reflow
-without a horizontal table on mobile; print uses an A4 layout. What is verified about these surfaces
-is technical — `test:report-surfaces:technical` checks every current screen and print cell for
-decoded pixels, contrast, accessibility and fragmentation — and the most recent human review, of
-the 0.6.0 surfaces, did not pass (see [`docs/releasing.md`](docs/releasing.md)). JSON remains
-canonical.
+without a horizontal table on mobile; print uses an A4 layout. What CI verifies about these
+surfaces is technical — `test:report-surfaces:technical` checks every current screen and print
+cell for decoded pixels, contrast, accessibility and fragmentation. A human review counts only as
+a passing round by a rostered reviewer in the review ledger, bound to the current inputs; see its
+latest round and [`docs/releasing.md`](docs/releasing.md).
+<!-- review-state -->
+At the release preparation of 0.7.0 the latest round was the review of the 0.6.0 surfaces, which
+did not pass. JSON remains canonical.
 The information contract and the reproducible 32-cell screen/print review are documented in
 [`docs/reporting.md`](docs/reporting.md).
 
@@ -308,10 +311,22 @@ npm i -D puppeteer-core@^25.8.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
 ## Running foreign HTML
 
 This tool executes foreign HTML including its scripts. It uses a fresh browser profile per run,
-keeps the sandbox on, has no flag that disables it, and blocks every network request by default.
-That protects against mistakes and badly built documents. It is **not** protection against
-someone deliberately attacking the browser sandbox — for untrusted third-party HTML, use a
-container.
+never asks for the sandbox to be off and has no flag that does, and by default lets no page
+request through except to its own loopback origin. That protects against mistakes and badly built
+documents. It is **not** an egress control and **not** protection against someone deliberately
+attacking the browser:
+
+- The request policy does not cover WebSocket, WebTransport or WebRTC connections a document
+  opens, nor the browser's own secure DNS and component updater traffic. Measured on 0.7.0 in the
+  default offline mode: a document's WebSocket to another loopback port was delivered and a WebRTC
+  STUN request was sent, and the run came back clean.
+- The environment can turn the sandbox off: puppeteer-core adds `--no-sandbox` when
+  `PUPPETEER_DANGEROUS_NO_SANDBOX=true`, and the browser inherits the environment. Make sure
+  `PUPPETEER_DANGEROUS_NO_SANDBOX`, `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` and
+  `CHROME_EXTRA_FLAGS` are unset.
+
+For untrusted third-party HTML, use a container or network namespace with no egress. Details are
+in [SECURITY.md](SECURITY.md).
 
 ## How this was made
 
