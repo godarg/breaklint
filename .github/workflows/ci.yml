@@ -256,6 +256,10 @@ jobs:
   # tests run under it too, so the real kernel sees the no-reap case on every CI run.
   lifecycle-soak:
     runs-on: ubuntu-latest
+    # Measured on a 4-core VM under load up to 23: 200 s per soak regime, about 30 s for the unit
+    # line; with `npm ci`, about 8 minutes. Three times that, rounded up, bounds a hang without
+    # cutting a slow runner short.
+    timeout-minutes: 30
     env:
       PUPPETEER_SKIP_DOWNLOAD: "1"
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "1"
