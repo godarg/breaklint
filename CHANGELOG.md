@@ -24,6 +24,17 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `true` does. This was always the behaviour; it is now written down in `docs/limitations.md` and
   pinned by a contract test.
 
+### Tooling
+
+- **SARIF output is validated against the SARIF 2.1.0 JSON schema.** The schema is vendored,
+  test-only, from `microsoft/sarif-sdk` (MIT) under `tests/fixtures/sarif-schema/`, with its
+  source commit, licence and sha256 recorded; the one normative OASIS errata01 constraint that copy
+  lacks (a region needs `startLine`, `charOffset` or `byteOffset`) is restored in memory by the
+  checker. `--demo --format sarif`, every canonical report state and a report with physical
+  locations validate; fifteen single-fault corruptions are rejected. JUnit gets an XSD-free
+  structural check (failure counts equal the `<failure>` elements) and Markdown a verdict-line
+  check, each with negative controls. breaklint's SARIF needed no change.
+
 ## 0.6.0 — 2026-09-18
 
 A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0: the canonical
