@@ -291,6 +291,7 @@ a `pending` round carries no outcome. An earlier passing round never carries for
 failed or pending one.
 
 Reviewers are named for what they are, and the human roster is closed:
+<!-- human-review-roles: @Brand, @Neo, @Founder -->
 
 - `human` is one of the **human review roles `@Brand`, `@Neo` and `@Founder`** and carries nothing
   but `kind` and `handle`. The roster is the constant `HUMAN_REVIEW_ROLES` in
@@ -310,7 +311,23 @@ Every cell that passed must name a `human` reviewer of its round from the roster
 verifier prints and appends to the GitHub job summary ("Report-surface review ledger") names every
 reviewer of the latest round with its kind and counts the cells a rostered human passed; it says
 "latest human review round N is PASS" only when that count is all 32 cells, and "latest review
-round N is …" otherwise.
+round N is …" otherwise. It ends with the binding in the same two halves the strict gate checks —
+"bound to the current render: inputs yes|no; environment/artifacts yes|no" — so "yes" for the
+inputs is never read as a transferable review when the environment, a cell fingerprint, a named
+artifact or the physical inventory differs.
+
+**What the roster check does not do.** It proves only that a rostered handle was written into the
+ledger. It does not authenticate a person: the ledger is a file in this repository, nothing in it
+is signed, and anyone who can commit can write `@Neo`. That a rostered human actually reviewed the
+surfaces rests on repository access control and on review of the ledger diff, not on this gate.
+This residual is deliberate (owner decision, 0.7.0 cycle) and is printed with every job summary.
+
+Rounds are also ordered in time, fail-closed: `reviewedAt` never decreases from one round to the
+next; no `historical` or `historical-reconstruction` record follows a `current` one; a passing
+latest round must be a `current` record; and a current round, and each cell it reviewed, carries an
+exact UTC `reviewedAt` at or after the `renderManifestGeneratedAt` it binds. A historical pass moved
+to the end of the ledger, or re-bound to today's render, therefore does not pass. Historical rounds
+keep the times they were recorded with (round 1's cells predate its render timestamp by minutes).
 
 The render manifest (schema 5) splits the environment in two. `reviewEnvironment` is the
 **declared** review environment and is what a review binds: artifact and pixel contract versions,

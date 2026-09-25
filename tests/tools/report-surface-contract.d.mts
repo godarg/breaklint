@@ -10,6 +10,7 @@ export const REQUIRED_BROWSER_RENDER_ARGS: readonly string[];
 export const DECLARED_ENVIRONMENT_FIELDS: readonly string[];
 export const OBSERVED_ENVIRONMENT_FIELDS: readonly string[];
 export const HUMAN_REVIEW_ROLES: readonly string[];
+export const REVIEWER_AUTHENTICATION_NOTE: string;
 
 export interface ReviewInput {
   fingerprint: string;
@@ -32,7 +33,13 @@ export function summarizeLatestRound(ledger: ReviewLedger): {
   humanPassingCells: number;
   humanPass: boolean;
 };
-export function describeLatestRound(ledger: ReviewLedger, currentFingerprint: string): string;
+export function latestBindingStatus(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): {
+  inputs: boolean;
+  environmentAndArtifacts: boolean;
+  bound: boolean;
+  reason: string | null;
+};
+export function describeLatestRound(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): string;
 export function assessHumanGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): ReviewRound;
 
 export interface ReviewRound {

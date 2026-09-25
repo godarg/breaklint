@@ -421,6 +421,15 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   list was a grid, and a fragmenting grid item is stretched to its unfragmented area. Print lays it
   out as block flow and drops the end mark's rule; the gate rejects any row pitch more than 8 % off
   the table's median, measured independently by the verifier.
+- **Review rounds are ordered in time, and "bound" means the whole binding.** A passing latest
+  round must be a `current` record; `reviewedAt` never decreases from round to round; no historical
+  or reconstructed record follows a current one; and a current round and each cell it reviewed
+  carry an exact UTC time at or after the render they bind. Moving the historical round-1 pass to
+  the end, with or without re-binding it to today's render, passed the strict gate before. The
+  ledger line and job summary now report the binding as "inputs yes|no; environment/artifacts
+  yes|no" — a matching input fingerprint over a different environment, cell fingerprint or
+  inventory printed "bound … yes". Both state that the roster check proves only that a rostered
+  handle was written, not who wrote it: that rests on repository access control and diff review.
 - **The live self-application red control checks the evidence outcome it gets, instead of assuming
   one.** It required exit 4 because the injected oversized tail supposedly could receive no
   evidence mark; its start mark is placed, so the page binds whenever the browser's PDF returns its

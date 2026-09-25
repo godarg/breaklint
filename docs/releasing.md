@@ -117,6 +117,11 @@ outcome — `pass` or `fail` — and only a passing latest round in which a rost
 (`@Brand`, `@Neo` or `@Founder`) passed every cell, bound to the exact current inputs, turns the
 gate green. An agent's review may be recorded in a round, by kind and model, and never passes a
 cell; the roster itself changes only by a reviewed code change (`docs/reporting.md`).
+<!-- human-review-roles: @Brand, @Neo, @Founder -->
+The roster check proves only that a rostered handle was written into the ledger; it does not
+authenticate a person. Whether a rostered human really reviewed rests on repository access control
+and on reviewing the ledger diff before it merges — check who committed it and that the round's
+cells name the artifacts actually rendered — not on this gate.
 
 The ledger is bound to the 0.2.3 input fingerprint from 2026-08-29. It was therefore red for
 0.3.0, 0.3.1, 0.4.0 and 0.5.0 without anyone noticing, because CI runs the technical mode, which

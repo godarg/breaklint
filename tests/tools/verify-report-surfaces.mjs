@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 
 import {
+  REVIEWER_AUTHENTICATION_NOTE,
   REVIEW_ARTIFACT_CONTRACT_VERSION,
   SCREEN_PIXEL_CONTRACT_VERSION,
   assertCurrentReviewInput,
@@ -932,12 +933,12 @@ assert.ok(fontMutationControl, "PDF font mutation control did not run");
 assert.deepEqual(manifest.physicalArtifacts, { screens: 24, screenTiles: 152, pdfs: 4, rasterPages: 26 },
   "the report-surface inventory must be exactly 24 screens with 152 viewport tiles, 4 PDFs and 26 PDF page rasters");
 
-const latestRound = describeLatestRound(ledger, currentReviewInput.fingerprint);
+const latestRound = describeLatestRound(ledger, manifest, currentReviewInput.fingerprint);
 // The review ledger's state belongs where a release reader looks, not only in a log line. The line
 // names every reviewer by kind; it says "human review ... PASS" only when a rostered human passed
 // every cell of the latest round (describeLatestRound), and never for an agent-recorded round.
 if (process.env.GITHUB_STEP_SUMMARY) {
-  appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Report-surface review ledger\n\n${latestRound}.\n\n`);
+  appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Report-surface review ledger\n\n${latestRound}.\n\n${REVIEWER_AUTHENTICATION_NOTE}\n\n`);
 }
 if (mode === "local") assessHumanGate(ledger, manifest, currentReviewInput.fingerprint);
 

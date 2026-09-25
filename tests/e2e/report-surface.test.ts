@@ -30,10 +30,12 @@ import {
   DECLARED_ENVIRONMENT_FIELDS,
   HUMAN_REVIEW_ROLES,
   REQUIRED_BROWSER_RENDER_ARGS,
+  REVIEWER_AUTHENTICATION_NOTE,
   REVIEW_ARTIFACT_CONTRACT_VERSION,
   assessHumanGate,
   describeLatestRound,
   isMeasurableBrowserVersion,
+  latestBindingStatus,
   validateReviewLedger,
   type ReviewLedger,
   type ReviewRound,
@@ -461,7 +463,8 @@ describe("report-surface human review gate", () => {
       "the public record names no reviewer handle, so the ledger names none");
     const { manifest, fingerprint } = boundPassingFixture();
     assert.throws(() => assessHumanGate(committedLedger(), manifest, fingerprint), /latest review round 2 is FAIL \(2026-09-18/u);
-    assert.match(describeLatestRound(committedLedger(), fingerprint), /reviewers: not recorded, not recorded; cells passed by a rostered human: 0 of 0 passing\); bound to the current inputs: no$/u);
+    assert.match(describeLatestRound(committedLedger(), manifest, fingerprint),
+      /reviewers: not recorded, not recorded; cells passed by a rostered human: 0 of 0 passing\); bound to the current render: inputs no; environment\/artifacts no$/u);
   });
 
   it("passes only a latest human round bound to the current inputs, environment and cells", () => {
@@ -531,11 +534,12 @@ describe("report-surface human review gate", () => {
     // record a failed cell; the summary line names every reviewer by kind.
     const recorded = probe([{ kind: "human", handle: "@Neo" }, agent], "@Neo");
     assert.equal(recorded().round, 3, "an agent recorded beside the rostered human who passed every cell does not block the gate");
-    const { ledger, fingerprint } = boundPassingFixture();
+    const { ledger, manifest, fingerprint } = boundPassingFixture();
     ledger.rounds.at(-1)!.reviewers = [{ kind: "human", handle: "@Neo" }, agent];
-    assert.equal(describeLatestRound(ledger, fingerprint),
+    assert.equal(describeLatestRound(ledger, manifest, fingerprint),
       "latest human review round 3 is PASS (2026-10-01T10:00:00.000Z; 0 blocker, 0 high, 0 medium, 0 low; current record; " +
-        "reviewers: @Neo (human), @Bot (agent: example-review-model); cells passed by a rostered human: 32 of 32 passing); bound to the current inputs: yes");
+        "reviewers: @Neo (human), @Bot (agent: example-review-model); cells passed by a rostered human: 32 of 32 passing); " +
+        "bound to the current render: inputs yes; environment/artifacts yes");
     const agentFail = structuredClone(ledger);
     const failRound = agentFail.rounds.at(-1)!;
     Object.assign(failRound, { outcome: "fail", findings: { blocker: 0, high: 0, medium: 1, low: 0 } });
@@ -547,10 +551,89 @@ describe("report-surface human review gate", () => {
     const unvalidated = structuredClone(ledger);
     unvalidated.rounds.at(-1)!.reviewers = [agent];
     for (const cell of Object.values(unvalidated.rounds.at(-1)!.cells!)) cell.reviewer = "@Bot";
-    const line = describeLatestRound(unvalidated, fingerprint);
+    const line = describeLatestRound(unvalidated, manifest, fingerprint);
     assert.doesNotMatch(line, /human review/u);
     assert.match(line, /^latest review round 3 is PASS but NOT a human pass \(.*reviewers: @Bot \(agent: example-review-model\); cells passed by a rostered human: 0 of 32 passing\)/u);
     assert.throws(() => validateReviewLedger(unvalidated), /passed under @Bot, an agent reviewer/u);
+  });
+
+  it("says 'bound' only for the full binding the strict gate checks", () => {
+    const { ledger, manifest, fingerprint } = boundPassingFixture();
+    // Same inputs, a different declared environment: the fingerprint alone would say "bound".
+    const otherBrowser = structuredClone(manifest);
+    (otherBrowser.reviewEnvironment as Record<string, string>).browser = "Google Chrome 152.0.7977.64";
+    assert.match(describeLatestRound(ledger, otherBrowser, fingerprint), /bound to the current render: inputs yes; environment\/artifacts no$/u);
+    assert.throws(() => assessHumanGate(ledger, otherBrowser, fingerprint), /different declared browser/u);
+    // Same inputs, one changed cell fingerprint.
+    const otherCell = structuredClone(manifest);
+    ((otherCell.artifacts as Record<string, unknown>[])[0]!).reviewArtifactFingerprint = "d".repeat(64);
+    const status = latestBindingStatus(ledger, otherCell, fingerprint);
+    assert.deepEqual([status.inputs, status.environmentAndArtifacts, status.bound], [true, false, false]);
+    assert.match(status.reason ?? "", /strict local human review is bound to a different rendered artifact/u);
+    // Same inputs, a different physical inventory.
+    const otherInventory = structuredClone(manifest);
+    (otherInventory.physicalArtifacts as Record<string, number>).rasterPages = 9;
+    assert.match(describeLatestRound(ledger, otherInventory, fingerprint), /environment\/artifacts no$/u);
+    assert.equal(latestBindingStatus(ledger, manifest, fingerprint).bound, true, "positive control");
+  });
+
+  it("orders rounds in time and never lets a historical record claim the latest pass", () => {
+    const failed = (mutate: (ledger: ReviewLedger) => void, expected: RegExp) => {
+      const { ledger } = boundPassingFixture();
+      mutate(ledger);
+      assert.throws(() => validateReviewLedger(ledger), expected);
+    };
+    // The verifier's historical-latest: a pass appended as a historical record.
+    failed((ledger) => { ledger.rounds.at(-1)!.record = "historical"; }, /a historical record cannot follow a current round|a passing latest round must be a current record, not historical/u);
+    // ...and as the only kind of round in the ledger (the forged round 1 pass moved last).
+    failed((ledger) => {
+      ledger.rounds.pop();
+      const [first, second] = ledger.rounds;
+      Object.assign(first!, { round: 2 });
+      Object.assign(second!, { round: 1 });
+      ledger.rounds = [second!, first!];
+    }, /reviewed 2026-08-29T03:22:30\.000Z, before the round it follows/u);
+    // The verifier's reorder-rebind: round 1's pass moved after round 2 and re-bound to a render of today.
+    failed((ledger) => {
+      const fresh = ledger.rounds.pop()!;
+      const [first, second] = ledger.rounds;
+      Object.assign(first!, { round: 2, binding: fresh.binding, cells: fresh.cells, physicalArtifactsReviewed: fresh.physicalArtifactsReviewed });
+      for (const cell of Object.values(first!.cells!)) cell.reviewer = "@Founder";
+      Object.assign(second!, { round: 1 });
+      ledger.rounds = [second!, first!];
+    }, /before the round it follows|must be a current record/u);
+    // Even in time order, a historical pass is not a current one.
+    failed((ledger) => {
+      const round = ledger.rounds.at(-1)!;
+      Object.assign(round, { record: "historical" });
+      ledger.rounds = [ledger.rounds[1]!, round].map((entry, index) => Object.assign(entry, { round: index + 1 }));
+    }, /a passing latest round must be a current record, not historical/u);
+    // A record written after the fact never follows a current one, even in time order and failed.
+    failed((ledger) => {
+      ledger.rounds.push({ ...structuredClone(ledger.rounds[1]!), round: 4, reviewedAt: "2026-10-02" });
+    }, /round 4: a historical-reconstruction record cannot follow a current round/u);
+    // A current round reviewed before the render it binds, as a round and cell by cell.
+    failed((ledger) => { ledger.rounds.at(-1)!.reviewedAt = "2026-10-01T08:59:59.000Z"; }, /round 3: reviewed 2026-10-01T08:59:59\.000Z, before the render it binds/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.cells!["print/clean/pdf"]!.reviewedAt = "2026-10-01T08:00:00.000Z"; },
+      /print\/clean\/pdf reviewed 2026-10-01T08:00:00\.000Z, before the render it binds/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.reviewedAt = "2026-10-01"; }, /a current round's reviewedAt must be an exact UTC timestamp/u);
+    // A later round reviewed before the one it follows.
+    failed((ledger) => { ledger.rounds.push({ ...structuredClone(ledger.rounds.at(-1)!), round: 4, reviewedAt: "2026-09-30T10:00:00.000Z" }); },
+      /round 4: reviewed 2026-09-30T10:00:00\.000Z, before the round it follows/u);
+    const { ledger } = boundPassingFixture();
+    assert.equal(validateReviewLedger(ledger).latest.round, 3, "positive control: a current round reviewed after its render");
+  });
+
+  it("names exactly the code roster wherever the docs name the human roles", () => {
+    const roster = [...HUMAN_REVIEW_ROLES].sort();
+    for (const path of ["docs/reporting.md", "docs/releasing.md"]) {
+      const text = readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+      const listed = [...text.matchAll(/<!-- human-review-roles: ([^>]*?) -->/gu)];
+      assert.equal(listed.length, 1, `${path} must carry exactly one human-review-roles marker`);
+      assert.deepEqual(listed[0]![1]!.split(/,\s*/u).sort(), roster, `${path} lists a human roster other than HUMAN_REVIEW_ROLES`);
+      for (const role of roster) assert.ok(text.includes(`\`${role}\``), `${path} does not name ${role}`);
+    }
+    assert.ok(REVIEWER_AUTHENTICATION_NOTE.includes("does not authenticate a person"), "the residual is stated, not implied");
   });
 
   it("rejects a ledger round whose record contradicts its outcome", () => {

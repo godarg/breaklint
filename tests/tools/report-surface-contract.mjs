@@ -238,6 +238,16 @@ export function assertObservedEnvironment(observed, label) {
  */
 export const HUMAN_REVIEW_ROLES = Object.freeze(["@Brand", "@Neo", "@Founder"]);
 
+/**
+ * What the roster check does NOT do, stated wherever a review result is shown. The ledger is a
+ * file in the repository; the check proves that a rostered handle was written into it, not who
+ * wrote it. Nothing here is signed.
+ */
+export const REVIEWER_AUTHENTICATION_NOTE =
+  "The roster check proves only that a rostered handle (@Brand, @Neo or @Founder) was written into the ledger; " +
+  "it does not authenticate a person. That a rostered human actually reviewed rests on repository access control " +
+  "and on review of the ledger diff, not on this gate.";
+
 const AGENT_HANDLE = /^@[A-Za-z0-9][A-Za-z0-9_.-]{0,38}$/u;
 const REVIEWER_FIELDS = Object.freeze({
   human: Object.freeze(["handle", "kind"]),
@@ -334,6 +344,10 @@ function assertReviewCell(cellId, cell, round, label) {
  * - within a round one handle names one reviewer of one kind;
  * - a cell that passed names a reviewer of its round who is a rostered human (HUMAN_REVIEW_ROLES);
  *   an agent may be recorded as a reviewer and may record a failed cell, never a passed one;
+ * - rounds are reviewed in numbered order (non-decreasing reviewedAt), no historical or
+ *   reconstructed record follows a current one, and a current round and each of its reviewed cells
+ *   were reviewed at or after the render timestamp it binds;
+ * - a passing LATEST round is a current record;
  * - a `pass` round names a rostered human reviewer, binds an input fingerprint, a render
  *   timestamp and an environment, records no blocker or high finding and carries a complete cell
  *   set in which every cell passed;
@@ -345,6 +359,8 @@ function assertReviewCell(cellId, cell, round, label) {
 export function validateReviewLedger(ledger, { cellCount = 32 } = {}) {
   assert.equal(ledger?.schemaVersion, REVIEW_LEDGER_SCHEMA_VERSION, "human ledger schema drift");
   assert.ok(Array.isArray(ledger.rounds) && ledger.rounds.length > 0, "human ledger holds no review round");
+  let previousReviewedAt = null;
+  let currentSeen = false;
   for (const [index, round] of ledger.rounds.entries()) {
     const label = `human ledger round ${index + 1}`;
     assert.equal(round.round, index + 1, `${label}: rounds must be numbered in order`);
@@ -370,6 +386,34 @@ export function validateReviewLedger(ledger, { cellCount = 32 } = {}) {
     const cells = round.cells === null ? null : Object.entries(round.cells ?? {});
     assert.ok(cells === null || cells.length > 0, `${label}: cells must be a record or null`);
     for (const [cellId, cell] of cells ?? []) assertReviewCell(cellId, cell, round, label);
+    // Order and time, fail-closed: rounds are reviewed in the order they are numbered, a record
+    // written after the fact never follows a current one, and a current round cannot have been
+    // reviewed before the render it binds existed. Historical rounds keep their times as recorded
+    // (round 1's cells predate its render timestamp by minutes; it is not rewritten).
+    if (round.outcome !== "pending") {
+      const reviewedAt = Date.parse(round.reviewedAt);
+      assert.ok(previousReviewedAt === null || reviewedAt >= previousReviewedAt,
+        `${label}: reviewed ${round.reviewedAt}, before the round it follows; rounds are reviewed in the order they are numbered`);
+      previousReviewedAt = reviewedAt;
+    }
+    if (round.record === "current") {
+      currentSeen = true;
+    } else {
+      assert.ok(!currentSeen, `${label}: a ${round.record} record cannot follow a current round`);
+    }
+    if (round.record === "current" && round.binding) {
+      const renderedAt = Date.parse(round.binding.renderManifestGeneratedAt);
+      if (round.outcome !== "pending") {
+        assertUtc(round.reviewedAt, `${label}: a current round's reviewedAt must be an exact UTC timestamp`);
+        assert.ok(Date.parse(round.reviewedAt) >= renderedAt,
+          `${label}: reviewed ${round.reviewedAt}, before the render it binds (${round.binding.renderManifestGeneratedAt})`);
+      }
+      for (const [cellId, cell] of cells ?? []) {
+        if (cell.status === "not-reviewed") continue;
+        assert.ok(Date.parse(cell.reviewedAt) >= renderedAt,
+          `${label}: ${cellId} reviewed ${cell.reviewedAt}, before the render it binds (${round.binding.renderManifestGeneratedAt})`);
+      }
+    }
     if (round.outcome === "pass") {
       assert.ok(round.reviewers.some(isRosteredHuman), `${label}: a passing round must name a rostered human reviewer`);
       assert.ok(round.binding, `${label}: a passing round must bind inputs and environment`);
@@ -387,7 +431,13 @@ export function validateReviewLedger(ledger, { cellCount = 32 } = {}) {
       assert.ok((cells ?? []).every(([, cell]) => cell.status === "not-reviewed"), `${label}: a pending round cannot carry a review outcome`);
     }
   }
-  return { rounds: ledger.rounds.length, latest: ledger.rounds.at(-1) };
+  const latest = ledger.rounds.at(-1);
+  // A pass is claimed only by a round recorded as it happened: a historical or reconstructed pass
+  // moved to the end, or re-bound to today's render, is not a review of today's render.
+  if (latest.outcome === "pass") {
+    assert.equal(latest.record, "current", `human ledger round ${latest.round}: a passing latest round must be a current record, not ${latest.record}`);
+  }
+  return { rounds: ledger.rounds.length, latest };
 }
 
 function describeReviewer(reviewer) {
@@ -417,35 +467,17 @@ export function summarizeLatestRound(ledger) {
   };
 }
 
-/** One line for logs and job summaries: what the review ledger currently says, by whom, and why. */
-export function describeLatestRound(ledger, currentFingerprint) {
-  const { latest, reviewers, passingCells, humanPassingCells, humanPass } = summarizeLatestRound(ledger);
-  const counts = `${latest.findings.blocker} blocker, ${latest.findings.high} high, ${latest.findings.medium} medium, ${latest.findings.low} low`;
-  const bound = latest.binding?.reviewInputFingerprint === currentFingerprint;
-  const who = reviewers.length > 0 ? reviewers.join(", ") : "none named";
-  return `latest ${humanPass ? "human " : ""}review round ${latest.round} is ${latest.outcome.toUpperCase()}` +
-    `${latest.outcome === "pass" && !humanPass ? " but NOT a human pass" : ""} ` +
-    `(${latest.reviewedAt ?? "not yet reviewed"}; ${counts}; ${latest.record} record; reviewers: ${who}; ` +
-    `cells passed by a rostered human: ${humanPassingCells} of ${passingCells} passing); ` +
-    `bound to the current inputs: ${bound ? "yes" : "no"}`;
-}
-
 /**
- * The strict local human gate. It passes only when the LATEST round passed, every one of its cells
- * passed under a rostered human reviewer, and that round is bound to exactly the current inputs, the current declared
- * environment, the current physical inventory and every current cell fingerprint. An earlier
- * passing round never carries forward over a later failed or pending one.
+ * Everything a passing latest round must be bound to besides the input fingerprint: the declared
+ * environment, the matrix of cells, every cell's artifact fingerprint and screen pixels, the named
+ * artifacts, the reviewed pages and the physical inventory. Throws on the first mismatch.
  */
-export function assessHumanGate(ledger, manifest, currentFingerprint) {
-  validateReviewLedger(ledger, { cellCount: manifest.artifacts.length });
-  const latest = ledger.rounds.at(-1);
-  assert.equal(latest.outcome, "pass", describeLatestRound(ledger, currentFingerprint));
-  // validateReviewLedger above already refused a passing round in which any cell passed under
-  // anyone but a rostered human, so reaching this line means every cell is a human pass.
-  assert.equal(latest.binding.reviewInputFingerprint, currentFingerprint, "human review ledger is bound to a different source/input revision");
+function assertEnvironmentAndArtifactBinding(latest, manifest) {
+  assert.ok(latest.binding, `latest review round ${latest.round} binds nothing`);
   assertReviewEnvironment(latest.binding.reviewEnvironment, "latest human review environment");
   assert.deepEqual(latest.binding.reviewEnvironment, manifest.reviewEnvironment,
     "strict local human review cannot transfer to a different declared browser/platform/render environment");
+  assert.ok(latest.cells, `latest review round ${latest.round} records no cells`);
   assert.deepEqual([...Object.keys(latest.cells)].sort(), manifest.artifacts.map((artifact) => artifact.cell).sort(),
     "the human review ledger and current render matrix disagree");
   for (const artifact of manifest.artifacts) {
@@ -463,6 +495,58 @@ export function assessHumanGate(ledger, manifest, currentFingerprint) {
     }
   }
   assert.deepEqual(latest.physicalArtifactsReviewed, manifest.physicalArtifacts, "human ledger does not attest the complete physical artifact inventory");
+}
+
+/**
+ * The latest round's binding, in the same two halves the strict gate checks: the input fingerprint,
+ * and the environment and artifacts (assertEnvironmentAndArtifactBinding). "Bound" in any line this
+ * module prints means both halves, never the fingerprint alone.
+ */
+export function latestBindingStatus(ledger, manifest, currentFingerprint) {
+  const latest = ledger.rounds.at(-1);
+  const inputs = latest.binding?.reviewInputFingerprint === currentFingerprint;
+  let environmentAndArtifacts = false;
+  let reason = null;
+  try {
+    assertEnvironmentAndArtifactBinding(latest, manifest);
+    environmentAndArtifacts = true;
+  } catch (error) {
+    reason = String(error?.message ?? error).split("\n")[0];
+  }
+  return { inputs, environmentAndArtifacts, bound: inputs && environmentAndArtifacts, reason };
+}
+
+/**
+ * One line for logs and job summaries: what the review ledger currently says, by whom, and whether
+ * it is bound to what is rendered now, in both halves of the strict gate's binding.
+ */
+export function describeLatestRound(ledger, manifest, currentFingerprint) {
+  const { latest, reviewers, passingCells, humanPassingCells, humanPass } = summarizeLatestRound(ledger);
+  const counts = `${latest.findings.blocker} blocker, ${latest.findings.high} high, ${latest.findings.medium} medium, ${latest.findings.low} low`;
+  const binding = latestBindingStatus(ledger, manifest, currentFingerprint);
+  const who = reviewers.length > 0 ? reviewers.join(", ") : "none named";
+  return `latest ${humanPass ? "human " : ""}review round ${latest.round} is ${latest.outcome.toUpperCase()}` +
+    `${latest.outcome === "pass" && !humanPass ? " but NOT a human pass" : ""} ` +
+    `(${latest.reviewedAt ?? "not yet reviewed"}; ${counts}; ${latest.record} record; reviewers: ${who}; ` +
+    `cells passed by a rostered human: ${humanPassingCells} of ${passingCells} passing); ` +
+    `bound to the current render: inputs ${binding.inputs ? "yes" : "no"}; environment/artifacts ${binding.environmentAndArtifacts ? "yes" : "no"}`;
+}
+
+/**
+ * The strict local human gate. It passes only when the LATEST round passed, every one of its cells
+ * passed under a rostered human reviewer, it is a current record, and it is bound to exactly the
+ * current inputs, the current declared environment, the current physical inventory and every
+ * current cell fingerprint. An earlier passing round never carries forward over a later failed or
+ * pending one.
+ */
+export function assessHumanGate(ledger, manifest, currentFingerprint) {
+  validateReviewLedger(ledger, { cellCount: manifest.artifacts.length });
+  const latest = ledger.rounds.at(-1);
+  assert.equal(latest.outcome, "pass", describeLatestRound(ledger, manifest, currentFingerprint));
+  // validateReviewLedger above already refused a passing latest round that is not a current
+  // record, or in which any cell passed under anyone but a rostered human.
+  assert.equal(latest.binding.reviewInputFingerprint, currentFingerprint, "human review ledger is bound to a different source/input revision");
+  assertEnvironmentAndArtifactBinding(latest, manifest);
   return latest;
 }
 
