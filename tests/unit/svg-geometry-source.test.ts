@@ -26,7 +26,7 @@ it("the injected SVG collector ships raw frame facts through captured primitives
   assert.doesNotMatch(SNAPSHOT_SOURCE, /\.(?:animVal|baseVal)\b/u);
   // The ancestor walk uses the captured nodeType getter, never the author-replaceable property.
   assert.match(SNAPSHOT_SOURCE, /for \(let at = el; at && P\.nodeType\(at\) === 1; at = P\.parent\(at\)\)/u);
-  assert.match(SNAPSHOT_SOURCE, /P\.nodeType\(ancestor\) === 1/u);
+  assert.match(SNAPSHOT_SOURCE, /for \(let at = P\.parent\(textEl\); at && P\.nodeType\(at\) === 1; at = P\.parent\(at\)\)/u);
   assert.doesNotMatch(SNAPSHOT_SOURCE, /(?:viewportAncestor|ancestor|\bat)\.nodeType/u);
   // The facts for the 3D decline and the CDP oracle are collected at all.
   for (const key of ["transform", "rotate", "scale", "translate", "perspective", "offset-path"]) {
@@ -48,8 +48,17 @@ it("reads every computed value of the SVG section through the captured getProper
   for (const name of ["overflow-x", "overflow-y", "overflow-clip-margin", "contain", "content-visibility", "clip-path", "mask-image", "box-sizing"]) {
     assert.match(section, new RegExp(`SVG_BOX_PROPS = \\[[^;]*"${name}"\\]`, "u"), name);
   }
-  for (const name of ["fill", "stroke", "stroke-width", "fill-opacity", "text-shadow", "text-decoration-line", "clip-path", "filter"]) {
+  for (const name of ["fill", "stroke", "stroke-width", "fill-opacity", "clip-path"]) {
     assert.ok(section.includes(`P.css(style, "${name}")`) || section.includes(`P.css(ancestorStyle, "${name}")`), name);
+  }
+  // The paint and label facts of the ink bound are read by the helpers before the section, the
+  // same way: by CSS name through P.css, from [key, name] pairs built in Node.
+  const helpers = SNAPSHOT_SOURCE.slice(SNAPSHOT_SOURCE.indexOf("const PAINT_PROPS = "), SNAPSHOT_SOURCE.indexOf("const pagesEls = "));
+  assert.ok(helpers.length > 0, "the paint helpers moved");
+  assert.doesNotMatch(helpers, /\b(?:style|childStyle|ancestorStyle|textStyle)\.[A-Za-z]/u, "a paint fact read through a replaceable getter");
+  assert.match(helpers, /const pickStyle = \(style, props\) => \{ const out = \{\}; for \(const \[key, name\] of props\) out\[key\] = P\.css\(style, name\); return out; \};/u);
+  for (const name of ["text-shadow", "text-decoration-line", "clip-path", "mask-image", "filter", "stroke-linejoin", "stroke-miterlimit", "vector-effect", "font-kerning", "-webkit-locale"]) {
+    assert.ok(helpers.includes(`"${name}"`), name);
   }
   assert.ok(PRIMITIVES_SOURCE.includes("const getPropertyValueFn = CSSStyleDeclaration.prototype.getPropertyValue;"));
   assert.ok(PRIMITIVES_SOURCE.includes("css: (style, name) => call.call(getPropertyValueFn, style, name),"));
@@ -63,7 +72,8 @@ it("ships the HTML ancestors that may clip, up to the page area, and declines pe
   assert.match(section, /const flowArea = P\.closest\(el, SVG_FLOW_AREA_SELECTOR\);/u);
   assert.match(section, /ancestors\.push\(\{ up, \.\.\.facts, radii: SVG_RADIUS_PROPS\.map/u);
   assert.match(section, /style: pick\(svgStyle, SVG_BOX_PROPS\), transforms, ancestors,/u);
-  assert.match(section, /P\.hasAttr\(textEl, "rotate"\) \|\| P\.all\(textEl, "\[rotate\]"\)\.length > 0/u);
+  // Shipped with the paint facts, and declined first in Node (classifyPaint, "per-glyph-rotate").
+  assert.match(SNAPSHOT_SOURCE, /const perGlyphRotate = P\.hasAttr\(textEl, "rotate"\) \|\| P\.all\(textEl, "\[rotate\]"\)\.length > 0;/u);
 });
 
 it("collects SVG only from the page content area, never from margin-box clones", () => {
@@ -86,6 +96,32 @@ it("captures the SVG matrix, rect and length getters before any document script"
     'getter(SVGLength.prototype, "value")',
   ]) assert.ok(PRIMITIVES_SOURCE.includes(capture), `not captured: ${capture}`);
   for (const name of ["svgGeometry", "svgCtm", "svgScreenCtm", "svgViewportLengths"]) {
+    assert.ok(PRIMITIVES_CHECK.includes(`"${name}"`), `the integrity check does not require ${name}`);
+  }
+});
+
+/**
+ * The painted-ink bound (src/measure/svg-ink.ts) is decided in Node too. Up to this build the page
+ * declined every stroked label itself and never looked at a <tspan>; now it ships the paint of the
+ * text, of every rendered descendant and of effect-bearing ancestors, the SVG text positions and a
+ * canvas raster — all through captured primitives — and decides nothing about them.
+ */
+it("ships SVG paint, text positions and the glyph raster raw, through captured primitives", () => {
+  assert.doesNotMatch(SNAPSHOT_SOURCE, /paintedBoundsUnsupported|unsupportedTargets \+= 1/u, "an in-page paint verdict is back");
+  assert.match(SNAPSHOT_SOURCE, /paint: paintFacts\(textEl, style\)/u);
+  assert.match(SNAPSHOT_SOURCE, /label: labelFacts\(textEl, style, targetGeometry\)/u);
+  // Descendants are read, not just the <text>.
+  assert.match(SNAPSHOT_SOURCE, /elements\.push\(\{ tag, \.\.\.pickStyle\(childStyle, PAINT_PROPS\), \.\.\.stretch\(child\) \}\)/u);
+  assert.match(SNAPSHOT_SOURCE, /P\.svgTextFacts\(textEl, /u);
+  assert.match(SNAPSHOT_SOURCE, /P\.textRaster\(collapsed, spec,/u);
+  assert.doesNotMatch(SNAPSHOT_SOURCE, /\.(?:measureText|fillText|getImageData|getContext|getStartPositionOfChar|getEndPositionOfChar|getComputedTextLength|getNumberOfChars)\(/u,
+    "a direct canvas or SVG text call bypasses the captured primitives");
+  for (const capture of [
+    "context2dProto.measureText", "context2dProto.fillText", "context2dProto.setTransform",
+    "getter(TextMetrics.prototype, name)", "textContentProto.getStartPositionOfChar", "textContentProto.getComputedTextLength",
+    'setterOf(HTMLCanvasElement.prototype, "width")',
+  ]) assert.ok(PRIMITIVES_SOURCE.includes(capture), `not captured: ${capture}`);
+  for (const name of ["svgTextFacts", "textRaster"]) {
     assert.ok(PRIMITIVES_CHECK.includes(`"${name}"`), `the integrity check does not require ${name}`);
   }
 });

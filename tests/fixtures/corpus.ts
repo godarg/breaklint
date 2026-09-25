@@ -158,8 +158,8 @@ function snapshot(parts: {
   };
 }
 
-type FixtureSvgText = Omit<SvgTextTarget, "boxLocal" | "bboxUser" | "userToLocal"> &
-  Partial<Pick<SvgTextTarget, "boxLocal" | "bboxUser" | "userToLocal">>;
+type FixtureSvgText = Omit<SvgTextTarget, "boxLocal" | "bboxUser" | "userToLocal" | "paint"> &
+  Partial<Pick<SvgTextTarget, "boxLocal" | "bboxUser" | "userToLocal" | "paint">>;
 
 const IDENTITY = [1, 0, 0, 1, 0, 0] as const;
 
@@ -167,7 +167,9 @@ const IDENTITY = [1, 0, 0, 1, 0, 0] as const;
  * A hand-authored SVG record. Unless a fixture says otherwise it is the untransformed case: the
  * local frame's origin sits at the viewport's screen corner, the viewport is its only clip when its
  * overflow clips, and every target's local box is its screen box moved by that origin. Fixtures
- * whose point is that the two frames DIFFER pass `viewportLocal` and `boxLocal` explicitly.
+ * whose point is that the two frames DIFFER pass `viewportLocal` and `boxLocal` explicitly. Unless a
+ * fixture passes `paint`, its box is an exact ink box on both sides (`inkSource: "projection"`),
+ * which is what a hand-authored box means; fixtures about the bracket pass the bounds they test.
  */
 function svgWith(texts: FixtureSvgText[], over: Partial<SvgRecord> = {}): SvgRecord {
   const viewportScreen = over.viewportScreen ?? box(48, 48, 300, 200);
@@ -204,7 +206,11 @@ function svgWith(texts: FixtureSvgText[], over: Partial<SvgRecord> = {}): SvgRec
     ...over,
     texts: texts.map((text) => {
       const boxLocal = text.boxLocal ?? local(text.boxScreen);
-      return { ...text, boxLocal, bboxUser: text.bboxUser ?? boxLocal, userToLocal: text.userToLocal ?? IDENTITY };
+      const bboxUser = text.bboxUser ?? boxLocal;
+      return {
+        ...text, boxLocal, bboxUser, userToLocal: text.userToLocal ?? IDENTITY,
+        paint: text.paint ?? { inkSource: "projection" as const, inkDiagnostic: null, inkInnerLocal: boxLocal, inkOuterLocal: boxLocal, strokePad: 0, strokeScaleX: 1, paints: true },
+      };
     }),
   };
 }
@@ -664,6 +670,80 @@ export function loadCorpus(): CorpusEntry[] {
               },
             },
           ),
+        ],
+      }),
+    },
+
+    // The painted-ink bound. The cell is not the ink: these decide on `paint`, the box the glyph
+    // ink provably reaches (canvas raster) and the box that provably holds all painted ink.
+    {
+      name: "svg-overflow-clean-descent-slack",
+      kind: "clean",
+      about: "svg/text-overflows-viewport",
+      complication:
+        "An axis tick at y = height − 2: its cell carries the font's descent below the digits and " +
+        "ends 1 px past the bottom edge, while the glyph ink ends 2 px inside it. The cell box is not " +
+        "ink; the released rule reported this label as not drawn.",
+      snapshot: snapshot({
+        blocks: [block("svg1", { tag: "figure" })],
+        svg: [
+          svgWith([svgText("tick", 100, 100, {
+            boxScreen: box(68, 243, 23, 14), boxLocal: box(20, 187, 23, 14), clipState: "none",
+            paint: { inkSource: "canvas-raster", inkDiagnostic: null, inkInnerLocal: box(21.7, 189.4, 20, 8.4), inkOuterLocal: box(21.3, 189, 20.8, 9.2), strokePad: 0, strokeScaleX: 1, paints: true },
+          })]),
+        ],
+      }),
+    },
+    {
+      name: "svg-overflow-clean-halo-inside",
+      kind: "clean",
+      about: "svg/text-overflows-viewport",
+      complication:
+        "The halo idiom: a white 4 px stroke under the fill, on the default miter join, so the stroke " +
+        "may paint up to 8 px beyond the glyph outlines. 12 px inside the edge it cannot reach it. Up " +
+        "to 0.6.0 every stroked label declined, and one halo took the error rule below its floor.",
+      snapshot: snapshot({
+        blocks: [block("svg1", { tag: "figure" })],
+        svg: [
+          svgWith([svgText("halo", 100, 100, {
+            boxScreen: box(256, 108, 80, 14), boxLocal: box(208, 60, 80, 14), clipState: "none",
+            paint: { inkSource: "canvas-raster", inkDiagnostic: null, inkInnerLocal: box(208.5, 62.4, 79, 9.6), inkOuterLocal: box(208.1, 62, 79.8, 10.4), strokePad: 8, strokeScaleX: 1, paints: true },
+          })]),
+        ],
+      }),
+    },
+    {
+      name: "svg-overflow-clean-stroke-band",
+      kind: "clean",
+      about: "svg/text-overflows-viewport",
+      complication:
+        "The same halo 3 px inside the edge: the glyphs are drawn, the stroke may or may not be. The " +
+        "rule must decline the band rather than report on the box around all possible ink — that " +
+        "box is an upper bound, not a measurement of anything painted.",
+      snapshot: snapshot({
+        blocks: [block("svg1", { tag: "figure" })],
+        svg: [
+          svgWith([svgText("halo-band", 100, 100, {
+            boxScreen: box(265, 108, 80, 14), boxLocal: box(217, 60, 80, 14), clipState: "none",
+            paint: { inkSource: "canvas-raster", inkDiagnostic: null, inkInnerLocal: box(217.5, 62.4, 79, 9.6), inkOuterLocal: box(217.1, 62, 79.8, 10.4), strokePad: 8, strokeScaleX: 1, paints: true },
+          })]),
+        ],
+      }),
+    },
+    {
+      name: "svg-overflow-trigger-ink-past-edge",
+      kind: "trigger",
+      about: "svg/text-overflows-viewport",
+      complication:
+        "The cell ends 6 px past the right edge but its trailing side bearing is empty: the glyph ink " +
+        "provably reaches 4 px past it. The finding is the inner box's 4 px, not the cell's 6.",
+      snapshot: snapshot({
+        blocks: [block("svg1", { tag: "figure" })],
+        svg: [
+          svgWith([svgText("ink-out", 100, 100, {
+            boxScreen: box(314, 108, 40, 14), boxLocal: box(266, 60, 40, 14), clipState: "none",
+            paint: { inkSource: "canvas-raster", inkDiagnostic: null, inkInnerLocal: box(266.5, 62.4, 37.5, 9.6), inkOuterLocal: box(266.1, 62, 38.3, 10.4), strokePad: 0, strokeScaleX: 1, paints: true },
+          })]),
         ],
       }),
     },

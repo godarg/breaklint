@@ -17,9 +17,11 @@ import {
   BREAK_CAUSE_DETERMINED_BY,
   BREAK_CAUSE_KINDS,
   SNAPSHOT_SCHEMA_VERSION,
+  SVG_INK_DIAGNOSTICS,
 } from "../core/enums.ts";
 import type {
   BlockRecord,
+  AffineMatrix,
   Box,
   InputIdentity,
   PageRecord,
@@ -37,6 +39,17 @@ import {
   SVG_FLOAT_NOISE_PX, SVG_OVERSHOOT_EPSILON_PX, envelope, resolveSvgFrames, resolveSvgText,
   type RawSvgFrame, type RawSvgTextFrame, type SvgBoxModel,
 } from "./svg-viewport.ts";
+import {
+  LABEL_STYLE_KEYS, PAINT_KEYS, cssPairs, RASTER_EM_DEVICE_PX, RASTER_MAX_CANVAS_PX, RASTER_MAX_CHARS, RASTER_MAX_CHECKPOINTS, RASTER_MIN_EM_DEVICE_PX,
+  RASTER_MIN_PER_SCREEN_PX,
+  STRETCH_KEYWORDS, TEXT_RENDERING, classifyPaint, textPaint, type RawTextLabel, type RawTextPaint,
+} from "./svg-ink.ts";
+
+/** A six-number matrix as the page ships it, or null. */
+function matrixOf(values: readonly number[] | null | undefined): AffineMatrix | null {
+  if (!values || values.length !== 6 || values.some((value) => !Number.isFinite(value))) return null;
+  return [values[0]!, values[1]!, values[2]!, values[3]!, values[4]!, values[5]!];
+}
 import { boundaryFactsFrom, type CollectorResult } from "../paginate/collector.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InjectionResult } from "../source/inject.ts";
@@ -371,13 +384,20 @@ interface RawBlock extends Omit<BlockRecord, "authorId" | "blockSignature" | "fr
  * markup, and hashing belongs on this side of the boundary, not in a string evaluated inside the
  * document under test.
  */
-interface RawSvgText extends Omit<SvgTextTarget, "targetKey" | "svgTextKey" | "ink" | "ambiguityGroupSize" | "boxScreen" | "boxLocal" | "bboxUser" | "userToLocal"> {
+interface RawSvgText extends Omit<SvgTextTarget, "targetKey" | "svgTextKey" | "ink" | "ambiguityGroupSize" | "boxScreen" | "boxLocal" | "bboxUser" | "userToLocal" | "paint"> {
   /** The `<text>`'s own `id`, or null. */
   sourceIdentity: string | null;
   /** Its text content, normalised and hashed in Node when there is no id. */
   signature: string;
-  /** getBBox(), getCTM() and getScreenCTM() as numbers; every box is built from them in Node. */
-  geometry: RawSvgTextFrame;
+  /**
+   * getBBox(), getCTM() and getScreenCTM() as numbers; every box is built from them in Node. null
+   * when the browser laid the text out and still gave no geometry: an unreadable target.
+   */
+  geometry: RawSvgTextFrame | null;
+  /** Computed paint of the text, its rendered descendants and effect-bearing ancestors. */
+  paint: RawTextPaint;
+  /** The label's structure, font state, SVG text positions and canvas raster. */
+  label: RawTextLabel;
 }
 
 export interface RawSvg extends Omit<SvgRecord, "sourceKey" | "texts" | "clipped" | "viewportLocal" | "viewportDiagnostic"> {
@@ -453,6 +473,97 @@ export const SNAPSHOT_SOURCE = `(() => {
       count += target ? referencedTextTargets(target, [...seen, id], depth + 1) : 1;
     }
     return count;
+  };
+  // Paint and label facts of one SVG text target, shipped raw (src/measure/svg-ink.ts reads them).
+  // Read through P.css, the captured getPropertyValue, by CSS name ([key, name] pairs built in Node).
+  const PAINT_PROPS = ${JSON.stringify(cssPairs(PAINT_KEYS))};
+  const LABEL_STYLE_PROPS = ${JSON.stringify(cssPairs(LABEL_STYLE_KEYS))};
+  const pickStyle = (style, props) => { const out = {}; for (const [key, name] of props) out[key] = P.css(style, name); return out; };
+  const paintFacts = (textEl, style) => {
+    const stretch = (el) => ({ textLength: P.attr(el, "textLength"), lengthAdjust: P.attr(el, "lengthAdjust") });
+    const elements = [{ tag: "text", ...pickStyle(style, PAINT_PROPS), ...stretch(textEl) }];
+    let renderedText = "";
+    const walk = (node) => {
+      for (const child of P.children(node)) {
+        const type = P.nodeType(child);
+        if (type === 3 || type === 4) { renderedText += P.text(child) || ""; continue; }
+        if (type !== 1) continue;
+        const tag = String(child.localName || "").toLowerCase();
+        if (tag === "title" || tag === "desc" || tag === "metadata") continue;
+        const childStyle = P.style(child, null);
+        if (P.css(childStyle, "display") === "none") continue;
+        elements.push({ tag, ...pickStyle(childStyle, PAINT_PROPS), ...stretch(child) });
+        walk(child);
+      }
+    };
+    walk(textEl);
+    // Clip, mask and filter on any ancestor; text decoration only inside the SVG tree, where it
+    // propagates to the text — an <svg> is a replaced element, and an underline on the HTML link
+    // around a figure does not reach into it.
+    const ancestors = [];
+    for (let at = P.parent(textEl); at && P.nodeType(at) === 1; at = P.parent(at)) {
+      const ancestorStyle = P.style(at, null);
+      const facts = { clipPath: P.css(ancestorStyle, "clip-path"), mask: P.css(ancestorStyle, "mask"),
+        maskImage: P.css(ancestorStyle, "mask-image"), filter: P.css(ancestorStyle, "filter"),
+        textDecorationLine: P.closest(at, "svg") !== null ? P.css(ancestorStyle, "text-decoration-line") : null };
+      if (effect(facts.clipPath) || effect(facts.mask) || effect(facts.maskImage) || effect(facts.filter)
+          || effect(facts.textDecorationLine)) ancestors.push(facts);
+    }
+    const perGlyphRotate = P.hasAttr(textEl, "rotate") || P.all(textEl, "[rotate]").length > 0;
+    return { perGlyphRotate, elements, ancestors, renderedText };
+  };
+  // The canvas font state for a computed style: the same mapping as canvasSpecFor in
+  // src/measure/svg-ink.ts, which Node applies again and compares. Key order is part of it.
+  const STRETCH_KEYWORDS = ${JSON.stringify(STRETCH_KEYWORDS)};
+  const TEXT_RENDERING = ${JSON.stringify(TEXT_RENDERING)};
+  const canvasSpec = (s) => {
+    const fontStretch = STRETCH_KEYWORDS[s.fontStretch];
+    const textRendering = TEXT_RENDERING[String(s.textRendering).toLowerCase()];
+    if (!fontStretch || !textRendering) return null;
+    const locale = s.webkitLocale;
+    const lang = !locale || locale === "auto" ? "inherit" : locale.replace(/^"|"$/gu, "");
+    return { font: s.fontStyle + " " + s.fontWeight + " " + s.fontSize + " " + s.fontFamily, fontSize: s.fontSize,
+      letterSpacing: s.letterSpacing === "normal" ? "0px" : s.letterSpacing, wordSpacing: s.wordSpacing,
+      fontKerning: s.fontKerning, fontStretch, fontVariantCaps: s.fontVariantCaps, textRendering, lang };
+  };
+  const labelFacts = (textEl, style, geometry) => {
+    let elementChildren = 0;
+    for (const child of P.children(textEl)) if (P.nodeType(child) === 1) elementChildren += 1;
+    const attributes = { x: P.attr(textEl, "x"), y: P.attr(textEl, "y"), dx: P.attr(textEl, "dx"), dy: P.attr(textEl, "dy"),
+      rotate: P.attr(textEl, "rotate"), textLength: P.attr(textEl, "textLength"), lengthAdjust: P.attr(textEl, "lengthAdjust") };
+    const labelStyle = pickStyle(style, LABEL_STYLE_PROPS);
+    const textContent = P.text(textEl) || "";
+    const collapsed = labelStyle.whiteSpaceCollapse === "collapse"
+      ? textContent.replace(/[\\t\\n\\r ]+/gu, " ").replace(/^ | $/gu, "") : null;
+    // Word boundaries: where the canvas, which shapes word by word, and the SVG, which shapes the
+    // whole run, can part ways (kerning across a space), and where Node compares the two.
+    const checkpoints = [];
+    if (collapsed !== null) for (let index = 1; index < collapsed.length; index += 1) {
+      if (collapsed[index] === " " || collapsed[index - 1] === " ") checkpoints.push(index);
+    }
+    const positions = P.svgTextFacts(textEl, checkpoints.length <= ${RASTER_MAX_CHECKPOINTS} ? checkpoints : []);
+    let raster = null;
+    // Attempted only where it can possibly be used: one run of text, a collapsed string, a font
+    // state the canvas takes. Node re-checks every condition; skipping here only saves the work.
+    if (elementChildren === 0 && geometry && positions && positions.chars > 0 && positions.chars <= ${RASTER_MAX_CHARS}
+        && positions.start && positions.end && collapsed !== null && checkpoints.length <= ${RASTER_MAX_CHECKPOINTS}) {
+      const spec = canvasSpec(labelStyle);
+      const size = parseFloat(labelStyle.fontSize);
+      if (spec && collapsed.length > 0 && size > 0) {
+        // Drawn through the text's own CTM, linear part; under spacingAndGlyphs stretched along the
+        // baseline to the run the SVG laid out.
+        const stretchTo = attributes.textLength !== null ? positions.end[0] - positions.start[0] : null;
+        // Screen px per unit of the text's viewport space, from its two matrices.
+        const [ca, cb, cc, cd] = geometry.ctm, [sa, sb, sc, sd] = geometry.screenCtm;
+        const screenScale = Math.max(Math.hypot(sa, sb), Math.hypot(sc, sd)) / Math.max(Math.hypot(ca, cb), Math.hypot(cc, cd));
+        const measured = P.textRaster(collapsed, spec, { size, linear: geometry.ctm.slice(0, 4), stretchTo, checkpoints,
+          screenScale: Number.isFinite(screenScale) && screenScale > 0 ? screenScale : 1,
+          emDevicePx: ${RASTER_EM_DEVICE_PX}, minEmDevicePx: ${RASTER_MIN_EM_DEVICE_PX}, minPerScreenPx: ${RASTER_MIN_PER_SCREEN_PX},
+          maxCanvasPx: ${RASTER_MAX_CANVAS_PX} });
+        if (measured) raster = { text: collapsed, spec, ...measured };
+      }
+    }
+    return { elementChildren, textContent, attributes, style: labelStyle, positions, raster };
   };
   const pagesEls = P.all(document, ".pagedjs_page");
   const fragments = [];
@@ -800,39 +911,27 @@ export const SNAPSHOT_SOURCE = `(() => {
               || parseFloat(P.css(style, "opacity")) === 0));
         if ((rect.width === 0 && rect.height === 0) || invisible) continue;
 
-        // SVG getBBox() omits stroke, clipping, masks and filter effects. It also cannot expose
-        // the painted result of a referenced paint server. Text decoration/shadow add ink outside
-        // the glyph box by the same route. Judge none of those with a different box: retain the
-        // target as an explicit coverage failure until the independent ink pass exists.
+        // The paint this target is drawn with, its label structure, and — for a label that is a
+        // single run of text — a canvas raster of its own glyphs. RAW FACTS ONLY: whether the paint
+        // is bounded at all (a stroke is; paint servers, shadow, decoration, clip, mask and filter
+        // are not, on the text, on any rendered descendant or on an ancestor), how far a stroke can
+        // reach, and whether the raster reproduces the label are decided in Node
+        // (src/measure/svg-ink.ts), where each decision can be tested. Until this build a visible
+        // stroke declined the target here outright, and a <tspan>'s own paint was never read.
         //
-        // Per-glyph rotation belongs here too. \`rotate\` on the text or any of its tspans turns each
-        // glyph about its own origin, and with lengthAdjust="spacingAndGlyphs" Chromium 141 draws
-        // ink 2.25 px beyond the getBBox() cell (measured on a 16 px run): the box stops being the
-        // ink's outer bound. x/y/dx/dy lists and textPath were measured to keep the ink inside the
-        // cell and stay measured.
-        let paintedBoundsUnsupported = strokeVisible
-          || /url\\(/u.test(fill) || /url\\(/u.test(stroke)
-          || effect(P.css(style, "text-shadow")) || effect(P.css(style, "text-decoration-line"))
-          || P.hasAttr(textEl, "rotate") || P.all(textEl, "[rotate]").length > 0;
-        let ancestor = textEl;
-        while (!paintedBoundsUnsupported && ancestor && P.nodeType(ancestor) === 1) {
-          const ancestorStyle = P.style(ancestor, null);
-          paintedBoundsUnsupported = effect(P.css(ancestorStyle, "clip-path"))
-            || effect(P.css(ancestorStyle, "mask")) || effect(P.css(ancestorStyle, "mask-image"))
-            || effect(P.css(ancestorStyle, "filter"));
-          ancestor = P.parent(ancestor);
-        }
-        if (paintedBoundsUnsupported) { unsupportedTargets += 1; continue; }
-
+        // Per-glyph rotation is one of those facts (\`rotate\` on the text or any descendant): each
+        // glyph turns about its own origin, and with lengthAdjust="spacingAndGlyphs" Chromium 141
+        // draws ink 2.25 px beyond the getBBox() cell (measured on a 16 px run), so neither the cell
+        // nor the raster bounds it. Node declines it before anything else is asked.
+        //
         // getBBox() throws on a <text> with no rendered geometry; getCTM()/getScreenCTM() return
         // null on one that is not in a rendered tree. For an element the browser DID lay out,
-        // either is a measurement this tool owed and did not deliver — declined, and counted
-        // against coverage. The boxes themselves are built in Node from these raw facts, all four
-        // corners through each matrix: under a rotation the min/max over one diagonal is smaller
-        // than the real extent in both axes (measured on the 45-degree fixture: four corners put
-        // the label 15.82 px outside the viewport, two put it 28 px inside it).
+        // either is a measurement this tool owed and did not deliver — Node counts it against
+        // coverage. The boxes themselves are built in Node from these raw facts, all four corners
+        // through each matrix: under a rotation the min/max over one diagonal is smaller than the
+        // real extent in both axes (measured on the 45-degree fixture: four corners put the label
+        // 15.82 px outside the viewport, two put it 28 px inside it).
         const targetGeometry = P.svgGeometry(textEl);
-        if (!targetGeometry) { unreadableTargets += 1; continue; }
         const clipPath = P.css(style, "clip-path");
         const mask = P.css(style, "mask");
         const clipped = !!clipPath && clipPath !== "none";
@@ -844,6 +943,8 @@ export const SNAPSHOT_SOURCE = `(() => {
           signature: P.text(textEl) || "",
           geometry: targetGeometry,
           clipState: clipped && masked ? "both" : clipped ? "clip-path" : masked ? "mask" : "none",
+          paint: paintFacts(textEl, style),
+          label: labelFacts(textEl, style, targetGeometry),
         });
       }
     }
@@ -1019,6 +1120,27 @@ export function validateSnapshotInvariants(
           !Array.isArray(text.userToLocal) || text.userToLocal.length !== 6 || !text.userToLocal.every(Number.isFinite) ||
           !sameBox(envelope(text.bboxUser, text.userToLocal), text.boxLocal)) {
         issues.push(`${svg.nodeKey}: ${text.targetKey} local box is not the envelope of its user box`);
+      }
+      // The paint bound the rule decides on. An inner box outside its outer box, or a raster claim
+      // without a raster, would let the rule report ink it has no evidence for.
+      const paint = text.paint as SvgTextTarget["paint"] | undefined;
+      if (!paint || !["canvas-raster", "cell", "projection"].includes(paint.inkSource) || !finiteBox(paint.inkOuterLocal) ||
+          !(typeof paint.strokePad === "number" && Number.isFinite(paint.strokePad) && paint.strokePad >= 0) ||
+          !(typeof paint.strokeScaleX === "number" && Number.isFinite(paint.strokeScaleX) && paint.strokeScaleX > 0) || typeof paint.paints !== "boolean") {
+        issues.push(`${svg.nodeKey}: ${text.targetKey} has no well-formed paint bound`);
+      } else {
+        const inner = paint.inkInnerLocal;
+        const outer = paint.inkOuterLocal;
+        if (inner !== null && (!finiteBox(inner) || inner.x < outer.x || inner.y < outer.y ||
+            inner.x + inner.width > outer.x + outer.width || inner.y + inner.height > outer.y + outer.height)) {
+          issues.push(`${svg.nodeKey}: ${text.targetKey} inner ink box is not inside its outer ink box`);
+        }
+        const diagnosticOk = paint.inkSource === "cell"
+          ? inner === null && (SVG_INK_DIAGNOSTICS as readonly string[]).includes(paint.inkDiagnostic ?? "")
+          : paint.inkSource === "canvas-raster"
+            ? paint.inkDiagnostic === null || (paint.inkDiagnostic === "dashed-stroke-only" && inner === null)
+            : paint.inkDiagnostic === null;
+        if (!diagnosticOk) issues.push(`${svg.nodeKey}: ${text.targetKey} ink source ${paint.inkSource} disagrees with its diagnostic`);
       }
     }
   }
@@ -1229,15 +1351,27 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
       raw.textTargetCount - raw.notRenderedTargets);
     const measurable = raw.measurable && (frame !== null || potentialTargets <= 0);
     let unreadableTargets = raw.unreadableTargets;
+    let unsupportedTargets = raw.unsupportedTargets;
     const texts = [];
-    if (frame) {
-      for (const text of raw.texts) {
-        const boxes = resolveSvgText(frame, text.geometry);
-        if (!boxes) { unreadableTargets += 1; continue; }
-        texts.push({ text, boxes });
-      }
+    // Per target, in the order the page's own tests used to run: paint this build cannot bound
+    // first (it declines whatever the geometry says), then missing geometry, then the frame.
+    // Classified on every record, framed or not, so a declined record keeps its counts.
+    for (const text of raw.texts) {
+      const classified = classifyPaint(text.paint);
+      if (!classified.ok) { unsupportedTargets += 1; continue; }
+      if (!text.geometry) { unreadableTargets += 1; continue; }
+      if (!frame) continue;
+      const boxes = resolveSvgText(frame, text.geometry);
+      const ctm = boxes ? matrixOf(text.geometry.ctm) : null;
+      const paint = boxes && ctm
+        ? textPaint(text.label, text.paint, classified, { bboxUser: boxes.bboxUser, ctm, userToLocal: boxes.userToLocal, localToScreen: frame.localToScreen })
+        : null;
+      // A stroke stretched by a spacingAndGlyphs scale nothing measured: no bound for its reach.
+      if (paint === "unsupported") { unsupportedTargets += 1; continue; }
+      if (!boxes || !paint) { unreadableTargets += 1; continue; }
+      texts.push({ text, boxes: { ...boxes, paint } });
     }
-    return { raw, resolved, frame, measurable, unreadableTargets, texts };
+    return { raw, resolved, frame, measurable, unreadableTargets, unsupportedTargets, texts };
   });
   // Two passes, because the group is a property of the DOCUMENT, not of one record. Two
   // structurally identical inline SVGs get the same `svgRootKey` on purpose — which of two
@@ -1256,10 +1390,10 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
   for (const entry of svgKeys) {
     for (const key of entry.textKeys) svgGroupSize.set(key, (svgGroupSize.get(key) ?? 0) + 1);
   }
-  const svg: SvgRecord[] = svgResolved.map(({ raw, resolved, frame, measurable, unreadableTargets, texts }, svgIndex) => {
+  const svg: SvgRecord[] = svgResolved.map(({ raw, resolved, frame, measurable, unreadableTargets, unsupportedTargets, texts }, svgIndex) => {
     const {
       sourceIdentity: _rootId, outerHtml: _outerHtml, texts: _rawTexts, geometry: _geometry, oracleIndex: _oracleIndex,
-      measurable: _measurable, reason: rawReason, unreadableTargets: _unreadable, ...rest
+      measurable: _measurable, reason: rawReason, unreadableTargets: _unreadable, unsupportedTargets: _unsupported, ...rest
     } = raw;
     const { rootKey, textKeys } = svgKeys[svgIndex]!;
     // The page's own reason (the target cap) takes precedence, as it did before the frame existed.
@@ -1269,6 +1403,7 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
       measurable,
       reason: rawReason ?? (viewportDeclined ? "env/svg-viewport-geometry-unsupported" : null),
       unreadableTargets,
+      unsupportedTargets,
       sourceKey: rootKey,
       clipped: resolved.clipped,
       // Unrounded, like the targets' boxLocal: the rule compares the two, and its epsilon is spent
@@ -1287,7 +1422,7 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
       // record for its target cap — including the target-free record that is not declined for it.
       viewportDiagnostic: raw.measurable && frame === null ? resolved.diagnostic : null,
       texts: texts.map(({ text, boxes }, index) => {
-        const { sourceIdentity: _textId, signature: _signature, geometry: _textGeometry, ...target } = text;
+        const { sourceIdentity: _textId, signature: _signature, geometry: _textGeometry, paint: _paint, label: _label, ...target } = text;
         svgTargetCounter += 1;
         const key = textKeys[index]!;
         return {

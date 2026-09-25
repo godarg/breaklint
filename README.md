@@ -176,8 +176,9 @@ from the in-page collector; a zero or truncated required sample is fatal.
 acquisition does not yet collect. Version 0.3.1 therefore removes them from the CLI registry,
 configuration schema, SARIF catalogue and demo instead of counting two rules that answer nothing.
 Their real-renderer lab remains explicitly research-only. `svg/text-overflows-viewport` needs only
-geometry and measures ordinary solid-fill text. When `getBBox()` cannot prove painted bounds
-(for example `<use>`, stroke, per-glyph `rotate`, clip/mask/filter or a paint server), or the clip
+geometry and measures solid-fill and stroked text against a two-sided bound of its painted ink,
+declining the band where the two bounds straddle the edge. When no bound is proven (for example
+`<use>`, text shadow, per-glyph `rotate`, clip/mask/filter or a paint server), or the clip
 that applies is one the collector does not rebuild in the SVG's own frame (a rounded or 3D-transformed
 viewport, a clip-path on the SVG, a clipping ancestor it cannot prove harmless), the target declines
 coverage-relevantly and the error rule fails closed with exit 4 rather than guessing.

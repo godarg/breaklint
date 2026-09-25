@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Labels whose cell leaves the viewport while their ink does not</title>
+<!--
+  The typographic cell is not the ink. getBBox() of an SVG <text> spans the font's ascent and
+  descent and every advance, trailing letter-spacing included, so a label can have its cell past
+  the viewport edge with every pixel of its glyphs inside. Up to this build svg/text-overflows-
+  viewport compared the cell and reported each of these as "not drawn": an error, from a gating
+  rule, on a document with nothing wrong in it (measured on patched Chromium 141 without evidence
+  binding, the build before the ink bound: exit 1, three findings of 1.00, 0.50 and 9.00 px).
+
+    #tick-bottom   "100" at y = height − 2: the cell's descent runs 0.5–0.8 px past the bottom
+                   edge, the digits end about 2 px above it
+    #caps-top      "TOP" at y = 10.5: the cell's ascent runs past the top edge, the capitals
+                   start about 1.7 px below it
+    #spaced-right  letter-spacing 12 px, anchored at its end: the cell carries 12 px of spacing
+                   after the last glyph and ends 9 px past the right edge; the glyphs stop about
+                   3 px inside it
+
+  The complication is that each label is ONE plain run a canvas can reproduce, and its glyph ink
+  sits 1.5 to 3 px inside the edge its cell crosses: close enough that only the ink, not the cell,
+  can answer, and far enough that the answer does not depend on which sans-serif a runner has.
+  Pixel-verified on Chromium 141 when authored (DPR 4, overflow visible, DejaVu Sans).
+-->
+<style>
+  @page { size: 360pt 300pt; margin: 24pt; }
+  body { font: 11pt/1.4 serif; margin: 0; }
+  svg { display: block; width: 300px; height: 100px; }
+  text { font-family: "DejaVu Sans", sans-serif; font-size: 12px; fill: #111; }
+</style>
+</head>
+<body>
+<p>Three labels whose glyphs are drawn in full; only their typographic cells leave the viewport.</p>
+<svg id="slack" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="300" height="100" fill="#eeeeee"></rect>
+  <text id="tick-bottom" x="20" y="98">100</text>
+  <text id="caps-top" x="120" y="10.5">TOP</text>
+  <text id="spaced-right" x="309" y="60" text-anchor="end" letter-spacing="12">ABC</text>
+</svg>
+</body>
+</html>

@@ -77,6 +77,34 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   screen distance. The detail now reads "Measured in the SVG's own coordinates, before CSS
   transforms and zoom." instead of "Coordinates are normalised through getScreenCTM()." The report
   shape is unchanged.
+- **`svg/text-overflows-viewport` decides on painted ink, bounded from both sides, instead of the
+  typographic cell.** Each target carries an inner box its glyph ink provably reaches (a canvas
+  raster of the label's own glyphs, for a plain run the canvas is shown to reproduce) and an outer
+  box that provably contains all painted ink (the glyph box grown by k · stroke-width / 2, k the
+  miter limit for miter joins). A finding needs the inner box past the edge, silence needs the outer
+  box inside, and the band between declines per target as the new coverage reason
+  **`env/svg-painted-bounds-inconclusive`**, counted against coverage. Consumers see:
+  - **Fewer exit 4 on illustrated documents.** A visible stroke no longer declines the target
+    outright: a haloed label (`paint-order: stroke fill`) well inside its viewport is measured and
+    silent. Measured on patched Chromium 141 without evidence binding: a chart of 21 haloed labels
+    went from exit 4 (0 measured) to exit 0 (21 of 21).
+  - **A false error is gone.** A label whose cell crossed the edge while its glyphs stayed inside
+    (an axis tick's descent, a cap-height label's ascent, trailing letter-spacing) was reported as
+    "not drawn"; a fixture of three such labels ended exit 1 with findings of 1.00, 0.50 and
+    9.00 px, and now ends exit 0 (patched Chromium 141, no evidence binding).
+  - **A finding's value is the proven overshoot of the ink** (the inner box, or the whole outer box
+    lying beyond the edge), rounded down to 0.01 px, not the cell's overshoot; it is usually
+    smaller. The message now says "glyph ink reaches at least … px beyond" or "lies entirely
+    outside … at least … px beyond". Each evaluation carries both bounds, `viewport-overshoot` and
+    `viewport-overshoot-upper-bound`. The rule's 0.01 px resolution applies to both: a finding
+    needs the lower bound more than 0.01 px past the permitted overshoot, silence needs the upper
+    bound no more than 0.01 px past it.
+  - **Some targets newly decline.** A label bounded only by its cell (tspans, per-glyph positions,
+    `textPath`) whose cell merely crosses the edge, and a stroked label whose miter tips may reach
+    it, are the band. Paint set on a `<tspan>` is now read: a descendant's text shadow, paint server,
+    clip, mask or filter declines as `env/svg-painted-bounds-unsupported`, as do percentage and
+    `calc()` stroke widths, `vector-effect: non-scaling-stroke`, and a stroke on a stretched
+    `spacingAndGlyphs` run the raster did not reproduce.
 
 ### Fixed
 
@@ -97,8 +125,9 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
 - **Snapshot schema 4 → 5.** Snapshot 5 adds the SVG local frame: `SvgRecord.clipped`,
   `viewportLocal` (viewport, clip rectangles, frame-to-screen matrix, the CDP residual
   `oracleDeltaPx`, the units check `modelDeltaPx` and the error bound `uncertaintyPx`, all in frame
-  px and unrounded) and `viewportDiagnostic`, and per target `boxLocal` (unrounded), `bboxUser` and
-  `userToLocal`. The engine now
+  px and unrounded) and `viewportDiagnostic`, and per target `boxLocal` (unrounded), `bboxUser`,
+  `userToLocal` and `paint` (the two painted-ink bounds, the stroke pad and where the glyph bound
+  came from). The engine now
   checks the stamp on read — nothing did before — and ends the run exit 3 on any snapshot that is
   not schema 5, because a schema-4 snapshot has no local geometry to convert. The shipped demo
   snapshot is migrated. The report schema stays 5; Configuration Contract stays 1. Measurement

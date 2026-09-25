@@ -18,7 +18,7 @@ against a boundary that is not chosen at all — and only those two gate.
 | rule | what makes the boundary structural |
 |---|---|
 | `layout/unbreakable-block-too-tall` | The block declares `break-inside: avoid` and is taller than the page content box. There is no page it can sit on. The comparison is between two measured lengths and the threshold is the medium itself. |
-| `svg/text-overflows-viewport` | The text box, carried through `getCTM()` into the SVG's own viewport coordinates, lies outside a viewport that clips it. What is outside the viewport is not drawn. The threshold is zero, not a preference. |
+| `svg/text-overflows-viewport` | Glyph ink the text provably paints, carried through `getCTM()` into the SVG's own viewport coordinates, lies outside a viewport that clips it. What is outside the viewport is not drawn. The threshold is zero, not a preference. |
 
 ## The three proof classes
 
@@ -113,8 +113,10 @@ was found by building the fixture for the previous one.
 A `<text>` that IS laid out and still has no readable box declines with `env/svg-ctm-unavailable`
 and DOES count against coverage — that is a measurement this tool owed and did not deliver, per
 target rather than per SVG. The same fail-closed rule applies when a box exists but does not prove
-the painted result: `<use>`, visible stroke, paint servers, text decoration, clip paths, masks,
-filters and per-glyph `rotate` decline with `env/svg-painted-bounds-unsupported`.
+the painted result: `<use>`, paint servers, text shadow, text decoration, clip paths, masks,
+filters, per-glyph `rotate` and strokes this build does not bound decline with
+`env/svg-painted-bounds-unsupported`, and a target whose two painted-ink bounds straddle the edge
+declines with `env/svg-painted-bounds-inconclusive`. Both count.
 
 Neither exemption leaves the report. Both keep their rule, reason and count in `notMeasured`, and
 each rule's own books are still checked first: `defineRule` requires measured plus declined to equal
@@ -132,15 +134,34 @@ fixtures and renderer lab are retained so the work is not erased, but they are a
 `ALL_RULES`, configuration, SARIF and the demo. The released rule count is thirteen.
 `svg/text-overflows-viewport` needs only geometry and does measure.
 
-**Complex SVG paint is detected but not geometrically solved in this build.** `querySelectorAll`
-does not cross the instance tree created by `<use>`, and `getBBox()` does not include stroke,
-clipping, masks or filter effects. The collector now detects those entrances and keeps each as an
-unmeasured candidate. Because the viewport rule is an error rule with a coverage floor of 1, even
-one such target produces `insufficient-coverage` (exit 4), never a silent clean result or a guessed
-error. Full support belongs to the independent ink passes, not to an expansion guessed from style.
+**SVG paint is bounded from both sides, and only the band between is declined.** What the
+viewport clips is ink, and `getBBox()` is neither side of it: it is the typographic cell, which
+carries ascent, descent and trailing-spacing slack the glyphs do not fill, and it knows nothing of a
+stroke. The collector now bounds each target's painted ink twice in the SVG's frame
+(`SvgTextTarget.paint`, `src/measure/svg-ink.ts`): an inner box the glyph ink provably reaches —
+from a canvas raster of the label's own glyphs, only for a plain run the canvas is shown to
+reproduce — and an outer box that provably contains every painted pixel, the glyph box grown by
+k · stroke-width / 2 (k the miter limit for miter joins, 1 for round and bevel, √2 at least for a
+dashed square cap). `svg/text-overflows-viewport` reports only what the inner box proves outside,
+stays silent only when the outer box is inside, and declines the band between as
+`env/svg-painted-bounds-inconclusive`, counted against coverage. The rule page states every
+constant and the measurement behind it.
 
-*What this costs on a real document, measured.* The entrance that fires in practice is not `<use>`
-or a filter — it is the **halo**: `paint-order="stroke fill"` with the stroke set to the background
+What this rests on, and so what it does not establish: the raster's error model (raster edge within
+2 canvas px of the outline) was measured on Chromium 141 only; a label the raster does not
+reproduce (tspans, per-glyph positions, textPath, unusual font properties) is bounded from above by
+its cell grown by 0.1 em, which relies on Chromium uniting the cell with the glyph bounds of the
+font it draws; such a label is reported only when all of its possible ink lies beyond an edge, so
+a partly clipped multi-line label is the band, not a finding. Paint this build does not bound —
+`<use>`, paint servers, text shadow, text decoration, clip paths, masks, filters, per-glyph
+`rotate`, percentage or `calc()` stroke widths, non-scaling strokes, a stroke on a stretched run the raster did not
+reproduce — still declines as `env/svg-painted-bounds-unsupported`, now also when it is set on a
+`<tspan>` rather than the `<text>`. Because the viewport rule is an error rule with a coverage floor
+of 1, one such target or one band target still produces `insufficient-coverage` (exit 4), never a
+silent clean result or a guessed error.
+
+*What it cost on a real document, measured before the bound (historical).* The entrance that
+fired in practice is not `<use>` or a filter — it is the **halo**: `paint-order="stroke fill"` with the stroke set to the background
 colour, the standard way to keep a diagram label legible where it crosses a line. Over an
 eighteen-document reference set of illustrated chapters:
 
@@ -153,19 +174,23 @@ eighteen-document reference set of illustrated chapters:
 | 07 | 27 | 10 | 17 | 17 haloed labels |
 
 Read the first two rows before the last three: inline SVG text is **not** structurally unmeasurable
-here, and a document whose labels carry no visible stroke measures at coverage 1. What is
+here, and a document whose labels carry no visible stroke measured at coverage 1. What was
 unmeasurable is a `<text>` that paints a stroke, because `getBBox()` returns the fill outline and
-the tool refuses to judge an overflow against a box that describes different ink. Three haloed
-labels are enough to take an error rule with a floor of 1 to exit 4, which is why one such figure
-reads in the report as though the whole class had failed.
+the tool refused to judge an overflow against a box that describes different ink. Three haloed
+labels were enough to take an error rule with a floor of 1 to exit 4, which is why one such figure
+read in the report as though the whole class had failed.
 
-The named next step is not the ink pass. A stroke centred on the glyph outline gives a **two-sided
-bound** for nothing but the stroke width: the fill box is a lower bound on the painted box and the
-fill box inflated by `stroke-width / 2` is an upper bound. A target whose lower bound already
-leaves the viewport overflows for certain; one whose upper bound is still inside it does not
-overflow for certain; only the band between them stays undecidable. On the corpus above the halo
-strokes are 2–4 px against overshoots that matter at ten times that, so almost all 35 declined
-targets are decidable without an ink pass at all. This is a named gap, not a design position.
+This page named the next step as a two-sided bound for the stroke alone: the fill box as the lower
+bound, the fill box inflated by `stroke-width / 2` as the upper. It is this build's bound, with two
+corrections to that sketch. The inflation by `stroke-width / 2` is an upper bound only for round and
+bevel joins. The default join is miter, whose tips reach up to `stroke-miterlimit` · stroke-width /
+2 beyond the outline (measured 2.56 of sw/2 at the default limit 4), so the outer box is grown by
+that instead; and the fill box is not a lower bound either, because it is the cell, not the ink.
+**The 35 declined labels above were not re-measured under the stricter bound**: the reference set is
+private, and whether each is now measured, silent or in the band is not known here. On the public
+fixtures (patched Chromium 141, no evidence binding) a chart of 21 haloed labels, rotated ticks and
+a tspan legend among them, went from exit 4 to exit 0 with every label measured
+(`tests/fixtures/svg-halo-labels.html`).
 
 **SVG viewports are reconstructed in the SVG's own coordinate system, and what that cannot prove
 still declines.** Containment is decided in the outermost SVG's viewport frame — CSS px from its

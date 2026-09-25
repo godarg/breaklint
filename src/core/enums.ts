@@ -22,6 +22,12 @@ export const ENV_IDS = [
   "env/svg-ctm-unavailable",
   "env/svg-viewport-geometry-unsupported",
   "env/svg-painted-bounds-unsupported",
+  /**
+   * Both bounds of a target's painted ink were computed and they disagree about the clip edge:
+   * the box provably inside the ink does not reach past it, the box provably containing all of
+   * the ink does. A measurement taken, with no verdict it supports. Counted against coverage.
+   */
+  "env/svg-painted-bounds-inconclusive",
   "env/canvas-content-lost",
   "env/pixel-oracle-unavailable",
   "env/ink-passes-unstable",
@@ -316,8 +322,9 @@ export const REPORT_SCHEMA_VERSION = 5;
 export const READABLE_REPORT_SCHEMA_VERSIONS: readonly number[] = [4, 5];
 /**
  * The measurement snapshot's shape. 5 adds the SVG local frame: `SvgRecord.clipped`,
- * `viewportLocal` and `viewportDiagnostic`, and `SvgTextTarget.boxLocal`, `bboxUser` and
- * `userToLocal`. There is no reader for 4: a schema-4 snapshot carries no local geometry, the
+ * `viewportLocal` and `viewportDiagnostic`, and `SvgTextTarget.boxLocal`, `bboxUser`,
+ * `userToLocal` and `paint` (the two-sided bound on the target's painted ink).
+ * 5 is unreleased; `paint` joined it before any 5 left this repository. There is no reader for 4: a schema-4 snapshot carries no local geometry, the
  * viewport rule cannot be run on it without guessing, and the missing numbers cannot be derived
  * from what it does carry — only re-measured. The engine therefore refuses any other stamp.
  */
@@ -382,6 +389,47 @@ export const SVG_VIEWPORT_DIAGNOSTICS = [
   "enclosing-viewport-unsupported",
 ] as const;
 export type SvgViewportDiagnostic = (typeof SVG_VIEWPORT_DIAGNOSTICS)[number];
+
+/**
+ * Why a target's glyph ink was bounded by its typographic cell rather than by the canvas raster
+ * of its own glyphs (`SvgTextPaint.inkDiagnostic`, snapshot only). The raster reproduces a label
+ * only when it can be shown to be ONE horizontal run drawn with a font state the canvas carries;
+ * each entry names the first condition that failed. None of them is a coverage reason: the cell
+ * still bounds the ink from above, and `svg/text-overflows-viewport` declines only when that bound
+ * and the fallback lower claim disagree (`env/svg-painted-bounds-inconclusive`).
+ */
+export const SVG_INK_DIAGNOSTICS = [
+  /** The text has element children (tspan, textPath, a, title, ...): more than one run. */
+  "element-children",
+  /**
+   * An x, y, dx or dy list with more than one value: glyphs placed one by one. (A `rotate` attribute
+   * never gets here: it declines the target as env/svg-painted-bounds-unsupported first.)
+   */
+  "positioning-lists",
+  /** textLength other than a spacingAndGlyphs scale of a plain run. */
+  "length-adjust",
+  /** A computed font or text property the canvas font state cannot reproduce. */
+  "font-properties",
+  /** Vertical writing, right-to-left direction, bidi overrides or right-to-left characters. */
+  "writing-direction",
+  /** A dominant-baseline, alignment-baseline or baseline-shift other than the alphabetic default. */
+  "baseline",
+  /** White-space processing other than collapse, or rendered characters the count does not confirm. */
+  "white-space",
+  /** The start and end positions are not one contiguous horizontal run on one baseline. */
+  "positions",
+  /** The canvas advance and the SVG advance differ beyond the stated tolerance: not the same font. */
+  "advance-mismatch",
+  /** The canvas raster did not run, or its font state did not read back as set. */
+  "raster-unavailable",
+  /** The raster found no ink. */
+  "raster-empty",
+  /** The raster's ink touches its canvas edge, so it may be cut. */
+  "raster-edge",
+  /** The raster's inner ink reaches past the SVG's own ink-including bounding box: a disagreement. */
+  "raster-exceeds-cell",
+] as const;
+export type SvgInkDiagnostic = (typeof SVG_INK_DIAGNOSTICS)[number];
 
 const asSet = <T extends string>(values: readonly T[]): ReadonlySet<string> => new Set(values);
 

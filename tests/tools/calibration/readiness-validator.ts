@@ -139,7 +139,7 @@ export type CandidateConfig = { ruleId: "svg/text-clipped"; maxMissingInk: numbe
  */
 export type ReceiptSvgRecordV1 = Omit<SvgRecord, "reason" | "clipped" | "viewportLocal" | "viewportDiagnostic" | "texts"> & {
   reason: SvgRecord["reason"] | null;
-  texts: Omit<SvgTextTarget, "boxLocal" | "bboxUser" | "userToLocal">[];
+  texts: Omit<SvgTextTarget, "boxLocal" | "bboxUser" | "userToLocal" | "paint">[];
 };
 export interface SnapshotProjection {
   schemaVersion: 1;
@@ -154,7 +154,10 @@ export interface SnapshotProjection {
  * interpretation those receipts always had explicit: the local frame IS the screen, the clip is
  * the receipt's viewport exactly when its overflow is not `visible` (the pre-0.7 rule's reading of
  * the same string), and each target's local box is its screen box. No oracle stands behind that
- * frame and `oracleDeltaPx`, `modelDeltaPx` and `uncertaintyPx` say so with null. Nothing here reaches the live collector.
+ * frame and `oracleDeltaPx`, `modelDeltaPx` and `uncertaintyPx` say so with null. A receipt box is
+ * the one box the receipt measured for the target, and the pre-0.7 rule decided on it as the text's
+ * extent, so it enters as an exact ink box on both sides (`inkSource: "projection"`): no stroke, no
+ * margin, nothing inferred. Nothing here reaches the live collector.
  */
 export function snapshotRecordFromReceiptV1(record: ReceiptSvgRecordV1): SvgRecord {
   const { reason, texts, ...rest } = record;
@@ -168,7 +171,10 @@ export function snapshotRecordFromReceiptV1(record: ReceiptSvgRecordV1): SvgReco
       ? { viewport: record.viewportScreen, clips: clipped ? [record.viewportScreen] : [], localToScreen: identity, oracleDeltaPx: null, modelDeltaPx: null, uncertaintyPx: null }
       : null,
     viewportDiagnostic: null,
-    texts: texts.map((text) => ({ ...text, boxLocal: text.boxScreen, bboxUser: text.boxScreen, userToLocal: identity })),
+    texts: texts.map((text) => ({
+      ...text, boxLocal: text.boxScreen, bboxUser: text.boxScreen, userToLocal: identity,
+      paint: { inkSource: "projection", inkDiagnostic: null, inkInnerLocal: text.boxScreen, inkOuterLocal: text.boxScreen, strokePad: 0, strokeScaleX: 1, paints: true },
+    })),
   };
 }
 export interface MeasurementReceiptRow { documentId: string; artifactSha256: string; targetId: string; ruleId: RuleId; candidateConfigHash: string; rendererFreezeId: string; rendererContentHash: string; measuredAt: string; snapshot: SnapshotProjection }
@@ -559,7 +565,7 @@ function metricValue(report: AcceptanceReport, metric: AcceptanceReport["gates"]
 export const PRODUCT_RULE_EXECUTABLE_CONTRACTS: Readonly<Record<RuleId, { moduleRelativePath: string; sourceSha256: string; executableContractVersion: "m3-0-real-rule-run-v1" }>> = Object.freeze({
   "svg/text-clipped": { moduleRelativePath: "src/rules/svg/text-clipped.ts", sourceSha256: "6e55541c82526ec89ee0d5b95574647399111e4a90c43ada849b0385a3c13307", executableContractVersion: "m3-0-real-rule-run-v1" },
   "svg/text-ink-collision": { moduleRelativePath: "src/rules/svg/text-ink-collision.ts", sourceSha256: "e6f3389c7df1ee5d3dd9cfc8dc8f8a218c63ce436c2e5e481e3640a3e560fe61", executableContractVersion: "m3-0-real-rule-run-v1" },
-  "svg/text-overflows-viewport": { moduleRelativePath: "src/rules/svg/text-overflows-viewport.ts", sourceSha256: "65a6d0b8a05107a3fcea0bb93bd57fcf28a93abe8acf3ada44c7386ee1d2ede5", executableContractVersion: "m3-0-real-rule-run-v1" },
+  "svg/text-overflows-viewport": { moduleRelativePath: "src/rules/svg/text-overflows-viewport.ts", sourceSha256: "a81e2c5d80d647af774e84bb2589c29b8bf8f1662986f649d63c6b746e76235f", executableContractVersion: "m3-0-real-rule-run-v1" },
 });
 
 export function producerSourceIdentitySha256(sourceIdentity: unknown): string { return sha256(canonicalJson(sourceIdentity)); }

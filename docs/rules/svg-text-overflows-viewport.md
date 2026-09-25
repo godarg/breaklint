@@ -9,7 +9,7 @@
 
 ## What is checked
 
-A text element lies outside its SVG's viewport and is not drawn.
+A text element's painted ink lies outside its SVG's viewport and is not drawn.
 
 ## Why
 
@@ -77,9 +77,10 @@ configurable. Both boxes are compared unrounded; the screen box a finding carrie
 snapshot's 0.01 px grid.
 
 **The value a finding reports** is the overshoot in that frame: CSS px of the SVG before its CSS
-transforms and zoom. Up to 0.6.0 it was screen px. For an SVG with no CSS transform or zoom between
-it and the page the two are the same number; under `zoom: 2` the frame value is half the screen
-distance.
+transforms and zoom, and — since the painted-ink bound below — the overshoot the ink is PROVEN to
+reach (the lower bound), rounded down to 0.01 px. Up to 0.6.0 it was screen px, of the cell. For
+an SVG with no CSS transform or zoom between it and the page the two are the same number; under
+`zoom: 2` the frame value is half the screen distance.
 
 Both halves of that are measured in `tests/fixtures/svg-text-geometry.html`. A label at 90 degrees
 has a LOCAL box inside the viewport and a screen box outside it, so `getBBox()` alone reports
@@ -87,6 +88,71 @@ nothing there. A second label at 45 degrees separates four corners from two: its
 crosses the viewport edge by 15.82 px while its two-corner box stays 28 px inside. At exactly 90
 degrees the two boxes coincide, which is why the first fixture cannot make that distinction and an
 independent review was right to say the claim was unmeasured until the second one existed.
+
+## What is compared: painted ink, bounded from both sides
+
+What the clip removes is ink — the glyph outlines and, where one is painted, the stroke around
+them. `getBBox()` of a `<text>` is neither side of it. It is the typographic cell (advance by
+ascent plus descent, trailing letter-spacing included) united with the glyph bounds, so it is not
+inside the ink: measured on Chromium 141, DejaVu Sans 12 px "100" has a cell 2 px above and 3 px
+below its digits, and an axis tick at `y = height − 2` had its cell 1 px past the edge with every
+pixel of its ink 2 px inside — up to this build the rule reported it as "not drawn". And it is not
+around the ink once a stroke is painted.
+
+The collector therefore sends raw facts and the bound is computed in Node
+(`src/measure/svg-ink.ts`, snapshot field `SvgTextTarget.paint`), as two boxes in the SVG's frame:
+
+- **an inner box the glyph ink provably reaches on every side.** For a label the canvas can be
+  shown to reproduce, the label's own glyphs are filled into a detached canvas with the same
+  computed font state, through the linear part of the text's CTM (a rotated label is rastered
+  rotated), magnified to about 128 canvas px per em and never fewer than 8 per screen px, and the
+  alpha channel is scanned for the first and last covered column and row. The raster edge is taken
+  to lie within 2 canvas px of the outline either way: measured over 270 labels against a DPR-8
+  screenshot, every edge lay within −0.61 / +1.36 canvas px. Glyph placement is compared with the
+  SVG's at every word boundary and at the end; the SVG keeps advances in 1/64 device px, so each
+  checkpoint may drift by that quantum per preceding glyph plus 0.05 px, more refuses the raster,
+  and the drift that remains is added to the margin along the baseline. Canvas `measureText()`
+  bounding boxes are not used: they are the rounded, hinted control box, measured up to 1.64 px
+  outside the outlines, and an inner bound built on them could invent ink.
+- **an outer box that provably contains every painted pixel**: the glyph box grown by the stroke
+  pad k · stroke-width / 2, with k = max(1, `stroke-miterlimit`) for miter joins (the default limit
+  4 gives 2 · stroke-width), 1 for round and bevel joins, and at least √2 for a dashed stroke with
+  square caps. Measured over 320 stroked labels: miter reach 2.56 of sw/2 at limit 4 and 8.81 at
+  10, round 1.06 (the 1/8 px screenshot rim), bevel 1.00, dashed square caps 1.375 — each within k.
+  The pad is the largest over the `<text>` and every rendered `<tspan>`, `<textPath>` and `<a>`
+  inside it, and a `spacingAndGlyphs` run stretches it by the run's measured scale.
+
+A label the raster does not reproduce — tspans or other element children, x/y/dx/dy lists,
+`textLength` other than a `spacingAndGlyphs` scale, a font property outside the
+canvas's state, right-to-left text, a non-alphabetic baseline, white space the character count
+does not confirm, an advance that disagrees with the canvas — gets **no inner box**, and its outer
+box is the cell grown by 0.1 em of the largest font size plus one device px. That margin rests on
+Chromium uniting the cell with the glyph bounds of the font it draws: measured, outlines reached
+past `getBBox()` by at most 0.0039 em over 112 such labels and 0.033 em over 195 single runs. A font
+whose ink escapes its own glyph bounds by more than that is outside what this bound claims. The
+snapshot names the first condition that failed (`SvgTextPaint.inkDiagnostic`).
+
+**The verdict is asymmetric by construction.** Against every clip rectangle:
+
+- the rule reports only when the **lower** bound exceeds the permitted overshoot by more than the
+  resolution (0.01 px): the inner box reaches past the edge, or the whole outer box lies beyond it
+  ("lies entirely outside", made only for text with a character that can paint). The finding's
+  value is that lower bound;
+- it stays silent only when the **upper** bound exceeds the permitted overshoot by no more than the
+  resolution — the same 0.02 px band the frame decision states, now for the ink: silent means no
+  painted pixel reaches more than 0.02 px past the edge;
+- the band between declines per target as `env/svg-painted-bounds-inconclusive`, counted against
+  coverage, with both bounds in the evaluation (`viewport-overshoot`,
+  `viewport-overshoot-upper-bound`).
+
+No finding rests on ink that was not shown to be there, and no silence on ink that was not shown to
+be absent. The stroke never enters the lower bound — a halo is usually the background colour, so a
+clipped halo is not visibly lost ink; a haloed label is reported only for its glyphs. Consequences
+worth knowing: a haloed chart label well inside its viewport is measured and silent (up to this
+build every stroked label declined); a label whose glyphs end 1–2 px inside the edge its cell
+crosses is silent; a miter-joined stroke whose glyphs are inside but whose miter tips may reach the
+edge is the band. The bounds are geometric: screen rasterisation at DPR 1 moves glyph origins and
+hinting by up to half a pixel, which a PDF does not carry, and the rule decides on the geometry.
 
 **A `<text>` that is not painted is not a target.** Chrome answers `getBBox()` and
 `getScreenCTM()` for an element inside `<defs>` and yields a box 609.65 px outside the viewport —
@@ -127,14 +193,20 @@ A `<text>` whose screen box cannot be read — no CTM, or `getBBox()` throwing o
 rendered geometry — declines with `env/svg-ctm-unavailable` and DOES count against coverage: that
 is a target this rule ought to have judged and could not.
 
-`getBBox()` also omits painted geometry introduced or removed by visible stroke, a paint server,
-text decoration, clip path, mask or filter. Text instantiated through `<use>` is inside a closed
-instance tree. A `rotate` attribute on the text or any of its `<tspan>`s turns each glyph about its
-own origin, and with `lengthAdjust="spacingAndGlyphs"` Chromium 141 draws ink 2.25 px beyond the
-`getBBox()` cell: the box stops being the ink's outer bound. Those cases decline per target with
-`env/svg-painted-bounds-unsupported`; they stay in the denominator, so the rule ends in exit 4
-rather than inventing a box or silently losing the candidate. Per-glyph `x`, `y`, `dx` and `dy`
-lists and `textPath` were measured to keep the ink inside the cell and are measured.
+Paint this build does not bound declines per target with `env/svg-painted-bounds-unsupported`,
+whether it is set on the `<text>` or on a rendered descendant: a paint server (`url(...)`),
+`text-shadow`, text decoration, a clip path, mask or filter (also on an ancestor inside the SVG), a
+stroke width that is a percentage or `calc()`, `vector-effect: non-scaling-stroke`, an unknown line
+join or cap, and a stroke on a `spacingAndGlyphs` run the raster did not reproduce. Text
+instantiated through `<use>` is inside a closed instance tree and declines the same way. Up to this
+build a descendant's paint was not read at all, so a `<tspan>` with a shadow was measured as bare
+glyphs. A `rotate` attribute on the text or any of its `<tspan>`s turns each glyph about its own
+origin, and with `lengthAdjust="spacingAndGlyphs"` Chromium 141 draws ink 2.25 px beyond the
+`getBBox()` cell, so neither the cell nor the raster bounds it: it declines the same way, first and
+with that one reason. These targets stay in the denominator, so the rule ends in exit 4 rather than
+inventing a box or silently losing the candidate. Per-glyph `x`, `y`, `dx` and `dy` lists and
+`textPath` were measured to keep the ink inside the cell; they are bounded by the cell and its
+overhang margin.
 
 Border, padding, `overflow-clip-margin` in every serialised form, 2D CSS transforms, the
 individual `rotate`/`scale`/`translate` properties and zoom — on the SVG or any ancestor — are
@@ -174,14 +246,19 @@ coverage reason.
 
 **A label flush with the edge is not a finding.** A label ending exactly on the viewport edge —
 `textLength` set to the full width of the viewBox, so the box ends on the edge by construction —
-measures 0 and stays clean, as does one within the 0.01 px resolution. 0.6.0 compared screen boxes
+has a lower bound at or inside the edge, so it is never reported. 0.6.0 compared screen boxes
 rounded to two decimals against that grid; the frame boxes are now compared unrounded against the
-stated resolution above.
+stated resolution above, on both bounds. Whether such a label is silent depends on its ink: one
+whose GLYPH INK ends within the raster margin of the edge (a block glyph filling its cell) has an
+upper bound past the resolution and declines as `env/svg-painted-bounds-inconclusive`; one whose
+side bearing keeps its ink further inside is silent. An exact box (a receipt projection) ending on
+the edge is silent, as in the frame decision.
 
-**What a finding measures is the typographic cell, not the ink.** `getBBox()` is advance by
-ascent plus descent; a label whose cell crosses the edge while its glyphs stay inside is reported.
-The live fixtures therefore use a glyph whose ink fills its cell. Replacing the cell by an ink
-bound is separate, later work.
+**What a finding measures is ink, not the typographic cell.** Up to this build a label whose
+cell crossed the edge while its glyphs stayed inside was reported; it is now silent when the outer
+ink box is inside, and declined as inconclusive when only the cell crossing is known.
+`tests/fixtures/svg-ink-slack.html` holds three such labels (exit 1 with findings of 1.00, 0.50
+and 9.00 px before, exit 0 now, patched Chromium 141 without evidence binding).
 
 ## Calibration
 

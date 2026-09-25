@@ -164,6 +164,10 @@ describe("the coverage base", () => {
 
   for (const reason of [
     "env/svg-painted-bounds-unsupported",
+    // The bracket's band: measured on both sides, the bounds disagree about the edge. A different
+    // state of knowledge from the one above, charged to coverage the same way — or admitting the
+    // bracket would quietly turn declines into clean results.
+    "env/svg-painted-bounds-inconclusive",
     "env/svg-viewport-geometry-unsupported",
   ] as const) {
     it(`${reason} remains an input coverage failure`, () => {

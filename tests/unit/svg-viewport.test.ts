@@ -58,6 +58,7 @@ import {
   type SvgBoxStyle,
 } from "../../src/measure/svg-viewport.ts";
 import { textOverflowsViewport } from "../../src/rules/svg/text-overflows-viewport.ts";
+import { rasterLabel, rawPaint } from "../fixtures/svg-raw.ts";
 
 const I: AffineMatrix = [1, 0, 0, 1, 0, 0];
 const translate = (x: number, y: number): AffineMatrix => [1, 0, 0, 1, x, y];
@@ -130,6 +131,9 @@ function rawSvg(index: number, frame: RawSvgFrame, texts: TextSpec[], screenOf: 
     texts: texts.map((text) => ({
       sourceIdentity: text.id, sourceAddressKey: null, signature: text.id, clipState: "none" as const,
       geometry: { bbox: [text.bbox.x, text.bbox.y, text.bbox.width, text.bbox.height], ctm: [...(text.ctm ?? I)], screenCtm: [...multiply(screenOf, text.ctm ?? I)] },
+      // A label whose raster ink reaches exactly its box on every side, so these frame tests keep
+      // measuring the geometry they were written for; tests/unit/svg-ink.test.ts is about the ink.
+      paint: rawPaint(), label: rasterLabel(text.bbox, { ctm: text.ctm ?? I, userToScreen: multiply(screenOf, text.ctm ?? I) }),
     })),
     shapes: [], paths: [], geometry: frame, oracleIndex: frame.kind === "outer" ? index : -1,
     inkPasses: { E: { count: 0, maskHash: "" }, S: { count: 0, maskHash: "" }, F: { count: 0, maskHash: "" } },
@@ -160,7 +164,17 @@ function assemble(svg: RawSvg[], models: readonly (SvgBoxModel | null)[] | undef
   });
 }
 
-function verdictOf(snapshot: Snapshot) {
+/**
+ * The rule's verdict on the FRAME: each target's paint replaced by the exact box `boxLocal` is
+ * (`inkSource: "projection"`, inner = outer = the cell), so these cases decide the clip geometry at
+ * the stated resolution and nothing else. The painted-ink bound — raster margins, stroke pad, the
+ * band — is tested through the same collector path in tests/unit/svg-ink.test.ts.
+ */
+function verdictOf(assembled: Snapshot) {
+  const snapshot = structuredClone(assembled);
+  for (const record of snapshot.svg) for (const text of record.texts) {
+    text.paint = { inkSource: "projection", inkDiagnostic: null, inkInnerLocal: text.boxLocal, inkOuterLocal: text.boxLocal, strokePad: 0, strokeScaleX: 1, paints: true };
+  }
   const report = runDocument(
     { path: "svg-frame.html", snapshot, infrastructure: [] },
     { failOn: "error", activeRules: [textOverflowsViewport], optionsByRule: {}, coverageFloors: {} },
@@ -500,7 +514,7 @@ describe("SVG local frame: collector facts through assembleSnapshot and the rule
     // not, and is unreadable rather than measured on a budget it has overdrawn.
     const deep = translate(10, 200_000);
     const deepRaw = rawSvg(0, outerFrame({ localToScreen: deep }), [inside("exact", 20), inside("residual", 60)], deep);
-    deepRaw.texts[1]!.geometry.screenCtm = [...translate(10.004, 200_000)];
+    deepRaw.texts[1]!.geometry!.screenCtm = [...translate(10.004, 200_000)];
     const deepSnapshot = assemble([deepRaw], [modelOf(deep, box(0, 0, 200, 80))]);
     assert.equal(deepSnapshot.svg[0]!.viewportLocal?.uncertaintyPx, 2 ** -7 + SVG_FLOAT_NOISE_PX);
     assert.deepEqual(deepSnapshot.svg[0]!.texts.map((text) => text.svgTextKey.split(":").at(-1)), ["exact"]);
@@ -791,10 +805,10 @@ describe("SVG local frame: collector facts through assembleSnapshot and the rule
     const raw = rawSvg(0, frame, [inside("good", 20), inside("drift", 60), inside("drift-small", 100), inside("drift-tiny", 140)], localToScreen);
     // 0.01 px exceeds the whole resolution; 0.006 px fits beside the frame's bound but exceeds
     // SVG_FRAME_TOLERANCE_PX, which is the model's own tolerance and is checked on its own.
-    raw.texts[1]!.geometry.screenCtm = [...translate(35.01, 35)];
-    raw.texts[2]!.geometry.screenCtm = [...translate(35.006, 35)];
+    raw.texts[1]!.geometry!.screenCtm = [...translate(35.01, 35)];
+    raw.texts[2]!.geometry!.screenCtm = [...translate(35.006, 35)];
     // 0.004 px is within both, and is charged to the target: it stays measured.
-    raw.texts[3]!.geometry.screenCtm = [...translate(35.004, 35)];
+    raw.texts[3]!.geometry!.screenCtm = [...translate(35.004, 35)];
     const snapshot = assemble([raw], [modelOf(localToScreen, box(0, 0, 200, 80))]);
     assert.deepEqual(snapshot.svg[0]!.texts.map((text) => text.svgTextKey.split(":").at(-1)), ["good", "drift-tiny"]);
     assert.equal(snapshot.svg[0]!.unreadableTargets, 2);

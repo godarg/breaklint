@@ -52,6 +52,7 @@ describe("the M2d live production chain", () => {
   let result: RenderResult | null = null;
   let noSource: RenderResult | null = null;
   let svgFrames: RenderResult | null = null;
+  let svgInk: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
     if (result?.documents.length === 24 && noSource?.documents.length === 4) return true;
@@ -139,6 +140,16 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "svg-computed-style-spoof.html"),
       ],
       options(join(root, "svg-frame-evidence")),
+    );
+    // The painted-ink bound, a batch of its own for the same reason.
+    svgInk = await renderDocuments(
+      [
+        join(FIXTURES, "svg-stroke-bracket.html"),
+        join(FIXTURES, "svg-halo-labels.html"),
+        join(FIXTURES, "svg-ink-slack.html"),
+        join(FIXTURES, "svg-ink-clipped.html"),
+      ],
+      options(join(root, "svg-ink-evidence")),
     );
   });
 
@@ -683,17 +694,18 @@ describe("the M2d live production chain", () => {
       [["svg:0:1", 1], ["svg:1:0", 2], ["svg:2:1", 3]],
     );
 
-    // The four-corner claim, bound to a number rather than to a comment. At 90 degrees two
-    // opposite corners span the same axis-aligned box as four, so the first rotated figure cannot
-    // tell the two apart. #rotated45 is placed in the gap between them: its four-corner box
-    // crosses the viewport edge by 15.82 px and its two-corner box stays 28 px inside. Rebuilding
-    // the collector on [first, last] drops exactly this finding and leaves the other two.
+    // The rotation claim, bound to a number rather than to a comment. The finding is the glyph
+    // ink's provable reach past the left edge, taken from a raster drawn through the label's own
+    // CTM, so its covered columns are the frame's (pixel-verified on Chromium 141: the ink crosses
+    // by 5.9 px, the bound claims 5.5). A raster taken upright and rotated as a box proves nothing
+    // at 45 degrees — measured, that build called the label inconclusive and ended this document 4 —
+    // and the cell's four-corner box crosses by 15.82 px, which is descent slack, not ink.
     const corners = viewport.find((item) => item.target.nodeKey === "svg:2:1");
-    assert.ok(corners, "the 45-degree label was not reported: two corners would also miss it");
+    assert.ok(corners, "the 45-degree label was not reported");
     assert.ok(
-      corners.measurement.value > 5 && corners.measurement.value < 25,
-      `the 45-degree overshoot moved to ${corners.measurement.value}; the fixture no longer sits in the gap ` +
-      "between the two-corner and four-corner boxes and has stopped testing what it claims",
+      corners.measurement.value >= 3 && corners.measurement.value < 15,
+      `the 45-degree overshoot moved to ${corners.measurement.value}; the fixture no longer puts the ` +
+      "rotated glyph ink clearly past the edge, or the value is the cell's again",
     );
 
     // The fourth figure does not clip, so the rule has no opinion — and that decline must not
@@ -820,8 +832,15 @@ describe("the M2d live production chain", () => {
     const complex = record("complex-paints");
     assert.equal(complex.textTargetCount, 8);
     assert.equal(complex.notRenderedTargets, 1, "the source text in defs is not itself painted");
-    assert.equal(complex.unsupportedTargets, 6, "clip, mask, filter, stroke, direct use and nested use must all decline");
-    assert.equal(complex.texts.length, 1, "the ordinary text in the mixed SVG remains measurable");
+    // Five, not six: a visible stroke is bounded now (k·stroke-width/2 beyond the glyph outlines),
+    // so the stroked label reaches the rule; clip, mask, filter and the two `use` instances have no
+    // bound and still decline here.
+    assert.equal(complex.unsupportedTargets, 5, "clip, mask, filter, direct use and nested use must all decline");
+    assert.equal(complex.texts.length, 2, "the ordinary text and the stroked text remain measurable");
+    const stroked = complex.texts.find((text) => text.paint.strokePad > 0);
+    assert.ok(stroked, "the stroked label reached the rule without its stroke pad");
+    // stroke-width 20 on the default miter join: up to 4 · 20/2 = 40 user units past the glyphs.
+    assert.equal(stroked.paint.strokePad, 40);
 
     // Declined up to 0.6.0; since the viewport is reconstructed from the content box it is measured,
     // and its label is inside.
@@ -889,10 +908,14 @@ describe("the M2d live production chain", () => {
     const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
     assert.equal(coverage?.candidates, 22);
     assert.equal(coverage?.measured, 5);
+    // Six outright, one inconclusive, and the split is the point: the stroked label's glyphs end
+    // inside the viewport and its stroke may reach 40 units past them, so both bounds were measured
+    // and they straddle the edge — its own reason, counted the same way.
     assert.deepEqual(
       coverage?.notMeasured.map((entry) => ({ reason: entry.reason, count: entry.count })),
       [
-        { reason: "env/svg-painted-bounds-unsupported", count: 7 },
+        { reason: "env/svg-painted-bounds-unsupported", count: 6 },
+        { reason: "env/svg-painted-bounds-inconclusive", count: 1 },
         { reason: "env/svg-viewport-geometry-unsupported", count: 10 },
       ],
     );
@@ -1087,6 +1110,121 @@ describe("the M2d live production chain", () => {
     assertClips(records[0]!.viewportLocal!.clips, [{ x: 0, y: 0, width: 400, height: 100 }], "spoofed");
     const { outcome, overshoot, reported } = svgFrameVerdicts(document);
     assertLabels(overshoot, reported, ["spoof-in", "spoof-out"]);
+    assert.equal(exitCodeFor(outcome.report.verdict), 1);
+  });
+
+  /**
+   * The painted-ink bound, live. The rule reports what the glyph ink provably loses to the
+   * viewport, stays silent where the box that holds all painted ink — glyphs grown by the widest the
+   * stroke can reach — is inside, and declines between. Every fixture was pixel-verified when
+   * authored (Chromium 141, DPR 4, overflow visible): for each label the rule's lower bound was at
+   * or below the ink's real overshoot and its upper bound at or above it.
+   */
+  const svgInkDocument = (t: TestContext, index: number): DocumentInput | null => {
+    if (svgInk?.documents.length !== 4) {
+      t.skip(`the SVG ink batch did not complete: ${svgInk?.documents.length ?? 0} of 4 documents`);
+      return null;
+    }
+    const document = svgInk.documents[index]!;
+    assert.ok(document.snapshot, `SVG ink document ${index} produced no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    assert.equal(document.infrastructure.some((event) => !["geometry-cross-check-passed"].includes(event.kind)), false,
+      `unexpected infrastructure: ${JSON.stringify(document.infrastructure)}`);
+    return document;
+  };
+  /** Per label id: the rule's row, and the target the collector built. */
+  const svgInkVerdicts = (document: DocumentInput) => {
+    const outcome = runDocument(document, { failOn: "error", activeRules: [textOverflowsViewport], optionsByRule: {}, coverageFloors: {} });
+    const targets = document.snapshot!.svg.flatMap((record) => record.texts.map((text) => ({ record, text })));
+    const idOf = (sid: string | null) => {
+      const found = targets.find(({ text }) => text.sourceAddressKey === sid);
+      assert.ok(found, `no target for ${String(sid)}`);
+      return found.text.svgTextKey.split("|id:")[1]!;
+    };
+    const rows = new Map(outcome.report.evaluations.filter((row) => row.ruleId === "svg/text-overflows-viewport")
+      .map((row) => [idOf(row.targetRef.sid), row]));
+    const reported = outcome.report.findings.filter((item) => item.ruleId === "svg/text-overflows-viewport").map((item) => idOf(item.target.sid)).sort();
+    const target = (id: string) => targets.find(({ text }) => text.svgTextKey.endsWith(`|id:${id}`))!;
+    return { outcome, rows, reported, target, coverage: outcome.report.coverage["svg/text-overflows-viewport"] };
+  };
+
+  it("bounds stroked labels from both sides and declines the band, a miter band included", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = svgInkDocument(t, 0);
+    if (!document) return;
+    const { outcome, rows, reported, target, coverage } = svgInkVerdicts(document);
+    // Until this build all four declined as env/svg-painted-bounds-unsupported.
+    assert.equal(document.snapshot!.svg.reduce((sum, record) => sum + record.unsupportedTargets, 0), 0, "a visible stroke must no longer decline outright");
+    assert.deepEqual(reported, ["label-outside"], "only the label whose glyph ink leaves the viewport may be reported");
+    assert.deepEqual([rows.get("label-inside")?.status, rows.get("label-inside")?.predicate.violated], ["measured", false]);
+    for (const id of ["label-band", "label-miter"]) {
+      assert.deepEqual([rows.get(id)?.status, rows.get(id)?.reason], ["not-measured", "env/svg-painted-bounds-inconclusive"], id);
+    }
+    // The miter band: the prototype's upper bound, cell + stroke-width/2, is inside the viewport —
+    // yet the pixels show the miter join drawn past the edge and clipped. Judged on that bound it
+    // would have been "measured, silent"; judged on k·sw/2 (k = miterlimit 4) it is the band.
+    const miter = target("label-miter");
+    const clip = miter.record.viewportLocal!.clips[0]!;
+    assert.ok(miter.text.boxLocal.x + miter.text.boxLocal.width + 6 < clip.x + clip.width, "cell + sw/2 must end inside for the case to mean anything");
+    assert.equal(miter.text.paint.strokePad, 24);
+    const [lower, upper] = rows.get("label-miter")!.measurements.map((m) => m.value as number);
+    assert.ok(lower! < 0 && upper! > 0, `miter band bounds ${lower} / ${upper}`);
+    assert.deepEqual([coverage?.candidates, coverage?.measured], [4, 2]);
+    assert.deepEqual(coverage?.notMeasured.map((entry) => [entry.reason, entry.count]), [["env/svg-painted-bounds-inconclusive", 2]]);
+    assert.equal(exitCodeFor(outcome.report.verdict), 4, "the band must keep an error rule below its floor");
+  });
+
+  it("passes a chart whose every label carries a halo, well inside its viewport", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = svgInkDocument(t, 1);
+    if (!document) return;
+    const { outcome, coverage, target } = svgInkVerdicts(document);
+    // Measured on patched Chromium 141 before this build: exit 4, 0 of 21 measured.
+    assert.deepEqual(outcome.report.findings, []);
+    assert.deepEqual([coverage?.candidates, coverage?.measured, coverage?.notMeasured.length], [21, 21, 0]);
+    const texts = document.snapshot!.svg.flatMap((record) => record.texts);
+    assert.ok(texts.every((text) => text.paint.strokePad > 0), "every label is haloed");
+    // One run each, except the two-line legend, which is bounded by its cell.
+    assert.deepEqual(texts.filter((text) => text.paint.inkSource !== "canvas-raster").map((text) => text.svgTextKey.split("|id:")[1]), ["legend-lines"]);
+    assert.equal(target("legend-lines").text.paint.inkDiagnostic, "element-children");
+    assert.equal(exitCodeFor(outcome.report.verdict), 0);
+  });
+
+  it("does not report a label whose cell leaves the viewport while its ink stays inside", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = svgInkDocument(t, 2);
+    if (!document) return;
+    const { outcome, rows, target, coverage } = svgInkVerdicts(document);
+    // The released rule's false error: exit 1, three findings, measured on patched Chromium 141.
+    assert.deepEqual(outcome.report.findings, [], "a label drawn in full was reported as not drawn");
+    assert.deepEqual([coverage?.candidates, coverage?.measured], [3, 3]);
+    for (const id of ["tick-bottom", "caps-top", "spaced-right"]) {
+      const { record, text } = target(id);
+      const clip = record.viewportLocal!.clips[0]!;
+      const cell = text.boxLocal;
+      const cellOvershoot = Math.max(clip.x - cell.x, clip.y - cell.y, cell.x + cell.width - (clip.x + clip.width), cell.y + cell.height - (clip.y + clip.height));
+      assert.ok(cellOvershoot > 0, `${id}: its cell must cross the edge for the case to mean anything (${cellOvershoot})`);
+      assert.equal(text.paint.inkSource, "canvas-raster", id);
+      const lower = rows.get(id)!.measurements[0]!.value as number;
+      assert.ok(lower <= -1, `${id}: its ink is authored 1.5 px or more inside, the lower bound says ${lower}`);
+    }
+    assert.equal(exitCodeFor(outcome.report.verdict), 0);
+  });
+
+  it("reports exactly the labels whose glyph ink the viewport clips", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const document = svgInkDocument(t, 3);
+    if (!document) return;
+    const { outcome, rows, reported, target } = svgInkVerdicts(document);
+    assert.deepEqual(reported, ["halo-bottom", "lines-gone", "plain-right", "rotated-top"]);
+    assert.deepEqual([rows.get("control-inside")?.status, rows.get("control-inside")?.predicate.violated], ["measured", false]);
+    for (const finding of outcome.report.findings) assert.ok(finding.measurement.value >= 5, `${finding.message}`);
+    // The tspan label has no raster: it is reported because the box around ALL of its possible ink
+    // lies beyond the edge, and the finding says so.
+    assert.equal(target("lines-gone").text.paint.inkSource, "cell");
+    const gone = outcome.report.findings.find((finding) => finding.target.sid === target("lines-gone").text.sourceAddressKey)!;
+    assert.match(gone.message, /entirely outside the SVG viewport/u);
+    // The halo does not excuse the glyphs: the finding rests on the glyph ink alone.
+    assert.ok(target("halo-bottom").text.paint.strokePad > 0);
     assert.equal(exitCodeFor(outcome.report.verdict), 1);
   });
 

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A chart whose labels carry a halo</title>
+<!--
+  The halo idiom, as a chart library draws it: every label painted twice, a stroke in the
+  background colour under the fill (paint-order: stroke fill), so it stays readable where it
+  crosses a grid line or a series. Nothing in this document is clipped.
+
+  Up to 0.6.0 every one of these labels declined as env/svg-painted-bounds-unsupported, and the
+  document ended exit 4: a visible stroke had no bound. Measured on patched Chromium 141 without
+  evidence binding, the build before the ink bound: exit 4, 0 of 21 measured.
+
+  The complication is the stroke's reach, not the glyphs. On the default miter join a 2 px halo can
+  paint up to miterlimit · stroke-width/2 = 4 px beyond the glyph outlines; a 3 px round halo 1.5 px.
+  Every label keeps at least 10 px of glyph clearance to every edge, so the bound that contains the
+  stroke is inside the viewport with room to spare and every label is measured and silent. Also in
+  the mix: rotated tick labels (drawn through their CTM), end- and middle-anchored labels, a
+  letter-spaced caption, and a two-line label made of tspans, which the raster does not reproduce
+  and which is bounded by its cell and a stated overhang margin instead.
+-->
+<style>
+  @page { size: 400pt 560pt; margin: 24pt; }
+  body { font: 11pt/1.35 serif; margin: 0; }
+  svg { display: block; width: 480px; height: 320px; }
+  .axis text, .value, .legend text, .note {
+    font-family: "DejaVu Sans", sans-serif;
+    fill: #222;
+    stroke: #fff;
+    paint-order: stroke fill;
+  }
+  .axis text { font-size: 11px; stroke-width: 2px; }
+  .value { font-size: 12px; stroke-width: 3px; stroke-linejoin: round; font-weight: bold; }
+  .legend text { font-size: 12px; stroke-width: 3px; stroke-linejoin: round; }
+  .note { font-size: 11px; stroke-width: 2px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<p>Quarterly revenue, with every label haloed against the grid behind it.</p>
+<svg id="halo-chart" viewBox="0 0 480 320" xmlns="http://www.w3.org/2000/svg">
+  <rect width="480" height="320" fill="#fff"></rect>
+  <g stroke="#ccc" stroke-width="1">
+    <line x1="60" y1="60" x2="440" y2="60"></line>
+    <line x1="60" y1="120" x2="440" y2="120"></line>
+    <line x1="60" y1="180" x2="440" y2="180"></line>
+    <line x1="60" y1="240" x2="440" y2="240"></line>
+  </g>
+  <polyline points="80,210 160,170 240,130 320,150 400,90" fill="none" stroke="#1f77b4" stroke-width="3"></polyline>
+  <g class="axis">
+    <text id="y-240" x="52" y="244" text-anchor="end">0</text>
+    <text id="y-180" x="52" y="184" text-anchor="end">50</text>
+    <text id="y-120" x="52" y="124" text-anchor="end">100</text>
+    <text id="y-60" x="52" y="64" text-anchor="end">150</text>
+    <text id="x-q1" x="80" y="258" text-anchor="middle">Q1</text>
+    <text id="x-q2" x="160" y="258" text-anchor="middle">Q2</text>
+    <text id="x-q3" x="240" y="258" text-anchor="middle">Q3</text>
+    <text id="x-q4" x="320" y="258" text-anchor="middle">Q4</text>
+    <text id="x-q5" x="400" y="258" text-anchor="middle">Q1'</text>
+    <text id="tick-a" x="100" y="290" transform="rotate(-30 100 290)">January</text>
+    <text id="tick-b" x="200" y="290" transform="rotate(-30 200 290)">April</text>
+    <text id="tick-c" x="300" y="290" transform="rotate(-30 300 290)">July</text>
+    <text id="tick-d" x="400" y="290" transform="rotate(-30 400 290)">October</text>
+  </g>
+  <text id="value-1" class="value" x="80" y="200" text-anchor="middle">42</text>
+  <text id="value-2" class="value" x="160" y="160" text-anchor="middle">57</text>
+  <text id="value-3" class="value" x="240" y="120" text-anchor="middle">71</text>
+  <text id="value-4" class="value" x="320" y="140" text-anchor="middle">64</text>
+  <text id="value-5" class="value" x="400" y="80" text-anchor="middle">88</text>
+  <g class="legend">
+    <text id="legend-series" x="300" y="36">Revenue (EUR m)</text>
+    <text id="legend-lines" x="80" y="36"><tspan x="80" dy="0">Two-line</tspan><tspan x="80" dy="14">legend</tspan></text>
+  </g>
+  <text id="note" class="note" x="440" y="300" text-anchor="end">source: fixture</text>
+</svg>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import { defineRule } from "../../core/rule.ts";
 import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
-import { SVG_OVERSHOOT_EPSILON_PX, overshootBeyond } from "../../measure/svg-viewport.ts";
+import { SVG_OVERSHOOT_EPSILON_PX } from "../../measure/svg-viewport.ts";
+import { bracketVerdict, lowerBoundOvershoot, upperBoundOvershoot } from "../../measure/svg-ink.ts";
 
 /**
  * svg/text-overflows-viewport — a `<text>` sits outside the SVG's viewport and is clipped away.
@@ -22,6 +23,18 @@ import { SVG_OVERSHOOT_EPSILON_PX, overshootBeyond } from "../../measure/svg-vie
  * on the outermost SVG, no clipping HTML ancestor in the page area — the text *is* drawn, and the
  * rule declines rather than reports. Anything that clips and is not rebuilt in the frame is a
  * decline counted against coverage, never that exemption.
+ *
+ * WHAT IS COMPARED IS INK, BOUNDED FROM BOTH SIDES. What the clip removes is painted ink, and the
+ * collector bounds it twice (`SvgTextPaint`, `src/measure/svg-ink.ts`): a box the glyph ink
+ * provably reaches in every direction, from a canvas raster of the label's own glyphs, and a box
+ * that provably contains every painted pixel — the glyph outlines grown by the widest the visible
+ * stroke can reach, k·stroke-width/2 with k the miter limit for miter joins. The rule reports only
+ * what the first proves to lie beyond the clip, stays silent only where the second lies inside it,
+ * and declines the band between as `env/svg-painted-bounds-inconclusive`, counted against
+ * coverage. The asymmetry is the safety property: no finding rests on ink that was not shown to
+ * be there, and no silence on ink that was not shown to be absent. Up to this build the rule
+ * compared the typographic cell, whose descent slack put an axis tick "1 px beyond the viewport"
+ * with every pixel of its ink 2 px inside, and it declined every stroked label outright.
  */
 export const textOverflowsViewport = defineRule(
   {
@@ -46,6 +59,7 @@ export const textOverflowsViewport = defineRule(
       "env/svg-ctm-unavailable",
       "env/svg-viewport-geometry-unsupported",
       "env/svg-painted-bounds-unsupported",
+      "env/svg-painted-bounds-inconclusive",
     ],
     remediation: {
       advice:
@@ -204,38 +218,58 @@ export const textOverflowsViewport = defineRule(
         for (const [textIndex, text] of svg.texts.entries()) evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, status: "not-measured", reason: "env/svg-viewport-geometry-unsupported" }));
         continue;
       }
-      measured += targets;
-
       const permitted = num(ctx.options.maxOvershootPx, 0);
+      // The rule's stated resolution, S1's error budget of one comparison: the clips and the paint
+      // bounds are unrounded frame values, and the collector declines every frame whose error bound
+      // (`uncertaintyPx`: CDP residual, float32 quantisation of the quads, the clip margin's
+      // serialisation) plus the target's own residual does not fit inside SVG_OVERSHOOT_EPSILON_PX
+      // (the snapshot invariants refuse a projection that carries one). So a lower bound above
+      // permitted + epsilon reaches past the real edge, and an upper bound at or below
+      // permitted + epsilon keeps all ink within the 2·epsilon resolution band the frame decision
+      // already states. Never a larger epsilon for a looser frame: such a frame is declined, not
+      // measured. Not configurable, and not the threshold.
+      const epsilon = SVG_OVERSHOOT_EPSILON_PX;
+      let inconclusive = 0;
       for (const [textIndex, text] of svg.texts.entries()) {
         // Frame px: CSS px of the outermost SVG before its CSS transforms and zoom. The screen box
         // stays the evidence and the position a reader looks at.
-        const overshoot = overshootBeyond(text.boxLocal, clips);
-        const violated = overshoot > permitted + SVG_OVERSHOOT_EPSILON_PX;
-        evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, status: "measured", measurements: [{ name: "viewport-overshoot", value: overshoot, unit: "px", operator: ">", threshold: permitted + SVG_OVERSHOOT_EPSILON_PX }], violated }));
-        // Both sides are unrounded frame values: the clips from CDP's used boxes carried into the
-        // frame (plus the clip margin, or a nested viewport's lengths), the target from its getBBox
-        // corners through its CTM chain. SVG_OVERSHOOT_EPSILON_PX is the rule's stated resolution
-        // and the error budget of this one comparison. The collector declines every frame whose
-        // error bound (`uncertaintyPx`: CDP residual, float32 quantisation of the quads, the clip
-        // margin's serialisation) does not fit inside it beside the target's own residual. So
-        // `overshoot > permitted + epsilon` means the true overshoot exceeds `permitted`: no
-        // finding is an artefact of the frame. The price is a band of at most 2·epsilon above
-        // `permitted` in which a clipped label can come out clean — the resolution, documented in
-        // the rule page, not a tolerance of the author's layout, and not configurable.
-        //
-        // A flush label — textLength set to the full viewBox width, so its box ends on the edge by
-        // construction — measures 0 and stays clean, as it must.
-        if (!violated) continue;
+        const lower = lowerBoundOvershoot(text.paint, text.userToLocal, clips);
+        const upper = upperBoundOvershoot(text.paint, text.userToLocal, clips);
+        const verdict = bracketVerdict(lower?.value ?? null, upper, permitted, epsilon);
+        const measurements = [
+          // The provable overshoot: null when nothing about this target's ink can be claimed past
+          // the edge. The finding's value, whenever there is a finding.
+          { name: "viewport-overshoot", value: lower === null ? null : lower.value, unit: "px", operator: ">" as const, threshold: permitted + epsilon },
+          // The most the painted ink can overshoot. Silence needs this one inside the edge.
+          { name: "viewport-overshoot-upper-bound", value: upper, unit: "px", operator: "<=" as const, threshold: permitted + epsilon },
+        ];
+        const base = { ruleId: "svg/text-overflows-viewport", keyType: "svg-text" as const, nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, measurements };
+        if (verdict === "inconclusive") {
+          // Measured twice, and the two bounds disagree about the edge: the ink provably inside
+          // does not reach past it, the box around all of it does. Neither "drawn" nor "not drawn"
+          // is a statement these boxes support, so the target is declined — counted, per target,
+          // and addressable across runs by its source identity.
+          inconclusive += 1;
+          evaluations.push(targetEvaluation({ ...base, status: "not-measured", reason: "env/svg-painted-bounds-inconclusive", violated: null }));
+          continue;
+        }
+        measured += 1;
+        const violated = verdict === "violated";
+        evaluations.push(targetEvaluation({ ...base, status: "measured", violated }));
+        if (!violated || lower === null) continue;
 
+        const overshoot = lower.value;
+        const what = lower.claim === "separated"
+          ? `This text lies entirely outside the SVG viewport, at least ${overshoot.toFixed(2)} px beyond its edge, and is not drawn.`
+          : text.paint.inkSource === "projection"
+            ? `This text extends ${overshoot.toFixed(2)} px beyond the SVG viewport and is not drawn.`
+            : `This text's glyph ink reaches at least ${overshoot.toFixed(2)} px beyond the SVG viewport, and that part is not drawn.`;
         findings.push(
           makeFinding({
             ctx,
             ruleId: "svg/text-overflows-viewport",
             severity: "error",
-            message:
-              `This text extends ${overshoot.toFixed(2)} px beyond the SVG viewport and is not ` +
-              `drawn. Measured in the SVG's own coordinates, before CSS transforms and zoom.`,
+            message: `${what} Measured in the SVG's own coordinates, before CSS transforms and zoom.`,
             page: svg.page,
             keyType: "svg-text",
             key: text.svgTextKey,
@@ -243,7 +277,9 @@ export const textOverflowsViewport = defineRule(
             sid: text.sourceAddressKey ?? null,
             boxScreen: text.boxScreen,
             source: text.sourceAddressKey ? snapshot.source.map[text.sourceAddressKey] ?? null : null,
-            value: Number(overshoot.toFixed(2)),
+            // The LOWER bound, rounded down to 0.01 px so the number printed never
+            // exceeds what was proven.
+            value: Math.floor(overshoot * 100 + 1e-9) / 100,
             threshold: permitted,
             unit: "px",
             proofSource: "A",
@@ -253,6 +289,20 @@ export const textOverflowsViewport = defineRule(
             ambiguity: text.ambiguityGroupSize > 1
               ? { groupSize: text.ambiguityGroupSize, resolvable: false }
               : null,
+          }),
+        );
+      }
+      if (inconclusive > 0) {
+        notMeasured.push(
+          declined({
+            scope: "svgText",
+            ruleId: "svg/text-overflows-viewport",
+            // Its own reason, not the outright decline's: "no bound exists for this paint" and
+            // "both bounds were measured and straddle the edge" are different states of knowledge,
+            // and only the second says what would settle it — more room, a shorter label, a
+            // thinner stroke.
+            reason: "env/svg-painted-bounds-inconclusive",
+            count: inconclusive,
           }),
         );
       }

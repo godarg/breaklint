@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Labels whose ink the viewport clips</title>
+<!--
+  The controls for the painted-ink bound: every label here loses glyph ink to its viewport, so
+  svg/text-overflows-viewport must report every one of them, and only them. A bound that became too
+  cautious — declining where it can prove the loss — would turn this document from exit 1 into
+  exit 4, and one that went back to the cell would report the silent label beside them.
+
+    #plain-right    a plain label whose glyphs run about 12 px past the right edge
+    #halo-bottom    a haloed label (white round-joined stroke under the fill) whose GLYPHS cross
+                    the bottom edge by several px: the stroke does not excuse it, and the finding
+                    rests on the glyph ink alone
+    #rotated-top    a tick label rotated −40°, rastered through its CTM, whose far end crosses the
+                    top edge by more than 10 px
+    #lines-gone     a two-line label made of tspans, which the canvas raster does not reproduce:
+                    bounded only by its cell and an overhang margin, it can be reported only
+                    because ALL of it lies beyond the right edge
+    #control-inside the same kind of label well inside: measured, and silent
+
+  Every loss is at least 5 px (pixel-verified on Chromium 141 when authored, DPR 4, overflow
+  visible), so the verdicts do not depend on the font a runner resolves.
+-->
+<style>
+  @page { size: 360pt 320pt; margin: 24pt; }
+  body { font: 11pt/1.4 serif; margin: 0; }
+  svg { display: block; width: 300px; height: 140px; }
+  text { font-family: "DejaVu Sans", sans-serif; font-size: 14px; fill: #111; }
+  .halo { stroke: #fff; stroke-width: 3px; stroke-linejoin: round; paint-order: stroke fill; }
+</style>
+</head>
+<body>
+<p>Four labels the viewport cuts, and one it does not.</p>
+<svg id="clipped" viewBox="0 0 300 140" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="300" height="140" fill="#eeeeee"></rect>
+  <text id="plain-right" x="250" y="30">Revenue</text>
+  <text id="halo-bottom" class="halo" x="40" y="146">Haloed</text>
+  <text id="rotated-top" x="150" y="40" transform="rotate(-40 150 40)">September</text>
+  <text id="lines-gone" x="320" y="80"><tspan x="320" dy="0">far</tspan><tspan x="320" dy="16">away</tspan></text>
+  <text id="control-inside" x="40" y="80">inside</text>
+</svg>
+</body>
+</html>

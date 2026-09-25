@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The two-sided bound for stroked SVG labels</title>
+<!--
+  The painted-ink bound of svg/text-overflows-viewport on stroked labels, one figure per position
+  the bound can produce.
+
+  getBBox() is neither side of a stroked label's ink: the stroke paints past the glyph outlines,
+  and by more than stroke-width/2 at a miter join (up to miterlimit · stroke-width/2). The rule
+  therefore reports only when the glyph ink itself provably leaves the viewport, stays silent only
+  when the glyph box grown by the widest the stroke can reach is inside it, and declines between.
+
+    #stroke-outside     the glyphs alone leave the viewport by about 20 units  -> REPORT
+    #stroke-inside      glyphs and any stroke far inside                        -> measured, silent
+    #stroke-band        glyphs 2 units inside, a 12-unit round stroke can cross -> DECLINE (band)
+    #stroke-miter-band  cell + stroke-width/2 ends 1 px inside the edge, yet the -> DECLINE (band),
+                        miter tips of "AVWA" are drawn past it and clipped         never "inside"
+
+  The first three widths are pinned with textLength (spacingAndGlyphs, a plain scale of the run),
+  so the cases do not drift into each other with the monospace font a runner resolves. The last
+  one is about the join, not the width: it needs real miter tips, and DejaVu Sans "AVWA" at 80 px
+  with stroke-width 12 has them. Pixel-verified on Chromium 141 when authored (DPR 4, overflow
+  visible): the cell ends at 393.0, cell + 6 at 399.0, the stroked ink at 400.75 — 0.75 px past the
+  400 px edge, and with overflow hidden the ink stops at 400. The complication of the whole file:
+  none of these labels may be judged on its cell, and only the first may be reported.
+-->
+<style>
+  @page { size: 360pt 620pt; margin: 24pt; }
+  body { font: 11pt/1.35 serif; margin: 0; }
+  svg { display: block; width: 260pt; height: 100pt; margin-bottom: 10pt; }
+  svg.stroke text {
+    font: 16px monospace;
+    fill: #111;
+    stroke: #fff;
+    paint-order: stroke fill;
+    stroke-linejoin: round;
+  }
+  svg.miter { width: 400px; height: 120px; }
+</style>
+</head>
+<body>
+<p>
+  A stroked label is bounded from both sides: its glyphs from below, its glyphs grown by the widest
+  the stroke can paint from above. Each figure puts a label in one of the positions that bound can
+  produce.
+</p>
+
+<!-- The glyphs alone leave the 400-unit viewport by about 20 units: must REPORT. -->
+<svg id="stroke-outside" class="stroke" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <text id="label-outside" x="210" y="60" textLength="210" lengthAdjust="spacingAndGlyphs" stroke-width="6">outside</text>
+</svg>
+
+<!-- Glyphs end near 210, the stroke adds at most 2: measured and silent. -->
+<svg id="stroke-inside" class="stroke" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <text id="label-inside" x="10" y="60" textLength="200" lengthAdjust="spacingAndGlyphs" stroke-width="4">inside</text>
+</svg>
+
+<!-- The cell ends 2 units inside the viewport, the round stroke reaches 6 past the glyphs. DECLINE. -->
+<svg id="stroke-band" class="stroke" viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+  <text id="label-band" x="210" y="60" textLength="188" lengthAdjust="spacingAndGlyphs" stroke-width="12">band</text>
+</svg>
+
+<!--
+  400 x 120 CSS px, no viewBox: user units are CSS px. The label's cell ends 7 px before the right
+  edge, so cell + stroke-width/2 ends 1 px inside it; the miter join at the last A's foot reaches
+  past the edge and is clipped. DECLINE, never "measured inside".
+-->
+<svg id="stroke-miter-band" class="miter" xmlns="http://www.w3.org/2000/svg">
+  <text id="label-miter" x="158.94" y="92" font-family="DejaVu Sans, sans-serif" font-size="80" fill="#111" stroke="#666" stroke-width="12">AVWA</text>
+</svg>
+</body>
+</html>

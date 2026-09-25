@@ -660,6 +660,25 @@
               0,
               0
             ],
+            "paint": {
+              "inkSource": "projection",
+              "inkDiagnostic": null,
+              "inkInnerLocal": {
+                "x": 12,
+                "y": 72,
+                "width": 80,
+                "height": 12
+              },
+              "inkOuterLocal": {
+                "x": 12,
+                "y": 72,
+                "width": 80,
+                "height": 12
+              },
+              "strokePad": 0,
+              "strokeScaleX": 1,
+              "paints": true
+            },
             "clipState": "clip-path",
             "ambiguityGroupSize": 1,
             "ink": {
@@ -705,6 +724,25 @@
               0,
               0
             ],
+            "paint": {
+              "inkSource": "projection",
+              "inkDiagnostic": null,
+              "inkInnerLocal": {
+                "x": 252,
+                "y": 12,
+                "width": 120,
+                "height": 12
+              },
+              "inkOuterLocal": {
+                "x": 252,
+                "y": 12,
+                "width": 120,
+                "height": 12
+              },
+              "strokePad": 0,
+              "strokeScaleX": 1,
+              "paints": true
+            },
             "clipState": "none",
             "ambiguityGroupSize": 1,
             "ink": {

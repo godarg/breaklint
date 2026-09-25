@@ -26,6 +26,7 @@ import type {
   ReportSource,
   RunVerdict,
   Severity,
+  SvgInkDiagnostic,
   SvgViewportDiagnostic,
 } from "./enums.ts";
 import type { ConfigSource, EffectiveConfig, ProfileName } from "../config/contract.ts";
@@ -195,14 +196,21 @@ export interface SvgTextTarget {
    * 0.01 px. `svg/text-overflows-viewport` compares this box with the clip rectangles.
    */
   boxLocal: Box;
-  /** `getBBox()` in the text's own user space, unrounded: the typographic cell, not the ink. */
+  /**
+   * `getBBox()` in the text's own user space, unrounded. The typographic cell (advance times
+   * ascent plus descent, trailing letter-spacing included) united with the glyph ink bounds of the
+   * font Chromium lays the text out with — neither a lower nor, on its own, a proven upper bound of
+   * what is painted. `paint` carries the bounds the rule decides on.
+   */
   bboxUser: Box;
   /**
    * The text's user space → the local frame: the enclosing viewports' composed `getCTM()` chain
-   * times the text's own `getCTM()`. `boxLocal` is the envelope of `bboxUser` through it. A later
-   * bound (stroke, ink) changes `bboxUser` in user space and maps it through the same matrix.
+   * times the text's own `getCTM()`. `boxLocal` is the envelope of `bboxUser` through it; the
+   * stroke pad of `paint` is carried into the frame through the same matrix.
    */
   userToLocal: AffineMatrix;
+  /** The two-sided bound on this target's painted ink, in the local frame (snapshot 5). */
+  paint: SvgTextPaint;
   clipState: "none" | "clip-path" | "mask" | "both";
   /**
    * How many targets in this SVG share this exact `svgTextKey`.
@@ -229,6 +237,61 @@ export interface SvgTextTarget {
     };
     T0: InkPass;
   };
+}
+
+/**
+ * The painted ink of one `<text>`, bounded from both sides, in the record's LOCAL FRAME (the frame
+ * `boxLocal` and the clip rectangles live in).
+ *
+ * `svg/text-overflows-viewport` reports only what the INNER box proves to be outside the clip and
+ * stays silent only where the OUTER box, grown by the stroke pad, is inside it; between the two it
+ * declines. Neither side is the typographic cell: the cell carries ascent and descent slack and
+ * trailing letter-spacing, so a cell past the edge is not ink past the edge (a released false
+ * error, measured on an axis tick whose ink sat 2 px inside), and it is not proven to hold every
+ * glyph either.
+ */
+export interface SvgTextPaint {
+  /**
+   * Where the glyph-ink bounds come from.
+   * - `canvas-raster`: the label's own glyphs, filled into a detached canvas with the computed font
+   *   state through the linear part of the text's CTM at about 128 canvas px per em, and scanned;
+   *   allowed only for one horizontal run whose font state and advance the canvas reproduces
+   *   (`src/measure/svg-ink.ts`).
+   * - `cell`: every other label. The cell grown by a stated overhang margin bounds the ink from
+   *   above; there is no inner box.
+   * - `projection`: an exact ink box supplied outside the collector (receipt v1, hand-authored
+   *   snapshots). The collector never produces it.
+   */
+  inkSource: "canvas-raster" | "cell" | "projection";
+  /** Why the raster was not used (`cell`), or why a raster gave no inner box; else null. */
+  inkDiagnostic: SvgInkDiagnostic | "dashed-stroke-only" | null;
+  /**
+   * A box the glyph ink reaches on every side: its bounding box contains this one. null when
+   * nothing proves one (not a raster label, or a dashed stroke is the only paint).
+   */
+  inkInnerLocal: Box | null;
+  /** A box containing every glyph outline, before the stroke. */
+  inkOuterLocal: Box;
+  /**
+   * How far a visible stroke can paint beyond the glyph outlines, in USER units: the largest
+   * k·stroke-width/2 over the text and every rendered descendant, with k = max(1, miterlimit) for
+   * miter joins, 1 for round and bevel, and at least √2 for square caps on a dashed stroke. 0
+   * without a visible stroke. `inkOuterLocal` grown by it through `userToLocal` contains all
+   * painted ink.
+   */
+  strokePad: number;
+  /**
+   * How much the stroke is stretched along the baseline: the spacingAndGlyphs scale of a raster
+   * label, which Chromium applies to the glyphs and the stroke painted with them; 1 otherwise. A
+   * stroked run stretched by a scale nothing measured is declined instead.
+   */
+  strokeScaleX: number;
+  /**
+   * Whether anything of the text can paint at all: raster ink was found, or the rendered text holds
+   * a character that is neither white space nor default-ignorable. The fallback claim "entirely
+   * outside, so not drawn" is only made about text that draws something.
+   */
+  paints: boolean;
 }
 
 export interface SvgShape {
@@ -338,10 +401,13 @@ export interface SvgRecord {
    */
   unreadableTargets: number;
   /**
-   * Laid-out text whose painted bounds cannot be proven by the geometry collector. This covers
-   * instantiated `<use>` text and paint effects that `getBBox()` explicitly omits (stroke,
-   * clipping, masking, filters and paint servers). These remain candidates and therefore make an
-   * error rule fail closed through coverage instead of becoming a clean result or false finding.
+   * Laid-out text whose painted bounds this collector cannot bound. This covers instantiated
+   * `<use>` text, and paint on the text, on any rendered descendant (`<tspan>`, `<textPath>`,
+   * `<a>`) or on an ancestor that no bound here describes: paint servers, text shadow, text
+   * decoration, clip-path, mask, filter, a stroke width that is not an absolute length, a
+   * non-scaling stroke and an unmodelled line join. A visible stroke alone is bounded (`paint`)
+   * and does not land here. These remain candidates and therefore make an error rule fail closed
+   * through coverage instead of becoming a clean result or false finding.
    */
   unsupportedTargets: number;
   /**

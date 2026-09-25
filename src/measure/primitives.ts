@@ -177,6 +177,45 @@ const PRIMITIVES_TEMPLATE = `(() => {
     // a crash of the whole collection.
     try { return matrixValue(call.call(fn, el)); } catch (_) { return null; }
   };
+  // The painted-ink bound of svg/text-overflows-viewport (src/measure/svg-ink.ts) needs two more
+  // kinds of fact, and both are measuring primitives like the geometry above: where SVG text layout
+  // placed a label's characters, and what the label's own glyphs cover when the same font state
+  // fills them into a canvas. A document that replaced measureText, fillText, getImageData, a
+  // context setter or a TextMetrics getter could otherwise draw a different label than it shows.
+  const setterOf = (prototype, name) => {
+    let at = prototype;
+    while (at) {
+      const found = descriptor(at, name);
+      if (found && found.set) return found.set;
+      at = Object.getPrototypeOf(at);
+    }
+    return null;
+  };
+  const textContentProto = SVGTextContentElement.prototype;
+  const numberOfCharsFn = textContentProto.getNumberOfChars;
+  const startOfCharFn = textContentProto.getStartPositionOfChar;
+  const endOfCharFn = textContentProto.getEndPositionOfChar;
+  const computedTextLengthFn = textContentProto.getComputedTextLength;
+  const rotationOfCharFn = textContentProto.getRotationOfChar;
+  const svgPointProto = typeof SVGPoint === "function" ? SVGPoint.prototype : DOMPointReadOnly.prototype;
+  const pointXGet = getter(svgPointProto, "x");
+  const pointYGet = getter(svgPointProto, "y");
+  const pointValue = (point) => [call.call(pointXGet, point), call.call(pointYGet, point)];
+  const context2dProto = CanvasRenderingContext2D.prototype;
+  const CANVAS_STATE = ["font", "letterSpacing", "wordSpacing", "fontKerning", "fontStretch", "fontVariantCaps",
+    "textRendering", "lang", "direction", "textAlign", "textBaseline", "fillStyle"];
+  const canvasSet = {};
+  const canvasGet = {};
+  for (const name of CANVAS_STATE) { canvasSet[name] = setterOf(context2dProto, name); canvasGet[name] = getter(context2dProto, name); }
+  const measureTextFn = context2dProto.measureText;
+  const fillTextFn = context2dProto.fillText;
+  const setTransformFn = context2dProto.setTransform;
+  const textMetricGets = ["width", "actualBoundingBoxLeft", "actualBoundingBoxRight", "actualBoundingBoxAscent",
+    "actualBoundingBoxDescent"].map((name) => getter(TextMetrics.prototype, name));
+  const canvasWidthSet = setterOf(HTMLCanvasElement.prototype, "width");
+  const canvasHeightSet = setterOf(HTMLCanvasElement.prototype, "height");
+  const mathMax = Math.max, mathMin = Math.min, mathCeil = Math.ceil, mathHypot = Math.hypot;
+  const sliceStringFn = String.prototype.slice;
   const DOMPointCtor = DOMPoint;
   const matrixTransformFn = DOMPoint.prototype.matrixTransform;
   const canvasContextFn = HTMLCanvasElement.prototype.getContext;
@@ -395,6 +434,121 @@ const PRIMITIVES_TEMPLATE = `(() => {
           return null;
         }
       },
+      // Where SVG text layout put a label: its addressable character count, the start of the first
+      // character and the end of the last on their baselines, the advance, and the rotation of the
+      // first character. Node checks from these that the label is one horizontal run.
+      // Also the start of each character named in checkpoints (the word boundaries of the label).
+      svgTextFacts: (el, checkpoints) => {
+        try {
+          const chars = call.call(numberOfCharsFn, el);
+          const advance = call.call(computedTextLengthFn, el);
+          if (!(chars > 0)) return { chars, start: null, end: null, advance, rotation: null, at: [] };
+          const at = [];
+          for (const index of checkpoints) if (index > 0 && index < chars) at.push([index, ...pointValue(call.call(startOfCharFn, el, index))]);
+          return {
+            chars,
+            start: pointValue(call.call(startOfCharFn, el, 0)),
+            end: pointValue(call.call(endOfCharFn, el, chars - 1)),
+            advance,
+            rotation: call.call(rotationOfCharFn, el, 0),
+            at,
+          };
+        } catch (_) {
+          return null;
+        }
+      },
+      // The label's own glyphs, filled into a detached canvas with the font state derived from the
+      // computed style, drawn through the linear part of the text's own CTM (so the covered columns
+      // and rows are the text's viewport axes), magnified by the context transform to about
+      // limits.emDevicePx canvas px per em (the font size stays the label's own), and scanned for
+      // the first and last covered column and row. limits.stretchTo, when set, is the SVG advance a
+      // spacingAndGlyphs label is scaled to along its baseline. Everything read back is returned;
+      // nothing is decided here. The canvas never enters the document.
+      textRaster: (text, spec, limits) => {
+        try {
+          const canvas = call.call(createElementFn, document, "canvas");
+          const context = call.call(canvasContextFn, canvas, "2d", { willReadFrequently: true });
+          if (!context) return null;
+          const setState = () => {
+            call.call(canvasSet.font, context, "1px serif");
+            const sentinel = call.call(canvasGet.font, context);
+            call.call(canvasSet.font, context, spec.font);
+            for (const name of ["fontStretch", "fontVariantCaps", "fontKerning", "letterSpacing", "wordSpacing", "textRendering"]) {
+              if (canvasSet[name]) call.call(canvasSet[name], context, spec[name]);
+            }
+            if (spec.lang !== "inherit" && canvasSet.lang) call.call(canvasSet.lang, context, spec.lang);
+            call.call(canvasSet.direction, context, "ltr");
+            call.call(canvasSet.textAlign, context, "left");
+            call.call(canvasSet.textBaseline, context, "alphabetic");
+            const applied = {};
+            for (const name of ["font", "letterSpacing", "wordSpacing", "fontKerning", "fontStretch", "fontVariantCaps", "textRendering", "lang", "direction"]) {
+              if (canvasGet[name]) applied[name] = call.call(canvasGet[name], context);
+            }
+            return { sentinel, applied };
+          };
+          setState();
+          const measured = call.call(measureTextFn, context, text);
+          const values = [];
+          for (let index = 0; index < textMetricGets.length; index += 1) values[index] = call.call(textMetricGets[index], measured);
+          const metrics = { width: values[0], left: values[1], right: values[2], ascent: values[3], descent: values[4] };
+          // The canvas advance up to each checkpoint, in the same font state.
+          const prefixes = [];
+          for (const index of limits.checkpoints) prefixes.push(call.call(textMetricGets[0], call.call(measureTextFn, context, call.call(sliceStringFn, text, 0, index))));
+          const size = limits.size;
+          const scaleX = limits.stretchTo === null ? 1 : limits.stretchTo / metrics.width;
+          const [la, lb, lc, ld] = limits.linear;
+          const A = la * scaleX, B = lb * scaleX, C = lc, D = ld;
+          const axisX = mathHypot(A, B), axisY = mathHypot(C, D);
+          const base = { sentinel: "", applied: {}, metrics, prefixes, linear: limits.linear, scaleX, k: 0, originX: 0, originY: 0, width: 0, height: 0, ink: null };
+          if (!(axisX > 0 && axisY > 0 && size > 0 && metrics.width > 0)) return base;
+          // Extents of the measured (control) box of the run under k·[A C; B D], and a pad around it.
+          const extents = (k) => {
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            for (const [x, y] of [[-metrics.left, -metrics.ascent], [metrics.right, -metrics.ascent], [metrics.right, metrics.descent], [-metrics.left, metrics.descent]]) {
+              const px = k * (A * x + C * y), py = k * (B * x + D * y);
+              minX = mathMin(minX, px); maxX = mathMax(maxX, px); minY = mathMin(minY, py); maxY = mathMax(maxY, py);
+            }
+            const pad = 4 + 0.5 * size * k * mathMax(axisX, axisY);
+            return { minX, minY, pad, width: mathCeil(maxX - minX + 2 * pad), height: mathCeil(maxY - minY + 2 * pad) };
+          };
+          // Resolution: at least emDevicePx canvas px per em on the label's SMALLER axis (a
+          // spacingAndGlyphs stretch makes the axes differ), and never coarser than minPerScreenPx
+          // canvas px per screen px, so a large label is not rastered coarser than it is shown.
+          let k = mathMax(limits.emDevicePx / (size * mathMin(axisX, axisY)), limits.minPerScreenPx * limits.screenScale);
+          let box = extents(k);
+          if (box.width > limits.maxCanvasPx || box.height > limits.maxCanvasPx) {
+            k *= mathMin((limits.maxCanvasPx - 16) / box.width, (limits.maxCanvasPx - 16) / box.height);
+            box = extents(k);
+          }
+          if (!(k * size * mathMin(axisX, axisY) >= limits.minEmDevicePx) || box.width > limits.maxCanvasPx || box.height > limits.maxCanvasPx) {
+            return { ...base, k };
+          }
+          const width = box.width;
+          const height = box.height;
+          const originX = box.pad - box.minX;
+          const originY = box.pad - box.minY;
+          call.call(canvasWidthSet, canvas, width);
+          call.call(canvasHeightSet, canvas, height);
+          // Resizing a canvas resets its state: the font state is set again, and it is THIS state
+          // that is read back, on the canvas that is drawn.
+          const state = setState();
+          call.call(setTransformFn, context, k * A, k * B, k * C, k * D, originX, originY);
+          call.call(canvasSet.fillStyle, context, "#000");
+          call.call(fillTextFn, context, text, 0, 0);
+          const data = call.call(imageDataGet, call.call(imageDataFn, context, 0, 0, width, height));
+          const covered = (x, y) => data[(y * width + x) * 4 + 3] > 0;
+          let left = -1, right = -1, top = -1, bottom = -1;
+          for (let x = 0; x < width && left < 0; x += 1) for (let y = 0; y < height; y += 1) if (covered(x, y)) { left = x; break; }
+          if (left >= 0) {
+            for (let x = width - 1; x >= 0 && right < 0; x -= 1) for (let y = 0; y < height; y += 1) if (covered(x, y)) { right = x + 1; break; }
+            for (let y = 0; y < height && top < 0; y += 1) for (let x = 0; x < width; x += 1) if (covered(x, y)) { top = y; break; }
+            for (let y = height - 1; y >= 0 && bottom < 0; y -= 1) for (let x = 0; x < width; x += 1) if (covered(x, y)) { bottom = y + 1; break; }
+          }
+          return { ...base, ...state, k, originX, originY, width, height, ink: left < 0 ? null : [left, top, right, bottom] };
+        } catch (_) {
+          return null;
+        }
+      },
       outerHtml: (el) => call.call(outerHtmlGet, el),
       painted: (el) => {
         if (typeof checkVisibilityFn !== "function") return null;
@@ -532,7 +686,7 @@ export const PRIMITIVES_CHECK = `(() => {
     return { ok: false, reason: "the primitive references are replaceable, so they prove nothing" };
   }
   for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
-    "svgGeometry", "svgCtm", "svgScreenCtm", "svgViewportLengths", "css", "outerHtml", "painted", "byId", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
+    "svgGeometry", "svgCtm", "svgScreenCtm", "svgViewportLengths", "css", "svgTextFacts", "textRaster", "outerHtml", "painted", "byId", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
     "rects", "setAttr", "setText", "nodeType", "parent", "next", "create", "append", "remove", "setCssText",
     "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityRecordPreview",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",
