@@ -1,7 +1,7 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  declined, hasLayoutBox, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber, renderingOf, sourceOf,
+  boxlessDeclined, declined, hasLayoutBox, isNotRendered, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber, renderingOf, sourceOf,
   targetEvaluation,
 } from "../shared.ts";
 
@@ -128,7 +128,7 @@ export const unbreakableBlockTooTall = defineRule(
     // fragment below, as before.
     const leadBySid = new Map<string, number>();
     for (const fragment of snapshot.blocks) {
-      if (fragment.sid === null || renderingOf(fragment) !== "box" || fragment.effectiveStyle.visibility !== "visible") continue;
+      if (fragment.sid === null || renderingOf(snapshot, fragment) !== "box" || fragment.effectiveStyle.visibility !== "visible") continue;
       const current = leadBySid.get(fragment.sid);
       if (current === undefined || fragment.fragmentIndex < current) leadBySid.set(fragment.sid, fragment.fragmentIndex);
     }
@@ -143,7 +143,9 @@ export const unbreakableBlockTooTall = defineRule(
         evaluations.push(targetEvaluation({
           ruleId: "layout/unbreakable-block-too-tall", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
           fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-applicable",
-          countsTowardCoverage: false, reason: before ? "rule/fragment-not-rendered" : "rule/non-initial-fragment",
+          countsTowardCoverage: false,
+          reason: !before ? "rule/non-initial-fragment"
+            : isNotRendered(snapshot, block) ? "rule/fragment-not-rendered" : "rule/fragment-without-visible-box",
           ...(before ? {
             measurements: [
               { name: "target-has-layout-box", value: hasLayoutBox(block.box), unit: null, operator: "=", threshold: true },
@@ -172,7 +174,7 @@ export const unbreakableBlockTooTall = defineRule(
         }));
         continue;
       }
-      const rendering = renderingOf(block);
+      const rendering = renderingOf(snapshot, block);
       // `display: contents` generates no box for the element, and `break-inside` applies to boxes:
       // the declaration does nothing, so "does this block fit the page unbroken" is not a question
       // about it. Its children are laid out and are candidates in their own right. Not applicable,
@@ -193,7 +195,7 @@ export const unbreakableBlockTooTall = defineRule(
       // (`rule/target-in-margin-box`: Paged.js hides it with `display: none` while its clones print
       // in the margin boxes); it was recorded as MEASURED at 0 px, and a document whose only avoid
       // block was a running element reported full coverage for a check that looked at nothing.
-      if (rendering !== "box") {
+      if (rendering === "margin-box" || rendering === "not-rendered") {
         evaluations.push(notRenderedEvaluation("layout/unbreakable-block-too-tall", block));
         continue;
       }
@@ -206,6 +208,17 @@ export const unbreakableBlockTooTall = defineRule(
         continue;
       }
       candidates += 1;
+      // A box of zero by zero that printed lines (`width: 0; height: 0; overflow: visible`), or
+      // whose lines were not recorded: the box's height is not the height of what printed, and the
+      // lines' extent is not the height of a box that could have broken. Neither is this block's
+      // height. Declined, counted against coverage — never excluded, which turned such a document's
+      // `insufficient-coverage` into a clean run.
+      if (rendering === "zero-box") {
+        const decline = boxlessDeclined("layout/unbreakable-block-too-tall", snapshot, block);
+        notMeasured.push(decline.notMeasured);
+        evaluations.push(decline.evaluation);
+        continue;
+      }
 
       const outOfScope = layoutOutOfScope(block.effectiveStyle);
       if (outOfScope) {

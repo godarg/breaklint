@@ -33,7 +33,9 @@ is recorded as `excluded` (`rule/target-in-margin-box`), and a block the author 
 (`rule/target-not-rendered`), both outside the coverage base and never as a measurement of 0 px.
 A `display: contents` block generates no box, and `break-inside` does not apply to it: it is
 `not-applicable` (`rule/target-generates-no-box`), outside coverage, and its children are
-candidates in their own right.
+candidates in their own right. A zero-size block that printed visible lines anyway
+(`overflow: visible`), or whose lines were not recorded, is declined as `env/invalid-measurement`,
+counted against coverage: its box's height is not the height of what printed.
 
 A split block is judged at its first fragment that printed — laid out with a box of its own and
 visible — not at fragment 0 as such. Hiding only the first fragment (`display: none`, moving it

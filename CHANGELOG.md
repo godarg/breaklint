@@ -52,7 +52,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   Paged.js printed in margin boxes, the clones of a running element) are required fields, checked
   by the snapshot invariants; the engine judges only a snapshot of its own stamp and refuses any
   other with `checker-crashed` (exit 3). The only stored snapshot, `examples/demo-snapshot.json`,
-  is migrated; the demo's findings do not change. The report schema does not move.
+  is migrated; the demo's findings do not change. The report schema does not move. In the same
+  stamp, `TextLine.visible` is true when any text on the line is visible — read from each text
+  node's element — where it used to copy the block's visibility, so a hidden block's visible
+  descendant (`p { visibility: hidden } span { visibility: visible }`) counts as printed.
 - **A zero box no longer decides how a block is judged; its computed display does.** A
   `display: contents` block has no box of its own but prints its text and children:
   `type/excessive-word-spacing` measures it from its lines (a justified `display: contents`
@@ -67,7 +70,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   longer called unrendered. Where a box-less block has no line to read,
   `layout/heading-at-page-bottom` excludes it when its lines are all invisible
   (`rule/target-not-visible`, so a hidden `display: contents` heading no longer ends a run at exit
-  4) and declines it as `env/invalid-measurement` when it has no line or unrecorded lines.
+  4) and declines it as `env/invalid-measurement` when it has no line or unrecorded lines. A box
+  of zero by zero is not read as "not rendered" by itself: only `display: none` or recorded lines
+  none of which is visible are. A zero-size block that printed its text outside its box
+  (`width: 0; height: 0; overflow: visible`) is placed by its lines by the heading rule, measured
+  by the word-spacing rule, and declined, counted, by `layout/unbreakable-block-too-tall` (an
+  unreleased intermediate state excluded it, which turned a counted decline into a clean run).
   `type/excessive-word-spacing` no longer measures a factor of 0 from lines nobody saw: all lines
   invisible is `rule/target-not-visible`, no line at all (an empty or image-only justified block)
   is `rule/no-text-lines` (both outside coverage), and unrecorded lines are declined as

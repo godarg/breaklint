@@ -56,7 +56,7 @@ export const headingAtPageBottom = defineRule(
       // running heading, whose in-flow original Paged.js hides with `display: none`
       // (`rule/target-in-margin-box`); it was counted as a measured candidate that "had content
       // below it".
-      if (isNotRendered(block)) {
+      if (isNotRendered(snapshot, block)) {
         evaluations.push(notRenderedEvaluation("layout/heading-at-page-bottom", block));
         continue;
       }

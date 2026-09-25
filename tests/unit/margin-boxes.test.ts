@@ -37,7 +37,7 @@ import { COLLECTOR_SOURCE, type CollectorResult } from "../../src/paginate/colle
 import { injectSourceIds } from "../../src/source/inject.ts";
 import type { BlockRecord, Finding, Snapshot } from "../../src/core/types.ts";
 import { fingerprint } from "../../src/core/fingerprint.ts";
-import { renderedBox } from "../../src/rules/shared.ts";
+import { renderedBox, renderingOf } from "../../src/rules/shared.ts";
 import { ALL_RULES } from "../../src/rules/index.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
 import { integritySource, orderedSourceSids, validateRuntimeSidState, type RuntimeIntegrityStatus } from "../../src/acquire/render-run.ts";
@@ -260,6 +260,52 @@ describe("margin-box content is not part of the flow", () => {
     assert.equal(records("author-wrapper").length, 1);
     // Every body paragraph is still there, exactly once.
     for (let i = 1; i <= 12; i += 1) assert.equal(records(`b${i}`).length, 1, `b${i}`);
+  });
+
+  /**
+   * Only margin boxes count as margin copies. A copy of an in-flow element in the page box (where
+   * Paged.js puts `position: fixed` clones), in the footnote area or anywhere else outside the
+   * margin boxes is not one, and a copy in a margin box is counted once per page.
+   */
+  it("counts margin copies in margin boxes only", () => {
+    const html = `<!doctype html><html lang="en"><body><p id="p1">One.</p><p id="p2">Two.</p><p id="p3">Three.</p></body></html>`;
+    const { sid } = source(html);
+    const at = (id: string, box: string) => `<p id="${id}" data-bl-sid="${sid[id]}" data-ref="ref-${id}" data-test-box="${box}">${id}</p>`;
+    const page = (index: number, content: string) => pagedPage({
+      pageBox: pageBox(index), contentBox: contentBox(index), content,
+      fixed: at("p1", `523.22 ${index * STRIDE} 43.7 ${LINE}`),
+      margins: { "top-center": at("p2", `56.69 ${19.02 + index * STRIDE} 453.53 ${LINE}`) },
+      footnotes: index === 1 ? at("p3", `56.69 ${378.5 + index * STRIDE} 453.53 ${LINE}`) : "",
+    });
+    const raw = evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, pagedDocument([
+      page(0, at("p1", lineBox(0, 0)) + at("p2", lineBox(0, 1))), page(1, at("p3", lineBox(1, 0))),
+    ]));
+    const copies = (id: string) => raw.blocks.filter((block) => block.sid === sid[id]).map((block) => block.marginCopies);
+    assert.deepEqual(copies("p1"), [0], "a page-box copy was counted as a margin copy");
+    assert.deepEqual(copies("p2"), [2], "the margin copies were not counted once per page");
+    assert.deepEqual(copies("p3"), [0, 0], "a footnote-area record was counted as a margin copy");
+  });
+
+  /**
+   * A line is visible when any text on it is. `p { visibility: hidden } span { visibility: visible }`
+   * prints the span; reading the block's visibility called its lines invisible, and
+   * `type/excessive-word-spacing` excluded a block that printed.
+   */
+  it("reads line visibility from the text, not from the block", () => {
+    const html = `<!doctype html><html lang="en"><body><p id="shown">Shown.</p><p id="gone">Gone.</p></body></html>`;
+    const { sid } = source(html);
+    const raw = evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, pagedDocument([pagedPage({
+      pageBox: pageBox(0), contentBox: contentBox(0),
+      content: `<p id="shown" data-bl-sid="${sid["shown"]}" data-ref="ref-shown" style="visibility: hidden;" data-test-box="${lineBox(0, 0)}">` +
+        `<span style="visibility: visible;" data-test-box="${lineBox(0, 0)}">Shown.</span></p>` +
+        `<p id="gone" data-bl-sid="${sid["gone"]}" data-ref="ref-gone" style="visibility: hidden;" data-test-box="${lineBox(0, 1)}">Gone.</p>`,
+    })]));
+    const visibility = (id: string) => {
+      const key = raw.blocks.find((block) => block.sid === sid[id])!.nodeKey;
+      return raw.textLines.filter((line) => line.blockKey === key).map((line) => line.visible);
+    };
+    assert.deepEqual(visibility("shown"), [true], "a visible descendant's line was recorded as invisible");
+    assert.deepEqual(visibility("gone"), [false]);
   });
 
   it("the collector's page edges ignore margin boxes and page-box clones", () => {
@@ -530,6 +576,72 @@ describe("a record with no layout box is never measured, and never anchors a pag
     }))];
     assert.deepEqual(records.map((record) => renderedBox(snapshot, record)),
       [null, null, { x: 60, y: 100, width: 50, height: 12 }]);
+  });
+
+  /**
+   * A box of zero by zero that is not `display: contents` and not `display: none` is not proof
+   * that nothing printed. `width: 0; height: 0; overflow: visible` prints its text outside the
+   * box; the lines are recorded and visible. Measured on 2026-09-25 against an earlier state of
+   * this change, which classified such a record "not rendered" from its box alone: a zero-size
+   * avoid block with seventeen printed lines went from a counted decline (exit 4) to a clean run,
+   * and a zero-box heading at the page bottom lost its finding. Per rule: the heading rule and
+   * `renderedBox` place it by its lines; `type/excessive-word-spacing` measures its lines;
+   * `layout/unbreakable-block-too-tall` declines it, counted — its box's height is not the height
+   * of what printed, and the lines' extent is not the height of a box that could have broken.
+   */
+  it("treats a zero box that printed visible lines as printed, per rule", () => {
+    for (const name of ["too-tall-trigger", "heading-bottom-trigger"] as const) {
+      const config = resolveConfig({ file: {}, cli: {} });
+      const engine = { failOn: config.failOn, activeRules: config.activeRules, optionsByRule: config.optionsByRule, coverageFloors: coverageFloorMap(config) };
+      const snapshot = structuredClone(loadCorpus().find((item) => item.name === name)!.snapshot);
+      const normal = runDocument({ path: "d.html", snapshot: structuredClone(snapshot), infrastructure: [] }, engine).report;
+      const target = name === "too-tall-trigger"
+        ? snapshot.blocks.find((block) => /avoid/u.test(block.effectiveStyle.breakInside))!
+        : snapshot.blocks.find((block) => /^h[1-6]$/u.test(block.tag))!;
+      assert.ok((target.lines ?? []).length > 0 && target.display === "block", "premise: a block-level target with recorded lines");
+      // The printed lines, where the box was: what the browser records for `overflow: visible`.
+      // (The corpus snapshot references the lines without carrying their geometry.)
+      if (!snapshot.textLines.some((line) => line.blockKey === target.nodeKey)) {
+        snapshot.textLines = [...snapshot.textLines, ...(target.lines ?? []).map((index) => ({
+          blockKey: target.nodeKey, index, box: { ...target.box }, visible: true, width: target.box.width, wordBoxes: null,
+        }))];
+      }
+      target.box = { ...target.box, width: 0, height: 0 };
+      const zero = runDocument({ path: "d.html", snapshot, infrastructure: [] }, engine).report;
+      const rule = name === "too-tall-trigger" ? "layout/unbreakable-block-too-tall" : "layout/heading-at-page-bottom";
+      const rows = zero.evaluations.filter((row) => row.ruleId === rule && row.targetRef.nodeKey === target.nodeKey);
+      assert.equal(rows.some((row) => row.reason === "rule/target-not-rendered"), false, `${name}: a record that printed lines was excluded as not rendered`);
+      if (name === "too-tall-trigger") {
+        assert.notEqual(normal.verdict, "clean");
+        assert.equal(zero.verdict, "insufficient-coverage", `${name}: the zero box turned into ${zero.verdict}`);
+        assert.deepEqual(rows.map((row) => [row.status, row.reason]), [["not-measured", "env/invalid-measurement"]]);
+      } else {
+        assert.equal(zero.findings.filter((finding) => finding.ruleId === rule).length,
+          normal.findings.filter((finding) => finding.ruleId === rule).length, `${name}: placing the heading by its lines lost its finding`);
+        assert.ok(rows.some((row) => row.status === "measured"), `${name}: the heading was not placed by its lines`);
+      }
+    }
+  });
+
+  /** The two things a zero box with no visible line can be, and a zero box whose lines were not recorded. */
+  it("calls a zero box not rendered only when the snapshot shows nothing printed", () => {
+    const snapshot = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
+    const zero = { x: 0, y: 0, width: 0, height: 0 };
+    const make = (nodeKey: string, over: Partial<BlockRecord>): BlockRecord => ({ ...structuredClone(snapshot.blocks[0]!), nodeKey, box: zero, ...over });
+    snapshot.textLines = [...snapshot.textLines,
+      { blockKey: "visible-line", index: 1, box: { x: 60, y: 100, width: 50, height: 12 }, visible: true, width: 50, wordBoxes: null },
+      { blockKey: "hidden-line", index: 1, box: { x: 60, y: 100, width: 50, height: 12 }, visible: false, width: 50, wordBoxes: null }];
+    const cases: [BlockRecord, string][] = [
+      [make("display-none", { display: "none", lines: [] }), "not-rendered"],
+      [make("display-none-unrecorded", { display: "none", lines: null, notMeasuredReason: "env/invalid-measurement" }), "not-rendered"],
+      [make("hidden-subtree", { display: "block", lines: [] }), "not-rendered"],
+      [make("hidden-line", { display: "block", lines: [1] }), "not-rendered"],
+      [make("visible-line", { display: "block", lines: [1] }), "zero-box"],
+      [make("unrecorded", { display: "block", lines: null, notMeasuredReason: "env/invalid-measurement" }), "zero-box"],
+      [make("margin-original", { display: "none", lines: [], marginCopies: 2 }), "margin-box"],
+      [make("contents", { display: "contents", lines: [] }), "contents"],
+    ];
+    assert.deepEqual(cases.map(([record]) => [record.nodeKey, renderingOf(snapshot, record)]), cases.map(([record, kind]) => [record.nodeKey, kind]));
   });
 
   /**

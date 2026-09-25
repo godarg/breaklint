@@ -178,30 +178,42 @@ export function hasLayoutBox(box: Box): boolean {
 }
 
 /**
- * How a block record was rendered, from its box and the facts Snapshot 5 records about it:
+ * How a block record was rendered, from its box, its recorded lines and the facts Snapshot 5
+ * records about it:
  * - `box`: laid out with a box of its own;
  * - `contents`: `display: contents` — no box for the element, while its text and children are laid
  *   out and printed (an image-only `display: contents` figure prints its image);
  * - `margin-box`: no box in the flow, and printed as margin-box copies: the in-flow original of a
  *   `position: running(...)` element, which Paged.js hides with `display: none`;
- * - `not-rendered`: no box and nothing printed from it: `display: none` set by the author, an element
- *   inside a hidden subtree or a closed `<details>`.
- * The classification reads the computed `display` and the margin-copy count; it never guesses from
- * geometry or from the absence of lines, which is how an image-only `display: contents` figure was
- * once called "not rendered" while its image printed.
+ * - `not-rendered`: no box and nothing the snapshot shows printed from it — `display: none`, or
+ *   lines that were recorded and none of which is visible (an element inside a hidden subtree or a
+ *   closed `<details>` has no line box);
+ * - `zero-box`: a box of zero by zero that is NOT proof of nothing printed: a visible line was
+ *   recorded (`width: 0; height: 0; overflow: visible` prints its text outside its box), or the
+ *   lines were not recorded at all, so the question is open.
+ * The classification never reads "no box" alone as "not rendered". An earlier state of this change
+ * did, and a zero-size block whose seventeen lines printed was excluded, turning a counted decline
+ * (exit 4) into a clean run.
  */
-export type Rendering = "box" | "contents" | "margin-box" | "not-rendered";
+export type Rendering = "box" | "contents" | "margin-box" | "not-rendered" | "zero-box";
 
-export function renderingOf(block: { box: Box; display: string; marginCopies: number }): Rendering {
+type RenderFacts = { nodeKey: string; box: Box; display: string; marginCopies: number; lines: readonly number[] | null };
+
+export function renderingOf(snapshot: Pick<Snapshot, "textLines">, block: RenderFacts): Rendering {
   if (hasLayoutBox(block.box)) return "box";
   if (block.display === "contents") return "contents";
   if (block.marginCopies > 0) return "margin-box";
+  if (block.display === "none") return "not-rendered";
+  if (block.lines === null) return "zero-box";
+  const lines = snapshot.textLines.filter((line) => line.blockKey === block.nodeKey);
+  // A visible line printed. A referenced line the snapshot does not carry is not proof of anything.
+  if (lines.some((line) => line.visible) || lines.length < block.lines.length) return "zero-box";
   return "not-rendered";
 }
 
 /** A record nothing in the flow was printed from: `margin-box` or `not-rendered`. */
-export function isNotRendered(block: { box: Box; display: string; marginCopies: number }): boolean {
-  const rendering = renderingOf(block);
+export function isNotRendered(snapshot: Pick<Snapshot, "textLines">, block: RenderFacts): boolean {
+  const rendering = renderingOf(snapshot, block);
   return rendering === "margin-box" || rendering === "not-rendered";
 }
 
@@ -215,7 +227,8 @@ export function isNotRendered(block: { box: Box; display: string; marginCopies: 
 export function notRenderedEvaluation(ruleId: string, block: {
   nodeKey: string; sid: string | null; fragmentIndex: number; box: Box; display: string; marginCopies: number;
 }): TargetEvaluation {
-  const inMargin = renderingOf(block) === "margin-box";
+  // Called for a record `isNotRendered`; of those, exactly the ones with margin copies printed there.
+  const inMargin = block.marginCopies > 0;
   return targetEvaluation({
     ruleId, keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex,
     boxScreen: block.box, status: "excluded", countsTowardCoverage: false,
@@ -248,9 +261,9 @@ export function lineStateOf(snapshot: Snapshot, block: { nodeKey: string; lines:
  * `isNotRendered` (a running element's in-flow original, an element the author hid): the two
  * helpers agree, so no rule can put in the flow what the classification says printed nowhere.
  */
-export function renderedBox(snapshot: Snapshot, block: { nodeKey: string; box: Box; display: string; marginCopies: number }): Box | null {
+export function renderedBox(snapshot: Snapshot, block: RenderFacts): Box | null {
   if (hasLayoutBox(block.box)) return block.box;
-  if (isNotRendered(block)) return null;
+  if (isNotRendered(snapshot, block)) return null;
   const lines = linesOfBlock(snapshot, block.nodeKey);
   if (lines.length === 0) return null;
   const left = Math.min(...lines.map((line) => line.box.x));

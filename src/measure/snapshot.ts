@@ -518,10 +518,16 @@ export const SNAPSHOT_SOURCE = `(() => {
     let spaceWidth = 0;
     for (const node of textNodes(el)) {
       const value = P.text(node) || "";
+      // A line is visible when any text on it is: visibility is read from each text node's own
+      // element, not from the block, because a hidden block may hold a visible descendant
+      // (p { visibility: hidden } span { visibility: visible } prints the span).
+      const parentStyle = P.style(P.parent(node), null);
+      const nodeVisible = (parentStyle && parentStyle.visibility) !== "hidden";
       for (const r of P.range(node)) {
         if (r.width <= 0 || r.height <= 0) continue;
         const existing = groups.find((g) => Math.abs(g.y - r.y) <= 0.5);
-        const entry = existing || { x: r.x, y: r.y, right: r.x + r.width, bottom: r.y + r.height, words: [] };
+        const entry = existing || { x: r.x, y: r.y, right: r.x + r.width, bottom: r.y + r.height, words: [], visible: false };
+        if (nodeVisible) entry.visible = true;
         entry.x = Math.min(entry.x, r.x); entry.right = Math.max(entry.right, r.x + r.width);
         entry.y = Math.min(entry.y, r.y); entry.bottom = Math.max(entry.bottom, r.y + r.height);
         if (!existing) groups.push(entry);
@@ -557,7 +563,7 @@ export const SNAPSHOT_SOURCE = `(() => {
       const lineWords = measured.words === null ? null : measured.words.filter((w) => Math.abs(w.y - line.y) <= 0.5);
       textLines.push({ blockKey: nodeKey, index: base + local,
         box: { x: round(line.x), y: round(line.y), width: round(line.right - line.x), height: round(line.bottom - line.y) },
-        visible: s.visibility !== "hidden", width: round(line.right - line.x), wordBoxes: lineWords });
+        visible: line.visible, width: round(line.right - line.x), wordBoxes: lineWords });
     });
     lineBaseBySid[sourceIdentity] = base + measured.groups.length;
     fonts.add(s.fontFamily);
@@ -1073,7 +1079,7 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
   // continuing block, which is deterministic; two such pages of the same block share an anchor.
   const anchorCandidates = new Map<number, BlockRecord[]>();
   for (const block of blocks) {
-    if (!mappedNodeKeys.has(block.nodeKey) || isNotRendered(block)) continue;
+    if (!mappedNodeKeys.has(block.nodeKey) || isNotRendered({ textLines: input.raw.textLines }, block)) continue;
     const list = anchorCandidates.get(block.page) ?? [];
     list.push(block);
     anchorCandidates.set(block.page, list);

@@ -342,9 +342,10 @@ reports it:
   no box of its own while its text and children are laid out. `layout/unbreakable-block-too-tall`
   asks about a box, and `break-inside` does not apply to an element without one, so such a block is
   `not-applicable` with the reason `rule/target-generates-no-box`, outside coverage; its children
-  are candidates in their own right. (Round 3 of this work declined it against coverage instead,
-  and a key/value grid whose `li` items were flattened with `display: contents` under a print rule
-  `li { break-inside: avoid }` ended exit 4 with twelve declines, where it had ended exit 0.) An
+  are candidates in their own right. (An unreleased intermediate state declined it against
+  coverage instead, and a key/value grid whose `li` items were flattened with `display: contents`
+  under a print rule `li { break-inside: avoid }` ended exit 4 with twelve declines, where it had
+  ended exit 0.) An
   image-only `display: contents` figure is the same case, not an unrendered one.
   `layout/heading-at-page-bottom` places such a heading, and a block below it, by its visible line
   boxes; with no visible line but recorded lines it is excluded as `rule/target-not-visible`, and
@@ -353,6 +354,18 @@ reports it:
   invisible are `rule/target-not-visible`, a block with no line at all (empty, or image-only) is
   `rule/no-text-lines`, and lines the snapshot did not record are declined as
   `env/invalid-measurement` — never a measurement of factor 0.
+- **A box of zero by zero is not by itself "not rendered".** A block counts as not rendered only
+  when the snapshot shows nothing printed from it: `display: none`, or recorded lines none of which
+  is visible (an element inside a hidden subtree or a closed `<details>` has no line box). A
+  zero-size block that is neither — `width: 0; height: 0; overflow: visible` prints its text
+  outside the box, or its lines were not recorded — is placed by its visible lines where the rule
+  reads positions (`layout/heading-at-page-bottom`, and the continuation rule's flow), measured
+  from its lines by `type/excessive-word-spacing`, and declined as `env/invalid-measurement`,
+  counted, by `layout/unbreakable-block-too-tall`, whose question is the height of a box that
+  printed nothing of its own. A line is visible when any text on it is: visibility is read from
+  each text node's element, so `p { visibility: hidden } span { visibility: visible }` prints and
+  is measured. What remains: `layout/unbreakable-block-too-tall` still reads the BLOCK's own
+  visibility, so a hidden block with a visible descendant is excluded there as not visible.
 - **A split block is judged at the first fragment that printed.** `layout/unbreakable-block-too-tall`
   takes the block's lead fragment to be the first one laid out with a box of its own and visible,
   joined by source id; earlier fragments are recorded `not-applicable` as

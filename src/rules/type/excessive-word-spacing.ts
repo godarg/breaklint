@@ -62,7 +62,7 @@ export const excessiveWordSpacing = defineRule(
       // Nothing printed, no gaps: a justified running header's hidden in-flow original was counted
       // as measured with nothing in it. A `display: contents` block has no box but has lines, and
       // its gaps are printed; it is measured from them like any other block.
-      if (isNotRendered(block)) {
+      if (isNotRendered(snapshot, block)) {
         evaluations.push(notRenderedEvaluation("type/excessive-word-spacing", block));
         continue;
       }
