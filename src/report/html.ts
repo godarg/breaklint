@@ -50,8 +50,7 @@ function renderCoverageAlert(model: ReturnType<typeof buildHtmlReportModel>): st
 <h2 id="coverage-alert-heading">Coverage did not meet the contract</h2>
 <div class="state-alert">
   <p><strong>This is not a clean run.</strong> A rule without enough measurement cannot establish absence of a defect.</p>
-  ${withdrawn ? `<ul class="coverage-shortfall-list">${withdrawn}</ul>` : ""}
-  ${shortfalls.length === 0
+  ${withdrawn ? `<ul class="coverage-shortfall-list">${withdrawn}</ul>\n  ` : ""}${shortfalls.length === 0
     ? withdrawn ? "" : `<p>The run declared insufficient coverage without a per-rule shortfall. Inspect the canonical JSON report.</p>`
     : `<ul class="coverage-shortfall-list">${shortfalls.map((row) => `<li class="coverage-shortfall-item">
       <p><strong>Rule:</strong> <code>${esc(row.ruleId)}</code> in <span class="mono">${esc(row.document)}</span></p>

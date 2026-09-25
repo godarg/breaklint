@@ -220,6 +220,23 @@ function inlineStyle(node: FakeNode): Record<string, string> {
   return declared;
 }
 
+/**
+ * The inherited properties a payload reads (`writing-mode`, `direction`), taken from the nearest
+ * ancestor that declares them inline, as the cascade would. Everything else stays uninherited.
+ */
+const INHERITED = ["writingMode", "direction"] as const;
+function inheritedStyle(node: FakeNode): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const name of INHERITED) {
+    for (let at = node.parentNode; at; at = at.parentNode) {
+      if (at.nodeType !== 1) continue;
+      const value = inlineStyle(at)[name];
+      if (value !== undefined) { out[name] = value; break; }
+    }
+  }
+  return out;
+}
+
 function displayedChain(node: FakeNode): boolean {
   for (let at: FakeNode | null = node; at; at = at.parentNode) {
     if (at.nodeType === 1 && inlineStyle(at).display === "none") return false;
@@ -267,7 +284,7 @@ export function fakePrimitives(document: FakeNode, hooks: {
       const box = boxOf(node);
       return box.width > 0 || box.height > 0 ? [box] : [];
     },
-    style: (node: FakeNode) => ({ ...DEFAULT_STYLE, ...classStyle(node), ...inlineStyle(node) }),
+    style: (node: FakeNode) => ({ ...DEFAULT_STYLE, ...inheritedStyle(node), ...classStyle(node), ...inlineStyle(node) }),
     // A text node's line box is its parent's box: one line per text node. A hidden text node has
     // none, which is what Range.getClientRects() answers under display: none.
     range: (node: FakeNode, start?: number, end?: number) => {

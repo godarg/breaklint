@@ -24,6 +24,7 @@
           "eligible": 86,
           "excludedSvgDescendants": 0,
           "excludedInlineBlockContainers": 1,
+          "fragmentedSamples": 1,
           "maxDeltaPx": 0,
           "tolerancePx": 0.05
         }
@@ -52,6 +53,7 @@
           "eligible": 168,
           "excludedSvgDescendants": 1,
           "excludedInlineBlockContainers": 0,
+          "fragmentedSamples": 0,
           "maxDeltaPx": 0,
           "tolerancePx": 0.05
         }
@@ -61,6 +63,16 @@
   "calibrationEvidenceEligible": false,
   "externalTrustRootClaimed": false,
   "expectationHistory": [
+    {
+      "recordedOn": "2026-09-25",
+      "release": "unreleased (0.7.0 cycle)",
+      "what": "geometryCrossCheck gains fragmentedSamples: 1 (project-gutenberg-gettysburg-address) and 0 (dargel-kleingewerbe)",
+      "why": "The geometry cross-check now compares a box the browser split into fragments fragment by fragment against CDP's content quads, and its positive event counts how many of the checked samples that applied to. The field is new; no existing expectation changes and no tolerance moves: checked, required, candidates, eligible, both exclusions, maxDeltaPx 0 and tolerancePx 0.05 are as before. The value 1 for the Gettysburg address is what CI measured (run 36101647286) and what patched Chromium 141 measures locally; the value 0 for dargel-kleingewerbe was measured locally on patched Chromium 141 on the admitted bytes, and CI must confirm it.",
+      "previous": {
+        "project-gutenberg-gettysburg-address": { "fragmentedSamples": null },
+        "dargel-kleingewerbe": { "fragmentedSamples": null }
+      }
+    },
     {
       "recordedOn": "2026-09-18",
       "release": "0.6.0",

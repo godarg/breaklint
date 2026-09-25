@@ -154,9 +154,17 @@ export function renderConsole(report: Report, opts: { colour?: boolean } = {}): 
           out.push(`  rule       ${ruleId} in ${doc.path}`);
           out.push(`  measured   ${cov.measured} of ${cov.candidates} candidates (${ratioPct}); required floor ${floorPct}`);
           out.push(`  reason     ${reasonStr}`);
-          out.push(`  options    - Inspect the document for unsupported constructs or environment limits`);
-          out.push(`             - If this document intentionally uses unsupported elements, disable the check with:`);
-          out.push(`               --disable ${ruleId}`);
+          // A decline for a withdrawn page is the page's, not the rule's: --disable removes the
+          // rule and the page stays withdrawn, so it is not offered for such a shortfall.
+          const pageReasons = new Set(doc.notMeasured.filter((n) => n.scope === "page" && n.ruleId === null).map((n) => n.reason));
+          if (reasons.some((reason) => pageReasons.has(reason))) {
+            out.push(`  options    - Some candidates lie on pages withdrawn from measurement (see pages above);`);
+            out.push(`               fix the layout. No --disable clears a withdrawn page.`);
+          } else {
+            out.push(`  options    - Inspect the document for unsupported constructs or environment limits`);
+            out.push(`             - If this document intentionally uses unsupported elements, disable the check with:`);
+            out.push(`               --disable ${ruleId}`);
+          }
           out.push("");
         }
       }

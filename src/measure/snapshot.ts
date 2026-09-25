@@ -526,7 +526,11 @@ export const SNAPSHOT_SOURCE = `(() => {
     return (count !== "auto" && count !== "1") || width !== "auto";
   };
   const roots = P.all(document, "html,body");
-  const rootMulticol = roots.some((el) => multicolContainer(P.style(el, null)));
+  // For html and body ANY column property counts, column-count 1 included: a one-column
+  // multi-column container is still a fragmentation context, and Paged.js's pages laid into it
+  // lose what does not fit (measured: body { column-count: 1 } printed half the document).
+  const rootColumns = (style) => (style.columnCount || "auto") !== "auto" || (style.columnWidth || "auto") !== "auto";
+  const rootMulticol = roots.some((el) => rootColumns(P.style(el, null)));
   const honouredSpanner = (style) => style.columnSpan === "all" && (style.float || "none") === "none" &&
     style.position !== "absolute" && style.position !== "fixed" &&
     !/^(inline|contents|none)/u.test(style.display || "block");
@@ -702,10 +706,15 @@ export const SNAPSHOT_SOURCE = `(() => {
     // were absent from pdftotext's reading of the PDF. The census is structural: a visible text
     // line box or replaced element lying ENTIRELY past the page box's edge on the side the columns
     // progress to has no pixel on the page. That side follows the fragmentainer's writing mode, as
-    // measured on Chromium 141: horizontal-tb goes to the inline end (right for ltr, left for rtl);
-    // vertical-rl and sideways-rl to the left, vertical-lr and sideways-lr to the right (the block
-    // end), and with direction rtl also above the page (the inline end). Content beyond the content
-    // box but inside the page box -- a margin note, a hanging figure -- prints, and is not counted.
+    // measured on Chromium 141 per writing mode: horizontal-tb goes to the inline end (right for
+    // ltr, left for rtl); in vertical writing to the block end (left for vertical-rl and
+    // sideways-rl, right for vertical-lr and sideways-lr) and ALSO to the inline end, which is the
+    // top of the page for vertical-* with direction rtl and for sideways-lr with direction ltr (its
+    // inline axis runs bottom to top), and the bottom otherwise. The same rule is applied to each
+    // box's own writing mode. Only those sides are looked at: content lying off the page in any
+    // other direction is not seen by the census. Content beyond the
+    // content box but inside the page box -- a margin note, a hanging figure -- prints, and is not
+    // counted.
     const pageRect = P.rect(page);
     const contentStyle = P.style(content, null);
     const writingMode = contentStyle.writingMode || "horizontal-tb";
@@ -714,25 +723,57 @@ export const SNAPSHOT_SOURCE = `(() => {
     const rightOf = (r) => r.x >= pageRect.x + pageRect.width;
     const above = (r) => r.y + r.height <= pageRect.y;
     const below = (r) => r.y >= pageRect.y + pageRect.height;
-    const vertical = writingMode !== "horizontal-tb";
-    const blockEnd = /-rl$/u.test(writingMode) ? leftOf : rightOf;
-    const offPage = (r) => r.width > 0 && r.height > 0 && (!vertical
-      ? (rtl ? leftOf(r) : rightOf(r))
-      : blockEnd(r) || (rtl ? above(r) : below(r)));
-    // DELIBERATELY CLIPPED CONTENT IS NOT RESIDUE. The visually-hidden idiom -- a 1 px box with
-    // overflow hidden, or clip / clip-path, moved off the page -- lays its text out past the page
-    // box on purpose; in a right-to-left document \`left: -10000px\` puts it exactly where residue
-    // would be. It is exempt, and counted as such: only an element or ancestor (up to the page
-    // content) that clips to at most one pixel, or through clip / clip-path, exempts. Content
-    // Paged.js strands is never inside such a box.
+    // The side(s) content overflows to under one writing mode and direction.
+    const progression = (mode, reverse) => {
+      if (mode === "horizontal-tb") return reverse ? leftOf : rightOf;
+      const blockEnd = /-rl$/u.test(mode) ? leftOf : rightOf;
+      const inlineEnd = (mode === "sideways-lr") !== reverse ? above : below;
+      return (r) => blockEnd(r) || inlineEnd(r);
+    };
+    const pageSide = progression(writingMode, rtl);
+    const outside = (r) => leftOf(r) || rightOf(r) || above(r) || below(r);
+    // A text or replaced box counts when it lies past the page on the side the page's columns
+    // progress to, or on the side its OWN writing mode overflows to: a vertical-rl \`main\` inside
+    // a horizontal page strands its lines to the LEFT of the page (measured: 140 line boxes, the PDF
+    // one page long), which the page's own progression never looks at.
+    const offPage = (r, el) => {
+      if (!(r.width > 0 && r.height > 0)) return false;
+      if (pageSide(r)) return true;
+      if (!el || !outside(r)) return false;
+      const own = P.style(el, null);
+      return progression(own.writingMode || "horizontal-tb", own.direction === "rtl")(r);
+    };
+    // DELIBERATELY CLIPPED CONTENT IS NOT RESIDUE. The visually-hidden idiom lays text out past the
+    // page box on purpose inside a box that clips it to nothing; in a right-to-left document
+    // \`left: -10000px\` puts it exactly where residue would be. The exemption is narrow, because an
+    // ordinary clip does not stop stranded content from being stranded (a rounded \`clip-path\` on
+    // \`main\` hid 7 lost paragraph tails from an earlier version of this test). An element or
+    // ancestor exempts only when its clip region is provably at most one pixel wide or high:
+    //   - \`overflow\` hidden or clip on an axis on which its border box is at most 1 px, with no
+    //     \`overflow-clip-margin\` (the region is then inside that border box);
+    //   - \`clip: rect(...)\` on an absolutely positioned element, with px edges at most 1 px apart;
+    //   - \`clip-path: inset(...)\` (never margin-box) on an element whose border box is at most 1 px
+    //     in one dimension, or \`inset(50%)\`, which leaves nothing.
+    // Every exemption is counted and reported on the page (\`env/clipped-past-page\`).
     const clipsAway = (el) => {
       const style = P.style(el, null);
-      if (style.clip && style.clip !== "auto") return true;
-      if (style.clipPath && style.clipPath !== "none") return true;
-      const hides = (value) => value === "hidden" || value === "clip";
-      if (!hides(style.overflow) && !hides(style.overflowX) && !hides(style.overflowY)) return false;
       const b = P.rect(el);
-      return b.width <= 1 || b.height <= 1;
+      const hides = (value) => value === "hidden" || value === "clip";
+      const margin = style.overflowClipMargin || "0px";
+      const noMargin = margin === "0px" || /^(content-box|padding-box|border-box)( 0px)?$/u.test(margin);
+      if (noMargin && ((hides(style.overflowX || style.overflow) && b.width <= 1) ||
+          (hides(style.overflowY || style.overflow) && b.height <= 1))) return true;
+      const clip = /^rect\\(\\s*(-?[\\d.]+)px,?\\s*(-?[\\d.]+)px,?\\s*(-?[\\d.]+)px,?\\s*(-?[\\d.]+)px\\s*\\)$/u.exec(style.clip || "");
+      if (clip && (style.position === "absolute" || style.position === "fixed")) {
+        const [top, right, bottom, left] = clip.slice(1).map(Number);
+        if (right - left <= 1 || bottom - top <= 1) return true;
+      }
+      const path = style.clipPath || "none";
+      if (/^inset\\(/u.test(path) && !/margin-box/u.test(path)) {
+        if (/^inset\\(\\s*50%\\s*\\)/u.test(path)) return true;
+        if (b.width <= 1 || b.height <= 1) return true;
+      }
+      return false;
     };
     const deliberatelyClipped = (el) => {
       for (let at = el; at && P.nodeType(at) === 1 && at !== content; at = P.parent(at)) if (clipsAway(at)) return true;
@@ -745,7 +786,7 @@ export const SNAPSHOT_SOURCE = `(() => {
     for (const node of textNodes(content)) {
       for (const rect of P.range(node)) {
         if (rect.width > 0 && rect.height > 0) rectangles.push(rect);
-        if (!offPage(rect)) continue;
+        if (!offPage(rect, P.parent(node))) continue;
         if (deliberatelyClipped(P.parent(node))) overflowResidue.clippedExempt += 1;
         else overflowResidue.textRects += 1;
       }
@@ -754,7 +795,7 @@ export const SNAPSHOT_SOURCE = `(() => {
       const style = P.style(el, null);
       if (style.display === "none" || style.visibility === "hidden") continue;
       rectangles.push(box(el));
-      if (el.tagName === "TABLE" || !offPage(P.rect(el))) continue;
+      if (el.tagName === "TABLE" || !offPage(P.rect(el), el)) continue;
       if (deliberatelyClipped(el)) overflowResidue.clippedExempt += 1;
       else overflowResidue.replacedElements += 1;
     }
@@ -1108,14 +1149,29 @@ export function rootColumnsWithdrawal(pageNumber: number, rootMulticol: boolean)
 }
 
 export function pageResidueWithdrawal(pageNumber: number, census: OverflowResidueCensus | undefined): NotMeasured[] {
-  if (!census || census.textRects + census.replacedElements === 0) return [];
-  return [{
-    scope: "page",
-    ruleId: null,
-    reason: "env/pagination-residue",
-    target: { keyType: "page", nodeKey: `page:${pageNumber}`, sid: null },
-    count: 1,
-  }];
+  const rows: NotMeasured[] = [];
+  if (census && census.textRects + census.replacedElements > 0) {
+    rows.push({
+      scope: "page",
+      ruleId: null,
+      reason: "env/pagination-residue",
+      target: { keyType: "page", nodeKey: `page:${pageNumber}`, sid: null },
+      count: 1,
+    });
+  }
+  // The trace of the visually-hidden exemption: how many boxes past the page box were not counted
+  // because they are clipped to nothing on purpose. Not a withdrawal (the reason is in
+  // NON_APPLICABLE_ENV_IDS), but in the report, so an exemption is never silent.
+  if (census?.clippedExempt && census.clippedExempt > 0) {
+    rows.push({
+      scope: "page",
+      ruleId: null,
+      reason: "env/clipped-past-page",
+      target: { keyType: "page", nodeKey: `page:${pageNumber}`, sid: null },
+      count: census.clippedExempt,
+    });
+  }
+  return rows;
 }
 
 /** Join browser measurements to source identity and classify each page boundary exactly once. */

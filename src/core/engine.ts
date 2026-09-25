@@ -216,12 +216,18 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
   // called clean whatever rules are active: a rule set that happened to have no candidate on the
   // page, or one that reads only source text, would otherwise let content that is missing from
   // the PDF end the run at exit 0.
-  const withdrawnRows = snapshot.pages.flatMap((page) =>
-    page.notMeasured.filter((n) => !IS.toolCapabilityEnvId.has(n.reason) && !IS.nonApplicableEnvId.has(n.reason)));
+  const counted = (n: NotMeasured) => !IS.toolCapabilityEnvId.has(n.reason) && !IS.nonApplicableEnvId.has(n.reason);
   const withdrawnPages = snapshot.pages
-    .filter((page) => page.notMeasured.some((n) => withdrawnRows.includes(n)))
+    .filter((page) => page.notMeasured.some(counted))
     .map((page) => page.pageNumber);
-  documentNotMeasured.push(...snapshot.pages.flatMap((page) => page.notMeasured));
+  // One document row per withdrawn page, its first coverage-counted reason, so that the aggregated
+  // rows' counts are a count of PAGES: a page withdrawn for two reasons is still one page. The
+  // exit reason names every reason; the snapshot keeps every row. Rows that do not withdraw (the
+  // census's exemption trace) pass through as they are.
+  documentNotMeasured.push(...snapshot.pages.flatMap((page) => {
+    const first = page.notMeasured.find(counted);
+    return [...(first ? [first] : []), ...page.notMeasured.filter((n) => !counted(n))];
+  }));
 
   const verdict = documentVerdict({
     infrastructure,

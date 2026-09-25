@@ -209,7 +209,9 @@ function coverageRow(
     floor: `${formatNumber(coverage.floor * 100)}%`,
     ok: coverage.ok,
     reasons,
-    options: [
+    options: reasons.some((reason) => document.notMeasured.some((n) => n.scope === "page" && n.ruleId === null && n.reason === reason))
+      ? ["Some candidates lie on pages withdrawn from measurement. Fix the layout; no --disable clears a withdrawn page."]
+      : [
       "Inspect the document for unsupported constructs or environment limits.",
       GATING_RULE_IDS.has(ruleId)
         ? `This rule gates by default. --disable ${ruleId} removes the gate, not the defect — use it only if this document intentionally uses constructs this version cannot measure.`

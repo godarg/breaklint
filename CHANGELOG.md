@@ -190,9 +190,11 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   child of the container, and its subtree, is measured; a deeper spanner stays declined. A block
   that sets only its own `column-width` (`columns: 8em`) is declined too (it was measured: a
   justified paragraph reported 4.28× word spacing across its columns). The walk stops at the block's
-  page structure by identity, not by class name, and columns on `html` or `body` put every block in
-  columns and withdraw every page as `env/multicolumn` (two pages were reported where the PDF
-  printed one, clipped). Widow, orphan, hyphen-across-page and excessive-word-spacing now also
+  page structure by identity, not by class name, and ANY column property on `html` or `body` —
+  `column-count: 1` and `columns: 1` included, which still make a fragmentation context — puts every
+  block in columns and withdraws every page as `env/multicolumn` (two pages were reported where the
+  PDF printed one, clipped; with `column-count: 1` half the document was missing and the run ended
+  0). Widow, orphan, hyphen-across-page and excessive-word-spacing now also
   declare `env/invalid-measurement`, for a block whose snapshot does not record these fields. A document
   whose error-rule candidate is in columns now ends exit 4 instead of 0 or 3. The rule-by-rule
   matrix, with the reason for each row, is in `docs/limitations.md` and is pinned against the
@@ -202,10 +204,15 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   the last 20 words of page 1 lie one column pitch to the right of the page and exactly those 20 of
   its 1136 words are missing from the PDF (pdftotext on the checked PDF). Nothing reported it. The
   collector now counts, per page, visible text line boxes and `img`/`svg`/`canvas`/`video` boxes
-  lying entirely past the page box on the side the columns progress to — the inline end in
-  horizontal writing, the block end in vertical writing (and above the page for vertical `rtl`),
-  measured per writing mode — except content the author clips away on purpose (a 1 px
-  `overflow: hidden` box, `clip`, `clip-path`: the visually-hidden idiom); such a page carries one
+  lying entirely past the page box on the side the page's columns progress to, or the side the
+  box's own writing mode overflows to — the inline end in horizontal writing, the block end and the
+  inline end in vertical writing (the inline end of `sideways-lr` runs to the top), measured per
+  writing mode; content off the page on any other side is not seen. Content the author clips to
+  nothing on purpose is exempt, and only that: a box whose clip region is provably at most one pixel
+  (`overflow` hidden/clip on a 1 px box without a clip margin, `clip: rect(...)` of at most 1 px on
+  an absolutely positioned box, `clip-path: inset(...)` on a 1 px box or `inset(50%)`); a rounded
+  `clip-path` on `main` no longer hides lost paragraph tails, and every exemption is reported as an
+  `env/clipped-past-page` page row that withdraws nothing. Such a page carries one
   `env/pagination-residue` row in `pages[].notMeasured`. The seven rules above and
   `layout/half-empty-page` decline their candidates on it (`layout/unbreakable-block-too-tall` when
   any fragment of a split block is on it, `layout/orphaned-continuation-page` also for the page
@@ -481,12 +488,16 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   advice proposes.
 - **New decline reason `env/pagination-residue`, page rows in `documents[].notMeasured`, and two
   counters on the cross-check events.** A withdrawn page appears as a `scope: "page"`,
-  `ruleId: null` row (aggregated per reason) beside the rules' own declines, and in `exitReason`.
+  `ruleId: null` row (one per withdrawn page under its first reason, aggregated, so the count is a
+  count of pages) beside the rules' own declines, and in `exitReason`. A second non-withdrawing page
+  reason, `env/clipped-past-page` (in `NON_APPLICABLE_ENV_IDS`), records how many boxes past the
+  page box the census exempted as deliberately clipped.
   `geometry-cross-check-passed` and `-failed` carry `fragmentedSamples`; the failed event also
   carries `failedPages`, and each `worst[]` entry its `fragment` and `page` where known. All
   additions; Report schema stays 5. The console, Markdown and HTML reports state withdrawn pages
   and the document's exit reason; the console used to say "insufficient coverage without a per-rule
-  shortfall" and offer no cause, and no `--disable` clears a withdrawn page. `render-unstable` also
+  shortfall" and offer no cause, and no `--disable` clears a withdrawn page, so the console and HTML
+  no longer offer one for a rule whose shortfall comes from withdrawn pages. `render-unstable` also
   names `strandedPages`, the pages the collector found content past the page box on. Snapshot:
   `effectiveStyle.multicolAncestor` and `effectiveStyle.columnWidth` are new REQUIRED fields — the
   snapshot invariants reject a block without them, and a rule that meets one declines the block as
@@ -649,6 +660,11 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `exports` map is unchanged), is also held locally: a unit test builds `src/` the way
   `npm run build` does and loads it through the runner's own loader. No `npm run` step was added,
   so the local gate lists are unchanged.
+- **The robustness corpus records the new cross-check counter.** The two `geometryCrossCheck`
+  expectations in `corpus/public/robustness-v1/manifest.json` gain `fragmentedSamples` (1 for the
+  Gettysburg address, as CI measured; 0 for dargel-kleingewerbe, measured locally), with an
+  `expectationHistory` entry. The field is new; every existing expected value and the tolerance
+  are unchanged.
 - **Live fixtures for fragmented boxes.** `tests/fixtures/multicolumn-ancestry.html` (a
   column-split paragraph among the sampled boxes, an avoid box in columns, a `column-span: all`
   heading, width-only columns, and a printed margin note as the control that content outside the

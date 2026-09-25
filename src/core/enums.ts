@@ -36,6 +36,12 @@ export const ENV_IDS = [
    * from measurement; counted against coverage (a property of the document, not of this build).
    */
   "env/pagination-residue",
+  /**
+   * Content past the page box that the author clips to nothing on purpose (the visually-hidden
+   * idiom). Not residue: a page row that records how many such boxes the census did not count.
+   * In NON_APPLICABLE_ENV_IDS, so it never withdraws a page or costs coverage.
+   */
+  "env/clipped-past-page",
 ] as const;
 export type EnvId = (typeof ENV_IDS)[number];
 
@@ -70,11 +76,16 @@ export const TOOL_CAPABILITY_ENV_IDS = ["env/pixel-oracle-unavailable"] as const
  * of 1 and end the run in `insufficient-coverage` — a verdict that reads as "your document could
  * not be fully judged" and would mean "one figure does not clip".
  *
+ * `env/clipped-past-page` is the same kind of statement about a page: content the author clips to
+ * nothing on purpose (the visually-hidden idiom) was laid out past the page box, and whether the
+ * paginator lost it does not arise. It only ever appears as a document-level page row, the trace
+ * of the census exemption; it withdraws no page and is no rule's decline.
+ *
  * Kept apart from `TOOL_CAPABILITY_ENV_IDS` on purpose. Both leave the coverage base and the two
  * reasons are not the same: one is a limit of this build, the other a property of the target. A
  * single list would let the first hide inside the second.
  */
-export const NON_APPLICABLE_ENV_IDS = ["env/svg-overflow-visible"] as const;
+export const NON_APPLICABLE_ENV_IDS = ["env/svg-overflow-visible", "env/clipped-past-page"] as const;
 
 /**
  * States of the measuring infrastructure. They appear only in `documents[].infrastructure[]`

@@ -359,6 +359,9 @@ describe("a page whose content lies past its page box is withdrawn", () => {
     assert.ok(snapshot.pages.every((page) => !("overflowResidue" in page)), "the raw census leaked into the snapshot");
     assert.deepEqual(pageResidueWithdrawal(7, undefined), []);
     assert.deepEqual(pageResidueWithdrawal(7, { textRects: 0, replacedElements: 0 }), []);
+    // An exemption leaves a trace: a page row that withdraws nothing.
+    assert.deepEqual(pageResidueWithdrawal(7, { textRects: 0, replacedElements: 0, clippedExempt: 3 })
+      .map((row) => [row.scope, row.ruleId, row.reason, row.count]), [["page", null, "env/clipped-past-page", 3]]);
   });
 
   it("every page-located rule declines its candidates there, and the document cannot end clean", () => {
@@ -586,6 +589,10 @@ describe("the residue census follows the fragmentainer's writing mode, and exemp
     ["writing-mode: vertical-rl", { LEFT: 1, RIGHT: 0, ABOVE: 0, BELOW: 1 }],
     ["writing-mode: sideways-rl", { LEFT: 1, RIGHT: 0, ABOVE: 0, BELOW: 1 }],
     ["writing-mode: vertical-lr", { LEFT: 0, RIGHT: 1, ABOVE: 0, BELOW: 1 }],
+    ["writing-mode: vertical-lr; direction: rtl", { LEFT: 0, RIGHT: 1, ABOVE: 1, BELOW: 0 }],
+    // sideways-lr runs its inline axis bottom to top: its inline end is the TOP for ltr.
+    ["writing-mode: sideways-lr", { LEFT: 0, RIGHT: 1, ABOVE: 1, BELOW: 0 }],
+    ["writing-mode: sideways-lr; direction: rtl", { LEFT: 0, RIGHT: 1, ABOVE: 0, BELOW: 1 }],
     ["writing-mode: vertical-rl; direction: rtl", { LEFT: 1, RIGHT: 0, ABOVE: 1, BELOW: 0 }],
     ["", { LEFT: 0, RIGHT: 1, ABOVE: 0, BELOW: 0 }],
     ["direction: rtl", { LEFT: 1, RIGHT: 0, ABOVE: 0, BELOW: 0 }],
@@ -596,6 +603,18 @@ describe("the residue census follows the fragmentainer's writing mode, and exemp
       }
     });
   }
+
+  it("also counts the side a box's OWN writing mode overflows to", () => {
+    // The verifier's wm-htb-main-vrl: a vertical-rl main in a horizontal page strands its lines to
+    // the LEFT of the page; the PDF was one page long and exit 0. RED BEFORE THIS ROUND.
+    const own = (style: string, box: string) => `<p data-test-box="${box}" style="${style}">stranded words</p>`;
+    assert.equal(censusOf(own("writing-mode: vertical-rl", "-900 10 18.66 200"))!.textRects, 1, "a vertical-rl box's residue was missed");
+    assert.equal(censusOf(own("writing-mode: vertical-lr", "900 10 18.66 200"))!.textRects, 1);
+    assert.equal(censusOf(own("direction: rtl", "-900 10 200 18.66"))!.textRects, 1);
+    // Horizontal left-to-right text off the LEFT of a left-to-right page is off neither side.
+    assert.equal(censusOf(own("", "-900 10 200 18.66"))!.textRects, 0);
+    assert.equal(censusOf(own("writing-mode: vertical-rl", "900 10 18.66 200"))!.textRects, 1, "the page's own side still counts");
+  });
 
   it("counts a line box that starts exactly at the page edge, and not one that still overlaps the page by a pixel", () => {
     // Pins the edge from both sides: `>` instead of `>=`, or any slack, moves one of the two.
@@ -611,12 +630,35 @@ describe("the residue census follows the fragmentainer's writing mode, and exemp
       `<a data-test-box="0 10 30 18.66"><span data-test-box="${box}" style="${style}">Skip to content</span></a>`;
     const sronly = censusOf(skip("position: absolute; width: 1px; height: 1px; overflow: hidden"), "direction: rtl")!;
     assert.deepEqual(sronly, { textRects: 0, replacedElements: 0, clippedExempt: 1 }, "a skip link withdrew its page");
-    assert.equal(censusOf(skip("clip: rect(0px, 0px, 0px, 0px)", "-10000 10 120 18.66"), "direction: rtl")!.textRects, 0);
+    // clip applies to an absolutely positioned element; its px edges bound the region.
+    assert.equal(censusOf(skip("position: absolute; clip: rect(0px, 0px, 0px, 0px)", "-10000 10 120 18.66"), "direction: rtl")!.textRects, 0);
     assert.equal(censusOf(skip("clip-path: inset(50%)", "-10000 10 120 18.66"), "direction: rtl")!.textRects, 0);
+    assert.equal(censusOf(skip("clip-path: inset(0px); width: 1px", "-10000 10 1 18.66"), "direction: rtl")!.textRects, 0);
+    // What does NOT exempt, each a real loss. RED IN ROUND 2: any clip-path or clip on the text's
+    // element or an ancestor exempted it; the verifier's l1-anc-clippath-round (main { clip-path:
+    // inset(0 round 12px) }) ended exit 0 with 7 paragraph tails missing from the PDF.
+    const counted = (html: string) => censusOf(html, "direction: rtl")!;
+    const ancestor = (style: string) =>
+      `<main data-test-box="-2000 10 600 600" style="${style}"><p data-test-box="-2000 10 600 18.66">A stranded tail.</p></main>`;
+    assert.deepEqual(counted(ancestor("clip-path: inset(0px round 12px)")), { textRects: 1, replacedElements: 0, clippedExempt: 0 },
+      "an ancestor's rounded clip-path hid stranded text");
+    assert.equal(counted(ancestor("clip-path: circle(50%)")).textRects, 1, "a non-inset clip-path hid stranded text");
+    assert.equal(counted(ancestor("clip-path: inset(0px) margin-box; width: 1px")).textRects, 1);
+    assert.equal(counted(skip("clip: rect(0px, 0px, 0px, 0px)", "-10000 10 120 18.66")).textRects, 1,
+      "clip on a box that is not absolutely positioned clips nothing");
+    assert.equal(counted(skip("position: absolute; clip: rect(0px, 200px, 20px, 0px)", "-10000 10 120 18.66")).textRects, 1);
+    assert.equal(counted(skip("overflow: hidden; overflow-clip-margin: 40px", "-10000 10 1 1")).textRects, 1,
+      "a clip margin lets the content show past the one-pixel box");
     // Overflow hidden on a box that is NOT one pixel does not hide what lies outside it here: the
     // residue of an ordinary scroll-less container is still residue.
     const wide = censusOf(skip("overflow: hidden", "-10000 10 120 18.66"), "direction: rtl")!;
     assert.deepEqual(wide, { textRects: 1, replacedElements: 0, clippedExempt: 0 }, "an ordinary box's residue was exempted");
+    // Replaced elements follow the same rule.
+    const image = (style: string, box: string) => `<span data-test-box="${box}" style="${style}"><img data-test-box="-10000 10 40 40"></span>`;
+    assert.deepEqual(counted(image("position: absolute; width: 1px; height: 1px; overflow: hidden", "-10000 10 1 1")),
+      { textRects: 0, replacedElements: 0, clippedExempt: 1 });
+    assert.deepEqual(counted(image("clip-path: inset(0px round 12px)", "-10000 10 400 400")),
+      { textRects: 0, replacedElements: 1, clippedExempt: 0 });
   });
 });
 
@@ -695,7 +737,7 @@ describe("only a coverage-counted page row withdraws a page", () => {
     return snapshot;
   };
   it("a build-capability or not-applicable page row does not withdraw, in the rules or in the engine", () => {
-    for (const reason of ["env/pixel-oracle-unavailable", "env/svg-overflow-visible"] as const) {
+    for (const reason of ["env/pixel-oracle-unavailable", "env/svg-overflow-visible", "env/clipped-past-page"] as const) {
       const snapshot = rowed(reason);
       assert.equal(pageWithdrawal(snapshot, 2), null, `${reason} withdrew the page`);
       const outcome = runDocument({ path: "x.html", snapshot, infrastructure: [] }, {
@@ -751,5 +793,94 @@ describe("render-unstable names the pages the census withdrew", () => {
     assert.match(detail, /overflow column of page\(s\) 4/u);
     assert.match(detail, /Page\(s\) 1, 4 also lay content out past the page box/u);
     assert.doesNotMatch(pdfReconciliationDetail("baseline", ["boxes"], residue), /also lay content/u);
+  });
+});
+
+describe("round 3: root columns of any kind, distinct pages, absent column width, --disable", () => {
+  const bodyDocument = (bodyStyle: string, htmlStyle = "") => {
+    // German, so that type/straight-quotes (default locale de-DE) measures the two paragraphs.
+    const html = `<!doctype html><html lang="de"><body><p id="a">A.</p><p id="b">B.</p></body></html>`;
+    const { injected, sid } = sources(html);
+    const pages = [0, 1].map((index) => pagedPage({ pageBox: pageBox(index), contentBox: contentBox(index),
+      content: `<p id="${index ? "b" : "a"}" data-bl-sid="${sid[index ? "b" : "a"]}" data-ref="r${index}" data-test-box="${at(index, 0)}">${index ? "B." : "A."}</p>` }));
+    const tree = fakeDocument(`<!doctype html><html lang="de"${htmlStyle ? ` style="${htmlStyle}"` : ""}><body${bodyStyle ? ` style="${bodyStyle}"` : ""}>` +
+      `<div class="pagedjs_pages">${pages.join("")}</div></body></html>`, "de");
+    return { injected, tree };
+  };
+
+  it("any column property on html or body is root columns, column-count 1 included", () => {
+    // The verifier's mcb-body-count1 / mcb-body-columns1: exit 0 with half the PDF missing.
+    for (const [body, html, expected] of [
+      ["column-count: 1", "", true], ["column-count: 2", "", true], ["column-width: 12em", "", true],
+      ["", "column-count: 1", true], ["column-count: auto", "", false], ["", "", false],
+    ] as const) {
+      const { tree } = bodyDocument(body, html);
+      assert.equal(evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, tree).rootMulticol, expected, `body "${body}", html "${html}"`);
+    }
+    // Inside the page, column-count 1 stays one column, as layoutOutOfScope has always read it.
+    assert.equal(blockOutOfScope({ pages: [] } as unknown as Snapshot, {
+      page: 1, sid: null, effectiveStyle: { columns: "1", columnWidth: "auto", multicolAncestor: false, writingMode: "horizontal-tb" },
+    } as unknown as BlockRecord), null);
+  });
+
+  it("root columns withdraw every page through assembleSnapshot, and a text-only rule set cannot end clean", () => {
+    // The verifier's mc-body, end to end through the production assembly and engine.
+    const { injected, tree } = bodyDocument("column-count: 2");
+    const snapshot = assemble(evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, tree), runCollector<CollectorResult>(COLLECTOR_SOURCE, tree), injected);
+    assert.deepEqual(snapshot.pages.map((page) => page.notMeasured.map((n) => n.reason)), [["env/multicolumn"], ["env/multicolumn"]]);
+    assert.ok(snapshot.blocks.every((block) => block.effectiveStyle.multicolAncestor));
+    const outcome = runDocument({ path: "body.html", snapshot, infrastructure: [] }, {
+      failOn: "never", activeRules: [straightQuotes], optionsByRule: {}, coverageFloors: {},
+    });
+    assert.equal(outcome.report.verdict, "insufficient-coverage");
+    assert.equal(outcome.report.exitReason, "page(s) 1, 2 withdrawn from measurement (env/multicolumn)");
+    const control = bodyDocument("");
+    const clean = assemble(evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, control.tree), runCollector<CollectorResult>(COLLECTOR_SOURCE, control.tree), control.injected);
+    assert.equal(runDocument({ path: "body.html", snapshot: clean, infrastructure: [] }, {
+      failOn: "never", activeRules: [straightQuotes], optionsByRule: {}, coverageFloors: {},
+    }).report.verdict, "clean");
+  });
+
+  it("a page withdrawn for two reasons is one page in the report", () => {
+    const snapshot = everyRuleSnapshot({ multicol: false, withdrawn: [2] });
+    snapshot.pages[1]!.notMeasured.push({ ...withdrawnRow(2), reason: "env/multicolumn" });
+    const outcome = runDocument({ path: "x.html", snapshot, infrastructure: [] }, {
+      failOn: "never", activeRules: [straightQuotes], optionsByRule: {}, coverageFloors: {},
+    });
+    const pageRows = outcome.report.notMeasured.filter((n) => n.scope === "page" && n.ruleId === null);
+    assert.equal(pageRows.reduce((sum, n) => sum + n.count, 0), 1, JSON.stringify(pageRows));
+    assert.equal(outcome.report.exitReason, "page(s) 2 withdrawn from measurement (env/multicolumn, env/pagination-residue)");
+  });
+
+  it("a block whose snapshot does not record its own column width is declined, not measured", () => {
+    for (const style of [
+      { columns: "auto", multicolAncestor: false, writingMode: "horizontal-tb" },
+      { columns: "auto", columnWidth: "auto", writingMode: "horizontal-tb" },
+    ]) {
+      assert.equal(blockOutOfScope({ pages: [] } as unknown as Snapshot, { page: 1, sid: null, effectiveStyle: style } as unknown as BlockRecord),
+        "env/invalid-measurement", JSON.stringify(style));
+    }
+  });
+
+  it("the console does not offer --disable for a shortfall caused by withdrawn pages", () => {
+    const snapshot = everyRuleSnapshot({ multicol: false, withdrawn: [1, 2] });
+    const config = resolveConfig({ file: {}, cli: {} });
+    const outcome = runDocument({ path: "residue.html", snapshot, infrastructure: [] }, {
+      failOn: config.failOn, activeRules: config.activeRules, optionsByRule: config.optionsByRule, coverageFloors: coverageFloorMap(config),
+    });
+    assert.ok(Object.values(outcome.report.coverage).some((c) => !c.ok), "no rule fell short, so the case is not exercised");
+    const report = buildReport({
+      outcomes: [outcome], mode: "live", source: "rendered", toolVersion: "0.0.0", commit: null,
+      startedAt: new Date(0).toISOString(), durationMs: 0, rulesRun: config.activeRules.length, failOn: config.failOn,
+      environment: {
+        browserVersion: "", platform: "test", rendererPath: null, rendererPresent: false, pagedjsVersion: "0.4.3",
+        rasterizer: null, rasterizerVersion: null, textPositionExtractor: null, fontFamiliesResolved: [], locale: "de-DE",
+      },
+      config: toReportConfig(config, { interventions: [], networkBlocked: 0 }),
+    });
+    const text = render(report, "console", { colour: false });
+    assert.doesNotMatch(text, /--disable [a-z]+\//u, "a --disable was offered for a withdrawn page's shortfall");
+    assert.match(text, /No --disable clears a withdrawn page/u);
+    assert.doesNotMatch(render(report, "html"), /--disable [a-z]+\//u);
   });
 });

@@ -92,7 +92,9 @@ released CLI, schema and SARIF catalogue never run them.
 **A question that does not arise** (`NON_APPLICABLE_ENV_IDS`). With `overflow: visible` an SVG's
 text is painted whether or not it leaves the viewport, so `svg/text-overflows-viewport` has
 nothing to decide about it — as with an SVG holding no text. One such figure would otherwise drive
-an error rule below its floor of 1 and end the whole run in exit 4.
+an error rule below its floor of 1 and end the whole run in exit 4. `env/clipped-past-page` is in the
+same list: a page row recording content the author clipped to nothing on purpose past the page box,
+the trace of the residue census's exemption; it is no rule's decline and withdraws no page.
 
 A third case is not a decline at all: a `<text>` that is not painted. Inside `<defs>`, `<symbol>`,
 `<clipPath>` or `<pattern>`; under `display: none`; or hidden by `visibility: hidden`,
@@ -207,12 +209,26 @@ longer refused such a document, it came back measured. The collector therefore t
 every page: a visible text line box, `img`, `svg`, `canvas` or `video` lying ENTIRELY past the page
 box's edge on the side the fragmentainer's columns progress to has no pixel on the paper. That side
 follows the page content's writing mode, as measured on Chromium 141: the inline end in
-`horizontal-tb` (right for left-to-right, left for right-to-left); the block end in vertical writing
-(left for `vertical-rl` and `sideways-rl`, right for `vertical-lr` and `sideways-lr`), and with
-`direction: rtl` also above the page. Text the author clips away on purpose — the visually-hidden
-idiom, a box of at most one pixel with `overflow: hidden`, or `clip` / `clip-path`, moved off the page
-— is not residue and is not counted; measured: a right-to-left skip link at `left: -10000px` alone no
-longer withdraws its page, while a right-to-left document whose paragraphs Paged.js left past the
+`horizontal-tb` (right for left-to-right, left for right-to-left); in vertical writing the block end
+(left for `vertical-rl` and `sideways-rl`, right for `vertical-lr` and `sideways-lr`) and also the
+inline end, which is the top of the page for `vertical-*` with `direction: rtl` and for `sideways-lr`
+with `direction: ltr` (its inline axis runs bottom to top), the bottom otherwise. The same rule is
+applied to each box's own writing mode, because an element that sets its own writing mode overflows
+its own way: a `vertical-rl` `main` inside a horizontal page left its lines to the LEFT of the page
+and the PDF was one page long. Only those sides are looked at; content that lies off the page in any
+other direction is not seen by the census, and a document that strands content there is not
+withdrawn.
+
+Text the author clips to nothing on purpose — the visually-hidden idiom — is not residue and is not
+counted, and the exemption is deliberately narrow: an element or ancestor exempts only when its clip
+region is provably at most one pixel wide or high (`overflow` hidden or clip on an axis on which its
+border box is at most 1 px, with no `overflow-clip-margin`; `clip: rect(...)` of at most 1 px on an
+absolutely positioned element; `clip-path: inset(...)` on an element at most 1 px in one dimension, or
+`inset(50%)`). Any other clip does not exempt: a rounded `clip-path` on `main` once hid seven lost
+paragraph tails. Each exemption leaves a trace, an `env/clipped-past-page` page row with the number
+of exempted boxes, which withdraws nothing (`NON_APPLICABLE_ENV_IDS`). Measured: a right-to-left skip
+link at `left: -10000px` alone does not withdraw its page, while a right-to-left document whose
+paragraphs Paged.js left past the
 page (156 of 366 words missing from the PDF) still does. Such a page is withdrawn: one `env/pagination-residue` row in its
 `pages[].notMeasured`, every rule that judges page geometry declines its candidates there (the
 matrix below), the report's `documents[].notMeasured` carries the page row, and the document cannot
@@ -273,7 +289,10 @@ collector records its own `column-width` beside its own `column-count`. The walk
 block's own page structure found by identity, not by a class name, so an author element called
 `pagedjs_area` does not end it. Columns on `html` or `body` lie above every page — Paged.js lays its
 pages into them; measured: two pages reported, one clipped page printed — so every block is in
-columns and every page is withdrawn as `env/multicolumn`. A snapshot that does not record
+columns and every page is withdrawn as `env/multicolumn`. For `html` and `body` any column property
+counts, `column-count: 1` and `columns: 1` included: a one-column multi-column container is still a
+fragmentation context, and with `body { column-count: 1 }` half the document was missing from the
+PDF. A snapshot that does not record
 `multicolAncestor` or `columnWidth` for a block is rejected by the snapshot invariants, and a rule
 that meets one declines the block as `env/invalid-measurement`: absence is not "single-column".
 

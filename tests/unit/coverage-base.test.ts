@@ -97,7 +97,9 @@ describe("the coverage base", () => {
     // be argued into it here as well, which is the point of asserting on their exact contents
     // rather than on their length.
     assert.deepEqual([...TOOL_CAPABILITY_ENV_IDS], ["env/pixel-oracle-unavailable"]);
-    assert.deepEqual([...NON_APPLICABLE_ENV_IDS], ["env/svg-overflow-visible"]);
+    // env/clipped-past-page: the trace of the page census's visually-hidden exemption, a page row
+    // that must withdraw nothing (tests/unit/columns-and-residue.test.ts pins that).
+    assert.deepEqual([...NON_APPLICABLE_ENV_IDS], ["env/svg-overflow-visible", "env/clipped-past-page"]);
     const overlap = TOOL_CAPABILITY_ENV_IDS.filter((id) => (NON_APPLICABLE_ENV_IDS as readonly string[]).includes(id));
     assert.deepEqual(overlap, [], "a reason in both lists would make the distinction unreadable");
   });
