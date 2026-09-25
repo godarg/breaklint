@@ -1,0 +1,56 @@
+<!doctype html>
+<!--
+  One `break-inside: avoid` block of 27 plain lines, too tall for the 340.16 px content box of these
+  pages and split by the paginator into exactly two fragments, neither taller than a page: the case
+  0.6.0 missed, because it believed a sum only from the third fragment on. No border, so no piece of
+  it reaches the bottom of its column and nothing is pushed into the overflow column beside the
+  page: every page's evidence can bind, and a build-breaking block must end the run at exit 1.
+  The eight plain paragraphs come first because the geometry cross-check samples the first eight
+  boxes.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 150mm 120mm; margin: 15mm; }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0; }
+.avoid { break-inside: avoid; }
+.fresh { break-before: page; }
+</style></head><body>
+<p id="lead-1">Introductory paragraph 1, one short line.</p>
+<p id="lead-2">Introductory paragraph 2, one short line.</p>
+<p id="lead-3">Introductory paragraph 3, one short line.</p>
+<p id="lead-4">Introductory paragraph 4, one short line.</p>
+<p id="lead-5">Introductory paragraph 5, one short line.</p>
+<p id="lead-6">Introductory paragraph 6, one short line.</p>
+<p id="lead-7">Introductory paragraph 7, one short line.</p>
+<p id="lead-8">Introductory paragraph 8, one short line.</p>
+<div class="avoid fresh" id="two-fragments">
+  <p>Plain line 001.</p>
+  <p>Plain line 002.</p>
+  <p>Plain line 003.</p>
+  <p>Plain line 004.</p>
+  <p>Plain line 005.</p>
+  <p>Plain line 006.</p>
+  <p>Plain line 007.</p>
+  <p>Plain line 008.</p>
+  <p>Plain line 009.</p>
+  <p>Plain line 010.</p>
+  <p>Plain line 011.</p>
+  <p>Plain line 012.</p>
+  <p>Plain line 013.</p>
+  <p>Plain line 014.</p>
+  <p>Plain line 015.</p>
+  <p>Plain line 016.</p>
+  <p>Plain line 017.</p>
+  <p>Plain line 018.</p>
+  <p>Plain line 019.</p>
+  <p>Plain line 020.</p>
+  <p>Plain line 021.</p>
+  <p>Plain line 022.</p>
+  <p>Plain line 023.</p>
+  <p>Plain line 024.</p>
+  <p>Plain line 025.</p>
+  <p>Plain line 026.</p>
+  <p>Plain line 027.</p>
+</div>
+<p>After the block.</p>
+</body></html>

@@ -117,7 +117,7 @@ describe("the M2d live production chain", () => {
   let noSource: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
-    if (result?.documents.length === 32 && noSource?.documents.length === 4) return true;
+    if (result?.documents.length === 33 && noSource?.documents.length === 4) return true;
     t.skip(
       `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
       `no-source=${noSource?.documents.length ?? 0}`,
@@ -185,6 +185,7 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "too-tall-split-bounds.html"),
         join(FIXTURES, "too-tall-decorated-ancestor.html"),
         join(FIXTURES, "too-tall-split-hazards.html"),
+        join(FIXTURES, "too-tall-two-fragments.html"),
       ],
       options(join(root, "evidence")),
     );
@@ -212,7 +213,7 @@ describe("the M2d live production chain", () => {
     }));
     assert.equal(
       result?.documents.length,
-      32,
+      33,
       `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
     );
     assert.equal(
@@ -1289,7 +1290,8 @@ describe("the M2d live production chain", () => {
       assert.equal(finding.severity, "error");
       // How far below: the block's own borders, a line in the overflow column beside the page
       // (printed nowhere, so not counted), and the half-leading at the ends of every fragment —
-      // 3.66 px at 10pt/1.4. Measured on Chromium 141: 7.33, 65.98 and 88.32 px for these three.
+      // 3.66 px at 10pt/1.4. Measured with the real CLI on patched Chromium 141 (2026-09-25): 7.33, 65.98 and 88.32 px
+      // for these three, against the probe's unsplit heights.
       const columnEnd = (page: number): number => snapshot.pages[page - 1]!.contentBox.x + snapshot.pages[page - 1]!.contentBox.width;
       const overflowLines = snapshot.textLines.filter((line) =>
         fragments.some((fragment: BlockRecord) => fragment.nodeKey === line.blockKey && line.box.x >= columnEnd(fragment.page))).length;
@@ -1300,7 +1302,77 @@ describe("the M2d live production chain", () => {
       );
     }
     assert.equal(tooTall.length, 3, `expected exactly the three split blocks: ${tooTall.map((finding) => finding.message).join(" | ")}`);
-    assert.equal(exitCodeFor(outcome.report.verdict), 1);
+    // The rule judged all three and declined nothing.
+    const ruleRows = outcome.report.notMeasured.filter((row) => row.ruleId === "layout/unbreakable-block-too-tall");
+    assert.deepEqual(ruleRows, [], `the rule declined: ${JSON.stringify(ruleRows)}`);
+    assert.equal(outcome.report.coverage["layout/unbreakable-block-too-tall"]?.ok, true);
+    // What the run ends with besides the findings. Measured on CI (Chrome 153, run 36090117010):
+    // exit 4, not 1. The cause is the evidence, not a rule: a bordered split piece reaches the
+    // bottom of its page's column and pushes its last line into the overflow column beside the
+    // page, which is printed nowhere, so the overlay cannot place that piece's end mark (nor
+    // either mark of an element wholly in that column; measured on patched Chromium 141 with the
+    // overlay alone: 9 marks refused, on pages 4, 6 and 7) and such a page cannot bind. The run
+    // then ends `insufficient-coverage` on evidence (env/evidence-fragment-outside-page). That
+    // is pinned exactly here: which marks, on which pages, and nothing else. The exit-1 claim for
+    // a two-fragment block is asserted on too-tall-two-fragments.html, which has no such piece.
+    const diagnostic = JSON.stringify({
+      verdict: outcome.report.verdict, exitReason: outcome.report.exitReason, notMeasured: outcome.report.notMeasured,
+      coverageNotOk: Object.entries(outcome.report.coverage).filter(([, entry]) => !entry.ok).map(([id]) => id),
+      evidence: outcome.report.evidenceCoverage, unplaced: unplacedMarks(document),
+    });
+    const borderedSids = new Set(snapshot.blocks
+      .filter((block) => block.authorId === "bordered-two" || block.authorId === "bordered-three")
+      .map((block) => block.sid));
+    const insideBordered = (sid: string): boolean => snapshot.blocks.some((block) => block.sid === sid &&
+      snapshot.blocks.some((outer) => borderedSids.has(outer.sid) && outer.page === block.page &&
+        block.box.y >= outer.box.y - 1 && block.box.y <= outer.box.y + outer.box.height + 1));
+    const refused = (document.evidence ?? []).flatMap((page) => (page.unplacedMarks ?? []).map((mark) => ({ page: page.page, ...mark })));
+    assert.ok(refused.length > 0, `premise: a bordered piece puts content in the overflow column: ${diagnostic}`);
+    for (const mark of refused) {
+      assert.equal(mark.reason, "fragment-outside-page", diagnostic);
+      assert.ok(borderedSids.has(mark.sid) || insideBordered(mark.sid), `a mark outside the bordered blocks was refused: ${JSON.stringify(mark)} ${diagnostic}`);
+      const columnEnd = snapshot.pages[mark.page - 1]!.contentBox.x + snapshot.pages[mark.page - 1]!.contentBox.width;
+      assert.ok(snapshot.textLines.some((line) => snapshot.blocks.some((block) => block.nodeKey === line.blockKey && block.page === mark.page) && line.box.x >= columnEnd),
+        `page ${mark.page} has a refused mark but no line in the overflow column: ${diagnostic}`);
+    }
+    const otherDeclines = outcome.report.notMeasured.filter((row) =>
+      !(row.ruleId === null && row.reason === "env/evidence-fragment-outside-page") && !(row.ruleId === "layout/orphaned-continuation-page" && row.reason === "env/forced-break"));
+    assert.deepEqual(otherDeclines, [], `a decline other than the refused evidence marks: ${diagnostic}`);
+    assert.deepEqual(Object.entries(outcome.report.coverage).filter(([, entry]) => !entry.ok).map(([id]) => id), [], diagnostic);
+    assert.notEqual(outcome.report.evidenceCoverage?.status, "complete", diagnostic);
+    assert.equal(exitCodeFor(outcome.report.verdict), 4, diagnostic);
+  });
+
+  /**
+   * The exit-1 claim for a block split in exactly two, on a document with no piece in the overflow
+   * column: 27 plain lines, 503.72 px unsplit (measured on 2026-09-24), split 335.81 + 167.91 against
+   * a 340.16 px page — the case 0.6.0 ended `clean` at exit 0. Its evidence binds on every page.
+   */
+  it("fails the build on a block split into exactly two fragments, with complete evidence", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[32]!;
+    const snapshot = document.snapshot;
+    assert.ok(snapshot, `no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    const outcome = withProfile(document);
+    const diagnostic = JSON.stringify({
+      verdict: outcome.report.verdict, exitReason: outcome.report.exitReason, notMeasured: outcome.report.notMeasured,
+      coverageNotOk: Object.entries(outcome.report.coverage).filter(([, entry]) => !entry.ok).map(([id]) => id),
+      evidence: outcome.report.evidenceCoverage, unplaced: unplacedMarks(document),
+    });
+    const fragments = snapshot.blocks.filter((block) => block.authorId === "two-fragments");
+    assert.equal(fragments.length, 2, `premise: the block splits in two: ${diagnostic}`);
+    const tooTall = outcome.report.findings.filter((finding) => finding.ruleId === "layout/unbreakable-block-too-tall");
+    assert.equal(tooTall.length, 1, diagnostic);
+    assert.ok(tooTall[0]!.measurement.value > tooTall[0]!.measurement.threshold);
+    assert.ok(tooTall[0]!.measurement.value <= 27 * (10 * 4 / 3 * 1.4), `${tooTall[0]!.measurement.value} is above the unsplit height`);
+    assert.match(tooTall[0]!.message, /is at least [\d.]+ px tall across the 2 fragments/u);
+    assert.deepEqual(unplacedMarks(document), [], diagnostic);
+    assert.deepEqual(outcome.report.notMeasured.filter((row) => row.ruleId === "layout/unbreakable-block-too-tall"), [], diagnostic);
+    // Everything below needs a browser whose PDF carries the marks (CI's current Chrome).
+    assert.equal(outcome.report.evidenceCoverage?.status, "complete", diagnostic);
+    assert.equal(tooTall[0]!.evidence.bindsFinding, true, diagnostic);
+    assert.equal(exitCodeFor(outcome.report.verdict), 1, diagnostic);
   });
 
   /**
