@@ -53,7 +53,7 @@ const SEMVER = /^\d+\.\d+\.\d+$/u;
 const VERSION_TOKEN = /(?<![\w.])v?(\d+\.\d+\.\d+)(?!\w|\.\d)/gu;
 
 /** A full-line YAML or shell comment executes nothing, so a version named there cannot mis-pin. */
-function executablePart(line) {
+export function executablePart(line) {
   if (/^\s*#/u.test(line)) return "";
   // `uses: owner/action@<sha> # v4.4.0` — the trailing comment names the action's release.
   return line.replace(/^(\s*-?\s*uses:\s*\S+)\s+#.*$/u, "$1");
@@ -71,8 +71,19 @@ function isThirdPartyPin(line, index) {
   return false;
 }
 
+/**
+ * The keys that make a step conditional or let it fail without failing its job. The derive step
+ * must carry neither, and tests/unit/workflow-gates.test.ts holds the packed-consumer steps to
+ * the same rule.
+ */
+export function conditionKeys(step) {
+  return step
+    .map(({ text, number }) => ({ number, key: /^\s*(?:-\s+)?(if|continue-on-error)\s*:/u.exec(executablePart(text))?.[1] }))
+    .filter((entry) => entry.key);
+}
+
 /** The steps of a job: each begins at a `- ` item of its `steps:` list. */
-function stepsOf(jobLines) {
+export function stepsOf(jobLines) {
   const steps = [];
   let indent = null;
   for (const line of jobLines) {
@@ -88,7 +99,7 @@ function stepsOf(jobLines) {
 }
 
 /** Splits the `jobs:` mapping into `{ name, startLine, lines }` by its two-space keys. */
-function jobsOf(lines) {
+export function jobsOf(lines) {
   const start = lines.findIndex((line) => /^jobs:\s*$/u.test(line));
   if (start === -1) return [];
   const jobs = [];
@@ -176,9 +187,8 @@ export function checkReleaseWorkflow({ workflowText, manifest, lock }) {
       if (!step.some(({ text }) => DERIVE_RUN.test(executablePart(text)))) {
         issues.push(`${WORKFLOW}:${at}: job ${job.name}: the derive step must be exactly "run: node tests/tools/${DERIVE_STEP}"`);
       }
-      for (const { text, number } of step) {
-        const key = /^\s*(?:-\s+)?(if|continue-on-error)\s*:/u.exec(executablePart(text));
-        if (key) issues.push(`${WORKFLOW}:${number}: job ${job.name}: the derive step must be unconditional; it carries ${key[1]}:`);
+      for (const { key, number } of conditionKeys(step)) {
+        issues.push(`${WORKFLOW}:${number}: job ${job.name}: the derive step must be unconditional; it carries ${key}:`);
       }
     }
     const firstUse = job.lines.find(({ text }) => /\bRELEASE_VERSION\b|\bPACKAGE_FILE\b/u.test(executablePart(text)));

@@ -14,6 +14,9 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { conditionKeys, executablePart, jobsOf, stepsOf } from "../tools/release-workflow-contract.mjs";
+import type { WorkflowLine } from "../tools/release-workflow-contract.mjs";
+
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const WORKFLOWS = [".github/workflows/ci.yml", ".github/workflows/release.yml"] as const;
 
@@ -68,6 +71,10 @@ function jobRunLines(path: string): Map<string, string[]> {
   }
   flush();
   return jobs;
+}
+
+function readLines(path: string): string[] {
+  return readFileSync(new URL(`../../${path}`, import.meta.url), "utf8").replace(/\r\n/gu, "\n").split("\n");
 }
 
 function runLinesOf(path: string): string[] {
@@ -147,28 +154,46 @@ describe("workflow gates", () => {
   it("every packed-consumer job runs the README-demo and docs-truth checks against the installed package", () => {
     const expect: [string, string, RegExp[]][] = [
       [".github/workflows/ci.yml", "check", [
-        /readme-demo-contract\.mjs" --consumer "\$PWD"/u,
-        /docs-truth\.mjs" --package node_modules\/breaklint --pending "\$GITHUB_WORKSPACE\/tests\/tools\/docs-truth-pending\.jsonl"/u,
+        /readme-demo-contract\.mjs" --consumer "\$PWD"$/u,
+        /docs-truth\.mjs" --package node_modules\/breaklint --pending "\$GITHUB_WORKSPACE\/tests\/tools\/docs-truth-pending\.jsonl"$/u,
       ]],
-      [".github/workflows/ci.yml", "node-floor", [/readme-demo-contract\.mjs" --consumer "\$PWD"/u]],
+      [".github/workflows/ci.yml", "node-floor", [/readme-demo-contract\.mjs" --consumer "\$PWD"$/u]],
       [".github/workflows/release.yml", "clean-consumer", [
-        /readme-demo-contract\.mjs" --consumer "\$consumer"/u,
-        /docs-truth\.mjs" --package "\$consumer\/node_modules\/breaklint" --pending "[^"]+docs-truth-pending\.jsonl" --release/u,
+        /readme-demo-contract\.mjs" --consumer "\$consumer"$/u,
+        /docs-truth\.mjs" --package "\$consumer\/node_modules\/breaklint" --pending "[^"]+docs-truth-pending\.jsonl" --release$/u,
       ]],
       [".github/workflows/release.yml", "publish", [
-        /readme-demo-contract\.mjs" --consumer "\$registry_consumer"/u,
-        /docs-truth\.mjs" --package "\$registry_consumer\/node_modules\/breaklint" --pending "[^"]+docs-truth-pending\.jsonl" --release/u,
+        /readme-demo-contract\.mjs" --consumer "\$registry_consumer"$/u,
+        /docs-truth\.mjs" --package "\$registry_consumer\/node_modules\/breaklint" --pending "[^"]+docs-truth-pending\.jsonl" --release$/u,
       ]],
     ];
-    for (const [path, job, patterns] of expect) {
-      const lines = jobRunLines(path).get(job);
-      assert.ok(lines, `${path} has no job ${job}; this guard has lost its subject`);
+    for (const [path, jobName, patterns] of expect) {
+      const job = jobsOf(readLines(path)).find((candidate) => candidate.name === jobName);
+      assert.ok(job, `${path} has no job ${jobName}; this guard has lost its subject`);
+      assert.ok(!job.lines.some(({ text }) => /^ {4}continue-on-error\s*:/u.test(executablePart(text))), `${path} job ${jobName} may fail without failing the workflow`);
       for (const pattern of patterns) {
-        assert.ok(lines.some((line) => pattern.test(line)), `${path} job ${job} no longer runs ${pattern.source}`);
+        // The line must run, and its exit code must reach the job: invoked by node itself (not
+        // echoed, not `true ||`), nothing chained or piped after it, errexit on at that point, in
+        // a step that is not conditional and whose failure is not ignored — the rule the release
+        // workflow's derive step is held to.
+        const found: { step: WorkflowLine[]; commands: string[]; at: number }[] = stepsOf(job.lines).flatMap((candidate) => {
+          const lines = workflowRunLines(candidate.map(({ text }) => text).join("\n"));
+          const index = lines.findIndex((line) => pattern.test(line));
+          return index === -1 ? [] : [{ step: candidate, commands: lines, at: index }];
+        });
+        assert.equal(found.length, 1, `${path} job ${jobName} runs ${pattern.source} ${found.length} times, not once`);
+        const { step, commands, at } = found[0]!;
+        const command = commands[at]!;
+        assert.match(command, /^node "\$GITHUB_WORKSPACE\/tests\/tools\/[\w-]+\.mjs"( |$)/u, `${path} job ${jobName}: the check is not invoked by node itself: ${command}`);
+        assert.doesNotMatch(command, /[|;&]/u, `${path} job ${jobName}: something is chained or piped after the check: ${command}`);
+        const errexit = commands.slice(0, at).reduce((on, line) => (/^set\s+\+e\b|^set\s+\+o\s+errexit\b/u.test(line) ? false : /^set\s+-e\b|^set\s+-o\s+errexit\b/u.test(line) ? true : on), true);
+        assert.ok(errexit, `${path} job ${jobName}: the check runs after "set +e", so its exit code is ignored: ${command}`);
+        assert.deepEqual(conditionKeys(step), [], `${path} job ${jobName}: the step running the check is conditional or may fail silently`);
       }
     }
     const releaseDocs = [...jobRunLines(".github/workflows/release.yml").values()].flat().filter((line) => /docs-truth\.mjs/u.test(line));
-    assert.deepEqual(releaseDocs.filter((line) => !/--release\b/u.test(line)), [], "release.yml runs the docs check without --release");
+    assert.ok(releaseDocs.length >= 2, "release.yml runs the docs check almost nowhere");
+    assert.deepEqual(releaseDocs.filter((line) => !/--release(?=\s|$)/u.test(line)), [], "release.yml runs the docs check without --release");
   });
 
   it("the gate-step reader sees npm run, npm test and repository tools, and ignores comments", () => {

@@ -211,7 +211,9 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   says the release workflow repeats the complete gate, and `tests/unit/workflow-gates.test.ts` now
   fails when `release.yml` leaves out any `npm run` gate step `ci.yml` runs, and when a
   packed-consumer job of either workflow stops running the README-demo or the docs-truth check
-  (in `release.yml`, with `--release`). The local gate lists
+  (in `release.yml`, with exactly `--release`) in a way whose exit code reaches the job: invoked by
+  `node` itself, nothing chained or piped after it, errexit on, and neither the step nor the job
+  conditional or allowed to fail. The local gate lists
   in `CONTRIBUTING.md` and `docs/releasing.md` follow, and the same test keeps them equal to
   `ci.yml`.
 
