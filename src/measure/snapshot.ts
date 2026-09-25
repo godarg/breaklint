@@ -481,6 +481,17 @@ export const SNAPSHOT_SOURCE = `(() => {
         "), so its flow content cannot be told apart from margin-box content");
     }
   }
+  // Margin-box copies per source id: the clones Paged.js prints of a position: running(...)
+  // element. They are not flow (see above), but that they exist is a fact about the in-flow
+  // original, which Paged.js hides with display: none: without the count, a running element's
+  // original cannot be told from an element the author hid. Only margin boxes count, never a
+  // margin-box class inside the page area.
+  const marginCopiesBySid = {};
+  for (const page of pagesEls) for (const el of P.all(page, ".pagedjs_margin [data-bl-sid]")) {
+    if (inFlow(el)) continue;
+    const sid = P.attr(el, "data-bl-sid");
+    if (sid) marginCopiesBySid[sid] = (marginCopiesBySid[sid] || 0) + 1;
+  }
   const fragments = [];
   const bySidCount = {};
   for (const page of pagesEls) for (const el of P.all(page, SOURCE_BLOCK_SELECTOR)) {
@@ -516,10 +527,16 @@ export const SNAPSHOT_SOURCE = `(() => {
     let spaceWidth = 0;
     for (const node of textNodes(el)) {
       const value = P.text(node) || "";
+      // A line is visible when any text on it is: visibility is read from each text node's own
+      // element, not from the block, because a hidden block may hold a visible descendant
+      // (p { visibility: hidden } span { visibility: visible } prints the span).
+      const parentStyle = P.style(P.parent(node), null);
+      const nodeVisible = (parentStyle && parentStyle.visibility) !== "hidden";
       for (const r of P.range(node)) {
         if (r.width <= 0 || r.height <= 0) continue;
         const existing = groups.find((g) => Math.abs(g.y - r.y) <= 0.5);
-        const entry = existing || { x: r.x, y: r.y, right: r.x + r.width, bottom: r.y + r.height, words: [] };
+        const entry = existing || { x: r.x, y: r.y, right: r.x + r.width, bottom: r.y + r.height, words: [], visible: false };
+        if (nodeVisible) entry.visible = true;
         entry.x = Math.min(entry.x, r.x); entry.right = Math.max(entry.right, r.x + r.width);
         entry.y = Math.min(entry.y, r.y); entry.bottom = Math.max(entry.bottom, r.y + r.height);
         if (!existing) groups.push(entry);
@@ -555,7 +572,7 @@ export const SNAPSHOT_SOURCE = `(() => {
       const lineWords = measured.words === null ? null : measured.words.filter((w) => Math.abs(w.y - line.y) <= 0.5);
       textLines.push({ blockKey: nodeKey, index: base + local,
         box: { x: round(line.x), y: round(line.y), width: round(line.right - line.x), height: round(line.bottom - line.y) },
-        visible: s.visibility !== "hidden", width: round(line.right - line.x), wordBoxes: lineWords });
+        visible: line.visible, width: round(line.right - line.x), wordBoxes: lineWords });
     });
     lineBaseBySid[sourceIdentity] = base + measured.groups.length;
     fonts.add(s.fontFamily);
@@ -569,6 +586,7 @@ export const SNAPSHOT_SOURCE = `(() => {
         visibility: s.visibility || "visible", widows: number(s.widows, 2), orphans: number(s.orphans, 2),
         textAlign: s.textAlign || "start", wordSpacing: s.wordSpacing || "normal", fontFamily: s.fontFamily || "",
         fontSize, lineHeight, lang: P.attr(el, "lang") || document.documentElement.lang || "" },
+      display: s.display || "", marginCopies: sid ? (marginCopiesBySid[sid] || 0) : 0,
       lines: measured.groups.map((_, i) => base + i), inertBreak: null,
     });
     seenBySid[sourceIdentity] = (seenBySid[sourceIdentity] || 0) + 1;
@@ -887,6 +905,11 @@ export function validateSnapshotInvariants(
   }
   for (const block of snapshot.blocks) {
     if (block.lines === null && !block.notMeasuredReason) issues.push(`${block.nodeKey}: lines absent without reason`);
+    // Snapshot 5. A block without its computed display, or with a margin-copy count that is not a
+    // count, cannot be classified by the rules that ask whether it has a box of its own.
+    if (typeof block.display !== "string" || block.display.length === 0) issues.push(`${block.nodeKey}: computed display is absent`);
+    if (!Number.isSafeInteger(block.marginCopies) || block.marginCopies < 0) issues.push(`${block.nodeKey}: marginCopies is not a count`);
+    else if (block.marginCopies > 0 && block.sid === null) issues.push(`${block.nodeKey}: margin copies without a source id`);
     // The inspected input artefact's injection map is always complete. Producer provenance is
     // deliberately separate in originalMap, where generated/ambiguous output can be omitted.
     if (options.sourceMapInjection && block.sid !== null && !snapshot.source.map[block.sid]) {
@@ -1065,7 +1088,7 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
   // continuing block, which is deterministic; two such pages of the same block share an anchor.
   const anchorCandidates = new Map<number, BlockRecord[]>();
   for (const block of blocks) {
-    if (!mappedNodeKeys.has(block.nodeKey) || isNotRendered(block)) continue;
+    if (!mappedNodeKeys.has(block.nodeKey) || isNotRendered({ textLines: input.raw.textLines }, block)) continue;
     const list = anchorCandidates.get(block.page) ?? [];
     list.push(block);
     anchorCandidates.set(block.page, list);

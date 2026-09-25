@@ -1,8 +1,8 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  boxlessDeclined, declined, isNotRendered, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber,
-  outsideContentBoxEvaluation, renderedBox, sourceOf, startsInContentBox, targetEvaluation,
+  boxlessDeclined, declined, hasLayoutBox, isNotRendered, layoutOutOfScope, lineStateOf, makeFinding, notRenderedEvaluation,
+  num, outsideContentBoxEvaluation, pageByNumber, renderedBox, sourceOf, startsInContentBox, targetEvaluation,
 } from "../shared.ts";
 
 const HEADINGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
@@ -52,12 +52,29 @@ export const headingAtPageBottom = defineRule(
 
     for (const block of snapshot.blocks) {
       if (!HEADINGS.has(block.tag.toLowerCase())) continue;
-      // A heading that was not rendered — no box and no lines — does not end any page: it is not
-      // on one. The case is a running heading, whose in-flow original Paged.js hides with
-      // `display: none`; it was counted as a measured candidate that "had content below it".
-      if (isNotRendered(block)) {
+      // A heading nothing was printed from does not end any page: it is not on one. The case is a
+      // running heading, whose in-flow original Paged.js hides with `display: none`
+      // (`rule/target-in-margin-box`); it was counted as a measured candidate that "had content
+      // below it".
+      if (isNotRendered(snapshot, block)) {
         evaluations.push(notRenderedEvaluation("layout/heading-at-page-bottom", block));
         continue;
+      }
+      // A heading with no box of its own whose recorded lines are all invisible prints nothing
+      // either: excluded as not visible, like any other hidden target, not declined against
+      // coverage — which turned a document with one hidden `display: contents` heading into exit 4.
+      if (!hasLayoutBox(block.box)) {
+        const lines = lineStateOf(snapshot, block);
+        if (lines.recorded && lines.total > 0 && lines.visible === 0) {
+          evaluations.push(targetEvaluation({
+            ruleId: "layout/heading-at-page-bottom", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+            fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "excluded", countsTowardCoverage: false,
+            reason: "rule/target-not-visible",
+            measurements: [{ name: "visible-line-count", value: 0, unit: "lines", operator: ">", threshold: 0 }],
+            connective: "single", violated: null,
+          }));
+          continue;
+        }
       }
       // Where the heading is printed. A `display: contents` heading has no box of its own — a zero
       // box at the origin, which said "content below it" about every heading — but its text has
@@ -73,7 +90,7 @@ export const headingAtPageBottom = defineRule(
       }
       candidates += 1;
       if (box === null) {
-        const decline = boxlessDeclined("layout/heading-at-page-bottom", block);
+        const decline = boxlessDeclined("layout/heading-at-page-bottom", snapshot, block);
         notMeasured.push(decline.notMeasured);
         evaluations.push(decline.evaluation);
         continue;

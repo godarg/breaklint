@@ -1208,7 +1208,10 @@ export function validateRuntimeSidState(
   for (const sid of known("footnote", status.footnoteSids ?? [])) if (!seen.has(sid)) moved.add(sid);
   const marginKnown = new Set(known("margin", status.marginSids ?? []));
   for (const sid of new Set(known("displaced", status.displacedSids ?? []))) {
-    issues.push(`source id ${sid} was moved into the page area outside the page content and the footnote area`);
+    // The displaced bucket holds everything in the page area outside the page content that is not
+    // inside a Paged.js note: an element in the footnote area without `data-note="footnote"` lands
+    // here too, so the message may not say "outside the footnote area".
+    issues.push(`source id ${sid} is in the page area outside the page content and is not inside a Paged.js footnote (data-note="footnote")`);
   }
   const pageBox = new Map<string, { pages: Set<number>; afterArea: boolean }>();
   for (const [position, entry] of (status.pageBoxSids ?? []).entries()) {
