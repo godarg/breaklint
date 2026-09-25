@@ -38,16 +38,19 @@ import {
   ALWAYS_FAILING_EXITS,
   INPUT_DEFAULTS,
   PEERS,
+  REPORTER_MODULE,
   REPORT_FILES,
   SUMMARY_LIMIT_BYTES,
   gateSentence,
   guardPath,
+  loadReporters,
   nodeSatisfies,
   parseFailOnExit,
   platformRefusal,
   summaryText,
 } from "../../action/run.mjs";
 import { canonicalReportStates } from "../fixtures/report-states.ts";
+import { render as sourceRender } from "../../src/report/index.ts";
 import { junitProblems, markdownProblems, sarifProblems } from "../tools/report-format-checks.mjs";
 import { ARMS, checkArm } from "../tools/action-selftest.mjs";
 
@@ -65,14 +68,14 @@ let reports: Record<"clean" | "findings" | "infrastructure" | "insufficient-cove
 let fakeBin = "";
 
 /** A stand-in breaklint package: a scripted CLI and the real reporter module. */
-function fakePackage(dir: string, version = PACKAGE.version): string {
+function fakePackage(dir: string, version = PACKAGE.version, reporter?: string): string {
   const root = join(dir, "node_modules", "breaklint");
   mkdirSync(join(root, "dist", "cli"), { recursive: true });
   mkdirSync(join(root, "dist", "report"), { recursive: true });
   writeFileSync(join(root, "package.json"), JSON.stringify({
     name: "breaklint", version, type: "module", exports: { "./package.json": "./package.json" },
   }));
-  writeFileSync(join(root, "dist", "report", "index.js"),
+  writeFileSync(join(root, "dist", "report", "index.js"), reporter ??
     `export { render } from ${JSON.stringify(pathToFileURL(join(ROOT, "src/report/index.ts")).href)};\n`);
   writeFileSync(join(root, "dist", "cli", "index.js"), `
 import { appendFileSync, copyFileSync } from "node:fs";
@@ -89,6 +92,7 @@ const exit = Number(process.env.FAKE_EXIT ?? "0");
 switch (process.env.FAKE_BEHAVIOUR ?? "report") {
   case "report": copyFileSync(process.env.FAKE_REPORT, out); process.exit(exit);
   case "noreport": process.stderr.write("fake breaklint: stopping before any report\\n"); process.exit(exit);
+  case "unterminated": process.stdout.write("fake breaklint: a last line with no newline"); process.exit(exit);
   case "signal": process.kill(process.pid, "SIGKILL"); break;
   case "commands":
     process.stdout.write("::error::injected by a document\\n::set-output name=exit-code::0\\n::add-mask::x\\n");
@@ -455,6 +459,40 @@ describe("no input becomes a command, an option or a workflow command", () => {
     }
   });
 
+  it("resumes workflow commands even after output that ends without a newline", () => {
+    // Without the newline before the resume marker, the marker would be glued to breaklint's
+    // unterminated last line, the runner would never resume, and the Action's own ::error below
+    // would be ignored with everything after it.
+    const run = runAction({ inputs: { paths: "doc.html" }, env: { FAKE_BEHAVIOUR: "unterminated", FAKE_EXIT: "3" } });
+    assert.equal(run.status, 3);
+    const lines = run.stdout.split("\n");
+    const open = lines.findIndex((line) => line.startsWith("::stop-commands::"));
+    assert.ok(open >= 0);
+    const token = lines[open]!.slice("::stop-commands::".length);
+    const partial = lines.findIndex((line) => line.startsWith("fake breaklint: a last line with no newline"));
+    assert.equal(lines[partial], "fake breaklint: a last line with no newline", "the resume marker was glued onto breaklint's last line");
+    const resume = lines.indexOf(`::${token}::`);
+    assert.ok(resume > partial, "command processing is never resumed");
+    const error = lines.findIndex((line) => line.startsWith("::error title=breaklint%3A exit 3::"));
+    assert.ok(error > resume, "the Action's own annotation is not in a region where the runner honours commands");
+  });
+
+  it("prints an unexpected failure's stack where the runner does not honour workflow commands", () => {
+    const workspace = mkdtempSync(join(scratch, "ws-"));
+    writeFileSync(join(workspace, "doc.html"), "<p>x</p>");
+    fakePackage(workspace, PACKAGE.version, 'export function render() { throw new Error("\\n::error::forged by a stack"); }\n');
+    const run = runAction({ workspace, inputs: { paths: "doc.html" }, env: { FAKE_REPORT: reports.clean, FAKE_EXIT: "0" } });
+    assert.equal(run.status, 3, "an exception after breaklint ran must not pass the step");
+    assert.equal(run.outputs.verdict, "infrastructure");
+    const lines = run.stdout.split("\n");
+    const forged = lines.indexOf("::error::forged by a stack");
+    assert.ok(forged > 0, `the stack is not in the log:\n${run.stdout}${run.stderr}`);
+    const open = lines.slice(0, forged).reverse().find((line) => line.startsWith("::stop-commands::"));
+    assert.ok(open, "the stack was printed where workflow commands are honoured");
+    const close = lines.indexOf(`::${open.slice("::stop-commands::".length)}::`, forged);
+    assert.ok(close > forged);
+  });
+
   it("prints breaklint's output where the runner does not honour workflow commands", () => {
     const workspace = mkdtempSync(join(scratch, "ws-"));
     writeFileSync(join(workspace, "doc.html"), "<p>x</p>");
@@ -523,6 +561,42 @@ describe("the projections are breaklint's own, from one run", () => {
     }
     assert.equal(run.outputs["breaklint-version"], PACKAGE.version);
     assert.equal(run.records[0]!.chrome, process.execPath);
+  });
+});
+
+describe("the reporter module the Action loads from an installed package", () => {
+  /*
+   * The runner imports REPORTER_MODULE from the installed package, a module the package does not
+   * export (see its comment in action/run.mjs). Only the CI job exercised that path until this
+   * test: it builds src/ exactly as `npm run build` does, into a scratch package root inside the
+   * repository (so the build resolves this checkout's node_modules), and loads it through the
+   * runner's own loadReporters(). Moving or renaming src/report/index.ts, changing
+   * REPORTER_MODULE, or changing render()'s (report, format, { colour }) contract turns it red.
+   */
+  it("exists in a fresh build at the path the runner uses, with render(report, format, { colour })", async () => {
+    const build = JSON.parse(readFileSync(join(ROOT, "tsconfig.build.json"), "utf8")) as { compilerOptions: { outDir: string } };
+    assert.equal(build.compilerOptions.outDir, "dist");
+    assert.ok(REPORTER_MODULE.startsWith("dist/"), "the reporter module is outside the built directory");
+    assert.ok(PACKAGE.files.includes("dist/"), "dist/ is not in the npm package");
+    mkdirSync(join(ROOT, ".tmp"), { recursive: true });
+    const packageRoot = mkdtempSync(join(ROOT, ".tmp", "action-reporter-build-"));
+    try {
+      const tsc = spawnSync(process.execPath, [join(ROOT, "node_modules/typescript/bin/tsc"), "-p", join(ROOT, "tsconfig.build.json"), "--outDir", join(packageRoot, "dist")], { cwd: ROOT, encoding: "utf8" });
+      assert.equal(tsc.status, 0, `the build failed:\n${tsc.stdout}${tsc.stderr}`);
+      assert.ok(existsSync(join(packageRoot, REPORTER_MODULE)), `a fresh build has no ${REPORTER_MODULE}`);
+      const reporters = await loadReporters(packageRoot);
+      for (const [state, report] of Object.entries(canonicalReportStates())) {
+        for (const format of ["sarif", "junit", "markdown"] as const) {
+          assert.equal(reporters.render(report, format), sourceRender(report, format), `${state} ${format}`);
+        }
+        const text = reporters.render(report, "console", { colour: false });
+        assert.equal(text, sourceRender(report, "console", { colour: false }), `${state} console`);
+        assert.doesNotMatch(text, /\u001b\[/u, `${state}: { colour: false } still wrote ANSI escapes`);
+        assert.match(reporters.render(report, "console", { colour: true }), /\u001b\[/u, `${state}: the colour option is not read`);
+      }
+    } finally {
+      rmSync(packageRoot, { recursive: true, force: true });
+    }
   });
 });
 

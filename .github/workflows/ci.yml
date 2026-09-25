@@ -304,19 +304,34 @@ jobs:
           paths: tests/fixtures/missing-font.html
           breaklint-tarball: ${{ steps.pack.outputs.tarball }}
           output-dir: ${{ runner.temp }}/arm-infrastructure
-      - name: "arm: a path that is not there, and inputs that must stay inert, exit 2"
+      - name: "arm: a path that is not there, and shell syntax that must stay inert, exit 2"
         id: usage
         continue-on-error: true
         uses: ./
         with:
-          # Neither line may be executed or read as an option: the first would create the
-          # canary the assertion step looks for, the second would turn the run into --demo.
+          # Executed by a shell, the first line would create the canary the assertion step
+          # looks for.
           paths: |
             $(touch "$RUNNER_TEMP/breaklint-action-canary").html
-            --demo
             tests/fixtures/action/does-not-exist.html
           breaklint-tarball: ${{ steps.pack.outputs.tarball }}
           output-dir: ${{ runner.temp }}/arm-usage
+      - name: "arm: a path that reads like an option stays a path, exit 2"
+        id: dash
+        continue-on-error: true
+        uses: ./
+        with:
+          # Guarded, `--fail-on` reaches breaklint as the path ./--fail-on, which is not .html:
+          # exit 2, no report. Unguarded it would be the option `--fail-on never`, and breaklint
+          # would render findings.html and report it clean: exit 0, a report, verdict clean.
+          # Only this arm tells the two apart; a `--demo` line would not, because the missing
+          # path next to it ends an unguarded run with exit 2 as well.
+          paths: |
+            --fail-on
+            never
+            tests/fixtures/action/findings.html
+          breaklint-tarball: ${{ steps.pack.outputs.tarball }}
+          output-dir: ${{ runner.temp }}/arm-dash
       - name: "arm: a fail-on-exit that would let exit 4 pass is refused, exit 2"
         id: refused
         continue-on-error: true
@@ -334,6 +349,7 @@ jobs:
           ARM_UNGATED: ${{ toJSON(steps.ungated) }}
           ARM_INFRASTRUCTURE: ${{ toJSON(steps.infrastructure) }}
           ARM_USAGE: ${{ toJSON(steps.usage) }}
+          ARM_DASH: ${{ toJSON(steps.dash) }}
           ARM_REFUSED: ${{ toJSON(steps.refused) }}
           INJECTION_CANARY: ${{ runner.temp }}/breaklint-action-canary
         run: |

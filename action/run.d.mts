@@ -45,3 +45,5 @@ export function gateSentence(exitCode: number, failOnExit: ReadonlySet<number>):
 export function summaryText(markdown: string, trailer: string, limit?: number): string;
 export function shadowingPeers(cwd: string): { name: string; dir: string; version: string | null }[];
 export function main(): Promise<void>;
+export const REPORTER_MODULE: string;
+export function loadReporters(root: string): Promise<{ render(report: unknown, format: string, options?: { colour?: boolean }): string }>;

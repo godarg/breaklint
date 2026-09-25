@@ -247,9 +247,12 @@ page that nothing checks, and this tool exists because such claims were wrong.
 
 In GitHub Actions, the composite Action at the root of this repository
 (`uses: godarg/breaklint@<ref>`) runs the check as a gate: one run over the HTML paths or bash
-globs you give it, the step failing on breaklint's own exit code (1 to 4 by default; only 1 may be
-left ungated), and SARIF for code scanning, JUnit and a Markdown step summary, all rendered from
-the one canonical JSON report. [`docs/ci-recipe.md`](docs/ci-recipe.md) has a workflow to copy,
+globs you give it, a step that fails on breaklint's own exit code (1 to 4 by default; only 1 may
+be left ungated), and SARIF for code scanning, JUnit and a Markdown step summary, all rendered
+from the one canonical JSON report. It installs the npm release named in that ref's
+`package.json`, not the ref's code: a tag works once its npm publish has succeeded, and a branch
+ref runs the last release, or fails with exit 3 after a version bump that is not yet published.
+[`docs/ci-recipe.md`](docs/ci-recipe.md) has a workflow to copy,
 the permissions it needs and what each exit code does to the job.
 
 There is no directory recursion and no glob expansion inside the tool. The shell has done this

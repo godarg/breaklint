@@ -29,6 +29,8 @@ export const ARMS = Object.freeze({
   UNGATED: { outcome: "success", exitCode: 1, verdict: "findings", report: true, inputsFound: 1 },
   INFRASTRUCTURE: { outcome: "failure", exitCode: 3, verdict: "infrastructure", report: true, inputsFound: 1 },
   USAGE: { outcome: "failure", exitCode: 2, verdict: "usage", report: false },
+  // Without the Action's dash guard this arm would be `--fail-on never`: exit 0, verdict clean.
+  DASH: { outcome: "failure", exitCode: 2, verdict: "usage", report: false },
   REFUSED: { outcome: "failure", exitCode: 2, verdict: "not-run", report: false },
 });
 

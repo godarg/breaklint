@@ -65,7 +65,7 @@ inputs:
 
 outputs:
   exit-code:
-    description: breaklint's exit code (0 clean, 1 findings, 2 invalid invocation, 3 infrastructure, 4 nothing or too little judged). Set on every run, including a failed one.
+    description: breaklint's own exit code (0 clean, 1 findings, 2 invalid invocation, 3 infrastructure, 4 nothing or too little judged), or the Action's own 2 or 3 when it refused an input or rejected breaklint's result. Set on every run. The step's exit status equals it, except that an ungated exit 1 ends the step with 0.
     value: ${{ steps.breaklint.outputs.exit-code }}
   verdict:
     description: The report's runVerdict, or usage / infrastructure / not-run when no report was written.

@@ -27,8 +27,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
 ### Added
 
 - **A GitHub Action for gating HTML-to-PDF builds** (`action.yml` at the repository root, runner
-  in `action/run.mjs`; neither is in the npm package). `uses: godarg/breaklint@<ref>` installs the
-  breaklint version of that ref with the pinned peers `puppeteer-core@25.8.0`, `pagedjs@0.4.3`
+  in `action/run.mjs`; neither is in the npm package). `uses: godarg/breaklint@<ref>` installs
+  `breaklint@<version>` from npm, where `<version>` is that ref's `package.json` version — so a
+  branch ref runs the last published release, not the branch's code, and a tag works only after
+  its npm publish succeeded (until then the step ends with exit 3) — with the pinned peers `puppeteer-core@25.8.0`, `pagedjs@0.4.3`
   and `pdfjs-dist@6.2.108` (or uses the project's own install), hands it the runner's Chrome with
   the sandbox on, runs it once over bash-expanded HTML paths, and writes the canonical JSON plus
   SARIF, JUnit and Markdown rendered from that one report by breaklint's own reporters. The
@@ -54,15 +56,20 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   structural check (failure counts equal the `<failure>` elements) and Markdown a verdict-line
   check, each with negative controls. breaklint's SARIF needed no change.
 - **A new `action` job in `ci.yml`** runs the Action with `uses: ./` against the tarball the same
-  commit packs, with real Chrome, in six arms: clean (passes), a gating finding over two documents
-  from one glob (fails), exit 1 left ungated (passes), a font that fails to load (exit 3, fails), a
-  missing path plus injection canaries (exit 2, fails, nothing executed) and a `fail-on-exit` that
-  would let exit 4 pass (refused, exit 2). `continue-on-error` keeps the failing arms from ending
+  commit packs, with real Chrome, in seven arms: clean (passes), a gating finding over two
+  documents from one glob (fails), exit 1 left ungated (passes), a font that fails to load (exit 3,
+  fails), a missing path plus a shell-substitution canary (exit 2, fails, nothing executed), the
+  paths `--fail-on` and `never` (exit 2; without the dash guard they would become the option
+  `--fail-on never` and the arm would end clean with exit 0) and a `fail-on-exit` that would let
+  exit 4 pass (refused, exit 2). `continue-on-error` keeps the failing arms from ending
   the job, and `tests/tools/action-selftest.mjs` then asserts every arm's recorded outcome, exit
   code and verdict and validates the SARIF, JUnit and Markdown it wrote. An optional
   `action-code-scanning` job uploads the findings arm's SARIF only when the repository variable
-  `BREAKLINT_ACTION_UPLOAD_SARIF` is `true`, and never for a fork's pull request. No `npm run`
-  step was added, so the local gate lists are unchanged.
+  `BREAKLINT_ACTION_UPLOAD_SARIF` is `true`, and never for a fork's pull request. The one
+  internal module the Action depends on, `dist/report/index.js` (not a public export; the package's
+  `exports` map is unchanged), is also held locally: a unit test builds `src/` the way
+  `npm run build` does and loads it through the runner's own loader. No `npm run` step was added,
+  so the local gate lists are unchanged.
 
 ## 0.6.0 — 2026-09-18
 

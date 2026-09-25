@@ -96,6 +96,15 @@ export const REPORT_FILES = Object.freeze({
 });
 export const EVIDENCE_DIR = "evidence";
 
+/**
+ * The installed package's reporter module, relative to its root. Not a public export: the npm
+ * package's `exports` map exposes only the API, the package.json and the config schema, and
+ * Node's `imports` field serves only the package's own modules, so no package-internal specifier
+ * exists that this runner could use instead. The path is therefore held by
+ * `tests/unit/action-runner.test.ts` against a fresh build of `src/`.
+ */
+export const REPORTER_MODULE = "dist/report/index.js";
+
 /** GitHub rejects a step summary above 1 MiB; stay well below it and say what was cut. */
 export const SUMMARY_LIMIT_BYTES = 900 * 1024;
 
@@ -495,10 +504,10 @@ function resolveChrome(inputs) {
   return null;
 }
 
-async function loadReporters(root) {
-  const file = join(root, "dist", "report", "index.js");
+export async function loadReporters(root) {
+  const file = join(root, ...REPORTER_MODULE.split("/"));
   if (!existsSync(file)) {
-    throw infrastructure(`this breaklint build has no reporter module at dist/report/index.js; the Action cannot project SARIF, JUnit or Markdown from it.`);
+    throw infrastructure(`this breaklint build has no reporter module at ${REPORTER_MODULE}; the Action cannot project SARIF, JUnit or Markdown from it.`);
   }
   const reporters = await import(pathToFileURL(file).href);
   if (typeof reporters.render !== "function") {
@@ -544,7 +553,8 @@ export async function main() {
     await runAction(inputs);
   } catch (failure) {
     if (!(failure instanceof ActionFailure)) {
-      process.stderr.write(`${failure instanceof Error ? failure.stack ?? failure.message : String(failure)}\n`);
+      // A stack can quote a path or a message that came from a document: no workflow commands.
+      printUntrusted(failure instanceof Error ? failure.stack ?? failure.message : String(failure));
     }
     actionError(failure, failOnExit);
   }
@@ -604,7 +614,9 @@ async function runAction(inputs) {
   await new Promise((done) => process.stdout.write(`::stop-commands::${token}\n`, done));
   breaklintStarted = true;
   const child = spawnSync(process.execPath, args, { cwd: workspace, env, stdio: ["ignore", 1, 1] });
-  process.stdout.write(`::${token}::\n`);
+  // Leading newline: a last line breaklint left unterminated would otherwise swallow the marker,
+  // and the runner would ignore every workflow command after it, the Action's own included.
+  process.stdout.write(`\n::${token}::\n`);
 
   if (child.error) throw infrastructure(`could not start breaklint: ${child.error.message}`);
   if (child.signal) throw infrastructure(`breaklint was terminated by ${child.signal}; no verdict exists.`);

@@ -29,6 +29,14 @@ third-party action is pinned to a full commit SHA. Pin the breaklint Action the 
 release tag, or better, to that tag's commit SHA. The Action exists from the first release whose
 [changelog](../CHANGELOG.md) lists it.
 
+**Which breaklint a ref runs.** The Action does not run the breaklint code of the ref you name.
+It installs `breaklint@<version>` from npm, where `<version>` is the `version` in that ref's
+`package.json`. Use a release tag only after that release's npm publish has succeeded; before
+that, the install fails and the step ends with exit 3. A branch ref such as `@main` runs the last
+published version between releases — not the code on the branch — and fails with exit 3 from the
+moment the branch's `package.json` names a version npm does not have yet. To gate on unreleased
+code, pack it yourself and pass the tarball as `breaklint-tarball`.
+
 ```yaml
 name: print QA
 
@@ -101,8 +109,8 @@ the `layout` job's result is unaffected.
 ## What each exit code does to the job
 
 The step ends with breaklint's own exit code, so the log says `exit code 1` for findings and
-`exit code 4` for a run that judged too little. The `exit-code` output carries the same number
-for later steps, on every run including a failed one.
+`exit code 4` for a run that judged too little. The `exit-code` output is set on every run,
+including a failed one; the table under [Outputs](#outputs) says exactly what it holds.
 
 | exit | meaning | step, by default | can it be left ungated? |
 |---|---|---|---|
@@ -150,7 +158,7 @@ warns about them, so check the spelling of `with:` keys against this table.
 
 | output | content |
 |---|---|
-| `exit-code` | breaklint's exit code as applied to the step |
+| `exit-code` | breaklint's own exit code; or the Action's own 2 or 3 when it refused an input, could not run breaklint, or rejected what breaklint left (an exit 0 or 1 without its report, a report that disagrees with the process, a signal). The step's own exit status equals it, except that an ungated exit 1 (`fail-on-exit: 2,3,4`) ends the step with 0 while `exit-code` stays 1. |
 | `verdict` | the report's `runVerdict`, or `usage`, `infrastructure` or `not-run` when there is no report |
 | `report-json` | `breaklint.json`, the canonical report |
 | `sarif-file` | `breaklint.sarif`, SARIF 2.1.0 for `upload-sarif` |
