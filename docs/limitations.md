@@ -197,10 +197,14 @@ stylesheet, no `break-inside` and no script are needed, only a table that crosse
 The six documents are recorded, not published. They are chapters of a paid product, and this
 repository is public and MIT, so `corpus/public/pagination-residue-v1` keeps their SHA-256 values,
 rights and privacy review and exact expected residue while their bytes stay outside it —
-the `private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. Without
-`BREAKLINT_RESIDUE_CORPUS_ROOT` the gate says `SKIPPED` and claims nothing about them. What holds
-this class in CI is the public `tests/fixtures/fragmentainer-residue.html`, reduced from one of the
-six until no product text remained; the reduction is itself the measurement that nothing exotic is
+the `private_nonredistributable` shape of `docs/validation/corpus-contract-v1.md`. That record is
+now historical: re-measured on 2026-09-18, five of the six documents and their shared stylesheet no
+longer exist at the recorded digests, so nobody can run its private half. `npm run
+test:pagination-residue` prints `NO CLAIM` and reads none of the six, with or without
+`BREAKLINT_RESIDUE_CORPUS_ROOT`, and it is no longer a CI or release step — a step that exits 0
+having read zero documents would be a green light over nothing. What holds this class in CI is the
+public `tests/fixtures/fragmentainer-residue.html` in the live suite, reduced from one of the six
+until no product text remained; the reduction is itself the measurement that nothing exotic is
 required.
 
 **Rendering is not reproducible across machines.** Browser rendering varies with the host operating
@@ -245,15 +249,20 @@ chain need no browser and no process group, so they work there. What does not wo
 your own HTML. Blocking the install would take away the part that functions in order to prevent
 the part that does not, and the part that does not already fails loudly rather than quietly.
 
-**A file that is not HTML gets an unhelpful error.** Point the tool at a Markdown file and the
-run ends with exit 3 and `pagination aborted: TypeError: node.getAttribute is not a function` —
-which is Paged.js throwing on a document that has none of the structure it expects, caught at the
-boundary and reported fail-closed. The behaviour is safe: nothing is measured and nothing is
-claimed. The message is not: it names an internal function rather than the mistake, and the
-mistake is one a first-time user makes. Found by a CI step whose own premise had quietly become
-false. Not fixed in 0.1.0, because a clean answer means deciding whether a non-HTML input is an
-infrastructure fault (exit 3) or an invalid invocation (exit 2), and that decision changes the
-exit matrix rather than a message.
+**Non-HTML input is refused by its name, not by its content.** An input path that does not end in
+`.html` or `.htm` — Markdown, PDF, a standalone SVG — ends with exit 2 and `unsupported input type`
+before any renderer starts and before the path is even opened; measured for a `.md` file, existing
+or missing: exit 2, nothing on stdout. A path that is not a regular file — a directory called
+`chapter.html`, for instance — is refused the same way with `input is not a regular file`; through
+0.6.0 it passed both checks, started Chrome and ended exit 3 with "resource byte limit exceeded".
+The content of a `.html` file is not sniffed. Markdown text
+saved under a `.html` name is served and parsed as HTML: one run of body text with no element in
+it. Such a run then ends with exit 3 and `geometry-cross-check-failed` ("measured no elements"),
+because a cross-check over zero elements is not a passed cross-check (`src/measure/cross-check.ts`)
+— measured locally on Chromium 141 with the evidence binding off; the zero-sample rule itself does
+not depend on the browser. A converter's HTML output is ordinary HTML and is measured as such. The
+paragraph that stood here through 0.6.0 described a Paged.js `pagination aborted` exit 3 for a
+Markdown file; that path is gone, because the name check runs first.
 
 **Foreign HTML is executed.** The run uses a fresh browser profile, keeps the sandbox on, has no
 flag that disables it, and blocks every network request by default. That is protection against
@@ -299,7 +308,7 @@ and `position: fixed` by cloning it into every page box; both clones keep the in
 The collector used to gather blocks from the whole `.pagedjs_page`, so every clone became one more
 "fragment" of its source block. Measured on 2026-09-24 with Paged.js 0.4.3: a six-page document
 with a one-line running title and an eight-line side running element carried seven records per
-element and reported ten widow/orphan warnings, every one about a clone; under a running header,
+element and reported ten `layout/widow` and `layout/orphan` warnings, every one about a clone; under a running header,
 the blank page a `break-before: recto` inserts was not blank, both of its boundaries came out
 `overflow`/`forced` instead of `parity`, it drew a `layout/orphaned-continuation-page` finding, and
 every page was anchored to the header, so three `layout/half-empty-page` findings on three pages
@@ -343,7 +352,7 @@ reports it:
   The test asks whether an element has an ancestor that is the area child of a page box. A running
   element whose own markup contains `<div class="pagedjs_pagebox"><div class="pagedjs_area">` makes
   its descendants pass that test in every margin-box clone, so they are measured once per page again
-  — the pre-repair behaviour, with its false widows and shared fingerprints, for that markup only.
+  — the pre-repair behaviour, with its false `layout/widow` findings and shared fingerprints, for that markup only.
   It cannot hide flow content from measurement: that would need an element of the real content area
   to lose the ancestor it has. A class name alone (`pagedjs_area` without the page-box parent) does
   not pass the test.

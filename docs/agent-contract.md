@@ -4,6 +4,8 @@ This document is the operating contract for coding agents using breaklint to ver
 
 > The most important thing an agent needs to know about breaklint is that silence is not approval, exit 0 is the only success, and the tool measures geometry — it does not understand typography or design intent. If your fix makes the document look worse to achieve a clean exit, you have misunderstood the assignment.
 
+Every rule id, verdict, `env/` reason, report field and repair lever this page names is held against the code by `tests/unit/agent-contract.test.ts`: the verdicts and exit codes against `src/core/enums.ts`, the ids against the rule registry, the fields against a real `--demo --format json` run, and the levers against each rule's own `remediation.advice`. Where this page and a rule's advice ever disagree, the advice is the source.
+
 ---
 
 ## 1. Exit Code Semantics
@@ -12,17 +14,17 @@ Always check the process exit code before inspecting findings. Never interpret m
 
 | Exit Code | Verdict | Meaning | Agent Action |
 |:---:|:---|:---|:---|
-| **0** | `clean` | All requested checks ran to required coverage floors and found zero gated defects. | **Success.** Document passes layout gates. |
-| **1** | `findings` | One or more measured targets violated a configured rule threshold. | **Repair needed.** Inspect findings, locate source, apply remediation. |
-| **2** | `usage-error` | Invalid CLI arguments, schema mismatch, or unparseable configuration. | **Fix invocation.** Do not edit document; correct CLI flags or config file. |
-| **3** | `infrastructure` | Renderer crash, missing local asset, or geometry cross-check mismatch. | **Investigate setup.** Missing image, bad path, or renderer failure. |
-| **4** | `insufficient-coverage` | Candidate elements were declined by the engine; coverage floor was not reached. | **Do NOT treat as clean.** Even if `findings: []`, checks did not run. |
+| **0** | `clean` | Every requested rule measured its candidates to its coverage floor and nothing gated reached its threshold. | **Success.** Document passes layout gates. |
+| **1** | `findings` | At least one non-experimental finding reached the gate set by `failOn`. | **Repair needed.** Inspect findings, locate source, apply remediation. |
+| **2** | `usage` | Invalid invocation: unknown option, invalid or unknown configuration, a missing input path, or an input that is not a `.html`/`.htm` file. **No report is written** — nothing on stdout, nothing at `--out`. | **Fix invocation.** Do not edit the document; correct the command line or the config file. |
+| **3** | `infrastructure` | The run could not measure: no renderer or driver, a font that failed to load, pagination aborted, a geometry cross-check that failed, an unstable render, a crashed checker. A failure before any document was measured (no renderer, for example) writes no report; a failure inside one document writes a report whose `documents[].exitReason` names it. | **Investigate setup.** Read stderr and `exitReason`; the document may be fine. |
+| **4** | `insufficient-coverage` | Nothing or too little was judged. `documents[].exitReason` says which: a rule's declined candidates took it below its coverage floor (`<rule> below its coverage floor`), no rule measured a single candidate, the input was empty, or required evidence binding is incomplete. | **Do NOT treat as clean.** Even if `findings: []`, the checks did not run to completion. |
 
 ### Critical Rule for Exit 4 (`insufficient-coverage`)
 When breaklint exits with code 4, the report may show zero findings (`findings: []`). **This is not a clean pass.**
-It means the engine could not measure enough elements to satisfy proof thresholds (e.g., SVG text inside unsupported transforms, unmeasured RTL runs). Inspect `documents[].coverage` and `documents[].notMeasured` in `report.json` to find the unmeasured rule and its environment reason.
+Exit 4 does not require a decline: `--only layout/widow --disable layout/widow` leaves no rule to run and ends exit 4 with "no rule measured a single candidate". Where candidates were declined, `documents[].coverage` shows the rule below its floor and `documents[].notMeasured[].reason` names why, as an `env/` id. The two `error` rules require full coverage in the default profile, so one decline by either of them is enough: `layout/unbreakable-block-too-tall` declines on `env/multicolumn`, `env/vertical-writing` or `env/invalid-measurement` (a split block whose fragments cannot be joined by source id, or a printed block with no box of its own), and `svg/text-overflows-viewport` on `env/svg-not-inline`, `env/svg-no-text`, `env/svg-too-many-text-targets`, `env/svg-ctm-unavailable`, `env/svg-viewport-geometry-unsupported` or `env/svg-painted-bounds-unsupported`. Each list is complete for its rule; `tests/unit/agent-contract.test.ts` fails when a rule declares a coverage-relevant reason this page does not list. A target that is out of scope altogether — `env/svg-overflow-visible` — does not count against coverage.
 
-**The CLI does not write a `context.json`.** `--format` offers `json | sarif | console | html | junit | markdown` and nothing else; the context pack exists only through the library call `writeReportBundle(report, {outDir})`, which writes `report.json`, `context.json` and `report.html` together (see `docs/reporting.md`). If you are driving the CLI, `report.json` is your only machine-readable surface, and everything below that names a `context.json` field names a projection you must produce yourself.
+**The CLI does not write a `context.json`.** `--format` offers `json | sarif | console | html | junit | markdown` and nothing else; the context pack exists only through the library call `writeReportBundle(report, {outDir})`, which writes `report.json`, `context.json`, `report.html`, `bundle.json` and the verified `assets/` together (see `docs/reporting.md`). If you are driving the CLI, `report.json` is your only machine-readable surface, and everything below that names a `context.json` field names a projection you must produce yourself.
 
 ---
 
@@ -33,11 +35,11 @@ Breaklint's canonical output is `report.json`. `context.json` is a bounded proje
 | Field | Stability | Purpose & Safe Usage |
 |:---|:---:|:---|
 | `finding.fingerprint` | **Stable** | Deterministic SHA-256 of rule id, key type and target key — and deliberately of *nothing else*. It contains no page number, no fragment index and no node key, which is what makes it survive a repair: if your edit moves a defect without removing it, the fingerprint does not change. **One exception, and it is load-bearing:** a finding scoped to a page that carries no semantic block at all keys on `ord:<pageOrdinal>`, so for those the ordinal does participate and the fingerprint moves when pages shift. Those findings are marked `stableIdentity.status` other than `unique` — check it before you treat a fingerprint as an identity. See `src/core/fingerprint.ts` for the mutation battery that settled this. |
-| `finding.source` | **Stable**, nullable | Mapped position in the authoring source. `null` whenever the node was produced by the paginator and has no authoring source. Five rules set it unconditionally — `layout/half-empty-page`, `layout/orphaned-continuation-page`, `artifact/local-uri`, `svg/text-clipped`, `svg/text-ink-collision` — so for those you will never get a line number, and no amount of re-running will produce one. `--no-source-map` sets it null for every finding. `offset`/`endOffset` are UTF-8 byte offsets; `line`/`column` follow `coordinateSystem`. A screen-profile finding carries a different `source` shape (`status`, `file`) and no line numbers. |
+| `finding.source` | **Stable**, nullable | Mapped position in the authoring source. `null` whenever the node was produced by the paginator and has no authoring source. Three released rules set it unconditionally — `layout/half-empty-page`, `layout/orphaned-continuation-page` and `artifact/local-uri` — so for those you will never get a line number, and no amount of re-running will produce one. `--no-source-map` sets it null for every finding. `offset`/`endOffset` are UTF-8 byte offsets; `line`/`column` follow `coordinateSystem`. A screen-profile finding carries a different `source` shape (`status`, `file`) and no line numbers. |
 | `finding.remediation` | **Stable** | `advice` is the rule author's guidance. `tested` says whether a trigger/remedied document pair in this repository demonstrates that applying the advice removes the finding and introduces no new one. **Today every rule ships `tested: false`**: no such pair is part of this package and no gate re-runs one. Treat the advice as a starting point, not as a verified repair. |
-| `finding.ruleId` | **Stable** | Canonical rule identifier (e.g., `type/straight-quotes`, `layout/widow`). |
-| `finding.measurement` | **Semi-stable** | Measured value, operator, and threshold. Check `measurement.calibrated`. |
-| `finding.id`, `runFindingId` | **Ephemeral** | Internal execution IDs bound to a specific process run. Do NOT match across runs. |
+| `finding.ruleId` | **Stable** | Canonical rule identifier (for example `type/straight-quotes` or `layout/widow`). |
+| `finding.measurement` | **Semi-stable** | Measured value, unit and threshold. Check `measurement.calibrated`. |
+| `finding.runFindingId` | **Ephemeral** | Identifies the finding within one run only. Do NOT match across runs; a document finding has no other id field. |
 | `finding.target.boxScreen` | **Ephemeral** | Absolute screen pixel coordinates. Shifts with any upstream content or styling changes. |
 
 ---
@@ -79,13 +81,25 @@ are the only rules that gate by default. See `docs/limitations.md` for what "unc
 When iterating on document repairs:
 
 ### Safe Repair Actions
-1. **Punctuation and micro-typography (`type/*`):** replace straight quotes with the curly pair for
-   the configured locale — `&bdquo;`…`&ldquo;` for `de-DE`, `&ldquo;`…`&rdquo;` for `en-*`. The rule
-   defaults to `de-DE`; check `--locale` before you substitute. Replace spaced hyphens ` - ` with
-   `&mdash;` or `&ndash;`.
-2. **Table Pagination (`layout/widow`, `layout/orphan` in tables):** If an orphan or widow occurs inside a fractured table row, apply `tr { break-inside: avoid; }`. *(Note: Paged.js does not implement CSS `widows` or `orphans` on paragraphs).*
-3. **Headings at Bottom (`layout/heading-at-page-bottom`):** Apply `h1, h2, h3, h4 { break-after: avoid; }` or force `break-before: page;`.
-4. **Oversized Blocks (`layout/unbreakable-block-too-tall`):** Remove `break-inside: avoid` from containers that exceed page height, or allow them to fragment.
+Each item names only levers its rule's own `remediation.advice` proposes; the advice in the finding is the full text.
+
+1. **Punctuation (`type/straight-quotes`):** replace straight quotes with the curly pair for the
+   configured locale — `&bdquo;`…`&ldquo;` for `de-DE`, `&ldquo;`…`&rdquo;` for `en-*`. The rule
+   defaults to `de-DE`; check `--locale` before you substitute.
+2. **Dashes (`type/spaced-hyphen`):** replace a spaced hyphen ` - ` with a spaced en dash
+   (`&ndash;`) or an unspaced em dash (`&mdash;`).
+3. **Split paragraphs and table rows (`layout/widow`, `layout/orphan`):** inside a table row, keep
+   the row together with `tr { break-inside: avoid; }`. For a paragraph, prevent the split with
+   `break-inside: avoid`, force an earlier break with `break-before: page`, or reword the text.
+   *(Note: CSS `widows` and `orphans` do take effect on paragraphs: Paged.js never reads them, but the
+   browser applies them through its own fragmentation inside Paged.js's flow. Each value is also its
+   rule's threshold, so changing it is not a fix.)*
+4. **Headings at the bottom (`layout/heading-at-page-bottom`):** add `break-after: avoid` to the
+   heading, or insert `break-before: page` before it.
+5. **Oversized blocks (`layout/unbreakable-block-too-tall`):** make the block shorter — split its
+   content into smaller sections deliberately, or reduce its padding, font size or contained rows.
+   Do not remove its `break-inside: avoid` to clear the finding: the finding then disappears only
+   because the rule has no candidate, while the block is exactly as tall and is still broken.
 
 ### The STOP Rules (Mandatory Abandonment)
 You must **STOP** and revert your edit immediately if:

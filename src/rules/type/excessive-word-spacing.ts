@@ -15,6 +15,10 @@ import {
  * to a window around page boundaries, which contradicted the rule that needs them; the cost of
  * keeping them all was measured at 4 221 bytes per page, about 8 MiB over 2 000 pages, and that
  * is affordable. The limit was not a trade-off, it was an unmeasured assumption.
+ *
+ * This rule owns the block-level `hyphens` setting and the soft hyphens of justified blocks;
+ * `layout/hyphen-across-page` defers to it on both and changes only the boundary word
+ * (`remediation.interactions` on both rules).
  */
 export const excessiveWordSpacing = defineRule(
   {
@@ -29,7 +33,11 @@ export const excessiveWordSpacing = defineRule(
     declines: ["env/multicolumn", "env/vertical-writing"],
     remediation: {
       advice:
-        "Justified text produces word spacing exceeding the uncalibrated threshold ('rivers' of whitespace). Enable hyphenation with 'hyphens: auto;' (specifying an HTML 'lang' attribute), use left alignment ('text-align: left;'), or insert soft hyphens ('&shy;') into long words. Note that enabling hyphenation can produce 'layout/hyphen-across-page' findings where a hyphenated word then falls on a page boundary; the two rules pull in opposite directions and neither threshold is calibrated.",
+        "Justified text produces word spacing exceeding the uncalibrated threshold ('rivers' of whitespace). Use left alignment ('text-align: left;'), insert soft hyphens ('&shy;') into long words, or enable hyphenation with 'hyphens: auto;' together with an HTML 'lang' attribute. Automatic hyphenation happens only where the rendering browser has a hyphenation dictionary for that language; where it has none, 'hyphens: auto' changes nothing and soft hyphens are the lever that works. This rule owns the block-level 'hyphens' setting and the soft hyphens of justified text: where a hyphen, soft or automatic, then falls on a page boundary, 'layout/hyphen-across-page' changes only that word and neither turns hyphenation off nor removes soft hyphens for the block.",
+      interactions: [
+        { ruleId: "layout/hyphen-across-page", lever: "hyphens", relation: "prevails", scope: "justified" },
+        { ruleId: "layout/hyphen-across-page", lever: "soft-hyphen", relation: "prevails", scope: "justified" },
+      ],
       // No trigger/remedied pair ships with this package and no gate re-runs one, so this
       // advice is untested in the sense the field defines.
       tested: false,

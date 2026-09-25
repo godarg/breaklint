@@ -59,9 +59,67 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   finding message had already stopped making that all-pages claim from one measured page; the
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
   compared advice text will see the new string.
+- **`layout/widow` and `layout/orphan` no longer say that CSS `widows`/`orphans` are "ignored by
+  Paged.js".** Paged.js 0.4.3 never reads either property, but it cuts every page where the
+  browser's own column fragmentation broke, and the browser applies both there. Measured on
+  Chromium 141 with Paged.js 0.4.3 over one geometry: `widows` 1, initial and 5 split a 9-line
+  paragraph 8+1, 7+2 and 4+5; with room for one line, `orphans: 1` splits it 1+8 while the initial
+  value and `orphans: 4` move it whole. The advice now says the browser applies both, that what is
+  left to report is a split the browser had to relax (CSS Fragmentation Level 3 §4.3, which is why
+  both rules stay warnings permanently), and that changing the block's own value moves the
+  threshold and is not a fix. The levers are unchanged. `Finding.remediation.advice` changes for
+  both rules; consumers that stored or compared it will see the new strings.
+- **`layout/hyphen-across-page` no longer recommends soft hyphens, `hyphens: manual`, `&nbsp;`, or
+  block-level `hyphens: none` in justified text.** Paged.js 0.4.3 marks a page split right after a
+  soft hyphen exactly like a split inside a word (`hyphenateAtBreak`), so the old cure re-created
+  the finding, and `manual` is the value under which soft hyphens break (measured). In a justified
+  block the advice now changes only the boundary word — `<span style="hyphens: none">` or
+  `white-space: nowrap` (both measured to leave no boundary hyphen), or rewording; `hyphens: none`
+  on the paragraph remains the fix for a block that is not justified.
+- **`type/excessive-word-spacing` and `layout/hyphen-across-page` state which of them owns
+  `hyphens` and soft hyphens.** Their two texts pulled the same levers in opposite directions and
+  said only that they did. The word-spacing rule now owns the block-level `hyphens` setting and the
+  soft hyphens (`&shy;`) of justified blocks, and the hyphen rule defers to it on both there,
+  changing only the boundary word; both advice texts say so, and the word-spacing advice adds that
+  `hyphens: auto` hyphenates only where the rendering browser has a dictionary for the language —
+  on the measured headless Chromium 141 it had none for English, so soft hyphens were the lever
+  that worked. The order is declared in the new registry field `remediation.interactions`, which
+  does not travel into reports: `Finding.remediation` still carries `advice` and `tested` only, and
+  no report, snapshot or configuration schema stamp moves. Both advice strings change.
+
+### Added
+
+- **A GitHub Action for gating HTML-to-PDF builds** (`action.yml` at the repository root, runner
+  in `action/run.mjs`; neither is in the npm package). `uses: godarg/breaklint@<ref>` installs
+  `breaklint@<version>` from npm, where `<version>` is that ref's `package.json` version — so a
+  branch ref runs the last published release, not the branch's code, and a tag works only after
+  its npm publish succeeded (until then the step ends with exit 3) — with the pinned peers `puppeteer-core@25.8.0`, `pagedjs@0.4.3`
+  and `pdfjs-dist@6.2.108` (or uses the project's own install), hands it the runner's Chrome with
+  the sandbox on, runs it once over bash-expanded HTML paths, and writes the canonical JSON plus
+  SARIF, JUnit and Markdown rendered from that one report by breaklint's own reporters. The
+  Markdown goes to the step summary. The step ends with breaklint's own exit code; exits 2, 3 and
+  4 always fail it, and only exit 1 can be left ungated (`fail-on-exit: 2,3,4`). The Action's own
+  setup failures use the same table (2 for a bad input, 3 for an install or runner that cannot
+  run the check), and an exit 0 or 1 without its report is treated as 3, because node's crash
+  exit is also 1. Inputs reach the runner as one `toJSON(inputs)` variable and are never pasted
+  into a script; breaklint's output is printed with workflow commands switched off.
+- **`docs/ci-recipe.md`**: a workflow to copy (build, check, keep the reports, upload SARIF from a
+  separate job that alone holds `security-events: write`, skipped for forks), what each exit code
+  does to the job, several documents, pull-request summaries, caching, and what is not covered.
+  The README links it from Usage.
 
 ### Fixed
 
+- **A directory named `*.html` ends with exit 2 before Chrome starts, instead of exit 3.** The
+  input type is decided by the name, so a directory called `chapter.html` passed the extension and
+  existence checks, started Chrome and ended exit 3 `source-acquisition-failed` with "input
+  capture failed: resource byte limit exceeded" — an infrastructure verdict with the wrong cause for
+  a mistake in the invocation, where the README promised exit 2. Anything that is not a regular
+  file is now `breaklint: input is not a regular file: <path>`, exit 2, no report.
+  `tests/e2e/input-validation.test.ts` pins exit 2 and an empty stdout for an existing and a
+  missing `.md`, a directory named `.html` (also after a valid path) and a missing `.html`.
+- **`--help` described exit 4 as including "no input"**; a run without an input path is exit 2.
+  The exit-2 line now names every usage case and says that no report is written.
 - **Margin-box content is no longer part of the flow: not in the snapshot, not in the collector's
   page edges, not in the evidence overlay, not in page anchors.** Paged.js clones every
   `position: running(...)` element into a
@@ -147,9 +205,266 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   blank page a `break-before: recto` inserts — cannot complete required evidence: a page binds only
   on marks it carries, so such a run ends `insufficient-coverage` (exit 4) under evidence binding.
   That was already the behaviour; it was not written down.
+- **`--out-dir <dir>` is documented and tested.** It was parsed, validated and applied — every
+  live run writes its page PNGs and checked PDF there, by default into `./breaklint-report` in the
+  working directory — and appeared in neither `--help`, the README nor `docs/configuration.md`, and
+  no test named it. It is now in all three, `tests/e2e/input-validation.test.ts` pins its exit-2
+  cases, and the live test `tests/live/cli-out-dir.test.ts` observes the evidence in the named and
+  in the default directory (one more live test).
+- The two documented blind spots of the community-intake secret tripwire — candidates shorter
+  than 12 characters, and candidates containing a character outside `A-Z a-z 0-9 + / _ = . : % -`
+  — are pinned on both sides of each boundary by `tests/e2e/community-intake-limits.test.ts`, so a
+  detector change cannot make `docs/community-testing.md` wrong unnoticed.
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as
   `true` does. This was always the behaviour; it is now written down in `docs/limitations.md` and
   pinned by a contract test.
+- **Stale contract statements corrected against the code.** The README said live reports use
+  Report 4 (they use 5; readers accept 4 and 5), that `examples/demo.html` is the document behind the
+  demo snapshot (no such file exists or ever did), that print uses a "verified" A4 layout (what is
+  verified is the technical surface gate; the 0.6.0 human review did not pass) and that a live run
+  needs `puppeteer-core@25.8.x` (the peer range is `>=25.8.0 <26`). `docs/source-bound-findings.md`
+  listed the document report as 4 and the context pack as 1 (5 and 2). `docs/configuration.md` now
+  says that any rule value other than `false` — an options object, even an empty one — enables a
+  rule, and that `strict` also enables `layout/half-empty-page`; `tests/e2e/configuration-doc-claims.test.ts`
+  pins both through the CLI. `docs/limitations.md` described a Paged.js exit 3 for a Markdown file;
+  a non-`.html` name has ended with exit 2 before any renderer since 0.3.1, and Markdown text
+  saved as `.html` is measured as HTML text (with no element in it, the run ends exit 3
+  `geometry-cross-check-failed`).
+- The shipped type declarations called `renderReport`'s input "a Report4" and
+  `Finding.originalSource` "Report4's source/actionability truth"; `renderReport` reads document
+  reports of schema 4 and 5 and screen reports, and `originalSource` has been part of every
+  document report since schema 4. Comment-only; no type changed.
+- **`SECURITY.md`** named 0.2.x as the supported line; only the latest published version receives
+  fixes. It also said the sandbox claim was checked in the test suite, and no test checked it:
+  `tests/unit/sandbox-boundary.test.ts` now pins the one browser launch, read with the TypeScript
+  compiler's parser: an object literal of allow-listed keys (`executablePath`, `headless`,
+  `userDataDir`, `args`, `detached`, `protocolTimeout`, `pipe`, `handleSIGINT`, `handleSIGTERM`,
+  `handleSIGHUP`, `timeout`, `signal`, each with the reason it cannot touch the sandbox), no spread,
+  no computed key and no key twice, with `args` the literal `[]` — and fails if any source, tool,
+  test or workflow file names a sandbox-disabling switch. A launch reached through `.call`,
+  `.apply`, `.bind`, an element access or an alias, and a `.mts` or `.cts` source, are not parsed
+  for their options; the test's header states these limits.
+- **The complete local gate is in `CONTRIBUTING.md`**, where `AGENTS.md` said it was and it was
+  not: the `npm run` steps of `ci.yml` in CI's order, plus the packed-consumer checks.
+  `docs/releasing.md` ran `test:real-document` before the build it needs, left out
+  `make-mark-font --check`, `test:report-surface-mutants`, `docs:rules:check` and the packed
+  consumer, and named 0.6.0 in its procedure; it is now version-neutral and complete.
+  `tests/unit/workflow-gates.test.ts` holds both lists against the workflow. `CONTRIBUTING.md` no
+  longer names schema numbers (it said Report 4 and Snapshot 3).
+- **`docs/agent-contract.md` is now held against the code, and it contradicted it in six places.**
+  It recommended removing `break-inside: avoid` for `layout/unbreakable-block-too-tall`, whose own
+  advice says that clears the finding only by removing the rule's candidate; named an exit-2
+  verdict `usage-error` (it is `usage`, and exit 2 writes no report); explained exit 4 as declined
+  candidates only, with "unmeasured RTL runs" as an example (no rule declines on direction, and
+  exit 4 also ends a run in which no rule measured anything, an empty input or incomplete required
+  evidence); listed the research rules `svg/text-clipped` and `svg/text-ink-collision` among the
+  rules that null `finding.source` (three released rules do); and named a `finding.id` that no
+  finding carries. `tests/unit/agent-contract.test.ts` checks the exit table against
+  `EXIT_CODE_BY_VERDICT`, every rule id against the registry, every `env/` id against `ENV_IDS` and
+  the declaring rule, every field path against a real `--demo --format json` run, and every lever
+  it proposes against the positive levers of that rule's `remediation.advice`; each of the six
+  contradictions, reinserted, fails a named test. A decline list the page attributes to a rule
+  must be that rule's complete coverage-relevant `declines`, so a rule that gains a reason fails
+  the test until the page lists it.
+- **The lever guard now also reads each rule page's Examples.** A lever counts as changed when the
+  remedied example sets it to a new value, adds it or REMOVES it — deleting `break-inside: avoid`
+  is the false repair the guard exists for. The remedied example of
+  `layout/orphaned-continuation-page` changed `font-size`, which its advice does not propose; it now
+  changes a preceding margin and `line-height`. The remedied example of
+  `layout/unbreakable-block-too-tall` still uses `break-inside: auto`; that page is rewritten by
+  another change of this release and is pending in the guard with exactly that one foreign lever,
+  so anything added to the example fails, and the entry fails once it is no longer needed. A
+  sentence proposes a lever clause by clause: "Delete …", "Drop …", "Strip …", "Change … to",
+  "Override …", "Consider removing …", "You should remove …" and "Removing … fixes the finding"
+  propose as "Remove …" does; a warning in one clause no longer exempts the others, a negation
+  voids only when it negates the proposal verb ("does not fit" is not a warning) and then the list
+  it opens, and a word inside a quoted span is not read as grammar. "Removing … fixes the finding"
+  proposes only when nothing in the sentence says the fix is none — never, not, nothing, only
+  because, without, false repair, hiding — and "clears the finding" is not a fix at all, so the
+  false repair `layout/unbreakable-block-too-tall` describes is not read as a lever even without
+  its "also". The reader is a heuristic that errs in both directions; on the advice itself an
+  invented proposal is the silent one, because it widens what the guards accept, and
+  `tests/unit/remediation-levers.test.ts` pins its contract sentence by sentence.
+- **Erratum to 0.6.0.** The 0.6.0 entry that introduced `docs/agent-contract.md` says
+  "`selfcheck:static` reads it, so its claims are held against the code". It did not:
+  `selfcheck:static` scans that file for emoji, first-person wording, marketing words and
+  uniqueness claims only, which is why the contradictions above shipped. The same entry's "five rules set
+  `finding.source` unconditionally to null" counted two research rules.
+- `docs/rules/layout-widow.md` and `layout-orphan.md` replace the warning "Chromium does not honour
+  it under Paged.js" with the measured splits, and the widow page's 6+3 relaxation example now names
+  the declaration that produces it (`widows: 6; orphans: 6`). `docs/rules/layout-hyphen-across-page.md`
+  adds a justified remedied example and a measured limit: Paged.js sets its class only between ASCII
+  word characters or after a soft hyphen, so a split next to a letter such as `ü` is not reported.
+- `docs/agent-contract.md` no longer says Paged.js "does not implement CSS `widows` or `orphans` on
+  paragraphs": the properties take effect through the browser's own fragmentation inside Paged.js's
+  flow, and each is also its rule's threshold, so changing it is not a fix. The comment on the repair
+  map in `src/api/context.ts` said "Chromium does not honour them under Paged.js" and now says the same
+  as the agent contract.
+- `docs/rules/layout-orphan.md` names the measured `orphans` 1 case without an `orphans: 1`
+  declaration, which the guard now reads as a lowering proposal.
+
+### Reporting
+
+- **The context pack's repair option for `layout/unbreakable-block-too-tall` no longer proposes a
+  false repair.** For a finding with a verified original source, `repair.options` in
+  `context.json` and on the HTML bundle's finding card said "Adjust the verified block's break
+  constraint or split its content; expected effect: the block can fit a page fragment". The
+  rule's advice warns that the break constraint is the one lever that clears the finding without
+  making the block fit. It now reads "Shorten the verified block or split its content into smaller
+  sections deliberately; do not only remove its 'break-inside: avoid', which clears the finding
+  without making the block fit; expected effect: the block no longer exceeds the content box of the
+  page it is laid out on." Context pack schema unchanged (2): the field and its type are the same.
+  `tests/unit/registry.test.ts` now checks every entry of that map against the levers its rule's
+  advice proposes.
+
+### Tooling
+
+- **The release workflow names its version once, and CI checks that it is the right one.**
+  `release.yml` carried the release version as a literal 28 times; the literal tag trigger is now
+  the only one in an executable line, and every job derives `RELEASE_VERSION` and `PACKAGE_FILE`
+  from the triggering tag after proving that the tag, the trigger, `package.json` and both root
+  fields of `package-lock.json` agree. `npm run test:release-tag` now also runs
+  `tests/tools/release-workflow-contract.mjs --check` on every CI run, so the 0.6.0 incident — a
+  version bump whose tag started nothing because the trigger still named the previous release —
+  fails on the pull request that causes it. The derive step must always run and must invoke the
+  script: no `if:`, no `continue-on-error:`, and exactly `run: node
+  tests/tools/release-workflow-contract.mjs --derive-env`. Its `--self-test` rejects a pin moved
+  alone, a version moved alone, a lock moved alone, a wildcard, a leftover release literal, a job
+  that reads the identity without deriving it and four ways of disarming the derive step, and
+  accepts a coherent release-prep commit. Run against the tree
+  of that incident (the parent of 9d53577) it reports "a push of v0.6.0 would start nothing".
+- **The changelog is checked against git, in three states.** `tests/tools/changelog-contract.mjs`,
+  also in `npm run test:release-tag`: after a release, any change under `src/` since the last tag
+  requires a non-empty `## Unreleased` section that names every changed rule id; while a release is
+  prepared, the version's heading must carry a date or exactly `TBD-at-tag`, and no
+  `## Unreleased` section or "(unreleased)" status line may remain; at the tag commit, which the
+  release workflow checks before packing anything, only a date is accepted, and a placeholder that
+  reached the tag fails with the instruction to date it in a final commit and tag that commit. The
+  tag commit of 0.6.0 shipped `## 0.6.0 — unreleased` in the published tarball, and the two
+  post-tag rule changes above had no section to go into; run against those two commits the check
+  fails on exactly those points. Without release tags, or in a shallow clone whose history is cut
+  above them, it fails instead of passing. A rule id counts as named only as a whole token
+  (`layout/orphan` is not named by `layout/orphaned-continuation-page`), a moved rule module must
+  name its old id too, and a heading date must exist (2026-02-30 is refused). Its `--self-test`
+  builds throwaway repositories for 23 states, including a shallow clone, a `TBD-at-tag` heading
+  before the tag (accepted) and at the tag (rejected).
+- **The README that ships is checked against the CLI that ships.** The published 0.6.0 README says
+  "one of its seven findings" and `rules run: 13`; `npx breaklint --demo` from the same tarball
+  prints five findings and `rules run: 12`. The only guard read the repository README and ran the
+  source CLI. Its parser now lives in `tests/tools/readme-demo-contract.mjs`, shared by the unit
+  test and by the packed-consumer steps of `ci.yml` (Node 24 and the Node 22.13 floor) and
+  `release.yml` (both clean consumers and the registry readback), which run it over
+  `node_modules/breaklint/README.md` and the installed `bin` in a child process. Each run also
+  rejects three corrupted copies of that README against the same output. Installed from the
+  registry, 0.6.0 fails it on all three counts it states.
+- **The pagination-residue record is no longer a CI or release step.** Its binding has been
+  historical since 2026-09-18 — five of the six private documents no longer exist at their
+  recorded digests — so `npm run test:pagination-residue` printed `NO CLAIM` and exited 0 having
+  read none of them, with or without an artifact root; the only thing the step could fail on was
+  its own manifest. A step that exits 0 over zero documents is a green light over nothing, so it
+  was retired from `ci.yml` and `release.yml`, and `tests/unit/workflow-gates.test.ts` fails if it
+  returns while the script reads nothing. The script stays as a local check of the record. The
+  class remains held in CI by the public `tests/fixtures/fragmentainer-residue.html` in the live
+  suite. `docs/releasing.md`, `docs/limitations.md`, `docs/status.md` and the corpus README said
+  the step printed `SKIPPED` and could be run in full before a release; neither was true.
+- **Schema stamps in the shipped documents are checked against the built package.**
+  `tests/unit/docs-truth.test.ts` compiles `dist/` into a staging package and reads the stamps by
+  running it (`tests/tools/docs-truth.mjs`): the report stamp from its CLI's `--demo --format json`,
+  the context-pack and comparison stamps from its public API, the readable set and the snapshot
+  stamp from its enums. Every "Report N", "report schema N", "Snapshot N", "context pack N" and
+  contract-table row in README, SECURITY.md, `docs/**` and CONTRIBUTING.md must equal them unless
+  that mention is stated as history within its own sentence — an arrow on it, a released version
+  joined to it by "from"/"until"/"since"/"before", by "in" plus a transition verb, or by a
+  transition verb between the version and the mention, "legacy" directly before it, or the exact
+  readable set. A version elsewhere in the paragraph, a common word such as "was" or "from the",
+  "legacy" elsewhere in the sentence or an arrow elsewhere in a table row does not count. Against
+  the documents of the previous commit it names every stale line the README, CONTRIBUTING.md,
+  `docs/source-bound-findings.md`, `docs/status.md` and `docs/configuration.md` carried; four
+  genuinely historical sentences in `docs/releasing.md` and `docs/status.md` now name their release.
+  Two lines in `docs/reporting.md` are listed in `tests/tools/docs-truth-pending.jsonl` for the
+  change that owns that page; each entry matches exactly one issue by file, kind, number and exact
+  sentence, so a copy of the sentence or a stale claim added to it fails, and an entry that
+  matches nothing fails. The same check runs in `ci.yml`'s packed clean-install step against the
+  installed `node_modules/breaklint` — the README and docs a user installs, and the stamps of the
+  code installed with them. In the release workflow it runs with `--release`, which refuses any
+  pending entry: a tag must not ship a sentence the check knows is stale, so a non-empty pending
+  list stops the release before anything is published and names the sentences to correct. A run
+  that finds no document to read fails instead of passing. The four tools this change adds to the workflows —
+  `docs-truth.mjs`, `changelog-contract.mjs`, `release-workflow-contract.mjs` and
+  `readme-demo-contract.mjs` — refuse any argument they do not know with exit 2, so a misspelt
+  `--release=no` or `--Release` cannot quietly run pull-request mode at a tag.
+- **`npm run docs:rules:check` is a CI step.** `AGENTS.md` says generated artifacts are checked
+  with their generator; the rule-page remediation blocks written by `tools/write-rule-docs.ts`
+  were checked in CI only by a unit test that re-derives the same assertion, and the generator's
+  own `--check` ran in no workflow. The release workflow runs it too, and its clean consumers and
+  registry readback run the docs-truth check against the installed package; `docs/releasing.md`
+  says the release workflow repeats the complete gate, and `tests/unit/workflow-gates.test.ts` now
+  fails when `release.yml` leaves out any `npm run` gate step `ci.yml` runs, and when a
+  packed-consumer job of either workflow stops running the README-demo or the docs-truth check
+  (in `release.yml`, with exactly `--release`) in a way whose exit code reaches the job: invoked by
+  `node` itself, nothing chained or piped after it, errexit on, and neither the step nor the job
+  conditional or allowed to fail. The local gate lists
+  in `CONTRIBUTING.md` and `docs/releasing.md` follow, and the same test keeps them equal to
+  `ci.yml`.
+- **A live suite asks the browser what the advice claims.** `tests/live/fragmentation-levers.test.ts`
+  (6 tests, registered in `tests/tools/live-run.mjs`) renders two
+  self-authored fixtures through the production chain and pins, per case, the widows/orphans split
+  and whether Paged.js marks a soft-hyphen split. The literals live in
+  `tests/fixtures/fragmentation-levers.ts` and were recorded on Chromium 141; CI on the supported
+  Chrome is the authority. The suite fails in both directions — a browser that stops applying a
+  property, or applies it differently from what the published text says — and a red run lists the
+  advice and page sentences the pin decides.
+- **The registry guard that banned `widows`/`orphans` from all advice is now an allow-list derived
+  from that pin.** It reads every rule's advice, summary and finding messages (sampled from the
+  corpus fixtures, numbers normalised), every rule page outside its generated block, README.md,
+  every `docs/*.md` page, and the comments of `src/api/context.ts`. The complete `layout/widow` and
+  `layout/orphan` advice texts must equal their approved texts exactly. Every other unit that names
+  `widows` or `orphans` (also spelled `widow-control`, "widow/orphan", "widow and orphan") must equal
+  one of the reviewed units in `APPROVED_FRAGMENTATION_TEXTS`, at the place it is approved for: a whole
+  advice, summary or message, otherwise a paragraph, heading, table row or list item — so a sentence
+  added to such a paragraph fails even if it does not name a property. A unit asserting that the
+  browser applies a property, including the measured 6+3 relaxation, is approved only while the pin
+  shows that; an approval for text that is no longer published also fails. Two checks hold even for
+  an approved unit, and also run on fenced code, HTML comments and inline `style=` attributes: in every
+  pin state, no proposal to lower an author's own value (a lowering verb or comparative such as lower,
+  smaller, reduce, decrease, remove, reset, drop or unset near the property, or a 0/1, `initial`,
+  `unset` or `revert` value given to it by `:`, `=`, `to`, `of` or "value of"); and, while the pin
+  says a property is not applied, no proposal to set or raise it, including any numeric value. A
+  numeric value above 1 is not treated as lowering, because it is how a measured case is named. Not
+  covered: a paragraph that neither names a property nor belongs to a pinned advice text. Two review
+  rounds walked around earlier versions of this guard with 22 phrasings; all of them, and more controls
+  per check, are kept in the unit suite. Each text the pin decides is also checked to be present and
+  to agree with the pin.
+- **`remediation.interactions` is validated.** A lever is one of `INTERACTION_LEVERS` (`hyphens`,
+  `soft-hyphen`). `defineRule` refuses a malformed declaration (self reference, unknown relation,
+  lever or scope, an advice that does not name its partner or never mentions the lever); the registry test
+  runs `interactionProblems` over all rules and refuses a pair declared on one side only or with
+  both sides the same. `npm run docs:rules:write` renders a generated "Precedence" line into both
+  rule pages from the field, and `docs:rules:check` keeps it current. A docs check refuses any advice
+  or rule page that names block-level `hyphens: none` for justified text.
+- **SARIF output is validated against the SARIF 2.1.0 JSON schema.** The schema is vendored,
+  test-only, from `microsoft/sarif-sdk` (MIT) under `tests/fixtures/sarif-schema/`, with its
+  source commit, licence and sha256 recorded; the one normative OASIS errata01 constraint that copy
+  lacks (a region needs `startLine`, `charOffset` or `byteOffset`) is restored in memory by the
+  checker. `--demo --format sarif`, every canonical report state and a report with physical
+  locations validate; fifteen single-fault corruptions are rejected. JUnit gets an XSD-free
+  structural check (failure counts equal the `<failure>` elements) and Markdown a verdict-line
+  check, each with negative controls. breaklint's SARIF needed no change.
+- **A new `action` job in `ci.yml`** runs the Action with `uses: ./` against the tarball the same
+  commit packs, with real Chrome, in seven arms: clean (passes), a gating finding over two
+  documents from one glob (fails), exit 1 left ungated (passes), a font that fails to load (exit 3,
+  fails), a missing path plus a shell-substitution canary (exit 2, fails, nothing executed), the
+  paths `--fail-on` and `never` (exit 2; without the dash guard they would become the option
+  `--fail-on never` and the arm would end clean with exit 0) and a `fail-on-exit` that would let
+  exit 4 pass (refused, exit 2). `continue-on-error` keeps the failing arms from ending
+  the job, and `tests/tools/action-selftest.mjs` then asserts every arm's recorded outcome, exit
+  code and verdict and validates the SARIF, JUnit and Markdown it wrote. An optional
+  `action-code-scanning` job uploads the findings arm's SARIF only when the repository variable
+  `BREAKLINT_ACTION_UPLOAD_SARIF` is `true`, and never for a fork's pull request. The one
+  internal module the Action depends on, `dist/report/index.js` (not a public export; the package's
+  `exports` map is unchanged), is also held locally: a unit test builds `src/` the way
+  `npm run build` does and loads it through the runner's own loader. No `npm run` step was added,
+  so the local gate lists are unchanged.
 
 ## 0.6.0 — 2026-09-18
 

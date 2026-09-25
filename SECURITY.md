@@ -22,8 +22,12 @@ intended:
 
 - **A fresh browser profile per run**, created with `mkdtemp` and removed afterwards. A run that
   cannot verify its own cleanup fails rather than reporting success.
-- **The browser sandbox stays on.** There is no `--no-sandbox` anywhere in this repository and no
-  flag that turns it off.
+- **The browser sandbox stays on.** The one browser launch in `src/acquire/browser.ts` passes no
+  switch at all (`args: []`), no code path, tool, test or workflow passes `--no-sandbox` or any
+  other sandbox-disabling switch, and there is no flag that turns the sandbox off.
+  `tests/unit/sandbox-boundary.test.ts` holds both: it reads that launch call with the TypeScript
+  parser and allows only named options that cannot touch the sandbox, with `args: []`, and it scans
+  `src/`, `tools/`, `tests/` and the workflows for the switches.
 - **The network is blocked by default.** Request interception is on, the default policy is
   `offline`, and only the tool's own loopback origin plus `data:`, `blob:` and `about:` are let
   through. `--allow-network <origin>` opens exactly one origin per use and nothing else.
@@ -74,10 +78,12 @@ uncalibrated and says so; a false positive is a bug, not a vulnerability.
 
 ## Supported versions
 
-The latest published version on npm receives fixes. The 0.2.x line is the supported line, and each
-published patch supersedes earlier 0.2.x packages. `breaklint@0.2.0` opened that line on 2026-08-22
-with npm provenance; the 0.1.x line receives no separate long-term-support branch. The npm package
-page remains the authority on which patch is actually published.
+Only the latest version published on npm receives fixes; a fix ships as a new version, and no
+older line has a long-term-support branch. The package is pre-1.0, so a fix can arrive in a new
+minor version rather than a patch. Every published version carries npm provenance (checked on
+2026-09-24 with `npm view breaklint@<version> dist.attestations` for 0.1.0 through 0.6.0). The npm
+package page, or `npm view breaklint dist-tags.latest`, is the authority on which version is
+currently the latest.
 
 
 ## Host-provided sources and pages
