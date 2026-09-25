@@ -86,6 +86,58 @@ Each file binds its document by `sha256` and carries:
 No entry carries a dependency marker of its own. The semantics every entry assumes are stated once,
 in the next section.
 
+## Field list
+
+This list is closed: an expected file contains exactly these keys, and a gate fails a file with a key
+it does not name, at every level listed here. **N** marks a key the gate interprets (normative);
+**I** marks one it only checks for presence and type (informational). A value marked *opaque* is
+informational JSON whose inner keys are not constrained and never read by a gate.
+
+Top level (all keys required):
+
+| key | | type and meaning |
+|---|---|---|
+| `schemaVersion` | N | `"selfauthored-expected-v1"` |
+| `documentId` | N | the document id, equal to `manifest.json` `documents[].id` |
+| `artifact` | N | path of the document, relative to this directory |
+| `sha256`, `byteLength` | N | the document's bytes; must match the artifact |
+| `authoredOn` | I | date the truth was first written |
+| `provenanceClass` | I | `"synthetic_first_party"` |
+| `calibrationEvidenceEligible` | I | `false` |
+| `title`, `genre`, `fontDependence` | I | strings |
+| `language` | I | `{htmlLang: string or null, typeRulesUnderDefaultLocale: string}` |
+| `paper` | I | array of `{pageRule, size, orientation, pageBoxCssPx, margins, contentBoxCssPx}` with optional `selector` (what selects a named page), `observed` (what the renderer did) and `note` |
+| `profile` | N | `"default"` |
+| `pages` | N | object: `range` (N: `[lo, hi]`, both ends included), `measured` (I: the probe's page count), `basis` (I) |
+| `expectedExit` | N | object: `set` (N: exit codes), `derivation` (I), `byCode` (I: map from exit code, as a string, to an explanation), `environmentNote` (I) |
+| `features`, `notes` | I | arrays of strings |
+| `runningElements` | I | array of `{id, marginBox, marginBoxCopies, pages}` with optional `zeroSizeCopyPages` and `zeroSizeCopyNote` |
+| `constructionFacts` | I | array of `{fact}` with optional `arithmetic` (string) and `measured` (opaque) |
+| `rules` | N | exactly the thirteen registered rule ids; each `{mustFire, mustNotFire, allowed, expectedDeclines}` (N, arrays) with optional `notes` (I, array of strings) |
+| `permittedDeclineReasons` | N | reasons a decline row of any rule of this document may carry |
+| `notActiveInDefaultProfile` | N | rule ids that must produce no finding |
+| `verification` | I | object: `method`, `browser`, `pagedjs`, `measuredOn`, `pageCount`, `pageCountByFontStack` (map from stack label to page count), `pdfPageCount`, `contentBoxHeightsPx`, `platformFonts` (opaque), `overflowColumnResidue` (array of `{page, kind, tag, id, cls, text, left, width, height}`), `fontStacks` (`{reference, dejavu, free}`) |
+
+Entries. Required: `target` and `why` in `mustFire`, `mustNotFire` and `allowed`, and `class` in
+`allowed`; `target`, `reason` and `required` in `expectedDeclines`, and `count` when `required` is
+true. Every other key is optional:
+
+| list | N keys | I keys |
+|---|---|---|
+| `mustFire` | `target` | `why` (required), `occurrences` (planted instances in the target), `text` (the planted text), `construction`, `measured` (opaque), `docsBasis`, `observed` (renderer behaviour the entry rests on), `underContentExtentLowerBound` (why the entry holds under the WP-F3 bound) |
+| `mustNotFire` | `target` | `why` (required), `docsBasis`, `measured` (opaque), `construction` |
+| `allowed` | `target`, `class` (`font-dependent`, `documented-gap`, `heuristic-boundary`, `docs-silent`) | `why` (required), `constructionTruth` (`"defect"`, with `documented-gap`), `text`, `construction`, `measured` (opaque), `docsBasis` |
+| `expectedDeclines` | `target`, `reason`, `required`, `count` (required when `required` is true), `measuredAlternative`, `ifMeasured`, `perText` | `countsTowardCoverage`, `why`, `docsBasis`, `future`, `measured` (opaque) |
+
+`perText[]` (only with `measuredAlternative`): `id` and `ifMeasured` (N); `why`, `strokeWidthPx` and
+the opaque `cellInsetsPx`, `fillInkInsetsPx` and `paintedInkInsetsPx` (I).
+
+Targets use only the keys of the Targets table, in one of these shapes: `{id}`, `{ids}`, `{selector}`,
+`{selectors}`, `{within}`, `{document}` or `{document, except}`, `{svg, id}`, `{svg, texts}`,
+`{svg, use}`, `{uri, id}`, `{pageOf}`, `{pages}`. `uri` is `{attribute, value}`; `pageOf` is
+`{id, fragment, resolvedPages, resolvedPagesByFontStack}` (the last one I, a map from stack label to
+pages); every `except` item is `{id}`.
+
 ## Release semantics
 
 > Expectations follow the documented semantics of the breaklint release that admits this corpus (0.7.0): e.g. content in Paged.js margin boxes (running()/fixed copies) is not in the flow and is not measured by block, line or page rules (docs/limitations.md, the 'Margin-box content.' bullet; the type rules still read a running element's source text once, and SVG in a margin box is still collected); layout/orphaned-continuation-page judges a page only where its content ends; layout/unbreakable-block-too-tall correlates fragments by flow membership, not coordinates.
@@ -128,10 +180,18 @@ For tracing only (a gate does not read this list):
 | `{"within": X}` | any finding whose source lies within the span of element X, inclusive: X itself is included |
 | `{"document": true}` | every finding of that rule in the document, including findings whose `source` is null. `except` (a list of targets) carves findings out of it: the entry matches every such finding that matches none of the `except` targets. `except` is used only on `document` targets |
 | `{"svg": X, "texts": [...]}` | a finding whose source lies within the span of one of the listed `<text>` elements (each has X as its nearest `<svg>`) |
+| `{"svg": X, "id": T}` | a finding whose source lies within the span of the `<text>` element T. X is T's nearest `<svg>` ancestor; that holds in every such target (the eight SVG `mustFire` entries), and a gate that finds otherwise fails the entry. The same holds for every id in `texts` |
 | `{"svg": X, "use": U}` | a finding whose source lies within the span of the `<text>` element that the `<use>` element U references (sa08: `#en-unit` references `#en-unit-def`) |
 | `{"uri": {"attribute": A, "value": V}}` | an `artifact/local-uri` finding for that attribute and raw (authored) value, matched through its message (below) |
 | `{"pageOf": {"id": X, "fragment": F, "resolvedPages": [...], "resolvedPagesByFontStack": {...}}}` | a finding whose `page` is in `resolvedPages` |
 | `{"pages": "any page not named in mustNotFire"}` | a finding whose `page` is in none of the `resolvedPages` of the rule's `mustNotFire` `pageOf` targets (a page-level allowance) |
+
+Identity. Every id a target names (`id`, `ids`, `within`, `svg`, `texts`, `use`, `pageOf.id`, the ids in
+`except`) occurs exactly once in its document; a target whose id occurs twice, or not at all, fails
+its entry. Within one list of one rule no target repeats (targets compared as canonical JSON; in
+`expectedDeclines` the target together with `reason`). Across the lists of one rule, `mustFire`,
+`mustNotFire` and `allowed` share no target; a target of `mustFire` or `allowed` may also appear in
+`expectedDeclines`, where it says the block may be declined instead.
 
 Combination. All keys of one target combine with AND: `{"uri": ..., "id": X}` is that attribute
 of that element. A list-valued key (`ids`, `selectors`, `texts`, `except`) matches when any of its
@@ -148,11 +208,15 @@ end.
 
 `artifact/local-uri`. Its findings carry `source: null` (`src/rules/artifact/local-uri.ts`); the only
 handle is `Finding.message`, which contains `attribute="rawValue"` with the attribute's local name as
-the HTML parser reports it, so `xlink:href` appears as `href`. A `uri` target matches a finding whose
+the HTML parser reports it, so `xlink:href` appears as `href`. "Raw" means the attribute value as the
+HTML parser returns it: character references decoded, nothing else changed (no trimming, no URL
+resolution, no normalisation). No URI-bearing attribute in the corpus contains a character reference,
+so the decoded and the authored bytes are the same. A `uri` target matches a finding whose
 message contains the exact string `L="V"`, where `L` is the local name of `uri.attribute` (sa19's
 `xlink:href` is compared as `href`) and `V` is `uri.value`. An `id` target matches a finding whose
-message contains `L="V"` for a URI-bearing attribute (`href`, `src`, each `srcset` candidate,
-`poster`, `data`, `xlink:href`) of X or of one of its descendants. An element without any such
+message contains `L="V"` for a URI-bearing attribute (`href`, `src`, `poster`, `data`, `xlink:href`)
+of X or of one of its descendants. `srcset` is out of scope: no document has a `srcset` (nor a
+`poster` or `data`) attribute, so no target names one; a gate may reject such a target. An element without any such
 attribute (sa06 `#p-6-2`, sa15 `#gpx-pfad`) can never be matched, and its `why` says so. Where a
 target has both `uri` and `id`, the pair is an attribute of X; that holds in every such target. In
 every document each local URI value occurs exactly once and no attribute and value pair repeats, so
@@ -183,6 +247,20 @@ therefore checked by count, per rule and reason, never per target:
 - A decline with `required: false` is checked only against `permittedDeclineReasons`; its `count`
   is the construction's expectation and is informational.
 
+Evidence-level declines. Rows with `ruleId: null` are outside this corpus's closed world. The
+build writes two of them, both from the evidence overlay (`src/render/evidence.ts`):
+`env/evidence-fragment-outside-page` (scope `page`: a mark for a block whose fragment lies outside the
+page, so evidence cannot bind it there) and `env/evidence-overlay-removed` (scope `document`: the
+overlay was installed but binding was not possible). They say whether the evidence overlay could be
+bound to the rendered PDF, which depends on the rasteriser, the evidence options and the environment,
+not on what a rule measured in the document's construction. The construction probe does not model
+evidence binding, so the corpus holds no truth about them and lists none. A gate therefore leaves
+rows with `ruleId: null` out of every per-rule check (the counts above and `permittedDeclineReasons`),
+but it fails a row with `ruleId: null` whose reason is not one of those two, or whose scope is not
+`page` or `document`. Their effect on the exit is not exempt: the exit must still be in
+`expectedExit.set` (`expectedExit.environmentNote` names the one environment outcome,
+`evidence/required-page-binding-incomplete`).
+
 Invariant, true in every expected file: for one rule and reason the entries are either all
 `required: true` or all `required: false`, and either all `measuredAlternative` or none; every
 `measuredAlternative` entry's `count` equals the number of its targets. No rule and reason mixes
@@ -195,8 +273,8 @@ This is the only gate procedure. `manifest.json` `gate.steps` repeats these five
 1. Read `manifest.json` and verify the SHA-256 and byte length of every file in `files`. Zero documents read is a failure, never a skip.
 2. Run each document in its own invocation under the default profile and read the canonical JSON report. The document's exit is that invocation's exit code, and its exit reason is `documents[0].exitReason`.
 3. If the document ended in exit 3, pass only if 3 is in `expectedExit.set` and the exit reason is `render-unstable`. A render-unstable run withholds its findings and reports no pages by design (`docs/limitations.md`), so the page and rule checks are skipped for that document. Any other exit 3 fails.
-4. Otherwise the exit code must be in `expectedExit.set` and the report's `pages` must lie in `pages.range`.
-5. Then, per rule: every `mustFire` entry is matched by at least one finding; no finding matches a `mustNotFire` target; every finding is matched by a `mustFire` or `allowed` entry of its rule, or is on a measured target whose `ifMeasured` is `mustFire` (closed world); the decline counts hold as the paragraph 'Declines' under 'Targets' defines, and a measured target with `ifMeasured: mustNotFire` has no finding; no decline carries a reason outside `permittedDeclineReasons`. `layout/half-empty-page` is not active in the default profile, so any finding of it fails.
+4. Otherwise the exit code must be in `expectedExit.set` and the report's `pages` must lie in `pages.range`, both ends included.
+5. Then, per rule: every `mustFire` entry is matched by at least one finding; no finding matches a `mustNotFire` target; every finding is matched by a `mustFire` or `allowed` entry of its rule, or is on a measured target whose `ifMeasured` is `mustFire` (closed world); the decline counts hold as the paragraph 'Declines' under 'Targets' defines, and a measured target with `ifMeasured: mustNotFire` has no finding; no decline row of that rule carries a reason outside `permittedDeclineReasons` (rows with `ruleId: null` follow the paragraph 'Evidence-level declines'). `layout/half-empty-page` is not active in the default profile, so any finding of it fails.
 
 The expected exits are derived from the documented exit semantics only: an error finding is 1;
 insufficient coverage (4) outranks findings; a table left in the paginator's overflow column is 3.
@@ -226,7 +304,8 @@ fact or an expectation turns out to be wrong, add a dated entry to `manifest.jso
 edits the expected file, and change the document's bytes only together with a new hash and a new
 entry. Errata E1 to E15 (2026-09-24), E16 to E26 and E27 to E35 (2026-09-25) came from three independent
 reviews before any breaklint run; E16 also applies an orchestrator decision, and E26 was found by
-the author during the second round.
+the author during the second round. E36 to E40 (2026-09-25) are rulings on the gate author's
+specification questions; they change no truth value.
 
 ## Reproducing the construction measurements
 

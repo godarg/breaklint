@@ -21,8 +21,8 @@
       "Read `manifest.json` and verify the SHA-256 and byte length of every file in `files`. Zero documents read is a failure, never a skip.",
       "Run each document in its own invocation under the default profile and read the canonical JSON report. The document's exit is that invocation's exit code, and its exit reason is `documents[0].exitReason`.",
       "If the document ended in exit 3, pass only if 3 is in `expectedExit.set` and the exit reason is `render-unstable`. A render-unstable run withholds its findings and reports no pages by design (`docs/limitations.md`), so the page and rule checks are skipped for that document. Any other exit 3 fails.",
-      "Otherwise the exit code must be in `expectedExit.set` and the report's `pages` must lie in `pages.range`.",
-      "Then, per rule: every `mustFire` entry is matched by at least one finding; no finding matches a `mustNotFire` target; every finding is matched by a `mustFire` or `allowed` entry of its rule, or is on a measured target whose `ifMeasured` is `mustFire` (closed world); the decline counts hold as the paragraph 'Declines' under 'Targets' defines, and a measured target with `ifMeasured: mustNotFire` has no finding; no decline carries a reason outside `permittedDeclineReasons`. `layout/half-empty-page` is not active in the default profile, so any finding of it fails."
+      "Otherwise the exit code must be in `expectedExit.set` and the report's `pages` must lie in `pages.range`, both ends included.",
+      "Then, per rule: every `mustFire` entry is matched by at least one finding; no finding matches a `mustNotFire` target; every finding is matched by a `mustFire` or `allowed` entry of its rule, or is on a measured target whose `ifMeasured` is `mustFire` (closed world); the decline counts hold as the paragraph 'Declines' under 'Targets' defines, and a measured target with `ifMeasured: mustNotFire` has no finding; no decline row of that rule carries a reason outside `permittedDeclineReasons` (rows with `ruleId: null` follow the paragraph 'Evidence-level declines'). `layout/half-empty-page` is not active in the default profile, so any finding of it fails."
     ]
   },
   "documentCount": 20,
@@ -1993,8 +1993,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "63f6e6fd604840ff4725af385769772c14625185dafff1d960a1e7435be77324",
-      "byteLength": 20835
+      "sha256": "e617311db080423ed8c80fcbfa4c52515de3cc28387d2630d7dfa696d312a603",
+      "byteLength": 27835
     },
     {
       "path": "PROVENANCE.md",
@@ -2642,6 +2642,53 @@
       "date": "2026-09-25",
       "review": "final pre-run review of 9f55ead",
       "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E36",
+      "question": "Q1",
+      "documents": [],
+      "what": "README Targets table defines {\"svg\": X, \"id\": T}, used by the eight SVG mustFire entries: a finding matches when its source lies within the span of the <text> element T, and X is T's nearest <svg> ancestor. The gate's reading is confirmed: AND, with matching by T's span. Checked on the static HTML for all 422 text and <use> ids in svg targets: each has the named svg as its nearest <svg> ancestor (the nested viewport of sa17 included). A gate that finds otherwise fails the entry. No expected file and no document changed; no truth value changed.",
+      "why": "The shape was used but not defined.",
+      "date": "2026-09-25",
+      "source": "gate author's specification questions (WP-K2), ruled from the specification's intent (no breaklint output seen)"
+    },
+    {
+      "id": "E37",
+      "question": "Q2",
+      "documents": [],
+      "what": "README paragraph 'Evidence-level declines': notMeasured rows with ruleId null are outside the corpus's closed world. The build emits two such reasons (src/render/evidence.ts): env/evidence-fragment-outside-page (scope page) and env/evidence-overlay-removed (scope document). A gate leaves these rows out of every per-rule check (the decline counts and permittedDeclineReasons). It fails a ruleId-null row with any other reason or scope. The exit check is not exempt. Gate step 5 (and so manifest.json gate.steps) now limits the permittedDeclineReasons check to the rule's own rows. No expected file and no document changed; no truth value changed.",
+      "why": "These rows say whether the evidence overlay could be bound to the rendered PDF, which depends on the rasteriser, the evidence options and the environment, not on what a rule measured in the construction. The construction probe does not model evidence binding, so the corpus has no truth to state about them. Step 5's wording would have failed every document in CI, where evidence binding is on.",
+      "previous": "step 5: 'no decline carries a reason outside permittedDeclineReasons'",
+      "date": "2026-09-25",
+      "source": "gate author's specification questions (WP-K2), ruled from the specification's intent (no breaklint output seen)"
+    },
+    {
+      "id": "E38",
+      "question": "Q3",
+      "documents": [],
+      "what": "README section 'Field list': a closed list of keys for every level of an expected file (top level, language, paper, pages, expectedExit, runningElements, constructionFacts, rules, the four entry lists, perText, targets and their shapes, uri, pageOf, except, verification and its sub-objects). Each key is marked normative (interpreted by a gate) or informational (presence and type only); measured, platformFonts and the inset objects are declared opaque. The previously unnamed informational keys (construction, text, observed, future, underContentExtentLowerBound, the verification sub-keys) are now listed with their meaning. The generator asserts the same list over all twenty files. No expected file and no document changed; no truth value changed.",
+      "why": "Without a closed list, the gate's 'unknown field fails' rested on the frozen files rather than on the specification.",
+      "date": "2026-09-25",
+      "source": "gate author's specification questions (WP-K2), ruled from the specification's intent (no breaklint output seen)"
+    },
+    {
+      "id": "E39",
+      "question": "Q4",
+      "documents": [],
+      "what": "README: the value compared by a uri or id target of artifact/local-uri is the attribute value as the HTML parser returns it, with character references decoded and nothing else changed (no trimming, resolution or normalisation). No URI-bearing attribute in the corpus contains a character reference, so decoded and authored bytes coincide. srcset is out of scope: no document has a srcset, poster or data attribute, no target names one, and the id-target attribute list no longer mentions srcset candidates. No expected file and no document changed; no truth value changed.",
+      "why": "'Raw (authored)' was ambiguous against a parser that decodes entities, and the message form of a srcset candidate was undefined.",
+      "previous": "'raw (authored) value'; id targets listed 'each srcset candidate'",
+      "date": "2026-09-25",
+      "source": "gate author's specification questions (WP-K2), ruled from the specification's intent (no breaklint output seen)"
+    },
+    {
+      "id": "E40",
+      "question": "Q5",
+      "documents": [],
+      "what": "README confirms three points and states them normatively. pages.range is inclusive at both ends (gate step 4 and the Field list). Every id a target names occurs exactly once in its document, and a target naming a duplicated or missing id fails its entry (checked: no document has a duplicate id; every targeted id exists). E17's rule applies per list: within one list of one rule no target repeats (in expectedDeclines, target together with reason). Across one rule's lists, mustFire, mustNotFire and allowed share no target (checked), and a mustFire or allowed target may also appear in expectedDeclines. No expected file and no document changed; no truth value changed.",
+      "why": "The gate author had assumed these; the README did not state them.",
+      "date": "2026-09-25",
+      "source": "gate author's specification questions (WP-K2), ruled from the specification's intent (no breaklint output seen)"
     }
   ]
 }
