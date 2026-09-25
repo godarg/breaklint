@@ -386,6 +386,18 @@ function committedLedger(): ReviewLedger {
   return JSON.parse(readFileSync(new URL("../golden/report-surfaces/review-ledger.json", import.meta.url), "utf8")) as ReviewLedger;
 }
 
+/**
+ * The two historical records every synthetic fixture below builds on. The committed ledger grows a
+ * real round at each release review, so a fixture that appended to "whatever is committed" would
+ * change meaning with every release; its first two rounds never change.
+ */
+function historicalLedger(): ReviewLedger {
+  const ledger = committedLedger();
+  ledger.rounds = ledger.rounds.slice(0, 2);
+  assert.deepEqual(ledger.rounds.map((round) => [round.round, round.record]), [[1, "historical"], [2, "historical-reconstruction"]]);
+  return ledger;
+}
+
 /** A complete, current-shape manifest and a round bound to it: the positive control for the gate. */
 function boundPassingFixture(): { ledger: ReviewLedger; manifest: Record<string, unknown>; fingerprint: string } {
   const fingerprint = "a".repeat(64);
@@ -426,7 +438,7 @@ function boundPassingFixture(): { ledger: ReviewLedger; manifest: Record<string,
   }
   const physicalArtifacts = { screens: 24, pdfs: 4, rasterPages: 8 };
   const manifest = { reviewEnvironment, observedEnvironment: { platformRelease: "6.18.44", node: "v24.21.0" }, artifacts, physicalArtifacts };
-  const ledger = committedLedger();
+  const ledger = historicalLedger();
   const round: ReviewRound = {
     round: ledger.rounds.length + 1,
     record: "current",
@@ -461,8 +473,8 @@ describe("report-surface human review gate", () => {
     assert.ok(BROWSER_VERSION_PATTERN.unicode, "the pattern is a unicode regular expression");
   });
 
-  it("records the 2026-09-18 FAIL as a structural round, and the strict local gate stays red on it", () => {
-    const ledger = committedLedger();
+  it("records the 2026-09-18 FAIL as a structural round, and the strict local gate is red on a ledger that ends there", () => {
+    const ledger = historicalLedger();
     const { rounds, latest } = validateReviewLedger(ledger);
     assert.equal(rounds, 2);
     assert.equal(ledger.rounds[0]!.outcome, "pass", "the 0.2.3 review stays on record as the pass it was");
@@ -474,9 +486,23 @@ describe("report-surface human review gate", () => {
     assert.ok(latest.reviewers.every((reviewer) => reviewer.kind === "not-recorded" && reviewer.handle === null),
       "the public record names no reviewer handle, so the ledger names none");
     const { manifest, fingerprint } = boundPassingFixture();
-    assert.throws(() => assessHumanGate(committedLedger(), manifest, fingerprint), /latest review round 2 is FAIL \(2026-09-18/u);
-    assert.match(describeLatestRound(committedLedger(), manifest, fingerprint),
+    assert.throws(() => assessHumanGate(historicalLedger(), manifest, fingerprint), /latest review round 2 is FAIL \(2026-09-18/u);
+    assert.match(describeLatestRound(historicalLedger(), manifest, fingerprint),
       /reviewers: not recorded, not recorded; cells passed by a rostered human: 0 of 0 passing\); bound to the current render: inputs no; environment\/artifacts no$/u);
+  });
+
+  it("records the 0.7.0 release review as a current human pass of all 32 cells", () => {
+    const ledger = committedLedger();
+    const { rounds, latest } = validateReviewLedger(ledger);
+    assert.equal(rounds, 3);
+    assert.equal(latest.round, 3);
+    assert.equal(latest.outcome, "pass");
+    assert.equal(latest.record, "current");
+    assert.deepEqual(latest.reviewers, [{ kind: "human", handle: "@Founder" }]);
+    assert.deepEqual(latest.findings, { blocker: 0, high: 0, medium: 0, low: 0 });
+    const cells = Object.values(latest.cells ?? {});
+    assert.equal(cells.length, 32);
+    assert.ok(cells.every((cell) => cell.status === "pass" && cell.reviewer === "@Founder"));
   });
 
   it("passes only a latest human round bound to the current inputs, environment and cells", () => {
