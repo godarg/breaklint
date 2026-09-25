@@ -64,11 +64,21 @@ function findingsBase(): Report {
     };
   }
   if (report.findings[1]) {
+    // Real-shaped: the name the evidence writer gives a page (`<run>-<document>-<source hash>-page-NNN.png`),
+    // 52 characters without a slash, so on a phone it is one segment wider than its line.
     report.findings[1].evidence = {
-      ref: "surface-demo-page-002.png",
+      ref: "1f5788f1e439-0001-demo-472f73b732bb5453-page-002.png",
       bindsFinding: false,
     };
     report.findings[1].ambiguity = { groupSize: 2, resolvable: false };
+  }
+  if (report.findings[2]) {
+    // A long basename behind a slash: wider than a phone line and than the A4 content box's
+    // evidence line would be at half width, so the slash break alone cannot save it.
+    report.findings[2].evidence = {
+      ref: "evidence/2c9d41a07be3-0003-annual-report-typeset-final-revision-9f14e2c7a0b35d61-page-003.png",
+      bindsFinding: true,
+    };
   }
   return report;
 }

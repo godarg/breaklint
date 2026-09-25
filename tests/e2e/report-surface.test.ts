@@ -209,7 +209,11 @@ describe("HTML Report Surface v2", () => {
     const withoutCode = html.replace(/<style>[\s\S]*?<\/style>/u, "").replace(/<code class="cli-flag">[\s\S]*?<\/code>/gu, "");
     assert.doesNotMatch(withoutCode, /--disable/u, "every command is inside a cli-flag code element");
     assert.match(html, /<h3 id="finding-1-title"><code class="rule-id"><span>layout\/<\/span><wbr><span>widow<\/span><\/code> · page 2<\/h3>/u);
-    assert.match(REPORT_HTML_STYLES, /\.rule-id > span, \.cli-flag > span, \.path-id > span \{ white-space: nowrap; \}/u, "no break inside a flag, a rule name or a path segment");
+    assert.match(REPORT_HTML_STYLES, /\.rule-id > span, \.cli-flag > span \{ white-space: nowrap; \}/u, "no break inside a flag or a rule name");
+    assert.match(REPORT_HTML_STYLES, /\.path-id > span \{ display: inline-block; max-inline-size: 100%; overflow-wrap: anywhere;/u,
+      "a path segment is an atomic box that wraps inside itself only when it alone is wider than its line");
+    assert.match(findingsHtmlForPaths(), /<span class="path-id"><span>1f5788f1e439-0001-demo-472f73b732bb5453-page-002\.png<\/span><\/span>/u,
+      "the matrix carries a real-shaped evidence name, one segment without a slash");
     const findingsHtml = renderHtml(findingsReportState());
     assert.match(findingsHtml, /<a href="evidence\/surface-demo-page-001\.png"><span class="path-id"><span>evidence\/<\/span><wbr><span>surface-demo-page-001\.png<\/span><\/span><\/a>/u,
       "an evidence path may break only after its slash, never at a hyphen");
@@ -569,6 +573,10 @@ describe("report-surface human review gate", () => {
     failed((ledger) => { ledger.schemaVersion = 4; }, /human ledger schema drift/u);
   });
 });
+
+function findingsHtmlForPaths(): string {
+  return renderHtml(findingsReportState());
+}
 
 /** The body of the first `{…}` block that follows `marker`, braces balanced. */
 function blockAfter(css: string, marker: string): string {

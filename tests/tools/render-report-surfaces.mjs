@@ -87,7 +87,10 @@ const SURFACE_CONTROLS = {
     .coverage-shortfall-item li { max-inline-size: 6ch !important; }
   }` },
   // Paths may break at their hyphens again, on a phone-narrow evidence line.
-  "broken-path-wrap": { screen: `.path-id > span { white-space: normal !important; } .evidence-state { max-inline-size: 18ch !important; }` },
+  "broken-path-wrap": { screen: `.path-id > span { display: inline !important; }` },
+  // Path segments stop wrapping even when one is wider than the line: the phone scrolls sideways
+  // on a real-shaped evidence name (the round-2 verifier's HIGH-2).
+  "broken-path-overflow": { screen: `.path-id > span { display: inline !important; white-space: nowrap !important; }` },
   // Rule ids may break at a hyphen inside the name again.
   "broken-rule-id-wrap": { screen: `.rule-id > span { white-space: normal !important; } .finding h3 { max-inline-size: 12ch !important; }` },
   // The coverage list becomes a grid again: its fragmenting table item is stretched on the
@@ -448,8 +451,45 @@ function identifierLinesInPage() {
       }
     }
     const kind = element.classList.contains("cli-flag") ? "flag" : element.classList.contains("path-id") ? "path" : "rule-id";
-    return lines.length === 0 ? [] : [{ kind, text: element.textContent, lines }];
+    if (lines.length === 0) return [];
+    if (kind !== "path") return [{ kind, text: element.textContent, lines }];
+    // A path segment is over-long when its own unbroken text is wider than the line it sits in:
+    // the segment's max-content width, measured on a hidden no-wrap copy in the same container,
+    // against the content width of the nearest block container. Only such a segment may break
+    // inside itself.
+    let container = element.parentElement;
+    while (container && (getComputedStyle(container).display.startsWith("inline") || getComputedStyle(container).display === "contents")) container = container.parentElement;
+    const containerStyle = getComputedStyle(container);
+    const containerPx = container.clientWidth - Number.parseFloat(containerStyle.paddingLeft) - Number.parseFloat(containerStyle.paddingRight);
+    const segments = [...element.children].filter((child) => child.tagName === "SPAN").map((span) => {
+      const copy = span.cloneNode(true);
+      copy.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;display:inline;max-inline-size:none";
+      span.parentElement.append(copy);
+      const maxContentPx = copy.getBoundingClientRect().width;
+      copy.remove();
+      return { text: span.textContent, maxContentPx: Math.round(maxContentPx * 100) / 100, overLong: maxContentPx > containerPx + 0.5 };
+    });
+    return [{ kind, text: element.textContent, lines, containerPx: Math.round(containerPx * 100) / 100, segments }];
   });
+}
+
+/** The text before every line break of a path that is neither after a slash nor inside an over-long segment. */
+function pathBreaksOutsidePermission(identifier) {
+  const misplaced = [];
+  let offset = 0;
+  for (const line of identifier.lines.slice(0, -1)) {
+    offset += line.length;
+    if (line.endsWith("/")) continue;
+    let start = 0;
+    const inside = identifier.segments.find((segment) => {
+      const end = start + segment.text.length;
+      const hit = offset > start && offset < end;
+      start = end;
+      return hit;
+    });
+    if (!inside?.overLong) misplaced.push(line);
+  }
+  return misplaced;
 }
 
 /**
@@ -459,9 +499,12 @@ function identifierLinesInPage() {
 function assertIdentifierLines(identifiers, label, { print }) {
   for (const identifier of identifiers) {
     if (identifier.kind === "path") {
-      // A path may break after any of its slashes, on screen and in print, and nowhere else.
-      if (identifier.lines.slice(0, -1).some((line) => !line.endsWith("/"))) {
-        throw new Error(`${label}: path ${identifier.text} split across ${identifier.lines.length} lines (${JSON.stringify(identifier.lines)}); a path may break only after a slash`);
+      // A path may break after any of its slashes, on screen and in print, and inside a segment
+      // only when that segment alone is wider than its line.
+      const misplaced = pathBreaksOutsidePermission(identifier);
+      if (misplaced.length > 0) {
+        throw new Error(`${label}: path ${identifier.text} split across ${identifier.lines.length} lines (${JSON.stringify(identifier.lines)}); ` +
+          `a path may break only after a slash or inside a segment wider than its line (${identifier.containerPx} px); misplaced after ${JSON.stringify(misplaced)}`);
       }
       continue;
     }
@@ -1177,6 +1220,9 @@ try {
           semantics.contrast = await measuredContrast(page);
           semantics.coverageTables = await page.evaluate(coverageTableGeometryInPage);
           assertCoverageTableGeometry(semantics.coverageTables, `${state}/${theme}/${viewport}`);
+          if (semantics.horizontalOverflowPx !== 0) {
+            throw new Error(`${state}/${theme}/${viewport}: the page scrolls sideways by ${semantics.horizontalOverflowPx} px`);
+          }
           semantics.identifiers = await page.evaluate(identifierLinesInPage);
           assertIdentifierLines(semantics.identifiers, `${state}/${theme}/${viewport}`, { print: false });
           semantics.boxedBlocks = await page.evaluate(boxedBlocksInPage);

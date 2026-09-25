@@ -43,8 +43,13 @@ export const REPORT_HTML_STYLES = String.raw`
   /* Identifiers and commands break only where a break cannot change what is copied: after a rule's
      namespace slash (a <wbr>), never at a hyphen inside the name or inside a flag. */
   .rule-id, .cli-flag { overflow-wrap: normal; word-break: normal; hyphens: manual; }
-  .rule-id > span, .cli-flag > span, .path-id > span { white-space: nowrap; }
+  .rule-id > span, .cli-flag > span { white-space: nowrap; }
+  /* A path breaks after a slash, and inside a segment only when that segment alone is wider than
+     its line: each segment is an atomic inline box, capped at the line, that wraps inside itself
+     only when its own text cannot fit (real evidence names run to 52+ characters with no slash;
+     as no-wrap spans they scrolled a phone sideways by 34-150 px). */
   .path-id { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+  .path-id > span { display: inline-block; max-inline-size: 100%; overflow-wrap: anywhere; vertical-align: baseline; }
   a { color: var(--bl-color-accent-info); text-underline-offset: .2em; text-decoration-thickness: var(--bl-border-thin); }
   a:hover { text-decoration-thickness: var(--bl-border-strong); }
   a:focus-visible, [tabindex]:focus-visible { outline: var(--bl-focus-width) solid var(--bl-color-focus); outline-offset: var(--bl-space-1); }

@@ -623,6 +623,32 @@ function runTileMutationControl(artifact, decodedFullPage) {
   }
 }
 
+/**
+ * A recorded path's lines, re-judged here: every break follows a slash or falls strictly inside a
+ * segment whose recorded unbroken width exceeds the recorded line width. The segments must spell
+ * the path, and each segment's over-long flag must follow from its two recorded widths.
+ */
+function assertRecordedPathBreaks(identifier, label) {
+  assert.equal(identifier.lines.join(""), identifier.text, `${label}: path lines do not spell ${identifier.text}`);
+  assert.equal(identifier.segments.map((segment) => segment.text).join(""), identifier.text, `${label}: path segments do not spell ${identifier.text}`);
+  for (const segment of identifier.segments) {
+    assert.equal(segment.overLong, segment.maxContentPx > identifier.containerPx + 0.5, `${label}: over-long flag of path segment ${segment.text} contradicts its widths`);
+  }
+  let offset = 0;
+  for (const line of identifier.lines.slice(0, -1)) {
+    offset += line.length;
+    if (line.endsWith("/")) continue;
+    let start = 0;
+    const inside = identifier.segments.find((segment) => {
+      const end = start + segment.text.length;
+      const hit = offset > start && offset < end;
+      start = end;
+      return hit;
+    });
+    assert.ok(inside?.overLong, `${label}: path ${identifier.text} breaks after "${line}", neither after a slash nor inside an over-long segment`);
+  }
+}
+
 /** The recorded accessibility contract of a screen cell. */
 function assertRecordedAccessibility(accessibility, label) {
   const roles = (wanted) => accessibility.landmarks.filter((landmark) => landmark.role === wanted);
@@ -671,7 +697,8 @@ function printVisibleContract(state) {
   assert.equal(pageContent.identifierBreaks.linesEndingInsideAFlag, 0, `print/${state}: a PDF line ends inside a command flag`);
   assert.equal(pageContent.identifierBreaks.linesEndingInsideARuleId, 0, `print/${state}: a PDF line ends inside a rule id`);
   assert.ok(pageContent.identifierBreaks.flagsWhole.every((flag) => flag.whole), `print/${state}: a command is not whole on one PDF line`);
-  assert.ok(pdf.printSemantics.identifiers.every((identifier) => identifier.lines.length === 1), `print/${state}: an identifier is split in the print layout`);
+  assert.ok(pdf.printSemantics.identifiers.every((identifier) => identifier.kind === "path" || identifier.lines.length === 1), `print/${state}: an identifier is split in the print layout`);
+  for (const identifier of pdf.printSemantics.identifiers.filter((candidate) => candidate.kind === "path")) assertRecordedPathBreaks(identifier, `print/${state}`);
   pageContent.furniture = independentlyCheckPageFurniture(resolve(output, pdf.path), pdf.pages, state, `print/${state}`);
   assert.ok(pdf.pageContentChecks.flow, `print/${state}: renderer recorded no page-flow checks`);
   independentlyCheckPageFlow(resolve(output, pdf.path), raster.pages, pdf.pageContentChecks.flow, `print/${state}`);
@@ -854,9 +881,10 @@ for (const artifact of manifest.artifacts) {
     assertRecordedTableGeometry(artifact.semantics.coverageTables, artifact.cell);
     assertRecordedAccessibility(artifact.semantics.accessibility, artifact.cell);
     assertRecordedBoxedBlocks(artifact.semantics.boxedBlocks, artifact.cell);
-    assert.ok(artifact.semantics.identifiers.every((identifier) => identifier.kind === "path"
-      ? identifier.lines.slice(0, -1).every((line) => line.endsWith("/"))
-      : identifier.lines.length === 1 || (identifier.lines.length === 2 && identifier.lines[0].endsWith("/"))), `${artifact.cell}: an identifier or path breaks outside a slash`);
+    for (const identifier of artifact.semantics.identifiers) {
+      if (identifier.kind === "path") assertRecordedPathBreaks(identifier, artifact.cell);
+      else assert.ok(identifier.lines.length === 1 || (identifier.lines.length === 2 && identifier.lines[0].endsWith("/")), `${artifact.cell}: an identifier breaks outside its namespace slash`);
+    }
     assert.ok(artifact.semantics.identifiers.some((identifier) => identifier.kind === "path"), `${artifact.cell}: no path was measured`);
     const caveat = artifact.semantics.remediationCaveat;
     assert.equal(caveat.statements, state === "clean" ? 0 : 1, `${artifact.cell}: untested-advice caveat count`);
@@ -898,9 +926,11 @@ assert.ok(fontMutationControl, "PDF font mutation control did not run");
 // insufficient-coverage 13 -> 10 on Chromium 141 / linux); 32 when the clean print kept its findings
 // section (clean 2 -> 3); 26 when findings fragment between their units instead of taking one page
 // each (findings 9 -> 7, infrastructure 10 -> 8, insufficient-coverage 10 -> 8). Tablet and mobile
-// cells also ship viewport-height tiles, pinned the same way.
-assert.deepEqual(manifest.physicalArtifacts, { screens: 24, screenTiles: 148, pdfs: 4, rasterPages: 26 },
-  "the report-surface inventory must be exactly 24 screens with 148 viewport tiles, 4 PDFs and 26 PDF page rasters");
+// cells also ship viewport-height tiles, pinned the same way: 148, then 152 when two findings
+// gained real-shaped evidence names that wrap on a phone (infrastructure and insufficient-coverage
+// mobile 14 -> 15 tiles each).
+assert.deepEqual(manifest.physicalArtifacts, { screens: 24, screenTiles: 152, pdfs: 4, rasterPages: 26 },
+  "the report-surface inventory must be exactly 24 screens with 152 viewport tiles, 4 PDFs and 26 PDF page rasters");
 
 const latestRound = describeLatestRound(ledger, currentReviewInput.fingerprint);
 // The review ledger's state belongs where a release reader looks, not only in a log line. The line

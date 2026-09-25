@@ -367,8 +367,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   copying it from the PDF gave a broken command. Commands are now carried in the HTML model apart
   from the prose around them and rendered as one unbreakable `<code>`; rule ids break only after
   their namespace slash on narrow screens (they broke at hyphens, `layout/unbreakable-block-too-/tall`)
-  and never in print. Paths (document, evidence, coverage caption) break only after a slash: on a
-  phone the evidence line broke as `evidence/surface-` / `demo-page-001.png`.
+  and never in print. Paths (document, evidence, coverage caption) break after a slash, and inside
+  a segment only when that segment alone is wider than its line: on a phone the evidence line broke
+  as `evidence/surface-` / `demo-page-001.png`, and a real evidence name (52 characters, no slash)
+  must still wrap rather than scroll the page sideways.
 
 - **The report has named landmarks, a skip link and a contents navigation.** Header and footer
   sat inside `main`, so there was no banner, navigation or content info and no in-page link; on a

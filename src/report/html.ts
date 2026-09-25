@@ -61,9 +61,11 @@ function ruleIdCode(ruleId: string): string {
 }
 
 /**
- * A path as text that breaks only after a slash: each segment is a no-wrap span, with a break
+ * A path as text that breaks after a slash: each segment is an atomic inline box, with a break
  * opportunity after every "/". Browsers otherwise break a path at its hyphens on a phone
- * (measured: `evidence/surface-` / `demo-page-001.png`), and the line then reads as two names.
+ * (measured: `evidence/surface-` / `demo-page-001.png`), and the line then reads as two names. A
+ * segment wider than its whole line still wraps inside itself (see `.path-id` in html-styles.ts),
+ * because a line that cannot break scrolls the page sideways.
  */
 function pathText(path: string): string {
   const segments = path.split(/(?<=\/)/u);

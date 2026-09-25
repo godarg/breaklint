@@ -86,11 +86,16 @@ cell; `broken-untested-repeat` and `broken-untested-marker` are its red controls
   each PDF's text for a line ending inside a flag or rule id (`broken-flag-wrap` and
   `broken-rule-id-wrap` are its red controls). In 0.6.0 the one printed command broke as
   `--` / `disable layout/widow`. Paths — document paths, evidence references, coverage captions —
-  get the same treatment with a break opportunity after every slash: each segment is a no-wrap
-  span, so a path breaks only after a `/`, on screen and in print, never at a hyphen (on a phone the
-  evidence line broke as `evidence/surface-` / `demo-page-001.png`, which reads as two names). The
-  gate measures every path's rendered lines in every cell (`broken-path-wrap`). A single segment
-  wider than its line is not broken and may overflow it; no canonical path comes close.
+  get a break opportunity after every slash, and each segment is an atomic inline box capped at
+  the line width: a path breaks after a `/`, and inside a segment only when that segment alone is
+  wider than its line, where it wraps at a hyphen or, failing that, anywhere. On a phone the
+  evidence line had broken as `evidence/surface-` / `demo-page-001.png`, which reads as two names;
+  and as no-wrap segments, the real-shaped evidence names the writer produces (52 characters and
+  more without a slash) scrolled a phone sideways by 34–150 px. The canonical findings now carry one
+  real-shaped name and one long basename behind a slash. The gate measures every path's rendered
+  lines in every cell and in print, and each segment's unbroken width against its line
+  (`broken-path-wrap` breaks a segment that fits; `broken-path-overflow` restores the no-wrap
+  segments and the phone scrolls sideways by 221 px); every screen cell must not scroll sideways.
 - Keyboard focus uses a visible three-pixel-equivalent outline.
 - Landmarks are named and separate: the verdict header is the banner, a contents navigation named
   "Report contents" follows it, the report body is `main`, and the footer is the content info. The
