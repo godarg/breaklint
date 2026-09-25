@@ -1124,8 +1124,10 @@ export interface RunOutcome {
   stderr: string;
   /** The timeout, when it fired. */
   timedOutMs?: number | null;
-  /** Processes the CLI left in its group (see `runCli`). */
+  /** Processes the CLI left behind (see `runCli`). */
   leftovers?: CliRun["leftovers"];
+  /** Whether every process the CLI started was tracked (Linux `/proc`), or only its group. */
+  tracked?: boolean;
 }
 
 export interface DeclineSummary {
@@ -1202,10 +1204,18 @@ export function evaluateDocument(expected: CompiledExpected, outcome: RunOutcome
   };
 
   // Step 2, harness integrity: the report must be the canonical JSON report of THIS invocation.
-  if (outcome.timedOutMs) failures.push(`the CLI timed out after ${outcome.timedOutMs} ms; it and every process it started were sent SIGTERM, then SIGKILL`);
+  if (outcome.timedOutMs) {
+    failures.push(outcome.tracked === false
+      ? `the CLI timed out after ${outcome.timedOutMs} ms; its process group was sent SIGTERM, then SIGKILL (no /proc: processes outside that group are not tracked)`
+      : `the CLI timed out after ${outcome.timedOutMs} ms; it and every process it started were sent SIGTERM, then SIGKILL`);
+  }
   if (outcome.signal) failures.push(`the CLI was terminated by ${outcome.signal}`);
   if (outcome.leftovers?.survivedSigkill.length) failures.push(`processes the CLI started survived SIGKILL: ${outcome.leftovers.survivedSigkill.join(", ")}`);
-  if (outcome.leftovers?.pids.length && !outcome.timedOutMs) verdict.notes.push(`the CLI exited and left ${outcome.leftovers.pids.length} process(es) it started; they were terminated`);
+  if (outcome.leftovers?.pids.length) {
+    verdict.notes.push(outcome.timedOutMs
+      ? `${outcome.leftovers.pids.length} process(es) it started were still alive after the timeout's termination; they were terminated again`
+      : `the CLI exited and left ${outcome.leftovers.pids.length} process(es) it started; they were terminated`);
+  }
   if (outcome.leftovers?.removedProfiles.length) verdict.notes.push(`removed ${outcome.leftovers.removedProfiles.length} browser profile(s) left behind: ${outcome.leftovers.removedProfiles.join(", ")}`);
   if (outcome.exitCode === null) failures.push("the CLI produced no exit code");
   if (outcome.reportProblem || !outcome.report) {
@@ -1442,8 +1452,27 @@ const PROFILE_PREFIX = "breaklint-chrome-profile-";
  * between two samples, whose parent then dies before the next one, is not seen either; sampling
  * runs every 50 ms and once more before every signal.
  */
+export interface ProcessReader {
+  table(): Map<number, ProcRow> | null;
+  cmdline(pid: number): string[] | null;
+}
+
+const PROC_READER: ProcessReader = {
+  table: readProcTable,
+  cmdline: (pid) => {
+    try {
+      return readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0");
+    } catch {
+      return null;
+    }
+  },
+};
+
 export class ProcessOwnership {
   readonly root: number;
+  private readonly reader: ProcessReader;
+  /** The CLI's start time, once seen: a later process that reuses its pid is not the CLI. */
+  private rootStart: string | null = null;
   private readonly identities = new Set<string>();
   private readonly groups = new Set<number>();
   private readonly sessions = new Set<number>();
@@ -1451,19 +1480,29 @@ export class ProcessOwnership {
   readonly profiles = new Set<string>();
   readonly procAvailable: boolean;
 
-  constructor(root: number) {
+  constructor(root: number, reader: ProcessReader = PROC_READER) {
     this.root = root;
+    this.reader = reader;
     // `detached: true` makes the CLI a session and group leader.
     this.groups.add(root);
     this.sessions.add(root);
-    this.procAvailable = readProcTable() !== null;
+    this.procAvailable = reader.table() !== null;
+  }
+
+  private isRoot(row: ProcRow): boolean {
+    return row.pid === this.root && (this.rootStart === null || this.rootStart === row.start);
   }
 
   private owns(row: ProcRow, table: Map<number, ProcRow>): boolean {
+    if (this.isRoot(row)) return true;
+    // A process seen before, by pid and start time: still ours after a reparent or a setsid.
     if (this.identities.has(`${row.pid}:${row.start}`)) return true;
-    if (this.groups.has(row.pgid) || this.sessions.has(row.sid)) return true;
+    // A member of an owned group or session. A leader is ours only by identity or descent: a pid
+    // reused after the whole group has gone could otherwise pass for its old leader.
+    if (row.pid !== row.pgid && this.groups.has(row.pgid)) return true;
+    if (row.pid !== row.sid && this.sessions.has(row.sid)) return true;
     for (let parent = table.get(row.ppid), hops = 0; parent && hops < 4096; parent = table.get(parent.ppid), hops += 1) {
-      if (parent.pid === this.root || this.identities.has(`${parent.pid}:${parent.start}`)) return true;
+      if (this.isRoot(parent) || this.identities.has(`${parent.pid}:${parent.start}`)) return true;
       if (parent.pid <= 1) break;
     }
     return false;
@@ -1471,8 +1510,10 @@ export class ProcessOwnership {
 
   /** Samples the table and returns the live owned processes. */
   observe(): number[] {
-    const table = readProcTable();
+    const table = this.reader.table();
     if (!table) return processGroupMembers(this.root);
+    const rootRow = table.get(this.root);
+    if (this.rootStart === null && rootRow) this.rootStart = rootRow.start;
     // Ownership spreads (a new group leader makes its members owned), so repeat until stable.
     let owned: ProcRow[] = [];
     for (let size = -1; size !== this.identities.size;) {
@@ -1489,12 +1530,8 @@ export class ProcessOwnership {
   }
 
   private readProfile(pid: number): void {
-    let argv: string[];
-    try {
-      argv = readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0");
-    } catch {
-      return;
-    }
+    const argv = this.reader.cmdline(pid);
+    if (!argv) return;
     for (const arg of argv) {
       if (arg.startsWith("--user-data-dir=")) this.profiles.add(arg.slice("--user-data-dir=".length));
     }
@@ -1566,6 +1603,8 @@ export interface CliRun {
    * terminated, the survivors of SIGKILL among them, and the Chrome profiles removed after them.
    */
   leftovers: { pids: number[]; survivedSigkill: number[]; removedProfiles: string[] } | null;
+  /** False without Linux `/proc`: then only the CLI's own group is signalled and checked. */
+  tracked: boolean;
   error: Error | null;
 }
 
@@ -1589,7 +1628,7 @@ export async function runCli(args: string[], cwd: string, timeoutMs: number, gra
   });
   if (child.pid === undefined) {
     const outcome = await exited;
-    return { status: outcome.status, signal: outcome.signal, stderr, timedOutMs: null, leftovers: null, error: outcome.error };
+    return { status: outcome.status, signal: outcome.signal, stderr, timedOutMs: null, leftovers: null, tracked: false, error: outcome.error };
   }
   const owned = new ProcessOwnership(child.pid);
   const sampler = setInterval(() => owned.observe(), 50);
@@ -1610,7 +1649,7 @@ export async function runCli(args: string[], cwd: string, timeoutMs: number, gra
     const survivedSigkill = pids.length ? await owned.terminate(graceMs) : [];
     leftovers = { pids, survivedSigkill, removedProfiles: survivedSigkill.length ? [] : owned.removeProfiles() };
   }
-  return { status: outcome.status, signal: outcome.signal, stderr, timedOutMs, leftovers, error: outcome.error };
+  return { status: outcome.status, signal: outcome.signal, stderr, timedOutMs, leftovers, tracked: owned.procAvailable, error: outcome.error };
 }
 
 /**
@@ -1667,7 +1706,7 @@ async function runOne(document: ManifestDocument, options: GateOptions, temporar
       reportProblem = `the report is not JSON: ${(error as Error).message}`;
     }
   }
-  return { exitCode: run.status, signal: run.signal, report, reportProblem, stderr: run.stderr, timedOutMs: run.timedOutMs, leftovers: run.leftovers };
+  return { exitCode: run.status, signal: run.signal, report, reportProblem, stderr: run.stderr, timedOutMs: run.timedOutMs, leftovers: run.leftovers, tracked: run.tracked };
 }
 
 function pad(value: string, width: number): string {

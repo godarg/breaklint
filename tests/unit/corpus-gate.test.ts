@@ -28,6 +28,7 @@ import {
   PAGE_OF_FIELDS,
   PER_TEXT_FIELDS,
   processGroupMembers,
+  ProcessOwnership,
   selectElements,
   summarizeGate,
   TARGET_SHAPES,
@@ -692,9 +693,16 @@ const input = argv[argv.length - 1];
 const spec = JSON.parse(readFileSync(process.env.FAKE_SPEC, "utf8"));
 // --demo: the stored-snapshot run the gate reads the rule registry from.
 if (argv.includes("--demo")) {
-  const active = spec.demoActiveRules ?? spec.activeRules;
-  writeFileSync(out, JSON.stringify({ schemaVersion: 5, mode: "demo", exitCode: 1, config: { profile: "default", activeRules: active, disabledRules: ["layout/half-empty-page"] }, documents: [] }));
-  process.exit(1);
+  const demo = spec.demo ?? {};
+  if (demo.hang) {
+    setInterval(() => {}, 1000);
+    await new Promise(() => {});
+  } else {
+    const report = { schemaVersion: demo.schemaVersion ?? 5, mode: demo.mode ?? "demo", exitCode: demo.reportExit ?? 1,
+      config: { profile: demo.profile ?? "default", activeRules: demo.activeRules ?? spec.demoActiveRules ?? spec.activeRules, disabledRules: demo.disabledRules ?? ["layout/half-empty-page"] }, documents: [] };
+    if (!demo.noReport) writeFileSync(out, demo.notJson ? "{" : JSON.stringify(report));
+    process.exit(1);
+  }
 }
 const html = createHash("sha256").update(readFileSync(input)).digest("hex");
 // As the real report does for a path under the home directory, an absolute input is echoed
@@ -869,7 +877,11 @@ test("process outcome: a signal, a missing exit code or a timeout fails the docu
   const raw = expectedFile();
   assertFail(judge(raw, { ...outcome([]), signal: "SIGKILL" }), /terminated by SIGKILL/u);
   assertFail(judge(raw, { ...outcome([]), exitCode: null }), /produced no exit code/u);
-  assertFail(judge(raw, { ...outcome([]), timedOutMs: 1234 }), /timed out after 1234 ms/u);
+  assertFail(judge(raw, { ...outcome([]), timedOutMs: 1234 }), /timed out after 1234 ms; it and every process it started were sent SIGTERM, then SIGKILL/u);
+  // Without /proc only the CLI's group is handled, and the message does not claim more.
+  assertFail(judge(raw, { ...outcome([]), timedOutMs: 1234, tracked: false }), /timed out after 1234 ms; its process group was sent SIGTERM, then SIGKILL \(no \/proc/u);
+  const swept = judge(raw, { ...outcome([]), timedOutMs: 1234, leftovers: { pids: [7, 8], survivedSigkill: [], removedProfiles: [] } });
+  assert.match(swept.notes.join("\n"), /2 process\(es\) it started were still alive after the timeout's termination; they were terminated again/u);
   assertFail(judge(raw, { ...outcome([]), leftovers: { pids: [7], survivedSigkill: [7], removedProfiles: [] } }), /processes the CLI started survived SIGKILL: 7/u);
   const leftover = judge(raw, { ...outcome([]), timedOutMs: null, leftovers: { pids: [7], survivedSigkill: [], removedProfiles: ["/tmp/breaklint-chrome-profile-x"] } });
   assertPass(leftover);
@@ -1014,6 +1026,8 @@ test("process boundary: on timeout everything the CLI started is terminated, inc
       assert.deepEqual(processGroupMembers(grandchild!), []);
       assert.equal(existsSync(profile), false, "the browser profile was left behind");
       assert.doesNotMatch(run.stdout, /survived SIGKILL/u);
+      // The timeout's own termination reached everything; the post-exit sweep found nothing left.
+      assert.doesNotMatch(run.stdout, /still alive after the timeout's termination/u);
     } finally {
       for (const pid of existsSync(pidFile) ? pidsIn(pidFile) : []) {
         try { process.kill(pid, "SIGKILL"); } catch { /* gone */ }
@@ -1022,6 +1036,38 @@ test("process boundary: on timeout everything the CLI started is terminated, inc
       rmSync(root, { recursive: true, force: true });
     }
   }
+});
+
+test("process ownership: descendants, the groups and sessions they lead, and known identities; nothing else", () => {
+  const row = (pid: number, ppid: number, pgid: number, sid: number, start = `s${pid}`, state = "S") => ({ pid, ppid, pgid, sid, state, start });
+  let table = new Map<number, ReturnType<typeof row>>();
+  const cmdlines = new Map<number, string[]>();
+  const set = (...rows: ReturnType<typeof row>[]) => { table = new Map(rows.map((r) => [r.pid, r])); };
+  const owned = new ProcessOwnership(100, { table: () => table, cmdline: (pid) => cmdlines.get(pid) ?? null });
+  const gate = row(50, 1, 50, 50);
+  const foreign = row(900, 1, 900, 900);
+  // t0: the CLI (100, its own session), a helper in its group, Chrome (200) in a session of its own
+  // with a zygote (201), a process (300) not yet moved to a new session, and a foreign session.
+  cmdlines.set(200, ["chrome", "--user-data-dir=/tmp/breaklint-chrome-profile-abc"]);
+  set(gate, row(100, 50, 100, 100), row(101, 100, 100, 100), row(200, 100, 200, 200), row(201, 200, 200, 200), row(300, 100, 100, 100), foreign);
+  assert.deepEqual(owned.observe(), [100, 101, 200, 201, 300]);
+  assert.deepEqual([...owned.profiles], ["/tmp/breaklint-chrome-profile-abc"]);
+  // t1: the CLI and Chrome's main process are gone. The zygote's child (202, reparented to init) is
+  // reached only through Chrome's session; 203 only through Chrome's group; 300 moved itself to a
+  // new session after its parent died, and is reached only by its identity. A process that reuses
+  // pid 300 with another start time is not ours, and neither is the foreign session.
+  set(gate, row(201, 1, 200, 200), row(202, 1, 200, 200), row(203, 1, 200, 999), row(300, 1, 300, 300), foreign);
+  assert.deepEqual(owned.observe(), [201, 202, 203, 300]);
+  // t2: 300 has a child (301) in its new session.
+  set(gate, row(300, 1, 300, 300), row(301, 300, 300, 300), foreign);
+  assert.deepEqual(owned.observe(), [300, 301]);
+  // t3: all of that has gone, and pids 100 and 300 were reused by new session leaders: neither the
+  // old CLI's pid nor an old leader's pid makes a new process ours.
+  set(gate, row(100, 1, 100, 100, "reused"), row(300, 1, 300, 300, "reused"), foreign);
+  assert.deepEqual(owned.observe(), []);
+  // A zombie is not alive; without /proc the reader reports no table.
+  set(gate, row(201, 1, 200, 200, "s201", "Z"), foreign);
+  assert.deepEqual(owned.observe(), []);
 });
 
 test("a zombie is not a live member of a process group", { skip: process.platform !== "linux" ? "reads /proc" : false }, async () => {
@@ -1167,6 +1213,31 @@ test("process boundary: the expected files name one rule set, and it is the buil
       assert.equal(run.status, 1);
       assert.match(run.stderr, /the expected files do not name the same rule set/u);
       assert.doesNotMatch(run.stdout, /corpus gate: syn:/u);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("process boundary: the registry read from the built CLI's --demo run is itself checked", () => {
+  const spec = { exit: 1, activeRules: ACTIVE, findings: [{ ruleId: "layout/widow", source: { offset: p1.start, endOffset: p1.end } }] };
+  const cases: [Json, RegExp][] = [
+    [{ schemaVersion: 4 }, /--demo run: report schemaVersion 4, this gate reads 5/u],
+    [{ mode: "live" }, /--demo run: report mode live, not demo/u],
+    [{ reportExit: 0 }, /--demo run: report exitCode 0 differs from the process exit 1/u],
+    [{ profile: "strict" }, /--demo run: profile strict, not default/u],
+    [{ activeRules: [], disabledRules: [] }, /--demo run reports no registered rules/u],
+    [{ noReport: true }, /--demo run wrote no report/u],
+    [{ notJson: true }, /--demo run wrote a report that is not JSON/u],
+    [{ hang: true }, /--demo run timed out after 1500 ms/u],
+  ];
+  for (const [demo, pattern] of cases) {
+    const { root, corpus } = makeCorpus();
+    try {
+      const run = runGateProcess(root, corpus, { ...spec, demo }, ["--timeout-ms", "1500", "--grace-ms", "300"]);
+      assert.equal(run.status, 1, JSON.stringify(demo));
+      assert.match(run.stderr, pattern);
+      assert.doesNotMatch(run.stdout, /corpus gate: syn:/u, `a document ran although the registry check failed (${JSON.stringify(demo)})`);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

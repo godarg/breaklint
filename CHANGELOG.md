@@ -597,13 +597,14 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   its `--demo` report) must be exactly those the expected files name. Each CLI runs in its own
   session and process group, and while it runs the gate samples the Linux process table every
   50 ms: every descendant (by its parent chain) is recorded by pid and start time, and every group
-  and session a descendant leads is owned with all its members, which covers Chrome, which
-  puppeteer starts in a session of its own. On a timeout all of that gets SIGTERM and, after the
+  and session a descendant leads is owned with all its members (a leader only by that identity or
+  by descent, so a reused pid is not mistaken for it), which covers Chrome, which puppeteer starts
+  in a session of its own. On a timeout all of that gets SIGTERM and, after the
   grace period, SIGKILL; the document fails naming the timeout; whatever is still owned after the
   CLI exits is terminated the same way; a process that survives SIGKILL fails the document; and once
   such a termination has left nothing alive, a `breaklint-chrome-profile-*` directory in the
   temporary directory that an owned process named on its command line is removed. Without Linux `/proc`
-  only the CLI's own group is signalled and checked.
+  only the CLI's own group is signalled and checked, and the timeout message says so.
   `tests/unit/corpus-gate.test.ts` holds a red case for every matching rule and every guard, on
   synthetic reports and through the gate's process boundary with a stand-in CLI. **The job is
   expected to be red until the 0.7.0 packages it depends on are integrated** (the state is in
