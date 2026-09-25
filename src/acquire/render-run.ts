@@ -33,6 +33,7 @@ import {
 import { IS, SUPPORTED_PAGEDJS_VERSION } from "../core/enums.ts";
 import { measureCapturedFontIdentity, prepareCapturedFontIdentity, releaseCapturedFontIdentity } from "../source/font-identity.ts";
 import { sha256Short } from "../core/fingerprint.ts";
+import { cssReferences as scanCssReferences } from "../core/css-references.ts";
 import type { DocumentInput } from "../core/engine.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InfraEvent, ReportEnvironment, ResourceRecord, SourceRef } from "../core/types.ts";
@@ -489,16 +490,9 @@ function parsedText(node: ParsedNode): string {
   return ((node as { childNodes?: ParsedNode[] }).childNodes ?? []).map(parsedText).join("");
 }
 
+/** Every URL a style sheet references, in source order (the shared CSS reference scanner). */
 function cssReferences(text: string): string[] {
-  const refs: string[] = [];
-  // @import "x.css" / 'x.css'. @import url(...) is collected by the url loop exactly once.
-  // CSS comments are whitespace, including between `@import` and the quoted URL.
-  for (const match of text.matchAll(/@import(?:\s|\/\*[\s\S]*?\*\/)+["']([^"']+)["']/giu)) if (match[1]) refs.push(match[1]);
-  for (const match of text.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s)'";]+))\s*\)/giu)) {
-    const value = match[1] ?? match[2] ?? match[3];
-    if (value) refs.push(value);
-  }
-  return refs;
+  return scanCssReferences(text).map((reference) => reference.value);
 }
 
 /**
@@ -508,12 +502,7 @@ function cssReferences(text: string): string[] {
  * browser took the sheet from elsewhere.
  */
 function cssImportReferences(text: string): Set<string> {
-  const out = new Set<string>();
-  for (const match of text.matchAll(/@import(?:\s|\/\*[\s\S]*?\*\/)+(?:["']([^"']+)["']|url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s)'";]+))\s*\))/giu)) {
-    const value = match[1] ?? match[2] ?? match[3] ?? match[4];
-    if (value) out.add(value);
-  }
-  return out;
+  return new Set(scanCssReferences(text).filter((reference) => reference.kind === "import").map((reference) => reference.value));
 }
 
 /** References which cause a browser resource fetch, deliberately excluding navigation anchors. */

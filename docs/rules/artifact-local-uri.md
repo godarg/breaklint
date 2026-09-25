@@ -42,17 +42,18 @@ time:
 - **Resolved against the final base, wherever they stand** — they went to the base host even
   before a late base: hyperlinks (`<a href>`, `<area href>`, SVG `<a>` with `href` or
   `xlink:href`; the HTML and both SVG forms were printed into the PDF with the base host, and
-  `<area>` is not printed as a PDF link at all), `<object data>`, `<embed src>`, `<video src>`, SVG
-  `<image>` (`href` and `xlink:href`), and `<link rel=icon>` (resolved the same way, and not fetched
-  at all by headless Chromium).
+  `<area>` is not printed as a PDF link at all), `<object data>`, `<embed src>`, `<video src>`,
+  `<audio src>`, `<source src>` inside `<video>` or `<audio>`, `<track src>`, SVG `<image>` (`href`
+  and `xlink:href`), and `<link rel=icon>` (resolved the same way, and not fetched at all by
+  headless Chromium).
 - **Resolved from where they stand** — fetched from the local file tree when they come before the
   base, and reported then: `<img src>` and `srcset`, `<picture><source>`, `poster`,
   `<iframe src>`, `<script src>`, `<link>` as stylesheet, preload or modulepreload, SVG `<use>`,
   and every CSS reference in a `<style>` or `style=""` — `url()`, `@font-face` sources, `@import`.
 - `<input type=image>` was requested from both. The rule keeps it with the second group, so its
   local fetch is reported.
-- An element the measurement did not cover (`<audio src>`, `<video><source>`, …) follows the second
-  group: judged by where it stands, which can only over-report.
+- An element the measurement did not cover follows the second group: judged by where it stands,
+  which can only over-report.
 
 An absolute URL ignores the base: a `file:` URI and a drive path stay reported under any base. A
 relative, root-relative, protocol-relative or `file:` base is not a published origin and leaves
@@ -107,6 +108,12 @@ fingerprint that groups them across runs. Neither claims a unique identity
 Reads `uriRefs`, which holds every URI-bearing attribute and every CSS `url()` from DOM and CSSOM **whether or not the browser fetched it**. Reading the loaded-resource list instead would miss a `srcset` candidate the browser never chose and a rule that never applied — precisely the references that survive to bite someone later.
 
 `data:` URIs and relative paths are not local URIs.
+
+In CSS it reads what a CSS tokenizer reads, with the same scanner breaklint's resource capture
+uses: every `url()` (quoted or not, CSS escapes decoded) and every `@import` target written as a
+string or as `url()`, with or without whitespace after `@import` (`@import"/x.css"` is valid CSS).
+Comments and ordinary strings hold no references. A URL string that is neither in `url()` nor an
+`@import` target, such as an argument of `image-set()`, is not read.
 
 Known misses and false alarms, stated rather than guessed around:
 

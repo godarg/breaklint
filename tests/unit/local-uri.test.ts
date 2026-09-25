@@ -128,6 +128,9 @@ describe("artifact/local-uri, one authored shape at a time", () => {
     { html: '<img alt="" srcset="/img/a.png 1x, img/b.png 2x">', expected: ['srcset="/img/a.png"'], complication: "only the absolute srcset candidate, never the relative one" },
     { html: '<div style="background:url(/img/bg.png)">x</div>', expected: ['style="/img/bg.png"'], complication: "CSS url() in a style attribute" },
     { html: '<style>@import "/css/print.css";</style>', expected: ['style-sheet="/css/print.css"'], complication: "a quoted @import without url()" },
+    { html: '<style>@import"/css/print.css";</style>', expected: ['style-sheet="/css/print.css"'], complication: "an @import with no space before its string" },
+    { html: "<style>@import'/css/print.css';</style>", expected: ['style-sheet="/css/print.css"'], complication: "an @import with no space before a single-quoted string" },
+    { html: '<style>@import url("/css/print.css");</style>', expected: ['style-sheet="/css/print.css"'], complication: "an @import url() with a quoted argument" },
     { html: '<a href="C:\\out\\a.pdf">x</a>', expected: ['href="C:\\out\\a.pdf"'], complication: "the URL parser reads C: as scheme \"c\"" },
     { html: '<a href="d:/out/a.pdf">x</a>', expected: ['href="d:/out/a.pdf"'], complication: "lower-case drive letter with a slash" },
     { html: '<a href="\\\\server\\share\\a.pdf">x</a>', expected: ['href="\\\\server\\share\\a.pdf"'], complication: "UNC share path, two leading backslashes" },
@@ -170,6 +173,10 @@ describe("artifact/local-uri and the document base", () => {
     { html: `<object data="/x.svg"></object>${LATE}`, expected: [], complication: "<object data> before a late base resolves on the base host" },
     { html: `<embed src="/x.svg">${LATE}`, expected: [], complication: "<embed src> before a late base resolves on the base host" },
     { html: `<video src="/x.mp4"></video>${LATE}`, expected: [], complication: "<video src> before a late base resolves on the base host" },
+    { html: `<audio src="/x.mp3"></audio>${LATE}`, expected: [], complication: "<audio src> before a late base resolves on the base host" },
+    { html: `<video><source src="/x.mp4"></video>${LATE}`, expected: [], complication: "<video><source src> before a late base resolves on the base host" },
+    { html: `<audio><source src="/x.mp3"></audio>${LATE}`, expected: [], complication: "<audio><source src> before a late base resolves on the base host" },
+    { html: `<video src="/x.mp4"><track kind="captions" src="/x.vtt"></video>${LATE}`, expected: [], complication: "<track src> before a late base resolves on the base host" },
     { html: `<svg><image href="/x.png"/></svg>${LATE}`, expected: [], complication: "SVG <image href> before a late base resolves on the base host" },
     { html: `<svg xmlns:xlink="http://www.w3.org/1999/xlink"><image xlink:href="/x.png"/></svg>${LATE}`, expected: [], complication: "SVG <image xlink:href> before a late base resolves on the base host" },
     { html: `<link rel="icon" href="/x.png">${LATE}`, expected: [], complication: "<link rel=icon> before a late base resolves on the base host" },
@@ -367,6 +374,24 @@ describe("artifact/local-uri, linked style sheets, fingerprints and repeated res
       writeFileSync(doc, html);
       writeFileSync(join(root, "imp.css"), ".big{height:200px}");
       assert.equal(discoverLocalAssets(html, doc).has("/imp.css"), true, "the paginator's @import would be answered with 403");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("discovers a no-space @import in <style> and inside a captured sheet", () => {
+    const root = mkdtempSync(join(tmpdir(), "breaklint-local-uri-nospace-"));
+    try {
+      const doc = join(root, "doc.html");
+      const html = '<style>@import"/a.css";</style><p>x</p>';
+      writeFileSync(doc, html);
+      writeFileSync(join(root, "a.css"), "@import'b.css';.a{background:url(/img/in-a.png)}");
+      writeFileSync(join(root, "b.css"), ".b{background:url(/img/in-b.png)}");
+      const assets = discoverLocalAssets(html, doc);
+      assert.deepEqual([...assets.keys()].sort(), ["/a.css", "/b.css"]);
+      const additionalCss = collisionSources(html, assets).slice(1).map((source) => ({ origin: source.origin, text: source.text }));
+      assert.deepEqual(reported(check(html, doc, additionalCss).findings),
+        ['style-sheet="/a.css"', 'style-sheet="/img/in-a.png"', 'style-sheet="/img/in-b.png"']);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

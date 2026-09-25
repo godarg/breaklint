@@ -23,6 +23,12 @@
  * base-governed references in discovery (the round-2 change) and `#big` measures 20 px; drop the
  * fail-closed rule for a failed style-sheet route and the host-only import measures a smaller page
  * instead of ending with source-acquisition-failed.
+ *
+ * Four more import forms go through the same two outcomes, because each once escaped discovery or the
+ * route guard: `@import"…"` and `@import'…'` with no whitespace (every per-reader regex required
+ * some), `@import url("…")` (the url() form of an import) and an @import nested inside a captured
+ * local sheet. Red conditions: the previous regexes (no-space leaves), import-kind for url() lost
+ * (url leaf), nested imports not marked as style-sheet routes (nested leaf).
  */
 
 import assert from "node:assert/strict";
@@ -48,12 +54,12 @@ const missing = [
   resolvePackageRoot("pdfjs-dist", REPO) ? null : "pdfjs-dist",
 ].filter((value): value is string => value !== null);
 
-/** A document with an early base to `host` and a head <style> importing `sheet`. */
-function earlyBaseImport(host: string, sheet: string): string {
+/** A document with an early base to `host` and a head <style> holding the import rule `rule`. */
+function earlyBaseImport(host: string, rule: string): string {
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>import under a base</title>' +
     `<base href="${host}/manual/">` +
     '<style>@page { size: 400px 600px; margin: 40px; } body { font: 14px/20px serif; margin: 0; } p { margin: 0 0 4px; }</style>' +
-    `<style>@import "${sheet}";</style></head>` +
+    `<style>${rule}</style></head>` +
     '<body><p>An imported sheet under an early base.</p><div id="big" class="big">tall block</div><p>after</p></body></html>';
 }
 
@@ -79,8 +85,11 @@ describe("artifact/local-uri and the document base, live", () => {
       locale: "de-DE",
     });
 
-    // The base host: it serves both sheets; only imp.css also exists beside the document.
-    const sheets: Record<string, string> = { "/imp.css": ".big { height: 200px; }", "/host-only.css": ".big { height: 200px; }" };
+    // The base host serves every sheet below. Beside the document, only `local` exists.
+    const BIG = ".big { height: 200px; }";
+    const sheets: Record<string, string> = {
+      "/imp.css": BIG, "/host-only.css": BIG, "/a.css": '@import "nested-host-only.css";', "/nested-host-only.css": BIG,
+    };
     host = createServer((request, response) => {
       const path = (request.url ?? "").split("?")[0]!;
       hostRequests.push(path);
@@ -90,11 +99,23 @@ describe("artifact/local-uri and the document base, live", () => {
     });
     await new Promise<void>((resolve) => host!.listen(0, "127.0.0.1", resolve));
     hostOrigin = `http://127.0.0.1:${(host.address() as AddressInfo).port}`;
-    for (const [name, sheet] of [["local-copy", "/imp.css"], ["host-only", "/host-only.css"]] as const) {
+    // Each case names its complication. `local` is what exists beside the document.
+    const importCases: { name: string; rule: string; local: Record<string, string> }[] = [
+      { name: "local-copy", rule: '@import "/imp.css";', local: { "imp.css": BIG } },
+      { name: "host-only", rule: '@import "/host-only.css";', local: {} },
+      // Valid CSS with no whitespace after @import: every per-reader regex used to miss it.
+      { name: "nospace-local-copy", rule: '@import"/imp.css";', local: { "imp.css": BIG } },
+      { name: "nospace-host-only", rule: "@import'/host-only.css';", local: {} },
+      // The url() form of @import with a quoted argument.
+      { name: "url-quoted-host-only", rule: '@import url("/host-only.css");', local: {} },
+      // A nested import inside a captured local sheet: Paged.js resolves it against that sheet.
+      { name: "nested-host-only", rule: '@import "/a.css";', local: { "a.css": '@import "nested-host-only.css";' } },
+    ];
+    for (const { name, rule, local } of importCases) {
       const dir = join(outDir, name);
       mkdirSync(dir);
-      if (name === "local-copy") writeFileSync(join(dir, "imp.css"), sheets["/imp.css"]!);
-      writeFileSync(join(dir, "doc.html"), earlyBaseImport(hostOrigin, sheet));
+      for (const [file, text] of Object.entries(local)) writeFileSync(join(dir, file), text);
+      writeFileSync(join(dir, "doc.html"), earlyBaseImport(hostOrigin, rule));
       imported[name] = await renderDocuments([join(dir, "doc.html")], {
         outDir: join(dir, "out"),
         evidenceBinding: false,
@@ -164,4 +185,28 @@ describe("artifact/local-uri and the document base, live", () => {
       JSON.stringify(document.infrastructure),
     );
   });
+
+  const assertServed = (name: string): void => {
+    const run = imported[name]!;
+    assert.equal(run.fatal, null, `fatal: ${run.fatal?.message}`);
+    const document = run.documents[0]!;
+    assert.ok(document.snapshot, `no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    const local = document.snapshot.resources.filter((resource) => resource.resolvedUri.endsWith("/imp.css") && resource.scheme === "file");
+    assert.deepEqual(local.map((resource) => resource.status), [200], "the paginator's loopback request for /imp.css was not served");
+    assert.equal(document.snapshot.blocks.find((block) => block.authorId === "big")?.box.height, 200, "the document was paginated without its imported sheet");
+  };
+  const assertRefused = (name: string, sheet: string): void => {
+    const document = imported[name]!.documents[0]!;
+    assert.ok(hostRequests.includes(`/${sheet}`), `the browser never took ${sheet} from the base host`);
+    assert.equal(document.snapshot, null, "a page paginated without its imported sheet was measured");
+    assert.ok(
+      document.infrastructure.some((event) => event.kind === "source-acquisition-failed" && event.detail.includes(sheet)),
+      JSON.stringify(document.infrastructure),
+    );
+  };
+
+  it("serves a no-space @import\"…\" the paginator requests under an early base", () => assertServed("nospace-local-copy"));
+  it("refuses to measure when a no-space @import'…' is available only on the base host", () => assertRefused("nospace-host-only", "host-only.css"));
+  it("refuses to measure when an @import url(\"…\") is available only on the base host", () => assertRefused("url-quoted-host-only", "host-only.css"));
+  it("refuses to measure when a nested @import inside a captured sheet is available only on the base host", () => assertRefused("nested-host-only", "nested-host-only.css"));
 });

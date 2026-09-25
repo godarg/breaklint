@@ -13,6 +13,7 @@ import { dirname, resolve } from "node:path";
 import { blockKey, normaliseSignature, sha256, svgRootKey, svgTextKey } from "../core/fingerprint.ts";
 import { resolveDocumentUri } from "../acquire/browser.ts";
 import { authoredScheme, publishedBaseUrl, urlInputText } from "../core/uri-text.ts";
+import { cssReferences as scanCssReferences } from "../core/css-references.ts";
 import {
   BREAK_CAUSE_CASCADE_HINTS,
   BREAK_CAUSE_DETERMINED_BY,
@@ -198,11 +199,8 @@ function cssUriParts(
     const value = urlInputText(raw);
     if (value.length > 0) refs.push({ ...uriParts(value, file, distributionRoot, documentBase), attribute });
   };
-  // Quoted @import without url(). url(...) imports are covered exactly once by the second loop.
-  for (const match of text.matchAll(/@import\s+["']([^"']+)["']/giu)) if (match[1]) add(match[1]);
-  for (const match of text.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s)'";]+))\s*\)/giu)) {
-    add(match[1] ?? match[2] ?? match[3] ?? "");
-  }
+  // Every @import target and url(), in source order, from the scanner discovery uses as well.
+  for (const reference of scanCssReferences(text)) add(reference.value);
   return refs;
 }
 
@@ -228,8 +226,9 @@ function documentBaseElement(document: Node): Element | null {
  * hyperlink is resolved when it is followed or printed, and these fetches start only after
  * parsing has moved on. Measured in plain Chromium 141 on file:// documents with a late
  * `<base href="https://…">`: `<a>`, SVG `<a>` (href and xlink:href), `<object data>`,
- * `<embed src>`, `<video src>` and SVG `<image>` (href and xlink:href) before it all went to the
- * base host; `<link rel=icon>` is resolved the same way and was not fetched at all. Everything
+ * `<embed src>`, `<video src>`, `<audio src>`, `<source src>` in `<video>` and `<audio>`,
+ * `<track src>` and SVG `<image>` (href and xlink:href) before it all went to the base host;
+ * `<link rel=icon>` is resolved the same way and was not fetched at all. Everything
  * else — img src and srcset, `<picture><source>`, poster, iframe, script, link stylesheet /
  * preload / modulepreload, SVG `<use>`, every CSS url() and @import — was fetched from the local
  * tree and follows tree order. `<input type=image>` requested both; it stays with tree order, so
@@ -243,8 +242,12 @@ function resolvesAgainstFinalBase(node: Element, attribute: string, attrs: Recor
     return tag === "link" && (attrs.rel ?? "").toLowerCase().split(/\s+/u).includes("icon");
   }
   if (attribute === "data") return tag === "object";
-  if (attribute === "src") return tag === "embed" || tag === "video";
-  return false;
+  if (attribute !== "src") return false;
+  if (tag === "embed" || tag === "video" || tag === "audio" || tag === "track") return true;
+  // <source src> is media only inside <video> or <audio>; inside <picture> it has srcset instead.
+  const parent = (node as { parentNode?: Node | null }).parentNode;
+  const parentTag = parent && isElement(parent) ? parent.tagName.toLowerCase() : "";
+  return tag === "source" && (parentTag === "video" || parentTag === "audio");
 }
 
 /** Parse identities and type runs from the injected source text, never from paginated clones. */

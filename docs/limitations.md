@@ -564,11 +564,27 @@ itself, and it resolves a `<style>` `@import` against the document URL, not agai
 under an early base it asks the loopback origin for a sheet the browser took from the base host.
 Measured on a patched Chromium 141: skipping references under the base answered that request with
 403, and a block the imported rule made 200 px tall was measured as one 20 px line, with no
-infrastructure event. Capturing a file the browser may not request costs nothing; not serving what
-the paginator requests produced a clean report over a different document. A failed loopback request
+infrastructure event. Capturing a file the browser may not request costs a false exit 3 at worst
+(below); not serving what the paginator requests produced a clean report over a different document. A failed loopback request
 for any linked or imported style sheet now ends the run with `source-acquisition-failed`, except a
 root-relative `<link rel=stylesheet>` whose file is absent, which keeps its exemption as a
 deployment route. What stays
 open: a style sheet captured this way is also scanned by `artifact/local-uri`, so a root-relative
 `url()` in the local copy of a sheet the browser took from the base host is reported — a
 conservative false alarm, never a missed local reference.
+
+The same capture produces two known false exit 3s, both conservative (the run refuses to measure
+instead of measuring the wrong document):
+
+- **A style sheet that exists only on the base host.** Under an http(s) `<base href>`, a relative
+  `<link rel=stylesheet href="print.css">` whose file is on the base host and not beside the
+  document ends the run with `source-acquisition-failed` ("resource snapshot failed: ENOENT"),
+  because capture requires a relative linked sheet to exist locally before the browser starts. A
+  plain browser would load it from the host. Keep a local copy beside the document, or render the
+  document with its published sheets present.
+- **A relative `<base href="sub/">`.** Capture resolves references against the document's own
+  directory; the browser resolves them against `sub/`. A linked sheet that exists only under `sub/`
+  ends with the same ENOENT, and one that exists in both places ends with "required document
+  resource request failed", because the browser's request for `sub/…` was never captured. Relative
+  bases are not applied anywhere in breaklint's resolution (the `artifact/local-uri` page says the
+  same for the rule).

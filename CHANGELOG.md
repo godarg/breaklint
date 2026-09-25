@@ -194,8 +194,8 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   and `data:`, `blob:`, `about:` and other schemes.
 - **The same rule honours an http(s) `<base href>` where the browser does.** Measured element by
   element in plain Chromium 141 on `file://` documents with a late https base: hyperlinks (`<a>`,
-  `<area>`, SVG `<a>`), `<object data>`, `<embed src>`, `<video src>`, SVG `<image>` and
-  `<link rel=icon>` resolve against the document's first `<base href>` wherever they stand; `<img>`,
+  `<area>`, SVG `<a>`), `<object data>`, `<embed src>`, `<video src>`, `<audio src>`, `<source src>`
+  in `<video>`/`<audio>`, `<track src>`, SVG `<image>` and `<link rel=icon>` resolve against the document's first `<base href>` wherever they stand; `<img>`,
   `srcset`, `<picture><source>`, `poster`, `<iframe>`, `<script>`, `<link>` stylesheet / preload /
   modulepreload, SVG `<use>` and every CSS `url()`, `@font-face` and `@import` are fetched from the
   local tree when they come before the base, and are reported then; `<input type=image>`, requested
@@ -209,8 +209,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   `<link>`ed sheet through its base-resolved `href` (so after a late base the paged document uses
   the base host's copy) and a `<style>` `@import` against the document URL, ignoring `<base>`. Local
   resource capture therefore still ignores `<base>` and captures what the document names (G-88 stays
-  open as a known, harmless over-capture, in `docs/limitations.md`); a root-relative `url()` in the
-  local copy of a sheet the browser took from the base host is reported, a conservative false alarm.
+  open as a known over-capture, in `docs/limitations.md`); a root-relative `url()` in the local copy
+  of a sheet the browser took from the base host is reported, a conservative false alarm, and a
+  relative sheet that exists only on the base host, or any sheet under a relative `<base href>`, ends
+  with a false exit 3 (both documented there).
 - **Fingerprints of the newly reported values do not depend on the checkout directory.** A
   scheme-less local reference is keyed on its own text resolved against `file:///`, not on
   `resolvedUri`, which carried the checkout path (`file:///<checkout>/docs/a.html`). Values with a
@@ -241,6 +243,20 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
 
 ### Fixed
 
+- **`@import"/x.css"` and `@import'/x.css'` — valid CSS with no space after `@import` — are
+  captured, guarded and reported.** Local resource discovery, the style-sheet route guard and the
+  `artifact/local-uri` collector each read CSS with their own regex, and every one required
+  whitespace after `@import`: such a sheet was neither captured nor served, so a document without a
+  base ended with a false exit 3 (the browser's request was refused), and under an early
+  `<base href>` the paginator's refused request passed silently and the document was measured
+  without the sheet. The three now share one CSS
+  reference scanner (`src/core/css-references.ts`) that reads comments, strings, `url()` with and
+  without quotes, escapes and optional whitespace as a CSS tokenizer does. Collected CSS references
+  now come in source order (previously every `@import` before every `url()`), which moves the
+  `uri:<n>` node keys of such references. Fingerprints do not change, except for a value written
+  with CSS escapes, which is now decoded (`url(\2f a.png)` is `/a.png`) before it is keyed and
+  reported. URL strings outside `url()`
+  and `@import` (e.g. `image-set("a.png" 1x)`) are still not read.
 - **A refused loopback request for a linked or imported style sheet now ends the run with exit 3.**
   Paged.js 0.4.3 fetches every linked and imported sheet a second time itself; that request has
   role fetch/xhr, which the required-resource check did not treat as a layout resource. Under an
