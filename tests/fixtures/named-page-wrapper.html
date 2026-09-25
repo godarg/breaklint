@@ -1,0 +1,61 @@
+<!doctype html>
+<!--
+  A named-page region inside a wrapper that spans every page, the shape of a real report.
+
+  COMPLICATION. `<main>` wraps the whole document, so Paged.js rebuilds it as a `data-split-from`
+  clone at the top of every page after the first: the FIRST source-bearing node of those pages is
+  a `<main>` with no named ancestor. The region `section.wide` (`page: wide`) sits in the middle
+  of it and spans three pages. A named page read from each page's first node saw a change of
+  named page on every boundary inside the region and on the one after it (a false `forced`, which
+  declines widows and orphans there) and none on the boundary into the region. The named page has
+  its own margins, so the content width of each page says which named page it was laid out at:
+  the independent oracle the live test compares the break causes against. Paragraphs run over
+  several lines so that boundaries split them and the widow and orphan rules have candidates.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 150mm 110mm; margin: 14mm; }
+@page wide { size: 150mm 110mm; margin: 14mm 7mm; }
+body { margin: 0; font: 10pt/1.45 Georgia, serif; }
+p, h2 { margin: 0 0 5pt; }
+h2 { font-size: 12pt; break-after: avoid; }
+.wide { page: wide; }
+</style></head><body>
+<main id="report">
+<section id="summary"><h2 id="h-summary">Summary</h2>
+<p id="sum0">SUM0: survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency.</p>
+<p id="sum1">SUM1: evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction.</p>
+<p id="sum2">SUM2: interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform.</p>
+<p id="sum3">SUM3: counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding.</p>
+<p id="sum4">SUM4: transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal.</p>
+<p id="sum5">SUM5: sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday.</p>
+<p id="sum6">SUM6: morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting.</p>
+</section>
+<section class="wide" id="wide"><h2 id="h-wide">The wide region</h2>
+<p id="wide0">WIDE0: district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer.</p>
+<p id="wide1">WIDE1: corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample.</p>
+<p id="wide2">WIDE2: frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning.</p>
+<p id="wide3">WIDE3: junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter.</p>
+<p id="wide4">WIDE4: platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season.</p>
+<p id="wide5">WIDE5: boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service.</p>
+<p id="wide6">WIDE6: terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable.</p>
+<p id="wide7">WIDE7: weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district.</p>
+<p id="wide8">WIDE8: alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor.</p>
+<p id="wide9">WIDE9: survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency.</p>
+<p id="wide10">WIDE10: evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction.</p>
+<p id="wide11">WIDE11: interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform.</p>
+<p id="wide12">WIDE12: counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding.</p>
+<p id="wide13">WIDE13: transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal.</p>
+<p id="wide14">WIDE14: sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday.</p>
+<p id="wide15">WIDE15: morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting.</p>
+<p id="wide16">WIDE16: shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey.</p>
+<p id="wide17">WIDE17: season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening.</p>
+</section>
+<section id="closing"><h2 id="h-closing">After the region</h2>
+<p id="close0">CLOSE0: service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval.</p>
+<p id="close1">CLOSE1: timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts.</p>
+<p id="close2">CLOSE2: district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer.</p>
+<p id="close3">CLOSE3: corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample.</p>
+<p id="close4">CLOSE4: frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning platform transfer frequency interval district survey service weekday shelter boarding sample junction counts corridor evening timetable alighting season terminal morning.</p>
+</section>
+</main>
+</body></html>
