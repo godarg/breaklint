@@ -54,8 +54,9 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   keys, types; opaque values unread), and a unit test fails if the gate's encoding of that list and
   the README diverge. Decline rows without a rule are left out of the per-rule checks only for the
   two evidence-level declines the README names (`env/evidence-fragment-outside-page` on a page,
-  `env/evidence-overlay-removed` on the document); any other such row fails, and the exit code is
-  judged as always.
+  `env/evidence-overlay-removed` on the document), while `env/parity-blank-page` rows without a
+  rule (scope page) must add up to the expected file's `parityBlankPages.count`; any other such row
+  fails, and the exit code is judged as always.
   `tests/unit/corpus-gate.test.ts` exercises every matching rule and fail-closed path on synthetic
   reports and through the gate's process boundary. **The step is expected to be red until the
   0.7.0 packages it depends on are integrated**: on the commit that adds it, measured locally on

@@ -111,6 +111,7 @@ function expectedFile(rules: Record<string, RuleLists> = {}, overrides: Json = {
       allowed: withWhy(rules[ruleId]?.allowed),
       expectedDeclines: rules[ruleId]?.expectedDeclines ?? [],
     }])),
+    parityBlankPages: { count: 0, byFontStack: { reference: [] }, basis: "synthetic" },
     permittedDeclineReasons: ["env/forced-break", "env/svg-painted-bounds-unsupported"],
     notActiveInDefaultProfile: ["layout/half-empty-page"],
     verification: {
@@ -427,6 +428,30 @@ test("E37: rows with ruleId null are left out only for the two evidence-level de
   assertFail(judge(raw, outcome([], { notMeasured: [row("page", "env/evidence-overlay-removed")] })), /not an evidence-level decline/u);
   // The exemption covers the per-rule checks, not the exit: an evidence exit 4 outside the set fails.
   assertFail(judge(raw, outcome([], { exit: 4, reason: "evidence/required-page-binding-incomplete", notMeasured: [row("page", "env/evidence-fragment-outside-page")] })), /exit 4 .* not in the expected set/u);
+});
+
+test("E41: env/parity-blank-page rows without a rule are checked by count against parityBlankPages", () => {
+  const parity = (scope: string, count: number) => ({ scope, ruleId: null, reason: "env/parity-blank-page", target: null, count });
+  const two = expectedFile({}, { parityBlankPages: { count: 2, byFontStack: { reference: [4, 8] }, basis: "synthetic" } });
+  // Matching: the counts of all rows add up to the construction fact.
+  const matching = judge(two, outcome([], { notMeasured: [parity("page", 1), parity("page", 1)] }));
+  assertPass(matching);
+  assert.deepEqual(matching.parityBlankPages, { expected: 2, actual: 2 });
+  assertPass(judge(expectedFile(), outcome([])));
+  // Mismatching, in both directions.
+  assertFail(judge(two, outcome([], { notMeasured: [parity("page", 1)] })), /sum to 1, parityBlankPages\.count is 2/u);
+  assertFail(judge(expectedFile(), outcome([], { notMeasured: [parity("page", 1)] })), /sum to 1, parityBlankPages\.count is 0/u);
+  // The right reason under the wrong scope fails, and does not count.
+  const wrongScope = judge(two, outcome([], { notMeasured: [parity("page", 1), parity("page", 1), parity("document", 1)] }));
+  assertFail(wrongScope, /env\/parity-blank-page has scope document, not page/u);
+  assert.deepEqual(wrongScope.parityBlankPages, { expected: 2, actual: 2 });
+  // The rule-level decline stays outside permittedDeclineReasons.
+  assertFail(judge(expectedFile(), outcome([], { notMeasured: [{ scope: "page", ruleId: "layout/orphaned-continuation-page", reason: "env/parity-blank-page", target: null, count: 1 }] })), /outside permittedDeclineReasons: layout\/orphaned-continuation-page env\/parity-blank-page/u);
+  // The construction fact is normative and typed.
+  const { parityBlankPages: _parity, ...withoutParity } = expectedFile();
+  assert.throws(() => compile(withoutParity), /required field "parityBlankPages" is missing/u);
+  assert.throws(() => compile(expectedFile({}, { parityBlankPages: { count: -1, byFontStack: {}, basis: "b" } })), /must not be negative/u);
+  assert.throws(() => compile(expectedFile({}, { parityBlankPages: { count: 0, byFontStack: { reference: 3 }, basis: "b" } })), /byFontStack\.reference: expected array of integer/u);
 });
 
 test("E39: uri values are compared as the parser decodes them, and srcset targets are rejected", () => {

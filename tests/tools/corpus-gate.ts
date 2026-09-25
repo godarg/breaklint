@@ -472,6 +472,7 @@ export const FIELD_LIST: Record<string, Field> = {
   }))),
   constructionFacts: I(T.array(T.object({ fact: I(T.string), arithmetic: I(T.string, false), measured: I(T.opaque, false) }))),
   rules: N(T.map(T.object(RULE_FIELDS))),
+  parityBlankPages: N(T.object({ count: N(T.integer), byFontStack: I(T.map(T.array(T.integer))), basis: I(T.string) })),
   permittedDeclineReasons: N(T.array(T.string)),
   notActiveInDefaultProfile: N(T.array(T.string)),
   verification: I(T.object({
@@ -583,6 +584,13 @@ export const EVIDENCE_LEVEL_DECLINES: readonly { reason: string; scope: string }
   { reason: "env/evidence-fragment-outside-page", scope: "page" },
   { reason: "env/evidence-overlay-removed", scope: "document" },
 ];
+/**
+ * README "Evidence-level declines" (E41): the third reason a row with `ruleId: null` may carry,
+ * scope `page`. It is not left out: the sum of its counts must equal the normative
+ * `parityBlankPages.count`, because whether a document has a parity blank page is a construction
+ * fact.
+ */
+export const PARITY_BLANK_DECLINE = { reason: "env/parity-blank-page", scope: "page" } as const;
 /**
  * README "`artifact/local-uri`" (E39): the URI-bearing attributes an `id` target reads. `srcset`
  * is out of scope, so a `uri` target naming it is rejected rather than guessed.
@@ -718,6 +726,8 @@ export interface CompiledExpected {
   exitSet: number[];
   permittedDeclineReasons: string[];
   notActiveInDefaultProfile: string[];
+  /** E41: the number of pages Paged.js inserts blank for parity. */
+  parityBlankPages: number;
   rules: Map<string, CompiledRule>;
 }
 
@@ -912,6 +922,8 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
   const exitSet = intArray(exit.set, `${label} expectedExit.set`);
   if (new Set(exitSet).size !== exitSet.length || !exitSet.every((code) => code >= 0 && code <= 4)) fail(`${label}: expectedExit.set must hold distinct codes 0..4`);
 
+  const parityBlankPages = (expected.parityBlankPages as Record<string, unknown>).count as number;
+  if (parityBlankPages < 0) fail(`${label}: parityBlankPages.count must not be negative`);
   const permitted = stringArray(expected.permittedDeclineReasons, `${label} permittedDeclineReasons`);
   const inactive = stringArray(expected.notActiveInDefaultProfile, `${label} notActiveInDefaultProfile`, false);
   const rulesRaw = expected.rules as Record<string, Record<string, unknown>>;
@@ -1022,7 +1034,7 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
     }
     rules.set(ruleId, compiled);
   }
-  return { documentId: binding.id, pagesRange: [range[0]!, range[1]!], exitSet, permittedDeclineReasons: permitted, notActiveInDefaultProfile: inactive, rules };
+  return { documentId: binding.id, pagesRange: [range[0]!, range[1]!], exitSet, permittedDeclineReasons: permitted, notActiveInDefaultProfile: inactive, parityBlankPages, rules };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1062,6 +1074,8 @@ export interface DocumentVerdict {
   declines: DeclineSummary[];
   /** Sum of the counts of evidence-level rows (`ruleId: null`), left out of the per-rule checks. */
   evidenceLevelDeclines: number;
+  /** E41: parity blank pages, expected and as the report's rows sum them; null when not judged. */
+  parityBlankPages: { expected: number; actual: number } | null;
   failures: string[];
   notes: string[];
 }
@@ -1097,6 +1111,7 @@ export function evaluateDocument(expected: CompiledExpected, outcome: RunOutcome
     findings: 0,
     declines: [],
     evidenceLevelDeclines: 0,
+    parityBlankPages: null,
     failures: [],
     notes: [],
   };
@@ -1229,8 +1244,14 @@ export function evaluateDocument(expected: CompiledExpected, outcome: RunOutcome
 
   // Step 5 (E37): "no decline row of that rule carries a reason outside `permittedDeclineReasons`
   // (rows with `ruleId: null` follow the paragraph 'Evidence-level declines')".
+  let parityBlankRows = 0;
   for (const row of rows) {
     if (!Number.isInteger(row.count) || row.count < 1) failures.push(`malformed decline row count: ${row.ruleId ?? "(no rule)"} ${row.reason} ${String(row.count)}`);
+    if (row.ruleId === null && row.reason === PARITY_BLANK_DECLINE.reason) {
+      if (row.scope !== PARITY_BLANK_DECLINE.scope) failures.push(`decline row with ruleId null: ${row.reason} has scope ${row.scope}, not ${PARITY_BLANK_DECLINE.scope}`);
+      else parityBlankRows += row.count;
+      continue;
+    }
     if (row.ruleId === null) {
       const exempt = EVIDENCE_LEVEL_DECLINES.some((allowed) => allowed.reason === row.reason && allowed.scope === row.scope);
       if (exempt) {
@@ -1243,6 +1264,10 @@ export function evaluateDocument(expected: CompiledExpected, outcome: RunOutcome
     }
     if (!expected.rules.has(row.ruleId)) failures.push(`decline of a rule the expected file does not name: ${row.ruleId} ${row.reason} x${row.count}`);
     if (!expected.permittedDeclineReasons.includes(row.reason)) failures.push(`decline reason outside permittedDeclineReasons: ${row.ruleId} ${row.reason} x${row.count}`);
+  }
+  verdict.parityBlankPages = { expected: expected.parityBlankPages, actual: parityBlankRows };
+  if (parityBlankRows !== expected.parityBlankPages) {
+    failures.push(`${PARITY_BLANK_DECLINE.reason} rows with ruleId null sum to ${parityBlankRows}, parityBlankPages.count is ${expected.parityBlankPages}`);
   }
   return done();
 }
@@ -1318,6 +1343,7 @@ export function formatTable(verdicts: DocumentVerdict[]): string[] {
     [
       ...v.declines.map((d) => `${d.ruleId.split("/")[1]} ${d.reason.slice(4)} ${d.actual}/${d.expected}${d.kind === "measured-alternative" ? ` ${d.state}` : d.state === "ok" ? "" : " MISMATCH"}`),
       ...(v.evidenceLevelDeclines ? [`evidence-level ${v.evidenceLevelDeclines}`] : []),
+      ...(v.parityBlankPages && (v.parityBlankPages.expected || v.parityBlankPages.actual) ? [`parity-blank ${v.parityBlankPages.actual}/${v.parityBlankPages.expected}`] : []),
     ].join("; ") || "-",
     v.pass ? "PASS" : "FAIL",
   ]);
