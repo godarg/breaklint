@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 — TBD-at-tag
+## 0.7.0 — 2026-09-25
 
 A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0 and 0.6.0: a
 versioned structure changes, so its stamp moves. **Snapshot 4 → 5.** The document report stays at
