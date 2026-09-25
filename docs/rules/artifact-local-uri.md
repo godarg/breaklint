@@ -31,25 +31,28 @@ document rendered from a local file:
 | `data:` | no | it carries its own content |
 | `blob:`, `about:` | no | a browsing session's object and a browser-internal document; neither names a file |
 
-**The document base decides for a value without a scheme — for a fetch only from where it
-stands.** HTML takes the first `<base>` with an `href`, wherever it sits, as the document base.
+**The document base decides for a value without a scheme — for many references only from where
+it stands.** HTML takes the first `<base>` with an `href`, wherever it sits, as the document base.
 Only an absolute `http:` or `https:` base is a published origin; under it `/docs/guide.html`,
 `\\server\share\x`, `//host/x` and `/var/share/x.pdf` are URLs on that host — a broken link there,
-if wrong, not a local reference — and are not reported. Which references it governs depends on
-when the browser resolves them:
+if wrong, not a local reference — and are not reported. Which references it governs was measured in
+plain Chromium 141 on `file://` documents with a late `<base href="https://…">`, one element at a
+time:
 
-- A **hyperlink** (`<a href>`, `<area href>`, SVG `<a>` with `href` or `xlink:href`) is resolved
-  when it is followed or printed, against the final document base. A base governs it wherever the
-  link stands, before the base or after it. Measured in plain Chromium 141 on a `file://` document:
-  an HTML `<a>` and both SVG `<a>` forms before a late https base were printed into the PDF with the
-  base host (`<area>` is not printed as a PDF link at all).
-- Every other reference is treated as a **fetch**, resolved when its element is parsed: an image,
-  a `srcset` candidate, a `<link>`ed style sheet, a `<style>` or `style=""` `url()` (an
-  `@font-face` source included), `poster`, `<object data>`, SVG `<image>` and `<use>`. A base
-  governs it only when the base comes first in the source. Measured in plain Chromium 141 on
-  `file://` documents: an `<img>`, a `<link rel=stylesheet>`, a `<style>` `url()`, a `style=""`
-  `url()` and an `@font-face` source placed before a late `<base href="https://…">` were all
-  fetched from the local file tree and rendered into the PDF. Such a fetch is reported.
+- **Resolved against the final base, wherever they stand** — they went to the base host even
+  before a late base: hyperlinks (`<a href>`, `<area href>`, SVG `<a>` with `href` or
+  `xlink:href`; the HTML and both SVG forms were printed into the PDF with the base host, and
+  `<area>` is not printed as a PDF link at all), `<object data>`, `<embed src>`, `<video src>`, SVG
+  `<image>` (`href` and `xlink:href`), and `<link rel=icon>` (resolved the same way, and not fetched
+  at all by headless Chromium).
+- **Resolved from where they stand** — fetched from the local file tree when they come before the
+  base, and reported then: `<img src>` and `srcset`, `<picture><source>`, `poster`,
+  `<iframe src>`, `<script src>`, `<link>` as stylesheet, preload or modulepreload, SVG `<use>`,
+  and every CSS reference in a `<style>` or `style=""` — `url()`, `@font-face` sources, `@import`.
+- `<input type=image>` was requested from both. The rule keeps it with the second group, so its
+  local fetch is reported.
+- An element the measurement did not cover (`<audio src>`, `<video><source>`, …) follows the second
+  group: judged by where it stands, which can only over-report.
 
 An absolute URL ignores the base: a `file:` URI and a drive path stay reported under any base. A
 relative, root-relative, protocol-relative or `file:` base is not a published origin and leaves
@@ -57,14 +60,28 @@ resolution against the local file in place (the browser also refuses a `data:` b
 `<base href>` itself is reported when it is a `file:` URI or an absolute path. A `<base>` inside SVG
 content is not the HTML base element and changes nothing.
 
-breaklint applies the same rule when it gathers a document's local resources: a style sheet,
-image or other fetch that follows an http(s) base is not captured from the document's directory,
-not served on the loopback origin and not scanned, because the browser requests it from the base
-host. Measured on a patched Chromium 141 without evidence binding: under
-`<base href="https://docs.example.org/manual/">` an `<img src="/logo.png">` was requested from
-`https://docs.example.org/logo.png`, and with no network allowlist the request was blocked and the
-run ended with exit 3. Resources behind such a base come from its host or not at all; a style sheet
-loaded from an allow-listed host is not scanned by this rule.
+**breaklint's own chain differs from plain Chromium here, in two places.** The rule judges the
+artefact a plain browser would print; breaklint's measurement runs Paged.js 0.4.3, which fetches
+every linked and imported style sheet a second time itself:
+
+- A `<link rel=stylesheet>` before a late base is loaded by the browser from the local tree, but
+  Paged.js takes the link's `href` as resolved at pagination time — against the base — so the paged
+  document breaklint measures uses the base host's copy (or none, offline).
+- A `<style>` `@import` or `url()` under an early base is loaded by the browser from the base host,
+  but Paged.js rewrites it against the document URL and ignores `<base>`, so breaklint's paginator
+  asks the loopback origin for it. breaklint therefore captures and serves every local resource the
+  document names, whether or not a `<base>` sends the browser elsewhere (see
+  [`docs/limitations.md`](../limitations.md)), and a failed loopback request for a linked or imported
+  style sheet ends the run with `source-acquisition-failed` (exit 3) instead of measuring a document
+  paginated without that sheet. (A root-relative `<link rel=stylesheet>` whose file is absent keeps
+  its existing exemption as a deployment route.)
+
+Under a base, the browser requests its resources from the base host. Measured on a patched
+Chromium 141 without evidence binding: under `<base href="https://docs.example.org/manual/">` an
+`<img src="/logo.png">` was requested from `https://docs.example.org/logo.png`, and with no network
+allowlist the request was blocked and the run ended with exit 3. A style sheet loaded from an
+allow-listed host is not scanned by this rule; its local copy, when one exists, is (a conservative
+false alarm for a root-relative `url()` in it).
 
 breaklint itself serves the document from a loopback origin whose root is the document's
 directory, so during its own run a root-relative value names a file under that directory. That is
@@ -73,7 +90,9 @@ a property of the measurement, not of the artefact, and the rule does not use it
 **Fingerprints.** A reported value without a scheme is keyed on its own text resolved against
 `file:///` (`/docs/a.html` becomes `file:///docs/a.html`, `\\srv\share\x` becomes
 `file://srv/share/x`), not on where it resolved in this checkout, so the same document gives the
-same fingerprint in any directory. A value with a scheme is keyed on its resolved URL, as before.
+same fingerprint in any directory. A value with a scheme is keyed on its resolved URL, as before —
+and that URL is canonicalised through the file system: a `file:` path that exists on the machine
+running breaklint is keyed on its real path, so a symbolic link on that machine changes the key.
 The same resource referenced twice — `src` and a `srcset` candidate naming one file, or one link
 repeated — gives two findings, one per reference to fix, with their own node keys and one shared
 fingerprint that groups them across runs. Neither claims a unique identity

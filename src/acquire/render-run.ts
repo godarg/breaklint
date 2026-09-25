@@ -33,7 +33,6 @@ import {
 import { IS, SUPPORTED_PAGEDJS_VERSION } from "../core/enums.ts";
 import { measureCapturedFontIdentity, prepareCapturedFontIdentity, releaseCapturedFontIdentity } from "../source/font-identity.ts";
 import { sha256Short } from "../core/fingerprint.ts";
-import { publishedBaseUrl } from "../core/uri-text.ts";
 import type { DocumentInput } from "../core/engine.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InfraEvent, ReportEnvironment, ResourceRecord, SourceRef } from "../core/types.ts";
@@ -502,36 +501,41 @@ function cssReferences(text: string): string[] {
   return refs;
 }
 
+/**
+ * The @import targets of a style sheet: the references the paginator fetches itself. Paged.js
+ * 0.4.3 re-requests every linked and imported sheet, resolved against the document URL and NOT
+ * against a <base>, so these routes can be requested from the loopback origin even when the
+ * browser took the sheet from elsewhere.
+ */
+function cssImportReferences(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const match of text.matchAll(/@import(?:\s|\/\*[\s\S]*?\*\/)+(?:["']([^"']+)["']|url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s)'";]+))\s*\))/giu)) {
+    const value = match[1] ?? match[2] ?? match[3] ?? match[4];
+    if (value) out.add(value);
+  }
+  return out;
+}
+
 /** References which cause a browser resource fetch, deliberately excluding navigation anchors. */
 type HtmlResourceReference = {
   raw: string;
   requiredStylesheet: boolean;
   /** Static root-relative script/style URLs belong to the deployment origin, not necessarily this file tree. */
   deploymentRequiredRole: "stylesheet" | "script" | null;
+  /** A linked or imported style sheet: a route the paginator requests on its own. */
+  stylesheet?: boolean;
 };
 
 function htmlResourceReferences(html: string): HtmlResourceReference[] {
   const references: HtmlResourceReference[] = [];
-  // The document base is the first HTML <base> with an href. Once an http(s) base has been parsed,
-  // every later fetch resolves on that host — the browser requests it there, not from the local
-  // tree — so a later reference is no local asset: it is neither captured, served nor scanned
-  // (measured in Chromium 141: a <link rel=stylesheet> after such a base was requested from the
-  // base host). A fetch before the base still resolves against the document, as before.
-  let baseDecided = false;
-  let underPublishedBase = false;
-  const add = (raw: string, requiredStylesheet = false, deploymentRequiredRole: "stylesheet" | "script" | null = null): void => {
-    if (underPublishedBase) return;
-    references.push({ raw, requiredStylesheet, deploymentRequiredRole });
+  const add = (raw: string, requiredStylesheet = false, deploymentRequiredRole: "stylesheet" | "script" | null = null, stylesheet = false): void => {
+    references.push({ raw, requiredStylesheet, deploymentRequiredRole, stylesheet });
   };
   const document = parse(html);
   const walk = (node: ParsedNode): void => {
     if (parsedElement(node)) {
       const tag = node.tagName.toLowerCase();
       const attrs = Object.fromEntries(node.attrs.map((attr) => [attr.name.toLowerCase(), attr.value]));
-      if (!baseDecided && tag === "base" && node.namespaceURI === "http://www.w3.org/1999/xhtml" && attrs.href !== undefined) {
-        baseDecided = true;
-        underPublishedBase = publishedBaseUrl(attrs.href) !== null;
-      }
       const linkRel = new Set((attrs.rel ?? "").toLowerCase().split(/\s+/u));
       const hrefIsResource = tag === "link" && ["stylesheet", "preload", "modulepreload", "icon", "manifest"].some((rel) => linkRel.has(rel));
       if (attrs.href && (hrefIsResource || tag === "image" || tag === "use")) {
@@ -540,6 +544,7 @@ function htmlResourceReferences(html: string): HtmlResourceReference[] {
           tag === "link" && linkRel.has("stylesheet"),
           tag === "link" && linkRel.has("stylesheet") ? "stylesheet" :
             (tag === "link" && linkRel.has("modulepreload") ? "script" : null),
+          tag === "link" && linkRel.has("stylesheet"),
         );
       }
       for (const attribute of ["src", "poster", "data"]) if (attrs[attribute]) {
@@ -552,7 +557,11 @@ function htmlResourceReferences(html: string): HtmlResourceReference[] {
         }
       }
       if (attrs.style) for (const raw of cssReferences(attrs.style)) add(raw);
-      if (tag === "style") for (const raw of cssReferences(parsedText(node))) add(raw);
+      if (tag === "style") {
+        const text = parsedText(node);
+        const imports = cssImportReferences(text);
+        for (const raw of cssReferences(text)) add(raw, false, null, imports.has(raw));
+      }
     }
     for (const child of (node as { childNodes?: ParsedNode[] }).childNodes ?? []) walk(child);
   };
@@ -568,6 +577,12 @@ interface LocalAssetDiscovery {
    * they are not represented as missing document-local filesystem inputs.
    */
   externalDeploymentRequiredRoutes: Set<string>;
+  /**
+   * Every loopback route a linked or imported style sheet resolves to, captured or not. A failed
+   * request for one of them is fatal whatever its request role: the paginator fetches these sheets
+   * itself, and a 403 there means it measures the document without that sheet.
+   */
+  stylesheetRoutes: Set<string>;
 }
 
 function virtualLogicalReference(fromLogicalPath: string, raw: string): string | null {
@@ -653,12 +668,14 @@ function discoverLocalAssetClosure(html: string, file: string, maxBytes = MAX_RE
   const root = realpathSync(dirname(resolve(file)));
   const assets = new Map<string, CapturedAsset>();
   const externalDeploymentRequiredRoutes = new Set<string>();
+  const stylesheetRoutes = new Set<string>();
   const visitedCss = new Set<string>();
   const sized = new Set<string>();
   let totalBytes = 0;
   const add = (reference: HtmlResourceReference, from: string): void => {
     const { raw, requiredStylesheet } = reference;
     const resolved = resolveLocalReference(root, raw, from);
+    if (resolved && reference.stylesheet) stylesheetRoutes.add(resolved.route);
     if (!resolved) {
       if (requiredStylesheet && localReference(raw.trim().split(/[?#]/u, 1)[0] ?? "")) {
         throw new Error(`required local resource is absent or outside the document root: ${raw}`);
@@ -708,14 +725,17 @@ function discoverLocalAssetClosure(html: string, file: string, maxBytes = MAX_RE
     visitedCss.add(resolved.real);
     const css = captured.text;
     if (css === null) return;
-    for (const ref of cssReferences(css)) add({ raw: ref, requiredStylesheet: false, deploymentRequiredRole: null }, resolved.real);
+    const imports = cssImportReferences(css);
+    for (const ref of cssReferences(css)) {
+      add({ raw: ref, requiredStylesheet: false, deploymentRequiredRole: null, stylesheet: imports.has(ref) }, resolved.real);
+    }
   };
   // `root` is canonical (macOS commonly exposes both /var and /private/var). Resolve the
   // document base beneath that same root so an alias does not look like an escape, while asset
   // components themselves remain lexical until the bounded reader validates them.
   const documentBase = join(root, basename(resolve(file)));
   for (const reference of htmlResourceReferences(html)) add(reference, documentBase);
-  return { assets, externalDeploymentRequiredRoutes };
+  return { assets, externalDeploymentRequiredRoutes, stylesheetRoutes };
 }
 
 export function discoverLocalAssets(html: string, file: string, maxBytes = MAX_RESOURCE_BYTES): Map<string, CapturedAsset> {
@@ -1756,6 +1776,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
   }
   let assets: Map<string, CapturedAsset>;
   let externalDeploymentRequiredRoutes = new Set<string>();
+  let stylesheetRoutes = new Set<string>();
   try {
     if (captured) {
       assets = new Map([...captured.assets.entries()].map(([route, asset]) => [route, {
@@ -1767,6 +1788,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       const discovery = discoverLocalAssetClosure(original, path);
       assets = discovery.assets;
       externalDeploymentRequiredRoutes = discovery.externalDeploymentRequiredRoutes;
+      stylesheetRoutes = discovery.stylesheetRoutes;
     }
   } catch (error) {
     if (error instanceof ResourceLimitError) {
@@ -2071,6 +2093,10 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
         const pathname = served.resourceRoutes.get(resource);
         if (!pathname) return true;
         if (externalDeploymentRequiredRoutes.has(pathname)) return false;
+        // The paginator's own request for a linked or imported sheet has role fetch/xhr, and under
+        // an http(s) <base> the browser may have taken the same sheet from the base host. A 403
+        // there still means Paged.js paginated without that sheet: fatal, never a smaller page.
+        if (stylesheetRoutes.has(pathname)) return true;
         const roles = opened.network.localRequestRoles.get(pathname);
         return !!roles && [...roles].some((role) => requiredLocalRoles.has(role));
       }

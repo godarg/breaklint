@@ -160,20 +160,25 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   with exit 1 instead of 0.** Still not reported, each for a reason in
   `docs/rules/artifact-local-uri.md`: relative paths, fragments, `~/…` (a path segment in a URL),
   and `data:`, `blob:`, `about:` and other schemes.
-- **The same rule honours an http(s) `<base href>` where the browser does.** A hyperlink
-  (`<a>`, `<area>`, SVG `<a>`) resolves against the document's first `<base href>` wherever it
-  stands; a fetch (image, style sheet, `url()`, `@font-face`, `srcset`, …) only when the base comes
-  before it — measured in plain Chromium 141 on `file://` documents: fetches before a late https
-  base came from the local tree and were rendered into the PDF, links before it were printed with
-  the base host. So `/docs/guide.html` under `<base href="https://docs.example.org/">` is a URL on
-  that host and is not reported, an `<img src="/logo.png">` before that base is. A `file:` URI and a
-  drive path stay reported under any base, and a `file:`, root-relative or protocol-relative base is
-  itself no published origin. Local asset discovery follows the same order: a style sheet or other
-  fetch after an http(s) base is no longer captured from the document's directory, served on the
-  loopback origin or scanned, because the browser requests it from the base host (a run without an
-  allowlist for that host still ends with exit 3, as before). `UriRef.resolvedUri` for a governed
+- **The same rule honours an http(s) `<base href>` where the browser does.** Measured element by
+  element in plain Chromium 141 on `file://` documents with a late https base: hyperlinks (`<a>`,
+  `<area>`, SVG `<a>`), `<object data>`, `<embed src>`, `<video src>`, SVG `<image>` and
+  `<link rel=icon>` resolve against the document's first `<base href>` wherever they stand; `<img>`,
+  `srcset`, `<picture><source>`, `poster`, `<iframe>`, `<script>`, `<link>` stylesheet / preload /
+  modulepreload, SVG `<use>` and every CSS `url()`, `@font-face` and `@import` are fetched from the
+  local tree when they come before the base, and are reported then; `<input type=image>`, requested
+  from both, is reported. So `/docs/guide.html` under `<base href="https://docs.example.org/">` is a
+  URL on that host and is not reported, an `<img src="/logo.png">` before that base is. A `file:`
+  URI and a drive path stay reported under any base, and a `file:`, root-relative or
+  protocol-relative base is itself no published origin. `UriRef.resolvedUri` for a governed
   reference is the https URL, which is also what `requested` is matched against. A script-inserted
   `<base>` is not seen; what it would govern is still reported (a conservative false alarm).
+  breaklint's own chain differs from plain Chromium for style sheets: Paged.js 0.4.3 re-fetches a
+  `<link>`ed sheet through its base-resolved `href` (so after a late base the paged document uses
+  the base host's copy) and a `<style>` `@import` against the document URL, ignoring `<base>`. Local
+  resource capture therefore still ignores `<base>` and captures what the document names (G-88 stays
+  open as a known, harmless over-capture, in `docs/limitations.md`); a root-relative `url()` in the
+  local copy of a sheet the browser took from the base host is reported, a conservative false alarm.
 - **Fingerprints of the newly reported values do not depend on the checkout directory.** A
   scheme-less local reference is keyed on its own text resolved against `file:///`, not on
   `resolvedUri`, which carried the checkout path (`file:///<checkout>/docs/a.html`). Values with a
@@ -204,6 +209,15 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
 
 ### Fixed
 
+- **A refused loopback request for a linked or imported style sheet now ends the run with exit 3.**
+  Paged.js 0.4.3 fetches every linked and imported sheet a second time itself; that request has
+  role fetch/xhr, which the required-resource check did not treat as a layout resource. Under an
+  early `<base href>` with an allow-listed host, a `<style>@import "/x.css"` that exists on the base
+  host but not beside the document was loaded by the browser from the host, refused by the loopback
+  origin to the paginator, and the document was measured without the sheet, with no
+  infrastructure event (observed on a patched Chromium 141 by `tests/live/local-uri.test.ts`).
+  Such a request is now `source-acquisition-failed`. A root-relative `<link rel=stylesheet>` whose
+  file is absent keeps its exemption as a deployment route.
 - **A directory named `*.html` ends with exit 2 before Chrome starts, instead of exit 3.** The
   input type is decided by the name, so a directory called `chapter.html` passed the extension and
   existence checks, started Chrome and ended exit 3 `source-acquisition-failed` with "input

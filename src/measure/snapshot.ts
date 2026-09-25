@@ -223,11 +223,28 @@ function documentBaseElement(document: Node): Element | null {
   return find(document);
 }
 
-/** A hyperlink: its href is resolved when it is followed or printed, against the final base. */
-function isHyperlink(node: Element): boolean {
+/**
+ * References the browser resolves against the FINAL document base, wherever they stand: a
+ * hyperlink is resolved when it is followed or printed, and these fetches start only after
+ * parsing has moved on. Measured in plain Chromium 141 on file:// documents with a late
+ * `<base href="https://…">`: `<a>`, SVG `<a>` (href and xlink:href), `<object data>`,
+ * `<embed src>`, `<video src>` and SVG `<image>` (href and xlink:href) before it all went to the
+ * base host; `<link rel=icon>` is resolved the same way and was not fetched at all. Everything
+ * else — img src and srcset, `<picture><source>`, poster, iframe, script, link stylesheet /
+ * preload / modulepreload, SVG `<use>`, every CSS url() and @import — was fetched from the local
+ * tree and follows tree order. `<input type=image>` requested both; it stays with tree order, so
+ * its local fetch is reported.
+ */
+function resolvesAgainstFinalBase(node: Element, attribute: string, attrs: Record<string, string>): boolean {
   const tag = node.tagName.toLowerCase();
-  if (node.namespaceURI === "http://www.w3.org/2000/svg") return tag === "a";
-  return tag === "a" || tag === "area";
+  if (node.namespaceURI === "http://www.w3.org/2000/svg") return attribute === "href" && (tag === "a" || tag === "image");
+  if (attribute === "href") {
+    if (tag === "a" || tag === "area") return true;
+    return tag === "link" && (attrs.rel ?? "").toLowerCase().split(/\s+/u).includes("icon");
+  }
+  if (attribute === "data") return tag === "object";
+  if (attribute === "src") return tag === "embed" || tag === "video";
+  return false;
 }
 
 /** Parse identities and type runs from the injected source text, never from paginated clones. */
@@ -242,12 +259,8 @@ export function buildSourceModel(
   const orderedBlocks: OrderedSourceBlockModel[] = [];
   const runs: SourceRunModel[] = [];
   const uriRefs: SourceModel["uriRefs"] = [];
-  // A published (http(s)) document base governs a hyperlink wherever the link sits: the link is
-  // resolved when it is followed or printed. A FETCH is resolved when its element is parsed, so a
-  // base governs an image, a stylesheet, a style attribute or a <style> url() only when the base
-  // precedes it in tree order. Measured in Chromium 141: an <img>, a <link rel=stylesheet>, a
-  // <style> url(), a style="" url() and an @font-face src before a late https base were all fetched
-  // from the local file tree; only <a href> was re-resolved against the base.
+  // A published (http(s)) document base governs the references in `resolvesAgainstFinalBase`
+  // wherever they sit, and every other reference only when the base precedes it in tree order.
   const baseElement = documentBaseElement(document);
   const publishedBase = baseElement ? publishedBaseUrl(attrsOf(baseElement).href ?? "") : null;
   let passedBase = false;
@@ -290,7 +303,7 @@ export function buildSourceModel(
         const values = attribute === "srcset"
           ? value.split(",").map((candidate) => candidate.trim().split(/\s+/u)[0] ?? "").filter(Boolean)
           : [value];
-        const base = attribute === "href" && isHyperlink(node) ? publishedBase : fetchBase;
+        const base = resolvesAgainstFinalBase(node, attribute, attrs) ? publishedBase : fetchBase;
         for (const raw of values) uriRefs.push({ ...uriParts(raw, file, distributionRoot, base), attribute });
       }
       if (attrs.style) uriRefs.push(...cssUriParts(attrs.style, file, distributionRoot, "style", fetchBase));

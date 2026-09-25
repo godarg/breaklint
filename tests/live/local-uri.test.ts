@@ -12,10 +12,23 @@
  * references become "remote" — no finding, and `requested` false because the https URL was never
  * requested. The run uses no evidence binding: binding decides whether a finding may point at the
  * evidence, not what was fetched.
+ *
+ * The second half is about breaklint's own paginator under an EARLY base. Paged.js 0.4.3 re-fetches
+ * a <style>'s @import resolved against the document URL, ignoring <base>, so it asks the loopback
+ * origin for `/imp.css` while the browser took the sheet from the (allow-listed) base host. The base
+ * host here is a second loopback server. THE COMPLICATION is that a discovery which skips references
+ * under the base serves nothing for that request: Paged.js receives a 403, paginates the document
+ * without the sheet, and a clean report comes out over a different document — the imported rule
+ * makes `#big` 200 px tall, and without it the block is one 20 px line. Red conditions: skip
+ * base-governed references in discovery (the round-2 change) and `#big` measures 20 px; drop the
+ * fail-closed rule for a failed style-sheet route and the host-only import measures a smaller page
+ * instead of ending with source-acquisition-failed.
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -35,9 +48,22 @@ const missing = [
   resolvePackageRoot("pdfjs-dist", REPO) ? null : "pdfjs-dist",
 ].filter((value): value is string => value !== null);
 
-describe("artifact/local-uri before a late base, live", () => {
+/** A document with an early base to `host` and a head <style> importing `sheet`. */
+function earlyBaseImport(host: string, sheet: string): string {
+  return '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>import under a base</title>' +
+    `<base href="${host}/manual/">` +
+    '<style>@page { size: 400px 600px; margin: 40px; } body { font: 14px/20px serif; margin: 0; } p { margin: 0 0 4px; }</style>' +
+    `<style>@import "${sheet}";</style></head>` +
+    '<body><p>An imported sheet under an early base.</p><div id="big" class="big">tall block</div><p>after</p></body></html>';
+}
+
+describe("artifact/local-uri and the document base, live", () => {
   let outDir = "";
   let result: RenderResult | null = null;
+  let host: Server | null = null;
+  let hostOrigin = "";
+  const hostRequests: string[] = [];
+  const imported: Record<string, RenderResult> = {};
 
   before(async (t) => {
     if (missing.length > 0) {
@@ -52,9 +78,35 @@ describe("artifact/local-uri before a late base, live", () => {
       network: { mode: "offline", allowed: [] },
       locale: "de-DE",
     });
+
+    // The base host: it serves both sheets; only imp.css also exists beside the document.
+    const sheets: Record<string, string> = { "/imp.css": ".big { height: 200px; }", "/host-only.css": ".big { height: 200px; }" };
+    host = createServer((request, response) => {
+      const path = (request.url ?? "").split("?")[0]!;
+      hostRequests.push(path);
+      const body = sheets[path];
+      if (body === undefined) response.writeHead(404).end();
+      else response.writeHead(200, { "content-type": "text/css", "access-control-allow-origin": "*" }).end(body);
+    });
+    await new Promise<void>((resolve) => host!.listen(0, "127.0.0.1", resolve));
+    hostOrigin = `http://127.0.0.1:${(host.address() as AddressInfo).port}`;
+    for (const [name, sheet] of [["local-copy", "/imp.css"], ["host-only", "/host-only.css"]] as const) {
+      const dir = join(outDir, name);
+      mkdirSync(dir);
+      if (name === "local-copy") writeFileSync(join(dir, "imp.css"), sheets["/imp.css"]!);
+      writeFileSync(join(dir, "doc.html"), earlyBaseImport(hostOrigin, sheet));
+      imported[name] = await renderDocuments([join(dir, "doc.html")], {
+        outDir: join(dir, "out"),
+        evidenceBinding: false,
+        sourceMapInjection: true,
+        network: { mode: "allowlist", allowed: [hostOrigin] },
+        locale: "de-DE",
+      });
+    }
   });
 
-  after(() => {
+  after(async () => {
+    if (host) await new Promise<void>((resolve) => host!.close(() => resolve()));
     if (outDir) rmSync(outDir, { recursive: true, force: true });
   });
 
@@ -87,5 +139,29 @@ describe("artifact/local-uri before a late base, live", () => {
       const ref = snapshot.uriRefs.find((item) => item.rawValue === value);
       assert.equal(ref?.resolvedUri, `https://docs.example.org${value}`);
     }
+  });
+
+  it("serves the paginator's own @import request under an early base, so the imported rule applies", () => {
+    const run = imported["local-copy"]!;
+    assert.equal(run.fatal, null, `fatal: ${run.fatal?.message}`);
+    const document = run.documents[0]!;
+    assert.ok(document.snapshot, `no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    const local = document.snapshot.resources.filter((resource) => resource.resolvedUri.endsWith("/imp.css") && resource.scheme === "file");
+    assert.deepEqual(local.map((resource) => resource.status), [200], "the paginator's loopback request for /imp.css was not served");
+    const big = document.snapshot.blocks.find((block) => block.authorId === "big");
+    assert.equal(big?.box.height, 200, "the document was paginated without its imported sheet");
+  });
+
+  it("ends with source-acquisition-failed when the paginator's style-sheet request is refused", () => {
+    // /host-only.css exists on the base host only: the browser loads it there, Paged.js asks the
+    // loopback origin, which cannot serve it. Measuring on would judge a page without the sheet.
+    const run = imported["host-only"]!;
+    const document = run.documents[0]!;
+    assert.ok(hostRequests.includes("/host-only.css"), "the browser never took the sheet from the base host");
+    assert.equal(document.snapshot, null, "a page paginated without its imported sheet was measured");
+    assert.ok(
+      document.infrastructure.some((event) => event.kind === "source-acquisition-failed" && /host-only\.css/u.test(event.detail)),
+      JSON.stringify(document.infrastructure),
+    );
   });
 });

@@ -520,3 +520,21 @@ it is not admitted here, not hashed here and not reproducible from this reposito
 cites the number says "a corpus constructed for this purpose"; this paragraph says the rest of it.
 The decision it supports is reversible by configuration and moves no exit code either way, which is
 why it was taken on that evidence — the same standard would not have been enough for a gating rule.
+
+**Local resource capture does not read `<base>`.** Before rendering, breaklint collects every local
+resource the document and its style sheets name, serves exactly those on its loopback origin, and
+scans the captured style sheets. It does this without regard to a `<base href>`, although under an
+http(s) base the browser requests most of those resources from the base host (G-88). The
+over-capture is deliberate: Paged.js 0.4.3 fetches linked and imported style sheets a second time
+itself, and it resolves a `<style>` `@import` against the document URL, not against the base — so
+under an early base it asks the loopback origin for a sheet the browser took from the base host.
+Measured on a patched Chromium 141: skipping references under the base answered that request with
+403, and a block the imported rule made 200 px tall was measured as one 20 px line, with no
+infrastructure event. Capturing a file the browser may not request costs nothing; not serving what
+the paginator requests produced a clean report over a different document. A failed loopback request
+for any linked or imported style sheet now ends the run with `source-acquisition-failed`, except a
+root-relative `<link rel=stylesheet>` whose file is absent, which keeps its exemption as a
+deployment route. What stays
+open: a style sheet captured this way is also scanned by `artifact/local-uri`, so a root-relative
+`url()` in the local copy of a sheet the browser took from the base host is reported — a
+conservative false alarm, never a missed local reference.

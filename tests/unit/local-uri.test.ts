@@ -15,8 +15,9 @@
  * the scheme from the resolved URL again in the collector and the file: URI with a host goes red;
  * stop honouring an http(s) <base href> in the collector and the base cases go red; apply the base
  * to fetches before it and the late-base cases go red; key on `resolvedUri` again and the
- * two-checkout fingerprint case goes red; let asset discovery capture a stylesheet under the base
- * and the linked-sheet case goes red; go back to `trim()` and the URL-whitespace cases go red.
+ * two-checkout fingerprint case goes red; go back to `trim()` and the URL-whitespace cases go red;
+ * move an element between the whole-document and the tree-order group and its per-element case
+ * goes red.
  */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -162,7 +163,32 @@ describe("artifact/local-uri, one authored shape at a time", () => {
 });
 
 describe("artifact/local-uri and the document base", () => {
+  const LATE = '<base href="https://docs.example.org/m/">';
   const cases: { html: string; expected: string[]; complication: string }[] = [
+    // Before a late base, per element, as plain Chromium 141 resolved each (the whole-document
+    // group went to the base host; every other one was fetched from the local tree).
+    { html: `<object data="/x.svg"></object>${LATE}`, expected: [], complication: "<object data> before a late base resolves on the base host" },
+    { html: `<embed src="/x.svg">${LATE}`, expected: [], complication: "<embed src> before a late base resolves on the base host" },
+    { html: `<video src="/x.mp4"></video>${LATE}`, expected: [], complication: "<video src> before a late base resolves on the base host" },
+    { html: `<svg><image href="/x.png"/></svg>${LATE}`, expected: [], complication: "SVG <image href> before a late base resolves on the base host" },
+    { html: `<svg xmlns:xlink="http://www.w3.org/1999/xlink"><image xlink:href="/x.png"/></svg>${LATE}`, expected: [], complication: "SVG <image xlink:href> before a late base resolves on the base host" },
+    { html: `<link rel="icon" href="/x.png">${LATE}`, expected: [], complication: "<link rel=icon> before a late base resolves on the base host" },
+    { html: `<link rel="shortcut icon" href="/x.png">${LATE}`, expected: [], complication: "rel is a token list: shortcut icon is an icon" },
+    { html: `<link rel="stylesheet" href="/x.css">${LATE}`, expected: ['href="/x.css"'], complication: "<link rel=stylesheet> before a late base is fetched locally: a link element is no hyperlink" },
+    { html: `<link rel="preload" as="image" href="/x.png">${LATE}`, expected: ['href="/x.png"'], complication: "<link rel=preload> before a late base is fetched locally" },
+    { html: `<img alt="" srcset="/x.png 1x">${LATE}`, expected: ['srcset="/x.png"'], complication: "srcset before a late base is fetched locally" },
+    { html: `<picture><source srcset="/x.png"><img alt="" src="/y.png"></picture>${LATE}`, expected: ['srcset="/x.png"', 'src="/y.png"'], complication: "<picture><source> before a late base is fetched locally" },
+    { html: `<video poster="/x.png"></video>${LATE}`, expected: ['poster="/x.png"'], complication: "poster before a late base is fetched locally, unlike the video's src" },
+    { html: `<iframe src="/x.html"></iframe>${LATE}`, expected: ['src="/x.html"'], complication: "<iframe src> before a late base is fetched locally" },
+    { html: `<script src="/x.js"></script>${LATE}`, expected: ['src="/x.js"'], complication: "<script src> before a late base is fetched locally" },
+    { html: `<svg><use href="/x.svg#r"/></svg>${LATE}`, expected: ['href="/x.svg#r"'], complication: "SVG <use> before a late base is fetched locally, unlike SVG <image>" },
+    { html: `<input type="image" alt="" src="/x.png">${LATE}`, expected: ['src="/x.png"'], complication: "<input type=image> is fetched locally AND from the base: its local fetch is reported" },
+    {
+      html: `${LATE}<img alt="" src="/1.png"><img alt="" src="/2.png"><img alt="" src="/3.png"><img alt="" src="/4.png">` +
+        `<div style="background:url(/5.png)"></div><style>.x{background:url(/6.png)}</style><img alt="" srcset="/7.png 2x"><a href="/8.html">x</a>`,
+      expected: [],
+      complication: "an early base governs every later reference, not only the first few",
+    },
     {
       html: '<base href="https://docs.example.org/"><a href="/docs/a.html">x</a><a href="\\\\server\\share\\a.pdf">y</a>',
       expected: [],
@@ -273,6 +299,21 @@ describe("artifact/local-uri, linked style sheets, fingerprints and repeated res
     assert.deepEqual(first, second, "a fingerprint moved with the checkout directory");
   });
 
+  it("keys a scheme-less value on its URL-normalised text, not on the text as written", () => {
+    // `\\docs\\a.html` and `/docs/./a.html` are the same URL as `/docs/a.html` (URL parsing
+    // treats a backslash as a slash and removes dot segments): one resource, one fingerprint.
+    const one = check('<a href="/docs/a.html">a</a>', scratchDoc).findings;
+    const two = check('<a href="\\docs\\a.html">a</a><a href="/docs/./a.html">b</a>', scratchDoc).findings;
+    assert.equal(one.length, 1);
+    assert.equal(two.length, 2);
+    assert.deepEqual(two.map((finding) => finding.fingerprint), [one[0]!.fingerprint, one[0]!.fingerprint]);
+  });
+
+  it("keeps an internal space: URL preprocessing strips only the ends", () => {
+    const { findings } = check('<a href=" /var/my share/a b.pdf ">x</a>', scratchDoc);
+    assert.deepEqual(reported(findings), ['href="/var/my share/a b.pdf"']);
+  });
+
   it("reports the same resource in src and srcset twice, under one fingerprint", () => {
     // Two references to fix, one resource: two findings with their own node keys, and the one
     // fingerprint that groups them across runs. stableIdentity stays "unavailable", never unique.
@@ -305,10 +346,30 @@ describe("artifact/local-uri, linked style sheets, fingerprints and repeated res
     assert.deepEqual(reported(findings), ['style-sheet="/img/root.png"']);
   });
 
-  it("neither captures nor scans a linked sheet the browser loads from an https base", () => {
+  it("still captures a linked sheet under an https base: the documented over-capture (G-88 open)", () => {
+    // Discovery does not read <base>. Capturing and serving a sheet the browser takes from the base
+    // host is harmless; NOT serving what the paginator then requests from the loopback origin is
+    // not (Paged.js 0.4.3 resolves <style> @import against the document URL). The local copy is
+    // scanned, so its root-relative url() is reported: a conservative false alarm, documented in
+    // docs/rules/artifact-local-uri.md. Change this expectation only together with G-88.
     const { captured, findings } = linked('<base href="https://docs.example.org/"><link rel="stylesheet" href="css/print.css"><p>x</p>');
-    assert.equal(captured, false, "a sheet the browser requests from the base host was captured from the local tree");
-    assert.deepEqual(reported(findings), []);
+    assert.equal(captured, true);
+    assert.deepEqual(reported(findings), ['style-sheet="/img/root.png"']);
+  });
+
+  it("captures a <style> @import under an early https base: breaklint's paginator requests it locally", () => {
+    // Paged.js 0.4.3 rewrites a head <style>'s @import against the document URL and ignores <base>,
+    // so it asks the loopback origin for this file (tests/live/local-uri.test.ts observes it).
+    const root = mkdtempSync(join(tmpdir(), "breaklint-local-uri-import-"));
+    try {
+      const doc = join(root, "doc.html");
+      const html = '<base href="https://docs.example.org/manual/"><style>@import "/imp.css";</style><p>x</p>';
+      writeFileSync(doc, html);
+      writeFileSync(join(root, "imp.css"), ".big{height:200px}");
+      assert.equal(discoverLocalAssets(html, doc).has("/imp.css"), true, "the paginator's @import would be answered with 403");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("still captures and scans a linked sheet that precedes a late base", () => {
