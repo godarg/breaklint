@@ -186,7 +186,12 @@ one that falls back to a *different* sans (`collapsed-display-font` and `acciden
 controls). The resolved faces are recorded per cell and summarised as `resolvedFonts` in the render
 manifest. Measured on Linux with Chromium 141: display Liberation Serif, body Liberation Sans, mono
 DejaVu Sans Mono; the four PDFs embed exactly LiberationSerif-Bold, LiberationSans(-Bold) and
-DejaVuSansMono(-Bold). macOS and Windows have not been measured by this gate yet.
+DejaVuSansMono(-Bold). That measurement is from an Ubuntu 24.04 development container
+(Chromium 141, Liberation and DejaVu installed). **Not measured (NEEDS-CI):** the GitHub
+`ubuntu-latest` runner that CI and the release workflow use — which faces it resolves depends on
+its installed font packages, and the gate is expected to fail there rather than pass on an
+undeclared face, but no run on it has been read yet; macOS and Windows have not been measured by
+this gate either.
 
 ## Trust and privacy boundary
 
@@ -321,8 +326,9 @@ Both modes cover:
 
 That is 32 review cells. Each tablet and mobile screen cell is also written as viewport-height
 tiles (`<cell>--tile-NN.png`, 148 in the canonical matrix) cut from the same decoded pixels as its
-full-page PNG — a 390 × 11 649 px strip cannot be judged at fit-to-window scale, its fourteen
-844 px tiles can. The verifier re-cuts every tile from the independently decoded full page and
+full-page PNG — a mobile strip (measured 390 × 4 097 px for the clean state and 390 × 11 073,
+11 578 and 11 692 px for findings, infrastructure and insufficient coverage) cannot be judged at
+fit-to-window scale; its five or fourteen 844 px tiles can. The verifier re-cuts every tile from the independently decoded full page and
 requires the normalized RGBA to match, so tiles add no unbound pixel. `review-gallery.html` in the
 same directory presents every full page, tile and printed page per state; it is what a reviewer
 opens, and the verifier requires it to reference every artifact. A reviewed screen cell names its
@@ -455,7 +461,7 @@ this bound the findings heading carried the untested-advice caveat inside its he
 heading + caveat + the first finding's head and facts formed one 456–481 px chain (44–47 %); the
 heading group and caveat are now one unbreakable intro that does not keep with the first finding.
 Measured on Chromium 141 / linux the tallest unit is the report header (359.6–384.8 px, at most
-37.3 %), and every non-final page's text reaches 71.8–98.7 % (clean 3 pages, findings 7,
+37.3 %), and every non-final page's text reaches 62.2–96.7 % (clean 3 pages, findings 7,
 infrastructure 8, insufficient-coverage 8; 43 in 0.6.0). The only fill exemption is a deliberate
 section boundary, defined mechanically: the next page begins with an element whose computed
 `break-before` is `page`, `left`, `right`, `recto` or `verso` — the canonical report declares none.

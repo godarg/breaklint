@@ -166,12 +166,15 @@ print PDF and raster-set cells) containing **71 physical artifacts** — 24 scre
 **On `main` since 0.6.0 (unreleased), re-measured on Chromium 141 / linux:** the surface work on the
 eight review findings changes these figures. The matrix is still 32 cells; it now contains
 **54 primary artifacts** — 24 screen PNGs, 4 PDFs and 26 PDF page rasters (clean 3, findings 7,
-infrastructure 8, insufficient-coverage 8; every non-final page filled to at least 80 %) — plus
+infrastructure 8, insufficient-coverage 8; on every non-final page the last line of text sits at
+62.2–96.7 % of the content box's height, and no unbreakable unit exceeds 37.3 % of it) — plus
 **148 viewport-height tiles** cut from the 16 tablet and mobile screens, 202 files in all,
-presented in one review gallery. The technical gate passes 32 of 32 cells and all 202 files, and
-26 negative controls each fail it for their named reason; no human review of these surfaces is
-claimed, and the strict local gate stays red on the recorded 2026-09-18 FAIL until a new round
-passes.
+presented in one review gallery. The technical gate passes 32 of 32 cells and all 202 files; 31
+renderer negative controls each fail it for their named reason, and the verifier breaks a copy of
+real evidence for each of its independent checks once per run. No human review of these surfaces
+is claimed, and the strict local gate stays red on the recorded 2026-09-18 FAIL until a new round
+passes. The resolved fonts were measured in the Linux development container only; the
+`ubuntu-latest` CI runner's font resolution is unmeasured (NEEDS-CI).
 
 ### Two records that no longer claim what they cannot
 
@@ -387,7 +390,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=455 aggregateTests=586 liveTests=71 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=455 aggregateTests=587 liveTests=71 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against

@@ -71,7 +71,8 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   labels each (78 labels) and spanning five printed pages; it is now one table per document — path
   and verdict in the caption, the rule id as row header, right-aligned tabular counts, coverage and
   floor, and the result in words. A 13-rule table is 0.46 of an A4 page and spans at most two;
-  printed reports shrink from 43 to 31 pages across the four canonical states (clean 5 → 2). A
+  this step alone removed twelve printed pages across the four canonical states (the complete page
+  count, after the later changes below, is under "Printed pages are full"). A
   zero-candidate rule shows `n/a`. On phones the same table becomes a two-line grid per row with
   aligned columns and no sideways scroll. The surface gate replaced every card-era check and control
   one for one (column alignment against the header, closed row rules in the raster, a repeated
@@ -120,7 +121,7 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   Findings now split between their units — head, each fact, tail — never inside one, with the
   card frame repeated on both pages; boxed blocks share the column's edges with a real gap. Printed
   reports drop from 43 pages in 0.6.0 to 26 (clean 3, findings 7, infrastructure 8,
-  insufficient-coverage 8) with every non-final page's text at 71.8–98.7 % of the content box.
+  insufficient-coverage 8) with every non-final page's text at 62.2–96.7 % of the content box.
   The surface gate fails any non-final page whose last text line is above 60 % of the content box
   (unless the next page starts with a declared forced break), any unbreakable unit taller than 40 %
   (keep-with-next chains counted as one unit, and the failure names it), any heading or caption
