@@ -216,8 +216,8 @@ machine-readable record is required.
 ## Public bounded review bundle
 
 The installed package also exposes three report-only helpers. They accept a canonical document
-Report 4 (and the renderer accepts the distinct screen-report profile); they do not acquire
-documents, run a browser, or turn report strings into commands.
+report — readers accept Report 4 and 5 — and the renderer also accepts the distinct screen-report
+profile; they do not acquire documents, run a browser, or turn report strings into commands.
 
 ```ts
 import { createContextPack, renderReport, writeReportBundle } from "breaklint";
@@ -245,7 +245,7 @@ reduced coverage, a missing target, or a disabled rule never becomes `resolved` 
 `writeReportBundle` writes `report.json`, `context.json`, and `report.html`. The report JSON is
 copied unchanged and remains canonical. A PNG or diagnostic PDF becomes a link only when it is a
 regular file below the supplied evidence directory and its current byte length and SHA-256 equal
-the integrity record in Report 4. A failed check produces an explicit unavailable-evidence state;
+the report's integrity record. A failed check produces an explicit unavailable-evidence state;
 it does not retain a stale image or link. Page-relative target crops use that same verified full
 page image and retain the declared `css-page-top-left` coordinate system. Legacy Report 3 input is
 shown as legacy: it receives neither a new original-source assertion nor a repair claim.

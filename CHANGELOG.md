@@ -744,9 +744,8 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   is the false repair the guard exists for. The remedied example of
   `layout/orphaned-continuation-page` changed `font-size`, which its advice does not propose; it now
   changes a preceding margin and `line-height`. The remedied example of
-  `layout/unbreakable-block-too-tall` still uses `break-inside: auto`; that page is rewritten by
-  another change of this release and is pending in the guard with exactly that one foreign lever,
-  so anything added to the example fails, and the entry fails once it is no longer needed. A
+  `layout/unbreakable-block-too-tall` set `break-inside: auto` — the false repair its own advice
+  warns about; it now splits the block into two sections that each fit a page. A
   sentence proposes a lever clause by clause: "Delete …", "Drop …", "Strip …", "Change … to",
   "Override …", "Consider removing …", "You should remove …" and "Removing … fixes the finding"
   propose as "Remove …" does; a warning in one clause no longer exempts the others, a negation
@@ -852,10 +851,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   the documents of the previous commit it names every stale line the README, CONTRIBUTING.md,
   `docs/source-bound-findings.md`, `docs/status.md` and `docs/configuration.md` carried; four
   genuinely historical sentences in `docs/releasing.md` and `docs/status.md` now name their release.
-  Two lines in `docs/reporting.md` are listed in `tests/tools/docs-truth-pending.jsonl` for the
-  change that owns that page; each entry matches exactly one issue by file, kind, number and exact
-  sentence, so a copy of the sentence or a stale claim added to it fails, and an entry that
-  matches nothing fails. The same check runs in `ci.yml`'s packed clean-install step against the
+  A pull request may list a sentence another change is still correcting in
+  `tests/tools/docs-truth-pending.jsonl`; each entry matches exactly one issue by file, kind,
+  number and exact sentence, so a copy of the sentence or a stale claim added to it fails, and an
+  entry that matches nothing fails. The list is empty: the two `docs/reporting.md` sentences it
+  carried ("Report 4" for the report helpers and for the evidence integrity record) are
+  corrected. The same check runs in `ci.yml`'s packed clean-install step against the
   installed `node_modules/breaklint` — the README and docs a user installs, and the stamps of the
   code installed with them. In the release workflow it runs with `--release`, which refuses any
   pending entry: a tag must not ship a sentence the check knows is stale, so a non-empty pending

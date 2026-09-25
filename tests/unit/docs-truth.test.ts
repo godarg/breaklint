@@ -157,18 +157,20 @@ describe("schema stamps in the shipped documents", () => {
   });
 
   it("a pending entry absorbs exactly its one sentence, and nothing added to it or copied from it", () => {
-    assert.ok(PENDING.length > 0, "no pending entry is left to exercise; delete this test with the last one");
-    const entry = PENDING[0]!;
+    // A synthetic page and entry: the real list must be empty at a release, and the mechanism a
+    // pull request may still use has to stay tested when it is.
+    const unit = `The helpers accept a canonical document Report ${stamps.report - 1} and nothing else.`;
+    const entry: PendingCorrection = { file: "docs/pending-fixture.md", kind: "report", number: stamps.report - 1, unit, reason: "canary" };
     const docs = mkdtempSync(join(tmpdir(), "breaklint-docs-truth-pending-"));
     try {
       mkdirSync(join(docs, "docs"), { recursive: true });
-      const original = readFileSync(join(ROOT, entry.file), "utf8");
-      assert.ok(original.replace(/\s+/gu, " ").includes(entry.unit), `the pending sentence is not in ${entry.file}`);
+      const original = `# Fixture\n\nAn unrelated paragraph.\n\n${unit}\n`;
       const check = (text: string) => {
         writeFileSync(join(docs, entry.file), text);
-        return checkDocsTruth({ packageDir: stage, docsRoot: docs, stamps, pending: PENDING.filter((e) => e.file === entry.file) });
+        return checkDocsTruth({ packageDir: stage, docsRoot: docs, stamps, pending: [entry] });
       };
-      assert.deepEqual(check(original).issues, [], "the unchanged page is not green with its pending entries");
+      assert.equal(check(original).issues.length, 0, "the unchanged page is not green with its pending entry");
+      assert.equal(checkDocsTruth({ packageDir: stage, docsRoot: docs, stamps, pending: [] }).issues.length, 1, "the fixture sentence is not stale without its entry");
       // A second copy of the pending sentence is a second issue.
       assert.equal(check(`${original}\n${entry.unit}\n`).issues.length, 1, "a copied pending sentence was absorbed");
       // A new stale claim inside the pending sentence un-matches the entry: the claim and the entry both fail.
