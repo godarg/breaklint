@@ -135,12 +135,41 @@ function independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, repo
       );
       return { ruleId: anchor.id, ruleY: y, left, right };
     });
-    return { page, rows, header, caption };
+    // Under the column header there is exactly one rule before the first row's text: the header's
+    // own. Collapsed borders painted the previous page's last row rule again under a repeated
+    // header — two rules, the second within a few raster rows of the first.
+    let headerRules = null;
+    let headerRuleEndY = null;
+    const headerWord = words.find((word) => word.text === "RESULT" && anchors.length > 0 && word.yMax * rasterDpi / 72 < anchors[0].start);
+    // Two rules can also touch: collapsed borders painted the thin row rule through the middle of
+    // the strong header rule (rows measured 14 / 114 / 14 mean red). A lighter row between two
+    // darker ones inside one band counts as a second rule.
+    const meanRed = (y) => {
+      let sum = 0;
+      for (let x = left; x <= right; x += 1) sum += decoded.data[(y * decoded.width + x) * 4];
+      return sum / (right - left + 1);
+    };
+    if (headerWord && anchors.length > 0) {
+      headerRules = 0;
+      let inRule = false;
+      const from = Math.ceil(headerWord.yMax * rasterDpi / 72);
+      for (let y = from; y < anchors[0].start; y += 1) {
+        const ruled = rowCoverage(y) >= 0.5;
+        if (ruled && !inRule) headerRules += 1;
+        if (ruled && inRule && rowCoverage(y + 1) >= 0.5 && meanRed(y) > meanRed(y - 1) + 40 && meanRed(y) > meanRed(y + 1) + 40) headerRules += 1;
+        if (!ruled && inRule && headerRuleEndY === null) headerRuleEndY = y;
+        inRule = ruled;
+      }
+    }
+    return { page, rows, header, caption, headerRules, headerRuleEndY, firstRowStartY: anchors[0]?.start ?? null };
   });
   const { medianPitchPx, sortedPitches } = assertRowPitch(pages, label);
   if (sortedPitches.length > 0) {
     assert.ok(Math.abs(reported.medianPitchPx - medianPitchPx) <= 2, `${label}: renderer row pitch ${reported.medianPitchPx} px disagrees with the independent ${medianPitchPx} px`);
     assert.equal(reported.maximumPitchDeviation, 0.08, `${label}: row pitch threshold drift`);
+  }
+  for (const page of pages.filter((candidate) => candidate.headerRules !== null)) {
+    assert.equal(page.headerRules, 1, `${label}: page ${page.page} shows ${page.headerRules} rules between the column header and the first row; exactly one, the header's own`);
   }
   const detected = pages.reduce((sum, page) => sum + page.rows.length, 0);
   assert.equal(detected, expectedRows, `${label}: coverage row text inventory drift: detected ${detected}/${expectedRows}`);
@@ -204,6 +233,24 @@ function runRowSelfControls(pdfPath, rasterPages, expectedRows, reported, label,
   shifted.find((page) => page.page === pageWithRows.page).rows[1].ruleY += Math.ceil(medianPitchPx / 5);
   assert.throws(() => assertRowPitch(shifted, `${label} (pitch control)`), /pitch \d+ px is irregular/u,
     `${label}: a row pushed down by a fifth of the pitch did not fail the verifier's pitch check`);
+  // A second rule painted just above the first row's text, under the header, must be rejected.
+  const headed = result.pages.find((page) => page.headerRules === 1 && page.rows.length > 0 && page.headerRuleEndY !== null && page.firstRowStartY - page.headerRuleEndY >= 3);
+  if (headed) {
+    const first = headed.rows[0];
+    const doubled = PNG.sync.read(readFileSync(resolve(output, rasterPages[headed.page - 1].path)), { checkCRC: true });
+    const y = Math.round((headed.headerRuleEndY + headed.firstRowStartY) / 2);
+    for (let x = first.left; x <= first.right; x += 1) doubled.data.set([0, 0, 0, 255], (y * doubled.width + x) * 4);
+    assert.throws(() => independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, reported, `${label} (header-rule control)`,
+      { decodedPages: new Map([[headed.page - 1, doubled]]) }), /shows 2 rules between the column header and the first row/u,
+    `${label}: a second rule under the column header did not fail the verifier's header-rule check`);
+    // And a thin rule painted through the middle of the strong header rule, as collapsed borders did.
+    const through = PNG.sync.read(readFileSync(resolve(output, rasterPages[headed.page - 1].path)), { checkCRC: true });
+    for (let x = first.left; x <= first.right; x += 1) through.data.set([114, 114, 107, 255], ((headed.headerRuleEndY - 2) * through.width + x) * 4);
+    assert.throws(() => independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, reported, `${label} (touching header-rule control)`,
+      { decodedPages: new Map([[headed.page - 1, through]]) }), /shows 2 rules between the column header and the first row/u,
+    `${label}: a thin rule through the header rule did not fail the verifier's header-rule check`);
+    verifierSelfControls.headerRule = { label, page: headed.page };
+  }
   verifierSelfControls.rowRule = { label, row: row.ruleId };
   verifierSelfControls.rowPitch = { label, row: row.ruleId };
 }
@@ -899,7 +946,47 @@ function verifyProbeFiles(probe) {
 function verifyTechnicalProbes() {
   assert.ok(Array.isArray(manifest.technicalProbes), "technical report-surface probes are missing");
   assert.deepEqual(manifest.technicalProbes.map((probe) => probe.id).sort(),
-    ["print-background-disabled/insufficient-coverage", "print-hostile-run-id/clean", "print-long-coverage-table/clean"], "technical probe inventory drift");
+    ["print-background-disabled/insufficient-coverage", "print-hostile-run-id/clean", "print-long-coverage-table/clean", "print-long-document-path/findings"], "technical probe inventory drift");
+  // A long document path must wrap, not widen the print: Chrome scales the whole PDF to fit wider
+  // content. Independent of the DOM: every word's height in the probe PDF equals the same word's in
+  // the canonical findings PDF, which a scaled print cannot satisfy (98.3 % shrinks a 20 pt line
+  // by 0.34 pt); and the path's own words stay inside the A4 content box.
+  const longPath = manifest.technicalProbes.find((probe) => probe.id === "print-long-document-path/findings");
+  assert.equal(longPath.horizontalOverflowPx, 0, "long document path: print content overflows the A4 content box");
+  for (const identifier of longPath.pathLines) assertRecordedPathBreaks(identifier, "print/long document path");
+  assert.ok(longPath.pathLines.length >= 1 && longPath.pathLines.some((identifier) => identifier.lines.length >= 2), "long document path probe no longer wraps a path");
+  const longPathPdf = verifyProbeFiles(longPath);
+  const canonicalFindingsPdf = resolve(output, manifest.artifacts.find((artifact) => artifact.cell === "print/findings/pdf").path);
+  const wordHeights = (pdfPath) => {
+    const xml = run("pdftotext", ["-f", "1", "-l", "1", "-bbox-layout", pdfPath, "-"]);
+    const [, width, height] = /<page width="([\d.]+)" height="([\d.]+)"/u.exec(xml).map(Number);
+    const words = [...xml.matchAll(/<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]+)<\/word>/gu)]
+      .map((match) => ({ xMax: Number(match[3]), yMin: Number(match[2]), yMax: Number(match[4]), height: Number(match[4]) - Number(match[2]), text: match[5] }));
+    return { width, height, words };
+  };
+  const probeWords = wordHeights(longPathPdf);
+  const canonicalWords = wordHeights(canonicalFindingsPdf);
+  const assertSameScale = (probe, canonical, label) => {
+    for (const text of ["Findings", "block", "Run", "summary"]) {
+      const a = probe.words.find((word) => word.text === text);
+      const b = canonical.words.find((word) => word.text === text);
+      assert.ok(a && b && Math.abs(a.height - b.height) <= 0.05, `${label}: "${text}" prints at ${a?.height} pt, not ${b?.height} pt as in the canonical PDF; the page was scaled`);
+    }
+  };
+  assertSameScale(probeWords, canonicalWords, "long document path");
+  // Red control: the same words at the 98.3 % the trailing caption margin produced must fail.
+  const scaled = { ...probeWords, words: probeWords.words.map((word) => ({ ...word, height: word.height * 0.983 })) };
+  assert.throws(() => assertSameScale(scaled, canonicalWords, "long document path (scale control)"), /the page was scaled/u,
+    "long document path: a page printed at 98.3 % did not fail the verifier's scale check");
+  // Page furniture lives in the margin boxes; only the content box's words are compared. A glyph
+  // box may overshoot the content edge by a fraction of a point (the canonical run-facts hash
+  // reaches 561.57 pt against a 560.94 pt edge), so the bound is the canonical page's own widest word.
+  const marginPt = 12 / 25.4 * 72;
+  const contentWords = (words) => words.words.filter((word) => word.yMin >= marginPt && word.yMax <= words.height - marginPt);
+  const canonicalRight = Math.max(...contentWords(canonicalWords).map((word) => word.xMax));
+  const probeRight = Math.max(...contentWords(probeWords).map((word) => word.xMax));
+  assert.ok(canonicalRight <= probeWords.width - marginPt + 1, "canonical findings PDF prints past the A4 content box");
+  assert.ok(probeRight <= canonicalRight + 0.5, `long document path: page 1 content reaches ${probeRight} pt, past the canonical ${canonicalRight} pt`);
   const hostile = manifest.technicalProbes.find((probe) => probe.id === "print-hostile-run-id/clean");
   assert.match(hostile.runId, /";.*\}.*<\/style>/u, "hostile run-id probe no longer carries a hostile run id");
   const hostilePdf = verifyProbeFiles(hostile);
@@ -1089,7 +1176,7 @@ verifierSelfControls.breakRuns = Object.fromEntries(Object.entries(breakRuns).ma
 assert.ok(tileMutationControl, "tile re-cut mutation control did not run");
 assert.ok(verifierSelfControls.strandedHeading, "verifier stranded-heading control did not run");
 assert.ok(verifierSelfControls.fill, "verifier text-depth control did not run");
-for (const control of ["rowRule", "rowPitch", "fillApplication", "bareContinuation"]) {
+for (const control of ["rowRule", "rowPitch", "headerRule", "fillApplication", "bareContinuation"]) {
   assert.ok(verifierSelfControls[control], `verifier ${control} control did not run`);
 }
 assert.ok(fontMutationControl, "PDF font mutation control did not run");
@@ -1121,7 +1208,7 @@ if (mode === "technical") {
   process.stdout.write(
     `report surfaces: technical gate passed 32/32 current cells and ${Object.values(manifest.physicalArtifacts).reduce((sum, count) => sum + count, 0)} physical artifacts; ` +
       `no human-review claim is made; ${latestRound} ` +
-      `(current inputs ${manifest.reviewInputFingerprint}; verifier self-controls rejected: pixel, font, tile re-cut, gallery, stranded heading, text depth, fill application, bare continuation, row rule, row pitch, break runs)\n`,
+      `(current inputs ${manifest.reviewInputFingerprint}; verifier self-controls rejected: pixel, font, tile re-cut, gallery, stranded heading, text depth, fill application, bare continuation, row rule, header rule, row pitch, break runs)\n`,
   );
 } else {
   process.stdout.write(

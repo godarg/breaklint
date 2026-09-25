@@ -39,6 +39,8 @@ const controls = [
   { name: "broken-right-row-rule", state: "insufficient-coverage", expect: /coverage row rule is open/u, sides: ["right"] },
   { name: "broken-left-row-rule", state: "insufficient-coverage", expect: /coverage row rule is open/u, sides: ["left"] },
   { name: "broken-both-row-rule", state: "insufficient-coverage", expect: /coverage row rule is open/u, sides: ["left", "right"] },
+  { name: "broken-border-collapse", state: "clean", expect: /(?:clean|long coverage table): the column header is not closed by exactly one rule: \[\{"page":\d+,"rules":2\}/u },
+  { name: "broken-caption-gap", state: "findings", expect: /long document path: print content overflows the A4 content box by [1-9]\d* px/u },
   { name: "broken-row-pitch", state: "clean", expect: /(?:clean|long coverage table): coverage row pitch is irregular \(median \d+ px/u },
   { name: "broken-column-alignment", state: "findings", expect: /coverage column 3 misaligned/u },
   // Whichever table continues first — the canonical clean table when its pagination continues it,

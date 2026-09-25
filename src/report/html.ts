@@ -246,7 +246,7 @@ function renderCoverageTable(document: ReturnType<typeof buildHtmlReportModel>["
     ? `<tbody>\n  ${rows.join("\n  ")}\n</tbody>`
     : `<tbody>\n  ${rows.slice(0, -2).join("\n  ")}\n</tbody>\n<tbody class="coverage-tail">\n  ${rows.slice(-2).join("\n  ")}\n</tbody>`;
   return `<table class="coverage-table" id="${esc(document.id)}">
-<caption><span class="coverage-path mono">${pathText(document.path)}</span> <span class="document-verdict">Document verdict: ${esc(document.verdict)}</span></caption>
+<caption><span class="caption-line"><span class="coverage-path mono">${pathText(document.path)}</span> <span class="document-verdict">Document verdict: ${esc(document.verdict)}</span></span></caption>
 <thead>
   ${COVERAGE_COLUMNS}
 </thead>

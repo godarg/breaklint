@@ -31,6 +31,7 @@ import {
   HUMAN_REVIEW_ROLES,
   REQUIRED_BROWSER_RENDER_ARGS,
   REVIEWER_AUTHENTICATION_NOTE,
+  REVIEW_INPUT_ROOTS,
   REVIEW_ARTIFACT_CONTRACT_VERSION,
   assessHumanGate,
   describeLatestRound,
@@ -184,7 +185,7 @@ describe("HTML Report Surface v2", () => {
     const rules = Object.keys(document.coverage);
     const table = /<table class="coverage-table"[\s\S]*?<\/table>/u.exec(html)?.[0] ?? "";
     assert.ok(table.length > 0, "coverage is not a table");
-    assert.match(table, /<caption><span class="coverage-path mono"><span class="path-id"><span>examples\/<\/span><wbr><span>demo\.html<\/span><\/span><\/span> <span class="document-verdict">Document verdict: findings<\/span><\/caption>/u,
+    assert.match(table, /<caption><span class="caption-line"><span class="coverage-path mono"><span class="path-id"><span>examples\/<\/span><wbr><span>demo\.html<\/span><\/span><\/span> <span class="document-verdict">Document verdict: findings<\/span><\/span><\/caption>/u,
       "the document path and verdict belong to the table caption, so they cannot strand above it");
     assert.equal((table.match(/<th scope="col"/gu) ?? []).length, 7, "seven column headers");
     assert.equal((table.match(/<th scope="row" class="rule"><code class="rule-id">/gu) ?? []).length, rules.length, "every rule is a row header");
@@ -412,16 +413,16 @@ function boundPassingFixture(): { ledger: ReviewLedger; manifest: Record<string,
         const path = `${state}--${theme}--${viewport}.png`;
         const tiles = viewport === "desktop" ? [] : [{ path: `${state}--${theme}--${viewport}--tile-01.png` }];
         artifacts.push({ cell, kind: "screen", path, tiles, reviewArtifactFingerprint: hex(++index), pixels: { normalizedRgbaSha256: hex(++index) } });
-        cells[cell] = { status: "pass", reviewer: "@Neo", reviewedAt: "2026-10-01T10:00:00.000Z", note: "Looked at the full page and every tile.", reviewArtifactFingerprint: hex(index - 1), reviewedRawSha256: hex(900), reviewedNormalizedRgbaSha256: hex(index), reviewedArtifacts: [path, ...tiles.map((tile) => tile.path)] };
+        cells[cell] = { status: "pass", reviewer: "@Neo", reviewedAt: "2026-09-20T10:00:00.000Z", note: "Looked at the full page and every tile.", reviewArtifactFingerprint: hex(index - 1), reviewedRawSha256: hex(900), reviewedNormalizedRgbaSha256: hex(index), reviewedArtifacts: [path, ...tiles.map((tile) => tile.path)] };
       }
     }
     const pdfCell = `print/${state}/pdf`;
     artifacts.push({ cell: pdfCell, kind: "pdf", path: `${state}--a4.pdf`, pages: 2, reviewArtifactFingerprint: hex(++index) });
-    cells[pdfCell] = { status: "pass", reviewer: "@Neo", reviewedAt: "2026-10-01T10:00:00.000Z", note: "Read both pages of the PDF.", reviewArtifactFingerprint: hex(index), reviewedRawSha256: hex(901), reviewedPages: [1, 2], reviewedArtifacts: [`${state}--a4.pdf`] };
+    cells[pdfCell] = { status: "pass", reviewer: "@Neo", reviewedAt: "2026-09-20T10:00:00.000Z", note: "Read both pages of the PDF.", reviewArtifactFingerprint: hex(index), reviewedRawSha256: hex(901), reviewedPages: [1, 2], reviewedArtifacts: [`${state}--a4.pdf`] };
     const rasterCell = `print/${state}/raster-set`;
     const pages = [{ path: `${state}--a4-page-1.png` }, { path: `${state}--a4-page-2.png` }];
     artifacts.push({ cell: rasterCell, kind: "raster-set", pages, reviewArtifactFingerprint: hex(++index) });
-    cells[rasterCell] = { status: "pass", reviewer: "@Neo", reviewedAt: "2026-10-01T10:00:00.000Z", note: "Compared both rasters with the PDF.", reviewArtifactFingerprint: hex(index), reviewedRawSha256: [hex(902), hex(903)], reviewedPages: [1, 2], reviewedArtifacts: pages.map((page) => page.path) };
+    cells[rasterCell] = { status: "pass", reviewer: "@Neo", reviewedAt: "2026-09-20T10:00:00.000Z", note: "Compared both rasters with the PDF.", reviewArtifactFingerprint: hex(index), reviewedRawSha256: [hex(902), hex(903)], reviewedPages: [1, 2], reviewedArtifacts: pages.map((page) => page.path) };
   }
   const physicalArtifacts = { screens: 24, pdfs: 4, rasterPages: 8 };
   const manifest = { reviewEnvironment, observedEnvironment: { platformRelease: "6.18.44", node: "v24.21.0" }, artifacts, physicalArtifacts };
@@ -430,9 +431,9 @@ function boundPassingFixture(): { ledger: ReviewLedger; manifest: Record<string,
     round: ledger.rounds.length + 1,
     record: "current",
     outcome: "pass",
-    reviewedAt: "2026-10-01T10:00:00.000Z",
+    reviewedAt: "2026-09-20T10:00:00.000Z",
     reviewers: [{ handle: "@Neo", kind: "human" }],
-    binding: { reviewInputFingerprint: fingerprint, renderManifestGeneratedAt: "2026-10-01T09:00:00.000Z", reviewEnvironment: structuredClone(reviewEnvironment) },
+    binding: { reviewInputFingerprint: fingerprint, renderManifestGeneratedAt: "2026-09-20T09:00:00.000Z", reviewEnvironment: structuredClone(reviewEnvironment) },
     physicalArtifactsReviewed: { ...physicalArtifacts },
     findings: { blocker: 0, high: 0, medium: 0, low: 0 },
     note: "Synthetic positive control for the strict local gate.",
@@ -506,7 +507,7 @@ describe("report-surface human review gate", () => {
 
     // An earlier pass never carries forward over a later failed round.
     const laterFail = structuredClone(ledger);
-    laterFail.rounds.push({ ...structuredClone(ledger.rounds[1]!), round: 4, record: "current", reviewedAt: "2026-10-02" });
+    laterFail.rounds.push({ ...structuredClone(ledger.rounds[1]!), round: 4, record: "current", reviewedAt: "2026-09-21" });
     assert.throws(() => assessHumanGate(laterFail, manifest, fingerprint), /latest review round 4 is FAIL/u);
   });
 
@@ -548,7 +549,7 @@ describe("report-surface human review gate", () => {
     const { ledger, manifest, fingerprint } = boundPassingFixture();
     ledger.rounds.at(-1)!.reviewers = [{ kind: "human", handle: "@Neo" }, agent];
     assert.equal(describeLatestRound(ledger, manifest, fingerprint),
-      "latest human review round 3 is PASS (2026-10-01T10:00:00.000Z; 0 blocker, 0 high, 0 medium, 0 low; current record; " +
+      "latest human review round 3 is PASS (2026-09-20T10:00:00.000Z; 0 blocker, 0 high, 0 medium, 0 low; current record; " +
         "reviewers: @Neo (human), @Bot (agent: example-review-model); cells passed by a rostered human: 32 of 32 passing); " +
         "bound to the current render: inputs yes; environment/artifacts yes");
     const agentFail = structuredClone(ledger);
@@ -621,18 +622,32 @@ describe("report-surface human review gate", () => {
     }, /a passing latest round must be a current record, not historical/u);
     // A record written after the fact never follows a current one, even in time order and failed.
     failed((ledger) => {
-      ledger.rounds.push({ ...structuredClone(ledger.rounds[1]!), round: 4, reviewedAt: "2026-10-02" });
+      ledger.rounds.push({ ...structuredClone(ledger.rounds[1]!), round: 4, reviewedAt: "2026-09-21" });
     }, /round 4: a historical-reconstruction record cannot follow a current round/u);
     // A current round reviewed before the render it binds, as a round and cell by cell.
-    failed((ledger) => { ledger.rounds.at(-1)!.reviewedAt = "2026-10-01T08:59:59.000Z"; }, /round 3: reviewed 2026-10-01T08:59:59\.000Z, before the render it binds/u);
-    failed((ledger) => { ledger.rounds.at(-1)!.cells!["print/clean/pdf"]!.reviewedAt = "2026-10-01T08:00:00.000Z"; },
-      /print\/clean\/pdf reviewed 2026-10-01T08:00:00\.000Z, before the render it binds/u);
-    failed((ledger) => { ledger.rounds.at(-1)!.reviewedAt = "2026-10-01"; }, /a current round's reviewedAt must be an exact UTC timestamp/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.reviewedAt = "2026-09-20T08:59:59.000Z"; }, /round 3: reviewed 2026-09-20T08:59:59\.000Z, before the render it binds/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.cells!["print/clean/pdf"]!.reviewedAt = "2026-09-20T08:00:00.000Z"; },
+      /print\/clean\/pdf reviewed 2026-09-20T08:00:00\.000Z, before the render it binds/u);
+    failed((ledger) => { ledger.rounds.at(-1)!.reviewedAt = "2026-09-20"; }, /a current round's reviewedAt must be an exact UTC timestamp/u);
     // A later round reviewed before the one it follows.
-    failed((ledger) => { ledger.rounds.push({ ...structuredClone(ledger.rounds.at(-1)!), round: 4, reviewedAt: "2026-09-30T10:00:00.000Z" }); },
-      /round 4: reviewed 2026-09-30T10:00:00\.000Z, before the round it follows/u);
+    failed((ledger) => { ledger.rounds.push({ ...structuredClone(ledger.rounds.at(-1)!), round: 4, reviewedAt: "2026-09-19T10:00:00.000Z" }); },
+      /round 4: reviewed 2026-09-19T10:00:00\.000Z, before the round it follows/u);
+    // A review recorded in the future, beyond clock skew, as a round or as a cell.
+    const verifiedAt = Date.parse("2026-09-20T12:00:00.000Z");
+    const future = (mutate: (ledger: ReviewLedger) => void, expected: RegExp) => {
+      const { ledger } = boundPassingFixture();
+      mutate(ledger);
+      assert.throws(() => validateReviewLedger(ledger, { now: verifiedAt }), expected);
+    };
+    future((ledger) => { Object.assign(ledger.rounds.at(-1)!, { reviewedAt: "2026-09-20T12:30:00.000Z" }); },
+      /round 3: reviewed 2026-09-20T12:30:00\.000Z lies in the future/u);
+    future((ledger) => { ledger.rounds.at(-1)!.cells!["screen/clean/dark/mobile"]!.reviewedAt = "2027-01-01T00:00:00.000Z"; },
+      /screen\/clean\/dark\/mobile reviewed 2027-01-01T00:00:00\.000Z lies in the future/u);
     const { ledger } = boundPassingFixture();
-    assert.equal(validateReviewLedger(ledger).latest.round, 3, "positive control: a current round reviewed after its render");
+    assert.equal(validateReviewLedger(ledger, { now: verifiedAt }).latest.round, 3, "positive control: reviewed two hours before the verifier's clock");
+    assert.equal(validateReviewLedger(structuredClone(ledger), { now: Date.parse("2026-09-20T09:55:00.000Z") }).latest.round, 3,
+      "within the clock-skew margin is accepted");
+    assert.equal(validateReviewLedger(structuredClone(ledger)).latest.round, 3, "positive control: a current round reviewed after its render");
   });
 
   it("names exactly the code roster wherever the docs name the human roles", () => {
@@ -645,6 +660,12 @@ describe("report-surface human review gate", () => {
       for (const role of roster) assert.ok(text.includes(`\`${role}\``), `${path} does not name ${role}`);
     }
     assert.ok(REVIEWER_AUTHENTICATION_NOTE.includes("does not authenticate a person"), "the residual is stated, not implied");
+    // The review package names exactly the inputs a review is bound to.
+    const reporting = readFileSync(new URL("../../docs/reporting.md", import.meta.url), "utf8");
+    const roots = [...reporting.matchAll(/<!-- review-input-roots: ([^>]*?) -->/gu)];
+    assert.equal(roots.length, 1, "docs/reporting.md must carry exactly one review-input-roots marker");
+    assert.deepEqual(roots[0]![1]!.split(/,\s*/u), [...REVIEW_INPUT_ROOTS], "the review package lists bound inputs other than REVIEW_INPUT_ROOTS");
+    for (const root of REVIEW_INPUT_ROOTS) assert.ok(reporting.includes(`\`${root}\``), `the review package does not name ${root}`);
   });
 
   it("rejects a ledger round whose record contradicts its outcome", () => {

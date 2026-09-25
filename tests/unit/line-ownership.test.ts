@@ -170,7 +170,12 @@ describe("line ownership: a split is judged at the block whose own container hol
     lineOf(snapshot, section0, 1, 1);
     const section1 = record(snapshot, "sec:1", { page: 2, tag: "section", fragmentIndex: 1, fragmentCount: 2, box: WITH_BOX(2, 0, 1) });
     lineOf(snapshot, section1, 2, 0);
-    assert.deepEqual(findings(snapshot).list.sort(), ["layout/orphan sec:0", "layout/widow sec:1"]);
+    const result = findings(snapshot);
+    assert.deepEqual(result.list.sort(), ["layout/orphan sec:0", "layout/widow sec:1"]);
+    // One line each side, so both messages speak of one line, in the singular.
+    const message = (ruleId: string) => result.report.findings.find((finding) => finding.ruleId === ruleId)!.message;
+    assert.match(message("layout/orphan"), /^1 line of this block remains at the foot of page 1;/u);
+    assert.match(message("layout/widow"), /^1 line of this block continues onto page 2;/u);
   });
 
   it("keeps a line that carries the wrapper's own text beside a nested block's", () => {

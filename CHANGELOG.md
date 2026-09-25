@@ -613,6 +613,17 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   the previous page's last row rule again under the repeated header; remediation and note text
   keep the 72ch measure inside their boxes; counts of one read "1 line" and "1 occurrence", and
   the `layout/widow` and `layout/orphan` messages read "1 line of this block continues / remains".
+- **A long document path no longer shrinks the whole printed report.** The coverage caption put
+  a trailing margin after the path, whose last segment was already capped at the line, so a long
+  path pushed the print 12 px past the A4 content box and Chrome scaled every page to 98.3 %.
+  Path and verdict are now wrapping flex items with a column gap, which never follows the last
+  item on a line. A technical print probe with a long document path fails on any overflow, and
+  the verifier compares its page-1 word heights with the canonical PDF (`broken-caption-gap`).
+- **The single rule under a repeated table header is checked.** Renderer and verifier count the
+  rules between the column header and the first row on every page; a second rule, or a thin rule
+  painted through the strong one (what collapsed borders did), fails (`broken-border-collapse`).
+- **A review time in the future is rejected.** No round or cell of the ledger may be dated more
+  than ten minutes after the verifying clock.
 - **Printed coverage rows keep one pitch across pages.** Rows on a table's continuation page were
   stretched (21.7 pt on the first page, 24.8–26.3 pt after the break) with a second rule under the
   header, and the end mark's own rule sat under the last row rule like a double line: the coverage

@@ -123,7 +123,13 @@ export const REPORT_HTML_STYLES = String.raw`
      floor are right-aligned tabular numbers, the result is text. */
   .coverage-table { width: 100%; border-collapse: collapse; font-size: var(--bl-font-size-sm); font-variant-numeric: tabular-nums; }
   .coverage-table caption { padding-block: var(--bl-space-3); border-block-start: var(--bl-border-strong) solid var(--bl-color-fg-primary); text-align: start; }
-  .coverage-path { margin-inline-end: var(--bl-space-3); font-size: var(--bl-font-size-base); font-weight: 700; }
+  /* Path and verdict are wrapping flex items with a column gap: a gap sits only BETWEEN items on
+     one line, never after the last, so a path that fills its line cannot be pushed past the edge.
+     A trailing margin on the path did exactly that (a long path's last segment, capped at the line,
+     plus the margin: 12 px of overflow, and Chrome shrank the whole printed document to 98.3 %). */
+  .caption-line { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--bl-space-3); row-gap: var(--bl-space-1); }
+  .caption-line > * { min-inline-size: 0; max-inline-size: 100%; }
+  .coverage-path { font-size: var(--bl-font-size-base); font-weight: 700; }
   .document-verdict { color: var(--bl-color-fg-muted); font-family: var(--bl-font-mono); font-size: var(--bl-font-size-sm); }
   .coverage-table th, .coverage-table td { padding: var(--bl-space-2) var(--bl-space-3); border-block-end: var(--bl-border-thin) solid var(--bl-color-divider); overflow-wrap: normal; text-align: start; vertical-align: baseline; }
   .coverage-table thead th { border-block-end: var(--bl-border-strong) solid var(--bl-color-fg-primary); color: var(--bl-color-fg-muted); font-size: var(--bl-font-size-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; vertical-align: bottom; }

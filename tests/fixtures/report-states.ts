@@ -199,6 +199,21 @@ export function longCoverageReportState(): Report {
   return report;
 }
 
+/**
+ * The findings state with a long document path whose last segment alone is wider than a printed
+ * line: the print probe for a caption, fact or path that must wrap rather than widen the page.
+ */
+export const LONG_DOCUMENT_PATH = "reports/2026/q3/annual-report-typeset-final-revision-with-appendices-glossary-and-index-v12.html";
+export function longDocumentPathReportState(): Report {
+  const report = findingsReportState();
+  const document = report.documents[0];
+  if (!document) throw new Error("surface fixture requires one document");
+  const previous = document.path;
+  document.path = LONG_DOCUMENT_PATH;
+  for (const finding of report.findings) if (finding.document === previous) finding.document = LONG_DOCUMENT_PATH;
+  return report;
+}
+
 export function canonicalReportStates(): Record<ReportSurfaceState, Report> {
   return {
     clean: cleanReportState(),

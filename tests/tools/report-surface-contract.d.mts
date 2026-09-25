@@ -24,7 +24,8 @@ export function runReviewInputMutationControl(expected: string, root?: string): 
 export function isMeasurableBrowserVersion(value: unknown): boolean;
 export function assertReviewEnvironment(environment: unknown, label: string, options?: { historical?: boolean }): void;
 export function assertObservedEnvironment(observed: unknown, label: string): void;
-export function validateReviewLedger(ledger: unknown, options?: { cellCount?: number }): { rounds: number; latest: ReviewRound };
+export const REVIEW_TIME_SKEW_MS: number;
+export function validateReviewLedger(ledger: unknown, options?: { cellCount?: number; now?: number }): { rounds: number; latest: ReviewRound };
 export function isRosteredHuman(reviewer: unknown): boolean;
 export function summarizeLatestRound(ledger: ReviewLedger): {
   latest: ReviewRound;

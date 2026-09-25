@@ -356,7 +356,13 @@ function assertReviewCell(cellId, cell, round, label) {
  * - a round written after the fact from another record says so (`record:
  *   "historical-reconstruction"`) and names that record in `source`.
  */
-export function validateReviewLedger(ledger, { cellCount = 32 } = {}) {
+/** How far a recorded review time may lie ahead of the verifying clock: clock skew, not a future. */
+export const REVIEW_TIME_SKEW_MS = 10 * 60 * 1000;
+
+export function validateReviewLedger(ledger, { cellCount = 32, now = Date.now() } = {}) {
+  const latestAcceptable = now + REVIEW_TIME_SKEW_MS;
+  const notInFuture = (value, what) => assert.ok(Date.parse(value) <= latestAcceptable,
+    `${what} ${value} lies in the future (verifier clock ${new Date(now).toISOString()}); a review is recorded after it happened`);
   assert.equal(ledger?.schemaVersion, REVIEW_LEDGER_SCHEMA_VERSION, "human ledger schema drift");
   assert.ok(Array.isArray(ledger.rounds) && ledger.rounds.length > 0, "human ledger holds no review round");
   let previousReviewedAt = null;
@@ -390,7 +396,9 @@ export function validateReviewLedger(ledger, { cellCount = 32 } = {}) {
     // written after the fact never follows a current one, and a current round cannot have been
     // reviewed before the render it binds existed. Historical rounds keep their times as recorded
     // (round 1's cells predate its render timestamp by minutes; it is not rewritten).
+    for (const [cellId, cell] of cells ?? []) if (cell.status !== "not-reviewed") notInFuture(cell.reviewedAt, `${label}: ${cellId} reviewed`);
     if (round.outcome !== "pending") {
+      notInFuture(round.reviewedAt, `${label}: reviewed`);
       const reviewedAt = Date.parse(round.reviewedAt);
       assert.ok(previousReviewedAt === null || reviewedAt >= previousReviewedAt,
         `${label}: reviewed ${round.reviewedAt}, before the round it follows; rounds are reviewed in the order they are numbered`);

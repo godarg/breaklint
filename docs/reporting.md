@@ -285,9 +285,15 @@ checks the record; it never writes a round, and no agent may write one that pass
 product and four-part version, platform, architecture, Node major line, launch arguments,
 viewports, print contract). From a clean checkout of the commit under review run `npm ci`, then
 `npm run test:report-surfaces:technical`. It renders into `.artifacts/report-surfaces` and must pass
-before anything is reviewed. Do not edit a bound input afterwards (`src/report`, `src/rules`,
-`src/core`, `src/config`, the surface tools, the fixtures, `package.json`, the lockfile, CI): any
-change unbinds the review and means rendering again.
+before anything is reviewed. Do not edit a bound input afterwards; any change unbinds the review
+and means rendering again. The bound inputs are exactly `REVIEW_INPUT_ROOTS` in
+`tests/tools/report-surface-contract.mjs` (a test holds this list against it):
+<!-- review-input-roots: .github/workflows/ci.yml, src/acquire/browser.ts, src/config, src/core, src/report, src/rules, examples/demo-snapshot.json, tests/fixtures/report-states.ts, tests/tools/render-report-surfaces.mjs, tests/tools/report-surface-mutations.mjs, tests/tools/verify-report-surfaces.mjs, tests/tools/report-surface-contract.mjs, package.json, package-lock.json -->
+`.github/workflows/ci.yml`, `src/acquire/browser.ts`, `src/config`, `src/core`, `src/report`,
+`src/rules`, `examples/demo-snapshot.json`, `tests/fixtures/report-states.ts`, the four surface
+tools (`tests/tools/render-report-surfaces.mjs`, `tests/tools/report-surface-mutations.mjs`,
+`tests/tools/verify-report-surfaces.mjs`, `tests/tools/report-surface-contract.mjs`),
+`package.json` and `package-lock.json`.
 
 **2. Open**, in `.artifacts/report-surfaces/`:
 
@@ -428,7 +434,8 @@ This residual is deliberate (owner decision, 0.7.0 cycle) and is printed with ev
 Rounds are also ordered in time, fail-closed: `reviewedAt` never decreases from one round to the
 next; no `historical` or `historical-reconstruction` record follows a `current` one; a passing
 latest round must be a `current` record; and a current round, and each cell it reviewed, carries an
-exact UTC `reviewedAt` at or after the `renderManifestGeneratedAt` it binds. A historical pass moved
+exact UTC `reviewedAt` at or after the `renderManifestGeneratedAt` it binds. No round or cell may be
+dated more than ten minutes (clock skew) after the verifying machine's clock. A historical pass moved
 to the end of the ledger, or re-bound to today's render, therefore does not pass. Historical rounds
 keep the times they were recorded with (round 1's cells predate its render timestamp by minutes).
 
@@ -563,7 +570,16 @@ within 2 px. The check exists because the coverage list was a CSS grid: a grid i
 is stretched to its unfragmented grid area, and Blink gave the continuation page's rows the surplus
 the repeated header creates (24.8–26.3 pt instead of 21.7 pt, with a second rule under the header).
 In print the list is block flow, and the end mark carries no rule of its own, so the table's last
-row rule is the only line under it. `broken-row-pitch` restores the grid.
+row rule is the only line under it. `broken-row-pitch` restores the grid. The column header is
+closed by exactly one rule on every page, counted in the raster between the header text and the
+first row: a separate second rule, or a thin rule painted through the strong one (a lighter row
+between two darker rows), fails. Print uses separate borders because collapsed borders did the
+latter on every continuation page; `broken-border-collapse` restores them. A long document path is
+printed as a technical probe (`print-long-document-path/findings`): the print content may not be
+wider than the A4 content box, which makes Chrome shrink the whole PDF (a trailing margin on the
+caption's path did, 12 px, every page at 98.3 %), and the verifier independently compares word
+heights on page 1 with the canonical findings PDF, which a scaled page cannot match
+(`broken-caption-gap`).
 
 Two technical A4 probes, which are not human-review cells, cover what the canonical states cannot:
 the insufficient-coverage state printed with `printBackground: false` must still close all 13 rows

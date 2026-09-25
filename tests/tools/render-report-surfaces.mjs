@@ -13,7 +13,7 @@ import { PNG } from "pngjs";
 import { resolveBrowser } from "../../src/acquire/browser.ts";
 import { render } from "../../src/report/index.ts";
 import { REPORT_FONT_ROLES, REPORT_TEXT_CONTRAST_PAIRS, TOKEN_PREFIX } from "../../src/report/html-tokens.ts";
-import { canonicalReportStates, longCoverageReportState } from "../fixtures/report-states.ts";
+import { LONG_DOCUMENT_PATH, canonicalReportStates, longCoverageReportState, longDocumentPathReportState } from "../fixtures/report-states.ts";
 import {
   REQUIRED_BROWSER_RENDER_ARGS,
   REVIEW_ARTIFACT_CONTRACT_VERSION,
@@ -93,6 +93,12 @@ const SURFACE_CONTROLS = {
   "broken-path-overflow": { screen: `.path-id > span { display: inline !important; white-space: nowrap !important; }` },
   // Rule ids may break at a hyphen inside the name again.
   "broken-rule-id-wrap": { screen: `.rule-id > span { white-space: normal !important; } .finding h3 { max-inline-size: 12ch !important; }` },
+  // Collapsed borders again: a continuation page paints the previous page's last row rule a
+  // second time under the repeated header (the round-2 typography note).
+  "broken-border-collapse": { print: `@media print { .coverage-table { border-collapse: collapse !important; } }` },
+  // The caption's path takes a trailing margin again: a path that fills its line is pushed past
+  // the A4 content box and Chrome shrinks the whole PDF (the final-round verifier's M1).
+  "broken-caption-gap": { print: `@media print { .caption-line { display: block !important; } .coverage-path { margin-inline-end: var(--bl-space-3) !important; } }` },
   // The coverage list becomes a grid again: its fragmenting table item is stretched on the
   // continuation page (round-2 finding L2).
   "broken-row-pitch": { print: `@media print { .coverage-documents { display: grid !important; } }` },
@@ -726,13 +732,40 @@ function coverageRowChecks(pdfPath, rasterPages, expectedRows, tableEdgesCssPx, 
         rightMaximumGapPx: rightStats.maximumGapPx,
       };
     });
-    return { page, path: raster.path, rows, header, caption };
+    // Exactly one rule between the column header and the first row: the header's own.
+    let headerRules = null;
+    const headerWord = words.find((word) => word.text === "RESULT" && anchors.length > 0 && word.yMax < anchors[0].yMin);
+    if (headerWord) {
+      headerRules = 0;
+      // A rule is a band of rows at least half dark across the table; a row inside a band that is
+      // clearly lighter than both neighbours splits it (a thin rule painted through a strong one).
+      const ruledRow = (y) => {
+        let count = 0;
+        for (let x = left; x <= right; x += 1) if (dark(x, y)) count += 1;
+        return count >= (right - left + 1) / 2;
+      };
+      const mean = (y) => {
+        let sum = 0;
+        for (let x = left; x <= right; x += 1) sum += decoded.data[(y * decoded.width + x) * 4];
+        return sum / (right - left + 1);
+      };
+      let inRule = false;
+      for (let y = Math.ceil(headerWord.yMax * PT_TO_RASTER); y < Math.floor(anchors[0].yMin * PT_TO_RASTER); y += 1) {
+        const ruled = ruledRow(y);
+        if (ruled && !inRule) headerRules += 1;
+        if (ruled && inRule && ruledRow(y + 1) && mean(y) > mean(y - 1) + 40 && mean(y) > mean(y + 1) + 40) headerRules += 1;
+        inRule = ruled;
+      }
+    }
+    return { page, path: raster.path, rows, header, caption, headerRules };
   });
   const rows = pages.flatMap((page) => page.rows.map((row) => ({ page: page.page, ...row })));
   // Structure first, then the physical rules: a control that breaks the page structure must fail
   // for that reason, not for the distorted rows a forced break can leave behind.
   if (rows.length !== expectedRows) throw new Error(`${label}: coverage row PDF inventory drift: detected ${rows.length}/${expectedRows}`);
   const withRows = pages.filter((page) => page.rows.length > 0);
+  const doubled = pages.filter((page) => page.headerRules !== null && page.headerRules !== 1).map((page) => ({ page: page.page, rules: page.headerRules }));
+  if (doubled.length > 0) throw new Error(`${label}: the column header is not closed by exactly one rule: ${JSON.stringify(doubled)}`);
   const headerless = withRows.filter((page) => !page.header).map((page) => page.page);
   if (headerless.length > 0) throw new Error(`${label}: continuation page lacks the table header: pages ${headerless.join(", ")}`);
   const continuations = withRows.filter((page) => !page.caption).map((page) => ({ page: page.page, rows: page.rows.length }));
@@ -1389,6 +1422,39 @@ try {
           belowFloorWordsInText: (text.match(/Below floor/gu) ?? []).length,
           rowChecks: coverageRowChecks(probe.pdfPath, probe.rasterPages, printSemantics.coverageRowCount, tableEdges, `${state} (no background)`),
         });
+      }
+      if (state === "findings") {
+        // A document path whose last segment alone is wider than a printed line. Content wider
+        // than the A4 content box makes Chrome shrink the WHOLE PDF to fit; a trailing margin on
+        // the caption's path did that (12 px, every page at 98.3 %) with no canonical path long
+        // enough to show it.
+        await page.setContent(render(longDocumentPathReportState(), "html"), { waitUntil: "load", timeout: 60_000 });
+        await page.evaluate(() => document.fonts.ready);
+        if (ACTIVE_CONTROL.print) await page.addStyleTag({ content: ACTIVE_CONTROL.print });
+        const overflow = await page.evaluate(() => ({
+          horizontalOverflowPx: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+          widest: [...document.querySelectorAll("main *")].reduce((best, element) => {
+            const right = element.getBoundingClientRect().right;
+            return right > best.right ? { right: Math.round(right * 100) / 100, element: element.className || element.tagName } : best;
+          }, { right: 0, element: null }),
+        }));
+        if (overflow.horizontalOverflowPx !== 0) {
+          throw new Error(`long document path: print content overflows the A4 content box by ${overflow.horizontalOverflowPx} px (widest ${JSON.stringify(overflow.widest)}), so Chrome scales the whole PDF`);
+        }
+        const pathLines = (await page.evaluate(identifierLinesInPage)).filter((identifier) => identifier.kind === "path" && identifier.text === LONG_DOCUMENT_PATH);
+        assertIdentifierLines(pathLines, "print/long document path", { print: true });
+        const probe = await writePrintArtifacts(page, ".technical/long-document-path.pdf", ".technical/long-document-path-page", true, "long document path");
+        technicalProbes.push({
+          id: "print-long-document-path/findings",
+          state,
+          printBackground: true,
+          documentPath: LONG_DOCUMENT_PATH,
+          horizontalOverflowPx: overflow.horizontalOverflowPx,
+          pathLines,
+          pdf: probe.pdf,
+          rasterPages: probe.rasterPages,
+        });
+        await page.setContent(html, { waitUntil: "load", timeout: 60_000 });
       }
       if (state === "clean") {
         // Thirteen rows fit on one page, so no canonical state has to repeat the header. This probe
