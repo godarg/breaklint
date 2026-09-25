@@ -220,7 +220,17 @@ describe("margin-box content is not part of the flow", () => {
       assert.equal(records(id).length, 1, `${id}: ${records(id).length} records, clones counted as fragments`);
       assert.equal(records(id)[0]!.page, 1);
       assert.deepEqual(records(id)[0]!.box, { x: 0, y: 0, width: 0, height: 0 }, `${id}: the record is not the hidden original`);
+      // Snapshot 5: the original says what it is — hidden (`display: none`) and printed three
+      // times, once per page, in a margin box. That is how the rules tell it from an element the
+      // author hid.
+      assert.equal(records(id)[0]!.display, "none", `${id}: the computed display was not recorded`);
+      assert.equal(records(id)[0]!.marginCopies, 3, `${id}: the margin-box copies were not counted`);
     }
+    // Nothing else has margin copies: not the body, not the footnote, not author content wearing a
+    // margin-box class inside the page area, not the spoofed area inside the running element.
+    assert.deepEqual(raw.blocks.filter((block) => block.marginCopies > 0 && !["running-title", "running-side", "side-spoof", "side-spoof-p"]
+      .some((id) => block.sid === sid[id])).map((block) => block.sid), []);
+    assert.ok(raw.blocks.every((block) => block.display.length > 0), "a record without its computed display");
     // A position: fixed element has no in-flow original at all: Paged.js removes it from the
     // flow and inserts a clone into every page box. It is therefore not measured anywhere.
     assert.equal(records("stamp").length, 0, "a position: fixed clone was recorded as flow content");
@@ -350,60 +360,73 @@ describe("margin-box content is not part of the flow", () => {
 
 describe("a record with no layout box is never measured, and never anchors a page", () => {
   /**
-   * The metamorphic form of the claim, over the whole registry: adding a record the browser did
-   * not lay out — the in-flow original of a running element, hidden with `display: none` — may not
-   * change any rule's candidates, measurements or findings. The record is built to be a candidate
-   * for every rule that selects blocks by style: it avoids breaks, it is a heading, it is
-   * justified. Measured before this change: `layout/unbreakable-block-too-tall` counted it as
-   * measured at 0 px (a document whose only avoid block was a running element reported full
-   * coverage), `layout/heading-at-page-bottom` as a measured heading "with content below it", and
-   * `type/excessive-word-spacing` as a measured justified block with nothing in it.
+   * The metamorphic form of the claim, over the whole registry: adding a record nothing was printed
+   * from may not change any rule's candidates, measurements or findings. Two such records, told
+   * apart by the facts Snapshot 5 records: the in-flow original of a running element
+   * (`display: none`, printed as margin-box copies) and an element the author hid (`display: none`,
+   * no copies). Each is built to be a candidate for every rule that selects blocks by style: it
+   * avoids breaks, it is a heading, it is justified. Measured before the round-2 change:
+   * `layout/unbreakable-block-too-tall` counted such a record as measured at 0 px (a document whose
+   * only avoid block was a running element reported full coverage), `layout/heading-at-page-bottom`
+   * as a measured heading "with content below it", and `type/excessive-word-spacing` as a measured
+   * justified block with nothing in it. Before Snapshot 5 both carried `rule/target-not-rendered`;
+   * the running original now says where it printed.
    */
-  it("changes no rule's candidates, measurements or findings", () => {
-    const base = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
-    const hidden: BlockRecord = {
-      ...structuredClone(base.blocks[0]!),
-      nodeKey: "bl:s9990:0", sid: "s9990", authorId: "running-heading", blockSignature: "Running heading",
-      tag: "h2", box: { x: 0, y: 0, width: 0, height: 0 }, lines: [], fragmentIndex: 0, fragmentCount: 1, spaceWidth: 3,
-    };
-    hidden.effectiveStyle = { ...hidden.effectiveStyle, breakInside: "avoid", textAlign: "justify", visibility: "visible" };
-    const withHidden = structuredClone(base);
-    withHidden.blocks = [hidden, ...withHidden.blocks];
-    const changed: string[] = [];
-    for (const rule of ALL_RULES) {
-      const ctx = { documentPath: "doc.html", options: rule.defaultOptions, fingerprint };
-      const before = rule.run(base, ctx);
-      const after = rule.run(withHidden, ctx);
-      if (after.candidates !== before.candidates || after.measured !== before.measured) {
-        changed.push(`${rule.id}: candidates ${before.candidates}->${after.candidates}, measured ${before.measured}->${after.measured}`);
+  for (const [name, marginCopies, reason] of [
+    ["the in-flow original of a running element", 6, "rule/target-in-margin-box"],
+    ["an element the author hid", 0, "rule/target-not-rendered"],
+  ] as const) {
+    it(`changes no rule's candidates, measurements or findings: ${name}`, () => {
+      const base = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
+      const hidden: BlockRecord = {
+        ...structuredClone(base.blocks[0]!),
+        nodeKey: "bl:s9990:0", sid: "s9990", authorId: "hidden-heading", blockSignature: "Hidden heading",
+        tag: "h2", box: { x: 0, y: 0, width: 0, height: 0 }, lines: [], fragmentIndex: 0, fragmentCount: 1, spaceWidth: 3,
+        display: "none", marginCopies,
+      };
+      hidden.effectiveStyle = { ...hidden.effectiveStyle, breakInside: "avoid", textAlign: "justify", visibility: "visible" };
+      const withHidden = structuredClone(base);
+      withHidden.blocks = [hidden, ...withHidden.blocks];
+      const changed: string[] = [];
+      for (const rule of ALL_RULES) {
+        const ctx = { documentPath: "doc.html", options: rule.defaultOptions, fingerprint };
+        const before = rule.run(base, ctx);
+        const after = rule.run(withHidden, ctx);
+        if (after.candidates !== before.candidates || after.measured !== before.measured) {
+          changed.push(`${rule.id}: candidates ${before.candidates}->${after.candidates}, measured ${before.measured}->${after.measured}`);
+        }
+        if (after.findings.some((finding) => finding.target.nodeKey === hidden.nodeKey)) changed.push(`${rule.id}: a finding on the hidden record`);
+        const measuredHidden = (after.evaluations ?? []).filter((row) => row.targetRef.nodeKey === hidden.nodeKey && row.status === "measured");
+        if (measuredHidden.length > 0) changed.push(`${rule.id}: the hidden record was evaluated as measured`);
+        for (const row of (after.evaluations ?? []).filter((item) => item.targetRef.nodeKey === hidden.nodeKey)) {
+          assert.equal(row.reason, reason, `${rule.id}: ${row.status} row for the hidden record with the wrong reason`);
+          assert.equal(row.countsTowardCoverage, false, `${rule.id}: the hidden record counts toward coverage`);
+        }
       }
-      if (after.findings.some((finding) => finding.target.nodeKey === hidden.nodeKey)) changed.push(`${rule.id}: a finding on the hidden record`);
-      const measuredHidden = (after.evaluations ?? []).filter((row) => row.targetRef.nodeKey === hidden.nodeKey && row.status === "measured");
-      if (measuredHidden.length > 0) changed.push(`${rule.id}: the hidden record was evaluated as measured`);
-      for (const row of (after.evaluations ?? []).filter((item) => item.targetRef.nodeKey === hidden.nodeKey)) {
-        assert.equal(row.reason, "rule/target-not-rendered", `${rule.id}: ${row.status} row for the hidden record without the not-rendered reason`);
-        assert.equal(row.countsTowardCoverage, false, `${rule.id}: the hidden record counts toward coverage`);
-      }
-    }
-    assert.deepEqual(changed, [], "a record with no layout box changed what the registry measured");
-  });
+      assert.deepEqual(changed, [], "a record nothing was printed from changed what the registry measured");
+    });
+  }
 
   /**
-   * The converse, over the same registry: a record with no box of its own that DOES print — a
-   * `display: contents` block, whose text is laid out and recorded as lines — is not "not rendered".
-   * Measured on 2026-09-25: a justified `<p style="display: contents">` with a word gap of 3.74× the
-   * natural space was a `type/excessive-word-spacing` finding on the base and was excluded as
+   * The converse, over the same registry: a `display: contents` record, which has no box of its
+   * own while its text is laid out and recorded as lines, is not "not rendered". Measured on
+   * 2026-09-25: a justified `<p style="display: contents">` with a word gap of 3.74× the natural
+   * space was a `type/excessive-word-spacing` finding on the base and was excluded as
    * `rule/target-not-rendered` on the round-2 code, so `--fail-on warn` went from exit 1 to exit 0.
-   * A rule that reads lines measures it (the word gaps; where a heading ends, from its last line);
-   * a rule that needs the block's own box declines it, and the decline is counted against coverage.
-   * No rule may exclude it as unrendered.
+   * A rule that reads lines measures it (the word gaps; where a heading ends, from its last line).
+   * `layout/unbreakable-block-too-tall` asks about a box the element does not generate, so
+   * `break-inside` does not apply to it: not applicable, outside coverage. Round 3 declined it
+   * against coverage instead, and a grid of `display: contents` list items with
+   * `li { break-inside: avoid }` went from exit 0 to exit 4 (twelve declines, measured 2026-09-25).
+   * No rule may call it unrendered.
    */
-  it("measures a box-less record that has rendered lines, or declines it where coverage counts", () => {
+  it("measures a display: contents record from its lines, and never calls it unrendered", () => {
     const base = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
     const contents: BlockRecord = {
       ...structuredClone(base.blocks[0]!),
       nodeKey: "bl:s9991:0", sid: "s9991", authorId: "contents-paragraph", blockSignature: "Aa Bb Cc",
       tag: "h2", box: { x: 0, y: 0, width: 0, height: 0 }, lines: [9991], fragmentIndex: 0, fragmentCount: 1, spaceWidth: 3,
+      display: "contents", marginCopies: 0,
     };
     contents.effectiveStyle = { ...contents.effectiveStyle, breakInside: "avoid", textAlign: "justify", visibility: "visible", wordSpacing: "normal" };
     const withContents = structuredClone(base);
@@ -417,7 +440,6 @@ describe("a record with no layout box is never measured, and never anchors a pag
         { text: "Cc", x: 60 + 24 + 14.44, y, width: 12, height: 12 },
       ],
     }];
-    const boxRules = new Set(["layout/unbreakable-block-too-tall"]);
     const problems: string[] = [];
     for (const rule of ALL_RULES) {
       const ctx = { documentPath: "doc.html", options: rule.defaultOptions, fingerprint };
@@ -425,7 +447,9 @@ describe("a record with no layout box is never measured, and never anchors a pag
       const after = rule.run(withContents, ctx);
       const rows = (after.evaluations ?? []).filter((row) => row.targetRef.nodeKey === contents.nodeKey);
       for (const row of rows) {
-        if (row.reason === "rule/target-not-rendered") problems.push(`${rule.id}: excluded a printed record as not rendered`);
+        if (row.reason === "rule/target-not-rendered" || row.reason === "rule/target-in-margin-box") {
+          problems.push(`${rule.id}: labelled a printed record ${row.reason}`);
+        }
       }
       if (rule.id === "type/excessive-word-spacing") {
         const measured = rows.find((row) => row.status === "measured");
@@ -444,16 +468,44 @@ describe("a record with no layout box is never measured, and never anchors a pag
           problems.push(`${rule.id}: the heading was not placed at its line box (remaining ${remaining?.value}, expected ${expected})`);
         }
       }
-      if (boxRules.has(rule.id)) {
-        if (after.candidates !== before.candidates + 1) problems.push(`${rule.id}: not a candidate (${before.candidates}->${after.candidates})`);
+      if (rule.id === "layout/unbreakable-block-too-tall") {
+        if (after.candidates !== before.candidates) problems.push(`${rule.id}: a candidate (${before.candidates}->${after.candidates})`);
         if (after.measured !== before.measured) problems.push(`${rule.id}: its zero box was measured`);
-        const declines = after.notMeasured.filter((row) => row.reason === "env/invalid-measurement").reduce((n, row) => n + row.count, 0)
-          - before.notMeasured.filter((row) => row.reason === "env/invalid-measurement").reduce((n, row) => n + row.count, 0);
-        if (declines !== 1) problems.push(`${rule.id}: the decline is not in the coverage account (${declines})`);
-        if (!rows.some((row) => row.status === "not-measured" && row.countsTowardCoverage !== false)) problems.push(`${rule.id}: no counted not-measured row`);
+        if (JSON.stringify(after.notMeasured) !== JSON.stringify(before.notMeasured)) problems.push(`${rule.id}: declined against coverage`);
+        const row = rows.find((item) => item.targetRef.fragmentIndex === 0);
+        if (row?.status !== "not-applicable" || row.reason !== "rule/target-generates-no-box" || row.countsTowardCoverage !== false) {
+          problems.push(`${rule.id}: not recorded as not applicable to an element without a box: ${JSON.stringify(row && [row.status, row.reason])}`);
+        }
       }
     }
-    assert.deepEqual(problems, [], "a box-less record with rendered lines was dropped, or measured by its zero box");
+    assert.deepEqual(problems, [], "a display: contents record was dropped, declined, or measured by its zero box");
+  });
+
+  /**
+   * An image-only `display: contents` figure: no box of its own and no text line, while its image
+   * prints. The round-3 predicate, which read "no box and no lines" as "not rendered", called it
+   * `rule/target-not-rendered` (measured on 2026-09-25). The computed display says what it is.
+   */
+  it("does not call an image-only display: contents figure unrendered", () => {
+    const base = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
+    const figure: BlockRecord = {
+      ...structuredClone(base.blocks[0]!),
+      nodeKey: "bl:s9994:0", sid: "s9994", authorId: "contents-figure", blockSignature: "",
+      tag: "figure", box: { x: 0, y: 0, width: 0, height: 0 }, lines: [], fragmentIndex: 0, fragmentCount: 1,
+      display: "contents", marginCopies: 0,
+    };
+    figure.effectiveStyle = { ...figure.effectiveStyle, breakInside: "avoid", textAlign: "justify", visibility: "visible", wordSpacing: "normal" };
+    const snapshot = structuredClone(base);
+    snapshot.blocks = [...snapshot.blocks, figure];
+    const reasons = new Map<string, string | null>();
+    for (const rule of ALL_RULES) {
+      const result = rule.run(snapshot, { documentPath: "doc.html", options: rule.defaultOptions, fingerprint });
+      for (const row of (result.evaluations ?? []).filter((item) => item.targetRef.nodeKey === figure.nodeKey)) reasons.set(rule.id, row.reason);
+    }
+    assert.equal(reasons.get("layout/unbreakable-block-too-tall"), "rule/target-generates-no-box");
+    assert.equal(reasons.get("type/excessive-word-spacing"), "rule/no-text-lines");
+    assert.deepEqual([...reasons].filter(([, reason]) => reason === "rule/target-not-rendered"), [],
+      "an element whose image prints was labelled not rendered");
   });
 
   /**
@@ -472,7 +524,7 @@ describe("a record with no layout box is never measured, and never anchors a pag
       box: { x: page.contentBox.x, y: bottom - 40, width: page.contentBox.width, height: 16 }, effectiveStyle: style };
     const after: BlockRecord = { ...structuredClone(template), nodeKey: "bl:s9993:0", sid: "s9993", authorId: "contents-after",
       blockSignature: "Printed below", tag: "p", page: page.pageNumber, lineHeight: 16, lines: [9993], fragmentIndex: 0, fragmentCount: 1,
-      box: { x: 0, y: 0, width: 0, height: 0 }, effectiveStyle: style };
+      box: { x: 0, y: 0, width: 0, height: 0 }, display: "contents", effectiveStyle: style };
     const snapshot = structuredClone(base);
     // Only the two records on this page, so nothing else can be the content below the heading.
     snapshot.blocks = [...snapshot.blocks.filter((block) => block.page !== page.pageNumber), heading, after];
@@ -515,6 +567,75 @@ describe("a record with no layout box is never measured, and never anchors a pag
       evaluatePayload<RawSnapshot>(SNAPSHOT_SOURCE, document), runCollector<CollectorResult>(COLLECTOR_SOURCE, document), injected);
     assert.deepEqual(snapshot.pages.map((page) => page.firstSemanticBlockKey), ["id:empty", "id:narrow", "id:p3", "id:contents"]);
     assert.ok((snapshot.blocks.find((block) => block.authorId === "contents")?.lines ?? []).length > 0, "premise: the display: contents block has lines");
+  });
+});
+
+// ---- what a record prints decides how a line-reading rule treats it -----------------------
+
+describe("a line-reading rule measures only lines that printed, and says why it did not", () => {
+  const base = () => structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
+  const record = (snapshot: Snapshot, over: Partial<BlockRecord>): BlockRecord => ({
+    ...structuredClone(snapshot.blocks[0]!), nodeKey: "bl:s9995:0", sid: "s9995", authorId: "probe", blockSignature: "Probe",
+    fragmentIndex: 0, fragmentCount: 1, spaceWidth: 3, box: { x: 0, y: 0, width: 0, height: 0 }, display: "contents", marginCopies: 0,
+    ...over,
+  });
+  const withRecord = (over: Partial<BlockRecord>, visible: boolean | null) => {
+    const snapshot = base();
+    const probe = record(snapshot, over);
+    probe.effectiveStyle = { ...probe.effectiveStyle, textAlign: "justify", wordSpacing: "normal", visibility: visible === false ? "hidden" : "visible" };
+    snapshot.blocks = [...snapshot.blocks, probe];
+    if (probe.lines && probe.lines.length > 0) {
+      const y = snapshot.pages[0]!.contentBox.y + 40;
+      snapshot.textLines = [...snapshot.textLines, { blockKey: probe.nodeKey, index: probe.lines[0]!, box: { x: 60, y, width: 60, height: 12 },
+        visible: visible !== false, width: 60, wordBoxes: [{ text: "Aa", x: 60, y, width: 12, height: 12 }, { text: "Bb", x: 90, y, width: 12, height: 12 }] }];
+    }
+    return { snapshot, probe };
+  };
+  const rowsFor = (ruleId: string, snapshot: Snapshot, nodeKey: string) => {
+    const rule = ALL_RULES.find((item) => item.id === ruleId)!;
+    const result = rule.run(snapshot, { documentPath: "doc.html", options: rule.defaultOptions, fingerprint });
+    return { result, rows: (result.evaluations ?? []).filter((row) => row.targetRef.nodeKey === nodeKey) };
+  };
+  const claimsLines = (rows: readonly { measurements: readonly { name: string; value: unknown }[] }[]) =>
+    rows.some((row) => row.measurements.some((item) => (item.name === "target-has-rendered-lines" && item.value === true) ||
+      (item.name === "visible-line-count" && typeof item.value === "number" && item.value > 0)));
+
+  /** The heading rule's decline branch, which no test reached (a surviving mutant). */
+  it("declines a box-less heading it cannot place, counted, and states the line count it saw", () => {
+    for (const [lines, expected] of [[null, null], [[], 0]] as const) {
+      const { snapshot, probe } = withRecord({ tag: "h2", lines: lines === null ? null : [...lines], ...(lines === null ? { notMeasuredReason: "env/invalid-measurement" as const } : {}) }, true);
+      const { result, rows } = rowsFor("layout/heading-at-page-bottom", snapshot, probe.nodeKey);
+      assert.deepEqual(rows.map((row) => [row.status, row.reason]), [["not-measured", "env/invalid-measurement"]], `lines ${JSON.stringify(lines)}`);
+      assert.ok(result.notMeasured.some((row) => row.reason === "env/invalid-measurement"), "the decline is not in the coverage account");
+      assert.equal(rows[0]!.measurements.find((item) => item.name === "visible-line-count")?.value, expected);
+      assert.equal(claimsLines(rows), false, "the decline claims rendered lines the snapshot does not show");
+    }
+  });
+
+  /** A hidden `display: contents` heading prints nothing: excluded, never declined against coverage (exit 4). */
+  it("excludes a box-less heading whose lines are all invisible", () => {
+    const { snapshot, probe } = withRecord({ tag: "h2", lines: [9995] }, false);
+    const { result, rows } = rowsFor("layout/heading-at-page-bottom", snapshot, probe.nodeKey);
+    assert.deepEqual(rows.map((row) => [row.status, row.reason, row.countsTowardCoverage]), [["excluded", "rule/target-not-visible", false]]);
+    assert.equal(result.notMeasured.some((row) => row.reason === "env/invalid-measurement"), false);
+  });
+
+  it("never measures word gaps at factor 0 from lines that did not print or were not recorded", () => {
+    const cases = [
+      { name: "lines not recorded", over: { lines: null, notMeasuredReason: "env/invalid-measurement" as const }, visible: true,
+        expected: ["not-measured", "env/invalid-measurement"], counted: true },
+      { name: "lines all invisible", over: { lines: [9995] }, visible: false, expected: ["excluded", "rule/target-not-visible"], counted: false },
+      { name: "no line at all (empty or image-only)", over: { lines: [], box: { x: 48, y: 60, width: 399, height: 0 }, display: "block" },
+        visible: true, expected: ["not-applicable", "rule/no-text-lines"], counted: false },
+    ];
+    for (const { name, over, visible, expected, counted } of cases) {
+      const { snapshot, probe } = withRecord({ tag: "p", ...over }, visible);
+      const { result, rows } = rowsFor("type/excessive-word-spacing", snapshot, probe.nodeKey);
+      assert.deepEqual(rows.map((row) => [row.status, row.reason]), [expected], name);
+      assert.equal(rows.some((row) => row.status === "measured"), false, `${name}: measured`);
+      assert.equal(result.notMeasured.some((row) => row.reason === "env/invalid-measurement"), counted, `${name}: coverage account`);
+      assert.equal(claimsLines(rows), false, `${name}: claims printed lines`);
+    }
   });
 });
 
@@ -657,7 +778,12 @@ describe("the post-pagination source-id check reads the order of the flow, and s
     refused("in every page box and in the flow", check(html, (sid) => two(sid,
       { fixed: p2(sid), content: s(sid, "p1", lineBox(0, 0), "One.") + p2(sid) }, { fixed: p2(sid) })), /in-flow occurrence/u);
     // Into the footnote area without being a note.
-    refused("moved into the footnote area", check(html, (sid) => two(sid, { footnotes: p2(sid) })), /outside the page content and the footnote area/u);
+    // The element IS in the footnote area; the refusal names what is missing (the note marker)
+    // and does not claim it was found outside the footnote area.
+    const intoFootnotes = check(html, (sid) => two(sid, { footnotes: p2(sid) }));
+    refused("moved into the footnote area", intoFootnotes, /not inside a Paged\.js footnote \(data-note="footnote"\)/u);
+    assert.deepEqual(intoFootnotes.filter((issue) => /outside the (page content and the )?footnote area/u.test(issue)), [],
+      "the refusal says the element is outside the footnote area, where it is not");
     // The same two places with the signature pass: a fixed clone on every page, a marked note.
     assert.deepEqual(check(html, (sid) => two(sid, { fixed: p2(sid) }, { fixed: p2(sid) })), []);
     assert.deepEqual(check(html, (sid) => two(sid, { footnotes: p2(sid, 'data-note="footnote"') })), []);

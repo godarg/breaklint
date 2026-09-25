@@ -218,45 +218,65 @@ describe("target evaluation contract", () => {
     // placed it, so the question does not arise: it is EXCLUDED, outside the coverage base, and
     // not "measured at 0 px" — which is what it was, and a document whose only avoid block was a
     // running element then reported full coverage for a check that had looked at nothing.
-    const hiddenSnapshot = fragmented([{ height: 0, width: 0, x: 0, y: 0 }]);
-    hiddenSnapshot.blocks[0]!.lines = [];
-    const runningOriginal = run(hiddenSnapshot);
-    assert.deepEqual(runningOriginal.findings, []);
-    assert.equal(runningOriginal.candidates, 0, "a block with no layout box was counted as a candidate");
-    assert.equal(runningOriginal.measured, 0, "a block with no layout box was counted as measured");
-    const originalRow = runningOriginal.evaluations!.find((row) => row.targetRef.fragmentIndex === 0 && row.status !== "not-applicable");
-    assert.equal(originalRow?.status, "excluded");
-    assert.equal(originalRow!.reason, "rule/target-not-rendered");
-    assert.equal(originalRow!.countsTowardCoverage, false);
+    // Snapshot 5 records the computed display and the margin-copy count, so the running original
+    // (`display: none`, printed in the margin boxes) is told from an element the author hid.
+    for (const [marginCopies, reason] of [[6, "rule/target-in-margin-box"], [0, "rule/target-not-rendered"]] as const) {
+      const hiddenSnapshot = fragmented([{ height: 0, width: 0, x: 0, y: 0 }]);
+      Object.assign(hiddenSnapshot.blocks[0]!, { lines: [], display: "none", marginCopies });
+      const hidden = run(hiddenSnapshot);
+      assert.deepEqual(hidden.findings, []);
+      assert.equal(hidden.candidates, 0, "a block with no layout box was counted as a candidate");
+      assert.equal(hidden.measured, 0, "a block with no layout box was counted as measured");
+      const hiddenRow = hidden.evaluations!.find((row) => row.targetRef.fragmentIndex === 0)!;
+      assert.equal(hiddenRow.status, "excluded");
+      assert.equal(hiddenRow.reason, reason);
+      assert.equal(hiddenRow.countsTowardCoverage, false);
+    }
     // Both dimensions decide, never one: an EMPTY avoid block is laid out with the column width
     // and no height, and it is measured — at 0 px, which fits. A predicate on the height alone
     // would call it unrendered and drop a real candidate.
     const emptyAvoid = run(fragmented([{ height: 0 }]));
     assert.equal(emptyAvoid.measured, 1, "a zero-height block with a width was dropped as if it had no box");
     assert.equal(emptyAvoid.evaluations!.find((row) => row.status === "measured")!.measurements[0]!.value, 0);
-    // A zero box is not the same as nothing rendered. A `display: contents` block has no box of its
-    // own while its text is laid out and recorded as lines; the regression this guards: such a
-    // block was excluded as not rendered, and a justified `display: contents` paragraph lost a real
-    // word-spacing finding. This rule judges the BOX, which such a block does not have, so it
-    // declines — counted against coverage — and never measures the zero box as a fit.
+    // A `display: contents` block generates no box, and `break-inside` applies to boxes: the rule
+    // does not apply. Not applicable, outside coverage — never a decline, which ended a grid of
+    // `display: contents` list items with `li { break-inside: avoid }` at exit 4 (round 3), and
+    // never "not rendered", since its text and children print.
     const contentsSnapshot = fragmented([{ height: 0, width: 0, x: 0, y: 0 }]);
-    assert.ok((contentsSnapshot.blocks[0]!.lines ?? []).length > 0, "premise: the template block has lines");
+    contentsSnapshot.blocks[0]!.display = "contents";
     const contents = run(contentsSnapshot);
     assert.deepEqual(contents.findings, []);
-    assert.equal(contents.candidates, 1, "a display: contents block with printed lines was dropped from the candidates");
-    assert.equal(contents.measured, 0, "a box-less block was measured at 0 px");
-    assert.deepEqual(contents.notMeasured.map((row) => [row.reason, row.count]), [["env/invalid-measurement", 1]]);
-    const contentsRow = contents.evaluations!.find((row) => row.targetRef.fragmentIndex === 0 && row.status !== "not-applicable")!;
-    assert.equal(contentsRow.status, "not-measured");
-    assert.notEqual(contentsRow.countsTowardCoverage, false);
-    // Lines not measured at all (`lines: null`, with the snapshot's reason) is not proof that
-    // nothing was rendered either: the same counted decline, never an exclusion.
-    const unknownSnapshot = fragmented([{ height: 0, width: 0, x: 0, y: 0 }]);
-    unknownSnapshot.blocks[0]!.lines = null;
-    unknownSnapshot.blocks[0]!.notMeasuredReason = "env/invalid-measurement";
-    const unknown = run(unknownSnapshot);
-    assert.equal(unknown.candidates, 1, "a box-less block whose lines were not measured was dropped as not rendered");
-    assert.deepEqual(unknown.notMeasured.map((row) => [row.reason, row.count]), [["env/invalid-measurement", 1]]);
+    assert.equal(contents.candidates, 0, "a display: contents block was a candidate for a box rule");
+    assert.deepEqual(contents.notMeasured, [], "a display: contents block was declined against coverage");
+    const contentsRow = contents.evaluations!.find((row) => row.targetRef.fragmentIndex === 0)!;
+    assert.deepEqual([contentsRow.status, contentsRow.reason, contentsRow.countsTowardCoverage],
+      ["not-applicable", "rule/target-generates-no-box", false]);
+
+    // A split block is judged at the first fragment that PRINTED as a visible box. Measured on
+    // 2026-09-25 with a hostile document: a script that set `display: none` on only the first
+    // fragment of a four-page avoid block — or moved it where it has no box — hid the whole block
+    // (base exit 1, then exit 0), because the later fragments were skipped as continuations of a
+    // candidate that had been excluded.
+    const hiddenFirst = fragmented([{ height: 0, width: 0, x: 0, y: 0 }, ...heights(320, 300, 260)]);
+    Object.assign(hiddenFirst.blocks[0]!, { lines: [], display: "none" });
+    const judgedLater = run(hiddenFirst);
+    assert.equal(judgedLater.findings.length, 1, "hiding the first fragment hid the split block");
+    assert.equal(judgedLater.findings[0]!.measurement.value, 880);
+    assert.equal(judgedLater.findings[0]!.target.fragmentIndex, 1, "the block was not judged at its first printed fragment");
+    const firstRow = judgedLater.evaluations!.find((row) => row.targetRef.fragmentIndex === 0)!;
+    assert.deepEqual([firstRow.status, firstRow.reason, firstRow.countsTowardCoverage], ["not-applicable", "rule/fragment-not-rendered", false]);
+    assert.equal(judgedLater.candidates, 1);
+    // The same with `visibility: hidden` on the first fragment: it has a box, but it did not print.
+    const invisibleFirst = fragmented(heights(320, 300, 260, 200));
+    invisibleFirst.blocks[0]!.effectiveStyle = { ...invisibleFirst.blocks[0]!.effectiveStyle, visibility: "hidden" };
+    const invisibleJudged = run(invisibleFirst);
+    assert.equal(invisibleJudged.findings.length, 1, "hiding the first fragment with visibility hid the split block");
+    assert.equal(invisibleJudged.findings[0]!.target.fragmentIndex, 1);
+    // A block none of whose fragments printed is not judged at all, and not counted.
+    const allHidden = fragmented([{ height: 0, width: 0, x: 0, y: 0 }, { height: 0, width: 0, x: 0, y: 0 }]);
+    for (const fragment of allHidden.blocks) Object.assign(fragment, { lines: [], display: "none" });
+    const none = run(allHidden);
+    assert.deepEqual([none.candidates, none.measured, none.findings.length], [0, 0, 0]);
 
     // Fragments with nothing to join them by. Without a sid (a `--no-source-map` run, or an
     // element a script created) three records of one split block cannot be told from three
