@@ -45,6 +45,7 @@ const controls = [
   // otherwise the long-table probe, which always does — must reject the missing header.
   { name: "broken-header-repeat", state: "clean", expect: /(?:clean|long coverage table): continuation page lacks the table header/u },
   { name: "broken-flag-wrap", state: "insufficient-coverage", expect: /print\/insufficient-coverage: flag --disable layout\/widow split across [2-9] lines/u },
+  { name: "broken-path-wrap", state: "findings", expect: /path evidence\/surface-demo-page-001\.png split across [2-9] lines \([^\n]*\); a path may break only after a slash/u },
   { name: "broken-rule-id-wrap", state: "findings", expect: /rule id layout\/[a-z-]+ split across [2-9] lines/u },
   {
     name: "broken-page-fill",

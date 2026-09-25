@@ -86,6 +86,8 @@ const SURFACE_CONTROLS = {
     .cli-flag, .cli-flag > span { white-space: normal !important; }
     .coverage-shortfall-item li { max-inline-size: 6ch !important; }
   }` },
+  // Paths may break at their hyphens again, on a phone-narrow evidence line.
+  "broken-path-wrap": { screen: `.path-id > span { white-space: normal !important; } .evidence-state { max-inline-size: 18ch !important; }` },
   // Rule ids may break at a hyphen inside the name again.
   "broken-rule-id-wrap": { screen: `.rule-id > span { white-space: normal !important; } .finding h3 { max-inline-size: 12ch !important; }` },
   // The coverage list becomes a grid again: its fragmenting table item is stretched on the
@@ -426,8 +428,8 @@ function untestedCaveatOccurrences(pdfPath) {
  * rendered lines, measured per character, so a break is seen wherever it falls.
  */
 function identifierLinesInPage() {
-  return [...document.querySelectorAll(".cli-flag, .rule-id")].flatMap((element) => {
-    if (element.parentElement?.closest(".cli-flag, .rule-id")) return [];
+  return [...document.querySelectorAll(".cli-flag, .rule-id, .path-id")].flatMap((element) => {
+    if (element.parentElement?.closest(".cli-flag, .rule-id, .path-id")) return [];
     const lines = [];
     let currentTop = null;
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
@@ -445,7 +447,8 @@ function identifierLinesInPage() {
         lines[lines.length - 1] += node.textContent[index];
       }
     }
-    return lines.length === 0 ? [] : [{ kind: element.classList.contains("cli-flag") ? "flag" : "rule-id", text: element.textContent, lines }];
+    const kind = element.classList.contains("cli-flag") ? "flag" : element.classList.contains("path-id") ? "path" : "rule-id";
+    return lines.length === 0 ? [] : [{ kind, text: element.textContent, lines }];
   });
 }
 
@@ -455,6 +458,13 @@ function identifierLinesInPage() {
  */
 function assertIdentifierLines(identifiers, label, { print }) {
   for (const identifier of identifiers) {
+    if (identifier.kind === "path") {
+      // A path may break after any of its slashes, on screen and in print, and nowhere else.
+      if (identifier.lines.slice(0, -1).some((line) => !line.endsWith("/"))) {
+        throw new Error(`${label}: path ${identifier.text} split across ${identifier.lines.length} lines (${JSON.stringify(identifier.lines)}); a path may break only after a slash`);
+      }
+      continue;
+    }
     const permitted = print ? identifier.lines.length === 1
       : identifier.lines.length === 1 || (identifier.lines.length === 2 && identifier.lines[0].endsWith("/"));
     if (!permitted) {

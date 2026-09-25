@@ -182,7 +182,7 @@ describe("HTML Report Surface v2", () => {
     const rules = Object.keys(document.coverage);
     const table = /<table class="coverage-table"[\s\S]*?<\/table>/u.exec(html)?.[0] ?? "";
     assert.ok(table.length > 0, "coverage is not a table");
-    assert.match(table, /<caption><span class="coverage-path mono">examples\/demo\.html<\/span> <span class="document-verdict">Document verdict: findings<\/span><\/caption>/u,
+    assert.match(table, /<caption><span class="coverage-path mono"><span class="path-id"><span>examples\/<\/span><wbr><span>demo\.html<\/span><\/span><\/span> <span class="document-verdict">Document verdict: findings<\/span><\/caption>/u,
       "the document path and verdict belong to the table caption, so they cannot strand above it");
     assert.equal((table.match(/<th scope="col"/gu) ?? []).length, 7, "seven column headers");
     assert.equal((table.match(/<th scope="row" class="rule"><code class="rule-id">/gu) ?? []).length, rules.length, "every rule is a row header");
@@ -209,7 +209,10 @@ describe("HTML Report Surface v2", () => {
     const withoutCode = html.replace(/<style>[\s\S]*?<\/style>/u, "").replace(/<code class="cli-flag">[\s\S]*?<\/code>/gu, "");
     assert.doesNotMatch(withoutCode, /--disable/u, "every command is inside a cli-flag code element");
     assert.match(html, /<h3 id="finding-1-title"><code class="rule-id"><span>layout\/<\/span><wbr><span>widow<\/span><\/code> · page 2<\/h3>/u);
-    assert.match(REPORT_HTML_STYLES, /\.rule-id > span, \.cli-flag > span \{ white-space: nowrap; \}/u, "no break inside a flag or a rule name");
+    assert.match(REPORT_HTML_STYLES, /\.rule-id > span, \.cli-flag > span, \.path-id > span \{ white-space: nowrap; \}/u, "no break inside a flag, a rule name or a path segment");
+    const findingsHtml = renderHtml(findingsReportState());
+    assert.match(findingsHtml, /<a href="evidence\/surface-demo-page-001\.png"><span class="path-id"><span>evidence\/<\/span><wbr><span>surface-demo-page-001\.png<\/span><\/span><\/a>/u,
+      "an evidence path may break only after its slash, never at a hyphen");
     assert.match(REPORT_HTML_STYLES, /\.rule-id wbr, \.cli-flag wbr \{ display: none; \}/u, "print removes even the slash break");
     const gating = buildHtmlReportModel(findingsReportState()).coverage[0]!.rows.find((row) => row.ruleId === "layout/unbreakable-block-too-tall")!;
     assert.match(gating.options[1]!.after, /removes the gate, not the defect/u, "a gating rule keeps its stronger warning");

@@ -43,7 +43,8 @@ export const REPORT_HTML_STYLES = String.raw`
   /* Identifiers and commands break only where a break cannot change what is copied: after a rule's
      namespace slash (a <wbr>), never at a hyphen inside the name or inside a flag. */
   .rule-id, .cli-flag { overflow-wrap: normal; word-break: normal; hyphens: manual; }
-  .rule-id > span, .cli-flag > span { white-space: nowrap; }
+  .rule-id > span, .cli-flag > span, .path-id > span { white-space: nowrap; }
+  .path-id { overflow-wrap: normal; word-break: normal; hyphens: manual; }
   a { color: var(--bl-color-accent-info); text-underline-offset: .2em; text-decoration-thickness: var(--bl-border-thin); }
   a:hover { text-decoration-thickness: var(--bl-border-strong); }
   a:focus-visible, [tabindex]:focus-visible { outline: var(--bl-focus-width) solid var(--bl-color-focus); outline-offset: var(--bl-space-1); }

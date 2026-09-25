@@ -85,7 +85,12 @@ cell; `broken-untested-repeat` and `broken-untested-marker` are its red controls
   rendered lines of every command and rule id per character in every cell and in print, and reads
   each PDF's text for a line ending inside a flag or rule id (`broken-flag-wrap` and
   `broken-rule-id-wrap` are its red controls). In 0.6.0 the one printed command broke as
-  `--` / `disable layout/widow`.
+  `--` / `disable layout/widow`. Paths — document paths, evidence references, coverage captions —
+  get the same treatment with a break opportunity after every slash: each segment is a no-wrap
+  span, so a path breaks only after a `/`, on screen and in print, never at a hyphen (on a phone the
+  evidence line broke as `evidence/surface-` / `demo-page-001.png`, which reads as two names). The
+  gate measures every path's rendered lines in every cell (`broken-path-wrap`). A single segment
+  wider than its line is not broken and may overflow it; no canonical path comes close.
 - Keyboard focus uses a visible three-pixel-equivalent outline.
 - Landmarks are named and separate: the verdict header is the banner, a contents navigation named
   "Report contents" follows it, the report body is `main`, and the footer is the content info. The

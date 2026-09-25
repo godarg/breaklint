@@ -756,8 +756,10 @@ for (const artifact of manifest.artifacts) {
     assertRecordedTableGeometry(artifact.semantics.coverageTables, artifact.cell);
     assertRecordedAccessibility(artifact.semantics.accessibility, artifact.cell);
     assertRecordedBoxedBlocks(artifact.semantics.boxedBlocks, artifact.cell);
-    assert.ok(artifact.semantics.identifiers.every((identifier) => identifier.lines.length === 1 ||
-      (identifier.lines.length === 2 && identifier.lines[0].endsWith("/"))), `${artifact.cell}: an identifier breaks outside its namespace slash`);
+    assert.ok(artifact.semantics.identifiers.every((identifier) => identifier.kind === "path"
+      ? identifier.lines.slice(0, -1).every((line) => line.endsWith("/"))
+      : identifier.lines.length === 1 || (identifier.lines.length === 2 && identifier.lines[0].endsWith("/"))), `${artifact.cell}: an identifier or path breaks outside a slash`);
+    assert.ok(artifact.semantics.identifiers.some((identifier) => identifier.kind === "path"), `${artifact.cell}: no path was measured`);
     const caveat = artifact.semantics.remediationCaveat;
     assert.equal(caveat.statements, state === "clean" ? 0 : 1, `${artifact.cell}: untested-advice caveat count`);
     assert.ok(caveat.markersInBodyTextColour && (caveat.markers === 0 || caveat.smallestMarkerToAdviceRatio >= 1), `${artifact.cell}: untested marker below body-text salience`);

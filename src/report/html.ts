@@ -61,6 +61,16 @@ function ruleIdCode(ruleId: string): string {
 }
 
 /**
+ * A path as text that breaks only after a slash: each segment is a no-wrap span, with a break
+ * opportunity after every "/". Browsers otherwise break a path at its hyphens on a phone
+ * (measured: `evidence/surface-` / `demo-page-001.png`), and the line then reads as two names.
+ */
+function pathText(path: string): string {
+  const segments = path.split(/(?<=\/)/u);
+  return `<span class="path-id">${segments.map((segment) => `<span>${esc(segment)}</span>`).join("<wbr>")}</span>`;
+}
+
+/**
  * A command the reader may run, as one `<code class="cli-flag">`. It never breaks inside the flag or
  * the rule name; on a narrow screen the only permitted break is after the rule's namespace slash,
  * and print keeps the whole command on one line.
@@ -110,7 +120,7 @@ function renderCoverageAlert(model: ReturnType<typeof buildHtmlReportModel>): st
   ${shortfalls.length === 0
     ? `<p>The run declared insufficient coverage without a per-rule shortfall. Inspect the canonical JSON report.</p>`
     : `<ul class="coverage-shortfall-list">${shortfalls.map((row) => `<li class="coverage-shortfall-item">
-      <p><strong>Rule:</strong> ${ruleIdCode(row.ruleId)} in <span class="mono">${esc(row.document)}</span></p>
+      <p><strong>Rule:</strong> ${ruleIdCode(row.ruleId)} in <span class="mono">${pathText(row.document)}</span></p>
       <p><strong>Measurement:</strong> ${row.measured} of ${row.candidates} candidates measured (${esc(row.ratio)}); required floor ${esc(row.floor)}</p>
       <p><strong>Reason verbatim:</strong> <code>${esc(row.reasons.join(", ") || "none declared")}</code></p>
       <p><strong>Options:</strong></p>
@@ -128,8 +138,8 @@ function renderFindingEvidence(finding: ReturnType<typeof buildHtmlReportModel>[
   }
   const reference = finding.evidence.ref ?? "Unavailable";
   const renderedReference = finding.evidence.href
-    ? `<a href="${esc(finding.evidence.href)}">${esc(reference)}</a>`
-    : `<span class="mono">${esc(reference)}</span> <span>(not navigable)</span>`;
+    ? `<a href="${esc(finding.evidence.href)}">${pathText(reference)}</a>`
+    : `<span class="mono">${pathText(reference)}</span> <span>(not navigable)</span>`;
   return `<p class="evidence-state"><strong>Evidence:</strong> ${esc(finding.evidence.label)} · ${renderedReference}</p>`;
 }
 
@@ -151,7 +161,7 @@ ${model.findings.map((finding, index) => `<li>
   <p class="finding-message">${esc(finding.message)}</p>
   </div>
   <dl class="finding-facts">
-    <div><dt>Document</dt><dd class="mono">${esc(finding.document)}</dd></div>
+    <div><dt>Document</dt><dd class="mono">${pathText(finding.document)}</dd></div>
     <div><dt>Source</dt><dd class="mono">${finding.source ? esc(finding.source) : "Unknown — no source location was measured"}</dd></div>
     <div><dt>Measured</dt><dd class="mono">${esc(finding.measured)}</dd></div>
     <div><dt>Threshold</dt><dd class="mono">${esc(finding.threshold)}</dd></div>
@@ -234,7 +244,7 @@ function renderCoverageTable(document: ReturnType<typeof buildHtmlReportModel>["
     ? `<tbody>\n  ${rows.join("\n  ")}\n</tbody>`
     : `<tbody>\n  ${rows.slice(0, -2).join("\n  ")}\n</tbody>\n<tbody class="coverage-tail">\n  ${rows.slice(-2).join("\n  ")}\n</tbody>`;
   return `<table class="coverage-table" id="${esc(document.id)}">
-<caption><span class="coverage-path mono">${esc(document.path)}</span> <span class="document-verdict">Document verdict: ${esc(document.verdict)}</span></caption>
+<caption><span class="coverage-path mono">${pathText(document.path)}</span> <span class="document-verdict">Document verdict: ${esc(document.verdict)}</span></caption>
 <thead>
   ${COVERAGE_COLUMNS}
 </thead>
@@ -247,7 +257,7 @@ function renderCoverage(model: ReturnType<typeof buildHtmlReportModel>): string 
     ? `<div class="empty-state"><h3>Coverage unavailable</h3><p>No document coverage was produced by this run.</p></div>`
     : `<div class="coverage-documents">
 ${model.coverage.map((document) => document.rows.length === 0
-    ? `<div class="empty-state" id="${esc(document.id)}"><h3 class="mono">${esc(document.path)}</h3><p>Document verdict: ${esc(document.verdict)}. No rule coverage rows were produced for this document.</p></div>`
+    ? `<div class="empty-state" id="${esc(document.id)}"><h3 class="mono">${pathText(document.path)}</h3><p>Document verdict: ${esc(document.verdict)}. No rule coverage rows were produced for this document.</p></div>`
     : renderCoverageTable(document)).join("\n")}
 </div>`;
   return `<section class="coverage-section" aria-labelledby="coverage-heading">
