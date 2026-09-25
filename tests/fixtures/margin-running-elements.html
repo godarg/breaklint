@@ -1,0 +1,131 @@
+<!doctype html>
+<!--
+  Running elements: one source element repeated into the margin box of every page.
+
+  COMPLICATION. Paged.js implements `position: running(...)` by deep-cloning the element into the
+  margin box of EVERY page. The clone keeps the injected source id and the paginator's
+  `data-ref`, and the in-flow original stays in the page content with an inline `display: none`.
+  A measurement that queries the whole `.pagedjs_page` therefore sees one "fragment" of the same
+  source block per page, although the element was never split.
+
+  Two running elements, because the two axes fail differently:
+
+    - `.title` sits in the TOP margin box and is one line tall. Summed per page it is harmless to
+      `layout/unbreakable-block-too-tall`, but every clone is a one-line "fragment" of a block
+      that "continues" on the next page, which is a widow and an orphan on every page.
+    - `.side` sits in the LEFT-MIDDLE margin box, carries `break-inside: avoid` and is eight lines
+      tall. A side margin box starts at a content-box y and sits beside the column, so a test on
+      the vertical axis alone lets it in. Six clones sum to well over one content box: the
+      0.6.0 release reported that sum as a build-breaking `error`.
+
+  The body is ninety-five one-line paragraphs, so nothing in the flow can carry a widow, an
+  orphan or an oversized block: every finding on this document would be about a clone. Keep the
+  paragraphs plain and first in the flow; a decorated split block among the first eight boxes
+  the geometry cross-check samples is a separate class of failure (see tests/live).
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 150mm 120mm; margin: 15mm; }
+@page { @top-center { content: element(title); } @left-middle { content: element(side); } }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0; }
+.title { position: running(title); break-inside: avoid; }
+.side { position: running(side); break-inside: avoid; font-size: 7pt; line-height: 1.3; }
+</style></head><body>
+<p class="title" id="running-title">Running title on every page</p>
+<div class="side" id="running-side">Side 1<br>Side 2<br>Side 3<br>Side 4<br>Side 5<br>Side 6<br>Side 7<br>Side 8</div>
+<p id="b01">Body paragraph 01, one short line.</p>
+<p id="b02">Body paragraph 02, one short line.</p>
+<p id="b03">Body paragraph 03, one short line.</p>
+<p id="b04">Body paragraph 04, one short line.</p>
+<p id="b05">Body paragraph 05, one short line.</p>
+<p id="b06">Body paragraph 06, one short line.</p>
+<p id="b07">Body paragraph 07, one short line.</p>
+<p id="b08">Body paragraph 08, one short line.</p>
+<p id="b09">Body paragraph 09, one short line.</p>
+<p id="b10">Body paragraph 10, one short line.</p>
+<p id="b11">Body paragraph 11, one short line.</p>
+<p id="b12">Body paragraph 12, one short line.</p>
+<p id="b13">Body paragraph 13, one short line.</p>
+<p id="b14">Body paragraph 14, one short line.</p>
+<p id="b15">Body paragraph 15, one short line.</p>
+<p id="b16">Body paragraph 16, one short line.</p>
+<p id="b17">Body paragraph 17, one short line.</p>
+<p id="b18">Body paragraph 18, one short line.</p>
+<p id="b19">Body paragraph 19, one short line.</p>
+<p id="b20">Body paragraph 20, one short line.</p>
+<p id="b21">Body paragraph 21, one short line.</p>
+<p id="b22">Body paragraph 22, one short line.</p>
+<p id="b23">Body paragraph 23, one short line.</p>
+<p id="b24">Body paragraph 24, one short line.</p>
+<p id="b25">Body paragraph 25, one short line.</p>
+<p id="b26">Body paragraph 26, one short line.</p>
+<p id="b27">Body paragraph 27, one short line.</p>
+<p id="b28">Body paragraph 28, one short line.</p>
+<p id="b29">Body paragraph 29, one short line.</p>
+<p id="b30">Body paragraph 30, one short line.</p>
+<p id="b31">Body paragraph 31, one short line.</p>
+<p id="b32">Body paragraph 32, one short line.</p>
+<p id="b33">Body paragraph 33, one short line.</p>
+<p id="b34">Body paragraph 34, one short line.</p>
+<p id="b35">Body paragraph 35, one short line.</p>
+<p id="b36">Body paragraph 36, one short line.</p>
+<p id="b37">Body paragraph 37, one short line.</p>
+<p id="b38">Body paragraph 38, one short line.</p>
+<p id="b39">Body paragraph 39, one short line.</p>
+<p id="b40">Body paragraph 40, one short line.</p>
+<p id="b41">Body paragraph 41, one short line.</p>
+<p id="b42">Body paragraph 42, one short line.</p>
+<p id="b43">Body paragraph 43, one short line.</p>
+<p id="b44">Body paragraph 44, one short line.</p>
+<p id="b45">Body paragraph 45, one short line.</p>
+<p id="b46">Body paragraph 46, one short line.</p>
+<p id="b47">Body paragraph 47, one short line.</p>
+<p id="b48">Body paragraph 48, one short line.</p>
+<p id="b49">Body paragraph 49, one short line.</p>
+<p id="b50">Body paragraph 50, one short line.</p>
+<p id="b51">Body paragraph 51, one short line.</p>
+<p id="b52">Body paragraph 52, one short line.</p>
+<p id="b53">Body paragraph 53, one short line.</p>
+<p id="b54">Body paragraph 54, one short line.</p>
+<p id="b55">Body paragraph 55, one short line.</p>
+<p id="b56">Body paragraph 56, one short line.</p>
+<p id="b57">Body paragraph 57, one short line.</p>
+<p id="b58">Body paragraph 58, one short line.</p>
+<p id="b59">Body paragraph 59, one short line.</p>
+<p id="b60">Body paragraph 60, one short line.</p>
+<p id="b61">Body paragraph 61, one short line.</p>
+<p id="b62">Body paragraph 62, one short line.</p>
+<p id="b63">Body paragraph 63, one short line.</p>
+<p id="b64">Body paragraph 64, one short line.</p>
+<p id="b65">Body paragraph 65, one short line.</p>
+<p id="b66">Body paragraph 66, one short line.</p>
+<p id="b67">Body paragraph 67, one short line.</p>
+<p id="b68">Body paragraph 68, one short line.</p>
+<p id="b69">Body paragraph 69, one short line.</p>
+<p id="b70">Body paragraph 70, one short line.</p>
+<p id="b71">Body paragraph 71, one short line.</p>
+<p id="b72">Body paragraph 72, one short line.</p>
+<p id="b73">Body paragraph 73, one short line.</p>
+<p id="b74">Body paragraph 74, one short line.</p>
+<p id="b75">Body paragraph 75, one short line.</p>
+<p id="b76">Body paragraph 76, one short line.</p>
+<p id="b77">Body paragraph 77, one short line.</p>
+<p id="b78">Body paragraph 78, one short line.</p>
+<p id="b79">Body paragraph 79, one short line.</p>
+<p id="b80">Body paragraph 80, one short line.</p>
+<p id="b81">Body paragraph 81, one short line.</p>
+<p id="b82">Body paragraph 82, one short line.</p>
+<p id="b83">Body paragraph 83, one short line.</p>
+<p id="b84">Body paragraph 84, one short line.</p>
+<p id="b85">Body paragraph 85, one short line.</p>
+<p id="b86">Body paragraph 86, one short line.</p>
+<p id="b87">Body paragraph 87, one short line.</p>
+<p id="b88">Body paragraph 88, one short line.</p>
+<p id="b89">Body paragraph 89, one short line.</p>
+<p id="b90">Body paragraph 90, one short line.</p>
+<p id="b91">Body paragraph 91, one short line.</p>
+<p id="b92">Body paragraph 92, one short line.</p>
+<p id="b93">Body paragraph 93, one short line.</p>
+<p id="b94">Body paragraph 94, one short line.</p>
+<p id="b95">Body paragraph 95, one short line.</p>
+</body></html>

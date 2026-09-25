@@ -22,6 +22,9 @@ import { straightQuotes } from "../../src/rules/type/straight-quotes.ts";
 import { textOverflowsViewport } from "../../src/rules/svg/text-overflows-viewport.ts";
 import { textClipped } from "../../src/rules/svg/text-clipped.ts";
 import { blockKey } from "../../src/core/fingerprint.ts";
+import { coverageFloorMap, resolveConfig } from "../../src/config/resolve.ts";
+import type { DocumentInput } from "../../src/core/engine.ts";
+import type { BlockRecord, Finding } from "../../src/core/types.ts";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 const FIXTURES = join(REPO, "tests", "fixtures");
@@ -31,6 +34,43 @@ const missing = [
   resolvePackageRoot("pagedjs", REPO) ? null : "pagedjs",
   resolvePackageRoot("pdfjs-dist", REPO) ? null : "pdfjs-dist",
 ].filter((value): value is string => value !== null);
+
+/** The whole registry under the default profile, optionally with rule overrides, as the CLI runs it. */
+function withProfile(document: DocumentInput, rules: Record<string, unknown> = {}) {
+  const config = resolveConfig({ file: { rules }, cli: {} });
+  return runDocument(document, {
+    failOn: config.failOn, activeRules: config.activeRules, optionsByRule: config.optionsByRule,
+    coverageFloors: coverageFloorMap(config),
+  });
+}
+
+/**
+ * Findings of one rule that share a fingerprint, as `rule on pages a, b share <fp>`. On a document
+ * whose content is distinct by construction, every entry is a collision the tool manufactured —
+ * the v1 key may legitimately be shared by two IDENTICAL source blocks, which is why this is a test
+ * and not an engine assertion.
+ */
+function fingerprintCollisions(findings: readonly Finding[]): string[] {
+  const out: string[] = [];
+  for (const rule of new Set(findings.map((finding) => finding.ruleId))) {
+    const own = findings.filter((finding) => finding.ruleId === rule);
+    for (const fingerprint of new Set(own.map((finding) => finding.fingerprint))) {
+      const pages = own.filter((finding) => finding.fingerprint === fingerprint).map((finding) => finding.page);
+      if (pages.length > 1) out.push(`${rule} on pages ${pages.join(", ")} share ${fingerprint.slice(0, 16)}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * The evidence facts that do not depend on the PDF text layer: which marks the overlay could not
+ * place. They are observable on any browser; whether the placed marks BIND is only observable
+ * where the browser's PDF carries them, which is why the exit-code assertions come last.
+ */
+function unplacedMarks(document: DocumentInput): string[] {
+  return (document.evidence ?? []).flatMap((page) =>
+    (page.unplacedMarks ?? []).map((mark) => `p${page.page}:${mark.sid}:${mark.side}`));
+}
 
 function options(outDir: string, sourceMapInjection = true): RenderOptions {
   return {
@@ -50,7 +90,7 @@ describe("the M2d live production chain", () => {
   let noSource: RenderResult | null = null;
 
   const completeChain = (t: TestContext): boolean => {
-    if (result?.documents.length === 24 && noSource?.documents.length === 4) return true;
+    if (result?.documents.length === 29 && noSource?.documents.length === 4) return true;
     t.skip(
       `root acquisition failure already reported by the first subtest: injected=${result?.documents.length ?? 0}, ` +
       `no-source=${noSource?.documents.length ?? 0}`,
@@ -110,6 +150,11 @@ describe("the M2d live production chain", () => {
         join(FIXTURES, "svg-in-viewport.html"),
         join(FIXTURES, "svg-geometry-declines.html"),
         join(FIXTURES, "fragmentainer-residue.html"),
+        join(FIXTURES, "margin-running-elements.html"),
+        join(FIXTURES, "margin-running-parity.html"),
+        join(FIXTURES, "fullbleed-avoid.html"),
+        join(FIXTURES, "margin-running-after-heading.html"),
+        join(FIXTURES, "margin-running-in-section.html"),
       ],
       options(join(root, "evidence")),
     );
@@ -137,7 +182,7 @@ describe("the M2d live production chain", () => {
     }));
     assert.equal(
       result?.documents.length,
-      24,
+      29,
       `the injected run stopped before every document; timeout/root cause=${JSON.stringify(resultSummary)}`,
     );
     assert.equal(
@@ -867,6 +912,196 @@ describe("the M2d live production chain", () => {
       ]);
     } finally {
       await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    }
+  });
+
+  /**
+   * `position: running(...)` clones are not part of the flow. Paged.js deep-clones both running
+   * elements into a margin box of every page and each clone keeps the source id; measured before
+   * this was fixed, the snapshot carried seven records per running element on this six-page
+   * document and the default profile reported ten widow/orphan warnings, all about clones.
+   */
+  it("keeps running() margin-box clones out of the snapshot, the page anchors and the findings", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[24]!;
+    const snapshot = document.snapshot;
+    assert.ok(snapshot, `no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    assert.ok(snapshot.pages.length >= 3, `the fixture must span at least three pages, got ${snapshot.pages.length}`);
+    for (const id of ["running-title", "running-side"]) {
+      const records: BlockRecord[] = snapshot.blocks.filter((block) => block.authorId === id);
+      assert.equal(records.length, 1, `${id}: ${records.length} records on ${snapshot.pages.length} pages — margin-box clones counted as fragments`);
+      assert.equal(records[0]!.fragmentCount, 1);
+      assert.deepEqual(records[0]!.box, { x: 0, y: 0, width: 0, height: 0 }, `${id}: the kept record is not the hidden in-flow original`);
+      assert.equal(snapshot.textLines.some((line) => line.blockKey === records[0]!.nodeKey), false, `${id}: a clone contributed text lines`);
+    }
+    // Nothing in this document bleeds: every block with a box lies inside its page's content box,
+    // so a box anywhere else would be margin-box content.
+    for (const block of snapshot.blocks.filter((item) => item.box.width > 0 || item.box.height > 0)) {
+      const box = snapshot.pages[block.page - 1]!.contentBox;
+      assert.ok(
+        block.box.x >= box.x - 0.5 && block.box.y >= box.y - 0.5 &&
+          block.box.x + block.box.width <= box.x + box.width + 0.5 && block.box.y + block.box.height <= box.y + box.height + 0.5,
+        `${block.nodeKey} (${block.authorId}) lies outside the content box of page ${block.page}: ${JSON.stringify(block.box)}`,
+      );
+    }
+    const anchors = snapshot.pages.map((page) => page.firstSemanticBlockKey);
+    assert.equal(new Set(anchors).size, anchors.length, `pages share an anchor: ${JSON.stringify(anchors)}`);
+    assert.equal(anchors.some((anchor) => /running-(title|side)/u.test(anchor ?? "")), false, `a page is anchored to a running element: ${JSON.stringify(anchors)}`);
+
+    // The hidden originals are not measured by the rules either: they have no layout box.
+    const tooTall = withProfile(document).report.evaluations.filter((row) =>
+      row.ruleId === "layout/unbreakable-block-too-tall" && row.targetRef.sid !== null &&
+      snapshot.blocks.some((block) => block.sid === row.targetRef.sid && /running-(title|side)/u.test(block.authorId ?? "")));
+    assert.deepEqual(tooTall.map((row) => [row.status, row.reason]), [["excluded", "rule/target-not-rendered"], ["excluded", "rule/target-not-rendered"]]);
+
+    const outcome = withProfile(document);
+    assert.deepEqual(
+      outcome.report.findings.map((finding) => `${finding.ruleId}@${finding.page}:${finding.target.nodeKey}`),
+      [],
+      "a document of one-line paragraphs and two running elements has nothing to report",
+    );
+    assert.deepEqual(fingerprintCollisions(withProfile(document, { "layout/half-empty-page": true }).report.findings), []);
+    // Evidence: no mark is required for a clone, and every flow mark fits its page. Measured
+    // before this was fixed: 24 unplaced marks, 4 per page, every page unbound, exit 4.
+    assert.deepEqual(unplacedMarks(document), [], "the evidence overlay tried to mark margin-box clones");
+    // Everything below needs a browser whose PDF carries the marks (CI's current Chrome).
+    assert.deepEqual(outcome.report.evidenceCoverage?.status, "complete", `evidence: ${JSON.stringify(outcome.report.evidenceCoverage)}`);
+    assert.equal(exitCodeFor(outcome.report.verdict), 0);
+  });
+
+  /**
+   * The parity-blank page stays blank under a running header. Measured before this was fixed: the
+   * header clone made page 2 look occupied, its boundaries came out `overflow` and `forced`, the
+   * default profile reported a widow, an orphan and an orphaned continuation page, and with
+   * `layout/half-empty-page` on, three findings on three pages carried one fingerprint.
+   */
+  it("keeps a running header from occupying a parity-blank page or anchoring its neighbours", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[25]!;
+    const snapshot = document.snapshot;
+    assert.ok(snapshot, `no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    assert.equal(snapshot.pages.length, 3, "chapter one, the inserted verso page, chapter two");
+    // The blank page identified independently of the field under test and of the block records:
+    // by its measured fill, which is read from the text and replaced boxes of the page CONTENT and
+    // has never seen a margin box.
+    assert.deepEqual(
+      snapshot.pages.map((page) => page.fill.net > 0),
+      [true, false, true],
+      "premise: chapter two starts on page 3 after a page 2 with nothing in its content area",
+    );
+    assert.deepEqual(snapshot.pages.map((page) => page.blank), [false, true, false], "a margin-box clone made the blank page look occupied");
+    const blank = snapshot.pages[1]!;
+    assert.equal(blank.incomingBreakCause.kind, "parity");
+    assert.equal(blank.outgoingBreakCause.kind, "parity");
+    assert.equal(blank.outgoingBreakCause.determinedBy, "page-blank");
+    assert.deepEqual(
+      snapshot.pages.map((page) => page.firstSemanticBlockKey),
+      [blockKey({ authorId: "c1p1", blockSignature: "" }), null, blockKey({ authorId: "chapter-two", blockSignature: "" })],
+      "a page is anchored to the running header, its hidden original, or nothing",
+    );
+
+    const outcome = withProfile(document);
+    assert.deepEqual(outcome.report.findings.map((finding) => `${finding.ruleId}@${finding.page}`), []);
+    const halfEmpty = withProfile(document, { "layout/half-empty-page": true }).report.findings;
+    assert.ok(halfEmpty.length > 0, "premise: the sparse chapter pages produce page findings, or the fingerprint guard checks nothing");
+    assert.deepEqual(fingerprintCollisions(halfEmpty), []);
+    assert.equal(halfEmpty.some((finding) => finding.page === 2), false, "a finding on the parity-blank page");
+    // Evidence: the header clone needs no mark any more (measured before: 6 unplaced, 2 per page).
+    // The blank page carries no source block and so no mark at all.
+    assert.deepEqual(unplacedMarks(document), [], "the evidence overlay tried to mark the running-header clone");
+    const blankEvidence = document.evidence?.find((page) => page.page === 2);
+    assert.equal(blankEvidence?.conformance, null, "premise: the blank page has no mark to bind");
+    // Everything below needs a browser whose PDF carries the marks (CI's current Chrome). Pages 1
+    // and 3 bind. Page 2 cannot: a page without a single mark never binds, and required evidence
+    // is complete only when EVERY page binds, so any document with a parity-blank page ends
+    // insufficient-coverage (exit 4) under evidence binding — on this fixture and on live-chain.html
+    // alike. That is the evidence contract as it stands, not a defect of the margin-box repair; it
+    // is recorded in docs/limitations.md. When that contract changes, this assertion must change
+    // with it, deliberately.
+    assert.deepEqual(
+      { status: outcome.report.evidenceCoverage?.status, boundPages: outcome.report.evidenceCoverage?.boundPages },
+      { status: "partial", boundPages: 2 },
+      `evidence: ${JSON.stringify(outcome.report.evidenceCoverage)}`,
+    );
+    assert.deepEqual(document.evidence?.map((page) => page.bindsFinding), [true, false, true]);
+    assert.equal(outcome.report.exitReason, "evidence/required-page-binding-incomplete");
+    assert.equal(exitCodeFor(outcome.report.verdict), 4);
+  });
+
+  /**
+   * A full-bleed `break-inside: avoid` block is still judged on all of its fragments. Its negative
+   * side margins put every fragment left of the content box; the coordinate filter this rule used
+   * to carry discarded all of them, measured the first fragment (335.81 px against 340.16 px) and
+   * the document came back clean at exit 0.
+   */
+  it("reports a full-bleed unbreakable block whose fragments all lie outside the content box", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    const document = result!.documents[26]!;
+    const snapshot = document.snapshot;
+    assert.ok(snapshot, `no snapshot: ${JSON.stringify(document.infrastructure)}`);
+    const fragments = snapshot.blocks.filter((block) => block.authorId === "full-bleed");
+    assert.ok(fragments.length >= 3, `the block must split into three or more fragments, got ${fragments.length}`);
+    for (const fragment of fragments) {
+      const box = snapshot.pages[fragment.page - 1]!.contentBox;
+      assert.ok(fragment.box.x < box.x - 1, `premise: fragment ${fragment.fragmentIndex} starts inside the content box (${fragment.box.x} vs ${box.x})`);
+    }
+    const outcome = withProfile(document);
+    const tooTall = outcome.report.findings.filter((finding) => finding.ruleId === "layout/unbreakable-block-too-tall");
+    assert.equal(tooTall.length, 1, "the full-bleed block was judged on one piece");
+    const sum = fragments.reduce((total, fragment) => total + fragment.box.height, 0);
+    assert.equal(tooTall[0]!.target.sid, fragments[0]!.sid);
+    assert.ok(Math.abs(tooTall[0]!.measurement.value - sum) < 0.01, `value ${tooTall[0]!.measurement.value} is not the sum ${sum}`);
+    assert.ok(tooTall[0]!.measurement.value > 3 * tooTall[0]!.measurement.threshold);
+    assert.equal(tooTall[0]!.severity, "error");
+    // Evidence: the fragments bleed into the side margin and are printed there, so their marks are
+    // placed there. Measured before this was fixed: 212 unplaced marks, pages 2-7 unbound, exit 4.
+    assert.deepEqual(unplacedMarks(document), [], "a mark for an in-flow fragment in the side margin was refused");
+    // Everything below needs a browser whose PDF carries the marks (CI's current Chrome).
+    assert.equal(outcome.report.evidenceCoverage?.status, "complete", `evidence: ${JSON.stringify(outcome.report.evidenceCoverage)}`);
+    assert.equal(tooTall[0]!.evidence.bindsFinding, true, "the error finding on a full-bleed block is not evidenced");
+    assert.equal(exitCodeFor(outcome.report.verdict), 1, "a build-breaking block must end the run at exit 1");
+  });
+
+  /**
+   * The source-id integrity check reads the order of the flow. Paged.js puts the running title's
+   * clone in the margin box, ahead of the content area in the page box, so a whole-document read
+   * met it before everything that precedes the title in the source. Measured before this was
+   * fixed: both documents ended `checker-crashed` at the post-pagination source-id check (exit 3).
+   * The section document also spans every page, so its pages must be anchored to the first block
+   * that starts on each of them, not to the section.
+   */
+  it("measures a running title that follows a heading or sits inside a section, without an integrity failure", (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    if (!completeChain(t)) return;
+    for (const [index, wrapper] of [[27, null], [28, "chapter"]] as const) {
+      const document = result!.documents[index]!;
+      const snapshot = document.snapshot;
+      assert.ok(snapshot, `document ${index}: no snapshot: ${JSON.stringify(document.infrastructure)}`);
+      assert.equal(document.infrastructure.some((event) => event.kind === "checker-crashed"), false,
+        `document ${index}: ${JSON.stringify(document.infrastructure)}`);
+      assert.ok(snapshot.pages.length >= 2, `document ${index}: the fixture must span pages`);
+      assert.equal(snapshot.blocks.filter((block) => block.authorId === "running-title").length, 1,
+        `document ${index}: the running title was recorded from its margin-box clones`);
+      const anchors = snapshot.pages.map((page) => page.firstSemanticBlockKey);
+      assert.equal(new Set(anchors).size, anchors.length, `document ${index}: pages share an anchor: ${JSON.stringify(anchors)}`);
+      assert.equal(anchors.includes("id:running-title"), false);
+      if (wrapper) {
+        assert.equal(snapshot.blocks.filter((block) => block.authorId === wrapper).length, snapshot.pages.length,
+          "premise: the section has a fragment on every page");
+        assert.deepEqual(anchors.filter((anchor) => anchor === `id:${wrapper}`), [`id:${wrapper}`],
+          "a page other than the section's first was anchored to the section");
+      }
+      const outcome = withProfile(document);
+      assert.deepEqual(outcome.report.findings.map((finding) => `${finding.ruleId}@${finding.page}`), []);
+      assert.deepEqual(unplacedMarks(document), [], `document ${index}: the evidence overlay tried to mark a clone`);
+    }
+    // Needs a browser whose PDF carries the marks (CI's current Chrome).
+    for (const index of [27, 28]) {
+      const outcome = withProfile(result!.documents[index]!);
+      assert.equal(exitCodeFor(outcome.report.verdict), 0, `document ${index}: ${outcome.report.exitReason}`);
     }
   });
 });
