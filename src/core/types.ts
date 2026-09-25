@@ -143,6 +143,22 @@ export interface BlockRecord {
    * zero, which is how the rules tell it from an element the author hid.
    */
   marginCopies: number;
+  /**
+   * The element's computed `float` and `position` (Snapshot 5). With `display` they say whether a
+   * nested block sits IN the flow of the block around it, where its lines end that block's own run
+   * of lines, or beside it — a float, an absolutely or fixed positioned box, an inline-block —
+   * where the lines on either side of it are still one run. Geometry cannot tell a full-line
+   * inline-block from a block child; these fields can.
+   */
+  float: string;
+  position: string;
+  /**
+   * Whether Paged.js marked a hyphen at a page split in this block's own inline content (Snapshot
+   * 5): the block, or an inline element inside it that is not inside a nested source block,
+   * carries `pagedjs_hyphen`. Paged.js marks the parent of the text node it cut, so the class alone
+   * in `classList` misses a word cut inside `<em>`.
+   */
+  boundaryHyphen: boolean;
   /** Either populated, or `notMeasuredReason` says why not. Never silently empty. */
   lines: number[] | null;
   notMeasuredReason?: EnvId;

@@ -41,6 +41,37 @@
 const TEST_APPARATUS_CAPABILITY = "breaklint-static-test-capability";
 const APPARATUS_CAPABILITY_MARKER = "__BREAKLINT_NODE_CAPABILITY__";
 
+/**
+ * The natural-space measurement, as the source of a factory over its captured dependencies, so that
+ * the unit suite can run the SAME text over a fake canvas (tests/unit/natural-space.test.ts). It
+ * answers the advance of one U+0020 in a CSS font shorthand, with a letter-spacing length added the
+ * way the browser adds it to every character — or null, never a guess:
+ *   - when `document.fonts` does not report the font loaded: asking a canvas for an unloaded font
+ *     starts a font load after the measured state;
+ *   - when the canvas rejected the shorthand: it then keeps the sentinel set just before;
+ *   - when the letter-spacing cannot be applied, or reads back as another value;
+ *   - when the width is not a positive finite number, or anything throws.
+ */
+export const SPACE_ADVANCE_FACTORY_SOURCE = `(deps) => (font, letterSpacing) => {
+  try {
+    if (!deps.loaded(font)) return null;
+    const context = deps.context();
+    if (!context) return null;
+    deps.setFont(context, deps.sentinel);
+    deps.setFont(context, font);
+    if (deps.getFont(context) === deps.sentinel) return null;
+    if (!deps.setLetterSpacing) { if (letterSpacing !== "0px") return null; }
+    else {
+      deps.setLetterSpacing(context, letterSpacing);
+      if (deps.getLetterSpacing(context) !== letterSpacing) return null;
+    }
+    const width = deps.measureSpace(context);
+    return typeof width === "number" && width > 0 && width < Infinity ? width : null;
+  } catch (_) {
+    return null;
+  }
+}`;
+
 const PRIMITIVES_TEMPLATE = `(() => {
   const apparatusCapability = "${APPARATUS_CAPABILITY_MARKER}";
   const call = Function.prototype.call;
@@ -382,29 +413,20 @@ const PRIMITIVES_TEMPLATE = `(() => {
           return { width, height, data: null };
         }
       },
-      // The advance of one U+0020 in a CSS font shorthand, with a letter-spacing length added the
-      // way the browser adds it to every character. null — never a guess — when the font is not
-      // loaded yet, when the canvas rejects the shorthand (it then keeps the sentinel), when the
-      // letter-spacing cannot be applied, or when anything throws.
-      spaceAdvance: (font, letterSpacing) => {
-        try {
-          if (call.call(fontCheckFn, call.call(fontsGet, document), font, " ") !== true) return null;
+      // The advance of one U+0020 in a CSS font shorthand; see SPACE_ADVANCE_FACTORY_SOURCE.
+      spaceAdvance: (${SPACE_ADVANCE_FACTORY_SOURCE})({
+        loaded: (font) => call.call(fontCheckFn, call.call(fontsGet, document), font, " ") === true,
+        context: () => {
           if (spaceContext === null) spaceContext = call.call(canvasContextFn, call.call(createElementFn, document, "canvas"), "2d");
-          if (!spaceContext) return null;
-          call.call(canvasFontSet, spaceContext, SPACE_FONT_SENTINEL);
-          call.call(canvasFontSet, spaceContext, font);
-          if (call.call(canvasFontGet, spaceContext) === SPACE_FONT_SENTINEL) return null;
-          if (!canvasLetterSpacingSet) { if (letterSpacing !== "0px") return null; }
-          else {
-            call.call(canvasLetterSpacingSet, spaceContext, letterSpacing);
-            if (call.call(canvasLetterSpacingGet, spaceContext) !== letterSpacing) return null;
-          }
-          const width = call.call(metricsWidthGet, call.call(measureTextFn, spaceContext, " "));
-          return typeof width === "number" && width > 0 && width < Infinity ? width : null;
-        } catch (_) {
-          return null;
-        }
-      },
+          return spaceContext;
+        },
+        setFont: (context, value) => call.call(canvasFontSet, context, value),
+        getFont: (context) => call.call(canvasFontGet, context),
+        setLetterSpacing: canvasLetterSpacingSet ? (context, value) => call.call(canvasLetterSpacingSet, context, value) : null,
+        getLetterSpacing: (context) => call.call(canvasLetterSpacingGet, context),
+        measureSpace: (context) => call.call(metricsWidthGet, call.call(measureTextFn, context, " ")),
+        sentinel: SPACE_FONT_SENTINEL,
+      }),
       styleSheets: () => {
         const regular = call.call(sliceFn, call.call(styleSheetsGet, document));
         const adopted = adoptedStyleSheetsGet ? call.call(sliceFn, call.call(adoptedStyleSheetsGet, document)) : [];

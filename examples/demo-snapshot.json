@@ -242,6 +242,9 @@
         },
         "display": "block",
         "marginCopies": 0,
+        "float": "none",
+        "position": "static",
+        "boundaryHyphen": false,
         "lines": [
           0,
           1,
@@ -289,6 +292,9 @@
         },
         "display": "block",
         "marginCopies": 0,
+        "float": "none",
+        "position": "static",
+        "boundaryHyphen": false,
         "lines": [
           8
         ]
@@ -329,6 +335,9 @@
         },
         "display": "table",
         "marginCopies": 0,
+        "float": "none",
+        "position": "static",
+        "boundaryHyphen": false,
         "lines": []
       },
       {
@@ -367,6 +376,9 @@
         },
         "display": "block",
         "marginCopies": 0,
+        "float": "none",
+        "position": "static",
+        "boundaryHyphen": false,
         "lines": [
           0,
           1
@@ -408,6 +420,9 @@
         },
         "display": "block",
         "marginCopies": 0,
+        "float": "none",
+        "position": "static",
+        "boundaryHyphen": false,
         "lines": []
       }
     ],

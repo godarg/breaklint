@@ -92,6 +92,9 @@ function block(id: string, over: Partial<BlockRecord> = {}): BlockRecord {
     effectiveStyle: style(),
     display: "block",
     marginCopies: 0,
+    float: "none",
+    position: "static",
+    boundaryHyphen: false,
     lines: [0],
     ...over,
   };
@@ -617,7 +620,7 @@ export function loadCorpus(): CorpusEntry[] {
       snapshot: snapshot({
         pages: [page(1), page(2)],
         blocks: [
-          block("y1", { fragmentIndex: 0, fragmentCount: 2, classList: ["pagedjs_hyphen"] }),
+          block("y1", { fragmentIndex: 0, fragmentCount: 2, classList: ["pagedjs_hyphen"], boundaryHyphen: true }),
           block("y2", { fragmentIndex: 1, fragmentCount: 2, page: 2 }),
         ],
       }),

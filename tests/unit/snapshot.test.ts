@@ -171,13 +171,25 @@ describe("the live snapshot seam", () => {
     const sidlessCopies = structuredClone(base);
     Object.assign(sidlessCopies.blocks[0]!, { sid: null, marginCopies: 2 });
     mutations.push({ name: "margin-copies-without-sid", snapshot: sidlessCopies });
+    // Also Snapshot 5: the flow facts (`float`, `position`) that tell a nested block in the flow from
+    // one beside it, and the boundary-hyphen mark.
+    const noFloat = structuredClone(base);
+    delete (noFloat.blocks[0] as { float?: string }).float;
+    mutations.push({ name: "float-missing", snapshot: noFloat });
+    const noPosition = structuredClone(base);
+    (noPosition.blocks[0] as { position?: string }).position = "";
+    mutations.push({ name: "position-absent", snapshot: noPosition });
+    const badHyphen = structuredClone(base);
+    (badHyphen.blocks[0] as unknown as { boundaryHyphen: unknown }).boundaryHyphen = "yes";
+    mutations.push({ name: "boundary-hyphen-not-boolean", snapshot: badHyphen });
 
     // The corpus snapshot is not free of issues itself, so "not ok" alone would not show that
     // these checks exist: each Snapshot 5 mutation must produce its own issue.
     for (const [snapshot, issue] of [
       [noDisplay, "computed display is absent"], [missingDisplay, "computed display is absent"],
       [badCopies, "marginCopies is not a count"], [fractionalCopies, "marginCopies is not a count"],
-      [sidlessCopies, "margin copies without a source id"],
+      [sidlessCopies, "margin copies without a source id"], [noFloat, "computed float is absent"],
+      [noPosition, "computed position is absent"], [badHyphen, "boundaryHyphen is not a boolean"],
     ] as const) {
       const issues = validateSnapshotInvariants(snapshot, { sourceMapInjection: true }).issues;
       assert.ok(issues.some((item) => item.endsWith(issue)), `the invariant gate does not name "${issue}": ${JSON.stringify(issues.slice(0, 3))}`);

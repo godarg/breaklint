@@ -26,13 +26,26 @@ The collector records a block's lines from every text node beneath it, so a `<se
 around a paragraph carries the paragraph's line boxes too. Such a wrapper used to be judged by its
 own threshold against its paragraph's lines: a paragraph split exactly as it asked was reported as a
 widow of the section around it, measured on patched Chromium 141 with Paged.js 0.4.3 and now pinned
-by `tests/live/rule-targets.test.ts`. The paragraph is the one judged; a wrapper is reported only for
-a break that splits text of its own, and a continuation that opens with a nested block's line has
-none. A `display: contents` element is no block container: a line that a block around it also holds
-is that block's. One case is still counted as before: a wrapper's own text that opens a page right
-after a nested block ended the previous one reads as a split run of its own. Ownership is read from line geometry and collection order, and its known limits —
-text of the wrapper's own between two nested blocks on one line, a `display: contents` element with
-no block around it — are listed at `lineOwnership` in `src/rules/shared.ts`.
+by `tests/live/rule-targets.test.ts`. The paragraph is the one judged, and a wrapper only for a
+break that splits text of its own:
+
+- The run opening the continuation ends at the first line of an in-flow nested block. The lines of
+  a float, a positioned box or an inline-block beside the wrapper's text are passed over; they
+  neither count nor end the run. Which is which comes from each block's recorded `display`, `float`
+  and `position`, never from geometry: a full-line inline-block and a block child look the same.
+- The run must continue on the other side. When the fragment before ends on a nested block's line —
+  a paragraph ended the page and the wrapper's own text opens the next — the own text is a new run
+  and is not reported. The fragments are joined by source id; without one, the continuation is
+  judged on its own side, and the evaluation says so (`previous-fragment-closing-lines` is `null`).
+- A `display: contents` or inline element is no block container: a line that a block around it
+  holds is that block's. Where no recorded block holds its lines — a `display: contents` element
+  directly in `<body>` — they belong to a container the snapshot does not record, and the element is
+  declined as `env/invalid-measurement`, counted against coverage.
+
+The ground truth these rules were checked against is a probe of the same documents with plain
+Paged.js and Range rectangles. Its one known limit is listed at `lineOwnership` in
+`src/rules/shared.ts`: text of the wrapper's own between two nested blocks on one line is taken for
+theirs.
 
 ## Calibration
 

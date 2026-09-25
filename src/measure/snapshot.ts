@@ -512,39 +512,98 @@ export const SNAPSHOT_SOURCE = `(() => {
     visit(root);
     return out;
   };
-  // The natural space of a block: its own computed font's advance for U+0020, from the captured
-  // canvas measurement (P.spaceAdvance), plus its letter-spacing. It used to be read from the
-  // block's FIRST rendered whitespace, and neither kind of rendered space is natural: in a
-  // justified line every space is stretched, which hid wide gaps, and a space at a line end is
-  // collapsed — 0.02 px measured on patched Chromium 141 — which turned an ordinary justified gap
-  // into "540.50x the natural space". 0 when the font cannot be reproduced for the canvas or is
-  // not loaded; the rule declines such a block instead of dividing by a guess (it used to fall
-  // back to a third of the font size).
+  // The natural space of a block: the advance of one U+0020 in its own computed font, plus its
+  // letter-spacing, scaled by its effective CSS zoom. It used to be read from the block's FIRST
+  // rendered whitespace, and neither kind of rendered space is natural: in a justified line every
+  // space is stretched, which hid wide gaps, and a space at a line end is collapsed — 0.02 px
+  // measured on patched Chromium 141 — which turned an ordinary justified gap into "540.50x the
+  // natural space".
+  //
+  // TWO SOURCES, in this order:
+  //   1. the font's own advance from the captured canvas measurement (P.spaceAdvance), where a
+  //      canvas font can reproduce the element's font: a keyword font-stretch, no
+  //      font-size-adjust, caps that are normal or small-caps (all-small-caps and the other
+  //      synthesised caps shrink the space with the letters), variation settings that are normal or
+  //      only restate the computed weight, and a font that is loaded. The canvas knows nothing of
+  //      zoom: computed font sizes are unzoomed while every rendered box is zoomed, so the advance
+  //      is multiplied by the product of the element's and its ancestors' zoom;
+  //   2. otherwise the rendered layout itself: the gaps between words on the unjustified last line
+  //      of a justified leaf block (text-align-last not justify) set in exactly the same font —
+  //      the median over every such line in the document, which is already zoomed.
+  // 0 when neither exists; the rule then declines the block (env/invalid-measurement) instead of
+  // dividing by a guess, as it used to (a third of the font size).
   const STRETCH_KEYWORDS = { "50%": "ultra-condensed", "62.5%": "extra-condensed", "75%": "condensed",
     "87.5%": "semi-condensed", "100%": "normal", "112.5%": "semi-expanded", "125%": "expanded",
     "150%": "extra-expanded", "200%": "ultra-expanded" };
-  const spaceCache = {};
-  const naturalSpace = (s) => {
-    // Every key below contains "%" and every cache key "|", so no inherited property can answer.
-    const stretch = STRETCH_KEYWORDS[s.fontStretch || "100%"] || null;
-    // A canvas font shorthand carries neither of these; a font that uses them cannot be reproduced.
-    if (stretch === null || (s.fontVariationSettings || "normal") !== "normal"
-        || (s.fontSizeAdjust || "none") !== "none") return 0;
-    const font = [s.fontStyle || "normal", s.fontVariantCaps === "small-caps" ? "small-caps" : "normal",
-      s.fontWeight || "400", stretch, s.fontSize, s.fontFamily].join(" ");
-    const letterSpacing = !s.letterSpacing || s.letterSpacing === "normal" ? "0px" : s.letterSpacing;
-    const key = font + "|" + letterSpacing;
-    if (spaceCache[key] === undefined) {
-      const advance = P.spaceAdvance(font, letterSpacing);
-      spaceCache[key] = advance === null ? 0 : round(advance);
-    }
-    return spaceCache[key];
+  const effectiveZoom = (el) => {
+    let zoom = 1;
+    for (let at = el; at && P.nodeType(at) === 1; at = P.parent(at)) zoom *= number(P.style(at, null).zoom, 1);
+    return zoom;
   };
-  const linesFor = (el, justify) => {
+  // Variation settings a canvas reproduces: none, or only "wght" at the computed weight, which
+  // says nothing the weight did not say. Any other axis (opsz, wdth, a custom one) or another
+  // weight may or may not exist in the font, and whether it does cannot be asked.
+  const variationReproducible = (settings, weight) => {
+    const value = (settings || "normal").trim();
+    if (value === "normal") return true;
+    const axes = value.split(",").map((part) => part.trim());
+    return axes.every((axis) => {
+      const match = /^["']wght["']\\s+(-?[\\d.]+)$/u.exec(axis);
+      return match !== null && Number(match[1]) === number(weight, NaN);
+    });
+  };
+  const spaceFacts = (s, el) => {
+    const stretch = STRETCH_KEYWORDS[s.fontStretch || "100%"] || null;
+    const caps = s.fontVariantCaps || "normal";
+    const letterSpacing = !s.letterSpacing || s.letterSpacing === "normal" ? "0px" : s.letterSpacing;
+    const zoom = effectiveZoom(el);
+    const font = [s.fontStyle || "normal", caps === "small-caps" ? "small-caps" : "normal",
+      s.fontWeight || "400", stretch || (s.fontStretch || ""), s.fontSize, s.fontFamily].join(" ");
+    // Every value that decides a rendered space, for pooling layout samples: two blocks share a
+    // natural space only if all of it agrees.
+    const layoutKey = [font, caps, letterSpacing, s.fontVariationSettings || "normal", s.fontSizeAdjust || "none",
+      s.fontKerning || "auto", String(zoom)].join("|");
+    const canvas = stretch !== null && (caps === "normal" || caps === "small-caps")
+      && (s.fontSizeAdjust || "none") === "none" && variationReproducible(s.fontVariationSettings, s.fontWeight);
+    return { font, letterSpacing, zoom, layoutKey, canvas };
+  };
+  const canvasCache = {};
+  const canvasSpace = (facts) => {
+    // Every cache key contains "|", and every STRETCH_KEYWORDS key "%", so no inherited property
+    // can answer a lookup.
+    const key = facts.font + "|" + facts.letterSpacing;
+    if (canvasCache[key] === undefined) {
+      const advance = P.spaceAdvance(facts.font, facts.letterSpacing);
+      canvasCache[key] = advance === null ? 0 : advance;
+    }
+    return canvasCache[key] > 0 ? round(canvasCache[key] * facts.zoom) : 0;
+  };
+  const layoutSamples = {};
+  const median = (values) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = sorted.length >> 1;
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+  // The nearest ancestor that is a block container (not display: contents, not inline): its
+  // text-align decides whether the lines of a display: contents or inline record are justified.
+  const containerStyle = (el, s) => {
+    if (s.display !== "contents" && s.display !== "inline") return s;
+    for (let at = P.parent(el); at && P.nodeType(at) === 1; at = P.parent(at)) {
+      const style = P.style(at, null);
+      if (style.display !== "contents" && style.display !== "inline") return style;
+    }
+    return s;
+  };
+  const linesFor = (el, justify, blockWordSpacing) => {
     const groups = [];
     const words = [];
     for (const node of textNodes(el)) {
       const value = P.text(node) || "";
+      // Text set with a word-spacing of its own — an inline element's, not the block's — was
+      // widened by the author on purpose. Its gaps are not judged: each of its line pieces is one
+      // unit in the word boxes, so no gap falls inside it (the block-level rule already leaves a
+      // block with its own word-spacing alone).
+      const ownSpacing = justify && P.style(P.parent(node), null).wordSpacing !== blockWordSpacing;
       // A line is visible when any text on it is: visibility is read from each text node's own
       // element, not from the block, because a hidden block may hold a visible descendant
       // (p { visibility: hidden } span { visibility: visible } prints the span).
@@ -558,6 +617,12 @@ export const SNAPSHOT_SOURCE = `(() => {
         entry.x = Math.min(entry.x, r.x); entry.right = Math.max(entry.right, r.x + r.width);
         entry.y = Math.min(entry.y, r.y); entry.bottom = Math.max(entry.bottom, r.y + r.height);
         if (!existing) groups.push(entry);
+      }
+      if (ownSpacing) {
+        for (const r of P.range(node)) {
+          if (r.width > 0 && r.height > 0) words.push({ text: value.trim(), x: round(r.x), y: round(r.y), width: round(r.width), height: round(r.height) });
+        }
+        continue;
       }
       for (const match of value.matchAll(/\\S+/gu)) {
         const start = match.index || 0;
@@ -575,8 +640,25 @@ export const SNAPSHOT_SOURCE = `(() => {
     const s = P.style(el, null);
     const fontSize = number(s.fontSize, 0);
     const lineHeight = number(s.lineHeight, fontSize * 1.2);
-    const justify = /justify/u.test(s.textAlign);
-    const measured = linesFor(el, justify);
+    // Word boxes where the lines are justified, which for a display: contents or inline record is
+    // decided by the block container around it, not by its own text-align.
+    const container = containerStyle(el, s);
+    const justify = /justify/u.test(s.textAlign) || /justify/u.test(container.textAlign);
+    const measured = linesFor(el, justify, s.wordSpacing);
+    const facts = spaceFacts(s, el);
+    const isLastFragment = (seenBySid[sourceIdentity] || 0) === (bySidCount[sourceIdentity] || 1) - 1;
+    // A layout sample: the gaps of the unjustified last line of a justified leaf block. A block
+    // with nested source blocks is no sample: its last line may be a nested block's, in its font.
+    if (measured.words !== null && isLastFragment && /justify/u.test(container.textAlign)
+        && !/justify/u.test(s.textAlignLast || "auto") && P.all(el, SOURCE_BLOCK_SELECTOR).length === 0
+        && measured.groups.length > 0) {
+      const last = measured.groups[measured.groups.length - 1];
+      const onLast = measured.words.filter((w) => Math.abs(w.y - last.y) <= 0.5).sort((a, b) => a.x - b.x);
+      for (let i = 1; i < onLast.length; i += 1) {
+        const gap = onLast[i].x - (onLast[i - 1].x + onLast[i - 1].width);
+        if (gap > 0) (layoutSamples[facts.layoutKey] = layoutSamples[facts.layoutKey] || []).push(gap);
+      }
+    }
     const nodeKey = "bl:" + sourceIdentity + ":" + String(seenBySid[sourceIdentity] || 0);
     const base = lineBaseBySid[sourceIdentity] || 0;
     measured.groups.forEach((line, local) => {
@@ -591,17 +673,30 @@ export const SNAPSHOT_SOURCE = `(() => {
       nodeKey, sid, sourceIdentity, sourceOrder, plainText: (P.text(el) || "").replace(/\\s+/g, " ").trim(),
       page: pagesEls.indexOf(page) + 1, box: box(el), tag: el.tagName.toLowerCase(),
       classList: (P.attr(el, "class") || "").split(/\\s+/u).filter(Boolean), lineHeight,
-      spaceWidth: naturalSpace(s),
+      spaceWidth: 0, spaceFacts: facts,
       effectiveStyle: { breakInside: s.breakInside || "auto", breakBefore: s.breakBefore || "auto",
         breakAfter: s.breakAfter || "auto", columns: s.columnCount || "auto", writingMode: s.writingMode || "horizontal-tb",
         visibility: s.visibility || "visible", widows: number(s.widows, 2), orphans: number(s.orphans, 2),
         textAlign: s.textAlign || "start", wordSpacing: s.wordSpacing || "normal", fontFamily: s.fontFamily || "",
         fontSize, lineHeight, lang: P.attr(el, "lang") || document.documentElement.lang || "" },
       display: s.display || "", marginCopies: sid ? (marginCopiesBySid[sid] || 0) : 0,
+      float: s.float || s.cssFloat || "none", position: s.position || "static",
+      // Paged.js marks the PARENT of the text node it cut at a page split, which is the block
+      // itself or an inline element inside it. The mark belongs to the nearest source block
+      // around it, never to a wrapper further out.
+      boundaryHyphen: P.all(el, ".pagedjs_hyphen").some((mark) => P.closest(mark, SOURCE_BLOCK_SELECTOR) === el)
+        || (P.attr(el, "class") || "").split(/\\s+/u).includes("pagedjs_hyphen"),
       lines: measured.groups.map((_, i) => base + i), inertBreak: null,
     });
     seenBySid[sourceIdentity] = (seenBySid[sourceIdentity] || 0) + 1;
   });
+  for (const block of blocks) {
+    const facts = block.spaceFacts;
+    delete block.spaceFacts;
+    const fromCanvas = facts.canvas ? canvasSpace(facts) : 0;
+    const samples = layoutSamples[facts.layoutKey];
+    block.spaceWidth = fromCanvas > 0 ? fromCanvas : samples && samples.length > 0 ? round(median(samples)) : 0;
+  }
 
   const clipped = (r, cb) => {
     const x = Math.max(cb.x, r.x), y = Math.max(cb.y, r.y);
@@ -921,6 +1016,11 @@ export function validateSnapshotInvariants(
     if (typeof block.display !== "string" || block.display.length === 0) issues.push(`${block.nodeKey}: computed display is absent`);
     if (!Number.isSafeInteger(block.marginCopies) || block.marginCopies < 0) issues.push(`${block.nodeKey}: marginCopies is not a count`);
     else if (block.marginCopies > 0 && block.sid === null) issues.push(`${block.nodeKey}: margin copies without a source id`);
+    // Snapshot 5, too: without them a nested block cannot be told in the flow or beside it, and a
+    // boundary hyphen inside an inline element cannot be read.
+    if (typeof block.float !== "string" || block.float.length === 0) issues.push(`${block.nodeKey}: computed float is absent`);
+    if (typeof block.position !== "string" || block.position.length === 0) issues.push(`${block.nodeKey}: computed position is absent`);
+    if (typeof block.boundaryHyphen !== "boolean") issues.push(`${block.nodeKey}: boundaryHyphen is not a boolean`);
     // The inspected input artefact's injection map is always complete. Producer provenance is
     // deliberately separate in originalMap, where generated/ambiguous output can be omitted.
     if (options.sourceMapInjection && block.sid !== null && !snapshot.source.map[block.sid]) {

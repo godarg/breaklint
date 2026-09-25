@@ -43,7 +43,9 @@ function base(): Snapshot {
 function record(snapshot: Snapshot, nodeKey: string, over: Partial<BlockRecord> & { page: number }): BlockRecord {
   const template = structuredClone(loadCorpus().find((entry) => entry.name === "widow-trigger")!.snapshot.blocks[0]!);
   const block: BlockRecord = {
-    ...template, nodeKey, sid: `s-${nodeKey}`, blockSignature: `signature of ${nodeKey}`, lines: [],
+    // Fragments of one source block share a sid, as the collector records them: "sec:0" and "sec:1"
+    // are the two fragments of `s-sec`.
+    ...template, nodeKey, sid: `s-${nodeKey.split(":")[0]}`, blockSignature: `signature of ${nodeKey}`, lines: [],
     fragmentIndex: 0, fragmentCount: 1, ...over,
     effectiveStyle: { ...template.effectiveStyle, widows: 2, orphans: 2, ...over.effectiveStyle },
   };
@@ -63,10 +65,19 @@ function lineOf(snapshot: Snapshot, block: BlockRecord, page: number, slot: numb
 const WITH_BOX = (page: number, from: number, to: number) => ({ x: 48, y: y(page, from), width: 399, height: (to - from) * LINE });
 const NO_BOX = { x: 0, y: 0, width: 0, height: 0 };
 
-function findings(snapshot: Snapshot) {
+/** Record a line box of any geometry under a block. */
+function rowOf(snapshot: Snapshot, block: BlockRecord, box: { x: number; y: number; width: number; height: number }): TextLine {
+  const index = block.lines!.length;
+  const line: TextLine = { blockKey: block.nodeKey, index, box, visible: true, width: box.width, wordBoxes: null };
+  block.lines!.push(index);
+  snapshot.textLines.push(line);
+  return line;
+}
+
+function findings(snapshot: Snapshot, extraLines = 0) {
   const report = runDocument(
     { path: "doc.html", snapshot, infrastructure: [] },
-    { failOn: "never", activeRules: [widow, orphan], optionsByRule: {}, coverageFloors: {} },
+    { failOn: "never", activeRules: [widow, orphan], optionsByRule: { "layout/widow": { extraLines }, "layout/orphan": { extraLines } }, coverageFloors: {} },
   ).report;
   return { report, list: report.findings.map((finding) => `${finding.ruleId} ${finding.target.nodeKey}`) };
 }
@@ -76,18 +87,18 @@ function findings(snapshot: Snapshot) {
  * paragraph split 8+1 on page 1 → 2. `innerWidows` 1 is the recorded case; 2 turns the inner split
  * into a real widow, which must be reported on the paragraph and nowhere else.
  */
-function wrapperWidow(innerWidows: number): Snapshot {
+function wrapperWidow(innerWidows: number, innerWidth = 120): Snapshot {
   const snapshot = base();
   const section0 = record(snapshot, "sec:0", { page: 1, tag: "section", fragmentIndex: 0, fragmentCount: 2, box: WITH_BOX(1, 0, 10) });
   const lead = record(snapshot, "lead", { page: 1, box: WITH_BOX(1, 0, 1) });
   const inner0 = record(snapshot, "inner:0", { page: 1, fragmentIndex: 0, fragmentCount: 2, box: WITH_BOX(1, 2, 10), effectiveStyle: { widows: innerWidows } as BlockRecord["effectiveStyle"] });
   lineOf(snapshot, section0, 1, 0, 48, 41);
   lineOf(snapshot, lead, 1, 0, 48, 41);
-  for (let slot = 2; slot < 10; slot += 1) { lineOf(snapshot, section0, 1, slot); lineOf(snapshot, inner0, 1, slot); }
+  for (let slot = 2; slot < 10; slot += 1) { lineOf(snapshot, section0, 1, slot); lineOf(snapshot, inner0, 1, slot, 48, innerWidth); }
   const section1 = record(snapshot, "sec:1", { page: 2, tag: "section", fragmentIndex: 1, fragmentCount: 2, box: WITH_BOX(2, 0, 1) });
   const inner1 = record(snapshot, "inner:1", { page: 2, fragmentIndex: 1, fragmentCount: 2, box: WITH_BOX(2, 0, 1), effectiveStyle: { widows: innerWidows } as BlockRecord["effectiveStyle"] });
   lineOf(snapshot, section1, 2, 0);
-  lineOf(snapshot, inner1, 2, 0);
+  lineOf(snapshot, inner1, 2, 0, 48, innerWidth);
   return snapshot;
 }
 
@@ -103,6 +114,7 @@ describe("line ownership: a split is judged at the block whose own container hol
     assert.deepEqual(row.measurements.map((m) => [m.name, m.value]), [
       ["widow-applicable-opening-lines", false], ["opening-fragment-lines", 0],
       ["widows-requirement-exceeds-one", 2], ["opening-fragment-lines-of-nested-blocks", 1],
+      ["previous-fragment-closing-lines", 0],
     ]);
   });
 
@@ -184,10 +196,10 @@ describe("line ownership: a split is judged at the block whose own container hol
     // lines are the section's, and the section's value judges the split.
     const snapshot = base();
     const section0 = record(snapshot, "sec:0", { page: 1, tag: "section", fragmentIndex: 0, fragmentCount: 2, box: WITH_BOX(1, 0, 8) });
-    const contents0 = record(snapshot, "contents:0", { page: 1, fragmentIndex: 0, fragmentCount: 2, box: NO_BOX, effectiveStyle: { widows: 1, orphans: 1 } as BlockRecord["effectiveStyle"] });
+    const contents0 = record(snapshot, "contents:0", { page: 1, fragmentIndex: 0, fragmentCount: 2, box: NO_BOX, display: "contents", effectiveStyle: { widows: 1, orphans: 1 } as BlockRecord["effectiveStyle"] });
     for (let slot = 0; slot < 8; slot += 1) { lineOf(snapshot, section0, 1, slot); lineOf(snapshot, contents0, 1, slot); }
     const section1 = record(snapshot, "sec:1", { page: 2, tag: "section", fragmentIndex: 1, fragmentCount: 2, box: WITH_BOX(2, 0, 1) });
-    const contents1 = record(snapshot, "contents:1", { page: 2, fragmentIndex: 1, fragmentCount: 2, box: NO_BOX, effectiveStyle: { widows: 1, orphans: 1 } as BlockRecord["effectiveStyle"] });
+    const contents1 = record(snapshot, "contents:1", { page: 2, fragmentIndex: 1, fragmentCount: 2, box: NO_BOX, display: "contents", effectiveStyle: { widows: 1, orphans: 1 } as BlockRecord["effectiveStyle"] });
     lineOf(snapshot, section1, 2, 0);
     lineOf(snapshot, contents1, 2, 0);
     const own = shared.lineOwnership(snapshot, { containers: true });
@@ -213,7 +225,7 @@ describe("line ownership: a split is judged at the block whose own container hol
     const justified = { textAlign: "justify", wordSpacing: "normal" } as BlockRecord["effectiveStyle"];
     const div = record(snapshot, "div", { page: 1, tag: "div", box: WITH_BOX(1, 0, 1), spaceWidth: 3, effectiveStyle: justified });
     const p = record(snapshot, "p", { page: 1, box: WITH_BOX(1, 0, 1), spaceWidth: 7.22, effectiveStyle: justified });
-    const contents = record(snapshot, "contents", { page: 1, box: NO_BOX, spaceWidth: 7.22, effectiveStyle: justified });
+    const contents = record(snapshot, "contents", { page: 1, box: NO_BOX, display: "contents", spaceWidth: 7.22, effectiveStyle: justified });
     const words = (slot: number) => [
       { text: "cccccc", x: 48, y: y(1, slot), width: 43.36, height: 14 },
       { text: "dddd", x: 48 + 43.36 + 50.54, y: y(1, slot), width: 28.92, height: 14 },
@@ -232,6 +244,130 @@ describe("line ownership: a split is judged at the block whose own container hol
       report.findings.map((finding) => [finding.target.nodeKey, Number(finding.measurement.value.toFixed(2))]),
       [["p", 7], ["contents", 7]],
     );
+  });
+
+  it("gives a line to the nested block within the collector's rounding, and not beyond it", () => {
+    // The paragraph's recorded line box 0.3 px narrower than the section's, as rounding leaves it.
+    assert.deepEqual(findings(wrapperWidow(1, 119.7)).list, []);
+    // 1 px is not rounding: the section's line carries something the paragraph's does not.
+    assert.deepEqual(findings(wrapperWidow(1, 119)).list, ["layout/widow sec:1"]);
+  });
+
+  it("counts the opening run of own lines, not every own line of the continuation", () => {
+    // `<section>own a<p>own b… </p>…` split so the continuation opens with ONE own line, then a nested
+    // paragraph's line, then two more own lines. The break split the one-line run.
+    const snapshot = base();
+    const section0 = record(snapshot, "sec:0", { page: 1, tag: "section", fragmentIndex: 0, fragmentCount: 2, box: WITH_BOX(1, 0, 2) });
+    for (let slot = 0; slot < 2; slot += 1) lineOf(snapshot, section0, 1, slot);
+    const section1 = record(snapshot, "sec:1", { page: 2, tag: "section", fragmentIndex: 1, fragmentCount: 2, box: WITH_BOX(2, 0, 4) });
+    const p = record(snapshot, "p", { page: 2, box: WITH_BOX(2, 1, 2) });
+    for (let slot = 0; slot < 4; slot += 1) lineOf(snapshot, section1, 2, slot);
+    lineOf(snapshot, p, 2, 1);
+    assert.equal(shared.openingOwnLines(shared.lineOwnership(snapshot, { containers: true })(section1)), 1);
+    assert.deepEqual(findings(snapshot).list, ["layout/widow sec:1"]);
+  });
+
+  it("does not end the own run at a float beside it", () => {
+    // f09d: a float with padding-top beside the continuation of the section's own text. The float's
+    // lines are recorded under the section as separate rows, 6 px below its own.
+    const snapshot = base();
+    const w0 = record(snapshot, "w:0", { page: 1, tag: "div", fragmentIndex: 0, fragmentCount: 2, box: WITH_BOX(1, 0, 5) });
+    for (let slot = 0; slot < 5; slot += 1) lineOf(snapshot, w0, 1, slot);
+    const w1 = record(snapshot, "w:1", { page: 2, tag: "div", fragmentIndex: 1, fragmentCount: 2, box: WITH_BOX(2, 0, 6) });
+    const float = record(snapshot, "float", { page: 2, tag: "div", float: "right", box: { x: 347, y: y(2, 0), width: 100, height: 3 * LINE + 6 } });
+    for (let slot = 0; slot < 6; slot += 1) {
+      lineOf(snapshot, w1, 2, slot, 48, 20);
+      if (slot < 3) for (const owner of [w1, float]) rowOf(snapshot, owner, { x: 347, y: y(2, slot) + 6, width: 20, height: 14 });
+    }
+    const own = shared.lineOwnership(snapshot, { containers: true });
+    assert.deepEqual(own(w1).lines.map((entry) => entry.role).filter((role) => role !== "own"), ["beside", "beside", "beside"]);
+    assert.equal(shared.openingOwnLines(own(w1)), 6);
+    assert.deepEqual(findings(snapshot).list, []);
+  });
+
+  it("tells a full-line inline-block from a block child by the recorded display, not by geometry", () => {
+    // f10b: `w1<br>w2<br><div style="display:inline-block; width:100%">ib1</div><br>x1…x4`. The
+    // inline-block's line is geometrically a block child's; it is on the wrapper's own line run.
+    const build = (display: string) => {
+      const snapshot = base();
+      const w0 = record(snapshot, "w:0", { page: 1, tag: "div", fragmentIndex: 0, fragmentCount: 2, box: WITH_BOX(1, 0, 3) });
+      const ib = record(snapshot, "ib", { page: 1, tag: "div", display, box: WITH_BOX(1, 2, 3) });
+      for (let slot = 0; slot < 3; slot += 1) lineOf(snapshot, w0, 1, slot, 48, slot === 2 ? 399 : 20);
+      lineOf(snapshot, ib, 1, 2, 48, 399);
+      const w1 = record(snapshot, "w:1", { page: 2, tag: "div", fragmentIndex: 1, fragmentCount: 2, box: WITH_BOX(2, 0, 4) });
+      for (let slot = 0; slot < 4; slot += 1) lineOf(snapshot, w1, 2, slot, 48, 20);
+      return snapshot;
+    };
+    // orphans 2 + 1 extra line = 3: the run at the break is w1, w2 — the inline-block is passed over.
+    assert.deepEqual(findings(build("inline-block"), 1).list, ["layout/orphan w:0"]);
+    // As an in-flow block child the same geometry ends the run: the wrapper's own run at the foot is
+    // empty, and a block child that fits whole is no orphan of anything.
+    assert.deepEqual(findings(build("block"), 1).list, []);
+  });
+
+  it("does not report a wrapper's own text as split when a nested block meets the break on the other side", () => {
+    // f03: `<section><p>5 lines</p>own line<p break-inside: avoid>8 lines</p></section>`: the own line
+    // ends page 1 and the second paragraph moved whole. The own line is a complete run.
+    const own = base();
+    const s0 = record(own, "sec:0", { page: 1, tag: "section", fragmentIndex: 0, fragmentCount: 2, box: WITH_BOX(1, 0, 6) });
+    const a = record(own, "a", { page: 1, box: WITH_BOX(1, 0, 5) });
+    for (let slot = 0; slot < 6; slot += 1) lineOf(own, s0, 1, slot);
+    for (let slot = 0; slot < 5; slot += 1) lineOf(own, a, 1, slot);
+    const s1 = record(own, "sec:1", { page: 2, tag: "section", fragmentIndex: 1, fragmentCount: 2, box: WITH_BOX(2, 0, 8) });
+    const b = record(own, "b", { page: 2, box: WITH_BOX(2, 0, 8) });
+    for (let slot = 0; slot < 8; slot += 1) { lineOf(own, s1, 2, slot); lineOf(own, b, 2, slot); }
+    assert.deepEqual(findings(own).list, []);
+    // f04, the mirror: the nested paragraph ends page 1 and the section's own line opens page 2.
+    const mirror = base();
+    const m0 = record(mirror, "sec:0", { page: 1, tag: "section", fragmentIndex: 0, fragmentCount: 2, box: WITH_BOX(1, 0, 11) });
+    const ma = record(mirror, "a", { page: 1, box: WITH_BOX(1, 0, 11) });
+    for (let slot = 0; slot < 11; slot += 1) { lineOf(mirror, m0, 1, slot); lineOf(mirror, ma, 1, slot); }
+    const m1 = record(mirror, "sec:1", { page: 2, tag: "section", fragmentIndex: 1, fragmentCount: 2, box: WITH_BOX(2, 0, 4) });
+    const mb = record(mirror, "b", { page: 2, box: WITH_BOX(2, 1, 4) });
+    for (let slot = 0; slot < 4; slot += 1) lineOf(mirror, m1, 2, slot);
+    for (let slot = 1; slot < 4; slot += 1) lineOf(mirror, mb, 2, slot);
+    const report = findings(mirror).report;
+    assert.deepEqual(report.findings, []);
+    const row = report.evaluations.find((item) => item.ruleId === "layout/widow" && item.targetRef.nodeKey === "sec:1")!;
+    assert.deepEqual(row.measurements.filter((m) => /opening-fragment-lines$|previous-fragment/u.test(m.name)).map((m) => [m.name, m.value]),
+      [["opening-fragment-lines", 1], ["previous-fragment-closing-lines", 0]]);
+  });
+
+  it("declines a display: contents record whose lines no recorded block holds, instead of judging them by its own value", () => {
+    // f11c: `<body><p style="display: contents; widows: 5">8 lines</p>` split 5+3. The lines are the
+    // body's, whose widows is the initial 2; the paragraph's 5 does not govern them.
+    const snapshot = base();
+    const p0 = record(snapshot, "p:0", { page: 1, fragmentIndex: 0, fragmentCount: 2, box: NO_BOX, display: "contents", effectiveStyle: { widows: 5 } as BlockRecord["effectiveStyle"] });
+    for (let slot = 0; slot < 5; slot += 1) lineOf(snapshot, p0, 1, slot);
+    const p1 = record(snapshot, "p:1", { page: 2, fragmentIndex: 1, fragmentCount: 2, box: NO_BOX, display: "contents", effectiveStyle: { widows: 5 } as BlockRecord["effectiveStyle"] });
+    for (let slot = 0; slot < 3; slot += 1) lineOf(snapshot, p1, 2, slot);
+    const { list, report } = findings(snapshot);
+    assert.deepEqual(list, []);
+    for (const ruleId of ["layout/widow", "layout/orphan"]) {
+      assert.deepEqual([report.coverage[ruleId]?.candidates, report.coverage[ruleId]?.measured], [1, 0], ruleId);
+    }
+    assert.deepEqual(report.notMeasured.map((entry) => [entry.ruleId, entry.reason]).sort(),
+      [["layout/orphan", "env/invalid-measurement"], ["layout/widow", "env/invalid-measurement"]]);
+  });
+
+  it("takes whether a display: contents record's lines are justified from the block container around it", () => {
+    const build = (containerAlign: string, ownAlign: string) => {
+      const snapshot = base();
+      const div = record(snapshot, "div", { page: 1, tag: "div", box: WITH_BOX(1, 0, 1), spaceWidth: 7.22, effectiveStyle: { textAlign: containerAlign, wordSpacing: "normal" } as BlockRecord["effectiveStyle"] });
+      const p = record(snapshot, "p", { page: 1, box: NO_BOX, display: "contents", spaceWidth: 7.22, effectiveStyle: { textAlign: ownAlign, wordSpacing: "normal" } as BlockRecord["effectiveStyle"] });
+      const words = [
+        { text: "cccccc", x: 48, y: y(1, 0), width: 43.36, height: 14 },
+        { text: "dddd", x: 48 + 43.36 + 50.54, y: y(1, 0), width: 28.92, height: 14 },
+      ];
+      for (const owner of [div, p]) lineOf(snapshot, owner, 1, 0, 48, 122.82).wordBoxes = words;
+      return runDocument({ path: "doc.html", snapshot, infrastructure: [] },
+        { failOn: "never", activeRules: [excessiveWordSpacing], optionsByRule: {}, coverageFloors: {} }).report;
+    };
+    // `text-align: left` on the paragraph does not unjustify lines its justified container sets.
+    assert.deepEqual(build("justify", "left").findings.map((finding) => finding.target.nodeKey), ["p"]);
+    // And `justify` on it does not justify lines a left-aligned container sets: not a candidate.
+    const left = build("left", "justify");
+    assert.deepEqual([left.findings.length, left.coverage["type/excessive-word-spacing"]?.candidates ?? 0], [0, 0]);
   });
 
   it("changes nothing for a block without nested blocks: every line of the fragment counts", () => {

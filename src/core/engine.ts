@@ -136,8 +136,8 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
     input.sourceIdentity = { bySid: {}, inventory: { complete: false, omittedCount: snapshot.svg.reduce((n, svg) => n + (svg.textTargetsCapped ? Math.max(1, svg.textTargetCount - svg.texts.length) : 0), 0), reason: "identity/target-enumeration-incomplete" } };
   }
 
-  // The rules read fields the snapshot stamp names (Snapshot 5: `BlockRecord.display` and
-  // `marginCopies`). A snapshot of another stamp has another shape, and a rule reading an absent
+  // The rules read fields the snapshot stamp names (Snapshot 5: `BlockRecord.display`,
+  // `marginCopies`, `float`, `position` and `boundaryHyphen`). A snapshot of another stamp has another shape, and a rule reading an absent
   // field does not fail, it misjudges: an undefined `display` is not "contents", so every box-less
   // block would pass as unrendered. Such a snapshot is refused, not judged.
   const stampMatches = snapshot.schemaVersion === SNAPSHOT_SCHEMA_VERSION;

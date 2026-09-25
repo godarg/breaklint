@@ -555,36 +555,41 @@ cites the number says "a corpus constructed for this purpose"; this paragraph sa
 The decision it supports is reversible by configuration and moves no exit code either way, which is
 why it was taken on that evidence — the same standard would not have been enough for a gating rule.
 
-**Which block a split belongs to is read from line geometry, not from the element tree.** The
+
+
+**Which block a split belongs to is read from line geometry and three recorded facts.** The
 snapshot records a block's lines from every text node beneath it and carries no parent link, so a
 wrapper and the paragraph inside it hold the same line boxes. `layout/widow` and `layout/orphan`
-give a line to the latest record in collection order (pages ascending, document order within a
-page) that records it and has a box of its own, and count only the run of a block's own lines next
-to the break. What that cannot see: the wrapper's own text lying between two nested blocks on one
-line (between two floats) is inside their span and goes to them; a wrapper's own text that ends
-exactly at a break, with a nested block opening the next page — or, for `layout/widow`, that opens a
-page right after a nested block ended the one before — still reads as a split run of its own,
-because telling it from a split needs the wrapper's other fragment, which the rules do not join.
-Measured on the first-party robustness document (`dargel-kleingewerbe`, patched Chromium 141): of
-its three `layout/orphan` and one `layout/widow` findings, all three orphan findings were wrappers whose
-page-5 or page-4 fragment ended on a nested block's line and are gone; the widow, a `<nav>` whose
-own links open page 6 after its title paragraph ended page 5, is this limit and stays; and a `display: contents` element with no boxed block around it keeps its lines and is judged
-by its own value. `type/excessive-word-spacing` asks about the text rather than its container: it
-gives a line to the deepest record that records it, box or not, because that element's font set the
-gaps. The same limit on text between two nested blocks applies there.
+give a line to the latest block container in collection order (pages ascending, document order
+within a page) that records it, and count only the run of a block's own lines next to the break.
+The run ends at an in-flow nested block and passes over a float, a positioned box or an
+inline-level box beside the block's text, which the recorded `display`, `float` and `position` tell
+apart (Snapshot 5); and a run is judged only when the run on the other side of the break, in the
+block's fragment joined by source id, is own text too. Checked against a probe of the same
+documents with plain Paged.js and Range rectangles — 24 layouts, 48 judgements at two thresholds,
+all agreeing on patched Chromium 141 — and pinned in `tests/live/rule-targets.test.ts`. On the
+first-party robustness document (`dargel-kleingewerbe`) three `layout/orphan` findings and one
+`layout/widow` finding were wrappers around nested blocks and are gone. What remains unseen: text
+of the wrapper's own lying between two nested blocks on one line (between two floats) is inside
+their span and is taken for theirs; a split block without a source id is judged on its own side of
+the break only; and a `display: contents` element whose lines no recorded block holds is declined
+(`env/invalid-measurement`), not judged by its own value. `type/excessive-word-spacing` asks about
+the text rather than its container: it gives a line to the deepest record that records it, because
+that element's font set the gaps, and takes whether the line is justified from its block container.
 
-**The natural space is the block's own font's, and only where a canvas can reproduce the font.**
-`type/excessive-word-spacing` divides by the advance of one space in the block's computed font plus
-its `letter-spacing`, measured with a canvas inside the page once `document.fonts` reports the font
-loaded. A block whose font is not loaded yet, or which sets `font-variation-settings`,
-`font-size-adjust` or a `font-stretch` that is not a keyword, is declined as
-`env/invalid-measurement` and counted against coverage. A gap next to an inline element in another
-font is still measured against the block's own space. The agreement with rendered spaces (within
-0.03 px on unjustified last lines) was measured on patched Chromium 141 with the machine's default
-fonts; CI on current Chrome re-takes it in `tests/live/rule-targets.test.ts`.
-
-**A boundary hyphen inside an inline element is not reported.** Paged.js marks the parent of the
-text node it cut, and when the cut word sits inside `<em>`, `<a>` or `<span>` that parent is not a
-recorded block; `layout/hyphen-across-page` reads each block's own classes only. Measured on
-patched Chromium 141, the same split was reported without `<em>` and not with it. Reading it needs a
-snapshot field that is not there yet.
+**The natural space comes from the font, or from the layout where a canvas cannot reproduce the
+font.** `type/excessive-word-spacing` divides by the advance of one space in the block's computed
+font plus its `letter-spacing`, times its effective `zoom`, measured with a canvas inside the page
+once `document.fonts` reports the font loaded. Where a canvas cannot reproduce the font —
+`font-variation-settings` beyond a `wght` that restates the weight, `font-size-adjust`, a
+non-keyword `font-stretch`, synthesised caps other than `small-caps`, a font not yet loaded — the
+median gap on the unjustified last lines of justified blocks set in the same font is used instead.
+A block for which neither exists is declined as `env/invalid-measurement` and counted against
+coverage, so a document in which more than half of the justified blocks are declined ends
+`insufficient-coverage` (exit 4). Gaps set in an inline element in another font or size are still
+measured against the block's own space (a monospace `<span>` in serif read 2.41× on natural spaces);
+an inline element's own `word-spacing` is not judged. Twelve font settings are pinned against their
+unjustified last lines in `tests/live/rule-targets.test.ts` (within 0.03 px on patched Chromium 141
+with the machine's default fonts), and CI re-takes exactly those. No web font (`@font-face`) is
+among them: on the Chromium 141 these changes were developed on, a document loading one does not
+reach a quiescent state, so the pin could not be recorded there.

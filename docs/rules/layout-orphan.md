@@ -24,9 +24,11 @@ exactly as for [`layout/widow`](layout-widow.md). A wrapper records its paragrap
 and a `<section>` whose second paragraph moved whole to the next page used to be reported as an
 orphan for the one line its first fragment held — the intro paragraph's, which the break did not
 split. Measured on patched Chromium 141 with Paged.js 0.4.3 and now pinned by
-`tests/live/rule-targets.test.ts`. A fragment that ends on a nested block's line has no run of its
-own at the break. One case is still counted as before: a wrapper's own text that ends exactly at the
-break, with a nested block opening the next page, reads as a split run of its own.
+`tests/live/rule-targets.test.ts`. The run closing a fragment ends at the last line of an in-flow
+nested block, passing over a float's, positioned box's or inline-block's lines beside it, and it is
+judged only when the fragment after opens with own text: a wrapper's own line that ends the page
+with a paragraph that moved whole after it is complete, not split. A `display: contents` or inline
+element whose lines no recorded block holds is declined as `env/invalid-measurement`.
 
 ## Calibration
 

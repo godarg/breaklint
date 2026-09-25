@@ -1,7 +1,7 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  declined, isNotRendered, layoutOutOfScope, lineOwnership, lineStateOf, makeFinding, notRenderedEvaluation, num,
+  declined, isBlockContainer, isNotRendered, layoutOutOfScope, lineOwnership, lineStateOf, makeFinding, notRenderedEvaluation, num,
   sourceOf, targetEvaluation,
 } from "../shared.ts";
 
@@ -62,9 +62,20 @@ export const excessiveWordSpacing = defineRule(
     // lines too; divided by the wrapper's own natural space they reported its paragraph's gaps a
     // second time, and in the wrapper's font (see `lineOwnership`).
     const ownership = lineOwnership(snapshot, { containers: false });
+    // Whether a line is justified is the block CONTAINER's text-align, not the element's: a
+    // `display: contents` paragraph with `text-align: left` inside a justified `<div>` prints
+    // justified lines, and its gaps are real (L3). The container is the recorded block that holds
+    // the record's lines; without one the record's own value is all there is.
+    const containerOwnership = lineOwnership(snapshot, { containers: true });
+    const byKey = new Map(snapshot.blocks.map((block) => [block.nodeKey, block]));
+    const justifiedBy = (block: (typeof snapshot.blocks)[number]) => {
+      if (isBlockContainer(snapshot, block)) return block;
+      const enclosing = containerOwnership(block).enclosedBy;
+      return (enclosing === null ? undefined : byKey.get(enclosing)) ?? block;
+    };
 
     for (const block of snapshot.blocks) {
-      if (!/justify/u.test(block.effectiveStyle.textAlign)) continue;
+      if (!/justify/u.test(justifiedBy(block).effectiveStyle.textAlign)) continue;
       // An explicit word-spacing is a decision. Reporting it back is reporting the author.
       const ws = block.effectiveStyle.wordSpacing.trim();
       if (ws && ws !== "normal" && ws !== "0px") continue;

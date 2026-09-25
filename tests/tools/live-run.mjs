@@ -31,7 +31,7 @@ const DEFAULT_SPECS = [
   { file: "tests/live/measure.test.ts", suite: "the measurement probe, live", leaves: 8 },
   { file: "tests/live/breaks.test.ts", suite: "the collector, live", leaves: 11 },
   { file: "tests/live/fragmentation-levers.test.ts", suite: "fragmentation levers under Paged.js, live", leaves: 6 },
-  { file: "tests/live/rule-targets.test.ts", suite: "rule targets on wrapped and justified blocks, live", leaves: 5 },
+  { file: "tests/live/rule-targets.test.ts", suite: "rule targets on wrapped and justified blocks, live", leaves: 7 },
   { file: "tests/live/render-run.test.ts", suite: "the M2d live production chain", leaves: 35 },
   { file: "tests/live/cli-out-dir.test.ts", suite: "the CLI evidence directory, live", leaves: 1 },
 ];

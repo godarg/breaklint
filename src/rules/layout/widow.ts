@@ -1,7 +1,7 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  declined, layoutOutOfScope, lineOwnership, makeFinding, num, openingOwnLines, pageByNumber, sourceOf, targetEvaluation,
+  closingOwnLines, declined, fragmentNeighbours, isBlockContainer, layoutOutOfScope, lineOwnership, makeFinding, num, openingOwnLines, pageByNumber, sourceOf, targetEvaluation,
 } from "../shared.ts";
 
 /**
@@ -43,7 +43,7 @@ export const widow = defineRule(
     unit: "lines",
     defaultOptions: { extraLines: 0 },
     summary: "The first fragment of a block on a page has fewer lines than its own widows value.",
-    declines: ["env/multicolumn", "env/vertical-writing", "env/forced-break"],
+    declines: ["env/multicolumn", "env/vertical-writing", "env/forced-break", "env/invalid-measurement"],
     remediation: {
       advice:
         "A block fragments across a page break and the fragment OPENING the next page carries fewer lines than the block's own 'widows' value (plus any configured extra lines) asks for. Chromium applies a paragraph's 'widows' and 'orphans' when Paged.js splits it; when the paragraph has too few lines at the break to satisfy both, the browser keeps 'orphans' and relaxes 'widows', as CSS Fragmentation Level 3 permits, so this rule is only a warning. Changing the block's 'widows' moves the threshold with it and is not a fix. For paragraphs, keep the block together with 'break-inside: avoid', force an earlier break with 'break-before: page', or reword/re-space the text. If this occurs inside a table row, keep the row together with 'tr { break-inside: avoid; }'.",
@@ -60,6 +60,7 @@ export const widow = defineRule(
     let measured = 0;
     // Block containers: `widows` and `orphans` govern a container's line boxes.
     const ownership = lineOwnership(snapshot, { containers: true });
+    const neighbours = fragmentNeighbours(snapshot);
 
     for (const block of snapshot.blocks) {
       // Only continuation fragments can carry a widow: the first fragment of a block has no
@@ -81,6 +82,17 @@ export const widow = defineRule(
         evaluations.push(targetEvaluation({ ruleId: "layout/widow", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: "env/forced-break" }));
         continue;
       }
+      const owned = ownership(block);
+      // A `display: contents` or inline record is no block container (`isBlockContainer`, which
+      // agrees with `renderingOf`). Where a recorded block around it holds its lines, that block
+      // is judged and this record owns none. Where none does, its lines belong to a container the
+      // snapshot does not record, and judging them by this element's own value would judge the
+      // wrong container: declined.
+      if (!isBlockContainer(snapshot, block) && owned.lines.some((entry) => entry.owned)) {
+        notMeasured.push(declined({ scope: "block", ruleId: "layout/widow", reason: "env/invalid-measurement" }));
+        evaluations.push(targetEvaluation({ ruleId: "layout/widow", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: "env/invalid-measurement" }));
+        continue;
+      }
       measured += 1;
 
       // The lines of this block's own container that the break split — the run that opens the
@@ -88,19 +100,26 @@ export const widow = defineRule(
       // its paragraphs' lines reported a split the author had asked for (see `lineOwnership`). A
       // nested block is a candidate of its own. For a block without nested blocks this is every
       // line of the fragment, as before.
-      const owned = ownership(block);
       const lines = openingOwnLines(owned);
       const delegated = owned.delegated;
+      // And only a run the break SPLIT: the own run must continue on the other side. When
+      // the fragment before it ends with a nested block's line, this run is complete — a wrapper's own
+      // line followed by a paragraph that moved whole was reported as a split it never was.
+      // Unjoinable fragments (no source id) keep the one-sided count, and the measurement says so.
+      const side = neighbours(block);
+      const otherSide = side.previous ? closingOwnLines(ownership(side.previous)) : null;
+      const applicable = lines > 0 && (otherSide === null || otherSide > 0);
       const required = block.effectiveStyle.widows + num(ctx.options.extraLines, 0);
-      const violated = lines > 0 && lines < required && required > 1;
+      const violated = applicable && lines < required && required > 1;
       evaluations.push(targetEvaluation({
         ruleId: "layout/widow", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
         fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured",
         measurements: [
-          { name: "widow-applicable-opening-lines", value: lines > 0, unit: null, operator: "=", threshold: true },
+          { name: "widow-applicable-opening-lines", value: applicable, unit: null, operator: "=", threshold: true },
           { name: "opening-fragment-lines", value: lines, unit: "lines", operator: "<", threshold: required },
           { name: "widows-requirement-exceeds-one", value: required, unit: "lines", operator: ">", threshold: 1 },
           { name: "opening-fragment-lines-of-nested-blocks", value: delegated, unit: "lines", operator: null, threshold: null },
+          { name: "previous-fragment-closing-lines", value: otherSide, unit: "lines", operator: null, threshold: null },
         ],
         connective: "all",
         violated,
@@ -109,7 +128,7 @@ export const widow = defineRule(
       // cross-check: without this the rule reports "0 lines" on a fragment carrying only a
       // figure or an image — a false alarm on every document that splits around a picture. A
       // fragment that meets the break with a nested block's line has no run of its own there.
-      if (lines === 0) continue;
+      if (!applicable) continue;
       // The element's own widows value, plus an offset a stricter house style may add. The
       // offset also makes the threshold injectable, which is what lets the mutation guard move
       // it — a threshold buried in a comparison cannot be mutated, and a mutant that changes

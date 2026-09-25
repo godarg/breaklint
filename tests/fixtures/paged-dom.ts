@@ -271,7 +271,9 @@ export function fakePrimitives(document: FakeNode, hooks: {
       if (!parent || !displayedChain(parent)) return [];
       const box = boxOf(parent);
       if (box.width <= 0 || box.height <= 0) return [];
-      if (typeof start === "number" && typeof end === "number") return [rect(box.x, box.y, 4 * (end - start), box.height)];
+      // A sub-range is 4 px per character from the start of the text, on the one line: so the words
+      // of a text node lie 4 px apart per space between them, which is its "rendered" space.
+      if (typeof start === "number" && typeof end === "number") return [rect(box.x + 4 * start, box.y, 4 * (end - start), box.height)];
       return [box];
     },
     painted: () => true,
