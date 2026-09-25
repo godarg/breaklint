@@ -329,6 +329,38 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   each boundary checked against the paginator's own `shouldBreak()` answers, a production-chain
   case in `tests/live/named-page-regions.test.ts` and recorded page and source trees in
   `tests/unit/named-page-regions.test.ts`.
+- **A report written to a pipe arrives whole.** Through 0.6.0 the CLI exited as soon as it had
+  handed the report to stdout, which discarded everything the pipe had not taken yet: behind
+  `| cat`, `| jq` or a slow uploader a report larger than the pipe buffer arrived cut at a
+  multiple of the pipe buffer, usually 65 536 bytes, on Linux — in all six formats, on Node 22 and
+  24, from the source and from the built entry — while the exit code still stated the verdict, so
+  the loss was silent. The demo's own
+  JSON report (82 585 bytes) was already over that size. The CLI now exits only after every write
+  has been accepted. `--out` and a `> file` redirect were never affected.
+- **Output that cannot be delivered is exit 3, not a verdict.** When stdout cannot be written
+  completely — the reader closed early (`| head`), or the device is full — the run now ends with
+  exit 3 and one `breaklint: could not write to stdout (…)` line on stderr, whatever its verdict.
+  That covers every output written to stdout, `--help` and `--version` included. Before, a reader
+  that closed early left the run at exit 1 with no message, a verdict about a report nobody
+  received. With `--out` the report is in the file, complete, before stdout is touched, and stdout
+  carries only a confirmation line: if that line cannot be written, the run keeps its verdict's
+  exit code and says so on stderr (`could not write the confirmation line to stdout (…); the
+  report file was written in full`). The exit-code table in the README and in `--help` names both
+  cases. A
+  process-boundary test, `tests/e2e/cli-pipe-integrity.test.ts`, drives the real source entry and
+  a freshly built `dist/` entry (through a bin symlink) with a report of at least 256 KiB in every
+  format, through a kernel pipe into `cat`, a kernel pipe into a slow reader and a Node pipe, and
+  compares the bytes with the `--out` file; it fails on the previous entry point.
+- **A run that stops without an answer ends with exit 3, not 0.** If the work the CLI waits on
+  can no longer settle — a driver whose browser went away, a handle closed underneath it — the
+  event loop empties, and Node then ended the process with exit 0 and no output, which a gate
+  reads as a clean document. This was seen once, on a run under heavy load. The CLI now notices
+  the empty loop while it is still waiting and ends with exit 3 and one line:
+  `breaklint: the run stopped before it finished: nothing was left for it to wait on, so no report exists; exit 3.`
+  Its default exit code is also 3, so no other route past the explicit exit can end at 0.
+  `tests/e2e/cli-unsettled-run.test.ts` runs the real CLI source on the live path. Node's
+  module-customisation hooks replace only the acquisition module with one whose promise never
+  settles; that is harness, not a product option. It ended exit 0 before this change.
 
 ### Documentation
 
