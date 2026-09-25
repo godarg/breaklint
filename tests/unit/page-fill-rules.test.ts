@@ -208,25 +208,72 @@ describe("page-fill rules", () => {
     assert.deepEqual(run(badge).findings, []);
   });
 
-  it("counts an inline image on the first line as part of that line", () => {
-    // Measured live (Chromium 141, Paged.js 0.4.3) on a paragraph at 12pt/3 whose line at the top of
-    // page 3 carries an 80 px inline image — canvas, <img> and SVG alike: the page's first fill
-    // band is the image's top, the line's glyph box starts 66 px below it and is 17 px tall, and
-    // the line height is 48 px. The line did not fit on page 2, which is full.
+  // Page 3 of the long paragraph, rebuilt from live records (Chromium 141, Paged.js 0.4.3): the
+  // content box's top is 48; the page's first fill band is at the top; the paragraph's glyph boxes
+  // start `glyphTop` below it, one line height apart; `svgs` are the SVG records laid out on page 3
+  // (x, y relative to the content box).
+  const nextPageShape = (lineHeight: number, glyphTop: number, glyphHeight: number, svgs: { x: number; y: number; width: number; height: number }[]) => {
     const snapshot = corpusSnapshot("orphaned-continuation-clean-full-middle-page");
     const long2 = snapshot.blocks.find((b) => b.nodeKey === "long:2")!;
-    long2.lineHeight = 48;
+    long2.lineHeight = lineHeight;
     snapshot.pages[2]!.fill.topGap = 0;
     snapshot.textLines = snapshot.textLines.filter((l) => l.blockKey !== "long:2");
-    for (let k = 0; k < 12; k++) snapshot.textLines.push(textLine("long:2", 36 + k, { x: 48, y: 48 + 66 + k * 48, width: 399, height: 17 }));
-    assert.deepEqual(run(snapshot).findings, [], "a full page was judged because the next line carried an image");
+    for (let k = 0; k < 10; k++) {
+      snapshot.textLines.push(textLine("long:2", 36 + k, { x: 48, y: 48 + glyphTop + k * lineHeight, width: 399, height: glyphHeight }));
+    }
+    const template = corpusSnapshot("svg-overflow-trigger").svg[0]!;
+    snapshot.svg = svgs.map((box, i) => ({ ...structuredClone(template), nodeKey: `svg:${i}`, page: 3, viewportScreen: { ...box, x: 48 + box.x, y: 48 + box.y } }));
+    return snapshot;
+  };
+  const pagesOf = (snapshot: Snapshot) => run(snapshot).findings.map((f) => f.page);
 
-    // Two line heights is the bound: a glyph box ending just past it is text below something else.
-    const below = structuredClone(snapshot);
-    const first = below.textLines.find((l) => l.blockKey === "long:2")!;
-    first.box = { ...first.box, y: 48 + 2 * 48 - 17 + 1 };
-    for (const l of below.textLines.filter((l) => l.blockKey === "long:2" && l !== first)) l.box = { ...l.box, y: l.box.y + 200 };
-    assert.deepEqual(run(below).findings.map((f) => f.page), [2]);
+  it("counts an inline SVG on the next page's first line as part of that line", () => {
+    // q2 / vf10: an inline SVG on the first line's baseline (70 px; 100 px) under 48 px lines, the
+    // glyph box starting 56 px (86 px) down. The line did not fit on page 2, which is full.
+    assert.deepEqual(pagesOf(nextPageShape(48, 56, 17, [{ x: 0, y: 0, width: 60, height: 70 }])), []);
+    assert.deepEqual(pagesOf(nextPageShape(48, 86, 17, [{ x: 0, y: 0, width: 40, height: 100 }])), [], "a 100 px inline SVG made its full page a tail");
+  });
+
+  // Text that resumes BELOW a block-level SVG shares no line with it, so the one-line window
+  // holds and the page before — measured two thirds empty or more — is judged.
+  it("keeps one line height below a block-level SVG (vf1a: 60 px icon, glyph at 75 px)", () => {
+    assert.deepEqual(pagesOf(nextPageShape(48, 75, 17, [{ x: 0, y: 0, width: 40, height: 60 }])), [2]);
+  });
+
+  it("keeps one line height below a block-level SVG (vf3: 22 px lines, 24 px icon, glyph at 27 px)", () => {
+    assert.deepEqual(pagesOf(nextPageShape(22, 27, 16, [{ x: 0, y: 0, width: 40, height: 24 }])), [2]);
+  });
+
+  it("keeps one line height below a block-level SVG (vf7: 64 px wrapper lines, 80 px icon, glyph at 81 px)", () => {
+    // One pixel below the icon, so no shared line. The window uses the recorded block's line
+    // height — the wrapper's — not the line's own: the snapshot carries no other.
+    assert.deepEqual(pagesOf(nextPageShape(64, 81, 17, [{ x: 0, y: 0, width: 40, height: 80 }])), [2]);
+  });
+
+  it("gives the extra room only to an SVG across the first line on the next page itself", () => {
+    // Beside the line's block, not across it — a side-margin element — shares no line.
+    assert.deepEqual(pagesOf(nextPageShape(48, 66, 17, [{ x: -44, y: 0, width: 40, height: 80 }])), [2], "side SVG");
+    // An inline SVG on a LATER line does not make the first one open the page.
+    assert.deepEqual(pagesOf(nextPageShape(48, 66, 17, [{ x: 0, y: 100, width: 40, height: 30 }])), [2], "SVG on the second line");
+    // An SVG recorded on another page is not on this line (the fixture's pages share coordinates).
+    const elsewhere = nextPageShape(48, 56, 17, [{ x: 0, y: 0, width: 60, height: 70 }]);
+    elsewhere.svg[0]!.page = 2;
+    assert.deepEqual(pagesOf(elsewhere), [2], "SVG on another page");
+  });
+
+  it("reports the page before an inline img or canvas line: only SVGs are recorded with a box", () => {
+    // q2f / q2e: an 80 px inline <img> or <canvas> on the first line, glyph box at 66 px under
+    // 48 px lines. The snapshot records a box for SVGs only, so the one-line window applies and
+    // the full page before it IS reported: the round-3 false alarm, kept deliberately — it errs
+    // toward reporting, and a snapshot field for replaced boxes is the follow-up.
+    assert.deepEqual(pagesOf(nextPageShape(48, 66, 17, [])), [2]);
+  });
+
+  it("keeps the one-line window strict", () => {
+    // A glyph box starting exactly one line height below the top does not open the page; half a
+    // pixel less does.
+    assert.deepEqual(pagesOf(nextPageShape(48, 48, 17, [])), [2]);
+    assert.deepEqual(pagesOf(nextPageShape(48, 47.5, 17, [])), []);
   });
 
   it("lets only a block that STARTS on the next page own a continuation's line", () => {
@@ -252,6 +299,10 @@ describe("page-fill rules", () => {
     const snapshot = corpusSnapshot("orphaned-continuation-trigger-carried-child");
     snapshot.textLines.push(textLine("section:2", 0, { x: 60, y: 39.5, width: 300, height: 16 }));
     assert.deepEqual(run(snapshot).findings.map((f) => f.page), [2]);
+    // Two pixels outside is outside: the line is the section's own, and it runs on.
+    const outside = corpusSnapshot("orphaned-continuation-trigger-carried-child");
+    outside.textLines.push(textLine("section:2", 0, { x: 60, y: 38, width: 300, height: 16 }));
+    assert.deepEqual(run(outside).findings, [], "a line 2 px outside the figure was taken as its own");
   });
 
   it("reads document order to decide which block owns a line", () => {

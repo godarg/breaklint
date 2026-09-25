@@ -28,18 +28,25 @@ function centreInside(line: Box, block: Box): boolean {
 }
 
 /**
- * Whether a text line opens the page whose content starts at `top`: the space from `top` to the
- * foot of its glyph box is less than two of its block's line heights — one for the line itself,
- * one for what sits on it. A plain line's glyph box ends half a leading above its line box's foot,
- * well inside the first. A line that also carries an inline image, SVG or canvas on its baseline is
- * taller than one line height, and the fill band that marks the page's top is that element's, not
- * the glyphs': measured with 64-80 px images, SVGs and canvases under 48 px lines, the glyph box
- * ended 67-83 px below it.
- * Text that resumes below a block of its own — an image or an SVG two lines tall or more — does
- * not open the page.
+ * Whether a text line opens the page whose content starts at `top`, given the SVGs laid out on
+ * that page. A line opens the page when its glyph box starts within one of its block's line
+ * heights of `top` (strictly). When an SVG shares the line — it overlaps the glyph box vertically,
+ * so its bottom lies below the glyph top, and it lies across the line's block horizontally, not
+ * beside it — and that SVG starts within one line height of `top`, the line is as tall as the SVG
+ * makes it and opens the page with it: the window then reaches one line height past the SVG's
+ * bottom, which the vertical overlap already implies. Measured under 48 px lines: 70-100 px inline
+ * SVGs on the baseline, glyph boxes starting 56-86 px down. Text that resumes BELOW a block-level
+ * SVG or image shares no line with it and keeps the one-line window. Only SVGs are recorded with a
+ * box: an inline img, canvas or video on the line is not, so such a line keeps the one-line window
+ * and the full page before it is reported. The window uses the line height of the recorded block
+ * the line belongs to, not the line's own.
  */
-function opensPage(glyph: Box, top: number, lineHeight: number): boolean {
-  return glyph.y + glyph.height < top + 2 * lineHeight;
+function opensPage(glyph: Box, top: number, lineHeight: number, svgs: readonly Box[], block: Box): boolean {
+  if (glyph.y < top + lineHeight) return true;
+  return svgs.some((svg) =>
+    svg.y < glyph.y + glyph.height && svg.y + svg.height > glyph.y &&
+    svg.x < block.x + block.width && svg.x + svg.width > block.x &&
+    svg.y < top + lineHeight);
 }
 
 /**
@@ -63,12 +70,13 @@ function nextPageOpensWithRunningText(
   const fresh = blocks.filter((b) => b.fragmentIndex === 0);
   const firstBand = next.contentBox.y + next.fill.topGap * next.contentBox.height;
   const top = Math.min(firstBand, ...fresh.map((b) => b.box.y));
+  const svgs = snapshot.svg.filter((svg) => svg.page === next.pageNumber).map((svg) => svg.viewportScreen);
   return blocks.some((continuing, at) => {
     if (continuing.fragmentIndex === 0) return false;
     const ownedByLater = blocks.slice(at + 1).filter((b) => b.fragmentIndex === 0);
     return (linesByBlock.get(continuing.nodeKey) ?? []).some((line) =>
       !ownedByLater.some((b) => centreInside(line.box, b.box)) &&
-      opensPage(line.box, top, continuing.lineHeight));
+      opensPage(line.box, top, continuing.lineHeight, svgs, continuing.box));
   });
 }
 
@@ -91,10 +99,10 @@ function nextPageOpensWithRunningText(
  *
  * So a page is judged only when what it carries ENDS on it (`ends-on-page`): the next page does
  * not open with text running on from it. "Running on" is a text line of a block that continues
- * onto the next page, whose glyph box ends less than two of that block's line heights below the
- * top of the next page's content (room for the line and for an inline image on it), and that does
- * not lie inside a block that starts there and follows it in document order (a wrapper's lines
- * include its children's). Everything else ends the page: a block that starts
+ * onto the next page, whose glyph box starts within one of that block's line heights of the top
+ * of the next page's content — or, when an inline SVG shares the line, within one line height of
+ * that SVG's bottom — and that does not lie inside a block that starts there and follows it in
+ * document order (a wrapper's lines include its children's). Everything else ends the page: a block that starts
  * on the next page and opens it (a wrapper — `<section>`, `<article>` — whose next child was
  * carried over), an image or SVG that did not fit, a forced break, the end of the document. The
  * decision needs no threshold, and it reads no box of the wrapper, so a border kept at the split
