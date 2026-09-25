@@ -1,0 +1,65 @@
+<!doctype html>
+<!--
+  A running title inside a section that spans several pages.
+
+  COMPLICATION. The section is the first source block and the running title its first child.
+  Paged.js clones the title into the margin box of every page, ahead of the content area in the
+  page box, so a whole-page read meets the title clone before the section fragment that contains
+  its in-flow original. The source-id order then disagrees with the source on page 1, and the
+  post-pagination integrity check ended the run `checker-crashed` (exit 3). The section also
+  spans every page, so each page's first block in document order is a continuation of it: the
+  page anchor must be the first block that STARTS on the page, or every page finding shares the
+  section's fingerprint.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 150mm 120mm; margin: 15mm; }
+@page { @top-center { content: element(title); } }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p, h1 { margin: 0; }
+h1 { font-size: 14pt; margin: 0 0 6px; }
+.title { position: running(title); }
+</style></head><body>
+<section id="chapter">
+<p class="title" id="running-title">Running title on every page</p>
+<p id="c01">Body paragraph 01, one short line.</p>
+<p id="c02">Body paragraph 02, one short line.</p>
+<p id="c03">Body paragraph 03, one short line.</p>
+<p id="c04">Body paragraph 04, one short line.</p>
+<p id="c05">Body paragraph 05, one short line.</p>
+<p id="c06">Body paragraph 06, one short line.</p>
+<p id="c07">Body paragraph 07, one short line.</p>
+<p id="c08">Body paragraph 08, one short line.</p>
+<p id="c09">Body paragraph 09, one short line.</p>
+<p id="c10">Body paragraph 10, one short line.</p>
+<p id="c11">Body paragraph 11, one short line.</p>
+<p id="c12">Body paragraph 12, one short line.</p>
+<p id="c13">Body paragraph 13, one short line.</p>
+<p id="c14">Body paragraph 14, one short line.</p>
+<p id="c15">Body paragraph 15, one short line.</p>
+<p id="c16">Body paragraph 16, one short line.</p>
+<p id="c17">Body paragraph 17, one short line.</p>
+<p id="c18">Body paragraph 18, one short line.</p>
+<p id="c19">Body paragraph 19, one short line.</p>
+<p id="c20">Body paragraph 20, one short line.</p>
+<p id="c21">Body paragraph 21, one short line.</p>
+<p id="c22">Body paragraph 22, one short line.</p>
+<p id="c23">Body paragraph 23, one short line.</p>
+<p id="c24">Body paragraph 24, one short line.</p>
+<p id="c25">Body paragraph 25, one short line.</p>
+<p id="c26">Body paragraph 26, one short line.</p>
+<p id="c27">Body paragraph 27, one short line.</p>
+<p id="c28">Body paragraph 28, one short line.</p>
+<p id="c29">Body paragraph 29, one short line.</p>
+<p id="c30">Body paragraph 30, one short line.</p>
+<p id="c31">Body paragraph 31, one short line.</p>
+<p id="c32">Body paragraph 32, one short line.</p>
+<p id="c33">Body paragraph 33, one short line.</p>
+<p id="c34">Body paragraph 34, one short line.</p>
+<p id="c35">Body paragraph 35, one short line.</p>
+<p id="c36">Body paragraph 36, one short line.</p>
+<p id="c37">Body paragraph 37, one short line.</p>
+<p id="c38">Body paragraph 38, one short line.</p>
+<p id="c39">Body paragraph 39, one short line.</p>
+<p id="c40">Body paragraph 40, one short line.</p>
+</section>
+</body></html>

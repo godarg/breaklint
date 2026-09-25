@@ -24,10 +24,11 @@ import {
   launchBrowser, ownServerLifecycle, resolveBrowser, resolvePackageRoot, type BrowserLike, type PageLike,
 } from "../../src/acquire/browser.ts";
 import {
-  cleanupBrowserProfile, closeBrowserBounded, integritySource, integrityStatusSource,
-  paginationApparatusSource, PAGINATION_PREVIEW_SOURCE, withPagination,
+  cleanupBrowserProfile, closeBrowserBounded, integritySource, integrityStatusSource, orderedSourceSids,
+  paginationApparatusSource, PAGINATION_PREVIEW_SOURCE, validateRuntimeSidState, withPagination,
   type RuntimeIntegrityStatus,
 } from "../../src/acquire/render-run.ts";
+import { SNAPSHOT_SOURCE, type RawSnapshot } from "../../src/measure/snapshot.ts";
 import { PRIMITIVES_SOURCE, TEST_PRIMITIVES_CAPABILITY } from "../../src/measure/primitives.ts";
 import { assignPageCauses, classifyBoundary } from "../../src/paginate/breaks.ts";
 import { boundaryFactsFrom, collectorSource, silentHooks, type CollectorResult } from "../../src/paginate/collector.ts";
@@ -85,6 +86,82 @@ ${Array.from({ length: 7 }, (_, i) => `<p id="r${i}">R${i} paragraph inside a NA
 </body></html>`;
 
 /**
+ * The same parity mechanism with a running header, which Paged.js clones into the margin box of
+ * EVERY page — the blank verso page included — keeping the header's source id.
+ *
+ * The collector used to read source nodes from the whole page, so on this document the clone made
+ * the blank page look occupied and both of its boundaries lost `parity`. It also became the first
+ * source-bearing node of every page, because the margin boxes precede the content area in the
+ * page box. The header is the first element of the source on purpose: its in-flow original, which
+ * Paged.js hides with `display: none`, then sits on page 1 and is a real edge of the flow there.
+ */
+const RUNNING_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@page{size:120mm 80mm;margin:10mm}
+@page{ @top-center{ content: element(title) } }
+body{font:9pt/1.4 Georgia,serif;margin:0} p,h2{margin:0 0 6px} h2{font-size:11pt}
+.title{ position: running(title) }
+.recto{ break-before: recto }
+</style></head><body>
+<p class="title" id="rtitle">Running title on every page</p>
+<p id="rc1">Chapter one, the only paragraph on the first page.</p>
+<h2 class="recto" id="rch2">Chapter two opens on a recto page</h2>
+<p id="rc2">Chapter two text.</p>
+</body></html>`;
+
+/**
+ * A block footnote (`float: footnote`). Paged.js moves it out of the page content into the
+ * footnote area of the same page: inside the page area, after the page's content in document
+ * order. It stays part of the flow for measurement, and its new position is out of source order,
+ * which the source-id integrity check must accept.
+ */
+const FOOTNOTE_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@page{size:120mm 80mm;margin:10mm}
+body{font:9pt/1.4 Georgia,serif;margin:0} p{margin:0 0 6px}
+.fn{ float: footnote }
+</style></head><body>
+<p id="fp1">A paragraph whose footnote follows it in the source.</p>
+<aside class="fn" id="fnote">A block footnote, moved into the footnote area.</aside>
+<p id="fp2">A paragraph after the footnote in the source, before it on the page.</p>
+</body></html>`;
+
+/**
+ * A `position: fixed` stamp with a nested source block, on a document with a parity-blank page.
+ * Paged.js removes the element from the flow and inserts a clone at the head of EVERY page box,
+ * the blank page's included: the signature the source-id check accepts for a page-box id.
+ */
+const FIXED_BODY = Array.from({ length: 5 }, (_, i) => `<p id="fx${i}">Fixed-stamp document, paragraph ${i}, one line.</p>`).join("\n");
+const FIXED_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@page{size:120mm 80mm;margin:10mm}
+body{font:9pt/1.4 Georgia,serif;margin:0} p,h2{margin:0 0 6px}
+.stamp{ position: fixed; top: 2mm; right: 2mm; font-size: 7pt }
+.recto{ break-before: recto }
+</style></head><body>
+<div class="stamp" id="stamp"><p id="stamp-text">DRAFT</p></div>
+${FIXED_BODY}
+<h2 class="recto" id="fxh">After the blank page</h2>
+<p id="fxlast">The last paragraph.</p>
+</body></html>`;
+
+/**
+ * The negative control, reproduced from the round-2 verification: a script that moves an in-flow
+ * paragraph into the page box once Paged.js has laid it out. It is then outside every measurement;
+ * the source-id check must refuse it.
+ */
+const PAGEBOX_MOVE_HTML = FIXED_HTML.replace("</body>", `<script>
+(() => {
+  let done = false;
+  new MutationObserver(() => {
+    if (done) return;
+    const el = document.querySelector(".pagedjs_page_content #fx3");
+    if (!el) return;
+    done = true;
+    el.closest(".pagedjs_page").querySelector(".pagedjs_pagebox").appendChild(el);
+  }).observe(document.documentElement, { subtree: true, childList: true });
+})();
+</script>
+</body>`);
+
+/**
  * The pagination bootstrap breaklint owns: `paged.js`, never the auto-previewing polyfill.
  *
  * The replacement is a FUNCTION, and that is not style. `String.replace` interprets `$&`, `` $` ``,
@@ -101,7 +178,17 @@ describe("the collector, live", () => {
   let serverLifecycle: ReturnType<typeof ownServerLifecycle> | null = null;
   let origin = "";
   let served = "";
+  let servedRunning = "";
+  let servedFootnote = "";
+  let footnoteExpectedSids: string[] = [];
+  let servedFixed = "";
+  let servedPageboxMove = "";
+  let fixedExpectedSids: string[] = [];
+  let pageboxMoveExpectedSids: string[] = [];
+  const fixedSidByAuthorId: Record<string, string> = {};
   let sidByAuthorId: Record<string, string> = {};
+  const runningSidByAuthorId: Record<string, string> = {};
+  const footnoteSidByAuthorId: Record<string, string> = {};
 
   before(async () => {
     if (missing.length > 0) {
@@ -124,10 +211,41 @@ describe("the collector, live", () => {
     }
     const pagedjs = readFileSync(join(pagedjsRoot!, "dist", "paged.js"), "utf8");
     served = withPagination(injected.html, pagedjs, true);
+    assert.equal(detectCollision([{ origin: "document", text: RUNNING_HTML }]).collided, false);
+    const running = injectSourceIds(RUNNING_HTML, "running.html");
+    for (const [sid, ref] of Object.entries(running.map)) {
+      const id = /\bid="([^"]+)"/u.exec(RUNNING_HTML.slice(ref.offset, ref.offset + 200))?.[1];
+      if (id) runningSidByAuthorId[id] = sid;
+    }
+    servedRunning = withPagination(running.html, pagedjs, true);
+    const footnote = injectSourceIds(FOOTNOTE_HTML, "footnote.html");
+    for (const [sid, ref] of Object.entries(footnote.map)) {
+      const id = /\bid="([^"]+)"/u.exec(FOOTNOTE_HTML.slice(ref.offset, ref.offset + 200))?.[1];
+      if (id) footnoteSidByAuthorId[id] = sid;
+    }
+    footnoteExpectedSids = orderedSourceSids(footnote.map);
+    servedFootnote = withPagination(footnote.html, pagedjs, true);
+    for (const html of [FIXED_HTML, PAGEBOX_MOVE_HTML]) {
+      assert.equal(detectCollision([{ origin: "document", text: html }]).collided, false);
+    }
+    const fixed = injectSourceIds(FIXED_HTML, "fixed.html");
+    for (const [sid, ref] of Object.entries(fixed.map)) {
+      const id = /\bid="([^"]+)"/u.exec(FIXED_HTML.slice(ref.offset, ref.offset + 200))?.[1];
+      if (id) fixedSidByAuthorId[id] = sid;
+    }
+    fixedExpectedSids = orderedSourceSids(fixed.map);
+    servedFixed = withPagination(fixed.html, pagedjs, true);
+    const moved = injectSourceIds(PAGEBOX_MOVE_HTML, "pagebox-move.html");
+    pageboxMoveExpectedSids = orderedSourceSids(moved.map);
+    servedPageboxMove = withPagination(moved.html, pagedjs, true);
 
-    server = createServer((_req, res) => {
+    server = createServer((req, res) => {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(served);
+      const routes: Record<string, string> = {
+        "/running.html": servedRunning, "/footnote.html": servedFootnote, "/fixed.html": servedFixed,
+        "/pagebox-move.html": servedPageboxMove,
+      };
+      res.end(routes[req.url ?? ""] ?? served);
     });
     serverLifecycle = ownServerLifecycle(server);
     await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", () => resolve()));
@@ -156,7 +274,7 @@ describe("the collector, live", () => {
     assert.equal(browserProfile ? existsSync(browserProfile) : false, false);
   });
 
-  async function collect(): Promise<{ page: PageLike; result: CollectorResult }> {
+  async function collect(path = "/doc.html"): Promise<{ page: PageLike; result: CollectorResult }> {
     const collectorNonce = "breaks-live-collector";
     const page = await browser!.newPage();
     await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(
@@ -167,7 +285,7 @@ describe("the collector, live", () => {
     );
     await page.setViewport({ width: 900, height: 700 });
     await page.emulateMediaType("print");
-    await page.goto(`${origin}/doc.html`, { waitUntil: "load", timeout: 30_000 });
+    await page.goto(`${origin}${path}`, { waitUntil: "load", timeout: 30_000 });
     await page.evaluate<void>(collectorSource(TEST_PRIMITIVES_CAPABILITY, collectorNonce));
     await page.evaluate<void>(paginationApparatusSource(TEST_PRIMITIVES_CAPABILITY));
     const pagination = await page.evaluate<{ paginationError: string | null }>(PAGINATION_PREVIEW_SOURCE);
@@ -319,6 +437,106 @@ describe("the collector, live", () => {
     assert.equal(causes[blankIndex]!.outgoing.kind, "parity", "the boundary OUT of the blank page");
     assert.equal(causes[blankIndex]!.outgoing.determinedBy, "page-blank");
     await page.close();
+  });
+
+  /**
+   * The recto blank page again, now under a running header. The premise is checked against the
+   * paginated tree itself before the collector is judged: the header must really be cloned into a
+   * margin box of every page, or a collector that still counted clones would pass by accident.
+   */
+  it("a running header cloned into every margin box does not occupy the recto blank page", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    for (const id of ["rtitle", "rc1", "rch2", "rc2"]) {
+      assert.ok(runningSidByAuthorId[id], `no source id was mapped for #${id}; the assertions below would be vacuous`);
+    }
+    const { page, result } = await collect("/running.html");
+    const title = runningSidByAuthorId["rtitle"]!;
+    const clones = await page.evaluate<number[]>(`[...document.querySelectorAll(".pagedjs_page")].map((pageEl) =>
+      pageEl.querySelectorAll(".pagedjs_margin [data-bl-sid='${title}']").length)`);
+    assert.equal(result.pages.length, 3, "chapter one, the inserted verso page, chapter two");
+    assert.deepEqual(clones, [1, 1, 1], "premise: Paged.js cloned the header into a margin box of every page");
+
+    assert.deepEqual(result.pages.map((p) => p.blank), [false, true, false], "a margin-box clone made the blank page look occupied");
+    assert.deepEqual(result.pages.map((p) => p.firstSid), [title, null, runningSidByAuthorId["rch2"]],
+      "a margin-box clone became the first node of a page");
+    assert.deepEqual(result.pages.map((p) => p.lastSid), [runningSidByAuthorId["rc1"], null, runningSidByAuthorId["rc2"]]);
+    const causes = assignPageCauses(result.pages.length, boundaryFactsFrom(result.pages), result.pages.map((p) => p.blank));
+    assert.equal(causes[1]!.incoming.kind, "parity", "the boundary INTO the blank page");
+    assert.equal(causes[1]!.outgoing.kind, "parity", "the boundary OUT of the blank page");
+    assert.equal(causes[1]!.outgoing.determinedBy, "page-blank");
+    assert.deepEqual(result.attributeDrift, []);
+    await page.close();
+  });
+
+  /**
+   * The footnote area is part of the page area, so a block footnote stays in the flow: in the
+   * snapshot and in the collector's page edges. Paged.js places it after the page content, out
+   * of source order, and the source-id check reads the order of the page content only. This is
+   * the real-paginator observation of what `tests/unit/margin-boxes.test.ts` checks on a
+   * hand-built tree. (The production chain does not get this far with a footnote: Paged.js gives
+   * the footnote call a per-run random `href`, which the paired control reads as a changed
+   * resource and refuses — see docs/limitations.md.)
+   */
+  it("keeps a block footnote in the flow and accepts its out-of-source-order position", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    for (const id of ["fp1", "fnote", "fp2"]) assert.ok(footnoteSidByAuthorId[id], `no source id was mapped for #${id}`);
+    const { page, result } = await collect("/footnote.html");
+    const note = footnoteSidByAuthorId["fnote"]!;
+    const placement = await page.evaluate<{ inFootnoteArea: boolean; pages: number }>(`(() => ({
+      inFootnoteArea: !!document.querySelector(".pagedjs_footnote_area [data-bl-sid='${note}']"),
+      pages: document.querySelectorAll(".pagedjs_page").length }))()`);
+    assert.equal(placement.inFootnoteArea, true, "premise: Paged.js moved the footnote into the footnote area");
+    const raw = await page.evaluate<RawSnapshot>(SNAPSHOT_SOURCE);
+    assert.deepEqual(raw.blocks.filter((block) => block.sid === note).map((block) => block.page), [1],
+      "the footnote was dropped from the flow, or recorded more than once");
+    assert.equal(result.pages[0]!.lastSid, note, "the footnote area is not an edge of the page's flow");
+    const integrity = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(TEST_PRIMITIVES_CAPABILITY));
+    assert.deepEqual(validateRuntimeSidState(footnoteExpectedSids, integrity), [],
+      "the footnote's position after the page content was read as a source-id order violation");
+    await page.close();
+  });
+
+  /**
+   * The page box accepts only a `position: fixed` clone, observed with the real paginator: the
+   * stamp and its nested paragraph are at the head of every page box, the parity-blank page's
+   * included, and nowhere in the flow, and the check accepts them. The paired control moves an
+   * in-flow paragraph into one page box after layout — on the round-2 code that ended exit 0 with
+   * the paragraph unmeasured — and the check names it.
+   */
+  it("accepts a position: fixed clone in every page box and refuses a paragraph a script moved there", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const stamp = fixedSidByAuthorId["stamp"]!, stampText = fixedSidByAuthorId["stamp-text"]!;
+    assert.ok(stamp && stampText, "no source id was mapped for the stamp");
+    const fixed = await collect("/fixed.html");
+    const layout = await fixed.page.evaluate<{ pages: number; blank: number; stamps: number; headOfBox: number; inFlow: number }>(`(() => {
+      const pages = [...document.querySelectorAll(".pagedjs_page")];
+      const boxes = pages.map((page) => page.querySelector(".pagedjs_pagebox"));
+      return {
+        pages: pages.length,
+        blank: pages.filter((page) => page.classList.contains("pagedjs_blank_page")).length,
+        stamps: boxes.filter((box) => box.querySelector(":scope > [data-bl-sid='${stamp}'] [data-bl-sid='${stampText}']")).length,
+        headOfBox: boxes.filter((box) => box.firstElementChild && box.firstElementChild.getAttribute("data-bl-sid") === "${stamp}").length,
+        inFlow: document.querySelectorAll(".pagedjs_page_content [data-bl-sid='${stamp}']").length,
+      };
+    })()`);
+    assert.ok(layout.pages >= 3 && layout.blank >= 1, `premise: a multi-page document with a blank page, got ${JSON.stringify(layout)}`);
+    assert.equal(layout.stamps, layout.pages, "premise: Paged.js put the stamp with its paragraph in every page box");
+    assert.equal(layout.headOfBox, layout.pages, "premise: the clone is the first child of every page box");
+    assert.equal(layout.inFlow, 0, "premise: the fixed element left the flow");
+    const fixedStatus = await fixed.page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(TEST_PRIMITIVES_CAPABILITY));
+    assert.deepEqual(validateRuntimeSidState(fixedExpectedSids, fixedStatus), [],
+      "a position: fixed clone in every page box was read as a moved element");
+    await fixed.page.close();
+
+    const moved = await collect("/pagebox-move.html");
+    const premise = await moved.page.evaluate<number>(
+      `document.querySelectorAll(".pagedjs_pagebox > p[data-bl-sid]").length`);
+    assert.equal(premise, 1, "premise: the script moved the paragraph into a page box");
+    const movedStatus = await moved.page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(TEST_PRIMITIVES_CAPABILITY));
+    const issues = validateRuntimeSidState(pageboxMoveExpectedSids, movedStatus);
+    assert.ok(issues.some((issue) => /page box but is not a position: fixed clone/u.test(issue)),
+      `a paragraph moved into the page box passed the source-id check: ${JSON.stringify(issues)}`);
+    await moved.page.close();
   });
 
   /** The tokens are real: the pages that ran out of room have one, the last page does not. */

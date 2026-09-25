@@ -5,13 +5,14 @@ Releases are published by GitHub Actions from an annotated version tag. A laptop
 
 ## Release contract
 
-For 0.6.0, all of the following must refer to the same commit and the same package bytes:
+For a release `X.Y.Z`, all of the following must refer to the same commit and the same package
+bytes:
 
-1. `origin/main` and annotated tag `v0.6.0`;
+1. `origin/main` and annotated tag `vX.Y.Z`;
 2. the successful `ci.yml` run queried by commit SHA;
 3. the one tarball created by the release workflow;
 4. both clean consumers, on Node 22.13 and Node 24;
-5. npm `breaklint@0.6.0` and its `dist.integrity`;
+5. npm `breaklint@X.Y.Z` and its `dist.integrity`;
 6. the tarball and checksum files attached to the GitHub Release.
 
 Any mismatch ends the workflow before or immediately after the outward action. A failed registry
@@ -25,15 +26,16 @@ run `33320332110` completed the Node 22.13/24 consumer matrix, npm provenance ve
 GitHub Release creation on 2026-08-30.
 
 0.6.0 is a minor pre-1.0 release by the same test this document applied to 0.5.0: the canonical
-document report changes structure, so its stamp moves. Report 4 becomes Report 5 with the optional
-`Finding.remediation`, and the agent context pack becomes 2 with one new required key and three new
+document report changes structure, so its stamp moves. In 0.6.0 Report 4 becomes Report 5 with the
+optional `Finding.remediation`, and the agent context pack becomes 2 with one new required key and three new
 finding-card keys. Snapshot stays 4 and Configuration Contract 1 is untouched. Readers accept
 Report 4 and 5, so a stored artefact does not have to be migrated — but an optional property does
 not let a schema-aware consumer distinguish the two shapes, and that is what a version is for.
 
 0.5.0 is a minor pre-1.0 release because live document output moves to Report 4 and Snapshot 4,
 and the installed package gains public producer, screen, comparison and report-bundle APIs.
-Configuration Contract 1 remains separate and unchanged. Consumers of Report 3 must migrate;
+Configuration Contract 1 remains separate and unchanged. Consumers of Report 3 must migrate when
+adopting 0.5.0;
 source identity, declared provenance and verified original positions are separate fields.
 The screen report is its own version-1 contract and contains no document-page semantics.
 
@@ -52,26 +54,52 @@ workflow passes it as `NODE_AUTH_TOKEN` only to the publish step.
 
 ## Before creating the tag
 
-Run from a clean checkout with the supported Node line and all live prerequisites present:
+Run from a clean checkout on Node 24 with all live prerequisites present — Chrome, poppler's
+`pdftoppm`, python3 with `fontTools`, gitleaks 8.30.1 on `PATH` and network access — in this order,
+which is the order `.github/workflows/ci.yml` runs them in (`tests/unit/workflow-gates.test.ts` fails
+when the `npm run` steps below leave out or reorder one of CI's):
 
 ```bash
 npm ci --no-audit --no-fund
 npm run test:secrets
-npm run test:advisories
 npm run test:release-tag
 node tests/tools/registry-provenance-contract.mjs --self-test
+npm run test:advisories
+node tools/make-mark-font.mjs --check
 npm run typecheck
 npm run schema:check
+npm run docs:rules:check
 npm test
 npm run test:mutants
-npm run test:real-document
-npm run test:pagination-residue          # SKIPPED without BREAKLINT_RESIDUE_CORPUS_ROOT; see below
 npm run test:licenses
 BREAKLINT_LIVE_REPORT=.tmp/live-report.json BREAKLINT_LIVE_SUMMARY=.tmp/live-summary.json npm run test:live
 npm run test:documented-figures
-npm run test:report-surfaces:technical
-npm run selfcheck
 npm run build
+npm run test:real-document
+npm run test:report-surfaces:technical
+npm run test:report-surface-mutants
+npm run selfcheck
+```
+
+`npm run build` comes before `test:real-document` because that gate runs `dist/cli/index.js`: in
+the other order a clean checkout fails, and a used one tests a stale build. The registry-provenance
+self-test runs in the release workflow rather than in `ci.yml`.
+
+Then check the packed package the way CI does, because none of the commands above sees it:
+
+```bash
+repo=$PWD
+tgz=$(npm pack --silent)
+consumer=$(mktemp -d) && cd "$consumer" && npm init -y > /dev/null
+npm i "$repo/$tgz" --no-audit --no-fund
+npx breaklint --version                                  # prints the package.json version
+npx breaklint --demo > demo.out; echo "exit $?"          # exit 1
+node "$repo/tests/tools/readme-demo-contract.mjs" --consumer .
+node "$repo/tests/tools/docs-truth.mjs" --package node_modules/breaklint --pending "$repo/tests/tools/docs-truth-pending.jsonl"
+node "$repo/tests/tools/installed-config-contract.mjs"
+npm i --no-audit --no-fund --save-exact pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
+node "$repo/tests/tools/real-document-gate.mjs" --cli "$PWD/node_modules/breaklint/dist/cli/index.js" --cwd "$PWD"
+cd "$repo"
 ```
 
 Two of these need the tap and summary files the runs before them write, and are therefore easy to
@@ -133,36 +161,54 @@ must NOT measure, and must say why — which elements a paginator left in an ove
 pages, and by how far. Their bytes are **not in this repository**: they are chapters of a paid
 product, 27 492 of that bundle's 69 017 words, and this repository is public and MIT. What is public
 is a hash-only record in the shape `docs/validation/corpus-contract-v1.md` defines for
-`private_nonredistributable` material, and the gate says `SKIPPED` rather than claiming a
-verification it did not perform. The class itself is held in CI by the public
-`tests/fixtures/fragmentainer-residue.html`, which carries no product text.
+`private_nonredistributable` material.
 
-Before a release, run the full gate once against the admitted bundle and read the six lines it
-prints:
+**That record is historical, and it is not a release step.** Re-measured on 2026-09-18, five of the
+six documents and the shared stylesheet no longer exist at their recorded digests, so the private
+half cannot be run by anybody. `npm run test:pagination-residue` therefore prints `NO CLAIM`, reads
+none of the six documents — with or without `BREAKLINT_RESIDUE_CORPUS_ROOT` — and exits 0; what it
+can still fail on is the internal consistency of its own manifest. It was a CI and release-workflow
+step until that became clear, and a step that exits 0 having read zero documents is a green light
+over nothing, so both steps were retired. `tests/unit/workflow-gates.test.ts` fails if either
+workflow runs it again while it reads nothing. The script remains as a local check of the record.
+The class itself is held in CI by the public `tests/fixtures/fragmentainer-residue.html` in the live
+suite, which was reduced from one of the six and carries no product text. Re-admitting the corpus
+against current bytes is a fresh admission with its own rights and privacy review.
 
-```bash
-BREAKLINT_RESIDUE_CORPUS_ROOT=<unpacked-bundle> npm run test:pagination-residue
-BREAKLINT_RESIDUE_CORPUS_ROOT=<unpacked-bundle> npm run test:pagination-residue:red-control
-```
-
-The red condition is not historical but re-derivable: the red control builds the parent of the
-commit that introduced `src/measure/fragmentainer.ts` and asserts that both cases were already fatal
-there and named no cause. Without the artifact root it still proves red-to-green on the public
-fixture and skips the corpus case by name. It is a local gate rather than a CI step because it
-compiles a second tree.
+The red control, `npm run test:pagination-residue:red-control`, builds the parent of the commit that
+introduced `src/measure/fragmentainer.ts`, asserts that each case it can run was already fatal
+there and named no cause, and that the current build names it. It is a local check rather than a CI
+step because it compiles a second tree. Without an artifact root it skips the corpus case by name
+and refuses to pass with zero cases, so its green result is a statement about the public fixture
+only.
 
 Then verify:
 
-- `.github/workflows/release.yml` is pinned to this tag and this tarball. The trigger is the
-  literal `tags: ["vX.Y.Z"]`, not a wildcard, and `PACKAGE_FILE` plus every version assertion in
-  the file name the same version. **This step is the one that is easy to forget and silent when
-  forgotten**: a tag pushed while the workflow still names the previous version starts nothing at
-  all — no run, no error, no notification, and the tag sits on the remote looking done. Measured on
-  2026-09-18: `v0.6.0` was pushed against a workflow still pinned to `v0.5.0`, nothing ran, and the
-  tag had to be deleted and recreated. The pinning is deliberate — a wildcard would let any `v*`
-  tag publish — but it belongs in this list.
+- `.github/workflows/release.yml` is pinned to this tag. The trigger is the literal
+  `tags: ["vX.Y.Z"]`, not a wildcard — a wildcard would let any `v*` tag publish — and it is the
+  only place the file names the version: every job derives `RELEASE_VERSION` and `PACKAGE_FILE`
+  from the triggering tag with `tests/tools/release-workflow-contract.mjs --derive-env`. A stale
+  pin is silent when it happens: a tag pushed while the workflow still names the previous version
+  starts nothing at all — no run, no error, no notification, and the tag sits on the remote
+  looking done. Measured on 2026-09-18: `v0.6.0` was pushed against a workflow still pinned to
+  `v0.5.0`, nothing ran, and the tag had to be deleted and recreated. The pin is therefore no
+  longer a manual check. `npm run test:release-tag` runs `release-workflow-contract.mjs --check`
+  on every CI run and fails when the trigger, `package.json` and both root version fields of
+  `package-lock.json` do not name one version, or when any other release literal is left in an
+  executable line of the workflow. The release-prep commit moves the version, the lock and the pin
+  together; a commit that moves only one of them fails on its pull request.
 - `package.json`, both root version fields in `package-lock.json` and `CHANGELOG.md` name the same
-  version;
+  version. The changelog half is also checked, by `tests/tools/changelog-contract.mjs` in
+  `npm run test:release-tag`: for a version with no tag yet, the first section must be
+  `## X.Y.Z — YYYY-MM-DD` or exactly `## X.Y.Z — TBD-at-tag`, no `## Unreleased` section may
+  remain, and `docs/status.md` must not call the version unreleased. At the tag commit — in the
+  release workflow, because that commit is what npm serves — only a date is accepted: the
+  published 0.6.0 tarball says `## 0.6.0 — unreleased`, and nothing checked it. A `TBD-at-tag`
+  that reaches the tag stops the release workflow in its validation job, before anything is
+  packed or published, with the instruction to date it (see Publishing). Between releases the
+  same check requires a non-empty `## Unreleased` section naming every changed rule as soon as
+  anything under `src/` differs from the last tag. It needs the tags: in a shallow clone without
+  them it fails rather than passes;
 - README, security policy, status and limitations make no future-tense success claim;
 - `git diff --check` is clean;
 - an independent verifier has no open Blocker/High finding;
@@ -170,30 +216,49 @@ Then verify:
 
 ## Publishing
 
-Create and push an annotated tag only after main CI is green:
+The release-prep commit carries the heading `## X.Y.Z — TBD-at-tag`, because the release date is
+not known when it is written. Before tagging:
+
+1. replace `TBD-at-tag` with the date, `## X.Y.Z — YYYY-MM-DD`, in a final commit on main — the
+   only change in that commit;
+2. let `ci.yml` go green on exactly that commit;
+3. tag that commit, and no other.
+
+Create and push the annotated tag only after main CI is green on the dated commit:
 
 ```bash
-git tag -a v0.6.0 -m "breaklint 0.6.0"
-git push origin v0.6.0
+git tag -a vX.Y.Z -m "breaklint X.Y.Z"
+git push origin vX.Y.Z
 ```
+
+A tag on a commit that still says `TBD-at-tag` is refused by the release workflow's first job,
+before anything is packed or published; the log names the heading and what to change. The same
+holds for `tests/tools/docs-truth-pending.jsonl`: a pull request may carry an entry there while
+the owner of that page corrects it, but the release workflow runs the docs check with `--release`,
+which refuses any entry — the tagged commit must have an empty list. The clean consumers stop on
+it before anything is published, and name the sentences to correct.
 
 The release workflow then:
 
-1. repeats the complete gate on Node 24;
-2. scans Git history/worktree and proves both scanner rules with runtime canaries;
-3. creates exactly one `breaklint-0.6.0.tgz`;
-4. records its SHA-256 and SHA-512 SRI;
-5. downloads those same bytes into Node 22.13 and Node 24 clean consumers;
-6. proves the ref is an annotated tag (with a lightweight-tag negative control), then proves
+1. proves, in every job, that the triggering tag, the workflow's one literal pin, `package.json`
+   and `package-lock.json` name one version, and derives the version and package file name from it;
+2. repeats the complete gate on Node 24 — every `npm run` gate step of `ci.yml`, which
+   `tests/unit/workflow-gates.test.ts` checks;
+3. scans Git history/worktree and proves both scanner rules with runtime canaries;
+4. creates exactly one `breaklint-X.Y.Z.tgz`;
+5. records its SHA-256 and SHA-512 SRI;
+6. downloads those same bytes into Node 22.13 and Node 24 clean consumers, which check the installed
+   README's demo excerpt and the installed docs' schema stamps against the installed code;
+7. proves the ref is an annotated tag (with a lightweight-tag negative control), then proves
    tag/version, exact `origin/main` SHA and successful main CI;
-7. publishes that tarball with provenance;
-8. waits until npm exposes the version, compares `dist.integrity`, binds the package digest and Git
+8. publishes that tarball with provenance;
+9. waits until npm exposes the version, compares `dist.integrity`, binds the package digest and Git
    commit through the signed SLSA provenance, runs npm signature verification and installs the
    registry version in a final consumer;
-9. creates the GitHub Release with the tarball and both identity records attached.
+10. creates the GitHub Release with the tarball and both identity records attached.
 
 Do not rerun a partially successful publish blindly: npm versions are immutable. Inspect the npm
-version, workflow logs and GitHub Release first. If npm already serves 0.6.0 but a post-publish
+version, workflow logs and GitHub Release first. If npm already serves `X.Y.Z` but a post-publish
 verification failed, repair the release metadata or publish a new patch version; never move the tag
 or overwrite evidence to make the old run look green.
 
@@ -209,13 +274,18 @@ source identity is never ignored.
 From a new temporary directory, independently verify the registry route:
 
 ```bash
-npm view breaklint@0.6.0 version dist.integrity
+npm view breaklint@X.Y.Z version dist.integrity
 npm init -y
-npm install breaklint@0.6.0 --no-audit --no-fund
+npm install breaklint@X.Y.Z --no-audit --no-fund
 npx breaklint --version
 npx breaklint --demo
 ```
 
-The version must be `0.6.0`; demo must produce real findings and exit 1. Import
+The version must be `X.Y.Z`; demo must produce real findings and exit 1. Import
 `breaklint/config.schema.json` and rerun the installed Configuration Contract gate. The later status
 commit records the completed release but is not retroactively part of the published tarball.
+
+The GitHub Action (`action.yml`) installs `breaklint@<package.json version>` of the ref it is
+called at, so `uses: godarg/breaklint@vX.Y.Z` works only from the moment the npm publish above
+has succeeded, and a branch ref fails with exit 3 from the version bump until then. Announce or
+move nothing that points users at the new tag's Action before `npm view breaklint@X.Y.Z` answers.

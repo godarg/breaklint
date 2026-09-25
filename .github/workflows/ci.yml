@@ -42,7 +42,12 @@ jobs:
       - name: Git history, worktree and secret-scanner canary
         run: npm run test:secrets
 
-      - name: annotated release-tag contract and lightweight-tag negative control
+      - name: annotated release-tag, release-pin and changelog contracts, each with its negative controls
+        # The pin half compares .github/workflows/release.yml against package.json at THIS commit,
+        # so a version bump that forgets the literal tag trigger fails here, on its pull request,
+        # instead of starting nothing when the tag is pushed. The changelog half reads the release
+        # tags, which is one more reason this job checks out with fetch-depth 0: without them it
+        # fails rather than guessing which work is released.
         run: npm run test:release-tag
 
       - name: published dependency graph and pinned development advisory disposition
@@ -71,6 +76,13 @@ jobs:
 
       - name: generated configuration schema has no drift
         run: npm run schema:check
+
+      - name: generated rule-page remediation blocks have no drift
+        # AGENTS.md: a generated artifact is checked with its generator. Each docs/rules page
+        # carries its rule's remediation.advice in a block tools/write-rule-docs.ts writes; until
+        # this step only a unit test re-derived that assertion, and the generator's own --check
+        # ran nowhere in CI.
+        run: npm run docs:rules:check
 
       - name: unit and e2e tests
         run: npm test
@@ -105,24 +117,13 @@ jobs:
           npm run build
           npm run test:real-document
 
-      - name: self-authored closed-world corpus gate
-        # Twenty self-authored documents with planted defects and clean controls, each judged
-        # against ground truth that was written before breaklint ever ran on it
-        # (corpus/public/selfauthored-v1). One document per invocation of the built CLI, default
-        # profile, evidence binding on. Closed world: a finding no entry accounts for fails, and
-        # so do zero documents, a hash mismatch or an unknown field in an expected file. It is a
-        # regression corpus, not calibration evidence.
-        run: npm run test:corpus
-
-      - name: pagination-residue corpus record
-        # The negative half of the same property: six real documents that must NOT measure, and
-        # must say why. Their bytes are a paid product and are NOT in this repository, so here this
-        # step only checks that the hash-only record is internally consistent and then reports
-        # SKIPPED. It makes no success claim about the six. What actually holds the class in CI is
-        # tests/fixtures/fragmentainer-residue.html in the live suite above, which is public and
-        # carries no product text. Supplying BREAKLINT_RESIDUE_CORPUS_ROOT on a private runner
-        # turns this step into the full gate without changing anything else.
-        run: npm run test:pagination-residue
+      # There is deliberately no pagination-residue step. `npm run test:pagination-residue` binds
+      # six private documents by digest, and that record is historical: the digests are reachable
+      # nowhere, so the script prints NO CLAIM and exits 0 having read none of them, with or
+      # without an artifact root. A step that exits 0 over zero documents is the shape this file
+      # exists to prevent, so it was retired rather than kept as a green light. The class is held
+      # by tests/fixtures/fragmentainer-residue.html in the live suite above, which is public and
+      # carries no product text. tests/unit/workflow-gates.test.ts fails if the step returns.
 
       - name: technical report-surface matrix
         # Linux verifies all 32 current cells, including decoded-pixel, semantic, accessibility
@@ -177,6 +178,15 @@ jobs:
           set -e
           test "$code" -eq 1 || { echo "installed --demo exited $code, expected 1"; cat demo.out; exit 1; }
           grep -q "uncalibrated" demo.out || { echo "installed --demo printed no findings"; exit 1; }
+          # The README a user reads on npm is the one in this tarball. Its demo excerpt must be what
+          # THIS installed bin prints, not what the source tree prints: the published 0.6.0 README
+          # said "seven findings" while its own --demo printed five.
+          node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$PWD"
+          # Every schema stamp the shipped README and docs name is the stamp THIS installed package
+          # carries, read by running it. Mentions another change is still correcting are listed,
+          # and a listed mention that no longer occurs fails too.
+          node "$GITHUB_WORKSPACE/tests/tools/docs-truth.mjs" --package node_modules/breaklint \
+            --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl"
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           npm install --no-audit --no-fund --save-exact \
             pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
@@ -248,5 +258,153 @@ jobs:
           set -e
           test "$code" -eq 1 || { echo "--demo exited $code on Node 22.13, expected 1"; cat demo.out; exit 1; }
           grep -q "uncalibrated" demo.out || { echo "--demo printed no findings on Node 22.13"; exit 1; }
+          node "$GITHUB_WORKSPACE/tests/tools/readme-demo-contract.mjs" --consumer "$PWD"
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           echo "Node 22.13: the installed package behaves as documented"
+
+  # The composite Action at the repository root (`action.yml`), run the way a consumer runs it
+  # (`uses: ./`) over this repository's own fixtures, against the tarball this commit packs, with
+  # the runner's own Chrome and the sandbox on. The arms that must fail run with
+  # continue-on-error, so the job colour alone proves nothing; the last step reads every arm's
+  # recorded outcome and outputs and validates the SARIF, JUnit and Markdown the Action wrote
+  # (tests/tools/action-selftest.mjs). This job holds no write permission of any kind.
+  action:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: "1"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: pack this commit, and set the checkout's own dependencies aside
+        id: pack
+        run: |
+          tgz=$(npm pack --silent)
+          test -n "$tgz" && test -s "$tgz" || { echo "npm pack produced no tarball"; exit 1; }
+          echo "tarball=$tgz" >> "$GITHUB_OUTPUT"
+          # A consumer repository has no breaklint peers of its own. With this checkout's
+          # node_modules in place breaklint would resolve those first, and the Action's own
+          # install would go untested.
+          mv node_modules "$RUNNER_TEMP/checkout-node_modules"
+
+      - name: "arm: a clean document passes"
+        id: clean
+        uses: ./
+        with:
+          paths: tests/fixtures/action/clean.html
+          breaklint-tarball: ${{ steps.pack.outputs.tarball }}
+          output-dir: ${{ runner.temp }}/arm-clean
+      - name: "arm: a gating finding fails the step (two documents, one glob)"
+        id: findings
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/action/**/*.html
+          breaklint-tarball: ${{ steps.pack.outputs.tarball }}
+          output-dir: ${{ runner.temp }}/arm-findings
+      - name: "arm: exit 1 left ungated on request"
+        id: ungated
+        uses: ./
+        with:
+          paths: tests/fixtures/action/findings.html
+          fail-on-exit: "2,3,4"
+          breaklint-tarball: ${{ steps.pack.outputs.tarball }}
+          output-dir: ${{ runner.temp }}/arm-ungated
+      - name: "arm: a font that fails to load is infrastructure, exit 3"
+        id: infrastructure
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/missing-font.html
+          breaklint-tarball: ${{ steps.pack.outputs.tarball }}
+          output-dir: ${{ runner.temp }}/arm-infrastructure
+      - name: "arm: a path that is not there, and shell syntax that must stay inert, exit 2"
+        id: usage
+        continue-on-error: true
+        uses: ./
+        with:
+          # Executed by a shell, the first line would create the canary the assertion step
+          # looks for.
+          paths: |
+            $(touch "$RUNNER_TEMP/breaklint-action-canary").html
+            tests/fixtures/action/does-not-exist.html
+          breaklint-tarball: ${{ steps.pack.outputs.tarball }}
+          output-dir: ${{ runner.temp }}/arm-usage
+      - name: "arm: a path that reads like an option stays a path, exit 2"
+        id: dash
+        continue-on-error: true
+        uses: ./
+        with:
+          # Guarded, `--fail-on` reaches breaklint as the path ./--fail-on, which is not .html:
+          # exit 2, no report. Unguarded it would be the option `--fail-on never`, and breaklint
+          # would render findings.html and report it clean: exit 0, a report, verdict clean.
+          # Only this arm tells the two apart; a `--demo` line would not, because the missing
+          # path next to it ends an unguarded run with exit 2 as well.
+          paths: |
+            --fail-on
+            never
+            tests/fixtures/action/findings.html
+          breaklint-tarball: ${{ steps.pack.outputs.tarball }}
+          output-dir: ${{ runner.temp }}/arm-dash
+      - name: "arm: a fail-on-exit that would let exit 4 pass is refused, exit 2"
+        id: refused
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/action/clean.html
+          fail-on-exit: "1,2,3"
+          breaklint-tarball: ${{ steps.pack.outputs.tarball }}
+          output-dir: ${{ runner.temp }}/arm-refused
+
+      - name: the Action behaved as specified in every arm
+        env:
+          ARM_CLEAN: ${{ toJSON(steps.clean) }}
+          ARM_FINDINGS: ${{ toJSON(steps.findings) }}
+          ARM_UNGATED: ${{ toJSON(steps.ungated) }}
+          ARM_INFRASTRUCTURE: ${{ toJSON(steps.infrastructure) }}
+          ARM_USAGE: ${{ toJSON(steps.usage) }}
+          ARM_DASH: ${{ toJSON(steps.dash) }}
+          ARM_REFUSED: ${{ toJSON(steps.refused) }}
+          INJECTION_CANARY: ${{ runner.temp }}/breaklint-action-canary
+        run: |
+          mv "$RUNNER_TEMP/checkout-node_modules" node_modules
+          node tests/tools/action-selftest.mjs
+      - name: keep the findings arm's SARIF for the optional code-scanning upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: breaklint-action-sarif
+          path: ${{ steps.findings.outputs.sarif-file }}
+          if-no-files-found: error
+          retention-days: 3
+
+  # Uploading the fixture SARIF to code scanning is OFF unless a maintainer sets the repository
+  # variable BREAKLINT_ACTION_UPLOAD_SARIF to 'true'. Whether code scanning is enabled here, and
+  # whether fixture alerts belong in it, is a repository decision this workflow does not make.
+  # Never for a fork's pull request: its token cannot write security events. The upload runs in
+  # its own job so that the job rendering HTML in Chrome never holds security-events: write.
+  action-code-scanning:
+    needs: action
+    if: >-
+      vars.BREAKLINT_ACTION_UPLOAD_SARIF == 'true' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: breaklint-action-sarif
+          path: ${{ runner.temp }}/breaklint-sarif
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: ${{ runner.temp }}/breaklint-sarif
+          category: breaklint-action-selftest
