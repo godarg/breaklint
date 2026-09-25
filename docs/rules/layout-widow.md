@@ -15,7 +15,7 @@ The opening fragment of a block on a page carries fewer lines than the author as
 
 **`error` is permanently excluded.** CSS Fragmentation Level 3 §4.3 drops the widow/orphan rule when keeping it would leave too few break points. So `lines < widows` does not prove a defect — it may be exactly the relaxation the specification permits, and this version has no way to prove the relaxation was unwarranted.
 
-The earlier justification for the downgrade was itself unmeasured: *in 230 runs no violation occurred*. At `widows: 6` the same layout produces 6+3, which **is** a violation — a permitted one, because with 9 lines and widows+orphans = 12 no conforming split exists. A run that fails to produce a case has not shown the case does not exist.
+The earlier justification for the downgrade was itself unmeasured: *in 230 runs no violation occurred*. At `widows: 6; orphans: 6` a 9-line paragraph with room for 8 lines splits 6+3, which **is** a violation — a permitted one, because widows+orphans = 12 exceeds the 9 lines and no conforming split exists. The browser kept `orphans` and relaxed `widows`. A run that fails to produce a case has not shown the case does not exist; this one is now pinned by `tests/live/fragmentation-levers.test.ts`.
 
 ## Limits and known false alarms
 
@@ -31,11 +31,19 @@ also why this rule ships with the severity it has.
 ## Remediation
 
 <!-- begin generated remediation: layout/widow -->
-A block fragments across a page break and the fragment OPENING the next page carries fewer lines than the block's own 'widows' value (plus any configured extra lines) asks for. If this occurs inside a table row, keep the row together with 'tr { break-inside: avoid; }'. For paragraphs, prevent the split with 'break-inside: avoid', force an earlier break with 'break-before: page', or reword/re-space the text. (Note: CSS 'widows' is ignored by Paged.js).
+A block fragments across a page break and the fragment OPENING the next page carries fewer lines than the block's own 'widows' value (plus any configured extra lines) asks for. Chromium applies a paragraph's 'widows' and 'orphans' when Paged.js splits it; when the paragraph has too few lines at the break to satisfy both, the browser keeps 'orphans' and relaxes 'widows', as CSS Fragmentation Level 3 permits, so this rule is only a warning. Changing the block's 'widows' moves the threshold with it and is not a fix. For paragraphs, keep the block together with 'break-inside: avoid', force an earlier break with 'break-before: page', or reword/re-space the text. If this occurs inside a table row, keep the row together with 'tr { break-inside: avoid; }'.
 <!-- end generated remediation: layout/widow -->
 
-> [!WARNING]
-> Do not propose or set the CSS `widows` property as a fix. `widows` is absent from Paged.js 0.4.3 and Chromium does not honour it under Paged.js.
+> [!NOTE]
+> Chromium applies `widows` when Paged.js splits a paragraph. Paged.js 0.4.3 never reads the
+> property, but it cuts every page where the browser's own column fragmentation broke, and the
+> browser honours `widows` there: over one geometry, `widows` 1, the initial 2 and 5 split a
+> 9-line paragraph 8+1, 7+2 and 4+5. `tests/live/fragmentation-levers.test.ts` pins those splits
+> and goes red when the browser stops producing them. Earlier versions of this page and of the
+> advice said the opposite without having asked the browser.
+>
+> The value is also this rule's threshold, so changing it moves the threshold and is not a fix.
+> What is left for this rule to report is a split the browser had to relax.
 
 ## Examples
 

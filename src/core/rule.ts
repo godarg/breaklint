@@ -76,8 +76,111 @@ export interface RuleMeta {
    * being applied verbatim, the finding going away, and no new finding arriving. A rule author
    * cannot set it from conviction — the previous shape let the engine stamp `tested: true` on
    * every remediation it copied, which is how an untested string reaches an agent as a tested one.
+   *
+   * `interactions` declares where this advice and another rule's pull on the same CSS lever, and
+   * which of the two owns it. It stays in the registry: `Finding.remediation` carries `advice` and
+   * `tested` only, so declaring a precedence changes no report shape.
    */
-  readonly remediation?: { readonly advice: string; readonly tested: boolean };
+  readonly remediation?: {
+    readonly advice: string;
+    readonly tested: boolean;
+    readonly interactions?: readonly RemediationInteraction[];
+  };
+}
+
+/**
+ * Two advice texts that pull one lever in opposite directions, with the order settled.
+ *
+ * Measured before this existed: `layout/hyphen-across-page` advised turning hyphenation off and
+ * `type/excessive-word-spacing` advised turning it on, and each text said the two "pull in
+ * opposite directions" — an agent that obeyed both oscillated. Saying so is not a precedence.
+ * An interaction is declared on BOTH rules, `defers` on one and `prevails` on the other, and
+ * `interactionProblems` refuses any other shape.
+ */
+export interface RemediationInteraction {
+  /** The other rule. */
+  readonly ruleId: string;
+  /** The CSS property both advices touch, spelled as in CSS. */
+  readonly lever: string;
+  /**
+   * `prevails`: this rule owns the block-level setting of `lever` in `scope`. `defers`: the other
+   * rule owns it there, and this rule's advice changes the lever only locally.
+   */
+  readonly relation: InteractionRelation;
+  readonly scope: InteractionScope;
+}
+
+export const INTERACTION_RELATIONS = ["defers", "prevails"] as const;
+export type InteractionRelation = (typeof INTERACTION_RELATIONS)[number];
+
+/** Where a precedence holds, with the phrase the rule pages render for it. */
+export const INTERACTION_SCOPES = Object.freeze({ justified: "in justified blocks" } as const);
+export type InteractionScope = keyof typeof INTERACTION_SCOPES;
+
+const OPPOSITE_RELATION: Readonly<Record<InteractionRelation, InteractionRelation>> = {
+  defers: "prevails",
+  prevails: "defers",
+};
+
+/** Shape errors one rule's declaration has on its own; the registry-wide pairing is below. */
+function ownInteractionProblems(meta: Pick<RuleMeta, "id" | "remediation">): string[] {
+  const problems: string[] = [];
+  const seen = new Set<string>();
+  for (const interaction of meta.remediation?.interactions ?? []) {
+    const label = `${meta.id} → ${interaction.ruleId} on ${interaction.lever} (${interaction.scope})`;
+    if (interaction.ruleId === meta.id) problems.push(`${label}: a rule cannot take precedence over itself`);
+    if (!(INTERACTION_RELATIONS as readonly string[]).includes(interaction.relation)) {
+      problems.push(`${label}: relation "${interaction.relation}" is not one of ${INTERACTION_RELATIONS.join(", ")}`);
+    }
+    if (!Object.hasOwn(INTERACTION_SCOPES, interaction.scope)) {
+      problems.push(`${label}: scope "${interaction.scope}" is not one of ${Object.keys(INTERACTION_SCOPES).join(", ")}`);
+    }
+    if (!/^[a-z][a-z-]*$/u.test(interaction.lever)) problems.push(`${label}: lever is not a CSS property name`);
+    const key = `${interaction.ruleId}\u0000${interaction.lever}\u0000${interaction.scope}`;
+    if (seen.has(key)) problems.push(`${label}: declared twice`);
+    seen.add(key);
+    // The advice is what a consumer reads. A precedence the advice does not mention is one an
+    // agent never learns about, so the partner must be named in the text itself.
+    if (!meta.remediation?.advice.includes(`'${interaction.ruleId}'`)) {
+      problems.push(`${label}: the advice does not name '${interaction.ruleId}'`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * Every precedence problem across a rule set: an unknown partner, a pair declared on one side
+ * only, a pair whose two sides do not oppose each other, and an advice that does not name its
+ * partner. Empty means every interaction is declared on both rules, `defers` against `prevails`,
+ * for the same lever and scope.
+ */
+export function interactionProblems(rules: readonly Pick<RuleMeta, "id" | "remediation">[]): string[] {
+  const byId = new Map(rules.map((rule) => [rule.id, rule]));
+  const problems: string[] = [];
+  for (const rule of rules) {
+    problems.push(...ownInteractionProblems(rule));
+    for (const interaction of rule.remediation?.interactions ?? []) {
+      const label = `${rule.id} ${interaction.relation} ${interaction.relation === "defers" ? "to" : "over"} ` +
+        `${interaction.ruleId} on ${interaction.lever} (${interaction.scope})`;
+      const partner = byId.get(interaction.ruleId);
+      if (!partner) {
+        problems.push(`${label}: ${interaction.ruleId} is not a registered rule`);
+        continue;
+      }
+      const opposite = OPPOSITE_RELATION[interaction.relation];
+      const mirror = (partner.remediation?.interactions ?? []).filter(
+        (other) => other.ruleId === rule.id && other.lever === interaction.lever && other.scope === interaction.scope,
+      );
+      if (mirror.length === 0) {
+        problems.push(`${label}: ${partner.id} declares no ${opposite} in return`);
+      } else if (mirror.some((other) => other.relation !== opposite)) {
+        problems.push(
+          `${label}: ${partner.id} declares ${mirror.map((other) => other.relation).join(", ")} in return, not ${opposite}`,
+        );
+      }
+    }
+  }
+  return problems;
 }
 
 export interface Rule extends RuleMeta {
@@ -105,6 +208,12 @@ export function defineRule(meta: RuleMeta, run: Rule["run"]): Rule {
       `${meta.id}: carries proof source ${meta.proofSource} but is not an error. Either the ` +
         `proof holds and the rule is an error, or it does not and the claim goes.`,
     );
+  }
+  // One rule's declaration can be checked here; whether its partner answers it needs the whole
+  // registry, and tests/unit/registry.test.ts runs `interactionProblems` over ALL_RULES for that.
+  const interactionErrors = ownInteractionProblems(meta);
+  if (interactionErrors.length > 0) {
+    throw new Error(`${meta.id}: invalid remediation.interactions — ${interactionErrors.join("; ")}`);
   }
   return {
     ...meta,

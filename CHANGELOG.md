@@ -17,12 +17,64 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   finding message had already stopped making that all-pages claim from one measured page; the
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
   compared advice text will see the new string.
+- **`layout/widow` and `layout/orphan` no longer say that CSS `widows`/`orphans` are "ignored by
+  Paged.js".** Paged.js 0.4.3 never reads either property, but it cuts every page where the
+  browser's own column fragmentation broke, and the browser applies both there. Measured on
+  Chromium 141 with Paged.js 0.4.3 over one geometry: `widows` 1, initial and 5 split a 9-line
+  paragraph 8+1, 7+2 and 4+5; with room for one line, `orphans: 1` splits it 1+8 while the initial
+  value and `orphans: 4` move it whole. The advice now says the browser applies both, that what is
+  left to report is a split the browser had to relax (CSS Fragmentation Level 3 §4.3, which is why
+  both rules stay warnings permanently), and that changing the block's own value moves the
+  threshold and is not a fix. The levers are unchanged. `Finding.remediation.advice` changes for
+  both rules; consumers that stored or compared it will see the new strings.
+- **`layout/hyphen-across-page` no longer recommends soft hyphens, `hyphens: manual`, `&nbsp;`, or
+  block-level `hyphens: none` in justified text.** Paged.js 0.4.3 marks a page split right after a
+  soft hyphen exactly like a split inside a word (`hyphenateAtBreak`), so the old cure re-created
+  the finding, and `manual` is the value under which soft hyphens break (measured). In a justified
+  block the advice now changes only the boundary word — `<span style="hyphens: none">` or
+  `white-space: nowrap` (both measured to leave no boundary hyphen), or rewording; `hyphens: none`
+  on the paragraph remains the fix for a block that is not justified.
+- **`type/excessive-word-spacing` and `layout/hyphen-across-page` state which of them owns
+  `hyphens`.** Their two texts pulled the same lever in opposite directions and said only that they
+  did. The word-spacing rule now owns the block-level `hyphens` setting of justified blocks and the
+  hyphen rule defers to it there; both advice texts say so, and the word-spacing advice adds that
+  `hyphens: auto` hyphenates only where the rendering browser has a dictionary for the language —
+  on the measured headless Chromium 141 it had none for English, so soft hyphens were the lever
+  that worked. The order is declared in the new registry field `remediation.interactions`, which
+  does not travel into reports: `Finding.remediation` still carries `advice` and `tested` only, and
+  no report, snapshot or configuration schema stamp moves. Both advice strings change.
+
+### Tooling
+
+- **A live suite asks the browser what the advice claims.** `tests/live/fragmentation-levers.test.ts`
+  (6 tests, registered in `tests/tools/live-run.mjs`; the live total goes from 71 to 77) renders two
+  self-authored fixtures through the production chain and pins, per case, the widows/orphans split
+  and whether Paged.js marks a soft-hyphen split. The literals live in
+  `tests/fixtures/fragmentation-levers.ts` and were recorded on Chromium 141; CI on the supported
+  Chrome is the authority. The suite fails in both directions — a browser that stops applying a
+  property, or applies it differently from what the published text says — and a red run lists the
+  advice and page sentences the pin decides.
+- **The registry guard that banned `widows`/`orphans` from all advice now follows that pin.** While
+  the pin shows the browser applying a property, no advice, rule page or repair-map line may call it
+  inert; if the pin ever shows otherwise, none may propose it. Each sentence the pin decides is
+  checked to be present and to agree with the pin.
+- **`remediation.interactions` is validated.** `defineRule` refuses a malformed declaration (self
+  reference, unknown relation or scope, an advice that does not name its partner); the registry test
+  runs `interactionProblems` over all rules and refuses a pair declared on one side only or with
+  both sides the same. `npm run docs:rules:write` renders a generated "Precedence" line into both
+  rule pages from the field, and `docs:rules:check` keeps it current. A docs check refuses any advice
+  or rule page that names block-level `hyphens: none` for justified text.
 
 ### Documentation
 
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as
   `true` does. This was always the behaviour; it is now written down in `docs/limitations.md` and
   pinned by a contract test.
+- `docs/rules/layout-widow.md` and `layout-orphan.md` replace the warning "Chromium does not honour
+  it under Paged.js" with the measured splits, and the widow page's 6+3 relaxation example now names
+  the declaration that produces it (`widows: 6; orphans: 6`). `docs/rules/layout-hyphen-across-page.md`
+  adds a justified remedied example and a measured limit: Paged.js sets its class only between ASCII
+  word characters or after a soft hyphen, so a split next to a letter such as `ü` is not reported.
 
 ## 0.6.0 — 2026-09-18
 

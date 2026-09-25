@@ -19,6 +19,12 @@ Detected by the paginator's own class, never by comparing characters. The hyphen
 
 A compound word at a page boundary without the paginator's class is not reported.
 
+Paged.js 0.4.3 sets the class only when the characters on both sides of its split are ASCII word
+characters or soft hyphens (`/^\w|\u00AD$/` in `hyphenateAtBreak`). A word split next to a letter
+such as `ü` or `ß` therefore carries neither the class nor a hyphen and is not reported —
+measured on Chromium 141 with a page split between `ü` and `ß` in an `overflow-wrap: anywhere`
+paragraph.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with
@@ -29,7 +35,9 @@ also why this rule ships with the severity it has.
 ## Remediation
 
 <!-- begin generated remediation: layout/hyphen-across-page -->
-The last text line on a page ends in a hyphen that breaks a word across the page boundary. The rule reads the paginator's own hyphenation class, so it only reports a hyphen Paged.js introduced — a hard hyphen you typed is not reported, and turning hyphenation off only helps where the paginator was doing the hyphenating. Apply 'hyphens: none' or 'hyphens: manual' to the paragraph, reword slightly, or insert non-breaking spaces ('&nbsp;') or soft hyphens ('&shy;') to shift the line break. Note that disabling hyphenation can produce 'type/excessive-word-spacing' findings in justified text; the two rules pull in opposite directions and neither threshold is calibrated.
+The last text line on a page ends in a hyphen that breaks a word across the page boundary. The rule reads the paginator's own hyphenation class, so it only reports a hyphen Paged.js introduced — a hard hyphen you typed is not reported. Paged.js marks a page split that falls inside a word, and a split right after a soft hyphen counts as one: do not insert soft hyphens ('&shy;') to cure this finding, and do not rely on 'hyphens: manual', under which soft hyphens still break. In justified text 'type/excessive-word-spacing' owns the block-level 'hyphens' setting, so change only the boundary word there: wrap it in '<span style="hyphens: none">' or 'white-space: nowrap', or reword slightly. In a block that is not justified, 'hyphens: none' on the paragraph is the direct fix.
+
+**Precedence.** `hyphens` in justified blocks: [`type/excessive-word-spacing`](type-excessive-word-spacing.md) owns the block-level setting, and this rule defers to it, changing that property only locally.
 <!-- end generated remediation: layout/hyphen-across-page -->
 
 ## Examples
@@ -43,12 +51,22 @@ The last text line on a page ends in a hyphen that breaks a word across the page
 </p>
 ```
 
-### Non-firing case (remedied)
+### Non-firing case (remedied), a block that is not justified
 
 ```html
-<!-- Disabling hyphens prevents hyphenation across the page break -->
+<!-- Not justified: disabling hyphenation on the paragraph prevents the boundary hyphen -->
 <p style="hyphens: none;">
   ...text wraps whole words cleanly before the page break...
+</p>
+```
+
+### Non-firing case (remedied), a justified block
+
+```html
+<!-- Justified: the block's hyphens setting belongs to type/excessive-word-spacing, so only the
+     boundary word changes -->
+<p style="text-align: justify; hyphens: auto;">
+  ...text ending page 1 with <span style="hyphens: none">boundaryword</span> and more text...
 </p>
 ```
 

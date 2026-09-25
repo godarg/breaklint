@@ -8,6 +8,9 @@
  * correction to either source never reached the other, and the drifting copy was the one a human
  * read.
  *
+ * The block carries the advice and, where the rule declares `remediation.interactions`, one
+ * precedence line per interaction, so a precedence is written once, in the rule, like the advice.
+ *
  * This module answers "what must the page say" and nothing else. It performs no I/O ON PURPOSE:
  * the first shape put the generator and the answer in one file, the unit test imported it for the
  * answer, and importing it REWROTE the pages the test was about to check — so the gate repaired
@@ -15,19 +18,37 @@
  * `write-rule-docs.ts`, which nothing under `tests/` imports.
  */
 
-import type { Rule } from "../src/core/rule.ts";
+import { INTERACTION_SCOPES, type Rule } from "../src/core/rule.ts";
 
 export const BEGIN = (id: string) => `<!-- begin generated remediation: ${id} -->`;
 export const END = (id: string) => `<!-- end generated remediation: ${id} -->`;
 
-export function pageNameFor(rule: Rule): string {
+export function pageNameFor(rule: Pick<Rule, "id">): string {
   return `${rule.id.replace("/", "-")}.md`;
+}
+
+/**
+ * One line per declared `remediation.interactions` entry, rendered from the registry and nothing
+ * else. Two advice texts that pull one lever in opposite directions have to say which one owns
+ * it, and a person reading one page must see the same order an agent reads in the finding. The
+ * pairing itself (both sides declared, opposite relations) is enforced by `interactionProblems`.
+ */
+export function precedenceLines(rule: Rule): string[] {
+  return (rule.remediation?.interactions ?? []).map((interaction) => {
+    const other = `[\`${interaction.ruleId}\`](${pageNameFor({ id: interaction.ruleId })})`;
+    const where = `\`${interaction.lever}\` ${INTERACTION_SCOPES[interaction.scope]}`;
+    return interaction.relation === "prevails"
+      ? `**Precedence.** ${where}: this rule owns the block-level setting, and ${other} defers to it, changing that property only locally.`
+      : `**Precedence.** ${where}: ${other} owns the block-level setting, and this rule defers to it, changing that property only locally.`;
+  });
 }
 
 /** The exact text the page must carry between its markers, including both delimiter lines. */
 export function generatedBlock(rule: Rule): string {
   const advice = rule.remediation?.advice ?? "";
-  return `${BEGIN(rule.id)}\n${advice}\n${END(rule.id)}`;
+  const precedence = precedenceLines(rule);
+  const body = precedence.length === 0 ? advice : `${advice}\n\n${precedence.join("\n\n")}`;
+  return `${BEGIN(rule.id)}\n${body}\n${END(rule.id)}`;
 }
 
 export type PageStatus = "current" | "rewritten" | "no-markers";

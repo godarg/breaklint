@@ -8,6 +8,10 @@ import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, pageByNumbe
  * The mirror of layout/widow, and it carries the same permanent ceiling of `warn` for the same
  * reason: the specification drops the rule rather than overflow the fragmentainer, so a
  * violation can be conforming. See docs/rules/layout-orphan.md.
+ *
+ * Like `widows`, the property is applied, not inert: Chromium honours it when Paged.js splits a
+ * paragraph, and with room for fewer lines than `orphans` it moves the whole paragraph to the
+ * next page (pinned by tests/live/fragmentation-levers.test.ts).
  */
 export const orphan = defineRule(
   {
@@ -22,7 +26,7 @@ export const orphan = defineRule(
     declines: ["env/multicolumn", "env/vertical-writing", "env/forced-break"],
     remediation: {
       advice:
-        "A block fragment ENDS at a page break carrying fewer lines than the block's own 'orphans' value (plus any configured extra lines) asks for. If this occurs inside a table row, keep the row together with 'tr { break-inside: avoid; }'. For paragraphs, move the block onto the next page with 'break-inside: avoid' or 'break-before: page', or reword/re-space the text. (Note: CSS 'orphans' is ignored by Paged.js).",
+        "A block fragment ENDS at a page break carrying fewer lines than the block's own 'orphans' value (plus any configured extra lines) asks for. Chromium applies a paragraph's 'widows' and 'orphans' when Paged.js splits it, and moves the whole paragraph to the next page when the page has room for fewer lines than 'orphans'; CSS Fragmentation Level 3 still permits a split that keeps fewer, so this rule is only a warning. Changing the block's 'orphans' moves the threshold with it and is not a fix. For paragraphs, move the block onto the next page with 'break-inside: avoid' or 'break-before: page', or reword/re-space the text. If this occurs inside a table row, keep the row together with 'tr { break-inside: avoid; }'.",
       // No trigger/remedied pair ships with this package and no gate re-runs one, so this
       // advice is untested in the sense the field defines.
       tested: false,
