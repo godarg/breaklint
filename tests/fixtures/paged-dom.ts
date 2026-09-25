@@ -275,6 +275,16 @@ export function fakePrimitives(document: FakeNode, hooks: {
       return [box];
     },
     painted: () => true,
+    // The font's own space advance, as the canvas answers it in production: here a quarter of the
+    // shorthand's pixel size plus the letter-spacing, so a test can tell it from any rendered range
+    // (4 px per character above). Only a well-formed shorthand is answered — style, caps, weight,
+    // stretch keyword, size, family, in that order — and the family `unloaded-face` stands for a
+    // font that is not loaded yet, which the production primitive answers with null.
+    spaceAdvance: (font: string, letterSpacing: string) => {
+      const match = /^(normal|italic|oblique(?: \S+)?) (normal|small-caps) (\d+) ([a-z-]+) ([\d.]+)px (.+)$/u.exec(font);
+      if (!match || match[6] === "unloaded-face" || !/^-?[\d.]+px$/u.test(letterSpacing)) return null;
+      return Number(match[5]) / 4 + Number.parseFloat(letterSpacing);
+    },
     styleSheets: () => [],
     sheetHref: () => null,
     sheetRules: () => [],

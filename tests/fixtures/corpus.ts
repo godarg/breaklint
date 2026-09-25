@@ -285,7 +285,10 @@ export function loadCorpus(): CorpusEntry[] {
         "Two continuation fragments: one single-column and conforming, one multi-column and " +
         "therefore declined. Coverage lands at exactly 0.5 — the default floor for a warning. " +
         "This fixture is what makes the coverage floor testable at all; without it the floor " +
-        "would only ever be exercised at 0 and 1, where a comparison bug is invisible.",
+        "would only ever be exercised at 0 and 1, where a comparison bug is invisible. The " +
+        "multi-column block's lines sit below the other block's: they used to share its line " +
+        "boxes, a geometry no page has, and line ownership then gives a shared line to the later " +
+        "record.",
       snapshot: snapshot({
         pages: [page(1), page(2)],
         blocks: [
@@ -294,7 +297,35 @@ export function loadCorpus(): CorpusEntry[] {
           block("mc1", { fragmentIndex: 0, fragmentCount: 2, page: 1, effectiveStyle: style({ columns: "2" }) }),
           block("mc2", { fragmentIndex: 1, fragmentCount: 2, page: 2, effectiveStyle: style({ columns: "2" }) }),
         ],
-        textLines: [line("ok1", 0), line("ok2", 1), line("mc1", 0), line("mc2", 1)],
+        textLines: [line("ok1", 0), line("ok2", 1), line("mc1", 2), line("mc2", 3)],
+      }),
+    },
+    {
+      name: "widow-clean-wrapper",
+      kind: "clean",
+      about: "layout/widow",
+      complication:
+        "A section around a paragraph that splits 8+1 exactly as its own widows: 1 asks. The " +
+        "collector records the paragraph's lines under the section too, and the section keeps the " +
+        "initial widows: judged by it, the paragraph's requested split was a widow of the wrapper " +
+        "(measured on patched Chromium 141, Paged.js 0.4.3). The section's lines on each page are " +
+        "all its paragraphs', so it has none of its own at the break.",
+      snapshot: snapshot({
+        pages: [page(1), page(2)],
+        blocks: [
+          block("sec1", { tag: "section", fragmentIndex: 0, fragmentCount: 2, page: 1, box: box(48, 48, 399, 154) }),
+          block("lead", { page: 1, box: box(48, 48, 399, 15.4) }),
+          block("inner1", { fragmentIndex: 0, fragmentCount: 2, page: 1, box: box(48, 63.4, 399, 123.2), effectiveStyle: style({ widows: 1 }) }),
+          block("sec2", { tag: "section", fragmentIndex: 1, fragmentCount: 2, page: 2, box: box(48, 48, 399, 15.4) }),
+          block("inner2", { fragmentIndex: 1, fragmentCount: 2, page: 2, box: box(48, 48, 399, 15.4), effectiveStyle: style({ widows: 1 }) }),
+        ],
+        textLines: [
+          ...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => line("sec1", i)),
+          line("lead", 0),
+          ...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => line("inner1", i)),
+          line("sec2", 0),
+          line("inner2", 0),
+        ],
       }),
     },
 
@@ -325,6 +356,32 @@ export function loadCorpus(): CorpusEntry[] {
           block("o2", { fragmentIndex: 1, fragmentCount: 2, page: 2, lines: [3, 4] }),
         ],
         textLines: [line("o1", 0), line("o1", 1), line("o1", 2), line("o2", 3), line("o2", 4)],
+      }),
+    },
+    {
+      name: "orphan-clean-wrapper-intro",
+      kind: "clean",
+      about: "layout/orphan",
+      complication:
+        "A section whose second paragraph moved to the next page whole: the section's first " +
+        "fragment holds one line, the intro paragraph's, which is complete. Counted as the " +
+        "section's own it was an orphan of the wrapper (measured on patched Chromium 141, " +
+        "Paged.js 0.4.3); the unwrapped document is clean.",
+      snapshot: snapshot({
+        pages: [page(1), page(2)],
+        blocks: [
+          block("sec1", { tag: "section", fragmentIndex: 0, fragmentCount: 2, page: 1, box: box(48, 48, 399, 190) }),
+          block("intro", { page: 1, box: box(48, 48, 399, 15.4) }),
+          block("spacer", { tag: "div", page: 1, box: box(48, 63.4, 399, 170), lines: [] }),
+          block("sec2", { tag: "section", fragmentIndex: 1, fragmentCount: 2, page: 2, box: box(48, 48, 399, 138.6) }),
+          block("inner", { page: 2, box: box(48, 48, 399, 138.6) }),
+        ],
+        textLines: [
+          line("sec1", 0),
+          line("intro", 0),
+          ...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => line("sec2", i)),
+          ...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => line("inner", i)),
+        ],
       }),
     },
 

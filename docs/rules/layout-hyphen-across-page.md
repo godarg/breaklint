@@ -25,6 +25,12 @@ such as `ü` or `ß` therefore carries neither the class nor a hyphen and is not
 measured on Chromium 141 with a page split between `ü` and `ß` in an `overflow-wrap: anywhere`
 paragraph.
 
+A boundary hyphen inside an inline element is not reported. Paged.js puts its class on the parent of
+the text node it cut, so when the cut word sits inside `<em>`, `<a>` or `<span>` the class is on that
+element, and the snapshot records only the block's own classes: measured on patched Chromium 141,
+the same split reported without `<em>` and silent with it. Reading it needs a field the snapshot does
+not carry yet.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with

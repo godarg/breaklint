@@ -19,6 +19,15 @@ The mirror of `layout/widow`, with the same permanent ceiling of `warn` for the 
 
 Skipped after a forced outgoing break, and on blocks with no visible text line.
 
+Only the lines of the block's own container count, and only the run of them that the break split,
+exactly as for [`layout/widow`](layout-widow.md). A wrapper records its paragraphs' line boxes too,
+and a `<section>` whose second paragraph moved whole to the next page used to be reported as an
+orphan for the one line its first fragment held — the intro paragraph's, which the break did not
+split. Measured on patched Chromium 141 with Paged.js 0.4.3 and now pinned by
+`tests/live/rule-targets.test.ts`. A fragment that ends on a nested block's line has no run of its
+own at the break. One case is still counted as before: a wrapper's own text that ends exactly at the
+break, with a nested block opening the next page, reads as a split run of its own.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with

@@ -150,6 +150,32 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const canvasHeightGet = getter(HTMLCanvasElement.prototype, "height");
   const imageDataFn = CanvasRenderingContext2D.prototype.getImageData;
   const imageDataGet = getter(ImageData.prototype, "data");
+  // The natural space of a font, for type/excessive-word-spacing. A space rendered on the page is
+  // no measure of it: in a justified line every space is stretched, and a space at a line end is
+  // collapsed to almost nothing (0.02 px measured). The font's own advance is asked of a canvas
+  // that is never inserted into the document, through references captured here like every other
+  // measurement, and only for a font that is already loaded — asking for one that is not would
+  // start a font load after the measured state (see the mark font below for what that costs).
+  const setter = (prototype, name) => {
+    let at = prototype;
+    while (at) {
+      const found = descriptor(at, name);
+      if (found && found.set) return found.set;
+      at = Object.getPrototypeOf(at);
+    }
+    return null;
+  };
+  // Taken from the document's own set rather than the FontFaceSet global, which not every
+  // Chromium exposes (141 does not); before any document script has run the two are the same.
+  const fontCheckFn = Object.getPrototypeOf(document.fonts).check;
+  const measureTextFn = CanvasRenderingContext2D.prototype.measureText;
+  const canvasFontGet = getter(CanvasRenderingContext2D.prototype, "font");
+  const canvasFontSet = setter(CanvasRenderingContext2D.prototype, "font");
+  const canvasLetterSpacingSet = setter(CanvasRenderingContext2D.prototype, "letterSpacing");
+  const canvasLetterSpacingGet = getter(CanvasRenderingContext2D.prototype, "letterSpacing");
+  const metricsWidthGet = getter(TextMetrics.prototype, "width");
+  const SPACE_FONT_SENTINEL = "7px __breaklint_space_sentinel__";
+  let spaceContext = null;
   const styleSheetsGet = getter(Document.prototype, "styleSheets");
   const adoptedStyleSheetsGet = getter(Document.prototype, "adoptedStyleSheets");
   const sheetHrefGet = getter(StyleSheet.prototype, "href");
@@ -356,6 +382,29 @@ const PRIMITIVES_TEMPLATE = `(() => {
           return { width, height, data: null };
         }
       },
+      // The advance of one U+0020 in a CSS font shorthand, with a letter-spacing length added the
+      // way the browser adds it to every character. null — never a guess — when the font is not
+      // loaded yet, when the canvas rejects the shorthand (it then keeps the sentinel), when the
+      // letter-spacing cannot be applied, or when anything throws.
+      spaceAdvance: (font, letterSpacing) => {
+        try {
+          if (call.call(fontCheckFn, call.call(fontsGet, document), font, " ") !== true) return null;
+          if (spaceContext === null) spaceContext = call.call(canvasContextFn, call.call(createElementFn, document, "canvas"), "2d");
+          if (!spaceContext) return null;
+          call.call(canvasFontSet, spaceContext, SPACE_FONT_SENTINEL);
+          call.call(canvasFontSet, spaceContext, font);
+          if (call.call(canvasFontGet, spaceContext) === SPACE_FONT_SENTINEL) return null;
+          if (!canvasLetterSpacingSet) { if (letterSpacing !== "0px") return null; }
+          else {
+            call.call(canvasLetterSpacingSet, spaceContext, letterSpacing);
+            if (call.call(canvasLetterSpacingGet, spaceContext) !== letterSpacing) return null;
+          }
+          const width = call.call(metricsWidthGet, call.call(measureTextFn, spaceContext, " "));
+          return typeof width === "number" && width > 0 && width < Infinity ? width : null;
+        } catch (_) {
+          return null;
+        }
+      },
       styleSheets: () => {
         const regular = call.call(sliceFn, call.call(styleSheetsGet, document));
         const adopted = adoptedStyleSheetsGet ? call.call(sliceFn, call.call(adoptedStyleSheetsGet, document)) : [];
@@ -465,7 +514,7 @@ export const PRIMITIVES_CHECK = `(() => {
     return { ok: false, reason: "the primitive references are replaceable, so they prove nothing" };
   }
   for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
-    "outerHtml", "painted", "byId", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
+    "outerHtml", "painted", "byId", "replaced", "canvas", "spaceAdvance", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
     "rects", "setAttr", "setText", "nodeType", "parent", "next", "create", "append", "remove", "setCssText",
     "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityRecordPreview",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",

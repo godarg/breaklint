@@ -501,10 +501,37 @@ export const SNAPSHOT_SOURCE = `(() => {
     visit(root);
     return out;
   };
+  // The natural space of a block: its own computed font's advance for U+0020, from the captured
+  // canvas measurement (P.spaceAdvance), plus its letter-spacing. It used to be read from the
+  // block's FIRST rendered whitespace, and neither kind of rendered space is natural: in a
+  // justified line every space is stretched, which hid wide gaps, and a space at a line end is
+  // collapsed — 0.02 px measured on patched Chromium 141 — which turned an ordinary justified gap
+  // into "540.50x the natural space". 0 when the font cannot be reproduced for the canvas or is
+  // not loaded; the rule declines such a block instead of dividing by a guess (it used to fall
+  // back to a third of the font size).
+  const STRETCH_KEYWORDS = { "50%": "ultra-condensed", "62.5%": "extra-condensed", "75%": "condensed",
+    "87.5%": "semi-condensed", "100%": "normal", "112.5%": "semi-expanded", "125%": "expanded",
+    "150%": "extra-expanded", "200%": "ultra-expanded" };
+  const spaceCache = {};
+  const naturalSpace = (s) => {
+    // Every key below contains "%" and every cache key "|", so no inherited property can answer.
+    const stretch = STRETCH_KEYWORDS[s.fontStretch || "100%"] || null;
+    // A canvas font shorthand carries neither of these; a font that uses them cannot be reproduced.
+    if (stretch === null || (s.fontVariationSettings || "normal") !== "normal"
+        || (s.fontSizeAdjust || "none") !== "none") return 0;
+    const font = [s.fontStyle || "normal", s.fontVariantCaps === "small-caps" ? "small-caps" : "normal",
+      s.fontWeight || "400", stretch, s.fontSize, s.fontFamily].join(" ");
+    const letterSpacing = !s.letterSpacing || s.letterSpacing === "normal" ? "0px" : s.letterSpacing;
+    const key = font + "|" + letterSpacing;
+    if (spaceCache[key] === undefined) {
+      const advance = P.spaceAdvance(font, letterSpacing);
+      spaceCache[key] = advance === null ? 0 : round(advance);
+    }
+    return spaceCache[key];
+  };
   const linesFor = (el, justify) => {
     const groups = [];
     const words = [];
-    let spaceWidth = 0;
     for (const node of textNodes(el)) {
       const value = P.text(node) || "";
       for (const r of P.range(node)) {
@@ -521,16 +548,9 @@ export const SNAPSHOT_SOURCE = `(() => {
         const rs = P.range(node, start, end);
         for (const r of rs) words.push({ text: match[0], x: round(r.x), y: round(r.y), width: round(r.width), height: round(r.height) });
       }
-      if (spaceWidth === 0) {
-        const at = value.search(/\\s/u);
-        if (at >= 0) {
-          const rs = P.range(node, at, at + 1);
-          if (rs[0] && rs[0].width > 0) spaceWidth = round(rs[0].width);
-        }
-      }
     }
     groups.sort((a, b) => a.y - b.y || a.x - b.x);
-    return { groups, words: justify ? words : null, spaceWidth };
+    return { groups, words: justify ? words : null };
   };
 
   fragments.forEach((item, sourceOrder) => {
@@ -554,7 +574,7 @@ export const SNAPSHOT_SOURCE = `(() => {
       nodeKey, sid, sourceIdentity, sourceOrder, plainText: (P.text(el) || "").replace(/\\s+/g, " ").trim(),
       page: pagesEls.indexOf(page) + 1, box: box(el), tag: el.tagName.toLowerCase(),
       classList: (P.attr(el, "class") || "").split(/\\s+/u).filter(Boolean), lineHeight,
-      spaceWidth: measured.spaceWidth || round(fontSize * 0.33),
+      spaceWidth: naturalSpace(s),
       effectiveStyle: { breakInside: s.breakInside || "auto", breakBefore: s.breakBefore || "auto",
         breakAfter: s.breakAfter || "auto", columns: s.columnCount || "auto", writingMode: s.writingMode || "horizontal-tb",
         visibility: s.visibility || "visible", widows: number(s.widows, 2), orphans: number(s.orphans, 2),

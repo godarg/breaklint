@@ -1,6 +1,8 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
-import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, pageByNumber, sourceOf, targetEvaluation } from "../shared.ts";
+import {
+  closingOwnLines, declined, layoutOutOfScope, lineOwnership, makeFinding, num, pageByNumber, sourceOf, targetEvaluation,
+} from "../shared.ts";
 
 /**
  * layout/orphan — the closing lines of a block on a page are fewer than the author asked for.
@@ -12,6 +14,10 @@ import { declined, layoutOutOfScope, linesOfBlock, makeFinding, num, pageByNumbe
  * Like `widows`, the property is applied, not inert: Chromium honours it when Paged.js splits a
  * paragraph, and with room for fewer lines than `orphans` it moves the whole paragraph to the
  * next page (pinned by tests/live/fragmentation-levers.test.ts).
+ *
+ * Like layout/widow it counts only the run of the block's own container's lines that the break
+ * split (`lineOwnership`, `closingOwnLines`), so a wrapper is not judged by its own value against
+ * its paragraphs' lines.
  */
 export const orphan = defineRule(
   {
@@ -38,6 +44,8 @@ export const orphan = defineRule(
     const evaluations = [];
     let candidates = 0;
     let measured = 0;
+    // Block containers: `widows` and `orphans` govern a container's line boxes.
+    const ownership = lineOwnership(snapshot, { containers: true });
 
     for (const block of snapshot.blocks) {
       // Only a fragment that has a successor can strand lines at the foot of a page.
@@ -58,7 +66,11 @@ export const orphan = defineRule(
       }
       measured += 1;
 
-      const lines = linesOfBlock(snapshot, block.nodeKey).length;
+      // The lines of this block's own container that the break split — the run that closes the
+      // fragment — never those of a block nested in it (see layout/widow and `lineOwnership`).
+      const owned = ownership(block);
+      const lines = closingOwnLines(owned);
+      const delegated = owned.delegated;
       const required = block.effectiveStyle.orphans + num(ctx.options.extraLines, 0);
       const violated = lines > 0 && lines < required && required > 1;
       evaluations.push(targetEvaluation({
@@ -68,13 +80,15 @@ export const orphan = defineRule(
           { name: "orphan-applicable-closing-lines", value: lines > 0, unit: null, operator: "=", threshold: true },
           { name: "closing-fragment-lines", value: lines, unit: "lines", operator: "<", threshold: required },
           { name: "orphans-requirement-exceeds-one", value: required, unit: "lines", operator: ">", threshold: 1 },
+          { name: "closing-fragment-lines-of-nested-blocks", value: delegated, unit: "lines", operator: null, threshold: null },
         ],
         connective: "all",
         violated,
       }));
       // A fragment with no visible text line has no text to strand. Found by the corpus
       // cross-check: without this the rule reports "0 lines" on a fragment carrying only a
-      // figure or an image — a false alarm on every document that splits around a picture.
+      // figure or an image — a false alarm on every document that splits around a picture. A
+      // fragment that meets the break with a nested block's line has no run of its own there.
       if (lines === 0) continue;
       if (lines >= required || required <= 1) continue;
 

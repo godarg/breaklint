@@ -21,6 +21,18 @@ The earlier justification for the downgrade was itself unmeasured: *in 230 runs 
 
 A block with no visible text line is skipped: there is no text to strand. Without that, a fragment carrying only a figure was reported as a widow with *0 lines* — found by the corpus cross-check, not by review.
 
+Only the lines of the block's own container count, and only the run of them that the break split.
+The collector records a block's lines from every text node beneath it, so a `<section>` or `<div>`
+around a paragraph carries the paragraph's line boxes too. Such a wrapper used to be judged by its
+own threshold against its paragraph's lines: a paragraph split exactly as it asked was reported as a
+widow of the section around it, measured on patched Chromium 141 with Paged.js 0.4.3 and now pinned
+by `tests/live/rule-targets.test.ts`. The paragraph is the one judged; a wrapper is reported only for
+a break that splits text of its own, and a continuation that opens with a nested block's line has
+none. A `display: contents` element is no block container: a line that a block around it also holds
+is that block's. Ownership is read from line geometry and collection order, and its known limits —
+text of the wrapper's own between two nested blocks on one line, a `display: contents` element with
+no block around it — are listed at `lineOwnership` in `src/rules/shared.ts`.
+
 ## Calibration
 
 `calibrated: false`. The threshold has not been fitted to a corpus of real documents with

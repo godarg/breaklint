@@ -520,3 +520,33 @@ it is not admitted here, not hashed here and not reproducible from this reposito
 cites the number says "a corpus constructed for this purpose"; this paragraph says the rest of it.
 The decision it supports is reversible by configuration and moves no exit code either way, which is
 why it was taken on that evidence — the same standard would not have been enough for a gating rule.
+
+**Which block a split belongs to is read from line geometry, not from the element tree.** The
+snapshot records a block's lines from every text node beneath it and carries no parent link, so a
+wrapper and the paragraph inside it hold the same line boxes. `layout/widow` and `layout/orphan`
+give a line to the latest record in collection order (pages ascending, document order within a
+page) that records it and has a box of its own, and count only the run of a block's own lines next
+to the break. What that cannot see: the wrapper's own text lying between two nested blocks on one
+line (between two floats) is inside their span and goes to them; a wrapper's own text that ends
+exactly at a break, with a nested block opening the next page, still reads as a split run of its
+own, because telling it from a split needs the wrapper's next fragment, which the rules do not
+join; and a `display: contents` element with no boxed block around it keeps its lines and is judged
+by its own value. `type/excessive-word-spacing` asks about the text rather than its container: it
+gives a line to the deepest record that records it, box or not, because that element's font set the
+gaps. The same limit on text between two nested blocks applies there.
+
+**The natural space is the block's own font's, and only where a canvas can reproduce the font.**
+`type/excessive-word-spacing` divides by the advance of one space in the block's computed font plus
+its `letter-spacing`, measured with a canvas inside the page once `document.fonts` reports the font
+loaded. A block whose font is not loaded yet, or which sets `font-variation-settings`,
+`font-size-adjust` or a `font-stretch` that is not a keyword, is declined as
+`env/invalid-measurement` and counted against coverage. A gap next to an inline element in another
+font is still measured against the block's own space. The agreement with rendered spaces (within
+0.03 px on unjustified last lines) was measured on patched Chromium 141 with the machine's default
+fonts; CI on current Chrome re-takes it in `tests/live/rule-targets.test.ts`.
+
+**A boundary hyphen inside an inline element is not reported.** Paged.js marks the parent of the
+text node it cut, and when the cut word sits inside `<em>`, `<a>` or `<span>` that parent is not a
+recorded block; `layout/hyphen-across-page` reads each block's own classes only. Measured on
+patched Chromium 141, the same split was reported without `<em>` and not with it. Reading it needs a
+snapshot field that is not there yet.

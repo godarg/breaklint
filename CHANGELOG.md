@@ -142,6 +142,53 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   longer says the last page is "downgraded to a note": its finding keeps `warn`, and only the
   message says the page is likely intended. The rule stays experimental and off by default, and
   nothing here is a calibration.
+- **`layout/widow` and `layout/orphan` judge a split at the block whose own lines it split, not at
+  a wrapper around it.** The collector records a block's lines from every text node beneath it, so a
+  `<section>` or `<div>` that crosses a page break carries its paragraphs' line boxes as well, and
+  both rules judged those lines by the WRAPPER's own value. Measured on patched Chromium 141 with
+  Paged.js 0.4.3, no evidence binding: a paragraph that asked for single-line widows and split 8+1
+  was reported as a `layout/widow` of the section around it, and a section whose second paragraph
+  moved whole to the next page was reported as a `layout/orphan` for the one line its first
+  fragment held — the intro paragraph's; the unwrapped controls reported neither. Both rules now
+  count the run of the block's own container's lines next to the break: a line belongs to the
+  latest record in collection order that records it and has a box of its own, a `display: contents`
+  record never takes a line from the block around it, and a fragment that meets the break with a
+  nested block's line has no run of its own there. The nested paragraph is judged as before, by its
+  own value, and a real widow inside a wrapper is reported once, on the paragraph. A wrapper's own
+  text split by the break is still judged — and a section whose own two-line text split 1+1 below a
+  nested paragraph is now an orphan too, which the old count, adding the paragraph's line, missed.
+  For a block without nested blocks nothing changes. Consumers see wrapper fragments measured with
+  0 lines where they carried findings, and a fourth, informational measurement in both rules'
+  evaluations (`opening-fragment-lines-of-nested-blocks`, `closing-fragment-lines-of-nested-blocks`).
+  Advice and message texts are unchanged. Pinned by `tests/live/rule-targets.test.ts`, which
+  repeats three pinned geometries of `tests/fixtures/widows-orphans.html` inside sections.
+- **`type/excessive-word-spacing` divides by the font's natural space, not by the block's first
+  rendered space.** In justified text no rendered space is natural. At a line end it collapses: a
+  justified monospace block whose first space fell there recorded 0.02 px and reported an ordinary
+  gap as "540.50× the natural space" (patched Chromium 141, Paged.js 0.4.3). Inside a justified line
+  it is stretched with that line, which divided a real six-space gap by itself: a block with gaps of
+  six and seven spaces was clean, and every other block's factors were deflated. The collector now
+  records the block's own font's advance for one space plus its `letter-spacing`, measured in the
+  page with a canvas that is never inserted into the document, through a new captured primitive,
+  and only once `document.fonts` reports the font loaded, so the measurement cannot start a font
+  load after the measured state; on patched Chromium 141 it matched the gaps of unjustified last
+  lines within 0.03 px for serif, sans-serif, monospace, a quoted family, bold, italic, small caps,
+  condensed, a 13.5 px size and 2 px letter-spacing. Where it cannot be measured — a font not loaded yet,
+  `font-variation-settings`, `font-size-adjust`, or a `font-stretch` that is not a keyword — the
+  snapshot records `spaceWidth` 0 and the rule declines the block as `env/invalid-measurement`
+  (newly listed in its declared decline reasons), counted against coverage. It used to fall back to
+  a third of the font size, and a block with no space at all left the rule without being counted.
+  Expect more findings on justified documents whose first spaces were stretched, fewer where they
+  were collapsed, and the decline where a font cannot be reproduced. No schema stamp moves: the
+  snapshot field keeps its shape and meaning, and only its value source changed.
+- **`type/excessive-word-spacing` judges a line at the block whose font sets it.** A justified
+  wrapper records its paragraphs' lines too. With the natural space now the font's own, a serif
+  `<div style="text-align: justify">` around a monospace paragraph reported the paragraph's
+  seven-space gap a second time, on the div, as 16.84 of the div's spaces (patched Chromium 141);
+  before, both read the paragraph's stretched first space and the wrapper duplicated whatever the
+  paragraph showed. A line now belongs to the deepest record that records it, with or without a box
+  of its own (a `display: contents` paragraph's text is set in its font), and a wrapper is measured
+  on its own text only. Its evaluations carry an informational `lines-of-nested-blocks` measurement.
 
 ### Added
 
@@ -257,6 +304,11 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
 
 ### Documentation
 
+- **`layout/hyphen-across-page` states a known miss: a boundary hyphen inside an inline element.**
+  Paged.js puts its class on the parent of the text node it cut, so a word cut inside `<em>`, `<a>`
+  or `<span>` carries the class on that element, and the snapshot records only each block's own
+  classes. Measured on patched Chromium 141: the same split is reported without `<em>` and not with
+  it. The rule page says so; reading it needs a field the snapshot does not carry yet.
 - `docs/limitations.md` now states that a document with a page that carries no source block — the
   blank page a `break-before: recto` inserts — cannot complete required evidence: a page binds only
   on marks it carries, so such a run ends `insufficient-coverage` (exit 4) under evidence binding.

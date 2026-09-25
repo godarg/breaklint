@@ -1,0 +1,34 @@
+<!doctype html>
+<!--
+  What type/excessive-word-spacing divides by: the natural space of the block's font
+  (tests/live/rule-targets.test.ts).
+
+  THE COMPLICATION is where a rendered space can be read. The collector used to take the block's
+  FIRST rendered whitespace, and in justified text no rendered space is natural:
+
+    - hanging: the first space falls at a line end, where it collapses to a fraction of a pixel, so
+      an ordinary justified gap read as hundreds of times the natural space — a false finding;
+    - inline: the first space falls inside a justified line and is stretched with it, which is not
+      a finding here but deflates every factor;
+    - wide: that deflation hiding a real one — the first line carries a single gap stretched to six
+      spaces, and it was the divisor, so the rule read 1.0;
+    - natural: a block whose last line is not justified, whose gaps ARE natural spaces: the value the
+      collector records must match them;
+    - wrapped: the wide paragraph again, inside a justified `<div>` set in serif. The div records the
+      paragraph's lines too; divided by the div's own serif space, the paragraph's seven-space gap
+      read 16.84 spaces and was reported a second time, on the div.
+
+  Monospace at a fixed 12px and a width in `ch`, so every line break is decided by character counts
+  rather than by glyph widths, and the gaps are whole multiples of one advance.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>natural space</title><style>
+@page { size: 400px 300px; margin: 40px; }
+body { margin: 0; font-family: serif; font-size: 12px; line-height: 20px; }
+p { margin: 0 0 20px; font-family: monospace; font-size: 12px; width: 17ch; text-align: justify; }
+</style></head><body>
+<p id="hanging">aaaaaaaaaaaaaaa bbbbbbbbbbbbbbb cccc dddd eeeeee ffff</p>
+<p id="inline">aaaa aaaa aaaaaa bbbbbbbbbbbbbbb cccc dddd eeeeee ffff</p>
+<p id="wide">aaaaaaaaaa b cccccc dddd eeeeeeeeeeeee</p>
+<p id="natural">aaaaaaaaaaaaaaaa bb cc dd ee</p>
+<div id="wrapper" style="font-family: serif; text-align: justify"><p id="wrapped">aaaaaaaaaa b cccccc dddd eeeeeeeeeeeee</p></div>
+</body></html>

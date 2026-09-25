@@ -1,7 +1,7 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  declined, isNotRendered, layoutOutOfScope, linesOfBlock, makeFinding, notRenderedEvaluation, num, sourceOf, targetEvaluation,
+  declined, isNotRendered, layoutOutOfScope, lineOwnership, makeFinding, notRenderedEvaluation, num, sourceOf, targetEvaluation,
 } from "../shared.ts";
 
 /**
@@ -15,6 +15,12 @@ import {
  * to a window around page boundaries, which contradicted the rule that needs them; the cost of
  * keeping them all was measured at 4 221 bytes per page, about 8 MiB over 2 000 pages, and that
  * is affordable. The limit was not a trade-off, it was an unmeasured assumption.
+ *
+ * The divisor is the block's NATURAL space: its own font's advance for one space, measured by the
+ * collector (`spaceWidth`), never a space rendered on the page — a justified space is stretched,
+ * and a space at a line end collapses to almost nothing, which once reported an ordinary gap as
+ * 540 times the natural one. A block whose natural space could not be measured is declined as
+ * `env/invalid-measurement`.
  *
  * This rule owns the block-level `hyphens` setting and the soft hyphens of justified blocks;
  * `layout/hyphen-across-page` defers to it on both and changes only the boundary word
@@ -30,7 +36,7 @@ export const excessiveWordSpacing = defineRule(
     unit: "× natural space",
     defaultOptions: { maxSpaceFactor: 3.0 },
     summary: "Word gaps in a justified block are far wider than the natural space.",
-    declines: ["env/multicolumn", "env/vertical-writing"],
+    declines: ["env/multicolumn", "env/vertical-writing", "env/invalid-measurement"],
     remediation: {
       advice:
         "Justified text produces word spacing exceeding the uncalibrated threshold ('rivers' of whitespace). Use left alignment ('text-align: left;'), insert soft hyphens ('&shy;') into long words, or enable hyphenation with 'hyphens: auto;' together with an HTML 'lang' attribute. Automatic hyphenation happens only where the rendering browser has a hyphenation dictionary for that language; where it has none, 'hyphens: auto' changes nothing and soft hyphens are the lever that works. This rule owns the block-level 'hyphens' setting and the soft hyphens of justified text: where a hyphen, soft or automatic, then falls on a page boundary, 'layout/hyphen-across-page' changes only that word and neither turns hyphenation off nor removes soft hyphens for the block.",
@@ -50,6 +56,11 @@ export const excessiveWordSpacing = defineRule(
     let candidates = 0;
     let measured = 0;
     const maxFactor = num(ctx.options.maxSpaceFactor, 3.0);
+    // The text, not its container: a line's gaps are set in the font of the deepest record that
+    // records it, and are that record's to judge. A justified wrapper records its paragraphs'
+    // lines too; divided by the wrapper's own natural space they reported its paragraph's gaps a
+    // second time, and in the wrapper's font (see `lineOwnership`).
+    const ownership = lineOwnership(snapshot, { containers: false });
 
     for (const block of snapshot.blocks) {
       if (!/justify/u.test(block.effectiveStyle.textAlign)) continue;
@@ -57,7 +68,6 @@ export const excessiveWordSpacing = defineRule(
       const ws = block.effectiveStyle.wordSpacing.trim();
       if (ws && ws !== "normal" && ws !== "0px") continue;
       if (block.tag.toLowerCase() === "td" || block.tag.toLowerCase() === "th") continue;
-      if (block.spaceWidth <= 0) continue;
       // No layout box, no lines, no gaps: a justified running header's hidden in-flow original
       // was counted as measured with nothing in it. A `display: contents` block has no box but has
       // lines, and its gaps are printed; it is measured from them like any other block.
@@ -73,11 +83,24 @@ export const excessiveWordSpacing = defineRule(
         evaluations.push(targetEvaluation({ ruleId: "type/excessive-word-spacing", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: outOfScope }));
         continue;
       }
+      // Every factor is divided by the natural space. Without one there is no factor, and a
+      // guessed divisor is a guessed finding: the block is declined and counted, never skipped
+      // (it used to leave the rule silently, outside the candidates).
+      if (!(block.spaceWidth > 0)) {
+        notMeasured.push(declined({ scope: "block", ruleId: "type/excessive-word-spacing", reason: "env/invalid-measurement" }));
+        evaluations.push(targetEvaluation({
+          ruleId: "type/excessive-word-spacing", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+          fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: "env/invalid-measurement",
+          measurements: [{ name: "natural-space-width", value: block.spaceWidth, unit: "px", operator: ">", threshold: 0 }],
+        }));
+        continue;
+      }
       measured += 1;
 
       let worst = 0;
       let worstLine = 0;
-      for (const line of linesOfBlock(snapshot, block.nodeKey)) {
+      const owned = ownership(block);
+      for (const { line } of owned.lines.filter((entry) => entry.owned)) {
         const boxes = line.wordBoxes;
         if (!boxes || boxes.length < 2) continue;
         for (let i = 1; i < boxes.length; i += 1) {
@@ -93,7 +116,10 @@ export const excessiveWordSpacing = defineRule(
           }
         }
       }
-      evaluations.push(targetEvaluation({ ruleId: "type/excessive-word-spacing", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured", measurements: [{ name: "largest-word-gap-factor", value: worst, unit: "× natural space", operator: ">", threshold: maxFactor }], violated: worst > maxFactor }));
+      evaluations.push(targetEvaluation({ ruleId: "type/excessive-word-spacing", keyType: "block", nodeKey: block.nodeKey, sid: block.sid, fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "measured", measurements: [
+        { name: "largest-word-gap-factor", value: worst, unit: "× natural space", operator: ">", threshold: maxFactor },
+        { name: "lines-of-nested-blocks", value: owned.delegated, unit: "lines", operator: null, threshold: null },
+      ], violated: worst > maxFactor }));
       if (worst <= maxFactor) continue;
 
       findings.push(
