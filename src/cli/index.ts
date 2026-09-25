@@ -252,7 +252,9 @@ options
   --locale <tag>            Locale for the type/ rules (default de-DE).
   --no-evidence-binding     Skip the evidence marks. Findings keep bindsFinding: false.
   --no-source-map           Skip source id injection. Every finding then has source: null.
-  --allow-network <origin>  Permit one origin. Repeatable. Default is fully offline.
+  --allow-network <origin>  Let page requests reach this origin. Repeatable. By default
+                            page requests are blocked; this is not an egress control
+                            (see SECURITY.md).
   --help, --version
 
 exit codes

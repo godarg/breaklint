@@ -371,7 +371,8 @@ that did not change, and those changes come first.
   `PUPPETEER_DANGEROUS_NO_SANDBOX=true` and honours `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES`,
   and the browser inherits variables such as `CHROME_EXTRA_FLAGS`. The documents now say so, tell
   operators to keep those variables unset, and recommend a container or network namespace with no
-  egress for untrusted documents. Nothing in the code changed.
+  egress for untrusted documents. The `--help` line for `--allow-network` now says the same;
+  nothing else in the code changed.
 - `docs/limitations.md` lists two known false-clean defects this release does not fix:
   `body { column-count: 1 }` can end `clean` (exit 0) over a PDF missing most of the document, and
   a `display: contents` heading split by a page break can lose its continuation at exit 0. Its
