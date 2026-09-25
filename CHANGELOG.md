@@ -531,8 +531,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   own CI job and by the release workflow** (`tests/tools/corpus-gate.ts`; job `corpus` in
   `ci.yml`, a build and then the gate, with no condition and no `continue-on-error`; a step in the
   release workflow's `validate-pack` job after the real-document gate). It implements the corpus
-  README's five gate steps: every manifest file verified by SHA-256 and length, and every document
-  and expected file bound to exactly one manifest document; one built-CLI invocation per document
+  README's five gate steps and its run conditions, and holds the manifest's copies of both
+  (`gate.steps`, `gate.runConditions`) against the README verbatim: every manifest file verified by
+  SHA-256 and length, and every document and expected file bound to exactly one manifest document
+  under the `documents/<id>.html` / `expected/<id>.expected.json` layout; one built-CLI invocation per document
   under the default profile; exit 3 passes only as `render-unstable` inside the expected set;
   otherwise exit set and page range; then per rule `mustFire`, `mustNotFire`, the closed world,
   declines checked by count per rule and reason, `measuredAlternative` entries all or nothing, and

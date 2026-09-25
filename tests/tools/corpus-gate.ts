@@ -179,12 +179,59 @@ export function verifyManifest(corpusRoot: string): VerifiedManifest {
       if (owners.length !== 1) fail(`${directory}/${name} belongs to ${owners.length === 0 ? "no manifest document" : `${owners.length} manifest documents (${owners.join(", ")})`}; it must belong to exactly one`);
     }
     for (const item of documents) {
+      // Run conditions: "the layout is exactly `documents/<id>.html` and `expected/<id>.expected.json`".
       const rel = relative(absolute, pathOf(item));
-      if (rel.startsWith("..") || rel.includes(sep)) fail(`${item.id}: its ${directory === "documents" ? "document" : "expected file"} is not directly in ${directory}/`);
+      const name = directory === "documents" ? `${item.id}.html` : `${item.id}.expected.json`;
+      if (rel !== name) fail(`${item.id}: its ${directory === "documents" ? "document" : "expected file"} is ${directory}/${rel.split(sep).join("/")}, not ${directory}/${name}`);
     }
   }
   if (typeof manifest.manifestId !== "string") fail("manifest has no manifestId");
+  checkGateText(manifest.gate, root, verified);
   return { root, manifestId: manifest.manifestId, documents, filesVerified: verified.size };
+}
+
+/**
+ * The procedure this gate implements is the README's; `manifest.json` `gate.steps` and
+ * `gate.runConditions` repeat it verbatim. Both are held against the (hash-verified) README here,
+ * item by item and in order, so neither copy can drift from the text the gate was written against.
+ */
+export function readmeGateText(readme: string): { steps: string[]; runConditions: string[] } {
+  const start = readme.indexOf("\n## How a gate consumes this\n");
+  if (start < 0) fail("README.md has no section 'How a gate consumes this'");
+  const end = readme.indexOf("\n## ", start + 5);
+  const lines = readme.slice(start, end < 0 ? undefined : end).split("\n");
+  const steps: string[] = [];
+  for (const line of lines) {
+    const match = /^(\d+)\. (.+)$/u.exec(line);
+    if (!match) continue;
+    if (Number(match[1]) !== steps.length + 1) fail(`README.md gate step ${match[1]} is out of order`);
+    steps.push(match[2]!);
+  }
+  const at = lines.findIndex((line) => line.startsWith("Run conditions"));
+  if (at < 0) fail("README.md has no Run conditions list");
+  const runConditions: string[] = [];
+  for (const line of lines.slice(at + 1)) {
+    if (line.trim() === "" && runConditions.length === 0) continue;
+    if (!line.startsWith("- ")) break;
+    runConditions.push(line.slice(2));
+  }
+  return { steps, runConditions };
+}
+
+function checkGateText(gate: unknown, root: string, verified: Map<string, string>): void {
+  const readmePath = join(root, "README.md");
+  if (!verified.has(readmePath)) fail("README.md, which defines the gate procedure, is not bound by manifest files");
+  if (!isObject(gate)) fail("manifest has no gate object");
+  const text = readmeGateText(readFileSync(readmePath, "utf8"));
+  for (const key of ["steps", "runConditions"] as const) {
+    const copy = gate[key];
+    if (!Array.isArray(copy) || !copy.every((item) => typeof item === "string")) fail(`manifest gate.${key} is not a list of strings`);
+    if (text[key].length === 0) fail(`README.md has no gate ${key}`);
+    if (copy.length !== text[key].length) fail(`manifest gate.${key} has ${copy.length} items, README.md has ${text[key].length}`);
+    copy.forEach((item, i) => {
+      if (item !== text[key][i]) fail(`manifest gate.${key}[${i}] is not README.md's text verbatim`);
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -400,7 +447,7 @@ export type FieldType =
   | { kind: "number" }
   | { kind: "literal"; value: string | boolean }
   | { kind: "opaque" }
-  | { kind: "array"; of: FieldType }
+  | { kind: "array"; of: FieldType; length?: number }
   | { kind: "map"; of: FieldType; keys?: RegExp }
   | { kind: "object"; fields: Record<string, Field> }
   /** A list of rule entries; each item is checked against `ENTRY_FIELDS[list]`. */
@@ -426,7 +473,7 @@ const T = {
   opaque: { kind: "opaque" } as FieldType,
   target: { kind: "target" } as FieldType,
   literal: (value: string | boolean): FieldType => ({ kind: "literal", value }),
-  array: (of: FieldType): FieldType => ({ kind: "array", of }),
+  array: (of: FieldType, length?: number): FieldType => (length === undefined ? { kind: "array", of } : { kind: "array", of, length }),
   map: (of: FieldType, keys?: RegExp): FieldType => (keys ? { kind: "map", of, keys } : { kind: "map", of }),
   object: (fields: Record<string, Field>): FieldType => ({ kind: "object", fields }),
   entries: (list: ListName): FieldType => ({ kind: "entries", list }),
@@ -459,9 +506,9 @@ export const FIELD_LIST: Record<string, Field> = {
     pageRule: I(T.string),
     size: I(T.string),
     orientation: I(T.string),
-    pageBoxCssPx: I(T.array(T.number)),
+    pageBoxCssPx: I(T.array(T.number, 2)),
     margins: I(T.string),
-    contentBoxCssPx: I(T.array(T.number)),
+    contentBoxCssPx: I(T.array(T.number, 2)),
     selector: I(T.string, false),
     observed: I(T.string, false),
     note: I(T.string, false),
@@ -615,7 +662,7 @@ const URI_TARGET_ATTRIBUTES = new Set(["href", "src", "poster", "data", "xlink:h
 function typeName(type: FieldType): string {
   switch (type.kind) {
     case "literal": return JSON.stringify(type.value);
-    case "array": return `array of ${typeName(type.of)}`;
+    case "array": return type.length === undefined ? `array of ${typeName(type.of)}` : `[${Array(type.length).fill(typeName(type.of)).join(", ")}]`;
     case "map": return `map of ${typeName(type.of)}`;
     default: return type.kind;
   }
@@ -647,7 +694,7 @@ function checkType(value: unknown, type: FieldType, label: string): void {
     case "opaque": return;
     case "target": if (!isObject(value)) wrong(); return;
     case "array":
-      if (!Array.isArray(value)) wrong();
+      if (!Array.isArray(value) || (type.length !== undefined && value.length !== type.length)) wrong();
       (value as unknown[]).forEach((item, i) => checkType(item, type.of, `${label}[${i}]`));
       return;
     case "map":
@@ -792,6 +839,8 @@ function localName(attribute: string): string {
 
 interface TargetScope {
   ruleId: string;
+  /** The labels of `verification.fontStacks`. */
+  fontStacks: string[];
   index: SourceIndex;
   /** Resolved pages of the rule's `mustNotFire` `pageOf` targets, for the `pages` allowance. */
   mustNotFirePages: () => number[];
@@ -802,7 +851,7 @@ function svgText(scope: TargetScope, svg: SourceElement, id: unknown, label: str
   const text = elementById(scope.index, id, label);
   if (text.tag !== "text" || text.namespace !== SVG_NS) fail(`${label}: "${String(id)}" is not an SVG <text> element`);
   // README Targets table (E36): X is T's nearest `<svg>` ancestor, for `{svg, id}` and every id
-  // in `texts`; "a gate that finds otherwise fails the entry".
+  // in `texts`; a file where it does not is malformed (Field list, "Malformed truth").
   if (nearestSvg(text) !== svg) fail(`${label}: "${String(id)}" does not have "${svg.id ?? "?"}" as its nearest <svg>`);
   return text;
 }
@@ -891,6 +940,13 @@ export function compileTarget(raw: unknown, scope: TargetScope, shapes: string[]
     elementById(scope.index, pageOf.id, `${scope.label} pageOf`);
     if (!["first", "last", "middle"].includes(pageOf.fragment as string)) fail(`${scope.label}: pageOf.fragment must be first, last or middle`);
     const pages = intArray(pageOf.resolvedPages, `${scope.label} pageOf.resolvedPages`);
+    // Field list: "a map from each label of `verification.fontStacks` to a list of pages"; README
+    // "Page targets": `resolvedPages` is "the union, over the three font stacks".
+    const byStack = pageOf.resolvedPagesByFontStack as Record<string, number[]>;
+    const stacks = Object.keys(byStack).sort();
+    if (stacks.join(",") !== [...scope.fontStacks].sort().join(",")) fail(`${scope.label}: resolvedPagesByFontStack names ${stacks.join(", ")}, verification.fontStacks names ${scope.fontStacks.join(", ")}`);
+    const union = [...new Set(stacks.flatMap((stack) => byStack[stack]!))].sort((a, b) => a - b);
+    if (union.join(",") !== [...new Set(pages)].sort((a, b) => a - b).join(",")) fail(`${scope.label}: resolvedPages [${pages.join(", ")}] is not the union of resolvedPagesByFontStack [${union.join(", ")}]`);
     pageOfPages = pages;
     conditions.push((finding) => pages.includes(finding.page));
   }
@@ -938,6 +994,7 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
 
   const parityBlankPages = (expected.parityBlankPages as Record<string, unknown>).count as number;
   if (parityBlankPages < 0) fail(`${label}: parityBlankPages.count must not be negative`);
+  const fontStacks = Object.keys((expected.verification as { fontStacks: Record<string, unknown> }).fontStacks);
   const permitted = stringArray(expected.permittedDeclineReasons, `${label} permittedDeclineReasons`);
   const inactive = stringArray(expected.notActiveInDefaultProfile, `${label} notActiveInDefaultProfile`, false);
   const rulesRaw = expected.rules as Record<string, Record<string, unknown>>;
@@ -949,7 +1006,7 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
     const ruleLabel = `${label} ${ruleId}`;
     const compiled: CompiledRule = { ruleId, mustFire: [], mustNotFire: [], allowed: [], declines: [] };
     const mustNotFirePages: number[] = [];
-    const scopeFor = (entryLabel: string): TargetScope => ({ ruleId, index, mustNotFirePages: () => mustNotFirePages, label: entryLabel });
+    const scopeFor = (entryLabel: string): TargetScope => ({ ruleId, index, fontStacks, mustNotFirePages: () => mustNotFirePages, label: entryLabel });
     // E40, "Identity": no target repeats within one list; `mustFire`, `mustNotFire` and `allowed`
     // share no target; a `mustFire` or `allowed` target may also appear in `expectedDeclines`.
     const findingListOf = new Map<string, string>();
@@ -978,7 +1035,7 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
       if (overlap.length) fail(`${ruleLabel}: mustFire and mustNotFire page sets overlap on ${overlap.join(", ")}`);
     }
 
-    const groups = new Map<string, { required: boolean[]; alternative: boolean[]; counts: (number | null)[]; alternatives: MeasuredAlternativeTarget[] }>();
+    const groups = new Map<string, { required: boolean[]; alternative: boolean[]; counts: (number | null)[]; alternatives: MeasuredAlternativeTarget[]; forms: Set<string> }>();
     const declineKeys = new Map<string, string>();
     (rule.expectedDeclines as Record<string, unknown>[]).forEach((entry, i) => {
       const entryLabel = `${ruleLabel} expectedDeclines[${i}]`;
@@ -994,7 +1051,7 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
       const alternative = entry.measuredAlternative === true;
       // Compiling the target checks that it resolves in the source, even where only the count is judged.
       compileTarget(entry.target, scopeFor(entryLabel));
-      const group = groups.get(reason) ?? { required: [], alternative: [], counts: [], alternatives: [] };
+      const group = groups.get(reason) ?? { required: [], alternative: [], counts: [], alternatives: [], forms: new Set<string>() };
       group.required.push(entry.required as boolean);
       group.alternative.push(alternative);
       group.counts.push(typeof entry.count === "number" ? entry.count : null);
@@ -1010,7 +1067,8 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
           const texts = stringArray(targetRaw.texts, `${entryLabel} texts`);
           const perText = entry.perText as Record<string, unknown>[];
           const perIds = perText.map((item) => item.id as string);
-          if ([...perIds].sort().join(",") !== [...texts].sort().join(",") || new Set(perIds).size !== perIds.length) fail(`${entryLabel}: perText ids differ from the target's texts`);
+          // Field list: "one item per listed text, in the same order".
+          if (perIds.join(",") !== texts.join(",")) fail(`${entryLabel}: perText ids [${perIds.join(", ")}] are not the target's texts [${texts.join(", ")}] in the same order`);
           targets = perText.map((item) => {
             if (item.ifMeasured !== "mustFire" && item.ifMeasured !== "mustNotFire") fail(`${entryLabel}: perText ${String(item.id)} ifMeasured must be mustFire or mustNotFire`);
             const text = svgText(svgScope, svg, item.id, `${entryLabel} perText`);
@@ -1027,6 +1085,7 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
         // README invariant: "every measuredAlternative entry's count equals the number of its targets".
         if (entry.count !== targets.length) fail(`${entryLabel}: count ${String(entry.count)} differs from its ${targets.length} target(s)`);
         group.alternatives.push(...targets);
+        group.forms.add("texts" in targetRaw ? "texts" : "use");
       } else if ("ifMeasured" in entry || "perText" in entry) {
         fail(`${entryLabel}: ifMeasured and perText belong to measuredAlternative entries`);
       }
@@ -1037,6 +1096,8 @@ export function compileExpected(raw: unknown, index: SourceIndex, binding: { id:
       // all `required: false`, and either all `measuredAlternative` or none".
       if (new Set(group.required).size !== 1) fail(`${ruleLabel} ${reason}: required and non-required entries are mixed`);
       if (new Set(group.alternative).size !== 1) fail(`${ruleLabel} ${reason}: measuredAlternative and plain entries are mixed`);
+      // README invariant: "No rule and reason mixes halo and `<use>` entries."
+      if (group.forms.size > 1) fail(`${ruleLabel} ${reason}: halo (texts) and <use> entries are mixed`);
       const counts = group.counts;
       compiled.declines.push({
         reason,

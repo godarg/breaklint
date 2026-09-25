@@ -302,10 +302,13 @@ test("page targets match Finding.page; the pages allowance excludes the mustNotF
   // The allowance does not reach a mustNotFire page, so that finding is also unaccounted.
   assert.equal(onForbiddenPage.unaccounted, 1);
   assertFail(judge(raw, outcome([finding("layout/orphaned-continuation-page", null, { page: 1 })])), /mustFire missed/u);
-  // resolvedPagesByFontStack is informational (E38): its type is checked, not its content.
-  const disagreeing = expectedFile({ "layout/orphaned-continuation-page": { mustFire: [{ target: { pageOf: { id: "p1", fragment: "last", resolvedPages: [3], resolvedPagesByFontStack: { reference: [3], dejavu: [4], free: [3] } } } }] } });
-  assertPass(judge(disagreeing, outcome([finding("layout/orphaned-continuation-page", null, { page: 3 })])));
-  const mistyped = expectedFile({ "layout/orphaned-continuation-page": { mustFire: [{ target: { pageOf: { id: "p1", fragment: "last", resolvedPages: [3], resolvedPagesByFontStack: { reference: 3 } } } }] } });
+  // resolvedPagesByFontStack (E43): one entry per label of verification.fontStacks, and
+  // resolvedPages is their union (README "Page targets").
+  const notUnion = expectedFile({ "layout/orphaned-continuation-page": { mustFire: [{ target: { pageOf: { id: "p1", fragment: "last", resolvedPages: [3], resolvedPagesByFontStack: { reference: [3], dejavu: [4], free: [3] } } } }] } });
+  assert.throws(() => compile(notUnion), /resolvedPages \[3\] is not the union of resolvedPagesByFontStack \[3, 4\]/u);
+  const missingStack = expectedFile({ "layout/orphaned-continuation-page": { mustFire: [{ target: { pageOf: { id: "p1", fragment: "last", resolvedPages: [3], resolvedPagesByFontStack: { reference: [3], dejavu: [3] } } } }] } });
+  assert.throws(() => compile(missingStack), /resolvedPagesByFontStack names dejavu, reference, verification\.fontStacks names reference, dejavu, free/u);
+  const mistyped = expectedFile({ "layout/orphaned-continuation-page": { mustFire: [{ target: { pageOf: { id: "p1", fragment: "last", resolvedPages: [3], resolvedPagesByFontStack: { reference: 3, dejavu: [3], free: [3] } } } }] } });
   assert.throws(() => compile(mistyped), /resolvedPagesByFontStack\.reference: expected array of integer/u);
 });
 
@@ -353,6 +356,8 @@ test("a non-required decline is checked only against permittedDeclineReasons", (
 });
 
 test("measuredAlternative entries are all or nothing per rule and reason", () => {
+  // Two halo entries under one reason (as sa10 and sa11 have), and a <use> entry under another:
+  // the README forbids mixing halo and <use> entries within one rule and reason.
   const raw = expectedFile({
     "svg/text-overflows-viewport": {
       expectedDeclines: [
@@ -360,28 +365,34 @@ test("measuredAlternative entries are all or nothing per rule and reason", () =>
           target: { svg: "s1", texts: ["t1", "t2"] }, reason: "env/svg-painted-bounds-unsupported", required: true, count: 2, measuredAlternative: true,
           perText: [pt("t1", "mustNotFire"), pt("t2", "mustFire")],
         },
-        { target: { svg: "s1", use: "u1" }, reason: "env/svg-painted-bounds-unsupported", required: true, count: 1, measuredAlternative: true, ifMeasured: "mustNotFire" },
+        {
+          target: { svg: "s1", texts: ["t3"] }, reason: "env/svg-painted-bounds-unsupported", required: true, count: 1, measuredAlternative: true,
+          perText: [pt("t3", "mustNotFire")],
+        },
+        { target: { svg: "s1", use: "u1" }, reason: "env/svg-ctm-unavailable", required: true, count: 1, measuredAlternative: true, ifMeasured: "mustNotFire" },
       ],
     },
-  });
+  }, { permittedDeclineReasons: ["env/forced-break", "env/svg-painted-bounds-unsupported", "env/svg-ctm-unavailable"] });
   const rows = (count: number) => [{ scope: "svg", ruleId: "svg/text-overflows-viewport", reason: "env/svg-painted-bounds-unsupported", target: null, count }];
-  // Declined: the report's sum equals the entries' total.
-  const declined = judge(raw, outcome([], { notMeasured: rows(3) }));
+  const useRow = { scope: "svg", ruleId: "svg/text-overflows-viewport", reason: "env/svg-ctm-unavailable", target: null, count: 1 };
+  // Declined: the report's sum equals the entries' total, per rule and reason.
+  const declined = judge(raw, outcome([], { notMeasured: [...rows(3), useRow] }));
   assertPass(declined);
-  assert.equal(declined.declines[0]!.state, "declined");
+  assert.deepEqual(declined.declines.map((d) => d.state), ["declined", "declined"]);
   // Declined, but a finding on a target is not covered by the alternative.
-  assertFail(judge(raw, outcome([finding("svg/text-overflows-viewport", span("t2"))], { notMeasured: rows(3) })), /unaccounted finding/u);
+  assertFail(judge(raw, outcome([finding("svg/text-overflows-viewport", span("t2"))], { notMeasured: [...rows(3), useRow] })), /unaccounted finding/u);
   // Measured: the mustFire text needs a finding, and that finding is covered.
   const measured = judge(raw, outcome([finding("svg/text-overflows-viewport", span("t2"))]));
   assertPass(measured);
-  assert.equal(measured.declines[0]!.state, "measured");
+  assert.deepEqual(measured.declines.map((d) => d.state), ["measured", "measured"]);
   assertFail(judge(raw, outcome([])), /measured target without a finding/u);
-  // Measured: a mustNotFire text, including the text a <use> references, must have none.
+  // Measured: a mustNotFire text of either entry, and the text a <use> references, must have none.
   assertFail(judge(raw, outcome([finding("svg/text-overflows-viewport", span("t2")), finding("svg/text-overflows-viewport", span("t1"))])), /ifMeasured mustNotFire.*t1/u);
+  assertFail(judge(raw, outcome([finding("svg/text-overflows-viewport", span("t2")), finding("svg/text-overflows-viewport", span("t3"))])), /ifMeasured mustNotFire.*t3/u);
   assertFail(judge(raw, outcome([finding("svg/text-overflows-viewport", span("t2")), finding("svg/text-overflows-viewport", span("tdef"))])), /ifMeasured mustNotFire.*use/u);
   // Any other sum fails, below and above the total.
   assertFail(judge(raw, outcome([finding("svg/text-overflows-viewport", span("t2"))], { notMeasured: rows(1) })), /all \(3\) or nothing \(0\)/u);
-  assertFail(judge(raw, outcome([], { notMeasured: rows(4) })), /all \(3\) or nothing \(0\)/u);
+  assertFail(judge(raw, outcome([], { notMeasured: [...rows(4), useRow] })), /all \(3\) or nothing \(0\)/u);
   // The format invariants hold: count equals the number of targets, perText equals texts.
   assert.throws(() => compile(expectedFile({ "svg/text-overflows-viewport": { expectedDeclines: [{
     target: { svg: "s1", texts: ["t1", "t2"] }, reason: "env/svg-painted-bounds-unsupported", required: true, count: 3, measuredAlternative: true,
@@ -390,7 +401,7 @@ test("measuredAlternative entries are all or nothing per rule and reason", () =>
   assert.throws(() => compile(expectedFile({ "svg/text-overflows-viewport": { expectedDeclines: [{
     target: { svg: "s1", texts: ["t1", "t2"] }, reason: "env/svg-painted-bounds-unsupported", required: true, count: 2, measuredAlternative: true,
     perText: [pt("t1", "mustNotFire")],
-  }] } })), /perText ids differ/u);
+  }] } })), /perText ids \[t1\] are not the target.s texts \[t1, t2\]/u);
 });
 
 test("exit and page steps: exit 3 passes only as render-unstable in the set; otherwise set and range", () => {
@@ -581,7 +592,7 @@ function fieldListDivergences(readme: string, encoded: {
 
   // Entries: the "Required:" sentence, then the table of N and I keys.
   const entriesText = rest.replace(/\n/gu, " ");
-  const requiredSentence = /Required: (.*?) Every other key is optional/u.exec(entriesText)?.[1] ?? "";
+  const requiredSentence = /Required: (.*?) Every other key/u.exec(entriesText)?.[1] ?? "";
   const readmeRequired = new Map<string, Set<string>>();
   for (const match of requiredSentence.matchAll(/((?:`\w+`(?:, | and )?)+) in ((?:`\w+`(?:, | and )?)+)/gu)) {
     for (const list of keysIn(match[2]!)) for (const key of keysIn(match[1]!)) readmeRequired.set(list, new Set([...(readmeRequired.get(list) ?? []), key]));
@@ -603,7 +614,7 @@ function fieldListDivergences(readme: string, encoded: {
   const perText = /`perText\[\]` \([^)]*\): (.*?)\. /u.exec(entriesText)?.[1];
   if (!perText) issues.push("Field list has no perText sentence");
   else {
-    const [nPart, iPart] = perText.split("(N);");
+    const [nPart, iPart] = perText.split(/\(N[^)]*\);/u);
     differ("perText N keys", sortedSet(keysIn(nPart!)), sortedSet(Object.entries(encoded.perText).filter(([, field]) => field.role === "N").map(([name]) => name)));
     differ("perText I keys", sortedSet(keysIn(iPart ?? "")), sortedSet(Object.entries(encoded.perText).filter(([, field]) => field.role === "I").map(([name]) => name)));
     const opaqueAt = (iPart ?? "").indexOf("opaque");
@@ -615,7 +626,7 @@ function fieldListDivergences(readme: string, encoded: {
   const shape = (keys: string) => keys.split(",").map((key) => key.trim()).sort().join("+");
   differ("target shapes", sortedSet([...shapesText.matchAll(/`\{([^}]*)\}`/gu)].map((match) => shape(match[1]!))), sortedSet(encoded.shapes.map((keys) => shape(keys.join(",")))));
   differ("uri keys", shape(/`uri` is `\{([^}]*)\}`/u.exec(entriesText)?.[1] ?? ""), shape(Object.keys(encoded.uri).join(",")));
-  const pageOf = /`pageOf` is\s*`\{([^}]*)\}`\s*\(the last one I/u.exec(entriesText)?.[1] ?? "";
+  const pageOf = /`pageOf` is\s*`\{([^}]*)\}`[^(]*\(the last one I/u.exec(entriesText)?.[1] ?? "";
   differ("pageOf keys", shape(pageOf), shape(Object.keys(encoded.pageOf).join(",")));
   const pageOfKeys = pageOf.split(",").map((key) => key.trim());
   pageOfKeys.forEach((key, i) => differ(`pageOf.${key} role`, i === pageOfKeys.length - 1 ? "I" : "N", encoded.pageOf[key]?.role ?? "-"));
@@ -713,9 +724,13 @@ function makeCorpus(options: { documents?: number; expected?: Json } = {}) {
   const expectedBytes = Buffer.from(JSON.stringify(options.expected ?? expectedFile({ "layout/widow": { mustFire: [{ target: { id: "p1" } }] } })));
   writeFileSync(join(corpus, "expected/syn.expected.json"), expectedBytes);
   const digest = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
+  // The gate procedure is the real README's, repeated in the manifest as the real corpus does.
+  const readmeBytes = readFileSync(join(ROOT, "corpus/public/selfauthored-v1/README.md"));
+  writeFileSync(join(corpus, "README.md"), readmeBytes);
   const files = [
     { path: "documents/syn.html", sha256: HTML_SHA, byteLength: HTML_BYTES.length },
     { path: "expected/syn.expected.json", sha256: digest(expectedBytes), byteLength: expectedBytes.length },
+    { path: "README.md", sha256: digest(readmeBytes), byteLength: readmeBytes.length },
   ];
   const documents = (options.documents ?? 1) === 0 ? [] : [{
     id: "syn",
@@ -724,7 +739,8 @@ function makeCorpus(options: { documents?: number; expected?: Json } = {}) {
     pagesRange: [2, 3],
     expectedExit: [0, 1],
   }];
-  const manifest = { contractVersion: "selfauthored-corpus-v1", manifestId: "syn-v1", calibrationEvidenceEligible: false, profile: "default", documentCount: documents.length, documents, files };
+  const gate = (JSON.parse(readFileSync(join(ROOT, "corpus/public/selfauthored-v1/manifest.json"), "utf8")) as { gate: { steps: string[]; runConditions: string[] } }).gate;
+  const manifest = { contractVersion: "selfauthored-corpus-v1", manifestId: "syn-v1", calibrationEvidenceEligible: false, profile: "default", gate, documentCount: documents.length, documents, files };
   writeFileSync(join(corpus, "manifest.json"), JSON.stringify(manifest));
   writeFileSync(join(root, "fake-cli.mjs"), FAKE_CLI);
   return { root, corpus, manifest };
@@ -870,7 +886,7 @@ test("a source in another coordinate system lies within no span", () => {
 });
 
 test("expected-file invariants the gate enforces before any run", () => {
-  const byStack = (pages: number[]) => ({ reference: pages });
+  const byStack = (pages: number[]) => ({ reference: pages, dejavu: pages, free: pages });
   assert.throws(() => compile(expectedFile({ "layout/orphaned-continuation-page": {
     mustFire: [{ target: { pageOf: { id: "p1", fragment: "last", resolvedPages: [3, 4], resolvedPagesByFontStack: byStack([3, 4]) } } }],
     mustNotFire: [{ target: { pageOf: { id: "p1", fragment: "middle", resolvedPages: [4], resolvedPagesByFontStack: byStack([4]) } } }],
@@ -1017,6 +1033,63 @@ test("process boundary: what the CLI leaves in its group after a normal exit is 
     assert.equal(run.status, 0, run.stdout + run.stderr);
     assert.match(run.stdout, /note syn: the CLI exited and left 1 process\(es\) in its group; they were terminated/u);
     assert.equal(alive(Number(readFileSync(pidFile, "utf8"))), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("E43: perText follows the listed texts in order, halo and <use> entries do not mix, box sizes are pairs", () => {
+  const declines = (entries: Json[]) => expectedFile({ "svg/text-overflows-viewport": { expectedDeclines: entries } });
+  const halo = (texts: string[], perText: Json[]) => ({ target: { svg: "s1", texts }, reason: "env/svg-painted-bounds-unsupported", required: true, count: texts.length, measuredAlternative: true, perText });
+  const use = { target: { svg: "s1", use: "u1" }, reason: "env/svg-painted-bounds-unsupported", required: true, count: 1, measuredAlternative: true, ifMeasured: "mustNotFire" };
+  compile(declines([halo(["t1", "t2"], [pt("t1", "mustNotFire"), pt("t2", "mustFire")])]));
+  assert.throws(() => compile(declines([halo(["t1", "t2"], [pt("t2", "mustFire"), pt("t1", "mustNotFire")])])), /are not the target's texts \[t1, t2\] in the same order/u);
+  compile(declines([use]));
+  assert.throws(() => compile(declines([halo(["t1"], [pt("t1", "mustNotFire")]), use])), /halo \(texts\) and <use> entries are mixed/u);
+  const paper = (pageBoxCssPx: number[]) => expectedFile({}, { paper: [{ pageRule: "@page", size: "A4", orientation: "portrait", pageBoxCssPx, margins: "20mm", contentBoxCssPx: [1, 2] }] });
+  compile(paper([793.7, 1122.5]));
+  assert.throws(() => compile(paper([793.7])), /pageBoxCssPx: expected \[number, number\]/u);
+});
+
+test("E43: manifest gate.steps and gate.runConditions are the README's text verbatim", () => {
+  const { root, corpus, manifest } = makeCorpus();
+  const rewrite = (change: (copy: typeof manifest) => void) => {
+    const copy = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
+    change(copy);
+    writeFileSync(join(corpus, "manifest.json"), JSON.stringify(copy));
+  };
+  try {
+    verifyManifest(corpus);
+    rewrite((copy) => { copy.gate.steps[1] = copy.gate.steps[1]!.replace("default profile", "strict profile"); });
+    assert.throws(() => verifyManifest(corpus), /gate\.steps\[1\] is not README\.md's text verbatim/u);
+    rewrite((copy) => { copy.gate.runConditions.pop(); });
+    assert.throws(() => verifyManifest(corpus), /gate\.runConditions has 6 items, README\.md has 7/u);
+    rewrite((copy) => { copy.gate.runConditions.reverse(); });
+    assert.throws(() => verifyManifest(corpus), /gate\.runConditions\[0\] is not README\.md's text verbatim/u);
+    rewrite((copy) => { (copy as { gate?: unknown }).gate = undefined; });
+    assert.throws(() => verifyManifest(corpus), /manifest has no gate object/u);
+    rewrite((copy) => { copy.files = copy.files.filter((file) => file.path !== "README.md"); });
+    assert.throws(() => verifyManifest(corpus), /README\.md, which defines the gate procedure, is not bound/u);
+    // The README side: a changed README (with its hash updated) no longer matches the manifest's copy.
+    const readme = readFileSync(join(corpus, "README.md"), "utf8").replace("- the report's `exitCode` equals the process exit code;\n", "");
+    writeFileSync(join(corpus, "README.md"), readme);
+    rewrite((copy) => { copy.files = copy.files.map((file) => file.path === "README.md" ? { ...file, sha256: createHash("sha256").update(readme).digest("hex"), byteLength: Buffer.byteLength(readme) } : file); });
+    assert.throws(() => verifyManifest(corpus), /gate\.runConditions has 7 items, README\.md has 6/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("E43 run conditions: the layout is exactly documents/<id>.html and expected/<id>.expected.json", () => {
+  const { root, corpus, manifest } = makeCorpus();
+  try {
+    writeFileSync(join(corpus, "documents/other.html"), HTML_BYTES);
+    const copy = JSON.parse(JSON.stringify(manifest)) as typeof manifest;
+    copy.files = copy.files.map((file) => file.path === "documents/syn.html" ? { ...file, path: "documents/other.html" } : file);
+    copy.documents[0]!.artifact.relativePath = "documents/other.html";
+    rmSync(join(corpus, "documents/syn.html"));
+    writeFileSync(join(corpus, "manifest.json"), JSON.stringify(copy));
+    assert.throws(() => verifyManifest(corpus), /syn: its document is documents\/other\.html, not documents\/syn\.html/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
