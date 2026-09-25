@@ -4,12 +4,16 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## Release in preparation — 0.7.0 — the rules judge what printed
+## Released — 0.7.0 — the rules judge what printed
 
-This is the release-preparation record. Nothing about 0.7.0 is published: there is no tag, no npm
-version and no GitHub Release for it, and the 0.6.0 record below stays the current published
-record until the release workflow has run. The changelog heading carries `TBD-at-tag`
-until the final dated commit.
+**Published 2026-09-25.** Annotated tag `v0.7.0` on the dated commit `73e7a90`; release
+workflow run 36132850535 green in all four jobs (validate and pack once, clean consumers on Node 24
+and 22.13.0, publish). npm `latest` is 0.7.0 with an npm publish attestation and SLSA provenance;
+the registry tarball and the GitHub Release asset are the same bytes (SHA-256
+`7f6172238095cebca92af70be195b87a05e8967e46e011d63c86300cc5dff681`). A clean install on macOS
+arm64 ran `npx breaklint --demo` to exit 1, and its JSON report arrived through a pipe at the
+same 86 161 bytes as with `--out`. The record below was written at release preparation; where it
+says "not published" it describes that moment.
 
 | | |
 |---|---|
