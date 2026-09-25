@@ -276,6 +276,103 @@ The report-surface gate has two explicit modes over the complete matrix in
   transfers a historical human PASS onto changed inputs and does not require a ceremonial
   re-review for a technical release gate.
 
+### Review package: what the human reviewer opens, checks and records
+
+The strict gate passes only on a genuine human review. The tooling prepares the surfaces and
+checks the record; it never writes a round, and no agent may write one that passes.
+
+**1. Render on the machine you review on.** A review binds the declared environment (browser
+product and four-part version, platform, architecture, Node major line, launch arguments,
+viewports, print contract). From a clean checkout of the commit under review run `npm ci`, then
+`npm run test:report-surfaces:technical`. It renders into `.artifacts/report-surfaces` and must pass
+before anything is reviewed. Do not edit a bound input afterwards (`src/report`, `src/rules`,
+`src/core`, `src/config`, the surface tools, the fixtures, `package.json`, the lockfile, CI): any
+change unbinds the review and means rendering again.
+
+**2. Open**, in `.artifacts/report-surfaces/`:
+
+- `review-gallery.html` in a browser: every full page, every viewport-height tile and every
+  printed page, per state;
+- each `<state>--a4.pdf` in a PDF viewer, because the gallery shows rasters, not the PDF;
+- `manifest.json`, for the values the round copies.
+
+The matrix is 32 cells: four states × light/dark × 1440/768/390 px screens, plus one PDF and its
+page rasters per state. A screen cell counts as reviewed only when its full page and every one of
+its tiles were looked at.
+
+**3. Check**, for every state:
+
+- the verdict, exit code and gate effect are true before any detail, and only clean says "Clean run";
+- nothing is illegible in either theme, including the tinted remediation and note boxes;
+- headings are in the serif display face, text in sans, identifiers in mono;
+- on tablet and phone:
+  - nothing is cut off and nothing scrolls sideways;
+  - rule ids break only after their slash;
+  - paths break after a slash, or inside one segment only when that segment alone is wider than
+    its line — judge whether the wrapped real-shaped evidence name reads acceptably;
+- coverage columns align with their headers, "Below floor" reads without colour, and no table
+  continues onto a page with a single row;
+- in print:
+  - "Page N of M" on every page, and the running head with the run id from page 2;
+  - the end mark on the final page only;
+  - no non-final page ends far short;
+  - a split finding continues at its labelled tail;
+  - a continued table repeats its header under a single rule;
+  - the untested-advice caveat appears once;
+- whatever the gate cannot see: spacing, hierarchy, anything that reads as broken or misleading.
+
+State in the round's note whether you accept these known residuals:
+
+- the tail label prints on every finding, split or not;
+- an over-long evidence name wraps inside itself;
+- `ubuntu-latest` font resolution is unmeasured (NEEDS-CI).
+
+**4. Record the round.** Append ONE new round to the ledger, and never edit or remove an earlier
+one. It carries:
+
+- `round`: the next number;
+- `record: "current"`;
+- `outcome`: `pass`, `fail` or `pending`;
+- `reviewedAt`: an exact UTC timestamp at or after `manifest.generatedAt`;
+- `reviewers`: your role as `{ "kind": "human", "handle": "@Neo" }`, using `@Brand`, `@Neo` or
+  `@Founder`;
+- `binding`: `reviewInputFingerprint` and `renderManifestGeneratedAt` copied from the manifest's
+  `reviewInputFingerprint` and `generatedAt`, and `reviewEnvironment` copied whole;
+- `physicalArtifactsReviewed`: `manifest.physicalArtifacts`, copied whole;
+- `findings`: counts by severity;
+- `note`;
+- one `cells` entry per manifest artifact.
+
+Each cell entry has:
+
+- `status`: `pass`, `fail` or `not-reviewed`;
+- `reviewer`: your handle;
+- `reviewedAt`: exact UTC, at or after `manifest.generatedAt`;
+- `note`: at least 12 characters;
+- `reviewArtifactFingerprint`, copied from the artifact;
+- `reviewedArtifacts`:
+  - for a screen: its path, then every tile path;
+  - for a PDF: its path;
+  - for a raster set: every page path;
+- `reviewedRawSha256`, the artifact's `sha256` (for a raster set, every page's);
+- `reviewedNormalizedRgbaSha256` for screens: `pixels.normalizedRgbaSha256`;
+- `reviewedPages` for a PDF and a raster set: 1 … N.
+
+Record the truth:
+
+- If anything fails, record `fail` with the findings counted and the failed cells marked. A failed
+  round is valid evidence and keeps the gate red.
+- If you stop part-way, record `pending` with every cell `not-reviewed`.
+- An agent that helped may be listed with `kind: "agent"` and its `model`. It may record a failed
+  cell, never a passed one.
+- Never copy an earlier round's cells.
+
+Then run `npm run test:report-surfaces:local`. It passes only when your round passed, every cell
+passed under a rostered human, the round is a current record reviewed after its render, and it is
+bound to exactly the current inputs, environment, cell fingerprints, pixels, named artifacts and
+inventory; otherwise the message names what differs. Commit the ledger change yourself; the
+reviewer of that commit checks who made it (see "What the roster check does not do" below).
+
 ### Review ledger and declared review environment
 
 `tests/golden/report-surfaces/review-ledger.json` (ledger format version 5, its `schemaVersion`)
