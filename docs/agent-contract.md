@@ -22,7 +22,7 @@ Always check the process exit code before inspecting findings. Never interpret m
 
 ### Critical Rule for Exit 4 (`insufficient-coverage`)
 When breaklint exits with code 4, the report may show zero findings (`findings: []`). **This is not a clean pass.**
-Exit 4 does not require a decline: `--only layout/widow --disable layout/widow` leaves no rule to run and ends exit 4 with "no rule measured a single candidate". Where candidates were declined, `documents[].coverage` shows the rule below its floor and `documents[].notMeasured[].reason` names why, as an `env/` id. The two `error` rules require full coverage in the default profile, so one decline by either of them is enough: `layout/unbreakable-block-too-tall` declines on `env/multicolumn` or `env/vertical-writing`, and `svg/text-overflows-viewport` on `env/svg-not-inline`, `env/svg-no-text`, `env/svg-too-many-text-targets`, `env/svg-ctm-unavailable`, `env/svg-viewport-geometry-unsupported` or `env/svg-painted-bounds-unsupported`. Each list is complete for its rule; `tests/unit/agent-contract.test.ts` fails when a rule declares a coverage-relevant reason this page does not list. A target that is out of scope altogether — `env/svg-overflow-visible` — does not count against coverage.
+Exit 4 does not require a decline: `--only layout/widow --disable layout/widow` leaves no rule to run and ends exit 4 with "no rule measured a single candidate". Where candidates were declined, `documents[].coverage` shows the rule below its floor and `documents[].notMeasured[].reason` names why, as an `env/` id. The two `error` rules require full coverage in the default profile, so one decline by either of them is enough: `layout/unbreakable-block-too-tall` declines on `env/multicolumn`, `env/vertical-writing` or `env/invalid-measurement` (a split block whose fragments cannot be joined by source id, or a printed block with no box of its own), and `svg/text-overflows-viewport` on `env/svg-not-inline`, `env/svg-no-text`, `env/svg-too-many-text-targets`, `env/svg-ctm-unavailable`, `env/svg-viewport-geometry-unsupported` or `env/svg-painted-bounds-unsupported`. Each list is complete for its rule; `tests/unit/agent-contract.test.ts` fails when a rule declares a coverage-relevant reason this page does not list. A target that is out of scope altogether — `env/svg-overflow-visible` — does not count against coverage.
 
 **The CLI does not write a `context.json`.** `--format` offers `json | sarif | console | html | junit | markdown` and nothing else; the context pack exists only through the library call `writeReportBundle(report, {outDir})`, which writes `report.json`, `context.json`, `report.html`, `bundle.json` and the verified `assets/` together (see `docs/reporting.md`). If you are driving the CLI, `report.json` is your only machine-readable surface, and everything below that names a `context.json` field names a projection you must produce yourself.
 
@@ -62,8 +62,9 @@ are the only rules that gate by default. See `docs/limitations.md` for what "unc
   replaced elements (`img`, `svg`, `canvas`, `video`, `table`), clips them to the content box, and
   divides the summed band height by the content box height (`src/measure/snapshot.ts`). Half-leading
   falls between the bands and no element margin ever enters the rectangles, so the quantity is
-  systematically smaller than the fill a reader perceives. A page of prose at `line-height: 1.5`
-  reaches at most about 0.686 — against a threshold of 0.60.
+  systematically smaller than the fill a reader perceives. Full pages of prose at
+  `line-height: 1.5` read 0.58–0.72 with this collector, and less with more leading — against a
+  threshold of 0.60, so some full pages fall below it. There is no fixed ceiling to reason from.
 - **Consequence:** the rule fires on pages a reader would call full — measured on a 40-document
   corpus built to exercise it, 37 of 40. It is `experimental`, never gates, and since 0.6.0 is not
   active in the default profile, so a default run does not emit it at all. The name promises a

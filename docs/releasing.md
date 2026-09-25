@@ -284,3 +284,8 @@ npx breaklint --demo
 The version must be `X.Y.Z`; demo must produce real findings and exit 1. Import
 `breaklint/config.schema.json` and rerun the installed Configuration Contract gate. The later status
 commit records the completed release but is not retroactively part of the published tarball.
+
+The GitHub Action (`action.yml`) installs `breaklint@<package.json version>` of the ref it is
+called at, so `uses: godarg/breaklint@vX.Y.Z` works only from the moment the npm publish above
+has succeeded, and a branch ref fails with exit 3 from the version bump until then. Announce or
+move nothing that points users at the new tag's Action before `npm view breaklint@X.Y.Z` answers.
