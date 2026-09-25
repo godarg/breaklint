@@ -154,3 +154,36 @@ New register items:
 - **WebRTC:** a document's `RTCPeerConnection` sent STUN to a non-loopback address under the default offline launch. Closed in WP-C2 with a profile preference; the TURN-over-TCP case under `--allow-network` remains, documented.
 
 Probe PRs #20 (reopened for F1 round 3), #21 and #22 were commented and closed without merging.
+
+## 2026-09-25 — wave 3: integrations, stops, and new packages
+
+Integration branch `claude/inspiring-archimedes-x2xq5t` (draft PR godarg/breaklint#18):
+
+| head | adds | CI |
+|---|---|---|
+| 2cae038 | WP-K3 | green |
+| 9c97c0d / 5a2aef0 | WP-E1 (+ progress log) | run 36091216378 green (check, action, node-floor) |
+| d0623d1 | WP-F1 (3380781 + integration merge bfbeadb) | green |
+| 8c3e4fd | WP-F4 (bce1e79) | run 36094144890 green |
+| 2a7ba4c | WP-F1b (e20bed8; Snapshot 4 → 5) | run 36100693632 green |
+
+Verdicts since the last entry (frozen commit → verdict, B/H/M/L open):
+
+| package | rounds | state |
+|---|---|---|
+| WP-F1 | 3380781 PASS (0/0/2/5); CI #20 green incl. evidence binding | integrated |
+| WP-F1b | 75f596d PASS (0/0/1/4; CI #29 green) → e20bed8 orchestrator delta check | integrated |
+| WP-F4 | 745180c PASS → f2b79bd delta check → bce1e79 merge | integrated |
+| WP-C1+C2 | 14d62d3 **FAIL** (0/2/3/3: Chrome 153 DoH egress past the resolver lock; inherited CHROME_EXTRA_FLAGS reaches the browser) | **stopped** (second consecutive FAIL with new high) |
+| WP-F3 | 8a374a2 **FAIL** (1/2/4/3) | **stopped** |
+| WP-R1 | ed84d2c **FAIL** (0/2/3/4) | **stopped** |
+| WP-F5 | 1fa776a FAIL (1/1/3/4) → dc664e3 **FAIL** (0/1/0/4; CI #27 green, block-footnote pages bind; new: a footnote clipped at the area's bottom edge still binds) | **stopped** |
+| WP-L1 | c5b3709 PASS (0/0/4/6) → 2352abf FAIL (0/1/1/4) → 48efb2f **FAIL** (0/1/1/4; `@import` without whitespace escapes discovery, pre-existing) | **stopped** |
+| WP-X | 52e9446 FAIL (1/0/3/6) → 9750c5e **FAIL** (1/2/1/6) | **stopped** |
+| WP-K2 | af300ec FAIL (0/2/2/4) → 0cbf466 under verification | 15/20 locally; the 5 failures need F5 and L1 |
+| WP-R2 | 1ab49f7 FAIL (0/2/2/6) → c502ead under verification; CI #30 | round 2 |
+| WP-B1 | G-99 named-page break cause | implementing |
+
+Corpus errata E27–E43 were recorded by the corpus author from the reviewers' specification questions. None of them used breaklint output. E42 moved sa03's caption page from mustFire to mustNotFire, citing the rule page's definition.
+
+Every stop above is the brief's stop condition ("two verifier rounds that keep finding new blocker/high defects"). Each was reported to the owner with a recommendation: one final round with a hard exit rule. New register items are G-85 … G-103; see scratchpad REGISTER-ADDENDUM, to be copied into open-work.md at handoff.
