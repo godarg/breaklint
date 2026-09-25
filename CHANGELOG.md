@@ -426,6 +426,18 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   empty cloned frame with borders, an accent bar and a split rule), and fails when a check accepts
   the broken copy.
 
+- **The context pack's repair option for `layout/unbreakable-block-too-tall` no longer proposes a
+  false repair.** For a finding with a verified original source, `repair.options` in
+  `context.json` and on the HTML bundle's finding card said "Adjust the verified block's break
+  constraint or split its content; expected effect: the block can fit a page fragment". The
+  rule's advice warns that the break constraint is the one lever that clears the finding without
+  making the block fit. It now reads "Shorten the verified block or split its content into smaller
+  sections deliberately; do not only remove its 'break-inside: avoid', which clears the finding
+  without making the block fit; expected effect: the block no longer exceeds the content box of the
+  page it is laid out on." Context pack schema unchanged (2): the field and its type are the same.
+  `tests/unit/registry.test.ts` now checks every entry of that map against the levers its rule's
+  advice proposes.
+
 ### Documentation
 
 - `docs/limitations.md` now states that a document with a page that carries no source block — the
@@ -534,20 +546,6 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   paragraph. The page also states when a page counts as ending, what was measured, and the
   remaining limits, and `docs/limitations.md` says what page fill counts and what a line-box fill
   would change.
-
-### Reporting
-
-- **The context pack's repair option for `layout/unbreakable-block-too-tall` no longer proposes a
-  false repair.** For a finding with a verified original source, `repair.options` in
-  `context.json` and on the HTML bundle's finding card said "Adjust the verified block's break
-  constraint or split its content; expected effect: the block can fit a page fragment". The
-  rule's advice warns that the break constraint is the one lever that clears the finding without
-  making the block fit. It now reads "Shorten the verified block or split its content into smaller
-  sections deliberately; do not only remove its 'break-inside: avoid', which clears the finding
-  without making the block fit; expected effect: the block no longer exceeds the content box of the
-  page it is laid out on." Context pack schema unchanged (2): the field and its type are the same.
-  `tests/unit/registry.test.ts` now checks every entry of that map against the levers its rule's
-  advice proposes.
 
 ### Tooling
 
