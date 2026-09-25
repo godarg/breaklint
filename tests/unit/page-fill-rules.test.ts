@@ -361,7 +361,7 @@ describe("page-fill rules", () => {
     const original = (page: number, fragmentIndex: number, fragmentCount: number) =>
       fragment(template, {
         nodeKey: `header-original:${page}`, sid: "s-header-2", tag: "header", page, fragmentIndex, fragmentCount,
-        box: { x: 0, y: 0, width: 0, height: 0 }, lines: [],
+        box: { x: 0, y: 0, width: 0, height: 0 }, lines: [], display: "none", marginCopies: 3,
       });
     base.pages[3]!.fill.net = 0.06;
     // Pages 1–3: a clone first. Page 4, the tail: the FIRST clone of a second running element
@@ -418,7 +418,7 @@ describe("page-fill rules", () => {
     withOriginal.pages[3]!.fill.net = 0.06;
     withOriginal.blocks.push(fragment(withOriginal.blocks[0]!, {
       nodeKey: "running-original", sid: "s-running", tag: "header", page: 4, fragmentIndex: 0, fragmentCount: 1,
-      box: { x: 0, y: 0, width: 0, height: 0 }, lines: [],
+      box: { x: 0, y: 0, width: 0, height: 0 }, lines: [], display: "none", marginCopies: 4,
     }));
     assert.deepEqual(run(withOriginal).findings.map((f) => f.page), [4]);
   });
@@ -430,7 +430,7 @@ describe("page-fill rules", () => {
     snapshot.pages[3]!.fill.net = 0.06;
     snapshot.blocks.push(fragment(snapshot.blocks[0]!, {
       nodeKey: "contents", sid: "s-contents", tag: "div", page: 4, fragmentIndex: 0, fragmentCount: 1,
-      box: { x: 0, y: 0, width: 0, height: 0 }, lines: [99],
+      box: { x: 0, y: 0, width: 0, height: 0 }, lines: [99], display: "contents",
     }));
     snapshot.textLines.push(textLine("contents", 99, { x: 48, y: 400, width: 200, height: 16 }));
     assert.deepEqual(run(snapshot).findings, [], "a printed display: contents block was not counted");

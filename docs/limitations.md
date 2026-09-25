@@ -327,22 +327,56 @@ reports it:
 - **Margin-box content.** A widow, an oversized block or an unfilled band inside a running header or
   footer is not judged. Generated margin content (`@top-center { content: "…" }`) never was.
 - **A running element keeps exactly one record**: the in-flow original Paged.js leaves in the page
-  content with an inline `display: none`. It was not rendered — no layout box (width and height
-  both zero) and no line boxes — so the block rules that could select it —
-  `layout/unbreakable-block-too-tall`, `layout/heading-at-page-bottom`,
+  content with an inline `display: none`. Snapshot 5 records each block's computed `display` and how
+  many margin-box copies of it Paged.js printed (`marginCopies`), so the block rules that could
+  select the original — `layout/unbreakable-block-too-tall`, `layout/heading-at-page-bottom`,
   `type/excessive-word-spacing` — record it as `excluded` with the reason
-  `rule/target-not-rendered`, outside the coverage base, and never as measured. Until this repair it
-  counted as measured at 0 px, and a document whose only avoid block was a running element reported
-  full coverage for a check that looked at nothing. The same holds for any block under
-  `display: none`; the snapshot does not record which hidden original has margin-box clones, so the
-  reason does not say "running element". A zero box alone does not decide it: a `display: contents`
-  block has no box of its own but prints its text, so it is measured from its lines by
-  `type/excessive-word-spacing` (the gaps) and `layout/heading-at-page-bottom` (where the heading
-  ends), and declined as `env/invalid-measurement` — counted against coverage — by
-  `layout/unbreakable-block-too-tall`, which judges the height of a box it does not have. The type
-  rules still read a running element's source text once, attributed to that hidden position, where
-  there is no box for evidence to mark. A page is anchored to its first rendered block, so the hidden original never
-  anchors one.
+  `rule/target-in-margin-box`, outside the coverage base, and never as measured. Until this repair
+  it counted as measured at 0 px, and a document whose only avoid block was a running element
+  reported full coverage for a check that looked at nothing. An element the author hid
+  (`display: none`, no margin copies), or one inside a hidden subtree or a closed `<details>`, is
+  `rule/target-not-rendered`. The type rules still read a running element's source text once,
+  attributed to that hidden position, where there is no box for evidence to mark. A page is
+  anchored to its first rendered block, so the hidden original never anchors one.
+- **A `display: contents` block is judged by what it prints, never by its zero box.** It generates
+  no box of its own while its text and children are laid out. `layout/unbreakable-block-too-tall`
+  asks about a box, and `break-inside` does not apply to an element without one, so such a block is
+  `not-applicable` with the reason `rule/target-generates-no-box`, outside coverage; its children
+  are candidates in their own right. (An unreleased intermediate state declined it against
+  coverage instead, and a key/value grid whose `li` items were flattened with `display: contents`
+  under a print rule `li { break-inside: avoid }` ended exit 4 with twelve declines, where it had
+  ended exit 0.) An
+  image-only `display: contents` figure is the same case, not an unrendered one.
+  `layout/heading-at-page-bottom` places such a heading, and a block below it, by its visible line
+  boxes; with no visible line but recorded lines it is excluded as `rule/target-not-visible`, and
+  with no line or unrecorded lines it is declined as `env/invalid-measurement`, counted.
+  `type/excessive-word-spacing` reads the visible lines of every block: lines that are all
+  invisible are `rule/target-not-visible`, a block with no line at all (empty, or image-only) is
+  `rule/no-text-lines`, and lines the snapshot did not record are declined as
+  `env/invalid-measurement` — never a measurement of factor 0.
+- **A box of zero by zero is not by itself "not rendered".** A block counts as not rendered only
+  when the snapshot shows nothing printed from it: `display: none`, or recorded lines none of which
+  is visible (an element inside a hidden subtree or a closed `<details>` has no line box). A
+  zero-size block that is neither — `width: 0; height: 0; overflow: visible` prints its text
+  outside the box, or its lines were not recorded — is placed by its visible lines where the rule
+  reads positions (`layout/heading-at-page-bottom`, and the continuation rule's flow), measured
+  from its lines by `type/excessive-word-spacing`, and declined as `env/invalid-measurement`,
+  counted, by `layout/unbreakable-block-too-tall`, whose question is the height of a box that
+  printed nothing of its own. A line is visible when any text on it is: visibility is read from
+  each text node's element, so `p { visibility: hidden } span { visibility: visible }` prints and
+  is measured. What remains: `layout/unbreakable-block-too-tall` still reads the BLOCK's own
+  visibility, so a hidden block with a visible descendant is excluded there as not visible.
+- **A split block is judged at the first fragment that printed.** `layout/unbreakable-block-too-tall`
+  takes the block's lead fragment to be the first one laid out with a box of its own and visible,
+  joined by source id; earlier fragments are recorded `not-applicable` as
+  `rule/fragment-not-rendered`. Measured on 2026-09-25 with hostile documents: a script that set
+  `display: none` on only the first fragment of a four-page avoid block, or marked it as a note and
+  moved it into the footnote area where it has no box, hid the whole block (exit 0, where the base
+  reported it at exit 1), because the later fragments were skipped as continuations of an excluded
+  candidate. What remains: a script that hides EVERY fragment hides the block, which is then also
+  not printed; a script that changes the first printed fragment's own `break-inside` changes the
+  question the rule asks; and a two-fragment block whose first fragment is hidden is judged by the
+  second fragment's box alone, as every two-fragment block is (see the rule page).
 - **A `position: fixed` element is not measured at all.** Paged.js removes it from the flow, so there
   is no in-flow original, and its per-page clones are outside the content area. (An element whose
   `position: fixed` is an INLINE style is not recognised by Paged.js at all: it stays in the flow,

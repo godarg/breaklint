@@ -1,7 +1,8 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  declined, isNotRendered, layoutOutOfScope, lineOwnership, makeFinding, notRenderedEvaluation, num, sourceOf, targetEvaluation,
+  declined, isNotRendered, layoutOutOfScope, lineOwnership, lineStateOf, makeFinding, notRenderedEvaluation, num,
+  sourceOf, targetEvaluation,
 } from "../shared.ts";
 
 /**
@@ -68,14 +69,45 @@ export const excessiveWordSpacing = defineRule(
       const ws = block.effectiveStyle.wordSpacing.trim();
       if (ws && ws !== "normal" && ws !== "0px") continue;
       if (block.tag.toLowerCase() === "td" || block.tag.toLowerCase() === "th") continue;
-      // No layout box, no lines, no gaps: a justified running header's hidden in-flow original
-      // was counted as measured with nothing in it. A `display: contents` block has no box but has
-      // lines, and its gaps are printed; it is measured from them like any other block.
-      if (isNotRendered(block)) {
+      // Nothing printed, no gaps: a justified running header's hidden in-flow original was counted
+      // as measured with nothing in it. A `display: contents` block has no box but has lines, and
+      // its gaps are printed; it is measured from them like any other block.
+      if (isNotRendered(snapshot, block)) {
         evaluations.push(notRenderedEvaluation("type/excessive-word-spacing", block));
         continue;
       }
+      // The gaps are read from the block's VISIBLE lines. A block with lines, none of them visible,
+      // prints no gap (excluded, like any hidden target); a block with no line at all has no gap to
+      // print (not applicable: an empty or image-only block). Neither is "measured at factor 0",
+      // which is what both used to be: a result about gaps nobody could see.
+      const lineState = lineStateOf(snapshot, block);
+      if (lineState.recorded && lineState.visible === 0) {
+        const hidden = lineState.total > 0;
+        evaluations.push(targetEvaluation({
+          ruleId: "type/excessive-word-spacing", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+          fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: hidden ? "excluded" : "not-applicable",
+          countsTowardCoverage: false, reason: hidden ? "rule/target-not-visible" : "rule/no-text-lines",
+          measurements: [
+            { name: "line-count", value: lineState.total, unit: "lines", operator: null, threshold: null },
+            { name: "visible-line-count", value: 0, unit: "lines", operator: ">", threshold: 0 },
+          ],
+          connective: "all", violated: null,
+        }));
+        continue;
+      }
       candidates += 1;
+      // Lines the snapshot did not measure: the gaps are unknown, and a factor of 0 would be a
+      // claim. Declined, counted against coverage.
+      if (!lineState.recorded) {
+        notMeasured.push(declined({ scope: "block", ruleId: "type/excessive-word-spacing", reason: "env/invalid-measurement" }));
+        evaluations.push(targetEvaluation({
+          ruleId: "type/excessive-word-spacing", keyType: "block", nodeKey: block.nodeKey, sid: block.sid,
+          fragmentIndex: block.fragmentIndex, boxScreen: block.box, status: "not-measured", reason: "env/invalid-measurement",
+          measurements: [{ name: "visible-line-count", value: null, unit: "lines", operator: ">", threshold: 0 }],
+          connective: "single", violated: null,
+        }));
+        continue;
+      }
 
       const outOfScope = layoutOutOfScope(block.effectiveStyle);
       if (outOfScope) {
