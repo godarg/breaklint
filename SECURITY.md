@@ -101,10 +101,12 @@ uncalibrated and says so; a false positive is a bug, not a vulnerability.
 
 ## Supported versions
 
-The latest published version on npm receives fixes. The 0.2.x line is the supported line, and each
-published patch supersedes earlier 0.2.x packages. `breaklint@0.2.0` opened that line on 2026-08-22
-with npm provenance; the 0.1.x line receives no separate long-term-support branch. The npm package
-page remains the authority on which patch is actually published.
+Only the latest version published on npm receives fixes; a fix ships as a new version, and no
+older line has a long-term-support branch. The package is pre-1.0, so a fix can arrive in a new
+minor version rather than a patch. Every published version carries npm provenance (checked on
+2026-09-24 with `npm view breaklint@<version> dist.attestations` for 0.1.0 through 0.6.0). The npm
+package page, or `npm view breaklint dist-tags.latest`, is the authority on which version is
+currently the latest.
 
 
 ## Host-provided sources and pages

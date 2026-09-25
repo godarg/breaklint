@@ -19,6 +19,7 @@ import { divergenceDetail } from "../../src/render/evidence.ts";
 import { LABELS } from "../../src/report/mandatory.ts";
 import type { Report, Snapshot } from "../../src/core/types.ts";
 import { REPORT_SCHEMA_VERSION } from "../../src/core/enums.ts";
+import { checkReadmeDemo, corruptions } from "../tools/readme-demo-contract.mjs";
 
 function demoReport(): Report {
   const parsed = JSON.parse(readFileSync(new URL("../../examples/demo-snapshot.json", import.meta.url), "utf8")) as {
@@ -84,9 +85,6 @@ function runRealDemo(extraArgs: readonly string[] = []): { code: number; stdout:
   }
 }
 
-/** Finding header lines of the console format: `<severity> <rule-id>  page <n>`. */
-const FINDING_HEADER = /^(error|warn|info) +[a-z]+\/[a-z0-9-]+ +page \d+$/u;
-const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 
 /** A clean live-style report carrying the positive geometry second-opinion event. */
 function positiveApparatusReport(base: Report): Report {
@@ -149,50 +147,25 @@ describe("output formats", () => {
     // Read from README.md itself and compared against a real CLI run. The earlier guard compared
     // a string typed into this test against `demoReport()`; it never opened the README, so the
     // README could say anything, and the in-process report ran a rule the CLI does not run.
+    //
+    // The parser is shared with the packed-consumer steps in .github/workflows/ci.yml and
+    // release.yml, which run it over the README inside node_modules/breaklint and the installed
+    // `bin` (tests/tools/readme-demo-contract.mjs). This test sees the source tree; those steps see
+    // what ships. Both oracles are a command that actually ran.
     const demo = runRealDemo();
     assert.equal(demo.code, 1, `--demo must end 1; stderr: ${demo.stderr}`);
-    const output = demo.stdout.split("\n");
-    // CRLF-normalised: a Windows checkout with autocrlf would otherwise report a missing excerpt
-    // instead of the actual difference.
-    const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8").replace(/\r\n/gu, "\n");
-    const intro = /Below is one of its ([a-z]+) findings, plus the closing counters, copied from that\ncommand's output:\n\n```\n([\s\S]*?)\n```\n/u.exec(readme);
-    assert.ok(intro, "README no longer carries the demo excerpt in the shape this guard reads");
-    const [, countWord, excerpt] = intro;
-    const excerptLines = excerpt!.split("\n");
+    const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
+    const result = checkReadmeDemo(readme, demo.stdout, demo.code);
+    assert.ok(result.valid, `README demo excerpt drifted from the real --demo output:\n${result.issues.join("\n")}`);
+    assert.ok((result.printed ?? 0) > 0, "the demo printed no finding at all");
 
-    // 1. The counter line: the excerpt's last line, whole-line equal to the CLI's.
-    const documentedCounters = excerptLines.at(-1);
-    const actualCounters = output.filter((l) => l.startsWith("inputs found:"));
-    assert.equal(actualCounters.length, 1, "the demo printed no single counter line");
-    assert.equal(documentedCounters, actualCounters[0], "README demo counters drifted from actual console output");
-
-    // 2. The quoted finding: one WHOLE finding — from its header to its closing `render` line —
-    //    verbatim and contiguous in the real output. An empty, header-less or truncated excerpt
-    //    cannot pass.
-    //
-    //    Which finding is quoted matters too. Until a release ships this tree, `npx breaklint
-    //    --demo` runs the published package, whose remedy text for
-    //    `layout/unbreakable-block-too-tall` differs from main's (e46a1bf, 6af6008). The README
-    //    therefore quotes a finding whose lines are identical in both — checked by diffing the
-    //    two outputs on 2026-09-24, not by this test, which can only see the source tree.
-    const blank = excerptLines.indexOf("");
-    assert.ok(blank > 0, "README excerpt has no finding block before the counters");
-    const findingBlock = excerptLines.slice(0, blank);
-    assert.match(findingBlock[0]!, FINDING_HEADER, "README excerpt does not open with a finding");
-    assert.match(findingBlock.at(-1)!, /^ {2}render {5}/u, "README finding block does not end at its render line");
-    assert.equal(
-      findingBlock.slice(1).filter((l) => FINDING_HEADER.test(l)).length,
-      0,
-      "README finding block runs into a second finding",
-    );
-    const start = output.indexOf(findingBlock[0]!);
-    assert.ok(start >= 0, `the demo prints no finding "${findingBlock[0]}"`);
-    assert.deepEqual(output.slice(start, start + findingBlock.length), findingBlock, "README finding block drifted from actual console output");
-
-    // 3. "one of its N findings": N is the number of finding headers the CLI printed.
-    const printed = output.filter((l) => FINDING_HEADER.test(l)).length;
-    assert.ok(printed > 0, "the demo printed no finding at all");
-    assert.equal(countWord, NUMBER_WORDS[printed], `README says "${countWord}" findings; the demo printed ${printed}`);
+    // The guard itself must be able to fail on this exact output: one character of a quoted
+    // line, of the counter line, and the count word.
+    const controls = corruptions(readme);
+    assert.equal(controls.length, 3, "the negative controls could not be built from this README");
+    for (const control of controls) {
+      assert.equal(checkReadmeDemo(control.text, demo.stdout, demo.code).valid, false, `a README with a corrupted ${control.name} still passed`);
+    }
   });
 
   for (const format of OUTPUT_FORMATS) {

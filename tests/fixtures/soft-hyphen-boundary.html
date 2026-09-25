@@ -1,0 +1,57 @@
+<!doctype html>
+<!--
+  A page split at a soft hyphen, and the word-local levers that keep one out of a justified block.
+
+  Paged.js 0.4.3 marks a page split with its `pagedjs_hyphen` class, and appends a hyphen glyph,
+  whenever the character before the split and the character after it are each a word character
+  or a soft hyphen (`hyphenateAtBreak`, src/chunker/layout.js). `layout/hyphen-across-page` reads
+  exactly that class. So the lever "insert a soft hyphen" CREATES this rule's finding when the
+  page ends at it, and `hyphens: manual` does not prevent it, because `manual` is the value under
+  which soft hyphens break. tests/live/fragmentation-levers.test.ts pins what each case produces.
+
+  THE COMPLICATION is that the four justified paragraphs differ in one boundary word only:
+
+    - `shy`: `ddddddd&shy;eeeeeee` with `hyphens: manual`. The line ends at the soft hyphen and
+      the page ends after that line;
+    - `space`: the soft hyphen replaced by a space. Same line count, same page split, but the
+      split falls between two words. It is the control that the class tracks the soft hyphen and
+      not the position;
+    - `span-none`: the boundary word wrapped in `<span style="hyphens: none">` — the word-local
+      lever for a justified block, whose block-level `hyphens` belongs to
+      `type/excessive-word-spacing`;
+    - `nowrap`: the same word wrapped in `white-space: nowrap` instead.
+
+  Geometry is font-independent: a monospace font, a 17ch measure, words of 7 and 15 characters,
+  so line 3 is `ccccccc ddddddd-` (16ch) and the whole word `dddddddeeeeeee` (14ch) cannot follow
+  `ccccccc` on it. The spare ch is load-bearing: Paged.js APPENDS its hyphen glyph to the text it
+  leaves on the page, and on an exactly full line (measured at 16ch) that glyph wrapped onto a
+  fourth line in the fragmentainer's overflow column, where the geometry cross-check refused the
+  whole document. A fixed 20px line height and half a line of slack put exactly three lines on
+  the first page.
+
+  `auto` and `auto-control` are NOT asserted. They record whether the rendering browser has a
+  hyphenation dictionary for English: `hyphens: auto` then needs fewer lines than `hyphens: none`
+  for the same six long words. It decides whether `type/excessive-word-spacing`'s `hyphens: auto`
+  lever does anything in the browser that measures it, and the test prints the answer.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>soft hyphen at a page boundary</title><style>
+@page { size: 400px 300px; margin: 40px; }
+body { margin: 0; font-family: monospace; font-size: 12px; line-height: 20px; }
+p { margin: 0; }
+.label { break-before: page; }
+.label.first { break-before: auto; }
+.probe { width: 17ch; text-align: justify; hyphens: manual; widows: 1; orphans: 1; }
+.dictionary { width: 30ch; }
+</style></head><body>
+<p class="label first" id="label-shy">case shy</p><div class="spacer" style="height: 130px"></div>
+<p class="probe" id="probe-shy">aaaaaaaaaaaaaaa bbbbbbbbbbbbbbb ccccccc ddddddd&shy;eeeeeee fffffffffffffff ggggggggggggggg</p>
+<p class="label" id="label-space">case space</p><div class="spacer" style="height: 130px"></div>
+<p class="probe" id="probe-space">aaaaaaaaaaaaaaa bbbbbbbbbbbbbbb ccccccc ddddddd eeeeeee fffffffffffffff ggggggggggggggg</p>
+<p class="label" id="label-span-none">case span-none</p><div class="spacer" style="height: 130px"></div>
+<p class="probe" id="probe-span-none">aaaaaaaaaaaaaaa bbbbbbbbbbbbbbb ccccccc <span style="hyphens: none">ddddddd&shy;eeeeeee</span> fffffffffffffff ggggggggggggggg</p>
+<p class="label" id="label-nowrap">case nowrap</p><div class="spacer" style="height: 130px"></div>
+<p class="probe" id="probe-nowrap">aaaaaaaaaaaaaaa bbbbbbbbbbbbbbb ccccccc <span style="white-space: nowrap">ddddddd&shy;eeeeeee</span> fffffffffffffff ggggggggggggggg</p>
+<p class="label" id="label-auto">case auto</p>
+<p class="dictionary" id="probe-auto" lang="en" style="hyphens: auto">internationalization characteristically representational interdisciplinary incomprehensibility counterrevolutionaries</p>
+<p class="dictionary" id="probe-auto-control" lang="en" style="hyphens: none">internationalization characteristically representational interdisciplinary incomprehensibility counterrevolutionaries</p>
+</body></html>

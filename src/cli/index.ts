@@ -15,7 +15,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { readFileSync, existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, relative, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -102,6 +102,14 @@ export async function main(argv: string[]): Promise<number> {
         // A path that does not exist is a typo in the invocation, not a finding about a
         // document. Exit 2, and the message names the path rather than the count.
         err(`breaklint: input not found: ${p}\n`);
+        return 2;
+      }
+      if (!statSync(p).isFile()) {
+        // The name decides the type, so a DIRECTORY called `chapter.html` passed both checks
+        // above, started Chrome and ended exit 3 with "resource byte limit exceeded" — an
+        // infrastructure verdict with the wrong cause for a mistake in the invocation. There is
+        // no directory recursion (see the header), so anything but a regular file is usage.
+        err(`breaklint: input is not a regular file: ${p}\n`);
         return 2;
       }
     }
@@ -231,6 +239,8 @@ options
   --format <f>              json | sarif | console | html | junit | markdown  (default console)
                             json is the truth; every other format is a lossy projection.
   --out <file>              Write the report to a file instead of stdout.
+  --out-dir <dir>           Where a live run writes its evidence: one PNG per page and the
+                            checked PDF (default ./breaklint-report). Not written by --demo.
   --fail-on <level>         error | warn | never   (default error)
                             error: the two rules with a named proof source gate.
                             warn:  the heuristics gate too — deliberately, on request.
@@ -248,11 +258,13 @@ options
 exit codes
   0  checked, coverage met, nothing reached the threshold
   1  at least one non-experimental finding reached the threshold
-  2  invalid invocation: unknown option, bad config, input path does not exist
+  2  invalid invocation: unknown option, bad config, no input, an input path that does not
+     exist, is not a regular file or is not .html/.htm. No report is written.
   3  infrastructure: no renderer, font failed, pagination aborted, checker crashed,
      or the output could not be written completely (the stdout reader closed early;
      with --out, a lost confirmation line keeps the verdict's code)
-  4  nothing or too little was judged — no input, no active rule, coverage below the floor
+  4  nothing or too little was judged — an empty document, no rule measured anything,
+     coverage below the floor
 
   Paged.js is pinned to exactly ${SUPPORTED_PAGEDJS_VERSION}. Any other resolved version stops
   the run with exit 3: the break cause is read from attributes the paginator writes and does
