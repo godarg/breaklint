@@ -46,9 +46,9 @@ import { writeFileSync } from "node:fs";
 
 import type { PageLike } from "../acquire/browser.ts";
 import type { Evidence, InfraEvent, NotMeasured } from "../core/types.ts";
-import type { PlacedMark, UnplacedMark } from "./overlay.ts";
+import type { OverlayPageFacts, PlacedMark, UnplacedMark } from "./overlay.ts";
 import { detachOverlay, installOverlay, readbackViolations, removeOverlay } from "./overlay.ts";
-import type { PdfTextPage, RasterPage, Rasterizer } from "./rasterizer.ts";
+import type { DeviceRegion, PdfTextPage, RasterPage, Rasterizer, RegionInk } from "./rasterizer.ts";
 import { readPngHeader, writeEvidencePng } from "./rasterizer.ts";
 
 /** CSS pixels per millimetre, and PDF points per millimetre. Both are definitions, not measurements. */
@@ -178,6 +178,12 @@ export interface EvidenceOutcome {
   notMeasured: NotMeasured[];
   /** Which source blocks came out bound. Rules consult this when filling `Finding.evidence`. */
   boundSids: ReadonlySet<string>;
+  /**
+   * Pages proven to carry nothing to bind (`verifyBlankPage`). NOT bound: their evidence record
+   * keeps `bindsFinding: false`. `finalizeEvidenceAcquisition` cross-checks them against the
+   * snapshot before it excuses any of them from the binding requirement.
+   */
+  verifiedBlankPages?: readonly number[];
   marks: PlacedMark[];
   /** Marks whose token was not found exactly once in the PDF text stream. Read, not just kept. */
   ambiguousMarks: number;
@@ -467,6 +473,8 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
       candidates: { marked, baseline },
       marks: installation.marks,
       unplacedMarks: installation.unplacedMarks ?? [],
+      pageFacts: installation.pageFacts ?? [],
+      textPages,
       ambiguousMarks: conformance?.ambiguous ?? 0,
       styleViolations: violations.length,
       rasterDiffPx: diffPixels,
@@ -708,6 +716,10 @@ interface FinishInput {
   /** Set when the delivered PDF is already rasterised and held under this key. */
   held?: { key: string; pages: RasterPage[] };
   conformance?: MarkConformance | null;
+  /** The overlay's per-page DOM facts, for the blank-page decision. */
+  pageFacts?: readonly OverlayPageFacts[];
+  /** The delivered PDF's text layer, when it was extracted. */
+  textPages?: readonly PdfTextPage[] | null;
 }
 
 /**
@@ -726,6 +738,7 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
   const { rasterizer, options, dpi, infrastructure, notMeasured } = input;
   const evidence: Evidence[] = [];
   const boundSids = new Set(input.conformance?.boundSids ?? []);
+  const verifiedBlankPages: number[] = [];
 
   if (input.overlayInstalled && !input.bindingPossible) {
     notMeasured.push({
@@ -795,6 +808,19 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
           !perPage.divergent &&
           perPage.targetsTotal > 0 &&
           perPage.targetsBound === perPage.targetsTotal;
+        // A page with no mark at all can never bind. It may instead be proven to carry nothing
+        // that a mark could stand for. That is recorded apart from binding and never turns
+        // `bindsFinding` on: the page is not evidence for anything.
+        if (
+          input.bindingPossible && perPage === null && unplacedHere.length === 0 &&
+          !input.marks.some((mark) => mark.page === i + 1) &&
+          await verifyBlankPage({
+            facts: input.pageFacts?.[i] ?? null, page: i + 1, textPage: input.textPages?.[i] ?? null,
+            raster: expected, dpi, ink: (region) => rasterizer.regionInk(key, i, region),
+          })
+        ) {
+          verifiedBlankPages.push(i + 1);
+        }
         evidence.push({
           key: `${options.documentKey}#${i + 1}`,
           page: i + 1,
@@ -867,13 +893,84 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
         e.pdfConformance = "unverified";
       }
       boundSids.clear();
+      verifiedBlankPages.length = 0;
     }
   }
 
-  return outcome(input, evidence, boundSids);
+  return outcome(input, evidence, boundSids, verifiedBlankPages);
 }
 
-function outcome(input: FinishInput, evidence: Evidence[], boundSids: Set<string>): EvidenceOutcome {
+/** Everything `verifyBlankPage` looks at for one page. */
+export interface BlankPageInput {
+  /** The overlay's DOM facts for this page; null when the overlay reported none. */
+  facts: OverlayPageFacts | null;
+  /** 1-based, and it must be the page the facts describe. */
+  page: number;
+  /** The delivered PDF's text layer for this page; null when it was not extracted. */
+  textPage: PdfTextPage | null;
+  /** The delivered PDF's raster of this page. */
+  raster: RasterPage;
+  dpi: number;
+  /** Ink inside a device-pixel region of this page's raster. */
+  ink: (region: DeviceRegion) => Promise<RegionInk>;
+}
+
+/**
+ * Whether a page that carries no mark is proven to carry nothing a mark could stand for.
+ *
+ * WHY THIS EXISTS. A page binds only on marks it carries, and required evidence is complete only
+ * when every page binds. The page Paged.js inserts for `break-before: right` (or `left`, `recto`,
+ * `verso`) has no source block and so no mark, which made every document with one end at exit 4
+ * under evidence binding. Counting such a page as bound would be a lie: nothing on it was
+ * checked. Excusing it on the paginator's word would be a hole: the word is a class name. So a
+ * page is excused only when four answers agree, and three of them do not come from the
+ * paginator or from the snapshot's own blank flag:
+ *
+ *   1. Paged.js inserted it as blank (`pagedjs_blank_page`). Necessary, never sufficient.
+ *   2. The DOM: its page area is exactly the empty page template (`PAGE_AREA_EMPTY_SOURCE`) — no
+ *      element, no text, no generated content inside the area. Structural: margin boxes are
+ *      outside the area, so the running header and the page number on a blank page are expected
+ *      and do not count, and no coordinate is used to decide membership.
+ *   3. The delivered PDF's text layer: no text item with a visible character starts inside the
+ *      page area's rectangle. This sees text the DOM does not have, such as generated content.
+ *   4. The delivered PDF's raster: the page area's rectangle, rounded inward to whole device
+ *      pixels, is one flat colour. This sees what is painted without being text — a background,
+ *      a rule, an image — and what reaches into the area from outside it.
+ *
+ * A page with content but without source ids fails 2 whenever the content is a DOM node, and 3
+ * or 4 whenever it is printed; generated content on an otherwise empty area fails 3 and 4. The
+ * rectangle comes from the DOM and is used only to say WHERE the PDF must be empty; a rectangle
+ * that cannot be placed on the raster answers "not blank". Every failure answers "not blank",
+ * which leaves the page unbound and the run at exit 4: the conservative direction.
+ */
+export async function verifyBlankPage(input: BlankPageInput): Promise<boolean> {
+  const { facts, textPage, raster } = input;
+  if (!facts || facts.page !== input.page || !facts.pagedBlank || !facts.areaEmpty || !facts.areaPx || !textPage) return false;
+  const area = facts.areaPx;
+  if (!(area.width > 0 && area.height > 0)) return false;
+  const pxPerPt = 96 / 72;
+  for (const item of textPage.items) {
+    if (item.text.replace(/\s+/gu, "") === "") continue;
+    const x = item.x * pxPerPt;
+    const y = (textPage.heightPt - item.y) * pxPerPt;
+    if (x >= area.x && x <= area.x + area.width && y >= area.y && y <= area.y + area.height) return false;
+  }
+  const scale = input.dpi / 96;
+  const region = {
+    x0: Math.ceil(area.x * scale), y0: Math.ceil(area.y * scale),
+    x1: Math.floor((area.x + area.width) * scale), y1: Math.floor((area.y + area.height) * scale),
+  };
+  if (region.x0 < 0 || region.y0 < 0 || region.x1 > raster.width || region.y1 > raster.height) return false;
+  if (region.x1 <= region.x0 || region.y1 <= region.y0) return false;
+  try {
+    const measured = await input.ink(region);
+    return measured.pixels === (region.x1 - region.x0) * (region.y1 - region.y0) && measured.ink === 0;
+  } catch {
+    return false;
+  }
+}
+
+function outcome(input: FinishInput, evidence: Evidence[], boundSids: Set<string>, verifiedBlankPages: number[] = []): EvidenceOutcome {
   const path = `${input.options.documentKey}-checked.pdf`;
   writeFileSync(join(input.options.outDir, path), input.pdf, { flag: "wx", mode: 0o600 });
   return {
@@ -881,6 +978,7 @@ function outcome(input: FinishInput, evidence: Evidence[], boundSids: Set<string
     infrastructure: input.infrastructure,
     notMeasured: input.notMeasured,
     boundSids,
+    verifiedBlankPages,
     marks: input.marks,
     ambiguousMarks: input.ambiguousMarks,
     deliveredPdf: input.pdf,

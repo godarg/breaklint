@@ -97,10 +97,30 @@ export interface Rasterizer {
   encodePng(key: string, pageIndex: number): Promise<Uint8Array>;
   /** Text items with positions, for the mark extraction of §11.4.3. */
   textItems(pdf: Uint8Array): Promise<PdfTextPage[]>;
+  /**
+   * Ink inside one device-pixel rectangle `[x0, x1) × [y0, y1)` of a held page: pixels whose
+   * colour differs from the rectangle's first pixel. Throws for a rectangle outside the page.
+   */
+  regionInk(key: string, pageIndex: number, region: DeviceRegion): Promise<RegionInk>;
   /** Errors the rasteriser page reported. Cumulative, and read more than once by design. */
   pageErrors(): readonly string[];
   release(key: string): Promise<void>;
   close(): Promise<void>;
+}
+
+/** A rectangle in device pixels of a rasterised page, half-open: `[x0, x1) × [y0, y1)`. */
+export interface DeviceRegion {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+export interface RegionInk {
+  /** Pixels in the region. */
+  pixels: number;
+  /** Of those, the ones whose colour differs from the region's first pixel. */
+  ink: number;
 }
 
 export interface RasterizerUnavailable {
@@ -215,6 +235,24 @@ window.__blText = async (bytes) => {
   } finally {
     await task.destroy();
   }
+};
+
+// How much of one rectangle of a held page is ink: pixels whose colour differs from the
+// rectangle's first pixel. Zero means the rectangle is one flat colour — paper, or a page
+// background — and nothing was printed on it. Read from the canvas, which survives dropPixels.
+window.__blRegionInk = (key, index, x0, y0, x1, y1) => {
+  const held = window.__blHeld.get(key);
+  if (!held || !held[index]) return { error: "no page " + index + " under " + key };
+  const page = held[index];
+  if (!(x0 >= 0 && y0 >= 0 && x1 <= page.width && y1 <= page.height && x1 > x0 && y1 > y0)) {
+    return { error: "region outside page " + index };
+  }
+  const data = page.canvas.getContext("2d", { willReadFrequently: true }).getImageData(x0, y0, x1 - x0, y1 - y0).data;
+  let ink = 0;
+  for (let p = 0; p < data.length; p += 4) {
+    if (data[p] !== data[0] || data[p + 1] !== data[1] || data[p + 2] !== data[2]) ink++;
+  }
+  return { pixels: (x1 - x0) * (y1 - y0), ink };
 };
 
 window.__blRelease = (key) => window.__blHeld.delete(key);
@@ -407,6 +445,23 @@ export async function openRasterizer(
           (window as unknown as { __blText(b: number[]): Promise<PdfTextPage[]> }).__blText(bytes),
         Array.from(pdf),
       );
+    },
+
+    async regionInk(key, pageIndex, region) {
+      assertContentPagesClosed(options.contentPagesOpen, "regionInk");
+      const result = await page.evaluate(
+        (k: string, i: number, x0: number, y0: number, x1: number, y1: number) =>
+          (window as unknown as { __blRegionInk(k: string, i: number, x0: number, y0: number, x1: number, y1: number): RegionInk & { error?: string } })
+            .__blRegionInk(k, i, x0, y0, x1, y1),
+        key,
+        pageIndex,
+        region.x0,
+        region.y0,
+        region.x1,
+        region.y1,
+      );
+      if (result.error) throw new Error(`rasteriser: ${result.error}`);
+      return { pixels: result.pixels, ink: result.ink };
     },
 
     pageErrors() {

@@ -144,6 +144,8 @@ function faithfulRasterizer(page: OverlayPage, pageCount: number): Rasterizer {
         })),
       }));
     },
+    // None of these documents has a blank page; a page without marks reads as printed on.
+    async regionInk() { return { pixels: 1, ink: 1 }; },
     pageErrors() { return []; },
     async release() {},
     async close() {},

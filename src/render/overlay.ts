@@ -71,8 +71,24 @@ export interface OverlayInstallation {
    */
   unplacedMarks: UnplacedMark[];
   layers: number;
-  /** Pages whose content area was `static` — the case §11.4.1 treats as an infrastructure fault. */
+  /**
+   * Pages whose content area — or, when a footnote needs a mark, whose footnote area — was
+   * `static`: the case §11.4.1 treats as an infrastructure fault.
+   */
   staticPageAreas: number;
+  /** One per page, in page order: the DOM half of the blank-page decision in `evidence.ts`. */
+  pageFacts?: OverlayPageFacts[];
+}
+
+/** What the overlay read off one page before it attached anything to it. */
+export interface OverlayPageFacts {
+  page: number;
+  /** Paged.js inserted the page as blank (`pagedjs_blank_page`). The paginator's claim, not proof. */
+  pagedBlank: boolean;
+  /** The page area is exactly Paged.js' empty template (`PAGE_AREA_EMPTY_SOURCE`). */
+  areaEmpty: boolean;
+  /** The page area in CSS pixels against the page box, or null when the page has none. */
+  areaPx: { x: number; y: number; width: number; height: number } | null;
 }
 
 const STYLE_LAYER =
@@ -117,6 +133,7 @@ const STYLE_MARK =
  */
 import { MARK_FONT_FAMILY } from "./mark-font.ts";
 import { PAGE_AREA_SELECTOR } from "../paginate/collector.ts";
+import { FOOTNOTE_AREA_SELECTOR, PAGE_AREA_EMPTY_SOURCE } from "../paginate/pagedjs-structure.ts";
 
 const OVERLAY_CAPABILITY_MARKER = "__BREAKLINT_NODE_CAPABILITY__";
 
@@ -126,6 +143,8 @@ const OVERLAY_TEMPLATE = `(() => {
   const STYLE_MARK = ${JSON.stringify(STYLE_MARK)};
   const FONT_FAMILY = ${JSON.stringify(MARK_FONT_FAMILY)};
   const PAGE_AREA_SELECTOR = ${JSON.stringify(PAGE_AREA_SELECTOR)};
+  const FOOTNOTE_AREA_SELECTOR = ${JSON.stringify(FOOTNOTE_AREA_SELECTOR)};
+  const PAGE_AREA_EMPTY = ${PAGE_AREA_EMPTY_SOURCE};
   const capability = P.randomToken();
   let stage = 0, unauthorizedCalls = 0;
   let state = { layers: [], marks: [], detached: [] };
@@ -135,6 +154,7 @@ const OVERLAY_TEMPLATE = `(() => {
     const unplacedMarks = [];
     let staticPageAreas = 0, ordinal = 0;
     state = { layers: [], marks: [], detached: [] };
+    const pageFacts = [];
     const pages = P.all(document, ".pagedjs_page");
     for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
       const pageEl = pages[pageIndex];
@@ -142,9 +162,42 @@ const OVERLAY_TEMPLATE = `(() => {
       if (P.style(area, null).position === "static") staticPageAreas++;
       const areaBox = P.rect(area);
       const pageBox = P.rect(pageEl);
+      // What the blank-page decision in evidence.ts needs from the DOM, read BEFORE any layer of
+      // ours is in the page: whether Paged.js inserted the page as blank, whether its page area is
+      // exactly the empty template (a structural test; margin boxes are outside the area), and the
+      // page area's rectangle against the page box, where the PDF must then show nothing either.
+      const pageAreaEl = P.all(pageEl, PAGE_AREA_SELECTOR)[0] || null;
+      const pageAreaBox = pageAreaEl ? P.rect(pageAreaEl) : null;
+      pageFacts.push({
+        page: pageIndex + 1,
+        pagedBlank: (P.attr(pageEl, "class") || "").split(/\\s+/u).indexOf("pagedjs_blank_page") !== -1,
+        areaEmpty: PAGE_AREA_EMPTY(P, pageEl),
+        areaPx: pageAreaBox ? { x: pageAreaBox.x - pageBox.x, y: pageAreaBox.y - pageBox.y, width: pageAreaBox.width, height: pageAreaBox.height } : null,
+      });
       const layer = P.create("div");
       P.setAttr(layer, "class", "bl-overlay");
       P.setCssText(layer, STYLE_LAYER);
+      // A block footnote is moved into the footnote area, below the content box. A mark hanging in
+      // the content-box layer cannot reach it: that layer's containing block is the multi-column
+      // fragmentainer, and a mark below its column height is carried into an off-page column. So a
+      // footnote-area fragment is marked from a second layer in the footnote area itself, which
+      // Paged.js positions (relative) and clips (overflow: hidden) and which is not fragmented.
+      // The layer's own box, at left 0 / top 0 of that containing block, is the origin its marks
+      // are placed against, so a border an author puts on the footnote area cannot shift them.
+      const footnoteArea = pageAreaEl ? (P.all(pageAreaEl, FOOTNOTE_AREA_SELECTOR)[0] || null) : null;
+      let footnoteLayer = null, footnoteOrigin = null, footnoteBox = null;
+      const footnoteHang = () => {
+        if (footnoteLayer) return true;
+        if (P.style(footnoteArea, null).position === "static") { staticPageAreas++; return false; }
+        footnoteLayer = P.create("div");
+        P.setAttr(footnoteLayer, "class", "bl-overlay");
+        P.setCssText(footnoteLayer, STYLE_LAYER);
+        P.append(footnoteArea, footnoteLayer);
+        state.layers.push(footnoteLayer);
+        footnoteOrigin = P.rect(footnoteLayer);
+        footnoteBox = P.rect(footnoteArea);
+        return true;
+      };
       for (const el of P.all(pageEl, "[data-bl-sid]")) {
         // Marks go where findings can go: on the flow, the page's content area. Paged.js clones a
         // position: running(...) element into a margin box of every page and a position: fixed
@@ -174,6 +227,21 @@ const OVERLAY_TEMPLATE = `(() => {
           );
           continue;
         }
+        const inFootnotes = footnoteArea !== null && P.closest(el, FOOTNOTE_AREA_SELECTOR) === footnoteArea;
+        if (inFootnotes && !footnoteHang()) {
+          unplacedMarks.push(
+            { sid, page: pageIndex + 1, side: "start", reason: "fragment-outside-page" },
+            { sid, page: pageIndex + 1, side: "end", reason: "fragment-outside-page" },
+          );
+          continue;
+        }
+        // Where this fragment's marks hang: its layer, the origin its offsets are taken from, and
+        // the box a mark must stay inside. For the footnote area that box bounds both axes,
+        // because it clips.
+        const hangLayer = inFootnotes ? footnoteLayer : layer;
+        const origin = inFootnotes ? footnoteOrigin : areaBox;
+        const vertical = inFootnotes ? footnoteBox : areaBox;
+        const horizontal = inFootnotes ? footnoteBox : pageBox;
         const ord = ordinal++;
         const digits = String(ord).padStart(3, "0");
         for (const [suffix, side, rect, edge] of [
@@ -195,11 +263,12 @@ const OVERLAY_TEMPLATE = `(() => {
           // stays the content box: the content box is Paged.js' multi-column fragmentainer, and a
           // positioned box below its column height is carried into the next, off-page column —
           // exactly the overflow that made Chrome shrink every page.
-          const relativeY = y - areaBox.y;
+          const relativeY = y - vertical.y;
           const maxAdvance = token.length * 1.2 + 2;
           if (
             x < pageBox.left || x + maxAdvance > pageBox.right || y < pageBox.top || y > pageBox.bottom ||
-            relativeY < 0 || relativeY + 1 > areaBox.height
+            x < horizontal.left || x + maxAdvance > horizontal.right ||
+            relativeY < 0 || relativeY + 1 > vertical.height
           ) {
             unplacedMarks.push({ sid, page: pageIndex + 1, side, reason: "fragment-outside-page" });
             continue;
@@ -207,10 +276,10 @@ const OVERLAY_TEMPLATE = `(() => {
           const mark = P.create("span");
           P.setAttr(mark, "class", "bl-mark");
           P.setCssText(mark, STYLE_MARK);
-          P.setStyle(mark, "left", (x - areaBox.x) + "px", "important");
-          P.setStyle(mark, "top", (y - areaBox.y) + "px", "important");
+          P.setStyle(mark, "left", (x - origin.x) + "px", "important");
+          P.setStyle(mark, "top", (y - origin.y) + "px", "important");
           P.setText(mark, token);
-          P.append(layer, mark);
+          P.append(hangLayer, mark);
           // The node itself is remembered. Everything downstream walks these references and
           // never a selector, so an author element of the same class is invisible to us.
           state.marks.push(mark);
@@ -230,7 +299,7 @@ const OVERLAY_TEMPLATE = `(() => {
       P.append(area, layer);
       state.layers.push(layer);
     }
-    return { marks, unplacedMarks, layers: state.layers.length, staticPageAreas };
+    return { marks, unplacedMarks, layers: state.layers.length, staticPageAreas, pageFacts };
   };
 
   // Stage 1: read the computed style of every mark back. Cheap, specific, and NOT conclusive —

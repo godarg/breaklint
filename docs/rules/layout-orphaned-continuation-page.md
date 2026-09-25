@@ -17,6 +17,11 @@ The threshold is chosen. `data-split-from` proves a fragment is a continuation; 
 
 ## Limits and known false alarms
 
+A block footnote printed on the page is not fresh content: it lies in the footnote area below
+the content box and belongs to a call in the text above it, so a page that carries only a
+continuation and the footnote of that continuation is still reported. Its fill is the fill of the
+content box, which Paged.js shortens by the footnote area's height.
+
 Declined after a forced incoming break. Reading the break reason from the computed style is verifiably wrong in both directions: `break-before: page` from a stylesheet reads back as `auto`, while the same declaration written inline survives as `page` and is measured *not* to take effect.
 
 ## Calibration

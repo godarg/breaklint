@@ -615,6 +615,7 @@ describe("the live path fails closed at its process boundary", () => {
       async dropPixels() {},
       async encodePng() { return new Uint8Array(); },
       async textItems() { return []; },
+      async regionInk() { return { pixels: 1, ink: 1 }; },
       pageErrors() { return []; },
       async release() {},
       close: never,

@@ -1,6 +1,6 @@
 import { defineRule } from "../../core/rule.ts";
 import { pageKey } from "../../core/fingerprint.ts";
-import { declined, makeFinding, num, targetEvaluation } from "../shared.ts";
+import { declined, makeFinding, num, startsInContentBox, targetEvaluation } from "../shared.ts";
 
 /**
  * layout/orphaned-continuation-page — a page whose only content is the tail of a block.
@@ -58,7 +58,9 @@ export const orphanedContinuationPage = defineRule(
       }
       measured += 1;
 
-      const onPage = snapshot.blocks.filter((b) => b.page === page.pageNumber);
+      // A block footnote below the content box is not fresh content on the page: it belongs to a
+      // call in the text above it (`startsInContentBox`).
+      const onPage = snapshot.blocks.filter((b) => b.page === page.pageNumber && startsInContentBox(b.box, page));
       if (onPage.length === 0) { evaluations.push(targetEvaluation({ ruleId: "layout/orphaned-continuation-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "measured", measurements: [{ name: "continuation-only", value: false, unit: null, operator: "=", threshold: true }, { name: "net-fill", value: page.fill.net, unit: "fill ratio", operator: "<", threshold: maxNetFill }], connective: "all", violated: false })); continue; }
       const allAreContinuations = onPage.every((b) => b.fragmentIndex > 0);
       const violated = allAreContinuations && page.fill.net < maxNetFill;

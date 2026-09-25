@@ -1,7 +1,8 @@
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import {
-  declined, hasLayoutBox, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber, sourceOf, targetEvaluation,
+  declined, hasLayoutBox, layoutOutOfScope, makeFinding, notRenderedEvaluation, num, pageByNumber, sourceOf, startsInContentBox,
+  targetEvaluation,
 } from "../shared.ts";
 
 const HEADINGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
@@ -78,8 +79,11 @@ export const headingAtPageBottom = defineRule(
 
       // The heading is only stranded if nothing else follows it on this page. A heading with
       // three lines of text under it is exactly what the author wanted.
+      // What follows has to start inside the content box, the space this rule measures: a block
+      // footnote below it does not rescue a heading stranded at the foot of the text.
       const onPage = byPage.get(block.page) ?? [];
-      const below = onPage.filter((b) => b.nodeKey !== block.nodeKey && b.box.y >= block.box.y + block.box.height - 0.5);
+      const below = onPage.filter((b) =>
+        b.nodeKey !== block.nodeKey && b.box.y >= block.box.y + block.box.height - 0.5 && startsInContentBox(b.box, page));
       const pageBottom = page.contentBox.y + page.contentBox.height;
       const remaining = pageBottom - (block.box.y + block.box.height);
       const lineHeight = block.lineHeight > 0 ? block.lineHeight : block.effectiveStyle.fontSize * 1.2;

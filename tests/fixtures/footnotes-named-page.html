@@ -1,0 +1,39 @@
+<!doctype html>
+<!--
+  A block footnote on the first page of a chapter that runs in a named page over two pages.
+
+  COMPLICATION. Paged.js writes `data-page="chapter"` on the element that carries `page: chapter`,
+  and breaklint reads a change of named page between the last source node before a boundary and
+  the first one after it as a FORCED break, which silences four layout rules on that boundary.
+  The footnote Paged.js moves into the footnote area comes after the page content in document
+  order, so it is the last source node of page 1, and it is no longer inside the chapter
+  element: read from the footnote, the page before the boundary has no name, the page after it
+  has one, and a boundary that is a plain overflow inside one chapter came out `forced`. The
+  footnote is not where the flow ends; the page content is.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 130mm 100mm; margin: 12mm; }
+@page chapter { size: 130mm 100mm; margin: 12mm; }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0 0 5px; }
+.chapter { page: chapter; }
+.fn { float: footnote; font-size: 8pt; }
+</style></head><body>
+<section class="chapter" id="chapter">
+<p id="p1">The chapter opens with a paragraph that carries a footnote.</p>
+<aside class="fn" id="fn-chapter">A block footnote on the chapter's first page.</aside>
+<p id="p2">Paragraph two of the chapter, still on the first page.</p>
+<p id="p3">Paragraph three of the chapter, still on the first page.</p>
+<p id="p4">Paragraph four of the chapter, still on the first page.</p>
+<p id="p5">Paragraph five of the chapter, still on the first page.</p>
+<p id="p6">Paragraph six of the chapter, still on the first page.</p>
+<p id="p7">Paragraph seven of the chapter, still on the first page.</p>
+<p id="p8">Paragraph eight of the chapter, still on the first page.</p>
+<p id="p9">Paragraph nine of the chapter, still on the first page.</p>
+<p id="p10">Paragraph ten of the chapter, still on the first page.</p>
+<p id="p11">Paragraph eleven of the chapter, probably on the second page.</p>
+<p id="p12">Paragraph twelve of the chapter, on the second page.</p>
+<p id="p13">Paragraph thirteen of the chapter, on the second page.</p>
+<p id="p14">Paragraph fourteen of the chapter, on the second page.</p>
+</section>
+</body></html>

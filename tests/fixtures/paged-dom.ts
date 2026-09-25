@@ -195,6 +195,7 @@ const DEFAULT_STYLE: Record<string, string> = {
  */
 const CLASS_STYLE: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   pagedjs_page_content: { position: "relative" },
+  pagedjs_footnote_area: { position: "relative", overflow: "hidden" },
   pagedjs_pagebox: { position: "relative", display: "grid" },
   pagedjs_sheet: { position: "relative", overflow: "hidden", display: "grid" },
 };
@@ -226,6 +227,13 @@ function displayedChain(node: FakeNode): boolean {
 function boxOf(node: FakeNode): FakeRect {
   if (node.nodeType !== 1 || !displayedChain(node)) return ZERO;
   const authored = node.attributes.get("data-test-box");
+  // The evidence overlay's layer is an absolutely positioned, zero-size box at left 0 / top 0, so
+  // a browser puts it at the origin of its containing block. The fake takes the parent's
+  // authored box for that origin — every container the overlay attaches a layer to is positioned.
+  if (!authored && node.attributes.get("class") === "bl-overlay" && node.parentNode) {
+    const parent = boxOf(node.parentNode);
+    return rect(parent.x, parent.y, 0, 0);
+  }
   if (!authored) return ZERO;
   const [x, y, width, height] = authored.trim().split(/\s+/u).map(Number);
   return rect(x!, y!, width!, height!);
@@ -263,7 +271,15 @@ export function fakePrimitives(document: FakeNode, hooks: {
       const box = boxOf(node);
       return box.width > 0 || box.height > 0 ? [box] : [];
     },
-    style: (node: FakeNode) => ({ ...DEFAULT_STYLE, ...classStyle(node), ...inlineStyle(node) }),
+    // A pseudo-element's `content` is authored as `data-test-before` / `data-test-after`; without
+    // one it has none, which is what Blink reports as "none".
+    style: (node: FakeNode, pseudo?: string | null) => {
+      if (pseudo) {
+        const authored = node.attributes.get(`data-test-${pseudo.replace(/^:+/u, "")}`);
+        return { ...DEFAULT_STYLE, content: authored === undefined ? "none" : JSON.stringify(authored) };
+      }
+      return { ...DEFAULT_STYLE, ...classStyle(node), ...inlineStyle(node) };
+    },
     // A text node's line box is its parent's box: one line per text node. A hidden text node has
     // none, which is what Range.getClientRects() answers under display: none.
     range: (node: FakeNode, start?: number, end?: number) => {
@@ -419,6 +435,18 @@ export function pagedPage(input: {
    * `closest("[data-break-before]")` from any node on that page answers it.
    */
   pageAttributes?: string;
+  /**
+   * A page Paged.js inserted for parity: the page element gets `pagedjs_blank_page` and the area
+   * is the untouched template — page content without its wrapper `div`, an empty footnote area
+   * whose content box carries `pagedjs_footnote_empty` — as read back from a real blank page on
+   * 2026-09-25. `content` and `footnotes` are still inserted if given, which is how a test builds
+   * a blank page that is NOT empty.
+   */
+  blank?: boolean;
+  /** Extra attributes on `.pagedjs_page_content`, e.g. `data-test-after="…"`. */
+  contentAttributes?: string;
+  /** The footnote area's box. Without one it has none, which is what an empty footnote area has. */
+  footnoteBox?: readonly [number, number, number, number];
 }): string {
   const box = (value: readonly number[]) => `data-test-box="${value.join(" ")}"`;
   const margins = MARGIN_LAYOUT.map(([holder, names]) =>
@@ -427,11 +455,14 @@ export function pagedPage(input: {
       return `<div class="pagedjs_margin pagedjs_margin-${name}${content ? " hasContent" : ""}">` +
         `<div class="pagedjs_margin-content">${content}</div></div>`;
     }).join("") + "</div>").join("");
-  return `<div class="pagedjs_page" ${input.pageAttributes ?? ""} ${box(input.pageBox)}><div class="pagedjs_sheet"><div class="pagedjs_pagebox">` +
+  const pageClass = input.blank ? "pagedjs_page pagedjs_blank_page" : "pagedjs_page";
+  const content = input.blank ? input.content : `<div>${input.content}</div>`;
+  const footnoteContentClass = input.blank && !input.footnotes ? "pagedjs_footnote_content pagedjs_footnote_empty" : "pagedjs_footnote_content";
+  return `<div class="${pageClass}" ${input.pageAttributes ?? ""} ${box(input.pageBox)}><div class="pagedjs_sheet"><div class="pagedjs_pagebox">` +
     (input.fixed ?? "") + margins +
-    `<div class="pagedjs_area"><div class="pagedjs_page_content" ${box(input.contentBox)}><div>${input.content}</div></div>` +
-    `<div class="pagedjs_footnote_area"><div class="pagedjs_footnote_content"><div class="pagedjs_footnote_inner_content">` +
-    `${input.footnotes ?? ""}</div></div></div></div></div></div></div>`;
+    `<div class="pagedjs_area" ${box(input.contentBox)}> <div class="pagedjs_page_content" ${input.contentAttributes ?? ""} ${box(input.contentBox)}>${content}</div> ` +
+    `<div class="pagedjs_footnote_area" ${input.footnoteBox ? box(input.footnoteBox) : ""}> <div class="${footnoteContentClass}"> <div class="pagedjs_footnote_inner_content">` +
+    `${input.footnotes ?? ""}</div> </div> </div> </div></div></div></div>`;
 }
 
 /** A whole paginated document: `<div class="pagedjs_pages">` around the pages. */

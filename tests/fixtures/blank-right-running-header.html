@@ -1,0 +1,35 @@
+<!doctype html>
+<!--
+  A `break-before: right` blank page under a running header and a page number.
+
+  COMPLICATION. Chapter one fills page 1, a right-hand page. `break-before: right` on chapter two
+  makes Paged.js insert an empty left-hand page 2 and mark it `pagedjs_blank_page`. That page
+  carries no source block, so the evidence overlay places no mark on it, and a page binds only on
+  marks it carries: under evidence binding (the default) every document with such a page ended at
+  exit 4 whatever else happened. The page is not empty on paper, though: Paged.js clones the
+  running header into its top margin box and prints its page number in the bottom margin box,
+  so a blank-page test that looks at the whole page, or at ink anywhere on the sheet, calls it
+  occupied, and a test that believes the paginator's class alone can be spoofed. The page must be
+  proven empty inside its page area, in the DOM and in the delivered PDF, and then stated as
+  "nothing to bind" rather than counted as bound.
+
+  Without the blank page this document has no findings under the default profile.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 150mm 120mm; margin: 15mm; }
+@page { @top-center { content: element(title); } @bottom-center { content: counter(page); } }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0 0 4px; }
+h2 { margin: 0 0 6px; font-size: 12pt; }
+.title { position: running(title); }
+.right { break-before: right; }
+</style></head><body>
+<p class="title" id="running-title">A running header on every page, the blank one included</p>
+<h2 id="chapter-one">Chapter one</h2>
+<p id="c1p1">Chapter one opens on the first page, which Paged.js treats as a right-hand page.</p>
+<p id="c1p2">Its second paragraph stays on that page.</p>
+<p id="c1p3">So does its third.</p>
+<h2 class="right" id="chapter-two">Chapter two</h2>
+<p id="c2p1">Chapter two must open on a right-hand page, so it starts on page 3.</p>
+<p id="c2p2">Page 2 is the left-hand page Paged.js inserted to make that true.</p>
+</body></html>

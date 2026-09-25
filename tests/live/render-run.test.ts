@@ -1013,21 +1013,20 @@ describe("the M2d live production chain", () => {
     assert.deepEqual(unplacedMarks(document), [], "the evidence overlay tried to mark the running-header clone");
     const blankEvidence = document.evidence?.find((page) => page.page === 2);
     assert.equal(blankEvidence?.conformance, null, "premise: the blank page has no mark to bind");
-    // Everything below needs a browser whose PDF carries the marks (CI's current Chrome). Pages 1
-    // and 3 bind. Page 2 cannot: a page without a single mark never binds, and required evidence
-    // is complete only when EVERY page binds, so any document with a parity-blank page ends
-    // insufficient-coverage (exit 4) under evidence binding — on this fixture and on live-chain.html
-    // alike. That is the evidence contract as it stands, not a defect of the margin-box repair; it
-    // is recorded in docs/limitations.md. When that contract changes, this assertion must change
-    // with it, deliberately.
+    // Page 2 carries nothing to bind, and that is now proven rather than left to block the run:
+    // Paged.js' blank marker, the empty page area in the DOM, and the delivered PDF's text layer
+    // and raster of that area (tests/live/real-documents.test.ts). It leaves the binding
+    // requirement with a declared env/parity-blank-page decline; it is never counted as bound.
+    // Before that change this fixture ended insufficient-coverage (exit 4) under evidence binding.
+    assert.deepEqual(document.evidenceRequirement, { required: true, expectedPages: 3, blankPages: [2] });
+    // Everything below needs a browser whose PDF carries the marks (CI's current Chrome).
     assert.deepEqual(
-      { status: outcome.report.evidenceCoverage?.status, boundPages: outcome.report.evidenceCoverage?.boundPages },
-      { status: "partial", boundPages: 2 },
+      { status: outcome.report.evidenceCoverage?.status, boundPages: outcome.report.evidenceCoverage?.boundPages, expectedPages: outcome.report.evidenceCoverage?.expectedPages },
+      { status: "complete", boundPages: 2, expectedPages: 2 },
       `evidence: ${JSON.stringify(outcome.report.evidenceCoverage)}`,
     );
     assert.deepEqual(document.evidence?.map((page) => page.bindsFinding), [true, false, true]);
-    assert.equal(outcome.report.exitReason, "evidence/required-page-binding-incomplete");
-    assert.equal(exitCodeFor(outcome.report.verdict), 4);
+    assert.equal(exitCodeFor(outcome.report.verdict), 0, `${outcome.report.verdict}: ${outcome.report.exitReason}`);
   });
 
   /**

@@ -17,7 +17,13 @@ The threshold is chosen. Using the heading's own line height rather than a fixed
 
 ## Limits and known false alarms
 
-A heading with anything under it on the same page is not stranded and is not reported.
+A heading with anything under it on the same page is not stranded and is not reported — as long
+as that something starts inside the page's content box. A block footnote (`float: footnote`) is
+recorded on the page it is printed on, but Paged.js lays it out in the footnote area below the
+content box, so it does not count as content following the heading: a heading stranded at the
+foot of the text, above the page's footnotes, is reported. Until this was decided, the footnotes
+hid it — on exactly the pages that carry footnotes. The remaining space is measured to the foot of
+the content box, which Paged.js shortens by the footnote area's height.
 
 A heading with no layout box does not end any page: the in-flow original of a running heading,
 which Paged.js hides with `display: none` while its clones print in the margin boxes, is recorded as

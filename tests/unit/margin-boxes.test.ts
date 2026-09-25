@@ -258,7 +258,9 @@ describe("margin-box content is not part of the flow", () => {
     // clone (first child of the page box) and the last one on pages 1-2 was a body paragraph only
     // because the area comes last in the page box.
     assert.deepEqual(result.pages.map((page) => page.firstSid), [sid["running-title"], sid["b6"], sid["b11"]]);
-    assert.deepEqual(result.pages.map((page) => page.lastSid), [sid["b5"], sid["b10"], sid["note"]]);
+    // Page 3's footnote is on the page but not its last flow node: edges are read from the page
+    // content, so a footnote cannot stand in for where the flow ends (tests/unit/footnotes.test.ts).
+    assert.deepEqual(result.pages.map((page) => page.lastSid), [sid["b5"], sid["b10"], sid["wrapped"]]);
     assert.deepEqual(result.pages.map((page) => page.blank), [false, false, false]);
     assert.deepEqual(result.attributeDrift, []);
   });

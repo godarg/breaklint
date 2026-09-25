@@ -1,0 +1,35 @@
+<!doctype html>
+<!--
+  A parity-blank page that is not blank: it prints "This page is intentionally left blank".
+
+  COMPLICATION. The negative control of the blank-page decision. Paged.js inserts page 2 for the
+  `break-before: right` of chapter two and marks it `pagedjs_blank_page`; no source block lands on
+  it, and its page content has no child element and no text node, so every DOM-tree test of
+  emptiness passes. The sentence is CSS generated content on the page content box, in the middle
+  of the content area. Only an oracle that looks at what is printed sees it: the delivered PDF has
+  ink and a text item inside the page area. Such a page carries content that no source block
+  owns, so no mark can stand for it, and it must stay unbound (exit 4 under evidence binding)
+  instead of being excused as blank. Everything else matches `blank-right-running-header.html`.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 150mm 120mm; margin: 15mm; }
+@page { @top-center { content: element(title); } @bottom-center { content: counter(page); } }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0 0 4px; }
+h2 { margin: 0 0 6px; font-size: 12pt; }
+.title { position: running(title); }
+.right { break-before: right; }
+.pagedjs_blank_page .pagedjs_page_content::after {
+  content: "This page is intentionally left blank.";
+  display: block; padding-top: 30mm; text-align: center; font-style: italic;
+}
+</style></head><body>
+<p class="title" id="running-title">A running header on every page, the blank one included</p>
+<h2 id="chapter-one">Chapter one</h2>
+<p id="c1p1">Chapter one opens on the first page, which Paged.js treats as a right-hand page.</p>
+<p id="c1p2">Its second paragraph stays on that page.</p>
+<p id="c1p3">So does its third.</p>
+<h2 class="right" id="chapter-two">Chapter two</h2>
+<p id="c2p1">Chapter two must open on a right-hand page, so it starts on page 3.</p>
+<p id="c2p2">Page 2 is the left-hand page Paged.js inserted, and it says so in print.</p>
+</body></html>

@@ -1,0 +1,34 @@
+<!doctype html>
+<!--
+  Real block footnotes next to a planted look-alike footnote call that changes between runs.
+
+  COMPLICATION. The negative control of the footnote-call recogniser. A script writes an <a> with
+  every attribute of a Paged.js footnote call — `data-footnote-call`, `data-ref` equal to it,
+  `data-data-counter-footnote-increment="1"` and `href="#note-"` plus that value, on an empty <a> —
+  and chooses the value by whether the document carries source ids, so the injected run and the
+  paired control run disagree about it. It is not a footnote: no footnote area holds a note with
+  that `data-ref`. A recogniser that excuses an `href` for its shape, its `#note-` prefix or its
+  attributes would excuse this one as well; it must still end the run as `injection-interference`
+  (exit 3). The real footnote next to it must not be what stops the run, and the run's detail
+  must name only the resource quantity.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 130mm 100mm; margin: 12mm; }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0 0 5px; }
+.fn { float: footnote; font-size: 8pt; }
+</style></head><body>
+<p id="p1">A paragraph with a real footnote.</p>
+<aside class="fn" id="fn-real">A real block footnote.</aside>
+<p id="p2">A paragraph with a planted call<a id="planted"></a> that no footnote backs.</p>
+<script>
+  const attribute = 'data-' + 'bl-' + 'sid';
+  const injected = document.querySelector('p[' + attribute + ']') !== null;
+  const ref = injected ? 'planted-in-the-injected-run' : 'planted-in-the-control-run';
+  const call = document.getElementById('planted');
+  call.setAttribute('data-footnote-call', ref);
+  call.setAttribute('data-ref', ref);
+  call.setAttribute('data-data-counter-footnote-increment', '1');
+  call.setAttribute('href', '#note-' + ref);
+</script>
+</body></html>

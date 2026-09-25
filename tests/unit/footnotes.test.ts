@@ -1,0 +1,189 @@
+/**
+ * Documents with footnotes reach the rules, and what the rules and the evidence then do with a
+ * footnote is decided, not inherited.
+ *
+ * THE DEFECT (G-79). Paged.js 0.4.3 builds a footnote call for every `float: footnote` element —
+ * `<a data-footnote-call="R" data-ref="R" data-data-counter-footnote-increment="1" href="#note-R">`
+ * — from the note's `data-ref`, a random UUID drawn per run. The paired control run of the
+ * injection check reads every `href` as a resource, so the injected run and the control run
+ * disagreed about it, and every document with a footnote ended `injection-interference` (exit 3)
+ * before any rule ran: measured with the real paginator on `footnotes-block.html` and
+ * `footnotes-inline.html` (patched Chromium 141, no evidence binding).
+ *
+ * Unblocking them exposed three more places where a footnote was read as something it is not:
+ *
+ *   - the evidence overlay could not mark a block footnote at all (it lies in the footnote area,
+ *     below the content box the marks hang in), so every page with one stayed unbound;
+ *   - the collector read a block footnote as the last node of its page's flow, so inside a
+ *     named-page chapter the page before an ordinary overflow boundary had no page name and the
+ *     boundary came out `forced` — measured on `footnotes-named-page.html`: `layout/widow` and
+ *     `layout/orphan` declined `env/forced-break` and the run ended at exit 4;
+ *   - `layout/heading-at-page-bottom` counted a footnote below the content box as content
+ *     following the heading, so a heading stranded above the footnotes was never reported
+ *     (corpus fixture `heading-bottom-trigger-above-footnotes`).
+ *
+ * WHAT IS REAL HERE. The payloads (`CONTROL_SIGNATURE_SOURCE`, the collector, the overlay) are the
+ * production strings, run over hand-authored Paged.js 0.4.3 page trees whose footnote structure is
+ * the one read back from the live fixtures on 2026-09-25 (`tests/fixtures/paged-dom.ts`).
+ */
+
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, it } from "node:test";
+
+import { compareControlSignatures, CONTROL_SIGNATURE_SOURCE, type ControlSignature } from "../../src/measure/snapshot.ts";
+import { classifyBoundary } from "../../src/paginate/breaks.ts";
+import { boundaryFactsFrom, COLLECTOR_SOURCE, type CollectorResult } from "../../src/paginate/collector.ts";
+import { PAGED_FOOTNOTE_CALLS_SOURCE } from "../../src/paginate/pagedjs-structure.ts";
+import { produceEvidence } from "../../src/render/evidence.ts";
+import { faithfulRasterizer, OverlayPage } from "../fixtures/evidence-harness.ts";
+import { evaluatePayload, pagedDocument, pagedPage, runCollector, type FakeNode } from "../fixtures/paged-dom.ts";
+
+const STRIDE = 700;
+const LINE = 18.66;
+const pageBox = (index: number) => [0, index * STRIDE, 566.93, 453.54] as const;
+/** With a footnote area of 30 px, the content box shrinks by that much (measured). */
+const contentBox = (index: number) => [56.69, 56.69 + index * STRIDE, 453.53, 310.16] as const;
+const footnoteBox = (index: number) => [56.69, 366.85 + index * STRIDE, 453.53, 30] as const;
+const lineBox = (index: number, line: number) => `56.69 ${56.69 + index * STRIDE + line * LINE} 453.53 ${LINE}`;
+
+/** The call Paged.js 0.4.3 inserts, exactly as read back from the live fixture. */
+const call = (ref: string, className = "fn") =>
+  `<a class="${className}" data-footnote-call="${ref}" data-ref="${ref}" data-data-counter-footnote-increment="1" href="#note-${ref}"></a>`;
+/** The note it moves into the footnote area, exactly as read back (source id optional). */
+const note = (ref: string, tag: string, text: string, sid: string | null, box: string) =>
+  `<${tag} ${sid ? `data-bl-sid="${sid}" ` : ""}class="fn" id="note-${ref}" data-ref="${ref}" data-note="footnote" ` +
+  `data-note-policy="auto" data-note-display="block" data-footnote-marker="${ref}" data-test-box="${box}">${text}</${tag}>`;
+
+/** One page with a block footnote; `sids` false builds the control run's tree. */
+function blockFootnotePage(ref: string, sids: boolean, extraContent = ""): string {
+  const s = (id: string) => (sids ? `data-bl-sid="${id}" ` : "");
+  return pagedPage({
+    pageBox: pageBox(0), contentBox: contentBox(0), footnoteBox: footnoteBox(0),
+    content: `<p ${s("p1")}data-ref="ref-p1" data-test-box="${lineBox(0, 0)}">The first paragraph.</p>` + call(ref) +
+      `<p ${s("p2")}data-ref="ref-p2" data-test-box="${lineBox(0, 1)}">The second paragraph.</p>` + extraContent,
+    footnotes: note(ref, "aside", "A block footnote.", sids ? "fn1" : null, "56.69 370 453.53 15"),
+  });
+}
+
+/** One page with an inline footnote: the call is inside the sentence, the note is a span. */
+function inlineFootnotePage(ref: string, sids: boolean): string {
+  return pagedPage({
+    pageBox: pageBox(0), contentBox: contentBox(0), footnoteBox: footnoteBox(0),
+    content: `<p ${sids ? 'data-bl-sid="p1" ' : ""}data-ref="ref-p1" data-test-box="${lineBox(0, 0)}">A sentence${call(ref)} with a note.</p>`,
+    footnotes: note(ref, "span", "An inline footnote.", null, "56.69 370 453.53 15"),
+  });
+}
+
+const signature = (pages: string[]) => evaluatePayload<ControlSignature>(CONTROL_SIGNATURE_SOURCE, pagedDocument(pages));
+const REF_A = "4a5d0ff7-896d-434f-8ddf-4d49afba3c7f";
+const REF_B = "25d23bc6-d719-4609-aaf5-3b183e4badd3";
+
+describe("the paired control run recognises Paged.js' own footnote calls, and nothing else", () => {
+  it("block and inline footnotes: two runs that differ only in the paginator's random data-ref agree", () => {
+    for (const build of [blockFootnotePage, inlineFootnotePage]) {
+      const injected = signature([build(REF_A, true)]);
+      const control = signature([build(REF_B, false)]);
+      assert.ok(injected.resources.includes("pagedjs-footnote-call:1"), `premise: the call was recognised: ${injected.resources}`);
+      assert.equal(injected.resources.includes(REF_A), false, "the random data-ref reached the resource signature");
+      assert.deepEqual(compareControlSignatures(injected, control), { equal: true, changed: [] }, build.name);
+    }
+  });
+
+  it("an author-preset data-ref is a recognised call too, and the same in both runs", () => {
+    const injected = signature([blockFootnotePage("chosen-by-author", true)]);
+    const control = signature([blockFootnotePage("chosen-by-author", false)]);
+    assert.deepEqual(compareControlSignatures(injected, control).changed, []);
+  });
+
+  it("a planted look-alike that differs between runs is still interference", () => {
+    // Every attribute of a call, and no note behind it — footnotes-planted-call.html, recorded.
+    const planted = (ref: string) => `<a id="planted" data-footnote-call="${ref}" data-ref="${ref}" ` +
+      `data-data-counter-footnote-increment="1" href="#note-${ref}" data-id="planted"></a>`;
+    const injected = signature([blockFootnotePage(REF_A, true, planted("planted-in-the-injected-run"))]);
+    const control = signature([blockFootnotePage(REF_B, false, planted("planted-in-the-control-run"))]);
+    assert.deepEqual(compareControlSignatures(injected, control).changed, ["resources"]);
+  });
+
+  it("recognises a call only as the whole structure", () => {
+    const calls = (pages: string[]) => evaluatePayload<Map<unknown, number>>(
+      `(${PAGED_FOOTNOTE_CALLS_SOURCE})(window.__blPrimitives)`, pagedDocument(pages)).size;
+    const page = (content: string, footnotes: string) => pagedPage({
+      pageBox: pageBox(0), contentBox: contentBox(0), footnoteBox: footnoteBox(0), content, footnotes,
+    });
+    const aNote = note(REF_A, "aside", "Note.", null, "56.69 370 453.53 15");
+    assert.equal(calls([page(call(REF_A), aNote)]), 1, "premise: the recorded pair");
+    assert.equal(calls([page(call(REF_A), "")]), 0, "no note");
+    assert.equal(calls([page(call(REF_A) + aNote, "")]), 0, "a note that is not in a footnote area");
+    assert.equal(calls([page(call(REF_A), note(REF_B, "aside", "Other.", null, "56.69 370 453.53 15"))]), 0, "a note for another ref");
+    assert.equal(calls([page(call(REF_A).replace(`href="#note-${REF_A}"`, `href="#note-${REF_B}"`), aNote)]), 0, "an href for another ref");
+    assert.equal(calls([page(call(REF_A).replace(`href="#note-${REF_A}"`, `href="img.png#note-${REF_A}"`), aNote)]), 0, "an href that fetches");
+    assert.equal(calls([page(call(REF_A).replace(`data-ref="${REF_A}"`, `data-ref="${REF_B}"`), aNote)]), 0, "a call whose data-ref differs");
+    assert.equal(calls([page(call(REF_A).replace(' data-data-counter-footnote-increment="1"', ""), aNote)]), 0, "no counter attribute");
+    assert.equal(calls([page(call(REF_A).replace("></a>", ">text</a>"), aNote)]), 0, "a call with content");
+    assert.equal(calls([page(call(REF_A), aNote.replace(`id="note-${REF_A}"`, 'id="other"'))]), 0, "a note without Paged.js' id");
+    assert.equal(calls([page(call(REF_A), aNote.replace('data-note="footnote"', 'data-note="endnote"'))]), 0, "not a footnote");
+    assert.equal(calls([page(call(REF_A), aNote.replace(`data-footnote-marker="${REF_A}"`, ""))]), 0, "no marker");
+  });
+
+  it("records calls by ordinal, so a run with a different number of footnotes still differs", () => {
+    const two = signature([blockFootnotePage(REF_A, true, call("second-call"))
+      .replace("</aside>", `</aside>${note("second-call", "aside", "Two.", null, "56.69 385 453.53 15")}`)]);
+    const one = signature([blockFootnotePage(REF_B, false)]);
+    assert.ok(two.resources.includes("pagedjs-footnote-call:2"));
+    assert.ok(compareControlSignatures(two, one).changed.includes("resources"));
+  });
+});
+
+describe("the collector reads a page's edges from its page content, not from its footnotes", () => {
+  it("an overflow boundary inside a named-page chapter stays overflow when page 1 carries a block footnote", () => {
+    const pages = [
+      pagedPage({
+        pageBox: pageBox(0), contentBox: contentBox(0), footnoteBox: footnoteBox(0),
+        content: `<section class="chapter" data-bl-sid="sec" data-ref="ref-sec" data-page="chapter" data-test-box="${lineBox(0, 0)}">` +
+          `<p data-bl-sid="p1" data-ref="ref-p1" data-test-box="${lineBox(0, 0)}">One.</p>${call(REF_A)}` +
+          `<p data-bl-sid="p2" data-ref="ref-p2" data-test-box="${lineBox(0, 1)}">Two.</p></section>`,
+        footnotes: note(REF_A, "aside", "A block footnote.", "fn1", "56.69 370 453.53 15"),
+      }),
+      pagedPage({
+        pageBox: pageBox(1), contentBox: contentBox(1),
+        content: `<section class="chapter" data-bl-sid="sec" data-ref="ref-sec" data-page="chapter" data-split-from="ref-sec" data-test-box="${lineBox(1, 0)}">` +
+          `<p data-bl-sid="p3" data-ref="ref-p3" data-test-box="${lineBox(1, 0)}">Three.</p></section>`,
+      }),
+    ];
+    const result = runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(pages));
+    assert.equal(result.pages[0]!.lastSid, "p2", "the footnote was read as the last node of page 1's flow");
+    assert.equal(result.pages[0]!.lastNodePage, "chapter");
+    assert.deepEqual(result.pages.map((page) => page.blank), [false, false]);
+    const facts = boundaryFactsFrom(result.pages)[0]!;
+    assert.equal(classifyBoundary({ ...facts, hasBreakToken: true }).kind, "overflow",
+      "a footnote outside the chapter element turned an overflow into a change of named page");
+  });
+});
+
+describe("the evidence overlay marks a block footnote in the footnote area", () => {
+  it("places both marks against the footnote area and lets the page bind", async () => {
+    const outDir = mkdtempSync(join(tmpdir(), "breaklint-footnote-evidence-"));
+    try {
+      const doc: FakeNode = pagedDocument([blockFootnotePage(REF_A, true)]);
+      const page = new OverlayPage(doc);
+      const outcome = await produceEvidence({
+        page, closePage: async () => page.close(), rasterizer: faithfulRasterizer(page, { pages: 1 }),
+        options: { outDir, documentKey: "footnote", binding: true },
+      });
+      const installation = page.installation!;
+      assert.deepEqual(installation.unplacedMarks, [], "a footnote-area fragment was refused a mark");
+      const marks = installation.marks.filter((mark) => mark.sid === "fn1");
+      // At the note's own edges, against the page box: nothing moved, nothing clamped.
+      assert.deepEqual(marks.map((mark) => [mark.side, mark.xPx, mark.yPx]), [["start", 56.69, 370], ["end", 56.69, 385]]);
+      assert.equal(installation.staticPageAreas, 0);
+      assert.equal(installation.layers, 2, "one layer in the content box and one in the footnote area");
+      assert.deepEqual(outcome.evidence.map((record) => record.bindsFinding), [true]);
+      assert.ok(outcome.boundSids.has("fn1"), "the footnote itself did not bind");
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+});

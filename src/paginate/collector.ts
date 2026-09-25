@@ -107,6 +107,12 @@ export function silentHooks(hooks: Readonly<Record<string, number>>): string[] {
 export const PAGE_AREA_SELECTOR = ".pagedjs_pagebox > .pagedjs_area";
 
 /**
+ * A page area's footnote area. It is part of the page (footnotes are printed on the page they
+ * belong to) but not part of the page content's flow: see `edges` below and the evidence overlay.
+ */
+export const FOOTNOTE_AREA_SELECTOR = `${PAGE_AREA_SELECTOR} > .pagedjs_footnote_area`;
+
+/**
  * The in-page collector.
  *
  * Registered BEFORE `new Paged.Previewer().preview()` runs, which the loader guarantees by
@@ -121,6 +127,7 @@ const COLLECTOR_TEMPLATE = `(() => {
   const P = window.__blPrimitives;
   const A = { before: "data-break-before", prevAfter: "data-previous-break-after", page: "data-page" };
   const PAGE_AREA_SELECTOR = ${JSON.stringify(PAGE_AREA_SELECTOR)};
+  const FOOTNOTE_AREA_SELECTOR = ${JSON.stringify(FOOTNOTE_AREA_SELECTOR)};
   const SOURCE_BLOCK_SELECTOR = "[data-bl-sid],address[data-ref],article[data-ref],aside[data-ref],blockquote[data-ref],caption[data-ref],dd[data-ref],details[data-ref],div[data-ref],dl[data-ref],dt[data-ref],fieldset[data-ref],figcaption[data-ref],figure[data-ref],footer[data-ref],form[data-ref],h1[data-ref],h2[data-ref],h3[data-ref],h4[data-ref],h5[data-ref],h6[data-ref],header[data-ref],hgroup[data-ref],hr[data-ref],li[data-ref],main[data-ref],nav[data-ref],ol[data-ref],p[data-ref],pre[data-ref],section[data-ref],summary[data-ref],table[data-ref],tbody[data-ref],td[data-ref],tfoot[data-ref],th[data-ref],thead[data-ref],tr[data-ref],ul[data-ref]";
 
   const state = {
@@ -169,8 +176,15 @@ const COLLECTOR_TEMPLATE = `(() => {
     // boxes precede the area in the page box, so it also became the FIRST node of every page.
     // SNAPSHOT_SOURCE applies the same test and refuses a page that has no area at all.
     const nodes = P.all(pageEl, SOURCE_BLOCK_SELECTOR).filter((el) => P.closest(el, PAGE_AREA_SELECTOR) !== null);
-    const first = nodes[0] || null;
-    const last = nodes.length ? nodes[nodes.length - 1] : null;
+    // The page's EDGES are read from its page content. A block footnote is on the page (it counts
+    // against blank above) but Paged.js moved it into the footnote area, after the page content
+    // in document order and out of the element it was written in, so it is neither where the
+    // flow of this page ends nor inside that flow's named page: read as the last node, a footnote
+    // turned every overflow boundary inside a named-page chapter into a change of named page,
+    // i.e. a false forced break that silences four layout rules.
+    const flow = nodes.filter((el) => P.closest(el, FOOTNOTE_AREA_SELECTOR) === null);
+    const first = flow[0] || null;
+    const last = flow.length ? flow[flow.length - 1] : null;
     // Every read below goes through the captured primitives. An audit found this function calling
     // el.getAttribute and el.hasAttribute directly while the header of this file claimed
     // otherwise — and those two decide the break cause, so a replaced getAttribute returning

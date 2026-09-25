@@ -1,0 +1,27 @@
+<!doctype html>
+<!--
+  Inline footnotes (`float: footnote` on a <span> inside the sentence it annotates) on two pages.
+
+  COMPLICATION. The note is not a block: it has no source id of its own, and its text belongs to
+  the paragraph it was written in. Paged.js lifts the span out of that paragraph into the
+  footnote area and leaves a footnote call in its place, an <a> whose `href` is `#note-` plus the
+  paginator's per-run random `data-ref`. The paired control run gets a different random value,
+  so the run stopped as `injection-interference` (exit 3), exactly as for block footnotes. The
+  footnote area then holds text that no source block on the page owns.
+
+  The document has no findings under the default profile.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 130mm 100mm; margin: 12mm; }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0 0 5px; }
+h2 { margin: 0 0 6px; font-size: 12pt; }
+.fn { float: footnote; font-size: 8pt; }
+.next { break-before: page; }
+</style></head><body>
+<h2 id="first">First page</h2>
+<p id="p1">A sentence with an inline footnote<span class="fn">The first inline footnote.</span> in the middle.</p>
+<p id="p2">A second sentence<span class="fn">The second inline footnote.</span> with another.</p>
+<h2 class="next" id="second">Second page</h2>
+<p id="p3">The last sentence carries the third note<span class="fn">The third inline footnote.</span> at its end.</p>
+</body></html>

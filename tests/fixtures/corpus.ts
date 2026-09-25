@@ -370,6 +370,24 @@ export function loadCorpus(): CorpusEntry[] {
         ],
       }),
     },
+    {
+      name: "heading-bottom-trigger-above-footnotes",
+      kind: "trigger",
+      about: "layout/heading-at-page-bottom",
+      complication:
+        "The heading ends the page's text, and the page carries a block footnote. Paged.js lays the " +
+        "footnote out in the footnote area BELOW the content box (which shrinks by its height), and " +
+        "the snapshot records it on this page after the heading. It follows the heading on the page " +
+        "but not in the space the rule measures; counted as following content, it hid the heading.",
+      snapshot: snapshot({
+        pages: [page(1, { contentBox: box(48, 48, 399, 560) })],
+        blocks: [
+          block("p1", { box: box(48, 48, 399, 520) }),
+          block("h1", { tag: "h2", box: box(48, 580, 399, 20), lineHeight: 20 }),
+          block("fn", { tag: "aside", box: box(48, 616, 399, 30) }),
+        ],
+      }),
+    },
 
     // --------------------------------------------------------- layout/half-empty-page
     {
@@ -434,6 +452,23 @@ export function loadCorpus(): CorpusEntry[] {
       snapshot: snapshot({
         pages: [page(1, { fill: { vertical: 0.1, topGap: 0.02, net: 0.06, area: 1 } })],
         blocks: [block("c1", { fragmentIndex: 1, fragmentCount: 2 })],
+      }),
+    },
+    {
+      name: "orphaned-continuation-trigger-with-footnote",
+      kind: "trigger",
+      about: "layout/orphaned-continuation-page",
+      complication:
+        "The same one-line continuation, and the page also prints the footnote its call is in. The " +
+        "note is a fresh block (fragment 0) recorded on this page, but Paged.js lays it out in the " +
+        "footnote area below the content box; counted as fresh content, it hid the finding.",
+      alsoFires: ["layout/half-empty-page"],
+      snapshot: snapshot({
+        pages: [page(1, { contentBox: box(48, 48, 399, 576), fill: { vertical: 0.1, topGap: 0.02, net: 0.06, area: 1 } })],
+        blocks: [
+          block("c1", { fragmentIndex: 1, fragmentCount: 2 }),
+          block("fn", { tag: "aside", box: box(48, 630, 399, 20) }),
+        ],
       }),
     },
     {

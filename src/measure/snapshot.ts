@@ -33,6 +33,7 @@ import type {
 } from "../core/types.ts";
 import { assignPageCauses } from "../paginate/breaks.ts";
 import { boundaryFactsFrom, PAGE_AREA_SELECTOR, type CollectorResult } from "../paginate/collector.ts";
+import { PAGED_FOOTNOTE_CALLS_SOURCE } from "../paginate/pagedjs-structure.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InjectionResult } from "../source/inject.ts";
 import { coordinateAtUtf8Byte } from "../source/bytes.ts";
@@ -322,6 +323,11 @@ export const CONTROL_SIGNATURE_SOURCE = `(() => {
       addResource(match[1] || match[2] || match[3] || "", base);
     }
   };
+  // Paged.js builds each footnote call's href from the note's per-run random data-ref, so the
+  // control run never agrees with the injected run on its spelling. A call recognised as the
+  // whole Paged.js structure (src/paginate/pagedjs-structure.ts) is recorded by ordinal instead;
+  // everything else, including a look-alike without its note, is recorded as written.
+  const footnoteCalls = (${PAGED_FOOTNOTE_CALLS_SOURCE})(P);
   for (const page of pages) {
     texts.push(P.text(page).replace(/\\s+/g, " ").trim());
     for (const el of P.all(page, "*")) {
@@ -332,7 +338,10 @@ export const CONTROL_SIGNATURE_SOURCE = `(() => {
         s.fontWeight, s.color, s.backgroundColor, s.textDecorationLine,
         s.breakBefore, s.breakAfter, s.breakInside, s.writingMode].join(":"));
       for (const attribute of ["href", "src", "poster", "data", "xlink:href"]) {
-        const value = P.attr(el, attribute); if (value) addResource(value);
+        const value = P.attr(el, attribute);
+        if (!value) continue;
+        if (attribute === "href" && footnoteCalls.has(el)) resourceUris.add("pagedjs-footnote-call:" + footnoteCalls.get(el));
+        else addResource(value);
       }
       const srcset = P.attr(el, "srcset");
       if (srcset) for (const candidate of srcset.split(",")) addResource(candidate.trim().split(/\\s+/u)[0] || "");

@@ -1,0 +1,40 @@
+<!doctype html>
+<!--
+  Block footnotes and a document script that swaps two source ids after pagination.
+
+  COMPLICATION. The negative control of the footnote allowances in the post-pagination source-id
+  check. A block footnote legitimately sits out of source order in the footnote area, and its
+  call legitimately differs between runs; neither may become cover for the document changing the
+  identities the rules report against. Once Paged.js has settled, the script swaps the source ids
+  of the footnote and of the paragraph that follows it, and hides the attribute mutations from
+  mutation observers first. The run must still stop before any rule (exit 3).
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 130mm 100mm; margin: 12mm; }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0 0 5px; }
+.fn { float: footnote; font-size: 8pt; }
+</style></head><body>
+<p id="p1">A paragraph with a footnote.</p>
+<aside class="fn" id="fn-swapped">A block footnote whose source id is swapped after pagination.</aside>
+<p id="p2">The paragraph whose source id the footnote receives.</p>
+<script>
+  Object.defineProperty(MutationRecord.prototype, 'type', { configurable: true, get() { return 'childList'; } });
+  Object.defineProperty(MutationRecord.prototype, 'attributeName', { configurable: true, get() { return null; } });
+  const name = 'data-' + 'bl-' + 'sid';
+  let lastPageCount = -1, stableFrames = 0;
+  const swapAfterPagination = () => {
+    const pageCount = document.querySelectorAll('.pagedjs_page').length;
+    stableFrames = pageCount > 0 && pageCount === lastPageCount ? stableFrames + 1 : 0;
+    lastPageCount = pageCount;
+    const note = document.querySelector('.pagedjs_footnote_area #fn-swapped, .pagedjs_footnote_area [data-id="fn-swapped"]');
+    const paragraph = document.querySelector('.pagedjs_page_content [data-id="p2"]');
+    if (stableFrames < 3 || !note || !paragraph) { requestAnimationFrame(swapAfterPagination); return; }
+    const a = note.getAttribute(name), b = paragraph.getAttribute(name);
+    if (!a || !b) return;
+    note.setAttribute(name, b);
+    paragraph.setAttribute(name, a);
+  };
+  requestAnimationFrame(swapAfterPagination);
+</script>
+</body></html>

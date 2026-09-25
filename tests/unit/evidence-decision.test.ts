@@ -170,6 +170,8 @@ function fakeRasterizer(options: FakeRasterizerOptions): Rasterizer {
     async textItems(): Promise<PdfTextPage[]> {
       return options.textItems ?? [];
     },
+    // No case here is about a blank page; a page without marks reads as printed on.
+    async regionInk() { return { pixels: 1, ink: 1 }; },
     pageErrors(): readonly string[] {
       return errors;
     },

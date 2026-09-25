@@ -410,13 +410,14 @@ describe("the collector, live", () => {
   });
 
   /**
-   * The footnote area is part of the page area, so a block footnote stays in the flow: in the
-   * snapshot and in the collector's page edges. Paged.js places it after the page content, out
-   * of source order, and the source-id check reads the order of the page content only. This is
-   * the real-paginator observation of what `tests/unit/margin-boxes.test.ts` checks on a
-   * hand-built tree. (The production chain does not get this far with a footnote: Paged.js gives
-   * the footnote call a per-run random `href`, which the paired control reads as a changed
-   * resource and refuses — see docs/limitations.md.)
+   * The footnote area is part of the page area, so a block footnote stays on its page: in the
+   * snapshot, and in the collector's blank test. It is not an EDGE of the page's flow: Paged.js
+   * places it after the page content, out of source order and out of the element it was written
+   * in, so the page edges are read from the page content (`tests/unit/footnotes.test.ts` has the
+   * named-page boundary this protects). The source-id check reads the order of the page content
+   * only. This is the real-paginator observation of what `tests/unit/margin-boxes.test.ts`
+   * checks on a hand-built tree; the production chain runs footnotes end to end in
+   * `tests/live/real-documents.test.ts`.
    */
   it("keeps a block footnote in the flow and accepts its out-of-source-order position", async (t) => {
     if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
@@ -430,7 +431,8 @@ describe("the collector, live", () => {
     const raw = await page.evaluate<RawSnapshot>(SNAPSHOT_SOURCE);
     assert.deepEqual(raw.blocks.filter((block) => block.sid === note).map((block) => block.page), [1],
       "the footnote was dropped from the flow, or recorded more than once");
-    assert.equal(result.pages[0]!.lastSid, note, "the footnote area is not an edge of the page's flow");
+    assert.equal(result.pages[0]!.lastSid, footnoteSidByAuthorId["fp2"], "the footnote was read as the end of the page's flow");
+    assert.equal(result.pages[0]!.blank, false);
     const integrity = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(TEST_PRIMITIVES_CAPABILITY));
     assert.deepEqual(validateRuntimeSidState(footnoteExpectedSids, integrity), [],
       "the footnote's position after the page content was read as a source-id order violation");

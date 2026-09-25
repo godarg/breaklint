@@ -198,3 +198,19 @@ export function notRenderedEvaluation(ruleId: string, block: {
     connective: "single", violated: null,
   });
 }
+
+/**
+ * Whether a block starts inside its page's content box — the space the page rules measure.
+ *
+ * A block footnote (`float: footnote`) is recorded on the page it is printed on: it is part of that
+ * page, and the block and line rules measure it like any other block. But Paged.js lays it out in
+ * the footnote area, BELOW the content box, which shrinks by the footnote area's height. A rule
+ * that asks what fills or follows inside the content box must therefore not count it:
+ * `layout/heading-at-page-bottom` took a page's footnotes for content following a heading stranded
+ * at the foot of its text, and `layout/orphaned-continuation-page` took them for fresh content on a
+ * page that carries only a continuation. Every other block starts inside the content box or above
+ * its bottom edge — a block that is not laid out at all has the zero box, which starts at 0.
+ */
+export function startsInContentBox(box: Box, page: PageRecord): boolean {
+  return box.y < page.contentBox.y + page.contentBox.height;
+}

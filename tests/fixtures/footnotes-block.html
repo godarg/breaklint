@@ -1,0 +1,35 @@
+<!doctype html>
+<!--
+  Block footnotes (`float: footnote` on an <aside>) on two pages.
+
+  COMPLICATION. Paged.js moves each note out of the page content into the footnote area below it
+  and leaves a footnote call in the text, an <a> whose `href` is `#note-` plus the paginator's
+  per-run random `data-ref`. The paired control run (the same document without source ids) gets
+  a different random `data-ref`, so a signature that reads every `href` as a resource sees the two
+  runs disagree and stops the run as `injection-interference` (exit 3) for any document with a
+  footnote. Each note is also a source block of its own that now sits in the footnote area,
+  outside the content box the evidence marks hang in, and after the page's content in document
+  order — out of source order.
+
+  The notes are one line each and the paragraphs short, so the document has no findings under the
+  default profile.
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+@page { size: 130mm 100mm; margin: 12mm; }
+body { margin: 0; font: 10pt/1.4 Georgia, serif; }
+p { margin: 0 0 5px; }
+h2 { margin: 0 0 6px; font-size: 12pt; }
+.fn { float: footnote; font-size: 8pt; }
+.next { break-before: page; }
+</style></head><body>
+<h2 id="first">First page</h2>
+<p id="p1">The first paragraph carries the first footnote.</p>
+<aside class="fn" id="fn-one">The first block footnote.</aside>
+<p id="p2">The second paragraph carries the second footnote.</p>
+<aside class="fn" id="fn-two">The second block footnote.</aside>
+<p id="p3">The third paragraph has none.</p>
+<h2 class="next" id="second">Second page</h2>
+<p id="p4">The fourth paragraph carries the third footnote.</p>
+<aside class="fn" id="fn-three">The third block footnote, on the second page.</aside>
+<p id="p5">The fifth paragraph closes the document.</p>
+</body></html>

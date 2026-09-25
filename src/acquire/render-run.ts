@@ -35,7 +35,7 @@ import { measureCapturedFontIdentity, prepareCapturedFontIdentity, releaseCaptur
 import { sha256Short } from "../core/fingerprint.ts";
 import type { DocumentInput } from "../core/engine.ts";
 import type { BreakCauseCascadeHint } from "../core/enums.ts";
-import type { InfraEvent, ReportEnvironment, ResourceRecord, SourceRef } from "../core/types.ts";
+import type { InfraEvent, NotMeasured, ReportEnvironment, ResourceRecord, SourceRef } from "../core/types.ts";
 import {
   compareGeometry, crossCheckEvent, crossCheckPassedEvent, CROSS_CHECK_SAMPLE_SIZE,
   CROSS_CHECK_TOLERANCE_PX, geometrySampleSource, quadEnvelope,
@@ -967,6 +967,22 @@ export function finalizeEvidenceAcquisition(
   evidenceRequired?: boolean,
 ): DocumentInput {
   const allInfrastructure = [...infrastructure, ...evidence.infrastructure];
+  // A page the evidence path proved empty (`verifyBlankPage`) is excused from the binding
+  // requirement only when the snapshot agrees independently: its page record is blank and no
+  // measured block is on it. The excuse is written into the report as a page-scope decline, so a
+  // reader sees which page carried nothing to bind and why, and it never counts as bound.
+  const blankPages = (evidence.verifiedBlankPages ?? []).filter((page) =>
+    snapshot.pages[page - 1]?.blank === true && !snapshot.blocks.some((block) => block.page === page));
+  const notMeasured: NotMeasured[] = [
+    ...evidence.notMeasured,
+    ...blankPages.map((page): NotMeasured => ({
+      scope: "page", ruleId: null, reason: "env/parity-blank-page",
+      target: { keyType: "page", nodeKey: `page:${page}`, sid: null }, count: 1,
+    })),
+  ];
+  const evidenceRequirement = evidenceRequired !== undefined
+    ? { evidenceRequirement: { required: evidenceRequired, expectedPages: snapshot.pages.length, ...(blankPages.length ? { blankPages } : {}) } }
+    : {};
   const renderArtifact = evidence.pdfArtifact ? {
     ...evidence.pdfArtifact, kind: "diagnostic-pdf" as const,
     inputHtmlSha256: snapshot.meta.inputIdentity?.html ?? null,
@@ -988,12 +1004,12 @@ export function finalizeEvidenceAcquisition(
   return {
     path,
     ...(renderArtifact ? { renderArtifact } : {}),
-    ...(evidenceRequired !== undefined ? { evidenceRequirement: { required: evidenceRequired, expectedPages: snapshot.pages.length } } : {}),
+    ...evidenceRequirement,
     snapshot,
     infrastructure: allInfrastructure,
     evidence: evidence.evidence,
     boundSids: [...evidence.boundSids],
-    notMeasured: evidence.notMeasured,
+    notMeasured,
   };
 }
 

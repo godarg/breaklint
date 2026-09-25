@@ -50,6 +50,15 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   finding message had already stopped making that all-pages claim from one measured page; the
   advice text in `Finding.remediation` now says the same thing (6af6008). Consumers that stored or
   compared advice text will see the new string.
+- **`layout/heading-at-page-bottom` and `layout/orphaned-continuation-page` no longer count a
+  block footnote as content on the page's text.** Paged.js lays a `float: footnote` block out in
+  the footnote area below the content box, and the snapshot records it on the page it is printed
+  on. The heading rule counted it as content following a heading, so a heading stranded at the
+  foot of the text above the page's footnotes was never reported; the continuation rule counted it
+  as fresh content, so a page carrying only the tail of a paragraph and that paragraph's footnote
+  was never reported. Both now count a block only when it starts inside the content box
+  (`startsInContentBox`, the space both rules measure). Consumers see these findings appear on
+  footnote pages. Until the footnote fix below, no document with a footnote reached these rules.
 
 ### Fixed
 
@@ -128,6 +137,58 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   now anchored to the first block that STARTS on it; only a page on which nothing starts falls back
   to its first continuing block. Page 1 of a wrapped document is still anchored to the wrapper;
   every later page moves to its first paragraph. The same baseline advice applies.
+- **Documents with footnotes reach the rules instead of stopping at exit 3.** Paged.js builds each
+  footnote call as `<a data-footnote-call="R" data-ref="R" href="#note-R">` from the note's
+  per-run random `data-ref`, so the paired control run disagreed with the injected run about that
+  `href` and every document with a `float: footnote`, block or inline, ended
+  `injection-interference` (exit 3) — measured on 2026-09-25 on `footnotes-block.html` and
+  `footnotes-inline.html` with the real paginator (patched Chromium 141, no evidence binding): exit
+  3 before, exit 0 after. The control signature now records a call Paged.js built by its ordinal,
+  and recognises it only together with the note it points at in a footnote area; a look-alike
+  call without its note is still interference (`footnotes-planted-call.html`, exit 3), and a
+  script that swaps source ids after pagination on a footnote page is still caught
+  (`footnotes-sid-swap.html`, exit 3). This supersedes the statement in the entry above that block
+  footnotes "still end the run at the paired control".
+- **A block footnote's evidence marks are placed.** They hang from a second overlay layer in the
+  footnote area, which Paged.js positions and clips; the content-box layer could not reach below
+  the content box, so both marks of every block footnote were refused and every page with one
+  stayed unbound (6 unplaced marks on the two pages of `footnotes-block.html` before; after, only
+  the end mark of a note touching the clipping bottom edge of the footnote area, whose start mark
+  binds it). Whether the PDF returns those marks at their position is established by the live
+  suite on current Chrome only.
+- **A block footnote no longer makes an overflow boundary inside a named-page chapter `forced`.**
+  The collector read the footnote — after the page content in document order, and outside the
+  `page: chapter` section it was written in — as the last node of its page, so the page before the
+  boundary had no page name and the boundary was classified as a change of named page: on
+  `footnotes-named-page.html` `layout/widow` and `layout/orphan` declined `env/forced-break` and the
+  run ended exit 4. A page's edges are now read from its page content; the footnote still keeps its
+  page from being blank.
+- **A page Paged.js inserts for parity no longer blocks required evidence — and is not counted as
+  bound.** A page binds only on marks it carries, and the blank page a `break-before: right`,
+  `left`, `recto` or `verso` inserts carries none, so with evidence binding on (the default) every
+  document with such a page ended `insufficient-coverage` (exit 4). Such a page is now excused from
+  the binding requirement when it is proven empty by five answers that must agree: Paged.js marked
+  it `pagedjs_blank_page`; its page area in the DOM is exactly Paged.js' empty page template (a
+  structural test — the running header and page number in its margin boxes are expected and do
+  not count); the delivered PDF's text layer has no text inside the page area; the delivered PDF's
+  raster of the page area is one flat colour; and the snapshot calls the page blank. Its evidence
+  record keeps `bindsFinding: false`. Measured on 2026-09-25 (patched Chromium 141): on
+  `blank-right-running-header.html` the inserted page is proven blank (0 ink pixels of 153 567 in
+  its page area) and leaves the requirement, and on `blank-generated-content.html`, whose blank page
+  prints "This page is intentionally left blank." as generated content, it is not — that document
+  still ends exit 4, by design. The exit 0 of the first document needs the other pages to bind,
+  which only CI's current Chrome can show. This supersedes the entries above that list "a page with
+  no source block at all" as unbindable.
+
+### Reporting
+
+- **`evidenceCoverage.expectedPages` counts the pages that must bind.** It used to be the page
+  count of the document; a page excused as proven blank (see *Fixed*) now leaves it, so for a
+  document with such a page `expectedPages` is lower than `pages`, and `complete` still means
+  `boundPages === expectedPages`. Each excused page is declared as a page-scope `notMeasured` row
+  with `ruleId: null` and reason `env/parity-blank-page` — a reason that until now appeared only
+  with a rule id — naming the page when there is one and counting them when there are several. No
+  field is added or removed; the Report stamp stays 5 and the Snapshot stamp stays 4.
 
 ### Documentation
 
@@ -138,6 +199,11 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
 - Naming an off-by-default rule in `rules` with only an options object enables it, exactly as
   `true` does. This was always the behaviour; it is now written down in `docs/limitations.md` and
   pinned by a contract test.
+- `docs/limitations.md` states what the rules measure for footnote-area content, how the footnote
+  call is recognised and what that recognition does not cover, where footnote evidence marks hang
+  and which one is refused, and exactly when a parity-blank page is excused from binding and when
+  it is not. The entry above about blank pages ending exit 4 describes the state before this
+  change.
 
 ## 0.6.0 — 2026-09-18
 

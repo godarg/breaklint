@@ -373,7 +373,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=471 aggregateTests=587 liveTests=77 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=492 aggregateTests=608 liveTests=85 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -857,6 +857,13 @@ Measured on a section spanning three pages: the leaf reported `null`, the ancest
 `chapter`. Reverting to the leaf-only read on the live fixture produces a **false `forced`** on a
 boundary inside the region and **misses the real `forced`** on the boundary leaving it — the second
 being the more expensive error, because a false `forced` silences four rules.
+
+**A page's edges are read from its page content, not from its footnotes.** A block footnote is on
+its page, but Paged.js moves it into the footnote area — after the page content in document order
+and out of the section it was written in — so read as the page's last node it has no named page:
+measured on `footnotes-named-page.html`, an ordinary overflow inside a `page: chapter` section came
+out `forced`, `layout/widow` and `layout/orphan` declined `env/forced-break`, and the run ended at
+exit 4. The edges now come from the page content; the footnote still makes its page non-blank.
 
 **A page the paginator never reported is `unknown`, not a page with default values.** A final page
 with no `afterPageLayout` record used to receive a fabricated record and be counted nowhere, so a

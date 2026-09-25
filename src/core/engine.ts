@@ -56,7 +56,12 @@ export interface DocumentInput {
   comparisonScope?: DocumentReport["comparisonScope"];
   path: string;
   renderArtifact?: DocumentRenderArtifact;
-  evidenceRequirement?: { required: boolean; expectedPages: number };
+  /**
+   * `expectedPages` is the document's page count. `blankPages` are pages the evidence path proved
+   * to carry nothing to bind and the snapshot agrees are blank; they leave the binding
+   * requirement, never enter `boundPages`, and are declared in `notMeasured` by the caller.
+   */
+  evidenceRequirement?: { required: boolean; expectedPages: number; blankPages?: readonly number[] };
   snapshot: Snapshot | null;
   /** Infrastructure events collected before or during measurement. Fail-closed: never dropped. */
   infrastructure: InfraEvent[];
@@ -317,11 +322,21 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
 function evidenceCoverageFor(input: DocumentInput): DocumentEvidenceCoverage | undefined {
   const requirement = input.evidenceRequirement;
   if (!requirement) return undefined;
-  const expectedPages = requirement.expectedPages;
   const pages = input.evidence ?? [];
   const present = new Set<number>();
   const bound = new Set<number>();
-  for (let page = 1; page <= expectedPages; page++) {
+  // A page proven blank is excused only when it has exactly one evidence record and that record
+  // binds nothing; anything else keeps it in the requirement, where it cannot be satisfied.
+  const blank = new Set((requirement.blankPages ?? []).filter((page) => {
+    const matches = pages.filter(item => item.page === page);
+    return Number.isInteger(page) && page >= 1 && page <= requirement.expectedPages &&
+      matches.length === 1 && matches[0]!.bindsFinding === false;
+  }));
+  // `expectedPages` in the report counts the pages that must bind: the document's pages less the
+  // excused blank ones. `complete` keeps meaning `boundPages === expectedPages`.
+  const expectedPages = requirement.expectedPages - blank.size;
+  for (let page = 1; page <= requirement.expectedPages; page++) {
+    if (blank.has(page)) continue;
     const matches = pages.filter(item => item.page === page);
     if (matches.length === 1) {
       present.add(page);
