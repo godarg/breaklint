@@ -287,8 +287,16 @@ repeats its parent's and no node precedes it), its `data-previous-break-after`, 
 `needsPageBreak()`, which compares the named page in force at the node (its own `data-page`, else
 its nearest ancestor's) with the one in force at the node **before** it — a previous sibling, or an
 ancestor's previous sibling, whose named page comes from itself and its ancestors, never from its
-descendants. A token that points into a node (an offset) was not forced: `shouldBreak()` was asked
-of that node where it started. The boundary is then, in this order: `parity` when the next page is
+descendants. Only a token at the node the layout walker handed out last on the page can be
+forced — layout.js asks `shouldBreak()` about each node it walks, immediately before laying it
+out, and breaks at that node — so the collector records it from the `layoutNode` hook. A token
+that points into a node (an offset) was not forced: `shouldBreak()` was asked of that node where it
+started. Nor was a token at a node the walker never handed out: Paged.js deep-clones `p`, `li`,
+`td`, `dd`, `dt`, `blockquote`, `h1`–`h6`, `pre` and `figcaption`, so a `break-before` or `page:`
+on a block inside one is never evaluated, and an overflow can still end a page exactly at that
+block. Measured: a list whose items each hold a `break-before: page` box classified as forced at
+every such overflow, 36 widow and 36 orphan candidates declined and exit 4, against the same list
+without the declaration at exit 0; now both end exit 0 with the same findings. The boundary is then, in this order: `parity` when the next page is
 blank; `unknown` when there was no token or it carried no node; `forced` by a forcing break-before,
 break-after or named-page difference; `overflow` otherwise. `unknown` suppresses nothing.
 

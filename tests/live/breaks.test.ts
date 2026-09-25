@@ -331,6 +331,28 @@ ${regionParagraphs("g", 3)}
 ${regionParagraphs("h", 2)}
 </main></body></html>`;
 
+/**
+ * Complication: forcing declarations Paged.js NEVER EVALUATES. Its walker deep-clones `li` and
+ * `td` (layout.js `isContainer`), so a `break-before: page` or a `page:` on a block inside one is
+ * never handed to `shouldBreak()`. An overflow can still end a page exactly at such a block, and
+ * the token then names it with offset 0: its attributes say "forced", the paginator did not force.
+ */
+const deepCloneItem = (i: number) =>
+  `<li id="li9-${i}"><p id="lp9-${i}">Item ${i}: ${"words in the list item before its box ".repeat(1 + (i % 4))}</p><div class="bb box" id="bx9-${i}">box ${i}</div></li>`;
+const deepCloneCell = (i: number) =>
+  `<tr id="tr9-${i}"><td id="td9-${i}"><p id="tp9-${i}">Cell ${i}: ${"words in the table cell before its box ".repeat(1 + (i % 3))}</p><div class="named box" id="tb9-${i}">cell box ${i}</div></td></tr>`;
+const REGION_DEEP_CLONE_HTML = `${REGION_HEAD("@page other{size:120mm 80mm;margin:10mm}", ".bb{break-before:page} .named{page:other} .box{height:22mm;background:#ddd;break-inside:avoid}")}
+<main id="wrap9">
+${regionParagraphs("e", 1)}
+<ul id="ul9">
+${Array.from({ length: 14 }, (_, i) => deepCloneItem(i)).join("\n")}
+</ul>
+<table id="table9"><tbody>
+${Array.from({ length: 10 }, (_, i) => deepCloneCell(i)).join("\n")}
+</tbody></table>
+${regionParagraphs("f", 2)}
+</main></body></html>`;
+
 const REGION_FIXTURES: Record<string, string> = {
   "/region-wrapper.html": REGION_WRAPPER_HTML,
   "/region-consecutive.html": REGION_CONSECUTIVE_HTML,
@@ -342,6 +364,7 @@ const REGION_FIXTURES: Record<string, string> = {
   "/region-nested-exit-at-boundary.html": REGION_NESTED_EXIT_AT_BOUNDARY_HTML,
   "/region-inline.html": REGION_INLINE_HTML,
   "/region-break-after-inline.html": REGION_BREAK_AFTER_INLINE_HTML,
+  "/region-deep-clone.html": REGION_DEEP_CLONE_HTML,
 };
 
 /**
@@ -982,6 +1005,18 @@ describe("the collector, live", () => {
       `premise: the paginator broke at the inline element after the declaring one: ${JSON.stringify(r.paginator)}`);
     assertAgreesWithPaginator(r);
     assert.deepEqual(r.reasons.filter(Boolean), ["break-after@closer8"]);
+    assert.deepEqual(r.result.attributeDrift, []);
+  });
+
+  it("a forcing block inside a deep-cloned li or td is never evaluated, so an overflow at it is not forced", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const r = await region("/region-deep-clone.html");
+    assertWrapperContinues(r.result, r.sid["wrap9"]!);
+    const atBoxes = r.paginator.filter((d) => d.kind === "overflow" && /^div#(bx|tb)9-/u.test(d.at ?? ""));
+    assert.ok(atBoxes.length >= 1, `premise: an overflow token at a forcing block inside an li or td: ${JSON.stringify(r.paginator)}`);
+    assert.equal(r.paginator.some((d) => d.kind === "forced"), false, "premise: the paginator forced no break in this document");
+    assertAgreesWithPaginator(r);
+    assert.ok(r.kinds.every((kind) => kind === "overflow"), JSON.stringify(r.kinds));
     assert.deepEqual(r.result.attributeDrift, []);
   });
 

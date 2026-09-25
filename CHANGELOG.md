@@ -307,8 +307,11 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   run of the same document recorded 13 declines each and widow coverage 8 of 21). The collector now
   evaluates `shouldBreak()` — its break-before, break-after and named-page clauses — at the node
   the break token names, in the paginator's parsed source, with the paginator's own previous-node
-  walk: a named page forces a break only where the element the next page starts with is under a
-  different named page than the element before it. Comparing the page styles of the two pages is
+  walk, and only for a token at the node the layout walker handed out last on the page: a named
+  page forces a break only where the element the next page starts with is under a different named
+  page than the element before it, and a `break-before` or `page:` on a block inside an element
+  Paged.js deep-clones (`li`, `td`, `dd`, `p`, …) forces nothing, because the paginator never
+  evaluates it. Comparing the page styles of the two pages is
   not that rule: a named region nested in a `<div>` ends without a break, so the page after it
   changes style by overflow. On the same report 2 candidates of each rule are declined, at the two
   boundaries the paginator forced, and widows and orphans that were hidden before can now be
@@ -322,7 +325,7 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   first-node read called `overflow`. A token with no node to evaluate makes the boundary `unknown`
   (`break-cause-undetermined`, not fatal). Snapshot break-cause reasons change their named source
   id where they named a wrapper; no schema stamp moves. See `docs/limitations.md`, *The break cause
-  of a page boundary*. Pinned by ten live named-region documents in `tests/live/breaks.test.ts`,
+  of a page boundary*. Pinned by eleven live named-region documents in `tests/live/breaks.test.ts`,
   each boundary checked against the paginator's own `shouldBreak()` answers, a production-chain
   case in `tests/live/named-page-regions.test.ts` and recorded page and source trees in
   `tests/unit/named-page-regions.test.ts`.

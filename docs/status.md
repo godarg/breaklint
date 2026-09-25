@@ -379,7 +379,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=618 aggregateTests=749 liveTests=98 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=619 aggregateTests=750 liveTests=99 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
@@ -551,7 +551,7 @@ The components below are now connected rather than isolated pieces:
 | Freeze signature | all seven components of §11.3, 250 ms window, 3 retries, and a drift report that names WHICH components moved; a real author-script inline-transform sabotage exhausts the budget (4 failed samples) and yields exit 3 with neither snapshot nor evidence |
 | Untouched primitives | references captured before any author script runs. Measured: a document that replaces `getBoundingClientRect`, `getComputedStyle` and `querySelectorAll` after pagination sees `x:999` and `"HIJACKED"`, and the probe reads values byte-identical to a clean run across all seven components. The positive control is in the same test — a naive collector under the same attack loses its boxes entirely, 5 097 characters to 0 |
 | Geometry cross-check | the product and live oracle share one sampler; selector plus rendered-fragment occurrence binds each in-page box to the exact CDP `DOM.getBoxModel` node. The two agree EXACTLY on this corpus, twice; a systematic 0.002 px disagreement fails the suite |
-| Break-cause collector | all five Paged.js hooks registered and each one verified to have fired; boundaries classified from the three attributes the paginator writes, on a document carrying six boundary kinds at once, and, on ten named-region documents inside a continuing wrapper, checked boundary by boundary against the paginator's own `shouldBreak()` answers |
+| Break-cause collector | all five Paged.js hooks registered and each one verified to have fired; boundaries classified from the three attributes the paginator writes, on a document carrying six boundary kinds at once, and, on eleven named-region documents inside a continuing wrapper, checked boundary by boundary against the paginator's own `shouldBreak()` answers |
 
 **Released:** `breaklint@0.1.0` is published on npm from the versioned release workflow with
 provenance, and the packed package is exercised from a clean consumer directory on Node 20 and 22.
@@ -871,9 +871,10 @@ declined 9 of the 14 candidates of `layout/widow` and of `layout/orphan` and end
 independent probe of the paginator's own answers: a page changes its `@page` style without a
 forced break when a named region nested in a `<div>` ends, because `needsPageBreak()` compares the
 next element with the `<div>`. The collector now evaluates `shouldBreak()` itself at the node the
-break token names, in the paginator's parsed source, with the paginator's limiter and
-previous-node walk. The live region documents check every boundary against Paged.js' own
-`shouldBreak()` answers, recorded by a test-only wrapper; the remaining limits are in
+break token names, in the paginator's parsed source, with the paginator's limiter and previous-node
+walk, and only where that node is the one the layout walker handed out last. The live region
+documents check every boundary against Paged.js' own `shouldBreak()` answers, recorded by a
+test-only wrapper; the remaining limits are in
 [limitations.md](limitations.md#the-break-cause-of-a-page-boundary).
 
 **A page the paginator never reported is `unknown`, not a page with default values.** A final page

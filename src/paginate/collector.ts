@@ -57,11 +57,15 @@ import type { BreakCauseCascadeHint } from "../core/enums.ts";
  * source, where the break attributes live (`data-break-before`, `data-previous-break-after`,
  * `data-page`). The collector evaluates the three clauses of `shouldBreak()` on it, with the same
  * limiter (the node the page's layout started at), the same previous-significant-node walk and the
- * same early exits. A token with an offset lies inside a node whose start is on the page before:
- * `shouldBreak()` was asked of that node when it was reached and did not break, so nothing is
- * forced there. A forced break is always a token at a node with offset 0 (`breakAt(node)`); an
- * overflow token at a node with offset 0 is forced by this evaluation only when `shouldBreak()`
- * would have broken at that node anyway.
+ * same early exits — but only for a token at the node the layout walker handed out LAST on the page,
+ * which the collector records from the `layoutNode` hook. A forced break is always such a token:
+ * layout.js triggers `layoutNode(node)`, asks `shouldBreak(node)`, and on `true` breaks at that node
+ * with offset 0. Any other token is an overflow: one with an offset lies inside a node whose start
+ * was already asked about; one at a node the walker never handed out — a block inside an element
+ * Paged.js deep-clones (`p`, `li`, `td`, `dd`, `dt`, `blockquote`, `h1`-`h6`, `pre`,
+ * `figcaption`), which `createBreakToken` can still name — was never asked at all, so its break
+ * attributes forced nothing. Measured: a `break-before: page` on a block inside an `<li>`,
+ * classified by its attributes alone, turned every overflow at such a block into a false `forced`.
  */
 export interface BreakDecision {
   /** False when the token carried no node, so nothing could be evaluated: the boundary is `unknown`. */
@@ -187,6 +191,7 @@ const COLLECTOR_TEMPLATE = `(() => {
     epoch: 0,
     discarded: 0,
     layoutStart: null,
+    lastWalked: null,
   };
   const sidOf = (el) => P.attr(el, "data-bl-sid");
 
@@ -260,6 +265,10 @@ const COLLECTOR_TEMPLATE = `(() => {
     if (!node) return { ...none, known: false };
     none.sid = sidAt(node);
     if (token.offset) return none;
+    // A token at a node the walker never handed out on this page is an overflow the paginator
+    // placed there (createBreakToken can name a descendant of a deep-cloned element): shouldBreak()
+    // was never asked about that node, so nothing was forced there, whatever its attributes say.
+    if (!token.walked) return none;
     const previous = nodeBefore(node, limiter);
     const parent = P.parent(node);
     const before = data(node, A.before);
@@ -341,8 +350,13 @@ const COLLECTOR_TEMPLATE = `(() => {
       // The node this page's layout starts at: layout.js getStart(), and the limiter it hands to
       // shouldBreak(). A blank page inserted for parity has neither contents nor token.
       state.layoutStart = breakToken && breakToken.node ? breakToken.node : (contents ? P.children(contents)[0] || null : null);
+      state.lastWalked = null;
     }
-    layoutNode() { state.hooks.layoutNode++; }
+    // layout.js triggers this for every node its walker hands out, immediately before it asks
+    // shouldBreak() about that node. The last one is the only node on this page shouldBreak() can
+    // have broken at: a node inside an element Paged.js deep-clones (p, li, td, dd, dt, blockquote,
+    // h1-h6, pre, figcaption) is never walked and never asked.
+    layoutNode(node) { state.hooks.layoutNode++; state.lastWalked = node || null; }
     renderNode() { state.hooks.renderNode++; }
     afterPageLayout(pageElement, page, breakToken) {
       state.hooks.afterPageLayout++;
@@ -355,7 +369,9 @@ const COLLECTOR_TEMPLATE = `(() => {
       const e = edges(pageElement);
       // The token is read NOW, the only moment it exists as an object; the node and limiter are
       // kept so the decision can be evaluated again after pagination and compared.
-      const token = breakToken ? { node: breakToken.node || null, offset: breakToken.offset || 0 } : null;
+      const token = breakToken
+        ? { node: breakToken.node || null, offset: breakToken.offset || 0, walked: !!breakToken.node && breakToken.node === state.lastWalked }
+        : null;
       const limiter = state.layoutStart;
       const decision = decide(token, limiter);
       state.byElement.set(pageElement, {

@@ -355,6 +355,12 @@ export function runCollector<T>(
     contents?: FakeNode;
     /** The token `afterPageLayout` hands out for page `i`; `null` for none. */
     tokens?: readonly (FakeBreakToken | null)[];
+    /**
+     * The last node the layout walker handed out on page `i` (the `layoutNode` hook). Defaults to
+     * the page's token node — the shape of a break `shouldBreak()` decided. A different node models
+     * an overflow token at a node the walker never visited.
+     */
+    walked?: readonly (FakeNode | null)[];
   } = {},
 ): T {
   let handlerClass: (new () => Record<string, (...args: unknown[]) => void>) | null = null;
@@ -378,9 +384,9 @@ export function runCollector<T>(
   let incoming: FakeBreakToken | null = null;
   for (const [index, page] of pages.entries()) {
     handler.beforePageLayout!({}, options.contents, incoming ?? undefined);
-    handler.layoutNode!();
-    handler.renderNode!();
     const token = options.tokens ? options.tokens[index] ?? null : defaultToken(index);
+    handler.layoutNode!(options.walked ? options.walked[index] ?? null : token?.node ?? null);
+    handler.renderNode!();
     handler.afterPageLayout!(page, {}, token ?? undefined);
     incoming = token;
   }

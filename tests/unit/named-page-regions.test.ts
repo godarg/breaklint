@@ -294,6 +294,24 @@ describe("the break decision is Paged.js' own, evaluated at the break token", ()
     assert.equal(classifyBoundary(facts!).kind, "unknown");
   });
 
+  /**
+   * Paged.js asks `shouldBreak()` only about nodes its walker hands out, and it deep-clones `li`,
+   * `td` and the other `isContainer` elements, so a block inside one is never asked. An overflow
+   * token can still name such a block with offset 0; only a token at the node the walker handed
+   * out last (the `layoutNode` hook) can be a forced break.
+   */
+  it("a token at a node the walker never handed out is an overflow, whatever its attributes", () => {
+    const html = `<!doctype html><html lang="en"><body><ul id="ul"><li id="li"><p id="lp">Item.</p><div class="bb" id="box">Box.</div></li></ul></body></html>`;
+    const { injected, sid } = source(html);
+    const src = pagedSource(injected.html.replace('class="bb"', 'class="bb" data-break-before="page"'));
+    const pages = [0, 1].map((page) => pagedPage({ pageBox: pageBox(page), contentBox: contentBox(page),
+      content: el(sid, "p", page === 0 ? "lp" : "box", "x", { box: lineBox(page, 0) }) }));
+    const run = (walked: FakeNode) => runCollector<CollectorResult>(COLLECTOR_SOURCE, pagedDocument(pages),
+      { contents: src.body, tokens: [token(src.byId("box")), null], walked: [walked, null] });
+    assert.deepEqual(kindsAndReasons(run(src.byId("li")), sid), ["overflow"], "the walker handed out the li, never the box inside it");
+    assert.deepEqual(kindsAndReasons(run(src.byId("box")), sid), ["forced break-before@box"], "the control: a walked box does break");
+  });
+
   it("a source attribute changed after layout is reported as drift, not silently re-read", () => {
     const { injected, sid } = source(WRAPPER_SOURCE);
     const run = wrapperRun(sid, injected.html);
