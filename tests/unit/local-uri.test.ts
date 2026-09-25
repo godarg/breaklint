@@ -397,6 +397,22 @@ describe("artifact/local-uri, linked style sheets, fingerprints and repeated res
     }
   });
 
+  it("resolves an escaped @import decoded in discovery, with the same root check", () => {
+    // `\69 mp.css` is `imp.css` to the browser; `\2e\2e/` is `../` and must stay outside the root.
+    const root = mkdtempSync(join(tmpdir(), "breaklint-local-uri-escape-"));
+    try {
+      mkdirSync(join(root, "site"));
+      const doc = join(root, "site", "doc.html");
+      const html = '<style>@import "\\69 mp.css";@import "\\2e\\2e/outside.css";</style><p>x</p>';
+      writeFileSync(doc, html);
+      writeFileSync(join(root, "site", "imp.css"), ".a{}");
+      writeFileSync(join(root, "outside.css"), ".secret{}");
+      assert.deepEqual([...discoverLocalAssets(html, doc).keys()], ["/imp.css"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("still captures and scans a linked sheet that precedes a late base", () => {
     const { captured, findings } = linked('<link rel="stylesheet" href="css/print.css"><base href="https://docs.example.org/"><p>x</p>');
     assert.equal(captured, true);

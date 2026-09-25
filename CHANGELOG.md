@@ -255,7 +255,9 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   now come in source order (previously every `@import` before every `url()`), which moves the
   `uri:<n>` node keys of such references. Fingerprints do not change, except for a value written
   with CSS escapes, which is now decoded (`url(\2f a.png)` is `/a.png`) before it is keyed and
-  reported. URL strings outside `url()`
+  reported; resource discovery resolves such a value decoded too, as the browser does, so a
+  reference spelled with escapes is captured, refused or served by the same path rules as any
+  other. URL strings outside `url()`
   and `@import` (e.g. `image-set("a.png" 1x)`) are still not read.
 - **A refused loopback request for a linked or imported style sheet now ends the run with exit 3.**
   Paged.js 0.4.3 fetches every linked and imported sheet a second time itself; that request has
