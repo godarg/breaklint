@@ -95,13 +95,19 @@ cell; `broken-untested-repeat` and `broken-untested-marker` are its red controls
 - The report follows the operating-system light/dark preference and honours reduced motion.
 - Print forces the light palette, uses an A4 page with 12 mm margins and keeps finding evidence in
   the normal vertical flow. A finding fragments between its units and never inside one: its head
-  (severity, rule and message), each measured fact, and its tail (remediation, note and evidence);
-  a split card repeats its frame on both pages. Whole, page-atomic findings (60–73 % of a page
+  (severity, rule and message) kept with its facts (six facts in three columns, one unit under
+  their rule), and its tail (remediation, note and evidence); a split card repeats its frame on
+  both pages. The tail opens with a print-only label, "Finding 07 · `artifact/local-uri` · remediation
+  and evidence", so the fragment that begins a page says whose it is; the surface gate rejects any
+  page that opens on a bare fact or tail line instead (`broken-continued-label`). Before, a split
+  finding could leave its facts' top rule alone at the foot of a page and open the next on a bare
+  fact in an unlabelled frame. Whole, page-atomic findings (60–73 % of a page
   each) meant one finding per printed page and pages filled to 29–45 % in 0.6.0. Boxed blocks —
   header, contents, summary, run facts, alert, checker card, empty state, finding, coverage table
   and footer — share one left and one right edge, and each is separated from the next by a gap; the
   72ch measure applies to the text inside them. A coverage row never splits,
-  the column header repeats on a continuation page, and the last two rows of a table never part.
+  the column header repeats on a continuation page, a caption and column header never end a page
+  without the first row, and the last two rows of a table never part.
   Printed content never exceeds the 703 CSS px content box: wider content makes Chrome scale the
   whole printed document down to fit, silently.
 - Every printed page carries "Page N of M", and every page from the second a running head with the

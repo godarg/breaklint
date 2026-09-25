@@ -57,8 +57,15 @@ const controls = [
     name: "broken-long-remediation",
     state: "findings",
     expect: /findings: page \d+ content text depth \d+\.\d % is below 60 % \(ink incl\. frames \d+\.\d %\)[^\n]*the tallest unbreakable unit, finding 01 tail, is \d+(?:\.\d+)? px/u,
+    // The labelled tail opens the next page: this control must not ALSO trip the label check.
+    absent: /starts inside a finding without its "Finding NN" label/u,
   },
-  { name: "broken-keep-chain", state: "findings", expect: /findings: [^\n]*the tallest unbreakable unit, [^\n]*finding 0\d head \+ finding 0\d fact "[A-Za-z ]+" \+ [^\n]*finding 0\d tail, is \d+(?:\.\d+)? px/u },
+  {
+    name: "broken-continued-label",
+    state: "findings",
+    expect: /findings: page \d+ starts inside a finding without its "Finding NN" label: \[\{"page":\d+,"firstLine":"Remediation untested/u,
+  },
+  { name: "broken-keep-chain", state: "findings", expect: /findings: [^\n]*the tallest unbreakable unit, [^\n]*finding 0\d head \+ finding 0\d facts \+ finding 0\d tail, is \d+(?:\.\d+)? px/u },
   { name: "broken-alert-width", state: "infrastructure", expect: /boxed blocks do not share the column's edges \(left spread 0 px, right spread [1-9]\d*(?:\.\d+)? px/u },
   { name: "broken-alert-gap", state: "infrastructure", expect: /boxed blocks abut: \{"after":"state-alert","before":"checker-event","gapPx":0\}/u },
   { name: "broken-heading-keep", state: "findings", expect: /findings: heading stranded from what it introduces: \[\{"heading":"examples\/demo\.html Document verdict: findings"/u },
@@ -117,6 +124,9 @@ for (const control of controls) {
     const transcript = `${result.stdout}${result.stderr}`;
     assert.notEqual(result.status, 0, `${control.name}: mutation unexpectedly rendered green\n${transcript}`);
     assert.match(transcript, control.expect, `${control.name}: failed for the wrong reason\n${transcript}`);
+    if (control.absent) {
+      assert.doesNotMatch(transcript, control.absent, `${control.name}: also failed a check it must leave green\n${transcript}`);
+    }
     if (control.phase) {
       assert.match(transcript, control.phase, `${control.name}: ${control.phaseHint}\n${transcript}`);
     }

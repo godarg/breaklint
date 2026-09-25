@@ -130,6 +130,12 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   empty inside that frame read as 99.9 % full. The findings heading and its untested-advice caveat
   are one unbreakable intro; inside the heading group they had formed a 44–47 % keep-with-next
   chain with the first finding.
+- **A split finding says whose it is.** A printed finding could leave its facts' top rule alone at
+  the foot of a page and open the next page on a bare fact or remediation box in a repeated frame.
+  In print the head now keeps with its facts (three columns, one unit under their rule) and the
+  tail opens with "Finding NN · rule · remediation and evidence"; the gate rejects a page that opens
+  on a bare fact or tail line. A table's caption and column header no longer end a page without
+  its first row.
 
 ### Documentation
 

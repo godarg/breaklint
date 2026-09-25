@@ -104,7 +104,10 @@ function independentlyCheckCoverageRows(pdfPath, rasterPages, expectedRows, repo
     };
     const used = new Set();
     const anchors = rowIds.map((id) => {
-      const word = words.find((candidate, index) => candidate.text === id && !used.has(index) && used.add(index));
+      // The rule id of a table row is followed on its line by the candidate count; the same id in a
+      // finding head or tail label on the same page is not.
+      const word = words.find((candidate, index) => candidate.text === id && !used.has(index) &&
+        /^\d+$/u.test(words[index + 1]?.text ?? "") && Math.abs(words[index + 1].yMin - candidate.yMin) < 1 && used.add(index));
       assert.ok(word, `${label}: page ${page} row ${id} has no positioned word`);
       return { id, top: Math.ceil(word.yMax * rasterDpi / 72), start: Math.floor(word.yMin * rasterDpi / 72) };
     }).sort((a, b) => a.top - b.top);
@@ -257,6 +260,13 @@ function independentlyCheckPageFlow(pdfPath, rasterPages, recorded, label) {
     assert.ok(final || exempt || depth >= MINIMUM_PAGE_FILL, `${label}: page ${index + 1} content text depth ${(depth * 100).toFixed(1)} % is below ${MINIMUM_PAGE_FILL * 100} %`);
     return { page: index + 1, contentDepth: depth, final, forcedBreakFollows: exempt };
   });
+  // A page that opens inside a finding opens at its labelled tail ("FINDING NN · ..."), never on a
+  // bare fact or remediation box.
+  for (const [pageIndex, pageLines] of lines.entries()) {
+    if (pageIndex === 0) continue;
+    assert.ok(!/^(?:(?:DOCUMENT|SOURCE|MEASURED|THRESHOLD|CALIBRATION|PROOF SOURCE)\b|Remediation\b|Note:|Evidence:|Ambiguity:)/u.test(pageLines[0] ?? ""),
+      `${label}: page ${pageIndex + 1} starts inside a finding without its label: ${JSON.stringify(pageLines[0])}`);
+  }
   // Section headings follow the banner: the h1 may wrap so that its first line reads "Findings".
   let inBody = false;
   for (const [pageIndex, pageLines] of lines.entries()) {

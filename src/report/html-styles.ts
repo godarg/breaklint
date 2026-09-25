@@ -101,6 +101,9 @@ export const REPORT_HTML_STYLES = String.raw`
   .remediation-caveat { max-width: var(--bl-text-width); margin-block: calc(-1 * var(--bl-space-2)) var(--bl-space-5); padding-inline-start: var(--bl-space-3); border-inline-start: var(--bl-border-strong) solid var(--bl-color-fg-primary); }
   /* The per-finding marker is set at the advice's own size and in body-text colour, not muted. */
   .untested-marker { display: inline-block; margin-inline: var(--bl-space-1); padding: 0 var(--bl-space-1); border: var(--bl-border-thin) solid currentColor; border-radius: var(--bl-radius-sm); color: var(--bl-color-fg-primary); font-size: 1em; font-weight: 700; line-height: 1.3; }
+  /* Print only: names the finding at the top of its tail, which is where a split finding's second
+     fragment begins (its head and facts never part; see the print rules below). */
+  .finding-continued { display: none; }
   .finding-remediation { margin-block: var(--bl-space-4) 0; padding: var(--bl-space-3); border-inline-start: var(--bl-border-strong) solid var(--bl-color-fg-primary); background: var(--bl-color-soft); font-size: var(--bl-font-size-sm); }
   .finding-remediation p, .finding-frequency-note p { margin: 0; }
   .finding-frequency-note { margin-block: var(--bl-space-3) 0; padding: var(--bl-space-3); border-inline-start: var(--bl-border-strong) solid var(--bl-color-divider); background: var(--bl-color-soft); font-size: var(--bl-font-size-sm); color: var(--bl-color-fg-muted); }
@@ -182,7 +185,9 @@ export const REPORT_HTML_STYLES = String.raw`
     .run-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .finding-list, .coverage-documents { gap: var(--bl-space-4); }
     .finding { padding: var(--bl-space-4); }
-    .finding-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* Three columns: the six facts take two rows, so head + facts (one keep-with-next run) stay
+       under 40 % of a page. In two columns the run measured 427.7 px (41.5 %). */
+    .finding-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     /* The heading explains why the first/only apparatus card is evidence rather than a failure.
        Keep the semantic unit together; a measured red control put the heading on page 1 and the
        positive card alone on page 2 when only the generic h2 break rule was present. */
@@ -194,6 +199,10 @@ export const REPORT_HTML_STYLES = String.raw`
     .coverage-table thead th { font-size: .6875rem; letter-spacing: .02em; }
     .coverage-table thead { display: table-header-group; }
     .coverage-table tr { break-inside: avoid; }
+    /* Caption and column header never end a page: they introduce the first rows. Measured without
+       it: caption and header alone at the foot of page 7, every row on page 8 (infrastructure). */
+    .coverage-table caption { break-inside: avoid; break-after: avoid; }
+    .coverage-table thead { break-after: avoid; }
     /* Blink honours <wbr> even under nowrap (measured: the table rule id broke at the slash), so
        print removes the opportunity itself. */
     .rule-id, .cli-flag { white-space: nowrap; }
@@ -203,14 +212,21 @@ export const REPORT_HTML_STYLES = String.raw`
     .report-header, .summary-grid > div, .checker-event, .state-alert, .empty-state, .findings-intro { break-inside: avoid; }
     /* A finding is 60-73 % of an A4 content box, so whole findings meant one finding per page and
        pages filled to 29-45 % (measured on 0.6.0). A finding now fragments BETWEEN its units and
-       never inside one: its head (severity, rule, message), each fact, and its tail (remediation,
+       never inside one: its head (severity, rule, message), its facts, and its tail (remediation,
        note, evidence) — the tail is one unit, because an evidence line alone in a cloned frame at
        the top of a page reads as a stray. A split card repeats its frame on both pages. */
     .finding-list { display: block; }
     .finding-list > li + li { margin-block-start: var(--bl-space-4); }
     .finding { break-inside: auto; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
-    .finding-head, .finding-facts > div, .finding-tail { break-inside: avoid; }
+    .finding-head, .finding-facts, .finding-tail { break-inside: avoid; }
     .finding-head { break-after: avoid; }
+    /* A split finding continues at its tail, and the tail says whose it is: a fragment that began
+       with a bare fact or remediation box in a cloned frame could not be told apart from the
+       finding before it. The facts are one unit so their top rule never prints without them
+       (measured on 0.6.0+: finding 02's rule alone at the foot of page 2, its facts on page 3). */
+    .finding-continued { display: block; margin: var(--bl-space-4) 0 0; color: var(--bl-color-fg-muted); font-size: var(--bl-font-size-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .finding-continued .rule-id { text-transform: none; letter-spacing: 0; }
+    .finding-continued + .finding-remediation { margin-block-start: var(--bl-space-2); }
     /* The footer prints as the end mark and stays with the content before it. */
     .report-footer { margin-block-start: var(--bl-space-5); break-before: avoid; break-inside: avoid; }
     a { color: var(--bl-color-fg-primary); }

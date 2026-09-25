@@ -140,7 +140,7 @@ function renderFindings(model: ReturnType<typeof buildHtmlReportModel>): string 
   <p>${model.status.key === "clean" ? "No finding was recorded, so nothing is listed here." : "The run ended before a trustworthy finding list existed."}</p>
 </div>`
     : `<ol class="finding-list">
-${model.findings.map((finding) => `<li>
+${model.findings.map((finding, index) => `<li>
 <article class="finding ${esc(finding.severity)}" id="${esc(finding.id)}" aria-labelledby="${esc(finding.id)}-title">
   <div class="finding-head">
   <div class="finding-kicker">
@@ -159,6 +159,7 @@ ${model.findings.map((finding) => `<li>
     <div><dt>Proof source</dt><dd>${finding.proofSource ? esc(finding.proofSource) : "None declared"}</dd></div>
   </dl>
   <div class="finding-tail">
+  <p class="finding-continued">Finding ${String(index + 1).padStart(2, "0")} · ${ruleIdCode(finding.ruleId)} · ${finding.remediation ? "remediation and evidence" : "evidence"}</p>
   ${finding.remediation ? `<div class="finding-remediation"><p><strong>Remediation</strong>${finding.remediationTested === false ? ` <span class="untested-marker">untested</span>` : ""} ${esc(finding.remediation)}</p></div>` : ""}
   ${finding.frequencyNote ? `<div class="finding-frequency-note"><p><strong>Note:</strong> ${esc(finding.frequencyNote)}</p></div>` : ""}
   ${renderFindingEvidence(finding)}

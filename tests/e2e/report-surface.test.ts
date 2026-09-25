@@ -347,8 +347,12 @@ describe("HTML Report Surface v2", () => {
     assert.match(html, /\.coverage-tail \{ break-inside: avoid; \}/u, "the last two coverage rows stay together");
     assert.match(html, /\.coverage-table \.num \{ text-align: end; \}/u, "numeric coverage columns are end-aligned");
     assert.match(html, /\.finding \{ break-inside: auto; box-decoration-break: clone;/u, "findings fragment between their units and repeat their frame");
-    assert.match(html, /\.finding-head, \.finding-facts > div, \.finding-tail \{ break-inside: avoid; \}/u, "a finding never splits inside a unit");
+    assert.match(html, /\.finding-head, \.finding-facts, \.finding-tail \{ break-inside: avoid; \}/u, "a finding never splits inside a unit, and its facts stay under their rule");
     assert.doesNotMatch(html, /\.finding \{ break-inside: avoid-page; \}/u, "whole findings meant one finding per printed page");
+    assert.match(html, /\.coverage-table thead \{ break-after: avoid; \}/u, "the printed column header keeps with the first row");
+    const findingsHtml = renderHtml(findingsReportState());
+    const labels = [...findingsHtml.matchAll(/<p class="finding-continued">Finding (\d{2}) · <code class="rule-id">/gu)].map((match) => match[1]);
+    assert.deepEqual(labels, ["01", "02", "03", "04", "05", "06", "07"], "every finding's tail names its finding for a printed continuation");
     assert.match(html, /section > h2 \{ break-after: avoid; \}/u, "section headings must stay with their first content");
     assert.match(html, /\.report-footer \{[^}]*break-before: avoid;[^}]*\}/u, "the printed end mark stays with the content before it");
     assert.doesNotMatch(html, /findings-empty \{ display: none; \}/u, "clean print keeps its findings statement");

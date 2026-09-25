@@ -104,6 +104,9 @@ const SURFACE_CONTROLS = {
   "broken-long-remediation": { print: `@media print { .finding-list > li:first-child .finding-remediation p::after { content: "${" Check the block in its own context and compare the measured value with the threshold before changing layout rules.".repeat(12)}"; } }` },
   // Every fact keeps with the next unit: no element grows, but head, facts and tail become one
   // keep-with-next chain as tall as the whole finding. Only a chain-aware unit bound sees it.
+  // The long remediation again, with the tail's label hidden: page 3 opens on a bare remediation
+  // box in a cloned frame (the verifier's round-2 finding L1).
+  "broken-continued-label": { print: `@media print { .finding-continued { display: none !important; } .finding-list > li:first-child .finding-remediation p::after { content: "${" Check the block in its own context and compare the measured value with the threshold before changing layout rules.".repeat(12)}"; } }` },
   "broken-keep-chain": { print: `@media print { .finding-facts > div { break-after: avoid !important; } }` },
   "broken-alert-width": {
     screen: `.state-alert { max-width: 72ch !important; }`,
@@ -820,6 +823,7 @@ function printLayoutInPage() {
     if (element.matches(".apparatus-section")) return `apparatus section "${text("h2")}"`;
     if (element.matches(".finding-head")) return `finding ${findingNumber(element)} head`;
     if (element.matches(".finding-facts > div")) return `finding ${findingNumber(element)} fact "${text("dt")}"`;
+    if (element.matches(".finding-facts")) return `finding ${findingNumber(element)} facts`;
     if (element.matches(".finding-tail")) return `finding ${findingNumber(element)} tail`;
     if (element.matches(".coverage-tail")) return `coverage table tail (${[...element.querySelectorAll("th[scope=row]")].map((cell) => cell.textContent.trim()).join(", ")})`;
     if (element.matches("thead tr")) return "coverage header row";
@@ -830,11 +834,19 @@ function printLayoutInPage() {
     if (/^H[1-3]$/u.test(element.tagName)) return `heading "${element.textContent.replace(/\s+/gu, " ").trim().slice(0, 40)}"`;
     return element.classList[0] ?? element.tagName.toLowerCase();
   };
+  // A break-after on a box's last child propagates to the box's own end, and a break-before on
+  // its first child to its start (CSS Fragmentation 3, 3.1): look down the edge as well as up.
   const gluedAfter = (first, second) => {
     for (let element = first; element && !element.contains(second); element = element.parentElement) {
       if (avoid(getComputedStyle(element).breakAfter)) return true;
     }
+    for (let element = first.lastElementChild; element; element = element.lastElementChild) {
+      if (avoid(getComputedStyle(element).breakAfter)) return true;
+    }
     for (let element = second; element && !element.contains(first); element = element.parentElement) {
+      if (avoid(getComputedStyle(element).breakBefore)) return true;
+    }
+    for (let element = second.firstElementChild; element; element = element.firstElementChild) {
       if (avoid(getComputedStyle(element).breakBefore)) return true;
     }
     return false;
@@ -894,6 +906,9 @@ function assertBoxedBlocks(boxes, label) {
   }
 }
 
+/** The first PDF text line of a finding fragment that does not say which finding it belongs to. */
+const BARE_FINDING_CONTINUATION = /^(?:(?:DOCUMENT|SOURCE|MEASURED|THRESHOLD|CALIBRATION|PROOF SOURCE)\b|Remediation\b|Note:|Evidence:|Ambiguity:)/u;
+
 /**
  * Page fill, keep-with-next and unit height, read from the PDF, its rasters and the print layout.
  * - no heading or caption ends up on a different page from the first text of what it introduces;
@@ -941,6 +956,13 @@ function pageFlowChecks(pdfPath, rasterPages, layout, label) {
     return { heading: keep.heading, unit: keep.unit, headingPage: heading ? heading.page + 1 : null, unitPage: unit ? unit.page + 1 : null };
   });
   const failures = [];
+  // A page that opens inside a finding opens at its tail, and the tail names the finding. A bare
+  // fact label or tail line at the top of a page is a fragment nobody can attribute.
+  const bareContinuations = contentLines.flatMap((lines, index) =>
+    index > 0 && BARE_FINDING_CONTINUATION.test(lines[0] ?? "") ? [{ page: index + 1, firstLine: lines[0] }] : []);
+  if (bareContinuations.length > 0) {
+    failures.push(`page ${bareContinuations[0].page} starts inside a finding without its "Finding NN" label: ${JSON.stringify(bareContinuations)}`);
+  }
   const stranded = keeps.filter((keep) => keep.headingPage === null || keep.unitPage === null || keep.headingPage !== keep.unitPage);
   if (stranded.length > 0) failures.push(`heading stranded from what it introduces: ${JSON.stringify(stranded)}`);
   // Shortest first: the message names the worst page, the list carries every short one.
