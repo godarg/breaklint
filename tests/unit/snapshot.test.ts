@@ -17,6 +17,9 @@ import {
 import { injectSourceIds } from "../../src/source/inject.ts";
 import { detectCollision } from "../../src/source/collision.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
+import { runDocument } from "../../src/core/engine.ts";
+import { coverageFloorMap, resolveConfig } from "../../src/config/resolve.ts";
+import { SNAPSHOT_SCHEMA_VERSION } from "../../src/core/enums.ts";
 
 describe("the live snapshot seam", () => {
   it("takes author identity and the whole signature from source text", () => {
@@ -150,6 +153,35 @@ describe("the live snapshot seam", () => {
     const justifiedBlock = justify.blocks.find((block) => block.effectiveStyle.textAlign === "justify")!;
     justify.textLines.find((item) => item.blockKey === justifiedBlock.nodeKey)!.wordBoxes = null;
     mutations.push({ name: "justify", snapshot: justify });
+
+    // Snapshot 5: a block the rules cannot classify — no computed display, or a margin-copy count
+    // that is not a count, or margin copies of an element without a source id.
+    const noDisplay = structuredClone(base);
+    (noDisplay.blocks[0] as { display?: string }).display = "";
+    mutations.push({ name: "display-absent", snapshot: noDisplay });
+    const missingDisplay = structuredClone(base);
+    delete (missingDisplay.blocks[0] as { display?: string }).display;
+    mutations.push({ name: "display-missing", snapshot: missingDisplay });
+    const badCopies = structuredClone(base);
+    badCopies.blocks[0]!.marginCopies = -1;
+    mutations.push({ name: "margin-copies-negative", snapshot: badCopies });
+    const fractionalCopies = structuredClone(base);
+    fractionalCopies.blocks[0]!.marginCopies = 1.5;
+    mutations.push({ name: "margin-copies-fractional", snapshot: fractionalCopies });
+    const sidlessCopies = structuredClone(base);
+    Object.assign(sidlessCopies.blocks[0]!, { sid: null, marginCopies: 2 });
+    mutations.push({ name: "margin-copies-without-sid", snapshot: sidlessCopies });
+
+    // The corpus snapshot is not free of issues itself, so "not ok" alone would not show that
+    // these checks exist: each Snapshot 5 mutation must produce its own issue.
+    for (const [snapshot, issue] of [
+      [noDisplay, "computed display is absent"], [missingDisplay, "computed display is absent"],
+      [badCopies, "marginCopies is not a count"], [fractionalCopies, "marginCopies is not a count"],
+      [sidlessCopies, "margin copies without a source id"],
+    ] as const) {
+      const issues = validateSnapshotInvariants(snapshot, { sourceMapInjection: true }).issues;
+      assert.ok(issues.some((item) => item.endsWith(issue)), `the invariant gate does not name "${issue}": ${JSON.stringify(issues.slice(0, 3))}`);
+    }
 
     const blank = structuredClone(base);
     blank.pages[0]!.blank = true;
@@ -306,6 +338,31 @@ describe("the live snapshot seam", () => {
       assert.ok(collision.occurrences.some((item) => item.origin.endsWith("/theme.css")));
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the engine judges only a snapshot of its own stamp", () => {
+  /**
+   * The rules read fields Snapshot 5 added (`BlockRecord.display`, `marginCopies`). A snapshot of
+   * another stamp lacks them, and a rule reading an absent field misjudges rather than fails: an
+   * undefined `display` is not "contents", so every box-less block would pass as unrendered. The
+   * engine refuses such a snapshot (exit 3) instead of judging it.
+   */
+  it("refuses a snapshot of another stamp, and runs the rules on its own", () => {
+    const config = resolveConfig({ file: {}, cli: {} });
+    const engine = { failOn: config.failOn, activeRules: config.activeRules, optionsByRule: config.optionsByRule, coverageFloors: coverageFloorMap(config) };
+    const current = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
+    assert.equal(current.schemaVersion, SNAPSHOT_SCHEMA_VERSION);
+    assert.equal(SNAPSHOT_SCHEMA_VERSION, 5);
+    const judged = runDocument({ path: "doc.html", snapshot: current, infrastructure: [] }, engine).report;
+    assert.ok(judged.findings.length > 0, "premise: the current-stamp snapshot is judged");
+    for (const stamp of [4, 6]) {
+      const old = { ...structuredClone(current), schemaVersion: stamp };
+      const report = runDocument({ path: "doc.html", snapshot: old, infrastructure: [] }, engine).report;
+      assert.equal(report.verdict, "infrastructure", `a schema ${stamp} snapshot was judged`);
+      assert.deepEqual(report.findings, []);
+      assert.ok(report.infrastructure.some((event) => event.kind === "checker-crashed" && /snapshot is schema/u.test(event.detail)));
     }
   });
 });
