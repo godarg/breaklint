@@ -421,6 +421,7 @@
           "required": true,
           "count": 7,
           "countsTowardCoverage": true,
+          "measuredAlternative": true,
           "docsBasis": "docs/limitations.md ('Complex SVG paint is detected but not geometrically solved'): a <text> that paints a visible stroke (paint-order halo) declines per target with env/svg-painted-bounds-unsupported and stays in the coverage denominator; docs/rules/svg-text-overflows-viewport.md 'Limits and fail-closed cases'.",
           "future": "docs/limitations.md names the next step: a two-sided bound (fill box as lower bound, fill box inflated by stroke-width/2 as upper bound). Every halo label here is decidable by that bound; ifMeasured is the construction truth a tool that measures it must report.",
           "perText": [

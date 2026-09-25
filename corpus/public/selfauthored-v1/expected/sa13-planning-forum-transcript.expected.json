@@ -61,16 +61,19 @@
     {
       "id": "recordhead",
       "marginBox": "top-center",
-      "marginBoxCopies": 7,
+      "marginBoxCopies": 6,
       "pages": [
-        1,
         2,
         3,
         4,
         5,
         6,
         7
-      ]
+      ],
+      "zeroSizeCopyPages": [
+        1
+      ],
+      "zeroSizeCopyNote": "Paged.js also places a copy on these pages, but the @page :first rule sets that margin box to content: none, so the copy is 0 x 0 px and is not counted"
     }
   ],
   "constructionFacts": [
@@ -119,7 +122,8 @@
           "target": {
             "id": "recordhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -149,7 +153,8 @@
           "target": {
             "id": "recordhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -179,7 +184,8 @@
           "target": {
             "id": "recordhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
@@ -213,7 +219,8 @@
           "target": {
             "id": "recordhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
@@ -243,10 +250,23 @@
           "target": {
             "pageOf": {
               "id": "verbatim",
-              "fragment": "last"
+              "fragment": "last",
+              "resolvedPages": [
+                6
+              ],
+              "resolvedPagesByFontStack": {
+                "reference": [
+                  6
+                ],
+                "dejavu": [
+                  6
+                ],
+                "free": [
+                  6
+                ]
+              }
             }
           },
-          "measuredPage": 6,
           "why": "the page holds only the last three lines of the verbatim record, which began four pages earlier; the next page is forced",
           "construction": "pre#verbatim: 97 lines on a fixed 40 px pitch (one display: block span per line). Its page opens with h2.record (48 px + 16 px); lines per page: floor((971.34 - 64) / 40) = 22, then floor(971.34 / 40) = 24, 24, 24, leaving 97 - 94 = 3 lines (120 px) for the tail page. The appendix heading after it has break-before: page. Net fill of the tail page is about 3 x 18.6 px / 971 px = 0.06 against 0.5.",
           "measured": {
@@ -291,24 +311,33 @@
           "target": {
             "pageOf": {
               "id": "verbatim",
-              "fragment": "nonFinal",
-              "excludeFirst": true
+              "fragment": "middle",
+              "resolvedPages": [
+                3,
+                4,
+                5
+              ],
+              "resolvedPagesByFontStack": {
+                "reference": [
+                  3,
+                  4,
+                  5
+                ],
+                "dejavu": [
+                  3,
+                  4,
+                  5
+                ],
+                "free": [
+                  3,
+                  4,
+                  5
+                ]
+              }
             }
           },
-          "measuredPages": [
-            3,
-            4,
-            5
-          ],
           "why": "middle pages of the record: completely full (24 lines each) and the record continues onto the next page, so they hold the middle of a block, not its tail. At 12 pt monospace on a 40 px pitch the glyph bands cover about 0.46 of the page (G-15 class), which is below the 0.5 threshold; a tool that judges them by net fill alone reports a full page.",
-          "docsBasis": "docs/rules/layout-orphaned-continuation-page.md: 'A page holds nothing but the tail of a block that began earlier.'",
-          "dependsOn": {
-            "item": "G-15",
-            "workPackage": "WP-F4",
-            "status": "rule page and rule change pending in this release",
-            "semantics": "a page is judged only where its content ends: its last flow block is the final fragment of its block, or the next page opens with a fresh block",
-            "basis": "The rule page at the base commit judges every continuation-only page by net fill alone, and these pages read about 0.46-0.47 against 0.50, so under the base wording they would fire. The release changes the rule and its page (WP-F4); the new page states that a page is judged only \"where its content ends\". This entry holds under that sentence. A gate reports it as 'depends on G-15 semantics' and treats a failure before that sentence is on the rule page as the known state, not as a new false alarm."
-          }
+          "docsBasis": "README 'Release semantics' (manifest.json releaseSemantics): layout/orphaned-continuation-page judges a page only where its content ends. These pages end in the middle of #verbatim, which continues on the next page."
         }
       ],
       "allowed": [
@@ -338,7 +367,8 @@
           "target": {
             "id": "recordhead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [

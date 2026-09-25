@@ -2,8 +2,8 @@
   "schemaVersion": "selfauthored-expected-v1",
   "documentId": "sa14-weather-station-install-guide",
   "artifact": "documents/sa14-weather-station-install-guide.html",
-  "sha256": "33be46f56f0e0b5bbe3db6d59c9e5c5b967e54f34f71ce840f056cf27be8050d",
-  "byteLength": 15554,
+  "sha256": "ad7636c10e0194efeefe539ec50eb80caa11e43d801f89d81e7a91fb03784d91",
+  "byteLength": 15564,
   "authoredOn": "2026-09-24",
   "provenanceClass": "synthetic_first_party",
   "calibrationEvidenceEligible": false,
@@ -62,14 +62,17 @@
     {
       "id": "guidehead",
       "marginBox": "top-center",
-      "marginBoxCopies": 5,
+      "marginBoxCopies": 4,
       "pages": [
-        1,
         2,
         3,
         4,
         5
-      ]
+      ],
+      "zeroSizeCopyPages": [
+        1
+      ],
+      "zeroSizeCopyNote": "Paged.js also places a copy on these pages, but the @page :first rule sets that margin box to content: none, so the copy is 0 x 0 px and is not counted"
     },
     {
       "id": "sidetab",
@@ -118,13 +121,15 @@
           "target": {
             "id": "guidehead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
             "id": "sidetab"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -154,13 +159,15 @@
           "target": {
             "id": "guidehead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
             "id": "sidetab"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -214,14 +221,7 @@
               }
             ]
           },
-          "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md; nothing in the rule documentation exempts a block because it bleeds into the page margin.",
-          "dependsOn": {
-            "item": "G-02",
-            "workPackage": "WP-F1",
-            "status": "rule change and documentation pending in this release",
-            "semantics": "fragments belong to the flow by ancestry (inside the page content area, not a margin-box copy), not by where their box starts",
-            "basis": "Read literally, docs/limitations.md at the base commit says the rule 'only counts a box that STARTS inside the content box of its page'; every fragment of this band starts 72 px left of it. The release removes that coordinate filter and its sentence (WP-F1). This entry holds under the flow-by-ancestry semantics documented in the same release."
-          }
+          "docsBasis": "docs/rules/layout-unbreakable-block-too-tall.md; nothing in the rule documentation exempts a block because it bleeds into the page margin. README 'Release semantics' (manifest.json releaseSemantics): the rule correlates fragments by flow membership, not coordinates, so all three fragments count although every one starts 72 px left of the content box."
         }
       ],
       "mustNotFire": [
@@ -265,25 +265,14 @@
               }
             ]
           },
-          "docsBasis": "docs/limitations.md 0.6.0 ('Blocks carrying the same source id are not always fragments of one flow') and CHANGELOG Unreleased (side margin boxes); flow-by-ancestry semantics of WP-F1",
-          "dependsOn": {
-            "item": "G-02",
-            "workPackage": "WP-F1",
-            "status": "rule change pending in this release",
-            "semantics": "margin-box copies of a running element are never fragments of the flow"
-          }
+          "docsBasis": "README 'Release semantics' (manifest.json releaseSemantics): content in margin boxes is not in the flow and is not measured by any rule; docs/limitations.md 0.6.0 ('Blocks carrying the same source id are not always fragments of one flow'); CHANGELOG Unreleased (side margin boxes)."
         },
         {
           "target": {
             "id": "guidehead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
-        },
-        {
-          "target": {
-            "id": "sidetab"
-          },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
@@ -335,13 +324,15 @@
           "target": {
             "id": "guidehead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
             "id": "sidetab"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
@@ -395,13 +386,15 @@
           "target": {
             "id": "guidehead"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
             "id": "sidetab"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -541,7 +534,7 @@
     "method": "probe/construction-probe.mjs: puppeteer-core + Paged.js 0.4.3 UMD bundle only, no code from src/; see PROVENANCE.md",
     "browser": "Chromium 141.0.7390.37 (headless, sandbox on, Linux x86_64)",
     "pagedjs": "0.4.3",
-    "measuredOn": "2026-09-24",
+    "measuredOn": "2026-09-25",
     "pageCount": 5,
     "pageCountByFontStack": {
       "reference (Liberation, DejaVu Sans Mono)": 5,

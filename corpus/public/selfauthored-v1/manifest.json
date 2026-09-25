@@ -3,6 +3,7 @@
   "schemaVersion": 1,
   "manifestId": "selfauthored-v1",
   "createdAt": "2026-09-24",
+  "updatedAt": "2026-09-25",
   "purpose": "Closed-world regression truth for the released rule set over self-authored HTML-to-PDF documents with planted, construction-known defects and clean controls. Never calibration data and never external trust evidence.",
   "provenanceClass": "synthetic_first_party",
   "realDocuments": 0,
@@ -13,15 +14,16 @@
   "expectedAuthoredBeforeFirstRun": true,
   "expectedAuthoredCommit": "the commit that first adds this directory (git log --diff-filter=A -- corpus/public/selfauthored-v1/expected); no breaklint report of any document exists in or before it",
   "profile": "default",
+  "releaseSemantics": "Expectations follow the documented semantics of the breaklint release that admits this corpus (0.7.0): e.g. content in Paged.js margin boxes (running()/fixed copies) is not in the flow and is not measured by any rule (docs/limitations.md 'unmeasured margin-box content'); layout/orphaned-continuation-page judges a page only where its content ends; layout/unbreakable-block-too-tall correlates fragments by flow membership, not coordinates.",
   "gate": {
-    "closedWorld": "per document, any finding whose rule and target are not covered by that rule's mustFire or allowed entries fails",
-    "mustFire": "every mustFire entry needs at least one matching finding (or, where the entry says so, the named decline)",
-    "mustNotFire": "any matching finding fails",
-    "declines": "every required expectedDecline must be present; a decline reason outside permittedDeclineReasons fails",
-    "exit": "the document's exit code must be in expectedExit.set",
-    "pages": "pagesAnalysed must lie in pages.range",
-    "bytes": "sha256 of every document and expected file must match this manifest",
-    "empty": "a run that reads zero documents fails; it is never a skip"
+    "normative": "README.md, section 'How a gate consumes this' (target, page and decline semantics: section 'Targets')",
+    "steps": [
+      "Read `manifest.json` and verify the SHA-256 and byte length of every file in `files`. Zero documents read is a failure, never a skip.",
+      "Run each document under the default profile and read the canonical JSON report.",
+      "If the document ended in exit 3, pass only if 3 is in `expectedExit.set` and the exit reason is `render-unstable`. A render-unstable run withholds its findings and reports no pages by design (`docs/limitations.md`), so the page and rule checks are skipped for that document. Any other exit 3 fails.",
+      "Otherwise the exit code must be in `expectedExit.set` and the report's `pages` must lie in `pages.range`.",
+      "Then, per rule: every `mustFire` entry is matched by at least one finding; no finding matches a `mustNotFire` target; every finding is matched by a `mustFire` or `allowed` entry of its rule, or is on a measured target whose `ifMeasured` is `mustFire` (closed world); every `required` decline is satisfied as the paragraph 'Declines' under 'Targets' defines, and a measured target with `ifMeasured: mustNotFire` has no finding; no decline carries a reason outside `permittedDeclineReasons`. `layout/half-empty-page` is not active in the default profile, so any finding of it fails."
+    ]
   },
   "documentCount": 20,
   "documents": [
@@ -37,7 +39,7 @@
       },
       "expected": {
         "relativePath": "expected/sa01-riverbank-survey-handbook.expected.json",
-        "sha256": "23b98cfedf451d26f4fda0b5ece0d501f4c287ea2f20a8fa41a9a2596abf62c9",
+        "sha256": "0600e324d72bcddf71a3c1a5916dd59dbf052d27cc3b8f8e47f0ecc9d661ba1c",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -107,7 +109,7 @@
       },
       "expected": {
         "relativePath": "expected/sa02-pump-service-manual.expected.json",
-        "sha256": "0f191786d0eee0f61f83ecef8f2e051780141a419b92fd831e5b121c27f3aaea",
+        "sha256": "e9d8d65f6e45aa7c3aad4994eb6c3693fe828d66de89bdeccd876a7a6747ccae",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -177,7 +179,7 @@
       },
       "expected": {
         "relativePath": "expected/sa03-transit-ridership-report.expected.json",
-        "sha256": "e4aba36ba620fa6dd25035349b45d0eddbd2dffefac857d27f67464830bb18fa",
+        "sha256": "79bf26b0d01f6484dea6183024853e0dc36912c592b83080ce7cb50b0e25f0a4",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -328,7 +330,7 @@
       },
       "expected": {
         "relativePath": "expected/sa05-kitchen-notebook.expected.json",
-        "sha256": "bed6ebb72fdd7740cbbe52976e49ee0336694c7412a7d1360fd4d29f3b18b036",
+        "sha256": "f0857085e4615b5a2ce5406330a8bf5d6d3182d5129884813684614c5c95fc9e",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -395,7 +397,7 @@
       },
       "expected": {
         "relativePath": "expected/sa06-mobile-work-policy-de.expected.json",
-        "sha256": "66a3dbcdf117cdc8c0e6dab3f308044c4b29eaa0e3e3060b083f51d9756e0aaf",
+        "sha256": "ee95427d1f48f734492f6a58278c89783262e30d3a2788ffb55237cfce3798e4",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -465,7 +467,7 @@
       },
       "expected": {
         "relativePath": "expected/sa07-sensor-datasheet.expected.json",
-        "sha256": "a153b9eac9c9207aff3043a78bbee8b6c72e01e7fe88f10a462632f5eea7f8df",
+        "sha256": "60431dd6eec129de72dccd96c0c80f228514fa6b9a2bb09f2f6359fdcbe4d36c",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -535,7 +537,7 @@
       },
       "expected": {
         "relativePath": "expected/sa08-tidewell-newsletter.expected.json",
-        "sha256": "9eb08c6821542cdbbda2c6641c36496165238d63681680c600debd2af271f4fa",
+        "sha256": "2649d8e4772c39c4d3ccffcdc34e81fccd2e5104615df890a29c751b73c03983",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -676,7 +678,7 @@
       },
       "expected": {
         "relativePath": "expected/sa10-lagoon-oxygen-report.expected.json",
-        "sha256": "ecb0168d75179ef0fa48259793eee9a8889177e84a4e2be8607e2386e4fd5e9d",
+        "sha256": "c852e14195afd29302c2033fcf451d4ab4bd56d1f4f567ba5a78ff666211e841",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -748,7 +750,7 @@
       },
       "expected": {
         "relativePath": "expected/sa11-insect-chorus-survey.expected.json",
-        "sha256": "06875a6575f4b20589b028a301ac1b2b7b6e09f5c345b8f62465cc5f3c95fd92",
+        "sha256": "24295f772d0d5cfcd0227d59f2dfe6976d18f9a966cd32eda903b3f23a1ffb28",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -820,7 +822,7 @@
       },
       "expected": {
         "relativePath": "expected/sa12-library-annual-report.expected.json",
-        "sha256": "87151bc4569a8c18b4600390563157a33c177d06af6d4e4130bae52b5305d86c",
+        "sha256": "e908133fff7a17a55b5bc5af87c9c2e52ec43106dbc8d25c5713c54bc4b9715c",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -900,7 +902,7 @@
       },
       "expected": {
         "relativePath": "expected/sa13-planning-forum-transcript.expected.json",
-        "sha256": "bd396be3088fd311183374161561560fa7f3ebfd552fc713426cbdd601c45dbd",
+        "sha256": "4bcb238cfd280da203b1168cdb6c2e52b5934edce74da186a3b83da917a74fb1",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -961,15 +963,15 @@
       "documentId": "doc_sa14-weather-station-install-guide",
       "id": "sa14-weather-station-install-guide",
       "artifact": {
-        "sha256": "33be46f56f0e0b5bbe3db6d59c9e5c5b967e54f34f71ce840f056cf27be8050d",
-        "byteLength": 15554,
+        "sha256": "ad7636c10e0194efeefe539ec50eb80caa11e43d801f89d81e7a91fb03784d91",
+        "byteLength": 15564,
         "storage": "public-repository",
         "relativePath": "documents/sa14-weather-station-install-guide.html",
         "mediaType": "text/html"
       },
       "expected": {
         "relativePath": "expected/sa14-weather-station-install-guide.expected.json",
-        "sha256": "3568fbb52e42e06ef96eb9169bd28b58be6b84ddf9cfdafd08325a3912cf820a",
+        "sha256": "61484385ca890d3ebdf39a6e19d32a69bc3d82ceab0c94f33d026fb881a88fba",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1039,7 +1041,7 @@
       },
       "expected": {
         "relativePath": "expected/sa15-hut-trail-guide-de.expected.json",
-        "sha256": "847142d86ad13b88b0d24a5f96dd7714aaefbd947f469ae2df28a758b9ca46de",
+        "sha256": "05c8b93f68c9bc048c050fbe0ecc6cec1451dc6a49441bbfc94d702febee7bba",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1112,7 +1114,7 @@
       },
       "expected": {
         "relativePath": "expected/sa16-lab-safety-manual.expected.json",
-        "sha256": "7d10a214204a8cfb1fea8b70599f9494475f330a914798caf7c5b7bcdaec3dfe",
+        "sha256": "c701be82b80f65c1b4977b3ce0e2caab4f6e41a3319b720e8715a42383b7c9cf",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1255,7 +1257,7 @@
       },
       "expected": {
         "relativePath": "expected/sa18-hand-tools-catalogue.expected.json",
-        "sha256": "7f468caa5b61827fd008055a1a47249628dc6d87f3ecf0d766015edd53475e31",
+        "sha256": "4f760302f8bf8d989018e2f29bc1cea48fa2546ff60ac85e80bbe7e93e05fd26",
         "schemaVersion": "selfauthored-expected-v1"
       },
       "realDocument": false,
@@ -1832,8 +1834,8 @@
     },
     {
       "path": "documents/sa14-weather-station-install-guide.html",
-      "sha256": "33be46f56f0e0b5bbe3db6d59c9e5c5b967e54f34f71ce840f056cf27be8050d",
-      "byteLength": 15554
+      "sha256": "ad7636c10e0194efeefe539ec50eb80caa11e43d801f89d81e7a91fb03784d91",
+      "byteLength": 15564
     },
     {
       "path": "documents/sa15-hut-trail-guide-de.html",
@@ -1867,18 +1869,18 @@
     },
     {
       "path": "expected/sa01-riverbank-survey-handbook.expected.json",
-      "sha256": "23b98cfedf451d26f4fda0b5ece0d501f4c287ea2f20a8fa41a9a2596abf62c9",
-      "byteLength": 25486
+      "sha256": "0600e324d72bcddf71a3c1a5916dd59dbf052d27cc3b8f8e47f0ecc9d661ba1c",
+      "byteLength": 26559
     },
     {
       "path": "expected/sa02-pump-service-manual.expected.json",
-      "sha256": "0f191786d0eee0f61f83ecef8f2e051780141a419b92fd831e5b121c27f3aaea",
-      "byteLength": 17880
+      "sha256": "e9d8d65f6e45aa7c3aad4994eb6c3693fe828d66de89bdeccd876a7a6747ccae",
+      "byteLength": 18735
     },
     {
       "path": "expected/sa03-transit-ridership-report.expected.json",
-      "sha256": "e4aba36ba620fa6dd25035349b45d0eddbd2dffefac857d27f67464830bb18fa",
-      "byteLength": 24042
+      "sha256": "79bf26b0d01f6484dea6183024853e0dc36912c592b83080ce7cb50b0e25f0a4",
+      "byteLength": 25554
     },
     {
       "path": "expected/sa04-essay-chapter-footnotes.expected.json",
@@ -1887,23 +1889,23 @@
     },
     {
       "path": "expected/sa05-kitchen-notebook.expected.json",
-      "sha256": "bed6ebb72fdd7740cbbe52976e49ee0336694c7412a7d1360fd4d29f3b18b036",
-      "byteLength": 16095
+      "sha256": "f0857085e4615b5a2ce5406330a8bf5d6d3182d5129884813684614c5c95fc9e",
+      "byteLength": 17227
     },
     {
       "path": "expected/sa06-mobile-work-policy-de.expected.json",
-      "sha256": "66a3dbcdf117cdc8c0e6dab3f308044c4b29eaa0e3e3060b083f51d9756e0aaf",
-      "byteLength": 17746
+      "sha256": "ee95427d1f48f734492f6a58278c89783262e30d3a2788ffb55237cfce3798e4",
+      "byteLength": 18952
     },
     {
       "path": "expected/sa07-sensor-datasheet.expected.json",
-      "sha256": "a153b9eac9c9207aff3043a78bbee8b6c72e01e7fe88f10a462632f5eea7f8df",
-      "byteLength": 25862
+      "sha256": "60431dd6eec129de72dccd96c0c80f228514fa6b9a2bb09f2f6359fdcbe4d36c",
+      "byteLength": 26974
     },
     {
       "path": "expected/sa08-tidewell-newsletter.expected.json",
-      "sha256": "9eb08c6821542cdbbda2c6641c36496165238d63681680c600debd2af271f4fa",
-      "byteLength": 22656
+      "sha256": "2649d8e4772c39c4d3ccffcdc34e81fccd2e5104615df890a29c751b73c03983",
+      "byteLength": 23768
     },
     {
       "path": "expected/sa09-queue-worker-tutorial.expected.json",
@@ -1912,38 +1914,38 @@
     },
     {
       "path": "expected/sa10-lagoon-oxygen-report.expected.json",
-      "sha256": "ecb0168d75179ef0fa48259793eee9a8889177e84a4e2be8607e2386e4fd5e9d",
-      "byteLength": 35236
+      "sha256": "c852e14195afd29302c2033fcf451d4ab4bd56d1f4f567ba5a78ff666211e841",
+      "byteLength": 36387
     },
     {
       "path": "expected/sa11-insect-chorus-survey.expected.json",
-      "sha256": "06875a6575f4b20589b028a301ac1b2b7b6e09f5c345b8f62465cc5f3c95fd92",
-      "byteLength": 26750
+      "sha256": "24295f772d0d5cfcd0227d59f2dfe6976d18f9a966cd32eda903b3f23a1ffb28",
+      "byteLength": 27901
     },
     {
       "path": "expected/sa12-library-annual-report.expected.json",
-      "sha256": "87151bc4569a8c18b4600390563157a33c177d06af6d4e4130bae52b5305d86c",
-      "byteLength": 17587
+      "sha256": "e908133fff7a17a55b5bc5af87c9c2e52ec43106dbc8d25c5713c54bc4b9715c",
+      "byteLength": 18660
     },
     {
       "path": "expected/sa13-planning-forum-transcript.expected.json",
-      "sha256": "bd396be3088fd311183374161561560fa7f3ebfd552fc713426cbdd601c45dbd",
-      "byteLength": 17848
+      "sha256": "4bcb238cfd280da203b1168cdb6c2e52b5934edce74da186a3b83da917a74fb1",
+      "byteLength": 18817
     },
     {
       "path": "expected/sa14-weather-station-install-guide.expected.json",
-      "sha256": "3568fbb52e42e06ef96eb9169bd28b58be6b84ddf9cfdafd08325a3912cf820a",
-      "byteLength": 22901
+      "sha256": "61484385ca890d3ebdf39a6e19d32a69bc3d82ceab0c94f33d026fb881a88fba",
+      "byteLength": 23585
     },
     {
       "path": "expected/sa15-hut-trail-guide-de.expected.json",
-      "sha256": "847142d86ad13b88b0d24a5f96dd7714aaefbd947f469ae2df28a758b9ca46de",
-      "byteLength": 19950
+      "sha256": "05c8b93f68c9bc048c050fbe0ecc6cec1451dc6a49441bbfc94d702febee7bba",
+      "byteLength": 21374
     },
     {
       "path": "expected/sa16-lab-safety-manual.expected.json",
-      "sha256": "7d10a214204a8cfb1fea8b70599f9494475f330a914798caf7c5b7bcdaec3dfe",
-      "byteLength": 22450
+      "sha256": "c701be82b80f65c1b4977b3ce0e2caab4f6e41a3319b720e8715a42383b7c9cf",
+      "byteLength": 24378
     },
     {
       "path": "expected/sa17-seed-bank-grant-proposal.expected.json",
@@ -1952,8 +1954,8 @@
     },
     {
       "path": "expected/sa18-hand-tools-catalogue.expected.json",
-      "sha256": "7f468caa5b61827fd008055a1a47249628dc6d87f3ecf0d766015edd53475e31",
-      "byteLength": 24166
+      "sha256": "4f760302f8bf8d989018e2f29bc1cea48fa2546ff60ac85e80bbe7e93e05fd26",
+      "byteLength": 24205
     },
     {
       "path": "expected/sa19-release-notes.expected.json",
@@ -1967,7 +1969,7 @@
     },
     {
       "path": "probe/construction-measurements.json",
-      "sha256": "b41ebbcb14ed1e100b2136a07850e54f3ca5e878d1458043cffcd27823cc3af2",
+      "sha256": "38a6455ed8cb22680c1591126047860e209223e06986557f2ee38d8e6eab657d",
       "byteLength": 608752
     },
     {
@@ -1987,13 +1989,13 @@
     },
     {
       "path": "README.md",
-      "sha256": "212486151a42a23477d4c9fe91afdab6db36637ba0417a476d8cbe5520ef4fe0",
-      "byteLength": 12676
+      "sha256": "f12db6a32b3e59908e46c31e9fa714a33cee208304d0e4d8695d358589962662",
+      "byteLength": 16501
     },
     {
       "path": "PROVENANCE.md",
-      "sha256": "ce06d08770664fe1145e0562ea45023fe4e4bdd9c51535873bde5cbfcfb9a412",
-      "byteLength": 6838
+      "sha256": "154f9808afd8be3010524ceb790fbacc5771b2a1ea3501a2bb4380f6b776cce4",
+      "byteLength": 7753
     },
     {
       "path": "RIGHTS.md",
@@ -2240,6 +2242,238 @@
       },
       "date": "2026-09-24",
       "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E16",
+      "review": "wv-k1b",
+      "reviewItem": "HIGH-1, MEDIUM-3 (resolved by orchestrator decision)",
+      "documents": [
+        "sa01-riverbank-survey-handbook",
+        "sa02-pump-service-manual",
+        "sa03-transit-ridership-report",
+        "sa05-kitchen-notebook",
+        "sa06-mobile-work-policy-de",
+        "sa07-sensor-datasheet",
+        "sa08-tidewell-newsletter",
+        "sa10-lagoon-oxygen-report",
+        "sa11-insect-chorus-survey",
+        "sa12-library-annual-report",
+        "sa13-planning-forum-transcript",
+        "sa14-weather-station-install-guide",
+        "sa15-hut-trail-guide-de",
+        "sa16-lab-safety-manual"
+      ],
+      "what": "Per-entry dependsOn is gone from the format and from every expected file: sa13 layout/orphaned-continuation-page middle pages (E2), sa14 #parts-band (E8) and #sidetab (E15), and sa03's string-valued dependsOn on the #cap-hourly caption page. The sa03 string, which described renderer behaviour rather than a semantic dependency, now sits in that entry's 'observed' field. README section 'Release semantics' states one class rule, and manifest.json releaseSemantics repeats it verbatim. Every mustNotFire entry of a running element (widow, orphan, unbreakable-block-too-tall, heading-at-page-bottom, hyphen-across-page: 80 entries for the 16 running elements of 14 documents) and the sa13 and sa14 entries now cite that rule in why or docsBasis.",
+      "why": "dependsOn marked 3 entries, but the same dependency sits in about 28 unmarked running-element entries across 13 documents, so the marker could not do its job. It also had no fixed schema (sa03 used a string; sa14's sidetab marker lacked basis) and no testable condition. The orchestrator decided that release semantics are stated once as a class rule and never change pass/fail for a single entry. The author chose to remove dependsOn entirely rather than keep it as an informational annotation, so there is nothing left to apply inconsistently. The README keeps the G-02/WP-F1 and G-15/WP-F4 tracing as information only.",
+      "previous": {
+        "dependsOn": {
+          "sa13-planning-forum-transcript": "layout/orphaned-continuation-page mustNotFire (object)",
+          "sa14-weather-station-install-guide": "layout/unbreakable-block-too-tall mustFire #parts-band and mustNotFire #sidetab (objects)",
+          "sa03-transit-ridership-report": "layout/orphaned-continuation-page mustFire (string)"
+        },
+        "runningElementWhy": "cited docs/limitations.md 0.6.0 only"
+      },
+      "passFailChange": "none: the entries held under the admitting release's semantics before and after; only the place where the dependency is stated changed",
+      "date": "2026-09-25",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E17",
+      "review": "wv-k1b",
+      "reviewItem": "HIGH-1 (second sidetab entry)",
+      "documents": [
+        "sa14-weather-station-install-guide"
+      ],
+      "what": "layout/unbreakable-block-too-tall had two mustNotFire entries with the target {\"id\": \"sidetab\"}: the generic running-element entry and the detailed E15 entry. The generic one is removed; the detailed one remains. No list of any rule in any expected file now repeats a target.",
+      "why": "The duplicate carried no marker, so the marker on the detailed entry had no effect; one target should have one entry.",
+      "previous": "two mustNotFire entries {\"id\": \"sidetab\"}",
+      "date": "2026-09-25",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E18",
+      "review": "wv-k1b",
+      "reviewItem": "MEDIUM-1",
+      "documents": [],
+      "what": "manifest.json gate now holds only a pointer to README 'How a gate consumes this' and its five steps, copied verbatim from the README (each step string occurs unchanged in README.md). The README's step 4 now names the report field pages (DocumentReport.pages) instead of 'pagesAnalysed', which is not a report field.",
+      "why": "The manifest's gate summary (no exit-3-first step, 'pagesAnalysed', and a mustFire clause 'or, where the entry says so, the named decline' that no entry used) disagreed with the README, so a gate built from the manifest would have failed every allowed render-unstable exit 3 (sa16 shows residue with all three font stacks).",
+      "previous": {
+        "gate": {
+          "closedWorld": "per document, any finding whose rule and target are not covered by that rule's mustFire or allowed entries fails",
+          "mustFire": "every mustFire entry needs at least one matching finding (or, where the entry says so, the named decline)",
+          "mustNotFire": "any matching finding fails",
+          "declines": "every required expectedDecline must be present; a decline reason outside permittedDeclineReasons fails",
+          "exit": "the document's exit code must be in expectedExit.set",
+          "pages": "pagesAnalysed must lie in pages.range",
+          "bytes": "sha256 of every document and expected file must match this manifest",
+          "empty": "a run that reads zero documents fails; it is never a skip"
+        }
+      },
+      "date": "2026-09-25",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E19",
+      "review": "wv-k1b",
+      "reviewItem": "MEDIUM-2",
+      "documents": [
+        "sa03-transit-ridership-report",
+        "sa05-kitchen-notebook",
+        "sa13-planning-forum-transcript"
+      ],
+      "what": "pageOf now has one grammar: {id, fragment: first | last | middle, resolvedPages, resolvedPagesByFontStack}. fragment is required and has no default. resolvedPages is the union, over the three font stacks, of the pages on which the construction probe placed those flow fragments, and a finding matches when its page (Finding.page) is in it. sa03: {\"id\": \"cap-hourly\"} becomes fragment first, resolvedPages [6, 7] (6 with the reference fonts and FreeFont, 7 with DejaVu). sa13: fragment last gives [6]; nonFinal with excludeFirst becomes middle, [3, 4, 5]; all three stacks agree. measuredPage and measuredPages are removed. sa05: the required env/forced-break decline of layout/orphaned-continuation-page, which targeted {\"pageOf\": {\"selector\": \"article.recipe\"}}, now targets {\"document\": true} with count 6. The README defines how count is checked (the matching notMeasured rows add up to it). The sa03 note now gives the nearly empty landscape pages per font stack.",
+      "why": "The README defined pageOf with id only, sa05 used a selector, and sa03 gave no fragment and no default existed. The canonical report has no page map (DocumentReport.pages is a count; evaluations carry no page), so 'the run's own page map' could not be resolved. Declines (notMeasured rows) carry no page at all, so a page-keyed decline target was not checkable.",
+      "previous": {
+        "sa03": {
+          "pageOf": {
+            "id": "cap-hourly"
+          }
+        },
+        "sa05": {
+          "pageOf": {
+            "selector": "article.recipe"
+          }
+        },
+        "sa13": [
+          {
+            "pageOf": {
+              "id": "verbatim",
+              "fragment": "last"
+            }
+          },
+          {
+            "pageOf": {
+              "id": "verbatim",
+              "fragment": "nonFinal",
+              "excludeFirst": true
+            }
+          }
+        ]
+      },
+      "date": "2026-09-25",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E20",
+      "review": "wv-k1b",
+      "reviewItem": "LOW-1",
+      "documents": [
+        "sa06-mobile-work-policy-de",
+        "sa15-hut-trail-guide-de"
+      ],
+      "what": "The why of the artifact/local-uri mustNotFire entries sa06 {\"id\": \"p-6-2\"} and sa15 {\"id\": \"gpx-pfad\"} now says that the entry can never match, because the element has no URI-bearing attribute, and that a tool that reports the visible-text path is caught by the closed-world check. The README's id row says the same.",
+      "why": "Under the id semantics for artifact/local-uri (E1, E13) these controls cannot fail, which the entries did not say.",
+      "previous": "why without that statement",
+      "date": "2026-09-25",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E21",
+      "review": "wv-k1b",
+      "reviewItem": "LOW-2",
+      "documents": [],
+      "what": "README 'Targets': the OR applies only to list-valued keys inside one target (ids, selectors, texts, except); the four lists of a rule are not OR lists. README 'Expected files' now defines occurrences (informational number of planted instances; a mustFire entry needs at least one matching finding, and a count that differs is never a failure) and count. manifest.json's 'at least one' now comes from the same README text (E18).",
+      "why": "'Several entries in a list combine with OR' could be read against step 5, where every mustFire entry is required. occurrences, used by 12 mustFire entries, was undefined.",
+      "previous": "'All keys of one target combine with AND; several entries in a list combine with OR'",
+      "date": "2026-09-25",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E22",
+      "review": "wv-k1b",
+      "reviewItem": "LOW-3",
+      "documents": [
+        "sa06-mobile-work-policy-de",
+        "sa15-hut-trail-guide-de",
+        "sa19-release-notes",
+        "sa20-wiki-meeting-minutes"
+      ],
+      "what": "Retroactive record of a round-1 change in c24b677: in seven document-wide mustNotFire entries the except list moved from the entry into its target. The entries are sa06 type/spaced-hyphen and type/straight-quotes, sa15 both, sa19 type/straight-quotes (except [up-p1]) and sa20 both. E3 named only the spaced-hyphen lists and only for new items. No expected file changes in this erratum.",
+      "why": "The move does not change meaning (README: except belongs to the document target it narrows), but every edit of an expected file needs a dated entry, and sa19 had none.",
+      "previous": "except at entry level (ee6c16c)",
+      "date": "2026-09-25",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E23",
+      "review": "wv-k1b",
+      "reviewItem": "LOW-4 (sa14 comment)",
+      "documents": [
+        "sa14-weather-station-install-guide"
+      ],
+      "what": "The sa14 CSS comment 'a third of the content box' now reads 'about 35 % of the 912 px content box'. Nothing else in the bytes changed. The document was re-probed with all three font stacks, and every element fragment and every SVG text inset is identical to the previous measurement.",
+      "why": "A third of 912 px is 304 px, not 320 px.",
+      "previous": "320 px, a third of the content box",
+      "byteChange": {
+        "document": "documents/sa14-weather-station-install-guide.html",
+        "previousSha256": "33be46f56f0e0b5bbe3db6d59c9e5c5b967e54f34f71ce840f056cf27be8050d",
+        "sha256": "ad7636c10e0194efeefe539ec50eb80caa11e43d801f89d81e7a91fb03784d91",
+        "reprobed": true
+      },
+      "date": "2026-09-25",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E24",
+      "review": "wv-k1b",
+      "reviewItem": "LOW-4 (running copies)",
+      "documents": [
+        "sa01-riverbank-survey-handbook",
+        "sa05-kitchen-notebook",
+        "sa07-sensor-datasheet",
+        "sa08-tidewell-newsletter",
+        "sa10-lagoon-oxygen-report",
+        "sa11-insect-chorus-survey",
+        "sa12-library-annual-report",
+        "sa13-planning-forum-transcript",
+        "sa14-weather-station-install-guide",
+        "sa15-hut-trail-guide-de",
+        "sa16-lab-safety-manual"
+      ],
+      "what": "runningElements[].marginBoxCopies and pages count only visible copies. A 0 x 0 copy on page 1, where @page :first sets that margin box to content: none, is listed under zeroSizeCopyPages with a note. For example, sa14 #guidehead goes from 5 copies on pages 1-5 to 4 copies on pages 2-5.",
+      "why": "Paged.js places a copy on page 1, but it is 0 x 0 px; counting it overstated the visible copies. The reviewer named sa14, and the same holds in 11 documents.",
+      "previous": {
+        "sa14-weather-station-install-guide": {
+          "guidehead": {
+            "marginBoxCopies": 5,
+            "pages": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          }
+        }
+      },
+      "date": "2026-09-25",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E25",
+      "review": "wv-k1b",
+      "reviewItem": "LOW-4 (PROVENANCE)",
+      "documents": [],
+      "what": "PROVENANCE.md no longer says the first review found 'no wrong construction fact'. It names the two facts that held only with the machine's fonts, L1 (sa11 #site-hedge 0.83 px inside with DejaVu Serif) and M4 (sa16 5 pages with FreeFont), and adds a paragraph on this round.",
+      "why": "The statement was wrong: L1 and M4 were construction facts that broke under other font stacks.",
+      "previous": "'It found no wrong construction fact but fifteen expectation and format problems.'",
+      "date": "2026-09-25",
+      "source": "independent pre-run review (no breaklint output seen)"
+    },
+    {
+      "id": "E26",
+      "documents": [
+        "sa07-sensor-datasheet",
+        "sa08-tidewell-newsletter",
+        "sa10-lagoon-oxygen-report",
+        "sa11-insect-chorus-survey",
+        "sa18-hand-tools-catalogue"
+      ],
+      "what": "The required env/svg-painted-bounds-unsupported declines that carry ifMeasured (halo labels via perText, <use> text via ifMeasured) now carry measuredAlternative: true. There are 7 such entries in 5 documents. The README defines them: each target is satisfied by the decline or by a measurement, and a measured target is judged as mustFire or mustNotFire according to ifMeasured, closed-world check included.",
+      "why": "The expected exit sets already admit the exit a tool reaches once halo labels are measured (for example sa07 {1, 4}). But a plain required decline would have failed exactly that tool. Under the new class rule the corpus must not presume which release documents the halo bound. And a finding on a clipped halo label had no mustFire or allowed entry, so the closed-world check would have rejected a correct measurement. No construction truth changes.",
+      "previous": "required: true without an alternative; ifMeasured informational only",
+      "date": "2026-09-25",
+      "source": "corpus author during errata round 2, applying the orchestrator's release-semantics decision (no breaklint output seen)"
     }
   ]
 }

@@ -33,8 +33,10 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   German). The truth is closed-world (`mustFire`, `mustNotFire`, `allowed`, `expectedDeclines`,
   expected exit set, page range) and was written from the construction before breaklint was run on
   any of them; its construction facts were checked with an independent probe that uses Paged.js
-  alone. Provenance class `synthetic_first_party`: regression truth only, never calibration
-  evidence. No gate consumes it yet.
+  alone. Its expectations follow the documented semantics of the release that admits it (0.7.0),
+  stated once as a class rule in its README rather than per entry. Provenance class
+  `synthetic_first_party`: regression truth only, never calibration evidence. No gate consumes it
+  yet.
 
 ## 0.6.0 — 2026-09-18
 

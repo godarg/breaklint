@@ -21107,11 +21107,11 @@
    }
   },
   "sa14-weather-station-install-guide": {
-   "sha256": "33be46f56f0e0b5bbe3db6d59c9e5c5b967e54f34f71ce840f056cf27be8050d",
-   "byteLength": 15554,
+   "sha256": "ad7636c10e0194efeefe539ec50eb80caa11e43d801f89d81e7a91fb03784d91",
+   "byteLength": 15564,
    "browser": "Chrome/141.0.7390.37",
    "pagedjs": "0.4.3",
-   "measuredAt": "2026-09-24T23:42:52.321Z",
+   "measuredAt": "2026-09-25T00:25:21.661Z",
    "pageCount": 5,
    "pdf": {
     "count": 5,

@@ -69,14 +69,24 @@ breaklint, until every construction fact held; the probe's condensed output on t
 ## Independent review and errata
 
 Before breaklint was run on any document, a second agent in the same session reviewed the corpus
-and re-measured it with a probe of its own, including under two font substitutions. It found no
-wrong construction fact but fifteen expectation and format problems. They were corrected on
-2026-09-24 as errata E1 to E15, each recorded in `manifest.json` `expectationHistory` with the
-source "independent pre-run review (no breaklint output seen)". Five documents changed bytes
-(sa05, sa11, sa14, sa15, sa17) and were re-probed. Every document was then measured again with
-the machine's fonts and with the two substitutions in `probe/fontconfig/` (taken from that
-review): SVG label classes agree under all three, recorded insets are the minimum of the three,
-and every page count lies inside its range.
+and re-measured it with a probe of its own, including under two font substitutions. It found
+fifteen problems. Most were expectation and format problems, but two were construction facts that
+held only with the machine's fonts: the sa11 label `#site-hedge` sat 0.83 px inside its viewport
+with DejaVu Serif, below the corpus's 3 px clearance (L1), and sa16 paginated to 5 pages with
+FreeFont, outside its range of 6 to 7 (M4). They were corrected on 2026-09-24 as errata E1 to E15,
+each recorded in `manifest.json` `expectationHistory` with the source "independent pre-run review
+(no breaklint output seen)". Five documents changed bytes (sa05, sa11, sa14, sa15, sa17) and were
+re-probed. Every document was then measured again with the machine's fonts and with the two
+substitutions in `probe/fontconfig/` (taken from that review): SVG label classes agree under all
+three, recorded insets are the minimum of the three, and every page count lies inside its range.
+
+A second review of those errata, still before any breaklint run, found eight problems in how the
+truth is expressed. They were corrected on 2026-09-25 as errata E16 to E25 with the same source
+string. E16 also applies an orchestrator decision: the release semantics are stated once, as one
+class rule, instead of by per-entry `dependsOn` markers. The author found one more problem during
+that round, recorded as E26: a halo decline was required even though a tool that measures halo
+labels is foreseen. No construction fact changed in this round. sa14 changed bytes (a CSS comment)
+and was re-probed with all three font stacks, with identical geometry.
 
 ## Measurement environment
 

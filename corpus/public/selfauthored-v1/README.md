@@ -62,56 +62,98 @@ Each file binds its document by `sha256` and carries:
 - `paper`, `pages.range` (with the basis for the range) and `expectedExit` (`set`, `derivation`,
   `byCode`), all under the **default profile** (`fail-on error`, coverage floors error 1, warn 0.5);
 - `rules`: an entry for each of the thirteen registered rules with four lists:
-  - `mustFire` — a finding of that rule must match the target;
-  - `mustNotFire` — no finding may match the target;
-  - `allowed` — findings matching the target are permitted, never required
+  - `mustFire`: at least one finding of that rule must match the target. `occurrences`, where
+    given, is the number of planted instances inside the target. It is informational: the rule
+    pages do not fix whether a tool reports one finding per mark or one per text run, so a gate
+    may print a count that differs from it but never fails on that;
+  - `mustNotFire`: no finding of that rule may match the target;
+  - `allowed`: findings matching the target are permitted, never required
     (`class`: `font-dependent`, `documented-gap` with `constructionTruth: "defect"`,
     `heuristic-boundary`, `docs-silent`);
-  - `expectedDeclines` — `reason` from `src/core/enums.ts` `ENV_IDS`, `required`, `count`,
-    `countsTowardCoverage`; for halo labels `perText[].ifMeasured` gives the construction truth a
-    tool must report once it measures them. A decline is `required: true` only where a rule page,
-    `docs/limitations.md` or the README states it; a decline that rests only on a rule's
-    `declines` list in the source is `required: false` (a correct tool may measure instead);
-  - an entry may carry `dependsOn` (`item`, `workPackage`, `semantics`, `basis`): it holds under
-    rule semantics that this release documents but the base commit's rule page does not yet state.
-    A gate reports such entries separately ("depends on G-15 semantics") and does not count their
-    failure as a new false alarm while the rule page lacks the sentence;
-- `permittedDeclineReasons`, `constructionFacts` (the arithmetic), `runningElements`, `features`,
-  `verification` (renderer, fonts, residue seen by the probe) and `notes`.
+  - `expectedDeclines`: `reason` from `src/core/enums.ts` `ENV_IDS`, `required`, `count`,
+    `countsTowardCoverage`. `count` is the number of candidates the construction declines under
+    that reason inside the target. A decline is `required: true` only where a rule page,
+    `docs/limitations.md` or this README states it; a decline that rests only on a rule's
+    `declines` list in the source is `required: false` (a correct tool may measure instead).
+    Entries with `measuredAlternative: true` (the halo and `<use>` labels) carry the construction
+    truth for a tool that measures the target: `ifMeasured` on the entry, or per text in
+    `perText[].ifMeasured`;
+- `permittedDeclineReasons`, `constructionFacts` (the arithmetic), `runningElements` (visible
+  margin-box copies; a 0 x 0 copy on a page whose `:first` rule sets the margin box to
+  `content: none` is listed under `zeroSizeCopyPages`, not counted), `features`, `verification`
+  (renderer, fonts, residue seen by the probe) and `notes`.
 
-Targets:
+No entry carries a dependency marker of its own. The semantics every entry assumes are stated once,
+in the next section.
+
+## Release semantics
+
+> Expectations follow the documented semantics of the breaklint release that admits this corpus (0.7.0): e.g. content in Paged.js margin boxes (running()/fixed copies) is not in the flow and is not measured by any rule (docs/limitations.md 'unmeasured margin-box content'); layout/orphaned-continuation-page judges a page only where its content ends; layout/unbreakable-block-too-tall correlates fragments by flow membership, not coordinates.
+
+This is the only class rule. `manifest.json` `releaseSemantics` repeats it verbatim. It never
+changes pass or fail for a single entry: the gate below is defined for the admitting release.
+Against a build that does not document these semantics, such as the 0.6.0 base where the copies of
+a running element are summed as fragments, the entries that rest on them fail. That result says
+the build is not the admitting release; it does not say the truth is wrong. Entries that rest on
+the rule cite it in `why` or `docsBasis`: every `mustNotFire` of a running element, sa13's middle
+pages and sa14's `#parts-band` and `#sidetab`. For tracing only (a gate does not read this): the
+margin-box and flow-membership semantics are backlog item G-02 (work package WP-F1), and the
+continuation-page semantics are G-15 (WP-F4).
+
+## Targets
 
 | target | matches |
 |---|---|
-| `{"id": X}` | the element or SVG `<text>` whose author `id` is X (resolve to its source span; a block finding matches when its source lies within that span). For `artifact/local-uri` it matches the URI-bearing attributes of X and of its descendants |
-| `{"ids": [...]}`, `{"selector": S}`, `{"selectors": [...]}` | each listed element / every element matching the CSS selector in the source document |
+| `{"id": X}` | the element or SVG `<text>` whose author `id` is X (resolve to its source span; a block finding matches when its source lies within that span). For `artifact/local-uri` it matches the URI-bearing attributes of X and of its descendants; an element without any (sa06 `#p-6-2`, sa15 `#gpx-pfad`) can never be matched, and its `why` says so |
+| `{"ids": [...]}`, `{"selector": S}`, `{"selectors": [...]}` | the listed elements, or every element matching the CSS selector in the source document |
 | `{"within": X}` | any finding whose source lies inside element X |
 | `{"document": true}` | the whole document. `except` (a list of targets) carves findings out of it: the entry matches every finding of that rule in the document that matches none of the `except` targets. `except` is used only on `document` targets |
 | `{"svg": X, "texts": [...]}` | the listed `<text>` ids whose nearest `<svg>` is X; `{"svg": X, "use": U}` a `<use>` instance |
-| `{"uri": {"attribute": A, "value": V}}` | the resource reference with that attribute and raw (authored) value. When a target also names `id`, both must hold (AND): the reference must be that attribute of that element. All keys of one target combine with AND; several entries in a list combine with OR |
-| `{"pageOf": {"id": X, "fragment": "last" \| "nonFinal", "excludeFirst": bool}}` | page(s) of the run under test, resolved from that run's own page map: the pages on which the report places the named fragments of X (the block records that carry X's source identity, in fragment order). `nonFinal` means every fragment except the last; `excludeFirst` also drops the first. `measuredPage(s)` is the reference layout for orientation only, never matched directly, so renderer-dependent page numbers need no tolerance. A target that the run cannot resolve fails the entry, whichever list it is in |
-| `{"pages": "any page not named in mustNotFire"}` | a page-level allowance |
+| `{"uri": {"attribute": A, "value": V}}` | the resource reference with that attribute and raw (authored) value |
+| `{"pageOf": {"id": X, "fragment": F, "resolvedPages": [...], "resolvedPagesByFontStack": {...}}}` | a finding whose `page` is in `resolvedPages` |
+| `{"pages": "any page not named in mustNotFire"}` | a finding whose `page` is in none of the `resolvedPages` of the rule's `mustNotFire` `pageOf` targets (a page-level allowance) |
+
+Combination. All keys of one target combine with AND: `{"uri": ..., "id": X}` is that attribute
+of that element. A list-valued key (`ids`, `selectors`, `texts`, `except`) matches when any of its
+items matches (OR). This OR applies only inside a target. The four lists of a rule are not OR
+lists: every `mustFire` entry must be matched on its own, and every `mustNotFire` entry must hold on
+its own.
+
+Page targets. The canonical report has no page map: `pages` is a count, and the only page a
+finding carries is `Finding.page`. So a gate never resolves a page target itself. `pageOf` names
+the element (`id` only) and one of `fragment: "first"`, `"last"` or `"middle"` (every fragment
+except the first and the last); `fragment` is required and has no default. `resolvedPages` is
+already resolved in the expected file: the union, over the three font stacks of
+`verification.fontStacks`, of the pages on which the construction probe placed those flow
+fragments of X. `resolvedPagesByFontStack` shows the parts. A finding matches when its `page` is in
+`resolvedPages`. Where the stacks disagree (sa03: page 6, or page 7 with DejaVu) the set is wider
+than any single layout. In no rule do the `mustFire` and `mustNotFire` page sets overlap.
+
+Declines. A required decline that names its targets (`ids`, or `svg` with `texts` or `use`) is
+satisfied when each named target is declined with that reason. A required decline on a `document`
+or `within` target is satisfied when that rule's declines with that reason inside the target add up
+to `count` (the sum of `count` over the matching `notMeasured` rows). An entry with
+`measuredAlternative: true` is satisfied per target either by the decline or by a measurement of
+that target: an evaluation of that rule for the target with status `measured`, or a finding on it.
+A measured target is then judged as if it were listed under `mustFire` or `mustNotFire` according
+to its `ifMeasured`, and this counts for the closed-world check too. A decline with
+`required: false` is checked only against `permittedDeclineReasons`.
 
 ## How a gate consumes this
 
-1. Read `manifest.json`; verify the SHA-256 of every file in `files`. **Zero documents read is a
-   failure, never a skip.**
+This is the only gate procedure. `manifest.json` `gate.steps` repeats these five steps verbatim.
+
+1. Read `manifest.json` and verify the SHA-256 and byte length of every file in `files`. Zero documents read is a failure, never a skip.
 2. Run each document under the default profile and read the canonical JSON report.
-3. If the document ended in exit 3: pass only if 3 is in `expectedExit.set` and the exit reason is
-   `render-unstable`. A render-unstable run withholds its findings and reports no pages by design
-   (`docs/limitations.md`), so page and rule checks are skipped for that document. Any other exit
-   3 fails.
-4. Otherwise check `exitCode ∈ expectedExit.set` and `pagesAnalysed ∈ pages.range`.
-5. Then, per rule: every `mustFire` entry matched; no `mustNotFire` target matched; **every
-   finding is covered by `mustFire ∪ allowed` of its rule (closed world)**; every required decline
-   present; no decline reason outside `permittedDeclineReasons`. `layout/half-empty-page` is not
-   active in the default profile, so any finding of it fails.
+3. If the document ended in exit 3, pass only if 3 is in `expectedExit.set` and the exit reason is `render-unstable`. A render-unstable run withholds its findings and reports no pages by design (`docs/limitations.md`), so the page and rule checks are skipped for that document. Any other exit 3 fails.
+4. Otherwise the exit code must be in `expectedExit.set` and the report's `pages` must lie in `pages.range`.
+5. Then, per rule: every `mustFire` entry is matched by at least one finding; no finding matches a `mustNotFire` target; every finding is matched by a `mustFire` or `allowed` entry of its rule, or is on a measured target whose `ifMeasured` is `mustFire` (closed world); every `required` decline is satisfied as the paragraph 'Declines' under 'Targets' defines, and a measured target with `ifMeasured: mustNotFire` has no finding; no decline carries a reason outside `permittedDeclineReasons`. `layout/half-empty-page` is not active in the default profile, so any finding of it fails.
 
 The expected exits are derived from the documented exit semantics only: an error finding is 1;
 insufficient coverage (4) outranks findings; a table left in the paginator's overflow column is 3.
 Where a documented capability is missing today (halo labels decline) the set contains both the
-current and the post-capability exit, and `expectedDeclines[].perText[].ifMeasured` carries the
-truth for the day the capability lands. Tables that cross pages admit 3 as "may be declined as
+current and the post-capability exit, and the conditional declines (`measuredAlternative`) carry
+the truth for the day the capability lands. Tables that cross pages admit 3 as "may be declined as
 unmeasurable"; the plain probe saw residue only in sa16.
 
 ## Font dependence
@@ -133,7 +175,9 @@ The truth is frozen with the documents. It is never edited to make a gate pass. 
 fact or an expectation turns out to be wrong, add a dated entry to `manifest.json`
 `expectationHistory` (id, date, what changed, why, previous value, source) in the same change that
 edits the expected file, and change the document's bytes only together with a new hash and a new
-entry. Errata E1 to E15 (2026-09-24) came from an independent review before any breaklint run.
+entry. Errata E1 to E15 (2026-09-24) and E16 to E26 (2026-09-25) came from two independent reviews
+before any breaklint run; E16 also applies an orchestrator decision, and E26 was found by the author
+during the second round.
 
 ## Reproducing the construction measurements
 

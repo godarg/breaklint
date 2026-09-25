@@ -65,12 +65,15 @@
     {
       "id": "kopfzeile",
       "marginBox": "top-center",
-      "marginBoxCopies": 3,
+      "marginBoxCopies": 2,
       "pages": [
-        1,
         2,
         3
-      ]
+      ],
+      "zeroSizeCopyPages": [
+        1
+      ],
+      "zeroSizeCopyNote": "Paged.js also places a copy on these pages, but the @page :first rule sets that margin box to content: none, so the copy is 0 x 0 px and is not counted"
     }
   ],
   "constructionFacts": [
@@ -87,7 +90,8 @@
           "target": {
             "id": "kopfzeile"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -117,7 +121,8 @@
           "target": {
             "id": "kopfzeile"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -147,7 +152,8 @@
           "target": {
             "id": "kopfzeile"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
@@ -205,7 +211,8 @@
           "target": {
             "id": "kopfzeile"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         },
         {
           "target": {
@@ -260,7 +267,8 @@
           "target": {
             "id": "kopfzeile"
           },
-          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). A margin-box copy is not a fragment of the document flow; no layout rule may treat the copies as fragments of one block (docs/limitations.md 0.6.0: 'Blocks carrying the same source id are not always fragments of one flow')."
+          "why": "running element: Paged.js clones it into a page margin box on every page (position: running). Under the release-semantics rule (README 'Release semantics', manifest.json releaseSemantics) content in margin boxes is not in the flow and is not measured by any rule, so no finding may name the element or any of its copies.",
+          "docsBasis": "README 'Release semantics'; docs/limitations.md 0.6.0 already says 'Blocks carrying the same source id are not always fragments of one flow'."
         }
       ],
       "allowed": [
@@ -533,7 +541,7 @@
           "target": {
             "id": "gpx-pfad"
           },
-          "why": "the path /opt/tourdaten/gpx appears only as visible text inside span#gpx-pfad, which carries no URI-bearing attribute (docs/rules/artifact-local-uri.md reads uriRefs)"
+          "why": "the path /opt/tourdaten/gpx appears only as visible text inside span#gpx-pfad, which carries no URI-bearing attribute (docs/rules/artifact-local-uri.md reads uriRefs). This entry can never match: under the README's id semantics for artifact/local-uri an id target matches only the URI-bearing attributes of the element and its descendants, and there are none here. It documents the control; a tool that reports the visible-text path is caught by the closed-world check, because no mustFire or allowed entry covers it."
         }
       ],
       "allowed": [],
