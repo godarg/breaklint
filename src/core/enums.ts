@@ -363,7 +363,12 @@ export const SVG_VIEWPORT_DIAGNOSTICS = [
   "oracle-disagreed",
   /** The computed-style content box and the used one differ beyond SVG_MODEL_TOLERANCE_PX. */
   "box-model-disagreed",
-  /** The frame's error bound does not fit inside SVG_OVERSHOOT_EPSILON_PX (float32 quads far down a run). */
+  /**
+   * The frame's error bound (`uncertaintyPx`: CDP residual, float32 quantisation of the quads, the
+   * clip margin's and a clipping nested viewport's serialisation) plus arithmetic noise exceeds
+   * SVG_OVERSHOOT_EPSILON_PX — quads far down a run; or a painted clip edge lies too close to a half
+   * pixel to know which way the browser rounds it.
+   */
   "frame-imprecise",
   /**
    * A clip-path, mask, url() filter or legacy clip on the outermost SVG or an HTML ancestor inside
@@ -371,9 +376,24 @@ export const SVG_VIEWPORT_DIAGNOSTICS = [
    * the SVG's own — including an SVG with no clip of its own under a clipping ancestor.
    */
   "ancestor-clip",
+  /**
+   * A clipped SVG whose paint offset is not in the document's space: a CSS transform,
+   * `will-change`, or fixed/sticky position on it or an ancestor; a frame map that is not a
+   * positive axis-aligned scale; or CDP quads that are not rectangles. The pixel-snapping model of
+   * the painted clip was measured only without them.
+   */
+  "pixel-snapping-unmodelled",
+  /** A clipped SVG below a scrolled ancestor: its paint offset moved by the scroll offset. */
+  "scrolled-ancestor",
+  /** The SVG or an ancestor is assigned to a slot: the shadow tree it is drawn in is not walked. */
+  "shadow-tree",
   /** A nested `<svg>` with a non-identity transform. */
   "nested-transform",
-  /** A nested `<svg>`'s x/y/width/height from its attributes disagree with its computed style. */
+  /**
+   * A nested `<svg>` whose placement by the browser (its screen CTM in the frame) is not
+   * `translate(x, y) · viewBoxTransform(width, height)` for its computed width/height, or whose
+   * width/height, viewBox or preserveAspectRatio this code cannot read.
+   */
   "nested-lengths-disagree",
   /** A nested `<svg>` with an `overflow-clip-margin` other than the UA default. */
   "nested-clip-margin",

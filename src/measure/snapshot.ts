@@ -672,19 +672,34 @@ export const SNAPSHOT_SOURCE = `(() => {
     ["borderTopRightRadius", "border-top-right-radius"], ["borderBottomRightRadius", "border-bottom-right-radius"],
     ["borderBottomLeftRadius", "border-bottom-left-radius"], ["overflowX", "overflow-x"], ["overflowY", "overflow-y"],
     ["overflowClipMargin", "overflow-clip-margin"], ["contain", "contain"], ["contentVisibility", "content-visibility"],
-    ["clipPath", "clip-path"], ["maskImage", "mask-image"], ["mask", "mask"], ["filter", "filter"], ["clip", "clip"]];
+    ["clipPath", "clip-path"], ["maskImage", "mask-image"], ["mask", "mask"],
+    ["maskBoxImageSource", "-webkit-mask-box-image-source"], ["maskBorderSource", "mask-border-source"],
+    ["filter", "filter"], ["clip", "clip"]];
+  // will-change and position are shipped with the transforms: each can give the SVG a paint
+  // offset of its own, and the frame's pixel-snapping model holds only without one.
   const SVG_TRANSFORM_PROPS = [["transform", "transform"], ["rotate", "rotate"], ["scale", "scale"],
-    ["translate", "translate"], ["perspective", "perspective"], ["offsetPath", "offset-path"]];
+    ["translate", "translate"], ["perspective", "perspective"], ["offsetPath", "offset-path"],
+    ["willChange", "will-change"], ["position", "position"]];
+  const transformInitial = (facts) => ["transform", "rotate", "scale", "translate", "perspective", "offsetPath"]
+    .every((key) => !facts[key] || facts[key] === "none")
+    && (facts.willChange === "auto" || facts.willChange === "")
+    && (facts.position === "static" || facts.position === "relative" || facts.position === "absolute" || facts.position === "");
   // What may clip an outermost SVG from above, inside the page area: overflow, paint containment,
   // clip-path, masks, url() filters and legacy clip, with the radii that round an overflow clip.
   const SVG_ANCESTOR_PROPS = [["overflowX", "overflow-x"], ["overflowY", "overflow-y"], ["contain", "contain"],
     ["contentVisibility", "content-visibility"], ["clipPath", "clip-path"], ["maskImage", "mask-image"],
-    ["mask", "mask"], ["filter", "filter"], ["clip", "clip"]];
+    ["mask", "mask"], ["maskBoxImageSource", "-webkit-mask-box-image-source"],
+    ["maskBorderSource", "mask-border-source"], ["filter", "filter"], ["clip", "clip"]];
   const SVG_RADIUS_PROPS = ["border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius",
     "border-bottom-left-radius"];
+  // An ALLOW-LIST: an ancestor is left out only when every property holds a value that provably
+  // clips nothing. Anything else — a mask-box image, a mask-border, a filter, a value this code has
+  // never seen — is shipped, and Node decides. A deny-list missed -webkit-mask-box-image.
+  const noneOrAbsent = (value) => value === "none" || value === "";
   const ancestorMayClip = (facts) => facts.overflowX !== "visible" || facts.overflowY !== "visible"
-    || facts.contain !== "none" || facts.contentVisibility !== "visible" || effect(facts.clipPath)
-    || effect(facts.maskImage) || effect(facts.mask) || /url\\(/u.test(facts.filter) || facts.clip !== "auto";
+    || facts.contain !== "none" || facts.contentVisibility !== "visible" || !noneOrAbsent(facts.clipPath)
+    || !noneOrAbsent(facts.maskImage) || !noneOrAbsent(facts.mask) || !noneOrAbsent(facts.maskBoxImageSource)
+    || !noneOrAbsent(facts.maskBorderSource) || !noneOrAbsent(facts.filter) || (facts.clip !== "auto" && facts.clip !== "");
   // FLOW MEMBERSHIP, the same test the block collection applies: an <svg> is measured only inside
   // its page's content area, the .pagedjs_area child of the page box (page content and footnote
   // area): PAGE_AREA_SELECTOR, the one constant the block collection above uses too. Paged.js deep-clones a position: running(...) element into the margin box of every page
@@ -765,10 +780,21 @@ export const SNAPSHOT_SOURCE = `(() => {
     // the SVG's own frame; they are shipped so Node can decline the 3D and motion-path cases.
     const transforms = [];
     const ancestors = [];
+    // The flat tree and scrolling, both invisible to a DOM parent walk. A slotted SVG (or one below
+    // a slotted ancestor) is clipped by the shadow tree it is assigned into, which the walk below
+    // never visits; and an ancestor scrolled by a fraction moves the space the browser snaps paint
+    // offsets in. Node declines on either.
+    let slotted = false;
+    let scrolled = false;
     if (kind === "outer") {
       for (let at = el; at && P.nodeType(at) === 1; at = P.parent(at)) {
         const facts = pick(P.style(at, null), SVG_TRANSFORM_PROPS);
-        if (SVG_TRANSFORM_PROPS.some(([key]) => facts[key] && facts[key] !== "none")) transforms.push(facts);
+        if (!transformInitial(facts)) transforms.push(facts);
+        if (P.assignedSlot(at) !== null) slotted = true;
+        if (at !== el && at !== document.documentElement) {
+          const offset = P.scrollOffset(at);
+          if (offset[0] !== 0 || offset[1] !== 0) scrolled = true;
+        }
       }
       // The HTML ancestors up to the page area, whose overflow, containment or clip may cut what
       // this SVG draws. The page area and what lies above it — the page box, the sheet that clips
@@ -802,12 +828,13 @@ export const SNAPSHOT_SOURCE = `(() => {
       lengths = P.svgViewportLengths(el);
       computedLengths = { x: P.css(svgStyle, "x"), y: P.css(svgStyle, "y"), width: P.css(svgStyle, "width"),
         height: P.css(svgStyle, "height"), transform: P.css(svgStyle, "transform") };
-      lengthAttributes = { x: P.attr(el, "x"), y: P.attr(el, "y") };
+      lengthAttributes = { x: P.attr(el, "x"), y: P.attr(el, "y"), viewBox: P.attr(el, "viewBox"),
+        preserveAspectRatio: P.attr(el, "preserveAspectRatio") };
     }
     const geometry = { kind,
       parentIndex: enclosingSvg && svgRecordIndex.has(enclosingSvg) ? svgRecordIndex.get(enclosingSvg) : -1,
       anchorIndex, anchorCtm, ctm: P.svgCtm(el), screenCtm: P.svgScreenCtm(el),
-      style: pick(svgStyle, SVG_BOX_PROPS), transforms, ancestors, lengths, computed: computedLengths,
+      style: pick(svgStyle, SVG_BOX_PROPS), transforms, ancestors, slotted, scrolled, lengths, computed: computedLengths,
       attributes: lengthAttributes };
     if (!capped) {
       for (const textEl of candidateTextEls) {
@@ -864,6 +891,8 @@ export const SNAPSHOT_SOURCE = `(() => {
           const ancestorStyle = P.style(ancestor, null);
           paintedBoundsUnsupported = effect(P.css(ancestorStyle, "clip-path"))
             || effect(P.css(ancestorStyle, "mask")) || effect(P.css(ancestorStyle, "mask-image"))
+            || effect(P.css(ancestorStyle, "-webkit-mask-box-image-source"))
+            || effect(P.css(ancestorStyle, "mask-border-source"))
             || effect(P.css(ancestorStyle, "filter"));
           ancestor = P.parent(ancestor);
         }

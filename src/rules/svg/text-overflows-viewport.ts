@@ -213,12 +213,13 @@ export const textOverflowsViewport = defineRule(
         const overshoot = overshootBeyond(text.boxLocal, clips);
         const violated = overshoot > permitted + SVG_OVERSHOOT_EPSILON_PX;
         evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, status: "measured", measurements: [{ name: "viewport-overshoot", value: overshoot, unit: "px", operator: ">", threshold: permitted + SVG_OVERSHOOT_EPSILON_PX }], violated }));
-        // Both sides are unrounded frame values: the clips from CDP's used boxes carried into the
-        // frame (plus the clip margin, or a nested viewport's lengths), the target from its getBBox
+        // Both sides are unrounded frame values: the clips from CDP's used boxes and the clip
+        // margin, snapped to the pixels Chromium paints them at and carried into the frame (or a
+        // nested viewport, placed by its own CTM at its used size), the target from its getBBox
         // corners through its CTM chain. SVG_OVERSHOOT_EPSILON_PX is the rule's stated resolution
         // and the error budget of this one comparison. The collector declines every frame whose
-        // error bound (`uncertaintyPx`: CDP residual, float32 quantisation of the quads, the clip
-        // margin's serialisation) does not fit inside it beside the target's own residual. So
+        // error bound (`uncertaintyPx`, itemised at SVG_OVERSHOOT_EPSILON_PX) does not fit inside
+        // it, and every target whose own residual does not fit beside that bound. So
         // `overshoot > permitted + epsilon` means the true overshoot exceeds `permitted`: no
         // finding is an artefact of the frame. The price is a band of at most 2·epsilon above
         // `permitted` in which a clipped label can come out clean — the resolution, documented in

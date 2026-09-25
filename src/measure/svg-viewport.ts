@@ -28,8 +28,14 @@
  * geometry itself. The computed values are still read and compared, as a units check: a frame whose
  * content box is not the computed one within SVG_MODEL_TOLERANCE_PX is not the frame this module
  * thinks it is. Nested viewports have no CDP counterpart (the box model of an inner `<svg>` is its
- * content's bounding box); they are reconstructed from the SVGAnimatedLength values the browser
- * lays them out with, checked against the computed style, and inherit the outermost SVG's frame.
+ * content's bounding box); each is placed where the browser's own `getScreenCTM()` puts it, sized by
+ * its computed (used) width and height, proven against its viewBox transform, and inherits the
+ * outermost SVG's frame (see nestedViewportGeometry).
+ *
+ * THE PAINTED CLIP. Chromium does not clip where layout puts the clip rectangle: it paints the
+ * outermost SVG's content at its border-box origin rounded to a whole CSS px of the document and
+ * clips at the clip rectangle with each edge rounded the same way (see paintedClip). The clip the
+ * rule compares against is that painted one, carried into the frame.
  *
  * THE RESOLUTION. Every frame carries a bound on how far its clip edges can sit from the browser's
  * (`uncertaintyPx`), and a frame whose bound does not fit inside SVG_OVERSHOOT_EPSILON_PX is
@@ -79,9 +85,17 @@ export const SVG_MODEL_TOLERANCE_PX = 0.1;
  *   clip side   frame residual against CDP        ≤ SVG_FRAME_TOLERANCE_PX (0.005)
  *               float32 quantisation of the quads  ≤ computed per record; 0.0039 at 100 000 px
  *               clip-margin serialisation          ≤ half the sixth significant digit (5e-5 at 10 px)
+ *               nested width/height serialisation  the same, times the nested frame's stretch;
+ *                                                  charged only where the nested viewport clips
  *               arithmetic                         SVG_FLOAT_NOISE_PX
  *   text side   local matrix against screen CTM    the text's own residual, charged per target
  *               arithmetic                         SVG_FLOAT_NOISE_PX
+ *
+ * The clip-side sum is the frame's `uncertaintyPx`. A frame is declined `frame-imprecise` when
+ * `uncertaintyPx` plus one more SVG_FLOAT_NOISE_PX exceeds this epsilon, and also when a painted
+ * clip edge cannot be snapped because its unrounded position lies within the margin's serialisation
+ * (and the quads' float32 spacing) of a half pixel. A target is declined as unreadable when
+ * `uncertaintyPx` plus its own residual plus SVG_FLOAT_NOISE_PX exceeds it.
  *
  * What that means for the verdict, with measured overshoot o, true overshoot t and permitted p: the
  * two differ by less than this epsilon, so `o > p + epsilon` implies `t > p` — no finding is an
@@ -120,11 +134,16 @@ export interface SvgBoxStyle {
   clipPath: string;
   maskImage: string;
   mask: string;
+  maskBoxImageSource: string;
+  maskBorderSource: string;
   filter: string;
   clip: string;
 }
 
-/** Computed transform-related properties of one element on the SVG's ancestor path. */
+/**
+ * Computed transform-related properties of one element on the SVG's ancestor path, with the two
+ * that give an element a paint offset of its own (`will-change`, `position: fixed | sticky`).
+ */
 export interface SvgTransformFacts {
   transform: string;
   rotate: string;
@@ -132,6 +151,8 @@ export interface SvgTransformFacts {
   translate: string;
   perspective: string;
   offsetPath: string;
+  willChange?: string;
+  position?: string;
 }
 
 /**
@@ -149,6 +170,8 @@ export interface SvgAncestorFacts {
   clipPath: string;
   maskImage: string;
   mask: string;
+  maskBoxImageSource: string;
+  maskBorderSource: string;
   filter: string;
   clip: string;
   /** border-top-left, -top-right, -bottom-right, -bottom-left radius. */
@@ -180,12 +203,16 @@ export interface RawSvgFrame {
   transforms: SvgTransformFacts[];
   /** Outer only: the HTML ancestors between the SVG and its page area that may clip it. */
   ancestors: SvgAncestorFacts[];
+  /** Outer only: the SVG or an ancestor is assigned to a slot, so the flat tree is not the DOM's. */
+  slotted: boolean;
+  /** Outer only: an ancestor (not the document) is scrolled, so its content's paint offset moved. */
+  scrolled: boolean;
   /** Nested only: x, y, width, height as SVGLength.value of the animated values. */
   lengths: number[] | null;
   /** Nested only: the computed x, y, width, height and transform. */
   computed: { x: string; y: string; width: string; height: string; transform: string } | null;
-  /** Nested only: the x and y attributes as written, for percentages the computed style keeps. */
-  attributes: { x: string | null; y: string | null } | null;
+  /** Nested only: the x and y attributes as written, and the viewBox and preserveAspectRatio. */
+  attributes: { x: string | null; y: string | null; viewBox?: string | null; preserveAspectRatio?: string | null } | null;
 }
 
 /** The raw facts behind one text target's box. */
@@ -427,18 +454,47 @@ export function paintContainment(contain: string, contentVisibility: string): bo
   return tokens.some((token) => token === "paint" || token === "strict" || token === "content") || contentVisibility !== "visible";
 }
 
-const paintEffect = (value: string): boolean => value !== "" && value !== "none" && !value.startsWith("none ");
+const noneOrAbsent = (value: string): boolean => value === "none" || value === "";
 
 /**
- * A clip this module does not reconstruct: `clip-path`, a mask, a `url()` filter (clipped to its
- * filter region) or a legacy `clip` rectangle. On the outermost SVG or an HTML ancestor, each cuts
- * away drawn content wherever it lies, so its presence makes the record clipped — never
- * non-applicable — and declined. Inside the SVG, on the text or a group, the same effects stay what
- * they were: a per-target `env/svg-painted-bounds-unsupported`.
+ * CSS filter functions, which change the colour or extend the ink but never cut drawn content
+ * away. A `url()` reference is not among them: an SVG filter clips to its filter region.
  */
-export function unmodelledClip(facts: Pick<SvgBoxStyle, "clipPath" | "maskImage" | "mask" | "filter" | "clip">): boolean {
-  return paintEffect(facts.clipPath) || paintEffect(facts.maskImage) || paintEffect(facts.mask) ||
-    /url\(/u.test(facts.filter) || (facts.clip !== "auto" && facts.clip !== "");
+const FILTER_FUNCTIONS = new Set(["blur", "brightness", "contrast", "drop-shadow", "grayscale", "hue-rotate",
+  "invert", "opacity", "saturate", "sepia"]);
+function filterClipsNothing(value: string): boolean {
+  if (noneOrAbsent(value)) return true;
+  let rest = value.trim();
+  while (rest.length > 0) {
+    const match = /^([a-z-]+)\(/u.exec(rest);
+    if (!match || !FILTER_FUNCTIONS.has(match[1]!)) return false;
+    let depth = 0;
+    let end = -1;
+    for (let index = match[1]!.length; index < rest.length; index += 1) {
+      if (rest[index] === "(") depth += 1;
+      if (rest[index] === ")") { depth -= 1; if (depth === 0) { end = index; break; } }
+    }
+    if (end < 0 || /url\(/u.test(rest.slice(0, end + 1))) return false;
+    rest = rest.slice(end + 1).trim();
+  }
+  return true;
+}
+
+/**
+ * A clip this module does not reconstruct. Decided by an ALLOW-LIST: every property that can cut
+ * drawn content away — `clip-path`, `mask-image` and the `mask` shorthand, the mask-box image
+ * (`-webkit-mask-box-image-source`) and `mask-border-source`, `filter` (a `url()` filter clips to
+ * its filter region) and legacy `clip` — must hold a value that provably clips nothing: `none`
+ * (or empty, a property this browser does not have), a list of CSS filter functions, `clip:
+ * auto`. Anything else counts as a clip, including a value never seen before; a deny-list read
+ * `url(` and `none` and missed `-webkit-mask-box-image` entirely. On the outermost SVG or an HTML
+ * ancestor such a clip makes the record clipped — never non-applicable — and declined. Inside the
+ * SVG, on the text or a group, the same effects stay per-target `env/svg-painted-bounds-unsupported`.
+ */
+export function unmodelledClip(facts: Pick<SvgBoxStyle, "clipPath" | "maskImage" | "mask" | "maskBoxImageSource" | "maskBorderSource" | "filter" | "clip">): boolean {
+  return !(noneOrAbsent(facts.clipPath) && noneOrAbsent(facts.maskImage) && noneOrAbsent(facts.mask) &&
+    noneOrAbsent(facts.maskBoxImageSource) && noneOrAbsent(facts.maskBorderSource) &&
+    filterClipsNothing(facts.filter) && (facts.clip === "auto" || facts.clip === ""));
 }
 
 const zeroRadius = (value: string): boolean => value.trim().split(/\s+/u).every((token) => /^0(?:\.0+)?(?:px|%)?$/u.test(token));
@@ -504,6 +560,12 @@ export interface SvgBoxModel {
    * none. Absent: nothing was asked, and a record that needs them declines.
    */
   ancestors?: readonly (readonly number[] | null)[];
+  /**
+   * The document's scroll offset (CDP `Page.getLayoutMetrics`), which carries the viewport-relative
+   * quads into the document space the browser snaps paint offsets in. Absent: a clipped record
+   * declines.
+   */
+  scroll?: readonly number[];
 }
 
 /**
@@ -577,9 +639,12 @@ export function localBoxes(model: SvgBoxModel, localToScreen: AffineMatrix): Loc
 
 /** The outermost SVG's own clip, in its frame, from the used boxes. */
 export interface OuterClip {
+  /** As layout has it, unsnapped; the painted clip is `paintedClip` of the same reference box. */
   clip: Box | null;
   /** The clip margin's serialisation error; 0 without a clip. */
   resolution: number;
+  reference: VisualBox | null;
+  margin: number;
 }
 
 /**
@@ -591,7 +656,7 @@ export function outerClip(style: SvgBoxStyle, boxes: Pick<LocalBoxes, "content" 
   if ("diagnostic" in overflow) return { ok: false, diagnostic: overflow.diagnostic };
   const containment = paintContainment(style.contain, style.contentVisibility);
   if (containment === null) return { ok: false, diagnostic: "containment-unrecognised" };
-  if (!overflow.clips && !containment) return { ok: true, clip: null, resolution: 0 };
+  if (!overflow.clips && !containment) return { ok: true, clip: null, resolution: 0, reference: null, margin: 0 };
 
   const clipMargin = parseClipMargin(style.overflowClipMargin);
   if (!clipMargin) return { ok: false, diagnostic: "clip-margin-unrecognised" };
@@ -625,76 +690,218 @@ export function outerClip(style: SvgBoxStyle, boxes: Pick<LocalBoxes, "content" 
     ok: true,
     clip: { x: reference.x - m, y: reference.y - m, width: reference.width + 2 * m, height: reference.height + 2 * m },
     resolution: clipMargin.resolution,
+    reference: clipMargin.box,
+    margin: m,
   };
 }
 
 /**
- * Whether every point lies inside a convex quad (CDP corner order), at least `margin` from each
- * edge; a negative margin lets a point sit that far outside. Used for an ancestor's clip, which
- * must contain the SVG's own before it can be set aside.
+ * Chromium's pixel snapping, measured. The browser paints an outermost SVG with its content moved
+ * to the SNAPPED border-box origin and clips it at the SNAPPED clip rectangle — `LayoutUnit::Round`,
+ * half up, on each edge, in CSS px of the document, whatever the device scale. Neither is what
+ * `getScreenCTM()` or CDP report, which are the unsnapped layout. So the clip that decides what is
+ * drawn, in the frame the targets' boxes are in, is the snapped clip rectangle minus the snapped
+ * origin: every edge moves by `(round(edge) − edge) − (round(origin) − origin)`, up to one pixel.
+ * Measured on Chromium 141 through Paged.js at a device scale of 8, over 18 SVGs on four pages with
+ * fractional page heights, margins, paddings, borders, zoom 1.37 and every clip-margin form: this
+ * model put every painted clip edge and every painted content offset exactly (0.000 px); the
+ * unsnapped layout was off by up to 0.5 px per edge. Up to round two of this build that half pixel
+ * was reported as a finding on labels drawn in full, and let clipped labels through as clean.
+ *
+ * The model holds only where the snapping space is the document: no CSS transform, `will-change`
+ * or fixed/sticky position on the SVG or an ancestor, and no scrolled ancestor. Elsewhere a clipped
+ * SVG is declined (`pixel-snapping-unmodelled`, `scrolled-ancestor`).
  */
-export function insideQuad(points: readonly [number, number][], quad: readonly number[], margin: number): boolean {
+export function snapPixel(value: number): number {
+  return Math.floor(value + 0.5);
+}
+
+/** Whether transform facts give the SVG a paint offset space other than the document's. */
+export function paintOffsetUnmodelled(facts: SvgTransformFacts): boolean {
+  const none = (value: string | undefined): boolean => value === undefined || value === "none" || value === "";
+  return !(none(facts.transform) && none(facts.rotate) && none(facts.scale) && none(facts.translate) &&
+      none(facts.perspective) && none(facts.offsetPath)) ||
+    !(facts.willChange === undefined || facts.willChange === "auto" || facts.willChange === "") ||
+    facts.position === "fixed" || facts.position === "sticky";
+}
+
+/**
+ * One edge, snapped. A layout coordinate below 2^17 px on the 1/64 grid is exactly what layout
+ * holds (float32 carries it exactly), so even a tie at .5 rounds as the browser does. Anything
+ * else is known only to `slack`, and a value that close to a tie cannot be snapped: null.
+ */
+function snapEdge(value: number, slack: number): number | null {
+  const exact = Math.abs(value) < 2 ** 17 && Number.isInteger(value * 64) && slack === 0;
+  if (!exact) {
+    const fraction = value - Math.floor(value);
+    if (Math.abs(fraction - 0.5) <= slack + float32HalfSpacing(value) + 1e-9) return null;
+  }
+  return snapPixel(value);
+}
+
+/** The painted (snapped) clip of an outermost SVG, in its frame and on the page. */
+export interface PaintedClip {
+  /** In the frame: where the targets' boxes are compared. */
+  clip: Box;
+  /** In document CSS px: the snapped rectangle itself, for holding against an ancestor's clip. */
+  page: { left: number; top: number; right: number; bottom: number };
+}
+
+export function paintedClip(
+  model: SvgBoxModel, reference: VisualBox, margin: number, marginResolution: number, localToScreen: AffineMatrix,
+): Resolved<PaintedClip> {
+  const [a, b, c, d, e, f] = localToScreen;
+  if (!(a > 0 && d > 0 && Math.abs(b) <= 1e-12 * a && Math.abs(c) <= 1e-12 * d)) return { ok: false, diagnostic: "pixel-snapping-unmodelled" };
+  const scroll = model.scroll;
+  if (!scroll || scroll.length !== 2 || !scroll.every(Number.isFinite)) return { ok: false, diagnostic: "oracle-unavailable" };
+  const sx = scroll[0]!;
+  const sy = scroll[1]!;
+  const quad = reference === "content-box" ? model.content : reference === "padding-box" ? model.padding : model.border;
+  const rectangular = (q: readonly number[]): boolean => q.length === 8 && q[0] === q[6] && q[1] === q[3] && q[2] === q[4] && q[5] === q[7];
+  if (!rectangular(quad) || !rectangular(model.border)) return { ok: false, diagnostic: "pixel-snapping-unmodelled" };
+  // The margin in document px. Its used value is a LayoutUnit, so it is snapped back onto the 1/64
+  // grid where its serialisation allows; otherwise it carries its resolution into the edge.
+  let slack = 0;
+  const grid = (value: number, resolution: number): number => {
+    const snapped = Math.round(value * 64) / 64;
+    if (Math.abs(snapped - value) <= resolution + 1e-9) return snapped;
+    slack = Math.max(slack, resolution);
+    return value;
+  };
+  const mx = grid(margin * a, marginResolution * a);
+  const my = grid(margin * d, marginResolution * d);
+  const left = snapEdge(quad[0]! + sx - mx, slack);
+  const right = snapEdge(quad[2]! + sx + mx, slack);
+  const top = snapEdge(quad[1]! + sy - my, slack);
+  const bottom = snapEdge(quad[5]! + sy + my, slack);
+  const originX = model.border[0]! + sx;
+  const originY = model.border[1]! + sy;
+  const snappedOriginX = snapEdge(originX, 0);
+  const snappedOriginY = snapEdge(originY, 0);
+  if (left === null || right === null || top === null || bottom === null || snappedOriginX === null || snappedOriginY === null) {
+    return { ok: false, diagnostic: "frame-imprecise" };
+  }
+  const shiftX = snappedOriginX - originX;
+  const shiftY = snappedOriginY - originY;
+  const toLocalX = (page: number): number => (page - sx - shiftX - e) / a;
+  const toLocalY = (page: number): number => (page - sy - shiftY - f) / d;
+  const x0 = toLocalX(left);
+  const y0 = toLocalY(top);
+  return {
+    ok: true,
+    clip: { x: x0, y: y0, width: toLocalX(right) - x0, height: toLocalY(bottom) - y0 },
+    page: { left, top, right, bottom },
+  };
+}
+
+/**
+ * Whether an ancestor's clip, known by its content quad, contains the SVG's painted clip. Every
+ * clip an ancestor makes contains its content box, snapped the same way (rounding is monotone),
+ * so the snapped content rectangle is the region to hold the SVG against.
+ */
+export function ancestorContains(quad: readonly number[], scroll: readonly number[], page: PaintedClip["page"]): boolean {
   if (quad.length !== 8 || quad.some((value) => !Number.isFinite(value))) return false;
-  const q = [0, 1, 2, 3].map((index) => [quad[2 * index]!, quad[2 * index + 1]!] as const);
-  let area = 0;
-  for (let i = 0; i < 4; i += 1) {
-    const [x1, y1] = q[i]!;
-    const [x2, y2] = q[(i + 1) % 4]!;
-    area += x1 * y2 - x2 * y1;
+  if (!(quad[0] === quad[6] && quad[1] === quad[3] && quad[2] === quad[4] && quad[5] === quad[7])) return false;
+  const [sx, sy] = scroll as [number, number];
+  const left = snapEdge(quad[0]! + sx, 0);
+  const right = snapEdge(quad[2]! + sx, 0);
+  const top = snapEdge(quad[1]! + sy, 0);
+  const bottom = snapEdge(quad[5]! + sy, 0);
+  if (left === null || right === null || top === null || bottom === null) return false;
+  return page.left >= left && page.right <= right && page.top >= top && page.bottom <= bottom;
+}
+
+/** A `viewBox` attribute as four numbers, or null when absent; "invalid" when present and unusable. */
+export function parseViewBox(value: string | null | undefined): [number, number, number, number] | null | "invalid" {
+  if (value === null || value === undefined) return null;
+  const tokens = value.trim().split(/[\s,]+/u).filter(Boolean);
+  if (tokens.length !== 4) return "invalid";
+  const numbers = tokens.map(Number);
+  if (numbers.some((number) => !Number.isFinite(number)) || numbers[2]! <= 0 || numbers[3]! <= 0) return "invalid";
+  return numbers as [number, number, number, number];
+}
+
+const ALIGNMENTS = new Set(["none", "xMinYMin", "xMidYMin", "xMaxYMin", "xMinYMid", "xMidYMid", "xMaxYMid", "xMinYMax", "xMidYMax", "xMaxYMax"]);
+
+/**
+ * The viewBox transform of SVG 2 §8.2 for a viewport of `width` x `height`: user space of the
+ * `<svg>` into its viewport, before the viewport's own x/y. null for a preserveAspectRatio this code
+ * does not parse.
+ */
+export function viewBoxTransform(viewBox: [number, number, number, number] | null, preserveAspectRatio: string | null | undefined,
+  width: number, height: number): AffineMatrix | null {
+  if (!viewBox) return IDENTITY;
+  const tokens = (preserveAspectRatio ?? "").trim().split(/\s+/u).filter(Boolean);
+  if (tokens[0] === "defer") tokens.shift();
+  const align = tokens[0] ?? "xMidYMid";
+  const meetOrSlice = tokens[1] ?? "meet";
+  if (!ALIGNMENTS.has(align) || (meetOrSlice !== "meet" && meetOrSlice !== "slice") || tokens.length > 2) return null;
+  const [vx, vy, vw, vh] = viewBox;
+  let sx = width / vw;
+  let sy = height / vh;
+  if (align !== "none") {
+    const scale = meetOrSlice === "slice" ? Math.max(sx, sy) : Math.min(sx, sy);
+    sx = scale;
+    sy = scale;
   }
-  if (!(Math.abs(area) > 0)) return false;
-  const orientation = Math.sign(area);
-  for (let i = 0; i < 4; i += 1) {
-    const [x1, y1] = q[i]!;
-    const [x2, y2] = q[(i + 1) % 4]!;
-    const length = Math.hypot(x2 - x1, y2 - y1);
-    if (!(length > 0)) return false;
-    for (const [px, py] of points) {
-      const distance = (orientation * ((x2 - x1) * (py - y1) - (y2 - y1) * (px - x1))) / length;
-      if (!(distance >= margin)) return false;
-    }
-  }
-  return true;
+  let tx = -vx * sx;
+  let ty = -vy * sy;
+  if (align.includes("xMid")) tx += (width - vw * sx) / 2;
+  if (align.includes("xMax")) tx += width - vw * sx;
+  if (align.includes("YMid")) ty += (height - vh * sy) / 2;
+  if (align.includes("YMax")) ty += height - vh * sy;
+  return [sx, 0, 0, sy, tx, ty];
 }
 
 /**
  * The viewport and clip rectangle of a nested `<svg>`, in the frame.
  *
- * x/y/width/height come from SVGLength.value of the animated lengths, which resolves percentages
- * against the enclosing viewport. They are believed only where the computed style says the same:
- * measured on Chromium 141, a CSS `width` overrides the attribute for the clip while a CSS `x` is
- * ignored, so an author rule on either leaves the attribute values describing a viewport that is
- * not there. The computed width/height arrive resolved to px; x/y keep a percentage as written,
- * which is then compared with the attribute text.
- *
- * A transform on the nested SVG moves the viewport off the rectangle x/y/width/height describe in
- * the parent's user space, and a clip margin on a clipping one was measured to be ignored — neither
- * is modelled; both decline.
+ * WHERE THE VIEWPORT IS comes from the browser's own placement of it, not from the attributes:
+ * the nested SVG's screen CTM carried back through the frame (`S⁻¹`) and its parent's frame map
+ * (`toOuter⁻¹`) is `translate(x, y) · viewBoxTransform(w, h)`, and x/y are read off that
+ * translation. HOW LARGE it is comes from the computed width/height, which Chromium 141 resolves to
+ * the used size in every case measured — the attribute, a CSS `width: 100px` that overrides it,
+ * `width: auto` (the parent viewport) — while `SVGLength.value` keeps the attribute whatever the
+ * CSS says, and a CSS `x` is ignored for the viewport although the computed `x` reports it. An
+ * earlier build required computed x/y/width/height to equal the SVGLength values, and on CI's
+ * Chrome 153 declined every nested SVG of the live suite; which value disagreed there could not be
+ * observed on Chromium 141, and the live suite now prints the browser's facts for any nested SVG
+ * that declines. The CTM's translation carries the page offset as layout holds it and the SVG
+ * lengths as floats; live on Chromium 141 the viewports it gives match the authored x/y to 1e-6 px
+ * (tests/live/render-run.test.ts, nested figures). With a viewBox the
+ * reconstructed transform's scale must match the CTM's, which checks width/height too. A
+ * transform on the nested SVG, or a clip margin on a clipping one (measured to be ignored), is not
+ * modelled; both decline. `resolution` is the six-digit serialisation of width/height.
  */
-export function nestedViewportGeometry(raw: RawSvgFrame, toOuter: AffineMatrix): Resolved<{ viewport: Box; clip: Box | null }> {
+export function nestedViewportGeometry(raw: RawSvgFrame, toOuter: AffineMatrix, localToScreen: AffineMatrix):
+  Resolved<{ viewport: Box; clip: Box | null; resolution: number }> {
   const computed = raw.computed;
-  const lengths = raw.lengths;
   if (!computed || computed.transform !== "none") return { ok: false, diagnostic: "nested-transform" };
-  if (!lengths || lengths.length !== 4 || lengths.some((value) => !Number.isFinite(value)) || lengths[2]! < 0 || lengths[3]! < 0) {
+  const width = cssPx(computed.width);
+  const height = cssPx(computed.height);
+  if (width === null || height === null || width < 0 || height < 0) return { ok: false, diagnostic: "nested-lengths-disagree" };
+  const screenCtm = matrix(raw.screenCtm);
+  const screenToLocal = invert(localToScreen);
+  const outerToParent = invert(toOuter);
+  if (!screenCtm || !screenToLocal || !outerToParent) return { ok: false, diagnostic: "matrix-unavailable" };
+  const placed = multiply(outerToParent, multiply(screenToLocal, screenCtm));
+  const viewBox = parseViewBox(raw.attributes?.viewBox);
+  if (viewBox === "invalid") return { ok: false, diagnostic: "nested-lengths-disagree" };
+  const content = viewBoxTransform(viewBox, raw.attributes?.preserveAspectRatio, width, height);
+  if (!content) return { ok: false, diagnostic: "nested-lengths-disagree" };
+  const close = (actual: number, expected: number): boolean => Math.abs(actual - expected) <= 1e-6 * Math.max(1, Math.abs(expected));
+  if (!close(placed[0], content[0]) || !close(placed[1], 0) || !close(placed[2], 0) || !close(placed[3], content[3])) {
     return { ok: false, diagnostic: "nested-lengths-disagree" };
   }
-  const [x, y, width, height] = lengths as [number, number, number, number];
-  const same = (css: string, value: number): boolean => {
-    const px = cssPx(css);
-    return px !== null && Math.abs(px - value) <= 1e-6 * Math.max(1, Math.abs(value));
-  };
-  const position = (css: string, attribute: string | null | undefined, value: number): boolean =>
-    same(css, value) || (/%$/u.test(css) && (attribute ?? "").trim() === css);
-  if (!same(computed.width, width) || !same(computed.height, height) ||
-      !position(computed.x, raw.attributes?.x, x) || !position(computed.y, raw.attributes?.y, y)) {
-    return { ok: false, diagnostic: "nested-lengths-disagree" };
-  }
+  const x = placed[4] - content[4];
+  const y = placed[5] - content[5];
   const overflow = overflowState("nested", raw.style.overflowX, raw.style.overflowY);
   if ("diagnostic" in overflow) return { ok: false, diagnostic: overflow.diagnostic };
   if (overflow.clips && raw.style.overflowClipMargin !== "content-box") return { ok: false, diagnostic: "nested-clip-margin" };
   if (!axisAligned(toOuter)) return { ok: false, diagnostic: "nested-viewport-rotated" };
   const viewport = envelope({ x, y, width, height }, toOuter);
-  return { ok: true, viewport, clip: overflow.clips ? viewport : null };
+  const resolution = stretch(toOuter) * Math.max(serialisationHalfUnit(width), serialisationHalfUnit(height));
+  return { ok: true, viewport, clip: overflow.clips ? viewport : null, resolution };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -715,7 +922,7 @@ export interface ResolvedSvgFrame {
 export function outerMayClip(raw: RawSvgFrame): boolean {
   const containment = paintContainment(raw.style.contain, raw.style.contentVisibility);
   return overflowMayClip("outer", raw.style.overflowX, raw.style.overflowY) || containment !== false ||
-    unmodelledClip(raw.style) || raw.ancestors.some((facts) => ancestorClip(facts) !== "none");
+    unmodelledClip(raw.style) || raw.slotted || raw.ancestors.some((facts) => ancestorClip(facts) !== "none");
 }
 
 function resolveOuter(raw: RawSvgFrame, model: SvgBoxModel | null): ResolvedSvgFrame {
@@ -726,6 +933,8 @@ function resolveOuter(raw: RawSvgFrame, model: SvgBoxModel | null): ResolvedSvgF
   // clip-path, mask or url() filter on the SVG or an ancestor decides what is drawn.
   const ancestors = raw.ancestors.map(ancestorClip);
   if (unmodelledClip(raw.style) || ancestors.includes("unsupported")) return decline("ancestor-clip");
+  // A slotted SVG is clipped by the shadow tree it is assigned into, which no DOM walk visits.
+  if (raw.slotted) return decline("shadow-tree");
   const ctm = matrix(raw.ctm);
   const screenCtm = matrix(raw.screenCtm);
   const ctmInverse = ctm ? invert(ctm) : null;
@@ -755,21 +964,25 @@ function resolveOuter(raw: RawSvgFrame, model: SvgBoxModel | null): ResolvedSvgF
   // error of the quad. An SVG with no clip of its own under a clipping ancestor has nothing to
   // hold against it and is declined, not called unclipped.
   const clipping = raw.ancestors.flatMap((_, index) => (ancestors[index] === "box" ? [index] : []));
-  if (clipping.length > 0) {
-    if (!own.clip) return decline("ancestor-clip");
-    const points = corners(own.clip).map(([x, y]) => apply(localToScreen, x, y));
+  if (clipping.length > 0 && !own.clip) return decline("ancestor-clip");
+  let clip: Box | null = null;
+  if (own.clip) {
+    // The painted clip, not the layout one (see paintedClip). Its space must be the document's.
+    if (raw.transforms.some(paintOffsetUnmodelled)) return decline("pixel-snapping-unmodelled");
+    if (raw.scrolled) return decline("scrolled-ancestor");
+    const painted = paintedClip(model, own.reference!, own.margin, own.resolution, localToScreen);
+    if (!painted.ok) return decline(painted.diagnostic);
+    clip = painted.clip;
     for (const index of clipping) {
       const quad = model.ancestors?.[index] ?? null;
-      if (!quad) return decline("ancestor-clip");
-      const slack = Math.SQRT2 * Math.max(0, ...quad.map(float32HalfSpacing)) + stretch(localToScreen) * SVG_FLOAT_NOISE_PX;
-      if (!insideQuad(points, quad, -slack)) return decline("ancestor-clip");
+      if (!quad || !ancestorContains(quad, model.scroll!, painted.page)) return decline("ancestor-clip");
     }
   }
   return {
     clipped,
     diagnostic: null,
     frame: {
-      toOuter: IDENTITY, viewport: boxes.content, clips: own.clip ? [own.clip] : [], localToScreen,
+      toOuter: IDENTITY, viewport: boxes.content, clips: clip ? [clip] : [], localToScreen,
       oracleDeltaPx: boxes.residual, modelDeltaPx: modelDelta, uncertaintyPx: uncertainty,
     },
   };
@@ -806,8 +1019,11 @@ export function resolveSvgFrames(
       const anchorCtm = matrix(raw.anchorCtm);
       if (!anchorCtm) { out.push(decline(clipped, "matrix-unavailable")); return; }
       const toOuter = multiply(anchor, anchorCtm);
-      const nested = nestedViewportGeometry(raw, toOuter);
+      const nested = nestedViewportGeometry(raw, toOuter, parent.frame.localToScreen);
       if (!nested.ok) { out.push(decline(clipped, nested.diagnostic)); return; }
+      // The nested clip's width/height are six-digit serialisations: charged to the bound.
+      const uncertainty = (parent.frame.uncertaintyPx ?? 0) + (nested.clip ? nested.resolution : 0);
+      if (uncertainty + SVG_FLOAT_NOISE_PX > SVG_OVERSHOOT_EPSILON_PX) { out.push(decline(clipped, "frame-imprecise")); return; }
       out.push({
         clipped,
         diagnostic: null,
@@ -816,6 +1032,7 @@ export function resolveSvgFrames(
           toOuter,
           viewport: nested.viewport,
           clips: [...(nested.clip ? [nested.clip] : []), ...parent.frame.clips],
+          uncertaintyPx: parent.frame.uncertaintyPx === null ? null : uncertainty,
         },
       });
       return;

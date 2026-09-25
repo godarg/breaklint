@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>An SVG clip on a fractional pixel</title>
+<!--
+  Chromium paints an outermost SVG with its content moved to the SNAPPED border-box origin and
+  clips it at the SNAPPED clip rectangle (each edge rounded half up, in CSS px of the document).
+  Neither is what getScreenCTM() and CDP report, which are the unsnapped layout.
+
+  The first SVG starts at x = 32.3 and is 300.4 px wide: its layout clip ends at 332.7, its painted
+  clip at 333, and its content is painted 0.3 px to the left. The label `edge-in` ends 0.04 px past
+  the layout edge — a finding against the unsnapped frame — and is drawn in full: 0.56 px inside the
+  painted edge. The second SVG starts at x = 32.5 and is 300.48 px wide: its layout clip ends at
+  332.98, its painted clip at 333, and its content is painted 0.5 px to the right. The label
+  `edge-out` ends 0.21 px inside the layout edge — clean against the unsnapped frame — and loses
+  0.27 px of its cell to the painted clip. (The verifier's snapedge.html, labels fe-0 and fc-1.)
+
+  Pixel-verified on Chromium 141 when authored, paginated, at a device scale of 4: `edge-in` has
+  the same ink clipped and unclipped; `edge-out` loses ink to the clip. Expected: exactly `edge-out`
+  reported, 0.27 px, exit 1.
+-->
+<style>
+  @page { size: 420pt 640pt; margin: 24pt; }
+  body { font: 11pt/1.35 serif; margin: 0; }
+  svg { display: block; box-sizing: content-box; overflow: hidden; }
+  text { font-family: "DejaVu Sans", sans-serif; }
+</style>
+</head>
+<body>
+<p>An SVG whose layout box starts at a fractional pixel.</p>
+<figure style="margin: 0 0 9.7pt 0.3px"><svg id="snap-left" style="width: 300.4px; height: 120px" xmlns="http://www.w3.org/2000/svg">
+<text id="edge-in" x="246.3746" y="24" font-size="14">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+</svg></figure>
+<p>A second one.</p>
+<figure style="margin: 0 0 9.7pt 0.5px"><svg id="snap-right" style="width: 300.48px; height: 120px" xmlns="http://www.w3.org/2000/svg">
+<text id="edge-out" x="246.2028" y="48" font-size="14">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
+</svg></figure>
+</body>
+</html>

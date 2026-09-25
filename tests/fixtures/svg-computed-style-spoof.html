@@ -8,11 +8,14 @@
   on: every clip margin reads 60 px wider than it is, and every overflow reads visible. The
   browser's layout does not care; the label `spoof-out` ends 6 px past the clip edge and is cut.
 
+  The second script replaces Function.prototype.call as well, which reaches a captured
+  getPropertyValue invoked as call.call(...) (the verifier's callspoof.html).
+
   A collector that reads computed values through those getters (style.overflowClipMargin,
   style.overflowX, as 0.6.0 read style.overflow) measures the label inside a clip 60 px too wide
   with the margin spoofed, and calls the SVG non-applicable with overflow spoofed. Both runs end
   exit 0 over a clipped label. Every value is now read by name through the captured
-  getPropertyValue. Pixel-verified on Chromium 141 when authored, raw and paginated. Expected:
+  getPropertyValue, invoked through a captured Reflect.apply. Pixel-verified on Chromium 141 when authored, raw and paginated. Expected:
   `spoof-out` reported, `spoof-in` clean, exit 1.
 -->
 <script>
@@ -28,6 +31,21 @@
     shadow("overflowX", "visible");
     shadow("overflowY", "visible");
     shadow("overflow", "visible");
+  })();
+  // And Function.prototype.call itself: a collector that reaches its captured getPropertyValue
+  // through call.call(...) resolves .call at call time and gets this one, which answers "visible"
+  // for every overflow read. Captured Reflect.apply is out of its reach.
+  (() => {
+    const getPropertyValue = CSSStyleDeclaration.prototype.getPropertyValue;
+    const apply = Reflect.apply;
+    const original = Function.prototype.call;
+    const overflow = (name) => name === "overflow-x" || name === "overflow-y" || name === "overflow";
+    const replaced = function (thisArg, ...args) {
+      if (this === original && thisArg === getPropertyValue && overflow(args[1])) return "visible";
+      if (this === getPropertyValue && overflow(args[0])) return "visible";
+      return apply(this, thisArg, args);
+    };
+    Object.defineProperty(Function.prototype, "call", { value: replaced, writable: true, configurable: true });
   })();
 </script>
 <style>

@@ -35,11 +35,27 @@ and border quads on the screen, and the collector carries them back into the fra
 `getScreenCTM() · getCTM()⁻¹` of the SVG. Layout snaps boxes to 1/64 px and computed style does
 not: a padding of `2.7px` lays out as 2.6875, so a border-box SVG 317.389 px wide has a used content
 box 312 px wide against a computed 311.975. A clip rebuilt from computed values is off by up to a
-LayoutUnit per edge, which is more than this rule resolves (0.6.0 declined every padded SVG). The clip is the content box when `overflow-clip-margin` is `content-box` (the user-agent
-default on every SVG root), and otherwise the padding, border or content box it names grown by its
-length — `10px` alone grows the **padding** box, and `padding-box` serialises as `0px`. The length
-is the used one too: Chromium stores the margin as a LayoutUnit and serialises that (`10.3px` reads
+LayoutUnit per edge, which is more than this rule resolves (0.6.0 declined every padded SVG). The
+clip is the content box when `overflow-clip-margin` is `content-box` (the user-agent default on
+every SVG root), and otherwise the padding, border or content box it names grown by its length —
+`10px` alone grows the **padding** box, and `padding-box` serialises as `0px`. The length is the
+used one too: Chromium stores the margin as a LayoutUnit and serialises that (`10.3px` reads
 `10.2969px`).
+
+**The painted clip.** Chromium does not clip where layout puts that rectangle. It paints the
+SVG's content at its border-box origin rounded to a whole CSS px of the document, and clips at the
+clip rectangle with each edge rounded the same way (half up), in CSS px of the document whatever
+the device scale. Measured on Chromium 141 through Paged.js at a device scale of 8, over 18 SVGs
+on fractional positions: every painted clip edge where that model puts it, to the pixel. The clip
+the rule compares against is therefore the snapped rectangle less the snapped origin, carried into
+the frame. Against the unsnapped one, labels within about 0.6 px of the edge came out on the wrong
+side in both directions (`tests/fixtures/svg-pixel-snapping.html`: a drawn label 0.04 px past the
+layout edge, a clipped one 0.21 px inside it). The model holds only where the SVG's paint offset is
+in the document's space; under a CSS transform, `will-change`, a fixed or sticky position, or a
+scrolled ancestor it was not measured, and an SVG whose own viewport clips there declines (a
+nested viewport's clip is drawn with the content and moves with it). An edge that lies within the
+margin's serialisation of a half pixel cannot be rounded with certainty and declines as
+`frame-imprecise`.
 
 What clips depends on the kind of SVG, measured on Chromium 141 by painting a large rectangle
 inside each viewport:
@@ -53,10 +69,16 @@ inside each viewport:
   — clips an outermost SVG exactly where the same clip margin puts an overflow clip, with
   `overflow: visible` too. On a nested SVG it clips nothing.
 
-For a nested `<svg>` the viewport is its `x`/`y`/`width`/`height` in its parent's user space,
-carried into the frame; its client rect is the union of its **content**, not its viewport, and was
-never a clip edge. A text is drawn in full only inside its own viewport's clip and every enclosing
-one, and the rule measures against all of them.
+For a nested `<svg>` the viewport is placed where the browser's own `getScreenCTM()` puts it,
+carried into the frame, and sized by its computed width and height. Measured on Chromium 141: the
+nested SVG's screen CTM in its parent's space is `translate(x, y)` times the viewBox transform of
+that size, the computed width and height are the used ones — a CSS `width` overrides the
+attribute, `auto` resolves to the parent viewport's size — and a CSS `x` moves neither the CTM nor
+the painting. The CTM must be exactly that, or the SVG declines: with a `viewBox` its scale holds
+the computed size against the browser's own placement; without one the CTM is a translation and
+the size rests on the computed value alone. Its client rect is the union of its
+**content**, not its viewport, and was never a clip edge. A text is drawn in full only inside its
+own viewport's clip and every enclosing one, and the rule measures against all of them.
 
 **The proof.** CDP's quads carried into the frame must be what the frame says they are —
 rectangles, nested inside each other, the content box's corner at the origin — to 0.005 px, or the
@@ -66,11 +88,14 @@ would fail by the whole box. Every model error seen while building this disagree
 
 **The resolution.** Each frame carries a bound on how far its clip edges can sit from the
 browser's (`SvgViewportLocal.uncertaintyPx`): the residual against CDP, the float32 quantisation of
-the quads — CDP builds them in single precision, 0.0039 px at 100 000 px down a run — and the clip
-margin's six-digit serialisation, plus arithmetic noise. An overshoot is reported only when it
-exceeds the permitted one by more than **0.01 px** (`SVG_OVERSHOOT_EPSILON_PX`), and a frame whose
-bound, with a target's own residual, does not fit inside that is declined, never measured with a
-larger epsilon. So no finding is an artefact of the frame: a reported overshoot is a true one. The
+the quads — CDP builds them in single precision, 0.0039 px at 100 000 px down a run — the clip
+margin's six-digit serialisation and, where a nested viewport clips, the serialisation of its
+width and height scaled into the frame, plus 0.001 px of arithmetic noise. An overshoot is
+reported only when it exceeds the permitted one by more than **0.01 px**
+(`SVG_OVERSHOOT_EPSILON_PX`). A frame whose bound plus another 0.001 px exceeds that is declined
+(`frame-imprecise`), and so is a target whose own residual does not fit beside the frame's bound;
+neither is measured with a larger epsilon. So no finding is an artefact of the frame: a reported
+overshoot is a true one. The
 price is a band of at most 0.02 px above the permitted overshoot in which a clipped label can come
 out clean — the stated resolution of the rule, 1/50 of a CSS pixel of the glyph cell. It is not
 configurable. Both boxes are compared unrounded; the screen box a finding carries keeps the
@@ -103,12 +128,15 @@ than the one that actually clips it. Each record takes only the targets whose ne
 ancestor is itself — and is then measured against its own clip and the clips of the SVGs around it.
 
 Every primitive involved — `getBBox()`, `getCTM()`, `getScreenCTM()`, the matrix and rectangle
-coefficients, the SVGLength values, and `CSSStyleDeclaration.prototype.getPropertyValue` through
-which every computed value is read by name — is captured before any author script runs, for the
-same reason the rest of the geometry is: a document that replaces them could otherwise decide what
-this rule sees. 0.6.0 read computed values through the property getters (`style.overflow`,
-`style.overflowClipMargin`), which live on the prototype; a page that shadows them turns a clipped
-label into a clean run (`tests/fixtures/svg-computed-style-spoof.html`).
+coefficients, the SVGLength values, `assignedSlot`, `scrollLeft`/`scrollTop`, and
+`CSSStyleDeclaration.prototype.getPropertyValue` through which every computed value is read by
+name — is captured before any author script runs, for the same reason the rest of the geometry is:
+a document that replaces them could otherwise decide what this rule sees. They are invoked through
+a captured `Reflect.apply`, not `Function.prototype.call`, so a page that replaces `call` does not
+reach them either. 0.6.0 read computed values through the property getters (`style.overflow`,
+`style.overflowClipMargin`), which live on the prototype; a page that shadows them — or, in round 2
+of 0.7.0, replaces `Function.prototype.call` — turns a clipped label into a clean run
+(`tests/fixtures/svg-computed-style-spoof.html`).
 
 Until 0.2.3 no geometry was collected at all. Every SVG arrived marked unmeasurable with a reason
 this rule had not declared, which is a fatal `checker-crashed` by design — so any document holding
@@ -117,8 +145,9 @@ a figure ended in exit 3 rather than being checked.
 ## Limits and fail-closed cases
 
 Where nothing clips — no clipping overflow on the SVG or any enclosing SVG, no paint
-containment, no clip-path, mask or `url()` filter on the outermost SVG, no clipping HTML ancestor
-inside the page area — the glyphs are painted after all, and the rule declines rather than
+containment, no clip-path, mask, mask-box image or `url()` filter on the outermost SVG, no clipping
+HTML ancestor inside the page area, no slot assignment — the glyphs are painted after all, and the
+rule declines rather than
 reports. Those targets are not counted against coverage either: the question does not arise for
 them, and one such figure would otherwise take an error rule with a coverage floor of 1 below its
 floor and end the run in exit 4. The decline stays in `notMeasured`.
@@ -136,9 +165,11 @@ own origin, and with `lengthAdjust="spacingAndGlyphs"` Chromium 141 draws ink 2.
 rather than inventing a box or silently losing the candidate. Per-glyph `x`, `y`, `dx` and `dy`
 lists and `textPath` were measured to keep the ink inside the cell and are measured.
 
-Border, padding, `overflow-clip-margin` in every serialised form, 2D CSS transforms, the
-individual `rotate`/`scale`/`translate` properties and zoom — on the SVG or any ancestor — are
-measured, not declined. Up to 0.6.0 each of them declined the whole record. What still declines the
+Border, padding, `overflow-clip-margin` in every serialised form and zoom — on the SVG or any
+ancestor — are measured, not declined; so are 2D CSS transforms and the individual
+`rotate`/`scale`/`translate` properties where the SVG itself does not clip (its viewport clips
+nothing the frame must snap). Up to 0.6.0 each of them declined the whole record. What still
+declines the
 whole record with `env/svg-viewport-geometry-unsupported`, counted against coverage, is geometry
 this build does not reconstruct:
 
@@ -151,7 +182,19 @@ this build does not reconstruct:
 - a `contain` or `content-visibility` value the collector does not know;
 - a clip-path, mask, `url()` filter or legacy `clip` on the outermost SVG, whatever its overflow:
   it cuts drawn text wherever it lies, so the SVG is clipped, not exempt (0.6.0 called it
-  non-applicable when the SVG's overflow was visible);
+  non-applicable when the SVG's overflow was visible). This is decided by an allow-list: `clip-path`,
+  `mask-image`, `mask`, `-webkit-mask-box-image-source` and `mask-border-source` must be `none`,
+  `filter` `none` or a list of CSS filter functions without `url()`, and `clip` `auto` (an empty
+  value, a property the browser does not have, counts as absent); any other value —
+  including one never seen before — is a clip (round 2 of 0.7.0 read `-webkit-mask-box-image` as
+  no clip at all);
+- an outermost SVG whose own viewport clips, under a CSS transform, the individual transform properties,
+  `will-change`, or a fixed or sticky position, on it or an ancestor (`pixel-snapping-unmodelled`),
+  or below a scrolled ancestor (`scrolled-ancestor`): the painted clip is snapped in a space the
+  frame does not model;
+- an SVG that is, or lies below, an element assigned to a `<slot>` (`shadow-tree`): it is drawn in
+  a shadow tree whose clips neither the collector's parent walk nor the CDP walk visits, so it
+  declines whatever its own overflow says;
 - an HTML ancestor inside the page area that clips — overflow, paint containment, clip-path, mask —
   unless it is a rectangular overflow or containment clip whose content box, on CDP's quad,
   contains the SVG's own clip. Every such clip contains the ancestor's content box, so then nothing
@@ -159,9 +202,9 @@ this build does not reconstruct:
   ancestor, a rounded ancestor clip and an ancestor clip-path decline. The page box and the sheet
   above the page area are the block rules' business;
 - a nested `<svg>` with a transform, with a clip margin, rotated or skewed within the outer frame,
-  or whose computed `x`/`y`/`width`/`height` disagree with its attributes — CSS sizes a nested SVG
-  (measured: a `width` rule overrides the attribute for the clip), so the attributes no longer
-  describe its viewport;
+  whose computed width or height is not a px length, whose `viewBox` or `preserveAspectRatio` this
+  code does not parse, or whose screen CTM is not `translate(x, y)` times the viewBox transform of
+  its computed size (`nested-lengths-disagree`);
 - an `<svg>` inside a `<foreignObject>`, which the foreignObject and the enclosing SVG clip too;
 - an SVG whose frame CDP does not confirm, whose computed content box is not the used one to
   0.1 px, whose error bound does not fit the resolution (quads more than 262 144 px down a run), or
@@ -171,6 +214,11 @@ this build does not reconstruct:
 
 The snapshot names which case applied (`SvgRecord.viewportDiagnostic`); the report carries the
 coverage reason.
+
+**An SVG inside a shadow root is not collected.** The collector enumerates the document's own
+elements, and `querySelectorAll` does not enter shadow trees: an `<svg>` a custom element renders
+in its shadow root is neither a candidate nor a decline, so a clipped label there goes unjudged and
+uncounted. A light-DOM SVG slotted into a shadow tree is collected and declined (`shadow-tree`).
 
 **A label flush with the edge is not a finding.** A label ending exactly on the viewport edge —
 `textLength` set to the full width of the viewBox, so the box ends on the edge by construction —

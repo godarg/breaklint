@@ -299,14 +299,18 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   actually clip it there. For an outermost SVG those are built from its USED boxes — CDP
   `DOM.getBoxModel()` quads, read out of process and carried into the frame — because layout snaps
   to 1/64 px where computed style does not; the clip is the content box, or the box
-  `overflow-clip-margin` names grown by its length. For a nested `<svg>` they are its own viewport
-  and every enclosing one. Consumers see:
+  `overflow-clip-margin` names grown by its length, each edge snapped to the pixel Chromium paints
+  it at. For a nested `<svg>` they are its own viewport — placed by the browser's own
+  `getScreenCTM()` and sized by its computed width and height — and every enclosing one. Consumers
+  see:
   - **SVGs 0.6.0 declined are now measured**: border, padding (fractional ones included, under
-    Paged.js' border-box too), every clip-margin form, 2D CSS transforms (`transform`, `rotate`,
-    `scale`, `translate`) and zoom on the SVG or an ancestor. Measured on patched Chromium 141
-    without evidence binding: a probe document with a padded, a bordered and a rotated-ancestor SVG
-    went from exit 4 (0 of 3 measured) to exit 0 (3 of 3). **A document that ended exit 4 on such
-    figures can now end exit 1**, if one of its labels really is clipped.
+    Paged.js' border-box too), every clip-margin form and zoom on the SVG or an ancestor, and 2D CSS
+    transforms (`transform`, `rotate`, `scale`, `translate`) where the outermost SVG does not clip
+    itself. Measured on patched Chromium 141 without evidence binding:
+    `tests/fixtures/svg-viewport-boxes.html` (padding, border, zoom and five clip-margin forms)
+    ended exit 4 with 2 of its labels measured before this change; now all 16 are measured and
+    exactly the 8 clipped ones are reported, exit 1. **A document that ended exit 4 on such figures
+    can now end exit 1**, if one of its labels really is clipped.
   - **A clipped label in a nested `<svg>` is now reported.** 0.6.0 took a nested SVG's viewport from
     its client rect, which is the union of its content, so a label running past it could never
     overshoot: a probe with 43.5 px of a label cut off ended exit 0. It now ends exit 1. **This can
@@ -326,21 +330,37 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
     20px")` is NaN and was read as no margin, so text the browser draws inside the margin was
     reported "not drawn" (a probe ended exit 1, 5.22 px). It is now parsed as `<visual-box>?
     <length>?`, measured serialisations included (`padding-box` reads `0px`).
+  - **The clip is where Chromium paints it, not where layout puts it.** Chromium paints an
+    outermost SVG's content at its border-box origin rounded to a whole CSS px of the document and
+    clips at the clip rectangle with each edge rounded the same way; measured on Chromium 141
+    through Paged.js at a device scale of 8, exact to the pixel over 18 SVGs. Against the layout
+    rectangle a label within about 0.6 px of the edge was judged on the wrong side in both
+    directions (`tests/fixtures/svg-pixel-snapping.html`: one drawn label reported, one clipped
+    label clean; now exactly the clipped one is reported, 0.27 px, pixel-verified).
 - **The rule states its resolution: 0.01 px.** Both boxes are compared unrounded, and an overshoot
   is reported only above the permitted one plus 0.01 px. Each SVG frame carries a bound on how far
   its clip can sit from the browser's (CDP residual, the quads' float32 quantisation, the clip
-  margin's serialisation); a frame whose bound does not fit is declined. A finding is therefore a
-  true overshoot; a clipped label can come out clean only within 0.02 px of the permitted
-  overshoot. A label flush with the edge stays clean. The threshold stays non-configurable.
+  margin's serialisation and, where a nested viewport clips, that of its width and height), plus
+  0.001 px of arithmetic noise; a frame whose bound and a further 0.001 px exceed 0.01 px is
+  declined, and so is one with a painted clip edge too close to a half pixel to round, and a target
+  whose own residual does not fit beside its frame's bound. A finding is therefore a true
+  overshoot; a clipped label can come out clean only within 0.02 px of the permitted overshoot. A
+  label flush with the edge stays clean. The threshold stays non-configurable.
 - **The same rule declines some SVGs it used to measure or exempt**, each counted against coverage
   as `env/svg-viewport-geometry-unsupported`: `overflow-x: visible` with `overflow-y: clip` on an
   outermost SVG (0.6.0 called it non-applicable, although one axis clips) and mixed axes on a
-  nested one; a clip-path, mask, `url()` filter or legacy `clip` on the outermost SVG, and an HTML
-  ancestor inside the page area that clips an SVG without a clip of its own or not provably outside
-  it (0.6.0 called both non-applicable when the SVG's overflow was visible); a nested `<svg>`
-  whose computed `x`/`y`/`width`/`height` disagree with its attributes (CSS sizes nested SVGs); a
-  nested SVG with a transform or clip margin; an `<svg>` inside `<foreignObject>`; an SVG whose
-  frame CDP does not confirm. Rounded clips, a radius with a clip margin, 3D transforms,
+  nested one; a clip-path, mask, mask-box image (`-webkit-mask-box-image`), mask border, `url()`
+  filter or legacy `clip` on the outermost SVG or an HTML ancestor, decided by an allow-list of
+  values that provably clip nothing so that an unknown value is a clip, and an HTML ancestor inside
+  the page area that clips an SVG without a clip of its own or not provably outside it (0.6.0
+  called both non-applicable when the SVG's overflow was visible); an outermost SVG that clips under
+  a CSS transform, `will-change`, a fixed or sticky position or a scrolled ancestor, where the
+  snapping of its painted clip was not measured; an SVG assigned to a `<slot>`, or below an element
+  that is, drawn in a shadow tree whose clips no walk visits (0.6.0 called one with a visible
+  overflow non-applicable); a nested `<svg>` whose computed size is not a px length or whose
+  screen CTM is not its x/y translation times the viewBox transform of that size; a nested SVG
+  with a transform or clip margin; an `<svg>` inside `<foreignObject>`; an SVG whose frame CDP does
+  not confirm. Rounded clips, a radius with a clip margin, 3D transforms,
   perspective and motion paths still decline. An SVG with no potential target at all is never
   declined for its viewport. A nested SVG with `overflow: visible` inside a clipping SVG is
   measured against the enclosing clip instead of being exempt.
@@ -362,7 +382,9 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   0.6.0 read `overflow` and `overflow-clip-margin` through `CSSStyleDeclaration` property getters,
   which a page script can shadow on the prototype; a probe that did so turned a clipped label into
   exit 0. Every computed value the SVG collector uses is now read by name through
-  `getPropertyValue`, captured before any author script runs.
+  `getPropertyValue`, captured before any author script runs, and every captured primitive the SVG
+  path uses is invoked through a captured `Reflect.apply`, so a page that replaces
+  `Function.prototype.call` does not reach them either.
 
 ### Schema
 
@@ -500,6 +522,15 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   advice proposes.
 
 ### Tooling
+
+- **The SVG local-frame live tests separate the rule's verdict from the evidence contract.** On
+  CI's Chrome two multi-page frame documents ended exit 4 with every SVG measured: the evidence
+  page binding, which has tests of its own, not the rule. Each frame test now judges the document
+  with its evidence requirement set aside, and requires the full document to differ from that only
+  by exit 4 for incomplete required page binding; the full verdict and its evidence facts are
+  printed as a test diagnostic. A frame that declines prints the browser's own values for that SVG
+  (computed style, attributes, SVGLength values, matrices) read in a separate page, so a decline on
+  a browser this suite cannot run locally names the value that disagreed.
 
 - **The live late-mutation test no longer depends on when a timer fires.** Its fixture appends a
   paragraph on a 600 ms timer, so whether that lands before the snapshot, between the snapshot and

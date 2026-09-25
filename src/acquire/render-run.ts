@@ -967,30 +967,61 @@ async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compare
  * document for it would say less, not more. What it cannot become is a clean exit: the error rule's
  * floor of 1 turns any declined target into exit 4.
  */
-async function svgBoxModels(page: PageLike, raw: RawSnapshot): Promise<(SvgBoxModel | null)[]> {
+export interface CdpNode { nodeId: number; nodeType: number; children?: CdpNode[] }
+
+/** Every node's parent and which nodes are elements, from the tree `DOM.getDocument` returned. */
+export interface CdpTree { parentOf: ReadonlyMap<number, number>; elements: ReadonlySet<number> }
+export function cdpTree(root: CdpNode): CdpTree {
+  const parentOf = new Map<number, number>();
+  const elements = new Set<number>();
+  const pending: CdpNode[] = [root];
+  while (pending.length > 0) {
+    const node = pending.pop()!;
+    for (const child of node.children ?? []) {
+      parentOf.set(child.nodeId, node.nodeId);
+      if (child.nodeType === 1) elements.add(child.nodeId);
+      pending.push(child);
+    }
+  }
+  return { parentOf, elements };
+}
+
+/**
+ * The CDP node `up` parent steps above `nodeId`: the same path the page walked with `parentNode` to
+ * name an ancestor, walked again in the browser's own tree. null when the path leaves the tree or
+ * does not end on an element.
+ */
+export function cdpAncestor(tree: CdpTree, nodeId: number, up: number): number | null {
+  let at: number | undefined = nodeId;
+  for (let step = 0; step < up && at !== undefined; step += 1) at = tree.parentOf.get(at);
+  return at !== undefined && tree.elements.has(at) ? at : null;
+}
+
+/**
+ * CDP `DOM.getBoxModel()` for each outermost SVG record, the content quad of each ancestor it
+ * named, and the document scroll offset (`Page.getLayoutMetrics`), read out of process. Exported
+ * for the unit test that pins the ancestor walk.
+ */
+export async function svgBoxModels(page: PageLike, raw: RawSnapshot): Promise<(SvgBoxModel | null)[]> {
   const out: (SvgBoxModel | null)[] = raw.svg.map(() => null);
   const wanted = raw.svg.flatMap((record, index) => (record.oracleIndex >= 0 ? [{ index, occurrence: record.oracleIndex }] : []));
   if (wanted.length === 0 || !page.createCDPSession) return out;
   const session = await page.createCDPSession();
-  interface CdpNode { nodeId: number; nodeType: number; children?: CdpNode[] }
   try {
     await session.send("DOM.enable");
     const { root } = await session.send<{ root: CdpNode }>("DOM.getDocument", { depth: -1, pierce: false });
     const { nodeIds } = await session.send<{ nodeIds: number[] }>("DOM.querySelectorAll", { nodeId: root.nodeId, selector: ".pagedjs_page svg" });
     // The two sources must agree about which SVGs exist before an index means the same element.
     if (nodeIds.length !== raw.svgRendered) return out;
-    // The parent of every node in the tree CDP just returned, so that an ancestor the page named by
-    // its distance from the <svg> is found by walking the browser's own tree, not the page's.
-    const parentOf = new Map<number, number>();
-    const elements = new Set<number>();
-    const pending: CdpNode[] = [root];
-    while (pending.length > 0) {
-      const node = pending.pop()!;
-      for (const child of node.children ?? []) {
-        parentOf.set(child.nodeId, node.nodeId);
-        if (child.nodeType === 1) elements.add(child.nodeId);
-        pending.push(child);
-      }
+    const tree = cdpTree(root);
+    let scroll: [number, number] | null = null;
+    try {
+      const metrics = await session.send<{ cssLayoutViewport?: { pageX?: number; pageY?: number } }>("Page.getLayoutMetrics");
+      const pageX = metrics.cssLayoutViewport?.pageX;
+      const pageY = metrics.cssLayoutViewport?.pageY;
+      if (typeof pageX === "number" && typeof pageY === "number") scroll = [pageX, pageY];
+    } catch {
+      // No scroll offset: no snapping model, and every clipped record declines.
     }
     const quadsOf = async (nodeId: number) => {
       try {
@@ -1008,12 +1039,11 @@ async function svgBoxModels(page: PageLike, raw: RawSnapshot): Promise<(SvgBoxMo
       if (!model || !Array.isArray(model.content) || !Array.isArray(model.padding) || !Array.isArray(model.border)) continue;
       const ancestors: (number[] | null)[] = [];
       for (const { up } of raw.svg[index]!.geometry.ancestors) {
-        let at: number | undefined = nodeId;
-        for (let step = 0; step < up && at !== undefined; step += 1) at = parentOf.get(at);
-        const quad = at !== undefined && elements.has(at) ? (await quadsOf(at))?.content : undefined;
+        const at = cdpAncestor(tree, nodeId, up);
+        const quad = at !== null ? (await quadsOf(at))?.content : undefined;
         ancestors.push(Array.isArray(quad) ? quad : null);
       }
-      out[index] = { content: model.content, padding: model.padding, border: model.border, ancestors };
+      out[index] = { content: model.content, padding: model.padding, border: model.border, ancestors, ...(scroll ? { scroll } : {}) };
     }
   } finally {
     await session.detach().catch(() => undefined);

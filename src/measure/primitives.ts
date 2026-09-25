@@ -44,6 +44,15 @@ const APPARATUS_CAPABILITY_MARKER = "__BREAKLINT_NODE_CAPABILITY__";
 const PRIMITIVES_TEMPLATE = `(() => {
   const apparatusCapability = "${APPARATUS_CAPABILITY_MARKER}";
   const call = Function.prototype.call;
+  // The SVG path's primitives invoke their captured functions through Reflect.apply, captured
+  // here, not through call.call: "call.call(fn, ...)" looks up .call on the captured function,
+  // which is Function.prototype.call AGAIN at the time of the call, and a document that replaces
+  // Function.prototype.call after this script answers every such read for itself (measured: a
+  // replaced call that returned "visible" for getPropertyValue("overflow-x") turned a clipped label
+  // into exit 0). Rest parameters and an array literal pass the arguments without an iterator.
+  // The other primitives still use call.call; closing that for all of them is G-70.
+  const reflectApply = Reflect.apply;
+  const invoke = (fn, receiver, ...args) => reflectApply(fn, receiver, args);
   const rectFn = Element.prototype.getBoundingClientRect;
   const rectsFn = Element.prototype.getClientRects;
   const styleFn = window.getComputedStyle;
@@ -115,13 +124,13 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const rectBottomGet = getter(DOMRectReadOnly.prototype, "bottom");
   const rectLeftGet = getter(DOMRectReadOnly.prototype, "left");
   const rectValue = (value) => ({
-    x: call.call(rectXGet, value), y: call.call(rectYGet, value),
-    width: call.call(rectWidthGet, value), height: call.call(rectHeightGet, value),
-    top: call.call(rectTopGet, value), right: call.call(rectRightGet, value),
-    bottom: call.call(rectBottomGet, value), left: call.call(rectLeftGet, value),
+    x: invoke(rectXGet, value), y: invoke(rectYGet, value),
+    width: invoke(rectWidthGet, value), height: invoke(rectHeightGet, value),
+    top: invoke(rectTopGet, value), right: invoke(rectRightGet, value),
+    bottom: invoke(rectBottomGet, value), left: invoke(rectLeftGet, value),
   });
   const rectValues = (list) => {
-    const raw = call.call(sliceFn, list), out = [];
+    const raw = invoke(sliceFn, list), out = [];
     for (let index = 0; index < raw.length; index += 1) out[index] = rectValue(raw[index]);
     return out;
   };
@@ -165,17 +174,20 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const svgLengthGets = ["x", "y", "width", "height"].map((name) => getter(SVGSVGElement.prototype, name));
   const animValGet = getter(SVGAnimatedLength.prototype, "animVal");
   const lengthValueGet = getter(SVGLength.prototype, "value");
+  const assignedSlotGet = getter(Element.prototype, "assignedSlot");
+  const scrollLeftGet = getter(Element.prototype, "scrollLeft");
+  const scrollTopGet = getter(Element.prototype, "scrollTop");
   const matrixValue = (matrix) => {
     if (!matrix) return null;
     const out = [];
-    for (let index = 0; index < 6; index += 1) out[index] = call.call(matrixGets[index], matrix);
+    for (let index = 0; index < 6; index += 1) out[index] = invoke(matrixGets[index], matrix);
     return out;
   };
   const svgMatrixOf = (fn, el) => {
     // getCTM/getScreenCTM on something that is not an SVGGraphicsElement throws; <defs>, <symbol>
     // and <mask> parents are exactly that. No matrix is an answer the caller has to handle, not
     // a crash of the whole collection.
-    try { return matrixValue(call.call(fn, el)); } catch (_) { return null; }
+    try { return matrixValue(invoke(fn, el)); } catch (_) { return null; }
   };
   const DOMPointCtor = DOMPoint;
   const matrixTransformFn = DOMPoint.prototype.matrixTransform;
@@ -222,23 +234,27 @@ const PRIMITIVES_TEMPLATE = `(() => {
 
   Object.defineProperty(window, "__blPrimitives", {
     value: call.call(freezeFn, Object, {
-      rect: (el) => rectValue(call.call(rectFn, el)),
-      rects: (el) => rectValues(call.call(rectsFn, el)),
-      style: (el, pseudo) => call.call(styleFn, window, el, pseudo),
+      rect: (el) => rectValue(invoke(rectFn, el)),
+      rects: (el) => rectValues(invoke(rectsFn, el)),
+      style: (el, pseudo) => invoke(styleFn, window, el, pseudo),
       all: (root, selector) => {
         const fn = root === document ? docQsaFn : qsaFn;
-        return call.call(sliceFn, call.call(fn, root, selector));
+        return invoke(sliceFn, invoke(fn, root, selector));
       },
-      byId: (id) => call.call(getByIdFn, document, id),
+      byId: (id) => invoke(getByIdFn, document, id),
       startsWith: (value, prefix) => call.call(startsWithFn, String(value), prefix),
-      attr: (el, name) => (el ? call.call(getAttrFn, el, name) : null),
+      attr: (el, name) => (el ? invoke(getAttrFn, el, name) : null),
       setAttr: (el, name, value) => call.call(setAttrFn, el, name, value),
-      hasAttr: (el, name) => (el ? call.call(hasAttrFn, el, name) === true : false),
-      closest: (el, selector) => (el ? call.call(closestFn, el, selector) : null),
-      text: (node) => (node ? call.call(textOf, node) : ""),
+      hasAttr: (el, name) => (el ? invoke(hasAttrFn, el, name) === true : false),
+      closest: (el, selector) => (el ? invoke(closestFn, el, selector) : null),
+      text: (node) => (node ? invoke(textOf, node) : ""),
       setText: (node, value) => call.call(textSet, node, value),
-      nodeType: (node) => call.call(nodeTypeOf, node),
-      parent: (node) => call.call(parentOf, node),
+      nodeType: (node) => invoke(nodeTypeOf, node),
+      parent: (node) => invoke(parentOf, node),
+      // The flat tree differs from the DOM tree for a slotted node: its assigned slot, not its
+      // parent, decides what clips it. The SVG collector declines a slotted SVG on this answer.
+      assignedSlot: (node) => (assignedSlotGet ? invoke(assignedSlotGet, node) : null),
+      scrollOffset: (el) => [invoke(scrollLeftGet, el), invoke(scrollTopGet, el)],
       next: (node) => call.call(nextOf, node),
       children: (node) => (node ? call.call(sliceFn, call.call(childrenOf, node)) : []),
       create: (tag) => call.call(createElementFn, document, tag),
@@ -370,35 +386,35 @@ const PRIMITIVES_TEMPLATE = `(() => {
       // losing the SVG.
       svgGeometry: (el) => {
         try {
-          const bb = call.call(svgBBoxFn, el);
-          const ctm = matrixValue(call.call(svgCtmFn, el));
-          const screenCtm = matrixValue(call.call(svgScreenCtmFn, el));
+          const bb = invoke(svgBBoxFn, el);
+          const ctm = matrixValue(invoke(svgCtmFn, el));
+          const screenCtm = matrixValue(invoke(svgScreenCtmFn, el));
           if (!ctm || !screenCtm) return null;
           const bbox = [];
-          for (let index = 0; index < 4; index += 1) bbox[index] = call.call(svgRectGets[index], bb);
+          for (let index = 0; index < 4; index += 1) bbox[index] = invoke(svgRectGets[index], bb);
           return { bbox, ctm, screenCtm };
         } catch (_) {
           return null;
         }
       },
-      css: (style, name) => call.call(getPropertyValueFn, style, name),
+      css: (style, name) => invoke(getPropertyValueFn, style, name),
       svgCtm: (el) => svgMatrixOf(svgCtmFn, el),
       svgScreenCtm: (el) => svgMatrixOf(svgScreenCtmFn, el),
       svgViewportLengths: (el) => {
         try {
           const out = [];
           for (let index = 0; index < 4; index += 1) {
-            out[index] = call.call(lengthValueGet, call.call(animValGet, call.call(svgLengthGets[index], el)));
+            out[index] = invoke(lengthValueGet, invoke(animValGet, invoke(svgLengthGets[index], el)));
           }
           return out;
         } catch (_) {
           return null;
         }
       },
-      outerHtml: (el) => call.call(outerHtmlGet, el),
+      outerHtml: (el) => invoke(outerHtmlGet, el),
       painted: (el) => {
         if (typeof checkVisibilityFn !== "function") return null;
-        return call.call(checkVisibilityFn, el, {
+        return invoke(checkVisibilityFn, el, {
           checkOpacity: true, checkVisibilityCSS: true,
           opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true,
         }) === true;
@@ -532,7 +548,7 @@ export const PRIMITIVES_CHECK = `(() => {
     return { ok: false, reason: "the primitive references are replaceable, so they prove nothing" };
   }
   for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
-    "svgGeometry", "svgCtm", "svgScreenCtm", "svgViewportLengths", "css", "outerHtml", "painted", "byId", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
+    "svgGeometry", "svgCtm", "svgScreenCtm", "svgViewportLengths", "css", "assignedSlot", "scrollOffset", "outerHtml", "painted", "byId", "replaced", "canvas", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
     "rects", "setAttr", "setText", "nodeType", "parent", "next", "create", "append", "remove", "setCssText",
     "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityRecordPreview",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",

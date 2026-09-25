@@ -181,7 +181,8 @@ Their real-renderer lab remains explicitly research-only. `svg/text-overflows-vi
 geometry and measures ordinary solid-fill text. When `getBBox()` cannot prove painted bounds
 (for example `<use>`, stroke, per-glyph `rotate`, clip/mask/filter or a paint server), or the clip
 that applies is one the collector does not rebuild in the SVG's own frame (a rounded or 3D-transformed
-viewport, a clip-path on the SVG, a clipping ancestor it cannot prove harmless), the target declines
+viewport, a clip-path on the SVG, a clipping ancestor it cannot prove harmless, a clipping SVG under
+a CSS transform or slotted into a shadow tree), the target declines
 coverage-relevantly and the error rule fails closed with exit 4 rather than guessing.
 
 **Their validation foundation is real-renderer, not real-corpus.** M3-0 exercises the ink rules'

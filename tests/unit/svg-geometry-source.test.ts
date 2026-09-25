@@ -53,8 +53,28 @@ it("reads every computed value of the SVG section through the captured getProper
     assert.ok(section.includes(`P.css(style, "${name}")`) || section.includes(`P.css(ancestorStyle, "${name}")`), name);
   }
   assert.ok(PRIMITIVES_SOURCE.includes("const getPropertyValueFn = CSSStyleDeclaration.prototype.getPropertyValue;"));
-  assert.ok(PRIMITIVES_SOURCE.includes("css: (style, name) => call.call(getPropertyValueFn, style, name),"));
+  assert.ok(PRIMITIVES_SOURCE.includes("css: (style, name) => invoke(getPropertyValueFn, style, name),"));
   assert.ok(PRIMITIVES_CHECK.includes('"css"'), "the integrity check does not require css");
+});
+
+it("invokes the SVG path's primitives through a captured Reflect.apply, not a replaceable call", () => {
+  // call.call(fn, ...) resolves .call on the captured function at call time, which is whatever
+  // Function.prototype.call is by then: a document that replaced it answered getPropertyValue
+  // itself (exit 0 over a clipped label). Reflect.apply is captured before any document script.
+  assert.ok(PRIMITIVES_SOURCE.includes("const reflectApply = Reflect.apply;"));
+  assert.ok(PRIMITIVES_SOURCE.includes("const invoke = (fn, receiver, ...args) => reflectApply(fn, receiver, args);"));
+  const start = PRIMITIVES_SOURCE.indexOf("rect: (el) =>");
+  const end = PRIMITIVES_SOURCE.indexOf("replaced: (el) =>");
+  assert.ok(start > 0 && end > start);
+  const svgPath = PRIMITIVES_SOURCE.slice(start, end).split("\n").filter((line) => /^\s*(rect|rects|style|all|byId|attr|hasAttr|closest|text|nodeType|parent|assignedSlot|scrollOffset|svgGeometry|css|svgCtm|svgScreenCtm|svgViewportLengths|outerHtml|painted):/u.test(line));
+  assert.ok(svgPath.length >= 19, `found ${svgPath.length} SVG-path primitives`);
+  for (const line of svgPath) assert.doesNotMatch(line, /call\.call\(/u, line.trim());
+  for (const name of ["matrixValue", "svgMatrixOf", "rectValue"]) {
+    const at = PRIMITIVES_SOURCE.indexOf(`const ${name} = `);
+    assert.ok(at > 0, name);
+    assert.doesNotMatch(PRIMITIVES_SOURCE.slice(at, PRIMITIVES_SOURCE.indexOf("};", at)), /call\.call\(/u, name);
+  }
+  for (const name of ["assignedSlot", "scrollOffset"]) assert.ok(PRIMITIVES_CHECK.includes(`"${name}"`), name);
 });
 
 it("ships the HTML ancestors that may clip, up to the page area, and declines per-glyph rotation", () => {
@@ -65,6 +85,19 @@ it("ships the HTML ancestors that may clip, up to the page area, and declines pe
   assert.match(section, /ancestors\.push\(\{ up, \.\.\.facts, radii: SVG_RADIUS_PROPS\.map/u);
   assert.match(section, /style: pick\(svgStyle, SVG_BOX_PROPS\), transforms, ancestors,/u);
   assert.match(section, /P\.hasAttr\(textEl, "rotate"\) \|\| P\.all\(textEl, "\[rotate\]"\)\.length > 0/u);
+  // The flat tree and scrolling: a slotted SVG and a scrolled ancestor are flagged on the whole chain.
+  assert.match(section, /if \(P\.assignedSlot\(at\) !== null\) slotted = true;/u);
+  assert.match(section, /const offset = P\.scrollOffset\(at\);/u);
+  assert.match(section, /ancestors, slotted, scrolled, lengths/u);
+  // An allow-list of clip facts, the mask-box image among them, on the SVG, its ancestors and the
+  // text's ancestors.
+  for (const name of ["-webkit-mask-box-image-source", "mask-border-source"]) {
+    assert.match(section, new RegExp(`SVG_BOX_PROPS = \\[[^;]*"${name}"\\]`, "u"), name);
+    assert.match(section, new RegExp(`SVG_ANCESTOR_PROPS = \\[[^;]*"${name}"\\]`, "u"), name);
+    assert.ok(section.includes(`effect(P.css(ancestorStyle, "${name}"))`), name);
+  }
+  assert.match(section, /const noneOrAbsent = \(value\) => value === "none" \|\| value === "";/u);
+  for (const name of ["will-change", "position"]) assert.match(section, new RegExp(`SVG_TRANSFORM_PROPS = \\[[^;]*"${name}"\\]`, "u"), name);
 });
 
 it("collects SVG only from the page content area, never from margin-box clones", () => {

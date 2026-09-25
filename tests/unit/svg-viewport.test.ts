@@ -16,6 +16,7 @@ import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
+import { cdpAncestor, cdpTree, svgBoxModels } from "../../src/acquire/render-run.ts";
 import { exitCodeFor, runDocument } from "../../src/core/engine.ts";
 import { SNAPSHOT_SCHEMA_VERSION, SVG_VIEWPORT_DIAGNOSTICS } from "../../src/core/enums.ts";
 import type { AffineMatrix, Box, Snapshot } from "../../src/core/types.ts";
@@ -38,7 +39,12 @@ import {
   cssPx,
   envelope,
   float32HalfSpacing,
-  insideQuad,
+  ancestorContains,
+  paintOffsetUnmodelled,
+  paintedClip,
+  parseViewBox,
+  snapPixel,
+  viewBoxTransform,
   localBoxes,
   localRectangle,
   multiply,
@@ -75,7 +81,8 @@ function style(over: Partial<SvgBoxStyle> = {}): SvgBoxStyle {
     paddingTop: "0px", paddingRight: "0px", paddingBottom: "0px", paddingLeft: "0px",
     borderTopLeftRadius: "0px", borderTopRightRadius: "0px", borderBottomRightRadius: "0px", borderBottomLeftRadius: "0px",
     overflowX: "hidden", overflowY: "hidden", overflowClipMargin: "content-box",
-    contain: "none", contentVisibility: "visible", clipPath: "none", maskImage: "none", mask: "none", filter: "none", clip: "auto",
+    contain: "none", contentVisibility: "visible", clipPath: "none", maskImage: "none", mask: "none",
+    maskBoxImageSource: "none", maskBorderSource: "none", filter: "none", clip: "auto",
     ...over,
   };
 }
@@ -89,7 +96,8 @@ const visible = { overflowX: "visible", overflowY: "visible" } as const;
 function ancestor(over: Partial<SvgAncestorFacts> = {}): SvgAncestorFacts {
   return {
     up: 1, overflowX: "hidden", overflowY: "hidden", contain: "none", contentVisibility: "visible",
-    clipPath: "none", maskImage: "none", mask: "none", filter: "none", clip: "auto", radii: ["0px", "0px", "0px", "0px"],
+    clipPath: "none", maskImage: "none", mask: "none", maskBoxImageSource: "none", maskBorderSource: "none",
+    filter: "none", clip: "auto", radii: ["0px", "0px", "0px", "0px"],
     ...over,
   };
 }
@@ -105,6 +113,7 @@ function modelOf(localToScreen: AffineMatrix, content: Box, padding = content, b
   return {
     content: quadOf(content, localToScreen, shift), padding: quadOf(padding, localToScreen, shift), border: quadOf(border, localToScreen, shift),
     ...(ancestors ? { ancestors } : {}),
+    scroll: [0, 0],
   };
 }
 
@@ -116,7 +125,7 @@ function outerFrame(over: Partial<RawSvgFrame> & { localToScreen: AffineMatrix; 
   return {
     kind: "outer", parentIndex: -1, anchorIndex: -1, anchorCtm: null,
     ctm: [...viewBox], screenCtm: [...multiply(localToScreen, viewBox)],
-    style: style(), transforms: [], ancestors: [], lengths: null, computed: null, attributes: null,
+    style: style(), transforms: [], ancestors: [], slotted: false, scrolled: false, lengths: null, computed: null, attributes: null,
     ...rest,
   };
 }
@@ -267,7 +276,7 @@ describe("SVG local frame: computed-style arithmetic", () => {
     assert.deepEqual(clipFor("border-box 5px", { ...visible, contain: "paint" }), box(-17, -17, 234, 114));
     assert.deepEqual(clipFor("content-box", { ...visible, contain: "strict" }), box(0, 0, 200, 80));
     assert.deepEqual(clipFor("6px", { ...visible, contentVisibility: "auto" }), box(-14, -14, 228, 108));
-    assert.deepEqual(outerClip(style({ ...visible, contain: "layout size" }), boxes), { ok: true, clip: null, resolution: 0 });
+    assert.deepEqual(outerClip(style({ ...visible, contain: "layout size" }), boxes), { ok: true, clip: null, resolution: 0, reference: null, margin: 0 });
     assert.deepEqual(outerClip(style({ ...visible, contain: "paint unknown" }), boxes), { ok: false, diagnostic: "containment-unrecognised" });
   });
 
@@ -299,10 +308,16 @@ describe("SVG local frame: computed-style arithmetic", () => {
     for (const [contain, cv] of [["", "visible"], ["none paint", "visible"], ["paint", "sometimes"], ["view-transition", "visible"]]) {
       assert.equal(paintContainment(contain!, cv!), null, `${contain} / ${cv}`);
     }
-    const none = { clipPath: "none", maskImage: "none", mask: "none", filter: "none", clip: "auto" };
-    assert.equal(unmodelledClip(none), false);
+    const none = { clipPath: "none", maskImage: "none", mask: "none", maskBoxImageSource: "none", maskBorderSource: "", filter: "none", clip: "auto" };
+    assert.equal(unmodelledClip(none), false, "an empty value is a property this browser does not have");
     assert.equal(unmodelledClip({ ...none, filter: "drop-shadow(rgb(0, 0, 0) 2px 2px 0px)" }), false, "a CSS filter function extends ink, it does not clip");
-    for (const over of [{ clipPath: "inset(10px)" }, { maskImage: "url(\"#m\")" }, { mask: "linear-gradient(rgb(0, 0, 0), rgba(0, 0, 0, 0))" }, { filter: "url(\"#f\")" }, { clip: "rect(10px, 100px, 50px, 20px)" }]) {
+    assert.equal(unmodelledClip({ ...none, filter: "blur(2px) brightness(1.2)" }), false);
+    // An allow-list: the -webkit-mask-box-image the deny-list missed, a url() inside a function
+    // list, and any value this code has never seen all count as clips.
+    for (const over of [{ clipPath: "inset(10px)" }, { maskImage: "url(\"#m\")" }, { mask: "linear-gradient(rgb(0, 0, 0), rgba(0, 0, 0, 0))" },
+      { maskBoxImageSource: "linear-gradient(to right, rgb(0, 0, 0) 50%, rgba(0, 0, 0, 0) 50%)" }, { maskBorderSource: "url(\"m.png\")" },
+      { filter: "url(\"#f\")" }, { filter: "blur(1px) url(\"#f\")" }, { filter: "future-function(1)" }, { clipPath: "something-new" },
+      { clip: "rect(10px, 100px, 50px, 20px)" }]) {
       assert.equal(unmodelledClip({ ...none, ...over }), true, JSON.stringify(over));
     }
     assert.equal(ancestorClip(ancestor()), "box");
@@ -345,31 +360,59 @@ describe("SVG local frame: computed-style arithmetic", () => {
     ]) assert.equal(threeDimensional({ ...none, ...facts }), true, JSON.stringify(facts));
   });
 
-  it("only takes a nested viewport the computed style agrees with", () => {
+  it("places a nested viewport where the browser's own CTM puts it, sized by the computed style", () => {
+    // Outer frame = screen here (S = I); the nested SVG's parent space is the frame (toOuter = I)
+    // unless a test says otherwise. screenCtm is what getScreenCTM() of the nested <svg> answers:
+    // translate(x, y) · viewBoxTransform(w, h).
     const nested = (over: Partial<RawSvgFrame> = {}): RawSvgFrame => ({
-      kind: "nested", parentIndex: 0, anchorIndex: -1, anchorCtm: [...I], ctm: null, screenCtm: null,
-      style: style({ overflowClipMargin: "content-box" }), transforms: [], ancestors: [], lengths: [50, 50, 100, 60],
+      kind: "nested", parentIndex: 0, anchorIndex: -1, anchorCtm: [...I], ctm: null, screenCtm: [...translate(50, 50)],
+      style: style({ overflowClipMargin: "content-box" }), transforms: [], ancestors: [], slotted: false, scrolled: false, lengths: [50, 50, 100, 60],
       computed: { x: "50px", y: "50px", width: "100px", height: "60px", transform: "none" }, attributes: { x: "50", y: "50" },
       ...over,
     });
-    assert.deepEqual(nestedViewportGeometry(nested(), translate(10, 5)), { ok: true, viewport: box(60, 55, 100, 60), clip: box(60, 55, 100, 60) });
-    // Chromium 141: CSS `x: 30px; width: 40px` on the nested SVG — the clip used width 40 and x 50.
-    assert.deepEqual(nestedViewportGeometry(nested({ computed: { x: "30px", y: "50px", width: "40px", height: "60px", transform: "none" } }), I),
-      { ok: false, diagnostic: "nested-lengths-disagree" });
-    assert.deepEqual(nestedViewportGeometry(nested({ lengths: [40, 50, 200, 50], computed: { x: "10%", y: "25%", width: "200px", height: "50px", transform: "none" }, attributes: { x: "10%", y: "25%" } }), I),
-      { ok: true, viewport: box(40, 50, 200, 50), clip: box(40, 50, 200, 50) });
-    assert.deepEqual(nestedViewportGeometry(nested({ computed: { x: "20%", y: "50px", width: "100px", height: "60px", transform: "none" }, attributes: { x: "10%", y: "50" } }), I),
-      { ok: false, diagnostic: "nested-lengths-disagree" });
-    assert.deepEqual(nestedViewportGeometry(nested({ computed: { x: "50px", y: "50px", width: "100px", height: "60px", transform: "matrix(1, 0, 0, 1, 30, 10)" } }), I),
+    const geometry = (raw: RawSvgFrame, toOuter: AffineMatrix = I, localToScreen: AffineMatrix = I) => {
+      const result = nestedViewportGeometry(raw, toOuter, localToScreen);
+      return result.ok ? { ok: true, viewport: result.viewport, clip: result.clip } : result;
+    };
+    assert.deepEqual(geometry(nested({ screenCtm: [...translate(60, 55)] }), translate(10, 5)), { ok: true, viewport: box(60, 55, 100, 60), clip: box(60, 55, 100, 60) });
+    // Measured on Chromium 141: a CSS `x: 70px` is reported by the computed x and ignored by both
+    // the viewport and the CTM (40 stays 40); a CSS `width: 100px` resizes the viewport and is what
+    // the computed width says, while SVGLength keeps the attribute's 160. The CTM and the computed
+    // width are what the clip is built from; neither the computed x nor SVGLength is read.
+    assert.deepEqual(geometry(nested({ screenCtm: [...translate(40, 20)], lengths: [40, 20, 160, 60],
+      computed: { x: "70px", y: "30px", width: "100px", height: "40px", transform: "none" } })), { ok: true, viewport: box(40, 20, 100, 40), clip: box(40, 20, 100, 40) });
+    // A viewBox: translate(40, 20)·scale(2) for viewBox 0 0 80 30 in 160 x 60; meet with 0 0 40 30
+    // centres (translation 80); slice aligned xMaxYMax overflows upward (-40). All measured.
+    assert.deepEqual(geometry(nested({ screenCtm: [2, 0, 0, 2, 40, 20], attributes: { x: "40", y: "20", viewBox: "0 0 80 30" },
+      computed: { x: "40px", y: "20px", width: "160px", height: "60px", transform: "none" } })), { ok: true, viewport: box(40, 20, 160, 60), clip: box(40, 20, 160, 60) });
+    assert.deepEqual(geometry(nested({ screenCtm: [2, 0, 0, 2, 80, 20], attributes: { x: "40", y: "20", viewBox: "0 0 40 30" },
+      computed: { x: "40px", y: "20px", width: "160px", height: "60px", transform: "none" } })).ok, true);
+    assert.deepEqual(geometry(nested({ screenCtm: [4, 0, 0, 4, 40, -40], attributes: { x: "40", y: "20", viewBox: "0 0 40 30", preserveAspectRatio: "xMaxYMax slice" },
+      computed: { x: "40px", y: "20px", width: "160px", height: "60px", transform: "none" } })), { ok: true, viewport: box(40, 20, 160, 60), clip: box(40, 20, 160, 60) });
+    // A CTM scale the computed size does not produce: the size is not the one laid out.
+    assert.deepEqual(geometry(nested({ screenCtm: [2, 0, 0, 2, 40, 20], attributes: { x: "40", y: "20", viewBox: "0 0 80 30" },
+      computed: { x: "40px", y: "20px", width: "100px", height: "60px", transform: "none" } })), { ok: false, diagnostic: "nested-lengths-disagree" });
+    for (const width of ["auto", "", "50%"]) {
+      assert.deepEqual(geometry(nested({ computed: { x: "50px", y: "50px", width, height: "60px", transform: "none" } })), { ok: false, diagnostic: "nested-lengths-disagree" }, width);
+    }
+    assert.deepEqual(geometry(nested({ attributes: { x: "50", y: "50", viewBox: "0 0 0 30" } })), { ok: false, diagnostic: "nested-lengths-disagree" });
+    assert.deepEqual(geometry(nested({ attributes: { x: "50", y: "50", viewBox: "0 0 50 30", preserveAspectRatio: "sideways" } })), { ok: false, diagnostic: "nested-lengths-disagree" });
+    assert.deepEqual(geometry(nested({ screenCtm: [0.9, 0.1, -0.1, 0.9, 50, 50] })), { ok: false, diagnostic: "nested-lengths-disagree" });
+    assert.deepEqual(geometry(nested({ screenCtm: null })), { ok: false, diagnostic: "matrix-unavailable" });
+    assert.deepEqual(geometry(nested({ computed: { x: "50px", y: "50px", width: "100px", height: "60px", transform: "matrix(1, 0, 0, 1, 30, 10)" } })),
       { ok: false, diagnostic: "nested-transform" });
-    assert.deepEqual(nestedViewportGeometry(nested({ style: style({ overflowClipMargin: "20px" }) }), I), { ok: false, diagnostic: "nested-clip-margin" });
-    assert.deepEqual(nestedViewportGeometry(nested(), rotate(20)), { ok: false, diagnostic: "nested-viewport-rotated" });
-    assert.equal(nestedViewportGeometry(nested({ style: style(visible) }), I).ok, true);
+    assert.deepEqual(geometry(nested({ style: style({ overflowClipMargin: "20px" }) })), { ok: false, diagnostic: "nested-clip-margin" });
+    assert.deepEqual(geometry(nested({ screenCtm: [...multiply(rotate(20), translate(50, 50))] }), rotate(20)), { ok: false, diagnostic: "nested-viewport-rotated" });
+    assert.equal(geometry(nested({ style: style(visible) })).ok, true);
     // `auto` on a nested SVG draws everything: a viewport, and no clip.
-    assert.deepEqual(nestedViewportGeometry(nested({ style: style({ overflowX: "auto", overflowY: "auto" }) }), I),
+    assert.deepEqual(geometry(nested({ style: style({ overflowX: "auto", overflowY: "auto" }) })),
       { ok: true, viewport: box(50, 50, 100, 60), clip: null });
     assert.equal(axisAligned(rotate(90)), true, "a quarter turn keeps a rectangle a rectangle");
     assert.equal(axisAligned(multiply(scale(-1, 1), translate(3, 4))), true);
+    assert.equal(parseViewBox(null), null);
+    assert.deepEqual(parseViewBox(" 0,0 80 30 "), [0, 0, 80, 30]);
+    assert.equal(parseViewBox("0 0 -1 30"), "invalid");
+    assert.deepEqual(viewBoxTransform([0, 0, 40, 30], "none", 160, 60), [4, 0, 0, 2, -0, -0]);
   });
 
   it("carries CDP's quads back into the frame and bounds their float32 quantisation", () => {
@@ -400,16 +443,54 @@ describe("SVG local frame: computed-style arithmetic", () => {
     assert.equal(shrunk.quantization, 2 * float32HalfSpacing(105), "a shrinking map magnifies the quad's error in the frame");
   });
 
-  it("holds an ancestor's quad against the SVG's clip with a margin", () => {
-    const quad = quadOf(box(0, 0, 100, 50), I);
-    assert.equal(insideQuad([[10, 10], [90, 40]], quad, 1), true);
-    assert.equal(insideQuad([[10, 10], [99.5, 40]], quad, 1), false, "closer to the edge than the margin");
-    assert.equal(insideQuad([[10, 10], [101, 40]], quad, 0), false);
-    assert.equal(insideQuad([[50, 25]], quadOf(box(0, 0, 100, 50), rotate(30)), 0), false);
-    assert.equal(insideQuad([[20, 30]], quadOf(box(0, 0, 100, 50), rotate(30)), 0), true);
-    assert.equal(insideQuad([[1, 1]], [0, 0, 0, 0, 0, 0, 0, 0], 0), false, "a degenerate quad contains nothing");
-    assert.equal(insideQuad([[100.0001, 25]], quad, -0.001), true, "a negative margin admits that much outside");
-    assert.equal(insideQuad([[100.01, 25]], quad, -0.001), false);
+  it("clips where Chromium paints: the snapped clip rectangle less the snapped origin", () => {
+    // The verifier's snapedge fixture, measured at a device scale of 4 through Paged.js: an SVG
+    // 300.4 px wide at x = 32.3 has its content painted at 32 and its clip at 333, so in its own
+    // frame the clip ends at 301, not 300.4; one 300.48 px wide at x = 32.5 is painted at 33 and
+    // clipped at 333: 300, not 300.48.
+    const model = (x: number, width: number): SvgBoxModel => ({
+      content: quadOf(box(x, 100, width, 120), I), padding: quadOf(box(x, 100, width, 120), I), border: quadOf(box(x, 100, width, 120), I), scroll: [0, 0],
+    });
+    const fe = paintedClip(model(32.3, 300.4), "content-box", 0, 0, translate(32.3, 100));
+    assert.ok(fe.ok);
+    assert.ok(Math.abs(fe.clip.x - 0) < 1e-9 && Math.abs(fe.clip.width - 301) < 1e-9, JSON.stringify(fe.clip));
+    assert.deepEqual(fe.page, { left: 32, top: 100, right: 333, bottom: 220 });
+    const fc = paintedClip(model(32.5, 300.48), "content-box", 0, 0, translate(32.5, 100));
+    assert.ok(fc.ok);
+    assert.ok(Math.abs(fc.clip.x + 0) < 1e-9 && Math.abs(fc.clip.width - 300) < 1e-9, JSON.stringify(fc.clip));
+    assert.equal(snapPixel(32.5), 33, "LayoutUnit::Round rounds a tie up");
+    assert.equal(snapPixel(-0.5), 0);
+    // Padding moves the content box off the border box: the origin that snaps is the BORDER box's.
+    const padded: SvgBoxModel = { content: quadOf(box(42.6, 100, 300, 50), I), padding: quadOf(box(32.3, 100, 320.6, 50), I), border: quadOf(box(32.3, 100, 320.6, 50), I), scroll: [0, 0] };
+    const pad = paintedClip(padded, "content-box", 0, 0, translate(42.6, 100));
+    assert.ok(pad.ok);
+    // content 42.6..342.6 snaps to 43..343; the painted origin moves by 32 - 32.3 = -0.3.
+    assert.ok(Math.abs(pad.clip.x - (43 - 42.6 + 0.3)) < 1e-9 && Math.abs(pad.clip.x + pad.clip.width - (343 - 42.6 + 0.3)) < 1e-9, JSON.stringify(pad.clip));
+    // A clip margin grows the rectangle before it snaps; zoom scales the margin into page px.
+    const margin = paintedClip(model(32.25, 300), "content-box", 10, 0, [2, 0, 0, 2, 32.25, 100]);
+    assert.ok(margin.ok);
+    assert.deepEqual(margin.page, { left: 12, top: 80, right: 352, bottom: 240 });
+    // The document scroll offset carries viewport quads into the snapping space.
+    const scrolled = paintedClip({ ...model(32.3, 300.4), scroll: [0, 0.5] }, "content-box", 0, 0, translate(32.3, 100));
+    assert.ok(scrolled.ok);
+    assert.equal(scrolled.page.top, 101);
+    // What the model does not cover declines.
+    assert.deepEqual(paintedClip(model(32.3, 300.4), "content-box", 0, 0, multiply(translate(32.3, 100), rotate(5))), { ok: false, diagnostic: "pixel-snapping-unmodelled" });
+    const { scroll: _scroll, ...noScroll } = model(32.3, 300.4);
+    assert.deepEqual(paintedClip(noScroll, "content-box", 0, 0, translate(32.3, 100)), { ok: false, diagnostic: "oracle-unavailable" });
+    // An edge off the LayoutUnit grid is known only to float32, and within that of a tie it cannot
+    // be snapped; a margin within its resolution of the grid is put back on it and snaps exactly.
+    assert.deepEqual(paintedClip(model(32.5000001, 300), "content-box", 0, 0, translate(32.5000001, 100)), { ok: false, diagnostic: "frame-imprecise" });
+    const regridded = paintedClip(model(32, 300), "content-box", 0.4999, 0.0005, translate(32, 100));
+    assert.ok(regridded.ok && regridded.page.left === 32 && regridded.page.right === 333, "0.4999 read as the LayoutUnit 0.5: 31.5 rounds up, 332.5 rounds up");
+    assert.equal(paintOffsetUnmodelled({ transform: "none", rotate: "none", scale: "none", translate: "none", perspective: "none", offsetPath: "none" }), false);
+    for (const over of [{ transform: "matrix(1, 0, 0, 1, 0.3, 0)" }, { translate: "0.3px" }, { willChange: "transform" }, { position: "sticky" }, { position: "fixed" }]) {
+      assert.equal(paintOffsetUnmodelled({ transform: "none", rotate: "none", scale: "none", translate: "none", perspective: "none", offsetPath: "none", ...over }), true, JSON.stringify(over));
+    }
+    // An ancestor's clip, known by its content quad, holds the SVG's painted clip after snapping both.
+    assert.equal(ancestorContains(quadOf(box(32, 90, 301.4, 200), I), [0, 0], fe.page), true, "333.4 snaps to 333");
+    assert.equal(ancestorContains(quadOf(box(32, 90, 300.4, 200), I), [0, 0], fe.page), false, "332.4 snaps to 332");
+    assert.equal(ancestorContains(quadOf(box(0, 0, 100, 50), rotate(30)), [0, 0], fe.page), false, "a rotated ancestor is not a rectangle here");
   });
 
   it("takes the worst overshoot over the whole clip chain", () => {
@@ -455,6 +536,8 @@ describe("SVG local frame: collector facts through assembleSnapshot and the rule
     // 311.975 x 89.0875.
     // Rebuilt from computed values the clip is 0.025 px short and the first label, which the
     // browser draws in full, is reported — or the whole SVG is declined, exit 4, as 0.6.0 did.
+    // Painted, the used content box 2.6875..314.6875 x 1.296875..90.390625 snaps to 3..315 x 1..90
+    // with the border-box origin already on the pixel grid: the clip in the frame starts 0.3125 in.
     const localToScreen = translate(2.6875, 1.296875);
     const frame = outerFrame({ localToScreen, style: style({ boxSizing: "border-box", width: "317.375px", height: "91.6875px", ...padding(edges(1.3, 2.7)) }) });
     const used = box(0, 0, 312, 89.09375);
@@ -462,7 +545,8 @@ describe("SVG local frame: collector facts through assembleSnapshot and the rule
       used, box(-2.6875, -1.296875, 317.375, 91.6875));
     assert.deepEqual(labels, ["used-out"]);
     assert.deepEqual([coverage?.candidates, coverage?.measured], [2, 2]);
-    assert.deepEqual(snapshot.svg[0]!.viewportLocal?.clips, [used]);
+    assert.deepEqual(snapshot.svg[0]!.viewportLocal?.clips, [box(0.3125, -0.296875, 312, 89)]);
+    assert.deepEqual(snapshot.svg[0]!.viewportLocal?.viewport, used, "the viewport stays the used box; the clip is what is painted");
     assert.ok(Math.abs(snapshot.svg[0]!.viewportLocal!.modelDeltaPx! - 0.025) < 1e-9);
   });
 
@@ -511,19 +595,52 @@ describe("SVG local frame: collector facts through assembleSnapshot and the rule
     assert.ok(validateSnapshotInvariants(edited, { sourceMapInjection: true }).issues.some((issue) => issue.includes("error bound")));
   });
 
-  it("measures a label under a rotated ancestor in the SVG's own frame, and reports frame px", () => {
+  it("declines a clipped SVG under a CSS transform: its painted clip snaps in a space the frame does not know", () => {
+    // The browser snaps an SVG's clip and paint offset in the space of its nearest transform, not
+    // in the document's, so the snapping model — and with it the half pixel this rule resolves
+    // below — does not hold. Up to round two such an SVG was measured against its unsnapped clip.
     const localToScreen = multiply(translate(64.95, 29.8), rotate(15));
-    const frame = outerFrame({ localToScreen, transforms: [{ transform: "matrix(0.965926, 0.258819, -0.258819, 0.965926, 0, 0)", rotate: "none", scale: "none", translate: "none", perspective: "none", offsetPath: "none" }] });
-    const { labels, exit, report, snapshot } = single(frame, [inside("in", 157), inside("out", 163)], localToScreen, box(0, 0, 200, 80));
-    assert.deepEqual(labels, ["out"]);
-    assert.equal(exit, 1);
-    assert.equal(report.findings[0]!.measurement.value, 3);
-    // Why the screen could not answer this: under the rotation the viewport's screen envelope is so
-    // much larger than the viewport that the clipped label's own envelope sits inside it. Envelope
-    // against envelope calls `out` drawn; it is 3 px past the edge.
-    const out = snapshot.svg[0]!.texts.find((item) => item.svgTextKey.endsWith("out"))!;
-    const viewportEnvelope = envelope(box(0, 0, 200, 80), localToScreen);
-    assert.ok(overshootBeyond(out.boxScreen, [viewportEnvelope]) < 0, "the screen envelopes would have missed the clipped label");
+    const facts = { transform: "matrix(0.965926, 0.258819, -0.258819, 0.965926, 0, 0)", rotate: "none", scale: "none", translate: "none", perspective: "none", offsetPath: "none" };
+    const rotated = assemble([rawSvg(0, outerFrame({ localToScreen, transforms: [facts] }), [inside("in", 157), inside("out", 163)], localToScreen)], [modelOf(localToScreen, box(0, 0, 200, 80))]);
+    assert.equal(rotated.svg[0]!.viewportDiagnostic, "pixel-snapping-unmodelled");
+    assert.equal(verdictOf(rotated).exit, 4);
+    // A sub-pixel translate is not rotated at all, and still declines: its space is not the page's.
+    const moved = translate(35.3, 35);
+    const shifted = assemble([rawSvg(0, outerFrame({ localToScreen: moved, transforms: [{ ...facts, transform: "matrix(1, 0, 0, 1, 0.3, 0)" }] }), [inside("t", 20)], moved)], [modelOf(moved, box(0, 0, 200, 80))]);
+    assert.equal(shifted.svg[0]!.viewportDiagnostic, "pixel-snapping-unmodelled");
+    // Unclipped, nothing is snapped against: overflow visible under a transform stays exempt.
+    const free = assemble([rawSvg(0, outerFrame({ localToScreen, transforms: [facts], style: style(visible) }), [inside("t", 900)], localToScreen)], [modelOf(localToScreen, box(0, 0, 200, 80))]);
+    assert.equal(free.svg[0]!.clipped, false);
+    assert.deepEqual(verdictOf(free).coverage?.notMeasured.map((entry) => entry.reason), ["env/svg-overflow-visible"]);
+  });
+
+  it("measures a label near a sub-pixel edge against the painted clip, in both directions", () => {
+    // The verifier's snapedge figures, rebuilt: content 32.3 + 300.4 is painted to 333 from 32, so a
+    // cell ending at local 300.44 (0.04 past the layout edge) is drawn — the old frame reported it;
+    // content 32.5 + 300.48 is painted to 333 from 33, so a cell ending at 300.27 (0.21 inside the
+    // layout edge) is cut — the old frame called it clean.
+    const run = (x: number, width: number, label: TextSpec) => {
+      const localToScreen = translate(x, 100);
+      const frame = outerFrame({ localToScreen, style: style({ width: `${width}px`, height: "120px" }) });
+      return single(frame, [label], localToScreen, box(0, 0, width, 120));
+    };
+    const drawn = run(32.3, 300.4, { id: "fe-in", bbox: box(250.4379, 30, 50, 14) });
+    assert.deepEqual(drawn.labels, [], "0.04 past the layout edge, 0.56 inside the painted one");
+    const cut = run(32.5, 300.48, { id: "fc-out", bbox: box(250.269, 30, 50, 14) });
+    assert.deepEqual(cut.labels, ["fc-out"], "0.21 inside the layout edge, 0.27 past the painted one");
+    assert.ok(Math.abs(cut.report.findings[0]!.measurement.value - 0.27) < 0.006);
+  });
+
+  it("declines what the snapping model and the DOM walk cannot see: a scrolled ancestor, a slotted SVG", () => {
+    const localToScreen = translate(35, 35);
+    const scrolled = assemble([rawSvg(0, outerFrame({ localToScreen, scrolled: true }), [inside("t", 20)], localToScreen)], [modelOf(localToScreen, box(0, 0, 200, 80))]);
+    assert.equal(scrolled.svg[0]!.viewportDiagnostic, "scrolled-ancestor");
+    // A slotted SVG is clipped by a shadow tree no walk visits — overflow visible or not.
+    for (const over of [{}, visible]) {
+      const slotted = assemble([rawSvg(0, outerFrame({ localToScreen, slotted: true, style: style(over) }), [inside("t", 20)], localToScreen)], [modelOf(localToScreen, box(0, 0, 200, 80))]);
+      assert.deepEqual([slotted.svg[0]!.clipped, slotted.svg[0]!.viewportDiagnostic], [true, "shadow-tree"]);
+      assert.equal(verdictOf(slotted).exit, 4);
+    }
   });
 
   it("measures under ancestor zoom in unzoomed px", () => {
@@ -614,8 +731,12 @@ describe("SVG local frame: collector facts through assembleSnapshot and the rule
       const flush = run({ ancestors: [ancestor()] }, [quadOf(box(0, 0, 200, 80), localToScreen)]);
       assert.equal(flush.svg[0]!.viewportDiagnostic, null, "touching the ancestor's edge is containment");
       assert.deepEqual(verdictOf(flush).labels, ["out"]);
-      const crossing = run({ ancestors: [ancestor()] }, [quadOf(box(0, 0, 199.99, 80), localToScreen)]);
-      assert.equal(crossing.svg[0]!.viewportDiagnostic, "ancestor-clip", "crossing it by 0.01 px is not");
+      // Both clips are painted snapped: an ancestor content box ending at 241.6 snaps to 242 and still
+      // holds the SVG's clip (242); one ending at 241.4 snaps to 241 and cuts a pixel off it.
+      const rounded = run({ ancestors: [ancestor()] }, [quadOf(box(0, 0, 199.6, 80), localToScreen)]);
+      assert.equal(rounded.svg[0]!.viewportDiagnostic, null);
+      const crossing = run({ ancestors: [ancestor()] }, [quadOf(box(0, 0, 199.4, 80), localToScreen)]);
+      assert.equal(crossing.svg[0]!.viewportDiagnostic, "ancestor-clip", "crossing it by a painted pixel is not containment");
       // The SVG's clip spans 42..242 on screen; the tight ancestor's content box ends at 200.
       const cases: [string, Partial<RawSvgFrame>, (number[] | null)[] | undefined][] = [
         ["cuts the SVG's clip", { ancestors: [ancestor()] }, [tight]],
@@ -647,8 +768,8 @@ describe("SVG local frame: collector facts through assembleSnapshot and the rule
     const nestedTextCtm = multiply(translate(50, 50), scale(2));
     const nestedFrame = (over: Partial<RawSvgFrame> = {}): RawSvgFrame => ({
       kind: "nested", parentIndex: 0, anchorIndex: -1, anchorCtm: [...I], ctm: [...nestedTextCtm], screenCtm: [...multiply(outerToScreen, nestedTextCtm)],
-      style: style(), transforms: [], ancestors: [], lengths: [50, 50, 100, 60],
-      computed: { x: "50px", y: "50px", width: "100px", height: "60px", transform: "none" }, attributes: { x: "50", y: "50" },
+      style: style(), transforms: [], ancestors: [], slotted: false, scrolled: false, lengths: [50, 50, 100, 60],
+      computed: { x: "50px", y: "50px", width: "100px", height: "60px", transform: "none" }, attributes: { x: "50", y: "50", viewBox: "0 0 50 30" },
       ...over,
     });
     const build = (nested: RawSvgFrame, texts: TextSpec[], outerStyle = style({ width: "400px", height: "200px" })) => {
@@ -681,6 +802,21 @@ describe("SVG local frame: collector facts through assembleSnapshot and the rule
         "against its client rect the clipped label is inside: the 0.6.0 false clean");
     });
 
+    it("charges a clipping nested viewport's size serialisation to the frame's error bound", () => {
+      // The computed width and height are six-digit serialisations: half a unit of the sixth
+      // digit each, scaled into the frame. Charged where the nested viewport clips, not otherwise.
+      const bound = (built: ReturnType<typeof build>, index: number) => built.snapshot.svg[index]!.viewportLocal?.uncertaintyPx ?? null;
+      const clipping = build(nestedFrame(), pair);
+      assert.ok(Math.abs(bound(clipping, 1)! - bound(clipping, 0)! - serialisationHalfUnit(100)) < 1e-12,
+        `nested ${String(bound(clipping, 1))} against outer ${String(bound(clipping, 0))}`);
+      const drawing = build(nestedFrame({ style: style(visible) }), pair);
+      assert.equal(bound(drawing, 1), bound(drawing, 0));
+      // Scaled 20 into the frame, the same half unit is 0.01 frame px: the budget is exceeded.
+      const scaled = build(nestedFrame({ anchorCtm: [...scale(20)], screenCtm: [...multiply(outerToScreen, multiply(scale(20), nestedTextCtm))] }), pair);
+      assert.deepEqual([scaled.snapshot.svg[1]!.measurable, scaled.snapshot.svg[1]!.viewportDiagnostic], [false, "frame-imprecise"]);
+      assert.equal(scaled.exit, 4);
+    });
+
     it("does not clip at a nested viewport with overflow auto, and does with scroll", () => {
       // Measured on Chromium 141 (svg-overflow-kinds.html): nested `auto` paints like `visible`.
       // Clipped like the root's `auto`, the drawn label would be reported.
@@ -702,9 +838,9 @@ describe("SVG local frame: collector facts through assembleSnapshot and the rule
 
     it("clips a nested label with overflow visible at the enclosing SVG", () => {
       // Inner overflow visible: its own viewport does not clip, the outer one (right edge 400) does.
-      const nested = nestedFrame({ lengths: [300, 50, 100, 60], computed: { x: "300px", y: "50px", width: "100px", height: "60px", transform: "none" }, attributes: { x: "300", y: "50" },
-        style: style(visible) });
       const ctm = multiply(translate(300, 50), scale(2));
+      const nested = nestedFrame({ lengths: [300, 50, 100, 60], computed: { x: "300px", y: "50px", width: "100px", height: "60px", transform: "none" },
+        attributes: { x: "300", y: "50", viewBox: "0 0 50 30" }, screenCtm: [...multiply(outerToScreen, ctm)], style: style(visible) });
       const { labels, snapshot } = build(nested, [
         { id: "v-in", bbox: box(10, 5, 38.5, 7), ctm },
         { id: "v-out", bbox: box(10, 15, 41.5, 7), ctm },
@@ -853,5 +989,63 @@ describe("snapshot schema 5", () => {
     const produced = new Set([...source.matchAll(/(?:decline\(|diagnostic: )(?:clipped, |true, )?"([a-z-]+)"/gu)].map((match) => match[1]!));
     assert.ok(produced.size >= 20, `found only ${produced.size} diagnostics in the resolver`);
     for (const diagnostic of produced) assert.ok((SVG_VIEWPORT_DIAGNOSTICS as readonly string[]).includes(diagnostic), diagnostic);
+  });
+});
+
+describe("the CDP walk to a clipping ancestor", () => {
+  // html > body > div.clip (node 4) > div.wide (node 5) > svg (node 6): the page names the clipping
+  // wrapper `up: 2`, and CDP has to reach the same element in its own tree — not the wide div one
+  // step up, whose box would hold the SVG and set the wrapper's clip aside (the verifier's walk.html).
+  const tree = { nodeId: 1, nodeType: 9, children: [{ nodeId: 2, nodeType: 1, children: [
+    { nodeId: 3, nodeType: 1, children: [
+      { nodeId: 4, nodeType: 1, children: [{ nodeId: 40, nodeType: 3 }, { nodeId: 5, nodeType: 1, children: [{ nodeId: 6, nodeType: 1 }] }] },
+    ] },
+  ] }] };
+  const quads: Record<number, number[]> = {
+    6: quadOf(box(32, 50, 400, 100), I),
+    5: quadOf(box(32, 50, 450, 100), I),
+    4: quadOf(box(32, 50, 200, 100), I),
+  };
+
+  it("walks the page's parent steps in the browser's tree", () => {
+    const walked = cdpTree(tree);
+    assert.equal(cdpAncestor(walked, 6, 0), 6);
+    assert.equal(cdpAncestor(walked, 6, 1), 5);
+    assert.equal(cdpAncestor(walked, 6, 2), 4);
+    assert.equal(cdpAncestor(walked, 6, 3), 3);
+    assert.equal(cdpAncestor(walked, 6, 5), null, "the document node is not an element");
+    assert.equal(cdpAncestor(walked, 6, 9), null, "off the tree");
+  });
+
+  it("asks CDP for the named ancestor's content quad, and the document scroll", async () => {
+    const sent: string[] = [];
+    const session = {
+      async send<R>(method: string, params?: Record<string, unknown>): Promise<R> {
+        sent.push(method);
+        if (method === "DOM.getDocument") return { root: tree } as R;
+        if (method === "DOM.querySelectorAll") return { nodeIds: [6] } as R;
+        if (method === "Page.getLayoutMetrics") return { cssLayoutViewport: { pageX: 0, pageY: 12 } } as R;
+        if (method === "DOM.getBoxModel") {
+          const quad = quads[Number(params?.["nodeId"])];
+          if (!quad) throw new Error("no box");
+          return { model: { content: quad, padding: quad, border: quad } } as R;
+        }
+        return {} as R;
+      },
+      async detach() {},
+    };
+    const page = { createCDPSession: async () => session } as unknown as Parameters<typeof svgBoxModels>[0];
+    const localToScreen = translate(32, 50);
+    const frame = outerFrame({ localToScreen, ancestors: [ancestor({ up: 2 })], style: style({ width: "400px", height: "100px" }) });
+    const raw = { svg: [rawSvg(0, frame, [], localToScreen)], svgRendered: 1 } as unknown as Parameters<typeof svgBoxModels>[1];
+    const [model] = await svgBoxModels(page, raw);
+    assert.deepEqual(model?.ancestors, [quads[4]], "the wrapper two steps up, not its wide child");
+    assert.deepEqual(model?.scroll, [0, 12]);
+    assert.ok(sent.includes("Page.getLayoutMetrics"));
+    // And that quad declines the SVG, where the wide child's would have set the clip aside.
+    const snapshot = assemble([rawSvg(0, frame, [inside("t", 20)], localToScreen)], [{ ...model!, scroll: [0, 0] }]);
+    assert.equal(snapshot.svg[0]!.viewportDiagnostic, "ancestor-clip");
+    const wrong = assemble([rawSvg(0, frame, [inside("t", 20)], localToScreen)], [{ ...model!, ancestors: [quads[5]!], scroll: [0, 0] }]);
+    assert.equal(wrong.svg[0]!.viewportDiagnostic, null);
   });
 });

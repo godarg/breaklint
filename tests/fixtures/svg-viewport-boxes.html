@@ -7,10 +7,11 @@
   The viewport boxes 0.6.0 declined, each with one label that is drawn and one that is clipped.
 
   Every <svg> here clips its text somewhere other than at its getBoundingClientRect: inside a
-  padding, inside a border, under a rotated ancestor, under a zoomed ancestor, and at the edge
-  each overflow-clip-margin form names. Up to 0.6.0 every one of them declined the whole record
-  (`env/svg-viewport-geometry-unsupported`), so this document ended exit 4 without a verdict on
-  any label. Measured in the SVG's own coordinate system it has exactly one clipped label per
+  padding, inside a border, under a zoomed ancestor, and at the edge each overflow-clip-margin
+  form names. (A rotated ancestor moved to svg-geometry-declines.html: under a CSS transform the
+  browser snaps the painted clip in a space the frame does not model, and the SVG declines.) Up
+  to 0.6.0 every one of them declined the whole record (`env/svg-viewport-geometry-unsupported`),
+  so this document ended exit 4 without a verdict on any label. Measured in the SVG's own coordinate system it has exactly one clipped label per
   figure — the `*-out` ones — and nothing else to report.
 
   The complication is the gap between the two edges each case confuses. The padded label ends
@@ -40,7 +41,7 @@
 </style>
 </head>
 <body>
-<p>Nine figures. In each, the label ending <code>-out</code> runs past the clip edge; the other is drawn in full.</p>
+<p>Eight figures. In each, the label ending <code>-out</code> runs past the clip edge; the other is drawn in full.</p>
 
 <figure>
   <svg class="f" id="padded" viewBox="0 0 200 60" style="padding: 10px" xmlns="http://www.w3.org/2000/svg">
@@ -60,17 +61,6 @@
     <text id="bordered-out" x="106" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
   </svg>
   <figcaption>border: 5px — the clip is the content box.</figcaption>
-</figure>
-
-<figure>
-  <div style="transform: rotate(15deg); transform-origin: 0 0; margin-left: 30px; height: 120px">
-    <svg class="f" id="rotated" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
-      <rect width="200" height="60" fill="#eeeeee"></rect>
-      <text id="rotated-in" x="94" y="24" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
-      <text id="rotated-out" x="106" y="48" textLength="100" lengthAdjust="spacingAndGlyphs">&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;</text>
-    </svg>
-  </div>
-  <figcaption>An ancestor rotated by 15 degrees: screen boxes are envelopes, the frame is not.</figcaption>
 </figure>
 
 <figure>

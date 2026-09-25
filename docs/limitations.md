@@ -92,8 +92,8 @@ every user's coverage. The enum and the two modules remain for the frozen M3 val
 released CLI, schema and SARIF catalogue never run them.
 
 **A question that does not arise** (`NON_APPLICABLE_ENV_IDS`). Where nothing clips an SVG — no
-clipping overflow on it or on an enclosing SVG, no paint containment, no clip-path or mask on it, no
-clipping HTML ancestor in the page area — its text is painted whether or not it leaves the
+clipping overflow on it or on an enclosing SVG, no paint containment, no clip-path, mask or mask-box
+image on it, no clipping HTML ancestor in the page area, no slot assignment — its text is painted whether or not it leaves the
 viewport, so `svg/text-overflows-viewport` has nothing to decide about it — as with an SVG holding
 no text. Anything that clips and is not rebuilt is a counted decline, never this exemption. One such figure would otherwise drive
 an error rule below its floor of 1 and end the whole run in exit 4.
@@ -170,25 +170,37 @@ targets are decidable without an ink pass at all. This is a named gap, not a des
 **SVG viewports are reconstructed in the SVG's own coordinate system, and what that cannot prove
 still declines.** Containment is decided in the outermost SVG's viewport frame — CSS px from its
 content-box corner, before CSS transforms and zoom — where the browser applies the clip. Border,
-padding, every `overflow-clip-margin` form, 2D transforms and zoom of the SVG or its ancestors, and
-nested `<svg>` viewports are therefore measured; up to 0.6.0 the first five declined the whole SVG,
+padding, every `overflow-clip-margin` form, zoom of the SVG or its ancestors, 2D transforms where
+the outermost SVG does not clip itself, and nested `<svg>` viewports are therefore measured; up to
+0.6.0 the first five declined the whole SVG,
 a nested viewport was taken from its client rect (the union of its content, so a clipped label
 could never overshoot it: a false clean), and a keyword clip margin read as none (a false error).
 The clip is built from the USED boxes — CDP's box-model quads, read out of process and carried into
 the frame — because layout snaps to 1/64 px where computed style does not; the computed box is only
-a units check. What clips is the kind's own: `auto` clips an outermost SVG but not a nested one,
+a units check. The clip is the one Chromium PAINTS: each edge rounded to a whole CSS px of the
+document, with the content painted at its rounded border-box origin (measured on Chromium 141,
+exact to the pixel over 18 SVGs at a device scale of 8); against the unsnapped layout rectangle a
+label within about 0.6 px of the edge was judged on the wrong side both ways. A nested viewport is
+placed where the browser's own CTM puts it and sized by its computed (used) width and height, which
+a `viewBox` then holds against that CTM. What clips is the kind's own: `auto` clips an outermost SVG but not a nested one,
 paint containment clips an outermost SVG like overflow does. The rule resolves overshoots to
 0.01 px: a finding is a true overshoot, and a clipped label may come out clean only within 0.02 px
 of the permitted overshoot. Still declined as `env/svg-viewport-geometry-unsupported`, counted
 against coverage: a rounded clip; a corner radius combined with a clip margin; 3D transforms,
 perspective and motion paths; `overflow-x: visible` with `overflow-y: clip` on an outermost SVG
-and mixed axes on a nested one; a clip-path, mask or `url()` filter on the outermost SVG; an HTML
-ancestor clip in the page area not proven to contain the SVG's own (or above an SVG with no clip of
-its own); a nested `<svg>` with a transform, a clip margin, a rotated or skewed placement, or
-computed `x`/`y`/`width`/`height` that disagree with its attributes (CSS such as a page-wide
-`svg { width: … }` sizes nested SVGs too); an `<svg>` inside `<foreignObject>`; and any SVG whose
-frame CDP does not confirm, or whose error bound does not fit the resolution (CDP's float32 quads
-more than 262 144 px down a run). What the rule compares is still the text's typographic cell box
+and mixed axes on a nested one; a clip-path, mask, mask-box image, mask border, `url()` filter or
+legacy `clip` on the outermost SVG — decided by an allow-list of values that provably clip nothing,
+so an unknown value is a clip; an HTML ancestor clip in the page area not proven to contain the
+SVG's own (or above an SVG with no clip of its own); an outermost SVG that clips under a CSS
+transform, `will-change`, a fixed or sticky position or a scrolled ancestor, where the snapping of
+its painted clip was not measured; an SVG assigned to a `<slot>`, or below an element that is,
+whose shadow tree's clips no walk visits; a nested `<svg>` with a transform, a clip margin, a
+rotated or skewed placement, a computed size that is not a px length, or a CTM that is not its
+x/y translation times the viewBox transform of that size; an `<svg>` inside `<foreignObject>`; and
+any SVG whose frame CDP does not confirm, or whose error bound does not fit the resolution (CDP's
+float32 quads more than 262 144 px down a run, or a painted clip edge too close to a half pixel to
+round). An SVG inside a shadow root is not collected at all: the collector reads the document, not
+shadow trees, so such a figure is neither judged nor counted. What the rule compares is still the text's typographic cell box
 rather than its ink; clipping by the page box itself is the block rules' question.
 
 **An SVG in a page margin box is not measured.** Paged.js clones a `position: running(...)`
