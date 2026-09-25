@@ -12,6 +12,7 @@
  * nothing at all.
  */
 
+import { SNAPSHOT_SCHEMA_VERSION } from "../../src/core/enums.ts";
 import type { BlockRecord, PageRecord, Snapshot, SvgRecord, TextLine, TextRun } from "../../src/core/types.ts";
 
 export interface CorpusEntry {
@@ -90,6 +91,8 @@ function block(id: string, over: Partial<BlockRecord> = {}): BlockRecord {
     spaceWidth: 4.2,
     effectiveStyle: style(),
     lines: [0],
+    atomicBoxes: [],
+    flowHazards: { inside: [], self: [], around: [] },
     ...over,
   };
 }
@@ -130,7 +133,10 @@ function snapshot(parts: {
   uriRefs?: Snapshot["uriRefs"];
 }): Snapshot {
   return {
-    schemaVersion: 2,
+    // The current stamp, not a literal: these are hand-authored snapshots of the current shape,
+    // and the engine refuses any other stamp. A literal 2 stood here through schemas 3 and 4,
+    // which is the claim-without-migration the stamp exists to prevent.
+    schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     meta: {
       renderer: null,
       browserVersion: "",

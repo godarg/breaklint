@@ -310,7 +310,55 @@ export const SUPPORTED_PDFJS_VERSION = "6.2.108";
 export const REPORT_SCHEMA_VERSION = 5;
 /** Document report shapes this build can read. A 4 simply carries no `remediation`. */
 export const READABLE_REPORT_SCHEMA_VERSIONS: readonly number[] = [4, 5];
-export const SNAPSHOT_SCHEMA_VERSION = 4;
+/**
+ * The measurement snapshot's shape. 5 adds, per block record, `atomicBoxes` (the boxes of replaced
+ * and other atomic content inside the element) and `flowHazards` (`inside`, `self` and `around`:
+ * what lays the element's content out other than as one untransformed block-direction flow; see
+ * FLOW_HAZARDS). There is no reader
+ * for 4: a schema-4 snapshot carries neither, the split-block bound of
+ * `layout/unbreakable-block-too-tall` cannot be taken without them, and they cannot be derived from
+ * what a schema-4 snapshot does carry — only re-measured. The engine therefore refuses any other
+ * stamp.
+ */
+export const SNAPSHOT_SCHEMA_VERSION = 5;
+
+/**
+ * What takes an element's content out of one untransformed block-direction flow, as the page
+ * records it in `BlockRecord.flowHazards` (Snapshot 5), in three scopes: `inside` (read over every
+ * element laid out inside the block — not only block records, because a `<span>` or an `<img>` can
+ * be positioned, transformed or floated as well as a `<div>`), `self` (the block's own style) and
+ * `around` (its ancestors up to the page's content area).
+ *
+ * It exists for one argument: that the lines and boxes one fragment of a split block carries sit at
+ * the same offsets from one another as in the block unsplit, at the same width, and that the pieces
+ * follow one another. Every entry is a way that argument can fail; the ones measured to fail are
+ * named in docs/limitations.md.
+ */
+export const FLOW_HAZARDS = [
+  /** `position: absolute` or `fixed`: placed off the flow; a Paged.js 0.4.3 split can lay the flow out twice around it. */
+  "out-of-flow",
+  /** `position: relative` with a nonzero `top`, `bottom`, `left` or `right`: drawn away from where it was laid out. */
+  "offset",
+  /** `position: sticky`. */
+  "sticky",
+  /** A `transform`, `translate`, `rotate`, `scale` or `offset-path`: drawn in another geometry than it was laid out in. */
+  "transformed",
+  /** `float`: other content flows beside it, and it is sized from its content. */
+  "float",
+  /** `column-count` or `column-width`: Paged.js balances each fragment's columns on their own. */
+  "multicol",
+  /** A flex or grid container (inline or not): items side by side, sized from their neighbours. */
+  "flex-or-grid",
+  /** A table row with two or more cells: column widths are recomputed per fragment, and later cells can move whole. */
+  "table-columns",
+  /** A vertical `writing-mode`. */
+  "vertical-writing",
+  /** Inside only: a negative `margin-top` or `margin-bottom`, which pulls what follows over what precedes it. */
+  "negative-margin",
+  /** Inside only: replaced content reaching out of a block-level ancestor that does not clip it, over whatever follows that ancestor. */
+  "overflowing-content",
+] as const;
+export type FlowHazard = (typeof FLOW_HAZARDS)[number];
 
 const asSet = <T extends string>(values: readonly T[]): ReadonlySet<string> => new Set(values);
 

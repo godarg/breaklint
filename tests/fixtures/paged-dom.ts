@@ -187,6 +187,10 @@ const DEFAULT_STYLE: Record<string, string> = {
   textDecorationLine: "none", breakBefore: "auto", breakAfter: "auto", breakInside: "auto",
   writingMode: "horizontal-tb", columnCount: "auto", widows: "2", orphans: "2", textAlign: "start",
   wordSpacing: "0px", content: "normal",
+  // Snapshot 5 reads these for a block's flow hazards; Chromium's computed defaults.
+  transform: "none", translate: "none", rotate: "none", scale: "none", offsetPath: "none", float: "none",
+  columnWidth: "auto", top: "auto", bottom: "auto", left: "auto", right: "auto", marginTop: "0px", marginBottom: "0px",
+  overflowX: "visible", overflowY: "visible",
 };
 
 /**

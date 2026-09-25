@@ -16,6 +16,7 @@ import type {
   EnvId,
   EvidenceOrigin,
   FailOn,
+  FlowHazard,
   InfraEventKind,
   KeyType,
   NetworkMode,
@@ -134,6 +135,32 @@ export interface BlockRecord {
   notMeasuredReason?: EnvId;
   /** Set when the source carried a forcing declaration the paginator did not act on. */
   inertBreak?: { side: "before" | "after"; cascadeHint: BreakCauseCascadeHint } | null;
+  /**
+   * Snapshot 5. The replaced and other atomic content inside this element (this fragment of it):
+   * `img`, the outermost `svg`, `canvas`, `video`, `iframe`, `object`, `embed`, `audio`, `input`,
+   * `textarea`, `select` — each laid out, not `visibility: hidden`, with a nonzero box. Text is in
+   * `textLines`; this is what a block holds besides text.
+   */
+  atomicBoxes: AtomicBox[];
+  /**
+   * Snapshot 5. What lays this element's content out other than as one untransformed
+   * block-direction flow: read over everything laid out inside it, over the element itself, and
+   * over its ancestors up to the page's content area. Each list sorted, no duplicates, empty when
+   * there is nothing. See FLOW_HAZARDS.
+   */
+  flowHazards: FlowHazards;
+}
+
+export interface FlowHazards {
+  inside: FlowHazard[];
+  self: FlowHazard[];
+  around: FlowHazard[];
+}
+
+export interface AtomicBox {
+  /** Lower-case tag name. */
+  tag: string;
+  box: Box;
 }
 
 export interface PageFill {

@@ -23,7 +23,7 @@
  * is where a reader looks for what was not judged and why.
  */
 
-import { COVERAGE_FLOOR_BY_SEVERITY, EXIT_CODE_BY_VERDICT, IS, VERDICT_PRECEDENCE } from "./enums.ts";
+import { COVERAGE_FLOOR_BY_SEVERITY, EXIT_CODE_BY_VERDICT, IS, SNAPSHOT_SCHEMA_VERSION, VERDICT_PRECEDENCE } from "./enums.ts";
 import type { FailOn, RunVerdict, Severity } from "./enums.ts";
 
 /** Whether this event alone makes the run exit 3. See `NON_FATAL_INFRA_EVENT_KINDS`. */
@@ -84,6 +84,24 @@ export interface DocumentOutcome {
 }
 
 export function runDocument(input: DocumentInput, config: EngineConfig): DocumentOutcome {
+  // The engine is the one reader of a snapshot, so the stamp is checked here: a snapshot of any
+  // other shape is not measured, and says so as a fatal event rather than letting the rules read
+  // fields it does not carry. Nothing checked the stamp on read until schema 5; it only means
+  // something if a mismatch has a consequence. The live path cannot mismatch — it stamps and reads
+  // in one process — so this guards stored snapshots: the demo fixture, and anything like it.
+  if (input.snapshot && input.snapshot.schemaVersion !== SNAPSHOT_SCHEMA_VERSION) {
+    const schemaVersion = input.snapshot.schemaVersion;
+    input = {
+      ...input,
+      snapshot: null,
+      infrastructure: [...input.infrastructure, {
+        kind: "checker-crashed",
+        detail: `the snapshot has schema ${String(schemaVersion)} and this build reads only schema ` +
+          `${SNAPSHOT_SCHEMA_VERSION}; it is not measured. A stored snapshot must be re-measured, not relabelled.`,
+        measured: { stage: "snapshot-schema", schemaVersion: typeof schemaVersion === "number" ? schemaVersion : null, readable: [SNAPSHOT_SCHEMA_VERSION] },
+      }],
+    };
+  }
   const evidenceCoverage = evidenceCoverageFor(input);
   const findings: Finding[] = [];
   const evaluations: TargetEvaluation[] = [];

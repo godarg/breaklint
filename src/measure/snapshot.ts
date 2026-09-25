@@ -14,6 +14,7 @@ import { blockKey, normaliseSignature, sha256, svgRootKey, svgTextKey } from "..
 import { resolveDocumentUri } from "../acquire/browser.ts";
 import {
   BREAK_CAUSE_CASCADE_HINTS,
+  FLOW_HAZARDS,
   BREAK_CAUSE_DETERMINED_BY,
   BREAK_CAUSE_KINDS,
   SNAPSHOT_SCHEMA_VERSION,
@@ -501,6 +502,110 @@ export const SNAPSHOT_SOURCE = `(() => {
     visit(root);
     return out;
   };
+  // SNAPSHOT 5. What a block holds besides text, and what lays its content out other than as one
+  // untransformed block-direction flow. layout/unbreakable-block-too-tall bounds a split block from
+  // the lines and boxes its fragments carry, and that bound is only sound while each fragment's
+  // content sits at the same offsets as in the block unsplit. Measured on 2026-09-25 (Paged.js
+  // 0.4.3, patched Chromium 141) with a bound from text lines alone: a split figure of five panels
+  // and a one-line caption was bounded at 14.99 px, a two-column descendant made the lines of a
+  // block 335.81 px tall read 347.13 px, and relatively positioned paragraphs made those of a block
+  // 301.19 px tall read 360.19 px — both above the 340.16 px page. The hazards are read over EVERY
+  // element laid out inside the block, not only over block records: a <span> or an <img> can be
+  // positioned, transformed or floated as well as a <div>.
+  const ATOMIC_SELECTOR = "img,svg,canvas,video,iframe,object,embed,audio,input,textarea,select";
+  // Each atomic box is recorded as much of it as its block-level ancestors inside the element let
+  // show (an ancestor whose overflow is not visible clips it to its own box, and that box is in the
+  // flow). One that reaches out of a block-level ancestor that does NOT clip it overlaps whatever
+  // follows that ancestor in the flow; that is reported as the hazard "overflowing-content".
+  const atomicBoxesFor = (el) => {
+    const atoms = [];
+    let overflowing = false;
+    for (const atom of P.all(el, ATOMIC_SELECTOR)) {
+      // An svg inside another svg, or anything in an svg's foreignObject, is drawn inside that
+      // outer svg's box, which is recorded itself; recording it again would count it twice.
+      if (P.closest(P.parent(atom), "svg") !== null) continue;
+      const atomStyle = P.style(atom, null);
+      if (atomStyle.display === "none" || atomStyle.visibility === "hidden" || atomStyle.visibility === "collapse") continue;
+      const atomBox = box(atom);
+      if (!(atomBox.width > 0 && atomBox.height > 0)) continue;
+      let top = atomBox.y;
+      let bottom = atomBox.y + atomBox.height;
+      for (let at = P.parent(atom); at && P.nodeType(at) === 1; at = P.parent(at)) {
+        const atStyle = P.style(at, null);
+        if (!/^(inline|contents)$/u.test(atStyle.display || "")) {
+          const outer = box(at);
+          const clips = (atStyle.overflowY || atStyle.overflow || "visible") !== "visible";
+          if (clips) { top = Math.max(top, outer.y); bottom = Math.min(bottom, outer.y + outer.height); }
+          else if (top < outer.y - 1 || bottom > outer.y + outer.height + 1) overflowing = true;
+        }
+        if (at === el) break;
+      }
+      if (!(bottom > top)) continue;
+      atoms.push({ tag: String(atom.tagName || "").toLowerCase(), box: { x: atomBox.x, y: round(top), width: atomBox.width, height: round(bottom - top) } });
+    }
+    return { atoms, overflowing };
+  };
+  const setTo = (value) => value !== undefined && value !== null && value !== "" && value !== "none";
+  const notAuto = (value) => value !== undefined && value !== null && value !== "" && value !== "auto";
+  const offsetBy = (value) => notAuto(value) && Math.abs(number(value, 0)) > 0.001;
+  // What an element does to the layout of its own content.
+  const contentHazards = (el, style, out) => {
+    if (setTo(style.transform) || setTo(style.translate) || setTo(style.rotate) || setTo(style.scale) || setTo(style.offsetPath)) out.add("transformed");
+    if (notAuto(style.columnCount) || notAuto(style.columnWidth)) out.add("multicol");
+    if (/^(inline-)?(flex|grid)$|^-webkit-(inline-)?box$/u.test(style.display || "")) out.add("flex-or-grid");
+    if (style.display === "table-row") {
+      let cells = 0;
+      for (const cell of P.children(el)) if (P.nodeType(cell) === 1 && P.style(cell, null).display === "table-cell") cells += 1;
+      if (cells >= 2) out.add("table-columns");
+    }
+  };
+  // Where an element is drawn, and what flows beside it.
+  const placementHazards = (style, out) => {
+    const position = style.position || "static";
+    if (position === "absolute" || position === "fixed") out.add("out-of-flow");
+    else if (position === "sticky") out.add("sticky");
+    else if (position === "relative" && (offsetBy(style.top) || offsetBy(style.bottom) || offsetBy(style.left) || offsetBy(style.right))) out.add("offset");
+    if (setTo(style.float)) out.add("float");
+    if (style.writingMode && style.writingMode !== "horizontal-tb") out.add("vertical-writing");
+  };
+  const insideHazardCache = new Map();
+  const insideHazards = (el) => {
+    const cached = insideHazardCache.get(el);
+    if (cached) return cached;
+    const out = new Set();
+    for (const child of P.children(el)) {
+      if (P.nodeType(child) !== 1 || /^(SCRIPT|STYLE)$/u.test(child.tagName)) continue;
+      const childStyle = P.style(child, null);
+      if (childStyle.display === "none") continue;
+      placementHazards(childStyle, out);
+      contentHazards(child, childStyle, out);
+      // A negative block-direction margin pulls what follows over what precedes it; at a split the
+      // two would be counted apart. Only inside: on the element itself it moves all of it alike.
+      if (number(childStyle.marginTop, 0) < 0 || number(childStyle.marginBottom, 0) < 0) out.add("negative-margin");
+      for (const hazard of insideHazards(child)) out.add(hazard);
+    }
+    insideHazardCache.set(el, out);
+    return out;
+  };
+  // Three places a hazard can sit: inside the element (anything laid out in it), the element
+  // itself, and around it — its ancestors up to the page's content area, which set its width and
+  // can transform or place it. The page content element itself is Paged.js' own multi-column
+  // fragmentainer (the overflow column) and is where the walk stops.
+  const PAGE_CONTENT_SELECTOR = ".pagedjs_page_content, .pagedjs_area";
+  const flowHazardsFor = (el, style, overflowing) => {
+    const self = new Set();
+    contentHazards(el, style, self);
+    placementHazards(style, self);
+    const around = new Set();
+    for (let at = P.parent(el); at && P.nodeType(at) === 1 && P.closest(at, PAGE_CONTENT_SELECTOR) !== at; at = P.parent(at)) {
+      const atStyle = P.style(at, null);
+      contentHazards(at, atStyle, around);
+      placementHazards(atStyle, around);
+    }
+    const inside = new Set(insideHazards(el));
+    if (overflowing) inside.add("overflowing-content");
+    return { inside: [...inside].sort(), self: [...self].sort(), around: [...around].sort() };
+  };
   const linesFor = (el, justify) => {
     const groups = [];
     const words = [];
@@ -540,6 +645,7 @@ export const SNAPSHOT_SOURCE = `(() => {
     const lineHeight = number(s.lineHeight, fontSize * 1.2);
     const justify = /justify/u.test(s.textAlign);
     const measured = linesFor(el, justify);
+    const atomic = atomicBoxesFor(el);
     const nodeKey = "bl:" + sourceIdentity + ":" + String(seenBySid[sourceIdentity] || 0);
     const base = lineBaseBySid[sourceIdentity] || 0;
     measured.groups.forEach((line, local) => {
@@ -561,6 +667,7 @@ export const SNAPSHOT_SOURCE = `(() => {
         textAlign: s.textAlign || "start", wordSpacing: s.wordSpacing || "normal", fontFamily: s.fontFamily || "",
         fontSize, lineHeight, lang: P.attr(el, "lang") || document.documentElement.lang || "" },
       lines: measured.groups.map((_, i) => base + i), inertBreak: null,
+      atomicBoxes: atomic.atoms, flowHazards: flowHazardsFor(el, s, atomic.overflowing),
     });
     seenBySid[sourceIdentity] = (seenBySid[sourceIdentity] || 0) + 1;
   });
@@ -878,6 +985,21 @@ export function validateSnapshotInvariants(
   }
   for (const block of snapshot.blocks) {
     if (block.lines === null && !block.notMeasuredReason) issues.push(`${block.nodeKey}: lines absent without reason`);
+    // Snapshot 5. A record without these fields is a schema-4 record, and the split-block bound of
+    // layout/unbreakable-block-too-tall would read an absent list as "nothing inside": no replaced
+    // content, no hazard. That is the silent pass the fields exist to prevent.
+    if (!Array.isArray(block.atomicBoxes) || block.atomicBoxes.some((atom) =>
+      !atom || typeof atom.tag !== "string" || !atom.box || ![atom.box.x, atom.box.y, atom.box.width, atom.box.height].every(Number.isFinite))) {
+      issues.push(`${block.nodeKey}: atomicBoxes absent or not finite`);
+    }
+    const hazards = block.flowHazards as Partial<Record<"inside" | "self" | "around", unknown>> | undefined;
+    for (const scope of ["inside", "self", "around"] as const) {
+      const list = hazards?.[scope];
+      if (!Array.isArray(list) || list.some((hazard) => !(FLOW_HAZARDS as readonly string[]).includes(hazard)) ||
+        new Set(list).size !== list.length) {
+        issues.push(`${block.nodeKey}: flowHazards.${scope} absent, unknown or repeated`);
+      }
+    }
     // The inspected input artefact's injection map is always complete. Producer provenance is
     // deliberately separate in originalMap, where generated/ambiguous output can be omitted.
     if (options.sourceMapInjection && block.sid !== null && !snapshot.source.map[block.sid]) {
