@@ -45,6 +45,27 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   does not travel into reports: `Finding.remediation` still carries `advice` and `tested` only, and
   no report, snapshot or configuration schema stamp moves. Both advice strings change.
 
+### Added
+
+- **A GitHub Action for gating HTML-to-PDF builds** (`action.yml` at the repository root, runner
+  in `action/run.mjs`; neither is in the npm package). `uses: godarg/breaklint@<ref>` installs
+  `breaklint@<version>` from npm, where `<version>` is that ref's `package.json` version — so a
+  branch ref runs the last published release, not the branch's code, and a tag works only after
+  its npm publish succeeded (until then the step ends with exit 3) — with the pinned peers `puppeteer-core@25.8.0`, `pagedjs@0.4.3`
+  and `pdfjs-dist@6.2.108` (or uses the project's own install), hands it the runner's Chrome with
+  the sandbox on, runs it once over bash-expanded HTML paths, and writes the canonical JSON plus
+  SARIF, JUnit and Markdown rendered from that one report by breaklint's own reporters. The
+  Markdown goes to the step summary. The step ends with breaklint's own exit code; exits 2, 3 and
+  4 always fail it, and only exit 1 can be left ungated (`fail-on-exit: 2,3,4`). The Action's own
+  setup failures use the same table (2 for a bad input, 3 for an install or runner that cannot
+  run the check), and an exit 0 or 1 without its report is treated as 3, because node's crash
+  exit is also 1. Inputs reach the runner as one `toJSON(inputs)` variable and are never pasted
+  into a script; breaklint's output is printed with workflow commands switched off.
+- **`docs/ci-recipe.md`**: a workflow to copy (build, check, keep the reports, upload SARIF from a
+  separate job that alone holds `security-events: write`, skipped for forks), what each exit code
+  does to the job, several documents, pull-request summaries, caching, and what is not covered.
+  The README links it from Usage.
+
 ### Fixed
 
 - **A directory named `*.html` ends with exit 2 before Chrome starts, instead of exit 3.** The
@@ -298,6 +319,29 @@ Changes on `main` since the `v0.6.0` tag. Nothing below is in the published 0.6.
   both sides the same. `npm run docs:rules:write` renders a generated "Precedence" line into both
   rule pages from the field, and `docs:rules:check` keeps it current. A docs check refuses any advice
   or rule page that names block-level `hyphens: none` for justified text.
+- **SARIF output is validated against the SARIF 2.1.0 JSON schema.** The schema is vendored,
+  test-only, from `microsoft/sarif-sdk` (MIT) under `tests/fixtures/sarif-schema/`, with its
+  source commit, licence and sha256 recorded; the one normative OASIS errata01 constraint that copy
+  lacks (a region needs `startLine`, `charOffset` or `byteOffset`) is restored in memory by the
+  checker. `--demo --format sarif`, every canonical report state and a report with physical
+  locations validate; fifteen single-fault corruptions are rejected. JUnit gets an XSD-free
+  structural check (failure counts equal the `<failure>` elements) and Markdown a verdict-line
+  check, each with negative controls. breaklint's SARIF needed no change.
+- **A new `action` job in `ci.yml`** runs the Action with `uses: ./` against the tarball the same
+  commit packs, with real Chrome, in seven arms: clean (passes), a gating finding over two
+  documents from one glob (fails), exit 1 left ungated (passes), a font that fails to load (exit 3,
+  fails), a missing path plus a shell-substitution canary (exit 2, fails, nothing executed), the
+  paths `--fail-on` and `never` (exit 2; without the dash guard they would become the option
+  `--fail-on never` and the arm would end clean with exit 0) and a `fail-on-exit` that would let
+  exit 4 pass (refused, exit 2). `continue-on-error` keeps the failing arms from ending
+  the job, and `tests/tools/action-selftest.mjs` then asserts every arm's recorded outcome, exit
+  code and verdict and validates the SARIF, JUnit and Markdown it wrote. An optional
+  `action-code-scanning` job uploads the findings arm's SARIF only when the repository variable
+  `BREAKLINT_ACTION_UPLOAD_SARIF` is `true`, and never for a fork's pull request. The one
+  internal module the Action depends on, `dist/report/index.js` (not a public export; the package's
+  `exports` map is unchanged), is also held locally: a unit test builds `src/` the way
+  `npm run build` does and loads it through the runner's own loader. No `npm run` step was added,
+  so the local gate lists are unchanged.
 
 ## 0.6.0 — 2026-09-18
 
