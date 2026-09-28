@@ -425,6 +425,12 @@ export const SNAPSHOT_SOURCE = `(() => {
     || /\\/\\s*0(?:\\.0+)?%?\\s*\\)$/u.test(value);
   const visiblePaint = (value, opacity) => value !== "none"
     && number(opacity, 1) > 0 && !transparentPaint(value);
+  // A non-zero stroke, however thin, can cross a viewport edge. An unparseable computed width
+  // must remain a candidate so that the strict bound below can decline it instead of hiding it.
+  const strokePainted = (style) => {
+    const width = Number.parseFloat(style.strokeWidth);
+    return visiblePaint(style.stroke, style.strokeOpacity) && (!Number.isFinite(width) || width > 0);
+  };
   const transformedGeometry = (style) => effect(style.transform)
     || effect(style.rotate) || effect(style.scale) || effect(style.translate)
     || effect(style.perspective) || effect(style.offsetPath);
@@ -864,8 +870,7 @@ export const SNAPSHOT_SOURCE = `(() => {
         const style = P.style(textEl, null);
         const painted = P.painted(textEl);
         const fillVisible = visiblePaint(style.fill, style.fillOpacity);
-        const strokeVisible = visiblePaint(style.stroke, style.strokeOpacity)
-          && nonzeroLength(style.strokeWidth);
+        const strokeVisible = strokePainted(style);
         const invisible = painted === false || (!fillVisible && !strokeVisible)
           || (painted === null && (style.visibility === "hidden" || style.visibility === "collapse"
               || parseFloat(style.opacity) === 0));
@@ -916,8 +921,7 @@ export const SNAPSHOT_SOURCE = `(() => {
         const style = P.style(textEl, null);
         const painted = P.painted(textEl);
         const fillVisible = visiblePaint(style.fill, style.fillOpacity);
-        const strokeVisible = visiblePaint(style.stroke, style.strokeOpacity)
-          && nonzeroLength(style.strokeWidth);
+        const strokeVisible = strokePainted(style);
         const unpainted = !fillVisible && !strokeVisible;
         // painted === null means this browser has no checkVisibility. Then the two remaining
         // sources decide, and the ancestor-opacity case is not covered — stated here rather than
@@ -927,12 +931,10 @@ export const SNAPSHOT_SOURCE = `(() => {
               || parseFloat(style.opacity) === 0));
         if ((rect.width === 0 && rect.height === 0) || invisible) continue;
 
-        // SVG getBBox() omits stroke, clipping, masks and filter effects. It also cannot expose
-        // the painted result of a referenced paint server. Text decoration/shadow add ink outside
-        // the glyph box by the same route. Judge none of those with a different box: retain the
-        // target as an explicit coverage failure until the independent ink pass exists.
-        let paintedBoundsUnsupported = strokeVisible
-          || /url\\(/u.test(style.fill) || /url\\(/u.test(style.stroke)
+        // SVG getBBox() omits stroke, clipping, masks and filter effects. Paint servers and text
+        // decoration/shadow have no bounded geometry here. A stroke may be admitted only by the
+        // separate upper-bound containment proof below, never by its fill box alone.
+        let paintedBoundsUnsupported = /url\\(/u.test(style.fill) || /url\\(/u.test(style.stroke)
           || effect(style.textShadow) || effect(style.textDecorationLine);
         let ancestor = textEl;
         while (!paintedBoundsUnsupported && ancestor && P.nodeType(ancestor) === 1) {
@@ -960,6 +962,55 @@ export const SNAPSHOT_SOURCE = `(() => {
           if (corner.x > maxX) maxX = corner.x;
           if (corner.y < minY) minY = corner.y;
           if (corner.y > maxY) maxY = corner.y;
+        }
+        if (strokeVisible) {
+          const bb = bounds.bb;
+          const corners = bounds.corners;
+          const widthText = String(style.strokeWidth || "").trim();
+          const width = widthText.endsWith("px") ? Number(widthText.slice(0, -2)) : NaN;
+          const miter = Number(style.strokeMiterlimit);
+          const join = style.strokeLinejoin;
+          const cap = style.strokeLinecap;
+          let transformedStroke = false;
+          for (let at = textEl; at && at !== el && P.nodeType(at) === 1; at = P.parent(at)) {
+            transformedStroke = transformedStroke || transformedGeometry(P.style(at, null))
+              || effect(P.attr(at, "transform"));
+          }
+          // Child tspans/textPaths may override stroke width, join or paint; vector-effect changes
+          // the coordinate system in which stroke width lives. Both defeat this single-style bound.
+          let safelyContained = !transformedStroke && P.all(textEl, "*").length === 0
+            && (style.vectorEffect || "none") === "none"
+            && ["miter", "round", "bevel"].includes(join)
+            && ["butt", "round", "square"].includes(cap)
+            && Number.isFinite(width) && width > 0 && Number.isFinite(miter) && miter > 0
+            && Number.isFinite(bb.width) && bb.width > 0
+            && Number.isFinite(bb.height) && bb.height > 0
+            && corners.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+          if (safelyContained) {
+            // SVG2 limits miter length as a multiple of stroke width. Use the FULL limit as a
+            // local radius (deliberately wider than the usual half-width formula); square caps
+            // fit inside sqrt(2) stroke widths. The primitive's four CTM-transformed corners
+            // recover both linear basis vectors without calling a mutable author-facing API.
+            const localRadius = width * Math.max(join === "miter" ? miter : 1, Math.SQRT2);
+            const dx1 = (corners[1].x - corners[0].x) / bb.width;
+            const dy1 = (corners[1].y - corners[0].y) / bb.width;
+            const dx2 = (corners[3].x - corners[0].x) / bb.height;
+            const dy2 = (corners[3].y - corners[0].y) / bb.height;
+            const padX = localRadius * (Math.abs(dx1) + Math.abs(dx2));
+            const padY = localRadius * (Math.abs(dy1) + Math.abs(dy2));
+            const viewport = P.rect(el);
+            // The 0.02 px gap covers the subsequent two-decimal snapshot rounding and floating
+            // arithmetic. At the boundary we decline; the error rule's coverage floor stays 1.
+            const gap = 0.02;
+            safelyContained = [localRadius, padX, padY, viewport.x, viewport.y,
+              viewport.width, viewport.height, minX, maxX, minY, maxY].every(Number.isFinite)
+              && viewport.width > 0 && viewport.height > 0
+              && minX - padX >= viewport.x + gap
+              && minY - padY >= viewport.y + gap
+              && maxX + padX <= viewport.x + viewport.width - gap
+              && maxY + padY <= viewport.y + viewport.height - gap;
+          }
+          if (!safelyContained) { unsupportedTargets += 1; continue; }
         }
         const textStyle = style;
         const clipped = !!textStyle.clipPath && textStyle.clipPath !== "none";
