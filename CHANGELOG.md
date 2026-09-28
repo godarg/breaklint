@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.0 — TBD-at-tag
+## 0.8.0 — 2026-09-28
 
 ### Behaviour and limits
 
