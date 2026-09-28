@@ -30,6 +30,15 @@
   <text x="360" y="50" clip-path="url(#empty-clip)">Clipped</text>
   <text x="360" y="75" mask="url(#black-mask)">Masked</text>
   <text x="360" y="100" filter="url(#zero-alpha)">Filtered</text>
+  <text id="safe-stroke" x="40" y="40" fill="#111" stroke="white" stroke-width="4"
+        stroke-linejoin="miter" stroke-miterlimit="4" paint-order="stroke fill">Safe halo</text>
+  <text id="rotated-safe-stroke" x="40" y="80" transform="rotate(12 60 80)" fill="#111"
+        stroke="white" stroke-width="3" stroke-linejoin="round">Rotated safe</text>
+  <text id="edge-stroke" x="1" y="145" fill="none" stroke="black" stroke-width="8"
+        stroke-linejoin="miter" stroke-miterlimit="10">Edge</text>
+  <text id="child-stroke" x="40" y="105" stroke="black" stroke-width="1"><tspan stroke-width="80">Child</tspan></text>
+  <text id="non-scaling-stroke" x="1" y="115" fill="none" stroke="black"
+        stroke-width="8" vector-effect="non-scaling-stroke">Vector</text>
   <text x="360" y="125" fill="none" stroke="black" stroke-width="20">Stroke</text>
   <use href="#used-text"></use>
   <use href="#used-symbol"></use>

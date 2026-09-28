@@ -16,8 +16,10 @@
   browser-managed egress limits are stated in `SECURITY.md` and `docs/limitations.md`.
 - G-113: page evidence binds to a physical page and an occurrence rather than only to a reused
   source id. This prevents colliding ids in repeated content from borrowing evidence from another
-  page. G-114 painted SVG stroke bounds are still open; a document can end at insufficient
-  coverage (exit 4) when that evidence cannot be measured.
+  page. G-114 measures a visible SVG text stroke only when a conservative painted-bounds envelope
+  fits strictly inside its viewport. Boundary-touching strokes and complex paint remain unmeasured
+  and can still produce insufficient coverage (exit 4). On the current generated P08 print edition,
+  all 472 SVG targets were measured and the 207-page document ended with findings (exit 1).
 
 ### Tooling
 

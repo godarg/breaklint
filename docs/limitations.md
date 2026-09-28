@@ -119,8 +119,9 @@ was found by building the fixture for the previous one.
 A `<text>` that IS laid out and still has no readable box declines with `env/svg-ctm-unavailable`
 and DOES count against coverage — that is a measurement this tool owed and did not deliver, per
 target rather than per SVG. The same fail-closed rule applies when a box exists but does not prove
-the painted result: `<use>`, visible stroke, paint servers, text decoration, clip paths, masks and
-filters decline with `env/svg-painted-bounds-unsupported`.
+the painted result: `<use>`, paint servers, text decoration, clip paths, masks and filters decline
+with `env/svg-painted-bounds-unsupported`. Visible strokes do so unless a conservative outer bound
+of the stroke fits wholly inside the SVG viewport.
 
 Neither exemption leaves the report. Both keep their rule, reason and count in `notMeasured`, and
 each rule's own books are still checked first: `defineRule` requires measured plus declined to equal
@@ -140,10 +141,11 @@ fixtures and renderer lab are retained so the work is not erased, but they are a
 
 **Complex SVG paint is detected but not geometrically solved in this build.** `querySelectorAll`
 does not cross the instance tree created by `<use>`, and `getBBox()` does not include stroke,
-clipping, masks or filter effects. The collector now detects those entrances and keeps each as an
-unmeasured candidate. Because the viewport rule is an error rule with a coverage floor of 1, even
-one such target produces `insufficient-coverage` (exit 4), never a silent clean result or a guessed
-error. Full support belongs to the independent ink passes, not to an expansion guessed from style.
+clipping, masks or filter effects. The collector detects those entrances and keeps each as an
+unmeasured candidate unless the narrow stroke proof below applies. Because the viewport rule is an
+error rule with a coverage floor of 1, even one undecidable target produces
+`insufficient-coverage` (exit 4), never a silent clean result or a guessed error. Full support
+belongs to the independent ink passes.
 
 *What this costs on a real document, measured.* The entrance that fires in practice is not `<use>`
 or a filter — it is the **halo**: `paint-order="stroke fill"` with the stroke set to the background
@@ -159,19 +161,19 @@ eighteen-document reference set of illustrated chapters:
 | 07 | 27 | 10 | 17 | 17 haloed labels |
 
 Read the first two rows before the last three: inline SVG text is **not** structurally unmeasurable
-here, and a document whose labels carry no visible stroke measures at coverage 1. What is
-unmeasurable is a `<text>` that paints a stroke, because `getBBox()` returns the fill outline and
-the tool refuses to judge an overflow against a box that describes different ink. Three haloed
-labels are enough to take an error rule with a floor of 1 to exit 4, which is why one such figure
-reads in the report as though the whole class had failed.
+here, and a document whose labels carry no visible stroke measures at coverage 1. The table is a
+dated pre-change measurement: then every visible stroke declined because `getBBox()` returns the
+fill outline, not the ink. Three haloed labels were enough to make the error rule end exit 4.
 
-The named next step is not the ink pass. A stroke centred on the glyph outline gives a **two-sided
-bound** for nothing but the stroke width: the fill box is a lower bound on the painted box and the
-fill box inflated by `stroke-width / 2` is an upper bound. A target whose lower bound already
-leaves the viewport overflows for certain; one whose upper bound is still inside it does not
-overflow for certain; only the band between them stays undecidable. On the corpus above the halo
-strokes are 2–4 px against overshoots that matter at ten times that, so almost all 35 declined
-targets are decidable without an ink pass at all. This is a named gap, not a design position.
+G-114 admits only a finite CSS-pixel stroke width, known cap and join, finite miter limit, no
+descendant paint override, vector effect, or text/inner-ancestor transform, and an intact CTM. It
+expands the local box by a deliberately conservative radius using the full
+`stroke-width × stroke-miterlimit` for miter joins (the [SVG 2 painting definition](https://www.w3.org/TR/SVG2/painting.html#StrokeLinejoinProperty)
+defines the ratio), carries that envelope through the CTM, and
+measures only if all four sides remain strictly inside the viewport. A boundary-touching halo
+stays `env/svg-painted-bounds-unsupported` and still causes exit 4. This proves containment for
+that narrow case; it does not identify painted bounds exactly or turn a partly outside stroke into
+a finding. The dated corpus counts above are not a claim about current coverage.
 
 **Nontrivial viewport boxes are detected but not reconstructed.** `getBoundingClientRect` is the
 border box and becomes only an axis-aligned envelope under rotation or skew. An SVG root with
