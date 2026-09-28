@@ -1374,6 +1374,735 @@
           ]
         }
       }
+    },
+    {
+      "round": 4,
+      "record": "current",
+      "outcome": "pass",
+      "reviewedAt": "2026-09-28T18:28:21Z",
+      "reviewers": [
+        {
+          "kind": "human",
+          "handle": "@Founder"
+        }
+      ],
+      "binding": {
+        "reviewInputFingerprint": "e9878ae3049ed1b6300c3bc242d91c50bb0157a7db5b24d443b651da0e075f25",
+        "renderManifestGeneratedAt": "2026-09-28T17:39:53.191Z",
+        "reviewEnvironment": {
+          "reviewArtifactContractVersion": 4,
+          "screenPixelContractVersion": 1,
+          "browser": "Google Chrome 153.0.8010.49",
+          "platform": "darwin",
+          "architecture": "arm64",
+          "nodeMajor": "24",
+          "deviceScaleFactor": 1,
+          "browserRenderArgs": [
+            "--deterministic-mode",
+            "--disable-gpu",
+            "--disable-lcd-text",
+            "--disable-skia-runtime-opts",
+            "--font-render-hinting=none",
+            "--force-color-profile=srgb",
+            "--hide-scrollbars"
+          ],
+          "viewports": {
+            "desktop": {
+              "width": 1440,
+              "height": 1000
+            },
+            "tablet": {
+              "width": 768,
+              "height": 1024
+            },
+            "mobile": {
+              "width": 390,
+              "height": 844
+            }
+          },
+          "themes": [
+            "light",
+            "dark"
+          ],
+          "print": {
+            "media": "print",
+            "format": "A4 from CSS @page",
+            "rasterDpi": 110,
+            "rasterizer": "pdftoppm version 25.11.0",
+            "contentViewportCssPx": {
+              "width": 703,
+              "height": 1123
+            }
+          }
+        }
+      },
+      "physicalArtifactsReviewed": {
+        "screens": 24,
+        "screenTiles": 152,
+        "pdfs": 4,
+        "rasterPages": 27
+      },
+      "findings": {
+        "blocker": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "note": "0.8.0 Founder-Sichtprüfung am PR-#33-Merge-Commit 33d78b9bc920354442051e205cdf1f5ad02ae609. Wörtliches Urteil im aktuellen Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\". Das Urteil gilt für das vorbereitete Paket mit allen 32 Zellen, 152 Tiles, vier PDFs und 27 Rastern sowie den drei ausdrücklich genannten Restpunkten: Tail-Label auch bei ungeteilten Befunden, Umbruch eines überlangen Evidenznamens innerhalb des Segments und ungemessene Ubuntu-Font-Auflösung. Letztere bleibt NEEDS-CI; das positive Sichturteil ist keine Messung unter ubuntu-latest. reviewedAt dokumentiert die Erfassung des Founder-Urteils nach dem Rendern.",
+      "cells": {
+        "screen/clean/light/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "44bcf39db5e2b53dbf6ba508abecbe7876d9a8369d4f04de239cb262122c2718",
+          "reviewedArtifacts": [
+            "clean--light--desktop.png"
+          ],
+          "reviewedRawSha256": "7245fda292577e6dd723f17e66bdff28491be0303477a12e3b149d2097c2eee9",
+          "reviewedNormalizedRgbaSha256": "601a04cdfb92a2b29850b8cc10c597a48cd0ef98072a9eeaef47df97365d64e7"
+        },
+        "screen/clean/light/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "ec2751a01c8f5e8b169ca3549bae1e6f7a2f2186901d8572509892fa49c63c28",
+          "reviewedArtifacts": [
+            "clean--light--tablet.png",
+            "clean--light--tablet--tile-01.png",
+            "clean--light--tablet--tile-02.png",
+            "clean--light--tablet--tile-03.png"
+          ],
+          "reviewedRawSha256": "80968ab4b83d761bcf87d60588f150a0b88f75a749a99860e21eb33954beba6d",
+          "reviewedNormalizedRgbaSha256": "91bf96a38a9f513615d431e3dc4eadc4bd1d7c06bac6af911322bce4c95ef87a"
+        },
+        "screen/clean/light/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "60f7ad1243fc5dd9ef31aa496ae100fe09adab9402e4e113b2a4a64e82475016",
+          "reviewedArtifacts": [
+            "clean--light--mobile.png",
+            "clean--light--mobile--tile-01.png",
+            "clean--light--mobile--tile-02.png",
+            "clean--light--mobile--tile-03.png",
+            "clean--light--mobile--tile-04.png",
+            "clean--light--mobile--tile-05.png"
+          ],
+          "reviewedRawSha256": "54344b65a3ce1af276c49ede1e66922d01931ef43195f4eae68ef8f9d12df076",
+          "reviewedNormalizedRgbaSha256": "8f843297420e4bb50d9bd176da5cfba77792767a60a9ca00746df532470071f7"
+        },
+        "screen/clean/dark/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "6518cee9363b162b55a0fe992b982bd46599c13c3a988b91057db5d4ea0261ea",
+          "reviewedArtifacts": [
+            "clean--dark--desktop.png"
+          ],
+          "reviewedRawSha256": "229f24bdef24363c4672fffa2e5b0147dcdd0b9c24b96d15ca193902dd6f3ec0",
+          "reviewedNormalizedRgbaSha256": "97ca21c75410968d2dd3dfaaec25ea104864cf37b204b2c077a21553a8ce073c"
+        },
+        "screen/clean/dark/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "2dd349acdd9c4187e90ca87999f0a00cbacdadfa7dc9f5b87a9590eb5729f376",
+          "reviewedArtifacts": [
+            "clean--dark--tablet.png",
+            "clean--dark--tablet--tile-01.png",
+            "clean--dark--tablet--tile-02.png",
+            "clean--dark--tablet--tile-03.png"
+          ],
+          "reviewedRawSha256": "3c97c86101da256f01c34a867b542ccafb27b17f3d7f21dbf3269790fe268f98",
+          "reviewedNormalizedRgbaSha256": "3dca53228fc43d05b5856a50cf18e0ddb2ab510b43b08098ce1eb3c7a3ddb9ba"
+        },
+        "screen/clean/dark/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "ab27e79322562f89ceb02f127c0ea025f9e23be42565f2170cfa5770401afaa7",
+          "reviewedArtifacts": [
+            "clean--dark--mobile.png",
+            "clean--dark--mobile--tile-01.png",
+            "clean--dark--mobile--tile-02.png",
+            "clean--dark--mobile--tile-03.png",
+            "clean--dark--mobile--tile-04.png",
+            "clean--dark--mobile--tile-05.png"
+          ],
+          "reviewedRawSha256": "dee7028d9ada0ec21ae07143899dbb8a55750beac078c07c0df0449621cb045d",
+          "reviewedNormalizedRgbaSha256": "0539ade21ccf24befac1cae88589dafce85747a8eedc1c3521bf7f43f9d7e449"
+        },
+        "print/clean/pdf": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "f4717e3d648fcc6e57f0b4e6b9736e00d06200a485b209c38226e47bcdc028f3",
+          "reviewedArtifacts": [
+            "clean--a4.pdf"
+          ],
+          "reviewedRawSha256": "558ce6473429b480ebd4bf9a658393f506b9f2defc9f50cb687750f5e2cc100f",
+          "reviewedPages": [
+            1,
+            2,
+            3
+          ]
+        },
+        "print/clean/raster-set": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "3af7a40cf544c7765af4749d0ef8a67a71f4fa04aded92b4b5865f3cc3248efc",
+          "reviewedArtifacts": [
+            "clean--a4-page-1.png",
+            "clean--a4-page-2.png",
+            "clean--a4-page-3.png"
+          ],
+          "reviewedRawSha256": [
+            "83faea049d6d7a4ffcb5242dc434ec3c63156a76f5e13c388449a1368fa967c8",
+            "a71e973cbf13da3124b8cdf23cd4a17db9247c9880471d584b49b2e4065396a4",
+            "bfca697f6a7b2b858cfa6d3c7b7d6c546b39c133c2b5e8128b2929aa09fb0fc9"
+          ],
+          "reviewedPages": [
+            1,
+            2,
+            3
+          ]
+        },
+        "screen/findings/light/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "094bf3b99d6b04920e3f6e6f12f74114b2cfb26e1580ce60a39c64950579e6a2",
+          "reviewedArtifacts": [
+            "findings--light--desktop.png"
+          ],
+          "reviewedRawSha256": "5bee5fc3745fc68b43cd0b667ea6a479d6a7e703c85e955e43f6270f9c8b086b",
+          "reviewedNormalizedRgbaSha256": "38b2aad6df00f180e8b0323145a44f96ef0f88f237cd47ee5b947cb846ec800e"
+        },
+        "screen/findings/light/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "36186fb56c06cb7dcba55e1aede4bd2cb44ec49b124d7372a9e391bb219126ad",
+          "reviewedArtifacts": [
+            "findings--light--tablet.png",
+            "findings--light--tablet--tile-01.png",
+            "findings--light--tablet--tile-02.png",
+            "findings--light--tablet--tile-03.png",
+            "findings--light--tablet--tile-04.png",
+            "findings--light--tablet--tile-05.png",
+            "findings--light--tablet--tile-06.png",
+            "findings--light--tablet--tile-07.png",
+            "findings--light--tablet--tile-08.png"
+          ],
+          "reviewedRawSha256": "2c5ac378a9c734f31f0de1ba2e3f24817a9f151d14de13a2564c14b4215072ab",
+          "reviewedNormalizedRgbaSha256": "f95561dbae66ba60eefb73abb7336ec79df4fcb49978a1adbccc53e215b48334"
+        },
+        "screen/findings/light/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "607e57fe474187a14dfe3d2cb33c4aa261af611c0504eb0616cf505140630be2",
+          "reviewedArtifacts": [
+            "findings--light--mobile.png",
+            "findings--light--mobile--tile-01.png",
+            "findings--light--mobile--tile-02.png",
+            "findings--light--mobile--tile-03.png",
+            "findings--light--mobile--tile-04.png",
+            "findings--light--mobile--tile-05.png",
+            "findings--light--mobile--tile-06.png",
+            "findings--light--mobile--tile-07.png",
+            "findings--light--mobile--tile-08.png",
+            "findings--light--mobile--tile-09.png",
+            "findings--light--mobile--tile-10.png",
+            "findings--light--mobile--tile-11.png",
+            "findings--light--mobile--tile-12.png",
+            "findings--light--mobile--tile-13.png",
+            "findings--light--mobile--tile-14.png"
+          ],
+          "reviewedRawSha256": "017197b87e169971aa1f22e1978a608419a7fb5dcc17f8b06ebefb0324d51d39",
+          "reviewedNormalizedRgbaSha256": "a8f32603740b87eb0fa053d625db6fb038cc2c46f9e3bca45728c3f4f2d461a7"
+        },
+        "screen/findings/dark/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "b9b445a6ac3ddcf6ce802537980c1d8e64a202830dd5548bee54e6fdebab92b7",
+          "reviewedArtifacts": [
+            "findings--dark--desktop.png"
+          ],
+          "reviewedRawSha256": "a9a6c4468f99bd366dfaef98acaed2fe3a3c147a28fdcfc650688c95c176bf0d",
+          "reviewedNormalizedRgbaSha256": "82686a9e317702681ce9a81dde33f88d7037eed8c24987dd1d11464bbbeb2fba"
+        },
+        "screen/findings/dark/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "84e46983095ba4c500839c364b2592fa8028ccc8cad9fd2fb504d652efddbd1c",
+          "reviewedArtifacts": [
+            "findings--dark--tablet.png",
+            "findings--dark--tablet--tile-01.png",
+            "findings--dark--tablet--tile-02.png",
+            "findings--dark--tablet--tile-03.png",
+            "findings--dark--tablet--tile-04.png",
+            "findings--dark--tablet--tile-05.png",
+            "findings--dark--tablet--tile-06.png",
+            "findings--dark--tablet--tile-07.png",
+            "findings--dark--tablet--tile-08.png"
+          ],
+          "reviewedRawSha256": "1b4fb2313693d200a12edfd40e22e81799f2de1e9cb81c0c7eb6d4106b4ea8f4",
+          "reviewedNormalizedRgbaSha256": "2db6349273427df0965f20fa2e6cabce362060f5b6afe7c208714dca2fc7fc2d"
+        },
+        "screen/findings/dark/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "02628b787e18ff1b75befe67e49ffac236a7c2b9078a0bf71cd9b34ee85cd6d2",
+          "reviewedArtifacts": [
+            "findings--dark--mobile.png",
+            "findings--dark--mobile--tile-01.png",
+            "findings--dark--mobile--tile-02.png",
+            "findings--dark--mobile--tile-03.png",
+            "findings--dark--mobile--tile-04.png",
+            "findings--dark--mobile--tile-05.png",
+            "findings--dark--mobile--tile-06.png",
+            "findings--dark--mobile--tile-07.png",
+            "findings--dark--mobile--tile-08.png",
+            "findings--dark--mobile--tile-09.png",
+            "findings--dark--mobile--tile-10.png",
+            "findings--dark--mobile--tile-11.png",
+            "findings--dark--mobile--tile-12.png",
+            "findings--dark--mobile--tile-13.png",
+            "findings--dark--mobile--tile-14.png"
+          ],
+          "reviewedRawSha256": "51eb2f68398e551009a291c5dae1660372ef732815e4cde925ba3b448d0101ab",
+          "reviewedNormalizedRgbaSha256": "58b422af6b046f1f166c738fdbb103fd4350aac61bd86730d9efbb8d71582b9b"
+        },
+        "print/findings/pdf": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "9250055c6c8ce0658e54a317aeeef61ad1654ec4eb5023c36ceaa6e964a727bd",
+          "reviewedArtifacts": [
+            "findings--a4.pdf"
+          ],
+          "reviewedRawSha256": "193251f64fa7e13fa4982bb6dd645ba853e9e5268f7b9c9f88ef1609423ebcc6",
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "print/findings/raster-set": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "188eb3707958570499e057d713031ad4b08c729a84a067ff1a1c02068b1b4609",
+          "reviewedArtifacts": [
+            "findings--a4-page-1.png",
+            "findings--a4-page-2.png",
+            "findings--a4-page-3.png",
+            "findings--a4-page-4.png",
+            "findings--a4-page-5.png",
+            "findings--a4-page-6.png",
+            "findings--a4-page-7.png",
+            "findings--a4-page-8.png"
+          ],
+          "reviewedRawSha256": [
+            "1b25685c74c03e757a0869699e8cc0323372675ed5440760e2d4392abc01a0cc",
+            "218bc57c285578c22e3e6569bcfec5ca6648cfb882d09581934606a4bb34ab71",
+            "c8c7b3319e332f39006f723700b768f5d010c301991b5e375f20f3ec32c59f15",
+            "867ef4ef47787d73ed5fbb9d0650f41114a5c5f049a7540dae012b66bc0d0293",
+            "84b13ddfef11e7340148f650b2b861875ce058fa02d1ff94e0caedf767664b5a",
+            "8a1e335f7d14260f140972f45777b2bec4351f46cc8c48689e6c27f087605fbb",
+            "98c61bfed2d6b11a62a4a638294fc4b623ab9d2bed8e5e29fe3ee0fe43f6e92b",
+            "c879b780becee35dc7baa098675fe8f40bce30ab044f7b3d2a090f7c29ea15b6"
+          ],
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "screen/infrastructure/light/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "c2f97011a40f9def9abebe90e3ead12a7bf3c3742a7648a384c797f92b1a9d69",
+          "reviewedArtifacts": [
+            "infrastructure--light--desktop.png"
+          ],
+          "reviewedRawSha256": "92877104d0de8cd2b6c167e2b5aeb7341c33bf464904bb25910b880be3424e05",
+          "reviewedNormalizedRgbaSha256": "67fc4dbdbd2cdd1b39122c15bc00981b9d0c3bcafc3dae59043366722ddcdc6f"
+        },
+        "screen/infrastructure/light/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "94fafb025de6ee6246db64add087dcb82631925e4e5921d17aa8b2a306621a86",
+          "reviewedArtifacts": [
+            "infrastructure--light--tablet.png",
+            "infrastructure--light--tablet--tile-01.png",
+            "infrastructure--light--tablet--tile-02.png",
+            "infrastructure--light--tablet--tile-03.png",
+            "infrastructure--light--tablet--tile-04.png",
+            "infrastructure--light--tablet--tile-05.png",
+            "infrastructure--light--tablet--tile-06.png",
+            "infrastructure--light--tablet--tile-07.png",
+            "infrastructure--light--tablet--tile-08.png"
+          ],
+          "reviewedRawSha256": "9eca3d566eaea4f6f8f83d058e6e6b424eb83c78f1869392a4ec4244feb501a9",
+          "reviewedNormalizedRgbaSha256": "1632532c68e98932af527a70f587007f4ac1b99b3fd31a72d0db878f0b021fb6"
+        },
+        "screen/infrastructure/light/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "8f21fc40f5cae37560d2dfc3c0ece41bafe97fe765bbe32d35263cbf7b3d155d",
+          "reviewedArtifacts": [
+            "infrastructure--light--mobile.png",
+            "infrastructure--light--mobile--tile-01.png",
+            "infrastructure--light--mobile--tile-02.png",
+            "infrastructure--light--mobile--tile-03.png",
+            "infrastructure--light--mobile--tile-04.png",
+            "infrastructure--light--mobile--tile-05.png",
+            "infrastructure--light--mobile--tile-06.png",
+            "infrastructure--light--mobile--tile-07.png",
+            "infrastructure--light--mobile--tile-08.png",
+            "infrastructure--light--mobile--tile-09.png",
+            "infrastructure--light--mobile--tile-10.png",
+            "infrastructure--light--mobile--tile-11.png",
+            "infrastructure--light--mobile--tile-12.png",
+            "infrastructure--light--mobile--tile-13.png",
+            "infrastructure--light--mobile--tile-14.png",
+            "infrastructure--light--mobile--tile-15.png"
+          ],
+          "reviewedRawSha256": "3474c640329ecd927a4526d82392e8547048718b89420e9bd037edd82f22f21d",
+          "reviewedNormalizedRgbaSha256": "173e5c907f5a0e87417723515a9ce336313163f70dbc9da4ff756f584dca05c7"
+        },
+        "screen/infrastructure/dark/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "45335d437b4f8f89c62b570025d0141a0bf034693ce78958b7e49bc6eff5df1c",
+          "reviewedArtifacts": [
+            "infrastructure--dark--desktop.png"
+          ],
+          "reviewedRawSha256": "593dac56589965910dc606c6160ac85ec1fbc914497b7ee4c91f04d12264c8ec",
+          "reviewedNormalizedRgbaSha256": "1ca576bc83fbcc8a938d6cf48917460f7caea3df6a428bc212439ce372de0f71"
+        },
+        "screen/infrastructure/dark/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "feaaad15e7ff5997ba27257c973df4b5a9101054889eb87b38ed2935fc4ff070",
+          "reviewedArtifacts": [
+            "infrastructure--dark--tablet.png",
+            "infrastructure--dark--tablet--tile-01.png",
+            "infrastructure--dark--tablet--tile-02.png",
+            "infrastructure--dark--tablet--tile-03.png",
+            "infrastructure--dark--tablet--tile-04.png",
+            "infrastructure--dark--tablet--tile-05.png",
+            "infrastructure--dark--tablet--tile-06.png",
+            "infrastructure--dark--tablet--tile-07.png",
+            "infrastructure--dark--tablet--tile-08.png"
+          ],
+          "reviewedRawSha256": "b26eff3254337c46031503345ac8579a266c3271ec12712e11e1e810432991dd",
+          "reviewedNormalizedRgbaSha256": "aa0658dbb9d81c779c3c1c5dfae3044cb025b4ab814abd036dfed48d6fb0c7f9"
+        },
+        "screen/infrastructure/dark/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "25e480b7a8d4a63d6c91dd1fda71d440bfc23e8ba038d440eb88873dc806fcb4",
+          "reviewedArtifacts": [
+            "infrastructure--dark--mobile.png",
+            "infrastructure--dark--mobile--tile-01.png",
+            "infrastructure--dark--mobile--tile-02.png",
+            "infrastructure--dark--mobile--tile-03.png",
+            "infrastructure--dark--mobile--tile-04.png",
+            "infrastructure--dark--mobile--tile-05.png",
+            "infrastructure--dark--mobile--tile-06.png",
+            "infrastructure--dark--mobile--tile-07.png",
+            "infrastructure--dark--mobile--tile-08.png",
+            "infrastructure--dark--mobile--tile-09.png",
+            "infrastructure--dark--mobile--tile-10.png",
+            "infrastructure--dark--mobile--tile-11.png",
+            "infrastructure--dark--mobile--tile-12.png",
+            "infrastructure--dark--mobile--tile-13.png",
+            "infrastructure--dark--mobile--tile-14.png",
+            "infrastructure--dark--mobile--tile-15.png"
+          ],
+          "reviewedRawSha256": "967f8f0aa02692611a318a646963f9adc2e46ae3ef0af70b0d2162d0452a567b",
+          "reviewedNormalizedRgbaSha256": "b8191b60c71c2297f7ec2c9fc4982bfe5820f345bb477321d6313c7dc2bbe6f3"
+        },
+        "print/infrastructure/pdf": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "933e20d68db04410b426d626342d1fb029ba9cdd2c798366dff03843375f97b0",
+          "reviewedArtifacts": [
+            "infrastructure--a4.pdf"
+          ],
+          "reviewedRawSha256": "be9b851111d578809f7b49dc2e82c5ca598955c7e16db66bfdf50d73295288ce",
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "print/infrastructure/raster-set": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "4871080e464482d8770a24d513efe412caff3110d3bc3673be21486d5cc9fdcb",
+          "reviewedArtifacts": [
+            "infrastructure--a4-page-1.png",
+            "infrastructure--a4-page-2.png",
+            "infrastructure--a4-page-3.png",
+            "infrastructure--a4-page-4.png",
+            "infrastructure--a4-page-5.png",
+            "infrastructure--a4-page-6.png",
+            "infrastructure--a4-page-7.png",
+            "infrastructure--a4-page-8.png"
+          ],
+          "reviewedRawSha256": [
+            "3e66dd8150a0d92f2e2867e6d81e7cdea1b1ae3511861aacbc69b8e07d7d975f",
+            "31c8afdf48bc5ca445a40a3f1f903c3f0c517ee232f8b8f5ee01f30a41263c5e",
+            "270d45dc256c37d920aa1ac24ec06950c9af771524f5229174088c748450095d",
+            "c907641ad79a9d4218598479bf8d50e74f8b45881e9ddcf7223c6fa951bdb9b1",
+            "2c15c0afb543e02d670fbaeb2beb689afcd4f539b9b77d84e8d76121fedddde5",
+            "d6f57479660f4f2bd454100a6267015fbe1a5b58e14f13c12328bd8babc82cca",
+            "c33c08aaad9e38021f5d945124d3ba9af1e339c25f288a2a493982b27ae8c725",
+            "c05514d0d0503f0fcc56dd18459a19c81e153fc2b8c6d10a270768178fa10167"
+          ],
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "screen/insufficient-coverage/light/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "6d9774acb3652b03515634b1a50ff9859e96172b7dba448cb76d9a3bf4d9aedc",
+          "reviewedArtifacts": [
+            "insufficient-coverage--light--desktop.png"
+          ],
+          "reviewedRawSha256": "464e13891fc242796b2b4f55deb5aba4ceebaff2e5491058c34a7bcf0e11443a",
+          "reviewedNormalizedRgbaSha256": "68f7eb77ecf58882ea47f3bf8458e5d37e34593fa81d12f5c3f1e65bc5e07d04"
+        },
+        "screen/insufficient-coverage/light/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "7ce695d55c9ea34c38b02e0387f3eb2e7598fc3e3d390ddf9c09266b44696f05",
+          "reviewedArtifacts": [
+            "insufficient-coverage--light--tablet.png",
+            "insufficient-coverage--light--tablet--tile-01.png",
+            "insufficient-coverage--light--tablet--tile-02.png",
+            "insufficient-coverage--light--tablet--tile-03.png",
+            "insufficient-coverage--light--tablet--tile-04.png",
+            "insufficient-coverage--light--tablet--tile-05.png",
+            "insufficient-coverage--light--tablet--tile-06.png",
+            "insufficient-coverage--light--tablet--tile-07.png",
+            "insufficient-coverage--light--tablet--tile-08.png"
+          ],
+          "reviewedRawSha256": "f45ea58ec7fdae369c247c25c87716642aed042d19d8f63bb512df24b01a5057",
+          "reviewedNormalizedRgbaSha256": "1a9a7ffbbdd4a3b0c1a24e7673acfb382468ed44740275d1211af9779ea17373"
+        },
+        "screen/insufficient-coverage/light/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "5884dc665233e058c8b144a1eeaaf872b4b359b915b5e3e82a78414382c6848e",
+          "reviewedArtifacts": [
+            "insufficient-coverage--light--mobile.png",
+            "insufficient-coverage--light--mobile--tile-01.png",
+            "insufficient-coverage--light--mobile--tile-02.png",
+            "insufficient-coverage--light--mobile--tile-03.png",
+            "insufficient-coverage--light--mobile--tile-04.png",
+            "insufficient-coverage--light--mobile--tile-05.png",
+            "insufficient-coverage--light--mobile--tile-06.png",
+            "insufficient-coverage--light--mobile--tile-07.png",
+            "insufficient-coverage--light--mobile--tile-08.png",
+            "insufficient-coverage--light--mobile--tile-09.png",
+            "insufficient-coverage--light--mobile--tile-10.png",
+            "insufficient-coverage--light--mobile--tile-11.png",
+            "insufficient-coverage--light--mobile--tile-12.png",
+            "insufficient-coverage--light--mobile--tile-13.png",
+            "insufficient-coverage--light--mobile--tile-14.png",
+            "insufficient-coverage--light--mobile--tile-15.png"
+          ],
+          "reviewedRawSha256": "002f59b7427082badcd8371723e786a84a2ed4c7fa1dea7c5fb38593a6c9bf82",
+          "reviewedNormalizedRgbaSha256": "b95bcf7ed0eaf85df1d66187b4f78d23732c2381ae36068680ea41c969a04b72"
+        },
+        "screen/insufficient-coverage/dark/desktop": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "e3e6c932145f9511feb916b1a4c4e4d691f4567affeac0bfd24999d8f4f0be5c",
+          "reviewedArtifacts": [
+            "insufficient-coverage--dark--desktop.png"
+          ],
+          "reviewedRawSha256": "f7d95605d0116d7b683c6252bba142bbea536fba55fa2fddcf2e66553fa09448",
+          "reviewedNormalizedRgbaSha256": "2b761c570ef6f3759623292b0fc151b0280171087f9a511daf84ee1b8447efd0"
+        },
+        "screen/insufficient-coverage/dark/tablet": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "0cd996dd857c6c2b3159adefe9dbfb26bb6355d1772408e10846bf3ecb731aef",
+          "reviewedArtifacts": [
+            "insufficient-coverage--dark--tablet.png",
+            "insufficient-coverage--dark--tablet--tile-01.png",
+            "insufficient-coverage--dark--tablet--tile-02.png",
+            "insufficient-coverage--dark--tablet--tile-03.png",
+            "insufficient-coverage--dark--tablet--tile-04.png",
+            "insufficient-coverage--dark--tablet--tile-05.png",
+            "insufficient-coverage--dark--tablet--tile-06.png",
+            "insufficient-coverage--dark--tablet--tile-07.png",
+            "insufficient-coverage--dark--tablet--tile-08.png"
+          ],
+          "reviewedRawSha256": "708c2409756faa2ffc220b17f48c7dae141b44ce4704c8e5a230c180cc04f8d3",
+          "reviewedNormalizedRgbaSha256": "ab5d3c49ea19e6046cdb2fafeb6fa153629e44b5387f5287680545cf61cce441"
+        },
+        "screen/insufficient-coverage/dark/mobile": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "9701edc1434d2568eb611bf502063825936c829d8acd238b6e1849a4165192fa",
+          "reviewedArtifacts": [
+            "insufficient-coverage--dark--mobile.png",
+            "insufficient-coverage--dark--mobile--tile-01.png",
+            "insufficient-coverage--dark--mobile--tile-02.png",
+            "insufficient-coverage--dark--mobile--tile-03.png",
+            "insufficient-coverage--dark--mobile--tile-04.png",
+            "insufficient-coverage--dark--mobile--tile-05.png",
+            "insufficient-coverage--dark--mobile--tile-06.png",
+            "insufficient-coverage--dark--mobile--tile-07.png",
+            "insufficient-coverage--dark--mobile--tile-08.png",
+            "insufficient-coverage--dark--mobile--tile-09.png",
+            "insufficient-coverage--dark--mobile--tile-10.png",
+            "insufficient-coverage--dark--mobile--tile-11.png",
+            "insufficient-coverage--dark--mobile--tile-12.png",
+            "insufficient-coverage--dark--mobile--tile-13.png",
+            "insufficient-coverage--dark--mobile--tile-14.png",
+            "insufficient-coverage--dark--mobile--tile-15.png"
+          ],
+          "reviewedRawSha256": "851aef70b29a2c0fbd043a48d8591196412f0bb5b34089513660638d844736a4",
+          "reviewedNormalizedRgbaSha256": "b4b97af7ac57670510559ff004881e356ed7ef2bde4def4e878b9809dcb1a3e0"
+        },
+        "print/insufficient-coverage/pdf": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "729a0eb8215a2c8409c51a86a8d083c6eb605d2e87d73e372cfe2ba7527c61bf",
+          "reviewedArtifacts": [
+            "insufficient-coverage--a4.pdf"
+          ],
+          "reviewedRawSha256": "b796304a22d9844f421ac01405cbd0e3a34c6975c8eb8d41642f652e5f53b176",
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "print/insufficient-coverage/raster-set": {
+          "status": "pass",
+          "reviewer": "@Founder",
+          "reviewedAt": "2026-09-28T18:28:21Z",
+          "note": "Founder wörtlich im Chat: \"Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt\".",
+          "reviewArtifactFingerprint": "2362ad9a557c474c0ca9445135965cfaa2e4fbc2da821e26e5ed9eda4a7ca4c7",
+          "reviewedArtifacts": [
+            "insufficient-coverage--a4-page-1.png",
+            "insufficient-coverage--a4-page-2.png",
+            "insufficient-coverage--a4-page-3.png",
+            "insufficient-coverage--a4-page-4.png",
+            "insufficient-coverage--a4-page-5.png",
+            "insufficient-coverage--a4-page-6.png",
+            "insufficient-coverage--a4-page-7.png",
+            "insufficient-coverage--a4-page-8.png"
+          ],
+          "reviewedRawSha256": [
+            "ee9d44792c0b6a5b324a4c1a8920249e8ed7d780f3d6fa6d642fb79660b870dd",
+            "fbb992d3971be53d49491aeafeeb0b17dd53a952db56e1cef66b04e3a4e2cdbe",
+            "a7caef3aff066a281a1e257f587e166a4f1c3d4c564125b1a6738418555dc2cc",
+            "555756f635e999ca701bd4d9858158eb5a29e0923e6f421e6668f4110a2d2334",
+            "4a1761018e2c06d742ccc49869da7c3920e30c469996ab7c7fddc79a2b9af70e",
+            "34d6c8f08f4cb217a0a7fb32ab9544c396a66ea951c30f98acaaedad5642d9a6",
+            "63c3ebf5e505dbf5c60d03999f2eba8dafb1a6d9c5f3fba9f2f16dd5bd256144",
+            "694edf65a3a544282308d51ce3b07789582c2aedcd31cbe3ed7ce778868f155b"
+          ],
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        }
+      }
     }
   ]
 }

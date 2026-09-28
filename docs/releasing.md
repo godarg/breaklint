@@ -207,10 +207,12 @@ finding list and an owner, instead of red and unread. The findings and their add
 carried in that release's follow-up register.
 
 <!-- review-state -->
-**For 0.7.0 the owner decided that only a genuine human review passes this gate, and one did.**
-The 0.6.0 override was not repeated and the gate was not dropped. Ledger round 3 (2026-09-25,
-`@Founder`) passed all 32 cells on the render of the PR #18 merge commit, and
-`npm run test:report-surfaces:local` passes on it.
+**For 0.8.0 the Founder reported a completed sight review without remarks.** Ledger round 4
+(2026-09-28, `@Founder`) binds all 32 passed cells to the render of the PR #33 merge commit;
+`npm run test:report-surfaces:local` passes on that binding. The round records the Founder's
+exact wording and the three known residuals; Ubuntu font resolution remains NEEDS-CI. For 0.7.0,
+ledger round 3 likewise passed all 32 cells on the PR #18 merge commit. The 0.6.0 override was
+not repeated and the gate was not dropped.
 
 The green real-document gate reads the rights/privacy-reviewed corpus manifest and binds exact
 artifact hashes, source evidence, page/rule counts and the positive independent geometry-oracle

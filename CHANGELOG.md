@@ -30,6 +30,9 @@
   leaves and wait for the injected control page. The Freeze assertion itself is unchanged.
 - Document the Action's Bash 4 globstar prerequisite and skip its Bash-dependent unit tests with an explicit reason on older shells. Keep every assertion active when Bash 4+ is available.
 - Make the report font mutation assert the platform's actual undeclared sans face and report a missing Python `fontTools` dependency before running the mark-font generator.
+- <!-- review-state --> `npm run test:report-surfaces`, the human gate, is green on ledger round 4:
+  the Founder reported a completed 32-cell sight review without remarks on the PR #33 merge
+  commit's render on 2026-09-28. Ubuntu font resolution remains NEEDS-CI.
 
 ## 0.7.0 — 2026-09-25
 
@@ -451,7 +454,7 @@ These change how this repository is checked and released, not what the package d
   ordered in time and a review time in the future is refused; the render manifest declares the
   review environment (schema 4 → 5, artifact contract 3 → 4); the technical gate accepts any
   Chromium-based browser; and the verifier re-measures the print checks independently and proves
-  its own checks with red controls on broken copies of real evidence. <!-- review-state --> `npm run test:report-surfaces`, the human gate, is green: ledger
+  its own checks with red controls on broken copies of real evidence. `npm run test:report-surfaces`, the human gate, was green for 0.7.0: ledger
   round 3, a rostered human review on 2026-09-25, passed all 32 cells on the release commit's render.
 - **The live late-mutation test no longer depends on when a timer fires;** it requires what the
   product guarantees — an event, or neither the measured snapshot nor the delivered PDF carrying

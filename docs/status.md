@@ -16,9 +16,18 @@ current P08 at exit 1, 207/207 pages bound and 472/472 SVG targets, in 104.15 s 
 1,933,590,528 B maximum RSS. Current P05 ended exit 0, 77/77 pages bound and 156/156 SVG targets,
 in 27.65 s with 1,720,860,672 B maximum RSS. These current-product runs do not measure the
 missing 175-page bytes. The G-114/G-117 package passed its permitted second independent review
-and was integrated at `297b0fa`; the report-surface human review and release tag are pending. Read the actual publication state
+and was integrated at `297b0fa`; the Founder passed the report-surface sight review in ledger
+round 4 on 2026-09-28, while the release tag is pending. Read the actual publication state
 from npm and GitHub rather than from this preparation record. No rule is calibrated;
 browser-managed secure DNS and communication egress remain documented limits.
+
+### The exact-environment human gate for 0.8.0
+
+<!-- review-state -->
+`npm run test:report-surfaces` is green: ledger round 4 records the Founder's completed sight
+review without remarks on 2026-09-28. All 32 cells bind to the PR #33 merge commit's inputs and
+the macOS arm64 Google Chrome render. The note carries the Founder's exact wording and identifies
+the three known residuals; `ubuntu-latest` font resolution remains unmeasured (NEEDS-CI).
 
 ## Released — 0.7.0 — the rules judge what printed
 
@@ -64,8 +73,7 @@ with no source block cannot complete required evidence.
 
 ### The exact-environment human gate for 0.7.0
 
-<!-- review-state -->
-`npm run test:report-surfaces` is green: ledger round 3 records a rostered human review (`@Founder`)
+`npm run test:report-surfaces` was green for 0.7.0: ledger round 3 records a rostered human review (`@Founder`)
 on 2026-09-25 that passed all 32 cells, bound to the review-input fingerprint and the exact render
 environment (macOS arm64, Google Chrome), with the three known residuals accepted in its note. The
 technical gate (`test:report-surfaces:technical`), which CI and the release workflow run, still
@@ -241,7 +249,7 @@ presented in one review gallery. The technical gate passes 32 of 32 cells and al
 renderer negative controls each fail it for their named reason, and the verifier breaks a copy of
 real evidence for each of its independent checks once per run. No human review of these surfaces
 is claimed by that technical gate; <!-- review-state --> the strict local gate is green on ledger
-round 3 (2026-09-25, 32 of 32 cells passed by a rostered human). The resolved fonts were measured in the Linux development container only; the
+round 4 (2026-09-28, 32 of 32 cells passed by a rostered human). The resolved fonts were measured in the Linux development container only; the
 `ubuntu-latest` CI runner's font resolution is unmeasured (NEEDS-CI).
 
 ### Two records that no longer claim what they cannot
