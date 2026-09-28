@@ -52,6 +52,7 @@ import {
   composeSignature,
   driftedComponents,
   DOCUMENT_TIMEOUT_MS,
+  DOCUMENT_TIMEOUT_MAX_MS,
   freezeSource,
   MAX_DOM_NODES,
   MAX_MUTATIONS_AFTER_RENDERED,
@@ -2389,7 +2390,10 @@ export async function renderDocuments(
           infrastructure: [{
             kind: "checker-crashed",
             detail: timedOut
-              ? `document acquisition exceeded its ${documentTimeoutMs} ms budget: ${error.message}. Raise it within the hard limit with --document-timeout-ms <milliseconds> or config documentTimeoutMs.`
+              ? `document acquisition exceeded its ${documentTimeoutMs} ms budget: ${error.message}. ` +
+                (documentTimeoutMs < DOCUMENT_TIMEOUT_MAX_MS
+                  ? "Raise it within the hard limit with --document-timeout-ms <milliseconds> or config documentTimeoutMs."
+                  : "The --document-timeout-ms hard maximum is reached; reduce or split the document.")
               : `document acquisition failed outside its owned result boundary: ${error instanceof Error ? error.message : String(error)}`,
             measured: timedOut
               ? { stage: "document-timeout", timeoutMs: documentTimeoutMs }
