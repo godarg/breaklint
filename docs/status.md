@@ -6,13 +6,14 @@ stated here rather than left to be inferred from a passing test suite.
 
 ## Release preparation — 0.8.0
 
-The integration branch contains the configurable 600,000 ms document budget, SVG occurrence
-identity and physical-page evidence binding, the content-loss checks, inherited Chrome-flag
-neutralisation and Mac gate repairs. This is a candidate, not a published release. The required
-packed run on the specified 175-page P08 `print.html` is still pending because that exact file is
-absent from the workspace; a generated 207-page copy is not a substitute and ends at exit 4 on
-the open SVG painted-bounds gap. The report-surface human review and release tag are pending.
-No rule is calibrated; browser-managed secure DNS and communication egress remain documented limits.
+At preparation on 2026-09-28, the integration candidate contains the configurable 600,000 ms
+document budget, SVG occurrence identity and physical-page evidence binding, the content-loss
+checks, inherited Chrome-flag neutralisation and Mac gate repairs. At that preparation snapshot,
+the packed run on the specified 175-page P08 `print.html` was pending because the exact file was
+absent; a generated 207-page copy was not a substitute and ended at exit 4 on the open SVG
+painted-bounds gap. The report-surface human review and release tag were pending then. Read the
+actual publication state from npm and GitHub rather than from this preparation record. No rule is
+calibrated; browser-managed secure DNS and communication egress remain documented limits.
 
 ## Released — 0.7.0 — the rules judge what printed
 
