@@ -1,6 +1,7 @@
 # The breaklint GitHub Action: a page-layout gate for documents printed from HTML.
 #
 # Copy-paste recipe, permissions, exit codes and caching: docs/ci-recipe.md.
+# Path expansion requires Bash 4 or newer with globstar; macOS /bin/bash 3.2 cannot run it.
 #
 # This file is deliberately thin. Every input reaches `action/run.mjs` as ONE environment
 # variable holding `toJSON(inputs)`; no `${{ inputs.* }}` expression is ever pasted into a shell
@@ -17,7 +18,8 @@ inputs:
   paths:
     description: >-
       Required. The HTML files to check, one path or bash glob per line, relative to the
-      workspace. `**` matches across directories. The tool itself never recurses; a pattern that
+      workspace. Bash 4 or newer with globstar is required; macOS /bin/bash 3.2 is insufficient.
+      `**` matches across directories. The tool itself never recurses; a pattern that
       matches nothing is passed on literally and ends with exit 2, exactly as in bash.
     required: true
   fail-on-exit:

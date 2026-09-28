@@ -130,6 +130,10 @@ the summary says the findings were not gated. That is different from `fail-on: n
 changes breaklint's own gate: breaklint then ends with 0 on findings, so the recorded exit code no
 longer shows them either.
 
+The Action's path expansion requires Bash 4 or newer with globstar. GitHub's Ubuntu runner has
+that shell; macOS `/bin/bash` 3.2 does not, so install Bash 4+ and put it first on `PATH` when
+running the Action on macOS. A runner without globstar exits 3 before checking a document.
+
 The Action adds two refusals of its own, both with breaklint's table. A step input that fails
 validation is exit 2. An install that fails, a runner that cannot run the check (Windows, a Node
 older than breaklint's `engines`, a `BREAKLINT_CHROME` that points nowhere), or a breaklint exit

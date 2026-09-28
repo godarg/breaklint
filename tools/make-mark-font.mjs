@@ -39,7 +39,7 @@
  * Run: node tools/make-mark-font.mjs        (writes src/render/mark-font.ts)
  *      node tools/make-mark-font.mjs --check (exits non-zero if the file is out of date)
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -51,6 +51,14 @@ const TARGET = join(HERE, "..", "src", "render", "mark-font.ts");
 const CHARS = [..."BLSIDAE0123456789"];
 const FAMILY = "breaklint-mark";
 const UPM = 1000;
+
+// Fail before the generator runs, with the missing development prerequisite and its remedy.
+const fontToolsPreflight = spawnSync("python3", ["-c", "import fontTools"], { encoding: "utf8" });
+if (fontToolsPreflight.error || fontToolsPreflight.status !== 0) {
+  const detail = fontToolsPreflight.error?.message ?? fontToolsPreflight.stderr.trim();
+  console.error(`mark font preflight: python3 with fontTools is required. Install it with: python3 -m pip install fonttools${detail ? `\n${detail}` : ""}`);
+  process.exit(1);
+}
 
 const PY = `
 import base64, io, sys

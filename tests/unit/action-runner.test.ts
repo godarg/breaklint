@@ -26,6 +26,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -55,6 +56,11 @@ import { junitProblems, markdownProblems, sarifProblems } from "../tools/report-
 import { ARMS, checkArm } from "../tools/action-selftest.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+const ACTION_BASH_PATH = `${dirname(process.execPath)}:${process.env.PATH ?? "/usr/bin:/bin"}`;
+const BASH_GLOBSTAR_REQUIRED = spawnSync("bash", ["--noprofile", "--norc", "-c", "shopt -s globstar"],
+  { encoding: "utf8", env: { ...process.env, PATH: ACTION_BASH_PATH } }).status === 0
+  ? {}
+  : { skip: "the Action's path expansion requires Bash 4 or newer with globstar; this host's bash lacks it" };
 const RUN = join(ROOT, "action/run.mjs");
 const CLI = join(ROOT, "src/cli/index.ts");
 const PACKAGE = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
@@ -181,7 +187,9 @@ function runAction(options: RunOptions = {}): ActionRun {
     cwd: workspace,
     encoding: "utf8",
     env: {
-      PATH: `${fakeBin}:${dirname(process.execPath)}:/usr/bin:/bin`,
+      // The child must find the same bash the platform probe found. On macOS a Bash 4+
+      // installation precedes /bin in PATH; hardcoding /usr/bin:/bin would test Bash 3.2.
+      PATH: `${fakeBin}:${ACTION_BASH_PATH}`,
       HOME: process.env.HOME ?? scratch,
       GITHUB_WORKSPACE: workspace,
       RUNNER_TEMP: runnerTemp,
@@ -219,7 +227,7 @@ function withReport(state: keyof typeof reports, exit: number, inputs: Record<st
 }
 
 before(() => {
-  scratch = mkdtempSync(join(tmpdir(), "breaklint-action-test-"));
+  scratch = realpathSync(mkdtempSync(join(tmpdir(), "breaklint-action-test-")));
   const states = canonicalReportStates();
   const written = {} as typeof reports;
   for (const [name, report] of Object.entries(states)) {
@@ -238,6 +246,16 @@ after(() => {
 
 describe("action.yml and the runner agree", () => {
   const actionYml = readFileSync(join(ROOT, "action.yml"), "utf8");
+
+  it("declares the Bash 4 globstar prerequisite at every public Action entry", () => {
+    for (const [name, content] of [
+      ["action.yml", actionYml],
+      ["README.md", readFileSync(join(ROOT, "README.md"), "utf8")],
+      ["docs/ci-recipe.md", readFileSync(join(ROOT, "docs/ci-recipe.md"), "utf8")],
+    ] as const) {
+      assert.match(content, /Bash 4(?:\+| or newer)[^\n]*globstar|globstar[^\n]*Bash 4(?:\+| or newer)/iu, `${name} does not explain the Bash 4 globstar prerequisite`);
+    }
+  });
 
   /** The `inputs:` block of our own action.yml: name → default. Enough YAML for this file. */
   function declaredInputs(): Record<string, string> {
@@ -312,7 +330,7 @@ describe("action.yml and the runner agree", () => {
 describe("the step result follows breaklint's exit code", () => {
   const byExit = { 0: "clean", 1: "findings", 3: "infrastructure", 4: "insufficient-coverage" } as const;
 
-  it("fails the step with breaklint's own code on 1, 2, 3 and 4 by default, and passes only 0", () => {
+  it("fails the step with breaklint's own code on 1, 2, 3 and 4 by default, and passes only 0", BASH_GLOBSTAR_REQUIRED, () => {
     for (const [exit, state] of Object.entries(byExit)) {
       const run = withReport(state, Number(exit));
       assert.equal(run.status, Number(exit), `exit ${exit}: step rc ${run.status}\n${run.stdout}${run.stderr}`);
@@ -325,7 +343,7 @@ describe("the step result follows breaklint's exit code", () => {
     assert.equal(usage.outputs.verdict, "usage");
   });
 
-  it("leaves exit 1 ungated only when asked, and says so where a reader looks", () => {
+  it("leaves exit 1 ungated only when asked, and says so where a reader looks", BASH_GLOBSTAR_REQUIRED, () => {
     const run = withReport("findings", 1, { "fail-on-exit": "2,3,4" });
     assert.equal(run.status, 0);
     assert.equal(run.outputs["exit-code"], "1");
@@ -349,7 +367,7 @@ describe("the step result follows breaklint's exit code", () => {
     assert.deepEqual(ALWAYS_FAILING_EXITS, [2, 3, 4]);
   });
 
-  it("reads no verdict into an exit 0 or 1 without its report, a mismatching report, or a signal", () => {
+  it("reads no verdict into an exit 0 or 1 without its report, a mismatching report, or a signal", BASH_GLOBSTAR_REQUIRED, () => {
     for (const exit of [0, 1]) {
       const run = runAction({ inputs: { paths: "doc.html" }, env: { FAKE_BEHAVIOUR: "noreport", FAKE_EXIT: String(exit) } });
       assert.equal(run.status, 3, `exit ${exit} without a report became step rc ${run.status}`);
@@ -385,7 +403,7 @@ describe("the step result follows breaklint's exit code", () => {
 });
 
 describe("no input becomes a command, an option or a workflow command", () => {
-  it("expands paths as bash globs and nothing else", () => {
+  it("expands paths as bash globs and nothing else", BASH_GLOBSTAR_REQUIRED, () => {
     const workspace = mkdtempSync(join(scratch, "ws-"));
     for (const file of ["docs/a.html", "docs/B.html", "docs/sub/b.html", "docs/sub/deeper/c.html", "docs/.hidden.html", "docs/with space.html"]) {
       mkdirSync(dirname(join(workspace, file)), { recursive: true });
@@ -407,7 +425,7 @@ describe("no input becomes a command, an option or a workflow command", () => {
     assert.equal(run.records[0]!.cwd, workspace);
   });
 
-  it("keeps shell syntax, leading dashes and unknown inputs inert", () => {
+  it("keeps shell syntax, leading dashes and unknown inputs inert", BASH_GLOBSTAR_REQUIRED, () => {
     const workspace = mkdtempSync(join(scratch, "ws-"));
     const hostile = [
       "$(touch PWNED-subst).html",
@@ -459,7 +477,7 @@ describe("no input becomes a command, an option or a workflow command", () => {
     }
   });
 
-  it("resumes workflow commands even after output that ends without a newline", () => {
+  it("resumes workflow commands even after output that ends without a newline", BASH_GLOBSTAR_REQUIRED, () => {
     // Without the newline before the resume marker, the marker would be glued to breaklint's
     // unterminated last line, the runner would never resume, and the Action's own ::error below
     // would be ignored with everything after it.
@@ -477,7 +495,7 @@ describe("no input becomes a command, an option or a workflow command", () => {
     assert.ok(error > resume, "the Action's own annotation is not in a region where the runner honours commands");
   });
 
-  it("prints an unexpected failure's stack where the runner does not honour workflow commands", () => {
+  it("prints an unexpected failure's stack where the runner does not honour workflow commands", BASH_GLOBSTAR_REQUIRED, () => {
     const workspace = mkdtempSync(join(scratch, "ws-"));
     writeFileSync(join(workspace, "doc.html"), "<p>x</p>");
     fakePackage(workspace, PACKAGE.version, 'export function render() { throw new Error("\\n::error::forged by a stack"); }\n');
@@ -493,7 +511,7 @@ describe("no input becomes a command, an option or a workflow command", () => {
     assert.ok(close > forged);
   });
 
-  it("prints breaklint's output where the runner does not honour workflow commands", () => {
+  it("prints breaklint's output where the runner does not honour workflow commands", BASH_GLOBSTAR_REQUIRED, () => {
     const workspace = mkdtempSync(join(scratch, "ws-"));
     writeFileSync(join(workspace, "doc.html"), "<p>x</p>");
     const run = runAction({
@@ -518,7 +536,7 @@ describe("no input becomes a command, an option or a workflow command", () => {
 });
 
 describe("the projections are breaklint's own, from one run", () => {
-  it("publishes SARIF, JUnit and Markdown equal to the CLI's own formats, and valid", () => {
+  it("publishes SARIF, JUnit and Markdown equal to the CLI's own formats, and valid", BASH_GLOBSTAR_REQUIRED, () => {
     const workspace = mkdtempSync(join(scratch, "ws-"));
     const run = runAction({ workspace, inputs: { paths: "doc.html" }, env: { FAKE_BEHAVIOUR: "demo" } });
     assert.equal(run.status, 1, `${run.stdout}${run.stderr}`);
@@ -547,7 +565,7 @@ describe("the projections are breaklint's own, from one run", () => {
     assert.equal(report.exitCode, 1);
   });
 
-  it("names every file in its outputs and hands breaklint the files it was asked to write", () => {
+  it("names every file in its outputs and hands breaklint the files it was asked to write", BASH_GLOBSTAR_REQUIRED, () => {
     const run = withReport("clean", 0, { "fail-on": "warn", profile: "strict", config: "cfg.json", "allow-network": "https://fonts.example" });
     assert.equal(run.status, 0);
     const argv = run.records[0]!.argv;
@@ -614,7 +632,7 @@ describe("installing breaklint", () => {
     });
   }
 
-  it("installs the pinned version and the pinned peers with scripts off, and resolves them for breaklint", () => {
+  it("installs the pinned version and the pinned peers with scripts off, and resolves them for breaklint", BASH_GLOBSTAR_REQUIRED, () => {
     const run = installRun();
     assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
     assert.equal(run.npmRecords.length, 1);
@@ -631,7 +649,7 @@ describe("installing breaklint", () => {
     assert.equal(run.records[0]!.argv[0], join(installDir, "node_modules", "breaklint", "dist", "cli", "index.js"));
   });
 
-  it("reuses an install within a job, and reinstalls one that did not finish", () => {
+  it("reuses an install within a job, and reinstalls one that did not finish", BASH_GLOBSTAR_REQUIRED, () => {
     const runnerTemp = mkdtempSync(join(scratch, "rt-"));
     const first = installRun({}, {}, runnerTemp);
     assert.equal(first.status, 0);
@@ -657,7 +675,7 @@ describe("installing breaklint", () => {
     for (const run of [wrongPeer, wrongVersion]) assert.equal(run.records.length, 0, "breaklint ran on an install that failed its check");
   });
 
-  it("installs a named tarball instead, and refuses a missing one or a conflicting mode", () => {
+  it("installs a named tarball instead, and refuses a missing one or a conflicting mode", BASH_GLOBSTAR_REQUIRED, () => {
     const workspace = mkdtempSync(join(scratch, "ws-"));
     writeFileSync(join(workspace, "breaklint-9.9.9.tgz"), "tarball bytes");
     writeFileSync(join(workspace, "doc.html"), "<p>x</p>");
@@ -693,7 +711,7 @@ describe("installing breaklint", () => {
 });
 
 describe("the browser the Action hands breaklint", () => {
-  it("takes chrome-path only as an existing absolute file, and never a missing BREAKLINT_CHROME", () => {
+  it("takes chrome-path only as an existing absolute file, and never a missing BREAKLINT_CHROME", BASH_GLOBSTAR_REQUIRED, () => {
     assert.equal(withReport("clean", 0, { "chrome-path": "chrome" }).status, 2);
     assert.equal(withReport("clean", 0, { "chrome-path": join(scratch, "no-such-chrome") }).status, 2);
     const chosen = withReport("clean", 0, { "chrome-path": RUN });
@@ -709,7 +727,7 @@ describe("the browser the Action hands breaklint", () => {
 describe("the CI job's assertion step can fail", () => {
   // `tests/tools/action-selftest.mjs` is what turns the `action` job's continue-on-error arms
   // back into a verdict. A checker that passes everything would make that job green over nothing.
-  it("accepts an arm that did what it must, and names each way one did not", () => {
+  it("accepts an arm that did what it must, and names each way one did not", BASH_GLOBSTAR_REQUIRED, () => {
     const run = withReport("clean", 0);
     assert.equal(run.status, 0);
     const step = { outcome: "success", conclusion: "success", outputs: run.outputs };
