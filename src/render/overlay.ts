@@ -174,10 +174,11 @@ const OVERLAY_TEMPLATE = `(() => {
           rect.y >= pageBox.top && rect.y <= pageBox.bottom,
         );
         if (!rects.length) {
-          unplacedMarks.push(
+          const refused = [
             { sid, page: pageIndex + 1, side: "start", reason: "fragment-outside-page" },
             { sid, page: pageIndex + 1, side: "end", reason: "fragment-outside-page" },
-          );
+          ];
+          unplacedMarks.push(...refused);
           // An unbreakable block can remain in Paged.js' side overflow fragmentainer on page N
           // while the printable clone is moved to N+1. Require all rectangles to be wholly to
           // the right, an avoid-break ancestor in this flow, and BOTH real marks on a following
@@ -194,7 +195,7 @@ const OVERLAY_TEMPLATE = `(() => {
           if (keptWhole && P.closest(el, ".pagedjs_footnote_area") === null &&
               allRects.every((rect) => rect.x >= pageBox.right) &&
               ancestorRects.length > 0 && ancestorRects.every((rect) => rect.x >= pageBox.right)) {
-            sideLaneCandidates.push({ sid, page: pageIndex + 1 });
+            sideLaneCandidates.push({ sid, page: pageIndex + 1, refused });
           }
           continue;
         }
@@ -266,10 +267,12 @@ const OVERLAY_TEMPLATE = `(() => {
       [page + 1, page + 2].some((nextPage) =>
         placed.has(nextPage + ":" + sid + ":start") &&
         placed.has(nextPage + ":" + sid + ":end")),
-    ).map(({ sid, page }) => page + ":" + sid));
+    ).flatMap(({ refused }) => refused));
     return {
       marks,
-      unplacedMarks: unplacedMarks.filter(({ sid, page }) => !deferred.has(page + ":" + sid)),
+      // Refuse/except the exact DOM fragment's mark requests. A footnote may carry the same SID
+      // on this page, and its clipped marks must never be cleared by another clone's exception.
+      unplacedMarks: unplacedMarks.filter((mark) => !deferred.has(mark)),
       layers: state.layers.length,
       staticPageAreas,
     };

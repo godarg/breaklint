@@ -77,6 +77,7 @@ const DEFERRED_FIXTURE = `<!doctype html><html lang="en"><head><meta charset="ut
       <section class="continued" data-bl-sid="continued"><p>visible first fragment</p></section>
       <div class="deferred" data-bl-sid="deferred"><p data-bl-sid="deferred-child">next page only</p></div>
       <div class="deferred" data-bl-sid="deferred-later">two pages later</div>
+      <div class="deferred" data-bl-sid="clipped-note">same SID as the separately clipped footnote</div>
       <div class="deferred" data-bl-sid="orphan">no printable clone exists</div>
       <section class="visible-keep">visible block <p class="escaped-child" data-bl-sid="escaped-child">escaped child</p></section>
     </div>
@@ -189,18 +190,28 @@ describe("evidence overlay page membership, live", () => {
     if (missingBrowser && optional) return t.skip("missing browser");
     const current = await page("/deferred.html");
     try {
-      const geometry = await current.evaluate<{ viewportBottom: number; physicalBottom: number; firstEnd: number; deferredX: number }>(`(() => {
+      const geometry = await current.evaluate<{
+        viewportBottom: number; physicalBottom: number; firstEnd: number; deferredX: number;
+        collidedSideX: number; clippedNoteX: number; clippedNoteTop: number; areaBottom: number;
+      }>(`(() => {
         const first = document.querySelector('.pagedjs_page');
         return {
           viewportBottom: first.getBoundingClientRect().bottom,
           physicalBottom: first.querySelector('.pagedjs_pagebox').getBoundingClientRect().bottom,
           firstEnd: first.querySelector('[data-bl-sid="continued"]').getBoundingClientRect().bottom,
           deferredX: first.querySelector('[data-bl-sid="deferred"]').getBoundingClientRect().x,
+          collidedSideX: first.querySelector('.pagedjs_page_content [data-bl-sid="clipped-note"]').getBoundingClientRect().x,
+          clippedNoteX: first.querySelector('.pagedjs_footnote_area [data-bl-sid="clipped-note"]').getBoundingClientRect().x,
+          clippedNoteTop: first.querySelector('.pagedjs_footnote_area [data-bl-sid="clipped-note"]').getBoundingClientRect().top,
+          areaBottom: first.querySelector('.pagedjs_page_content').getBoundingClientRect().bottom,
         };
       })()`);
       assert.ok(geometry.firstEnd > geometry.viewportBottom && geometry.firstEnd < geometry.physicalBottom,
         "fixture must place the real continuation edge outside the viewport but inside the physical page");
       assert.ok(geometry.deferredX > 794, "fixture must put deferred content in the side fragmentainer");
+      assert.ok(geometry.collidedSideX > 794 && geometry.clippedNoteX < 794 &&
+        geometry.clippedNoteTop > geometry.areaBottom && geometry.clippedNoteTop < geometry.physicalBottom,
+      "fixture must put the colliding SID in both the deferrable side lane and the clipped footnote area");
       const installation = await installOverlay(current);
       assert.ok(installation.marks.some((mark) => mark.page === 1 && mark.sid === "continued" && mark.side === "end"),
         "the measured continuation boundary was refused despite lying on the physical page");
@@ -214,8 +225,9 @@ describe("evidence overlay page membership, live", () => {
         "an avoid-break element outside the page was excluded without a printable clone");
       assert.ok(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "escaped-child"),
         "an off-sheet child of a visible avoid-break container was mistaken for a deferred container");
-      assert.ok(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "clipped-note"),
-        "a clipped footnote became falsely bound merely because a later clone has the same source id");
+      assert.deepEqual(installation.unplacedMarks.filter((mark) => mark.page === 1 && mark.sid === "clipped-note")
+        .map((mark) => mark.side), ["start", "end"],
+      "the side-lane clone may be excluded, but both marks of the separate clipped footnote must remain unplaced");
       assert.deepEqual(await readbackViolations(current), []);
       assert.equal(await detachOverlay(current), 3);
       assert.equal(await removeOverlay(current), 0);
