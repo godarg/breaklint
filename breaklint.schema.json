@@ -27,6 +27,12 @@
       "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z]{4})?(?:-(?:[A-Za-z]{2}|[0-9]{3}))?(?:-(?:[A-Za-z0-9]{5,8}|[0-9][A-Za-z0-9]{3}))*$",
       "default": "de-DE"
     },
+    "documentTimeoutMs": {
+      "type": "integer",
+      "minimum": 30000,
+      "maximum": 1800000,
+      "default": 600000
+    },
     "rules": {
       "type": "object",
       "additionalProperties": false,

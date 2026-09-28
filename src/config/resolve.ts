@@ -27,6 +27,7 @@ import type {
   EffectiveConfig,
   ProfileName,
 } from "./contract.ts";
+import { DOCUMENT_TIMEOUT_MAX_MS, DOCUMENT_TIMEOUT_MIN_MS, DOCUMENT_TIMEOUT_MS } from "../measure/freeze.ts";
 
 export type { ConfigFile, ConfigSource, EffectiveConfig, ProfileName } from "./contract.ts";
 export { CONFIG_CONTRACT_VERSION } from "./contract.ts";
@@ -47,6 +48,7 @@ export interface ResolvedConfig {
   sourceMapInjection: boolean;
   network: { mode: "offline" | "allowlist"; allowed: string[] };
   locale: string;
+  documentTimeoutMs: number;
   effective: EffectiveConfig;
   sources: Record<string, ConfigSource>;
   fingerprint: string;
@@ -88,6 +90,7 @@ export function resolveConfig(input: {
     noSourceMap?: boolean | undefined;
     allowNetwork?: string[] | undefined;
     locale?: string | undefined;
+    documentTimeoutMs?: number | undefined;
   };
 }): ResolvedConfig {
   return usage(() => resolveValidated(input.file === undefined ? {} : validateConfigFile(input.file), input.cli));
@@ -143,6 +146,13 @@ function resolveValidated(file: ConfigFile, cli: Parameters<typeof resolveConfig
   }
   const localeSource: ConfigSource = cli.locale !== undefined ? "cli" : file.locale !== undefined ? "config" : "default";
   source(configPointer("locale"), localeSource);
+  const documentTimeoutMs = cli.documentTimeoutMs ?? file.documentTimeoutMs ?? DOCUMENT_TIMEOUT_MS;
+  if (!Number.isSafeInteger(documentTimeoutMs) || documentTimeoutMs < DOCUMENT_TIMEOUT_MIN_MS ||
+    documentTimeoutMs > DOCUMENT_TIMEOUT_MAX_MS) {
+    throw new UsageError(`documentTimeoutMs must be an integer from ${DOCUMENT_TIMEOUT_MIN_MS} to ${DOCUMENT_TIMEOUT_MAX_MS}.`);
+  }
+  source(configPointer("documentTimeoutMs"),
+    cli.documentTimeoutMs !== undefined ? "cli" : file.documentTimeoutMs !== undefined ? "config" : "default");
 
   // The profile decides which rules run before config or CLI is consulted. Registration is not
   // activation: see OFF_BY_DEFAULT_RULE_IDS in the contract for why exactly one rule is off here.
@@ -244,6 +254,7 @@ function resolveValidated(file: ConfigFile, cli: Parameters<typeof resolveConfig
   const effective: EffectiveConfig = {
     failOn,
     locale,
+    documentTimeoutMs,
     evidenceBinding,
     sourceMapInjection,
     network,
@@ -267,6 +278,7 @@ function resolveValidated(file: ConfigFile, cli: Parameters<typeof resolveConfig
     sourceMapInjection,
     network,
     locale,
+    documentTimeoutMs,
     effective,
     sources,
     fingerprint: effectiveConfigFingerprint(effective),

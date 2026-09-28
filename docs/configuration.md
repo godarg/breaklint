@@ -54,6 +54,7 @@ claim. Missing, stale, or changed proof remains declared/unknown with a typed ev
   "profile": "default",
   "failOn": "warn",
   "locale": "de-DE",
+  "documentTimeoutMs": 600000,
   "rules": {
     "layout/half-empty-page": true,
     "layout/widow": { "extraLines": 1 },
@@ -93,6 +94,16 @@ file that asks for 0.9 or by a later `--profile default`; both invocations end w
 CLI rule selection is also explicit. `--only` replaces config-file enablement for the selected
 set, then `--disable` can remove rules from that set. Empty lists and unknown rule ids are usage
 errors.
+
+## Document time budget
+
+One document has a default acquisition budget of 600000 ms (10 minutes). Set
+`documentTimeoutMs` in the JSON file or pass `--document-timeout-ms <n>`; the CLI wins when both
+are present. The value must be an integer from 30000 to 1800000 ms. Invalid values stop before
+Chrome starts with exit 2. Exceeding the budget during acquisition ends with exit 3; the message
+reports the effective budget and names the flag. The producer API uses the same default and hard
+maximum for its host-controlled process boundary. A larger budget can use substantially more
+memory on long documents; it is not a page-count or memory guarantee.
 
 ## Rules and options
 

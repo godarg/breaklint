@@ -98,6 +98,7 @@ export interface RenderOptions {
   sourceMapInjection: boolean;
   network: { mode: "offline" | "allowlist"; allowed: string[] };
   locale: string;
+  documentTimeoutMs?: number;
 }
 
 export interface RenderEnvironment extends ReportEnvironment {
@@ -135,7 +136,7 @@ export interface RenderDependencies {
   openRasterizer: typeof openRasterizer;
   /** Test seam for the provenance corruption red condition; production always uses the parser injector. */
   injectSourceIds?: typeof injectSourceIds;
-  /** Unit-only timing seam. Production dependencies omit it and remain fixed at §13.3's 120000 ms. */
+  /** Unit-only timing seam; the resolved public option is in RenderOptions. */
   documentTimeoutMs?: number;
   /** Test seam for an unreadable process table; production uses the POSIX verifier above. */
   terminateBrowserProcessTree?: typeof terminateProcessTree;
@@ -1639,7 +1640,7 @@ async function openContentPage(
     await page.emulateMediaType("print");
     const ready = await withTimeout(
       page.evaluate<ResourceBarrierResult>(RESOURCE_BARRIER_SOURCE),
-      DOCUMENT_TIMEOUT_MS,
+      context.options.documentTimeoutMs ?? DOCUMENT_TIMEOUT_MS,
       "font/image readiness barrier",
     );
     if (ready.failedFonts.length > 0) {
@@ -2368,7 +2369,7 @@ export async function renderDocuments(
     runId: randomBytes(6).toString("hex"),
   };
   const documents: DocumentInput[] = [];
-  const documentTimeoutMs = dependencies.documentTimeoutMs ?? DOCUMENT_TIMEOUT_MS;
+  const documentTimeoutMs = dependencies.documentTimeoutMs ?? options.documentTimeoutMs ?? DOCUMENT_TIMEOUT_MS;
   let browserTerminationError: string | null = null;
   let rasterizerCloseError: string | null = null;
   let profileCleanupError: string | null = null;
@@ -2388,7 +2389,7 @@ export async function renderDocuments(
           infrastructure: [{
             kind: "checker-crashed",
             detail: timedOut
-              ? `document acquisition exceeded its process boundary: ${error.message}`
+              ? `document acquisition exceeded its ${documentTimeoutMs} ms budget: ${error.message}. Raise it within the hard limit with --document-timeout-ms <milliseconds> or config documentTimeoutMs.`
               : `document acquisition failed outside its owned result boundary: ${error instanceof Error ? error.message : String(error)}`,
             measured: timedOut
               ? { stage: "document-timeout", timeoutMs: documentTimeoutMs }

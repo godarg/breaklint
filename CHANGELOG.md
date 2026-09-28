@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- G-111: the live document budget is configurable with `--document-timeout-ms` and
+  `documentTimeoutMs` (30000–1800000 ms); the default is 600000 ms. Invalid values exit 2,
+  and a timeout names the effective budget and flag. The producer boundary shares the default.
+
 ## 0.7.0 — 2026-09-25
 
 A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0 and 0.6.0: a

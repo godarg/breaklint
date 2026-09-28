@@ -12,6 +12,7 @@ import type { FailOn } from "../core/enums.ts";
 import { sha256 } from "../core/fingerprint.ts";
 import type { Rule, RuleOptions } from "../core/rule.ts";
 import { ALL_RULES, RULES_BY_ID } from "../rules/index.ts";
+import { DOCUMENT_TIMEOUT_MAX_MS, DOCUMENT_TIMEOUT_MIN_MS, DOCUMENT_TIMEOUT_MS } from "../measure/freeze.ts";
 
 export const CONFIG_CONTRACT_VERSION = 1 as const;
 export const CONFIG_SOURCES = ["default", "profile", "config", "cli"] as const;
@@ -30,6 +31,7 @@ export type ConfigFile = {
   rules?: Record<string, boolean | Record<string, unknown>>;
   coverageFloors?: Record<string, number>;
   locale?: string;
+  documentTimeoutMs?: number;
 };
 
 export interface EffectiveRuleConfig {
@@ -41,6 +43,7 @@ export interface EffectiveRuleConfig {
 export interface EffectiveConfig {
   failOn: FailOn;
   locale: string;
+  documentTimeoutMs: number;
   evidenceBinding: boolean;
   sourceMapInjection: boolean;
   network: { mode: "offline" | "allowlist"; allowed: string[] };
@@ -185,7 +188,7 @@ function validateRuleValue(rule: Rule, value: unknown): void {
 /** Validate a parsed JSON value before resolution. Unknown input never becomes an ignored field. */
 export function validateConfigFile(raw: unknown): ConfigFile {
   if (!isRecord(raw)) throw new Error("config must be a JSON object.");
-  const unknown = unknownKeys(raw, ["profile", "failOn", "rules", "coverageFloors", "locale"]);
+  const unknown = unknownKeys(raw, ["profile", "failOn", "rules", "coverageFloors", "locale", "documentTimeoutMs"]);
   if (unknown.length > 0) throw new Error(`config: unknown top-level field "${unknown[0]}".`);
 
   if (raw.profile !== undefined) {
@@ -199,6 +202,12 @@ export function validateConfigFile(raw: unknown): ConfigFile {
     }
   }
   if (raw.locale !== undefined) assertLocale(raw.locale, "config: locale");
+  if (raw.documentTimeoutMs !== undefined &&
+    (!Number.isSafeInteger(raw.documentTimeoutMs) ||
+      (raw.documentTimeoutMs as number) < DOCUMENT_TIMEOUT_MIN_MS ||
+      (raw.documentTimeoutMs as number) > DOCUMENT_TIMEOUT_MAX_MS)) {
+    throw new Error(`config: documentTimeoutMs must be an integer from ${DOCUMENT_TIMEOUT_MIN_MS} to ${DOCUMENT_TIMEOUT_MAX_MS}.`);
+  }
 
   if (raw.rules !== undefined) {
     if (!isRecord(raw.rules)) throw new Error("config: rules must be an object.");
@@ -283,6 +292,7 @@ export function configSchema(): Record<string, unknown> {
       profile: { type: "string", enum: [...PROFILE_NAMES], default: "default" },
       failOn: { type: "string", enum: [...FAIL_ON_VALUES] },
       locale: { type: "string", pattern: LOCALE_PATTERN_SOURCE, default: "de-DE" },
+      documentTimeoutMs: { type: "integer", minimum: DOCUMENT_TIMEOUT_MIN_MS, maximum: DOCUMENT_TIMEOUT_MAX_MS, default: DOCUMENT_TIMEOUT_MS },
       rules: { type: "object", additionalProperties: false, properties: ruleProperties },
       coverageFloors: { type: "object", additionalProperties: false, properties: floorProperties },
     },

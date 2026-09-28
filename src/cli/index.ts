@@ -122,6 +122,7 @@ export async function main(argv: string[]): Promise<number> {
       sourceMapInjection: config.sourceMapInjection,
       network: config.network,
       locale: config.locale,
+      documentTimeoutMs: config.documentTimeoutMs,
     });
     if (rendered.fatal) {
       err(rendered.fatal.message + "\n");
@@ -250,6 +251,8 @@ options
   --disable <rule,...>      Run everything except these.
   --config <file>           JSON config (default ./breaklint.config.json).
   --locale <tag>            Locale for the type/ rules (default de-DE).
+  --document-timeout-ms <n> Budget for one document in milliseconds (30000–1800000;
+                            default 600000). A timeout ends with exit 3.
   --no-evidence-binding     Skip the evidence marks. Findings keep bindsFinding: false.
   --no-source-map           Skip source id injection. Every finding then has source: null.
   --allow-network <origin>  Let page requests reach this origin. Repeatable. By default
