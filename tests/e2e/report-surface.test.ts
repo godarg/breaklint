@@ -491,11 +491,19 @@ describe("report-surface human review gate", () => {
       /reviewers: not recorded, not recorded; cells passed by a rostered human: 0 of 0 passing\); bound to the current render: inputs no; environment\/artifacts no$/u);
   });
 
-  it("records the 0.7.0 release review as a current human pass of all 32 cells", () => {
+  it("retains the 0.7.0 review and records the 0.8.0 Founder pass of all 32 cells", () => {
     const ledger = committedLedger();
     const { rounds, latest } = validateReviewLedger(ledger);
-    assert.equal(rounds, 3);
-    assert.equal(latest.round, 3);
+    assert.equal(rounds, 4);
+    const prior = ledger.rounds[2]!;
+    assert.equal(prior.round, 3);
+    assert.equal(prior.outcome, "pass");
+    assert.equal(prior.record, "current");
+    assert.deepEqual(prior.reviewers, [{ kind: "human", handle: "@Founder" }]);
+    const priorCells = Object.values(prior.cells ?? {});
+    assert.equal(priorCells.length, 32);
+    assert.ok(priorCells.every((cell) => cell.status === "pass" && cell.reviewer === "@Founder"));
+    assert.equal(latest.round, 4);
     assert.equal(latest.outcome, "pass");
     assert.equal(latest.record, "current");
     assert.deepEqual(latest.reviewers, [{ kind: "human", handle: "@Founder" }]);
