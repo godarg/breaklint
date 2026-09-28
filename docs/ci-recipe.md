@@ -9,7 +9,7 @@ What the Action does, in one run:
 1. installs breaklint at the version its own ref pins, with the renderer peers
    `puppeteer-core@25.8.0`, `pagedjs@0.4.3` and `pdfjs-dist@6.2.108`, into the runner's temporary
    directory — or uses your project's own install;
-2. hands breaklint the runner's Chrome, with the sandbox on (there is no way to turn it off);
+2. hands breaklint the runner's Chrome without a sandbox-disabling switch; breaklint refuses two known Puppeteer overrides and strips `CHROME_EXTRA_FLAGS`, while other wrapper variables are not proven safe;
 3. runs breaklint once over the HTML paths you give it, and writes the canonical JSON report;
 4. renders SARIF, JUnit and Markdown from that one report with breaklint's own reporters, appends
    the Markdown to the job's step summary, and prints the console report to the log;
@@ -269,9 +269,11 @@ the run with exit 3, as breaklint's version gate requires. Pin the peers in your
   `security-events: write`.
 - Do not run this on `pull_request_target` with the pull request's own code checked out. That
   combination runs untrusted HTML, including its scripts, in a job that holds a write token.
-- breaklint executes the documents it checks, scripts included, in a fresh browser profile with
-  the sandbox on and the network blocked unless `allow-network` names an origin. That protects
-  against mistakes, not against an attack on the browser sandbox; see
+- breaklint executes the documents it checks, scripts included, in a fresh browser profile.
+  It requests Chrome without a sandbox-disabling switch and intercepts page requests, allowing
+  only its own loopback origin and data/blob/about URLs by default. That interception is not a
+  network block: WebSocket, WebRTC, WebTransport and browser-managed traffic are outside it.
+  The known driver overrides are refused, but other wrapper variables are not proven safe; see
   [Running foreign HTML](../README.md#running-foreign-html).
 - The Action passes all inputs to its runner as one JSON environment variable and never pastes
   an input into a script. Paths are expanded by bash without evaluation, so `$(…)`, backticks and

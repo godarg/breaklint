@@ -285,7 +285,9 @@ and the run came back `clean`. In 0.8.0, breaklint refuses to launch if
 `PUPPETEER_DANGEROUS_NO_SANDBOX` or `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` is present, and
 removes `CHROME_EXTRA_FLAGS` from Chrome's child environment. This closes those known environment
 paths; other wrapper variables are not generally audited. For a document you do not trust, run
-breaklint in a container or network namespace with no egress. See [SECURITY.md](../SECURITY.md).
+breaklint in a container or network namespace with no egress. The GitHub Action's empty
+`allow-network` input applies this same interceptor policy; it does not make the runner fully
+offline. See [SECURITY.md](../SECURITY.md).
 
 The longer, measurement-by-measurement account of what has been established and what has not is in
 [status.md](status.md).

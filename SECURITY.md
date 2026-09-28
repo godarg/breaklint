@@ -34,7 +34,9 @@ intended, and each says what it does not cover:
   either is present, breaklint refuses the renderer with exit 3 before launch. The child environment
   omits `CHROME_EXTRA_FLAGS` so a Chrome wrapper cannot turn it into a switch. Tests cover the
   refusal and the scrubbed child environment. Other browser or wrapper variables are not proven
-  safe by these three checks; isolate untrusted HTML at the operating-system boundary.
+  safe by these three checks; isolate untrusted HTML at the operating-system boundary. The Action
+  uses the same launch path and its empty `allow-network` input does not add sandbox or network
+  isolation.
 - **The page's requests are intercepted, and the default policy is `offline`.** Request
   interception is on, and only the tool's own loopback origin plus `data:`, `blob:` and `about:`
   are let through; `--allow-network <origin>` lets one more origin through per use. **This is not

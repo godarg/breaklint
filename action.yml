@@ -42,7 +42,7 @@ inputs:
     required: false
     default: ""
   allow-network:
-    description: Origins the document may load from, one per line (`--allow-network`). Empty keeps the run fully offline.
+    description: Origins allowed by page-request interception, one per line (`--allow-network`). Empty permits only the tool's loopback origin and data/blob/about requests through that interceptor; it is not a network-isolation boundary.
     required: false
     default: ""
   output-dir:

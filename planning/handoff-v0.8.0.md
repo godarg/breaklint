@@ -1,6 +1,6 @@
 # Handoff — breaklint 0.8.0
 
-Status on 2026-09-28: **integration in progress; release blocked before the release-preparation PR**. No 0.8.0 tag, npm publication, GitHub release, site deployment or consumer upgrade has been made. This record describes measured work on `claude/integrate-breaklint-080`; it is not a publication claim.
+Status on 2026-09-28: **release candidate prepared on the integration branch; release blocked before the release-preparation PR merge**. No 0.8.0 tag, npm publication, GitHub release, site deployment or consumer upgrade has been made. This record describes measured work on `claude/integrate-breaklint-080`; it is not a publication claim.
 
 ## 1. Integrated work
 
@@ -40,7 +40,7 @@ To resume the release, use the actual 175-page `print.html` from the requested p
 
 ## 4. Release steps still required
 
-Follow `docs/releasing.md` in order. Prepare version 0.8.0 in `package.json` and both lockfile root fields, the `v0.8.0` tag trigger, `## 0.8.0 — TBD-at-tag`, the v0.8.0 poster URL, package dry-run review and truthful status marker. Run a fresh independent release audit, repair documentation findings, then open and merge the preparation PR after green CI and run the exact local gate on its merge commit.
+Follow `docs/releasing.md` in order. Candidate commit `70a4505` prepared version 0.8.0 in `package.json` and both lockfile root fields, the literal `v0.8.0` tag trigger, `## 0.8.0 — TBD-at-tag`, the v0.8.0 poster URL and a truthful preparation status. `npm run test:release-tag` passed; `npm pack --dry-run --json` listed 190 package files and excluded `planning/`, `tests/` and `action/`. A fresh independent release audit found public security wording and register staleness, repaired in the next commit. The specified P08 packed acceptance is still absent, so the preparation PR must not be merged, and the exact local release gate on a merge commit has not run.
 
 The changed `src/` files are within `REVIEW_INPUT_ROOTS`. After the preparation merge, **stop for the Founder's real report-surface review** under `docs/reporting.md`. Only the literal judgment from the current chat may be entered into the ledger. A FAIL is recorded as FAIL and stops the release. If it passes, commit the ledger with the `<!-- review-state -->` sentences, wait for green CI, make the date-only changelog commit, wait for green CI on that exact commit, then set and push the annotated tag. Never move or reuse the tag. After tagging, verify release run, both clean consumers, npm integrity, tarball SHA-256, provenance, poster URL and Action reference; a failure stops without deleting or retagging.
 

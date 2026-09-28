@@ -321,10 +321,10 @@ attacking the browser:
   opens, nor the browser's own secure DNS and component updater traffic. Measured on 0.7.0 in the
   default offline mode: a document's WebSocket to another loopback port was delivered and a WebRTC
   STUN request was sent, and the run came back clean.
-- The environment can turn the sandbox off: puppeteer-core adds `--no-sandbox` when
-  `PUPPETEER_DANGEROUS_NO_SANDBOX=true`, and the browser inherits the environment. Make sure
-  `PUPPETEER_DANGEROUS_NO_SANDBOX`, `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` and
-  `CHROME_EXTRA_FLAGS` are unset.
+- breaklint refuses `PUPPETEER_DANGEROUS_NO_SANDBOX` and
+  `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` before launch and strips `CHROME_EXTRA_FLAGS`
+  from Chrome's child environment. Other browser or wrapper variables are not proven safe;
+  isolate untrusted documents at the operating-system boundary.
 
 For untrusted third-party HTML, use a container or network namespace with no egress. Details are
 in [SECURITY.md](SECURITY.md).
