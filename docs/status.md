@@ -4,9 +4,9 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## Release preparation — 0.8.0
+## Release v0.8.0: published 2026-09-28
 
-At preparation on 2026-09-28, the integration candidate contains the configurable 600,000 ms
+The 0.8.0 release contains the configurable 600,000 ms
 document budget, SVG occurrence identity and physical-page evidence binding, the content-loss
 checks, inherited Chrome-flag neutralisation and Mac gate repairs. The old specified 175-page P08
 `print.html` is absent. With the Founder's delegated document choice, the current product's
@@ -17,9 +17,17 @@ current P08 at exit 1, 207/207 pages bound and 472/472 SVG targets, in 104.15 s 
 in 27.65 s with 1,720,860,672 B maximum RSS. These current-product runs do not measure the
 missing 175-page bytes. The G-114/G-117 package passed its permitted second independent review
 and was integrated at `297b0fa`; the Founder passed the report-surface sight review in ledger
-round 4 on 2026-09-28, while the release tag is pending. Read the actual publication state
-from npm and GitHub rather than from this preparation record. No rule is calibrated;
-browser-managed secure DNS and communication egress remain documented limits.
+round 4 on 2026-09-28. The annotated `v0.8.0` tag points to `e3a3fd9`; release run
+[36472842589](https://github.com/godarg/breaklint/actions/runs/36472842589) passed all four jobs,
+including both clean consumers. npm `breaklint@0.8.0` carries SLSA provenance bound to that
+commit and SHA-512 integrity `sha512-ognSD5165I6ryYbNfFqdtfJicA0/KPDki/XKvAJJoTkw74k/Sbik1hO78hQaxjMIm26on3ASHXtCqleJ4yK0uQ==`.
+The registry tarball and GitHub Release asset are byte-identical (SHA-256
+`ee339c09815f7ed8bf99d3bac7dc6b053026eb5004d03d8d69e60258f941f335`).
+The published Action ref `godarg/breaklint@v0.8.0` passed an Ubuntu PR smoke run
+[36475794152](https://github.com/godarg/breaklint/actions/runs/36475794152).
+These values were measured from npm/GitHub on 2026-09-28; query those services for current
+publication state. No rule is calibrated; browser-managed secure DNS and communication egress
+remain documented limits.
 
 ### The exact-environment human gate for 0.8.0
 
@@ -33,7 +41,7 @@ the three known residuals; `ubuntu-latest` font resolution remains unmeasured (N
 
 **Published 2026-09-25.** Annotated tag `v0.7.0` on the dated commit `73e7a90`; release
 workflow run 36132850535 green in all four jobs (validate and pack once, clean consumers on Node 24
-and 22.13.0, publish). npm `latest` is 0.7.0 with an npm publish attestation and SLSA provenance;
+and 22.13.0, publish). At that publication, npm `latest` was 0.7.0 with an npm publish attestation and SLSA provenance;
 the registry tarball and the GitHub Release asset are the same bytes (SHA-256
 `7f6172238095cebca92af70be195b87a05e8967e46e011d63c86300cc5dff681`). A clean install on macOS
 arm64 ran `npx breaklint --demo` to exit 1, and its JSON report arrived through a pipe at the

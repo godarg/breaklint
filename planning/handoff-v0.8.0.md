@@ -1,6 +1,6 @@
 # Handoff — breaklint 0.8.0
 
-Status on 2026-09-28: **release candidate prepared; G-114/G-117 passed the permitted second independent review and was integrated, while the release-preparation PR and Founder surface review remain**. No 0.8.0 tag, npm publication, GitHub release, site deployment or consumer upgrade has been made. This record describes measured work on `claude/integrate-breaklint-080`; it is not a publication claim.
+Status measured 2026-09-28: **v0.8.0 published on GitHub and npm; website merged and live in DE/EN**. The annotated tag resolves to `e3a3fd986168f43e0b017d4b7db626dcab14eba3`; release run [36472842589](https://github.com/godarg/breaklint/actions/runs/36472842589) completed successfully. This is a dated handoff, not a volatile-state source: use the live commands in §4 to check a later state.
 
 ## 1. Integrated work
 
@@ -10,13 +10,13 @@ The integration branch starts at `10765b4` and uses `--no-ff` package merges. `p
 |---|---|---|---|
 | P2 content and inherited flags | G-85, G-89, G-92, G-103 | `744dab7` / `078536a` | Fresh verifier PASS; real red-to-green content and launch controls. `SECURITY.md` and `docs/limitations.md` changed with the code. |
 | G-112 SVG occurrence identity | G-112 | `6979782` / `dbfccaf` | Fresh verifier PASS; the duplicate-target control was red before the fix and green after it. |
-| P0 configurable document budget | G-111 | `7b5e2b4`, `188dc20` / `fbf0a7f` | Real red control for the 120 s budget and green unit/config controls. Current source-bound P08 and P05 foreign-tarball acceptance is recorded in §3; the original 175-page bytes are absent. Final independent P0 review is pending. |
+| P0 configurable document budget | G-111 | `7b5e2b4`, `188dc20` / `fbf0a7f` | Real red control for the 120 s budget and green unit/config controls. Current source-bound P08 and P05 foreign-tarball acceptance is recorded in §3; the original 175-page bytes are absent. Fresh independent P0 review PASS on the integrated current-product acceptance. |
 | P1 Mac gates | G-108, G-109, G-110 | `aac36c5`, `92d1cc9` / `a2e7739` | Mac red-to-green controls; first fresh review found a MEDIUM PATH probe mismatch, corrected in `92d1cc9`; targeted gates and typecheck green. The request permits a second round only for a new BLOCKER/HIGH, so no second round was run. |
 | G-113 physical evidence binding | G-113 | `66b438d`, `1c3220c` / `2eaec13` | First verifier found HIGH SID-wide deletion; the repair passed a fresh second review without new BLOCKER/HIGH. Colliding-SID footnote control red before and green after. Isolated P08 generated artifact bound 207/207 pages with raster diff 0. |
 | G-114 SVG painted bounds and G-117 descendant paint | G-114, G-117 | `8b7c526`, `adfa124` / `297b0fa` | Two real Chrome red-to-green controls. The first fresh verifier found HIGH G-117; the repair passed the permitted second review with no findings. Formal `engineering-verification` gate PASS on `beb3985`; packed foreign-CWD current P08/P05 acceptance in §3. |
 | Live gate count and drift fixture | G-115, G-116 | `caef40a` / `292b390` | Fresh independent @Prog verifier PASS with no findings. The real red gate first expected 1 instead of 2 overlay leaves; two more runs exposed the control-page drift and a diagnostic run exposed a null access in the initial fixture repair. The final unchanged Freeze assertion passed in `render-run` 35/35, full Node 24 live 107/107, `npm test` 839/839, typecheck 0. |
 
-The integration-only test pin correction is `c9e5dfa`: a real red `npm test` run (837/839) was corrected to 839/839 before G-113 was merged. The `docs/status.md` marker now records 677 unit tests, 839 aggregate tests and 107 live tests, measured in the G-115/G-116 worktree; `npm run test:documented-figures` passed on the integration worktree using those generated measurement files, whose source code is byte-identical after the no-ff merge. The exact local release gate is still pending. The integrated G-114/G-117 package has two real red-to-green Chrome controls, `npm test` 839/839, full live 107/107 and typecheck green on its frozen branch.
+The integration-only test pin correction is `c9e5dfa`: a real red `npm test` run (837/839) was corrected to 839/839 before G-113 was merged. The `docs/status.md` marker now records 677 unit tests, 839 aggregate tests and 107 live tests, measured in the G-115/G-116 worktree; `npm run test:documented-figures` passed on the integration worktree using those generated measurement files, whose source code is byte-identical after the no-ff merge. The ordered 19-command local release gate passed on the PR #33 merge commit and again on the ledger merge commit; exact GitHub CI passed on both. The integrated G-114/G-117 package has two real red-to-green Chrome controls, `npm test` 839/839, full live 107/107 and typecheck green on its frozen branch.
 
 ## 2. Packages that fell out of 0.8.0
 
@@ -44,55 +44,39 @@ The unchanged integration tarball at `64d7c0a` first established the negative ba
 
 Before each load, `pgrep -fl breaklint-chrome-profile` found no orphan Chrome. The return code was read immediately after each command, without a pipe. `pdfinfo` independently counted 207 and 77 pages in the checked PDFs. The 600,000 ms default has 82.6% observed time reserve against current P08 on this Mac; the peak is below 2.0 GB on a 16 GiB system. This supports the document-budget setting for these current inputs, while larger or heavier files remain a memory limitation. The repaired G-114/G-117 package passed its permitted second independent @Prog review and was integrated at `297b0fa`.
 
-## 4. Release steps still required
+## 4. Ordered release and identity evidence
 
-Follow `docs/releasing.md` in order. Candidate commit `70a4505` prepared version 0.8.0 in `package.json` and both lockfile root fields, the literal `v0.8.0` tag trigger, `## 0.8.0 — TBD-at-tag`, the v0.8.0 poster URL and a truthful preparation status. `npm run test:release-tag` passed; `npm pack --dry-run --json` listed 190 package files and excluded `planning/`, `tests/` and `action/`. A fresh independent release audit found public security wording and register staleness, repaired in the next commit. The current source-bound packed P08/P05 acceptance is now recorded in §3; final P0 review, PR CI and exact local gate on the future merge commit still remain.
+1. Release preparation PR #33 merged as `33d78b9bc920354442051e205cdf1f5ad02ae609`. The preparation checks, including version/lock/trigger alignment, dated-at-tag placeholder, poster pin and `npm pack --dry-run` exclusion of `planning/`, `tests/` and `action/`, were reviewed independently. Exact `main` CI [36458883954](https://github.com/godarg/breaklint/actions/runs/36458883954) and the ordered local gate passed on that merge commit.
+2. The Founder reported in the current chat, verbatim: “Haben die Sichtprüfung durchgeführt und keine Anmerkungen. Alles passt”. Ledger round 4 records this positive human judgment for 32/32 cells on the exact PR #33 render, with 152 screen tiles, four PDFs and 27 page rasters. The three known residuals remain named there. No AI review substitutes for that judgment.
+3. Ledger PR #35 merged as `6ac2e2e0ae2479cfbe3bab1b290b1f3695dbe3c0`. Exact CI [36467854886](https://github.com/godarg/breaklint/actions/runs/36467854886) passed. All 19 ordered local gate commands passed on this merge commit, as did the packed foreign-CWD consumer; `WI-20260928-breaklint-080-human-ledger/merge-commit-local-gate.json` binds the outputs. No `REVIEW_INPUT_ROOTS` path changed after the Founder's render.
+4. Date-only PR #36 changed only the `CHANGELOG.md` heading to `2026-09-28` and merged as `e3a3fd986168f43e0b017d4b7db626dcab14eba3`. Exact CI [36471159267](https://github.com/godarg/breaklint/actions/runs/36471159267) passed. The annotated `v0.8.0` tag was created and pushed once on that commit; tag object `e0795ab7ecbb7afb8d6cf0f5f157db807a4a62c1` peels to `e3a3fd9`.
+5. Release run [36472842589](https://github.com/godarg/breaklint/actions/runs/36472842589) passed all four jobs: validate/pack, two clean consumers (Node 24 and 22.13.0), and publish plus GitHub Release. The workflow was the only npm publisher. No tag was moved and no local `npm publish` was used.
 
-The changed `src/` files are within `REVIEW_INPUT_ROOTS`. After the preparation merge, **stop for the Founder's real report-surface review** under `docs/reporting.md`. Only the literal judgment from the current chat may be entered into the ledger. A FAIL is recorded as FAIL and stops the release. If it passes, commit the ledger with the `<!-- review-state -->` sentences, wait for green CI, make the date-only changelog commit, wait for green CI on that exact commit, then set and push the annotated tag. Never move or reuse the tag. After tagging, verify release run, both clean consumers, npm integrity, tarball SHA-256, provenance, poster URL and Action reference; a failure stops without deleting or retagging.
+Independent after-tag checks, measured 2026-09-28:
 
-## 5. Other downstream work
+| Check | Result |
+|---|---|
+| npm registry | `breaklint@0.8.0` available; `dist.integrity` = `sha512-ognSD5165I6ryYbNfFqdtfJicA0/KPDki/XKvAJJoTkw74k/Sbik1hO78hQaxjMIm26on3ASHXtCqleJ4yK0uQ==` |
+| Tarball identity | npm tarball and GitHub Release asset are byte-identical; SHA-256 `ee339c09815f7ed8bf99d3bac7dc6b053026eb5004d03d8d69e60258f941f335` |
+| Provenance | npm SLSA v1 attestation present; `tests/tools/registry-provenance-contract.mjs --verify` bound package digest and Git commit `e3a3fd9`; `npm audit signatures` reported zero invalid or missing entries |
+| Fresh foreign install | version 0.8.0; demo returned expected exit 1 with real findings; installed Configuration Contract v1 passed with 53 sourced leaves and four fail-closed controls |
+| README poster | `https://raw.githubusercontent.com/godarg/breaklint/v0.8.0/assets/breaklint-film-poster.jpg` returned HTTP 200, JPEG 1920×1080 |
+| Public Action ref | Real Ubuntu PR run [36475794152](https://github.com/godarg/breaklint/actions/runs/36475794152) called `uses: godarg/breaklint@v0.8.0`; clean four-page fixture exited 0 and output package version 0.8.0. The one-run workflow was removed in a later branch commit, so it is not in the final register diff. |
 
-The DE/EN website draft is on local branch `prog/breaklint-080-site-20260928` in a separate site worktree, commit `280e6e0`. Its local declared gate passed. It must await real 0.8.0 release facts, the final copy check, both required PR gates and a merge to deploy. Site PR #47 is untouched. Studio and DS_OS consumers remain on their existing versions until npm 0.8.0 is verified. The workspace release note and memory update also remain to be written from final measurements.
+Read-only recheck commands: `git ls-remote --tags origin 'refs/tags/v0.8.0*'`; `gh run view 36472842589 --json headSha,status,conclusion,jobs`; `npm view breaklint@0.8.0 version dist.integrity dist.attestations --json`; `gh release view v0.8.0 --json assets`; `curl -I` the pinned poster URL. The signed provenance binds the npm bytes to the tag commit; npm `gitHead` is not the source identity for this publish route.
 
-## 6. Founder report-surface review package — for the future merge commit
+## 5. Website and consumers
 
-This section is a preparation aid, not a review result. It becomes actionable only after the
-P08 gate, PR merge and exact local release gate. Record `git rev-parse HEAD` from a clean checkout
-of the **release-preparation merge commit**; use that SHA in the chat judgment. On this candidate,
-the technical gate passed 32/32 cells and produced 207 physical artifacts (24 full screens, 152
-screen tiles, four PDFs and 27 page rasters). Comparison with the 0.7.0 ledger changed the bound
-fingerprint of **all 32 cells** and the decoded pixels of all 24 screen cells. Re-render at the
-merge commit; these candidate hashes are not transferable.
+Site PR [#48](https://github.com/godarg/dargel-solutions-site/pull/48) merged as `eb135d3fcf478db39a51acca1114c5ad191409eb` after npm verification. Its final head `007835c` passed both required PR gates; @Brand approved the DE/EN G-114 wording and an independent @Prog verifier found no BLOCKER/HIGH/MEDIUM. The new G-122 site-truth finding and the earlier G-118–G-121 fixes are in `planning/open-work.md`. Site PR #47 was not edited. Both Site `main` checks on the merge commit completed successfully: Gate run 36476171342 and Portfolio refresh gate run 36476171470 (`gh run view`, measured 2026-09-28).
 
-Commands on the Mac from that clean checkout, in this order:
+Live `curl` on 2026-09-28 returned HTTP 200 for `https://dargel-solutions.de/breaklint/` and `/en/breaklint/`. Both pages contain the exact 0.8.0 version line, the narrow SVG viewport-edge caveat, and `og:image` ending `breaklint-card.png?v=0.8.0`; neither response contains Cloudflare email-obfuscation markers. Response-body SHA-256: DE `045590e4a34bd3f670602f51a577a24f2a487c6e192a2c8b0d99aa12189c620e`, EN `75ab85e268ec60e77e5e5a37b5909d5ceef223bea26e3d0bbd950ccace4bc7f9`.
 
-```bash
-git rev-parse HEAD
-npm ci --no-audit --no-fund
-npm run test:report-surfaces:technical
-open .artifacts/report-surfaces/review-gallery.html
-open .artifacts/report-surfaces/*--a4.pdf
-```
+Studio at `~/.local/share/dargel/breaklint-studio` is pinned to registry `breaklint: 0.8.0` in manifest and lockfile; installed CLI returns 0.8.0 and demo returns the expected finding exit 1. The exact old manifest remains at `package.json.pre-breaklint-0.8.0.20260928.bak` (SHA-256 `a2d30c89c9050284a77a3ad66645a5695b08a71ab5a0321ec35e8a6c0d2dbd42`). DS_OS frontend is pinned to exact Registry 0.8.0 in local commits `20dbd968925374ff1a85eb28a36a4fa85d8a9bc2` and `0766646239c7479287a094b32da1111e6ad84fcf`; typecheck, tests, build and the post-build consumer E2E passed (46 passed, four viewport-independent skips). A focused old-matcher run was red (exit 1) before the precise path matcher and green (exit 0) after it, with the visible-error assertion unchanged. The focused old-matcher red run is the bound negative control. An intermediate run after the test-source edit failed 45 tests because the old build receipt bound the prior test bytes; after a new build, the full 46-test run passed. The first independent @Prog review found HIGH evidence gaps; a reproducible baseline/current pin contract closed them, and the permitted second round returned PASS without a new BLOCKER/HIGH. The mechanical `engineering-verification` PASS for `WI-20260928-breaklint-080-dsos-consumer` binds frozen commit `0766646`, exact scope fingerprint and the declared `make quality-live` gate at exit 0. No DS_OS push or deployment was performed.
 
-The gallery groups the exact 32 cells as follows; each screen cell includes its full image and
-every viewport-height tile. Open `manifest.json` alongside it for the binding and artifact names.
+## 6. Boundaries and retained work
 
-| State to judge | Light screens | Dark screens | Print cells | What must be visible |
-|---|---|---|---|---|
-| `clean` | desktop · tablet · mobile | desktop · tablet · mobile | PDF · three rasters | “Clean run” only here; all 13 rules and coverage table readable. |
-| `findings` | desktop · tablet · mobile | desktop · tablet · mobile | PDF · eight rasters | Finding cards, evidence paths, remediation tint and table continuation. |
-| `infrastructure` | desktop · tablet · mobile | desktop · tablet · mobile | PDF · eight rasters | Checker failure verdict and exit 3, with no false clean state. |
-| `insufficient-coverage` | desktop · tablet · mobile | desktop · tablet · mobile | PDF · eight rasters | Coverage verdict and exit 4, with “Below floor” legible without colour. |
+G-91 (browser-owned DoH egress) and G-94 (WebSocket/WebRTC/WebTransport egress) remain open because no current-Chrome CI net-log proof for a fix was obtained. L1 (G-86/88/96/101), F5 (G-78/79/100), and C1/C2/K2 (G-23/93/95/106) remain **herausgefallen** with their branches and review findings in §2 and the register. P4 was not attempted. G-18 memory was measured, not optimised. G-11, G-19/G-20/G-24, G-21/G-22/G-25, G-58 and Windows stay outside this release; `calibrated: false` remains.
 
-For each state, check verdict and exit code first; then legibility, font roles, mobile wrapping
-and horizontal clipping; then PDF page numbers, running head, final end mark, split findings,
-repeated table header and the untested-advice caveat as specified in `docs/reporting.md` §“Review
-package”. The known residuals to accept or reject explicitly are: tail label even on unsplit
-findings; over-long evidence name wrapping within itself; Ubuntu font resolution unmeasured.
-The review can be navigated in about 20 minutes by following the gallery state order, then the
-four PDFs; it still requires looking at every tile and printed page.
+A post-tag rerun of the ledger work item's local gate at the historical ledger merge commit `6ac2e2e` fails its release-tag contract because `v0.8.0` now exists on the later date commit; rerunning at `e3a3fd9` changes the work item's `CHANGELOG.md` scope fingerprint and requires a new verifier. The historical 19-command local gate and exact GitHub CI on `6ac2e2e` are preserved with hashes. This is a formal post-tag artifact limitation, not a change to the successful release workflow. Do not alter the tag or relax the gate to make a replay green.
 
-The Founder supplies a literal **PASS or FAIL**, the merge SHA, cell-specific findings and the
-three residual decisions in this chat. The assistant records exactly that judgment as one new
-ledger round and runs `npm run test:report-surfaces:local`; no prior round or agent judgment can
-stand in for it. A FAIL is entered as FAIL and stops the release.
+Retain all remote branches. Relevant product branches include `claude/integrate-breaklint-080`, `claude/wp-g114-current-p08-080`, `claude/wp-g114-svg-safe-bounds`, `claude/wp-l1-080`, `prog/p3-f5-disposition-20260928`, `prog/p3-c1c2-k2-disposition-20260928`, `claude/wp-g118-g119-site-disposition` and `claude/wp-g118-g121-site-followup`; relevant Site branches include `prog/breaklint-080-site-20260928`, `prog/breaklint-080-site-followup-20260928` and `prog/breaklint-080-site-precision-20260928`. Tip hashes and any further branches should be measured with `git ls-remote --heads`, not inferred from this list. No remote branch or tag was deleted.
