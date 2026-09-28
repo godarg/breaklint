@@ -173,7 +173,9 @@ defines the ratio), carries that envelope through the CTM, and
 measures only if all four sides remain strictly inside the viewport. A boundary-touching halo
 stays `env/svg-painted-bounds-unsupported` and still causes exit 4. This proves containment for
 that narrow case; it does not identify painted bounds exactly or turn a partly outside stroke into
-a finding. The dated corpus counts above are not a claim about current coverage.
+a finding. A painted stroke on a `<tspan>` or other descendant declines even if the outer `<text>`
+has `stroke="none"` or no paint of its own; descendant paint remains a candidate, never a silent
+clean result. The dated corpus counts above are not a claim about current coverage.
 
 **Nontrivial viewport boxes are detected but not reconstructed.** `getBoundingClientRect` is the
 border box and becomes only an axis-aligned envelope under rotation or skew. An SVG root with

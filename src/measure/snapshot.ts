@@ -864,18 +864,37 @@ export const SNAPSHOT_SOURCE = `(() => {
     let unsupportedTargets = useTextTargets;
     let notRenderedTargets = 0;
     const candidateTextEls = [];
+    const descendantPaintState = (textEl) => {
+      let visible = false;
+      let unsupported = false;
+      for (const child of P.all(textEl, "*")) {
+        const childStyle = P.style(child, null);
+        const childStroke = strokePainted(childStyle);
+        visible = visible || visiblePaint(childStyle.fill, childStyle.fillOpacity) || childStroke;
+        // getBBox() includes the descendant's fill geometry, but not its stroke or other ink.
+        // This applies even when the outer <text> itself has stroke:none. A child transform
+        // also invalidates a single parent-style paint bound, so decline the whole target.
+        unsupported = unsupported || childStroke
+          || /url\\(/u.test(childStyle.fill) || /url\\(/u.test(childStyle.stroke)
+          || effect(childStyle.textShadow) || effect(childStyle.textDecorationLine)
+          || effect(childStyle.clipPath) || effect(childStyle.mask) || effect(childStyle.filter)
+          || transformedGeometry(childStyle) || effect(P.attr(child, "transform"));
+      }
+      return { visible, unsupported };
+    };
     if (!rawCapped) {
       for (const textEl of textEls) {
         const rect = P.rect(textEl);
         const style = P.style(textEl, null);
+        const descendants = descendantPaintState(textEl);
         const painted = P.painted(textEl);
         const fillVisible = visiblePaint(style.fill, style.fillOpacity);
         const strokeVisible = strokePainted(style);
-        const invisible = painted === false || (!fillVisible && !strokeVisible)
+        const invisible = painted === false || (!fillVisible && !strokeVisible && !descendants.visible)
           || (painted === null && (style.visibility === "hidden" || style.visibility === "collapse"
               || parseFloat(style.opacity) === 0));
         if ((rect.width === 0 && rect.height === 0) || invisible) notRenderedTargets += 1;
-        else candidateTextEls.push(textEl);
+        else candidateTextEls.push({ textEl, descendants });
       }
     }
     const capped = rawCapped || candidateTextEls.length + unsupportedTargets > ${SVG_TEXT_TARGET_CAP};
@@ -900,7 +919,7 @@ export const SNAPSHOT_SOURCE = `(() => {
       viewportAncestor = P.parent(viewportAncestor);
     }
     if (!capped && !viewportUnsupported) {
-      for (const textEl of candidateTextEls) {
+      for (const { textEl, descendants } of candidateTextEls) {
         // Is this element painted at all? Asked FIRST, because getBBox alone gets it wrong exactly
         // where it matters. Measured in Chrome 152: a <text> inside <defs> answers getBBox() and
         // getScreenCTM() perfectly happily and yields a full screen box — 609.65 px outside its
@@ -922,7 +941,7 @@ export const SNAPSHOT_SOURCE = `(() => {
         const painted = P.painted(textEl);
         const fillVisible = visiblePaint(style.fill, style.fillOpacity);
         const strokeVisible = strokePainted(style);
-        const unpainted = !fillVisible && !strokeVisible;
+        const unpainted = !fillVisible && !strokeVisible && !descendants.visible;
         // painted === null means this browser has no checkVisibility. Then the two remaining
         // sources decide, and the ancestor-opacity case is not covered — stated here rather than
         // silently assumed, because the pinned browser does have it.
@@ -934,7 +953,8 @@ export const SNAPSHOT_SOURCE = `(() => {
         // SVG getBBox() omits stroke, clipping, masks and filter effects. Paint servers and text
         // decoration/shadow have no bounded geometry here. A stroke may be admitted only by the
         // separate upper-bound containment proof below, never by its fill box alone.
-        let paintedBoundsUnsupported = /url\\(/u.test(style.fill) || /url\\(/u.test(style.stroke)
+        let paintedBoundsUnsupported = descendants.unsupported
+          || /url\\(/u.test(style.fill) || /url\\(/u.test(style.stroke)
           || effect(style.textShadow) || effect(style.textDecorationLine);
         let ancestor = textEl;
         while (!paintedBoundsUnsupported && ancestor && P.nodeType(ancestor) === 1) {

@@ -20,6 +20,9 @@
   fits strictly inside its viewport. Boundary-touching strokes and complex paint remain unmeasured
   and can still produce insufficient coverage (exit 4). On the current generated P08 print edition,
   all 472 SVG targets were measured and the 207-page document ended with findings (exit 1).
+- G-117: a stroke painted only by a `<tspan>` descendant now stays in the candidate count and
+  declines even when its outer `<text>` has no stroke or paints nothing itself. This closes a
+  false-clean path found by the independent G-114 review; it does not change the SVG coverage floor.
 
 ### Tooling
 

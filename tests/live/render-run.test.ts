@@ -969,14 +969,16 @@ describe("the M2d live production chain", () => {
     assert.equal(transparent.texts.length, 1);
 
     const complex = record("complex-paints");
-    assert.equal(complex.textTargetCount, 13);
+    assert.equal(complex.textTargetCount, 15);
     assert.equal(complex.notRenderedTargets, 1, "the source text in defs is not itself painted");
-    assert.equal(complex.unsupportedTargets, 10, "complex paint, edge/transform/child/vector strokes and use instances must decline");
+    assert.equal(complex.unsupportedTargets, 12, "complex paint, edge/transform/child/vector strokes and use instances must decline");
     assert.equal(complex.texts.length, 2, "ordinary text and the provably contained stroke are measured");
     assert.ok(complex.texts.some((text) => text.svgTextKey.includes("safe-stroke")), "the contained halo must be measured");
     assert.ok(!complex.texts.some((text) => text.svgTextKey.includes("rotated-safe-stroke")), "transformed stroke stays undecidable");
     assert.ok(!complex.texts.some((text) => text.svgTextKey.includes("edge-stroke")), "a stroke touching the viewport edge stays undecidable");
     assert.ok(!complex.texts.some((text) => text.svgTextKey.includes("child-stroke")), "descendant paint overrides stay undecidable");
+    assert.ok(!complex.texts.some((text) => text.svgTextKey.includes("child-only-stroke")), "a stroked descendant must decline even when its text parent has no stroke");
+    assert.ok(!complex.texts.some((text) => text.svgTextKey.includes("child-only-paint")), "a stroked descendant must remain a target even when its text parent paints nothing");
     assert.ok(!complex.texts.some((text) => text.svgTextKey.includes("non-scaling-stroke")), "non-scaling stroke stays undecidable");
 
     const border = record("border-box");
@@ -997,12 +999,12 @@ describe("the M2d live production chain", () => {
     });
     assert.deepEqual(outcome.report.findings, [], "unsupported geometry produced a guessed error finding");
     const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
-    assert.equal(coverage?.candidates, 15);
+    assert.equal(coverage?.candidates, 17);
     assert.equal(coverage?.measured, 4);
     assert.deepEqual(
       coverage?.notMeasured.map((entry) => ({ reason: entry.reason, count: entry.count })),
       [
-        { reason: "env/svg-painted-bounds-unsupported", count: 10 },
+        { reason: "env/svg-painted-bounds-unsupported", count: 12 },
         { reason: "env/svg-viewport-geometry-unsupported", count: 1 },
       ],
     );
