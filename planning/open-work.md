@@ -6,6 +6,25 @@ code with file:line citations, and by measurement where it was cheap. The regist
 evidence, not authority. The full per-item records (fix designs, test strategies, sharpened "done
 when") are the triage working files. This page is their consolidated, public summary.
 
+## 2026-09-28 L1 package decision for 0.8.0
+
+⛔ Supersedes the L1 plan cells for G-86, G-88, G-96 and G-101 below. The package is
+**dropped from 0.8.0**, with evidence branch `claude/wp-l1-080`. This is a scope decision,
+not a claim that any of the four defects is fixed. Measured against `origin/main` at
+`10765b4` with `git show a1d8380 -- src/acquire/render-run.ts`,
+`git show d2d519e --stat` and source inspection on 2026-09-28:
+
+| id | 0.8.0 outcome | blocking finding |
+|---|---|---|
+| G-86 | dropped with L1 | The isolated rule change is not a complete L1 package while the resource and base paths below remain unresolved. No 0.8.0 fix was committed on this branch. |
+| G-88 | dropped with L1 | The earlier L1 branch added base-aware capture in `c44238c` and reverted it in `a1d8380`: Paged.js requested an imported sheet from the document origin after Chrome had resolved it against `<base>`. The resulting uncaptured request returned 403 and allowed an unstyled measurement. The old branch's final limitations still disclose over-capture and two conservative false exit-3 cases. Current Chrome behavior was not remeasured here: **UNBEKANNT**. |
+| G-96 | dropped with L1 | A failed paginator stylesheet request must be tied to both resource discovery and the browser's observed request role. The previous base-aware change exposed a silent unstyled measurement; taking only its route guard would leave the base mismatch. |
+| G-101 | dropped with L1 | The previous branch's fix replaced three regex readers (discovery, stylesheet guard, local-URI collector) with a shared 201-line CSS reference scanner in `d2d519e`, including escape decoding. This is a parser and provenance change, not a narrow whitespace patch. No current Chrome/CI acceptance was run for that candidate. |
+
+The four items remain open for a separately specified package with a browser-request oracle and
+new independent verification. The original historical triage rows below are retained as evidence;
+their former plan cells are superseded by this decision.
+
 ## Measurement environment and its limits
 
 - Linux x86_64 VM, kernel 6.18, Node 24.21.0 (the engines floor, 22.13.0, was also checked where it
@@ -222,9 +241,9 @@ release
 | G-83 | type/excessive-word-spacing measures the natural space at the block's first whitespace; a collapsed line-end space (~0.02 px) gives false gaps of 361× / 1082× | K3 impl | medium | open |
 | G-84 | Paged.js soft-hyphen split carries a letter back; the appended hyphen glyph can wrap into the overflow column → geometry cross-check refuses the document | K3 impl | low (upstream) | document |
 | G-85 | puppeteer-core honours PUPPETEER_DANGEROUS_NO_SANDBOX (adds --no-sandbox) and PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES; SECURITY.md "no flag turns it off" false; plus document WebRTC STUN egress under offline mode | C2 impl r2 | high (security claim) | WP-C2 r2 (b712dea) |
-| G-86 | artifact/local-uri skips scheme-less absolute/root-relative paths (/var/…, /opt/…) — snapshot scheme "" skipped before the absolute-path test; contradicts the rule page | K2 impl (corpus gate) | medium (false clean, warn rule) | WP-L1 |
+| G-86 | artifact/local-uri skips scheme-less absolute/root-relative paths (/var/…, /opt/…) — snapshot scheme "" skipped before the absolute-path test; contradicts the rule page | K2 impl (corpus gate) | medium (false clean, warn rule) | ⛔ superseded by 2026-09-28 L1 decision above: dropped from 0.8.0 |
 | G-87 | sa03 caption `pageOf` target (#cap-hourly) not fired | K2 impl | resolved | two causes: the entry contradicted the rule definition (corpus erratum E42) and G-99 declined the page (WP-B1) |
-| G-88 | Local asset capture (discoverLocalAssetClosure / htmlResourceReferences) ignores <base href>: under an http(s) base it captures local files the browser never requests, while the browser's real requests go to the network | L1 impl | low–medium (source identity / acquisition truth) | open |
+| G-88 | Local asset capture (discoverLocalAssetClosure / htmlResourceReferences) ignores <base href>: under an http(s) base it captures local files the browser never requests, while the browser's real requests go to the network | L1 impl | low–medium (source identity / acquisition truth) | ⛔ superseded by 2026-09-28 L1 decision above: dropped from 0.8.0 |
 | G-89 | `display: contents` heading split across a page break loses its continuation in Paged.js (17 of 89 words printed), exit 0, no check catches it (pre-existing) | F1 r3 verifier | medium (silent content loss) | open / document |
 | G-90 | "rejects late scripted content" live test flaky (≈3/42, also on base): detection only via paired-control asymmetry | F1 r3 verifier | low | WP-F1b |
 | G-91 | Offline mode: Chrome 153 secure-DNS (DoH to [2001:4860:4860::8888]:443) bypasses the host-resolver lock → browser-level egress (caught by C2's own net-log test on CI) | C2 r2 verifier | high (security claim) | WP-C2 (stopped) |
@@ -232,12 +251,12 @@ release
 | G-93 | Signal delivered between the render's hold release and process.exit is dropped (3–44 ms window) → verdict exit instead of death by signal | C2 r2 verifier | medium | WP-C2 (stopped) |
 | G-94 | The request-interception policy does not cover WebSocket / WebTransport / WebRTC / iframe TCP — in the default offline mode as well as with --allow-network (release audit 2026-09-25 on 0.7.0, offline default: WebSocket to a non-tool loopback port delivered, WebRTC STUN sent, verdict clean). Pre-existing; SECURITY.md "network is blocked by default" and "exactly one origin" overclaimed — corrected in docs for 0.7.0, not fixed in code | C2 r2 verifier; release audit | high (security claim) | open (documented) |
 | G-95 | SIGTERM to an API host leaves the detached source producer alive (pre-existing, producer.ts:682) | C2 r2 verifier | medium | open |
-| G-96 | A paginator stylesheet/@import request answered 403 by the loopback server raises no infrastructure event → report over an unstyled document (fail-open; exposed by L1 r2's discovery change, mechanism pre-existing for any uncaptured resource) | L1 r2 verifier | high (in the exposing config) | WP-L1 r3 |
+| G-96 | A paginator stylesheet/@import request answered 403 by the loopback server raises no infrastructure event → report over an unstyled document (fail-open; exposed by L1 r2's discovery change, mechanism pre-existing for any uncaptured resource) | L1 r2 verifier | high (in the exposing config) | ⛔ superseded by 2026-09-28 L1 decision above: dropped from 0.8.0 |
 | G-97 | Lone tall avoid div with only inline text after an h1 ends exit 3 `document-not-quiescent` ("collector reconciliation failed: 1 unreconciled") — the WP-E1 note, after G-65 is fixed | WP-X impl | medium (real documents) | open |
 | G-98 | Paged.js carries a structured block footnote to a page of its own + non-fatal break-cause-undetermined | F5 impl/verifier | low (upstream) | document |
 | G-99 | Break-cause classification inside a named-page region: named page read from the page's first source node (a continuing wrapper) → every boundary in/after the region reads `forced`; the real change missed → false env/forced-break declines, exit 4 (sa03) | K2 impl (investigation) | medium–high | WP-B1 |
 | G-100 | F5 r2: a footnote fragment clipped away at the footnote-area bottom edge still binds its page (start mark placed on the edge in the non-clipping page-box layer) — false "bound" | F5 r2 verifier | high | WP-F5 (stopped) |
-| G-101 | CSS `@import` without whitespace (`@import"/x.css"`) escapes resource discovery, the stylesheet fail-closed guard and the local-uri collector → clean exit over an unstyled document under an allow-listed https base (pre-existing regex `\s+`) | L1 r3 verifier | high (narrow config) | WP-L1 (stopped) |
+| G-101 | CSS `@import` without whitespace (`@import"/x.css"`) escapes resource discovery, the stylesheet fail-closed guard and the local-uri collector → clean exit over an unstyled document under an allow-listed https base (pre-existing regex `\s+`) | L1 r3 verifier | high (narrow config) | ⛔ superseded by 2026-09-28 L1 decision above: dropped from 0.8.0 |
 | G-102 | WP-X r2 clip exemption: any clip-path/clip on an ancestor exempts stranded text from the residue census → exit 0 with text missing from the PDF (e.g. rounded-corner `clip-path: inset(0 round 12px)`) | X r2 verifier | high | WP-X (stopped) |
 | G-103 | `body { column-count: 1 }` / `columns: 1` makes body a multicol container; Paged.js lays pages into it → PDF 1 page / half the words, report 2 pages, exit 0 (pre-existing) | X r2 verifier | high | WP-X (stopped) |
 | G-104 | WP-R2 r2: word-spacing layout fallback samples gaps that are not natural spaces (author word-spacing, other-font inline text, container text-align-last) → divisor inflated, real findings hidden | R2 r2 verifier | high | WP-R2 (stopped) |
