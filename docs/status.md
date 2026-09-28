@@ -4,6 +4,16 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
+## Release preparation — 0.8.0
+
+The integration branch contains the configurable 600,000 ms document budget, SVG occurrence
+identity and physical-page evidence binding, the content-loss checks, inherited Chrome-flag
+neutralisation and Mac gate repairs. This is a candidate, not a published release. The required
+packed run on the specified 175-page P08 `print.html` is still pending because that exact file is
+absent from the workspace; a generated 207-page copy is not a substitute and ends at exit 4 on
+the open SVG painted-bounds gap. The report-surface human review and release tag are pending.
+No rule is calibrated; browser-managed secure DNS and communication egress remain documented limits.
+
 ## Released — 0.7.0 — the rules judge what printed
 
 **Published 2026-09-25.** Annotated tag `v0.7.0` on the dated commit `73e7a90`; release
@@ -56,7 +66,7 @@ technical gate (`test:report-surfaces:technical`), which CI and the release work
 makes no human-review claim. The roster check proves that a rostered handle was written, not who
 wrote it (`docs/reporting.md`).
 
-## Current published release — 0.6.0 (2026-09-18) — remediation that says when nobody checked
+## Previous release — 0.6.0 (2026-09-18) — remediation that says when nobody checked
 
 | | |
 |---|---|

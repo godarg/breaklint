@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 — TBD-at-tag
+
+### Behaviour and limits
 
 - G-112 (`svg/text-overflows-viewport`): the SVG viewport rule now distinguishes printed occurrences of a source `<text>`
   while preserving the duplicate-target guard within each occurrence. A repeated SVG no longer
@@ -8,6 +10,19 @@
 - G-111: the live document budget is configurable with `--document-timeout-ms` and
   `documentTimeoutMs` (30000–1800000 ms); the default is 600000 ms. Invalid values exit 2,
   and a timeout names the effective budget and flag. The producer boundary shares the default.
+- G-89 and G-103: a boxless `display: contents` heading and a body forced to one CSS column
+  are no longer silently reported clean when the checker cannot establish the intended page
+  structure. G-85 and G-92 remove inherited Chrome escape flags before launch; the remaining
+  browser-managed egress limits are stated in `SECURITY.md` and `docs/limitations.md`.
+- G-113: page evidence binds to a physical page and an occurrence rather than only to a reused
+  source id. This prevents colliding ids in repeated content from borrowing evidence from another
+  page. G-114 painted SVG stroke bounds are still open; a document can end at insufficient
+  coverage (exit 4) when that evidence cannot be measured.
+
+### Tooling
+
+- G-115 and G-116: the live overlay count and the drift fixture now measure the actual emitted
+  leaves and wait for the injected control page. The Freeze assertion itself is unchanged.
 - Document the Action's Bash 4 globstar prerequisite and skip its Bash-dependent unit tests with an explicit reason on older shells. Keep every assertion active when Bash 4+ is available.
 - Make the report font mutation assert the platform's actual undeclared sans face and report a missing Python `fontTools` dependency before running the mark-font generator.
 
