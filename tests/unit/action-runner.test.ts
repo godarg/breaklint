@@ -56,7 +56,9 @@ import { junitProblems, markdownProblems, sarifProblems } from "../tools/report-
 import { ARMS, checkArm } from "../tools/action-selftest.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const BASH_GLOBSTAR_REQUIRED = spawnSync("bash", ["--noprofile", "--norc", "-c", "shopt -s globstar"], { encoding: "utf8" }).status === 0
+const ACTION_BASH_PATH = `${dirname(process.execPath)}:${process.env.PATH ?? "/usr/bin:/bin"}`;
+const BASH_GLOBSTAR_REQUIRED = spawnSync("bash", ["--noprofile", "--norc", "-c", "shopt -s globstar"],
+  { encoding: "utf8", env: { ...process.env, PATH: ACTION_BASH_PATH } }).status === 0
   ? {}
   : { skip: "the Action's path expansion requires Bash 4 or newer with globstar; this host's bash lacks it" };
 const RUN = join(ROOT, "action/run.mjs");
@@ -187,7 +189,7 @@ function runAction(options: RunOptions = {}): ActionRun {
     env: {
       // The child must find the same bash the platform probe found. On macOS a Bash 4+
       // installation precedes /bin in PATH; hardcoding /usr/bin:/bin would test Bash 3.2.
-      PATH: `${fakeBin}:${dirname(process.execPath)}:${process.env.PATH ?? "/usr/bin:/bin"}`,
+      PATH: `${fakeBin}:${ACTION_BASH_PATH}`,
       HOME: process.env.HOME ?? scratch,
       GITHUB_WORKSPACE: workspace,
       RUNNER_TEMP: runnerTemp,
