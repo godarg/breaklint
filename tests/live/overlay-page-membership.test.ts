@@ -57,6 +57,45 @@ const FIXTURE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><sty
   </div></div></div>
 </body></html>`;
 
+// Paged.js keeps an unbreakable block in a side fragmentainer on the preceding page, then
+// creates the printable clone on the next page. Its physical page box is taller than the
+// preview's viewport-height wrapper; the latter is not the sheet boundary in the PDF.
+const DEFERRED_FIXTURE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+  body { margin: 0; }
+  .pagedjs_page { position: relative; width: 794px; height: 800px; }
+  .pagedjs_pagebox { position: relative; width: 794px; height: 1123px; }
+  .pagedjs_page_content { position: relative; width: 733px; height: 994px; }
+  .continued { height: 994px; }
+  .deferred { position: absolute; left: 1800px; top: 20px; break-inside: avoid; }
+  .visible-keep { position: relative; break-inside: avoid; }
+  .escaped-child { position: absolute; left: 1800px; top: 0; }
+  .pagedjs_footnote_area { position: absolute; top: 1000px; height: 40px; overflow: hidden; }
+  .clipped-note { position: absolute; top: 39px; height: 20px; }
+</style></head><body>
+  <div class="pagedjs_page"><div class="pagedjs_sheet"><div class="pagedjs_pagebox"><div class="pagedjs_area">
+    <div class="pagedjs_page_content">
+      <section class="continued" data-bl-sid="continued"><p>visible first fragment</p></section>
+      <div class="deferred" data-bl-sid="deferred"><p data-bl-sid="deferred-child">next page only</p></div>
+      <div class="deferred" data-bl-sid="deferred-later">two pages later</div>
+      <div class="deferred" data-bl-sid="clipped-note">same SID as the separately clipped footnote</div>
+      <div class="deferred" data-bl-sid="orphan">no printable clone exists</div>
+      <section class="visible-keep">visible block <p class="escaped-child" data-bl-sid="escaped-child">escaped child</p></section>
+    </div>
+    <div class="pagedjs_footnote_area"><aside class="clipped-note" data-bl-sid="clipped-note">not printed here</aside></div>
+  </div></div></div></div>
+  <div class="pagedjs_page"><div class="pagedjs_sheet"><div class="pagedjs_pagebox"><div class="pagedjs_area">
+    <div class="pagedjs_page_content">
+      <section data-bl-sid="continued">visible continuation</section>
+      <div data-bl-sid="deferred"><p data-bl-sid="deferred-child">next page only</p></div>
+      <p data-bl-sid="escaped-child">a later copy does not redeem the escaped child of a visible block</p>
+      <aside data-bl-sid="clipped-note">printable clone elsewhere does not justify the clipped note</aside>
+    </div>
+  </div></div></div></div>
+  <div class="pagedjs_page"><div class="pagedjs_sheet"><div class="pagedjs_pagebox"><div class="pagedjs_area">
+    <div class="pagedjs_page_content"><div data-bl-sid="deferred-later">two pages later</div></div>
+  </div></div></div></div>
+</body></html>`;
+
 describe("evidence overlay page membership, live", () => {
   let server: Server | null = null;
   let origin = "";
@@ -68,9 +107,9 @@ describe("evidence overlay page membership, live", () => {
       if (optional) return (t as { skip(message: string): void }).skip("missing browser");
       assert.fail("the page-membership regression requires a browser");
     }
-    server = createServer((_request, response) => {
+    server = createServer((request, response) => {
       response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      response.end(FIXTURE);
+      response.end(request.url === "/deferred.html" ? DEFERRED_FIXTURE : FIXTURE);
     });
     await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
     const address = server.address();
@@ -101,12 +140,12 @@ describe("evidence overlay page membership, live", () => {
     assert.equal(cleanupBrowserProfile(profile), null);
   });
 
-  async function page(): Promise<PageLike> {
+  async function page(path = "/fixture.html"): Promise<PageLike> {
     const current = await browser!.newPage();
     assert.ok(current.evaluateOnNewDocument, "browser page lacks the new-document primitive boundary");
     await current.evaluateOnNewDocument(PRIMITIVES_SOURCE);
     await current.setViewport({ width: 1000, height: 800 });
-    await current.goto(`${origin}/fixture.html`, { waitUntil: "load", timeout: 30_000 });
+    await current.goto(`${origin}${path}`, { waitUntil: "load", timeout: 30_000 });
     return current;
   }
 
@@ -141,6 +180,56 @@ describe("evidence overlay page membership, live", () => {
       ], "the clone must be neither marked nor unplaced; only envelopes past the page edge are refused");
       assert.deepEqual(await readbackViolations(current), []);
       assert.equal(await detachOverlay(current), 1);
+      assert.equal(await removeOverlay(current), 0);
+    } finally {
+      await current.close();
+    }
+  });
+
+  it("uses the physical page box for a real boundary and excludes only proven deferred clones", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    const current = await page("/deferred.html");
+    try {
+      const geometry = await current.evaluate<{
+        viewportBottom: number; physicalBottom: number; firstEnd: number; deferredX: number;
+        collidedSideX: number; clippedNoteX: number; clippedNoteTop: number; areaBottom: number;
+      }>(`(() => {
+        const first = document.querySelector('.pagedjs_page');
+        return {
+          viewportBottom: first.getBoundingClientRect().bottom,
+          physicalBottom: first.querySelector('.pagedjs_pagebox').getBoundingClientRect().bottom,
+          firstEnd: first.querySelector('[data-bl-sid="continued"]').getBoundingClientRect().bottom,
+          deferredX: first.querySelector('[data-bl-sid="deferred"]').getBoundingClientRect().x,
+          collidedSideX: first.querySelector('.pagedjs_page_content [data-bl-sid="clipped-note"]').getBoundingClientRect().x,
+          clippedNoteX: first.querySelector('.pagedjs_footnote_area [data-bl-sid="clipped-note"]').getBoundingClientRect().x,
+          clippedNoteTop: first.querySelector('.pagedjs_footnote_area [data-bl-sid="clipped-note"]').getBoundingClientRect().top,
+          areaBottom: first.querySelector('.pagedjs_page_content').getBoundingClientRect().bottom,
+        };
+      })()`);
+      assert.ok(geometry.firstEnd > geometry.viewportBottom && geometry.firstEnd < geometry.physicalBottom,
+        "fixture must place the real continuation edge outside the viewport but inside the physical page");
+      assert.ok(geometry.deferredX > 794, "fixture must put deferred content in the side fragmentainer");
+      assert.ok(geometry.collidedSideX > 794 && geometry.clippedNoteX < 794 &&
+        geometry.clippedNoteTop > geometry.areaBottom && geometry.clippedNoteTop < geometry.physicalBottom,
+      "fixture must put the colliding SID in both the deferrable side lane and the clipped footnote area");
+      const installation = await installOverlay(current);
+      assert.ok(installation.marks.some((mark) => mark.page === 1 && mark.sid === "continued" && mark.side === "end"),
+        "the measured continuation boundary was refused despite lying on the physical page");
+      assert.equal(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "deferred"), false,
+        "the next-page clone remained a phantom fragment of page 1");
+      assert.equal(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "deferred-child"), false,
+        "descendants of the unbreakable deferred block remained phantom fragments");
+      assert.equal(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "deferred-later"), false,
+        "a table-sized deferred clone two pages later remained a phantom fragment");
+      assert.ok(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "orphan"),
+        "an avoid-break element outside the page was excluded without a printable clone");
+      assert.ok(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "escaped-child"),
+        "an off-sheet child of a visible avoid-break container was mistaken for a deferred container");
+      assert.deepEqual(installation.unplacedMarks.filter((mark) => mark.page === 1 && mark.sid === "clipped-note")
+        .map((mark) => mark.side), ["start", "end"],
+      "the side-lane clone may be excluded, but both marks of the separate clipped footnote must remain unplaced");
+      assert.deepEqual(await readbackViolations(current), []);
+      assert.equal(await detachOverlay(current), 3);
       assert.equal(await removeOverlay(current), 0);
     } finally {
       await current.close();
