@@ -47,3 +47,46 @@ The changed `src/` files are within `REVIEW_INPUT_ROOTS`. After the preparation 
 ## 5. Other downstream work
 
 The DE/EN website draft is on local branch `prog/breaklint-080-site-20260928` in a separate site worktree, commit `280e6e0`. Its local declared gate passed. It must await real 0.8.0 release facts, the final copy check, both required PR gates and a merge to deploy. Site PR #47 is untouched. Studio and DS_OS consumers remain on their existing versions until npm 0.8.0 is verified. The workspace release note and memory update also remain to be written from final measurements.
+
+## 6. Founder report-surface review package — for the future merge commit
+
+This section is a preparation aid, not a review result. It becomes actionable only after the
+P08 gate, PR merge and exact local release gate. Record `git rev-parse HEAD` from a clean checkout
+of the **release-preparation merge commit**; use that SHA in the chat judgment. On this candidate,
+the technical gate passed 32/32 cells and produced 207 physical artifacts (24 full screens, 152
+screen tiles, four PDFs and 27 page rasters). Comparison with the 0.7.0 ledger changed the bound
+fingerprint of **all 32 cells** and the decoded pixels of all 24 screen cells. Re-render at the
+merge commit; these candidate hashes are not transferable.
+
+Commands on the Mac from that clean checkout, in this order:
+
+```bash
+git rev-parse HEAD
+npm ci --no-audit --no-fund
+npm run test:report-surfaces:technical
+open .artifacts/report-surfaces/review-gallery.html
+open .artifacts/report-surfaces/*--a4.pdf
+```
+
+The gallery groups the exact 32 cells as follows; each screen cell includes its full image and
+every viewport-height tile. Open `manifest.json` alongside it for the binding and artifact names.
+
+| State to judge | Light screens | Dark screens | Print cells | What must be visible |
+|---|---|---|---|---|
+| `clean` | desktop · tablet · mobile | desktop · tablet · mobile | PDF · three rasters | “Clean run” only here; all 13 rules and coverage table readable. |
+| `findings` | desktop · tablet · mobile | desktop · tablet · mobile | PDF · eight rasters | Finding cards, evidence paths, remediation tint and table continuation. |
+| `infrastructure` | desktop · tablet · mobile | desktop · tablet · mobile | PDF · eight rasters | Checker failure verdict and exit 3, with no false clean state. |
+| `insufficient-coverage` | desktop · tablet · mobile | desktop · tablet · mobile | PDF · eight rasters | Coverage verdict and exit 4, with “Below floor” legible without colour. |
+
+For each state, check verdict and exit code first; then legibility, font roles, mobile wrapping
+and horizontal clipping; then PDF page numbers, running head, final end mark, split findings,
+repeated table header and the untested-advice caveat as specified in `docs/reporting.md` §“Review
+package”. The known residuals to accept or reject explicitly are: tail label even on unsplit
+findings; over-long evidence name wrapping within itself; Ubuntu font resolution unmeasured.
+The review can be navigated in about 20 minutes by following the gallery state order, then the
+four PDFs; it still requires looking at every tile and printed page.
+
+The Founder supplies a literal **PASS or FAIL**, the merge SHA, cell-specific findings and the
+three residual decisions in this chat. The assistant records exactly that judgment as one new
+ledger round and runs `npm run test:report-surfaces:local`; no prior round or agent judgment can
+stand in for it. A FAIL is entered as FAIL and stops the release.
