@@ -28,7 +28,7 @@ These branches remain available remotely; they have not been merged as fixes. On
 | C1/C2 and K2 | G-23, G-93, G-95, G-106 | `origin/prog/p3-c1c2-k2-disposition-20260928` at `20c9e69` | The lifecycle changes depend on a broad process-ownership and egress branch; the corpus gate is absent from main. No narrow independently verified port. |
 | G-114 SVG painted bounds | G-114 | `origin/claude/wp-g114-svg-safe-bounds` at `e9f780e` (code candidate `e0c9430`) | The sole fresh verifier returned FAIL/MEDIUM because the frozen register did not carry admissible packed P08/P05 end-to-end evidence. The request allows a second review only after a new BLOCKER/HIGH. Code was not integrated. |
 
-G-91 secure-DNS egress and G-94 WebSocket/WebRTC/WebTransport egress remain open and documented. No current-Chrome CI net-log proof for a fix was obtained, so no security claim was upgraded. P4 was not attempted while the release blocker remained. The explicitly excluded G-11, G-19–G-25 and G-58 remain outside this release; `calibrated: false` remains in place.
+G-91 secure-DNS egress and G-94 WebSocket/WebRTC/WebTransport egress are outside the 0.8.0 fix scope under the stated proof condition and remain open product findings. No current-Chrome CI net-log proof for a fix was obtained, so no security claim was upgraded. P4 was not attempted while the release blocker remained. The explicitly excluded G-11, G-19–G-25 and G-58 remain outside this release; `calibrated: false` remains in place.
 
 ## 3. Real-document blocker
 
