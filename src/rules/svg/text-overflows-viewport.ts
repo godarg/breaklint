@@ -92,7 +92,7 @@ export const textOverflowsViewport = defineRule(
               count: potentialTargets,
             }),
           );
-          for (const [textIndex, text] of svg.texts.entries()) evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, status: "not-applicable", reason: "env/svg-overflow-visible", measurements: [
+          for (const [textIndex, text] of svg.texts.entries()) evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: `${svg.nodeKey}:${textIndex}`, boxScreen: text.boxScreen, status: "not-applicable", reason: "env/svg-overflow-visible", measurements: [
             { name: "svg-overflow-visible", value: true, unit: null, operator: "=", threshold: true },
             { name: "svg-text-rendered", value: true, unit: null, operator: "=", threshold: true },
           ], connective: "all", violated: null }));
@@ -174,7 +174,7 @@ export const textOverflowsViewport = defineRule(
             count: targets,
           }),
         );
-        for (const [textIndex, text] of svg.texts.entries()) evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: text.boxScreen, status: "not-measured", reason: "env/svg-too-many-text-targets" }));
+        for (const [textIndex, text] of svg.texts.entries()) evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: `${svg.nodeKey}:${textIndex}`, boxScreen: text.boxScreen, status: "not-measured", reason: "env/svg-too-many-text-targets" }));
         continue;
       }
       measured += targets;
@@ -190,7 +190,7 @@ export const textOverflowsViewport = defineRule(
           b.y + b.height - (vp.y + vp.height),
         );
         const violated = overshoot > permitted + SNAPSHOT_ROUNDING_PX;
-        evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: String(textIndex), boxScreen: b, status: "measured", measurements: [{ name: "viewport-overshoot", value: overshoot, unit: "px", operator: ">", threshold: permitted + SNAPSHOT_ROUNDING_PX }], violated }));
+        evaluations.push(targetEvaluation({ ruleId: "svg/text-overflows-viewport", keyType: "svg-text", nodeKey: svg.nodeKey, sid: text.sourceAddressKey ?? null, occurrenceKey: `${svg.nodeKey}:${textIndex}`, boxScreen: b, status: "measured", measurements: [{ name: "viewport-overshoot", value: overshoot, unit: "px", operator: ">", threshold: permitted + SNAPSHOT_ROUNDING_PX }], violated }));
         // The two boxes come from different APIs — the viewport from getBoundingClientRect, the
         // target from CTM-transformed getBBox corners — and the collector stores both rounded to
         // two decimals. Each value therefore carries up to 0.005 px of rounding, and a difference

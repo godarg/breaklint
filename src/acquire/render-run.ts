@@ -52,6 +52,7 @@ import {
   composeSignature,
   driftedComponents,
   DOCUMENT_TIMEOUT_MS,
+  DOCUMENT_TIMEOUT_MAX_MS,
   freezeSource,
   MAX_DOM_NODES,
   MAX_MUTATIONS_AFTER_RENDERED,
@@ -98,6 +99,7 @@ export interface RenderOptions {
   sourceMapInjection: boolean;
   network: { mode: "offline" | "allowlist"; allowed: string[] };
   locale: string;
+  documentTimeoutMs?: number;
 }
 
 export interface RenderEnvironment extends ReportEnvironment {
@@ -135,7 +137,7 @@ export interface RenderDependencies {
   openRasterizer: typeof openRasterizer;
   /** Test seam for the provenance corruption red condition; production always uses the parser injector. */
   injectSourceIds?: typeof injectSourceIds;
-  /** Unit-only timing seam. Production dependencies omit it and remain fixed at §13.3's 120000 ms. */
+  /** Unit-only timing seam; the resolved public option is in RenderOptions. */
   documentTimeoutMs?: number;
   /** Test seam for an unreadable process table; production uses the POSIX verifier above. */
   terminateBrowserProcessTree?: typeof terminateProcessTree;
@@ -1033,6 +1035,7 @@ interface OpenedContentPage {
   collectorNonce: string | null;
   pageErrors: string[];
   cascadeHints: Record<string, BreakCauseCascadeHint | null>;
+  sourceLayoutRisks: string[];
   imageFailures: ImageDecodeFailure[];
   network: NetworkTracker;
   close(): Promise<void>;
@@ -1639,7 +1642,7 @@ async function openContentPage(
     await page.emulateMediaType("print");
     const ready = await withTimeout(
       page.evaluate<ResourceBarrierResult>(RESOURCE_BARRIER_SOURCE),
-      DOCUMENT_TIMEOUT_MS,
+      context.options.documentTimeoutMs ?? DOCUMENT_TIMEOUT_MS,
       "font/image readiness barrier",
     );
     if (ready.failedFonts.length > 0) {
@@ -1674,6 +1677,20 @@ async function openContentPage(
     // §11.6a ordering: read the non-normative cascade hint in print media BEFORE Paged.js consumes
     // the declarations, then reset the medium and only then start pagination.
     const cascadeHints = await page.evaluate<Record<string, BreakCauseCascadeHint | null>>(CASCADE_HINT_SOURCE);
+    // Read the authored print tree before Paged.js clones or discards its nodes. A normal
+    // snapshot cannot prove completeness after either of these pagination failure modes.
+    const sourceLayoutRisks = await page.evaluate<string[]>(`(() => {
+      const risks = [];
+      const body = getComputedStyle(document.body);
+      if (body.columnCount !== "auto" || body.columnWidth !== "auto") risks.push("body-column-container");
+      for (const heading of document.querySelectorAll("h1,h2,h3,h4,h5,h6")) {
+        if (heading.textContent?.trim() && getComputedStyle(heading).display === "contents") {
+          risks.push("contents-heading");
+          break;
+        }
+      }
+      return risks;
+    })()`);
     await page.emulateMediaType(null);
     const paginationError = await page.evaluate<{ paginationError: string | null }>(PAGINATION_PREVIEW_SOURCE);
     if (paginationError.paginationError) throw new Error(`pagination aborted: ${paginationError.paginationError}`);
@@ -1712,7 +1729,7 @@ async function openContentPage(
     network.activityAfterRendered = 0;
     if (pageErrors.length > 0) throw new Error(`content page error during pagination: ${pageErrors.join(" | ")}`);
     return {
-      page, browserContext, apparatusCapability, collectorNonce, pageErrors, cascadeHints,
+      page, browserContext, apparatusCapability, collectorNonce, pageErrors, cascadeHints, sourceLayoutRisks,
       imageFailures, network, close,
     };
   } catch (error) {
@@ -1876,6 +1893,17 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     );
     openedMain = opened;
     const page = opened.page;
+    for (const risk of opened.sourceLayoutRisks) {
+      infrastructure.push({
+        kind: "source-layout-unsupported",
+        detail: `${risk}: authored print CSS can silently omit text during Paged.js pagination; this document cannot be certified clean`,
+        measured: { stage: "pre-pagination-print-style", risk },
+      });
+    }
+    if (fatalInfrastructure(infrastructure)) {
+      await closePage();
+      return { path, snapshot: null, infrastructure };
+    }
     if (opened.imageFailures.length > 0) {
       infrastructure.push({
         kind: "image-content-unavailable",
@@ -2368,7 +2396,7 @@ export async function renderDocuments(
     runId: randomBytes(6).toString("hex"),
   };
   const documents: DocumentInput[] = [];
-  const documentTimeoutMs = dependencies.documentTimeoutMs ?? DOCUMENT_TIMEOUT_MS;
+  const documentTimeoutMs = dependencies.documentTimeoutMs ?? options.documentTimeoutMs ?? DOCUMENT_TIMEOUT_MS;
   let browserTerminationError: string | null = null;
   let rasterizerCloseError: string | null = null;
   let profileCleanupError: string | null = null;
@@ -2388,7 +2416,10 @@ export async function renderDocuments(
           infrastructure: [{
             kind: "checker-crashed",
             detail: timedOut
-              ? `document acquisition exceeded its process boundary: ${error.message}`
+              ? `document acquisition exceeded its ${documentTimeoutMs} ms budget: ${error.message}. ` +
+                (documentTimeoutMs < DOCUMENT_TIMEOUT_MAX_MS
+                  ? "Raise it within the hard limit with --document-timeout-ms <milliseconds> or config documentTimeoutMs."
+                  : "The --document-timeout-ms hard maximum is reached; reduce or split the document.")
               : `document acquisition failed outside its owned result boundary: ${error instanceof Error ? error.message : String(error)}`,
             measured: timedOut
               ? { stage: "document-timeout", timeoutMs: documentTimeoutMs }

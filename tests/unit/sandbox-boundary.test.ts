@@ -12,6 +12,7 @@
  * It reads the real files. It is static on purpose: a unit test must not need Chrome, and the
  * question "does any code path ask for the sandbox to be off" is a question about the code.
  *
+ * The environment guard is exercised separately in environment-boundary.test.ts.
  * KNOWN LIMITS, accepted: check 1 recognises a call whose callee is the name `launch` or a
  * property access ending in `.launch`. A launch reached any other way — `launch.call(…)`,
  * `launch.apply(…)`, `launch.bind(…)(…)`, an element access such as `puppeteer["launch"](…)`, or
@@ -64,6 +65,7 @@ const ALLOWED_LAUNCH_OPTIONS: Record<string, string> = {
   executablePath: "which binary starts; the sandbox is a property of the switches, not the path",
   headless: "the display mode; Chrome keeps its sandbox headless",
   userDataDir: "the fresh per-run profile directory",
+  env: "the browser-only environment with wrapper flags removed",
   args: "extra switches — pinned to the literal []",
   detached: "whether the child gets its own process group, for cleanup",
   protocolTimeout: "how long one DevTools call may take",
@@ -110,6 +112,9 @@ function launchOptionIssues(source: string, fileName: string): { calls: number; 
               issues.push(`${fileName}: args must be the literal [] — it is ${value ? value.getText(file) : "a shorthand"}`);
             }
             if (key === "pipe" && value?.kind !== ts.SyntaxKind.TrueKeyword) issues.push(`${fileName}: pipe must be the literal true`);
+            if (key === "env" && value?.getText(file) !== "safeBrowserEnvironment(process.env)") {
+              issues.push(`${fileName}: env must be the scrubbed browser environment`);
+            }
             if (/^handleSIG/u.test(key) && value?.kind !== ts.SyntaxKind.FalseKeyword && value?.kind !== ts.SyntaxKind.TrueKeyword) {
               issues.push(`${fileName}: ${key} must be a boolean literal`);
             }
@@ -163,6 +168,7 @@ describe("the browser sandbox", () => {
       ['args: ["--no-sandbox"],', /args must be the literal \[\]/u],
       ["ignoreDefaultArgs: true,", /ignoreDefaultArgs is not an allowed launch option/u],
       ["pipe: usePipe,", /pipe must be the literal true/u],
+      ["env: { ...process.env },", /env must be the scrubbed browser environment/u],
     ];
     for (const [entry, message] of refused) {
       const result = launchOptionIssues(`launch({ headless: true, ${entry} });`, "mutant.ts");

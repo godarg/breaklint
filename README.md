@@ -9,7 +9,7 @@
 widows, orphans, blocks too tall to keep together and hyphenation across page breaks, each with
 the measured value and the threshold it failed.
 
-[![A still from the 39-second breaklint film, with the line “Perfect in the browser. Broken on page 47.” over a blurred page of layout findings](https://raw.githubusercontent.com/godarg/breaklint/v0.7.0/assets/breaklint-film-poster.jpg)](https://dargel-solutions.de/en/breaklint/#film)
+[![A still from the 39-second breaklint film, with the line “Perfect in the browser. Broken on page 47.” over a blurred page of layout findings](https://raw.githubusercontent.com/godarg/breaklint/v0.8.0/assets/breaklint-film-poster.jpg)](https://dargel-solutions.de/en/breaklint/#film)
 
 The image links to the project page, which carries the 39-second film about breaklint.
 
@@ -259,6 +259,7 @@ be left ungated), and SARIF for code scanning, JUnit and a Markdown step summary
 from the one canonical JSON report. It installs the npm release named in that ref's
 `package.json`, not the ref's code: a tag works once its npm publish has succeeded, and a branch
 ref runs the last release, or fails with exit 3 after a version bump that is not yet published.
+Path expansion requires Bash 4 or newer with globstar; macOS `/bin/bash` 3.2 does not provide it.
 [`docs/ci-recipe.md`](docs/ci-recipe.md) has a workflow to copy,
 the permissions it needs and what each exit code does to the job.
 
@@ -320,10 +321,10 @@ attacking the browser:
   opens, nor the browser's own secure DNS and component updater traffic. Measured on 0.7.0 in the
   default offline mode: a document's WebSocket to another loopback port was delivered and a WebRTC
   STUN request was sent, and the run came back clean.
-- The environment can turn the sandbox off: puppeteer-core adds `--no-sandbox` when
-  `PUPPETEER_DANGEROUS_NO_SANDBOX=true`, and the browser inherits the environment. Make sure
-  `PUPPETEER_DANGEROUS_NO_SANDBOX`, `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` and
-  `CHROME_EXTRA_FLAGS` are unset.
+- breaklint refuses `PUPPETEER_DANGEROUS_NO_SANDBOX` and
+  `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` before launch and strips `CHROME_EXTRA_FLAGS`
+  from Chrome's child environment. Other browser or wrapper variables are not proven safe;
+  isolate untrusted documents at the operating-system boundary.
 
 For untrusted third-party HTML, use a container or network namespace with no egress. Details are
 in [SECURITY.md](SECURITY.md).

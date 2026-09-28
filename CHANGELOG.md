@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.8.0 — TBD-at-tag
+
+### Behaviour and limits
+
+- G-112 (`svg/text-overflows-viewport`): the SVG viewport rule now distinguishes printed occurrences of a source `<text>`
+  while preserving the duplicate-target guard within each occurrence. A repeated SVG no longer
+  crashes solely because its copies share one source address.
+- G-111: the live document budget is configurable with `--document-timeout-ms` and
+  `documentTimeoutMs` (30000–1800000 ms); the default is 600000 ms. Invalid values exit 2,
+  and a timeout names the effective budget and flag. The producer boundary shares the default.
+- G-89 and G-103: a boxless `display: contents` heading and a body forced to one CSS column
+  are no longer silently reported clean when the checker cannot establish the intended page
+  structure. G-85 and G-92 remove inherited Chrome escape flags before launch; the remaining
+  browser-managed egress limits are stated in `SECURITY.md` and `docs/limitations.md`.
+- G-113: page evidence binds to a physical page and an occurrence rather than only to a reused
+  source id. This prevents colliding ids in repeated content from borrowing evidence from another
+  page. G-114 measures a visible SVG text stroke only when a conservative painted-bounds envelope
+  fits strictly inside its viewport. Boundary-touching strokes and complex paint remain unmeasured
+  and can still produce insufficient coverage (exit 4). On the current generated P08 print edition,
+  all 472 SVG targets were measured and the 207-page document ended with findings (exit 1).
+- G-117: a stroke painted only by a `<tspan>` descendant now stays in the candidate count and
+  declines even when its outer `<text>` has no stroke or paints nothing itself. This closes a
+  false-clean path found by the independent G-114 review; it does not change the SVG coverage floor.
+
+### Tooling
+
+- G-115 and G-116: the live overlay count and the drift fixture now measure the actual emitted
+  leaves and wait for the injected control page. The Freeze assertion itself is unchanged.
+- Document the Action's Bash 4 globstar prerequisite and skip its Bash-dependent unit tests with an explicit reason on older shells. Keep every assertion active when Bash 4+ is available.
+- Make the report font mutation assert the platform's actual undeclared sans face and report a missing Python `fontTools` dependency before running the mark-font generator.
+
 ## 0.7.0 — 2026-09-25
 
 A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0 and 0.6.0: a

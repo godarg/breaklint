@@ -315,7 +315,7 @@ describe("the M2d live production chain", () => {
     assert.equal(drifting.evidence?.length ?? 0, 0, "a rejected snapshot wrote evidence");
     const event = drifting.infrastructure.find((item) =>
       item.kind === "document-not-quiescent" && /layout did not settle/u.test(item.detail));
-    assert.ok(event, "the real freeze loop did not fail closed");
+    assert.ok(event, `the real freeze loop did not fail closed: ${JSON.stringify(drifting.infrastructure)}`);
     const measured = event.measured as { retries?: number; components?: string[] } | null;
     assert.equal(measured?.retries, 4, "the three retry budget was not exhausted");
     assert.ok(measured?.components?.includes("boxes"), `box drift was not named: ${JSON.stringify(measured)}`);
@@ -969,10 +969,17 @@ describe("the M2d live production chain", () => {
     assert.equal(transparent.texts.length, 1);
 
     const complex = record("complex-paints");
-    assert.equal(complex.textTargetCount, 8);
+    assert.equal(complex.textTargetCount, 15);
     assert.equal(complex.notRenderedTargets, 1, "the source text in defs is not itself painted");
-    assert.equal(complex.unsupportedTargets, 6, "clip, mask, filter, stroke, direct use and nested use must all decline");
-    assert.equal(complex.texts.length, 1, "the ordinary text in the mixed SVG remains measurable");
+    assert.equal(complex.unsupportedTargets, 12, "complex paint, edge/transform/child/vector strokes and use instances must decline");
+    assert.equal(complex.texts.length, 2, "ordinary text and the provably contained stroke are measured");
+    assert.ok(complex.texts.some((text) => text.svgTextKey.includes("safe-stroke")), "the contained halo must be measured");
+    assert.ok(!complex.texts.some((text) => text.svgTextKey.includes("rotated-safe-stroke")), "transformed stroke stays undecidable");
+    assert.ok(!complex.texts.some((text) => text.svgTextKey.includes("edge-stroke")), "a stroke touching the viewport edge stays undecidable");
+    assert.ok(!complex.texts.some((text) => text.svgTextKey.includes("child-stroke")), "descendant paint overrides stay undecidable");
+    assert.ok(!complex.texts.some((text) => text.svgTextKey.includes("child-only-stroke")), "a stroked descendant must decline even when its text parent has no stroke");
+    assert.ok(!complex.texts.some((text) => text.svgTextKey.includes("child-only-paint")), "a stroked descendant must remain a target even when its text parent paints nothing");
+    assert.ok(!complex.texts.some((text) => text.svgTextKey.includes("non-scaling-stroke")), "non-scaling stroke stays undecidable");
 
     const border = record("border-box");
     assert.equal(border.measurable, false);
@@ -992,12 +999,12 @@ describe("the M2d live production chain", () => {
     });
     assert.deepEqual(outcome.report.findings, [], "unsupported geometry produced a guessed error finding");
     const coverage = outcome.report.coverage["svg/text-overflows-viewport"];
-    assert.equal(coverage?.candidates, 10);
-    assert.equal(coverage?.measured, 3);
+    assert.equal(coverage?.candidates, 17);
+    assert.equal(coverage?.measured, 4);
     assert.deepEqual(
       coverage?.notMeasured.map((entry) => ({ reason: entry.reason, count: entry.count })),
       [
-        { reason: "env/svg-painted-bounds-unsupported", count: 6 },
+        { reason: "env/svg-painted-bounds-unsupported", count: 12 },
         { reason: "env/svg-viewport-geometry-unsupported", count: 1 },
       ],
     );

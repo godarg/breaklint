@@ -8,6 +8,16 @@ argument rather than an edit.
 
 It also states, in one place, what this tool does not know.
 
+## Document time and memory
+
+The live document acquisition budget defaults to 600000 ms and is configurable through
+`--document-timeout-ms` or `documentTimeoutMs` in the JSON config, within 30000–1800000 ms.
+Reaching it ends with exit 3 and a message naming the budget. The budget is a hard stop, not a
+speed promise. Large paginated documents can consume substantial memory: the earlier G-18
+measurement found about 15.7 MiB per page during comparison. No streaming or peak-memory
+improvement is part of the budget change. A fresh 200-page memory measurement is required before
+claiming that the default is adequate for that document size on a particular machine.
+
 ## Why exactly two rules may fail a build
 
 Eleven of the thirteen released rules compare a chosen threshold against a real measurement. A
@@ -109,8 +119,9 @@ was found by building the fixture for the previous one.
 A `<text>` that IS laid out and still has no readable box declines with `env/svg-ctm-unavailable`
 and DOES count against coverage — that is a measurement this tool owed and did not deliver, per
 target rather than per SVG. The same fail-closed rule applies when a box exists but does not prove
-the painted result: `<use>`, visible stroke, paint servers, text decoration, clip paths, masks and
-filters decline with `env/svg-painted-bounds-unsupported`.
+the painted result: `<use>`, paint servers, text decoration, clip paths, masks and filters decline
+with `env/svg-painted-bounds-unsupported`. Visible strokes do so unless a conservative outer bound
+of the stroke fits wholly inside the SVG viewport.
 
 Neither exemption leaves the report. Both keep their rule, reason and count in `notMeasured`, and
 each rule's own books are still checked first: `defineRule` requires measured plus declined to equal
@@ -130,10 +141,11 @@ fixtures and renderer lab are retained so the work is not erased, but they are a
 
 **Complex SVG paint is detected but not geometrically solved in this build.** `querySelectorAll`
 does not cross the instance tree created by `<use>`, and `getBBox()` does not include stroke,
-clipping, masks or filter effects. The collector now detects those entrances and keeps each as an
-unmeasured candidate. Because the viewport rule is an error rule with a coverage floor of 1, even
-one such target produces `insufficient-coverage` (exit 4), never a silent clean result or a guessed
-error. Full support belongs to the independent ink passes, not to an expansion guessed from style.
+clipping, masks or filter effects. The collector detects those entrances and keeps each as an
+unmeasured candidate unless the narrow stroke proof below applies. Because the viewport rule is an
+error rule with a coverage floor of 1, even one undecidable target produces
+`insufficient-coverage` (exit 4), never a silent clean result or a guessed error. Full support
+belongs to the independent ink passes.
 
 *What this costs on a real document, measured.* The entrance that fires in practice is not `<use>`
 or a filter — it is the **halo**: `paint-order="stroke fill"` with the stroke set to the background
@@ -149,19 +161,21 @@ eighteen-document reference set of illustrated chapters:
 | 07 | 27 | 10 | 17 | 17 haloed labels |
 
 Read the first two rows before the last three: inline SVG text is **not** structurally unmeasurable
-here, and a document whose labels carry no visible stroke measures at coverage 1. What is
-unmeasurable is a `<text>` that paints a stroke, because `getBBox()` returns the fill outline and
-the tool refuses to judge an overflow against a box that describes different ink. Three haloed
-labels are enough to take an error rule with a floor of 1 to exit 4, which is why one such figure
-reads in the report as though the whole class had failed.
+here, and a document whose labels carry no visible stroke measures at coverage 1. The table is a
+dated pre-change measurement: then every visible stroke declined because `getBBox()` returns the
+fill outline, not the ink. Three haloed labels were enough to make the error rule end exit 4.
 
-The named next step is not the ink pass. A stroke centred on the glyph outline gives a **two-sided
-bound** for nothing but the stroke width: the fill box is a lower bound on the painted box and the
-fill box inflated by `stroke-width / 2` is an upper bound. A target whose lower bound already
-leaves the viewport overflows for certain; one whose upper bound is still inside it does not
-overflow for certain; only the band between them stays undecidable. On the corpus above the halo
-strokes are 2–4 px against overshoots that matter at ten times that, so almost all 35 declined
-targets are decidable without an ink pass at all. This is a named gap, not a design position.
+G-114 admits only a finite CSS-pixel stroke width, known cap and join, finite miter limit, no
+descendant paint override, vector effect, or text/inner-ancestor transform, and an intact CTM. It
+expands the local box by a deliberately conservative radius using the full
+`stroke-width × stroke-miterlimit` for miter joins (the [SVG 2 painting definition](https://www.w3.org/TR/SVG2/painting.html#StrokeLinejoinProperty)
+defines the ratio), carries that envelope through the CTM, and
+measures only if all four sides remain strictly inside the viewport. A boundary-touching halo
+stays `env/svg-painted-bounds-unsupported` and still causes exit 4. This proves containment for
+that narrow case; it does not identify painted bounds exactly or turn a partly outside stroke into
+a finding. A painted stroke on a `<tspan>` or other descendant declines even if the outer `<text>`
+has `stroke="none"` or no paint of its own; descendant paint remains a candidate, never a silent
+clean result. The dated corpus counts above are not a claim about current coverage.
 
 **Nontrivial viewport boxes are detected but not reconstructed.** `getBoundingClientRect` is the
 border box and becomes only an axis-aligned envelope under rotation or skew. An SVG root with
@@ -271,11 +285,13 @@ letting through only its own loopback origin (plus `data:`, `blob:`, `about:` an
 connections a document opens, nor the browser's own traffic — secure DNS (DNS over HTTPS) and the
 component updater. Measured on 0.7.0 in the default offline mode with a self-authored document: a
 WebSocket to a loopback port that was not the tool's was delivered, a WebRTC STUN request was sent,
-and the run came back `clean`. The sandbox can be turned off from the environment, which breaklint
-does not clear: puppeteer-core adds `--no-sandbox` when `PUPPETEER_DANGEROUS_NO_SANDBOX=true`,
-honours `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES`, and the browser inherits variables such as
-`CHROME_EXTRA_FLAGS`; keep them unset. For a document you do not trust, run breaklint in a
-container or network namespace with no egress. See [SECURITY.md](../SECURITY.md).
+and the run came back `clean`. In 0.8.0, breaklint refuses to launch if
+`PUPPETEER_DANGEROUS_NO_SANDBOX` or `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` is present, and
+removes `CHROME_EXTRA_FLAGS` from Chrome's child environment. This closes those known environment
+paths; other wrapper variables are not generally audited. For a document you do not trust, run
+breaklint in a container or network namespace with no egress. The GitHub Action's empty
+`allow-network` input applies this same interceptor policy; it does not make the runner fully
+offline. See [SECURITY.md](../SECURITY.md).
 
 The longer, measurement-by-measurement account of what has been established and what has not is in
 [status.md](status.md).
@@ -422,19 +438,22 @@ why it was taken on that evidence — the same standard would not have been enou
 
 ## 0.7.0 limits
 
-**`body { column-count: 1 }` can end `clean` over a PDF that lost most of its content — a known
-false-clean defect, not fixed in 0.7.0.** `column-count: 1` or `columns: 1` on `body` makes the
-body a multi-column container, and Paged.js then lays its pages out inside it. Measured by
+**In 0.7.0, `body { column-count: 1 }` could end `clean` over a PDF that lost most of its content.**
+`column-count: 1` or `columns: 1` on `body` makes the body a multi-column container, and Paged.js
+then lays its pages out inside it. Measured by
 independent verifications of this release cycle: the produced PDF was missing most of the
 document's content — in one run it held one page and about half the words — while the run
-reported its pages as measured and ended `clean`, exit 0. No check in this release catches it; the `env/multicolumn` decline applies to multi-column blocks
-the rules measure, not to a paginated body.
+reported its pages as measured and ended `clean`, exit 0. In 0.8.0, a computed print `column-count`
+or `column-width` on `body` ends exit 3 before the source can be called clean. This refuses even
+one-column bodies because Paged.js may create its own pagination columns inside them. It is a
+guard against this known failure mode, not a general multicolumn completeness proof.
 
-**A `display: contents` heading that a page break splits can lose its continuation — a known
-false-clean defect, not fixed in 0.7.0.** Paged.js does not carry the rest of such a heading to
-the next page: measured by an independent verification of this release cycle, 17 of the heading's
-89 words were printed, and the run ended exit 0. No rule or cross-check in this release sees the
-missing text. Avoid `display: contents` on headings long enough to break, or check the PDF.
+**In 0.7.0, a `display: contents` heading split at a page break could lose its continuation.**
+Paged.js does not carry the rest of such a heading to the next page: measured by an independent
+verification of the 0.7.0 cycle, 17 of the heading's
+89 words were printed, and the run ended exit 0. In 0.8.0, any nonempty heading with computed
+print `display: contents` ends exit 3, including headings that would have fit. The guard names the
+style; it does not attempt to reconstruct missing text after pagination.
 
 **Nothing printed in a page margin box is measured by any block, line or page rule.** Paged.js
 implements `position: running(...)` by deep-cloning the element into the margin box of every page,

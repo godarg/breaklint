@@ -409,6 +409,19 @@ export interface LaunchResult {
   userDataDir?: string | null;
 }
 
+const UNSAFE_DRIVER_ENV = [
+  "PUPPETEER_DANGEROUS_NO_SANDBOX",
+  "PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES",
+] as const;
+
+/** Chrome wrappers may interpret inherited flags; Puppeteer reads its own toggles from process.env. */
+export function safeBrowserEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const child = { ...source };
+  delete child.CHROME_EXTRA_FLAGS;
+  for (const name of UNSAFE_DRIVER_ENV) delete child[name];
+  return child;
+}
+
 /**
  * Start a browser, or say precisely why not.
  *
@@ -417,6 +430,15 @@ export interface LaunchResult {
  * crash and a missing renderer are different things for the person reading the output.
  */
 export async function launchBrowser(fromDir: string = process.cwd()): Promise<LaunchResult> {
+  const unsafe = UNSAFE_DRIVER_ENV.filter((name) => Object.hasOwn(process.env, name));
+  if (unsafe.length > 0) {
+    return {
+      browser: null,
+      executablePath: null,
+      userDataDir: null,
+      detail: `breaklint: unsafe inherited browser environment: ${unsafe.join(", ")}; unset before running.`,
+    };
+  }
   const found = resolveBrowser();
   if (!found.path) {
     return {
@@ -465,6 +487,7 @@ export async function launchBrowser(fromDir: string = process.cwd()): Promise<La
       executablePath: found.path,
       headless: true,
       userDataDir,
+      env: safeBrowserEnvironment(process.env),
     // No `--allow-file-access-from-files`. It was here so the rasteriser page could import its
     // library over a `file://` URL, but the switch is browser-WIDE: it would also let the
     // audited document — untrusted HTML, often loaded from disk — read other local files. The

@@ -50,7 +50,10 @@ import type { PageLike } from "../acquire/browser.ts";
 export const STABILITY_WINDOW_MS = 250;
 export const MAX_STABILITY_RETRIES = 3;
 export const PAGINATION_TIMEOUT_MS = 30_000;
-export const DOCUMENT_TIMEOUT_MS = 120_000;
+/** Default and hard bounds for one document, including pagination and evidence capture. */
+export const DOCUMENT_TIMEOUT_MS = 600_000;
+export const DOCUMENT_TIMEOUT_MIN_MS = 30_000;
+export const DOCUMENT_TIMEOUT_MAX_MS = 1_800_000;
 export const MAX_PAGES = 2_000;
 export const MAX_DOM_NODES = 500_000;
 export const MAX_MUTATIONS_AFTER_RENDERED = 200;

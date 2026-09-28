@@ -1,4 +1,5 @@
 import { UsageError } from "../config/resolve.ts";
+import { DOCUMENT_TIMEOUT_MAX_MS, DOCUMENT_TIMEOUT_MIN_MS } from "../measure/freeze.ts";
 
 export interface ParsedArgs {
   paths: string[];
@@ -17,6 +18,7 @@ export interface ParsedArgs {
   noEvidenceBinding?: boolean;
   noSourceMap?: boolean;
   allowNetwork?: string[];
+  documentTimeoutMs?: number;
 }
 
 /**
@@ -107,6 +109,16 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
           out.locale = value;
         }
         break;
+      case "--document-timeout-ms": {
+        const value = argv[++i];
+        const number = Number(value);
+        if (value === undefined || !/^[0-9]+$/u.test(value) || !Number.isSafeInteger(number) ||
+          number < DOCUMENT_TIMEOUT_MIN_MS || number > DOCUMENT_TIMEOUT_MAX_MS) {
+          throw new UsageError(`--document-timeout-ms must be an integer from ${DOCUMENT_TIMEOUT_MIN_MS} to ${DOCUMENT_TIMEOUT_MAX_MS}.`);
+        }
+        out.documentTimeoutMs = number;
+        break;
+      }
       case "--no-evidence-binding":
         out.noEvidenceBinding = true;
         break;

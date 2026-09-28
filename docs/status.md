@@ -4,6 +4,22 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
+## Release preparation — 0.8.0
+
+At preparation on 2026-09-28, the integration candidate contains the configurable 600,000 ms
+document budget, SVG occurrence identity and physical-page evidence binding, the content-loss
+checks, inherited Chrome-flag neutralisation and Mac gate repairs. The old specified 175-page P08
+`print.html` is absent. With the Founder's delegated document choice, the current product's
+`TOOLING_SPEC.md` § Full-Pass-Portabilitaet supplied a byte-bound way to regenerate a 207-page
+print input in scratch. An isolated 0.8.0 tarball installed in foreign CWD then measured that
+current P08 at exit 1, 207/207 pages bound and 472/472 SVG targets, in 104.15 s with
+1,933,590,528 B maximum RSS. Current P05 ended exit 0, 77/77 pages bound and 156/156 SVG targets,
+in 27.65 s with 1,720,860,672 B maximum RSS. These current-product runs do not measure the
+missing 175-page bytes. The G-114/G-117 package passed its permitted second independent review
+and was integrated at `297b0fa`; the report-surface human review and release tag are pending. Read the actual publication state
+from npm and GitHub rather than from this preparation record. No rule is calibrated;
+browser-managed secure DNS and communication egress remain documented limits.
+
 ## Released — 0.7.0 — the rules judge what printed
 
 **Published 2026-09-25.** Annotated tag `v0.7.0` on the dated commit `73e7a90`; release
@@ -56,7 +72,7 @@ technical gate (`test:report-surfaces:technical`), which CI and the release work
 makes no human-review claim. The roster check proves that a rostered handle was written, not who
 wrote it (`docs/reporting.md`).
 
-## Current published release — 0.6.0 (2026-09-18) — remediation that says when nobody checked
+## Previous release — 0.6.0 (2026-09-18) — remediation that says when nobody checked
 
 | | |
 |---|---|
@@ -448,7 +464,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=670 aggregateTests=831 liveTests=106 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=677 aggregateTests=839 liveTests=107 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against
