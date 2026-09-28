@@ -578,7 +578,9 @@ describe("exit matrix", () => {
     });
 
     it("every declared kind is covered by a row below", () => {
-      assert.equal(INFRA_EVENT_KINDS.length, 22, "a kind was added or removed without deciding its fatality");
+      // G-103/G-89 add a fatal source-layout-unsupported event. Keep the count as an
+      // independent ratchet; the loop below still tests each kind's exit and verdict.
+      assert.equal(INFRA_EVENT_KINDS.length, 23, "a kind was added or removed without deciding its fatality");
     });
 
     for (const kind of INFRA_EVENT_KINDS) {
