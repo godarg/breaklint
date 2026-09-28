@@ -133,6 +133,7 @@ const OVERLAY_TEMPLATE = `(() => {
   const install = () => {
     const marks = [];
     const unplacedMarks = [];
+    const sideLaneCandidates = [];
     let staticPageAreas = 0, ordinal = 0;
     state = { layers: [], marks: [], detached: [] };
     const pages = P.all(document, ".pagedjs_page");
@@ -141,7 +142,12 @@ const OVERLAY_TEMPLATE = `(() => {
       const area = P.all(pageEl, ".pagedjs_page_content")[0] || pageEl;
       if (P.style(area, null).position === "static") staticPageAreas++;
       const areaBox = P.rect(area);
-      const pageBox = P.rect(pageEl);
+      // The preview wrapper and sheet can be only viewport-height (800px on a 1123px A4
+      // page). Paged.js' pagebox is the physical print box; its bottom matches the PDF sheet.
+      const physicalNode = P.all(pageEl, ".pagedjs_pagebox")[0] || null;
+      const physicalBox = physicalNode ? P.rect(physicalNode) : null;
+      const pageBox = physicalBox && physicalBox.width > 0 && physicalBox.height > 0
+        ? physicalBox : P.rect(pageEl);
       const layer = P.create("div");
       P.setAttr(layer, "class", "bl-overlay");
       P.setCssText(layer, STYLE_LAYER);
@@ -172,6 +178,24 @@ const OVERLAY_TEMPLATE = `(() => {
             { sid, page: pageIndex + 1, side: "start", reason: "fragment-outside-page" },
             { sid, page: pageIndex + 1, side: "end", reason: "fragment-outside-page" },
           );
+          // An unbreakable block can remain in Paged.js' side overflow fragmentainer on page N
+          // while the printable clone is moved to N+1. Require all rectangles to be wholly to
+          // the right, an avoid-break ancestor in this flow, and BOTH real marks on a following
+          // page below. A tall figure can place its figure on N+1 and its table on N+2.
+          // A mere out-of-page author target, or a clipped footnote, stays unplaced.
+          let ancestor = el, keptWhole = false;
+          while (ancestor && ancestor !== area) {
+            const style = P.style(ancestor, null);
+            if (style.breakInside === "avoid" || style.breakInside === "avoid-page" ||
+                style.pageBreakInside === "avoid") { keptWhole = true; break; }
+            ancestor = P.parent(ancestor);
+          }
+          const ancestorRects = keptWhole ? P.rects(ancestor) : [];
+          if (keptWhole && P.closest(el, ".pagedjs_footnote_area") === null &&
+              allRects.every((rect) => rect.x >= pageBox.right) &&
+              ancestorRects.length > 0 && ancestorRects.every((rect) => rect.x >= pageBox.right)) {
+            sideLaneCandidates.push({ sid, page: pageIndex + 1 });
+          }
           continue;
         }
         const ord = ordinal++;
@@ -199,9 +223,14 @@ const OVERLAY_TEMPLATE = `(() => {
           // browser was shown to move them. The bound refuses them rather than depend on that.
           const relativeY = y - areaBox.y;
           const maxAdvance = token.length * 1.2 + 2;
+          // A continuation container can end exactly at the area boundary. That observed edge
+          // lies inside the physical page box; its mark is checked against the actual PDF later.
+          // Never extend this exception to the footnote area, where a clipped note is G-100.
+          const observedAreaEdge = side === "end" && rect.bottom === areaBox.bottom &&
+            P.closest(el, ".pagedjs_footnote_area") === null && y + 1 <= pageBox.bottom;
           if (
             x < pageBox.left || x + maxAdvance > pageBox.right || y < pageBox.top || y > pageBox.bottom ||
-            relativeY < 0 || relativeY + 1 > areaBox.height
+            relativeY < 0 || (relativeY + 1 > areaBox.height && !observedAreaEdge)
           ) {
             unplacedMarks.push({ sid, page: pageIndex + 1, side, reason: "fragment-outside-page" });
             continue;
@@ -232,7 +261,18 @@ const OVERLAY_TEMPLATE = `(() => {
       P.append(area, layer);
       state.layers.push(layer);
     }
-    return { marks, unplacedMarks, layers: state.layers.length, staticPageAreas };
+    const placed = new Set(marks.map((mark) => mark.page + ":" + mark.sid + ":" + mark.side));
+    const deferred = new Set(sideLaneCandidates.filter(({ sid, page }) =>
+      [page + 1, page + 2].some((nextPage) =>
+        placed.has(nextPage + ":" + sid + ":start") &&
+        placed.has(nextPage + ":" + sid + ":end")),
+    ).map(({ sid, page }) => page + ":" + sid));
+    return {
+      marks,
+      unplacedMarks: unplacedMarks.filter(({ sid, page }) => !deferred.has(page + ":" + sid)),
+      layers: state.layers.length,
+      staticPageAreas,
+    };
   };
 
   // Stage 1: read the computed style of every mark back. Cheap, specific, and NOT conclusive —
