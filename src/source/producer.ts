@@ -29,10 +29,11 @@ import type { Report } from "../core/types.ts";
 import type { DocumentRevision } from "../core/types.ts";
 import { identitiesForProducedOutput } from "./identity.ts";
 import { captureHostGit, bindCapturedRevision, type HostGitRevisionOptions } from "./revision.ts";
+import { DOCUMENT_TIMEOUT_MAX_MS, DOCUMENT_TIMEOUT_MS } from "../measure/freeze.ts";
 
 export const PRODUCER_RECORD_PROTOCOL = "studio-producer-record-v1" as const;
 export const PRODUCER_RECORD_MAX_BYTES = 10 * 1024 * 1024;
-export const PRODUCER_TIMEOUT_MS = 120_000;
+export const PRODUCER_TIMEOUT_MS = DOCUMENT_TIMEOUT_MS;
 export const PRODUCER_MAX_FILES = 2_000;
 export const PRODUCER_MAX_TOTAL_BYTES = 256 * 1024 * 1024;
 
@@ -335,8 +336,8 @@ function validateProducedCheckInput(value: unknown): { producer: HostControlledP
   for (const field of ["evidenceBinding", "sourceMapInjection"] as const) {
     if (rawOptions[field] !== undefined && typeof rawOptions[field] !== "boolean") throw new TypeError(`options.${field} must be a boolean`);
   }
-  if (rawOptions.timeoutMs !== undefined && (typeof rawOptions.timeoutMs !== "number" || !Number.isSafeInteger(rawOptions.timeoutMs) || rawOptions.timeoutMs < 1)) {
-    throw new TypeError("options.timeoutMs must be a positive safe integer");
+  if (rawOptions.timeoutMs !== undefined && (typeof rawOptions.timeoutMs !== "number" || !Number.isSafeInteger(rawOptions.timeoutMs) || rawOptions.timeoutMs < 1 || rawOptions.timeoutMs > DOCUMENT_TIMEOUT_MAX_MS)) {
+    throw new TypeError(`options.timeoutMs must be an integer from 1 to ${DOCUMENT_TIMEOUT_MAX_MS}`);
   }
   if (rawOptions.config !== undefined && !isRecord(rawOptions.config)) throw new TypeError("options.config must be an object");
   if (rawOptions.network !== undefined) {
@@ -735,7 +736,8 @@ export async function checkProducedDocuments(input: {
     return { ok: false, code: "source/producer-record-mismatch", detail: "outputPaths must be a non-empty unique list" };
   }
   const startedAt = new Date().toISOString(); const started = Date.now();
-  const acquired = await acquireProducedDocuments({ producer: checked.producer, manifest: checked.manifest, options: checked.options });
+  const acquired = await acquireProducedDocuments({ producer: checked.producer, manifest: checked.manifest,
+    options: { ...checked.options, timeoutMs: checked.options.timeoutMs ?? resolved.documentTimeoutMs } });
   if (!acquired.ok) return acquired;
   try {
     const state = producedBytesForInternalRender(acquired.capability);
@@ -766,7 +768,7 @@ export async function checkProducedDocuments(input: {
         },
       };
     });
-    const renderOptions: RenderOptions = { outDir: resolved.outDir, evidenceBinding: resolved.evidenceBinding, sourceMapInjection: resolved.sourceMapInjection, network: resolved.network, locale: resolved.locale };
+    const renderOptions: RenderOptions = { outDir: resolved.outDir, evidenceBinding: resolved.evidenceBinding, sourceMapInjection: resolved.sourceMapInjection, network: resolved.network, locale: resolved.locale, documentTimeoutMs: resolved.documentTimeoutMs };
     const rendered = await renderCapturedDocuments(inputs, renderOptions);
     if (rendered.fatal || !rendered.environment) return { ok: false, code: "source/producer-incomplete", detail: "captured renderer setup failed; private error details withheld" };
     const outcomes = rendered.documents.map((document) => {

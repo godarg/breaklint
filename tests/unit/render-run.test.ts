@@ -693,8 +693,7 @@ describe("the live path fails closed at its process boundary", () => {
       async setRequestInterception() {},
       async close() {},
     };
-    const result = await renderDocuments(["README.md", "README.md"], OPTIONS, {
-      documentTimeoutMs: 25,
+    const result = await renderDocuments(["README.md", "README.md"], { ...OPTIONS, documentTimeoutMs: 25 }, {
       async launchBrowser() {
         return {
           executablePath: "/measured/fake-chrome", userDataDir: profile, detail: "",

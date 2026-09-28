@@ -8,6 +8,16 @@ argument rather than an edit.
 
 It also states, in one place, what this tool does not know.
 
+## Document time and memory
+
+The live document acquisition budget defaults to 600000 ms and is configurable through
+`--document-timeout-ms` or `documentTimeoutMs` in the JSON config, within 30000–1800000 ms.
+Reaching it ends with exit 3 and a message naming the budget. The budget is a hard stop, not a
+speed promise. Large paginated documents can consume substantial memory: the earlier G-18
+measurement found about 15.7 MiB per page during comparison. No streaming or peak-memory
+improvement is part of the budget change. A fresh 200-page memory measurement is required before
+claiming that the default is adequate for that document size on a particular machine.
+
 ## Why exactly two rules may fail a build
 
 Eleven of the thirteen released rules compare a chosen threshold against a real measurement. A
