@@ -315,7 +315,7 @@ describe("the M2d live production chain", () => {
     assert.equal(drifting.evidence?.length ?? 0, 0, "a rejected snapshot wrote evidence");
     const event = drifting.infrastructure.find((item) =>
       item.kind === "document-not-quiescent" && /layout did not settle/u.test(item.detail));
-    assert.ok(event, "the real freeze loop did not fail closed");
+    assert.ok(event, `the real freeze loop did not fail closed: ${JSON.stringify(drifting.infrastructure)}`);
     const measured = event.measured as { retries?: number; components?: string[] } | null;
     assert.equal(measured?.retries, 4, "the three retry budget was not exhausted");
     assert.ok(measured?.components?.includes("boxes"), `box drift was not named: ${JSON.stringify(measured)}`);
