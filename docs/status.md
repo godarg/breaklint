@@ -12,11 +12,11 @@ checks, inherited Chrome-flag neutralisation and Mac gate repairs. The old speci
 `print.html` is absent. With the Founder's delegated document choice, the current product's
 `TOOLING_SPEC.md` § Full-Pass-Portabilitaet supplied a byte-bound way to regenerate a 207-page
 print input in scratch. An isolated 0.8.0 tarball installed in foreign CWD then measured that
-current P08 at exit 1, 207/207 pages bound and 472/472 SVG targets, in 104.77 s with
-1,718,583,296 B maximum RSS. Current P05 ended exit 0, 77/77 pages bound and 156/156 SVG targets,
-in 27.75 s with 1,749,925,888 B maximum RSS. These current-product runs do not measure the
-missing 175-page bytes. The new G-114 SVG package awaits independent review and integration;
-the report-surface human review and release tag are pending. Read the actual publication state
+current P08 at exit 1, 207/207 pages bound and 472/472 SVG targets, in 104.15 s with
+1,933,590,528 B maximum RSS. Current P05 ended exit 0, 77/77 pages bound and 156/156 SVG targets,
+in 27.65 s with 1,720,860,672 B maximum RSS. These current-product runs do not measure the
+missing 175-page bytes. The G-114/G-117 package passed its permitted second independent review
+and was integrated at `297b0fa`; the report-surface human review and release tag are pending. Read the actual publication state
 from npm and GitHub rather than from this preparation record. No rule is calibrated;
 browser-managed secure DNS and communication egress remain documented limits.
 
