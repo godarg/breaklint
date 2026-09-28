@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { platform, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -90,7 +90,7 @@ const controls = [
     phaseHint: "the control no longer drives muted text on the soft background below 4.5:1",
   },
   { name: "collapsed-display-font", state: "clean", expect: /display role resolved to [^\n]*not a declared serif face/u },
-  { name: "accidental-display-font", state: "clean", expect: /display role resolved to DejaVu Sans, not a declared serif face/u },
+  { name: "accidental-display-font", state: "clean", expect: new RegExp(`display role resolved to ${platform() === "darwin" ? "Avenir Next" : platform() === "linux" ? "DejaVu Sans" : "Arial"}, not a declared serif face`, "u") },
 ];
 
 /**

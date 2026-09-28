@@ -9,6 +9,11 @@
  */
 import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
+import { spawnSync } from "node:child_process";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { MARK_FONT_BASE64, MARK_FONT_CHARS, MARK_FONT_FAMILY, MARK_FONT_SRC } from "../../src/render/mark-font.ts";
 import { OVERLAY_SOURCE } from "../../src/render/overlay.ts";
@@ -129,4 +134,22 @@ describe("the evidence mark font", () => {
     assert.match(MARK_FONT_SRC, /^url\(data:font\/ttf;base64,[A-Za-z0-9+/=]+\) format\("truetype"\)$/u);
     assert.ok(MARK_FONT_SRC.includes(MARK_FONT_BASE64), "the src does not carry the font this file declares");
   });
+});
+
+it("names fontTools and its installation command before generating when Python lacks it", () => {
+  const bin = mkdtempSync(join(tmpdir(), "breaklint-fonttools-missing-"));
+  try {
+    const python = join(bin, "python3");
+    writeFileSync(python, "#!/bin/sh\necho \"ModuleNotFoundError: No module named 'fontTools'\" >&2\nexit 1\n");
+    chmodSync(python, 0o755);
+    const generator = fileURLToPath(new URL("../../tools/make-mark-font.mjs", import.meta.url));
+    const run = spawnSync(process.execPath, [generator, "--check"], {
+      encoding: "utf8", env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` },
+    });
+    assert.notEqual(run.status, 0, "missing fontTools must never pass the generator check");
+    assert.match(run.stderr, /fontTools/u);
+    assert.match(run.stderr, /python3 -m pip install fonttools/u, "the preflight did not name the installation command");
+  } finally {
+    rmSync(bin, { recursive: true, force: true });
+  }
 });

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Document the Action's Bash 4 globstar prerequisite and skip its Bash-dependent unit tests with an explicit reason on older shells. Keep every assertion active when Bash 4+ is available.
+- Make the report font mutation assert the platform's actual undeclared sans face and report a missing Python `fontTools` dependency before running the mark-font generator.
+
 ## 0.7.0 — 2026-09-25
 
 A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0 and 0.6.0: a

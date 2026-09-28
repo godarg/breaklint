@@ -160,8 +160,8 @@ const SURFACE_CONTROLS = {
   // Display falls back to a sans that is NOT the body face. "display differs from body" would pass
   // this; the declared expectation must not.
   "accidental-display-font": {
-    screen: `h1, h2 { font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif !important; }`,
-    print: `h1, h2 { font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif !important; }`,
+    screen: `h1, h2 { font-family: "Avenir Next", "DejaVu Sans", "Helvetica Neue", Arial, sans-serif !important; }`,
+    print: `h1, h2 { font-family: "Avenir Next", "DejaVu Sans", "Helvetica Neue", Arial, sans-serif !important; }`,
   },
 };
 if (process.argv.includes("--list-controls")) {

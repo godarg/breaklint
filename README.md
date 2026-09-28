@@ -259,6 +259,7 @@ be left ungated), and SARIF for code scanning, JUnit and a Markdown step summary
 from the one canonical JSON report. It installs the npm release named in that ref's
 `package.json`, not the ref's code: a tag works once its npm publish has succeeded, and a branch
 ref runs the last release, or fails with exit 3 after a version bump that is not yet published.
+Path expansion requires Bash 4 or newer with globstar; macOS `/bin/bash` 3.2 does not provide it.
 [`docs/ci-recipe.md`](docs/ci-recipe.md) has a workflow to copy,
 the permissions it needs and what each exit code does to the job.
 
