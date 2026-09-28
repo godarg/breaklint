@@ -935,6 +935,7 @@ describe("the live path fails closed at its process boundary", () => {
         }
         if (source.includes("failedFonts")) return { failedFonts: [], failedImages: [] };
         if (source.includes("breakBefore")) return {};
+        if (source.includes("body-column-container")) return [];
         if (source.includes("new Paged.Previewer")) return { paginationError: null };
         throw new Error("measurement boundary failed after page ownership was established");
       }, async waitForFunction() {},

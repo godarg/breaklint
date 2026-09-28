@@ -22,21 +22,19 @@ intended, and each says what it does not cover:
 
 - **A fresh browser profile per run**, created with `mkdtemp` and removed afterwards. A run that
   cannot verify its own cleanup fails rather than reporting success.
-- **breaklint never asks for the sandbox to be off — but the environment it runs in can.** The one
+- **breaklint never asks for the sandbox to be off and rejects known driver overrides.** The one
   browser launch in `src/acquire/browser.ts` passes no switch at all (`args: []`), no code path,
   tool, test or workflow of this repository passes `--no-sandbox` or any other sandbox-disabling
   switch, and breaklint has no option or flag that turns the sandbox off.
   `tests/unit/sandbox-boundary.test.ts` holds both: it reads that launch call with the TypeScript
   parser and allows only named options that cannot touch the sandbox, with `args: []`, and it scans
   `src/`, `tools/`, `tests/` and the workflows for the switches. What that test cannot see is the
-  process environment, which breaklint does not clear. The browser driver, puppeteer-core, reads
-  variables of its own: it adds `--no-sandbox` when `PUPPETEER_DANGEROUS_NO_SANDBOX=true`, and it
-  enables experimental Chrome features when `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES=true`. The
-  browser also inherits the whole environment, so a variable that a browser build or its wrapper
-  script reads as extra switches can reach it too; `CHROME_EXTRA_FLAGS` was reported to do so in
-  this project's own verification and is not ruled out. **Make sure `PUPPETEER_DANGEROUS_NO_SANDBOX`,
-  `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` and `CHROME_EXTRA_FLAGS` are unset** in the
-  environment that runs breaklint, CI included.
+  process environment by itself. Puppeteer-core reads `PUPPETEER_DANGEROUS_NO_SANDBOX` and
+  `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` from that process before spawning Chrome. If
+  either is present, breaklint refuses the renderer with exit 3 before launch. The child environment
+  omits `CHROME_EXTRA_FLAGS` so a Chrome wrapper cannot turn it into a switch. Tests cover the
+  refusal and the scrubbed child environment. Other browser or wrapper variables are not proven
+  safe by these three checks; isolate untrusted HTML at the operating-system boundary.
 - **The page's requests are intercepted, and the default policy is `offline`.** Request
   interception is on, and only the tool's own loopback origin plus `data:`, `blob:` and `about:`
   are let through; `--allow-network <origin>` lets one more origin through per use. **This is not
@@ -48,6 +46,12 @@ intended, and each says what it does not cover:
   request was sent, and the run came back `clean`. **For a document you do not trust, run
   breaklint in a container or network namespace with no egress;** that, not this policy, is what
   keeps data on the machine.
+- **Known Paged.js text-loss styles are refused.** The computed print style is read from the
+  source tree before pagination. A multi-column `body` (including `column-count: 1` and
+  `columns: 1`) or a nonempty `display: contents` heading produces a fatal diagnostic and exit 3.
+  This is conservative: a short heading that happens to print in full is refused too. It does not
+  establish a general PDF/source text-completeness guarantee; other multicolumn and footnote
+  cases remain open in [limitations](docs/limitations.md).
 - **No browser-wide file-access switch.** The document is served from a loopback origin instead. A
   test measures that a document loaded this way cannot read a neighbouring file, because removing
   the reason for a switch and leaving the switch in place is a mistake that was actually made here
@@ -68,9 +72,8 @@ intended, and each says what it does not cover:
 
 **What this is not.** None of the above is protection against a determined attack on the browser
 sandbox itself, and the request policy above is not an egress control. For untrusted third-party
-HTML, run this in a container or network namespace with no network egress and with the variables
-named above unset, the same way you would run any other tool that executes code you did not
-write.
+HTML, run this in a container or network namespace with no network egress, the same way you would
+run any other tool that executes code you did not write.
 
 ## Dependency-hygiene exception: Paged.js 0.4.3
 
