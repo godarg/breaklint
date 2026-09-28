@@ -1,0 +1,28 @@
+name: action tag v0.8.0 smoke
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  published-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - id: breaklint
+        uses: godarg/breaklint@v0.8.0
+        with:
+          paths: tests/fixtures/action/clean.html
+      - name: assert the published package and clean exit
+        env:
+          ACTUAL_VERSION: ${{ steps.breaklint.outputs.breaklint-version }}
+          ACTUAL_EXIT: ${{ steps.breaklint.outputs.exit-code }}
+        run: |
+          test "$ACTUAL_VERSION" = '0.8.0'
+          test "$ACTUAL_EXIT" = '0'
