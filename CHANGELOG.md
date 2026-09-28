@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- G-112: the SVG viewport rule now distinguishes printed occurrences of a source `<text>`
+  while preserving the duplicate-target guard within each occurrence. A repeated SVG no longer
+  crashes solely because its copies share one source address.
+
 ## 0.7.0 — 2026-09-25
 
 A minor rather than a patch for the reason `docs/releasing.md` gives for 0.5.0 and 0.6.0: a
