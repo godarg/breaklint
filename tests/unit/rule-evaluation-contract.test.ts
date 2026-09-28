@@ -352,6 +352,19 @@ describe("target evaluation contract", () => {
     });
   });
 
+  it("judges two printed copies of one SVG text source separately", () => {
+    const snapshot = structuredClone(loadCorpus().find((item) => item.name === "svg-overflow-trigger")!.snapshot);
+    const original = snapshot.svg[0]!;
+    original.texts[0]!.sourceAddressKey = "bt392";
+    snapshot.svg.push({ ...structuredClone(original), nodeKey: "svg:page2:copy", page: 2 });
+    const rows = textOverflowsViewport.run(snapshot, {
+      ...context, options: textOverflowsViewport.defaultOptions, fingerprint,
+    }).evaluations!;
+    assert.equal(rows.length, 2);
+    assert.deepEqual(rows.map((row) => row.targetRef.sid), ["bt392", "bt392"]);
+    assert.notEqual(rows[0]!.occurrenceKey, rows[1]!.occurrenceKey);
+  });
+
   it("retains a hidden or removed SVG aggregate as an excluded unknown scope", () => {
     const snapshot = structuredClone(loadCorpus().find((item) => item.snapshot.svg.length > 0)!.snapshot);
     snapshot.svg[0]!.notRenderedTargets = 2;
