@@ -11,8 +11,13 @@
   <p id="moving">Dieser Autoren-Loop verschiebt den paginierten Knoten nach dem Rendern fortlaufend.</p>
   <script>
     const drift = () => {
+      // Keep the un-injected paired control still so this fixture reaches the
+      // production freeze retry loop in the source-mapped run. Constructing the
+      // attribute name mirrors an author script that observes the injected map.
+      const marker = ["data", "bl", "sid"].join("-");
       const target = document.querySelector(".pagedjs_page #moving");
       if (!target) return setTimeout(drift, 5);
+      if (!target.hasAttribute(marker)) return;
       let x = 0;
       setInterval(() => { x += 1; target.style.transform = `translateX(${x}px)`; }, 40);
     };
