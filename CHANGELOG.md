@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- G-112: the SVG viewport rule now distinguishes printed occurrences of a source `<text>`
+- G-112 (`svg/text-overflows-viewport`): the SVG viewport rule now distinguishes printed occurrences of a source `<text>`
   while preserving the duplicate-target guard within each occurrence. A repeated SVG no longer
   crashes solely because its copies share one source address.
 - G-111: the live document budget is configurable with `--document-timeout-ms` and
