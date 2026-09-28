@@ -271,11 +271,11 @@ letting through only its own loopback origin (plus `data:`, `blob:`, `about:` an
 connections a document opens, nor the browser's own traffic — secure DNS (DNS over HTTPS) and the
 component updater. Measured on 0.7.0 in the default offline mode with a self-authored document: a
 WebSocket to a loopback port that was not the tool's was delivered, a WebRTC STUN request was sent,
-and the run came back `clean`. The sandbox can be turned off from the environment, which breaklint
-does not clear: puppeteer-core adds `--no-sandbox` when `PUPPETEER_DANGEROUS_NO_SANDBOX=true`,
-honours `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES`, and the browser inherits variables such as
-`CHROME_EXTRA_FLAGS`; keep them unset. For a document you do not trust, run breaklint in a
-container or network namespace with no egress. See [SECURITY.md](../SECURITY.md).
+and the run came back `clean`. In 0.8.0, breaklint refuses to launch if
+`PUPPETEER_DANGEROUS_NO_SANDBOX` or `PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES` is present, and
+removes `CHROME_EXTRA_FLAGS` from Chrome's child environment. This closes those known environment
+paths; other wrapper variables are not generally audited. For a document you do not trust, run
+breaklint in a container or network namespace with no egress. See [SECURITY.md](../SECURITY.md).
 
 The longer, measurement-by-measurement account of what has been established and what has not is in
 [status.md](status.md).
@@ -422,19 +422,22 @@ why it was taken on that evidence — the same standard would not have been enou
 
 ## 0.7.0 limits
 
-**`body { column-count: 1 }` can end `clean` over a PDF that lost most of its content — a known
-false-clean defect, not fixed in 0.7.0.** `column-count: 1` or `columns: 1` on `body` makes the
-body a multi-column container, and Paged.js then lays its pages out inside it. Measured by
+**In 0.7.0, `body { column-count: 1 }` could end `clean` over a PDF that lost most of its content.**
+`column-count: 1` or `columns: 1` on `body` makes the body a multi-column container, and Paged.js
+then lays its pages out inside it. Measured by
 independent verifications of this release cycle: the produced PDF was missing most of the
 document's content — in one run it held one page and about half the words — while the run
-reported its pages as measured and ended `clean`, exit 0. No check in this release catches it; the `env/multicolumn` decline applies to multi-column blocks
-the rules measure, not to a paginated body.
+reported its pages as measured and ended `clean`, exit 0. In 0.8.0, a computed print `column-count`
+or `column-width` on `body` ends exit 3 before the source can be called clean. This refuses even
+one-column bodies because Paged.js may create its own pagination columns inside them. It is a
+guard against this known failure mode, not a general multicolumn completeness proof.
 
-**A `display: contents` heading that a page break splits can lose its continuation — a known
-false-clean defect, not fixed in 0.7.0.** Paged.js does not carry the rest of such a heading to
-the next page: measured by an independent verification of this release cycle, 17 of the heading's
-89 words were printed, and the run ended exit 0. No rule or cross-check in this release sees the
-missing text. Avoid `display: contents` on headings long enough to break, or check the PDF.
+**In 0.7.0, a `display: contents` heading split at a page break could lose its continuation.**
+Paged.js does not carry the rest of such a heading to the next page: measured by an independent
+verification of the 0.7.0 cycle, 17 of the heading's
+89 words were printed, and the run ended exit 0. In 0.8.0, any nonempty heading with computed
+print `display: contents` ends exit 3, including headings that would have fit. The guard names the
+style; it does not attempt to reconstruct missing text after pagination.
 
 **Nothing printed in a page margin box is measured by any block, line or page rule.** Paged.js
 implements `position: running(...)` by deep-cloning the element into the margin box of every page,

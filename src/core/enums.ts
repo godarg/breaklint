@@ -111,6 +111,8 @@ export const INFRA_EVENT_KINDS = [
    */
   "geometry-cross-check-failed",
   "source-input-invalid",
+  /** Authored print CSS is in a class where Paged.js may silently omit source text. */
+  "source-layout-unsupported",
   "source-acquisition-failed",
   "source-producer-record-mismatch",
 ] as const;

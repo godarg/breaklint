@@ -1033,6 +1033,7 @@ interface OpenedContentPage {
   collectorNonce: string | null;
   pageErrors: string[];
   cascadeHints: Record<string, BreakCauseCascadeHint | null>;
+  sourceLayoutRisks: string[];
   imageFailures: ImageDecodeFailure[];
   network: NetworkTracker;
   close(): Promise<void>;
@@ -1674,6 +1675,20 @@ async function openContentPage(
     // §11.6a ordering: read the non-normative cascade hint in print media BEFORE Paged.js consumes
     // the declarations, then reset the medium and only then start pagination.
     const cascadeHints = await page.evaluate<Record<string, BreakCauseCascadeHint | null>>(CASCADE_HINT_SOURCE);
+    // Read the authored print tree before Paged.js clones or discards its nodes. A normal
+    // snapshot cannot prove completeness after either of these pagination failure modes.
+    const sourceLayoutRisks = await page.evaluate<string[]>(`(() => {
+      const risks = [];
+      const body = getComputedStyle(document.body);
+      if (body.columnCount !== "auto" || body.columnWidth !== "auto") risks.push("body-column-container");
+      for (const heading of document.querySelectorAll("h1,h2,h3,h4,h5,h6")) {
+        if (heading.textContent?.trim() && getComputedStyle(heading).display === "contents") {
+          risks.push("contents-heading");
+          break;
+        }
+      }
+      return risks;
+    })()`);
     await page.emulateMediaType(null);
     const paginationError = await page.evaluate<{ paginationError: string | null }>(PAGINATION_PREVIEW_SOURCE);
     if (paginationError.paginationError) throw new Error(`pagination aborted: ${paginationError.paginationError}`);
@@ -1712,7 +1727,7 @@ async function openContentPage(
     network.activityAfterRendered = 0;
     if (pageErrors.length > 0) throw new Error(`content page error during pagination: ${pageErrors.join(" | ")}`);
     return {
-      page, browserContext, apparatusCapability, collectorNonce, pageErrors, cascadeHints,
+      page, browserContext, apparatusCapability, collectorNonce, pageErrors, cascadeHints, sourceLayoutRisks,
       imageFailures, network, close,
     };
   } catch (error) {
@@ -1876,6 +1891,17 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     );
     openedMain = opened;
     const page = opened.page;
+    for (const risk of opened.sourceLayoutRisks) {
+      infrastructure.push({
+        kind: "source-layout-unsupported",
+        detail: `${risk}: authored print CSS can silently omit text during Paged.js pagination; this document cannot be certified clean`,
+        measured: { stage: "pre-pagination-print-style", risk },
+      });
+    }
+    if (fatalInfrastructure(infrastructure)) {
+      await closePage();
+      return { path, snapshot: null, infrastructure };
+    }
     if (opened.imageFailures.length > 0) {
       infrastructure.push({
         kind: "image-content-unavailable",
