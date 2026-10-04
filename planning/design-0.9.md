@@ -85,6 +85,11 @@ measured: migration records missing ownership, counter values, placement and met
 with affected predicates declined. It must not invent zero sizes, an empty complete reference set,
 or positive evidence. Fresh semantic measurement is required to resolve those unknowns.
 
+Before admitting a legacy snapshot, define typed unavailable-data reasons and list every reason in
+each consuming rule's `RuleMeta.declines`. Migration tests must execute the real engine and prove
+`measured + declined = candidates`, with no unregistered reason or checker crash. A stamp update
+and a validator accepting the new shape alone do not establish executable migration compatibility.
+
 If canonical findings gain cause evidence, structured fix hints or suppression records, propose
 **Report 5 → 6** independently. A reader migration must preserve original findings, diagnostics,
 identities and stamps; new facts remain unknown for legacy reports. Context-pack/comparison/config
@@ -174,6 +179,12 @@ coverage floor. Preserve underlying occurrence records for the registered label/
 no retrospective denominator reduction. Generic profiles supply selectors, DE/EN reference words,
 chapter/page-role conventions and validated metric settings without consumer-specific core logic.
 
+Configuration Contract v1 does not admit these selector/profile/suppression settings. They must not
+be inserted as unchecked keys or confused with the existing HTML-tag exclusion list. A proposed
+Configuration Contract v2 needs generated schema checks, rejection tests for unknown/malformed
+entries, and explicit compatibility with v1 inputs. Acquisition-only attributes likewise need their
+own validated accounting contract; reading an attribute does not authorize bypassing config checks.
+
 ## 6. Packages, verification and release blockers
 
 Serialize collector, snapshot, rule engine and report-schema packages. Independent fixtures/docs
@@ -191,3 +202,25 @@ criteria in `expectations-0.9.md` remain unchanged; unknown or zero-denominator 
 At least two independent nonimplementing families must establish clearly higher value. Record actual
 models and image/hash coverage, never infer a verdict from missing pixels or a prior reviewer.
 No candidate exists yet, and no release condition is established by this proposal.
+
+## 7. First text audit and dispositions
+
+An independent Gemini text audit inspected the preceding draft, identified by SHA-256
+`198565a20d77d4d6fd86b0aaf906951519039164fc3919d3694418c3fc1615d4`, and supplied repository-contract
+excerpts on 2026-10-05. The service audit reports **`gemini-3.7-flash`** after the configured model
+chain's fallback. It saw **zero images**, issued a **CONDITIONAL** verdict, and returned six findings
+(two high, three medium, one low). This is a text audit of a proposal, not sight review, execution
+proof, implementation acceptance or release approval. The fresh Claude design audit remains
+unavailable after a quota stop. The revised requirements below still need independent acceptance.
+
+| Audit finding | Disposition and required proof |
+| --- | --- |
+| ARCH-09-01, high: migrated unknowns can produce unregistered decline reasons | Accepted as a migration prerequisite. Section 2 now requires typed reasons, per-rule metadata and real-engine legacy fixtures proving complete accounting without crashes. No migration exists yet. |
+| ARCH-09-02, medium: selector/suppression proposals exceed Config v1 | Accepted. Section 5 now explicitly requires a separate v2 contract and validation/compatibility tests before exposing such keys; acquisition attributes also require accountable validation. |
+| ARCH-09-03, medium: promotion of a candidate to error hits the two-error guard | Retain the existing guard and candidate off/warn policy. Any later error proposal needs its own proof-source argument in `docs/limitations.md` and fresh review before a guard change; this draft approves none. |
+| ARCH-09-04, high: semantic rules cannot repair faulty collector attribution | Accepted as a package dependency already required in section 3. Demonstrated physical-line and fragment defects need independent oracle tests and fresh verification before dependent rules. Thresholds and coverage floors remain unchanged. |
+| ARCH-09-05, medium: graphic metrics may remain unavailable | Accepted. Missing decoded dimensions or effective SVG text transforms produce registered declines; no synthetic ppi or font-size fallback. Acquisition controls must demonstrate the supported metrics. |
+| ARCH-09-06, low: exposing `--baseline` before consumer validation creates an untested contract | Accepted. Keep the proposed option unexposed until real CLI, comparison and packed-consumer tests pass. No shipped option is claimed. |
+
+All implementation proofs in this table remain outstanding. Dispositions narrow the proposal; they
+do not convert the audit verdict to PASS or satisfy either required design reviewer.

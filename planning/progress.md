@@ -282,3 +282,20 @@ The corrected self-authored series completed 23 acquisitions against the unchang
 Ten diagnostic table pixels show the expected distinction: natural continuation loses its authored column headings, while two separately authored tables each have headings. The whole-table and two wrapper variations keep their table together on the following page, so those variations do not establish table-header continuation causes. Twenty-four stock pages are decoded but not claimed visually inspected. Static contract inventory identifies missing semantic ownership, reference spans, resolved counters, intrinsic-image metrics and effective SVG print-size records; this is not an approved figure-index architecture.
 
 Four individually bound whitespace hits now have qualified grok-4.7-build image judgments: two intentional/acceptable and two false-positive. Matching original/reencoded hashes, literal image-count success markers, direct exits, observed model and fixed response schemas are retained. They are single-family baseline judgments, not adjudicated labels. Gemini's four-image fallback returned gemini-3.7-flash after the chain head reported HTTP429, but lacks the required literal inline-count success marker and remains visually unqualified. Claude's shared quota remains an explicit gap. No favorable rerun, runner modification, label-set freeze, public implementation, A/B pass or release is claimed.
+
+## 2026-10-05 — repeated baseline gates and provisional architecture audit
+
+Seven preregistered test files completed ten isolated commands each on frozen baseline `98e33c0`,
+with Node 24.21.0 and Chrome 154.0.8037.97. All 70 commands returned 0: 960 leaf-test pass events,
+zero failures and zero skips. All 140 before/after profile checks were empty; source and lock bytes
+remained unchanged. Raw TAP/time hashes were independently rechecked against the saved metadata.
+This before-series does not clear the known flakes, replace the after-fix ten-run series, or establish
+the ordered release-candidate gates. No test threshold, timeout or source was changed.
+
+The provisional `planning/design-0.9.md` received one independent text-only audit. The service audit
+identifies `gemini-3.7-flash`, zero images and CONDITIONAL: two high, three medium and one low finding.
+Dispositions require registered unavailable-data declines in real-engine legacy migration tests,
+an explicit configuration contract for new settings, verified collector attribution before dependent
+semantic rules, measured graphic metrics and packed-consumer validation before exposing CLI options.
+The two-error guard remains unchanged. The revised proposal is not independently accepted, and the
+fresh Claude design audit remains unavailable. No implementation or release approval is inferred.
