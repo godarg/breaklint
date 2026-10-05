@@ -342,3 +342,12 @@ audit digest and remains invalid; direct decoded payload bytes instead match the
 single audit record and original pixels. No digest was overwritten or model call repeated.
 The other 96 findings in that acquisition and two optional visible candidates remain unjudged /
 unconfirmed; one family does not constitute a label set, precision estimate or accepted repair.
+
+
+## 2026-10-05 — bounded text-loss and semantic controls
+
+The remaining 23 pre-registered registry-0.8.0 text-loss acquisition commands completed: seven expected `contents-heading` guard refusals (exit 3, no PDF) and sixteen exit-0 commands with individually bound same-acquisition PDFs. These are acquisitions, not word-survival or pixel judgments. The independent token comparison and every-page 110-dpi sight review remain pending. The original invalid ALL-configuration command remains an invalid attempt; it was not reinterpreted or silently repeated.
+
+Sixteen whitespace-cause controls and eight figure/reference controls have handwritten expectations and sealed acquisition registrations. Their actual pagination, break causes, semantic ownership and labels remain unknown. No collector, rule, schema or report implementation has started.
+
+The revised provisional design has no new Gemini verdict: the sanctioned text runner exhausted its model chain with HTTP 503 responses. Claude design review remains unavailable on the previously observed quota. Neither absence authorizes implementation. One further baseline visual hit received a qualified `grok-4.7-build` false-positive judgment; it remains a single-family judgment, outside the adjudicated label denominator. A separate completed judgment whose caller failed to retain the direct wrapper status remains unqualified.
