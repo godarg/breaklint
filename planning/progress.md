@@ -351,3 +351,25 @@ The remaining 23 pre-registered registry-0.8.0 text-loss acquisition commands co
 Sixteen whitespace-cause controls and eight figure/reference controls have handwritten expectations and sealed acquisition registrations. Their actual pagination, break causes, semantic ownership and labels remain unknown. No collector, rule, schema or report implementation has started.
 
 The revised provisional design has no new Gemini verdict: the sanctioned text runner exhausted its model chain with HTTP 503 responses. Claude design review remains unavailable on the previously observed quota. Neither absence authorizes implementation. One further baseline visual hit received a qualified `grok-4.7-build` false-positive judgment; it remains a single-family judgment, outside the adjudicated label denominator. A separate completed judgment whose caller failed to retain the direct wrapper status remains unqualified.
+
+## 2026-10-05 — independent text accounting and diagnostic coverage stops
+
+The frozen independent text comparison completed for all sixteen own PDFs. All sixteen retain exact
+Counter mismatches: none of the preregistered required tokens is missing, but the extracted text
+includes additional `BLSID` evidence-mark tokens. No token was filtered or oracle broadened. The
+separate handwritten removed-token control correctly reports its missing required token. All
+sixteen PDFs were copied byte-for-byte and rastered at 110 dpi; every one of their 28 pages was
+individually viewed. These controls do not reproduce whole-word loss. A possible small rounded-edge
+glyph clipping remains unconfirmed; general clipping safety and the refused contents cases remain
+unknown. These observations are not independent release acceptance or adjudicated labels.
+
+The first whitespace control retains checker exit 4, two half-empty warnings, and native forced-break
+declines that leave widow/orphan coverage below their unchanged floors. The original series stopped
+before its other 31 arms. The figure/reference series completed ten exit-0 arms and stopped on arm
+eleven, an explicitly repeated-header table, with checker exit 4; five arms remain unrun. Own PDFs
+and refusal evidence are retained. Separate diagnostic collection proposals cannot convert either
+stopped series into a pass or supply eligible labels from partial captures.
+
+Source inspection adds preservation and clipping requirements to the provisional design. The actual
+runtime clone/column origin is still unknown. Core implementation, complete three-family hit review,
+recall, label-set metrics, candidate gates and release remain open.

@@ -125,6 +125,19 @@ reconciliation, running-clone, multi-column, text-loss, spacing and named-page c
 fixtures; historical status alone cannot select a fix. The table exit-4 control needs cause/coverage
 investigation. Security claims require real network-log evidence; existing egress limits remain.
 
+Collector repair must distinguish source ownership from printable placement. Positive DOM Range
+rectangles alone do not prove that text paints in the page: the current collector groups them by
+vertical position without intersecting the sheet or ancestor clip. Paged.js also uses a large column
+gap offset. This supports a hidden-column hypothesis, not the origin of any observed clone.
+Any repair needs same-acquisition occurrence, ungrouped Range and ancestor clipping evidence.
+Content-box exterior, repeated text or a split marker alone must never discard a real continuation,
+table cell, repeated header or author overflow that still paints in the sheet or bleed. Every
+excluded occurrence stays in the source/candidate census with its reason and any separately proved
+printable placement. A source token without proved placement remains explicitly unmeasured or
+unplaced. Unsupported clipping and effects remain unknown. Independent controls must falsify a
+filter that loses genuine continuation or merges separate physical columns by matching vertical
+coordinates; a whole-block union box cannot replace its contributing rectangles.
+
 ## 4. Candidate rules and evidence needed
 
 All entries are conditional candidates. No minimum print font size, ppi value, page distance or new
