@@ -500,3 +500,33 @@ particular PDF raster remains unproved and the source-box crop attempt stays sto
 Another baseline recall packet and its exact single-call controller are committed and
 read back; the first eight-page native external review is running. Native image, model,
 full canonical schema and response-copy qualifications remain pending until it exits.
+
+## 2026-10-05 — measured recall status and minimal raster evidence
+
+⛔ superseded by this measured update: the preceding first-call running status is historical.
+That native eight-page review completed with exit 0, eight actual original image results,
+full canonical validation and eight rejected adverse response copies. Its thirteen raw
+candidates remain unconfirmed. A second original seven-page call exited 0 but read no
+images and honestly marked all seven pages unreviewed. It has zero visual credit and
+will not be repaired or repeated.
+
+The second response cited a stale operative prerequisite: the bound input still said
+that its original disposition was not committed, although actual commits and Root
+readbacks had completed. The successful first call contained the same statement, so
+this is a measured text-state error rather than a deterministic explanation of model
+behavior. The four uncalled groups remain on hold while a prospective, bounded input
+correction is prepared. The original prompts, caller, failed response and acceptance
+criteria remain retained; no previous qualification extends to changed input.
+
+For the separate unproved source-box transform, a prospective manual raster method
+was registered and committed. Two original page views informed integer pixel regions,
+which were separately committed before extraction. Both resulting crops preserve
+the exact original subarray without scaling; actual local crop views establish
+sufficient table context and no observed personal identifiers in these selected regions.
+A fresh second-family confirmation request is being prepared using only the two minimal
+crops. The original transform stop, incomplete acquisition eligibility, source-owner
+and cause limits remain open. The new views add no primary or overlap recall credit.
+
+The private label set still contains two independently confirmed defects. Complete
+Phase A, final design acceptance, implementation, blinded A/B, release gates and
+publication remain incomplete.
