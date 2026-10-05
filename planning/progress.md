@@ -299,3 +299,35 @@ an explicit configuration contract for new settings, verified collector attribut
 semantic rules, measured graphic metrics and packed-consumer validation before exposing CLI options.
 The two-error guard remains unchanged. The revised proposal is not independently accepted, and the
 fresh Claude design audit remains unavailable. No implementation or release approval is inferred.
+
+## 2026-10-05 — compound fragment controls, stdout stress and exact engines floor
+
+The preregistered compound figure/table series retains 16 original acquisitions: eight exit 0,
+four exit 1 and four exit 3. A preparation error that created the adapter output directory too
+early is retained separately; the correction changed only fresh paths and the documented absent
+directory precondition. Twelve available PDFs contain 28 pages at 110 dpi. Their seven distinct
+decoded page images were inspected locally; identical images across arms do not establish report
+identity. The genuinely tall control fails the cross-check in every arm and has no diagnostic PDF.
+
+The compound source puts a 36-row table inside a kept figure. Its first retained figure fragment
+lies beyond the physical page, while the visible figure/caption/table begin later. Fifty caption
+and table-cell candidates retain paired off-sheet/visible one-line fragments. The outside-figure
+comparison changes ownership and still loses repeated table headings; it is not an accepted fix.
+Actual pagination tokens, unique physical extent and a valid scaling remedy remain unknown.
+
+The current registry package completed 120 full-reader pairs across six formats and two runtimes.
+Each retains direct CLI/consumer exits 1/0 and equality under the preregistered narrow byte projection;
+stock JSON is below the registered 262,144-byte stress floor. A positive private copy with 55 added,
+self-authored resource references then completed ten JSON stress triples per runtime. All twenty
+`--out` controls are 442,353 bytes. Slow-reader CLI/consumer exits are 1/0 with projected equality;
+early-close exits are 3/0 with 100 received bytes and the stdout/EPIPE diagnostic. Twenty separate
+preclosed confirmation-channel cases retain complete reports, CLI exit 1 and their own diagnostic.
+No comparator was broadened, package code edited or historical result silently replaced. Other-format
+stress and the existing greater-than-1-MiB gate remain outside this scoped conclusion.
+
+All nineteen ordered baseline commands completed with direct exit 0 under exact Node 22.13.0,
+including live acquisition, technical report surfaces, report-surface mutations and selfcheck.
+The unchanged source was bound to `98e33c0`; the downloaded runtime was matched to its official
+checksum before execution. This additional floor characterization is not a new release-candidate
+gate, packed-consumer proof, CI acceptance, after-fix flake series or multi-model sight review.
+Collector/figure implementation, complete hit adjudication, label-set metrics and release remain open.

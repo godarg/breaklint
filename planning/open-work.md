@@ -25,7 +25,29 @@ The four items remain open for a separately specified package with a browser-req
 new independent verification. The original historical triage rows below are retained as evidence;
 their former plan cells are superseded by this decision.
 
-## Measurement environment and its limits
+## 2026-10-05 scoped remeasurement for the 0.9 investigation
+
+⛔ Supersedes the historical current-status interpretation of G-01, G-03, G-07, G-12,
+G-89, G-99 and G-102 below only to the extent stated in this table. The historical
+measurements and stopped-package records remain intact. No item is universally closed
+by this checkpoint, and no 0.9 implementation or release acceptance is claimed.
+
+Measured with the unchanged registry `breaklint@0.8.0`, Paged.js 0.4.3,
+Chrome 154.0.8037.97 and separately bound Node 24.21.0 / 22.13.0 processes.
+Self-authored controls and private command/exit/hash receipts precede these conclusions.
+The counts elsewhere in this register describe their dated historical investigations.
+
+| id | current scoped evidence | remaining work |
+|---|---|---|
+| G-01 | changed: 120 stock full-reader pairs across six formats and two runtimes retain the expected direct CLI exit 1, consumer exit 0 and narrowly projected byte equality. Stock JSON is below the preregistered 262,144-byte stress floor. A separate self-authored JSON control produces 442,353-byte `--out` reports: ten triples per runtime retain complete slow-reader output and early-close CLI/consumer exits 3/0. Twenty preclosed `--out` confirmation channels retain complete reports and their distinct diagnostic. | Qualify stress for the other five formats and the existing greater-than-1-MiB early-close gate. Do not infer a universal pipe guarantee from the JSON control or silently replace the historical 65,536-byte observation. |
+| G-03 | still open: a compound figure/table control retains a three-fragment figure height sum; its first fragment lies beyond the physical page. Fifty one-line caption/table-cell candidates each have an off-sheet fragment and a visible fragment. The outside-figure comparison changes ownership and is not an accepted repair. | Prove unique physical fragment/content extent independently before changing two-fragment behavior. Retained fragment heights and generated rule messages are not independent oracles. |
+| G-07 | still open: the compound control sums 2,580.07 px against a 971.33 px content box, including a 949.13 px off-sheet fragment. This does not establish the unsplit physical height or a truthful scaling remedy. | The historical +46 px observation and refuted upper-bound premise remain dated evidence. Establish physical attribution and an independently measured remedy before claiming a fix. |
+| G-12 | still open: the corrected whole-table control has two bound PDF pages but retains exit 4 in all three acquisitions. A separate genuinely tall figure control fails the geometry cross-check in all four arms and produces no diagnostic PDF. | Keep coverage refusal, cross-check failure and missing repeated table headings distinct. Do not withdraw a page or clear a gate using these controls alone. |
+| G-89 | existing 0.8 guard reverified statically: nonempty print headings with `display: contents` produce the named infrastructure refusal. The existing live test checks that refusal and exit 3, not survival of every authored word. | Proposed independently authored long/short heading and ordinary-block controls are not yet measured. A refusal is not a general text-preservation guarantee. |
+| G-99 | still open: the compound control's retained overflow classification does not test named-page transitions or expose the actual pagination token. | Remeasure named-page boundaries with actual decision evidence. No named-page fix or forced-break classification is established here. |
+| G-102 | historical stopped WP-X branch finding, not present as that exemption in the shipped 0.8 residue code. The current census measures stranded boxes; SID presence, first ordering and line records do not prove full token survival. | The proposed rounded/unclipped and intentionally hidden text controls remain unmeasured. Keep the stopped-branch defect distinct from a demonstrated shipped-package loss. |
+
+## Historical measurement environment and its limits
 
 - Linux x86_64 VM, kernel 6.18, Node 24.21.0 (the engines floor, 22.13.0, was also checked where it
   matters), Paged.js 0.4.3, poppler 24.02.
