@@ -555,3 +555,41 @@ finding-record query supports the local object binding, while global acquisition
 eligibility remains refused. This is a confirmed pixel candidate with no global
 `NOT_REPORTED` label, denominator credit or source-box-transform claim. The private
 label set remains two defects; no release criterion is yet established.
+
+### 2026-10-05 — remaining original recall groups and corrected acquisition diagnosis
+
+Supersedes the preceding pending status for the remaining three original recall groups.
+Their unchanged criteria were registered and committed before the native calls. Eight
+primary pages, four primary pages and six preregistered overlap pages completed with
+exit 0 and respectively eight, four and six actual byte-identical PNG results. Each
+unchanged response passed the full canonical schema and eight rejected adverse copies.
+Native output identifies `claude-opus-5-5`. Complete semantic review retains ten, five
+and six unconfirmed observations respectively. These include incoming tables without
+visible column labels, short monospace wraps and whitespace. Authored hard-break origin,
+PDF copy fidelity and whitespace avoidability remain unproved. The earlier seven-page
+image-less call remains unqualified and is not repeated. Across the five qualified
+original groups there are 27 primary and six overlap pixel observations, with 44 raw
+candidates and no new confirmed-miss, label or denominator credit.
+
+A separate read-only tooling composition question now has actual source-read evidence.
+An earlier intake opened no source because its prompt gave relative locators to an
+empty working directory; that failed intake remains retained. A separately registered
+absolute-locator request completed with exit 0, 51 successful reads of 47 allowed paths,
+all five current sources read in full and one explicitly partial historical stderr.
+It supports mocked offline transport within the supplied scope; joint runtime binding,
+helper/live coverage and formal completion remain unestablished. Original finishing
+failures and review budgets remain unchanged, and affected visual calls remain on hold.
+
+The abbreviated font-decoding explanation for four historical acquisition refusals is
+refuted by the original native reports. They show post-pagination document quiescence
+failure with 18 retained font requests, zero pending body tasks, and eight served local
+font resources per run. Those 32 resource records match 16 existing registered local
+font files. Server-byte identity and successful local metadata parsing do not prove
+browser font selection or decoding. The request tracker counts native request objects,
+not unused FontFaceSet entries; individual lifecycle events and failing page role remain
+unknown. A separately blocked favicon is also retained as a resource failure. No timeout,
+request gate, font source or delivered document was changed to clear these refusals.
+
+The private label set still contains two confirmed defects. Complete Phase A, accepted
+final design, implementation, blind A/B, exact candidate release gates and publication
+remain incomplete. No new-version improvement or release criterion is claimed.
