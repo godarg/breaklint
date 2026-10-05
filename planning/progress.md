@@ -449,3 +449,38 @@ no studio skill change was applied.
 
 Phase A, independent corrected-design acceptance, candidate implementation, the complete blinded
 A/B, release and every publication/consumer step remain incomplete. No release claim is made.
+
+## 2026-10-05 — separate infrastructure reviews and an explicit finishing failure
+
+The approved private test-environment repair declares pinned image/PDF development dependencies;
+it adds no breaklint runtime dependency. Original full tests failed the two new import pins in both
+profiles while the existing pins remained green. The current full two-profile integration and the
+separate declaration-removal controls retain actual native statuses and handwritten image/PDF
+oracles. The declaration controls produce wrapper exits 0, 2 and 0 for each profile, with only the
+private manifest changed and the original state restored.
+
+Two fresh independent source reviews now report PASS, actual `claude-opus-5-5`, with no blocker or
+high finding. The dependency review has two low findings and six explicit review limits; the
+separate mock-launcher review has three low findings and seven review limits. These are source
+reviews with documented evidence limits, not blanket acceptance of every retained output or of
+the original wrapper repair. Earlier failed captures, stopped series and missing visual success
+markers remain distinct. Advisory dispositions do not erase the review limits.
+
+The dependency package's real finishing operation exits 2. Its selected complete six-command
+Quality gate exits 0, but the commit-interval check includes an unrelated automation commit
+interleaved immediately after the first own preregistration commit. Moving the start past that
+commit would omit own work. No start boundary, declaration flag, selected gate, threshold or
+foreign automation source was changed; the work item remains open without a completion marker.
+New Gemini visual calls remain on hold. The launcher package's formal finishing operation is still
+pending.
+
+Further baseline recall calls have qualified native image and full-schema evidence. Their raw
+candidate observations remain unconfirmed until source/report binding and a second model family
+support a miss. Corrected prospective recall prompts retain their original schemas and acceptance
+criteria; local full-schema compilation authorizes no foreign transfer. New original Codex page
+ranges have actual image emissions, while earlier stopped ranges retain zero review credit.
+Raster presence does not upgrade a page whose original native coverage is unverified.
+
+The private label set still contains only two independently confirmed table-continuation defects.
+Phase A, final evidence-led design acceptance, candidate rules and report implementation, complete
+blind A/B, release gates, publication and consumer integration remain incomplete.
