@@ -373,3 +373,44 @@ stopped series into a pass or supply eligible labels from partial captures.
 Source inspection adds preservation and clipping requirements to the provisional design. The actual
 runtime clone/column origin is still unknown. Core implementation, complete three-family hit review,
 recall, label-set metrics, candidate gates and release remain open.
+
+
+## 2026-10-05 — conditional design audit and bounded diagnostic evidence
+
+The fresh text-only design audit completed at frozen `212a675`: native exit 0, actual
+`claude-opus-5-5`, zero images, CONDITIONAL with three high, four medium and one low finding.
+The changed proposal now names counted inventory-completeness obligations, immutable proof-source
+thresholds/profile floors, collector semantics and legacy provenance, acquisition-profile matching,
+public enum/stamp impacts, all-placement dependency gates, counted suppression annotations and
+default-off admission. These remain proposed dispositions; independent acceptance and implementation
+proof are pending. No collector, rule, schema, config or report implementation has started.
+
+The separate remaining-case whitespace diagnostic stopped on its eighth command. The actual reason
+is required-page-binding-incomplete: three written pages but two bound, with the blank recto page
+unbound. All existing rule coverage records are complete; that does not waive the evidence guard.
+Twenty-three registered diagnostic commands remain unrun. The separate five remaining figure/table
+diagnostics completed with three checker exits 4 and two exits 0, without making the stopped
+original series eligible or accepted. Thirteen own PDFs were copied and rastered at 110 dpi; every
+one of their 31 pages was individually viewed. Visible blank/parity, repeated-header and separated-
+caption controls are retained as sight evidence, not new-rule precision, labels or a release gate.
+Possible named-page paragraph-prefix clipping remains unconfirmed.
+
+Three scoped baseline whitespace hits now have qualified Claude pixel reviews. Two corresponding
+Grok judgments are typed and image-bound; the third has malformed embedded JSON and stays
+unqualified despite valid image transport. A Codex sub-run lost its native image trace during
+normal isolation cleanup and remains unqualified; direct main-agent baseline sight is documented
+separately with its reviewer-context limitation. A first Gemini three-image call returned
+`gemini-3.6-flash` through fallback. Its image audit records three files but the required literal
+inline-count success marker is absent, so the visual judgments remain unqualified. No marker or
+missing trace was reconstructed and no unfavorable or malformed call was silently repeated.
+Complete independent-family hit coverage, disagreements/adjudication and the label denominator
+remain unfinished.
+
+A bounded private inventory step stopped after an overbroad local snapshot serialization exceeded
+its whitelist. The incident is retained as metadata; its scope and related foreign transfers remain
+stopped/on hold, with personal content unknown. No model, helper, renderer, test or Git action ran
+in that stopped step. Original product files are unchanged.
+
+The original report arrays were re-read: 538 all-rules and 141 default-profile findings. These
+remain inventory counts, not validated precision denominators. Candidate metrics, blind A/B,
+release-candidate gates, publication, website and consumer integration remain open.
