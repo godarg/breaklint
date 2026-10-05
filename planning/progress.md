@@ -393,7 +393,7 @@ diagnostics completed with three checker exits 4 and two exits 0, without making
 original series eligible or accepted. Thirteen own PDFs were copied and rastered at 110 dpi; every
 one of their 31 pages was individually viewed. Visible blank/parity, repeated-header and separated-
 caption controls are retained as sight evidence, not new-rule precision, labels or a release gate.
-Possible named-page paragraph-prefix clipping remains unconfirmed.
+⛔ superseded by the exact later paragraph-prefix sight check: the complete first words are visible in both named-page controls. The earlier clipping candidate is refuted; this is not general clipping-safety evidence.
 
 Three scoped baseline whitespace hits now have qualified Claude pixel reviews. Two corresponding
 Grok judgments are typed and image-bound; the third has malformed embedded JSON and stays
@@ -414,3 +414,38 @@ in that stopped step. Original product files are unchanged.
 The original report arrays were re-read: 538 all-rules and 141 default-profile findings. These
 remain inventory counts, not validated precision denominators. Candidate metrics, blind A/B,
 release-candidate gates, publication, website and consumer integration remain open.
+
+
+## 2026-10-05 — contract refinement and explicit evidence limits
+
+The frozen `791385b` design received a second qualified Claude text audit: actual
+`claude-opus-5-5`, CONDITIONAL with three high, four medium and one low finding. A qualified
+`gemini-3.8-flash` text audit reports zero additional contradictions; it does not erase the
+source-supported Claude findings. The provisional refinement now separates registration, admission
+and automatic enablement, inventories all thirteen released rule consumers and their owed controls,
+and specifies cause decisions, completeness witnesses, demo/legacy migration, comparison identities,
+Config v2 compatibility and retained suppression annotations. All eight dispositions remain OPEN.
+No core code, new rule, schema, migration, threshold, floor or runtime dependency changed.
+
+Two independently confirmed table-continuation defects are now retained in the private label and
+miss ledgers. Their source ownership and delivered-file identity remain explicitly unknown where
+not proven. This is a partial label set, not completed recall, precision or evidence-led scope freeze.
+The three scoped whitespace hits in a second document have qualified Claude pixel judgments; one
+separately registered Grok response remains unqualified because its nested hit id differs from the
+canonical id. The response is preserved without repair or a favorable retry. Other original calls
+remain distinct, with qualification pending.
+
+A third document has twenty-four actual primary Codex page views and a separately recorded privacy
+screen. The privacy screen contributes zero recall credit. Twenty-five exact pages are approved for
+prospective Claude primary/overlap review; three pages with visible personal/contact categories
+remain on hold. The remaining pages and preselected overlap are not represented as reviewed.
+
+A necessary local Gemini-wrapper repair has frozen code and red/green/external-mutation evidence.
+Its independent `claude-opus-5-5` code verifier reports PASS with three low test advisories, while
+explicitly stating that it did not inspect the saved run evidence. Those evidence gaps remain open
+and the separate repair work item is not yet closed. Historical Gemini fallback calls lacking the
+required literal image-count marker remain unqualified. This repair is outside the public package;
+no studio skill change was applied.
+
+Phase A, independent corrected-design acceptance, candidate implementation, the complete blinded
+A/B, release and every publication/consumer step remain incomplete. No release claim is made.

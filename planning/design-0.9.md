@@ -9,6 +9,14 @@ and [limitations](../docs/limitations.md). Complete adjudicated labels and indep
 and Gemini design audits, with dispositions, are still required before implementation. Thresholds,
 rule enablement and schema choices below are proposals requiring that evidence and review.
 
+This revision is an **architecture contract refinement before evidence-led scope and admission
+freeze**, not final implementation authorization. **Phase A remains INCOMPLETE.** All eight findings
+in section 9 remain **OPEN** until the corrected frozen design receives fresh independent audits and
+Root accepts their dispositions. Future implementation controls are **PENDING**, not automatic failures
+because they are unrun. There is **no current migration PASS**, no candidate acquisition or primary
+membership freeze established here, and no new-version or release verdict. Actual model identifiers
+and unretained runtime fields remain **UNKNOWN** unless bound existing run output establishes them.
+
 ## 1. Evidence available and limits
 
 The original baseline report files were re-read on 2026-10-05: counting their canonical findings
@@ -78,43 +86,147 @@ Selectors are search hints, not stable identities or permission to edit source.
 
 ### Schema proposal and migration
 
-Propose **Snapshot 5 → 6** for the new required typed facts and completeness/provenance states.
-A schema move requires a real migration of the shipped stored snapshot, validator/engine controls,
-and live versus stored-consumer tests. An older snapshot cannot acquire facts that were never
-measured: migration records missing ownership, counter values, placement and metrics as **UNKNOWN**,
-with affected predicates declined. It must not invent zero sizes, an empty complete reference set,
-or positive evidence. Fresh semantic measurement is required to resolve those unknowns.
+Propose **Snapshot 5 → 6** for collector-semantic repair and new typed facts, required completeness
+obligations and measurement provenance. An older snapshot cannot acquire missing ownership, counter
+values, placement or metrics: preserve observations and original diagnostics and mark missing facts
+**UNKNOWN**, with the exact owed consumer declines below. Never invent zero sizes, complete-empty
+inventories or fresh measurement. A changed stamp or validator alone proves no executable migration.
+Before a migrated snapshot is judged, register every unavailable-data reason in `ENV_IDS` and each
+consuming `RuleMeta.declines`; real-engine controls must prove `measured + declined = candidates`
+without undeclared reasons or a checker crash. Live/stored controls remain pending.
 
-Before admitting a legacy snapshot, define typed unavailable-data reasons and list every reason in
-each consuming rule's `RuleMeta.declines`. Migration tests must execute the real engine and prove
-`measured + declined = candidates`, with no unregistered reason or checker crash. A stamp update
-and a validator accepting the new shape alone do not establish executable migration compatibility.
+**Report 5 → 6 is required** for the mandatory inventory and measurement-semantics projections,
+cause/accepted-decision evidence and canonical suppression annotations in this proposal. Readers for
+Report 4/5 preserve findings, diagnostics, identities, original stamps and available facts. New facts
+are **UNKNOWN**, including legacy suppression completeness. Snapshot, report, configuration, decision,
+context and comparison compatibility are separate contracts. Each structural or identity change owes
+its own stamp/version and reader/migration controls. No enum, schema or stamp is changed by this text.
 
-If canonical findings gain cause evidence, structured fix hints or suppression records, propose
-**Report 5 → 6** independently. A reader migration must preserve original findings, diagnostics,
-identities and stamps; new facts remain unknown for legacy reports. Context-pack/comparison/config
-stamps move only when their own structures change, with separate migration and compatibility tests.
-None of these stamp moves is accepted by this draft.
+### Stored demo: fresh recording and legacy control
 
-### Proposed non-vacuous completeness and provenance contracts
+The existing public `examples/demo-snapshot.json` explicitly identifies a **handwritten snapshot
+fixture**, not an acquired document. It is Snapshot 5; its renderer and inputIdentity are null. Its
+metadata does not bind original HTML for the illustrative former line addresses. The current CLI
+loads this fixture and documents exit 1. These are static source/metadata observations; its current
+CLI exit was not remeasured during this design refinement.
 
-An unknown semantic inventory is a counted acquisition obligation, not an empty complete object set. For every enabled inventory-dependent rule and each inventory kind it requires, acquisition records one document-scoped completeness witness with a deterministic document/kind identity. That witness counts as one candidate alongside the individually observed object/reference candidates; it does not estimate missing objects. Its target evaluation is measured only when that inventory is positively complete. Unknown, partial, capped, legacy or mismatched inventory produces a registered not-measured evaluation with count 1, predicate UNKNOWN and countsTowardCoverage=true. These declines never enter the tool-capability or non-applicable exclusions. Show completeness-witness counts separately from concrete-object counts.
+Keep the public demo behavior as a stored-snapshot rule/reporter demonstration ending with exit 1.
+Before Snapshot 6 activation, create a fresh recorded Snapshot 6 from a new finite, self-authored
+public HTML input through the supported acquisition. Bind source and resource closure, acquisition
+options, implementation/collector/parser/profile identities and the same-acquisition expected
+violation. Choose a supported existing nonexperimental gating error under the unchanged default
+failOn policy and fully measured obligations, then verify the real CLI and engine end with exit 1.
+The demo runtime continues to need no renderer because it reads that stored measurement; the
+preparation of its record is a real acquisition.
 
-Any required incomplete inventory also makes document semantic completeness insufficient and produces exit 4, even if other rules measured targets or the numeric rule ratio exceeds its unchanged floor. Fatal infrastructure still takes precedence. failOn, display grouping and suppression cannot waive this obligation. A positively complete empty inventory may establish that no object exists; missing inventory may not. Real-engine migration controls must demonstrate all-unknown inventory, mixed measured/unknown inventories and a complete-empty control without a checker crash or vacuous clean result. This is proposed accounting, not an implemented migration.
+Retain the exact old handwritten Snapshot-5 bytes as a named migration control, never as freshly
+acquired or repaired geometry. Its migration preserves observations and original diagnostics and
+explicitly sets missing collector/semantic facts UNKNOWN. Its expected outcome follows the declared
+per-rule obligations and is frozen before testing; it cannot invent evidence to preserve the old
+illustrative demo result. Do not merely change its stamp or silently accept stamp 5 in the new
+engine. A fresh Snapshot-6 demo is required to preserve the help contract; the legacy control does
+not satisfy it.
 
-Snapshot 6 is required for the collector-semantic repair as well as the semantic index. Fresh snapshots carry an explicit collector-semantics revision and a binding to the acquisition implementation/options that produced their line, fragment, placement and fill facts. Producer-source provenance remains separate. A stamp alone is not proof that the repaired semantics ran.
+### Non-vacuous completeness, report fields and exit order
 
-Migration of Snapshot 5 preserves its original observed bytes and legacy diagnostics, but marks collector-semantic provenance unknown. It must not relabel old lines, fragment groups or fill as repaired measurements. Rules that depend on affected legacy facts decline with a registered reason and remain coverage-accounted until fresh acquisition supplies the required independent witness. The shipped stored snapshot needs a real migration and real-engine controls; silently accepting stamp5 or merely changing its stamp is forbidden.
+An unknown semantic inventory is a counted acquisition obligation, not an empty complete object set.
+For every enabled inventory-dependent rule and required inventory kind, retain one document-scoped
+completeness witness with deterministic document/kind identity. It counts as one candidate alongside
+concrete observed targets, without estimating missing objects. A complete inventory gives the witness
+a measured decision; partial, unknown, capped, legacy or mismatched inventory gives a registered
+not-measured decision, count 1, predicate **UNKNOWN** and `countsTowardCoverage=true`. These are owed
+measurements retained in both the coverage base and the source census.
 
-Source-based fingerprints remain deterministic and exclude page ordinals and fragment order. A repair must not claim the document changed because the collector changed. Comparisons require compatible collector and decision semantics; absent compatibility they return not-sufficiently-measured, never resolved. If comparison/context adds explicit provenance fields, its own stamp and reader migration must move. Tests must retain unaffected source identities, expose changed/unknown measurement semantics and prevent clone or line repair from manufacturing a fixed defect.
+Report 6 requires a document semanticInventory projection. Each enabled inventory-dependent
+rule/kind obligation records ruleId, kind, deterministic document/kind witness identity,
+required=true, status complete/partial/unknown/capped/legacy/mismatched, reason and compatible
+acquisition identity. SemanticCompleteness is sufficient only if all required obligations are
+positively complete. A complete empty set is a measured completeness witness with zero concrete
+objects; unknown never means empty.
 
-Validated semantic selectors, reference words, language settings and numbering conventions are resolved before acquisition. Object identification, reference parsing and ownership indexing occur once over the captured input and the same paginated acquisition. Rules consume these retained facts; reporters and rules do not reconstruct missing ownership or reparse under a different profile.
+RuleCoverage retains total candidates/measured/notMeasuredCount and adds separate
+completenessWitness and concreteTarget components, each with those three counts and their typed
+not-measured records. Component counts reconcile exactly with the unchanged total accounting. One
+witness is one obligation, not an estimate of missing objects. Report 6 document, context and
+whatWasNotMeasured projections retain rule, kind, witness/target distinction, reason and count;
+bounded omissions are explicit.
 
-Snapshot 6 records the canonical effective semantic-profile identity, parser/identification revision and acquisition option binding separately from producer provenance. Semantic settings that are set-like are normalized before hashing; ordered settings retain order. A stored snapshot reused with a different or unknown semantic profile declines the affected inventory and reaches the completeness/exit contract above. It cannot silently reuse stale facts. Fresh acquisition under the requested profile resolves the mismatch. A same-input changed-profile control and a matching-profile control must prove this behavior before exposing selector/profile settings.
+After invocation validation, document verdict precedence is: fatal infrastructure → required
+semantic inventory incomplete → required page evidence incomplete → empty input/no measured rule →
+numeric coverage-floor failure → finding gate → clean. The first failed condition determines
+exitReason; all concurrent records remain visible. The new deterministic reason is
+semantic-inventory-incomplete, with the ordered rule/kind reasons in semanticInventory. Fatal
+infrastructure remains exit 3 and precedes every insufficiency; semantic/evidence/coverage
+insufficiency remains exit 4 even if a numeric ratio passes or failOn=never. Ratio, display grouping
+and suppression cannot waive a required incomplete witness. Across documents, the existing
+strongest-verdict ordering remains.
 
-The candidate namespace additions are figure, table and reference. Add them to the normative registry-derived namespace enum only when a separately admitted rule uses them. The completeness witness needs the proposed target key type semantic-inventory, with document scope; it is an acquisition record with no invented DOM/source box. Proposed measured-unavailability reasons are env/semantic-inventory-incomplete, env/collector-semantics-unavailable, env/semantic-profile-mismatch, env/semantic-owner-unavailable, env/semantic-placement-unavailable, env/semantic-number-unavailable, env/reference-target-unavailable, env/printed-folio-unavailable and env/figure-print-metric-unavailable. Each admitted consumer declares its exact subset in RuleMeta.declines. These owed-measurement reasons are not tool-capability or non-applicable exceptions. Intentional accepted decisions and suppression of an already measured predicate are not unavailable measurements.
+Real-engine controls must cover all-unknown, mixed and complete-empty inventories, a numeric ratio
+that passes despite an unknown required witness, and simultaneous fatal/inventory/evidence failures.
+Each asserts reason precedence and separated witness/target accounting. These controls remain
+**PENDING**; their specification is not a migration or executable test result.
 
-These proposed public values and retained facts require Snapshot 6, Report 6 and Configuration Contract v2 with explicit reader/migration controls. Target-evaluation semantics for the new completeness obligation require their own versioned decision contract; do not emit a changed meaning under rule-decision-v1. Generated configuration remains registry-derived. Standard interchange output retains its external schema and must prove that new ids/reasons serialize within it; a new rule id alone does not rename that external schema. Context/comparison stamps move if their own shape or identity contract changes, with independent compatibility tests. No enum or stamp is changed by this text.
+### Required measurement identities and comparison compatibility
+
+Snapshot 6 records collector-semantics revision and acquisition implementation/options binding for
+its line, fragment, placement and fill facts. Collector provenance stays separate from producer/source
+capability provenance. Snapshot-5 migration marks collector semantics **UNKNOWN** and preserves the
+original observed bytes; it cannot relabel old lines or fragment groups as repaired. Every affected
+released consumer in section 3 declares its exact owed legacy reason.
+
+Validated semantic selectors, reference words, language/numbering and page-role conventions resolve
+before acquisition. Identification, reference parsing and ownership indexing occur once over captured
+input and the same paginated acquisition. Rules and reporters consume retained facts and do not
+reparse missing facts under another profile. A stored matching-profile control and a changed/unknown
+profile control must prove the proposed mismatch decline and completeness/exit contract.
+
+Report 6 requires measurementSemantics per document: collectorSemanticsRevision, acquisition
+implementation/options binding, canonical effective semanticProfileIdentity, parser/identification
+revision and the applicable ruleDecisionVersions. Every member has known/unknown availability and
+identity provenance; producer/source capability provenance remains separate and mandatory under its
+existing contract. Snapshot 6 is the acquisition source for this projection. Legacy Report 4/5
+reading preserves findings, identities, diagnostics and original stamps and projects the missing
+semantic identities UNKNOWN.
+
+Configuration v2 expands every permitted semantic setting into config.effective before acquisition,
+including selectors, reference words, language/numbering and declared role conventions. Its
+versioned canonical fingerprint includes those effective values. Set-like values normalize before
+hashing; meaningfully ordered values retain order. A profile label alone is not an independent
+hidden input. No document-provided policy layer is introduced. Acquisition uses this exact resolved
+identity once; rules/reporters do not reparse under another profile.
+
+compareReports checks known compatible collector, parser/profile, acquisition options and per-rule
+decision identities before both observed-finding matching and absent-finding/resolution branches.
+Missing, changed or unsupported compatibility produces not-sufficiently-measured with explicit
+reasons, never resolved or proved target deletion. A source identity must not change merely because
+the collector changed. Suppression, lower coverage, omitted targets and legacy unknowns cannot
+establish repair. Compatibility rules are explicit, versioned and supported by independent controls;
+equal tool version or equal schema stamp is insufficient. Context and comparison contracts require
+their own version/stamp and reader migrations wherever this mandatory projection or identity guard
+changes their shape/meaning.
+
+### Proposed enum and decision-contract additions
+
+The proposed new rule namespaces are `figure`, `table` and `reference`; add a namespace to the
+normative released enum when its first rule is **REGISTERED**, not only when admitted. Registration,
+admission and default enablement are distinct section 4 states. The completeness witness uses proposed
+key type `semantic-inventory`, with document scope and no invented DOM/source box.
+
+Proposed owed measured-unavailability reasons are `env/semantic-inventory-incomplete`,
+`env/collector-semantics-unavailable`, `env/semantic-profile-mismatch`, `env/semantic-owner-unavailable`,
+`env/semantic-placement-unavailable`, `env/semantic-number-unavailable`, `env/reference-target-unavailable`,
+`env/printed-folio-unavailable`, `env/figure-print-metric-unavailable`, `env/break-cause-unavailable`,
+`env/page-role-unavailable` and `env/displacement-witness-unavailable`. Every released or new consuming
+rule declares its exact subset in `RuleMeta.declines`, with the inventory below and cause contract in
+section 3. None enters TOOL_CAPABILITY_ENV_IDS or NON_APPLICABLE_ENV_IDS. Intentional/accepted decisions
+and annotations of measured violations are separate typed reasons, never unavailable measurements.
+
+The completeness obligation and changed cause-aware decisions use proposed `rule-decision-v2`.
+Preserve old v1 decisions and their version as historical input; do not emit changed meanings under
+v1 or assume compatibility. Snapshot 6, Report 6, Configuration Contract v2 and changed context/
+comparison contracts require independent compatibility controls. Standard interchange schemas remain
+external contracts; new ids/reasons/annotations must serialize in them without falsely renaming those
+schemas. All proposed values and exact reader behavior remain **OPEN** until independently audited.
 
 ## 3. Whitespace and collector correctness
 
@@ -133,13 +245,113 @@ keep chain, its required height, available space and actual destination. Unknown
 they do not become confident alarms. Apply the same cause records to half-empty pages, orphaned
 continuation pages and headings at page bottom, while retaining each rule's candidate accounting.
 
+### Released cause-aware decisions and versioned accounting
+
+The proposed cause-aware decision change applies explicitly to layout/half-empty-page,
+layout/orphaned-continuation-page and layout/heading-at-page-bottom. It has rule-decision-v2
+semantics, including the completeness-witness obligation; changed decisions must not be emitted
+under rule-decision-v1. Registry and readable decision contracts identify compatible versions per
+rule. Migration preserves old v1 decisions with their version and makes compatibility UNKNOWN; it
+cannot reinterpret them as new decisions.
+
+Positively established intentional/accepted cases use status=measured, predicate.violated=false,
+countsTowardCoverage=true, and a typed decision disposition of intentional or accepted, with an
+independently retained compatible boundary/role witness. The proposed closed decision-reason
+registry names chapter-end, document-end, forced-start, parity-start, acted-named-page-transition,
+declared-special-page and full-page-object. Each reason is an accepted decision reason, never an
+EnvId. The reason, witness and unchanged candidate count remain visible in Report 6 and bounded
+context. Sparse geometry or unacted CSS cannot establish acceptance. Not-applicable/excluded remains
+reserved for demonstrated scope exclusions; an intended page is not unavailable merely because the
+author intended it.
+
+If a required cause, compatible page-role boundary or displacement witness is absent, use
+status=not-measured, predicate UNKNOWN and countsTowardCoverage=true. Proposed owed reasons are
+env/break-cause-unavailable, env/page-role-unavailable and env/displacement-witness-unavailable,
+with exact per-consumer RuleMeta.declines entries. A rule requires a role witness only for the
+particular asserted role-dependent decision; absence of arbitrary role declarations does not make
+every ordinary page unknown. These reasons do not enter TOOL_CAPABILITY_ENV_IDS or
+NON_APPLICABLE_ENV_IDS. Existing independent infrastructure diagnostics remain visible. Suppression
+cannot supply a witness or waive coverage.
+
+Before activation, preregister the finite default/strict before-and-after cases for measured defect,
+proved intentional/accepted, unknown cause, unknown displacement and legacy provenance. Keep all
+released numeric thresholds, default settings and floors. Unknown owed candidates can legitimately
+produce exit 4, immediately under strict floor 1, but every baseline 0/1→candidate 3/4 transition
+still requires fresh independent proof under the unchanged no-regression criterion. No measured
+geometric violation disappears merely through a reporter annotation. Half-empty-page remains
+experimental/default-off; experimental findings still do not trigger the finding gate, while its
+enabled measurement obligations retain their coverage effect.
+
 Evaluate a perceived-fill measure built from physical line bands and replaced-body occupancy against
 independent visual labels. Glyph-band net fill is not perceived fill and has no fixed universal
 ceiling. Preserve the old quantity as a diagnostic where useful; changing `minNetFill`/`maxNetFill`
 semantics requires an explicit migration, not a silent replacement. No new fill threshold is chosen.
 `layout/half-empty-page` remains experimental and **off by default**.
 
-Collector ownership and printable-placement verification precede every candidate that consumes line, fragment, occurrence, page-placement or physical-transform facts. The dependency gate covers figure/caption-separated, figure/far-from-reference, figure/text-too-small, figure/raster-resolution, figure/overflows-content-box, both table placement/header rules and reference/page-number-mismatch, as well as the existing whitespace and typography consumers. Each rule admission names the exact collector facts and independent controls it requires. Source-only predicates still need a positively complete source/ownership inventory; they may not smuggle in unverified placement.
+The dependency gate applies to every released rule as well as every new candidate. The normative
+inventory names all thirteen released ids and, for each, the exact retained line, fragment,
+occurrence, placement, source-census or physical-transform facts it reads; the independent
+hand-authored positive, negative, unsupported and mutation controls; and the exact registered
+legacy/missing-fact decline subset. The following thirteen-rule table is the bounded proposed
+inventory. It preserves each existing RuleMeta.declines list and identifies proposed additions
+separately. No released rule is implicitly exempt because it predates admission.
+
+The ten geometry/fragment/placement consumers in that table require known compatible collector
+semantics. Their proposed legacy decline is env/collector-semantics-unavailable, declared
+individually in RuleMeta.declines and counted as an owed measurement. Source-text and local-URI
+predicates retain their source-based arithmetic where the captured source census and ownership are
+positively complete. They do not need artificial geometry to detect a character or URI, but
+source-run loss, unproved occurrence ownership, missing source census or an invented page address
+cannot be hidden. Source-census incompleteness uses the explicitly declared
+env/semantic-inventory-incomplete obligation; placement UNKNOWN remains separate from an otherwise
+measured source predicate. Retain unplaced source leaves in the census with their reason, rather
+than dropping them because a printable block was filtered.
+
+Before changing any consumed fact, freeze independent physical-line, continuation, ownership,
+placement or transformed-boundary controls and observed red/green/mutation evidence, followed by a
+fresh verifier on the frozen implementation. A real two-page table, repeated header, independent
+physical columns, running original/clone, author overflow/bleed and unsupported clipping/transform
+controls must be able to falsify the filter. Content-box exterior alone is insufficient to discard
+printed material. All excluded residual occurrences stay visible in the source census. The
+structural Proof-A boundaries, the two-error guard, options and floors remain unchanged; no
+two-fragment sum is asserted to be safe where the released error rule explicitly retains its
+decoration ambiguity.
+
+### Existing released rule dependency inventory
+
+This table names all thirteen released rules observed in `src/rules/index.ts`, both Proof-A errors,
+their actual body dependencies and declared decline lists. It describes static current code, not a
+runtime proof that collector geometry painted or a claim that the proposed controls passed. The
+current default enables twelve; `layout/half-empty-page` is off; current strict enables thirteen.
+Current defaults, structural options and floors are preserved. The table's proposed reasons are
+additions requiring enum/metadata/reader controls, not existing emitted values. For the three source
+predicates, the UNKNOWN source-census obligation is separate from otherwise measured source arithmetic;
+missing placement alone never invents a geometry requirement for the local-URI predicate.
+
+| Released rule and actual body ranges | Retained facts read by the current rule | Independent finite controls required before changing those facts | Current declared declines; proposed additions |
+| --- | --- | --- | --- |
+| `layout/widow`; `src/rules/layout/widow.ts` 62–127 | Opening own-line count, delegated/nested ownership, previous source-correlated fragment, fragmentIndex/count, incoming paginator cause, block-container and effective widows facts. | Two-page own-text continuation with hand-counted opening/previous closing lines; nested paragraph carried whole; display:contents/container; forced boundary; running clone; shifted inline and separate physical columns. Mutation: join or duplicate an unplaced rectangle or delegate the wrong owned line; oracle must detect changed counts. **PENDING.** | Current: `env/multicolumn`, `env/vertical-writing`, `env/forced-break`, `env/invalid-measurement`. Proposed owed: `env/collector-semantics-unavailable`. |
+| `layout/orphan`; `src/rules/layout/orphan.ts` 48–107 | Closing own-line count, next correlated fragment, fragmentIndex/count, outgoing cause, container/effective orphans facts. | Two-page own-text split with independent closing/next opening line counts; intact nested child moved whole; forced boundary; hidden original/printed clone. Mutation: change next-fragment owner or admit staging line; oracle must fail. **PENDING.** | Current: `env/multicolumn`, `env/vertical-writing`, `env/forced-break`, `env/invalid-measurement`. Proposed owed: `env/collector-semantics-unavailable`. |
+| `layout/unbreakable-block-too-tall` **error, Proof A**; `src/rules/layout/unbreakable-block-too-tall.ts` 113–204, 235–284 | sid-correlated flow fragment census, visible boxed lead, rendering/display/marginCopies/visibility, fragmentCount, retained first-box height for one/two fragments and sum for >=3, page content height, fixed break-inside structural option. | Independently measured oversized avoid block spanning >=3 pages; hidden first fragment with later printed lead; genuine two-page table/block with repeated decoration, preserving the released ambiguity; running clones; printed bleed outside ContentBox. Mutation: drop a real fragment or add a clone height; independent membership/length oracle must fail. **PENDING.** | Current: `env/multicolumn`, `env/vertical-writing`, `env/invalid-measurement`. Proposed owed: `env/collector-semantics-unavailable`. |
+| `layout/heading-at-page-bottom`; `src/rules/layout/heading-at-page-bottom.ts` 46–135 | Heading tag, printable/renderedBox own or visible lines, same-page following blocks and their placement, contentBox bottom, lineHeight/font fallback, visibility/container scope. | Heading stranded vs heading followed by real body; display:contents heading; hidden/running original and margin clone; transformed/clip unknown; compatible deliberate page boundary with accepted reason vs unknown cause. Mutation: promote staging following block or lose a printed follower. **PENDING.** | Current: `env/multicolumn`, `env/vertical-writing`, `env/invalid-measurement`. Proposed owed: `env/collector-semantics-unavailable`, `env/break-cause-unavailable`, `env/page-role-unavailable`, `env/displacement-witness-unavailable`. |
+| `layout/half-empty-page`; `src/rules/layout/half-empty-page.ts` 40–136 | Page blank, glyph-band fill.net/topGap, contentBox, isLast, incoming cause and fragment continuation membership. Existing net-fill arithmetic is diagnostic; new perceived fill is a separately versioned proposal. | Hand-labelled physically full large-leading page; intentional terminal/role page; parity/forced starts; independently measured avoid-object displacement vs unknown displacement; unchanged defaults and strict enabled coverage. Mutation: replace missing cause with overflow or pretend glyph fill is perceived fill. **PENDING.** | Current: `env/parity-blank-page`, `env/forced-break`. Proposed owed: `env/collector-semantics-unavailable`, `env/break-cause-unavailable`, `env/page-role-unavailable`, `env/displacement-witness-unavailable`. |
+| `layout/orphaned-continuation-page`; `src/rules/layout/orphaned-continuation-page.ts` 1–82, 94–232 | Page-by-page pre-order blocks, renderedBox/contentBox vertical overlap, fragmentIndex, linesByBlock and next-page fresh-block ownership, net/topGap, block lineHeight, overlapping SVG viewport, blank/incoming cause. Horizontal position alone is not validated by the current flowBlocks predicate. | Genuine tiny ending continuation vs full middle continuation; two-page table continuation/repeated header vs two independent tables; running/margin SVG; inline tall SVG vs body object; printed bleed; unknown cause. Mutation: reorder ownership or substitute staging next-page lines; independent physical ownership oracle must fail. **PENDING.** | Current: `env/parity-blank-page`, `env/forced-break`. Proposed owed: `env/collector-semantics-unavailable`, `env/break-cause-unavailable`, `env/page-role-unavailable`, `env/displacement-witness-unavailable`. |
+| `layout/hyphen-across-page`; `src/rules/layout/hyphen-across-page.ts` 45–85 | Source fragment continuation/index/count, effective layout scope and retained boundaryHyphen mark on own/nested inline content. Page cause is also message data. | Known word split across pages inside an inline emphasis element vs intact word/whole moved child; repeated/running clone and source ownership; no-source-map/unsupported provenance. Mutation: transfer hyphen mark to wrong owner or silently drop a real boundary occurrence. **PENDING.** | Current: `env/multicolumn`, `env/vertical-writing`. Proposed owed: `env/collector-semantics-unavailable`. |
+| `svg/text-overflows-viewport` **error, Proof A**; `src/rules/svg/text-overflows-viewport.ts` 22–42, 59–129, 131–195 | Inline SVG/text source census and per-target addresses, viewportScreen and CTM-transformed text boxes, measurable/reason/capped/unreadable/unsupported counts, visible-overflow applicability, rounding and fixed structural boundary. | Known transformed text within and outside a clipped viewport; overflow:visible nonapplicable target; CTM/viewport unsupported; painted stroke/filter/use targets; cap/unaddressable rest; repeated SVG identities. Mutation: remove an unreadable target or change CTM/viewport basis; independent geometry/census oracle must fail. **PENDING.** | Current: `env/svg-not-inline`, `env/svg-no-text`, `env/svg-overflow-visible`, `env/svg-too-many-text-targets`, `env/svg-ctm-unavailable`, `env/svg-viewport-geometry-unsupported`, `env/svg-painted-bounds-unsupported`. Proposed owed: `env/collector-semantics-unavailable`. |
+| `type/spaced-hyphen`; `src/rules/type/spaced-hyphen.ts` 48–87 | TextRun source characters, language/ancestor exclusion and math-window predicate; candidate census and block/source identity are first-collected-block dependent; page/box projection is not an occurrence-specific printable witness. | Self-authored DE/EN character/context and excluded-code cases; same source with split/clone placement must keep source count/identity; unplaced source run must stay censused with UNKNOWN location; first fragment cannot establish later occurrence page. Mutation: drop source run when block placement is excluded. **PENDING.** | Current: none. Proposed owed: `env/semantic-inventory-incomplete`. |
+| `type/straight-quotes`; `src/rules/type/straight-quotes.ts` 40–77 | TextRun source characters, digit-before-mark exception, language/ancestor exclusion; first-block-dependent census/identity and placement projection. | DE/EN straight mark, inch/arc-minute and excluded-code controls; split/clone/unplaced run count and source identity; explicit UNKNOWN occurrence location. Mutation: multiply source run for clones or omit unplaced quoted source. **PENDING.** | Current: none. Proposed owed: `env/semantic-inventory-incomplete`. |
+| `type/short-last-line`; `src/rules/type/short-last-line.ts` 45–100 | Paragraph tag/alignment, last-fragment status, visible physical lines, last width, block width and effective fontSize, layout scope/finite geometry. | Hand-measured last line width and ems vs page-boundary line; shifted inline fragments and distinct physical columns; narrow/long final line; unsupported geometry. Mutation: merge columns by y or treat clipped staging line as last printed line. **PENDING.** | Current: `env/multicolumn`, `env/vertical-writing`, `env/invalid-measurement`. Proposed owed: `env/collector-semantics-unavailable`. |
+| `type/excessive-word-spacing`; `src/rules/type/excessive-word-spacing.ts` 69–164 | Visible container/leaf ownership, justification, authored word-spacing, td/th exclusions, line records and wordBoxes horizontal gaps, independently sampled natural spaceWidth, source block/source rendering facts. | Hand-counted consecutive-word gaps and natural space under same font; author-spaced inline run; nested/display:contents container; separate physical columns; table-cell exclusion; missing natural space. Mutation: mix word boxes between columns/owners or invent missing divisor. **PENDING.** | Current: `env/multicolumn`, `env/vertical-writing`, `env/invalid-measurement`. Proposed owed: `env/collector-semantics-unavailable`. |
+| `artifact/local-uri`; `src/rules/artifact/local-uri.ts` 46–77 | Source-model URI inventory, rawValue/scheme/resolvedUri and request metadata. No line, fragment, page box or CTM is read by the predicate; literal page 1 is a report address, not a measured rendered occurrence. | Self-authored file:/absolute-local/relative/data URI forms in supported HTML/CSS inventories; same source with altered paginated placements preserves URI census; unsupported/incomplete source census remains UNKNOWN. Mutation: silently omit a URI source leaf. Geometry-provenance absence alone must not fabricate a URI predicate decline. **PENDING.** | Current: none. Proposed owed: `env/semantic-inventory-incomplete`. |
+
+The source-text snapshot assembly currently joins a source run to its first collected block and drops
+runs lacking that join (`src/measure/snapshot.ts` 1387–1393). URI references map directly from the source
+model (1444–1447). Thus character predicates do not use geometry for arithmetic but can still lose
+candidates through collector-dependent mapping. The new source census must retain those residuals and
+UNKNOWN occurrence placement; neither a first-fragment box nor literal fallback page 1 is a proved
+reference/character occurrence page. The unbreakable-block error currently retains first-box geometry
+for one/two fragments and sums correlated fragments only from three onward; this proposal does not
+claim that a two-fragment sum is safe or silently change that structural decision.
 
 Required collector controls distinguish genuine continuations and repeated table headers from running clones and unplaced columns, preserve source census and printed overflow/bleed, keep independent physical columns separate and decline unsupported clipping or transforms. Same-acquisition ownership/ungrouped-rectangle/clip evidence and independent line or placement oracles are prerequisites, not after-the-fact rule filters. No placement-dependent rule is admitted on a repaired-looking box without those frozen red/green/mutation controls and fresh verification.
 
@@ -167,7 +379,50 @@ All entries are conditional candidates. No minimum print font size, ppi value, p
 severity has been chosen. An error requires a named proof source and an explicit argument for
 changing the current registry's two-error invariant.
 
-Every new section 4 rule is OFF by default in all shipped profiles until its supported measurement contract, independent labels and preregistered precision/adverse-share gates pass and a separate evidence-bound enablement decision is reviewed. Warn severity does not grant default enablement, and a strict profile cannot activate an unadmitted candidate merely because it is registered. Explicit research opt-in is recorded as a separate arm and supplies no default-profile acceptance. Do not reduce the frozen precision denominator or alter the baseline/default comparison to admit a candidate. figure/unreferenced remains info-level and off by default; layout/half-empty-page retains its existing experimental/default-off decision unless its separately required evidence justifies changing it. The two-error guard stays in force; no new error is approved.
+Define registered, admitted and default-enabled separately. Registered means a supported definition
+is in the shipped rule registry and its id is supported by the generated schema and CLI. Admitted
+means its preregistered measurement, precision and gate obligations have been fulfilled with
+independent evidence. Default-enabled means a separate reviewed enablement decision permits
+automatic selection by the named shipped execution profile. Store admission and per-profile
+default-enablement policy with RuleMeta and derive the resolver, generated schema and report
+registry projection from that single source. Add the normative namespace when a rule is REGISTERED,
+rather than waiting for ADMISSION. Registration alone never grants admission or automatic
+default/strict-profile activation. Existing released rules retain their present status and
+enablement policy; half-empty-page remains experimental and default-off, and strict retains its
+existing activation of that released rule.
+
+A registered but unadmitted candidate is off automatically in both default and strict. Explicit
+rules:{id:true} or --only for a registered candidate is valid and records research opt-in
+classification, selection origin and lifecycle status in the report. It does not grant admission or
+default-profile acceptance. These are the existing explicit selection mechanisms, with proposed
+lifecycle constraints and reporting; their current implementation does not yet supply those
+constraints. The existing unregistered RESEARCH_RULES registry remains separate from the public
+CLI/config/schema/SARIF. No new public toggle for that private validation registry is invented.
+Every changed selection/registry/report contract still requires implementation controls before
+exposure.
+
+Baseline ALL remains its measured thirteen-rule registry. Candidate ALL explicitly enables EVERY
+rule actually shipped in its registry, existing and new, using the registered default
+coverage/gating semantics. Before the FIRST candidate acquisition, commit a complete candidate
+rule-id/registry/lifecycle/selection manifest and keep it unchanged throughout that comparison.
+Explicit registered but unadmitted candidates are included and carry their research opt-in
+classification; this classification cannot remove their findings from the primary metric. The
+default arms remain separately recorded. For each primary arm, N is EVERY reported finding,
+including new findings and real-but-cosmetic findings; F retains the two registered adverse labels.
+All new candidate findings require independent Claude, Gemini and Grok pixel labels under the
+unchanged protocol. Useful rules or unknown candidates cannot be omitted to improve the ratio, and
+low-value findings cannot be added to dilute it. A separately paired existing-thirteen ledger may be
+disclosed as a SECONDARY diagnostic only; it cannot replace the primary ALL metric, change its
+thresholds or modify old labels/denominators. Research-registry definitions that are not shipped
+remain outside the public registry; they cannot silently count as shipped supported rules.
+
+No actual candidate rule membership or primary freeze is established by this draft. Before the first
+candidate acquisition, Root must review and commit the complete prospective rule-id declaration and
+supported contracts. The existing baseline bytes and labels remain unchanged. Newly registered
+legitimate true-/false-positive findings all require the independent label protocol; a candidate's
+research classification is diagnostic and never a primary denominator exclusion. Figure/unreferenced
+remains info-level/off automatically; half-empty-page retains its released experimental/default-off
+policy. The two-error guard remains in force and no new error is approved.
 
 | Candidate | Established need / outstanding proof |
 | --- | --- |
@@ -209,22 +464,80 @@ value/range, expected effect and preconditions, but are data, never executable i
 authority. Emit a numeric scaling suggestion only when the geometry supports it. Tested advice
 requires a genuine trigger/remedied pair; all calibration claims remain false.
 
-Reason-required suppression is proposed as an explicit presentation/acceptance annotation for this release. It requires Report 6; that stamp move is not conditional once canonical suppression records are introduced. Each record binds the occurrence/finding id, source or config origin, validated scope and non-empty reason. The underlying finding, measured predicate, severity, source/evidence status and target evaluation remain in canonical JSON. A suppressed measured violation remains measured with predicate violated=true; it is not a decline or an excluded candidate. Candidate, measured, declined and error/warn/info counts are unchanged. The suppressed count is an additional annotated subset, never a replacement denominator.
+Suppression is an additional reason-required annotation on a still-measured violation. Canonical
+Report 6 retains every underlying finding and predicate.violated=true, severity, identity, coverage
+and counts. Use a typed per-finding annotation with validated config-origin selection and nonempty
+reason. Report 6 summary.suppressed is number|null, with a typed completeness/UNKNOWN reason. Fresh
+validated complete annotation state may produce numeric zero; migrated Report 4/5 produces
+null/UNKNOWN despite the original legacy summary.suppressed:0. Preserve the original legacy bytes
+and declared value as historical input; that old placeholder does not prove a complete suppression
+inventory.
 
-Suppression does not change the exit verdict in this proposal. The unchanged underlying findings still participate in the existing failOn and experimental-rule policy, while infrastructure and incomplete evidence/inventory/coverage retain precedence. Invalid config suppression is rejected as a usage error; an invalid authored suppression request is visibly rejected and leaves the occurrence unsuppressed. Applying an attribute cannot authorize a config bypass. Comparison and the registered label/count metrics retain every underlying occurrence; suppression never establishes a resolved defect. Report 5 migration sets suppression data unknown, not an asserted complete empty set. Real-engine/public-consumer controls must prove these counts, exit behavior, missing-reason rejection and visibility before suppression is implemented.
+JSON carries these canonical annotations. SARIF keeps the result, level, message, fingerprints and
+measurements unchanged and projects the annotation only as a proprietary
+result.properties.breaklintSuppression value with reason/origin/identity and violated=true. Do not
+populate SARIF standard suppressions, accepted-dismissal state or an external suppression kind.
+JUnit retains the existing failure for each annotated violation and annotates it in escaped
+properties/system-out or its failure detail; suppression never produces skipped, reduces failures or
+makes the testcase pass. Existing skipped for an actual coverage gap remains a distinct
+unknown-measurement signal and is not used for an annotated measured violation.
 
-Generic profiles supply selectors, DE/EN reference words, chapter/page-role conventions and validated
-registry-declared metric settings without consumer-specific core logic.
+Console, Markdown and HTML visibly show the retained violation plus its annotation/reason and
+unknown completeness, while display grouping retains all occurrence ids and metric counts. Mandatory
+facts add the annotated-subset count or UNKNOWN and its completeness, separately from findings and
+not-measured counts. Context retains annotated violations and exposes bounded omissions. Comparison
+never resolves a violation because it is annotated. failOn and experimental findings keep their
+existing gate policy; inventory, coverage and infrastructure retain precedence. Annotation text is
+escaped untrusted data and cannot authorize edits, commands or profile bypass.
 
-Profiles and Configuration Contract v2 preserve the existing threshold and floor boundary. No profile, include, alias, acquisition attribute, config or CLI layer may supply proof-source-A threshold/options values. Rule enablement is separate from threshold configuration. Other tunable metrics must be registry-declared with validated ranges; structural proof boundaries remain fixed. Effective coverage floors may only stay at or rise above the active profile floor, and a later layer cannot undo a stricter floor already established. Selector and reference-word profiles are acquisition settings, never a second threshold table.
+Suppression does not change the exit verdict. Underlying findings still participate in unchanged
+failOn and experimental-rule policy; fatal infrastructure, required inventory/evidence and coverage
+retain precedence. Invalid config suppression is a usage error with no report. The proposed release
+has config-origin annotations only and introduces no authored suppression/policy attribute. Real
+engine/public-consumer controls for retained counts/exit, nonempty reason, escaped visibility and
+UNKNOWN legacy reading are required before implementation; all remain **PENDING**.
 
-The runtime validator and generated schema derive these restrictions from the same rule registry. Before exposing v2, real public-consumer rejection controls must cover direct and profile-sourced threshold overrides, profile-sourced lower floors, a stricter-profile override attempt, unknown keys and malformed settings, plus legitimate stricter-floor controls. Existing v1 inputs require explicit compatibility; they do not gain unchecked v2 keys. No threshold, floor or timeout is changed by this proposal.
+### Configuration v2: discriminator, actual layers and immutable boundaries
 
-Configuration Contract v1 does not admit these selector/profile/suppression settings. They must not
-be inserted as unchecked keys or confused with the existing HTML-tag exclusion list. A proposed
-Configuration Contract v2 needs generated schema checks, rejection tests for unknown/malformed
-entries, and explicit compatibility with v1 inputs. Acquisition-only attributes likewise need their
-own validated accounting contract; reading an attribute does not authorize bypassing config checks.
+Keep the proposed release grammar small: add a required contractVersion:2 discriminator to v2 files.
+An absent discriminator is read as the unchanged v1 grammar, with only its existing accepted keys
+and rules. A versionless file containing v2-only keys is rejected as usage; unknown/unsupported or
+malformed explicit versions are rejected. The v2 generated schema and runtime reader use the same
+registry and grammar. A valid versionless v1 input retains config.contractVersion=1, its permitted effective-config
+shape and the v1 fingerprint domain. It cannot supply v2-only semantic or annotation settings.
+Fresh acquisition uses the validated built-in semantic defaults and records their identity in
+Report 6 measurementSemantics; those defaults are not fabricated as user-supplied v1 keys. Explicit
+v2 input produces contractVersion=2, expanded effective semantic values and the v2 fingerprint domain.
+These two reader paths and their compatibility require real controls before activation.
+
+The only policy precedence remains defaults < selected built-in execution profile < validated JSON
+config file < CLI. ConfigSource remains default/profile/config/cli, with a reported source for every
+effective leaf. Semantic identification settings are a validated closed v2 config subset resolved
+before acquisition, not additional include, alias or document-attribute layers. Remove proposals for
+includes, policy aliases and new custom document attributes that set semantic profiles, suppression,
+thresholds, rule enablement or floors. Native HTML/ARIA and captured source declarations remain
+untrusted object-identification data under the validated profile, not a policy override or an
+instruction. The proposed suppression selection is config-origin only; its source target is an
+identity binding, not an authored configuration layer.
+
+No layer supplies Proof-A threshold/options values. Other metrics remain registry-declared with
+ranges. Effective floors are monotonic through every actual layer: max of the inherited floor and
+each validated stricter request; a lowering request is rejected rather than silently clamped. Rule
+enablement is distinct from metric options. Automatic default/strict enablement obeys the RuleMeta
+admission and reviewed enablement policy; explicit config:true/--only for registered candidates
+remains valid and records research opt-in classification. V2 fingerprint domain is
+breaklint-effective-config-v2 plus the canonical effective semantic values; it excludes output
+paths, model text, runtime counters and provenance. Invalid configuration is exit 2 with no report,
+as currently contracted. No include/alias/attribute implementation is needed to satisfy this
+version's design.
+
+Before exposure, real public-consumer controls cover versionless v1 compatibility, explicit v2 reading,
+unknown/malformed versions and keys, legitimate stricter floors, every actual layer's forbidden Proof-A
+options and lower-floor attempts, stricter-profile downgrade rejection, effective-source reporting
+and matching/reordered/different semantic fingerprints. Runtime validator and generated schema share
+the same registry. These controls remain **PENDING**. Configuration Contract v1 does not gain unchecked
+semantic keys or confuse semantic selectors with the existing HTML-tag exclusion list. No threshold,
+floor, document timeout or runtime dependency changes in this refinement.
 
 ## 6. Packages, verification and release blockers
 
@@ -285,7 +598,7 @@ revision, and each admitted implementation still owes its measured controls and 
 | Finding | Proposed resolution; proof still outstanding |
 | --- | --- |
 | AUD-09-01, high | Count document inventory-completeness witnesses; incomplete required inventories force insufficient measurement instead of vacuous zero candidates. Real-engine legacy controls remain unrun. |
-| AUD-09-02, high | Lock proof-source-A options and monotonic floors across profiles, includes, attributes and direct config. Public-consumer rejection controls remain unrun. |
+| AUD-09-02, high | Lock proof-source-A options and monotonic floors across the actual profile/config/CLI layers. Speculative include/alias/policy-attribute layers are removed from this revision; public-consumer rejection controls remain unrun. |
 | AUD-09-03, high | Require Snapshot 6 collector semantics/provenance; legacy data stays unknown and comparisons cannot manufacture repair. Migration and identity controls remain unrun. |
 | AUD-09-04, medium | Parse profile-dependent semantics at acquisition; retain canonical profile provenance and decline mismatch. Matching/mismatching stored-consumer controls remain unrun. |
 | AUD-09-05, medium | Name proposed namespaces, inventory target and unavailable-data reasons with artifact/decision stamps. Registry/schema/migration controls remain unrun. |
@@ -295,3 +608,46 @@ revision, and each admitted implementation still owes its measured controls and 
 
 The label set, recall sweep, default/all-rules metrics and blinded improvement judgments remain
 incomplete. This revised proposal authorizes no code, migration, new rule, schema or release.
+
+
+## 9. Second fresh text audit: all eight dispositions OPEN
+
+A second fresh Claude text design audit inspected the frozen public design `791385b22c1ffd8c9b36e5993ff8b676a6f65cc5`,
+whose design source was 32,385 bytes, SHA-256
+`225a0760e44beabe5603be93d3248305f99aad00a68e16e77b1d95e67a6d56ea`. Existing native output identifies
+**claude-opus-5-5**, exit 0, and a saved text candidate before judgment parsing. It returned
+**CONDITIONAL: three HIGH, four MEDIUM and one LOW finding**, with zero images. A qualified Gemini
+text audit identifies **gemini-3.8-flash**, zero additional contradictions, and zero images. Its scoped
+result cannot erase source-supported Claude issues or supply architecture acceptance. Actual model
+identifiers are observed only for those bound historical outputs; this draft's contributing model
+remains **UNKNOWN**.
+
+The first conditional Claude design review in section 8 and this second conditional review are both
+retained, including the new HIGHs. These are Phase B preimplementation text design reviews, not code-
+package test/acceptance reports or C3 implementation verifier results. This document does not decide
+stop-rule applicability or authorize further reviews; the registered stop rule remains unchanged for
+Root's interpretation. No prior failed or terminally stopped scope is renamed, replaced or rerun.
+
+The current refinements address proposed architecture contracts before the evidence-led scope and
+admission freeze. They authorize no implementation or measurements. All eight dispositions below
+remain **OPEN** until fresh independent audits examine the corrected frozen text and Root accepts the
+evidence-bound dispositions. Proposed implementation controls are **PENDING**, not automatically
+failed by this unexecuted draft. Their absence still means no implementation/migration/release claim.
+
+| Finding | Proposed correction sections | Status and evidence still required |
+| --- | --- | --- |
+| DESIGN-R01-01, HIGH | §2 enum timing; §4 registry lifecycle and primary ALL membership; §5 actual config selection | OPEN. RuleMeta/schema/CLI lifecycle and namespace controls; explicit opt-in and source reporting; full candidate manifest before first acquisition; all new three-family labels. |
+| DESIGN-R01-02, HIGH | §3 thirteen-rule facts/controls/declines inventory; §2 legacy reasons | OPEN. Independent physical/source oracles, observed red/green/mutation controls and fresh verification for every changed released consumer, including both Proof-A errors. |
+| DESIGN-R01-03, HIGH | §3 cause-aware statuses/reasons/exits; §2 decision-v2 and reader compatibility | OPEN. Finite before/after default/strict controls, accepted witness visibility and independently justified 0/1→3/4 transitions. |
+| DESIGN-R01-04, MEDIUM | §2 Report 6 inventory fields, separated counters and deterministic exitReason order | OPEN. All-unknown, mixed, complete-empty and ratio-passing unknown-witness real-engine controls; context reconciliation. |
+| DESIGN-R01-05, MEDIUM | §2 fresh acquired Snapshot-6 demo and preserved handwritten legacy control | OPEN. Self-authored fresh source/provenance, real acquisition, live/stored parity and actual demo exit 1; migrated legacy accounting/UNKNOWN controls. |
+| DESIGN-R01-06, MEDIUM | §2 mandatory Report 6 semantics and both comparison branches; §5 expanded semantic fingerprint | OPEN. Matching/mismatching collector/parser/profile/options, legacy readers, retained source identities and no manufactured resolved/deleted defect. |
+| DESIGN-R01-07, MEDIUM | §5 Config v2 discriminator, v1 reading and four actual layers | OPEN. Schema/runtime compatibility and rejection controls; no include/alias/document-attribute policy implementation. |
+| DESIGN-R01-08, LOW | §5 retained-violation reporter projections, mandatory facts and nullable legacy suppression | OPEN. JSON/SARIF/JUnit/human/context/comparison consumer controls; no suppression-induced dismissal, skipped or resolved result. |
+
+**Phase A is INCOMPLETE.** Complete labels, recall confirmation, baseline/default denominators and
+independent judgements are not established by this text. **No current migration PASS**, candidate
+acquisition, primary membership freeze or new-version verdict exists. All unchanged registered metric,
+cost, no-regression, exact-candidate gate, packed-consumer, complete blinded usefulness and report sight
+review obligations remain outstanding. Workplan, saved reproduction, observed red-before/green-after,
+mutation and fresh independent Opus verification precede any activation. Unknown facts stay UNKNOWN.
