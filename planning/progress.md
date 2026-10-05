@@ -484,3 +484,19 @@ Raster presence does not upgrade a page whose original native coverage is unveri
 The private label set still contains only two independently confirmed table-continuation defects.
 Phase A, final evidence-led design acceptance, candidate rules and report implementation, complete
 blind A/B, release gates, publication and consumer integration remain incomplete.
+
+The private portability repair has an actual successful finish (exit 0), a native closure
+marker and an artifact commit whose 759 positive file blobs match the measured bytes.
+The separate runtime dependency repair remains OPEN after its actual finish exit 2,
+although all selected tests returned 0. Its original commit interval and stop criteria
+remain unchanged; a read-only isolation assessment does not authorize another finish.
+New visual calls through the affected runner remain on hold.
+
+A completed original baseline recall split now retains 38 primary pixel observations and
+9 preregistered overlap observations; an earlier eight-page stopped range remains
+unreviewed. Its candidate observations still have no confirmed-miss or label credit.
+The shipped coordinate contract establishes CSS-pixel units, while the transform to the
+particular PDF raster remains unproved and the source-box crop attempt stays stopped.
+Another baseline recall packet and its exact single-call controller are committed and
+read back; the first eight-page native external review is running. Native image, model,
+full canonical schema and response-copy qualifications remain pending until it exits.
