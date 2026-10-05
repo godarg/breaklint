@@ -331,3 +331,14 @@ The unchanged source was bound to `98e33c0`; the downloaded runtime was matched 
 checksum before execution. This additional floor characterization is not a new release-candidate
 gate, packed-consumer proof, CI acceptance, after-fix flake series or multi-model sight review.
 Collector/figure implementation, complete hit adjudication, label-set metrics and release remain open.
+
+One independent `grok-4.7-build` review now has qualified judgments for five selected synthetic
+baseline findings on six original 110-dpi pages. It identifies four false-positive one-line
+caption/header alerts and one real compound-layout problem whose reported height and scaling
+advice are unsupported. Its NO_GO applies to those five existing report claims, not a new-version
+release decision. All six image hashes, the literal inline count, observed model, typed response
+records and concrete sight details are bound. An earlier local encoding receipt has an unexplained
+audit digest and remains invalid; direct decoded payload bytes instead match the authoritative
+single audit record and original pixels. No digest was overwritten or model call repeated.
+The other 96 findings in that acquisition and two optional visible candidates remain unjudged /
+unconfirmed; one family does not constitute a label set, precision estimate or accepted repair.
