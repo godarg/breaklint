@@ -628,3 +628,27 @@ prior technical stops and external-transfer holds remain unchanged.
 Complete Phase A, accepted final design, implementation, blinded A/B, exact candidate
 release gates and publication remain incomplete. No new-version improvement, global
 precision or recall value, calibrated status or release criterion is claimed.
+
+### 2026-10-06 — bounded review tooling and local privacy checks
+
+The separately authorised review-environment work continues outside this repository.
+An isolated image-attachment feature has a genuine pre-feature refusal at the complete
+Codex wrapper boundary and a failing regression test. Its implementation, native vision
+proof and independent acceptance remain pending. The unchanged instruction profile,
+numeric read witness and existing external-transfer holds remain binding. No product
+review is credited from a tooling test or a mocked image payload.
+
+A separate status-query reproduction stopped after its first registered trial: the
+complete unchanged commit script exited successfully and did not reproduce the
+historical temporary-file failure. An unexpected generated runtime cache is retained
+as drift. The remaining registered trials were not run, and no source fix is justified
+by this measurement. The historical warning cause remains unknown.
+
+Nine exactly bound original rendered pages received local privacy sight only. Public
+location references refute two earlier location-only exclusions for those exact pixels;
+a visible natural-person provider block keeps its full-page external-transfer hold.
+All eleven registered source inputs remained byte-identical. This adds no layout
+judgment, original recall credit or label: the private label set still has four rows.
+
+Complete Phase A, accepted final design, implementation, blind A/B, exact candidate
+release gates and publication remain incomplete. Version 0.9.0 has not been released.
