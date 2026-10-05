@@ -530,3 +530,28 @@ and cause limits remain open. The new views add no primary or overlap recall cre
 The private label set still contains two independently confirmed defects. Complete
 Phase A, final design acceptance, implementation, blinded A/B, release gates and
 publication remain incomplete.
+
+### 2026-10-05 — qualified original recall group and bounded table confirmation
+
+Supersedes the preceding pending status for the first of the four uncalled groups
+and for the two-crop confirmation request; all historical failures remain retained.
+The prospective input correction and exact native acquisition registration were
+committed before submission. The original seven-page group then exited 0 with seven
+actual image responses, each byte-identical to its registered PNG. The unchanged
+structured response passed the full canonical schema, and all eight negative copies
+were rejected. Native output identifies `claude-opus-5-5`. Complete semantic review
+retains ten unconfirmed observations, including small figure text, a split panel and
+whitespace. Glyph-height estimates establish no measured font size; visible whitespace
+establishes no avoidable break cause. No observation became a label or recall numerator.
+The earlier image-less seven-page response remains unqualified and is not repeated.
+
+The separately registered two-crop request exited 0 with two actual byte-identical
+image responses. Full canonical validation and eight rejected negative copies passed.
+Native output again identifies `claude-opus-5-5`. This second family confirms a minor
+visible table-continuation problem: missing repeated column labels and differing column
+starts, with reader impact 1/3. Its repair suggestion remains untested; the retained
+source already declares a table header group. A separate whole-source and complete
+finding-record query supports the local object binding, while global acquisition
+eligibility remains refused. This is a confirmed pixel candidate with no global
+`NOT_REPORTED` label, denominator credit or source-box-transform claim. The private
+label set remains two defects; no release criterion is yet established.
