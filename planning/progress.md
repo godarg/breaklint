@@ -593,3 +593,38 @@ request gate, font source or delivered document was changed to clear these refus
 The private label set still contains two confirmed defects. Complete Phase A, accepted
 final design, implementation, blind A/B, exact candidate release gates and publication
 remain incomplete. No new-version improvement or release criterion is claimed.
+
+### 2026-10-05 — complete table context and original recall coverage census
+
+Supersedes the preceding two-label count. A bounded context adjudication of two
+previously unconfirmed table continuations completed with native exit 0. Its four
+actual PNG responses match the exact registered source bytes, and the complete
+artifact Read output reconstructs the frozen context bytes. The preregistered response
+schema and identity relations passed; all 16 malformed copies were rejected without normalization.
+
+Both cases are confirmed visible defects, with reader impact 2/3 and 1/3 respectively.
+The lower impact follows from the continued cells making their column roles inferable,
+not from averaging prior model judgments. Earlier wording that all column meanings
+were impossible to identify overstates the evidence. An older crop omitted the fifth
+continued row; its immutable review retains that four-row limit. The complete new
+context establishes intact row continuity. The older omission was a crop error.
+
+A captured authored-file ownership chain is now established for these two objects.
+Logical-node value identity remains unavailable under its separate contract; renderer
+cause, source-box-to-PDF transformation and delivered-file correspondence remain
+unproved. The authored header-group declaration already exists. Proposed fragment
+handlers, fixed column widths and keep constraints remain untested, with reflow,
+overflow and whitespace tradeoffs requiring a separate scratch repair assignment.
+No delivered product file was changed.
+
+The private label set now contains four confirmed misses. Existing records were
+preserved byte-for-byte, and the new adjudication adds no original primary or overlap
+recall credit. A separate metadata census preserves the actual original family/role
+assignments, partial pages, acquisition distinctions and unreviewed groups. It performs
+no retrospective pixel qualification and establishes no complete recall denominator.
+The next original page task is limited to local privacy sight after exact file binding;
+prior technical stops and external-transfer holds remain unchanged.
+
+Complete Phase A, accepted final design, implementation, blinded A/B, exact candidate
+release gates and publication remain incomplete. No new-version improvement, global
+precision or recall value, calibrated status or release criterion is claimed.
