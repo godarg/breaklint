@@ -998,3 +998,67 @@ blind A/B, exact release-candidate gates and publication remain incomplete.
 Live measurement at 2026-10-06 13:08 UTC, using direct `git ls-remote origin
 refs/heads/main` and `npm view breaklint dist-tags --json`, still finds the remote
 main commit `98e33c006cd6a0ef6a596caa5f18062b0ee74175` and npm latest `0.8.0`.
+
+### 2026-10-06 — bounded guard-audit uptake and remaining review gaps
+
+⛔ Earlier pending-audit and third-family statuses are superseded only to the extent
+explicitly recorded below; all historical failures and unmet gates remain.
+
+The frozen two-file source-artifact path and error-message guard follow-up has a
+fresh independent `claude-opus-5-5` PASS: zero blocker, high or medium findings and
+six low findings. The seven narrow code/evidence criteria are supported; the
+eighth, covering the complete experiment, remains open. The final package run
+contains 27 passing tests and the changed-test compiler mutation is retained as
+limited copied-source evidence. The original worktree typecheck exit 127 and the
+omitted before-runtime measurement remain unmet. No integration, collector fix,
+full work-item acceptance or release credit follows from this bounded audit.
+The original hundred-run experiment remains stopped with zero qualified cases.
+
+The first saved synthetic case preserves the individual heading and body text,
+including the order of all non-whitespace source characters. Exactly one
+inter-element line feed is absent from the flattened placed container text. The
+existing flat-text comparator consequently rejects the case; this saved-data
+analysis does not alter that comparator, ignore arbitrary whitespace or qualify
+the expected empty-fragment anatomy. G-128 remains open. The separately registered
+three-page visual review ended with native exit 1 and HTTP 529 before any image
+Read or model token. Its actual judging model and visual verdict remain unknown;
+there was no second invocation or substitute reviewer.
+
+Nine original stock findings now have three-family category agreement. Five have
+completed three-family finding labels; the other four still require adjudication
+of disputed impact, message, remedy and fix fields. Category agreement alone is
+not complete field agreement or population precision. Their fresh adjudication
+has completed at native process level; saved-data qualification and evidence
+disposition remain pending. No new judging model identity or image-read count is
+claimed for that invocation before qualification. The separate image-count/runtime
+package's registered four-image Gemini admission remains unrun.
+
+One original preselected Codex overlap page has a qualified zero-candidate
+observation with exact image, witness and response bindings. This is that
+reviewer's page observation, not a whole-document clean claim. Seven other
+preselected overlap pages remain unrun. The earlier seven-page Claude primary
+answer remains unqualified after its original exactly-one-formatter guard saw
+one rejected schema-format attempt and one successful formatter. A fresh textual review of the bounded transport-accounting proposal returned
+two high, four medium and two low findings. Saved-data audit qualification and
+Root dispositions remain pending. No implementation is approved, and the original
+answer, schema, guard failure and privacy holds are unchanged.
+A separate candidate-confirmation invocation has also ended at native process
+level, with saved-data qualification and evidence disposition still pending.
+It supplies no new overlap, label or confirmed-miss credit at this stage.
+
+The image-count/runtime package remains on HOLD. Its linked-worktree control
+completed six preparatory configuration cells, not bootstrap selftests. The
+last cell returned native exit 0 and `true` followed by a line feed for the
+filesystem-monitor setting, where the registration expected absence and exit 1.
+It stopped before worktree creation or bootstrap. One security review with
+blocker/high findings is evidenced for this proposal; no second such round or
+budget reset is claimed. A separately registered pure-filesystem observation ended with native exit 0
+and unchanged source bindings, without executing Git. It records selector-link
+metadata and an embedded version label; actual runtime dispatch and index/socket
+effects remain unknown. It supplies no cold-bootstrap, mutation or visual-admission
+acceptance.
+
+The design and core packages stopped after two rounds with new blocker/high
+findings remain stopped. Complete original hit and recall review, accepted final
+design, production changes, blind A/B, exact release gates and publication remain
+incomplete. This update adds no new label, confirmed miss or release claim.
