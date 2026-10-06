@@ -1147,3 +1147,34 @@ were not run. A bounded read of the available log returned no matching events an
 does not identify the cause or establish isolation. Complete baseline review,
 accepted production design, implementation, blind A/B and release gates remain
 pending. There is no 0.9.0 release candidate or publication.
+
+### 2026-10-06 — fresh code audits and scoped review evidence
+
+Fresh independent code audits found one high-severity finding in each of the two
+private diagnostic packages. The saved-carrier audit also found missing proof for
+session coverage, strict decoding, typed joins and the mutation oracle. Its high
+finding exposed an incorrect description of the native image-dimension keys in
+the audit contract; the original native bytes use the keys already checked by
+the code. That description is being corrected prospectively. The original audit
+FAIL and the remaining findings are retained. Earlier local green test results
+do not establish independent acceptance.
+
+The passive font diagnostic can currently count events observed after close as
+if they had completed before close. Its repair must bind the close-entry sequence
+and keep later terminal events separate, while preserving the original exception
+and independently checking process cleanup. A new frozen candidate is in
+preparation; the diagnostic fixture has not been rendered. No production timeout
+or gate has been changed.
+
+Five additional original pages completed a technically qualified visual sweep
+with no new unreported defect proposed. This is only the registered five-page
+scope. The remaining original-role pages and the full recall sweep remain open.
+A separate text-confirmation response is saved, but its QA script stopped on a
+loop-variable error; no new confirmed-miss label follows until that correction
+and the unchanged response controls are verified.
+
+The security boundary remains unproved, and the required image-review family is
+not admitted. A real isolated checkout is being prepared to close the separately
+approved test-environment repair without changing its original start or gates.
+Production design acceptance, implementation, full A/B and release gates remain
+incomplete. No version, tag, consumer or publication has been changed.
