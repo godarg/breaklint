@@ -1062,3 +1062,56 @@ The design and core packages stopped after two rounds with new blocker/high
 findings remain stopped. Complete original hit and recall review, accepted final
 design, production changes, blind A/B, exact release gates and publication remain
 incomplete. This update adds no new label, confirmed miss or release claim.
+
+### 2026-10-06 — qualified finite judgments and explicit implementation limits
+
+⛔ The preceding pending saved-data statuses are superseded only for the three
+finite responses below. Their original answers, failures and other unmet gates
+remain preserved.
+
+The four-finding fresh adjudication has qualified native attribution to
+`claude-opus-5-5`, exactly four image Reads and one successful formatter. All answer
+forms satisfy the unchanged closed schema and typed equality; 19 targeted
+negative cases reach their named predicates. Root accepts its two false-positive,
+one acceptable chapter-ending and one cosmetic short-line decisions. Disputed
+impact/message/remedy fields are adjudicated on the supplied evidence. Mandatory
+Gemini disagreement review remains unavailable, so this does not finish the four
+label records or establish population precision. A blanket source-unknown statement
+in the response is too broad: the short-line finding retains its verified original
+source range. Computed pagination cause and delivered-edition correspondence remain
+unknown, and the proposed repair is untested.
+
+The separate two-page candidate opinion has qualified attribution to
+`gpt-6.1-sol`, two native image joins, its numeric read witness and the unchanged
+closed response contract. Five schema and two parser negatives fail as intended.
+The reviewer identifies a complete heading separated from every line of its short
+explanation, with reader impact 2. This is one event across two pages. The first
+Claude answer remains unqualified, so no additional confirmed miss or original
+recall-role credit follows. Canonical authoring ownership and the actual pagination
+cause remain unknown; the targeted keep proposal has not been tested. Historical
+before/after witness metadata that was never recorded stays explicitly unknown.
+
+The textual carrier-design audit has qualified `claude-opus-5-5` attribution,
+one formatter, four typed-equal answer forms and the original closed audit schema.
+Twelve targeted controls pass. The actual design verdict remains FAIL: two high,
+four medium and two low findings. Root accepts all eight corrections, including
+type-sensitive joins and mutation predicates that must be reachable separately
+from raw-byte pin guards. This is the first high-finding round of this distinct
+bounded transport design. A second corrected design is being prepared; implementation
+remains unapproved. The original seven-page guard STOP and its response/schema bytes
+remain unchanged.
+
+The image-count/runtime package still has one evidenced security review with open
+blocker/high findings. A pure-filesystem read binds a candidate under the observed
+developer selector and the embedded label `2.54.0 (Apple Git-157)`; its bytes differ
+from the separately recorded command-line-tools candidate. Neither candidate read
+proves actual runtime dispatch. The prospectively exact official Git-157 tag lookup
+returned HTTP 404 and native curl exit 22, with no redirect or alternate-tag retry.
+Matching implementation evidence therefore remains unavailable at that endpoint.
+No cold-bootstrap, shared-index/socket safety or Gemini visual-admission acceptance
+follows.
+
+The private confirmed-miss set remains eight. Earlier generic and core packages
+stopped after two new blocker/high rounds remain stopped. Complete original hit
+and recall review, accepted final design, production changes, blind A/B, exact
+release gates and publication remain incomplete. No 0.9.0 publication is claimed.
