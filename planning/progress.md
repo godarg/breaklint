@@ -1115,3 +1115,35 @@ The private confirmed-miss set remains eight. Earlier generic and core packages
 stopped after two new blocker/high rounds remain stopped. Complete original hit
 and recall review, accepted final design, production changes, blind A/B, exact
 release gates and publication remain incomplete. No 0.9.0 publication is claimed.
+
+### 2026-10-06 — retained visual disagreement and bounded diagnostics
+
+Two original error findings now have technically qualified image opinions from
+three independent model families. Each opinion names details from its registered
+images. The figure body and its caption remain together; the continuation table
+loses its header. The original error is variously classified as false positive,
+cosmetic or unclear. These judgments remain separate: a fragment-height sum does
+not establish an independently measured unsplit height, and the actual pagination
+cause is absent from the original export. The required fourth-family error review
+and evidence adjudication remain incomplete. Three recall candidates have a neutral
+text-confirmation package prepared; none earns a new confirmed-miss label yet.
+
+The corrected saved-carrier classifier has reached a frozen local candidate.
+Its original-data check, 69 registered leaf controls, 19 original response controls
+and eight isolated mechanism mutations produced the expected specific results.
+The final full suite passed. Independent code verification is pending; this is
+technical transport classification, not acceptance of the candidate observations
+or their added reasons.
+
+Two additional documented print builds succeeded, but their original renderer
+checks refused measurement before any pages were bound, with open font requests.
+A separate self-authored fixture and passive lifecycle diagnostic are being
+prepared to distinguish outstanding requests from missing terminal-event joins.
+No timeout, renderer gate or production source has been changed for this diagnosis.
+
+The image-count/runtime security findings remain open. A registered OS-boundary
+probe stopped at its first positive case after the child aborted; later controls
+were not run. A bounded read of the available log returned no matching events and
+does not identify the cause or establish isolation. Complete baseline review,
+accepted production design, implementation, blind A/B and release gates remain
+pending. There is no 0.9.0 release candidate or publication.
