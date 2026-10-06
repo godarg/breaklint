@@ -954,3 +954,47 @@ production collector acceptance follows from this static audit.
 
 Complete original hit and recall review, accepted final design, production changes,
 blind A/B, release-candidate gates and publication remain incomplete.
+
+### 2026-10-06 — eight confirmed misses and frozen guard follow-up
+
+The private confirmed-miss set now contains eight records across four inputs. The
+additional local example lead-in is separated from the content it introduces.
+Its marked crop and source association are bound; the generic outgoing decision
+is overflow, but the specific cause remains unknown. This grouping effect is
+outside the preregistered B.1/B.2 recall denominator. No delivered product changed.
+
+Two further original baseline findings now have three qualified visual opinions
+from `claude-opus-5-5`, `gpt-6.1-sol` and `grok-4.7-build`, bringing the completed
+original-stock joins to five. Both new findings are false positives. The earlier
+five-entry Grok response remains unqualified; a fresh prospectively clarified
+four-image response passed the unchanged closed data contract. Message/remedy
+judgments differ between families and remain separate from numeric measurement.
+
+Four additional original findings have qualified Claude and Codex opinions:
+two false positives, one acceptable chapter-ending layout and one cosmetic short
+last line. Their third-family review is pending. The original Grok offline image
+preflight stopped above its fixed byte budget; no model request followed. A
+separately preregistered data variant preserves every main-evidence pixel and
+reduces only contextual thumbnails. It has no encoded-budget or visual-judge
+credit until the real preflight and independent response pass.
+
+The two-file source-artifact test follow-up is frozen at package commit
+`1c14427468bc88504a15acc63b559353989d700a`. Genuine PNG-path and wrong-error-reason
+reds are retained. The final package run passed 27 tests with no skips. The PNG
+call-site and wrong-reason mutants fail their intended controls; the PNG mutant
+stops at the API assertion, so no CLI-branch execution is inferred from that red.
+A fresh 202-file compiler copy passed; a mutation in the changed TypeScript test
+produced the sole expected type error, and exact restoration passed. The original
+worktree compiler exit 127 and omitted before-runtime measurement remain unmet.
+A fresh independent audit is running on the exact frozen code and evidence.
+The original hundred-run experiment and anatomy qualification remain open.
+
+A prospective additional Claude full-page recall of five further original pages
+is running. It does not retroactively satisfy their assigned Codex-primary role
+or the preselected overlap. All other held pages retain their privacy boundaries.
+
+Complete original hit/recall review, accepted final design, production changes,
+blind A/B, exact release-candidate gates and publication remain incomplete.
+Live measurement at 2026-10-06 13:08 UTC, using direct `git ls-remote origin
+refs/heads/main` and `npm view breaklint dist-tags --json`, still finds the remote
+main commit `98e33c006cd6a0ef6a596caa5f18062b0ee74175` and npm latest `0.8.0`.
