@@ -921,3 +921,36 @@ successful synthetic measurement follows from the path correction.
 The confirmed private miss set remains six records. Complete original hit and
 recall reviews, accepted final design, production changes, blind A/B, exact release
 gates and publication remain incomplete. No 0.9.0 publication is claimed.
+
+### 2026-10-06 — further original-page evidence and source-test audit
+
+A neutral `gpt-6.1-sol` second-family review assessed twelve observations on six
+original stock pages. One panel-grouping event is confirmed across the page turn;
+its two original candidate IDs remain separate. All input, result and continuation
+text remains visible. This small grouping defect is outside the preregistered
+figure/table recall denominator. The private confirmed miss set now has seven
+records. Exact marked crops and neighboring-page thumbnails are available for
+that event; whole-panel ownership, computed CSS and the actual Paged cause remain
+unknown. No delivered product file or tested repair changed.
+
+Two further original baseline findings have qualified visual opinions from
+`claude-opus-5-5` and `gpt-6.1-sol`: both call each visibly filled page a false
+positive. The accompanying `grok-4.7-build` answer contains a fifth coverage entry
+where the frozen contract requires exactly four image records. That original
+answer remains unqualified and unchanged; it supplies no third-family credit.
+The sanctioned wrapper does not append the extra entry. Its upstream origin
+remains unknown because the native response carrier was not retained. These two findings add no completed three-family joins.
+
+The source-artifact path repair has a fresh static `claude-opus-5-5` audit with
+zero blocker/high, two medium and three low observations. An equivalent-source
+compiler copy passed its positive/negative/restored checks; the changed test is
+included in the compiler program. The original isolated-worktree exit127 and its
+missing development compiler remain recorded. Targeted PNG guard and rejection-
+reason checks were preregistered. Their first private-copy full-suite control
+stopped because an existing test requires a real Git repository; no source edit
+or dependent control followed. A correct repository setup must be preregistered
+before those checks proceed. No synthetic runtime, anatomy qualification or
+production collector acceptance follows from this static audit.
+
+Complete original hit and recall review, accepted final design, production changes,
+blind A/B, release-candidate gates and publication remain incomplete.
