@@ -884,3 +884,40 @@ identified unresolved repository identity and write-boundary concerns. Its faile
 controls are retained. It has no new visual-judge admission or integration completion.
 Complete original hit review, final design, production changes, blind A/B, exact
 release-candidate gates and publication remain incomplete.
+
+### 2026-10-06 — original baseline opinions and further primary page observations
+
+Three original baseline findings now have joined visual opinions from
+`claude-opus-5-5`, `gpt-6.1-sol` and `grok-4.7-build`. All three agree on the
+verdicts: one cosmetic continuation and two false positives on visibly filled
+pages. Message and remedy differences remain separate. This is three findings,
+not the complete hit review; source/CSS/cause packs and tested fixes remain
+incomplete. An unsupported local whole-answer format predicate was corrected
+without changing the registered JSON object or rerunning a model.
+
+One native `claude-opus-5-5` primary review saw six further original pages through
+exact native PNG reads and a whole artifact read. The original closed schema and
+all nineteen registered negative controls passed. Its twelve observations remain
+unconfirmed; two excluded pages retain their privacy holds. One further neutral
+`gpt-6.1-sol` primary complement saw two original target pages with four context
+neighbors. Exact six-image attachment identities, the original full schema and
+twenty-eight negative controls passed. Its one observation is also unconfirmed.
+Context pages and empty candidate arrays add no labels or clean-page claims.
+Independent temporary-directory cleanup remains unknown for that invocation.
+
+The first Source4 synthetic acquisition stopped while resolving native artifact
+paths. The narrow export-root correction has three passing focused tests,
+twenty-six passing package tests and three killed guard mutants. Typechecking
+could not start in the isolated worktree because its declared development compiler
+is absent. The original exit 127 remains recorded; a prospective equivalent-source
+tooling check and a fresh independent delta audit are pending. No renderer runtime,
+fixture oracle or production collector changed.
+
+A separate saved-data diagnostic found a single formatting line-feed difference
+between a heading and body text. The existing anatomy comparator rejects that
+case, and its not-comparable status is preserved. No text-normalization change or
+successful synthetic measurement follows from the path correction.
+
+The confirmed private miss set remains six records. Complete original hit and
+recall reviews, accepted final design, production changes, blind A/B, exact release
+gates and publication remain incomplete. No 0.9.0 publication is claimed.
