@@ -807,3 +807,43 @@ completion credit follows yet.
 
 Complete Phase A, accepted final design, production implementation, blind A/B and
 exact release gates remain incomplete. Version 0.9.0 has not been published.
+
+### 2026-10-06 — additional original observations and measured fixture failures
+
+Eight additional original pages received exactly one `claude-opus-5-5` primary
+recall review. All eight native image reads and three response forms are bound
+exactly; the original closed schema and pixel bounds passed 19 targeted negative
+controls. Its eight candidates remain unconfirmed. The actual baseline already
+reports a heading at the relevant page boundary, so that observation is not added
+as a new miss. Source, intent and delivered-file correspondence remain unresolved.
+
+A separately registered neutral table review returned from `gpt-6.1-sol` with three
+ordered native crops and exact attachment byte identities. It identifies missing
+local headings and changing column tracks, with different impact scores for the
+two candidates. A local qualifier initially failed an additional schema-lint policy
+before validating the response. That failure is retained; a separately registered
+compiler-policy correction leaves the complete schema and data constraints
+unchanged and rejects all 19 original negative controls. An independent temporary
+directory cleanup receipt is missing for this invocation, so full preregistration
+compliance remains unmet. No automatic label or release credit is inferred.
+
+The synthetic driver loader repair passed its focused real-peer, contract and
+mutation tests. The separately activated first browser case then stopped during
+PDF cleanup because the installed PDF API exposes destruction on the loading task,
+not the returned document proxy. One incomplete acquisition and its original PDF
+are preserved; no complete case, PNG, collector result or paint classification was
+produced. A small separately planned driver repair is underway. The handwritten
+fixture expectations and hundred required attempts remain unchanged.
+
+The native linked-worktree runtime fixture first stopped before any cell because
+of its own initialization ordering. The additive harness repair passed genuine
+before/after and mutation controls. Its next registered invocation stopped at a
+safety query: the real repository has the built-in Git filesystem monitor enabled,
+contrary to the fixture's assumption that the setting was absent. No worktree or
+bootstrap was created. Configuration remains unchanged while the actual write
+boundary is reviewed. Both original cold-bootstrap failures and both subsequent
+fixture stops remain recorded.
+
+The private label set still has four confirmed misses. Complete Phase A, accepted
+final design, production implementation, blind A/B, exact release gates and
+publication remain incomplete. No 0.9.0 release is claimed.
