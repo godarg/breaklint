@@ -764,3 +764,46 @@ A setup failure before that family received an input is retained separately.
 
 Complete Phase A, an accepted final design, implementation, blind A/B and exact
 release gates remain incomplete. No 0.9.0 publication has occurred.
+
+### 2026-10-06 — independent review-tooling acceptance and original-page evidence
+
+The bounded native image-review tooling has now received its final fresh independent
+acceptance from `claude-opus-5-5`, with no open blocker or high finding. Four low
+limitations are dispositioned explicitly. The unchanged actual completion gate exited
+0 after materialising two existing tracked gate inputs omitted by the sparse checkout.
+No implementation, gate selection or threshold changed for that checkout repair.
+This accepts the isolated review-tooling package only. The previously missed separate
+before-directory inventory remains unmet; the native functional image proof does not
+become a complete preregistration pass.
+
+Two additional exactly bound original pages received a successful `claude-opus-5-5`
+visual recall review. Its three visible candidates remain unconfirmed; the distinct
+primary and preselected-overlap roles are recorded separately. A literal prompt
+instruction about short quoted product text was unmet and is preserved, so there is
+no full-instruction or blind-review PASS. No adjacent-page or whole-document credit
+is inferred.
+
+The original table-candidate confirmation now has an actual `grok-4.7-build` review
+with two verified inline images. Its judgments disagree with the first family. A
+fresh evidence adjudicator has read all three relevant original page images and
+confirms the missing continuation headers and changing column tracks. An earlier
+coordinator visual claim that the tracks were stable was wrong and is withdrawn;
+its original record remains intact. Label qualification is still pending and the
+private confirmed-miss set still contains four entries.
+
+The public synthetic-fixture driver has exact registry-package bindings: all 190
+regular tarball members match the foreign installed 0.8.0 package. Its first native
+activation exited 2 before any case or browser operation because a renderer peer
+restricts package-manifest subpath exports. The original failure is retained. A
+minimal test-driver loader repair requires its own before/after and mutation proof,
+then new reviewed source pins, before another browser activation. Fixture
+expectations and the original full measurement count remain unchanged.
+
+The separate image-count/runtime integration retains both failed cold-bootstrap
+positive controls. The second exposed a genuine dependency on the main repository's
+Git context. A prospective native linked-worktree fixture is being prepared, with
+unchanged selftests and expected exits; it has not run. No visual-judge or integration
+completion credit follows yet.
+
+Complete Phase A, accepted final design, production implementation, blind A/B and
+exact release gates remain incomplete. Version 0.9.0 has not been published.
