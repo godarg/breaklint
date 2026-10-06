@@ -736,3 +736,31 @@ fixture consumer is claimed. The private label set remains four confirmed misses
 
 Complete Phase A, accepted final design, implementation, blind A/B, exact candidate
 release gates and publication remain incomplete. Version 0.9.0 has not been released.
+
+### 2026-10-06 — native image proof and finite negative controls
+
+The image-review integration now has an actual successful offline input proof and
+a successful real model invocation with two synthetic images, exact source/staged/
+preview/execution byte bindings, an unchanged instruction prefix and a valid numeric
+read witness. Independent acceptance remains pending. A preregistered separate
+before-directory inventory was missed and remains explicitly recorded; the named
+run home is absent afterwards. No product-review or release credit follows from
+the functional invocation.
+
+A separate image-count/runtime integration passed its six complete declared
+processes and both image-marker mutations. Its cold-bootstrap positive control
+failed because the fresh source-only test namespace lacked the Git HEAD required
+by an unchanged mandatory selftest. The failure is retained; the actual cold
+mutation and subsequent runtime-declaration mutation remain unrun. A minimal
+prospective correction of that test namespace is being prepared without changing
+source files, gates, or expected mutation results.
+
+Ten self-authored fixtures in two paper formats now have a prepared strict
+consumer and independent acquisition/classification path. Native browser
+measurements, rendered-pixel confirmation and independent verification remain
+pending. The work does not yet fix the production collector. Two additional
+private table observations are unconfirmed and await their second model family.
+A setup failure before that family received an input is retained separately.
+
+Complete Phase A, an accepted final design, implementation, blind A/B and exact
+release gates remain incomplete. No 0.9.0 publication has occurred.
