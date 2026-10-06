@@ -652,3 +652,28 @@ judgment, original recall credit or label: the private label set still has four 
 
 Complete Phase A, accepted final design, implementation, blind A/B, exact candidate
 release gates and publication remain incomplete. Version 0.9.0 has not been released.
+
+### 2026-10-06 — current service state and further evidence limits
+
+Direct live queries at 05:05 UTC confirm the public main commit is still `98e33c0`,
+npm latest is still `0.8.0`, and no `v0.9.0` tag is present. The integration branch is
+not an accepted release candidate. There is no measured new-version improvement.
+
+The isolated review-wrapper candidate failed its unchanged commit gate because fresh
+local declared namespaces were missing. Empty worktree-local namespaces and an empty
+local log were subsequently created without copying any main-workspace memory or
+changing the validator. This setup establishes path readiness only.
+
+A separate registered complete-wrapper reproduction now establishes an output-path
+selection defect in all ten isolated before runs: a valued token equal to `--out`
+selects unrelated stale sidecars for removal while preserving the intended ones.
+All runs exit at argument rejection and make zero vendor calls. The bounded correction,
+after measurements, mutation, real image proof and fresh acceptance remain pending.
+Earlier evidence and its explicitly recorded process deviation are retained.
+
+Seven further exactly bound original pages received local privacy sight only. Three
+target pages retain full-page external-transfer holds because personal-data provenance
+is unknown. No content or personal values are included in this public log. These
+checks add no layout judgments, original recall credits or labels; the private label
+set still contains four confirmed misses. Complete Phase A and all release criteria
+remain unestablished.
