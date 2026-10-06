@@ -677,3 +677,31 @@ is unknown. No content or personal values are included in this public log. These
 checks add no layout judgments, original recall credits or labels; the private label
 set still contains four confirmed misses. Complete Phase A and all release criteria
 remain unestablished.
+
+### 2026-10-06 — native image proof failed; review candidate remains stopped
+
+Supersedes the earlier pending correction status. The registered output-path fix now
+has ten genuine before failures, ten after results matching the registered file-state
+expectations, a 32-test suite with exit 0, and a mutation that restores all ten failures.
+The older temporal-test deviation remains open; later evidence does not repair it.
+
+The frozen review-tooling candidate subsequently passed its unchanged commit gates.
+Its single authorised real harmless image probe through the complete wrapper then
+failed with wrapper exit 8 at native preview. The native preview command exited 0,
+but the required instruction isolation was not demonstrated. Zero model requests
+were made. Source and input bytes stayed unchanged, and no staging directories
+remained. The actual failing preview check is unknown because its payload was not
+retained. Local mocked tests therefore do not establish native image support.
+
+A fresh independent diagnostic review by `claude-opus-5-5` returned FAIL on the frozen
+candidate: one blocker, one unresolved high-severity static hypothesis, three medium
+findings and one low finding. The reviewer was not a contributor. The high hypothesis
+is not presented as a demonstrated defect; missing package context and counter-evidence
+remain recorded. The review process exited 0 because it wrote an evaluable report,
+which is not an acceptance. No source changed during the review.
+
+This candidate is not approved for product-image reviews or completion. No native
+retry, new layout judgment, original recall credit or label follows from this result.
+The private label set remains four confirmed misses. Complete Phase A, accepted
+final design, implementation, blind A/B, exact release gates and publication remain
+incomplete. Version 0.9.0 has not been released.
