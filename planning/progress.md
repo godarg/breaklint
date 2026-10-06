@@ -847,3 +847,40 @@ fixture stops remain recorded.
 The private label set still has four confirmed misses. Complete Phase A, accepted
 final design, production implementation, blind A/B, exact release gates and
 publication remain incomplete. No 0.9.0 release is claimed.
+
+### 2026-10-06 — six confirmed private misses and further native review
+
+The private label set now has six confirmed misses. Two separately qualified table
+observations were added after exact full-context page evidence and fresh independent
+confirmation. Header repetition and column-track alignment are separate effects; the
+latter is outside the preregistered figure/table rule recall denominator. The earlier
+four records remain byte-identical. No product delivery file was changed.
+
+One further native `gpt-6.1-sol` image review is qualified for an exact additional
+capture acquisition. It returns `unclear`, reader impact 1, and distinguishes visible
+space from an established pagination cause. All four preregistered negative response
+copies are rejected. Fresh adjudication remains pending. This supplies no original
+stock-hit, blind A/B, source-owner or release credit.
+
+Two original stock pages have a new preselected Codex overlap invocation with exact
+native attachment bindings. The response identifies two unconfirmed observations;
+semantic uptake and the original complete recall sweep remain pending. The independent
+home-only observer records one positive directory identity and an empty identical
+root afterwards. Image-stage cleanup remains unknown; no complete runtime acceptance
+is inferred.
+
+The PDF loading-task driver correction received a fresh `claude-opus-5-5` static audit:
+all eight narrow criteria PASS, zero blocker/high, one medium and one low. The medium
+remains an accepted diagnostic limitation: nested error objects may lose their cause
+details across the browser-to-Node exception boundary, while the native acquisition
+still fails. The low concerns the factored legacy test variant, which is not presented
+as an unchanged-parent API run. Four original review gaps, including zero successful
+source-file reads by that reviewer, remain recorded. New fixture measurements require
+separate source pins and activation. No collector fix or public-corpus qualification
+follows from this code audit.
+
+The isolated image-count/runtime package remains on HOLD after a fresh safety review
+identified unresolved repository identity and write-boundary concerns. Its failed
+controls are retained. It has no new visual-judge admission or integration completion.
+Complete original hit review, final design, production changes, blind A/B, exact
+release-candidate gates and publication remain incomplete.
