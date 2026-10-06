@@ -1178,3 +1178,20 @@ not admitted. A real isolated checkout is being prepared to close the separately
 approved test-environment repair without changing its original start or gates.
 Production design acceptance, implementation, full A/B and release gates remain
 incomplete. No version, tag, consumer or publication has been changed.
+
+### 2026-10-06 — diagnostic audit decisions and test-environment prerequisite
+
+The text-QA loop repair passed its final independent code audit with no blocker
+or high finding. Its advisory findings are dispositioned; product evidence still
+needs source and baseline linkage before any new confirmed-miss label is counted.
+
+The font diagnostic failed its second code audit with a high finding: its empty
+infrastructure requirement rejects every real successful acquisition, because
+the shipped renderer records a non-fatal cross-check event. The package is stopped.
+Its fixture and renderer remain unrun; no third repair is authorized.
+
+The isolated Quality bootstrap failed before primary-environment creation because
+its mandatory rollback test already requires that environment. A separate manual
+prerequisite is prepared with the existing locked setup function and full gates.
+It cannot establish a cold-start pass. The security boundary remains unproved.
+Production implementation, full recall, blind A/B and release gates remain open.
