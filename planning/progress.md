@@ -705,3 +705,34 @@ retry, new layout judgment, original recall credit or label follows from this re
 The private label set remains four confirmed misses. Complete Phase A, accepted
 final design, implementation, blind A/B, exact release gates and publication remain
 incomplete. Version 0.9.0 has not been released.
+
+### 2026-10-06 — first bounded review-tooling repair; evidence work continues
+
+The first bounded repair of the frozen review-tooling candidate is now committed.
+Eleven specific test failures were measured before the change, followed by eleven
+passing cases and a full 43-test run with exit 0. Three private mutations separately
+restored the prompt-boundary and safe-diagnostic failures. These local tests do not
+establish native image support. One prospective offline input diagnosis is prepared;
+its execution, complete-wrapper functional proof and second independent acceptance
+remain pending. The original native failure and first audit FAIL remain recorded.
+
+A separate fresh integration of the image-count and development-runtime changes
+retains the failed old complete bootstrap. Static evidence identifies a cold-start
+selftest assumption that required the primary environment before its creation. The
+frozen candidate test already corrects that assumption. Actual old rollback imports
+fail specifically for both missing development packages. Only the three registered
+runtime files have now been integrated; the unchanged complete bootstrap and both
+mandatory selftests are running. No runtime, wrapper or acceptance PASS is claimed.
+
+Fifteen additional exactly bound original pages received local privacy sight.
+Fourteen are eligible for separately registered minimal external review; one full
+page retains a personal-data transfer hold. Two attribution-only exclusions were
+refuted for the exact pixels. This adds no layout judgments or original recall credit.
+Ten independent synthetic fixtures are proposed to distinguish an empty initial
+container fragment from authored empty containers, visible overflow, real
+continuations and an actual out-of-page source target, in two paper formats.
+Their handwritten expectations precede measurement; no reproduction or public
+fixture consumer is claimed. The private label set remains four confirmed misses.
+
+Complete Phase A, accepted final design, implementation, blind A/B, exact candidate
+release gates and publication remain incomplete. Version 0.9.0 has not been released.
