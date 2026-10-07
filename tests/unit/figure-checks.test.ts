@@ -4,10 +4,10 @@ import { mkdtempSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { it } from "node:test";
-import { buildSourceModel } from "../../src/measure/snapshot.ts";
+import { assembleSnapshot, buildSourceModel, inputIdentity, type AssembleSnapshotInput } from "../../src/measure/snapshot.ts";
 import { injectSourceIds } from "../../src/source/inject.ts";
 import { RULES_BY_ID } from "../../src/rules/index.ts";
-import { runDocument } from "../../src/core/engine.ts";
+import { exitCodeFor, runDocument } from "../../src/core/engine.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
 import type { Snapshot } from "../../src/core/types.ts";
 import { resolveConfig } from "../../src/config/resolve.ts";
@@ -40,6 +40,75 @@ function judge(snapshot: Snapshot, id: string) {
   const rule = RULES_BY_ID.get(id)!;
   return runDocument({ path: "authored.html", snapshot, infrastructure: [] }, { activeRules: [rule], optionsByRule: {}, coverageFloors: {}, failOn: "warn" }).report;
 }
+
+// This oracle is authored source text, not the figure index returned by the assembler. Each
+// prose paragraph contains a pair of straight quotes; the code pair must remain excluded.
+const INVENTORY_SOURCE = '<html lang="de"><body><figure id="plot"><svg width="80" height="40"><text>BODY</text></svg><figcaption id="caption">Figure 1</figcaption></figure><p id="first">Er sagte "alpha".</p><p id="second">Sie sagte "beta". <a href="#missing">Figure 2</a></p><p id="code"><code>code "quote"</code></p></body></html>';
+const INVENTORY_TEXT = ['Er sagte "alpha".', 'Sie sagte "beta". Figure 2', 'code "quote"'];
+function inventoryInput(mapped: boolean): AssembleSnapshotInput {
+  const injected = injectSourceIds(INVENTORY_SOURCE, "inventory.html");
+  const html = mapped ? injected.html : INVENTORY_SOURCE;
+  const model = buildSourceModel(html, "inventory.html");
+  const base = sample("straight-quotes-trigger");
+  const rawBlocks = INVENTORY_TEXT.map((plainText, index) => {
+    const { authorId: _authorId, blockSignature: _signature, fragmentIndex: _fragmentIndex, fragmentCount: _fragmentCount, ...block } = base.blocks[0]!;
+    const authorId = ["first", "second", "code"][index];
+    const sid = Object.values(model.blocks).find(item => item.authorId === authorId)?.sid ?? null;
+    return { ...block, nodeKey: `paragraph-${index}`, sid, lines: [], sourceOrder: index, sourceIdentity: `authored-paragraph-${index}`, plainText };
+  });
+  return {
+    raw: { pages: base.pages, blocks: rawBlocks, textLines: [], svg: [], figureBodies: [], requestedUrls: [], fontFamilies: [], control: { pages: 1, geometry: "", text: "", style: "", resources: "" } },
+    collector: { pages: [{ index: 0, reconciled: true, hasBreakToken: false, decisionAtLayout: null, decisionAfterRender: null, firstSid: null, lastSid: null, startSid: null, blank: false, epoch: 0 }], hooks: {}, discardedRecords: 0, unreconciledPages: 0, attributeDrift: [], epochCount: 1 },
+    sourceModel: model, sourceMap: mapped ? injected.map : {}, sourceMapInjection: mapped,
+    renderer: "unit", browserVersion: "unit", pagedjsVersion: "0.4.3", platform: "test", locale: "de-DE", freezeSignature: "unit", freezeRetries: 0,
+    inputIdentity: inputIdentity({ html, browserVersion: "unit", platform: "test", fontFamilies: [], resources: [] }), evidenceOverlayApplied: false, resources: [],
+  };
+}
+
+it("keeps legacy checks measurable without a complete source-bound figure inventory", () => {
+  for (const condition of ["no-map", "incomplete", "missing-figure-ref", "missing-caption-ref", "missing-reference-block-ref"]) {
+    const input = inventoryInput(condition !== "no-map");
+    if (condition === "incomplete") {
+      const sid = input.sourceModel.figureIndex.figures[0]!.sid;
+      const injected = injectSourceIds(INVENTORY_SOURCE, "inventory.html").html;
+      input.sourceModel = buildSourceModel(injected.replace(` data-bl-sid="${sid}"`, ""), "inventory.html");
+      assert.equal(input.sourceModel.figureIndex.complete, false, "control must actually lack authored figure identity");
+    }
+    if (condition === "missing-figure-ref") delete input.sourceMap[input.sourceModel.figureIndex.figures[0]!.sid];
+    if (condition === "missing-caption-ref") delete input.sourceMap[input.sourceModel.figureIndex.figures[0]!.captionSids[0]!];
+    if (condition === "missing-reference-block-ref") {
+      const referenceSid = input.sourceModel.figureIndex.referenceBlocks[0]!.sid;
+      delete input.sourceMap[referenceSid];
+      // The missing reference owner is not a collected paragraph in this control. Other mapped
+      // blocks retain their genuine SourceRefs, so the existing invariant is not bypassed.
+      input.raw.blocks = input.raw.blocks.filter(block => block.sid !== referenceSid);
+    }
+    const snapshot = assembleSnapshot(input);
+    const legacy = judge(snapshot, "type/straight-quotes");
+    assert.equal(legacy.findings.length, condition === "missing-reference-block-ref" ? 1 : 2, condition);
+    assert.equal(legacy.infrastructure.length, 0, condition);
+    assert.equal(snapshot.figureIndex, undefined, condition);
+    if (condition === "no-map") assert.ok(legacy.findings.every(finding => finding.source === null));
+    for (const id of ["figure/caption-separated", "figure/dangling-reference"]) {
+      const result = judge(snapshot, id);
+      assert.equal(result.verdict, "insufficient-coverage", `${condition}: ${id}`);
+      assert.equal(exitCodeFor(result.verdict), 4, `${condition}: ${id}`);
+      assert.equal(result.notMeasured[0]?.reason, "env/figure-index-unavailable", `${condition}: ${id}`);
+    }
+  }
+});
+
+it("retains complete mapped figure inventories and rejects malformed supplied empty SIDs", () => {
+  const snapshot = assembleSnapshot(inventoryInput(true));
+  assert.equal(snapshot.figureIndex?.complete, true);
+  assert.equal(snapshot.figureIndex?.figures.length, 1);
+  assert.equal(judge(snapshot, "type/straight-quotes").findings.length, 2);
+  snapshot.figureIndex!.figures[0]!.sid = "";
+  const malformed = judge(snapshot, "type/straight-quotes");
+  assert.equal(malformed.verdict, "infrastructure");
+  assert.equal(exitCodeFor(malformed.verdict), 3);
+  assert.deepEqual(malformed.findings, []);
+});
 it("reports the caption's real source target and measured page pair", () => {
   const snapshot = sample("caption-separated-trigger");
   const result = judge(snapshot, "figure/caption-separated");

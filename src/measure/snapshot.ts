@@ -1482,6 +1482,18 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
     requested: requested.has(ref.resolvedUri),
   }));
 
+  // The optional figure inventory needs authored source addresses, even when its geometry is
+  // incomplete. --no-source-map and partially bound source models must not emit empty or orphan
+  // SIDs: those would invalidate the entire snapshot and prevent unrelated legacy checks from
+  // running. An absent inventory is an explicit decline for enabled figure rules.
+  const hasFigureSource = (sid: string): boolean =>
+    sid.length > 0 && Object.hasOwn(input.sourceMap, sid) && input.sourceMap[sid] !== undefined;
+  const figureIndexAvailable = input.sourceMapInjection && input.sourceModel.figureIndex.complete &&
+    !input.sourceModel.scriptBearing &&
+    input.sourceModel.figureIndex.figures.every(figure =>
+      hasFigureSource(figure.sid) && figure.captionSids.every(hasFigureSource)) &&
+    input.sourceModel.figureIndex.referenceBlocks.every(block => hasFigureSource(block.sid));
+
   return {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     meta: {
@@ -1513,7 +1525,7 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
       provenance: sourceProvenance,
       ...(input.sourceFiles === undefined ? {} : { files: input.sourceFiles }),
     },
-    figureIndex: {
+    ...(figureIndexAvailable ? { figureIndex: {
       ...input.sourceModel.figureIndex,
       complete: input.sourceMapInjection && input.sourceModel.figureIndex.complete && !input.sourceModel.scriptBearing && input.raw.figureBodies !== undefined,
       figures: input.sourceModel.figureIndex.figures.map(figure => ({ ...figure,
@@ -1522,7 +1534,7 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
           identity: figureBodyIdentity(body.tag, body.authorId, body.value),
         })),
       })),
-    },
+    } } : {}),
     pages,
     blocks,
     textLines: input.raw.textLines,
