@@ -134,7 +134,7 @@ try {
   }
 
   process.stdout.write(
-    `installed Configuration Contract v1: report schema 3, exported schema, ` +
+    `installed Configuration Contract v1: report schema 5, exported schema, ` +
       `${leaves(report.config.effective).length} sourced leaves, independent fingerprint, ` +
       `${invalidCases.length} fail-closed controls\n`,
   );
