@@ -10,7 +10,11 @@
       "independentPdfTextOracle": {
         "BODY-WITNESS": 1,
         "CAPTION-WITNESS": 1
-      }
+      },
+      "pdfPageSizePointsRoundedToHundredth": [
+        595.28,
+        841.89
+      ]
     },
     {
       "fixture": "separated-a4.html",
@@ -21,7 +25,11 @@
       "independentPdfTextOracle": {
         "BODY-WITNESS": 1,
         "CAPTION-WITNESS": 2
-      }
+      },
+      "pdfPageSizePointsRoundedToHundredth": [
+        595.28,
+        841.89
+      ]
     },
     {
       "fixture": "together-letter.html",
@@ -32,7 +40,11 @@
       "independentPdfTextOracle": {
         "BODY-WITNESS": 1,
         "CAPTION-WITNESS": 1
-      }
+      },
+      "pdfPageSizePointsRoundedToHundredth": [
+        612,
+        792
+      ]
     },
     {
       "fixture": "separated-letter.html",
@@ -43,7 +55,11 @@
       "independentPdfTextOracle": {
         "BODY-WITNESS": 1,
         "CAPTION-WITNESS": 2
-      }
+      },
+      "pdfPageSizePointsRoundedToHundredth": [
+        612,
+        792
+      ]
     }
   ],
   "referenceFixture": {
@@ -73,5 +89,6 @@
     "script-bearing source",
     "malformed percent-encoded fragment",
     "caption-only wrapper"
-  ]
+  ],
+  "formatCorrection": "Original lowercase a4 fixture declarations measured as Letter (612 x 792 PDF points) with Paged.js 0.4.3. Corrected self-authored A4 inputs to explicit 210mm 297mm before remeasurement. Original candidate/finding/source/page-marker expectations are unchanged. The added size oracle is independently hand-written from paper dimensions, not observed SUT output."
 }
