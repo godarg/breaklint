@@ -521,8 +521,8 @@ GitHub assets.
 
 | | |
 |---|---|
-| 15 registered rules as pure functions over a snapshot | `src/rules/` |
-| Mutation guard | 15/15 registered rules kill all five mutants each (75/75), each on a fixture that actually triggers it |
+| 17 registered rules as pure functions over a snapshot | `src/rules/` |
+| Mutation guard | 17/17 registered rules kill all 83 applicable mutants on triggering fixtures: five controls each for 16 numeric rules, three concrete controls for the categorical table-header rule; empty numeric perturbation sets are not tests |
 | False-alarm corpus | every clean fixture stays silent, every trigger fixture fires and is attributed correctly |
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
 | Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in the canonical JSON report; generated schema drift and process-boundary exit 2 are tested |
