@@ -4,6 +4,20 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
+## Release candidate 0.9.0 — 2026-10-07
+
+Publication has not yet been verified. The candidate adds two source-bound, opt-in figure
+warning checks and clearer next-check navigation with counted declined candidates. It has
+15 registered rules and retains 12 default checks; none is calibrated. Snapshot 6 adds a
+figure/ID inventory; Snapshot 5 remains readable for existing checks, with explicit declines
+when requested figure measurements are unavailable. Report 5, context pack 2 and Configuration
+Contract 1 retain their stamps.
+
+This is the focused completion authorized by the maintainer on 2026-10-07. It does not claim
+the original exhaustive product label-set precision/recall study or blind all-product A/B
+was completed. Technical gates, packed consumers and fresh independent acceptance are
+required before tagging. The following release records are historical measurements.
+
 ## Release v0.8.0: published 2026-09-28
 
 The 0.8.0 release contains the configurable 600,000 ms
@@ -61,7 +75,7 @@ Most of it changes what the rules report about documents that did not change, an
 lists those changes first. Margin-box content — the per-page clones Paged.js makes of
 `position: running(...)` and `position: fixed` elements — is no longer part of the flow, so it no
 longer produces widow, orphan and block-height findings about clones, no longer anchors every page,
-and no longer keeps required evidence from completing. Snapshot 5 records each block's computed
+and no longer keeps required evidence from completing. In 0.7.0, Snapshot 5 recorded each block's computed
 `display`, `float` and `position`, its margin-box copies, its own boundary hyphen and which lines
 carry its own text, and the rules read those instead of inferring them from a zero box or from a
 wrapper's lines. `layout/widow` and `layout/orphan` judge the block whose own lines a break split;

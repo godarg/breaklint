@@ -1310,4 +1310,10 @@ Strict technical tests, independent acceptance, privacy and tag-based publicatio
 
 ## 2026-10-07 — Focused release procedure and truthful sight-review documentation
 
-Aligned reporting and release instructions with ledger6: delegated AI is a distinct review kind, ordinary agents cannot pass, and the complete native image inventory remains required. Frozen candidate review precedes a green PR merge, exact-main CI and annotated tag. This follows the maintainer's targeted-completion authorization; it does not waive technical gates or invent a human review. Workflow documentation parity:7tests passed with native exit0.
+Aligned reporting and release instructions with ledger6: delegated AI is a distinct review kind, ordinary agents cannot pass, and the complete native image inventory remains required. Frozen candidate review precedes a green PR merge, exact-main CI and annotated tag. This follows the maintainer's targeted-completion authorization; it does not waive technical gates or invent a human review. Workflow documentation parity: 7 tests passed with native exit 0.
+
+## 2026-10-07 — Version and compatibility preparation
+
+Prepared 0.9.0 package/lock/workflow pin and dated change log. Default demo remains exit 1; strict demo must be exit 4 because its hand-written snapshot has no authored figure inventory. Snapshot 6 keeps legacy 5 readable for existing checks; requested new figure checks decline absent inventory. No publication claim before service verification. The original all-product quantitative acceptance was superseded by the focused completion authorization, not measured as passed.
+
+Figure package b7cfe98 integrated with a no-ff merge. Five self-authored live cases matched the original finding/source/body/caption expectations; paper classification was independently read from unchanged PDFs. The initial exact theoretical A4-size assertion was wrong about Chrome/Skia output and remains a saved red; no finding, page, coverage or binding oracle was changed. The suite is now an explicit five-leaf entry in the CI live runner. New rule mutation contract:15 rules ×5 killed mutants.

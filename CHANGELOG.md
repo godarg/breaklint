@@ -1,8 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 — 2026-10-07
 
 Behavior on unchanged documents:
+
+- Two opt-in warning checks inspect standard single-image figures: `figure/caption-separated`
+  compares the concrete body and caption pages; `figure/dangling-reference` checks local
+  Figure/Fig./Abbildung/Abb. links against the authored ID inventory. Unsupported or ambiguous
+  sources are counted as declined. Neither check establishes author intent, printed numbering
+  or a full figure model. Both remain disabled by default and uncalibrated.
+- `--strict --demo` now exits 4: the hand-written snapshot has no original HTML from which the
+  requested new figure checks can establish an inventory. Default `--demo` retains exit 1.
+- Snapshot 6 adds the authored figure/ID inventory and concrete body witnesses. The engine
+  still reads Snapshot 5 for existing checks; enabled figure checks explicitly decline when
+  that legacy snapshot lacks their inventory. Report 5, context pack 2 and Configuration
+  Contract 1 are unchanged.
 
 - Console, HTML and Markdown start with up to three deterministic next checks. Incomplete
   measurements take priority; repeated rule IDs remain separate individual findings.
@@ -58,7 +70,7 @@ that did not change, and those changes come first.
 
 ### What a consumer has to do
 
-- **Snapshot 5 is the only snapshot the engine judges.** Every `BlockRecord` gains the required
+- **In 0.7.0, Snapshot 5 became the only snapshot the engine judged.** Every `BlockRecord` gains the required
   fields `display` (computed), `marginCopies` (how many copies Paged.js printed in margin boxes —
   the clones of a `position: running(...)` element), `float` and `position` (computed) and
   `boundaryHyphen` (Paged.js marked a boundary hyphen in the block's own inline content), and every

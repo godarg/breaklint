@@ -25,6 +25,16 @@ published repair from this change set and binds the child CLI to the actual cons
 run `33320332110` completed the Node 22.13/24 consumer matrix, npm provenance verification and
 GitHub Release creation on 2026-08-30.
 
+0.9.0 is a minor pre-1.0 release because it adds checks and changes the measurement snapshot.
+Snapshot 5 → 6 adds an optional authored figure/ID inventory and concrete image-body witnesses.
+Readers retain Snapshot 5 compatibility for the existing checks; requested figure checks count
+an absent or incomplete inventory as declined and cannot produce a clean result from it. A
+present malformed inventory is refused. Producers should emit 6 with their actual acquisition
+status; they must not turn missing source data into a complete empty inventory. The hand-written
+demo is migrated to 6 with its inventory explicitly incomplete. Report 5, context pack 2 and
+Configuration Contract 1 are unchanged. Ledger 5 → 6 adds delegated AI receipts while preserving
+all historical rounds; that ledger is release evidence, not a document report schema.
+
 0.7.0 is a minor pre-1.0 release by the same test: the measurement snapshot changes structure, so
 its stamp moves, Snapshot 4 → 5. It gains six required fields — `BlockRecord.display`,
 `marginCopies`, `float`, `position`, `boundaryHyphen` and `TextLine.ownText` — and the engine

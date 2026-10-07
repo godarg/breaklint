@@ -334,3 +334,11 @@ changes relative to 0.8.0; private response-classification tooling is not produc
 
 The two new figure checks and counted human-report measurement reasons are separate bounded
 packages. Their supported acquisition and test results will be recorded after implementation.
+
+## Focused 0.9 follow-up entries
+
+| id | problem | disposition |
+|---|---|---|
+| G-129 | Figure bodies and captions lacked a shared authored index and local fragment witnesses. | The 0.9 candidate adds a bounded single-image figure check, off by default at warning severity. Unsupported or ambiguous bodies are counted as declined. Complex bodies, tables, numbering and free-text references remain open capabilities. |
+| G-130 | Human reports made counted declined candidates difficult to see after coverage met its floor. | The 0.9 candidate shows counted reasons in console, HTML and Markdown, three deterministic next checks and rule counts while retaining every finding. This is navigation, not an estimated reader-impact score or cause diagnosis. |
+| G-131 | A delegated AI visual review had no distinct, hash-bound receipt contract and could only be represented incorrectly as a human or a failing ordinary agent. | Ledger 6 introduces a distinct delegated-ai kind with release-specific delegation, native model/output receipt and complete image inventory. Ordinary agent entries remain unable to pass; historical rounds are unchanged. The record is not provider authentication or proof of perception. |
