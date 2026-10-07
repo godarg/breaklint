@@ -1488,3 +1488,19 @@ Two medium and28 low presentation findings have explicit follow-up/accepted-risk
 All original six ledger rounds remain structurally unchanged. Release is blocked pending the
 HIGH correction, arithmetic negative control and one fresh bounded sight review; no human
 or Ubuntu visual acceptance is claimed.
+
+### Bounded round7 HIGH correction
+
+The handwritten insufficient-coverage fixture had a scalar decline count without a recorded
+reason. Two new arithmetic/projection tests fail on the unchanged old fixture and pass after
+its explicitly authored multicolumn decline is present in both rule and document accounts.
+The independent outside-base5/3/2 control remains green; all ten navigation leaves and
+typecheck pass. Production rule-engine and report projection code are unchanged.
+
+All screen viewports now include full-height legible tiles. Independent filesystem/IHDR,
+pdfinfo and pypdf observations measure24 screens,212 tiles,four PDFs and27 printed-page
+rasters on macOS and [Linux run37686731564](https://github.com/godarg/breaklint/actions/runs/37686731564).
+The print-state counts remain3/8/8/8. The old158 tile pin actually rejects this new physical
+inventory; the fixed expectation is updated from those independent measurements. Missing,
+extra and redistributed-page, unknown-platform, gallery membership and one-pixel recut
+negative controls remain. Fresh technical, mutation, sight and final release gates are pending.

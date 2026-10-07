@@ -1211,6 +1211,11 @@ assert.ok(fontMutationControl, "PDF font mutation control did not run");
 // Linux run https://github.com/godarg/breaklint/actions/runs/37679854862 measured the same fixed
 // per-state pages and tile count from the unchanged candidate, with native renderer/oracle exit0.
 // The first diagnostic run timed out before rendering; it supplies no oracle and remains retained.
+// The round7 HIGH repair records the previously missing handwritten widow decline and adds
+// readable desktop tiles to every screen cell. Independent macOS filesystem/IHDR/pdfinfo/pypdf
+// and Linux run https://github.com/godarg/breaklint/actions/runs/37686731564 measured 212 tiles
+// and the same fixed3/8/8/8 pages on2026-10-07. The212 expectation is a physical observation,
+// not a renderer-manifest-derived count. The preceding158 count remains historical evidence.
 const EXPECTED_PRINT_PAGES_BY_PLATFORM = Object.freeze({
   darwin: Object.freeze({ clean: 3, findings: 8, infrastructure: 8, "insufficient-coverage": 8 }),
   linux: Object.freeze({ clean: 3, findings: 8, infrastructure: 8, "insufficient-coverage": 8 }),
@@ -1224,8 +1229,8 @@ function assertSurfaceInventory(inventory, platform) {
   const actualPages = Object.fromEntries(pdfs.map((artifact) => [artifact.cell.split("/")[1], artifact.pages]));
   assert.deepEqual(actualPages, expectedPages, `${platform}: print page inventory must match every fixed state`);
   const rasterPages = Object.values(expectedPages).reduce((sum, pages) => sum + pages, 0);
-  assert.deepEqual(inventory.physicalArtifacts, { screens: 24, screenTiles: 158, pdfs: 4, rasterPages },
-    `${platform}: the report-surface inventory must be exactly 24 screens with 158 viewport tiles, 4 PDFs and ${rasterPages} PDF page rasters`);
+  assert.deepEqual(inventory.physicalArtifacts, { screens: 24, screenTiles: 212, pdfs: 4, rasterPages },
+    `${platform}: the report-surface inventory must be exactly 24 screens with 212 viewport tiles, 4 PDFs and ${rasterPages} PDF page rasters`);
 }
 
 assertSurfaceInventory(manifest, process.platform);

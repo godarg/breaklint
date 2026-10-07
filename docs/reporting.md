@@ -497,13 +497,22 @@ the same decoded pixels as its full-page PNG. The complete matrix also has 24 fu
 four PDFs. Measured on 2026-10-07, their page counts are 3/9/9/9 on macOS and 3/8/9/9
 on Linux, in state order clean/findings/infrastructure/insufficient-coverage: 30 and 29 page
 rasters respectively. Independent `pdfinfo` and canonical PNG membership confirm both inventories.
-The preceding values describe the historical 0.9.0 matrix. For the 0.10.0 presentation,
-independent physical measurements on 2026-10-07 record 158 tiles and 3/8/8/8 printed pages
+The preceding values describe the historical 0.9.0 matrix. The initial 0.10.0 presentation's
+independent physical measurements on 2026-10-07 recorded 158 tiles and 3/8/8/8 printed pages
 on both macOS and Linux (27 page rasters). The [Linux diagnostic](https://github.com/godarg/breaklint/actions/runs/37679854862)
 rendered all 32 cells and passed its independent inventory oracle; it is technical evidence,
 not a visual review. The original first diagnostic timeout is retained as incomplete infrastructure.
+Round7's original delegated review failed on a contradictory handwritten insufficient-coverage
+fixture and left four desktop cells unread at their downscaled size. The fixture now records its
+missing applicable decline, and every screen viewport includes legible tiles. Independent macOS
+and [Linux measurements](https://github.com/godarg/breaklint/actions/runs/37686731564) count
+212 tiles and the same 27 printed pages. The arithmetic is23=20+3 applicable evaluations, with
+the affected widow row2=1+1; the new fixture reason is explicitly authored presentation data.
+This correction changes no production threshold or rule-engine accounting. The failed review
+remains on record; a fresh frozen-input second round and strict gate are required for acceptance.
 The verifier pins each platform and state separately; it does not derive its expected count from
-the renderer manifest. Long mobile pages cannot be judged at fit-to-window scale; their viewport-height tiles can.
+the renderer manifest. Long desktop, tablet and mobile pages cannot be judged at fit-to-window
+scale; every screen cell therefore supplies viewport-height tiles.
 The verifier re-cuts every tile from the independently decoded full page and
 requires the normalized RGBA to match, so tiles add no unbound pixel. `review-gallery.html` in the
 same directory presents every full page, tile and printed page per state; it is what a reviewer
