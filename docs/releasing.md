@@ -156,17 +156,32 @@ both run. On 2026-09-18 a local chain omitted it and CI caught the drift instead
 the chain did not. And when a step in such a chain is piped (`npm test | tail`), `$?` is the exit
 code of `tail`: read every return value directly after its command.
 
-The technical surface gate reconstructs and verifies every current cell without claiming a human
-look. `npm run test:report-surfaces` is the separate exact-environment human gate. It must stay red
-when the bound inputs changed and no person reviewed the new artifacts; never refresh its ledger as
-release ceremony. A real later review is recorded as a new round with its actual reviewers, date and
-outcome — `pass` or `fail` — and only a passing latest round in which a rostered human role
-(`@Brand`, `@Neo` or `@Founder`) passed every cell, bound to the exact current inputs, turns the
-gate green. An agent's review may be recorded in a round, by kind and model, and never passes a
-cell; the roster itself changes only by a reviewed code change (`docs/reporting.md`).
+The technical surface gate reconstructs and verifies every current cell without claiming a sight
+review. `npm run test:report-surfaces:local` is the separate exact-environment sight gate. It stays
+red when the bound inputs changed and no authorized reviewer reviewed the new artifacts; never
+refresh its ledger as release ceremony. A real later review is a new round with its actual
+reviewers, date and outcome — `pass` or `fail`. A passing latest round must cover every cell and
+bind the current input fingerprint, declared environment, rendered artifacts, screen RGBA hashes
+and complete physical inventory. `assessHumanGate` remains human-only: only `@Brand`, `@Neo` or
+`@Founder` can pass it. An ordinary `agent` entry never passes a cell.
+
+Ledger schema 6 additionally permits `kind: "delegated-ai"` for the explicitly delegated 0.9.0
+sight review. The round must carry the Founder's release-specific delegation: `founder: "@Founder"`,
+date, verbatim session quote, `release: "0.9.0"` and `revoked: false`. The reviewer must have a
+nonhuman handle, a recorded nonUNKNOWN `actual_model`, prompt/output SHA-256 hashes, and a native
+receipt with path, SHA-256 and exact image count. Its closed `receivedImages` entries contain
+exact `{path, sha256}` pairs for **every assigned full screen PNG, every screen tile and every A4
+page PNG**. PDF cells are judged through their complete matching raster sets; the receipt cannot
+substitute a PDF filename for unseen pages. Missing, extra, duplicate or differently hashed images
+refuse the gate. The release operator must extract these bindings from actual native image-read results; a
+planned call or a model's self-reported image count is insufficient. Strict local status reports
+`delegatedAI` for this path and never calls it a human pass. Migrating the schema stamp preserves
+every prior round and does not upgrade any old agent entry or invent a new review.
 <!-- human-review-roles: @Brand, @Neo, @Founder -->
 The roster check proves only that a rostered handle was written into the ledger; it does not
-authenticate a person. Whether a rostered human really reviewed rests on repository access control
+authenticate a person. Delegated AI model, receipt and image fields likewise bind the recorded
+review to the manifest; the gate does not authenticate a provider identity or independently prove
+image perception. Whether a rostered human really reviewed rests on repository access control
 and on reviewing the ledger diff before it merges — check who committed it and that the round's
 cells name the artifacts actually rendered — not on this gate.
 

@@ -19,7 +19,7 @@ import {
   assertCurrentReviewInput,
   assertObservedEnvironment,
   assertReviewEnvironment,
-  assessHumanGate,
+  assessSightGate,
   describeLatestRound,
   runReviewInputMutationControl,
   validateReviewLedger,
@@ -1201,12 +1201,11 @@ assert.deepEqual(manifest.physicalArtifacts, { screens: 24, screenTiles: 152, pd
 
 const latestRound = describeLatestRound(ledger, manifest, currentReviewInput.fingerprint);
 // The review ledger's state belongs where a release reader looks, not only in a log line. The line
-// names every reviewer by kind; it says "human review ... PASS" only when a rostered human passed
-// every cell of the latest round (describeLatestRound), and never for an agent-recorded round.
+// names every reviewer by kind; delegatedAI is explicit and never reported as a human pass.
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Report-surface review ledger\n\n${latestRound}.\n\n${REVIEWER_AUTHENTICATION_NOTE}\n\n`);
 }
-if (mode === "local") assessHumanGate(ledger, manifest, currentReviewInput.fingerprint);
+const sightReview = mode === "local" ? assessSightGate(ledger, manifest, currentReviewInput.fingerprint) : null;
 
 if (mode === "technical") {
   process.stdout.write(
@@ -1216,7 +1215,7 @@ if (mode === "technical") {
   );
 } else {
   process.stdout.write(
-    `report surfaces: strict local exact-environment human gate passed 32/32 cells ` +
+    `report surfaces: strict local exact-environment ${sightReview.reviewKind} sight gate passed 32/32 cells ` +
       `(${latestRound}; ${manifest.reviewInputFingerprint}; pixel mutation rejected)\n`,
   );
 }

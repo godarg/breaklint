@@ -33,6 +33,8 @@ export function summarizeLatestRound(ledger: ReviewLedger): {
   passingCells: number;
   humanPassingCells: number;
   humanPass: boolean;
+  delegatedPassingCells: number;
+  delegatedPass: boolean;
 };
 export function latestBindingStatus(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): {
   inputs: boolean;
@@ -42,13 +44,32 @@ export function latestBindingStatus(ledger: ReviewLedger, manifest: unknown, cur
 };
 export function describeLatestRound(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): string;
 export function assessHumanGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): ReviewRound;
+export function assessSightGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): { latest: ReviewRound; reviewKind: "human" | "delegatedAI" };
+
+export interface FounderSightDelegation {
+  founder: "@Founder";
+  date: string;
+  sessionQuote: string;
+  release: "0.9.0";
+  revoked: false;
+}
+export interface DelegatedAIReviewer {
+  kind: "delegated-ai";
+  handle: string;
+  actual_model: string;
+  promptSha256: string;
+  outputSha256: string;
+  nativeReceipt: { path: string; sha256: string; imageCount: number };
+  receivedImages: { path: string; sha256: string }[];
+}
 
 export interface ReviewRound {
   round: number;
   record: "current" | "historical" | "historical-reconstruction";
   outcome: "pass" | "fail" | "pending";
   reviewedAt: string | null;
-  reviewers: { handle: string | null; kind: "human" | "agent" | "not-recorded"; model?: string }[];
+  reviewers: ({ handle: string | null; kind: "human" | "agent" | "not-recorded"; model?: string } | DelegatedAIReviewer)[];
+  delegation?: FounderSightDelegation;
   binding: null | { reviewInputFingerprint: string; renderManifestGeneratedAt: string; reviewEnvironment: Record<string, unknown> };
   findings: { blocker: number; high: number; medium: number; low: number };
   cells: null | Record<string, Record<string, unknown> & { status: "pass" | "fail" | "not-reviewed" }>;
