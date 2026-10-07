@@ -2,6 +2,7 @@ import type { Finding, Report } from "../core/types.ts";
 import { summaryLine } from "./mandatory.ts";
 import { emptyStateSentence, infraLines } from "./infra.ts";
 import { VALIDATION_RULES_BY_ID } from "../rules/index.ts";
+import { projectDecisions } from "./decisions.ts";
 
 const ESC = "\u001b[";
 const RESET = `${ESC}0m`;
@@ -91,6 +92,27 @@ export function renderConsole(report: Report, opts: { colour?: boolean } = {}): 
     out.push("action: check command arguments and configuration");
   }
   out.push("");
+
+  const decisions = projectDecisions(report);
+  if (decisions.nextChecks.length > 0) {
+    out.push("Next checks (navigation, not tested fixes)");
+    for (const [index, check] of decisions.nextChecks.entries()) {
+      out.push(`  ${index + 1}. ${check.title}`, `     ${check.detail}`);
+    }
+    out.push("");
+  }
+  if (decisions.groups.length > 1 || decisions.groups.some((group) => group.findingIds.length > 1)) {
+    out.push("Findings by rule (every finding remains below)");
+    for (const group of decisions.groups) out.push(`  ${group.ruleId}: ${group.findingIds.length} finding${group.findingIds.length === 1 ? "" : "s"}`);
+    out.push("");
+  }
+  if (decisions.declines.length > 0) {
+    out.push("Declined candidates (including when coverage meets its floor)");
+    for (const decline of decisions.declines) {
+      out.push(`  ${decline.document} · ${decline.ruleId ?? "no rule"} · ${decline.scope} · ${decline.reason}: ${decline.count}`);
+    }
+    out.push("");
+  }
 
   // 3. Render findings
   for (const finding of allFindings) {

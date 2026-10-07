@@ -1,6 +1,15 @@
 import type { Report } from "../core/types.ts";
 import { LABELS, mandatoryFacts } from "./mandatory.ts";
 import { emptyStateSentence, infraLines } from "./infra.ts";
+import { projectDecisions } from "./decisions.ts";
+import { VALIDATION_RULES_BY_ID } from "../rules/index.ts";
+
+function text(value: string): string {
+  return value.replace(/[\u0000-\u0020]+/gu, " ").replace(/&/gu, "&amp;")
+    .replace(/</gu, "&lt;").replace(/>/gu, "&gt;")
+    .replace(/[\\`\[\]*_!]/gu, (character) => `&#${character.charCodeAt(0)};`)
+    .replace(/\|/gu, "\\|");
+}
 
 export function renderMarkdown(report: Report): string {
   const f = mandatoryFacts(report);
@@ -16,6 +25,24 @@ export function renderMarkdown(report: Report): string {
   out.push(`| ${LABELS.mode} | ${f.mode} |`);
   out.push(`| ${LABELS.failOn} | ${f.failOn} |`);
   out.push(`| ${LABELS.gateTriggeredBy} | ${f.gateTriggeredBy} |`, "");
+
+  const decisions = projectDecisions(report);
+  if (decisions.nextChecks.length > 0) {
+    out.push("## Next checks", "", "Navigation only; these are not tested fixes.", "");
+    for (const [index, check] of decisions.nextChecks.entries()) out.push(`${index + 1}. ${text(check.title)}. ${text(check.detail)}`);
+    out.push("");
+  }
+  if (decisions.groups.length > 1 || decisions.groups.some((group) => group.findingIds.length > 1)) {
+    out.push("## Findings by rule", "", "Every individual finding remains below.", "", "| rule | findings |", "|---|---:|");
+    for (const group of decisions.groups) out.push(`| ${text(group.ruleId)} | ${group.findingIds.length} |`);
+    out.push("");
+  }
+  if (decisions.declines.length > 0) {
+    out.push("## Declined candidates", "", "Counted reasons remain visible even when coverage meets its floor.", "",
+      "| document | rule | scope | reason | count |", "|---|---|---|---|---:|");
+    for (const decline of decisions.declines) out.push(`| ${text(decline.document)} | ${text(decline.ruleId ?? "no rule")} | ${decline.scope} | ${decline.reason} | ${decline.count} |`);
+    out.push("");
+  }
 
   // The apparatus before the findings: a run that could not measure has to say so here, not
   // only in the verdict cell above. This reporter printed the clean-run sentence on an exit-3
@@ -46,6 +73,13 @@ export function renderMarkdown(report: Report): string {
       );
     }
     out.push("");
+    for (const finding of report.findings) {
+      const remediation = VALIDATION_RULES_BY_ID.get(finding.ruleId)?.remediation;
+      out.push(`### ${text(finding.runFindingId)} — ${text(finding.ruleId)}, page ${finding.page}`, "",
+        `Message: ${text(finding.message)}`, "");
+      if (remediation) out.push(`Remediation: ${text(remediation.advice)}`, "",
+        `Remediation tested: ${remediation.tested ? "yes" : "no (untested)"}`, "");
+    }
   }
 
   // Coverage is printed even when it is complete. A reader who only sees it when it is short
