@@ -4,7 +4,48 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## 0.9.0 release preparation — 2026-10-07
+## Release v0.9.0: published 2026-10-07
+
+⛔ Supersedes the publication-state part of the preparation record below. The preparation and older release records remain historical evidence.
+
+The annotated `v0.9.0` tag points to release commit
+`af794dc0e10a7b739d8430f54f8bdbf92cc85db1` (tag object
+`70037d2e98038c1e21ea9d588ceb0bc5165f5544`). The
+[release workflow, run 37606129549](https://github.com/godarg/breaklint/actions/runs/37606129549)
+completed successfully on 2026-10-07, including validation, clean consumers on Node 24 and
+22.13.0, publication of the validated tarball and creation of the
+[GitHub Release](https://github.com/godarg/breaklint/releases/tag/v0.9.0).
+
+Registry and GitHub readback on 2026-10-07 at 10:38 UTC measured npm `breaklint@0.9.0`,
+`latest` = `0.9.0`, and byte-identical npm/GitHub tarballs: 602,641 bytes, SHA-256
+`6e2265326410a64b9c15a6b250fc437889ddad4a961e0cb7b29e5d910d467674`. The registry integrity is
+`sha512-74/w5mSV/fauT+qqXeImRlLAH5bSODM37yeKS3hTwz6EOKCxUKf4qGcEQglLKZSDKxG51/i6BnfkEr3qJBQGbg==`. The retained SLSA provenance contract passed against this exact tag and commit.
+These are dated publication measurements; query `npm view breaklint version dist.integrity`
+and the release workflow for a later live state.
+
+A separate clean published consumer ran `npm audit signatures --json` at 10:39 UTC:
+exit 0, with both `invalid` and `missing` empty. An installed
+`npx --no-install breaklint --demo` and an empty-directory `npx --yes breaklint@0.9.0 --demo`
+each ended with the expected exit 1 because the demo contains layout findings. These signature and consumer checks are separate from the narrower
+registry byte/provenance readback; that runner did not reverify signatures itself.
+The real [published-tag Action smoke, run 37608861377](https://github.com/godarg/breaklint/actions/runs/37608861377)
+completed successfully: `uses: godarg/breaklint@v0.9.0` returned exit 0 and `clean` on its
+self-authored four-page fixture, with installed version `0.9.0` and matching canonical report evidence.
+
+This release adds two experimental, default-off figure warning checks and human report
+navigation with up to three next checks. It retains 12 default rules among 15 registered rules;
+none is calibrated. Strict enables the new checks and can now end with exit 4 when their
+source or supported figure measurements are unavailable, including non-image figure bodies,
+unsupported source constructs or `--no-source-map`. The authored target inventory covers
+`id`, not legacy `<a name>` targets. The outside-coverage next-check count wording also remains
+a known limitation; JSON keeps the separate accounted values. These accepted audit advisories
+remain open as G-142, G-143 and G-144 in [the work register](../planning/open-work.md).
+
+The maintainer's focused completion authorization of 2026-10-07 governs this release. Publication
+does not establish the former exhaustive all-product precision/recall study, blind A/B,
+population calibration or completion of the wider product repair work.
+
+## Historical 0.9.0 release preparation — 2026-10-07
 
 This record was written before publication; query npm and the GitHub Release for current
 publication state. The candidate adds two source-bound, opt-in figure

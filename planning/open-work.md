@@ -359,3 +359,26 @@ packages. Their supported acquisition and test results will be recorded after im
 | G-140 | Two historical review regression tests incorrectly required the whole ledger to stop at its fourth round. | Fixed after the actual ordered test failure: the original first-four digest and all human-review assertions are preserved, and the fifth delegated round is separately checked without human-pass transfer. Original red, 53-leaf green, stale-test red mutation and restored green are retained; no rendered-input or gate logic changed. |
 
 | G-141 | The 0.9 report inventory used the measured macOS total of 30 A4 rasters as a universal Linux expectation. | Changed to fixed platform/state inventory assertions after CI run 37594360825 and isolated unchanged-renderer run [37597727752](https://github.com/godarg/breaklint/actions/runs/37597727752) independently confirmed Linux 3/8/9/9 pages versus macOS 3/9/9/9. Native `pdfinfo`, PNG membership/hashes and all preceding semantic/pixel/print checks agree; screens 24, tiles 168 and PDFs 4 are identical. No content bound or tolerance is relaxed. Fresh source-bound round 6 sight evidence passed all 32 cells after the correction. The complete final release gates remain required. The isolated diagnostic workflow is superseded by this measured correction; its native evidence is retained privately before its one-off branch is eligible for cleanup. |
+
+
+## 2026-10-07 — publication audit advisories retained as open work
+
+The 0.9.0 release accepted these bounded audit risks with disclosure. None is a completed fix;
+the experimental figure rules remain warnings and default-off. The canonical report remains
+JSON. Each follow-up must retain source/evidence accounting and the existing coverage gates.
+
+| id | problem | disposition |
+|---|---|---|
+| G-142 | Strict enables the new figure checks and requires complete coverage. Unsupported non-image figure bodies or unavailable source inventories can therefore change an unchanged strict document from exit 0/1 to exit 4. | Still open, medium. The release notes disclose the boundary, including unsupported source constructs and `--no-source-map`. Determine supported applicability and non-image figure classification with independent fixtures before changing the core; never convert an unavailable measurement into a clean result. |
+| G-143 | The authored fragment target inventory includes `id` attributes but not legacy `<a name>` targets, so the opt-in `figure/dangling-reference` rule can report those legacy targets as missing. | Still open, low. Disclosed for 0.9.0; use an authored `id` when enabling this experimental check. Expanding the inventory needs source-bound fixtures for legacy targets without inventing IDs or claiming complete HTML fragment coverage. |
+| G-144 | Human next-check text can count outside-coverage declines as not measured while using the reduced candidate denominator, producing confusing wording such as “1/1 measured; 2 not measured”. | Still open, low. Canonical JSON retains the separate accounted values. Clarify the display in a bounded follow-up while keeping every decline and its reason visible; this wording does not establish precision, recall or calibration. |
+
+## 2026-10-07 — completed published-tag Action witness
+
+⛔ Superseded: the one-off `codex/breaklint-090-action-reference-smoke` branch is superseded by the successful [published v0.9.0 Action smoke, run 37608861377](https://github.com/godarg/breaklint/actions/runs/37608861377).
+
+The single push of commit `7ff5480cc89f9f6c0590720a2f693887cbe827b9`, based on release commit `af794dc0e10a7b739d8430f54f8bdbf92cc85db1`, exercised `uses: godarg/breaklint@v0.9.0` against the unchanged self-authored `tests/fixtures/action/clean.html`. Attempt 1 completed successfully on 2026-10-07 at 10:40:08 UTC. The actual Action carrier and canonical schema-5 JSON report agree on installed version `0.9.0`, exit `0` and verdict `clean`: one input, four analysed pages, twelve enabled rules, three measured rules and zero findings. The report input hash matches the authored fixture; all four retained page rasters and its diagnostic PDF match their recorded hashes. The report does not assert a delivered-product binding.
+
+The named artifact `breaklint-090-published-action-smoke` (id `11476376497`, 170,236 service-reported bytes) and its ten original members are retained privately with the complete native logs and command exits. The service reports artifact digest `sha256:76c88eae4479c84ed7599410e95013ea74b5f43837bd09d14f77b65b51c6ef30`; this service ZIP digest is retained separately from the independently recorded member hashes. An initial CLI lookup returned HTTP 404 because the temporary workflow was absent from the default branch; the retained read-only correction identified the same successful run by its exact branch, commit, event, workflow path and attempt. No second push or workflow rerun occurred.
+
+This isolated workflow is a release end-to-end witness, not a product feature, and must not be merged into `main`. After this supersession record is adopted and the private evidence retained, its clean branch/worktree are eligible for cleanup. This smoke does not establish population precision, recall, broad product quality or an independent acceptance of the full mission.
