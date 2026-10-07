@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+Behavior on unchanged documents:
+
+- Console, HTML and Markdown start with up to three deterministic next checks. Incomplete
+  measurements take priority; repeated rule IDs remain separate individual findings.
+- Human reports now show counted reasons for declined candidates even when the coverage floor
+  is met. Passing a coverage floor does not mean every candidate was measured.
+- Markdown includes each finding's actual message and the rule registry's remedy, with its
+  tested or untested status. JSON, severity and exit decisions remain canonical and unchanged.
+- The report surface ledger moves from schema 5 to 6, preserving all earlier review rounds.
+  An explicitly delegated AI sight review has its own kind and complete PNG/page hash binding.
+  It is never presented as a human review; ordinary agent records still cannot pass a cell.
+
 ## 0.8.0 — 2026-09-28
 
 ### Behaviour and limits

@@ -334,7 +334,7 @@ in [SECURITY.md](SECURITY.md).
 
 Parts of this repository were written with the help of large language models: the initial
 implementation of several rules, most of the test fixtures, and the first draft of this
-documentation. The rule set, the thresholds and their sources were chosen by a person. Every
+documentation. The rule definitions document their thresholds and sources; new checks may be implemented and reviewed with AI assistance. Every
 rule that cites the German orthography ruleset was checked against the published text of that
 ruleset, not against a model's summary of it.
 
