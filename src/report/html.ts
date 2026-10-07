@@ -328,7 +328,7 @@ function renderDeclines(decisions: ReportDecisions): string {
 <h2 id="declines-heading">Declined candidates</h2>
 <p class="section-lead">Counted reasons remain visible even when coverage meets its floor. These are recorded reasons a measurement was not made, not layout findings.</p>
 <ul class="decline-list">
-${decisions.declines.map((decline) => `<li>${pathText(decline.document)} · ${decline.ruleId === null ? "no rule" : ruleIdCode(decline.ruleId)} · ${esc(decline.scope)} · ${esc(decline.reason)}: <strong>${decline.count}</strong></li>`).join("\n")}
+${decisions.declines.map((decline) => `<li><span class="decline-count"><strong>Count ${decline.count}</strong></span> · ${pathText(decline.document)} · ${decline.ruleId === null ? "no rule" : ruleIdCode(decline.ruleId)} · ${esc(decline.scope)} · ${esc(decline.reason)}</li>`).join("\n")}
 </ul>
 </section>`;
 }

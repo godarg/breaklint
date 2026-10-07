@@ -20,6 +20,11 @@ function elements(node: HtmlNode): HtmlElement[] {
 const attribute = (element: HtmlElement, name: string): string | undefined =>
   element.attrs.find((attr) => attr.name === name)?.value;
 
+function textContent(node: HtmlNode): string {
+  if ("value" in node) return node.value;
+  return "childNodes" in node ? node.childNodes.map(textContent).join("") : "";
+}
+
 function assertFindingNavigationTargets(className: string, expectedLinks: number): void {
   const nodes = elements(parse(renderHtml(navigationReport())));
   const container = nodes.find((node) => attribute(node, "class")?.split(" ").includes(className));
@@ -83,9 +88,33 @@ describe("human report navigation", () => {
     assertFindingNavigationTargets("finding-navigation", 4);
   });
 
+  it("labels each HTML decline count before its reason and keeps label and value together", () => {
+    const nodes = elements(parse(renderHtml(navigationReport())));
+    const list = nodes.find((node) => attribute(node, "class") === "decline-list");
+    assert.ok(list);
+    const items = elements(list).filter((node) => node.tagName === "li");
+    assert.equal(items.length, 3);
+    const expected = [
+      { reason: "env/vertical-writing", count: 4, rule: "no rule", scope: "document" },
+      { reason: "env/forced-break", count: 1, rule: "layout/widow", scope: "block" },
+      { reason: "env/multicolumn", count: 5, rule: "layout/widow", scope: "block" },
+    ];
+    for (const row of expected) {
+      const item = items.find((node) => textContent(node).includes(row.reason));
+      assert.ok(item, `Missing decline reason ${row.reason}`);
+      const countLabels = elements(item).filter((node) => attribute(node, "class") === "decline-count");
+      assert.equal(countLabels.length, 1, `${row.reason} needs one explicit count label`);
+      assert.equal(textContent(countLabels[0]!), `Count ${row.count}`);
+      assert.equal(textContent(item), `Count ${row.count} · examples/demo.html · ${row.rule} · ${row.scope} · ${row.reason}`);
+    }
+    const styles = nodes.filter((node) => node.tagName === "style").map(textContent).join("\n");
+    assert.match(styles, /\.decline-count\s*\{[^}]*white-space:\s*nowrap\s*;/u);
+  });
+
   it("discloses counted decline reasons even when the coverage floor is met", () => {
     const report = navigationReport();
-    for (const output of [renderConsole(report), renderHtml(report), renderMarkdown(report)]) {
+    // HTML's labeled count/reason tuples are checked independently in the parsed DOM above.
+    for (const output of [renderConsole(report), renderMarkdown(report)]) {
       assert.match(output, /Declined candidates/u);
       assert.match(output, /env\/multicolumn[^\n]*5/u);
       assert.match(output, /env\/forced-break[^\n]*1/u);
