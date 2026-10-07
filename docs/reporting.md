@@ -497,6 +497,11 @@ the same decoded pixels as its full-page PNG. The complete matrix also has 24 fu
 four PDFs. Measured on 2026-10-07, their page counts are 3/9/9/9 on macOS and 3/8/9/9
 on Linux, in state order clean/findings/infrastructure/insufficient-coverage: 30 and 29 page
 rasters respectively. Independent `pdfinfo` and canonical PNG membership confirm both inventories.
+The preceding values describe the historical 0.9.0 matrix. For the 0.10.0 presentation,
+independent physical measurements on 2026-10-07 record 158 tiles and 3/8/8/8 printed pages
+on both macOS and Linux (27 page rasters). The [Linux diagnostic](https://github.com/godarg/breaklint/actions/runs/37679854862)
+rendered all 32 cells and passed its independent inventory oracle; it is technical evidence,
+not a visual review. The original first diagnostic timeout is retained as incomplete infrastructure.
 The verifier pins each platform and state separately; it does not derive its expected count from
 the renderer manifest. Long mobile pages cannot be judged at fit-to-window scale; their viewport-height tiles can.
 The verifier re-cuts every tile from the independently decoded full page and

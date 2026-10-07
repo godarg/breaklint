@@ -1445,3 +1445,19 @@ The four frozen unchanged-input comparison runs retained 215 byte-identical page
 This is a bounded behavior study through the actual published producer/engine boundary, not
 stock CLI equivalence, a blind holdout or population accuracy. Fresh final gates, current
 surface review, independent acceptance, publication and consumer updates remain pending.
+
+
+## 2026-10-07 — independent 0.10 report inventory
+
+The changed six-finding presentation, coverage labels and atomic printed run-fact pairs measure
+24 whole screens, 158 viewport tiles, four PDFs and 27 A4 page rasters. Independent pdfinfo and
+pypdf count clean/findings/infrastructure/insufficient-coverage as 3/8/8/8 on macOS and in
+[Linux diagnostic run 37679854862](https://github.com/godarg/breaklint/actions/runs/37679854862).
+Actual PNG membership, dimensions and hashes join both inventories; expected values remain
+fixed per platform/state. The missing/extra-page, unchanged-total redistribution and unknown-
+platform negative controls remain. The old 0.9 inventory is historical evidence, not a
+0.10 oracle. First Linux attempt 37677161097 timed out at a combined quiet prerequisite
+step before rendering; its exact subcommand cause remains unknown and its evidence is retained.
+The second attempt separated and bounded prerequisites and successfully rendered/independently
+counted the unchanged candidate. This supplies no AI or human visual review. A new full local
+technical gate, fresh delegated sight review and final release acceptance remain required.
