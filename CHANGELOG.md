@@ -46,6 +46,8 @@ example evaluation is recorded; frozen-candidate acceptance and publication are 
   preserves whole rule-name segments, numeric alignment and the separate print-specific padding.
   On the 390px mobile surface, shared weighted tracks also keep that whole heading aligned with
   its counts, without reducing the existing label size.
+- Keep each printed run fact's label and value together across a page break, so source and
+  configuration values retain their context.
 
 All 17 registered rules retain `calibrated: false`; 12 are enabled by default. A bounded human
 evaluation of ten selected real pages supplied six defect and four acceptable/intended labels.

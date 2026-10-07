@@ -205,6 +205,9 @@ export const REPORT_HTML_STYLES = String.raw`
     .summary-grid > div:first-child dd { overflow-wrap: normal; font-size: var(--bl-font-size-base); white-space: nowrap; word-break: normal; }
     .summary-grid > div:first-child small { white-space: normal; }
     .run-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    /* Each fact is one label/value unit. A grid fragment otherwise left SOURCE and CONFIGURATION
+       labels at the end of one page and their values alone at the top of the next. */
+    .run-facts > div { break-inside: avoid; }
     .finding-list { gap: var(--bl-space-4); }
     /* Block flow, not a grid: a grid item that fragments is stretched to its unfragmented grid
        area, and Blink handed the surplus a repeated table header creates to the continuation
