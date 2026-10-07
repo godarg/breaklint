@@ -485,10 +485,11 @@ Both modes cover:
 - one real A4 PDF per state and an independently rasterized page set for each PDF.
 
 That is 32 review cells. Each tablet and mobile screen cell is also written as viewport-height
-tiles (`<cell>--tile-NN.png`, 152 in the canonical matrix) cut from the same decoded pixels as its
-full-page PNG — a mobile strip (measured 390 × 4 092 px for the clean state and 390 × 11 341,
-11 846 and 11 960 px for findings, infrastructure and insufficient coverage) cannot be judged at
-fit-to-window scale; its five, fourteen or fifteen 844 px tiles can. The verifier re-cuts every tile from the independently decoded full page and
+tiles (`<cell>--tile-NN.png`, 168 in the 0.9.0 matrix measured on 2026-10-07) cut from
+the same decoded pixels as its full-page PNG. The complete matrix also has 24 full-screen PNGs,
+four PDFs and 30 page rasters; counts and dimensions come from the current manifest. Long
+mobile pages cannot be judged at fit-to-window scale; their viewport-height tiles can.
+The verifier re-cuts every tile from the independently decoded full page and
 requires the normalized RGBA to match, so tiles add no unbound pixel. `review-gallery.html` in the
 same directory presents every full page, tile and printed page per state; it is what a reviewer
 opens, and the verifier requires it to reference every artifact. A reviewed screen cell names its
