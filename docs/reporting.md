@@ -53,6 +53,8 @@ and is therefore represented as `ok: true` in canonical JSON, but a run in which
 candidate is still `insufficient-coverage`. Its primary HTML summary says `Not established`, never
 `Coverage met`. This preserves both truths instead of allowing a row-level arithmetic fact to
 overwrite the run verdict.
+When a rule has an actual measured shortfall, the primary summary instead says `Below required floor`.
+
 
 ## Finding grammar
 
@@ -696,3 +698,13 @@ with the error still reported. Both require the injected 1600 px block itself to
 the per-page records to agree with the summary.
 
 The portable bundle keeps `report.json` as the historical capture record. `context.json` adds `bundleEvidence` contract version 1 with current per-finding asset availability; `bundle.json` lists every copied PNG/PDF and its SHA-256 and byte length. A missing or tampered local asset remains `missing-or-integrity-failed` in both HTML and AI context. A historical report comparison is not a fresh verification of local bundle assets. Overflow crops show the visible intersection while preserving the original target coordinates.
+
+<!-- review-state -->
+For 0.9.0 the current record is round 5: four fresh Claude Opus 5.5 reviews passed all 32 cells
+under the Founder's release-specific AI delegation of 2026-10-04 and targeted-completion
+instruction of 2026-10-07. Native receipts bind 222 image reads (24 full screens, 168 viewport
+tiles and 30 A4 page rasters); the four PDF cells were judged through every matching raster.
+This is AI sight review, not human review. One medium and sixteen low findings are dispositioned:
+ratio wording, identifier wrapping, print disclosure and continuation labels remain follow-up
+or accepted risks. Full desktop captures were downscaled; small-text judgement rests on tablet,
+mobile and A4 evidence. Ubuntu font resolution remains unmeasured. JSON remains canonical.

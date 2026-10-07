@@ -223,12 +223,21 @@ finding list and an owner, instead of red and unread. The findings and their add
 carried in that release's follow-up register.
 
 <!-- review-state -->
-**For 0.8.0 the Founder reported a completed sight review without remarks.** Ledger round 4
-(2026-09-28, `@Founder`) binds all 32 passed cells to the render of the PR #33 merge commit;
-`npm run test:report-surfaces:local` passes on that binding. The round records the Founder's
-exact wording and the three known residuals; Ubuntu font resolution remains NEEDS-CI. For 0.7.0,
-ledger round 3 likewise passed all 32 cells on the PR #18 merge commit. The 0.6.0 override was
-not repeated and the gate was not dropped.
+For 0.9.0 the current record is round 5: four fresh Claude Opus 5.5 reviews passed all 32 cells
+under the Founder's release-specific AI delegation of 2026-10-04 and targeted-completion
+instruction of 2026-10-07. Native receipts bind 222 image reads (24 full screens, 168 viewport
+tiles and 30 A4 page rasters); the four PDF cells were judged through every matching raster.
+This is AI sight review, not human review. One medium and sixteen low findings are dispositioned:
+ratio wording, identifier wrapping, print disclosure and continuation labels remain follow-up
+or accepted risks. Full desktop captures were downscaled; small-text judgement rests on tablet,
+mobile and A4 evidence. Ubuntu font resolution remains unmeasured. JSON remains canonical.
+
+The Founder stated on 2026-10-04: “by the mandate in §0 the Founder delegates the sight review
+that docs/releasing.md reserves for a human to this multi-model review.” The targeted 2026-10-07
+instruction removes mandatory extra model rounds. Round 5 names the actual AI model and exact
+received images; it claims no human look. The original failed private criterion review is retained,
+and only its affected state was rejudged against the existing trust-label contract. Historical
+rounds 1–4 remain unchanged. No failing technical check was waived.
 
 The green real-document gate reads the rights/privacy-reviewed corpus manifest and binds exact
 artifact hashes, source evidence, page/rule counts and the positive independent geometry-oracle

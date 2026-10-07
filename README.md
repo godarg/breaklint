@@ -297,9 +297,14 @@ cell for decoded pixels, contrast, accessibility and fragmentation. A human revi
 a passing round by a rostered reviewer in the review ledger, bound to the current inputs; see its
 latest round and [`docs/releasing.md`](docs/releasing.md).
 <!-- review-state -->
-For 0.8.0 the latest round is round 4: the Founder reported a completed sight review without
-remarks on 2026-09-28, passing all 32 cells bound to the release-preparation render and its
-environment (macOS, Google Chrome). Ubuntu font resolution remains unmeasured. JSON remains canonical.
+For 0.9.0 the current record is round 5: four fresh Claude Opus 5.5 reviews passed all 32 cells
+under the Founder's release-specific AI delegation of 2026-10-04 and targeted-completion
+instruction of 2026-10-07. Native receipts bind 222 image reads (24 full screens, 168 viewport
+tiles and 30 A4 page rasters); the four PDF cells were judged through every matching raster.
+This is AI sight review, not human review. One medium and sixteen low findings are dispositioned:
+ratio wording, identifier wrapping, print disclosure and continuation labels remain follow-up
+or accepted risks. Full desktop captures were downscaled; small-text judgement rests on tablet,
+mobile and A4 evidence. Ubuntu font resolution remains unmeasured. JSON remains canonical.
 The information contract and the reproducible 32-cell screen/print review are documented in
 [`docs/reporting.md`](docs/reporting.md).
 

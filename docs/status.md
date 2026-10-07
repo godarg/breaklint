@@ -17,7 +17,7 @@ Contract 1 retain their stamps.
 This is the focused completion authorized by the maintainer on 2026-10-07. It does not claim
 the original exhaustive product label-set precision/recall study or blind all-product A/B
 was completed. Technical gates, packed consumers and fresh independent acceptance are
-required before tagging. The following release records are historical measurements.
+required before tagging. The current delegated AI sight record is round 5, all 32 cells passed by four fresh Claude Opus 5.5 state reviews. It retains one medium and sixteen low dispositions and does not establish human review or Ubuntu font resolution. The following release records are historical measurements.
 
 ## Release v0.8.0: published 2026-09-28
 

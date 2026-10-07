@@ -1365,3 +1365,7 @@ The unchanged original rejection expression and labelled-continuation requiremen
 The original injection fails that expected-phase assertion on reversal; corrected bytes were
 restored. Both old red outputs remain recorded. No production CSS, verifier limit, test
 expectation, skip or timeout changed.
+
+## 2026-10-07 — current sight record and unchanged surface controls
+
+All 34 original surface mutation controls passed on `0da4d74` after the two documented injection repairs; the technical gate also passed. Round 5 binds four fresh actual `claude-opus-5-5` state reviews to 222 native image reads and every one of the 32 matrix cells. No blocker/high remains; one medium and sixteen low findings are explicitly dispositioned. The original overly broad private exit-4 criterion was refuted by the unchanged source contract and only that state was reviewed again. Native receipts are hash-only public evidence; original provider streams and failed records remain private. This establishes sight evidence, not publication, calibration or completion of the former all-product A/B.
