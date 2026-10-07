@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, symlinkSync, copyFileSync, readFileSync, readdi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { after, describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import type { Report } from "../../src/core/types.ts";
 const repo = fileURLToPath(new URL("../..", import.meta.url));
 const root = mkdtempSync(join(tmpdir(), "breaklint-figure-live-"));
@@ -30,6 +30,17 @@ function run(fixture: string, id: string, expectedExit: number) {
   return { cwd, report, pdf: join(cwd, "evidence", pdfs[0]!) };
 }
 describe("source-bound figure checks, live", () => {
+before(() => {
+  // The ordered release gate runs live checks before its later standalone build.
+  const argv = ["run", "build"];
+  const native = spawnSync("npm", argv, { cwd: repo, encoding: "utf8" });
+  const exitCode = native.status;
+  writeFileSync(join(root, "build.stdout.txt"), native.stdout ?? "");
+  writeFileSync(join(root, "build.stderr.txt"), native.stderr ?? "");
+  writeFileSync(join(root, "build-native-exit.json"), JSON.stringify({ argv, exitCode, signal: native.signal, error: native.error?.message, node: process.version }));
+  console.log(`retained build evidence: ${root}`);
+  assert.equal(exitCode, 0, `real CLI build failed: ${native.stdout}${native.stderr}${native.error?.message ?? ""}`);
+});
 for (const oracle of expected.cases) it(`caption placement and PDF witness: ${oracle.fixture}`, () => {
   const { cwd, report, pdf } = run(oracle.fixture, "figure/caption-separated", oracle.captionFindings ? 1 : 0);
   const coverage = report.documents[0]!.coverage["figure/caption-separated"]!;
