@@ -769,6 +769,10 @@ Source-script presence alone does not prevent this bounded measurement, but an u
 table, a missing source row or changed content does. Missing inventory, headerless tables, split
 data rows, spanning cells, multicolumn/vertical flow and unusable geometry decline. An authored
 `thead` or an initial contiguous all-`th` row run supplies the header; a data row never does.
+Snapshot 7 represents positive integer spans. Valid `rowspan="0"` row-group growth and raw
+attributes outside that representation withhold the optional table inventory; enabled table
+checks decline explicitly while unrelated default checks continue. Browser recovery of malformed
+span attributes is not modeled, and an unsupported zero is never replaced by a unit span.
 The header check observes lost column context. The drift check observes changed cell tracks
 relative to each fragment's origin, with a chosen 2 CSS px default tolerance. Neither proves
 author intent or a particular CSS cause. Repeated-header and column-width repair suggestions

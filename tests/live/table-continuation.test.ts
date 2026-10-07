@@ -9,8 +9,55 @@ import { renderDocuments } from "../../src/acquire/render-run.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import { tableHeaderNotRepeated, tableColumnDrift } from "../../src/rules/layout/table-continuation.ts";
 import { captionSeparated } from "../../src/rules/figure/caption-separated.ts";
+import { coverageFloorMap, resolveConfig } from "../../src/config/resolve.ts";
 
 describe("source-bound table checks, live", () => {
+it("keeps unsupported span attributes out of optional inventory without losing default checks", async () => {
+  // Independent HTML truth: rowspan=0 grows to the end of its row group, rather than one row.
+  // The present inventory only represents positive integer spans; malformed values also decline.
+  const variants = [
+    { name: "row-group-span", attributes: 'rowspan="0"', supported: false },
+    { name: "malformed-span", attributes: 'colspan="0" rowspan="2px"', supported: false },
+    { name: "unit-span-control", attributes: 'colspan="1" rowspan="1"', supported: true },
+  ];
+  for (const variant of variants) {
+    const root = mkdtempSync(join(tmpdir(), "breaklint-table-span-live-"));
+    try {
+      const html = `<!doctype html><html lang="en"><meta charset="utf-8"><title>Span control</title>
+<style>@page { size: 120mm 140mm; margin: 10mm; } body { font: 14px/1.5 serif; }
+table { border-collapse: collapse; } th, td { border: 1px solid black; padding: 6px; }</style>
+<body><h1>Span control</h1><table><thead><tr><th>Label</th><th>Value</th></tr></thead><tbody>
+<tr><td ${variant.attributes}>Quartz</td><td>11</td></tr><tr><td>Maple</td><td>22</td></tr>
+</tbody></table><p>End of control.</p></body></html>`;
+      const path = join(root, "input.html"); writeFileSync(path, html);
+      const rendered = await renderDocuments([path], {
+        outDir: root, evidenceBinding: true, sourceMapInjection: true, locale: "en-US", network: { mode: "offline", allowed: [] },
+      });
+      assert.equal(rendered.fatal, null, variant.name);
+      const input = rendered.documents[0]!;
+      assert.ok(input.snapshot, JSON.stringify(input.infrastructure));
+      const pdf = readdirSync(root).find(name => name.endsWith("-checked.pdf")); assert.ok(pdf);
+      const text = spawnSync("pdftotext", ["-layout", join(root, pdf), "-"], { encoding: "utf8" });
+      assert.equal(text.status, 0, text.stderr);
+      for (const label of ["Quartz", "Maple"]) assert.equal((text.stdout.match(new RegExp(`\\b${label}\\b`, "gu")) ?? []).length, 1);
+      const config = resolveConfig({ file: {}, cli: {} });
+      const report = runDocument(input, { activeRules: config.activeRules, optionsByRule: config.optionsByRule,
+        coverageFloors: coverageFloorMap(config), failOn: config.failOn }).report;
+      assert.notEqual(report.exitReason, "checker-crashed", variant.name);
+      assert.equal(Object.keys(report.coverage).length, 12, variant.name);
+      const tables = runDocument(input, { activeRules: [tableHeaderNotRepeated, tableColumnDrift], optionsByRule: {}, coverageFloors: {}, failOn: "warn" }).report;
+      if (variant.supported) {
+        assert.equal(input.snapshot.tableIndex?.complete, true);
+        assert.equal(tables.coverage[tableHeaderNotRepeated.id]!.measured, 1);
+        assert.equal(tables.findings.length, 0);
+      } else {
+        assert.equal(input.snapshot.tableIndex, undefined);
+        assert.equal(tables.verdict, "insufficient-coverage");
+        assert.equal(tables.notMeasured[0]!.reason, "env/table-index-unavailable");
+      }
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
 it("collects actual continued cells and independently witnesses missing heads in the delivered PDF", async () => {
   const root = mkdtempSync(join(tmpdir(), "breaklint-table-live-"));
   try {

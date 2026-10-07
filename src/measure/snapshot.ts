@@ -1517,6 +1517,16 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
       hasFigureSource(figure.sid) && figure.captionSids.every(hasFigureSource)) &&
     input.sourceModel.figureIndex.referenceBlocks.every(block => hasFigureSource(block.sid));
 
+  // HTML rowspan="0" is valid row-group growth, not a unit span. Raw authored values can also
+  // be NaN, zero or fractional even when the browser recovers. Snapshot 7 represents positive
+  // integer spans only. Decline this optional inventory rather than poisoning unrelated rules
+  // or replacing an unsupported span with 1; present malformed snapshots are still refused.
+  const representableSpans = (rows: readonly { cells: readonly { colSpan: number; rowSpan: number }[] }[]): boolean =>
+    rows.every(row => row.cells.every(cell => [cell.colSpan, cell.rowSpan].every(span => Number.isSafeInteger(span) && span >= 1)));
+  const tableIndexAvailable = input.sourceMapInjection && input.raw.tables !== undefined &&
+    input.sourceModel.tableIndex.tables.every(table => representableSpans(table.rows)) &&
+    input.raw.tables.every(table => representableSpans(table.rows));
+
   return {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     meta: {
@@ -1560,8 +1570,8 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
         })),
       })),
     } } : {}),
-    ...(input.sourceMapInjection && input.raw.tables !== undefined ? { tableIndex: {
-      complete: input.sourceModel.tableIndex.complete && input.raw.tables.every(table =>
+    ...(tableIndexAvailable ? { tableIndex: {
+      complete: input.sourceModel.tableIndex.complete && input.raw.tables!.every(table =>
         table.sid !== null && input.sourceModel.tableIndex.tables.some(source => source.sid === table.sid)),
       tables: input.sourceModel.tableIndex.tables.map(table => ({ ...table,
         fragments: input.raw.tables!.filter(fragment => fragment.sid === table.sid),

@@ -14,6 +14,9 @@ records are kept separately in `docs/status.md`.
 - Emit Snapshot 7 with the table inventory and printed flow witnesses. Read Snapshot 5, 6 and 7;
   absent legacy inventories decline enabled checks. Report 5 (readers accept Report 4 and 5),
   context pack 2, comparison 1 and Configuration Contract 1 remain unchanged.
+- Withhold optional table inventory for spans outside its positive-integer representation,
+  including valid `rowspan="0"`. Enabled table checks decline; unrelated default checks continue.
+  Do not replace unsupported spans with unit spans or weaken validation of present snapshots.
 - Recognize local Table/Tbl./Tabelle/Tab. links alongside figure conventions. Honor legacy
   `<a name>` fragment anchors with authored IDs taking precedence. An older inventory lacking
   named anchors cannot prove a missing target and declines the ambiguous block.
