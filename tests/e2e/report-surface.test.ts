@@ -37,6 +37,7 @@ import {
   describeLatestRound,
   isMeasurableBrowserVersion,
   latestBindingStatus,
+  summarizeLatestRound,
   validateReviewLedger,
   type ReviewLedger,
   type ReviewRound,
@@ -493,7 +494,8 @@ describe("report-surface human review gate", () => {
 
   it("retains the 0.7.0 review and records the 0.8.0 Founder pass of all 32 cells", () => {
     const ledger = committedLedger();
-    const { rounds, latest } = validateReviewLedger(ledger);
+    const historical = { ...ledger, rounds: ledger.rounds.slice(0, 4) };
+    const { rounds, latest } = validateReviewLedger(historical);
     assert.equal(rounds, 4);
     const prior = ledger.rounds[2]!;
     assert.equal(prior.round, 3);
@@ -511,6 +513,26 @@ describe("report-surface human review gate", () => {
     const cells = Object.values(latest.cells ?? {});
     assert.equal(cells.length, 32);
     assert.ok(cells.every((cell) => cell.status === "pass" && cell.reviewer === "@Founder"));
+
+    // The new delegated round does not replace or become a historical human review.
+    const current = validateReviewLedger(ledger);
+    assert.equal(current.rounds, 5);
+    assert.equal(current.latest.round, 5);
+    assert.equal(current.latest.record, "current");
+    assert.equal(current.latest.outcome, "pass");
+    assert.deepEqual(current.latest.reviewers.map(({ kind, handle }) => ({ kind, handle })), [
+      { kind: "delegated-ai", handle: "@ClaudeOpus-clean" },
+      { kind: "delegated-ai", handle: "@ClaudeOpus-findings" },
+      { kind: "delegated-ai", handle: "@ClaudeOpus-infrastructure" },
+      { kind: "delegated-ai", handle: "@ClaudeOpus-insufficient-coverage" },
+    ]);
+    assert.equal(current.latest.delegation?.release, "0.9.0");
+    const summary = summarizeLatestRound(ledger);
+    assert.equal(summary.passingCells, 32);
+    assert.equal(summary.delegatedPassingCells, 32);
+    assert.equal(summary.humanPassingCells, 0);
+    assert.equal(summary.delegatedPass, true);
+    assert.equal(summary.humanPass, false);
   });
 
   it("passes only a latest human round bound to the current inputs, environment and cells", () => {

@@ -124,8 +124,21 @@ describe("delegated AI sight review", () => {
   it("migrates only the schema stamp and preserves all four original review rounds", () => {
     const ledger = JSON.parse(readFileSync(new URL("../golden/report-surfaces/review-ledger.json", import.meta.url), "utf8")) as ReviewLedger;
     assert.equal(ledger.schemaVersion, 6);
-    assert.equal(ledger.rounds.length, 4);
-    assert.equal(sha(JSON.stringify(ledger.rounds)), "d16be7667cdbb2dbb7437ff9824c813b4529a07823302d3ded87c1bd1e9aa573");
-    assert.equal(contract.validateReviewLedger(ledger).rounds, 4);
+    const historical = { ...ledger, rounds: ledger.rounds.slice(0, 4) };
+    assert.equal(historical.rounds.length, 4);
+    assert.equal(sha(JSON.stringify(historical.rounds)), "d16be7667cdbb2dbb7437ff9824c813b4529a07823302d3ded87c1bd1e9aa573");
+    assert.equal(contract.validateReviewLedger(historical).rounds, 4);
+
+    const current = contract.validateReviewLedger(ledger);
+    assert.equal(current.rounds, 5);
+    assert.equal(current.latest.round, 5);
+    assert.ok(current.latest.reviewers.every((reviewer) => reviewer.kind === "delegated-ai"));
+    assert.equal(current.latest.delegation?.release, "0.9.0");
+    const summary = contract.summarizeLatestRound(ledger);
+    assert.equal(summary.passingCells, 32);
+    assert.equal(summary.delegatedPassingCells, 32);
+    assert.equal(summary.humanPassingCells, 0);
+    assert.equal(summary.delegatedPass, true);
+    assert.equal(summary.humanPass, false);
   });
 });
