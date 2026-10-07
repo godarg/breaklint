@@ -489,8 +489,11 @@ Both modes cover:
 That is 32 review cells. Each tablet and mobile screen cell is also written as viewport-height
 tiles (`<cell>--tile-NN.png`, 168 in the 0.9.0 matrix measured on 2026-10-07) cut from
 the same decoded pixels as its full-page PNG. The complete matrix also has 24 full-screen PNGs,
-four PDFs and 30 page rasters; counts and dimensions come from the current manifest. Long
-mobile pages cannot be judged at fit-to-window scale; their viewport-height tiles can.
+four PDFs. Measured on 2026-10-07, their page counts are 3/9/9/9 on macOS and 3/8/9/9
+on Linux, in state order clean/findings/infrastructure/insufficient-coverage: 30 and 29 page
+rasters respectively. Independent `pdfinfo` and canonical PNG membership confirm both inventories.
+The verifier pins each platform and state separately; it does not derive its expected count from
+the renderer manifest. Long mobile pages cannot be judged at fit-to-window scale; their viewport-height tiles can.
 The verifier re-cuts every tile from the independently decoded full page and
 requires the normalized RGBA to match, so tiles add no unbound pixel. `review-gallery.html` in the
 same directory presents every full page, tile and printed page per state; it is what a reviewer
