@@ -85,6 +85,14 @@ export const REPORT_HTML_STYLES = String.raw`
   .checker-event p { margin-block-end: var(--bl-space-2); }
   .checker-event p:last-child { margin-block-end: 0; }
   .section-lead { max-width: var(--bl-text-width); margin-block-end: var(--bl-space-5); color: var(--bl-color-fg-muted); }
+  .next-check-list, .decline-list { padding-inline-start: var(--bl-space-5); }
+  .next-check-list > li { margin-block-end: var(--bl-space-4); break-inside: avoid; }
+  .next-check-list p { max-width: var(--bl-text-width); margin-block-end: var(--bl-space-2); }
+  .decline-list > li { margin-block-end: var(--bl-space-2); break-inside: avoid; }
+  .decline-count { white-space: nowrap; }
+  .finding-navigation { margin-block-start: var(--bl-space-5); }
+  .finding-navigation summary { cursor: pointer; font-weight: 700; }
+  .finding-navigation p { max-width: var(--bl-text-width); margin-block-start: var(--bl-space-3); }
   .section-heading { break-inside: avoid; break-after: avoid; }
   .finding-list { display: grid; gap: var(--bl-space-5); counter-reset: finding; }
   .finding-list > li { counter-increment: finding; }

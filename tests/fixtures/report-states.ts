@@ -16,6 +16,9 @@ function clone(report: Report): Report {
   return JSON.parse(JSON.stringify(report)) as Report;
 }
 
+// This presentation fixture keeps its original 13-rule baseline. New figure checks require
+// authored inventory; the source-less handwritten demo cannot fabricate that coverage.
+const SURFACE_BASELINE_RULES = ALL_RULES.filter(rule => !rule.id.startsWith("figure/"));
 function findingsBase(): Report {
   const parsed = JSON.parse(readFileSync(new URL("../../examples/demo-snapshot.json", import.meta.url), "utf8")) as {
     snapshot: Snapshot;
@@ -25,7 +28,7 @@ function findingsBase(): Report {
     { path: "examples/demo.html", snapshot: parsed.snapshot, infrastructure: [] },
     {
       failOn: "error",
-      activeRules: [...ALL_RULES],
+      activeRules: [...SURFACE_BASELINE_RULES],
       optionsByRule: {},
       coverageFloors: resolved.coverageFloorsByRule,
     },
@@ -38,7 +41,7 @@ function findingsBase(): Report {
     commit: "8e8491e",
     startedAt: "2026-08-22T12:00:00.000Z",
     durationMs: 184,
-    rulesRun: ALL_RULES.length,
+    rulesRun: SURFACE_BASELINE_RULES.length,
     // A real CLI run id has this shape (randomUUID). The canonical surfaces print it in the tool
     // line, the running head of every printed page after the first, and the end mark.
     runId: "3f6c1a2e-8b4d-4f7a-9c21-5e0b7d9a4c68",

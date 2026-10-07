@@ -185,3 +185,26 @@ describe("schema stamps in the shipped documents", () => {
     }
   });
 });
+
+it("reads actual snapshot compatibility and refuses an unsupported readable stamp", () => {
+  const actual = stamps as Stamps & { readableSnapshots?: number[] };
+  assert.ok(Array.isArray(actual.readableSnapshots), "the child build did not report its snapshot readers");
+  assert.ok(actual.readableSnapshots.includes(stamps.snapshot));
+  assert.deepEqual(scanText("x.md", `Readers accept Snapshot ${actual.readableSnapshots.join(" and ")}.`, stamps), []);
+  const future = stamps.snapshot + 1;
+  assert.equal(scanText("x.md", `Legacy Snapshot ${future} remains readable.`, stamps).length, 1);
+  assert.equal(scanText("x.md", `Readers accept Snapshot ${actual.readableSnapshots[0]} and ${future}.`, stamps).length, 1);
+  assert.equal(scanText("x.md", `Snapshot ${future} records live geometry.`, stamps).length, 1);
+  const path = join(stage, "examples/demo-snapshot.json"); const original = readFileSync(path);
+  try {
+    const legacy = JSON.parse(original.toString("utf8")); legacy.snapshot.schemaVersion = actual.readableSnapshots[0]; delete legacy.snapshot.figureIndex;
+    writeFileSync(path, JSON.stringify(legacy));
+    const oldRules = spawnSync(process.execPath, [join(stage, "dist/cli/index.js"), "--demo", "--format", "json"], { cwd: stage, encoding: "utf8" });
+    const oldCode = oldRules.status; assert.equal(oldCode, 1, oldRules.stderr);
+    const newRule = spawnSync(process.execPath, [join(stage, "dist/cli/index.js"), "--demo", "--only", "figure/caption-separated", "--format", "json"], { cwd: stage, encoding: "utf8" });
+    const newCode = newRule.status; assert.equal(newCode, 4, newRule.stderr);
+    const report = JSON.parse(newRule.stdout);
+    assert.equal(report.documents[0].coverage["figure/caption-separated"].measured, 0);
+    assert.equal(report.documents[0].notMeasured[0].reason, "env/figure-index-unavailable");
+  } finally { writeFileSync(path, original); }
+});

@@ -101,7 +101,11 @@ const SURFACE_CONTROLS = {
   "broken-caption-gap": { print: `@media print { .caption-line { display: block !important; } .coverage-path { margin-inline-end: var(--bl-space-3) !important; } }` },
   // The coverage list becomes a grid again: its fragmenting table item is stretched on the
   // continuation page (round-2 finding L2).
-  "broken-row-pitch": { print: `@media print { .coverage-documents { display: grid !important; } }` },
+  // The old grid-container control no longer perturbs row pitch after the 0.9 report
+  // changed pagination. Stretch one actual row instead; keep the independent ±8% gate.
+  "broken-row-pitch": { print: `@media print {
+    .coverage-table tbody:first-of-type tr:nth-child(2) > * { padding-block-end: 24px !important; }
+  }` },
   // Page fill, alignment and keep-with-next controls.
   // Page-atomic findings, each well under half a page, with a gap after each that the next one
   // cannot fit beside: one finding per page, text to about 40 % of the content box. (Page-atomic
@@ -111,11 +115,11 @@ const SURFACE_CONTROLS = {
     .finding-facts { display: none !important; }
     .finding-list > li + li { margin-block-start: 640px !important; }
   }` },
-  // One remediation grows to about 55 % of a page (the verifier's x-longer-remediation experiment):
-  // the tail cannot break, moves whole to the next page and leaves the cloned frame of finding 01
-  // empty below its facts. Ink depth read that frame as a full page; text depth and the unit bound
-  // must both reject it.
-  "broken-long-remediation": { print: `@media print { .finding-list > li:first-child .finding-remediation p::after { content: "${" Check the block in its own context and compare the measured value with the threshold before changing layout rules.".repeat(12)}"; } }` },
+  // Start the first finding on a fresh page so preceding report navigation cannot fill the
+  // intended counterexample. The enlarged tail moves whole to the next page; measured on
+  // 2026-10-07, the prior page has 34.1% text but 99.9% framed ink, and the tail is 80.2%
+  // of the content box. Both unchanged text-depth and unbreakable-unit bounds must reject it.
+  "broken-long-remediation": { print: `@media print { .finding-list > li:first-child { break-before: page !important; } .finding-list > li:first-child .finding-remediation p::after { content: "${" Check the block in its own context and compare the measured value with the threshold before changing layout rules.".repeat(18)}"; } }` },
   // Every fact keeps with the next unit: no element grows, but head, facts and tail become one
   // keep-with-next chain as tall as the whole finding. Only a chain-aware unit bound sees it.
   // The long remediation again, with the tail's label hidden: page 3 opens on a bare remediation

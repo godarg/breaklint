@@ -9,7 +9,7 @@
 widows, orphans, blocks too tall to keep together and hyphenation across page breaks, each with
 the measured value and the threshold it failed.
 
-[![A still from the 39-second breaklint film, with the line “Perfect in the browser. Broken on page 47.” over a blurred page of layout findings](https://raw.githubusercontent.com/godarg/breaklint/v0.8.0/assets/breaklint-film-poster.jpg)](https://dargel-solutions.de/en/breaklint/#film)
+[![A still from the 39-second breaklint film, with the line “Perfect in the browser. Broken on page 47.” over a blurred page of layout findings](https://raw.githubusercontent.com/godarg/breaklint/v0.9.0/assets/breaklint-film-poster.jpg)](https://dargel-solutions.de/en/breaklint/#film)
 
 The image links to the project page, which carries the 39-second film about breaklint.
 
@@ -34,13 +34,19 @@ error svg/text-overflows-viewport  page 5
 inputs found: 1 · pages analysed: 5 · rules run: 12 · rules that measured something: 10 · not measured: 1 · verdict: findings · mode: demo · fail-on: error · gate triggered by: error
 ```
 
+The two figure checks are opt-in warnings. They require an authored figure/ID inventory;
+complex figure bodies and ambiguous references are counted as declined. Free-text numbering,
+page-number references, and pagination cause are outside these checks. The hand-written demo
+has no original HTML to inventory: default `--demo` still exits 1; `--profile strict --demo` now exits 4
+because those requested figure checks cannot establish their source measurements.
+
 Every finding carries what was measured, what the threshold was, and the word `uncalibrated` —
 because no threshold in this project has been calibrated against real documents, and a number
 that hides that is worse than no number.
 
 One thing about that output, since the demo invites the assumption: the rule and reporter chain
 running there is the real one, but the page it judges is a **hand-written snapshot**, built so
-that every rule path is reachable in a command that needs no browser. No HTML document stands
+to demonstrate findings from the existing checks in a command that needs no browser. No HTML document stands
 behind it: the snapshot names `examples/demo.html` as its document path, but that file does not
 exist and never did, which is why the demo's findings carry no source location. The run says which
 kind of fixture it used in its own `source` field rather than leaving you to guess. Point the tool
@@ -105,7 +111,7 @@ previous version to compare to.
 
 ## What is checked
 
-Thirteen rules. Twelve of them run by default: two can fail a build, ten more are advisory unless
+Fifteen rules. Twelve of them run by default: two can fail a build, ten more are advisory unless
 you ask for more, with `--fail-on warn`. The thirteenth — `layout/half-empty-page` — is
 experimental, never moves an exit code at all, and since 0.6.0 is not active in the default
 profile: measured on a 40-document corpus built to exercise it, it fired on 37 of them, because
@@ -131,6 +137,8 @@ quantities against a structural boundary.
 | [`type/short-last-line`](docs/rules/type-short-last-line.md) | width of a paragraph's closing line | warn |
 | [`type/excessive-word-spacing`](docs/rules/type-excessive-word-spacing.md) | word gaps against the natural space | warn |
 | [`artifact/local-uri`](docs/rules/artifact-local-uri.md) | `file:` URIs and build-machine paths left in the artefact | warn |
+| [`figure/caption-separated`](docs/rules/figure-caption-separated.md) | a standard single-image figure body and its caption on different pages | warn, **off by default** |
+| [`figure/dangling-reference`](docs/rules/figure-dangling-reference.md) | local Figure/Fig./Abbildung/Abb. links with missing authored IDs | warn, **off by default** |
 
 **No threshold in this project is calibrated.** `calibrated: false` appears in the type, in
 every finding and on every rule page. There is no corpus of real documents with human-checked
@@ -289,9 +297,18 @@ cell for decoded pixels, contrast, accessibility and fragmentation. A human revi
 a passing round by a rostered reviewer in the review ledger, bound to the current inputs; see its
 latest round and [`docs/releasing.md`](docs/releasing.md).
 <!-- review-state -->
-For 0.8.0 the latest round is round 4: the Founder reported a completed sight review without
-remarks on 2026-09-28, passing all 32 cells bound to the release-preparation render and its
-environment (macOS, Google Chrome). Ubuntu font resolution remains unmeasured. JSON remains canonical.
+For 0.9.0 the current record is round 6: four fresh Claude Opus reviews (actual model
+`claude-opus-5-5`) passed all 32 cells on the source after the platform inventory correction,
+under the Founder's release-specific AI delegation of 2026-10-04 and targeted-completion
+instruction of 2026-10-07. Native receipts bind 222 image reads (24 full screens, 168 viewport
+tiles and 30 A4 page rasters); the four PDF cells were judged through every matching raster.
+This is AI sight review, not human review. One medium and eighteen low findings have explicit
+accepted-risk or follow-up dispositions: split-card frames, identifier wrapping, print disclosure,
+ratio wording and short-list continuations remain documented presentation costs. Full desktop
+captures were downscaled; fine-text judgement rests on tablet/mobile tiles and A4 evidence.
+This local sight review does not establish Ubuntu visual review. The separate Linux technical
+diagnostic measured LiberationSerif, LiberationSans and DejaVuSansMono resolution and 3/8/9/9
+A4 pages versus macOS 3/9/9/9. JSON remains canonical.
 The information contract and the reproducible 32-cell screen/print review are documented in
 [`docs/reporting.md`](docs/reporting.md).
 
@@ -334,7 +351,7 @@ in [SECURITY.md](SECURITY.md).
 
 Parts of this repository were written with the help of large language models: the initial
 implementation of several rules, most of the test fixtures, and the first draft of this
-documentation. The rule set, the thresholds and their sources were chosen by a person. Every
+documentation. The rule definitions document their thresholds and sources; new checks may be implemented and reviewed with AI assistance. Every
 rule that cites the German orthography ruleset was checked against the published text of that
 ruleset, not against a model's summary of it.
 
@@ -350,7 +367,7 @@ The useful report is the page where human judgement and the checker disagree. An
 public, unpaid [community test](docs/community-testing.md); there is no application or selection.
 Use only material you may publish. Security findings still go through [`SECURITY.md`](SECURITY.md),
 never a public issue. Community reports are additional QA, not blind annotations or calibration
-evidence, and all thirteen released rules remain `calibrated: false`.
+evidence, and all fifteen released rules remain `calibrated: false`.
 
 ## License
 

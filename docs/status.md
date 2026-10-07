@@ -4,6 +4,21 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
+## 0.9.0 release preparation — 2026-10-07
+
+This record was written before publication; query npm and the GitHub Release for current
+publication state. The candidate adds two source-bound, opt-in figure
+warning checks and clearer next-check navigation with counted declined candidates. It has
+15 registered rules and retains 12 default checks; none is calibrated. Snapshot 6 adds a
+figure/ID inventory; legacy Snapshot 5 remains readable for existing checks, with explicit declines
+when requested figure measurements are unavailable. Report 5, context pack 2 and Configuration
+Contract 1 retain their stamps.
+
+This is the focused completion authorized by the maintainer on 2026-10-07. It does not claim
+the original exhaustive product label-set precision/recall study or blind all-product A/B
+was completed. Technical gates, packed consumers and fresh independent acceptance are
+required before tagging. The current delegated AI sight record is round 6: all 32 cells passed four fresh `claude-opus-5-5` state reviews after the measured platform inventory correction. One medium and eighteen low findings have explicit dispositions. The local sight record establishes neither human nor Ubuntu visual review; the separate Linux technical diagnostic measured font resolution and 29 A4 pages. The following release records are historical measurements.
+
 ## Release v0.8.0: published 2026-09-28
 
 The 0.8.0 release contains the configurable 600,000 ms
@@ -61,7 +76,7 @@ Most of it changes what the rules report about documents that did not change, an
 lists those changes first. Margin-box content — the per-page clones Paged.js makes of
 `position: running(...)` and `position: fixed` elements — is no longer part of the flow, so it no
 longer produces widow, orphan and block-height findings about clones, no longer anchors every page,
-and no longer keeps required evidence from completing. Snapshot 5 records each block's computed
+and no longer keeps required evidence from completing. In 0.7.0 the snapshot moved to 5 and recorded each block's computed
 `display`, `float` and `position`, its margin-box copies, its own boundary hyphen and which lines
 carry its own text, and the rules read those instead of inferring them from a zero box or from a
 wrapper's lines. `layout/widow` and `layout/orphan` judge the block whose own lines a break split;
@@ -439,13 +454,13 @@ GitHub assets.
 
 | | |
 |---|---|
-| 13 released rules as pure functions over a snapshot | `src/rules/` |
-| Mutation guard | 13/13 released rules kill every mutant, each on a fixture that actually triggers it |
+| 15 registered rules as pure functions over a snapshot | `src/rules/` |
+| Mutation guard | 15/15 registered rules kill all five mutants each (75/75), each on a fixture that actually triggers it |
 | False-alarm corpus | every clean fixture stays silent, every trigger fixture fires and is attributed correctly |
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
 | Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in the canonical JSON report; generated schema drift and process-boundary exit 2 are tested |
 | Six output formats | each carries every mandatory counter, checked mechanically, including on a clean run |
-| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; current 32-cell technical gate over 55 primary artifacts and 152 viewport tiles (0.7.0; 71 artifacts in 0.6.0) with decoded-pixel, contrast, font-role, table-alignment, accessibility-tree and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
+| HTML Report Surface v2 | four truthful verdict states; semantic finding cards; responsive light/dark and A4 print; 32-cell technical gate; artifact counts come from its current manifest (historically 55 primary artifacts and 152 viewport tiles in 0.7.0; 71 artifacts in 0.6.0) with decoded-pixel, contrast, font-role, table-alignment, accessibility-tree and fragmentation checks; the 0.2.3 human ledger remains historical and is not presented as review of 0.3.1 |
 | Release-integrity gates | checksum-pinned full-history/worktree secret scan with two canaries; runtime and full dependency audits at zero; one-tarball Node 22.13/24 consumer and publish contract |
 | Licence gate | walks the whole of `node_modules`, so `dependencies`, `optionalDependencies` and the dev tree are all covered; a missing licence field fails |
 | `npx breaklint --demo` | runs the real rule and reporter chain, exit 1, 5 findings across 5 rules |
@@ -480,7 +495,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=677 aggregateTests=839 liveTests=107 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=726 aggregateTests=888 liveTests=112 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against

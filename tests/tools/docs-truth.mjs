@@ -15,7 +15,8 @@
  *   - report: `schemaVersion` of `<dir>/dist/cli/index.js --demo --format json`, which must also
  *     equal the package's `REPORT_SCHEMA_VERSION`;
  *   - readable reports: `READABLE_REPORT_SCHEMA_VERSIONS`;
- *   - snapshot: `SNAPSHOT_SCHEMA_VERSION`;
+ *   - snapshot and readable snapshots: `SNAPSHOT_SCHEMA_VERSION` and
+ *     `READABLE_SNAPSHOT_SCHEMA_VERSIONS`;
  *   - context pack and comparison: `createContextPack(report).schemaVersion` and
  *     `compareReports(report, report).schemaVersion` from the package root;
  *   - configuration contract: `config.contractVersion` of the same report.
@@ -25,6 +26,8 @@
  * stamp passes only in one of these forms, and a new stale mention cannot pass without taking one:
  *   1. the readable set: "readers accept Report 4 and 5", "Reports 4 and 5 are readable" — its
  *      numbers must be exactly `READABLE_REPORT_SCHEMA_VERSIONS`;
+ *      Snapshot reader sets are checked against the built snapshot reader set; a claim that
+ *      a legacy Snapshot remains readable must name an actually supported reader stamp.
  *   2. an arrow on the mention itself: "Report 4 → 5", "Snapshot schema | 2 → 3";
  *   3. a dated transition, with a released version no newer than the package IN THE SAME SENTENCE:
  *      (a) the mention is followed by "from/until/since/before <version>" — "schema 3 from 0.2.3";
@@ -85,6 +88,7 @@ export function currentStamps(packageDir) {
       reportConstant: enums.REPORT_SCHEMA_VERSION,
       readable: [...enums.READABLE_REPORT_SCHEMA_VERSIONS].sort((a, b) => a - b),
       snapshot: enums.SNAPSHOT_SCHEMA_VERSION,
+      readableSnapshots: [...enums.READABLE_SNAPSHOT_SCHEMA_VERSIONS].sort((a, b) => a - b),
       context: index.createContextPack(report).schemaVersion,
       comparison: (await index.compareReports(report, report)).schemaVersion,
       config: report.config.contractVersion,
@@ -98,6 +102,8 @@ export function currentStamps(packageDir) {
   for (const key of ["report", "snapshot", "context", "comparison", "config"]) {
     if (!Number.isInteger(stamps[key])) throw new Error(`the built package yielded no ${key} stamp`);
   }
+  if (!Array.isArray(stamps.readableSnapshots) || !stamps.readableSnapshots.every(Number.isSafeInteger)
+    || !stamps.readableSnapshots.includes(stamps.snapshot)) throw new Error("the built package yielded no valid snapshot reader set");
   return { ...stamps, packageVersion: manifest.version };
 }
 
@@ -228,12 +234,16 @@ function unitsOf(text) {
 }
 
 function readableSetOk(unit, stamps) {
-  // "readers accept Report 4 and 5", or "Reports 4 and 5 are readable".
-  const match = /\b(?:readers?|reads?|accepts?|accepted|readable)\b[^.;]{0,40}?(?:Report[- ]?)?(\d+)((?:,\s*\d+)*)\s*(?:and|or)\s*(\d+)/iu.exec(unit)
+  // Explicit snapshot wording must not be read as the report set by the generic grammar.
+  const snapshot = /\b(?:readers?|reads?|accepts?|accepted|readable)\b[^.;]{0,40}?Snapshots?[- ]?(\d+)((?:,\s*\d+)*)\s*(?:and|or)\s*(\d+)/iu.exec(unit)
+    ?? /\bSnapshots?[- ]?(\d+)((?:,\s*\d+)*)\s*(?:and|or)\s*(\d+)\s+(?:are|remain|stay)\s+readable\b/iu.exec(unit);
+  const match = snapshot ?? /\b(?:readers?|reads?|accepts?|accepted|readable)\b[^.;]{0,40}?(?:Report[- ]?)?(\d+)((?:,\s*\d+)*)\s*(?:and|or)\s*(\d+)/iu.exec(unit)
     ?? /\bReports?[- ]?(\d+)((?:,\s*\d+)*)\s*(?:and|or)\s*(\d+)\s+(?:are|remain|stay)\s+readable\b/iu.exec(unit);
   if (!match) return null;
-  const numbers = [match[1], ...match[2].split(",").map((s) => s.trim()).filter(Boolean), match[3]].map(Number).sort((a, b) => a - b);
-  return { numbers, ok: JSON.stringify(numbers) === JSON.stringify(stamps.readable), start: match.index, end: match.index + match[0].length };
+  const kind = snapshot ? "snapshot" : "report";
+  const expected = snapshot ? stamps.readableSnapshots : stamps.readable;
+  const numbers = [match[1], ...match[2].split(",").map(s => s.trim()).filter(Boolean), match[3]].map(Number).sort((a, b) => a - b);
+  return { kind, expected, numbers, ok: JSON.stringify(numbers) === JSON.stringify(expected), start: match.index, end: match.index + match[0].length };
 }
 
 /** Structured issues: `{ file, line, kind, number, unit, message }`, one per stale mention. */
@@ -245,12 +255,20 @@ export function scanIssues(file, text, stamps) {
     if (readable && !readable.ok) {
       issues.push({
         file, line, kind: "readable", number: readable.numbers.join(","), unit: sentence,
-        message: `${file}:${line}: names the readable report set ${readable.numbers.join(" and ")}, but the package reads ${stamps.readable.join(" and ")}: ${sentence}`,
+        message: `${file}:${line}: names the readable ${readable.kind} set ${readable.numbers.join(" and ")}, but the package reads ${readable.expected.join(" and ")}: ${sentence}`,
       });
     }
     for (const mention of mentionsIn(unit, paragraph, offset)) {
       if (mention.number === stamps[mention.kind]) continue;
-      if (readable && mention.kind === "report" && mention.at >= readable.start && mention.at <= readable.end) continue;
+      if (readable && mention.kind === readable.kind && mention.at >= readable.start && mention.at <= readable.end) continue;
+      // A stated legacy reader claim is an actual capability, not merely a historical mention.
+      if (mention.kind === "snapshot" && /\blegacy\s+(?:[\w-]+\s+)?$/iu.test(unit.slice(0, mention.start))
+        && /^\s+(?:is|remains?|stays?)\s+readable\b/iu.test(unit.slice(mention.at + String(mention.number).length))) {
+        if (stamps.readableSnapshots.includes(mention.number)) continue;
+        issues.push({ file, line, kind: "snapshot", number: mention.number, unit: sentence,
+          message: `${file}:${line}: claims snapshot ${mention.number} readable, but the built package reads ${stamps.readableSnapshots.join(", ")}: ${sentence}` });
+        continue;
+      }
       if (statedAsHistory(unit, mention, stamps.packageVersion)) continue;
       issues.push({
         file, line, kind: mention.kind, number: mention.number, unit: sentence,

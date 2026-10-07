@@ -103,13 +103,13 @@ describe("Configuration Contract v1", () => {
    * notion of "enabled" but the rule list an engine would actually run (`activeRules`) and its
    * complement (`disabledRuleIds`), which is what a report prints.
    */
-  it("keeps the one off-by-default rule off in the default profile and reachable by three paths", () => {
+  it("keeps the three off-by-default rules disabled while preserving explicit enablement", () => {
     const OFF = "layout/half-empty-page";
 
     const defaults = resolve();
     assert.equal(defaults.activeRules.some((rule) => rule.id === OFF), false, "default profile still runs it");
-    assert.deepEqual(defaults.disabledRuleIds, [OFF], "exactly one rule is off by default");
-    assert.equal(defaults.activeRules.length, ALL_RULES.length - 1);
+    assert.deepEqual(defaults.disabledRuleIds, [OFF, "figure/caption-separated", "figure/dangling-reference"], "three measured registry rules are off by default");
+    assert.equal(defaults.activeRules.length, ALL_RULES.length - 3);
     assert.equal(defaults.sources[configPointer("rules", OFF, "enabled")], "default");
 
     const strict = resolve({ profile: "strict" });
@@ -250,7 +250,7 @@ describe("Configuration Contract v1", () => {
     assert.deepEqual(ruleSchemas.properties["svg/text-overflows-viewport"]!.oneOf[1]!.properties, {});
     assert.ok(ruleSchemas.properties["type/straight-quotes"]!.oneOf[1]!.properties!.excludeTags);
     assert.equal(ruleSchemas.properties["type/straight-quotes"]!.oneOf[1]!.properties!.excludeSelectors, undefined);
-    assert.equal(ALL_RULES.length, 13, "the independent rule-count literal changed; audit the schema surface");
+    assert.equal(ALL_RULES.length, 15, "the independent rule-count literal changed; audit the schema surface");
     assert.equal(ruleSchemas.properties["svg/text-clipped"], undefined, "a research-only rule entered the public schema");
     assert.equal(ruleSchemas.properties["svg/text-ink-collision"], undefined, "a research-only rule entered the public schema");
   });

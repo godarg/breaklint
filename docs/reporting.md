@@ -3,6 +3,24 @@
 The JSON report is breaklint's canonical record. The HTML report is a self-contained,
 evidence-first projection for review, attachment to a build artifact and A4 printing.
 
+Console, HTML and Markdown show up to three **next checks** from the existing report data.
+An infrastructure or coverage failure comes first, then individual coverage shortfalls, then
+rule groups ordered by nonexperimental severity and rule id. Experimental groups come last.
+This is a reading order, not a reader-impact estimate, a cause diagnosis or a tested repair.
+The JSON shape, findings, measurement floors and exit codes are unchanged by this projection.
+
+**Findings by rule** counts every individual finding without merging their identities or
+claiming a common cause. HTML provides an optional, script-free disclosure linking each rule
+group to its first finding. All finding articles remain in the report. Console and Markdown
+include the same counts; Markdown also prints each actual message and the rule registry's
+remediation advice with its tested status.
+
+**Declined candidates** lists counted reasons by document, rule and scope. Counts sum the
+canonical `documents[].notMeasured[].count` values, not the number of bookkeeping rows.
+Document-level entries without a rule are labelled `no rule`. Reasons remain visible when
+coverage meets its floor; meeting a floor does not erase candidates the checker declined.
+These entries explain why candidate measurements were declined and are separate from layout findings.
+
 ## Information order
 
 The first screen answers four questions before it shows implementation detail:
@@ -35,6 +53,8 @@ and is therefore represented as `ok: true` in canonical JSON, but a run in which
 candidate is still `insufficient-coverage`. Its primary HTML summary says `Not established`, never
 `Coverage met`. This preserves both truths instead of allowing a row-level arithmetic fact to
 overwrite the run verdict.
+When a rule has an actual measured shortfall, the primary summary instead says `Below required floor`.
+
 
 ## Finding grammar
 
@@ -266,20 +286,21 @@ The report-surface gate has two explicit modes over the complete matrix in
 `.artifacts/report-surfaces/`:
 
 - `npm run test:report-surfaces` and `npm run test:report-surfaces:local` are the strict local
-  human gate. They pass only when the **latest** review round in the ledger passed, every one of
-  its 32 cells passed under a rostered human reviewer, and it is bound to exactly the current source fingerprint, declared review
+  sight gate. They pass only when the **latest** review round in the ledger passed, every one of
+  its 32 cells passed under a rostered human or an explicitly delegated AI reviewer, and it is bound to exactly the current source fingerprint, declared review
   environment, stable artifact fingerprints, visible screen-pixel hashes and physical inventory.
 - `npm run test:report-surfaces:technical` is the release/CI technical gate. It renders and
   validates the current platform's complete matrix, validates every round of the separately
-  retained human ledger structurally, and prints the latest round's outcome and whether it is
+  retained review ledger structurally, and prints the latest round's outcome and whether it is
   bound to the current inputs (also into the GitHub job summary when one exists). It never
   transfers a historical human PASS onto changed inputs and does not require a ceremonial
   re-review for a technical release gate.
 
-### Review package: what the human reviewer opens, checks and records
+### Review package: what the reviewer opens, checks and records
 
-The strict gate passes only on a genuine human review. The tooling prepares the surfaces and
-checks the record; it never writes a round, and no agent may write one that passes.
+The strict gate accepts a genuine human review or the release-specific delegated AI review
+documented in `docs/releasing.md`. The tooling prepares the surfaces and checks the record;
+it never invents a review. A nondelegated agent cannot record passing cells.
 
 **1. Render on the machine you review on.** A review binds the declared environment (browser
 product and four-part version, platform, architecture, Node major line, launch arguments,
@@ -340,8 +361,8 @@ one. It carries:
 - `record: "current"`;
 - `outcome`: `pass`, `fail` or `pending`;
 - `reviewedAt`: an exact UTC timestamp at or after `manifest.generatedAt`;
-- `reviewers`: your role as `{ "kind": "human", "handle": "@Neo" }`, using `@Brand`, `@Neo` or
-  `@Founder`;
+- `reviewers`: a rostered human role, or the closed `delegated-ai` receipt described below;
+  ordinary agent contributions are recorded as `agent`, never relabelled as a person;
 - `binding`: `reviewInputFingerprint` and `renderManifestGeneratedAt` copied from the manifest's
   `reviewInputFingerprint` and `generatedAt`, and `reviewEnvironment` copied whole;
 - `physicalArtifactsReviewed`: `manifest.physicalArtifacts`, copied whole;
@@ -374,14 +395,14 @@ Record the truth:
 - Never copy an earlier round's cells.
 
 Then run `npm run test:report-surfaces:local`. It passes only when your round passed, every cell
-passed under a rostered human, the round is a current record reviewed after its render, and it is
+passed under a rostered human or explicitly delegated AI reviewer, the round is a current record reviewed after its render, and it is
 bound to exactly the current inputs, environment, cell fingerprints, pixels, named artifacts and
 inventory; otherwise the message names what differs. Commit the ledger change yourself; the
 reviewer of that commit checks who made it (see "What the roster check does not do" below).
 
 ### Review ledger and declared review environment
 
-`tests/golden/report-surfaces/review-ledger.json` (ledger format version 5, its `schemaVersion`)
+`tests/golden/report-surfaces/review-ledger.json` (ledger format version 6, its `schemaVersion`)
 is a list of numbered review **rounds**, each `pass`, `fail` or `pending`. Ledger format version 4
 could hold only one all-pass record, and
 technical mode rejected any cell that was not `pass`, so the one failed review this gate produced
@@ -393,7 +414,8 @@ states; per-cell outcomes, reviewer handles, the render fingerprint and the envi
 recorded at the time, so its `binding` and `cells` are `null` and its two reviewers are
 `not-recorded` instead of named after the fact.
 
-A round is validated fail-closed: a `pass` round names a rostered human reviewer, binds an input
+Ledger 6 preserves all prior rounds and adds a separate, explicitly delegated AI reviewer kind.
+A round is validated fail-closed: a `pass` round names a rostered human or delegated AI reviewer, binds an input
 fingerprint, a render timestamp and an environment, covers all 32 cells with every cell `pass`, and
 records no blocker or high finding; a `fail` round records at least one finding or one failed cell;
 a `pending` round carries no outcome. An earlier passing round never carries forward over a later
@@ -411,12 +433,20 @@ Reviewers are named for what they are, and the human roster is closed:
   that is not a human role. An agent may be recorded as a reviewer of a round and may record a
   failed cell; a cell it marks `pass` is rejected, so an agent's review never satisfies the human
   requirement, whether it is the only reviewer or listed beside a human.
+- `delegated-ai` is a separately declared release-specific sight reviewer with the native model
+  and received-image receipts described below. It may pass only under the recorded Founder
+  delegation; the verifier reports the review kind as `delegatedAI`.
 - `not-recorded` states that the record of the time did not name the reviewer (`handle: null`).
 - Within a round one handle is one reviewer of one kind: a handle listed as both `agent` and
   `human` is rejected, and every reviewer entry is closed over its fields, so a model label cannot
   move into a field of its own.
 
-Every cell that passed must name a `human` reviewer of its round from the roster. The line the
+Every passing cell must name a rostered `human` or `delegated-ai` reviewer of its round.
+A delegated AI record carries the release-specific Founder delegation, actual model identity
+from the native runner output, prompt/output hashes, a native receipt with image count, and
+the exact path and SHA-256 of every assigned full-page PNG, tile and printed-page raster.
+The strict gate checks the complete received-image inventory and never calls this a human pass.
+See `docs/releasing.md` for the closed receipt fields and the trust limits of this record. The line the
 verifier prints and appends to the GitHub job summary ("Report-surface review ledger") names every
 reviewer of the latest round with its kind and counts the cells a rostered human passed; it says
 "latest human review round N is PASS" only when that count is all 32 cells, and "latest review
@@ -457,10 +487,14 @@ Both modes cover:
 - one real A4 PDF per state and an independently rasterized page set for each PDF.
 
 That is 32 review cells. Each tablet and mobile screen cell is also written as viewport-height
-tiles (`<cell>--tile-NN.png`, 152 in the canonical matrix) cut from the same decoded pixels as its
-full-page PNG — a mobile strip (measured 390 × 4 092 px for the clean state and 390 × 11 341,
-11 846 and 11 960 px for findings, infrastructure and insufficient coverage) cannot be judged at
-fit-to-window scale; its five, fourteen or fifteen 844 px tiles can. The verifier re-cuts every tile from the independently decoded full page and
+tiles (`<cell>--tile-NN.png`, 168 in the 0.9.0 matrix measured on 2026-10-07) cut from
+the same decoded pixels as its full-page PNG. The complete matrix also has 24 full-screen PNGs,
+four PDFs. Measured on 2026-10-07, their page counts are 3/9/9/9 on macOS and 3/8/9/9
+on Linux, in state order clean/findings/infrastructure/insufficient-coverage: 30 and 29 page
+rasters respectively. Independent `pdfinfo` and canonical PNG membership confirm both inventories.
+The verifier pins each platform and state separately; it does not derive its expected count from
+the renderer manifest. Long mobile pages cannot be judged at fit-to-window scale; their viewport-height tiles can.
+The verifier re-cuts every tile from the independently decoded full page and
 requires the normalized RGBA to match, so tiles add no unbound pixel. `review-gallery.html` in the
 same directory presents every full page, tile and printed page per state; it is what a reviewer
 opens, and the verifier requires it to reference every artifact. A reviewed screen cell names its
@@ -479,7 +513,7 @@ channels canonicalized to zero; SHA-256 is then computed over the normalized RGB
 verifier independently decodes and normalizes the file and rejects a one-channel mutation of one
 visible pixel. The exact deterministic Chrome launch arguments—software rasterization, fixed sRGB,
 disabled LCD text and deterministic compositor mode—are part of the recorded review environment.
-Generated PNG/PDF evidence remains ignored by Git; the generator and the human review ledger are
+Generated PNG/PDF evidence remains ignored by Git; the generator and the review ledger are
 versioned.
 
 The review gate deliberately keeps two distinct bindings:
@@ -495,7 +529,7 @@ The review gate deliberately keeps two distinct bindings:
   remains identical.
 
 The verifier independently reconstructs the current source/input fingerprint, every stable artifact
-fingerprint and every screen RGBA hash. A local human PASS transfers only when those fingerprints,
+fingerprint and every screen RGBA hash. A local sight-review PASS transfers only when those fingerprints,
 pixels and the complete declared review environment are identical. It also runs its own negative
 controls, each once per run on a copy of real evidence broken in exactly the way its check exists
 for, and fails if a check accepts the copy:
@@ -667,3 +701,17 @@ with the error still reported. Both require the injected 1600 px block itself to
 the per-page records to agree with the summary.
 
 The portable bundle keeps `report.json` as the historical capture record. `context.json` adds `bundleEvidence` contract version 1 with current per-finding asset availability; `bundle.json` lists every copied PNG/PDF and its SHA-256 and byte length. A missing or tampered local asset remains `missing-or-integrity-failed` in both HTML and AI context. A historical report comparison is not a fresh verification of local bundle assets. Overflow crops show the visible intersection while preserving the original target coordinates.
+
+<!-- review-state -->
+For 0.9.0 the current record is round 6: four fresh Claude Opus reviews (actual model
+`claude-opus-5-5`) passed all 32 cells on the source after the platform inventory correction,
+under the Founder's release-specific AI delegation of 2026-10-04 and targeted-completion
+instruction of 2026-10-07. Native receipts bind 222 image reads (24 full screens, 168 viewport
+tiles and 30 A4 page rasters); the four PDF cells were judged through every matching raster.
+This is AI sight review, not human review. One medium and eighteen low findings have explicit
+accepted-risk or follow-up dispositions: split-card frames, identifier wrapping, print disclosure,
+ratio wording and short-list continuations remain documented presentation costs. Full desktop
+captures were downscaled; fine-text judgement rests on tablet/mobile tiles and A4 evidence.
+This local sight review does not establish Ubuntu visual review. The separate Linux technical
+diagnostic measured LiberationSerif, LiberationSans and DejaVuSansMono resolution and 3/8/9/9
+A4 pages versus macOS 3/9/9/9. JSON remains canonical.

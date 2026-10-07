@@ -2,6 +2,7 @@ import type { Report } from "../core/types.ts";
 import { LABELS } from "./mandatory.ts";
 import { buildHtmlReportModel } from "./html-model.ts";
 import { REPORT_HTML_STYLES } from "./html-styles.ts";
+import { projectDecisions, type ReportDecisions } from "./decisions.ts";
 
 /**
  * A CSS string literal for text the report does not control (the run id is caller-supplied through
@@ -281,13 +282,15 @@ ${documents}
  * the findings start about three screens down and coverage about twelve; the contents navigation
  * reaches both from the first screen.
  */
-function renderContents(model: ReturnType<typeof buildHtmlReportModel>): string {
+function renderContents(model: ReturnType<typeof buildHtmlReportModel>, decisions: ReportDecisions): string {
   const entries: [string, string][] = [["summary-heading", "Run summary"]];
+  if (decisions.nextChecks.length > 0) entries.push(["next-checks-heading", "Next checks"]);
   if (model.infrastructure.length > 0 || model.status.key === "infrastructure") {
     entries.push(["apparatus-heading", model.status.key === "infrastructure" ? "Checker failure" : "Measurement apparatus"]);
   }
   if (model.status.key === "insufficient-coverage") entries.push(["coverage-alert-heading", "Coverage did not meet the contract"]);
   entries.push(["findings-heading", `Findings (${model.findings.length})`]);
+  if (decisions.declines.length > 0) entries.push(["declines-heading", "Declined candidates"]);
   entries.push(["coverage-heading", "Coverage details"]);
   return `<nav class="report-contents" aria-label="Report contents">
   <ol>
@@ -296,8 +299,43 @@ function renderContents(model: ReturnType<typeof buildHtmlReportModel>): string 
 </nav>`;
 }
 
+function renderNextChecks(decisions: ReportDecisions): string {
+  if (decisions.nextChecks.length === 0) return "";
+  return `<section class="next-checks" aria-labelledby="next-checks-heading">
+<h2 id="next-checks-heading">Next checks</h2>
+<p class="section-lead">Navigation only; these are not tested fixes. Measurement limits come before partial findings.</p>
+<ol class="next-check-list">
+${decisions.nextChecks.map((check) => `<li><p><strong>${check.findingIndex === null ? esc(check.title)
+    : `<a href="#finding-${check.findingIndex + 1}-title">${esc(check.title)}</a>`}</strong></p><p>${esc(check.detail)}</p></li>`).join("\n")}
+</ol>
+</section>`;
+}
+
+function renderFindingNavigation(decisions: ReportDecisions): string {
+  if (decisions.groups.length < 2 && !decisions.groups.some((group) => group.findingIds.length > 1)) return "";
+  return `<details class="finding-navigation">
+<summary>Findings by rule (${decisions.groups.length} rule${decisions.groups.length === 1 ? "" : "s"})</summary>
+<p>Counts group rule ids, not causes. Every individual finding remains below.</p>
+<ul>
+${decisions.groups.map((group) => `<li><a href="#finding-${group.firstIndex + 1}-title">${ruleIdCode(group.ruleId)} · ${group.findingIds.length} finding${group.findingIds.length === 1 ? "" : "s"}</a></li>`).join("\n")}
+</ul>
+</details>`;
+}
+
+function renderDeclines(decisions: ReportDecisions): string {
+  if (decisions.declines.length === 0) return "";
+  return `<section class="declines-section" aria-labelledby="declines-heading">
+<h2 id="declines-heading">Declined candidates</h2>
+<p class="section-lead">Counted reasons remain visible even when coverage meets its floor. These are recorded reasons a measurement was not made, not layout findings.</p>
+<ul class="decline-list">
+${decisions.declines.map((decline) => `<li><span class="decline-count"><strong>Count ${decline.count}</strong></span> · ${pathText(decline.document)} · ${decline.ruleId === null ? "no rule" : ruleIdCode(decline.ruleId)} · ${esc(decline.scope)} · ${esc(decline.reason)}</li>`).join("\n")}
+</ul>
+</section>`;
+}
+
 export function renderHtml(report: Report): string {
   const model = buildHtmlReportModel(report);
+  const decisions = projectDecisions(report);
   const f = model.facts;
   return `<!doctype html>
 <html lang="en">
@@ -319,7 +357,7 @@ export function renderHtml(report: Report): string {
   <p class="status-sentence">${esc(model.status.sentence)}</p>
   <p class="gate-effect"><span>Gate effect</span><strong>${esc(model.status.gate)}</strong></p>
 </header>
-${renderContents(model)}
+${renderContents(model, decisions)}
 <main id="report">
 <section aria-labelledby="summary-heading">
 <h2 id="summary-heading">Run summary</h2>
@@ -345,9 +383,12 @@ ${renderContents(model)}
 </dl>
 </section>
 
+${renderNextChecks(decisions)}
 ${renderInfrastructure(model)}
 ${renderCoverageAlert(model)}
+${renderFindingNavigation(decisions)}
 ${renderFindings(model)}
+${renderDeclines(decisions)}
 ${renderCoverage(model)}
 </main>
 <footer class="report-footer">

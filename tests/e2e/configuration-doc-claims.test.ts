@@ -22,7 +22,7 @@ const OFF = "layout/half-empty-page";
 const dir = mkdtempSync(join(tmpdir(), "breaklint-config-doc-"));
 after(() => rmSync(dir, { recursive: true, force: true }));
 
-function enabledUnder(config: unknown, name: string): { enabled: boolean; source: string; rulesRun: number } {
+function enabledUnder(config: unknown, name: string): { enabled: boolean; source: string; rulesRun: number; figureChecks: { id: string; enabled: boolean; measured: number | null; reasons: string[] }[] } {
   const file = join(dir, `${name}.json`);
   writeFileSync(file, JSON.stringify(config));
   const run = spawnSync(process.execPath, ["--experimental-strip-types", CLI, "--demo", "--format", "json", "--config", file], {
@@ -33,12 +33,18 @@ function enabledUnder(config: unknown, name: string): { enabled: boolean; source
   assert.ok([0, 1, 4].includes(run.status ?? -1), `${name}: the demo ended ${run.status}: ${run.stderr}`);
   const report = JSON.parse(run.stdout) as {
     rulesRun: number;
+    documents: { coverage: Record<string, { measured: number }>; notMeasured: { ruleId: string; reason: string }[] }[];
     config: { effective: { rules: Record<string, { enabled: boolean }> }; sources: Record<string, string> };
   };
   return {
     enabled: report.config.effective.rules[OFF]!.enabled,
     source: report.config.sources[`/rules/${OFF.replace("/", "~1")}/enabled`]!,
     rulesRun: report.rulesRun,
+    figureChecks: ["figure/caption-separated", "figure/dangling-reference"].map(id => ({
+      id, enabled: report.config.effective.rules[id]!.enabled,
+      measured: report.documents[0]!.coverage[id]?.measured ?? null,
+      reasons: report.documents[0]!.notMeasured.filter(item => item.ruleId === id).map(item => item.reason),
+    })),
   };
 }
 
@@ -52,7 +58,10 @@ describe("docs/configuration.md: which values enable a rule", () => {
   it("strict enables it, as the profile table says", () => {
     const run = enabledUnder({ profile: "strict" }, "strict");
     assert.equal(run.enabled, true);
-    assert.equal(run.rulesRun, 13);
+    assert.equal(run.rulesRun, 15);
+    assert.deepEqual(run.figureChecks, ["figure/caption-separated", "figure/dangling-reference"].map(id => ({
+      id, enabled: true, measured: 0, reasons: ["env/figure-index-unavailable"],
+    })));
   });
 
   it("an options object enables it, and so does an empty one", () => {

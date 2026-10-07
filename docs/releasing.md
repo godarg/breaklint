@@ -25,6 +25,16 @@ published repair from this change set and binds the child CLI to the actual cons
 run `33320332110` completed the Node 22.13/24 consumer matrix, npm provenance verification and
 GitHub Release creation on 2026-08-30.
 
+0.9.0 is a minor pre-1.0 release because it adds checks and changes the measurement snapshot.
+Snapshot 5 → 6 adds an optional authored figure/ID inventory and concrete image-body witnesses.
+Legacy Snapshot 5 remains readable for the existing checks; requested figure checks count
+an absent or incomplete inventory as declined and cannot produce a clean result from it. A
+present malformed inventory is refused. Producers should emit 6 with their actual acquisition
+status; they must not turn missing source data into a complete empty inventory. The hand-written
+demo is migrated to 6 with its inventory explicitly incomplete. Report 5, context pack 2 and
+Configuration Contract 1 are unchanged. Ledger 5 → 6 adds delegated AI receipts while preserving
+all historical rounds; that ledger is release evidence, not a document report schema.
+
 0.7.0 is a minor pre-1.0 release by the same test: the measurement snapshot changes structure, so
 its stamp moves, Snapshot 4 → 5. It gains six required fields — `BlockRecord.display`,
 `marginCopies`, `float`, `position`, `boundaryHyphen` and `TextLine.ownText` — and the engine
@@ -63,41 +73,32 @@ workflow passes it as `NODE_AUTH_TOKEN` only to the publish step.
 
 ## Before creating the tag
 
-A release is these seven steps, in this order, each on the commit the step before it produced.
-None is skipped and none is reordered.
+For the focused 0.9.0 release, complete preparation and review on a frozen candidate branch
+before merging its pull request. This avoids successive release-only commits on `main` while
+retaining the same source, environment, artifact and pixel bindings. The maintainer authorized
+this targeted completion on 2026-10-07; see `planning/finish-0.9.md`.
 
-1. **Merge the release-preparation pull request into `main`** (for 0.7.0: godarg/breaklint#18),
-   without rewriting history. Its commit carries `## X.Y.Z — TBD-at-tag` and must already satisfy
-   the checks under *Before step 7, also verify* below.
-2. **On that exact merge commit, a rostered human reviews the report surfaces.** One of `@Brand`,
-   `@Neo` or `@Founder` follows `docs/reporting.md`, *Review package*, steps 1–4: `npm ci`,
-   `npm run test:report-surfaces:technical`, the review itself, and ONE new round appended to
-   `tests/golden/report-surfaces/review-ledger.json` (for 0.7.0, round 3). Then
-   `npm run test:report-surfaces:local` must pass. Only a genuine passing human review turns this
-   gate green; there is no documented override and no dropping the gate (the owner's decision for
-   0.7.0). A `fail` or `pending` round is recorded as what it is, and the release stops here.
-   **From this step on, nothing under `REVIEW_INPUT_ROOTS` in
-   `tests/tools/report-surface-contract.mjs` may change** — among them `package.json`,
-   `package-lock.json`, `ci.yml`, `src/config`, `src/core`, `src/report`, `src/rules` and the four
-   surface tools. Any such change unbinds the review and sends the release back to this step.
-3. **The reviewer commits the ledger, and in the same commit updates every sentence marked
-   `<!-- review-state -->`.** Those sentences describe the gate's state as of the release
-   preparation, and a passing round makes them out of date:
-   - `README.md`, the paragraph on what is verified about the HTML report's surfaces;
-   - `docs/status.md`, the release record's *exact-environment human gate* paragraph and the
-     sentence on the strict local gate in the 0.6.0 section's surface figures;
-   - `docs/releasing.md`, the paragraph on the report-surface gate for the release in preparation
-     (under *The local gate*, below);
-   - `CHANGELOG.md`, the sentence on `npm run test:report-surfaces` under *Tooling*.
+1. **Prepare the candidate:** version all package/workflow references, date the changelog,
+   generate rule documentation and schema, and run the ordered local gates below. Run the
+   packed consumers from foreign working directories on Node 22.13 and 24.
+2. **Review the complete report matrix:** follow `docs/reporting.md`, *Review package*.
+   A rostered human or the explicitly delegated AI reviewer must actually inspect every
+   assigned PNG, tile and A4 page raster. Append one truthful new ledger round and update
+   current review-state prose. A failed or incomplete review stops the release.
+   From this step on, no file under `REVIEW_INPUT_ROOTS` may change; any such change requires
+   a new render and review. Historical records remain unchanged.
+3. **Freeze and obtain fresh independent acceptance:** commit the candidate and its review
+   record, audit the declared scope and real gate evidence, and resolve every blocker/high.
+   Then `npm run test:report-surfaces:local` must pass on the exact input binding.
+4. **Push and merge the pull request after green CI.** The merge must preserve the candidate's
+   reviewed inputs. Query `ci.yml` on the exact resulting `main` commit and verify success.
+5. **Push the annotated tag `v0.9.0` on that exact commit.** The workflow publishes and verifies
+   registry integrity, provenance and release assets. Measure those service results before
+   recording publication or updating consumers and the live website.
 
-   Whoever reviews that commit checks who made it and that its cells name the artifacts actually
-   rendered (see "What the roster check does not do" in `docs/reporting.md`).
-4. **`ci.yml` is green on `main` at the ledger commit**, and the local gate below passes on it.
-5. **Date the changelog:** replace `TBD-at-tag` with the release date, `## X.Y.Z — YYYY-MM-DD`, in
-   a final commit on `main` that changes nothing else. `CHANGELOG.md` is not a review input, so
-   the review stays bound.
-6. **`ci.yml` is green again, on exactly that dated commit.**
-7. **Create and push the annotated tag on that commit and no other** (see *Publishing*).
+A future release without explicit AI delegation requires a rostered human sight review.
+Changing package files, source or any other bound input after review invalidates that review.
+The ledger records review evidence; it is not provider authentication or proof of perception.
 
 ### The local gate
 
@@ -156,17 +157,32 @@ both run. On 2026-09-18 a local chain omitted it and CI caught the drift instead
 the chain did not. And when a step in such a chain is piped (`npm test | tail`), `$?` is the exit
 code of `tail`: read every return value directly after its command.
 
-The technical surface gate reconstructs and verifies every current cell without claiming a human
-look. `npm run test:report-surfaces` is the separate exact-environment human gate. It must stay red
-when the bound inputs changed and no person reviewed the new artifacts; never refresh its ledger as
-release ceremony. A real later review is recorded as a new round with its actual reviewers, date and
-outcome — `pass` or `fail` — and only a passing latest round in which a rostered human role
-(`@Brand`, `@Neo` or `@Founder`) passed every cell, bound to the exact current inputs, turns the
-gate green. An agent's review may be recorded in a round, by kind and model, and never passes a
-cell; the roster itself changes only by a reviewed code change (`docs/reporting.md`).
+The technical surface gate reconstructs and verifies every current cell without claiming a sight
+review. `npm run test:report-surfaces:local` is the separate exact-environment sight gate. It stays
+red when the bound inputs changed and no authorized reviewer reviewed the new artifacts; never
+refresh its ledger as release ceremony. A real later review is a new round with its actual
+reviewers, date and outcome — `pass` or `fail`. A passing latest round must cover every cell and
+bind the current input fingerprint, declared environment, rendered artifacts, screen RGBA hashes
+and complete physical inventory. `assessHumanGate` remains human-only: only `@Brand`, `@Neo` or
+`@Founder` can pass it. An ordinary `agent` entry never passes a cell.
+
+Ledger schema 6 additionally permits `kind: "delegated-ai"` for the explicitly delegated 0.9.0
+sight review. The round must carry the Founder's release-specific delegation: `founder: "@Founder"`,
+date, verbatim session quote, `release: "0.9.0"` and `revoked: false`. The reviewer must have a
+nonhuman handle, a recorded nonUNKNOWN `actual_model`, prompt/output SHA-256 hashes, and a native
+receipt with path, SHA-256 and exact image count. Its closed `receivedImages` entries contain
+exact `{path, sha256}` pairs for **every assigned full screen PNG, every screen tile and every A4
+page PNG**. PDF cells are judged through their complete matching raster sets; the receipt cannot
+substitute a PDF filename for unseen pages. Missing, extra, duplicate or differently hashed images
+refuse the gate. The release operator must extract these bindings from actual native image-read results; a
+planned call or a model's self-reported image count is insufficient. Strict local status reports
+`delegatedAI` for this path and never calls it a human pass. Migrating the schema stamp preserves
+every prior round and does not upgrade any old agent entry or invent a new review.
 <!-- human-review-roles: @Brand, @Neo, @Founder -->
 The roster check proves only that a rostered handle was written into the ledger; it does not
-authenticate a person. Whether a rostered human really reviewed rests on repository access control
+authenticate a person. Delegated AI model, receipt and image fields likewise bind the recorded
+review to the manifest; the gate does not authenticate a provider identity or independently prove
+image perception. Whether a rostered human really reviewed rests on repository access control
 and on reviewing the ledger diff before it merges — check who committed it and that the round's
 cells name the artifacts actually rendered — not on this gate.
 
@@ -207,12 +223,26 @@ finding list and an owner, instead of red and unread. The findings and their add
 carried in that release's follow-up register.
 
 <!-- review-state -->
-**For 0.8.0 the Founder reported a completed sight review without remarks.** Ledger round 4
-(2026-09-28, `@Founder`) binds all 32 passed cells to the render of the PR #33 merge commit;
-`npm run test:report-surfaces:local` passes on that binding. The round records the Founder's
-exact wording and the three known residuals; Ubuntu font resolution remains NEEDS-CI. For 0.7.0,
-ledger round 3 likewise passed all 32 cells on the PR #18 merge commit. The 0.6.0 override was
-not repeated and the gate was not dropped.
+For 0.9.0 the current record is round 6: four fresh Claude Opus reviews (actual model
+`claude-opus-5-5`) passed all 32 cells on the source after the platform inventory correction,
+under the Founder's release-specific AI delegation of 2026-10-04 and targeted-completion
+instruction of 2026-10-07. Native receipts bind 222 image reads (24 full screens, 168 viewport
+tiles and 30 A4 page rasters); the four PDF cells were judged through every matching raster.
+This is AI sight review, not human review. One medium and eighteen low findings have explicit
+accepted-risk or follow-up dispositions: split-card frames, identifier wrapping, print disclosure,
+ratio wording and short-list continuations remain documented presentation costs. Full desktop
+captures were downscaled; fine-text judgement rests on tablet/mobile tiles and A4 evidence.
+This local sight review does not establish Ubuntu visual review. The separate Linux technical
+diagnostic measured LiberationSerif, LiberationSans and DejaVuSansMono resolution and 3/8/9/9
+A4 pages versus macOS 3/9/9/9. JSON remains canonical.
+
+The Founder stated on 2026-10-04: “by the mandate in §0 the Founder delegates the sight review
+that docs/releasing.md reserves for a human to this multi-model review.” The targeted 2026-10-07
+instruction removes mandatory extra model rounds. Round 6 names the actual AI model and exact
+received images; it claims no human look. The original failed private criterion review is retained,
+and only its affected state was rejudged against the existing trust-label contract in round 5.
+Round 6 is a fresh review after the measured platform inventory correction; historical rounds
+1–5 remain unchanged. No failing technical check was waived.
 
 The green real-document gate reads the rights/privacy-reviewed corpus manifest and binds exact
 artifact hashes, source evidence, page/rule counts and the positive independent geometry-oracle
