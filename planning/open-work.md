@@ -314,3 +314,23 @@ release
 
 G-06 and G-12 remain open. The new synthetic-driver audit does not establish a
 collector correction or clear the earlier whole-table coverage refusal.
+
+## 2026-10-07 focused release disposition
+
+The maintainer replaced the exhaustive review process with `planning/finish-0.9.md`.
+This does not close any uncorrected product defect. Integration at `eeddff5` has no source
+changes relative to 0.8.0; private response-classification tooling is not product code.
+
+- G-06/G-12: remain open. Existing margin-flow filtering is already on main; it does not
+  establish a fix for newly observed off-sheet/staging fragments or whole-table coverage refusal.
+- G-83/G-104/G-105: existing line ownership and natural-space sampling fixes are already in
+  main (ancestor `1640d4411f66206abe96e3a6d5d39e83787778b0`). Newly alleged residual cases
+  need a discriminating public reproduction; no new port or blanket closure is credited.
+- G-99/G-107: token-based named-page handling is already in main (ancestor
+  `0c24a323cae2b95f891d631908a14bf87133e364`). Newly unbound observations are not evidence
+  that this implementation is absent; its remaining limits stay open.
+- G-89/G-102: 0.8.0 refusals remain in force; no general PDF completeness guarantee is added.
+- G-91/G-94: remain open and documented. There is no new current-Chrome net-log fix.
+
+The two new figure checks and counted human-report measurement reasons are separate bounded
+packages. Their supported acquisition and test results will be recorded after implementation.

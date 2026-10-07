@@ -1,3 +1,5 @@
+> Superseded for the 0.9 release process on 2026-10-07 by [the focused completion plan](finish-0.9.md). This earlier scope and its unmet criteria remain historical research, not a release PASS.
+
 # PROVISIONAL: evidence-led document understanding for 0.9
 
 Status: **PROVISIONAL — no architecture acceptance, implementation approval or release claim.**

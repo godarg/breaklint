@@ -1,3 +1,5 @@
+> Superseded for the 0.9 release process on 2026-10-07 by [the focused completion plan](finish-0.9.md). This earlier scope and its unmet criteria remain historical research, not a release PASS.
+
 # 0.9 mission: expectations registered before measurement
 
 Protocol: `breaklint-090-metrics-v1`. Registered on 2026-10-04 before any mission product baseline or A/B run. Baseline implementation: npm `breaklint@0.8.0`; starting repository commit: `98e33c006cd6a0ef6a596caa5f18062b0ee74175`. No product content, labels, source paths or rendered product pixels belong in this public repository. The private work item holds those artifacts.
