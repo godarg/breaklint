@@ -3,11 +3,12 @@ import { describe, it } from "node:test";
 import { parse, type DefaultTreeAdapterMap } from "parse5";
 
 import type { Report } from "../../src/core/types.ts";
+import { IS } from "../../src/core/enums.ts";
 import { renderConsole } from "../../src/report/console.ts";
 import { renderHtml } from "../../src/report/html.ts";
 import { renderMarkdown } from "../../src/report/markdown.ts";
 import { render } from "../../src/report/index.ts";
-import { findingsReportState } from "../fixtures/report-states.ts";
+import { canonicalReportStates, findingsReportState, insufficientCoverageReportState } from "../fixtures/report-states.ts";
 import { buildHtmlReportModel } from "../../src/report/html-model.ts";
 
 type HtmlNode = DefaultTreeAdapterMap["node"];
@@ -106,6 +107,41 @@ function coverageAccountingReport(): Report {
 }
 
 describe("human report navigation", () => {
+  it("keeps every canonical presentation state's candidates and recorded declines accountable", () => {
+    for (const [state, report] of Object.entries(canonicalReportStates())) {
+      for (const document of report.documents) {
+        for (const [ruleId, row] of Object.entries(document.coverage)) {
+          const declined = row.notMeasured.reduce((sum, item) => sum + item.count, 0);
+          assert.equal(row.notMeasuredCount, declined, `${state}/${ruleId}: counted declines need recorded reasons`);
+          const applicable = row.notMeasured.filter(item => !IS.nonApplicableEnvId.has(item.reason)
+            && !IS.toolCapabilityEnvId.has(item.reason)).reduce((sum, item) => sum + item.count, 0);
+          assert.equal(row.candidates, row.measured + applicable, `${state}/${ruleId}: applicable = measured + applicable unmeasured`);
+          for (const item of row.notMeasured) {
+            assert.ok(document.notMeasured.some(recorded => JSON.stringify(recorded) === JSON.stringify(item)),
+              `${state}/${ruleId}: the document decline list must include the coverage reason`);
+          }
+        }
+      }
+    }
+  });
+
+  it("shows the handwritten insufficient-coverage scene as23=20+3 and widow2=1+1", () => {
+    // Independent arithmetic of this declared scene, not values obtained from any projection.
+    // The adjacent five/three/two oracle separately covers outside-base exclusions.
+    const report = insufficientCoverageReportState();
+    const original = JSON.stringify(report);
+    for (const output of [renderConsole(report), textContent(parse(renderHtml(report))), renderMarkdown(report)]) {
+      assert.match(output, /20 of 23 applicable rule-candidate evaluations measured; 3 applicable evaluations not measured/u);
+      assert.match(output, /1 of 2 applicable rule-candidate evaluations measured; 1 applicable evaluations not measured/u);
+      assert.match(output, /env\/multicolumn/u);
+      assert.doesNotMatch(output, /Reason verbatim: none declared/u);
+    }
+    const row = buildHtmlReportModel(report).coverage[0]!.rows.find(item => item.ruleId === "layout/widow")!;
+    assert.deepEqual([row.candidates, row.measured, row.notMeasured], [2, 1, 1]);
+    assert.equal(report.documents[0]!.notMeasured.reduce((sum, item) => sum + item.count, 0), 3);
+    assert.equal(JSON.stringify(report), original, "Projection cannot repair or mutate the canonical scene");
+  });
+
   it("distinguishes applicable rule evaluations from outside-coverage declines without summing document objects", () => {
     const report = coverageAccountingReport();
     const original = JSON.stringify(report);

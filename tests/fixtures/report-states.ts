@@ -166,8 +166,15 @@ export function insufficientCoverageReportState(): Report {
   if (!document) throw new Error("surface fixture requires one document");
   document.verdict = "insufficient-coverage";
   document.exitReason = "coverage-below-floor";
-  const [ruleId, coverage] = Object.entries(document.coverage)[0] ?? [];
-  if (!ruleId || !coverage) throw new Error("surface fixture requires one coverage row");
+  const ruleId = "layout/widow";
+  const coverage = document.coverage[ruleId];
+  if (!coverage) throw new Error("surface fixture requires the widow coverage row");
+  // Handwritten presentation scene: a second, multicolumn paragraph is applicable but cannot
+  // be measured. Its recorded decline must appear in both the rule account and document list.
+  // This is an authored fixture condition, not a claim about a rendered product's cause.
+  const decline = { scope: "block" as const, ruleId, reason: "env/multicolumn" as const, target: null, count: 1 };
+  coverage.notMeasured = [decline];
+  document.notMeasured.push(decline);
   coverage.candidates = 2;
   coverage.measured = 1;
   coverage.notMeasuredCount = 1;

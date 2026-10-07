@@ -764,14 +764,14 @@ function independentlyNormalizeScreenPixels(bytes) {
 }
 
 /**
- * Tablet and mobile cells ship viewport-height tiles. Each is re-cut here from the independently
+ * Every screen cell ships viewport-height tiles. Each is re-cut here from the independently
  * decoded full page and must match byte for byte in normalized RGBA: a tile can add no pixel the
  * fingerprinted full page does not already bind.
  */
 function independentlyCheckTiles(artifact, decodedFullPage, tilePath = (tile) => resolve(output, tile.path)) {
   const viewport = artifact.cell.split("/")[3];
   const viewportHeight = manifest.reviewEnvironment.viewports[viewport].height;
-  const expected = viewport === "desktop" ? 0 : Math.ceil(artifact.dimensions.height / viewportHeight);
+  const expected = Math.ceil(artifact.dimensions.height / viewportHeight);
   assert.equal(artifact.tiles.length, expected, `${artifact.cell}: expected ${expected} viewport-height tiles`);
   const width = decodedFullPage.decoded.width;
   for (const [index, tile] of artifact.tiles.entries()) {
