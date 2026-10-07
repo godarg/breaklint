@@ -85,7 +85,8 @@ A missing target is not proved by an old ID inventory that lacks legacy named an
 checks require exact source/runtime row/cell membership and content, visible existing headers,
 unit spans and supported flow; they do not invent headers or accept a wrapper as cell geometry.
 
-No actual human labels have yet been received for the candidate's planned example evaluation.
+Ten selected examples received actual human labels on 2026-10-07; see
+[`evaluation-0.10.md`](evaluation-0.10.md) for selection, results and limits.
 Selected-example labels, rules adjusted from those labels, bounded validation and population
 calibration must be reported separately. `calibrated: false` remains the contract.
 
