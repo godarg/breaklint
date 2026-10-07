@@ -1195,3 +1195,115 @@ its mandatory rollback test already requires that environment. A separate manual
 prerequisite is prepared with the existing locked setup function and full gates.
 It cannot establish a cold-start pass. The security boundary remains unproved.
 Production implementation, full recall, blind A/B and release gates remain open.
+
+### 2026-10-06 — confirmed misses and continued prerequisite-bound verification
+
+The private diagnostic label set now contains eleven confirmed misses. Three additional
+observations cover step numbering and table continuation headers; the original eight
+records are preserved byte-for-byte. These are partial diagnostic labels, not a completed
+recall denominator, delivery-file verdict or release metric.
+
+The private saved-carrier test adapter has a frozen source commit and nineteen specific
+old-version counterfactual assertion failures. Its corrected controls and mutations remain
+under verification; chronological red-before-edit is explicitly not established. A separate
+original eight-page recall invocation ended with native exit zero; exact image and response
+qualification is still pending.
+
+The isolated Quality closure retained a failing commit-gate attempt. Three omitted historic
+regression inputs were proved to be exact tracked blobs in the unchanged starting commit;
+restoration and another unchanged gate attempt are separately registered. No current
+completion marker is inferred from those historical fixtures. A single bounded read of
+existing OS logs returned no matching records, so the wrapper safety hold remains open.
+
+The stopped font diagnostic package remains stopped after its second independent high
+finding. No third repair round, new production behavior, independent A/B pass, release tag,
+publication or consumer upgrade is claimed by this checkpoint.
+
+### 2026-10-06 — source-linked review and separate vision capability
+
+An additional original eight-page baseline review is technically qualified, with
+actual `claude-opus-5-5` attribution and all original image reads accounted for.
+Its eleven candidate observations remain unconfirmed. The original response,
+full schema and independent pixel bounds passed the existing eighteen negative
+controls and two strict-parser controls. Source linkage and comparison with
+existing findings are in progress; related observations will retain separate
+IDs without becoming duplicate confirmed misses.
+
+A preceding original eight-page `gpt-6.1-sol` review proposed one ambiguous
+forward-reference candidate. The source supplies neither a numbered locator nor
+an explicit target link. The next figure in document order does not, by itself,
+prove the intended target. No reference-distance label follows from proximity.
+
+The two focused header-continuation cases have a qualified `grok-4.7-build` image
+opinion. The prior reviewers disagree about one case's reader impact. One fresh
+Claude adjudication is running with the original full pages, the existing crops
+and the relevant design convention. No adjudicated label is claimed yet.
+
+Root corrected an overly broad coupling between the pending Quality integration
+security audit and the existing Gemini Mode-A image path. The original vision
+probe was completed, but its historical executable-byte continuity is unknown.
+A separately preregistered current sight experiment is running through the
+unchanged sanctioned probe. The Quality integration's open security findings,
+original failures and acceptance gates remain unchanged. Neither a capability
+test nor a qualified response accepts that engineering package.
+
+The confirmed-miss set remains twelve, with an incomplete recall denominator.
+Complete baseline judging, design acceptance, production changes, blind A/B,
+release gates and publication remain pending. No 0.9.0 release is claimed.
+
+### 2026-10-06 — saved baseline evidence and finite qualification checkpoint
+
+Two further original eight-page baseline calls completed with native exit 0: actual
+`claude-opus-5-5` and `gpt-6.1-sol`. Their twelve and two observations respectively
+remain unconfirmed. The exact existing schema, pixel-bound checks, eighteen data
+controls and two strict-parser controls were registered before activation. A saved
+projection of the preceding Codex result completed without another model or Node
+call; the original caller failure remains preserved separately.
+
+A focused four-crop `grok-4.7-build` call completed with all four ordered inline
+image tuples bound. It described both observed separations as cosmetic reader
+friction. Its positive schema check and four separately preregistered data copies
+are activated through the unchanged existing Node program. The missing negative
+coverage for the strict duplicate/nonfinite parser remains an explicit gap.
+Neither native success nor these limited data checks completes a visual role.
+
+A second separately preregistered Gemini attempt ended with native exit 7 after
+all six provider requests returned HTTP 503. The six image tuples and failed
+transport remain recorded, but there is no visual verdict or actual responding
+model. No third attempt is registered at this checkpoint.
+
+The retained 207-page diagnostic and stock raster sets were measured byte-equal.
+A separate examination retained all 159 original stock findings and their IDs.
+Direct native target absence does not alone establish that the same semantic
+visible event was missed. Two adopted visible defects therefore retain pending
+stock-event joins; the confirmed-miss set remains twelve and its denominator is
+still incomplete. Cause, author intent and delivered-file correspondence remain
+unknown where not independently established.
+
+The next sixteen original pages keep their original alternating-family assignment
+and blind prompts. Local privacy sight, exact image tuples and unchanged closed
+schemas were reviewed before their separate activation. Private evidence and
+prospective checks were saved in a 92-path workspace checkpoint with direct exit 0
+and an exact readback. No product bytes or private paths are added to this public
+log. All stopped engineering scopes remain stopped; design acceptance, core
+implementation, A/B, release gates and publication remain incomplete.
+
+### 2026-10-07 — Design package stopped; independent evidence retained
+
+Two fresh independent design judgments on successive frozen revisions each returned conditional acceptance with three high findings. The second round added distinct contract gaps. The coordinating lead applies the original two-round stop rule to this design package; a renamed audit or revision does not reset its budget. The eight latest dispositions remain open. The private correction proposal and its24 prospective controls remain unrun. No third design judgment, core implementation or release admission follows.
+
+The independently completed original visual page sweeps have scoped uptake; visual coverage is separate from causal attribution, confirmed misses and metric denominators. Newly encountered financial-content whole-page assignments remain withheld under the data boundary. Previously approved independent baseline data checks continue within their exact registered scope.
+
+Fresh registry and Git remote queries still show version0.8.0 and no version0.9.0 release tag. The mission has no accepted release candidate, A/B result or final engineering acceptance.
+
+
+2026-10-06T22:52:03.535752+00:00 — The four already registered original visual roles passed saved-data qualification: exact native zero exits, closed schemas, independent bounds, 18 data negatives and two strict-parser negatives. The coordinator admitted only their original blind page-sweep roles; candidate labels, overlaps, source ownership, intent and delivery remain separate. Four original Grok data negative copies were each rejected as expected without repeating the positive child; its strict-parser negative gap remains open. The release design remains stopped after two independent rounds with new High findings. No third design audit or new implementation is admitted. The cleanup inventory and exact merged-PR-head lookup establish no deletion candidate; evidence, unmerged work and uncertain residue are retained. Registry latest remains 0.8.0 and no v0.9.0 tag exists. Phase A, A/B, release gates and the parent finish remain incomplete. No publication, deployment, consumer upgrade or cleanup mutation occurred.
+
+## 2026-10-07 — focused completion authorized
+
+The maintainer explicitly requested targeted completion, publication and cleanup.
+`planning/finish-0.9.md` replaces the exhaustive process requirements for this bounded release.
+Old failed audits remain historical; unsupported design work is not credited as implementation.
+Measured again: remote main `98e33c006cd6a0ef6a596caa5f18062b0ee74175`, npm latest 0.8.0,
+no v0.9.0 tag; integration `c59c2a1` contains planning changes only.
+Strict technical tests, independent acceptance, privacy and tag-based publication remain required.
