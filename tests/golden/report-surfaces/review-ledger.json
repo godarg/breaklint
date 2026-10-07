@@ -3807,6 +3807,1710 @@
           ]
         }
       }
+    },
+    {
+      "round": 6,
+      "record": "current",
+      "outcome": "pass",
+      "reviewedAt": "2026-10-07T09:23:24.985Z",
+      "reviewers": [
+        {
+          "handle": "@ClaudeOpus-clean",
+          "kind": "delegated-ai",
+          "actual_model": "claude-opus-5-5",
+          "promptSha256": "70223fbe3264650d9060c2ac6a71246a082f06ac6dd932bee7283b665828ef2b",
+          "outputSha256": "c2780e9cf125acfc3263a2a20c1683971d1e12b1ce31cdd17970d8abf1fc7f84",
+          "nativeReceipt": {
+            "path": "tests/golden/report-surfaces/delegated-ai-090-clean-r6-native-receipt.json",
+            "sha256": "0d4ef56adfcf480ce39e56d57bdc5a060a16f69a09a90b07bbe888449bcdaf17",
+            "imageCount": 29
+          },
+          "receivedImages": [
+            {
+              "path": "clean--light--desktop.png",
+              "sha256": "1b866cb6095b1b36ed4eeac2f4d33d6ab66c57f55aecd72e17fcd46257370c49"
+            },
+            {
+              "path": "clean--light--tablet.png",
+              "sha256": "caeb65cf31818ca6d3801bb40efcbcf1914a9afbe9cecb177fd3bdffde575d6a"
+            },
+            {
+              "path": "clean--light--tablet--tile-01.png",
+              "sha256": "4f1b9f31e7388785eb4c08403f3e24fde1156b8fa99d548a0005659d3cd169bb"
+            },
+            {
+              "path": "clean--light--tablet--tile-02.png",
+              "sha256": "f3884aa00e9a41e2361fde5422f89480793e173ae4cd50a713013c67416e6480"
+            },
+            {
+              "path": "clean--light--tablet--tile-03.png",
+              "sha256": "0933f538b7797ce8aacd98380e4234d503db02051b23dd8a1549572be6d0bc45"
+            },
+            {
+              "path": "clean--light--tablet--tile-04.png",
+              "sha256": "41af7001d4ffd6933e10b6013f583a41396f935632b1ef75af6cc72583a543e6"
+            },
+            {
+              "path": "clean--light--mobile.png",
+              "sha256": "8e2cfa2b37cf4eb3802eb2b292a2ab0c2a920aa0edbaeb3d6867a21df2219470"
+            },
+            {
+              "path": "clean--light--mobile--tile-01.png",
+              "sha256": "2e679cb34f2efb835e6f1a74baa5c72b05e2d16abe92083725382899863f2451"
+            },
+            {
+              "path": "clean--light--mobile--tile-02.png",
+              "sha256": "1744152e2e94ae04b0e44a0ef4b2a3bbbb7ad811695390924b5a264b98086752"
+            },
+            {
+              "path": "clean--light--mobile--tile-03.png",
+              "sha256": "9b6a61a9f168b2e1e33dd3e03a32ba8e1fede83dafb700d8c2f54f6efc8e2a6a"
+            },
+            {
+              "path": "clean--light--mobile--tile-04.png",
+              "sha256": "96e612aa619ef7a834abe134122f5b1fc759e2013edf59722ee9e27861a2b349"
+            },
+            {
+              "path": "clean--light--mobile--tile-05.png",
+              "sha256": "9e53236e7557f188c123c17b4cae38e857e84de3ac208a345684809ee55749af"
+            },
+            {
+              "path": "clean--light--mobile--tile-06.png",
+              "sha256": "3431e1ee47ddcc8868e8313f9a48aede3e5a19f773efa7175832f42a8615c55b"
+            },
+            {
+              "path": "clean--dark--desktop.png",
+              "sha256": "ddf027fcf83a8c01ee9e31af73ba7b139ade1800927e1238b42a0b3ebb707851"
+            },
+            {
+              "path": "clean--dark--tablet.png",
+              "sha256": "6f515b1fc17a49809be68b852c1d94b097a22fb74a3a06b1195994bdacebd55a"
+            },
+            {
+              "path": "clean--dark--tablet--tile-01.png",
+              "sha256": "fe262d08fdefbf5fcd50898fdf7ff729e587cd7b7917f51f744f993fa8ff6b11"
+            },
+            {
+              "path": "clean--dark--tablet--tile-02.png",
+              "sha256": "eb3d46da8f163337dd9e9380893248679da388c0798e049afba5c8a58be3c372"
+            },
+            {
+              "path": "clean--dark--tablet--tile-03.png",
+              "sha256": "b4b4e51830eab243c4c8ca0b8302cbb58170561fab14627006cd1b26d2f8d247"
+            },
+            {
+              "path": "clean--dark--tablet--tile-04.png",
+              "sha256": "f51eb6f22cb986ad5793cf5a2f17c38674b0973701cf500eedafb432fc3636e3"
+            },
+            {
+              "path": "clean--dark--mobile.png",
+              "sha256": "4be27159615946c62543403ad3619cfc2676219cdf1c0d300a6e28f461e987f2"
+            },
+            {
+              "path": "clean--dark--mobile--tile-01.png",
+              "sha256": "1acf8eec86ebc61264709ed5492656906e1421785ff575c7f7c16e8e2083191e"
+            },
+            {
+              "path": "clean--dark--mobile--tile-02.png",
+              "sha256": "f2ab11f555a70a249cde936ee5cf6f9ac1dbf3c605cc880b40545bd908fb9025"
+            },
+            {
+              "path": "clean--dark--mobile--tile-03.png",
+              "sha256": "fdea9663711b20febb7584d74d8e77b09347176ffee11a882e6413f040dd5ba5"
+            },
+            {
+              "path": "clean--dark--mobile--tile-04.png",
+              "sha256": "8b0cb2cf34ba77f5093041f2b5f7a1797e5f39b87e111475260fc10bc982d6d3"
+            },
+            {
+              "path": "clean--dark--mobile--tile-05.png",
+              "sha256": "29807c07b9ba4d01b3c4995c1c72db05ac6d418002095b1fa9754e4cff9a9b39"
+            },
+            {
+              "path": "clean--dark--mobile--tile-06.png",
+              "sha256": "2f709828f1f58c78c61f2124192e81a54abb9cfefbad307d1c36c2e1118363e6"
+            },
+            {
+              "path": "clean--a4-page-1.png",
+              "sha256": "06346b5bd49f8e4d5cc9399460c37bc0d8ba56b4eefb309e044003cc484c4f9a"
+            },
+            {
+              "path": "clean--a4-page-2.png",
+              "sha256": "bc76b78f515ef7005c0e64267ccefd2d4ad7a7f5a54fe81cbcbe0388c6849979"
+            },
+            {
+              "path": "clean--a4-page-3.png",
+              "sha256": "bbcd42ef31b3433c596a9e4906b42fd17eb70c777ab8a78d1c3d31c773505f92"
+            }
+          ]
+        },
+        {
+          "handle": "@ClaudeOpus-findings",
+          "kind": "delegated-ai",
+          "actual_model": "claude-opus-5-5",
+          "promptSha256": "9fe8c31d5be36a845f4fb29563bb6a9810ea099a139e8328e71314b871c4ce93",
+          "outputSha256": "12ec101aabdab540935d96977baad81a60e1f1c69ca2be965b7d871d4ea00f98",
+          "nativeReceipt": {
+            "path": "tests/golden/report-surfaces/delegated-ai-090-findings-r6-native-receipt.json",
+            "sha256": "823cd4e81d8dbfa1bf5328b2cdb9a1229de72759b6ef95426b1ce2b29ec06381",
+            "imageCount": 63
+          },
+          "receivedImages": [
+            {
+              "path": "findings--light--desktop.png",
+              "sha256": "de9095e38e9846884d2ca3778cd74d48d3b15ac2232debf3e02384f3138885d1"
+            },
+            {
+              "path": "findings--light--tablet.png",
+              "sha256": "7a664e6234dd01378af779ef256fa06b27bd21285dd9ab5f13dd3d31dcab4571"
+            },
+            {
+              "path": "findings--light--tablet--tile-01.png",
+              "sha256": "d938a7e79be77824c005dd4da4b0410a6aed6c78c3d8014e071837bbf31a35e5"
+            },
+            {
+              "path": "findings--light--tablet--tile-02.png",
+              "sha256": "1edafa39fe15a937b23ac38e740fd90e719d513a2262481c7a6c80005ed20bfa"
+            },
+            {
+              "path": "findings--light--tablet--tile-03.png",
+              "sha256": "2f366d90d60df9d9db0c39aca1225974eba11c1538ac401a34699863be651e84"
+            },
+            {
+              "path": "findings--light--tablet--tile-04.png",
+              "sha256": "3c604d3e9b51be7b4e4dc1cdd9bc6d4f7df2db5874c5bcd0ee2f5d42aed8cbce"
+            },
+            {
+              "path": "findings--light--tablet--tile-05.png",
+              "sha256": "6a13876c2b26f7f6a0db879a3604ab02320270b43364cae9aaef24cbc8808a08"
+            },
+            {
+              "path": "findings--light--tablet--tile-06.png",
+              "sha256": "54006ff40244ed65a3495e8f3257615ba42e0c766ce92bcd3bd0d7fb95d6bede"
+            },
+            {
+              "path": "findings--light--tablet--tile-07.png",
+              "sha256": "fd3b949854c43fc11dc677d1040f818044df25dfe07eeae11e0b4428bc17931a"
+            },
+            {
+              "path": "findings--light--tablet--tile-08.png",
+              "sha256": "15aff34e8e4b578d064cb7930d551f6a88b9ff2777261585460f149d0f3148ac"
+            },
+            {
+              "path": "findings--light--tablet--tile-09.png",
+              "sha256": "3a651d1d4d9eceacb46b0cbf5cb7f9e15d389a96dddddb25923c02ef19c6ff21"
+            },
+            {
+              "path": "findings--light--mobile.png",
+              "sha256": "b8716f3627db465f9bf81cef8ccfcaef9a407824a582ea165afab0c8846fc831"
+            },
+            {
+              "path": "findings--light--mobile--tile-01.png",
+              "sha256": "139c2edf5e3776613d04e0f5064a047fb778570113184932ed5fca57ec1e4af5"
+            },
+            {
+              "path": "findings--light--mobile--tile-02.png",
+              "sha256": "4b6da833e312980b5edb00c60689069109202bd25fa7337e715729b9bbf2841b"
+            },
+            {
+              "path": "findings--light--mobile--tile-03.png",
+              "sha256": "130331ce3af79ae6fe0fcebad04c20d0995fdb5a61514e2ee0b7d79d29d12b82"
+            },
+            {
+              "path": "findings--light--mobile--tile-04.png",
+              "sha256": "a9b9d94848b49cc0852803a2d6ce974bfe121db286692de9c17f684c39d4726d"
+            },
+            {
+              "path": "findings--light--mobile--tile-05.png",
+              "sha256": "560bc114c703df10bd1d1aac03ecf9279fd97e01db70cb59b5b19b91188b31d9"
+            },
+            {
+              "path": "findings--light--mobile--tile-06.png",
+              "sha256": "eff8078df6f7fc6b416b2382e23739aff64bf3692c2fb746291de7c52a2082d9"
+            },
+            {
+              "path": "findings--light--mobile--tile-07.png",
+              "sha256": "b19a645ce4b98f78934382fc97b1394d35f5854bbc511c5b11e518525d970e62"
+            },
+            {
+              "path": "findings--light--mobile--tile-08.png",
+              "sha256": "ef613483d05b27f61d0f7e01e4178ce932be09a86c437b8678c58a7db3453fa8"
+            },
+            {
+              "path": "findings--light--mobile--tile-09.png",
+              "sha256": "d1035e987043669c7d95889d254d060c31fa1325ce6bbdf3ea61c71ffa2d1262"
+            },
+            {
+              "path": "findings--light--mobile--tile-10.png",
+              "sha256": "d0e7383214b206d24c9066f47e1ae9d18b9aea27afd4185ace243e92543bd12d"
+            },
+            {
+              "path": "findings--light--mobile--tile-11.png",
+              "sha256": "8c65dc77c07981788c61d5e15a6be1ecc3ada38a6659c51a12ce887cb28406f4"
+            },
+            {
+              "path": "findings--light--mobile--tile-12.png",
+              "sha256": "aaeaf896686d7f041c6214b10e5df9b7ef885e0b1c4e079f1d3ce4d81db021ff"
+            },
+            {
+              "path": "findings--light--mobile--tile-13.png",
+              "sha256": "8c41980c0f741b75feb74f51f7f9da3f3aaa33f2f134a248ea3173e5796766b0"
+            },
+            {
+              "path": "findings--light--mobile--tile-14.png",
+              "sha256": "fc0c7b575c436f9485d46c94d4e4986a92f7bc0ef5afa5e7890917ca3f7c9f1f"
+            },
+            {
+              "path": "findings--light--mobile--tile-15.png",
+              "sha256": "f674d7762c1105d9fc3895684538213a336a31d39978d9fe9789c79a3f7616f6"
+            },
+            {
+              "path": "findings--dark--desktop.png",
+              "sha256": "ee629ff88c2ed00af6fa1e04289e9234a53c5a366ce6cc88b09b9ac31264772f"
+            },
+            {
+              "path": "findings--dark--tablet.png",
+              "sha256": "d0d45d7ee1002ed6c3edaa32ab7ba15e4af8e00b0a9555c42e4bbd741981b687"
+            },
+            {
+              "path": "findings--dark--tablet--tile-01.png",
+              "sha256": "ca97215042c01a693fade0c22e7f130c4f79c441d7565c8afc597ac061107c58"
+            },
+            {
+              "path": "findings--dark--tablet--tile-02.png",
+              "sha256": "88dba39d32f675dd4cb299ba311452318725f2b70ad1a6033c6d6c5f8084cdd9"
+            },
+            {
+              "path": "findings--dark--tablet--tile-03.png",
+              "sha256": "1dd817a1a0aad932cc5e0656e31fe3bd353b2a9bab648f43e2beddc5fd31e0bb"
+            },
+            {
+              "path": "findings--dark--tablet--tile-04.png",
+              "sha256": "4b3732901a7ff398e8ef91445dce0bffd70203e9cbb8b764f1f3af1cdd609f39"
+            },
+            {
+              "path": "findings--dark--tablet--tile-05.png",
+              "sha256": "e0abdff8d2a632ec0ae966c161f2b0212de19a311f57dcb8e1da9ceae856f27e"
+            },
+            {
+              "path": "findings--dark--tablet--tile-06.png",
+              "sha256": "48c62c61f3d5b0bb3b5bde6d34404954f9c6698be014f82c34f17adae32dec1e"
+            },
+            {
+              "path": "findings--dark--tablet--tile-07.png",
+              "sha256": "971971e29c17315f6101065a3403e90022f5711f3f7760037b87c656966917e7"
+            },
+            {
+              "path": "findings--dark--tablet--tile-08.png",
+              "sha256": "54047c46482b360e5e0b2a86841ee43ef6ea6632241d0662291dd510e7c98d33"
+            },
+            {
+              "path": "findings--dark--tablet--tile-09.png",
+              "sha256": "694fe439a770c5397efc933b7c6e4dee28f8f93c13da6b588b7042fa85833cc1"
+            },
+            {
+              "path": "findings--dark--mobile.png",
+              "sha256": "277542db8a481c817053eea882ebc79b3532e5b490421338a50665f82521860b"
+            },
+            {
+              "path": "findings--dark--mobile--tile-01.png",
+              "sha256": "b4044bc7b0fba35e9dec0eaef667a236000bb4e5ab0fe9e9cd982ada4d90421f"
+            },
+            {
+              "path": "findings--dark--mobile--tile-02.png",
+              "sha256": "14a931a5a4357a7b7a77ac83173a08b496fe5d09b221b592f64d807cdf124267"
+            },
+            {
+              "path": "findings--dark--mobile--tile-03.png",
+              "sha256": "cb736534af7c7ac5daa2a943deee3b70d3975c655cd7b93a663f2c99fc081b79"
+            },
+            {
+              "path": "findings--dark--mobile--tile-04.png",
+              "sha256": "e4c03956965cb2041f9614d019dc52db2162246ce69c561726338f632e727674"
+            },
+            {
+              "path": "findings--dark--mobile--tile-05.png",
+              "sha256": "83b2e943ddfc2b6826be6e4eac1494b56743ce4c0e2d64ad4fc7421458ff58d9"
+            },
+            {
+              "path": "findings--dark--mobile--tile-06.png",
+              "sha256": "37fdfe1852f039546e6f7bcaf5ba3152011650bec2421d971154129abf2b62fe"
+            },
+            {
+              "path": "findings--dark--mobile--tile-07.png",
+              "sha256": "6f55fbe757401973898f897a09b4068ef2ae9f0401e4620221c51ab331454388"
+            },
+            {
+              "path": "findings--dark--mobile--tile-08.png",
+              "sha256": "487159e969b97915e6f848d0e001030edba0374b6ef07a16e82ba690ef22ddfe"
+            },
+            {
+              "path": "findings--dark--mobile--tile-09.png",
+              "sha256": "ee543b3110ca01e5b1ed901d8af6a957664464647537da93bef5497cf42060cc"
+            },
+            {
+              "path": "findings--dark--mobile--tile-10.png",
+              "sha256": "5b359cf9dd00bec7d9e8afa7e1673a517a953545d9e48a947b65fcdb91f176dc"
+            },
+            {
+              "path": "findings--dark--mobile--tile-11.png",
+              "sha256": "27194ae9030eab98e613b8090de55fc662ec7657ff8efdea65f7dba7f2e9ee0a"
+            },
+            {
+              "path": "findings--dark--mobile--tile-12.png",
+              "sha256": "18387dea0b4fa5bf1a7b4235a2c73d366bcd906498a07611d2bd1834415de0d1"
+            },
+            {
+              "path": "findings--dark--mobile--tile-13.png",
+              "sha256": "33187d86781ee8a7023e6f9763b40884b15fba70281cb146ca2b265fbacfdca0"
+            },
+            {
+              "path": "findings--dark--mobile--tile-14.png",
+              "sha256": "4b2606b5b22aa7848f46816c02f87c6df86e0dccecf1865fbc0c77c13f531108"
+            },
+            {
+              "path": "findings--dark--mobile--tile-15.png",
+              "sha256": "9d93f2fa4a4d28038017f04a65c853ae89e435363adf60693704d3b95123c589"
+            },
+            {
+              "path": "findings--a4-page-1.png",
+              "sha256": "56871254b922041834a4f2eab752086c4e485c7abd70510141096bd8ad6fb8e0"
+            },
+            {
+              "path": "findings--a4-page-2.png",
+              "sha256": "428f479bc03ff5d1ef0084e57ef2dc0f72b7546dc24224666f5177c374571312"
+            },
+            {
+              "path": "findings--a4-page-3.png",
+              "sha256": "e20e1fbd3738d643bbd0d0752b17fffe6afb86bb992fdf181d97f362c6b915ea"
+            },
+            {
+              "path": "findings--a4-page-4.png",
+              "sha256": "89cc1a0fd18635fd943e68cdd815423b2e6612297e6404f7bc9dede7f83c7147"
+            },
+            {
+              "path": "findings--a4-page-5.png",
+              "sha256": "4ba9bfe35f22a905eb1cebaa388f3ad7d5908849e91791f787d908e5f93fd5d8"
+            },
+            {
+              "path": "findings--a4-page-6.png",
+              "sha256": "3cac0038eb8e978ff1c7d26410967558eee733618d3848a94b425f5a1e99fba4"
+            },
+            {
+              "path": "findings--a4-page-7.png",
+              "sha256": "6a0a0f0a6e36b77094f3c60759670a300bc3eae29a55fead38079b3a0a110adb"
+            },
+            {
+              "path": "findings--a4-page-8.png",
+              "sha256": "361d701e85e958c87e4cc90efaffbe9837f9bcf425caf1f58c50161e593b9db6"
+            },
+            {
+              "path": "findings--a4-page-9.png",
+              "sha256": "9d74dd14445392d43f123741da758f4ff353bbcac2c748f05c385c7faead85e7"
+            }
+          ]
+        },
+        {
+          "handle": "@ClaudeOpus-infrastructure",
+          "kind": "delegated-ai",
+          "actual_model": "claude-opus-5-5",
+          "promptSha256": "3f2c830580d7b8ef9d46cce71f76fb8e651eba26fbe7c59e1448f6d67ac4e41e",
+          "outputSha256": "01e62ab6d064d4e00d845e1ea402f623215bfc1ae15838bca9b55434ad3a0c3a",
+          "nativeReceipt": {
+            "path": "tests/golden/report-surfaces/delegated-ai-090-infrastructure-r6-native-receipt.json",
+            "sha256": "0062c08dcbf4a5ab0caec018f45961b1f84261e8f394e66c43d74f0af3b4e3d4",
+            "imageCount": 65
+          },
+          "receivedImages": [
+            {
+              "path": "infrastructure--light--desktop.png",
+              "sha256": "db0ca1e0cc91f45460da55ab52e6ad3f05993df6001a966e35abdeb171279398"
+            },
+            {
+              "path": "infrastructure--dark--desktop.png",
+              "sha256": "6b07ac2d5ca870413f6aedf5f747083cf61df62a22a35175b30a5722880df4c8"
+            },
+            {
+              "path": "infrastructure--a4-page-1.png",
+              "sha256": "dd54f0274302fb66c0ba8af95578c816577bc600223e7ea2de4ff341b6a55070"
+            },
+            {
+              "path": "infrastructure--a4-page-2.png",
+              "sha256": "dfc75f3dbcf2428b64c63d7eae2aa35c636e39825afd039b87701247a7773a9b"
+            },
+            {
+              "path": "infrastructure--a4-page-3.png",
+              "sha256": "0705cb0a6bc51b7784537d120345f5159a037e0589d5ec1e15b5366a4ea11b01"
+            },
+            {
+              "path": "infrastructure--a4-page-4.png",
+              "sha256": "bc2655be4d4a9f5d57935949c66e3722ce4e7d659ee3907dbddf09918cb993b0"
+            },
+            {
+              "path": "infrastructure--a4-page-5.png",
+              "sha256": "c8cf4f2fd34c0a7c16ec007e4645ff23c6780dd5b378ead4c810ad1f0a63906a"
+            },
+            {
+              "path": "infrastructure--a4-page-6.png",
+              "sha256": "2cdcb4835a92d2fb1d6f729ad59a13a5d83b0d91026462ecd9eabed0508e1321"
+            },
+            {
+              "path": "infrastructure--a4-page-7.png",
+              "sha256": "3f6abaf750b2e4f8e9c383c3e86e264d7e49badf2afea9955ba37ef4b7837970"
+            },
+            {
+              "path": "infrastructure--a4-page-8.png",
+              "sha256": "940605ea7a348c412e11f39885fd2695c8f69a854c93505a498295618687af5b"
+            },
+            {
+              "path": "infrastructure--a4-page-9.png",
+              "sha256": "08e59685e3dce1d883ac72fb5b4be59d78866f460a7d535fee561e14b5d08b4b"
+            },
+            {
+              "path": "infrastructure--light--tablet.png",
+              "sha256": "a9ba0fb30b219ada0fbb4e4d50356a7f4746de155228f8cc95606a612a0c84a3"
+            },
+            {
+              "path": "infrastructure--light--tablet--tile-01.png",
+              "sha256": "942df8fa042a8be02f5f8d9b567fda719513bc14329a7704f1f973f00bdbe2e6"
+            },
+            {
+              "path": "infrastructure--light--tablet--tile-02.png",
+              "sha256": "64284fde01963211c774343d147734ccf105bfa39453358ba6e21e007598fd05"
+            },
+            {
+              "path": "infrastructure--light--tablet--tile-03.png",
+              "sha256": "e534fc114db2d88a2ed0cdd9669fb5d9a84114adc94bcf04a6613a40ee233415"
+            },
+            {
+              "path": "infrastructure--light--tablet--tile-04.png",
+              "sha256": "08f871d63ff7409df4a9703f01d2630d7e07746f6ecb27f3817557cfdd812137"
+            },
+            {
+              "path": "infrastructure--light--tablet--tile-05.png",
+              "sha256": "ac6822e7d9291e262fadf1685434d837a8bd2b205207935787ea76d3639abf2f"
+            },
+            {
+              "path": "infrastructure--light--tablet--tile-06.png",
+              "sha256": "b96db30339e3c0194705ecd1a71c711a206678fa86353c89a425a9606e602794"
+            },
+            {
+              "path": "infrastructure--light--tablet--tile-07.png",
+              "sha256": "fdc5fed8ddc128b8bfe808c2d7f1e44128e42b1b68a0b96d2b80dafeb62fa47c"
+            },
+            {
+              "path": "infrastructure--light--tablet--tile-08.png",
+              "sha256": "fcdb8f184dd6032bd09f93c088444cb47e3450f323e510af582cebd5ec8fa401"
+            },
+            {
+              "path": "infrastructure--light--tablet--tile-09.png",
+              "sha256": "d8a97d59bd53d1d6aa93a8311e4b2df015473de7b4ab0af7951f9b5c1084d416"
+            },
+            {
+              "path": "infrastructure--dark--tablet.png",
+              "sha256": "5eb4e523fc662db1f605726b012fdb202e198f278f56f98a5e2b0b3e92563c68"
+            },
+            {
+              "path": "infrastructure--dark--tablet--tile-01.png",
+              "sha256": "cdc749b888a784066de782c4b5d7c9eb3282340253c38ec0012c49961e609f9d"
+            },
+            {
+              "path": "infrastructure--dark--tablet--tile-02.png",
+              "sha256": "08592e210ef05563c06924b336e8a9f9cbae762700662c3809831bb4f21c0325"
+            },
+            {
+              "path": "infrastructure--dark--tablet--tile-03.png",
+              "sha256": "034c2226f1120b75d6d8ffe363694e17bcfc4b01e82997e83eb7ebef86a87c26"
+            },
+            {
+              "path": "infrastructure--dark--tablet--tile-04.png",
+              "sha256": "60a53b360a1fb6e0c22236d531fbf328c19a2646eff738240275fef80d73c8cd"
+            },
+            {
+              "path": "infrastructure--dark--tablet--tile-05.png",
+              "sha256": "7de97fcaae01971af4f0204889cc720fa395d240058f2beb8743760a1c7bebfa"
+            },
+            {
+              "path": "infrastructure--dark--tablet--tile-06.png",
+              "sha256": "f6a23822d5089dd91f564aa82bba7866a20e71807e48894c602036517aa4f9a9"
+            },
+            {
+              "path": "infrastructure--dark--tablet--tile-07.png",
+              "sha256": "4c1b899df117a78687d4968c6dc7d9b1314cc4b3d1cc3b041890684474e32aea"
+            },
+            {
+              "path": "infrastructure--dark--tablet--tile-08.png",
+              "sha256": "3697f93c24bf037c66bdcc5b8ce0fb3d0238bef2a0ca4f7787f4f80fce5032ff"
+            },
+            {
+              "path": "infrastructure--dark--tablet--tile-09.png",
+              "sha256": "bb66ee84f797639980992d5a13612e1264d61a6920e84f140ff9ba28fdee29ea"
+            },
+            {
+              "path": "infrastructure--light--mobile.png",
+              "sha256": "94be37bd893e7a8bb5ee18639296584e8cd0da2ac34eb2e79233e07e6c08bf6a"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-01.png",
+              "sha256": "dae7014de56fa8b487f5978d28bbcff1833df07295dbb784134ab50abbca7459"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-02.png",
+              "sha256": "ecf79ceb23b51ba1d0a55d9c9301e92636ea0931ca3bb0b31af4dddc64825ec0"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-03.png",
+              "sha256": "d8b0bf1c805a71f7f5a00039d0dab3dc48b7393d32bf2ab87826754fb2d0fd94"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-04.png",
+              "sha256": "d0f43d5f7008c14c7690ce68925aa419a4b897c5be7d3fc9b5eba4355d7315f5"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-05.png",
+              "sha256": "fc96b240f6d1f45459b4a0f51de8d4cb6dd81ec17252267963fdd07b5df05087"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-06.png",
+              "sha256": "18370ec615df9549820bfb0ff66047c28a7c7b8c3060e736773e98c426f0a13d"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-07.png",
+              "sha256": "b948a6204a05e59119dd88840db8f44357567e89d234889c010cabaeb1673a52"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-08.png",
+              "sha256": "ceb0d4f9efa0f7ac2a5c4eef9e59e81a45bac0224dbb07b6e3953bce3bb7ffdc"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-09.png",
+              "sha256": "7c060332cb58bb8f5cb4d83629f9397703edf9fa91014df211deee47da186a60"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-10.png",
+              "sha256": "7b03b80e29ef83c10048873703bfafe421ebf4b655a14a21019e91702ef5fa6b"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-11.png",
+              "sha256": "312edab75353c2619187e93aaf2e29e2f657dd90cc8d163de19b09495f233f87"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-12.png",
+              "sha256": "cd9a0ef874d7616548eb280a491e29459bbefe395585fd3a52775832aa33ebd3"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-13.png",
+              "sha256": "ad8ad61bbe96c2b05d0aa94a51f77f299e6755f35dd1f411f3c1dbdbfc4a8086"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-14.png",
+              "sha256": "37847bafafbeb4463f613736197674d8150e8774a1072df460605b563c66d01e"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-15.png",
+              "sha256": "82fa32166e3177c37f9fe7beb23df604790144d97df5c0656abb9c5e9a532a0b"
+            },
+            {
+              "path": "infrastructure--light--mobile--tile-16.png",
+              "sha256": "fbdf6d54fbe0838d94e90a455ee27491df217fc07528749fbb4d634069f8d990"
+            },
+            {
+              "path": "infrastructure--dark--mobile.png",
+              "sha256": "f0af734d551cfc8606a5cf501337d5958bc429e591e93f4df3f4af0bd7cae868"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-01.png",
+              "sha256": "be1b2cab5a27ee037210ad3acfe465981e34785d7ebbfbffc9402ef998ecd2ee"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-02.png",
+              "sha256": "56b3bfe21583687019729d5dd5f8857eef76b2c749e4c83097560835e577ce98"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-03.png",
+              "sha256": "7f30ed5d8fc801eb092e83b184c42d117322645e7fd260c9f5ef98310d9c0349"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-04.png",
+              "sha256": "934d49421fe02a6ecff5830fb61f4adc03c7da9ac7bbecb3fc980c21b1662eae"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-05.png",
+              "sha256": "46305a6a9615b5662547b3df4e115fdb46667cf6dca75ad22857aa9862ffc225"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-06.png",
+              "sha256": "e0b629424f30475d543bfbba1762637128c3d257819e4b14f257ee4e03f30e81"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-07.png",
+              "sha256": "7c77c748bdfc5536dbba53740c34e81b7437cacfc7b609f351caee4ef812d542"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-08.png",
+              "sha256": "66799e2e31ab5d76e661eb828e076de3e41128dfaac10d63ee68ef934a179bca"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-09.png",
+              "sha256": "b98cae9dc8caf3e490a24b0e62aadaf51da91d626f2fd02af57617508bd7fe40"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-10.png",
+              "sha256": "649a10aef4af000203654d90fe9f0145db9dbf6512e004177781c15159ff0c0b"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-11.png",
+              "sha256": "de0ffe4d61e74f6bf973a569cb73e3d40b023bd79fa0d51bf2c4e019e371938c"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-12.png",
+              "sha256": "d748ce7e33cb13a0681daad47f45c4214227f35f2535b88259343363c6da4586"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-13.png",
+              "sha256": "759d7a520e629e9ac84c5c6d746cb517693814980e88f54c9017471ed657ba5a"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-14.png",
+              "sha256": "b990e7eebcff27ef4b230ce14865946773ca211346058e9699a75176f27f0fc1"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-15.png",
+              "sha256": "cfd0a179e6e3de514127110177e3ab2cc7a5e26d9d795c8dfb6b1696bcda20e8"
+            },
+            {
+              "path": "infrastructure--dark--mobile--tile-16.png",
+              "sha256": "ed611cabeb1201f75b02cea918ebc2314d502a0742b319001ceda0c07af9e5b0"
+            }
+          ]
+        },
+        {
+          "handle": "@ClaudeOpus-insufficient-coverage",
+          "kind": "delegated-ai",
+          "actual_model": "claude-opus-5-5",
+          "promptSha256": "bff0670853ea292da5739024f5a278b13d564e14d080edbf0f579a4e747afb22",
+          "outputSha256": "7c3e522b7638ceefa62bc9fa76c1140e1f9fc5da26ba5c16afd187a9a32c6d2f",
+          "nativeReceipt": {
+            "path": "tests/golden/report-surfaces/delegated-ai-090-insufficient-coverage-r6-native-receipt.json",
+            "sha256": "66df0d533d1ed80b59a693e3c6cc4ef642bb8dbfc3d981d07bd5fe02bb737dcf",
+            "imageCount": 65
+          },
+          "receivedImages": [
+            {
+              "path": "insufficient-coverage--light--desktop.png",
+              "sha256": "d67b5c2f1b23d73b97a2ccb6c4364ec439393cb0c1e7eae27668887a5b88128c"
+            },
+            {
+              "path": "insufficient-coverage--light--tablet.png",
+              "sha256": "4a2a3819f3d369c148eabfb0e89377f400f5e777910587c1de2f7866500a6674"
+            },
+            {
+              "path": "insufficient-coverage--light--tablet--tile-01.png",
+              "sha256": "a8425a4b656956fed8147273fe4deca4b859b53b1db9247861e8a9d15b3436da"
+            },
+            {
+              "path": "insufficient-coverage--light--tablet--tile-02.png",
+              "sha256": "c17f492393abd1be1872d39331d3b61ff5b6ea7f0e5e2bf276d30304303eaaee"
+            },
+            {
+              "path": "insufficient-coverage--light--tablet--tile-03.png",
+              "sha256": "d2e2d912f5298df6b43a3a8453c7e556ec65712a677ebdf5a4c9e7d02f65e305"
+            },
+            {
+              "path": "insufficient-coverage--light--tablet--tile-04.png",
+              "sha256": "dc7fa0f84bc23390451adb637c9a281e9c0c386e3848e6babec27cbc24495884"
+            },
+            {
+              "path": "insufficient-coverage--light--tablet--tile-05.png",
+              "sha256": "8feba16fb8cb2d8196060f0446a8067fc1a26768a40ea69aa3f723d3cb48dcee"
+            },
+            {
+              "path": "insufficient-coverage--light--tablet--tile-06.png",
+              "sha256": "7afb5c461b76895a5d291d528cd39272c33ad93bab1da249849fe9d8d9bd9f47"
+            },
+            {
+              "path": "insufficient-coverage--light--tablet--tile-07.png",
+              "sha256": "809469f79df97eaa49acbd8731999692ac2bcfe07a6bce411c408529e54f9595"
+            },
+            {
+              "path": "insufficient-coverage--light--tablet--tile-08.png",
+              "sha256": "3839819ca1af3fcd9bb9c8d49e5f46d57a60078cbeb58d7b612f8b096acdef71"
+            },
+            {
+              "path": "insufficient-coverage--light--tablet--tile-09.png",
+              "sha256": "871e4d13eb2c4c53b73ba12e3acee89ef7b7a9e6f13da2243d13ded442914ddd"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile.png",
+              "sha256": "7b01173fbcf531e11ca24682e2a0ee28b3f751c6524b73bb88d36fdf9cb9c084"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-01.png",
+              "sha256": "7b2973e6cd5b91ebd9a52b35e100f419dda89def8f47800b5ea8addc7dffbe71"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-02.png",
+              "sha256": "75dce3073579ff36d2c2865bad5de3ab8cbf9ac8e3bdb08bb4009963d76ae4a7"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-03.png",
+              "sha256": "e269245ed60fd8c789880c595a3b363865bc23bcbe3e2cdaf3cf748fe50fc6df"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-04.png",
+              "sha256": "0e1736b6304ee2e45e0669758f6c0bbf946e53e07889c8abdaff74f9170e6f04"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-05.png",
+              "sha256": "a0975756f2606724dcb10e86acfcc14585a2edbdf7154dafbe84d0cc84052e96"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-06.png",
+              "sha256": "a64a206eed2887f729a644e23e61bc9ff40e969204f72e51007a15ca7d775237"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-07.png",
+              "sha256": "18ca3b20e07d7d75e1fefa5c90a09b37b61d0d90a7f40aaba82d18d9b8a998b4"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-08.png",
+              "sha256": "a29bebe571b3393334c23bcb24239a712eea02fc1b1e47e291c0552f2d9a9611"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-09.png",
+              "sha256": "d4c02d9774d06f90d566411fdf48903ca3f88a70f8a39c8c4f92a1991cd5edbc"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-10.png",
+              "sha256": "0c5f8976da5e8bc088fa0c1da78c08b541f4727c5981db0ef64dea4c9a10261c"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-11.png",
+              "sha256": "03647ad1e202e0c685e30a3cce2893b828c62f08ae2c930acc6a482eb7d5bbf7"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-12.png",
+              "sha256": "6635ec58607fa9f71d5f9444ee5c65443befbe1253fdbc493e9d4d2cd56f34b6"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-13.png",
+              "sha256": "9d1b1c1a1cbedc76fbac2cfb347f4eb792ed98877ac647fbadda655f558020f7"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-14.png",
+              "sha256": "95ec43287bd9835a20f2d50fd76717e71c559261c0d90b37b6682cbbaf56c89a"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-15.png",
+              "sha256": "bae51d532fbec732502e562345b08c51a0f63d49052a53c043eb5f45831ddbd4"
+            },
+            {
+              "path": "insufficient-coverage--light--mobile--tile-16.png",
+              "sha256": "679ca86432af8430e734061390c27e128ffda501a86874b77a1f4079db19b690"
+            },
+            {
+              "path": "insufficient-coverage--dark--desktop.png",
+              "sha256": "a6a18f793620353a10ca96ad61b6f3be9cd5f0dd7f897ca03104617386868a4a"
+            },
+            {
+              "path": "insufficient-coverage--dark--tablet.png",
+              "sha256": "c46e4eee6b6b7e10422f2cd251730b69c916f3fe5826c02192510496109d3dc2"
+            },
+            {
+              "path": "insufficient-coverage--dark--tablet--tile-01.png",
+              "sha256": "7ae78121f185b2fe8ec6039cbcc6294c570b67fe0c8e5b2c396e6507d34fb6d0"
+            },
+            {
+              "path": "insufficient-coverage--dark--tablet--tile-02.png",
+              "sha256": "0590100ed9d7f198e2d3aaedde476550d07eba55415ddd0acd5850eb973c662f"
+            },
+            {
+              "path": "insufficient-coverage--dark--tablet--tile-03.png",
+              "sha256": "1675e0820ba7ef2c4d3dcf8cf9e5d7b88774c26b2b05ddb6d266307eae90f011"
+            },
+            {
+              "path": "insufficient-coverage--dark--tablet--tile-04.png",
+              "sha256": "9a1861f41cc308a6bc6a19eb5cf14e309d5cde4e038157fd2d7971a37abb7835"
+            },
+            {
+              "path": "insufficient-coverage--dark--tablet--tile-05.png",
+              "sha256": "71d611a619670e097da6c765d5dfd627f5049e39788bdda21408ee301ed6aebb"
+            },
+            {
+              "path": "insufficient-coverage--dark--tablet--tile-06.png",
+              "sha256": "8533159e3747541b717ff1c67b8e4680f41a8c2909c4406b2511c285d092e3b7"
+            },
+            {
+              "path": "insufficient-coverage--dark--tablet--tile-07.png",
+              "sha256": "f90d22a683f4d68488406038979efacd02370708557ce85fe44c9e964879f799"
+            },
+            {
+              "path": "insufficient-coverage--dark--tablet--tile-08.png",
+              "sha256": "85b343b466c7aaf558c327ffefe5d1b1d64ee67f58cf24ceb74e7ae4e66b7e01"
+            },
+            {
+              "path": "insufficient-coverage--dark--tablet--tile-09.png",
+              "sha256": "2dc10e8b9b5c668ba14bc20e24ffec49d57079d329ee56fcefe91307c0df5d95"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile.png",
+              "sha256": "62ef6dfc5f22e01bc57abef85081fff5aad337d88aad66f4b3ca70bbe9592adb"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-01.png",
+              "sha256": "57b817bf8d9c517712aa9567344bafee3d165e27ea9524909986debb2796b0e5"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-02.png",
+              "sha256": "032d4c334be153128b7efee27fcd644e5b3086584f97fc6730964903570d970e"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-03.png",
+              "sha256": "73f4cf5ca4cde445f980cc4e0ba17a37224ee236825c566e87bcc75747bc4453"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-04.png",
+              "sha256": "a3828ccaff3ff095cd7a3bf5160f505676d18f4566b8e938a4e1ebdce7693da7"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-05.png",
+              "sha256": "35b59b5c16c8c0cc5b0fcb73b21887ebf9382e486ec3aadb175040587957b3c6"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-06.png",
+              "sha256": "b66cf10ec9970a167c4261214b59c84f8cbf2851e134416d23774cca6a26d5b5"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-07.png",
+              "sha256": "9c4b4f9e188010ce8376a39030b8b8b31238ddf4798e1392e497620e2f69afec"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-08.png",
+              "sha256": "b7415e80f562671811822b1425b4b4c95682a52e9705bbecd3c91db685338776"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-09.png",
+              "sha256": "703f105bae3754bb8967c4faa443c622f1771754f0eb937a9057d10168e24f5f"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-10.png",
+              "sha256": "3919489580f02175348652830f9f45b91b1281f4e5351c31161c6ac758014ab9"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-11.png",
+              "sha256": "64b1e9295cff4e7189a0a349e82ef9d0582ce71b60fba71e257f1b5775bcb167"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-12.png",
+              "sha256": "5299abcee0864f5581428c66511f9cd9b3a61bb163942efcc6e2b4361175cedf"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-13.png",
+              "sha256": "130edb8050a6592e48848d1fc0400d036972e7cdbb88b76bd127646aa2f94142"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-14.png",
+              "sha256": "e769bb9ab3714b7ea68804e05464b7a361ac9112f6a980747604853eda22cc73"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-15.png",
+              "sha256": "3484be1f20e4c6b0176dca02146c2619ee85d79ba8b9ad5659288ee11c554025"
+            },
+            {
+              "path": "insufficient-coverage--dark--mobile--tile-16.png",
+              "sha256": "012c2067db26280c258e3586e93ea98774c3380d222106f391af6c8640d5bcec"
+            },
+            {
+              "path": "insufficient-coverage--a4-page-1.png",
+              "sha256": "b9ae0d9be8451df54af011e19638d2a61e43d319d416239adbba602a37d955a9"
+            },
+            {
+              "path": "insufficient-coverage--a4-page-2.png",
+              "sha256": "78ebdf31fc482a4d75d865ed5227e468e571fb0ee2d2d7f16c0764616200737a"
+            },
+            {
+              "path": "insufficient-coverage--a4-page-3.png",
+              "sha256": "98d200a62ce8f0db512eaac60c55b65da05a7a324d393b4f7559d0b72b3ecebf"
+            },
+            {
+              "path": "insufficient-coverage--a4-page-4.png",
+              "sha256": "711d60377e48b54d06e10bf9f3c18980e9c8d1540ce7349ab4a9797deff5041d"
+            },
+            {
+              "path": "insufficient-coverage--a4-page-5.png",
+              "sha256": "877bd7cf751c240e66404bea8e367d21fd33d2c8ed7474cba7bd2ff4bde1dda7"
+            },
+            {
+              "path": "insufficient-coverage--a4-page-6.png",
+              "sha256": "d5d7d4cf986151b506fc78af89209d148d5c33b3f0db397957e495a0784aa141"
+            },
+            {
+              "path": "insufficient-coverage--a4-page-7.png",
+              "sha256": "a21a8f2ca403f08e4c8acf58819ed17d72bf5b1772ef917bf59d13699128da95"
+            },
+            {
+              "path": "insufficient-coverage--a4-page-8.png",
+              "sha256": "2a7f8aff1c270a16a0e9446538403a28517a486a70a8e5485767aec5017aa8de"
+            },
+            {
+              "path": "insufficient-coverage--a4-page-9.png",
+              "sha256": "04673c799ea0e2a8025f4615ebd72191aff770372e3c9563d2562f374266dc20"
+            }
+          ]
+        }
+      ],
+      "delegation": {
+        "founder": "@Founder",
+        "date": "2026-10-04",
+        "sessionQuote": "Founder delegation for this release: by the mandate in §0 the Founder delegates the sight review that docs/releasing.md reserves for a human to this multi-model review.",
+        "release": "0.9.0",
+        "revoked": false
+      },
+      "binding": {
+        "reviewInputFingerprint": "0f36d64f02d10b9877bdff470a7a91ba0ee5b9b8e948a7bd48fb5e0aaabda8d9",
+        "renderManifestGeneratedAt": "2026-10-07T09:11:13.973Z",
+        "reviewEnvironment": {
+          "reviewArtifactContractVersion": 4,
+          "screenPixelContractVersion": 1,
+          "browser": "Google Chrome 154.0.8037.98",
+          "platform": "darwin",
+          "architecture": "arm64",
+          "nodeMajor": "24",
+          "deviceScaleFactor": 1,
+          "browserRenderArgs": [
+            "--deterministic-mode",
+            "--disable-gpu",
+            "--disable-lcd-text",
+            "--disable-skia-runtime-opts",
+            "--font-render-hinting=none",
+            "--force-color-profile=srgb",
+            "--hide-scrollbars"
+          ],
+          "viewports": {
+            "desktop": {
+              "width": 1440,
+              "height": 1000
+            },
+            "tablet": {
+              "width": 768,
+              "height": 1024
+            },
+            "mobile": {
+              "width": 390,
+              "height": 844
+            }
+          },
+          "themes": [
+            "light",
+            "dark"
+          ],
+          "print": {
+            "media": "print",
+            "format": "A4 from CSS @page",
+            "rasterDpi": 110,
+            "rasterizer": "pdftoppm version 25.11.0",
+            "contentViewportCssPx": {
+              "width": 703,
+              "height": 1123
+            }
+          }
+        }
+      },
+      "physicalArtifactsReviewed": {
+        "screens": 24,
+        "screenTiles": 168,
+        "pdfs": 4,
+        "rasterPages": 30
+      },
+      "findings": {
+        "blocker": 0,
+        "high": 0,
+        "medium": 1,
+        "low": 18
+      },
+      "note": "Delegated AI review of every assigned full screen PNG, tile and complete A4 page raster. PDF cells judged through their matching rasters. No human pass or provider authentication claim. Four fresh independent claude-opus-5-5 state reviews on the post-inventory-fix source; all 32 cells and 222 native image reads passed. One medium and eighteen low findings have explicit Root dispositions. All five original rounds remain unchanged. No human, Gemini or Grok review is claimed for this round. Desktop full captures were downscaled; fine text was judged from tablet/mobile tiles and A4 rasters. The separate Linux technical diagnostic measured font resolution and 29 PDF pages; these local sight runs do not establish Ubuntu visual review. No publication or calibration is claimed.",
+      "cells": {
+        "screen/clean/light/desktop": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-clean",
+          "reviewedAt": "2026-10-07T09:22:13.098Z",
+          "note": "Masthead shows a 'PASS · EXIT 0' mono badge, a large serif 'Clean run' heading, the sans line 'Coverage met. The requested checks ran and no finding reached the configured gate.' and GATE EFFECT 'Build passes (exit 0).' This matches the clean/exit0 wording contract. | Run summary has four cards: COVERAGE TRUST 'Coverage met' with mono '20 of 22 candidates measured', then ERRORS 0, WARNINGS 0, INFORMATION 0. The metadata grid shows VERDICT clean, GATE TRIGGERED BY none, and a mono configuration hash wrapped over three lines inside its column. | The coverage table is one row of headers (RULE, CANDIDATES, MEASURED, NOT MEASURED, COVERAGE, FLOOR, RESULT) over 13 mono rule IDs, each on a single line with no wrapping. Numbers are right-aligned under their headers. The two 80% rows sit against a 50% floor and every row reads 'Coverage met' in text, so the result does not depend on colour. | Declined candidates lists two 'Count 1' bullets ending 'env/parity-blank-page' without wrapping. The document path and the reason code are set in sans, while the rule ID is in mono. The footer reads 'End of report.' and includes the run ID.",
+          "reviewArtifactFingerprint": "33fe7888eb852f31efa9fd14257da090102aaba92321dcb177eb44d5de38a0c1",
+          "reviewedArtifacts": [
+            "clean--light--desktop.png"
+          ],
+          "reviewedRawSha256": "1b866cb6095b1b36ed4eeac2f4d33d6ab66c57f55aecd72e17fcd46257370c49",
+          "reviewedNormalizedRgbaSha256": "64c5d3b59eb780f77861243b8749212625c9f82055014b65fc6f790d22230eeb"
+        },
+        "screen/clean/light/tablet": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-clean",
+          "reviewedAt": "2026-10-07T09:22:13.098Z",
+          "note": "In tile-01 the run ID '3f6c1a2e-8b4d-4f7a-9c21-5e0b7d9a4c68' fits on one line beside 'breaklint v0.9.0 · report schema 5'. The serif 'Clean run' heading and the 'PASS · EXIT 0' badge are clear, and the summary cards reflow to a 2x2 grid. | In tile-03 long rule IDs wrap only at the slash ('layout/' then 'unbreakable-block-too-tall', 'svg/' then 'text-overflows-viewport'). The numeric cells stay top-aligned with the first line. 'NOT MEASURED' stacks over two lines in the header without colliding. | In tile-03 the second declined bullet breaks the evidence name inside itself: 'env/parity-' / 'blank-page' (residual, F01). Tile-04 shows only the footer rule and 'End of report.' with nothing clipped and no horizontal overflow.",
+          "reviewArtifactFingerprint": "af5671f4562c56e0e837fc0c04c29d04a3406d0b048f8f1ae282bb4c00ab669b",
+          "reviewedArtifacts": [
+            "clean--light--tablet.png",
+            "clean--light--tablet--tile-01.png",
+            "clean--light--tablet--tile-02.png",
+            "clean--light--tablet--tile-03.png",
+            "clean--light--tablet--tile-04.png"
+          ],
+          "reviewedRawSha256": "caeb65cf31818ca6d3801bb40efcbcf1914a9afbe9cecb177fd3bdffde575d6a",
+          "reviewedNormalizedRgbaSha256": "0fef9807e77991994cb93b1723a72fddb0b0b9aed8e31bad22f2ef98639769b2"
+        },
+        "screen/clean/light/mobile": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-clean",
+          "reviewedAt": "2026-10-07T09:22:13.098Z",
+          "note": "In tile-01 the run ID drops to its own mono line under 'v0.9.0 · report schema 5 · run'. The nav links wrap onto three lines and the summary cards stack as a single column. Nothing is clipped at 390px. | In tile-05 the coverage table switches to stacked rows: the mono rule ID and bold 'Coverage met' sit on top, with the numbers below. The headers are paired the same way, RULE/RESULT over CANDIDATES/MEASURED/NOT MEASURED/COVERAGE/FLOOR, and the values line up under them. | In tile-04 the declined bullets wrap 'layout/' then 'half-empty-page', and 'env/parity-blank-' then 'page' (residual wrap inside the evidence name, F02). Tile-06 ends with 'End of report.' and the run ID wrapped once. Tiles 02 and 03 show the single-column metadata list and the measurement apparatus box without overflow.",
+          "reviewArtifactFingerprint": "16bd5864be683aea6cd2f535399d2a232d72d140a01f2015dcda96c9779f6212",
+          "reviewedArtifacts": [
+            "clean--light--mobile.png",
+            "clean--light--mobile--tile-01.png",
+            "clean--light--mobile--tile-02.png",
+            "clean--light--mobile--tile-03.png",
+            "clean--light--mobile--tile-04.png",
+            "clean--light--mobile--tile-05.png",
+            "clean--light--mobile--tile-06.png"
+          ],
+          "reviewedRawSha256": "8e2cfa2b37cf4eb3802eb2b292a2ab0c2a920aa0edbaeb3d6867a21df2219470",
+          "reviewedNormalizedRgbaSha256": "02be57d5b3fba08e7fa6c405e43b948b55d1b2b5c63a37da2b4a1f90fe50d952"
+        },
+        "screen/clean/dark/desktop": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-clean",
+          "reviewedAt": "2026-10-07T09:22:13.098Z",
+          "note": "Dark theme: off-white serif 'Clean run' on a near-black panel with a lime left rule and a white border. The 'PASS · EXIT 0' badge and 'Build passes (exit 0).' are legible with strong contrast. | The coverage table keeps a white header underline and thin grey row dividers. All 13 rules read 'Coverage met' in bold white, and grey secondary text such as 'Counted reasons remain visible…' is still readable. | The layout matches the light desktop view: four summary cards, a four-column metadata grid, and a mono configuration hash over three lines. The footer reads 'End of report.' and nothing overflows horizontally.",
+          "reviewArtifactFingerprint": "4fc62a32fd846c1779def39ddcdcb860e2267bdc999179a2acc98560030b54b0",
+          "reviewedArtifacts": [
+            "clean--dark--desktop.png"
+          ],
+          "reviewedRawSha256": "ddf027fcf83a8c01ee9e31af73ba7b139ade1800927e1238b42a0b3ebb707851",
+          "reviewedNormalizedRgbaSha256": "4f687d98e528cf3876bb72f58bbbb27befa130fad6a8c820df1b7369335cc848"
+        },
+        "screen/clean/dark/tablet": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-clean",
+          "reviewedAt": "2026-10-07T09:22:13.098Z",
+          "note": "In dark tile-01 the 2x2 summary cards use dark-grey fills with lighter top rules. 'Coverage met' is in white mono and '20 of 22 candidates measured' in grey mono, both readable. | In dark tile-03 rule IDs wrap only at the slash and the numeric columns stay aligned. The bullet 'env/parity-' / 'blank-page' shows the same evidence-name wrap as in the light tablet view. | Tile-02 shows the measurement apparatus box with a mono 'geometry-cross-check-passed' title and wrapped measured context. Tile-04 shows the footer only, with no clipping.",
+          "reviewArtifactFingerprint": "096e6e6fd97e92725212d307de8a684906a1b55fb510f9dc68691e8fe9d33aef",
+          "reviewedArtifacts": [
+            "clean--dark--tablet.png",
+            "clean--dark--tablet--tile-01.png",
+            "clean--dark--tablet--tile-02.png",
+            "clean--dark--tablet--tile-03.png",
+            "clean--dark--tablet--tile-04.png"
+          ],
+          "reviewedRawSha256": "6f515b1fc17a49809be68b852c1d94b097a22fb74a3a06b1195994bdacebd55a",
+          "reviewedNormalizedRgbaSha256": "14bd64c02aef7bef9f058f67aa56315c958d03685b424d5757475e3718bba275"
+        },
+        "screen/clean/dark/mobile": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-clean",
+          "reviewedAt": "2026-10-07T09:22:13.098Z",
+          "note": "In dark tile-05 the stacked coverage rows (rule ID plus 'Coverage met' on top, numbers below) are separated by grey dividers. The RESULT/FLOOR header pair is right-aligned over the values. | In dark tile-04 the declined bullets wrap 'env/parity-blank-' / 'page' exactly as in light mobile. 'Nothing reached the gate' sits in a bordered dark box above them. | Dark tile-01 keeps the lime left rule and the white border on the masthead. Tile-06 ends with 'End of report.' in grey and white, with no overflow.",
+          "reviewArtifactFingerprint": "d6b01110ae57791d0e28278bbbd4a79e3bcc09d5abb42b9a801d50ba8165eb89",
+          "reviewedArtifacts": [
+            "clean--dark--mobile.png",
+            "clean--dark--mobile--tile-01.png",
+            "clean--dark--mobile--tile-02.png",
+            "clean--dark--mobile--tile-03.png",
+            "clean--dark--mobile--tile-04.png",
+            "clean--dark--mobile--tile-05.png",
+            "clean--dark--mobile--tile-06.png"
+          ],
+          "reviewedRawSha256": "4be27159615946c62543403ad3619cfc2676219cdf1c0d300a6e28f461e987f2",
+          "reviewedNormalizedRgbaSha256": "37788c750b6c578874db9fa0326b15f548f5215cf7589e75b398bb0367ebaa58"
+        },
+        "print/clean/pdf": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-clean",
+          "reviewedAt": "2026-10-07T09:22:13.098Z",
+          "note": "Judged only through the three A4 rasters. Every page carries 'Page N of 3' bottom-right in mono (Page 1 of 3, Page 2 of 3, Page 3 of 3). | Pages 2 and 3 carry the running head 'breaklint · Clean run · exit 0' on the left and 'run 3f6c1a2e-8b4d-4f7a-9c21-5e0b7d9a4c68' on the right. Page 1 uses the full masthead instead. | 'End of report.' appears only on page 3, below the coverage table. Pages 1 and 2 are substantially filled, ending at about 82% and 78% of page height. The table fits on page 3 with a single header row, so no repeated header or continuation label is needed. No findings exist, so no labelled finding continuation applies. | No untested-advice caveat is visible on any page. Because no findings or fix advice are rendered in this clean run, I treated the caveat as not applicable and did not count it as a defect. | On page 2 the second declined bullet wraps 'env/parity-' / 'blank-page' (F03). On page 1 the configuration hash wraps over four mono lines and '20 of 22 candidates measured' over two, both within their columns.",
+          "reviewArtifactFingerprint": "271a98e105c0f4a4aa2677d61f91266128fb12a6c28a50963e149bd6c1ec10b9",
+          "reviewedArtifacts": [
+            "clean--a4.pdf"
+          ],
+          "reviewedRawSha256": "8598891f4a018a712dabed3ccf6ef47d8648a4e5cc693e46f2b81bc87ed08dd2",
+          "reviewedPages": [
+            1,
+            2,
+            3
+          ]
+        },
+        "print/clean/raster-set": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-clean",
+          "reviewedAt": "2026-10-07T09:22:13.098Z",
+          "note": "The raster set has exactly three A4-proportioned pages, all 909x1287, with consistent margins and serif section headings: 'Run summary' (p1), 'Measurement apparatus', 'Findings' and 'Declined candidates' (p2), and 'Coverage details' (p3). | The page 3 table shows all 13 mono rule IDs unwrapped (for example 'layout/orphaned-continuation-page'). The headers CANDIDATES through RESULT sit over right-aligned numbers, and every row reads 'Coverage met' in bold text, so colour is not needed. | The page 1 masthead repeats the screen wording: 'PASS · EXIT 0', 'Clean run', 'Coverage met…', 'Build passes (exit 0).' No content is clipped at any page edge.",
+          "reviewArtifactFingerprint": "cde1376975c7e03ebc6bf5b6360fbfb76acf330299e6775a758512e0ec06c320",
+          "reviewedArtifacts": [
+            "clean--a4-page-1.png",
+            "clean--a4-page-2.png",
+            "clean--a4-page-3.png"
+          ],
+          "reviewedRawSha256": [
+            "06346b5bd49f8e4d5cc9399460c37bc0d8ba56b4eefb309e044003cc484c4f9a",
+            "bc76b78f515ef7005c0e64267ccefd2d4ad7a7f5a54fe81cbcbe0388c6849979",
+            "bbcd42ef31b3433c596a9e4906b42fd17eb70c777ab8a78d1c3d31c773505f92"
+          ],
+          "reviewedPages": [
+            1,
+            2,
+            3
+          ]
+        },
+        "screen/findings/light/desktop": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-findings",
+          "reviewedAt": "2026-10-07T09:23:12.328Z",
+          "note": "The hero box has a rust left stripe, a 'FAIL · EXIT 1' chip, the serif headline 'Findings block this run', the line 'The finding gate was triggered. Review the measured failures below.' and the gate effect 'Build fails (exit 1).' This matches the findings/exit1 contract. | The run summary shows four cards in a row: Coverage Trust 'Coverage met' in mono with '20 of 22 candidates measured', Errors 2, Warnings 5 and Information 0. Below them is a four-column metadata grid that includes the configuration hash in mono. | Seven finding cards numbered 01–07 each use a two-column metadata grid: Document and Measured in mono, Source reading 'Unknown — no source location was measured', and Calibration and Proof source in sans. Every remediation box carries an 'untested' chip. | The coverage table fits on one line per rule at 1440px. Columns are right-aligned, with Floor values of 50% or 100% and the Result reading 'Coverage met' as bold text, so the result does not depend on colour. 'End of report.' with the run ID closes the page.",
+          "reviewArtifactFingerprint": "b3cabfaf1913c83048d493e00a37b79e728a116aa3b7c36533f68f7f72d0bb43",
+          "reviewedArtifacts": [
+            "findings--light--desktop.png"
+          ],
+          "reviewedRawSha256": "de9095e38e9846884d2ca3778cd74d48d3b15ac2232debf3e02384f3138885d1",
+          "reviewedNormalizedRgbaSha256": "7b18e2d01aa8874437935c945414c1546e056f59a08d4c4c80e0a8c0a4c7b851"
+        },
+        "screen/findings/light/tablet": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-findings",
+          "reviewedAt": "2026-10-07T09:23:12.328Z",
+          "note": "Tile-01 shows the masthead 'breaklint v0.9.0 · report schema 5 · run 3f6c1a2e-…' on one mono line, the serif headline broken over two lines, a 2×2 summary-card grid and a nav row with Run summary, Next checks, Findings (7), Declined candidates and Coverage details. | Tile-02 shows Next checks with three underlined links (layout/unbreakable-block-too-tall, svg/text-overflows-viewport, artifact/local-uri), a collapsed 'Findings by rule (6 rules)' toggle and the single caveat 'Remediation advice in this report is untested.' with a left rule. | Tile-05 shows the finding 03 evidence path split after 'evidence/', with '2c9d41a07be3-0003-annual-report-typeset-final-revision-9f14e2c7a0b35d61-page-003.png' kept whole on the second line. Nothing clips at the card edge. | Tile-08 shows coverage rule IDs wrapping at the slash ('layout/' then 'unbreakable-block-too-tall', 'svg/' then 'text-overflows-viewport'). The numeric columns stay top-aligned with the first line, and 'NOT MEASURED' stacks in its header. Tile-09 ends on the artifact/local-uri row and the 'End of report.' line.",
+          "reviewArtifactFingerprint": "a72af72245d267ca95ac22d3f2b5294da636b5848ed881fdf19e6429bc14deaf",
+          "reviewedArtifacts": [
+            "findings--light--tablet.png",
+            "findings--light--tablet--tile-01.png",
+            "findings--light--tablet--tile-02.png",
+            "findings--light--tablet--tile-03.png",
+            "findings--light--tablet--tile-04.png",
+            "findings--light--tablet--tile-05.png",
+            "findings--light--tablet--tile-06.png",
+            "findings--light--tablet--tile-07.png",
+            "findings--light--tablet--tile-08.png",
+            "findings--light--tablet--tile-09.png"
+          ],
+          "reviewedRawSha256": "7a664e6234dd01378af779ef256fa06b27bd21285dd9ab5f13dd3d31dcab4571",
+          "reviewedNormalizedRgbaSha256": "a7e5df96955067b0320ece7e86f4674e7d49239e784b40487101460569808e91"
+        },
+        "screen/findings/light/mobile": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-findings",
+          "reviewedAt": "2026-10-07T09:23:12.328Z",
+          "note": "Tile-01 at 390px: the masthead wraps 'v0.9.0 · report schema 5 · run' with the full run ID on a second mono line. The serif headline 'Findings block this run' and 'Build fails (exit 1).' fit without clipping, and the nav wraps onto two rows. | Tiles 02–03 stack the metadata grid as a single column (Verdict findings, Gate triggered by error, Fail-on error, Mode demo …). The configuration hash breaks across two mono lines inside the margins. | Tiles 06 and 08: long evidence names wrap inside a segment at existing hyphens, '1f5788f1e439-0001-demo-472f73b732bb5453-' then 'page-002.png', and '…annual-report-typeset-final-' then 'revision-9f14e2c7a0b35d61-page-003.png'. See F03. | Tiles 14–15: the coverage table changes to a two-tier row. Rule ID and 'Coverage met' share the first line, with candidates, measured, not measured, coverage and floor on the second. The header stacks RULE/CANDIDATES on the left and RESULT/FLOOR on the right to match, and nothing overflows horizontally.",
+          "reviewArtifactFingerprint": "011a737565f61bf69df2365efa80cb56ae0196eda94b9a041afcb428c0b2be1b",
+          "reviewedArtifacts": [
+            "findings--light--mobile.png",
+            "findings--light--mobile--tile-01.png",
+            "findings--light--mobile--tile-02.png",
+            "findings--light--mobile--tile-03.png",
+            "findings--light--mobile--tile-04.png",
+            "findings--light--mobile--tile-05.png",
+            "findings--light--mobile--tile-06.png",
+            "findings--light--mobile--tile-07.png",
+            "findings--light--mobile--tile-08.png",
+            "findings--light--mobile--tile-09.png",
+            "findings--light--mobile--tile-10.png",
+            "findings--light--mobile--tile-11.png",
+            "findings--light--mobile--tile-12.png",
+            "findings--light--mobile--tile-13.png",
+            "findings--light--mobile--tile-14.png",
+            "findings--light--mobile--tile-15.png"
+          ],
+          "reviewedRawSha256": "b8716f3627db465f9bf81cef8ccfcaef9a407824a582ea165afab0c8846fc831",
+          "reviewedNormalizedRgbaSha256": "e57e70606b5a33fce41f38cc91deb8a7c135422eb69cdf4429ad264888008b73"
+        },
+        "screen/findings/dark/desktop": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-findings",
+          "reviewedAt": "2026-10-07T09:23:12.328Z",
+          "note": "The dark hero uses a near-black panel with a white border and orange left stripe. The 'FAIL · EXIT 1' chip and the white serif 'Findings block this run' stay legible, and 'Build fails (exit 1).' remains visible. | The ERROR labels on findings 02 and 05 are orange with an orange top border, while WARNING cards use a white top border. Rule IDs in white mono keep the hierarchy that the light theme has. | The coverage table on the dark background keeps one row per rule with right-aligned numbers and bold white 'Coverage met' text in every row, ending with 'End of report.'",
+          "reviewArtifactFingerprint": "b862eb8c6e6c75edc73a6c63875b781e8bbc29ee16f6185d9931965217f5934c",
+          "reviewedArtifacts": [
+            "findings--dark--desktop.png"
+          ],
+          "reviewedRawSha256": "ee629ff88c2ed00af6fa1e04289e9234a53c5a366ce6cc88b09b9ac31264772f",
+          "reviewedNormalizedRgbaSha256": "e4ae72601f3ca6058c8bd003c27f4eb379417769722f9378c615551ecdb335c8"
+        },
+        "screen/findings/dark/tablet": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-findings",
+          "reviewedAt": "2026-10-07T09:23:12.328Z",
+          "note": "Tile-01 shows the dark summary cards: Coverage Trust 'Coverage met' sits on a lighter card with a white top rule, and the Errors, Warnings and Information cards sit on mid-grey with readable white numerals. | Tile-02 shows Next checks links in light blue with underlines and a body note in grey. The untested caveat box keeps its white left rule, and the 'untested' chip is outlined. | Tile-05 shows the evidence link split after 'evidence/' in light blue, with the long PNG name on its own line and no clipping. Tile-08 shows the coverage rows with slash-wrapped rule IDs and numbers aligned to the first line. Tile-09 ends with 'End of report.'",
+          "reviewArtifactFingerprint": "31a7ead678c6c0af3c045495b1cc2aee7f53b8e0176623985ee87163ac2deb63",
+          "reviewedArtifacts": [
+            "findings--dark--tablet.png",
+            "findings--dark--tablet--tile-01.png",
+            "findings--dark--tablet--tile-02.png",
+            "findings--dark--tablet--tile-03.png",
+            "findings--dark--tablet--tile-04.png",
+            "findings--dark--tablet--tile-05.png",
+            "findings--dark--tablet--tile-06.png",
+            "findings--dark--tablet--tile-07.png",
+            "findings--dark--tablet--tile-08.png",
+            "findings--dark--tablet--tile-09.png"
+          ],
+          "reviewedRawSha256": "d0d45d7ee1002ed6c3edaa32ab7ba15e4af8e00b0a9555c42e4bbd741981b687",
+          "reviewedNormalizedRgbaSha256": "01cec6d37454ce10ea71d5dfe43f6fc5dad616678924855f338a229323682c1c"
+        },
+        "screen/findings/dark/mobile": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-findings",
+          "reviewedAt": "2026-10-07T09:23:12.328Z",
+          "note": "Tile-01 shows a narrow dark hero with an orange stripe. The run ID wraps onto its own mono line, and the headline and 'Build fails (exit 1).' fit inside the white border. | Tile-05: the finding 02 rule ID breaks as 'layout/' then 'unbreakable-block-too-tall ·' then 'page 2' in bold mono, inside the card. Tile-04: finding 01 metadata stacks as Document, Source, Measured, Threshold and Calibration. | Tile-08 shows the evidence name wrapping inside itself at the hyphen after 'typeset-final-', in light blue (see F04). Tiles 14–15 show the two-tier coverage rows with 'Coverage met' right-aligned in bold white and floors at 50%/100%.",
+          "reviewArtifactFingerprint": "a6cb20169945defc62b21907dbc5c4017f6e60f9099689009d37333b9e243d9c",
+          "reviewedArtifacts": [
+            "findings--dark--mobile.png",
+            "findings--dark--mobile--tile-01.png",
+            "findings--dark--mobile--tile-02.png",
+            "findings--dark--mobile--tile-03.png",
+            "findings--dark--mobile--tile-04.png",
+            "findings--dark--mobile--tile-05.png",
+            "findings--dark--mobile--tile-06.png",
+            "findings--dark--mobile--tile-07.png",
+            "findings--dark--mobile--tile-08.png",
+            "findings--dark--mobile--tile-09.png",
+            "findings--dark--mobile--tile-10.png",
+            "findings--dark--mobile--tile-11.png",
+            "findings--dark--mobile--tile-12.png",
+            "findings--dark--mobile--tile-13.png",
+            "findings--dark--mobile--tile-14.png",
+            "findings--dark--mobile--tile-15.png"
+          ],
+          "reviewedRawSha256": "277542db8a481c817053eea882ebc79b3532e5b490421338a50665f82521860b",
+          "reviewedNormalizedRgbaSha256": "f42a000c91e1a75d2efd37f967e8f066f937aade74fc9da11184f7e4ef4cf73a"
+        },
+        "print/findings/pdf": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-findings",
+          "reviewedAt": "2026-10-07T09:23:12.328Z",
+          "note": "Page 1 of 9 has no running head and carries the hero 'FAIL · EXIT 1', 'Findings block this run' and 'Build fails (exit 1).', followed by the run summary. Pages 2–9 each have the running head 'breaklint · Findings block this run · exit 1' on the left and 'run 3f6c1a2e-8b4d-4f7a-9c21-5e0b7d9a4c68' on the right. | Split findings continue with labelled tails: 'FINDING 01 · layout/widow · REMEDIATION AND EVIDENCE' (p3), 'FINDING 02 …' (p4), 'FINDING 03 …' (p5), 'FINDING 04 …' (p6) and 'FINDING 07 · artifact/local-uri …' (p8). Findings 05 and 06 are unsplit but still carry the tail label (F02). | The coverage table starts on page 8 under a single heavy rule. On page 9 the header row RULE / CANDIDATES / MEASURED / NOT MEASURED / COVERAGE / FLOOR / RESULT repeats with one heavy rule, followed by the last three rows and the only 'End of report.' | The caveat 'Remediation advice in this report is untested.' appears once, on page 2. Pages 3, 4, 5 and 7 end with large empty regions inside bordered finding cards (F01), but each nonfinal page is still more than half filled with content.",
+          "reviewArtifactFingerprint": "7ef35933ac8dde6fab3b8a44a1a767bd02525cb864eee8a234c99e1c15fba8f2",
+          "reviewedArtifacts": [
+            "findings--a4.pdf"
+          ],
+          "reviewedRawSha256": "f8a02818035edfed1316d6c8f6c4bd9713d045dd4104e0476887266e63321047",
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        },
+        "print/findings/raster-set": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-findings",
+          "reviewedAt": "2026-10-07T09:23:12.328Z",
+          "note": "Nine rasters, findings--a4-page-1.png to findings--a4-page-9.png, all 909×1287, with footers running in sequence 'Page 1 of 9' to 'Page 9 of 9' in mono at the bottom right. | Page 9 is the only short page, about 20% filled: the repeated table header, three rows and the end mark. Every nonfinal page carries substantial content, and page 1 has blank space only below the summary grid. | Typography holds in print: serif section heads (Next checks, Findings, Declined candidates, Coverage details), sans body text, and mono for rule IDs, measured values, the configuration hash and running heads. Nothing clips at the right margin.",
+          "reviewArtifactFingerprint": "ffa4c71250c45c11b69ed408bd20d6bf328d38fb4a41bc46ef3e478e006f2318",
+          "reviewedArtifacts": [
+            "findings--a4-page-1.png",
+            "findings--a4-page-2.png",
+            "findings--a4-page-3.png",
+            "findings--a4-page-4.png",
+            "findings--a4-page-5.png",
+            "findings--a4-page-6.png",
+            "findings--a4-page-7.png",
+            "findings--a4-page-8.png",
+            "findings--a4-page-9.png"
+          ],
+          "reviewedRawSha256": [
+            "56871254b922041834a4f2eab752086c4e485c7abd70510141096bd8ad6fb8e0",
+            "428f479bc03ff5d1ef0084e57ef2dc0f72b7546dc24224666f5177c374571312",
+            "e20e1fbd3738d643bbd0d0752b17fffe6afb86bb992fdf181d97f362c6b915ea",
+            "89cc1a0fd18635fd943e68cdd815423b2e6612297e6404f7bc9dede7f83c7147",
+            "4ba9bfe35f22a905eb1cebaa388f3ad7d5908849e91791f787d908e5f93fd5d8",
+            "3cac0038eb8e978ff1c7d26410967558eee733618d3848a94b425f5a1e99fba4",
+            "6a0a0f0a6e36b77094f3c60759670a300bc3eae29a55fead38079b3a0a110adb",
+            "361d701e85e958c87e4cc90efaffbe9837f9bcf425caf1f58c50161e593b9db6",
+            "9d74dd14445392d43f123741da758f4ff353bbcac2c748f05c385c7faead85e7"
+          ],
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        },
+        "screen/infrastructure/light/desktop": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-infrastructure",
+          "reviewedAt": "2026-10-07T09:23:06.013Z",
+          "note": "Hero box with dark-red left bar shows 'ERROR · EXIT 3' badge above the large serif heading 'Checker failed' and the line 'This is not a clean run…'; 'Build fails (exit 3)' appears under GATE EFFECT. | Run summary shows the COVERAGE TRUST card ('Not trustworthy') beside ERRORS 2, WARNINGS 5 and INFORMATION 0 tiles in one row. Seven finding cards are stacked full-width in the 1440 px column. The coverage table spans the column with 13 rows and no horizontal overflow at this downscaled view. | This view was only available downscaled to about 0.25×, and there are no desktop tiles. Structure, headings and hierarchy are visible, but body-text legibility at desktop was not proven from this image.",
+          "reviewArtifactFingerprint": "d94de8befc7af58c3e849e1332c372a05c45f6a3ed7a7e3c52ef6a0461a0bec5",
+          "reviewedArtifacts": [
+            "infrastructure--light--desktop.png"
+          ],
+          "reviewedRawSha256": "db0ca1e0cc91f45460da55ab52e6ad3f05993df6001a966e35abdeb171279398",
+          "reviewedNormalizedRgbaSha256": "e61192f0e4fbf35f759ff0d7f881bada3e37ad34e85cf2e090568b1c4a41364e"
+        },
+        "screen/infrastructure/light/tablet": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-infrastructure",
+          "reviewedAt": "2026-10-07T09:23:06.013Z",
+          "note": "tile-01: serif 'Checker failed' with 'ERROR · EXIT 3', 'This is not a clean run', 'Build fails (exit 3)'. The COVERAGE TRUST card reads 'Not trustworthy' in mono, with 'Partial measurement only: 20 of 22 candidates measured before the checker failed'. | tile-03: 'Partial findings only: 7 findings…' and a single 'Remediation advice in this report is untested' caveat block, followed by finding card 01 in a two-column metadata grid with mono values. | tiles 08–09: in the coverage table, long rule IDs wrap at the slash ('layout/' / 'unbreakable-block-too-tall'). Numeric columns stay right-aligned under the CANDIDATES…FLOOR headers, and the RESULT column reads 'Coverage met' as text. 'End of report.' appears once at the bottom. | tile-08: declined-candidate reason 'env/parity-blank-page' wraps inside itself after 'env/parity-'.",
+          "reviewArtifactFingerprint": "61d86fe48978892511538238511b0525933f837949ea8a6c390f84d260055173",
+          "reviewedArtifacts": [
+            "infrastructure--light--tablet.png",
+            "infrastructure--light--tablet--tile-01.png",
+            "infrastructure--light--tablet--tile-02.png",
+            "infrastructure--light--tablet--tile-03.png",
+            "infrastructure--light--tablet--tile-04.png",
+            "infrastructure--light--tablet--tile-05.png",
+            "infrastructure--light--tablet--tile-06.png",
+            "infrastructure--light--tablet--tile-07.png",
+            "infrastructure--light--tablet--tile-08.png",
+            "infrastructure--light--tablet--tile-09.png"
+          ],
+          "reviewedRawSha256": "a9ba0fb30b219ada0fbb4e4d50356a7f4746de155228f8cc95606a612a0c84a3",
+          "reviewedNormalizedRgbaSha256": "1973831c0ecb1debd22f7f97aa4b3501be6354ba28ed4347397d64b5a4227b33"
+        },
+        "screen/infrastructure/light/mobile": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-infrastructure",
+          "reviewedAt": "2026-10-07T09:23:06.013Z",
+          "note": "tile-01: run ID wraps cleanly onto its own mono line. Serif 'Checker failed', 'ERROR · EXIT 3' and 'Build fails (exit 3)' are present, and Coverage Trust 'Not trustworthy' appears at full width. | tiles 02–03: summary metadata stacks single-column. The configuration hash wraps across two mono lines, and the Next checks links wrap at the internal hyphen ('layout/unbreakable-' / 'block-too-tall'). | tiles 07 and 09: evidence filenames wrap inside their own segment ('…472f73b732bb5453-' / 'page-002.png' and '…typeset-final-' / 'revision-9f14e2c7a0b35d61-page-003.png'). No clipping or horizontal overflow. | tiles 14–16: the coverage table switches to a two-tier row layout (rule ID + 'Coverage met' on top, numbers below). Values align under the CANDIDATES/MEASURED/NOT MEASURED/COVERAGE/FLOOR headers, and the page ends with one 'End of report.'",
+          "reviewArtifactFingerprint": "6b52358fab7fe191c7222bcf9a47ea5745168b1254a05224ac0e89b73800a901",
+          "reviewedArtifacts": [
+            "infrastructure--light--mobile.png",
+            "infrastructure--light--mobile--tile-01.png",
+            "infrastructure--light--mobile--tile-02.png",
+            "infrastructure--light--mobile--tile-03.png",
+            "infrastructure--light--mobile--tile-04.png",
+            "infrastructure--light--mobile--tile-05.png",
+            "infrastructure--light--mobile--tile-06.png",
+            "infrastructure--light--mobile--tile-07.png",
+            "infrastructure--light--mobile--tile-08.png",
+            "infrastructure--light--mobile--tile-09.png",
+            "infrastructure--light--mobile--tile-10.png",
+            "infrastructure--light--mobile--tile-11.png",
+            "infrastructure--light--mobile--tile-12.png",
+            "infrastructure--light--mobile--tile-13.png",
+            "infrastructure--light--mobile--tile-14.png",
+            "infrastructure--light--mobile--tile-15.png",
+            "infrastructure--light--mobile--tile-16.png"
+          ],
+          "reviewedRawSha256": "94be37bd893e7a8bb5ee18639296584e8cd0da2ac34eb2e79233e07e6c08bf6a",
+          "reviewedNormalizedRgbaSha256": "04ed5afe474f6cff96e7d6a1f3d056a95ab5c7ae04b2928df89b15e48fc2f7d3"
+        },
+        "screen/infrastructure/dark/desktop": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-infrastructure",
+          "reviewedAt": "2026-10-07T09:23:06.013Z",
+          "note": "Dark hero with orange left bar: 'ERROR · EXIT 3' and the serif 'Checker failed' heading show light on a near-black background. The summary row shows the 'Not trustworthy' card plus ERRORS 2, WARNINGS 5 and INFORMATION 0 tiles. | Error cards 02 and 05 have orange top borders; warning cards have light borders. Section headings are visible (Next checks, Checker failure, Findings, Declined candidates, Coverage details), and the coverage table fits the column without overflow. | This view was only available downscaled to about 0.25×, with no desktop tiles. Small-text contrast and legibility were not proven at native size.",
+          "reviewArtifactFingerprint": "3ffdf7198f7c9ce016fca2617d749d90fc430aac5b4a2b60edbf3608222df2b3",
+          "reviewedArtifacts": [
+            "infrastructure--dark--desktop.png"
+          ],
+          "reviewedRawSha256": "6b07ac2d5ca870413f6aedf5f747083cf61df62a22a35175b30a5722880df4c8",
+          "reviewedNormalizedRgbaSha256": "b7416cfe7470f121a6d3eb43ab5a83e6ae2badf51e4b04275ce90224885987db"
+        },
+        "screen/infrastructure/dark/tablet": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-infrastructure",
+          "reviewedAt": "2026-10-07T09:23:06.013Z",
+          "note": "tile-01: white serif 'Checker failed' on a dark panel with an orange accent bar. 'Not trustworthy' sits in a slightly lighter card, and the stat tiles read 2/5/0. | tile-04: the ERROR label and top border of card 02 are orange. The evidence link '1f5788f1e439-…-page-002.png' is light blue and readable, and the remediation box contrasts with the card. | tiles 08–09: coverage table text is light on dark. 'Coverage met' is bold white, and right-aligned numbers line up under the headers. Rule IDs wrap at the slash, with no clipping.",
+          "reviewArtifactFingerprint": "afca3720f27d425f583ac8994050aa828d1cbb1f8d154a454b870e3961b4c399",
+          "reviewedArtifacts": [
+            "infrastructure--dark--tablet.png",
+            "infrastructure--dark--tablet--tile-01.png",
+            "infrastructure--dark--tablet--tile-02.png",
+            "infrastructure--dark--tablet--tile-03.png",
+            "infrastructure--dark--tablet--tile-04.png",
+            "infrastructure--dark--tablet--tile-05.png",
+            "infrastructure--dark--tablet--tile-06.png",
+            "infrastructure--dark--tablet--tile-07.png",
+            "infrastructure--dark--tablet--tile-08.png",
+            "infrastructure--dark--tablet--tile-09.png"
+          ],
+          "reviewedRawSha256": "5eb4e523fc662db1f605726b012fdb202e198f278f56f98a5e2b0b3e92563c68",
+          "reviewedNormalizedRgbaSha256": "748830a0c4f122e4ec668cb666dab6cca02bbd3ec1e8bd41d0e58c7883049e8c"
+        },
+        "screen/infrastructure/dark/mobile": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-infrastructure",
+          "reviewedAt": "2026-10-07T09:23:06.013Z",
+          "note": "tile-01: orange accent bar, 'ERROR · EXIT 3', serif 'Checker failed', 'This is not a clean run' and 'Build fails (exit 3)'; Coverage Trust 'Not trustworthy' is legible. | tile-04: the 'This is not a clean run.' callout has an orange left rule. The checker-crashed box shows 'stage=evidence; pagesCompleted=2', and the single untested caveat has an outlined 'untested' badge. | tiles 07/09: evidence filenames wrap mid-segment at hyphens in light blue. tiles 14–16: the two-tier coverage rows stay aligned, and the report ends with one 'End of report.'",
+          "reviewArtifactFingerprint": "e5e39589ef368a0b03a12d0e05d63c77ff0c4d665a3e20945be5b6e88a81929d",
+          "reviewedArtifacts": [
+            "infrastructure--dark--mobile.png",
+            "infrastructure--dark--mobile--tile-01.png",
+            "infrastructure--dark--mobile--tile-02.png",
+            "infrastructure--dark--mobile--tile-03.png",
+            "infrastructure--dark--mobile--tile-04.png",
+            "infrastructure--dark--mobile--tile-05.png",
+            "infrastructure--dark--mobile--tile-06.png",
+            "infrastructure--dark--mobile--tile-07.png",
+            "infrastructure--dark--mobile--tile-08.png",
+            "infrastructure--dark--mobile--tile-09.png",
+            "infrastructure--dark--mobile--tile-10.png",
+            "infrastructure--dark--mobile--tile-11.png",
+            "infrastructure--dark--mobile--tile-12.png",
+            "infrastructure--dark--mobile--tile-13.png",
+            "infrastructure--dark--mobile--tile-14.png",
+            "infrastructure--dark--mobile--tile-15.png",
+            "infrastructure--dark--mobile--tile-16.png"
+          ],
+          "reviewedRawSha256": "f0af734d551cfc8606a5cf501337d5958bc429e591e93f4df3f4af0bd7cae868",
+          "reviewedNormalizedRgbaSha256": "cd279cdd2c35cdd196e0ebc34d7a1569b732967076d8ce813a139ea274f0892b"
+        },
+        "print/infrastructure/pdf": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-infrastructure",
+          "reviewedAt": "2026-10-07T09:23:06.013Z",
+          "note": "page-1: no running head. Hero box with 'ERROR · EXIT 3', serif 'Checker failed' and 'This is not a clean run'. The Run summary grid shows Coverage Trust 'Not trustworthy' with '20 of 22 candidates measured'. Footer reads 'Page 1 of 9'. | pages 2–9: running head 'breaklint · Checker failed · exit 3' on the left and 'run 3f6c1a2e-8b4d-4f7a-9c21-5e0b7d9a4c68' on the right; each page has a 'Page N of 9' footer. | page-2 has the only report-level 'Remediation advice in this report is untested' caveat. Each finding carries an inline 'untested' badge, and there is no repeated caveat block. | page-7 ends finding 06 after its metadata. page-8 continues it under the label 'FINDING 06 · type/spaced-hyphen · REMEDIATION AND EVIDENCE', so the continuation is labelled. | page-9: the coverage table sits on one page with one thick rule under the header. All 13 rows are aligned and read 'Coverage met' as text, with 'Document verdict: infrastructure'. The page ends with the only 'End of report.' end mark.",
+          "reviewArtifactFingerprint": "235036da092e05e272baf6af3580c7133d0b3f6ed07f6d17d5e0da469300af72",
+          "reviewedArtifacts": [
+            "infrastructure--a4.pdf"
+          ],
+          "reviewedRawSha256": "4c4e916d0e952f4c406027de8b5c289ea86f56dd2e7e949fa853f1196b58dcf0",
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        },
+        "print/infrastructure/raster-set": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-infrastructure",
+          "reviewedAt": "2026-10-07T09:23:06.013Z",
+          "note": "All nine A4 rasters (909×1287) were read in order, pages 1–9. Page numbering is contiguous from 'Page 1 of 9' to 'Page 9 of 9', with no missing or duplicate page. | Pages 3–6 each hold one finding card (01–04) and leave roughly the bottom third blank. Pages 7–8 hold two finding segments each. No page is near-empty, and no text collides with the running head or footer. | Serif section headings (Next checks, Checker failure, Findings, Declined candidates, Coverage details), sans body text, and mono rule IDs, values and run ID are consistent across pages.",
+          "reviewArtifactFingerprint": "ae082380f0da2bd0b13264d15393267f4199c444437ffc7cb67212b867b5ab96",
+          "reviewedArtifacts": [
+            "infrastructure--a4-page-1.png",
+            "infrastructure--a4-page-2.png",
+            "infrastructure--a4-page-3.png",
+            "infrastructure--a4-page-4.png",
+            "infrastructure--a4-page-5.png",
+            "infrastructure--a4-page-6.png",
+            "infrastructure--a4-page-7.png",
+            "infrastructure--a4-page-8.png",
+            "infrastructure--a4-page-9.png"
+          ],
+          "reviewedRawSha256": [
+            "dd54f0274302fb66c0ba8af95578c816577bc600223e7ea2de4ff341b6a55070",
+            "dfc75f3dbcf2428b64c63d7eae2aa35c636e39825afd039b87701247a7773a9b",
+            "0705cb0a6bc51b7784537d120345f5159a037e0589d5ec1e15b5366a4ea11b01",
+            "bc2655be4d4a9f5d57935949c66e3722ce4e7d659ee3907dbddf09918cb993b0",
+            "c8cf4f2fd34c0a7c16ec007e4645ff23c6780dd5b378ead4c810ad1f0a63906a",
+            "2cdcb4835a92d2fb1d6f729ad59a13a5d83b0d91026462ecd9eabed0508e1321",
+            "3f6abaf750b2e4f8e9c383c3e86e264d7e49badf2afea9955ba37ef4b7837970",
+            "940605ea7a348c412e11f39885fd2695c8f69a854c93505a498295618687af5b",
+            "08e59685e3dce1d883ac72fb5b4be59d78866f460a7d535fee561e14b5d08b4b"
+          ],
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        },
+        "screen/insufficient-coverage/light/desktop": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-insufficient-coverage",
+          "reviewedAt": "2026-10-07T09:23:24.985Z",
+          "note": "The full-page capture (seen downscaled to 353x2000) shows the boxed hero at the top with the 'INCOMPLETE · EXIT 4' badge and the large serif 'Not enough was measured'. Below it is a single nav row, then a four-tile Run summary with a white Coverage Trust tile and grey Errors/Warnings/Information tiles, and a four-column metadata grid. | Seven numbered finding cards (01–07) sit in a single column. The ERROR cards (02, 05) have a red top rule and the WARNING cards a dark one. The Coverage details table at the foot has one red-marked first row, the rest bold 'Coverage met', and an 'End of report.' line. There is no horizontal overflow or clipped card edge at 1440 px. Fine text was only judged at reduced scale.",
+          "reviewArtifactFingerprint": "f96b8dc2b910b548e69386bd1cf724a6db40f7c019b93aa046a91f537c8c8306",
+          "reviewedArtifacts": [
+            "insufficient-coverage--light--desktop.png"
+          ],
+          "reviewedRawSha256": "d67b5c2f1b23d73b97a2ccb6c4364ec439393cb0c1e7eae27668887a5b88128c",
+          "reviewedNormalizedRgbaSha256": "f2feb53adb830c1a5f3dc2a6cc655defc5bec9e3363a71db4d667f846bd0ca78"
+        },
+        "screen/insufficient-coverage/light/tablet": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-insufficient-coverage",
+          "reviewedAt": "2026-10-07T09:23:24.985Z",
+          "note": "Tile-01 shows the mono run header 'run 3f6c1a2e-8b4d-4f7a-9c21-5e0b7d9a4c68' on one line, the serif hero 'Not enough was measured', the sans line 'This is not a clean run. At least one rule did not meet its required coverage floor.', 'GATE EFFECT Build fails (exit 4).' and the Coverage Trust tile 'Below required floor / 1 rule check below the configured floor'. | Tile-02/03 show the 'Coverage did not meet the contract' callout: 'Rule: layout/widow in examples/demo.html; Measurement: 1 of 2 candidates measured (50%); required floor 100%'. Next to it is the single untested-advice caveat 'Remediation advice in this report is untested… 7 of 7 findings'. | In tile-08/09 the coverage table headers (RULE, CANDIDATES, MEASURED, NOT MEASURED, COVERAGE, FLOOR, RESULT) line up with right-aligned numerals. The layout/widow row reads '2 1 1 50% 100% Below floor' with a red left bar and red bold text. Long rule IDs wrap only at the slash ('layout/ / unbreakable-block-too-tall'). The Next checks text says 'floor 1' where the table says 100% (F05). Zero-candidate rows show 'n/a' coverage with 'Coverage met' (F06).",
+          "reviewArtifactFingerprint": "1ab5ec0ac1a6c70be81af164ee6dd3fcdb8b1844696c58fd7cfa70d2278855da",
+          "reviewedArtifacts": [
+            "insufficient-coverage--light--tablet.png",
+            "insufficient-coverage--light--tablet--tile-01.png",
+            "insufficient-coverage--light--tablet--tile-02.png",
+            "insufficient-coverage--light--tablet--tile-03.png",
+            "insufficient-coverage--light--tablet--tile-04.png",
+            "insufficient-coverage--light--tablet--tile-05.png",
+            "insufficient-coverage--light--tablet--tile-06.png",
+            "insufficient-coverage--light--tablet--tile-07.png",
+            "insufficient-coverage--light--tablet--tile-08.png",
+            "insufficient-coverage--light--tablet--tile-09.png"
+          ],
+          "reviewedRawSha256": "4a2a3819f3d369c148eabfb0e89377f400f5e777910587c1de2f7866500a6674",
+          "reviewedNormalizedRgbaSha256": "e8a8541aa5836bc32803e78b0d2e385ef370cd9d7a304d5f520739d9b2bcb164"
+        },
+        "screen/insufficient-coverage/light/mobile": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-insufficient-coverage",
+          "reviewedAt": "2026-10-07T09:23:24.985Z",
+          "note": "Tile-01 shows the run ID wrapped onto its own mono line under 'v0.9.0 · report schema 5 · run'. The serif hero fits at 390 px with no clipping. Coverage Trust reads 'Below required floor' with '1 rule check below the configured floor' on one line. | The finding cards stack their metadata into one column (DOCUMENT, SOURCE, MEASURED, THRESHOLD, CALIBRATION, PROOF SOURCE). The 'untested' badge sits inline in each Remediation box, and the ERROR heading is red. Tile-06 wraps the rule ID as 'layout/ / unbreakable-block-too-tall · / page 2' at the slash. Nothing overflows horizontally. | Tile-15 uses a two-line row layout: the rule ID and the right-aligned result on top, then candidates/measured/not measured/coverage/floor below. The stacked header (RULE…RESULT / CANDIDATES…FLOOR) matches it. 'Below floor' is in words with a red bar. In tile-09 the evidence filename segment breaks inside itself ('…typeset-final-' / 'revision-9f14e2c7…png') (F02).",
+          "reviewArtifactFingerprint": "294ff24396dc487fb599bca150371f418a55925524ee43d01fa9adf333d9252c",
+          "reviewedArtifacts": [
+            "insufficient-coverage--light--mobile.png",
+            "insufficient-coverage--light--mobile--tile-01.png",
+            "insufficient-coverage--light--mobile--tile-02.png",
+            "insufficient-coverage--light--mobile--tile-03.png",
+            "insufficient-coverage--light--mobile--tile-04.png",
+            "insufficient-coverage--light--mobile--tile-05.png",
+            "insufficient-coverage--light--mobile--tile-06.png",
+            "insufficient-coverage--light--mobile--tile-07.png",
+            "insufficient-coverage--light--mobile--tile-08.png",
+            "insufficient-coverage--light--mobile--tile-09.png",
+            "insufficient-coverage--light--mobile--tile-10.png",
+            "insufficient-coverage--light--mobile--tile-11.png",
+            "insufficient-coverage--light--mobile--tile-12.png",
+            "insufficient-coverage--light--mobile--tile-13.png",
+            "insufficient-coverage--light--mobile--tile-14.png",
+            "insufficient-coverage--light--mobile--tile-15.png",
+            "insufficient-coverage--light--mobile--tile-16.png"
+          ],
+          "reviewedRawSha256": "7b01173fbcf531e11ca24682e2a0ee28b3f751c6524b73bb88d36fdf9cb9c084",
+          "reviewedNormalizedRgbaSha256": "2e4f02beba58975ee1f20388daaabf90fb8c9309aa56b30a3c94590cf033f5c3"
+        },
+        "screen/insufficient-coverage/dark/desktop": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-insufficient-coverage",
+          "reviewedAt": "2026-10-07T09:23:24.985Z",
+          "note": "The full-page dark capture (seen downscaled) has a near-black page and a dark hero box with a white outline and a light left bar. The serif hero is in white, and the Coverage Trust tile has a white top rule while the other three tiles have grey rules. | The ERROR cards (02, 05) carry orange-red top rules and labels. The bottom Coverage details table marks the first row orange with the rest 'Coverage met' in white bold, followed by the End of report line. There is no horizontal overflow at 1440 px. Fine text was only judged at reduced scale.",
+          "reviewArtifactFingerprint": "d0d8bf3c76798d0cb83da3e16e39c3c646142cbbc76536e6bd5e815cb00ddb1f",
+          "reviewedArtifacts": [
+            "insufficient-coverage--dark--desktop.png"
+          ],
+          "reviewedRawSha256": "a6a18f793620353a10ca96ad61b6f3be9cd5f0dd7f897ca03104617386868a4a",
+          "reviewedNormalizedRgbaSha256": "6ed128cb1a470725744ad5b11224b619195ed1961b778ee7019b8725c48bc59f"
+        },
+        "screen/insufficient-coverage/dark/tablet": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-insufficient-coverage",
+          "reviewedAt": "2026-10-07T09:23:24.985Z",
+          "note": "Tile-01 shows white text on a near-black card: 'INCOMPLETE · EXIT 4', the serif 'Not enough was measured', 'This is not a clean run…' and 'Build fails (exit 4).'. The Coverage Trust tile reads 'Below required floor'. The nav links are underlined in white. | Tile-03/04 show the orange left bar on the contract callout and the 'untested' outlined badges, which stay legible on the dark grey remediation boxes. The evidence links are light blue: 'evidence/surface-demo-page-001.png', and 'evidence/ / 2c9d41a07be3-0003-annual-report-typeset-final-revision-9f14e2c7a0b35d61-page-003.png' on one line after the slash. | Tile-08/09 show the coverage table with the layout/widow row 'Below floor' in orange bold with an orange left bar, and the other rows 'Coverage met' in white. Numeric columns align right under their headers. The end mark reads 'End of report. Generated by breaklint 0.9.0 · run 3f6c1a2e-…'.",
+          "reviewArtifactFingerprint": "74b9d2614187311fffe286ae757eb60c435cd3835b3bf465820f9a866504beb4",
+          "reviewedArtifacts": [
+            "insufficient-coverage--dark--tablet.png",
+            "insufficient-coverage--dark--tablet--tile-01.png",
+            "insufficient-coverage--dark--tablet--tile-02.png",
+            "insufficient-coverage--dark--tablet--tile-03.png",
+            "insufficient-coverage--dark--tablet--tile-04.png",
+            "insufficient-coverage--dark--tablet--tile-05.png",
+            "insufficient-coverage--dark--tablet--tile-06.png",
+            "insufficient-coverage--dark--tablet--tile-07.png",
+            "insufficient-coverage--dark--tablet--tile-08.png",
+            "insufficient-coverage--dark--tablet--tile-09.png"
+          ],
+          "reviewedRawSha256": "c46e4eee6b6b7e10422f2cd251730b69c916f3fe5826c02192510496109d3dc2",
+          "reviewedNormalizedRgbaSha256": "5365b83900b89e063ab0103329e5cab3780ed7585a588ec84a32b79192670bbe"
+        },
+        "screen/insufficient-coverage/dark/mobile": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-insufficient-coverage",
+          "reviewedAt": "2026-10-07T09:23:24.985Z",
+          "note": "Tile-01 shows the dark hero with a white border and thick light left bar. The run ID is mono on its own line, and the Coverage Trust tile reads 'Below required floor / 1 rule check below the configured floor'. The secondary text is grey but readable. | Tile-04 shows the orange-barred callout 'This is not a clean run. A rule without enough measurement cannot establish absence of a defect.', the mono '--disable layout/widow' and the collapsed '▶ Findings by rule (6 rules)'. The cards in tiles 05–14 stack cleanly with no text running past the card edges. | Tile-15/16 show the stacked coverage rows with 'Below floor' in orange text and an orange bar for layout/widow, and 'n/a' with 'Coverage met' for the zero-candidate rules. Tile-09 shows the same in-segment filename wrap as light mobile ('…typeset-final-' / 'revision-…').",
+          "reviewArtifactFingerprint": "704168c8aad7ccc610952a75d34d18b653b81cc24d16d71849e0b982338b75be",
+          "reviewedArtifacts": [
+            "insufficient-coverage--dark--mobile.png",
+            "insufficient-coverage--dark--mobile--tile-01.png",
+            "insufficient-coverage--dark--mobile--tile-02.png",
+            "insufficient-coverage--dark--mobile--tile-03.png",
+            "insufficient-coverage--dark--mobile--tile-04.png",
+            "insufficient-coverage--dark--mobile--tile-05.png",
+            "insufficient-coverage--dark--mobile--tile-06.png",
+            "insufficient-coverage--dark--mobile--tile-07.png",
+            "insufficient-coverage--dark--mobile--tile-08.png",
+            "insufficient-coverage--dark--mobile--tile-09.png",
+            "insufficient-coverage--dark--mobile--tile-10.png",
+            "insufficient-coverage--dark--mobile--tile-11.png",
+            "insufficient-coverage--dark--mobile--tile-12.png",
+            "insufficient-coverage--dark--mobile--tile-13.png",
+            "insufficient-coverage--dark--mobile--tile-14.png",
+            "insufficient-coverage--dark--mobile--tile-15.png",
+            "insufficient-coverage--dark--mobile--tile-16.png"
+          ],
+          "reviewedRawSha256": "62ef6dfc5f22e01bc57abef85081fff5aad337d88aad66f4b3ca70bbe9592adb",
+          "reviewedNormalizedRgbaSha256": "7e12c3fa8451be76a1e2dc69dfd08efab5c3753af6adec5c1ba7ad379c11e12f"
+        },
+        "print/insufficient-coverage/pdf": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-insufficient-coverage",
+          "reviewedAt": "2026-10-07T09:23:24.985Z",
+          "note": "Judged through all nine A4 rasters. Every page has 'Page N of 9' at bottom right, and pages 2–9 carry the running head 'breaklint · Not enough was measured · exit 4' on the left and 'run 3f6c1a2e-8b4d-4f7a-9c21-5e0b7d9a4c68' on the right. Page 1 has the full hero instead. | Only page 9 has 'End of report. Generated by breaklint 0.9.0 · run 3f6c1a2e-…'. Page 2 alone has the caveat 'Remediation advice in this report is untested… 7 of 7 findings'. The coverage table fits whole on page 9 with one header row, a single heavy rule and 'Below floor' in red bold words for layout/widow (2/1/1/50%/100%). | Finding 06 splits across pages 7–8. Page 8 opens with the continuation label 'FINDING 06 · type/spaced-hyphen · REMEDIATION AND EVIDENCE'. The same label also appears on unsplit findings 01–05 and 07 (F01). Pages 3–6 hold one finding each with about a third of each page blank (F03).",
+          "reviewArtifactFingerprint": "54e6f07b753d1c954787eca853df4c954d018a18b63b379e2ed83558f3a7c207",
+          "reviewedArtifacts": [
+            "insufficient-coverage--a4.pdf"
+          ],
+          "reviewedRawSha256": "8cf8fcef5e2d8503bbb51ad0e2fc86f4236f89b3d037226f9a51e6ecb9114b95",
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        },
+        "print/insufficient-coverage/raster-set": {
+          "status": "pass",
+          "reviewer": "@ClaudeOpus-insufficient-coverage",
+          "reviewedAt": "2026-10-07T09:23:24.985Z",
+          "note": "Page 1 has the serif hero 'Not enough was measured', 'Build fails (exit 4).' and four summary tiles in a row with Coverage Trust 'Below required floor'. Below is a four-column metadata grid where the configuration hash wraps across four mono lines without overflow ('fa94a74e0eb84b115 / 3bd5bfaa7e5edadd0 / …'). | The finding cards use a three-column metadata grid (DOCUMENT/SOURCE/MEASURED, THRESHOLD/CALIBRATION/PROOF SOURCE). Page 5 breaks the evidence path after 'evidence/' and keeps the long segment on one line. The declined-candidates list splits between pages 8 and 9 with no continuation cue (F07). Page 2 prints the collapsed '▶ Findings by rule (6 rules)' disclosure (F04).",
+          "reviewArtifactFingerprint": "52dc762027e292e8d75db59aa0b810525d03766d43be3b447f844fdf3a406015",
+          "reviewedArtifacts": [
+            "insufficient-coverage--a4-page-1.png",
+            "insufficient-coverage--a4-page-2.png",
+            "insufficient-coverage--a4-page-3.png",
+            "insufficient-coverage--a4-page-4.png",
+            "insufficient-coverage--a4-page-5.png",
+            "insufficient-coverage--a4-page-6.png",
+            "insufficient-coverage--a4-page-7.png",
+            "insufficient-coverage--a4-page-8.png",
+            "insufficient-coverage--a4-page-9.png"
+          ],
+          "reviewedRawSha256": [
+            "b9ae0d9be8451df54af011e19638d2a61e43d319d416239adbba602a37d955a9",
+            "78ebdf31fc482a4d75d865ed5227e468e571fb0ee2d2d7f16c0764616200737a",
+            "98d200a62ce8f0db512eaac60c55b65da05a7a324d393b4f7559d0b72b3ecebf",
+            "711d60377e48b54d06e10bf9f3c18980e9c8d1540ce7349ab4a9797deff5041d",
+            "877bd7cf751c240e66404bea8e367d21fd33d2c8ed7474cba7bd2ff4bde1dda7",
+            "d5d7d4cf986151b506fc78af89209d148d5c33b3f0db397957e495a0784aa141",
+            "a21a8f2ca403f08e4c8acf58819ed17d72bf5b1772ef917bf59d13699128da95",
+            "2a7f8aff1c270a16a0e9446538403a28517a486a70a8e5485767aec5017aa8de",
+            "04673c799ea0e2a8025f4615ebd72191aff770372e3c9563d2562f374266dc20"
+          ],
+          "reviewedPages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        }
+      }
     }
   ]
 }

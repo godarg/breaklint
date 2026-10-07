@@ -17,7 +17,7 @@ Contract 1 retain their stamps.
 This is the focused completion authorized by the maintainer on 2026-10-07. It does not claim
 the original exhaustive product label-set precision/recall study or blind all-product A/B
 was completed. Technical gates, packed consumers and fresh independent acceptance are
-required before tagging. The current delegated AI sight record is round 5, all 32 cells passed by four fresh Claude Opus 5.5 state reviews. It retains one medium and sixteen low dispositions and does not establish human review or Ubuntu font resolution. The following release records are historical measurements.
+required before tagging. The current delegated AI sight record is round 6: all 32 cells passed four fresh `claude-opus-5-5` state reviews after the measured platform inventory correction. One medium and eighteen low findings have explicit dispositions. The local sight record establishes neither human nor Ubuntu visual review; the separate Linux technical diagnostic measured font resolution and 29 A4 pages. The following release records are historical measurements.
 
 ## Release v0.8.0: published 2026-09-28
 

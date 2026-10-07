@@ -223,21 +223,26 @@ finding list and an owner, instead of red and unread. The findings and their add
 carried in that release's follow-up register.
 
 <!-- review-state -->
-For 0.9.0 the current record is round 5: four fresh Claude Opus 5.5 reviews passed all 32 cells
+For 0.9.0 the current record is round 6: four fresh Claude Opus reviews (actual model
+`claude-opus-5-5`) passed all 32 cells on the source after the platform inventory correction,
 under the Founder's release-specific AI delegation of 2026-10-04 and targeted-completion
 instruction of 2026-10-07. Native receipts bind 222 image reads (24 full screens, 168 viewport
 tiles and 30 A4 page rasters); the four PDF cells were judged through every matching raster.
-This is AI sight review, not human review. One medium and sixteen low findings are dispositioned:
-ratio wording, identifier wrapping, print disclosure and continuation labels remain follow-up
-or accepted risks. Full desktop captures were downscaled; small-text judgement rests on tablet,
-mobile and A4 evidence. Ubuntu font resolution remains unmeasured. JSON remains canonical.
+This is AI sight review, not human review. One medium and eighteen low findings have explicit
+accepted-risk or follow-up dispositions: split-card frames, identifier wrapping, print disclosure,
+ratio wording and short-list continuations remain documented presentation costs. Full desktop
+captures were downscaled; fine-text judgement rests on tablet/mobile tiles and A4 evidence.
+This local sight review does not establish Ubuntu visual review. The separate Linux technical
+diagnostic measured LiberationSerif, LiberationSans and DejaVuSansMono resolution and 3/8/9/9
+A4 pages versus macOS 3/9/9/9. JSON remains canonical.
 
 The Founder stated on 2026-10-04: “by the mandate in §0 the Founder delegates the sight review
 that docs/releasing.md reserves for a human to this multi-model review.” The targeted 2026-10-07
-instruction removes mandatory extra model rounds. Round 5 names the actual AI model and exact
+instruction removes mandatory extra model rounds. Round 6 names the actual AI model and exact
 received images; it claims no human look. The original failed private criterion review is retained,
-and only its affected state was rejudged against the existing trust-label contract. Historical
-rounds 1–4 remain unchanged. No failing technical check was waived.
+and only its affected state was rejudged against the existing trust-label contract in round 5.
+Round 6 is a fresh review after the measured platform inventory correction; historical rounds
+1–5 remain unchanged. No failing technical check was waived.
 
 The green real-document gate reads the rights/privacy-reviewed corpus manifest and binds exact
 artifact hashes, source evidence, page/rule counts and the positive independent geometry-oracle

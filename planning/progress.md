@@ -1377,3 +1377,16 @@ The final ordered run on `3049a4b` stopped at npm test: 886 of 888 leaves passed
 ## 2026-10-07 — independently measured Linux inventory
 
 CI run [37594360825](https://github.com/godarg/breaklint/actions/runs/37594360825) on `6b4f477` failed only the final universal 30-raster inventory assertion. An isolated workflow left the renderer and verifier byte-identical. Its first attempt did not start a job because `runner.temp` was used outside the supported expression context; that diagnostic setup error remains recorded. Corrected run [37597727752](https://github.com/godarg/breaklint/actions/runs/37597727752) rendered all 32 cells and reached the same native exit 1 at the final assertion. Independent `pdfinfo` and actual canonical PNG membership measured Linux page counts 3/8/9/9, compared with macOS 3/9/9/9; the changed state is findings. Both inventories have 24 screens, 168 viewport tiles and four PDFs. The fixed expectations are platform/state-specific, with all existing content, pixel, accessibility, break and print-integrity checks retained. This correction changes a reviewed verifier input, so round 5 remains historical candidate evidence until a genuine fresh frozen-input sight review is appended. No passing release or publication is asserted here.
+
+
+### 2026-10-07 — current post-inventory-fix sight evidence
+
+Four new native `claude-opus-5-5` runs each read every assigned image once: 29 clean, 63 findings,
+65 infrastructure and 65 insufficient-coverage images. Round 6 binds all 32 cells to the unchanged
+post-fix review-input fingerprint. All four native exits and verdicts passed; no blocker/high remains.
+One medium and eighteen low findings have explicit accepted-risk/follow-up dispositions, including
+split-card-frame whitespace, identifier wrapping, ratio wording, inert print disclosure and a
+short-list continuation. All five original ledger rounds remain structurally unchanged. These
+local PNG reviews do not establish human or Ubuntu visual review; the separately retained Linux
+technical diagnostic measured its font resolution and fixed 29-page inventory. Final ordered,
+packed, strict-local and CI gates plus independent release acceptance remain required before tagging.

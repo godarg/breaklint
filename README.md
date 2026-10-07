@@ -297,14 +297,18 @@ cell for decoded pixels, contrast, accessibility and fragmentation. A human revi
 a passing round by a rostered reviewer in the review ledger, bound to the current inputs; see its
 latest round and [`docs/releasing.md`](docs/releasing.md).
 <!-- review-state -->
-For 0.9.0 the current record is round 5: four fresh Claude Opus 5.5 reviews passed all 32 cells
+For 0.9.0 the current record is round 6: four fresh Claude Opus reviews (actual model
+`claude-opus-5-5`) passed all 32 cells on the source after the platform inventory correction,
 under the Founder's release-specific AI delegation of 2026-10-04 and targeted-completion
 instruction of 2026-10-07. Native receipts bind 222 image reads (24 full screens, 168 viewport
 tiles and 30 A4 page rasters); the four PDF cells were judged through every matching raster.
-This is AI sight review, not human review. One medium and sixteen low findings are dispositioned:
-ratio wording, identifier wrapping, print disclosure and continuation labels remain follow-up
-or accepted risks. Full desktop captures were downscaled; small-text judgement rests on tablet,
-mobile and A4 evidence. Ubuntu font resolution remains unmeasured. JSON remains canonical.
+This is AI sight review, not human review. One medium and eighteen low findings have explicit
+accepted-risk or follow-up dispositions: split-card frames, identifier wrapping, print disclosure,
+ratio wording and short-list continuations remain documented presentation costs. Full desktop
+captures were downscaled; fine-text judgement rests on tablet/mobile tiles and A4 evidence.
+This local sight review does not establish Ubuntu visual review. The separate Linux technical
+diagnostic measured LiberationSerif, LiberationSans and DejaVuSansMono resolution and 3/8/9/9
+A4 pages versus macOS 3/9/9/9. JSON remains canonical.
 The information contract and the reproducible 32-cell screen/print review are documented in
 [`docs/reporting.md`](docs/reporting.md).
 
