@@ -1,11 +1,18 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { describe, it } from "node:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, describe, it } from "node:test";
 import * as contract from "../tools/report-surface-contract.mjs";
 import type { ReviewLedger } from "../tools/report-surface-contract.mjs";
 
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
+// This independently authored historical fixture binds its own package version. A new
+// checkout version must not hide image-membership failures behind an unrelated release error.
+const fixtureRoot = mkdtempSync(join(tmpdir(), "breaklint-delegated-fixture-"));
+writeFileSync(join(fixtureRoot, "package.json"), JSON.stringify({ version: "0.9.0" }));
+after(() => rmSync(fixtureRoot, { recursive: true, force: true }));
 
 /** Handwritten complete fixture: one screen and tile, and one two-page PDF/raster pair. */
 function fixture() {
@@ -56,7 +63,7 @@ type Fixture = ReturnType<typeof fixture>;
 function sight(input: Fixture) {
   const assess = Reflect.get(contract, "assessSightGate");
   assert.equal(typeof assess, "function", "delegated sight review requires the separate assessSightGate contract");
-  return (assess as (ledger: unknown, manifest: unknown, fingerprint: string) => { reviewKind: string })(input.ledger, input.manifest, input.fingerprint);
+  return (assess as (ledger: unknown, manifest: unknown, fingerprint: string, root: string) => { reviewKind: string })(input.ledger, input.manifest, input.fingerprint, fixtureRoot);
 }
 function reject(change: (input: Fixture) => void, expected: RegExp) {
   const input = fixture(); change(input);
@@ -79,7 +86,7 @@ describe("delegated AI sight review", () => {
   it("refuses an ordinary agent pass even beside a delegation", () => reject((i) => { i.ledger.rounds[0]!.reviewers = [{ kind: "agent", handle: "@SightAI", model: "example" }] as unknown as typeof i.ledger.rounds[0]["reviewers"]; }, /an agent reviewer/u));
   it("refuses missing delegation", () => reject((i) => { Reflect.deleteProperty(i.ledger.rounds[0]!, "delegation"); }, /delegation missing/u));
   it("refuses revoked delegation", () => reject((i) => { i.ledger.rounds[0]!.delegation.revoked = true; }, /revoked/u));
-  it("refuses a different release", () => reject((i) => { i.ledger.rounds[0]!.delegation.release = "0.10.0"; }, /release 0\.9\.0/u));
+  it("refuses a release different from its bound package", () => reject((i) => { i.ledger.rounds[0]!.delegation.release = "0.10.0"; }, /does not match bound package version 0\.9\.0/u));
   it("refuses missing session quote", () => reject((i) => { i.ledger.rounds[0]!.delegation.sessionQuote = ""; }, /session quote/u));
   it("refuses an unrecorded actual model", () => {
     for (const value of ["", " ", "UNKNOWN", "unknown", "UNKNOWN (unavailable)"]) reject((i) => { i.ledger.rounds[0]!.reviewers[0]!.actual_model = value; }, /actual_model/u);
@@ -139,7 +146,11 @@ describe("delegated AI sight review", () => {
     assert.equal(current.rounds, ledger.rounds.length);
     assert.equal(current.latest.round, ledger.rounds.length);
     assert.ok(current.latest.reviewers.every((reviewer) => reviewer.kind === "delegated-ai"));
-    assert.equal(current.latest.delegation?.release, "0.9.0");
+    assert.equal(sha(JSON.stringify(ledger.rounds.slice(0, 6))),
+      "5526ecc6f4c90e49c9572e9999495750e93ccd0bb131b688618bf42f16d9a074",
+      "the complete six historical rounds remain unchanged");
+    assert.equal(current.latest.delegation?.release, ledger.rounds.length === 6 ? "0.9.0" :
+      (JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string }).version);
     const summary = contract.summarizeLatestRound(ledger);
     assert.equal(summary.passingCells, 32);
     assert.equal(summary.delegatedPassingCells, 32);

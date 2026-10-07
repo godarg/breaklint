@@ -588,7 +588,11 @@ describe("report-surface human review gate", () => {
       { kind: "delegated-ai", handle: "@ClaudeOpus-infrastructure" },
       { kind: "delegated-ai", handle: "@ClaudeOpus-insufficient-coverage" },
     ]);
-    assert.equal(current.latest.delegation?.release, "0.9.0");
+    assert.equal(createHash("sha256").update(JSON.stringify(ledger.rounds.slice(0, 6))).digest("hex"),
+      "5526ecc6f4c90e49c9572e9999495750e93ccd0bb131b688618bf42f16d9a074",
+      "the complete six historical rounds remain unchanged");
+    assert.equal(current.latest.delegation?.release, ledger.rounds.length === 6 ? "0.9.0" :
+      (JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string }).version);
     const summary = summarizeLatestRound(ledger);
     assert.equal(summary.passingCells, 32);
     assert.equal(summary.delegatedPassingCells, 32);

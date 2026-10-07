@@ -22,7 +22,7 @@ const OFF = "layout/half-empty-page";
 const dir = mkdtempSync(join(tmpdir(), "breaklint-config-doc-"));
 after(() => rmSync(dir, { recursive: true, force: true }));
 
-function enabledUnder(config: unknown, name: string): { enabled: boolean; source: string; rulesRun: number; figureChecks: { id: string; enabled: boolean; measured: number | null; reasons: string[] }[] } {
+function enabledUnder(config: unknown, name: string): { enabled: boolean; source: string; rulesRun: number; figureChecks: { id: string; enabled: boolean; measured: number | null; reasons: string[] }[]; tableChecks: { id: string; enabled: boolean; measured: number | null; reasons: string[] }[] } {
   const file = join(dir, `${name}.json`);
   writeFileSync(file, JSON.stringify(config));
   const run = spawnSync(process.execPath, ["--experimental-strip-types", CLI, "--demo", "--format", "json", "--config", file], {
@@ -45,6 +45,11 @@ function enabledUnder(config: unknown, name: string): { enabled: boolean; source
       measured: report.documents[0]!.coverage[id]?.measured ?? null,
       reasons: report.documents[0]!.notMeasured.filter(item => item.ruleId === id).map(item => item.reason),
     })),
+    tableChecks: ["layout/table-header-not-repeated", "layout/table-column-drift"].map(id => ({
+      id, enabled: report.config.effective.rules[id]!.enabled,
+      measured: report.documents[0]!.coverage[id]?.measured ?? null,
+      reasons: report.documents[0]!.notMeasured.filter(item => item.ruleId === id).map(item => item.reason),
+    })),
   };
 }
 
@@ -53,14 +58,18 @@ describe("docs/configuration.md: which values enable a rule", () => {
     const run = enabledUnder({}, "default");
     assert.equal(run.enabled, false);
     assert.equal(run.rulesRun, 12);
+    assert.ok(run.tableChecks.every(check => check.enabled === false));
   });
 
   it("strict enables it, as the profile table says", () => {
     const run = enabledUnder({ profile: "strict" }, "strict");
     assert.equal(run.enabled, true);
-    assert.equal(run.rulesRun, 15);
+    assert.equal(run.rulesRun, 17, "strict includes the two optional table continuation checks");
     assert.deepEqual(run.figureChecks, ["figure/caption-separated", "figure/dangling-reference"].map(id => ({
       id, enabled: true, measured: 0, reasons: ["env/figure-index-unavailable"],
+    })));
+    assert.deepEqual(run.tableChecks, ["layout/table-header-not-repeated", "layout/table-column-drift"].map(id => ({
+      id, enabled: true, measured: 0, reasons: ["env/table-index-unavailable"],
     })));
   });
 
