@@ -1307,3 +1307,7 @@ Old failed audits remain historical; unsupported design work is not credited as 
 Measured again: remote main `98e33c006cd6a0ef6a596caa5f18062b0ee74175`, npm latest 0.8.0,
 no v0.9.0 tag; integration `c59c2a1` contains planning changes only.
 Strict technical tests, independent acceptance, privacy and tag-based publication remain required.
+
+## 2026-10-07 — Focused release procedure and truthful sight-review documentation
+
+Aligned reporting and release instructions with ledger6: delegated AI is a distinct review kind, ordinary agents cannot pass, and the complete native image inventory remains required. Frozen candidate review precedes a green PR merge, exact-main CI and annotated tag. This follows the maintainer's targeted-completion authorization; it does not waive technical gates or invent a human review. Workflow documentation parity:7tests passed with native exit0.

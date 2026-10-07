@@ -63,41 +63,32 @@ workflow passes it as `NODE_AUTH_TOKEN` only to the publish step.
 
 ## Before creating the tag
 
-A release is these seven steps, in this order, each on the commit the step before it produced.
-None is skipped and none is reordered.
+For the focused 0.9.0 release, complete preparation and review on a frozen candidate branch
+before merging its pull request. This avoids successive release-only commits on `main` while
+retaining the same source, environment, artifact and pixel bindings. The maintainer authorized
+this targeted completion on 2026-10-07; see `planning/finish-0.9.md`.
 
-1. **Merge the release-preparation pull request into `main`** (for 0.7.0: godarg/breaklint#18),
-   without rewriting history. Its commit carries `## X.Y.Z — TBD-at-tag` and must already satisfy
-   the checks under *Before step 7, also verify* below.
-2. **On that exact merge commit, a rostered human reviews the report surfaces.** One of `@Brand`,
-   `@Neo` or `@Founder` follows `docs/reporting.md`, *Review package*, steps 1–4: `npm ci`,
-   `npm run test:report-surfaces:technical`, the review itself, and ONE new round appended to
-   `tests/golden/report-surfaces/review-ledger.json` (for 0.7.0, round 3). Then
-   `npm run test:report-surfaces:local` must pass. Only a genuine passing human review turns this
-   gate green; there is no documented override and no dropping the gate (the owner's decision for
-   0.7.0). A `fail` or `pending` round is recorded as what it is, and the release stops here.
-   **From this step on, nothing under `REVIEW_INPUT_ROOTS` in
-   `tests/tools/report-surface-contract.mjs` may change** — among them `package.json`,
-   `package-lock.json`, `ci.yml`, `src/config`, `src/core`, `src/report`, `src/rules` and the four
-   surface tools. Any such change unbinds the review and sends the release back to this step.
-3. **The reviewer commits the ledger, and in the same commit updates every sentence marked
-   `<!-- review-state -->`.** Those sentences describe the gate's state as of the release
-   preparation, and a passing round makes them out of date:
-   - `README.md`, the paragraph on what is verified about the HTML report's surfaces;
-   - `docs/status.md`, the release record's *exact-environment human gate* paragraph and the
-     sentence on the strict local gate in the 0.6.0 section's surface figures;
-   - `docs/releasing.md`, the paragraph on the report-surface gate for the release in preparation
-     (under *The local gate*, below);
-   - `CHANGELOG.md`, the sentence on `npm run test:report-surfaces` under *Tooling*.
+1. **Prepare the candidate:** version all package/workflow references, date the changelog,
+   generate rule documentation and schema, and run the ordered local gates below. Run the
+   packed consumers from foreign working directories on Node 22.13 and 24.
+2. **Review the complete report matrix:** follow `docs/reporting.md`, *Review package*.
+   A rostered human or the explicitly delegated AI reviewer must actually inspect every
+   assigned PNG, tile and A4 page raster. Append one truthful new ledger round and update
+   current review-state prose. A failed or incomplete review stops the release.
+   From this step on, no file under `REVIEW_INPUT_ROOTS` may change; any such change requires
+   a new render and review. Historical records remain unchanged.
+3. **Freeze and obtain fresh independent acceptance:** commit the candidate and its review
+   record, audit the declared scope and real gate evidence, and resolve every blocker/high.
+   Then `npm run test:report-surfaces:local` must pass on the exact input binding.
+4. **Push and merge the pull request after green CI.** The merge must preserve the candidate's
+   reviewed inputs. Query `ci.yml` on the exact resulting `main` commit and verify success.
+5. **Push the annotated tag `v0.9.0` on that exact commit.** The workflow publishes and verifies
+   registry integrity, provenance and release assets. Measure those service results before
+   recording publication or updating consumers and the live website.
 
-   Whoever reviews that commit checks who made it and that its cells name the artifacts actually
-   rendered (see "What the roster check does not do" in `docs/reporting.md`).
-4. **`ci.yml` is green on `main` at the ledger commit**, and the local gate below passes on it.
-5. **Date the changelog:** replace `TBD-at-tag` with the release date, `## X.Y.Z — YYYY-MM-DD`, in
-   a final commit on `main` that changes nothing else. `CHANGELOG.md` is not a review input, so
-   the review stays bound.
-6. **`ci.yml` is green again, on exactly that dated commit.**
-7. **Create and push the annotated tag on that commit and no other** (see *Publishing*).
+A future release without explicit AI delegation requires a rostered human sight review.
+Changing package files, source or any other bound input after review invalidates that review.
+The ledger records review evidence; it is not provider authentication or proof of perception.
 
 ### The local gate
 

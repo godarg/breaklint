@@ -284,20 +284,21 @@ The report-surface gate has two explicit modes over the complete matrix in
 `.artifacts/report-surfaces/`:
 
 - `npm run test:report-surfaces` and `npm run test:report-surfaces:local` are the strict local
-  human gate. They pass only when the **latest** review round in the ledger passed, every one of
-  its 32 cells passed under a rostered human reviewer, and it is bound to exactly the current source fingerprint, declared review
+  sight gate. They pass only when the **latest** review round in the ledger passed, every one of
+  its 32 cells passed under a rostered human or an explicitly delegated AI reviewer, and it is bound to exactly the current source fingerprint, declared review
   environment, stable artifact fingerprints, visible screen-pixel hashes and physical inventory.
 - `npm run test:report-surfaces:technical` is the release/CI technical gate. It renders and
   validates the current platform's complete matrix, validates every round of the separately
-  retained human ledger structurally, and prints the latest round's outcome and whether it is
+  retained review ledger structurally, and prints the latest round's outcome and whether it is
   bound to the current inputs (also into the GitHub job summary when one exists). It never
   transfers a historical human PASS onto changed inputs and does not require a ceremonial
   re-review for a technical release gate.
 
-### Review package: what the human reviewer opens, checks and records
+### Review package: what the reviewer opens, checks and records
 
-The strict gate passes only on a genuine human review. The tooling prepares the surfaces and
-checks the record; it never writes a round, and no agent may write one that passes.
+The strict gate accepts a genuine human review or the release-specific delegated AI review
+documented in `docs/releasing.md`. The tooling prepares the surfaces and checks the record;
+it never invents a review. A nondelegated agent cannot record passing cells.
 
 **1. Render on the machine you review on.** A review binds the declared environment (browser
 product and four-part version, platform, architecture, Node major line, launch arguments,
@@ -358,8 +359,8 @@ one. It carries:
 - `record: "current"`;
 - `outcome`: `pass`, `fail` or `pending`;
 - `reviewedAt`: an exact UTC timestamp at or after `manifest.generatedAt`;
-- `reviewers`: your role as `{ "kind": "human", "handle": "@Neo" }`, using `@Brand`, `@Neo` or
-  `@Founder`;
+- `reviewers`: a rostered human role, or the closed `delegated-ai` receipt described below;
+  ordinary agent contributions are recorded as `agent`, never relabelled as a person;
 - `binding`: `reviewInputFingerprint` and `renderManifestGeneratedAt` copied from the manifest's
   `reviewInputFingerprint` and `generatedAt`, and `reviewEnvironment` copied whole;
 - `physicalArtifactsReviewed`: `manifest.physicalArtifacts`, copied whole;
@@ -392,14 +393,14 @@ Record the truth:
 - Never copy an earlier round's cells.
 
 Then run `npm run test:report-surfaces:local`. It passes only when your round passed, every cell
-passed under a rostered human, the round is a current record reviewed after its render, and it is
+passed under a rostered human or explicitly delegated AI reviewer, the round is a current record reviewed after its render, and it is
 bound to exactly the current inputs, environment, cell fingerprints, pixels, named artifacts and
 inventory; otherwise the message names what differs. Commit the ledger change yourself; the
 reviewer of that commit checks who made it (see "What the roster check does not do" below).
 
 ### Review ledger and declared review environment
 
-`tests/golden/report-surfaces/review-ledger.json` (ledger format version 5, its `schemaVersion`)
+`tests/golden/report-surfaces/review-ledger.json` (ledger format version 6, its `schemaVersion`)
 is a list of numbered review **rounds**, each `pass`, `fail` or `pending`. Ledger format version 4
 could hold only one all-pass record, and
 technical mode rejected any cell that was not `pass`, so the one failed review this gate produced
@@ -411,7 +412,8 @@ states; per-cell outcomes, reviewer handles, the render fingerprint and the envi
 recorded at the time, so its `binding` and `cells` are `null` and its two reviewers are
 `not-recorded` instead of named after the fact.
 
-A round is validated fail-closed: a `pass` round names a rostered human reviewer, binds an input
+Ledger 6 preserves all prior rounds and adds a separate, explicitly delegated AI reviewer kind.
+A round is validated fail-closed: a `pass` round names a rostered human or delegated AI reviewer, binds an input
 fingerprint, a render timestamp and an environment, covers all 32 cells with every cell `pass`, and
 records no blocker or high finding; a `fail` round records at least one finding or one failed cell;
 a `pending` round carries no outcome. An earlier passing round never carries forward over a later
@@ -429,12 +431,20 @@ Reviewers are named for what they are, and the human roster is closed:
   that is not a human role. An agent may be recorded as a reviewer of a round and may record a
   failed cell; a cell it marks `pass` is rejected, so an agent's review never satisfies the human
   requirement, whether it is the only reviewer or listed beside a human.
+- `delegated-ai` is a separately declared release-specific sight reviewer with the native model
+  and received-image receipts described below. It may pass only under the recorded Founder
+  delegation; the verifier reports the review kind as `delegatedAI`.
 - `not-recorded` states that the record of the time did not name the reviewer (`handle: null`).
 - Within a round one handle is one reviewer of one kind: a handle listed as both `agent` and
   `human` is rejected, and every reviewer entry is closed over its fields, so a model label cannot
   move into a field of its own.
 
-Every cell that passed must name a `human` reviewer of its round from the roster. The line the
+Every passing cell must name a rostered `human` or `delegated-ai` reviewer of its round.
+A delegated AI record carries the release-specific Founder delegation, actual model identity
+from the native runner output, prompt/output hashes, a native receipt with image count, and
+the exact path and SHA-256 of every assigned full-page PNG, tile and printed-page raster.
+The strict gate checks the complete received-image inventory and never calls this a human pass.
+See `docs/releasing.md` for the closed receipt fields and the trust limits of this record. The line the
 verifier prints and appends to the GitHub job summary ("Report-surface review ledger") names every
 reviewer of the latest round with its kind and counts the cells a rostered human passed; it says
 "latest human review round N is PASS" only when that count is all 32 cells, and "latest review
@@ -497,7 +507,7 @@ channels canonicalized to zero; SHA-256 is then computed over the normalized RGB
 verifier independently decodes and normalizes the file and rejects a one-channel mutation of one
 visible pixel. The exact deterministic Chrome launch arguments—software rasterization, fixed sRGB,
 disabled LCD text and deterministic compositor mode—are part of the recorded review environment.
-Generated PNG/PDF evidence remains ignored by Git; the generator and the human review ledger are
+Generated PNG/PDF evidence remains ignored by Git; the generator and the review ledger are
 versioned.
 
 The review gate deliberately keeps two distinct bindings:
@@ -513,7 +523,7 @@ The review gate deliberately keeps two distinct bindings:
   remains identical.
 
 The verifier independently reconstructs the current source/input fingerprint, every stable artifact
-fingerprint and every screen RGBA hash. A local human PASS transfers only when those fingerprints,
+fingerprint and every screen RGBA hash. A local sight-review PASS transfers only when those fingerprints,
 pixels and the complete declared review environment are identical. It also runs its own negative
 controls, each once per run on a copy of real evidence broken in exactly the way its check exists
 for, and fails if a check accepts the copy:
