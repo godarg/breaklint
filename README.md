@@ -37,7 +37,7 @@ inputs found: 1 · pages analysed: 5 · rules run: 12 · rules that measured som
 The two figure checks are opt-in warnings. They require an authored figure/ID inventory;
 complex figure bodies and ambiguous references are counted as declined. Free-text numbering,
 page-number references, and pagination cause are outside these checks. The hand-written demo
-has no original HTML to inventory: default `--demo` still exits 1; `--strict --demo` now exits 4
+has no original HTML to inventory: default `--demo` still exits 1; `--profile strict --demo` now exits 4
 because those requested figure checks cannot establish their source measurements.
 
 Every finding carries what was measured, what the threshold was, and the word `uncalibrated` —

@@ -9,7 +9,7 @@ Behavior on unchanged documents:
   Figure/Fig./Abbildung/Abb. links against the authored ID inventory. Unsupported or ambiguous
   sources are counted as declined. Neither check establishes author intent, printed numbering
   or a full figure model. Both remain disabled by default and uncalibrated.
-- `--strict --demo` now exits 4: the hand-written snapshot has no original HTML from which the
+- `--profile strict --demo` now exits 4: the hand-written snapshot has no original HTML from which the
   requested new figure checks can establish an inventory. Default `--demo` retains exit 1.
 - Snapshot 6 adds the authored figure/ID inventory and concrete body witnesses. The engine
   still reads Snapshot 5 for existing checks; enabled figure checks explicitly decline when
