@@ -22,9 +22,9 @@ The font-loading boundary repair preserves quiescence, declared-font and geometr
 font acquisition does not mean an entire product passed. Infrastructure failures remain exit 3;
 unsupported structures remain explicit nonmeasurements. No complete all-product pass is claimed.
 
-The planned private before/after example review has not received human judgments yet. No rule or
-profile is human-calibrated, and every rule retains `calibrated: false`. Bounded fixture/renderer
-validation, [human example labels](evaluation-0.10.md) and population calibration are distinct claims.
+No rule or profile is human-calibrated, and every rule retains `calibrated: false`. Bounded
+fixture/renderer validation, [human example labels](evaluation-0.10.md) and population calibration
+are distinct claims.
 The maintainer has supplied actual feedback on all ten bound examples; it refines table context
 and reader-impact wording. Frozen release gates, a new review of changed report surfaces,
 independent acceptance and registry publication remain pending. The historical 0.9.0 records below

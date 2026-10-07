@@ -812,7 +812,7 @@ interface NetworkTracker {
   localRequestRoles: Map<string, Set<string>>;
   redirects: { from: string; to: string; status: number }[];
   /** One page-owned public CDP session: requestId identifies a transport across redirect hops. */
-  inFlight: Map<string, { url: string; resourceType: string }>;
+  inFlight: Map<string, { url: string; resourceType: string; responseStatus?: number; responseUrl?: string }>;
   close(): Promise<void>;
   pendingBodies: Set<Promise<void>>;
   afterRendered: boolean;
@@ -859,13 +859,38 @@ export async function configureNetwork(
         resourceType: typeof event.type === "string" ? event.type.toLowerCase() : "unknown" });
       activity();
     });
+    session.on("Network.responseReceived", payload => {
+      const event = payload as { requestId?: unknown; response?: { status?: unknown; url?: unknown } } | null;
+      if (!event || typeof event.requestId !== "string" || !event.response ||
+          typeof event.response.status !== "number" || !Number.isInteger(event.response.status) ||
+          event.response.status < 100 || event.response.status > 599 || typeof event.response.url !== "string") {
+        lifecycleError("response event is malformed"); return;
+      }
+      const pending = tracker.inFlight.get(event.requestId);
+      if (!pending) { lifecycleError("response event has no observed request"); return; }
+      pending.responseStatus = event.response.status;
+      pending.responseUrl = event.response.url;
+      activity();
+    });
     const terminal = (payload: unknown, failed: boolean): void => {
-      const event = payload as { requestId?: unknown; errorText?: unknown } | null;
+      const event = payload as { requestId?: unknown; errorText?: unknown; canceled?: unknown } | null;
       if (!event || typeof event.requestId !== "string") { lifecycleError("terminal event is malformed"); return; }
       const pending = tracker.inFlight.get(event.requestId);
       if (!pending) lifecycleError("terminal event has no observed request");
       tracker.inFlight.delete(event.requestId);
-      if (failed) lifecycleError(`transport failed: ${typeof event.errorText === "string" ? event.errorText : "unknown failure"}`);
+      // A cancelled, unread body of an observed loopback deny response is not an unknown
+      // transport failure. Chromium emits this for the fixture's Fetch of a denied sibling.
+      // Keep the request pending until this terminal event and retain the server's403 record.
+      // Only ambient Fetch/XHR can take this path: fonts, images, styles/scripts/media,
+      // remote requests, missing responses and failed successful responses remain fatal.
+      let deniedAmbientCancellation = false;
+      if (failed && pending?.responseStatus === 403 && pending.responseUrl === pending.url &&
+          ["fetch", "xhr"].includes(pending.resourceType) && event.canceled === true &&
+          event.errorText === "net::ERR_ABORTED") {
+        try { deniedAmbientCancellation = new URL(pending.url).origin === localOrigin; }
+        catch { /* Malformed resource identity cannot establish the local-deny exception. */ }
+      }
+      if (failed && !deniedAmbientCancellation) lifecycleError(`transport failed: ${typeof event.errorText === "string" ? event.errorText : "unknown failure"}`);
       activity();
     };
     session.on("Network.loadingFinished", payload => terminal(payload, false));
@@ -2188,7 +2213,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
         acquisition: { inputIdentity: identity, resources },
         infrastructure: [{
           kind: "source-acquisition-failed",
-          detail: `required document resource request failed: ${failedRequiredResources.slice(0, 4).map((resource) => `${resource.resolvedUri} (${resource.status})`).join(", ")}`,
+          detail: `required document resource request failed: ${failedRequiredResources.slice(0, 4).map(resource => resourceFailureDetail(resource, served.resourceRoutes.get(resource))).join(", ")}`,
           measured: { stage: "resource-request", failures: failedRequiredResources.length },
         }],
       };

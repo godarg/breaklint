@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.10.0 — TBD-at-tag
+## 0.10.0 — 2026-10-07
 
 The candidate changes judgments on unchanged inputs and adds two optional checks. A bounded human
 example evaluation is recorded; frozen-candidate acceptance and publication are pending.
@@ -34,6 +34,11 @@ example evaluation is recorded; frozen-candidate acceptance and publication are 
   objects; repeated rule IDs do not establish a shared cause. Canonical JSON remains unchanged.
 - Repair the CDP font-loading boundary while retaining acquisition, quiescence, declared-font
   and geometry gates. A successfully acquired font is not proof that the later document gates pass.
+  A cancelled local Fetch/XHR of a denied sibling is accepted only after the same CDP request ID
+  records the loopback403 response and its terminal `ERR_ABORTED` cancellation. Pending requests,
+  required layout resources, failed successful responses and remote transport failures still block.
+  Failed-resource diagnostics identify observed logical routes/statuses without host directories
+  or URL credentials, queries and fragments.
 
 All 17 registered rules retain `calibrated: false`; 12 are enabled by default. A bounded human
 evaluation of ten selected real pages supplied six defect and four acceptable/intended labels.

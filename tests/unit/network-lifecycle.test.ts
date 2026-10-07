@@ -88,6 +88,49 @@ describe("public CDP network lifecycle", () => {
       assert.equal(await awaitNetworkQuiet(tracker, 350), false);
     } finally { if ("close" in tracker) await close(tracker); }
   });
+  it("settles a cancelled local Fetch only after its observed loopback deny response", async () => {
+    const { page, tracker } = await setup();
+    try {
+      start(page, "denied-fetch", url, { type: "Fetch" });
+      assert.equal(await awaitNetworkQuiet(tracker, 35), false, "a known URL is not terminal evidence");
+      page.session.emit("Network.responseReceived", { requestId: "denied-fetch", response: { status: 403, url } });
+      page.session.emit("Network.loadingFailed", { requestId: "denied-fetch", errorText: "net::ERR_ABORTED", canceled: true });
+      assert.equal(tracker.inFlight.size, 0);
+      assert.deepEqual(tracker.errors, []);
+      assert.equal(await awaitNetworkQuiet(tracker, 350), true);
+    } finally { await close(tracker); }
+  });
+  it("keeps other cancellation and resource failure cases fatal", async () => {
+    for (const control of [
+      { type: "Fetch", uri: url, status: 200, canceled: true, errorText: "net::ERR_ABORTED" },
+      { type: "Fetch", uri: "https://assets.example/private-resource", status: 403, canceled: true, errorText: "net::ERR_ABORTED" },
+      { type: "Stylesheet", uri: url, status: 403, canceled: true, errorText: "net::ERR_ABORTED" },
+      { type: "Font", uri: url, status: 403, canceled: true, errorText: "net::ERR_ABORTED" },
+      { type: "Fetch", uri: url, status: 403, canceled: false, errorText: "net::ERR_FAILED" },
+      { type: "Fetch", uri: url, status: null, canceled: true, errorText: "net::ERR_ABORTED" },
+    ]) {
+      const { page, tracker } = await setup();
+      try {
+        start(page, "negative", control.uri, { type: control.type });
+        if (control.status !== null) page.session.emit("Network.responseReceived", { requestId: "negative", response: { status: control.status, url: control.uri } });
+        page.session.emit("Network.loadingFailed", { requestId: "negative", errorText: control.errorText, canceled: control.canceled });
+        assert.equal(tracker.inFlight.size, 0);
+        assert.match(tracker.errors.join("; "), /transport failed/u, JSON.stringify(control));
+        assert.equal(await awaitNetworkQuiet(tracker, 350), false);
+      } finally { await close(tracker); }
+    }
+  });
+  it("rejects an unjoined or malformed response observation", async () => {
+    const { page, tracker } = await setup();
+    try {
+      page.session.emit("Network.responseReceived", { requestId: "not-started", response: { status: 403, url } });
+      start(page, "bad-status", url, { type: "Fetch" });
+      page.session.emit("Network.responseReceived", { requestId: "bad-status", response: { status: "403", url } });
+      finish(page, "bad-status");
+      assert.match(tracker.errors.join("; "), /response/u);
+      assert.equal(await awaitNetworkQuiet(tracker, 350), false);
+    } finally { await close(tracker); }
+  });
   it("requires event measurement and detaches after enable failure", async () => {
     const page = new Page(); page.session.failEnable = true;
     await assert.rejects(setup(page), /enable refusal/u); assert.equal(page.session.detached, 1);

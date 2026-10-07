@@ -402,11 +402,14 @@ describe("the M2d live production chain", () => {
         event.kind === "checker-crashed" && /equal to explicit authored width and height/iu.test(event.detail)),
       `missing fatal image diagnostic: ${JSON.stringify(undeclaredDocument.infrastructure)}`,
     );
-    assert.doesNotMatch(
-      JSON.stringify(undeclaredDocument.infrastructure),
-      /(?:file:|missing-image\.png)/u,
-      "the fatal branch persisted the failed resource URI",
-    );
+    const fatalImageDiagnostics = JSON.stringify(undeclaredDocument.infrastructure);
+    const failedResource = undeclaredDocument.infrastructure.find((event) => event.kind === "source-acquisition-failed");
+    assert.ok(failedResource, "the failed image must retain a named resource outcome");
+    assert.match(failedResource.detail, /\/missing-image\.png \(403\)/u,
+      "the diagnostic must identify the observed logical route and status");
+    assert.doesNotMatch(fatalImageDiagnostics, /file:/u, "diagnostics must not expose host file URIs");
+    assert.equal(fatalImageDiagnostics.includes(root), false, "diagnostics must not expose the host input directory");
+    assert.equal(fatalImageDiagnostics.includes(outside), false, "diagnostics must not expose the sibling host directory");
 
     const cssOverriddenDocument = imageRun.documents[2]!;
     assert.equal(cssOverriddenDocument.snapshot, null, "authored CSS detached the failed-image box from its attributes");

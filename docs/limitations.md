@@ -773,3 +773,19 @@ The header check observes lost column context. The drift check observes changed 
 relative to each fragment's origin, with a chosen 2 CSS px default tolerance. Neither proves
 author intent or a particular CSS cause. Repeated-header and column-width repair suggestions
 are untested; validate row preservation, wrapping and overflow after any change.
+
+## Network lifecycle classification in 0.10
+
+Transport completion uses public CDP request IDs, including redirect hops; a Puppeteer request
+object or repeated URL is not proof of completion. An unconsumed local denied Fetch can produce
+a terminal `Network.loadingFailed` after its HTTP403 response. This narrowly observed case is
+accepted only for same-origin Fetch/XHR, with the same request's observed403 response and a
+cancelled `net::ERR_ABORTED` terminal event. It stays pending until that event. Other transport
+failures, malformed or unjoined observations, remote requests and failed successful responses
+remain fatal. Local required-resource roles and the independent font/image geometry barriers
+still apply. This does not establish author intent or excuse an incomplete resource body.
+
+A failure diagnostic can name the observed logical resource route and status. It strips host
+directories and URL credentials, query strings and fragments; canonical resource provenance
+remains a separate record. This is not a universal anonymous-path promise for arbitrary authored
+filenames.
