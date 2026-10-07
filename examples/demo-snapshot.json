@@ -5,7 +5,7 @@
     "note": "Hand-written rule fixture, not an acquired document. No original HTML artifact exists for its former illustrative line addresses; source locations are unavailable. The real rule and report chains run, while mode/source identify this demo."
   },
   "snapshot": {
-    "schemaVersion": 5,
+    "schemaVersion": 6,
     "meta": {
       "renderer": null,
       "browserVersion": "",
@@ -732,6 +732,12 @@
       }
     ],
     "resources": [],
-    "notMeasured": []
+    "notMeasured": [],
+    "figureIndex": {
+      "complete": false,
+      "ids": {},
+      "figures": [],
+      "referenceBlocks": []
+    }
   }
 }

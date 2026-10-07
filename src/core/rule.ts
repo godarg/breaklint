@@ -64,6 +64,8 @@ export interface RuleMeta {
   readonly experimental: boolean;
   readonly unit: string;
   readonly defaultOptions: RuleOptions;
+  /** Registry-owned integer constraints shared by runtime config and generated JSON Schema. */
+  readonly optionBounds?: Readonly<Record<string, { integer: true; maximum: number }>>;
   /** One line, English, third person about the document. Used in `--help` and the rule table. */
   readonly summary: string;
   /** Reasons this rule can decline to measure. Checked against the registry test. */

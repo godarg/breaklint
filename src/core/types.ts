@@ -371,6 +371,25 @@ export interface SnapshotMeta {
   interventions: string[];
 }
 
+/** Snapshot 6: authored relations and separately measured image bodies, never wrapper geometry. */
+export interface FigureBodyFragment {
+  page: number;
+  box: Box;
+  visible: boolean;
+  identity: string;
+}
+export interface FigureIndex {
+  complete: boolean;
+  ids: Record<string, number>;
+  figures: {
+    sid: string;
+    captionSids: string[];
+    body: { tag: "img" | "svg"; identity: string } | null;
+    bodyFragments: FigureBodyFragment[];
+  }[];
+  referenceBlocks: { sid: string; references: { href: string; targetId: string | null }[] }[];
+}
+
 export interface Snapshot {
   schemaVersion: number;
   meta: SnapshotMeta;
@@ -413,6 +432,8 @@ export interface Snapshot {
       diagnostics: string[];
     };
   };
+  /** Absent on stored Snapshot 5: enabled figure rules explicitly decline the unknown inventory. */
+  figureIndex?: FigureIndex;
   pages: PageRecord[];
   blocks: BlockRecord[];
   textLines: TextLine[];

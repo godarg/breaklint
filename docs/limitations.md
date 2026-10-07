@@ -480,7 +480,7 @@ reports it:
 - **Margin-box content.** A widow, an oversized block or an unfilled band inside a running header or
   footer is not judged. Generated margin content (`@top-center { content: "…" }`) never was.
 - **A running element keeps exactly one record**: the in-flow original Paged.js leaves in the page
-  content with an inline `display: none`. Snapshot 5 records each block's computed `display` and how
+  content with an inline `display: none`. Snapshot 6 records each block's computed `display` and how
   many margin-box copies of it Paged.js printed (`marginCopies`), so the block rules that could
   select the original — `layout/unbreakable-block-too-tall`, `layout/heading-at-page-bottom`,
   `type/excessive-word-spacing` — record it as `excluded` with the reason
@@ -667,7 +667,7 @@ not in this release. None of these readings is a calibration.
 snapshot records a block's lines from every text node beneath it and carries no parent link, so a
 wrapper and the paragraph inside it hold the same line boxes. `layout/widow` and `layout/orphan`
 count a line as a block's own when the collector saw text on it whose nearest block container is
-that block (`TextLine.ownText`, Snapshot 5), and count only the run of the block's own lines next to
+that block (`TextLine.ownText`, Snapshot 6), and count only the run of the block's own lines next to
 the break. The run ends at an in-flow nested block and passes over a float, a positioned box or an
 inline-level box beside the block's text, which the recorded `display`, `float` and `position` tell
 apart; and a run is judged only when the run on the other side of the break, in the block's
@@ -724,3 +724,10 @@ reach a quiescent state, so the pin could not be recorded there. Right-to-left t
 at all, and this predates the release: word gaps are read in text order, which in right-to-left
 text runs against their positions, so every gap reads negative and is skipped, and the block is
 reported as measured with a largest factor of 0.
+
+
+## Conservative figure checks
+
+The two figure checks are warnings and off by default. No calibration or complete figure model is claimed. Caption separation supports one authored image or inline SVG with positively visible geometry, one measured body page and one visible caption fragment. It never substitutes a figure wrapper for an image. Multiple/split/hidden/mismatched bodies, several captions, missing source addressing or unsupported flow decline explicitly. SVG body visibility requires a visible painted primitive; use-only/empty SVGs may be declined. A measured split does not establish the break cause, author intent, or that a keep remedy will fit.
+
+Dangling references check only fragment-only hrefs labelled Figure/Fig./Abbildung/Abb. plus a number. All authored IDs are inventoried, including inline IDs; duplicate IDs or malformed fragment encoding decline. One candidate/finding aggregates a containing source block. It does not prove printed numbering, exact link placement within that block, external-link validity or target visibility. Script-bearing/base-URI source cannot be treated as a complete authored inventory. Snapshot 6 adds the inventory; absent data in legacy Snapshot 5 remains a decline for enabled figure rules. Source and delivered-document claims retain the existing producer/evidence requirements.

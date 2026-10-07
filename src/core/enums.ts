@@ -30,6 +30,9 @@ export const ENV_IDS = [
   "env/evidence-fragment-outside-page",
   /** A collector projection supplied unusable geometry; never report it as a clean measurement. */
   "env/invalid-measurement",
+  "env/figure-index-unavailable",
+  "env/figure-body-unsupported",
+  "env/figure-reference-ambiguous",
 ] as const;
 export type EnvId = (typeof ENV_IDS)[number];
 
@@ -254,7 +257,7 @@ export const PROOF_SOURCES = ["A", "B", "C"] as const;
 export type ProofSource = (typeof PROOF_SOURCES)[number];
 
 /** Rule namespaces. `env/` is deliberately absent: those are diagnoses, not rules. */
-export const RULE_NAMESPACES = ["layout", "svg", "type", "artifact"] as const;
+export const RULE_NAMESPACES = ["layout", "svg", "type", "artifact", "figure"] as const;
 export type RuleNamespace = (typeof RULE_NAMESPACES)[number];
 
 /** Exit codes, paired with their verdicts. */
@@ -315,10 +318,13 @@ export const READABLE_REPORT_SCHEMA_VERSIONS: readonly number[] = [4, 5];
 /**
  * The measurement snapshot's own shape. 5 adds the required `BlockRecord.display`,
  * `BlockRecord.marginCopies`, `BlockRecord.float`, `BlockRecord.position`,
- * `BlockRecord.boundaryHyphen` and `TextLine.ownText`. There is no reader for 4: a stored snapshot is only ever the demo's,
- * migrated with this stamp, and the engine refuses a snapshot of any other stamp.
+ * `BlockRecord.boundaryHyphen` and `TextLine.ownText`. 6 adds the optional authored figure
+ * inventory and separately measured body fragments. Readers retain 5: absent figure data stays
+ * unknown and enabled figure rules decline it. Schemas before 5 are refused.
  */
-export const SNAPSHOT_SCHEMA_VERSION = 5;
+export const SNAPSHOT_SCHEMA_VERSION = 6;
+/** Old snapshots retain their old inventory limits; new rules decline absent figure data. */
+export const READABLE_SNAPSHOT_SCHEMA_VERSIONS: readonly number[] = [5, 6];
 
 const asSet = <T extends string>(values: readonly T[]): ReadonlySet<string> => new Set(values);
 

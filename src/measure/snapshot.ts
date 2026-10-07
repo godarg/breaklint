@@ -37,6 +37,7 @@ import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InjectionResult } from "../source/inject.ts";
 import { coordinateAtUtf8Byte } from "../source/bytes.ts";
 import { isNotRendered } from "../rules/shared.ts";
+import { buildFigureIndex, figureBodyIdentity } from "../source/figure-index.ts";
 
 type Node = DefaultTreeAdapterMap["node"];
 type Element = DefaultTreeAdapterMap["element"];
@@ -72,6 +73,7 @@ export interface SourceModel {
   runs: SourceRunModel[];
   uriRefs: Omit<UriRef, "nodeKey" | "requested">[];
   scriptBearing: boolean;
+  figureIndex: NonNullable<Snapshot["figureIndex"]>;
 }
 
 const SOURCE_BLOCK_TAGS = new Set([
@@ -282,7 +284,7 @@ export function buildSourceModel(
   for (const sheet of additionalCss) {
     uriRefs.push(...cssUriParts(sheet.text, sheet.origin, distributionRoot, "style-sheet"));
   }
-  return { blocks, orderedBlocks, runs, uriRefs, scriptBearing };
+  return { blocks, orderedBlocks, runs, uriRefs, scriptBearing, figureIndex: buildFigureIndex(document) };
 }
 
 export interface ControlSignature {
@@ -389,6 +391,7 @@ export interface RawSnapshot {
   svg: RawSvg[];
   requestedUrls: string[];
   fontFamilies: string[];
+  figureBodies?: { sid: string; tag: string; authorId: string | null; value: string; page: number; box: BlockRecord["box"]; visible: boolean }[];
   control: ControlSignature;
 }
 
@@ -1067,7 +1070,39 @@ export const SNAPSHOT_SOURCE = `(() => {
       inkPasses: { E: { count: 0, maskHash: "" }, S: { count: 0, maskHash: "" }, F: { count: 0, maskHash: "" } },
       inkCollected: false, inkStable: false });
   }));
-  return { pages, blocks, textLines, svg,
+  const figureBodies = [];
+  pagesEls.forEach((page, pageIndex) => P.all(page, "figure[data-bl-sid] img,figure[data-bl-sid] svg").forEach((el) => {
+    if (!inFlow(el) || P.closest(el, "figcaption") || (el.tagName.toLowerCase() === "svg" && P.closest(P.parent(el), "svg"))) return;
+    const owner = P.closest(el, "figure[data-bl-sid]");
+    if (!owner) return;
+    const tag = el.tagName.toLowerCase();
+    // Paint effects can remove all content without removing the root's CSS box. The page
+    // location is usable only for this simple body seam; complex clipping stays a decline.
+    let simplePaint = true;
+    for (let at = el; at && at !== page; at = P.parent(at)) {
+      const style = P.style(at, null);
+      if (effect(style.clipPath) || effect(style.mask) || effect(style.filter)) { simplePaint = false; break; }
+    }
+    const viewport = P.rect(el);
+    figureBodies.push({ sid: P.attr(owner, "data-bl-sid"), tag, authorId: P.attr(el, "id"),
+      value: tag === "svg" ? P.outerHtml(el) : P.attr(el, "src") || "",
+      page: pageIndex + 1, box: box(el), visible: simplePaint && P.painted(el) === true && (tag === "img"
+        ? P.replaced(el).naturalWidth > 0 && P.replaced(el).naturalHeight > 0
+        : P.all(el, "rect,circle,ellipse,line,polyline,polygon,path,text,image").some(part => {
+          if (P.closest(part, "defs,symbol,clipPath,mask,pattern") || P.closest(P.parent(part), "svg") !== el || P.painted(part) !== true) return false;
+          const r = P.rect(part), style = P.style(part, null);
+          let simplePart = true;
+          for (let at = part; at && at !== el; at = P.parent(at)) {
+            const effectStyle = P.style(at, null);
+            if (effect(effectStyle.clipPath) || effect(effectStyle.mask) || effect(effectStyle.filter)) { simplePart = false; break; }
+          }
+          return simplePart && r.width > 0 && r.height > 0
+            && r.x < viewport.x + viewport.width && r.x + r.width > viewport.x
+            && r.y < viewport.y + viewport.height && r.y + r.height > viewport.y
+            && (part.tagName.toLowerCase() === "image" || visiblePaint(style.fill, style.fillOpacity) || strokePainted(style));
+        })) });
+  }));
+  return { pages, blocks, textLines, svg, figureBodies,
     requestedUrls: performance.getEntriesByType("resource").map((e) => e.name),
     fontFamilies: [...fonts].filter(Boolean).sort(),
     control: (${CONTROL_SIGNATURE_SOURCE}) };
@@ -1477,6 +1512,16 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
       input: sourceInput,
       provenance: sourceProvenance,
       ...(input.sourceFiles === undefined ? {} : { files: input.sourceFiles }),
+    },
+    figureIndex: {
+      ...input.sourceModel.figureIndex,
+      complete: input.sourceMapInjection && input.sourceModel.figureIndex.complete && !input.sourceModel.scriptBearing && input.raw.figureBodies !== undefined,
+      figures: input.sourceModel.figureIndex.figures.map(figure => ({ ...figure,
+        bodyFragments: (input.raw.figureBodies ?? []).filter(body => body.sid === figure.sid).map(body => ({
+          page: body.page, box: body.box, visible: body.visible,
+          identity: figureBodyIdentity(body.tag, body.authorId, body.value),
+        })),
+      })),
     },
     pages,
     blocks,

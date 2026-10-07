@@ -400,10 +400,10 @@ describe("the engine judges only a snapshot of its own stamp", () => {
     const engine = { failOn: config.failOn, activeRules: config.activeRules, optionsByRule: config.optionsByRule, coverageFloors: coverageFloorMap(config) };
     const current = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
     assert.equal(current.schemaVersion, SNAPSHOT_SCHEMA_VERSION);
-    assert.equal(SNAPSHOT_SCHEMA_VERSION, 5);
+    assert.equal(SNAPSHOT_SCHEMA_VERSION, 6);
     const judged = runDocument({ path: "doc.html", snapshot: current, infrastructure: [] }, engine).report;
     assert.ok(judged.findings.length > 0, "premise: the current-stamp snapshot is judged");
-    for (const stamp of [4, 6]) {
+    for (const stamp of [4, 7]) {
       const old = { ...structuredClone(current), schemaVersion: stamp };
       const report = runDocument({ path: "doc.html", snapshot: old, infrastructure: [] }, engine).report;
       assert.equal(report.verdict, "infrastructure", `a schema ${stamp} snapshot was judged`);

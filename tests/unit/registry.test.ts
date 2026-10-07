@@ -72,8 +72,8 @@ describe("rule registry", () => {
     // The corpus of >= 30 real documents with human-checked truth does not exist. Saying so in
     // the type, in every finding and in the docs is the honest form. The two withdrawn ink
     // definitions remain under this guard too: research-only must not become calibrated by drift.
-    assert.equal(ALL_RULES.length, 13, "released rule count drifted");
-    assert.equal(VALIDATION_RULES_BY_ID.size, 15, "released + research rule inventory drifted");
+    assert.equal(ALL_RULES.length, 15, "released rule count drifted");
+    assert.equal(VALIDATION_RULES_BY_ID.size, 17, "released + research rule inventory drifted");
     for (const rule of VALIDATION_RULES_BY_ID.values()) assert.equal(rule.calibrated, false, `${rule.id}`);
   });
 

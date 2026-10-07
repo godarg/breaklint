@@ -304,6 +304,46 @@
             }
           ],
           "description": "A file: URI or an absolute build-machine path remains in the artefact."
+        },
+        "figure/caption-separated": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxPageDistance": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "default": 0
+                }
+              }
+            }
+          ],
+          "description": "A standard figure's single measured image body and its caption have a page distance above the configured allowance."
+        },
+        "figure/dangling-reference": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxMissingTargets": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "default": 0
+                }
+              }
+            }
+          ],
+          "description": "A source block contains a local Figure/Fig./Abbildung/Abb. link whose missing authored targets exceed the configured allowance."
         }
       }
     },
@@ -384,6 +424,18 @@
           "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
         },
         "artifact/local-uri": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "figure/caption-separated": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "figure/dangling-reference": {
           "type": "number",
           "minimum": 0.5,
           "maximum": 1,
@@ -471,6 +523,16 @@
                 "maximum": 1
               },
               "artifact/local-uri": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "figure/caption-separated": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "figure/dangling-reference": {
                 "type": "number",
                 "minimum": 1,
                 "maximum": 1

@@ -25,6 +25,7 @@ const JUDGED_EXIT_GRACE_MS = 750;
 const TERMINATION_GRACE_MS = 2_000;
 
 const DEFAULT_SPECS = [
+  { file: "tests/live/figure-checks.test.ts", suite: "source-bound figure checks, live", leaves: 5 },
   { file: "tests/live/evidence.test.ts", suite: "evidence path, live", leaves: 18 },
   { file: "tests/live/check-page.test.ts", suite: "screen checkPage host-page adapter, live", leaves: 7 },
   { file: "tests/live/overlay-page-membership.test.ts", suite: "evidence overlay page membership, live", leaves: 2 },

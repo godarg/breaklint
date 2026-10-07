@@ -3,6 +3,7 @@ export interface Stamps {
   reportConstant: number;
   readable: number[];
   snapshot: number;
+  readableSnapshots: number[];
   context: number;
   comparison: number;
   config: number;
