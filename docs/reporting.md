@@ -3,6 +3,24 @@
 The JSON report is breaklint's canonical record. The HTML report is a self-contained,
 evidence-first projection for review, attachment to a build artifact and A4 printing.
 
+Console, HTML and Markdown show up to three **next checks** from the existing report data.
+An infrastructure or coverage failure comes first, then individual coverage shortfalls, then
+rule groups ordered by nonexperimental severity and rule id. Experimental groups come last.
+This is a reading order, not a reader-impact estimate, a cause diagnosis or a tested repair.
+The JSON shape, findings, measurement floors and exit codes are unchanged by this projection.
+
+**Findings by rule** counts every individual finding without merging their identities or
+claiming a common cause. HTML provides an optional, script-free disclosure linking each rule
+group to its first finding. All finding articles remain in the report. Console and Markdown
+include the same counts; Markdown also prints each actual message and the rule registry's
+remediation advice with its tested status.
+
+**Declined candidates** lists counted reasons by document, rule and scope. Counts sum the
+canonical `documents[].notMeasured[].count` values, not the number of bookkeeping rows.
+Document-level entries without a rule are labelled `no rule`. Reasons remain visible when
+coverage meets its floor; meeting a floor does not erase candidates the checker declined.
+These entries explain why candidate measurements were declined and are separate from layout findings.
+
 ## Information order
 
 The first screen answers four questions before it shows implementation detail:
