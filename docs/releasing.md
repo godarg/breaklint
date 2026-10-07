@@ -25,7 +25,7 @@ published repair from this change set and binds the child CLI to the actual cons
 run `33320332110` completed the Node 22.13/24 consumer matrix, npm provenance verification and
 GitHub Release creation on 2026-08-30.
 
-The unpublished 0.10.0 candidate is a minor pre-1.0 change: it adds two optional table checks
+Version 0.10.0 is a minor pre-1.0 change: it adds two optional table checks
 and changes judgments on unchanged documents. Snapshot 7 adds table row/cell and printed-fragment
 inventory. Readers accept Snapshot 5, 6 and 7; missing legacy inventory declines enabled checks.
 Optional legacy named-anchor data cannot be assumed present in old figure inventories. Report 5
@@ -87,7 +87,9 @@ workflow passes it as `NODE_AUTH_TOKEN` only to the publish step.
 ## Before creating the tag
 
 Complete preparation and review on a frozen candidate branch before merging its pull request.
-For 0.10.0, first obtain and address the planned actual human example feedback. Preserve all
+For 0.10.0, actual human feedback on all ten bound examples is recorded in
+`docs/evaluation-0.10.md`. Round 8 supplies fresh delegated AI surface sight evidence, separate
+from those human labels. Preserve all
 source, environment, artifact and pixel bindings, including historical failed attempts. The
 0.9.0 completion record in `planning/finish-0.9.md` is historical, not approval of the candidate.
 

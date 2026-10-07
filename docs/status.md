@@ -4,9 +4,9 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## Candidate 0.10.0: unpublished
+## Version 0.10.0: behavior and bounded evaluation
 
-The working candidate registers 17 rules, with 12 enabled by default. Two new default-off table
+Version 0.10.0 registers 17 rules, with 12 enabled by default. Two new default-off table
 checks compare existing header context and concrete continuation-cell tracks. Figure checks now
 support proven inline-SVG body identity, cell-bound table bodies with authored caption order,
 and legacy named anchors, and recognize table-reference
@@ -25,10 +25,17 @@ unsupported structures remain explicit nonmeasurements. No complete all-product 
 No rule or profile is human-calibrated, and every rule retains `calibrated: false`. Bounded
 fixture/renderer validation, [human example labels](evaluation-0.10.md) and population calibration
 are distinct claims.
-The maintainer has supplied actual feedback on all ten bound examples; it refines table context
-and reader-impact wording. Frozen release gates, a new review of changed report surfaces,
-independent acceptance and registry publication remain pending. The historical 0.9.0 records below
-are not acceptance of this candidate.
+The maintainer supplied actual feedback on all ten bound examples; it refines table context
+and reader-impact wording. The changed report surfaces have a new delegated AI review: round 8
+passes 32 cells with 263 qualified native image reads by actual model `claude-opus-5-5`, following
+an honestly retained round 7 FAIL and measured correction. Four medium and 27 low presentation
+findings remain explicitly disposed. This is local-image AI sight evidence, separate from human
+example evaluation, code acceptance, package identity and publication.
+
+Current service status comes from the [release workflow](https://github.com/godarg/breaklint/actions/workflows/release.yml),
+[GitHub Releases](https://github.com/godarg/breaklint/releases) and
+`npm view breaklint version dist-tags dist.integrity`. Preparation records cannot establish
+current registry state. The historical 0.9.0 measurements below keep their original date and scope.
 
 ## Release v0.9.0: published 2026-10-07
 

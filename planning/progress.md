@@ -1504,3 +1504,26 @@ The print-state counts remain3/8/8/8. The old158 tile pin actually rejects this 
 inventory; the fixed expectation is updated from those independent measurements. Missing,
 extra and redistributed-page, unknown-platform, gallery membership and one-pixel recut
 negative controls remain. Fresh technical, mutation, sight and final release gates are pending.
+
+## 2026-10-07 — repaired current report sight review, round 8
+
+⛔ Supersedes the round 7 HIGH and incomplete desktop sight status only through the following
+measured repair and fresh review. Round 7 and its original receipts remain unchanged.
+
+At committed source `3ca25437`, input fingerprint `01609709`, the complete technical surface
+gate, 34 expected-red surface mutants and selfcheck each finished with native Exit 0. The
+handwritten fixture repair has two real focused failures before and ten navigation tests green
+after; its separate outside-base control remains green. Independent Mac and Linux inventories
+measure 24 screens, 212 tiles, four PDFs and 27 A4 pages (3/8/8/8).
+
+Four fresh independent read-only Opus state calls then returned PASS, actual model
+`claude-opus-5-5`, CLI 2.1.292. Qualified native image receipts contain 35/74/76/78 reads:
+263 total, including every full screen, viewport tile and A4 raster. All 32 cells pass; none
+remains unreviewed. There are zero BLOCKER/HIGH, four medium and 27 low findings. Root read
+the original answers, per-image details, visible assistant text, limitations and native carrier
+joins, and explicitly disposed every advisory. G-148–G-151 record consolidated successor work.
+
+All seven previous ledger rounds are structurally preserved; the new passing round is appended
+as round 8 with new receipt filenames. This is delegated AI local-image sight evidence, not
+human surface review, Ubuntu visual acceptance or publication. Full exact-candidate gates,
+final packed consumers and independent code acceptance remain separate required proofs.

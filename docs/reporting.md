@@ -509,7 +509,10 @@ and [Linux measurements](https://github.com/godarg/breaklint/actions/runs/376867
 212 tiles and the same 27 printed pages. The arithmetic is23=20+3 applicable evaluations, with
 the affected widow row2=1+1; the new fixture reason is explicitly authored presentation data.
 This correction changes no production threshold or rule-engine accounting. The failed review
-remains on record; a fresh frozen-input second round and strict gate are required for acceptance.
+remains on record. The fresh frozen-input second review is round 8: all 32 cells pass, with
+263 qualified native image reads and actual model `claude-opus-5-5`. Four medium and 27 low
+findings remain explicitly disposed; this is delegated AI local-image sight evidence, without
+human or Ubuntu visual acceptance. The strict gate must still verify the actual current binding.
 The verifier pins each platform and state separately; it does not derive its expected count from
 the renderer manifest. Long desktop, tablet and mobile pages cannot be judged at fit-to-window
 scale; every screen cell therefore supplies viewport-height tiles.

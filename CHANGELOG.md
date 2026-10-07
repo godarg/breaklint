@@ -49,6 +49,11 @@ records are kept separately in `docs/status.md`.
   its counts, without reducing the existing label size.
 - Keep each printed run fact's label and value together across a page break, so source and
   configuration values retain their context.
+- Correct the handwritten insufficient-coverage surface fixture's applicable-unmeasured
+  reason accounting (23 = 20 + 3), with independently specified invariant/projection controls.
+  Supply native desktop tiles as well as tablet/mobile tiles. The original failed sight review
+  remains round 7; fresh round 8 passes all 32 cells with qualified image-read receipts and
+  explicitly disposed presentation advisories.
 
 All 17 registered rules retain `calibrated: false`; 12 are enabled by default. A bounded human
 evaluation of ten selected real pages supplied six defect and four acceptable/intended labels.
