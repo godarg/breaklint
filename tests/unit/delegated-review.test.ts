@@ -84,6 +84,11 @@ describe("delegated AI sight review", () => {
   it("refuses an unrecorded actual model", () => {
     for (const value of ["", " ", "UNKNOWN", "unknown", "UNKNOWN (unavailable)"]) reject((i) => { i.ledger.rounds[0]!.reviewers[0]!.actual_model = value; }, /actual_model/u);
   });
+  it("refuses UNBEKANNT and n/a as missing actual-model markers", () => {
+    for (const value of ["UNBEKANNT", "unbekannt", "UNBEKANNT (not recorded)", "n/a", "N/A"]) {
+      reject((i) => { i.ledger.rounds[0]!.reviewers[0]!.actual_model = value; }, /actual_model/u);
+    }
+  });
   it("refuses missing or malformed prompt and output hashes", () => {
     for (const field of ["promptSha256", "outputSha256"]) reject((i) => { Reflect.set(i.ledger.rounds[0]!.reviewers[0]!, field, "not-a-hash"); }, /SHA-256/u);
   });
