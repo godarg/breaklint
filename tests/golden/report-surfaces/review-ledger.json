@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "purpose": "Human review rounds of the 32-cell report-surface matrix. The last round is the current state of the strict local gate (npm run test:report-surfaces); an earlier pass never carries forward over a later fail or pending round.",
   "rounds": [
     {
