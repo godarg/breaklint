@@ -11,10 +11,11 @@
         "BODY-WITNESS": 1,
         "CAPTION-WITNESS": 1
       },
-      "pdfPageSizePointsRoundedToHundredth": [
+      "originalTheoreticalPdfSizePoints": [
         595.28,
         841.89
-      ]
+      ],
+      "independentPdfPaperClassification": "A4"
     },
     {
       "fixture": "separated-a4.html",
@@ -26,10 +27,11 @@
         "BODY-WITNESS": 1,
         "CAPTION-WITNESS": 2
       },
-      "pdfPageSizePointsRoundedToHundredth": [
+      "originalTheoreticalPdfSizePoints": [
         595.28,
         841.89
-      ]
+      ],
+      "independentPdfPaperClassification": "A4"
     },
     {
       "fixture": "together-letter.html",
@@ -41,10 +43,11 @@
         "BODY-WITNESS": 1,
         "CAPTION-WITNESS": 1
       },
-      "pdfPageSizePointsRoundedToHundredth": [
+      "originalTheoreticalPdfSizePoints": [
         612,
         792
-      ]
+      ],
+      "independentPdfPaperClassification": "letter"
     },
     {
       "fixture": "separated-letter.html",
@@ -56,10 +59,11 @@
         "BODY-WITNESS": 1,
         "CAPTION-WITNESS": 2
       },
-      "pdfPageSizePointsRoundedToHundredth": [
+      "originalTheoreticalPdfSizePoints": [
         612,
         792
-      ]
+      ],
+      "independentPdfPaperClassification": "letter"
     }
   ],
   "referenceFixture": {
@@ -90,5 +94,6 @@
     "malformed percent-encoded fragment",
     "caption-only wrapper"
   ],
-  "formatCorrection": "Original lowercase a4 fixture declarations measured as Letter (612 x 792 PDF points) with Paged.js 0.4.3. Corrected self-authored A4 inputs to explicit 210mm 297mm before remeasurement. Original candidate/finding/source/page-marker expectations are unchanged. The added size oracle is independently hand-written from paper dimensions, not observed SUT output."
+  "formatCorrection": "Original lowercase a4 fixture declarations measured as Letter (612 x 792 PDF points) with Paged.js 0.4.3. Corrected self-authored A4 inputs to explicit 210mm 297mm before remeasurement. Original candidate/finding/source/page-marker expectations are unchanged. The added size oracle is independently hand-written from paper dimensions, not observed SUT output.",
+  "paperOracleCorrection": "The added ideal hundredth-point A4 assertion was measured wrong: Skia emitted 594.96 x 841.92 points, independently classified as A4 by Poppler. Original theoretical dimensions remain recorded above as the missed assertion, not a measured expectation. Check the independent PDF paper classification instead; retain actual dimensions and all original finding/source/placement expectations. No tolerance or production threshold changed."
 }
