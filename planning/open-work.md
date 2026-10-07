@@ -364,13 +364,13 @@ packages. Their supported acquisition and test results will be recorded after im
 ## 2026-10-07 — publication audit advisories retained as open work
 
 The 0.9.0 release accepted these bounded audit risks with disclosure. None is a completed fix;
-the experimental figure rules remain warnings and default-off. The canonical report remains
+the opt-in figure rules remain uncalibrated warnings and default-off. The canonical report remains
 JSON. Each follow-up must retain source/evidence accounting and the existing coverage gates.
 
 | id | problem | disposition |
 |---|---|---|
 | G-142 | Strict enables the new figure checks and requires complete coverage. Unsupported non-image figure bodies or unavailable source inventories can therefore change an unchanged strict document from exit 0/1 to exit 4. | Still open, medium. The release notes disclose the boundary, including unsupported source constructs and `--no-source-map`. Determine supported applicability and non-image figure classification with independent fixtures before changing the core; never convert an unavailable measurement into a clean result. |
-| G-143 | The authored fragment target inventory includes `id` attributes but not legacy `<a name>` targets, so the opt-in `figure/dangling-reference` rule can report those legacy targets as missing. | Still open, low. Disclosed for 0.9.0; use an authored `id` when enabling this experimental check. Expanding the inventory needs source-bound fixtures for legacy targets without inventing IDs or claiming complete HTML fragment coverage. |
+| G-143 | The authored fragment target inventory includes `id` attributes but not legacy `<a name>` targets, so the opt-in `figure/dangling-reference` rule can report those legacy targets as missing. | Still open, low. Disclosed for 0.9.0; use an authored `id` when enabling this opt-in check. Expanding the inventory needs source-bound fixtures for legacy targets without inventing IDs or claiming complete HTML fragment coverage. |
 | G-144 | Human next-check text can count outside-coverage declines as not measured while using the reduced candidate denominator, producing confusing wording such as “1/1 measured; 2 not measured”. | Still open, low. Canonical JSON retains the separate accounted values. Clarify the display in a bounded follow-up while keeping every decline and its reason visible; this wording does not establish precision, recall or calibration. |
 
 ## 2026-10-07 — completed published-tag Action witness

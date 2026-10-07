@@ -32,7 +32,7 @@ The real [published-tag Action smoke, run 37608861377](https://github.com/godarg
 completed successfully: `uses: godarg/breaklint@v0.9.0` returned exit 0 and `clean` on its
 self-authored four-page fixture, with installed version `0.9.0` and matching canonical report evidence.
 
-This release adds two experimental, default-off figure warning checks and human report
+This release adds two uncalibrated, default-off figure warning checks and human report
 navigation with up to three next checks. It retains 12 default rules among 15 registered rules;
 none is calibrated. Strict enables the new checks and can now end with exit 4 when their
 source or supported figure measurements are unavailable, including non-image figure bodies,
