@@ -1337,3 +1337,19 @@ only the exact current counters and diagnostic are updated. The original exit 1 
 No classifier, tolerance, viewport, historical review round or artifact digest is changed.
 Verification of the current render, a fresh render for the changed review-input fingerprint and
 independent sight review remain required; this measurement is not release acceptance.
+
+### 2026-10-07 — measured row-pitch negative-control correction
+
+The complete technical matrix passed on `a7fc2607`, but the unchanged mutation suite stopped
+at `broken-row-pitch`: the old grid-container injection returned exit 0. Its cleanup removed
+the mutant render; no explanation of that lost geometry is claimed. The retained canonical
+clean table has 13 rows on page 3, median pitch 35 px and range 34–36 px. The replacement
+injection adds bottom padding only to the second normal row, preserving the table structure.
+A real renderer run returned exit 1 with `layout/orphan` pitch 57 px, median 35 px, exceeding
+the unchanged ±8% bound. Restoring the old injection made the same expected-red assertion
+fail again, and the corrected renderer bytes were restored exactly. Existing renderer and
+independent verifier thresholds remain unchanged. A new complete matrix and mutation run
+are required before sight review; none is credited by this note.
+
+Native `npm test` on the integrated report fixes passed 726 unit and 888 aggregate tests
+without skips; the documented counter marker now uses those measured totals.
