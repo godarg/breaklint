@@ -306,7 +306,7 @@ function renderNextChecks(decisions: ReportDecisions): string {
 <p class="section-lead">Navigation only; these are not tested fixes. Measurement limits come before partial findings.</p>
 <ol class="next-check-list">
 ${decisions.nextChecks.map((check) => `<li><p><strong>${check.findingIndex === null ? esc(check.title)
-    : `<a href="#finding-${check.findingIndex + 1}">${esc(check.title)}</a>`}</strong></p><p>${esc(check.detail)}</p></li>`).join("\n")}
+    : `<a href="#finding-${check.findingIndex + 1}-title">${esc(check.title)}</a>`}</strong></p><p>${esc(check.detail)}</p></li>`).join("\n")}
 </ol>
 </section>`;
 }
@@ -317,7 +317,7 @@ function renderFindingNavigation(decisions: ReportDecisions): string {
 <summary>Findings by rule (${decisions.groups.length} rule${decisions.groups.length === 1 ? "" : "s"})</summary>
 <p>Counts group rule ids, not causes. Every individual finding remains below.</p>
 <ul>
-${decisions.groups.map((group) => `<li><a href="#finding-${group.firstIndex + 1}">${ruleIdCode(group.ruleId)} · ${group.findingIds.length} finding${group.findingIds.length === 1 ? "" : "s"}</a></li>`).join("\n")}
+${decisions.groups.map((group) => `<li><a href="#finding-${group.firstIndex + 1}-title">${ruleIdCode(group.ruleId)} · ${group.findingIds.length} finding${group.findingIds.length === 1 ? "" : "s"}</a></li>`).join("\n")}
 </ul>
 </details>`;
 }

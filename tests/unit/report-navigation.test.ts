@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
+import { parse, type DefaultTreeAdapterMap } from "parse5";
 
 import type { Report } from "../../src/core/types.ts";
 import { renderConsole } from "../../src/report/console.ts";
@@ -7,6 +8,43 @@ import { renderHtml } from "../../src/report/html.ts";
 import { renderMarkdown } from "../../src/report/markdown.ts";
 import { render } from "../../src/report/index.ts";
 import { findingsReportState } from "../fixtures/report-states.ts";
+
+type HtmlNode = DefaultTreeAdapterMap["node"];
+type HtmlElement = DefaultTreeAdapterMap["element"];
+
+function elements(node: HtmlNode): HtmlElement[] {
+  const own = "tagName" in node ? [node] : [];
+  return [...own, ...("childNodes" in node ? node.childNodes.flatMap(elements) : [])];
+}
+
+const attribute = (element: HtmlElement, name: string): string | undefined =>
+  element.attrs.find((attr) => attr.name === name)?.value;
+
+function assertFindingNavigationTargets(className: string, expectedLinks: number): void {
+  const nodes = elements(parse(renderHtml(navigationReport())));
+  const container = nodes.find((node) => attribute(node, "class")?.split(" ").includes(className));
+  assert.ok(container, `Missing ${className}`);
+  const links = elements(container).filter((node) => node.tagName === "a");
+  assert.equal(links.length, expectedLinks);
+  for (const link of links) {
+    const href = attribute(link, "href");
+    assert.ok(href, "Finding navigation must have an href");
+    assert.ok(href.startsWith("#"), "Finding navigation must remain in-page");
+    const targets = nodes.filter((node) => attribute(node, "id") === href.slice(1));
+    assert.equal(targets.length, 1, `${href} must identify exactly one target`);
+    assert.ok(["h1", "h2", "h3", "h4", "h5", "h6", "section"].includes(targets[0]!.tagName),
+      `${href} targets <${targets[0]!.tagName}> instead of a heading or section`);
+  }
+  // Existing article anchors and accessible names are independent of navigation destinations.
+  const articles = nodes.filter((node) => node.tagName === "article");
+  assert.deepEqual(articles.map((node) => attribute(node, "id")),
+    ["finding-1", "finding-2", "finding-3", "finding-4", "finding-5"]);
+  for (const article of articles) {
+    const titleId = `${attribute(article, "id")}-title`;
+    assert.equal(attribute(article, "aria-labelledby"), titleId);
+    assert.equal(elements(article).filter((node) => node.tagName === "h3" && attribute(node, "id") === titleId).length, 1);
+  }
+}
 
 // Hand-written presentation oracle: five distinct findings, including two for the same rule.
 // This tests navigation and disclosure, not whether a layout rule should emit these findings.
@@ -37,6 +75,14 @@ function navigationReport(): Report {
 }
 
 describe("human report navigation", () => {
+  it("targets a heading or section from every next-check link", () => {
+    assertFindingNavigationTargets("next-check-list", 3);
+  });
+
+  it("targets a heading or section from every grouped-rule navigation link", () => {
+    assertFindingNavigationTargets("finding-navigation", 4);
+  });
+
   it("discloses counted decline reasons even when the coverage floor is met", () => {
     const report = navigationReport();
     for (const output of [renderConsole(report), renderHtml(report), renderMarkdown(report)]) {
@@ -69,7 +115,7 @@ describe("human report navigation", () => {
     reversed.documents[0]!.findings = reversed.findings;
     const checks = (html: string) => /<section class="next-checks"[\s\S]*?<\/section>/u.exec(html)?.[0];
     // Only the navigation target may change with the canonical finding order.
-    assert.equal(checks(renderHtml(report))?.replace(/href="#finding-\d+"/gu, ""), checks(renderHtml(reversed))?.replace(/href="#finding-\d+"/gu, ""));
+    assert.equal(checks(renderHtml(report))?.replace(/href="#finding-\d+(?:-title)?"/gu, ""), checks(renderHtml(reversed))?.replace(/href="#finding-\d+(?:-title)?"/gu, ""));
   });
 
   it("offers rule count navigation while retaining all five distinct findings", () => {
