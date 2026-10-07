@@ -287,8 +287,8 @@ function assertDelegation(round, label) {
 function assertDelegatedReviewer(reviewer, label) {
   assert.match(reviewer.handle ?? "", AGENT_HANDLE, `${label}: delegated AI handle is malformed`);
   assert.ok(!HUMAN_REVIEW_ROLES.includes(reviewer.handle), `${label}: a delegated AI cannot carry the human review role ${reviewer.handle}`);
-  assert.ok(typeof reviewer.actual_model === "string" && reviewer.actual_model.trim().length > 0 && !/^UNKNOWN\b/iu.test(reviewer.actual_model.trim()),
-    `${label}: delegated AI actual_model must be recorded and nonUNKNOWN`);
+  assert.ok(typeof reviewer.actual_model === "string" && reviewer.actual_model.trim().length > 0 && !/^(?:(?:UNKNOWN|UNBEKANNT)\b|n\/a$)/iu.test(reviewer.actual_model.trim()),
+    `${label}: delegated AI actual_model must be recorded, not UNKNOWN, UNBEKANNT or n/a`);
   for (const field of ["promptSha256", "outputSha256"]) {
     assert.match(reviewer[field] ?? "", SHA256, `${label}: ${field} must be SHA-256`);
   }
