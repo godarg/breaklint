@@ -1390,3 +1390,37 @@ short-list continuation. All five original ledger rounds remain structurally unc
 local PNG reviews do not establish human or Ubuntu visual review; the separately retained Linux
 technical diagnostic measured its font resolution and fixed 29-page inventory. Final ordered,
 packed, strict-local and CI gates plus independent release acceptance remain required before tagging.
+
+
+## 2026-10-07 — publication verified from the services
+
+⛔ Supersedes earlier publication-pending statements for 0.9.0 only; earlier failed runs, audit limits and product-study gaps remain historical evidence.
+
+The annotated `v0.9.0` tag names `af794dc0e10a7b739d8430f54f8bdbf92cc85db1`.
+[Release run 37606129549](https://github.com/godarg/breaklint/actions/runs/37606129549)
+completed successfully in all four jobs, including both clean-consumer Node versions and the
+validated-byte publisher. Registry and GitHub readback at 10:38 UTC measured `0.9.0` as npm
+`latest` and identical 602,641-byte release tarballs with SHA-256
+`6e2265326410a64b9c15a6b250fc437889ddad4a961e0cb7b29e5d910d467674`. The retained provenance contract passed for the tag and commit.
+
+The separate 10:39 UTC published consumer recorded signature verification exit 0 with empty
+`invalid`/`missing` arrays, installed demo exit 1 and empty-directory
+`npx --yes breaklint@0.9.0 --demo` exit 1, both expected finding results. These are additional
+native checks, not retroactive signature coverage for the narrow registry readback.
+
+[Action smoke run 37608861377](https://github.com/godarg/breaklint/actions/runs/37608861377)
+ran the actual published `uses: godarg/breaklint@v0.9.0` reference once. Its canonical report and
+Action outputs agree on version `0.9.0`, exit 0, `clean`, four pages and zero findings. The
+self-authored fixture, four page rasters and diagnostic PDF have retained hash bindings. The
+one-off workflow branch is superseded by this successful witness and its private retained
+evidence; it is not a production feature and must not be merged into main. The initial default-branch
+workflow lookup returned 404; a read-only exact-run lookup found the same attempt without a
+second push or rerun.
+
+The three accepted release audit advisories are now explicitly registered, still open, as
+G-142 (strict applicability), G-143 (legacy named targets) and G-144 (decline-count wording).
+Only `docs/status.md`, `planning/open-work.md` and this log change in this publication record;
+all three lie outside the actual `REVIEW_INPUT_ROOTS` in `report-surface-contract.mjs`. No
+rendered review input, ledger, production code, rule default, schema, version or gate changes.
+No population precision/recall, exhaustive three-family hit review or blind product A/B pass
+is inferred from publication.
