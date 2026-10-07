@@ -89,6 +89,7 @@ export const REPORT_HTML_STYLES = String.raw`
   .next-check-list > li { margin-block-end: var(--bl-space-4); break-inside: avoid; }
   .next-check-list p { max-width: var(--bl-text-width); margin-block-end: var(--bl-space-2); }
   .decline-list > li { margin-block-end: var(--bl-space-2); break-inside: avoid; }
+  .decline-count { white-space: nowrap; }
   .finding-navigation { margin-block-start: var(--bl-space-5); }
   .finding-navigation summary { cursor: pointer; font-weight: 700; }
   .finding-navigation p { max-width: var(--bl-text-width); margin-block-start: var(--bl-space-3); }
