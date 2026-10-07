@@ -256,7 +256,7 @@ if (invokedDirectly) {
   // drift this guard exists to catch, in the guard itself. The scenario was caught elsewhere, by
   // the false-alarm corpus in `npm test` — but a guard whose own summary line cannot notice a
   // missing rule should not be the thing anyone reads to decide the rules are covered.
-  const EXPECTED_RULE_COUNT = 13;
+  const EXPECTED_RULE_COUNT = 15;
   const clean = reports.filter((r) => r.survived.length === 0 && r.triggerFixture).length;
   console.log(`\n${clean}/${EXPECTED_RULE_COUNT} rules killed every mutant on a fixture that actually triggers them.`);
   if (reports.length !== EXPECTED_RULE_COUNT) {

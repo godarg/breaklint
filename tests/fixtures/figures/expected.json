@@ -1,0 +1,99 @@
+{
+  "provenance": "Self-authored synthetic fixtures; no product-derived bytes. Authored by the package contributor for breaklint. MIT, as this repository. Hand-written before measurement.",
+  "cases": [
+    {
+      "fixture": "together-a4.html",
+      "captionCandidates": 1,
+      "captionMeasured": 1,
+      "captionFindings": 0,
+      "captionTargetAuthorId": "caption",
+      "independentPdfTextOracle": {
+        "BODY-WITNESS": 1,
+        "CAPTION-WITNESS": 1
+      },
+      "originalTheoreticalPdfSizePoints": [
+        595.28,
+        841.89
+      ],
+      "independentPdfPaperClassification": "A4"
+    },
+    {
+      "fixture": "separated-a4.html",
+      "captionCandidates": 1,
+      "captionMeasured": 1,
+      "captionFindings": 1,
+      "captionTargetAuthorId": "caption",
+      "independentPdfTextOracle": {
+        "BODY-WITNESS": 1,
+        "CAPTION-WITNESS": 2
+      },
+      "originalTheoreticalPdfSizePoints": [
+        595.28,
+        841.89
+      ],
+      "independentPdfPaperClassification": "A4"
+    },
+    {
+      "fixture": "together-letter.html",
+      "captionCandidates": 1,
+      "captionMeasured": 1,
+      "captionFindings": 0,
+      "captionTargetAuthorId": "caption",
+      "independentPdfTextOracle": {
+        "BODY-WITNESS": 1,
+        "CAPTION-WITNESS": 1
+      },
+      "originalTheoreticalPdfSizePoints": [
+        612,
+        792
+      ],
+      "independentPdfPaperClassification": "letter"
+    },
+    {
+      "fixture": "separated-letter.html",
+      "captionCandidates": 1,
+      "captionMeasured": 1,
+      "captionFindings": 1,
+      "captionTargetAuthorId": "caption",
+      "independentPdfTextOracle": {
+        "BODY-WITNESS": 1,
+        "CAPTION-WITNESS": 2
+      },
+      "originalTheoreticalPdfSizePoints": [
+        612,
+        792
+      ],
+      "independentPdfPaperClassification": "letter"
+    }
+  ],
+  "referenceFixture": {
+    "fixture": "references.html",
+    "candidates": 3,
+    "measured": 2,
+    "declined": 1,
+    "findings": 1,
+    "targetAuthorId": "missing",
+    "missingTargets": [
+      "missing-a",
+      "missing-b"
+    ],
+    "duplicateId": "repeated",
+    "externalLinksExcluded": true
+  },
+  "legacySnapshot": {
+    "schemaVersion": 5,
+    "newIndexAbsent": "new enabled rules decline inventory unavailable; existing rules still run; never fabricated complete inventory"
+  },
+  "unsupportedControls": [
+    "multiple image bodies",
+    "body on multiple pages",
+    "hidden/missing body",
+    "nested figure ownership",
+    "no source map",
+    "script-bearing source",
+    "malformed percent-encoded fragment",
+    "caption-only wrapper"
+  ],
+  "formatCorrection": "Original lowercase a4 fixture declarations measured as Letter (612 x 792 PDF points) with Paged.js 0.4.3. Corrected self-authored A4 inputs to explicit 210mm 297mm before remeasurement. Original candidate/finding/source/page-marker expectations are unchanged. The added size oracle is independently hand-written from paper dimensions, not observed SUT output.",
+  "paperOracleCorrection": "The added ideal hundredth-point A4 assertion was measured wrong: Skia emitted 594.96 x 841.92 points, independently classified as A4 by Poppler. Original theoretical dimensions remain recorded above as the missed assertion, not a measured expectation. Check the independent PDF paper classification instead; retain actual dimensions and all original finding/source/placement expectations. No tolerance or production threshold changed."
+}

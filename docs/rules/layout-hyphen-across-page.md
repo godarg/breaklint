@@ -29,7 +29,7 @@ A boundary hyphen inside an inline element is reported on the block that holds i
 class on the parent of the text node it cut, so when the cut word sits inside `<em>`, `<a>` or
 `<span>` the class is on that element. The rule used to read the block's own classes and missed it
 (measured on patched Chromium 141: the same split reported without `<em>` and silent with it). The
-collector now records the mark per block (`boundaryHyphen`, Snapshot 5), on the nearest source block
+collector now records the mark per block (`boundaryHyphen`, Snapshot 6), on the nearest source block
 around the marked element; a wrapper further out does not carry it. The mark is what Paged.js
 does, not the class alone: the fragment's LAST text node must end in the hyphen glyph Paged.js
 appends (U+2011; breaklint never configures another), and the element holding that text node, or

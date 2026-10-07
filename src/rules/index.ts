@@ -32,6 +32,9 @@ import { shortLastLine } from "./type/short-last-line.ts";
 import { excessiveWordSpacing } from "./type/excessive-word-spacing.ts";
 import { localUri } from "./artifact/local-uri.ts";
 
+import { captionSeparated } from "./figure/caption-separated.ts";
+import { danglingReference } from "./figure/dangling-reference.ts";
+
 export const ALL_RULES: readonly Rule[] = Object.freeze([
   widow,
   orphan,
@@ -46,6 +49,8 @@ export const ALL_RULES: readonly Rule[] = Object.freeze([
   shortLastLine,
   excessiveWordSpacing,
   localUri,
+  captionSeparated,
+  danglingReference,
 ]);
 
 const seen = new Set<string>();

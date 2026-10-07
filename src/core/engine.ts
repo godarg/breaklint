@@ -23,7 +23,7 @@
  * is where a reader looks for what was not judged and why.
  */
 
-import { COVERAGE_FLOOR_BY_SEVERITY, EXIT_CODE_BY_VERDICT, IS, SNAPSHOT_SCHEMA_VERSION, VERDICT_PRECEDENCE } from "./enums.ts";
+import { COVERAGE_FLOOR_BY_SEVERITY, EXIT_CODE_BY_VERDICT, IS, READABLE_SNAPSHOT_SCHEMA_VERSIONS, SNAPSHOT_SCHEMA_VERSION, VERDICT_PRECEDENCE } from "./enums.ts";
 import type { FailOn, RunVerdict, Severity } from "./enums.ts";
 
 /** Whether this event alone makes the run exit 3. See `NON_FATAL_INFRA_EVENT_KINDS`. */
@@ -137,14 +137,14 @@ export function runDocument(input: DocumentInput, config: EngineConfig): Documen
   }
 
   // The rules read fields the snapshot stamp names (Snapshot 5: `BlockRecord.display`,
-  // `marginCopies`, `float`, `position`, `boundaryHyphen` and `TextLine.ownText`). A snapshot of another stamp has another shape, and a rule reading an absent
+  // `marginCopies`, `float`, `position`, `boundaryHyphen` and `TextLine.ownText`). Readable legacy snapshots retain these required fields. A rule reading an absent
   // field does not fail, it misjudges: an undefined `display` is not "contents", so every box-less
   // block would pass as unrendered. Such a snapshot is refused, not judged.
-  const stampMatches = snapshot.schemaVersion === SNAPSHOT_SCHEMA_VERSION;
+  const stampMatches = READABLE_SNAPSHOT_SCHEMA_VERSIONS.includes(snapshot.schemaVersion);
   if (!stampMatches) {
     infrastructure.push({
       kind: "checker-crashed",
-      detail: `the measurement snapshot is schema ${String(snapshot.schemaVersion)}; this build's rules read schema ${SNAPSHOT_SCHEMA_VERSION} only`,
+      detail: `the measurement snapshot is schema ${String(snapshot.schemaVersion)}; this build reads schemas ${READABLE_SNAPSHOT_SCHEMA_VERSIONS.join(", ")}`,
       measured: { stage: "snapshot-schema", schemaVersion: snapshot.schemaVersion ?? null, expected: SNAPSHOT_SCHEMA_VERSION },
     });
   }
@@ -463,6 +463,28 @@ export function missingSnapshotFields(snapshot: Snapshot): string[] {
   }
   for (const line of snapshot.textLines ?? []) {
     if (typeof (line as unknown as Record<string, unknown>).ownText !== "boolean") missing.add("TextLine.ownText");
+  }
+  // Optional in Snapshot 6 so old inventories remain honest. Present data must nevertheless
+  // satisfy its numeric/identity contract; malformed ID counts must not look like healthy links.
+  if (snapshot.figureIndex !== undefined) {
+    const index = snapshot.figureIndex;
+    const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
+    const sid = (value: unknown): value is string => typeof value === "string" && value.length > 0;
+    const box = (value: unknown): boolean => record(value) && ["x", "y", "width", "height"].every(key => typeof value[key] === "number" && Number.isFinite(value[key])) && Number(value.width) >= 0 && Number(value.height) >= 0;
+    if (!record(index) || typeof index.complete !== "boolean" || !record(index.ids)
+      || !Object.values(index.ids).every(count => Number.isSafeInteger(count) && count > 0)
+      || !Array.isArray(index.figures) || !Array.isArray(index.referenceBlocks)) missing.add("FigureIndex.inventory");
+    else {
+      for (const figure of index.figures) {
+        if (!record(figure) || !sid(figure.sid) || !Array.isArray(figure.captionSids) || !figure.captionSids.every(sid)
+          || (figure.body !== null && (!record(figure.body) || !["img", "svg"].includes(String(figure.body.tag)) || !sid(figure.body.identity)))
+          || !Array.isArray(figure.bodyFragments)) { missing.add("FigureIndex.figure"); continue; }
+        for (const body of figure.bodyFragments) if (!record(body) || !Number.isSafeInteger(body.page) || Number(body.page) < 1
+          || !snapshot.pages.some(page => page.pageNumber === body.page) || !box(body.box) || typeof body.visible !== "boolean" || !sid(body.identity)) missing.add("FigureIndex.bodyFragment");
+      }
+      for (const group of index.referenceBlocks) if (!record(group) || !sid(group.sid) || !Array.isArray(group.references)
+        || !group.references.every(ref => record(ref) && typeof ref.href === "string" && ref.href.startsWith("#") && (ref.targetId === null || sid(ref.targetId)))) missing.add("FigureIndex.referenceBlock");
+    }
   }
   return [...missing].sort();
 }

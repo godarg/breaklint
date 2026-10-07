@@ -128,6 +128,7 @@ function snapshot(parts: {
   textRuns?: TextRun[];
   svg?: SvgRecord[];
   uriRefs?: Snapshot["uriRefs"];
+  figureIndex?: Snapshot["figureIndex"];
 }): Snapshot {
   return {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
@@ -155,6 +156,7 @@ function snapshot(parts: {
         producerId: null, receiptHash: null, diagnostics: ["fixture has no source-bound provenance"],
       },
     },
+    ...(parts.figureIndex === undefined ? {} : { figureIndex: parts.figureIndex }),
     pages: parts.pages ?? [page(1)],
     blocks: parts.blocks ?? [],
     textLines: parts.textLines ?? [],
@@ -1025,5 +1027,22 @@ export function loadCorpus(): CorpusEntry[] {
         ],
       }),
     },
+    // Independent hand-written source/placement controls for the conservative figure rules.
+    ...[true, false].map((separated): CorpusEntry => ({
+      name: separated ? "caption-separated-trigger" : "caption-together-clean", kind: separated ? "trigger" : "clean", about: "figure/caption-separated",
+      complication: "A wrapper's continuation does not count as an image; one actual body and one caption are independently addressed.",
+      snapshot: snapshot({ pages: [page(1), page(2)],
+        blocks: [block("caption", { tag: "figcaption", page: separated ? 2 : 1, authorId: "caption" })],
+        figureIndex: { complete: true, ids: { plot: 1, caption: 1 }, referenceBlocks: [], figures: [{ sid: "s-plot", captionSids: ["s-caption"],
+          body: { tag: "img", identity: "authored-image" }, bodyFragments: [{ page: 1, box: box(48, 48, 100, 60), visible: true, identity: "authored-image" }] }] },
+      }),
+    })),
+    ...[true, false].map((missing): CorpusEntry => ({
+      name: missing ? "figure-reference-trigger" : "figure-reference-clean", kind: missing ? "trigger" : "clean", about: "figure/dangling-reference",
+      complication: "Reference identity is the containing source block; inline target IDs come from the complete authored inventory.",
+      snapshot: snapshot({ blocks: [block("reference", { authorId: "reference" })],
+        figureIndex: { complete: true, ids: missing ? {} : { plot: 1 }, figures: [], referenceBlocks: [{ sid: "s-reference", references: [{ href: "#plot", targetId: "plot" }] }] },
+      }),
+    })),
   ];
 }

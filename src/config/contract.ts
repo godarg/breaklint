@@ -76,7 +76,7 @@ export interface ProfileDefinition {
  * The threshold was NOT lowered instead. 0.60 is uncalibrated; replacing it with a second
  * uncalibrated number would move the noise rather than account for it.
  */
-export const OFF_BY_DEFAULT_RULE_IDS: ReadonlySet<string> = new Set(["layout/half-empty-page"]);
+export const OFF_BY_DEFAULT_RULE_IDS: ReadonlySet<string> = new Set(["layout/half-empty-page", "figure/caption-separated", "figure/dangling-reference"]);
 
 export const PROFILES: Readonly<Record<ProfileName, ProfileDefinition>> = Object.freeze({
   default: Object.freeze({
@@ -134,6 +134,10 @@ function assertOptionValue(rule: Rule, key: string, value: unknown): void {
   if (typeof expected === "number") {
     if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
       throw new Error(`${path} must be a finite number greater than or equal to 0.`);
+    }
+    const bounds = rule.optionBounds?.[key];
+    if (bounds && (!Number.isSafeInteger(value) || value > bounds.maximum)) {
+      throw new Error(`${path} must be a safe integer between 0 and ${bounds.maximum}.`);
     }
     return;
   }
@@ -231,8 +235,8 @@ export function validateConfigFile(raw: unknown): ConfigFile {
   return raw as ConfigFile;
 }
 
-function optionSchema(key: string, defaultValue: RuleOptions[string]): Record<string, unknown> {
-  if (typeof defaultValue === "number") return { type: "number", minimum: 0, default: defaultValue };
+function optionSchema(key: string, defaultValue: RuleOptions[string], bounds?: { integer: true; maximum: number }): Record<string, unknown> {
+  if (typeof defaultValue === "number") return { type: bounds ? "integer" : "number", minimum: 0, ...(bounds ? { maximum: bounds.maximum } : {}), default: defaultValue };
   if (typeof defaultValue === "string") return { type: "string", minLength: 1, default: defaultValue };
   if (typeof defaultValue === "boolean") return { type: "boolean", default: defaultValue };
   return {
@@ -253,7 +257,7 @@ export function configSchema(): Record<string, unknown> {
       const properties = Object.fromEntries(
         Object.entries(rule.defaultOptions)
           .filter(([key]) => key !== "locale" && rule.proofSource !== "A")
-          .map(([key, value]) => [key, optionSchema(key, value)]),
+          .map(([key, value]) => [key, optionSchema(key, value, rule.optionBounds?.[key])]),
       );
       return [
         rule.id,
