@@ -1353,3 +1353,15 @@ are required before sight review; none is credited by this note.
 
 Native `npm test` on the integrated report fixes passed 726 unit and 888 aggregate tests
 without skips; the documented counter marker now uses those measured totals.
+
+### 2026-10-07 — preserve the long-remediation control's original two checks
+
+The complete matrix passed again on `c3db6d6`. Its full mutation run correctly rejected the
+long-remediation tail at 654.3 px, but no longer reproduced the additionally required
+underfilled-page phase. More injected prose alone produced 827.8 px without restoring that
+phase. Anchoring the first synthetic finding on a fresh page isolates the counterexample from
+preceding navigation: measured text depth 34.1%, framed ink depth 99.9%, tail 827.8 px (80.2%).
+The unchanged original rejection expression and labelled-continuation requirement both match.
+The original injection fails that expected-phase assertion on reversal; corrected bytes were
+restored. Both old red outputs remain recorded. No production CSS, verifier limit, test
+expectation, skip or timeout changed.
