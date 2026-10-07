@@ -1321,3 +1321,19 @@ Figure package b7cfe98 integrated with a no-ff merge. Five self-authored live ca
 ### 2026-10-07 — complete live path and measured documentation counters
 
 On `f8108579`, Node 24.21.0 passed 723 unit tests, 885 aggregate tests, 75/75 rule mutants and all 112 live leaves in 11 suites. The ordered gate then correctly rejected the old 677/839/107 counters. The marker is updated from those saved native measurements; its 226 report leaves and both 200-pixel raster differences remain unchanged. G-132 records the actual incomplete-inventory correction, without broadening the supported figure model. Publication, current report sight review and packed consumers remain pending.
+
+## 2026-10-07 — Current physical report inventory measured
+
+Independent enumeration of the current render files, PNG headers and `pdfinfo` on all four
+PDFs measured 24 whole screens, 168 viewport-height tiles, 4 PDFs and 30 page rasters. Per state,
+tiles/pages are clean 20/3, findings 48/9, infrastructure 50/9 and insufficient-coverage 50/9.
+All 222 PNGs and four PDFs matched the current 32-cell manifest by exact paths and SHA-256;
+source files remained unchanged during the measurement. The layout now includes explicit
+declines and the current coverage rows.
+
+The saved technical run passed the per-cell and print checks before its final exact-inventory
+assertion rejected the old 152-tile/27-page counters. Those counters belong to the earlier layout;
+only the exact current counters and diagnostic are updated. The original exit 1 remains evidence.
+No classifier, tolerance, viewport, historical review round or artifact digest is changed.
+Verification of the current render, a fresh render for the changed review-input fingerprint and
+independent sight review remain required; this measurement is not release acceptance.

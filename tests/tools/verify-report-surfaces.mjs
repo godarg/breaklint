@@ -1196,8 +1196,11 @@ assert.ok(fontMutationControl, "PDF font mutation control did not run");
 // gained real-shaped evidence names that wrap on a phone (infrastructure and insufficient-coverage
 // mobile 14 -> 15 tiles each). 27 page rasters when remediation and note text took the 72ch
 // measure (findings 7 -> 8).
-assert.deepEqual(manifest.physicalArtifacts, { screens: 24, screenTiles: 152, pdfs: 4, rasterPages: 27 },
-  "the report-surface inventory must be exactly 24 screens with 152 viewport tiles, 4 PDFs and 27 PDF page rasters");
+// 30 page rasters and 168 viewport tiles in the 0.9.0 layout with explicit declines and the
+// current coverage rows, independently measured 2026-10-07: clean 3/20, findings 9/48,
+// infrastructure 9/50, insufficient-coverage 9/50 (page rasters/tiles).
+assert.deepEqual(manifest.physicalArtifacts, { screens: 24, screenTiles: 168, pdfs: 4, rasterPages: 30 },
+  "the report-surface inventory must be exactly 24 screens with 168 viewport tiles, 4 PDFs and 30 PDF page rasters");
 
 const latestRound = describeLatestRound(ledger, manifest, currentReviewInput.fingerprint);
 // The review ledger's state belongs where a release reader looks, not only in a log line. The line
