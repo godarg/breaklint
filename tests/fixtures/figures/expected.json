@@ -1,0 +1,77 @@
+{
+  "provenance": "Self-authored synthetic fixtures; no product-derived bytes. Authored by the package contributor for breaklint. MIT, as this repository. Hand-written before measurement.",
+  "cases": [
+    {
+      "fixture": "together-a4.html",
+      "captionCandidates": 1,
+      "captionMeasured": 1,
+      "captionFindings": 0,
+      "captionTargetAuthorId": "caption",
+      "independentPdfTextOracle": {
+        "BODY-WITNESS": 1,
+        "CAPTION-WITNESS": 1
+      }
+    },
+    {
+      "fixture": "separated-a4.html",
+      "captionCandidates": 1,
+      "captionMeasured": 1,
+      "captionFindings": 1,
+      "captionTargetAuthorId": "caption",
+      "independentPdfTextOracle": {
+        "BODY-WITNESS": 1,
+        "CAPTION-WITNESS": 2
+      }
+    },
+    {
+      "fixture": "together-letter.html",
+      "captionCandidates": 1,
+      "captionMeasured": 1,
+      "captionFindings": 0,
+      "captionTargetAuthorId": "caption",
+      "independentPdfTextOracle": {
+        "BODY-WITNESS": 1,
+        "CAPTION-WITNESS": 1
+      }
+    },
+    {
+      "fixture": "separated-letter.html",
+      "captionCandidates": 1,
+      "captionMeasured": 1,
+      "captionFindings": 1,
+      "captionTargetAuthorId": "caption",
+      "independentPdfTextOracle": {
+        "BODY-WITNESS": 1,
+        "CAPTION-WITNESS": 2
+      }
+    }
+  ],
+  "referenceFixture": {
+    "fixture": "references.html",
+    "candidates": 3,
+    "measured": 2,
+    "declined": 1,
+    "findings": 1,
+    "targetAuthorId": "missing",
+    "missingTargets": [
+      "missing-a",
+      "missing-b"
+    ],
+    "duplicateId": "repeated",
+    "externalLinksExcluded": true
+  },
+  "legacySnapshot": {
+    "schemaVersion": 5,
+    "newIndexAbsent": "new enabled rules decline inventory unavailable; existing rules still run; never fabricated complete inventory"
+  },
+  "unsupportedControls": [
+    "multiple image bodies",
+    "body on multiple pages",
+    "hidden/missing body",
+    "nested figure ownership",
+    "no source map",
+    "script-bearing source",
+    "malformed percent-encoded fragment",
+    "caption-only wrapper"
+  ]
+}
