@@ -17,7 +17,11 @@ The threshold is chosen. Using the heading's own line height rather than a fixed
 
 ## Limits and known false alarms
 
-A heading with anything under it on the same page is not stranded and is not reported.
+A heading with a measured block under it on the same page is not reported. The finding records
+the count of following blocks and remaining heading-line heights. Its message names the outgoing
+paginator break kind and determination method, while leaving cause and author intent unknown.
+Inspect the following page and verified source before applying a keep; the threshold does not
+prove that the heading must move or that the suggested remedy will fit.
 
 A heading nothing was printed from does not end any page. The in-flow original of a running
 heading, which Paged.js hides with `display: none` while its clones print in the margin boxes, is

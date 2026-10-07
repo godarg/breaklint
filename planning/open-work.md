@@ -1,5 +1,30 @@
 # Open work — triage of the 2026-09-24 known-gap register
 
+## 2026-10-07 — bounded 0.10 candidate and actual human feedback
+
+⛔ Supersedes the older blanket parking of human example evaluation for this explicitly
+authorized bounded scope only. Historical stopped packages and failed reviews remain retained.
+The candidate is unpublished and still needs exact-candidate gates and independent acceptance.
+
+| existing item | current candidate evidence | remaining boundary |
+|---|---|---|
+| G-125 | Optional source-bound header-continuation check, independently authored live/PDF controls and actual human confirmation on selected real pages. Header-only initial fragments now name the first data page. | Spans, split rows, absent headers and unsupported flow decline. No blanket table support or tested universal repair. |
+| G-126 | Optional measured column-edge comparison with shared source membership. Human feedback distinguishes nearly identical tracks from a materially disruptive change. | The 2 CSS px default remains a review tolerance; displacement alone does not establish reader impact or author intent. |
+| G-129/G-142 | Concrete normalized SVG witnesses and source-matched multi-page table bodies reduce actual nonmeasurement. Caption order chooses the first/last body boundary. | Script/base figure inventories, ambiguous bodies and unsupported flow still decline. Strict can legitimately remain exit 4; that boundary is not erased. |
+| G-143 | Authored named anchors, ID precedence, duplicate/legacy nonmeasurement and source-bound controls implemented. | Old inventories without named anchors cannot prove a missing target. |
+| G-144 | Applicable declines, outside-denominator targets and unavailable capabilities now have separate wording in the human surfaces. | Canonical JSON remains unchanged; final fresh visual review is pending. |
+
+The ten selected human-reviewed examples, their adjustments and limits are described in
+[`docs/evaluation-0.10.md`](../docs/evaluation-0.10.md). They establish neither a population
+metric nor an independent blind holdout. Separated code introductions, numbering, printed
+page references and broad raster-resolution checks remain outside this release.
+
+| new item | current evidence | disposition |
+|---|---|---|
+| G-145 | Real font transport reached 25 CDP completions and zero pending requests while the previous Puppeteer object set retained 18 stale objects. | Request-ID lifecycle repair has independent held-request/redirect/failure controls. Font, quiet and geometry gates remain required; a later genuine geometry refusal is not bypassed. |
+| G-146 | Low glyph-band fill warned on nearly full pages, an accepted title page and a natural short document ending. | Experimental half-empty check now uses recorded line-height bottom-space context, explicit forced-break nonmeasurement and natural-end guard. Actual human labels confirm these selected examples only. |
+| G-147 | Authored `data-ref` can affect SVG CSS selectors but would be discarded by paginator-metadata normalization. | Independent authored selector control red before, green after: refuse source ownership instead of asserting body equality. Ordinary SVG control remains measurable. |
+
 Triage date: 2026-09-24. Tree: `db0e4c0` (= `origin/main`, v0.6.0 + 10 commits).
 Method: six independent triage agents (T1–T6), each re-verifying its register items against the
 code with file:line citations, and by measurement where it was cheap. The register was treated as

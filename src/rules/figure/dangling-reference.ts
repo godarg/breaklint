@@ -7,9 +7,9 @@ export const danglingReference = defineRule({
   id: ID, severity: "warn", proofSource: null, calibrated: false, experimental: false,
   unit: "references", defaultOptions: { maxMissingTargets: 0 },
   optionBounds: { maxMissingTargets: { integer: true, maximum: Number.MAX_SAFE_INTEGER } },
-  summary: "A source block contains a local Figure/Fig./Abbildung/Abb. link whose missing authored targets exceed the configured allowance.",
+  summary: "A source block contains a local figure or table link whose missing authored fragment targets exceed the configured allowance.",
   declines: ["env/figure-index-unavailable", "env/figure-reference-ambiguous"],
-  remediation: { advice: "Check the missing fragment targets named in the finding. Correct the local href or add the intended unique authored ID. The location identifies the containing source block, not the exact inline link. This check does not validate printed figure numbers, external references, or the target's visibility.", tested: false },
+  remediation: { advice: "Check the missing fragment targets named in the finding. Correct the local href or add the intended unique authored ID or legacy a[name] anchor. IDs take precedence over named anchors. The location identifies the containing source block, not the exact inline link. This check does not validate printed numbers, external references, or the target's visibility.", tested: false },
 }, (snapshot, ctx) => {
   const index = snapshot.figureIndex;
   if (!index?.complete) return unavailable(ID);
@@ -22,8 +22,11 @@ export const danglingReference = defineRule({
       evaluations.push(targetEvaluation({ ...target, status: "excluded", countsTowardCoverage: false, reason: "rule/target-not-visible" })); continue;
     }
     candidates += 1;
-    const count = (id: string) => Object.hasOwn(index.ids, id) ? index.ids[id]! : 0;
-    const ambiguous = !block || group.references.some(ref => ref.targetId === null || count(ref.targetId) > 1);
+    const count = (id: string) => Object.hasOwn(index.ids, id) ? index.ids[id]!
+      : index.namedAnchors && Object.hasOwn(index.namedAnchors, id) ? index.namedAnchors[id]! : 0;
+    // Snapshot 6 knows IDs only. Absence there cannot prove a legacy named target is missing.
+    const ambiguous = !block || group.references.some(ref => ref.targetId === null || count(ref.targetId) > 1
+      || (count(ref.targetId) === 0 && index.namedAnchors === undefined));
     if (ambiguous) {
       const reason = "env/figure-reference-ambiguous" as const;
       notMeasured.push(declined({ scope: "block", ruleId: ID, reason, target: { keyType: "block", nodeKey: target.nodeKey, sid: group.sid } }));
@@ -36,7 +39,7 @@ export const danglingReference = defineRule({
       { name: "local-figure-links", value: group.references.length, unit: "references", operator: null, threshold: null },
       { name: "missing-unique-targets", value: missing.length, unit: "references", operator: ">", threshold },
     ] }));
-    if (violated) findings.push(makeFinding({ ctx, ruleId: ID, severity: "warn", message: `Local figure link target${missing.length === 1 ? " is" : "s are"} absent from the authored ID inventory: ${missing.map(id => JSON.stringify(id)).join(", ")}. Location and page identify the containing block; printed numbers and author intent are not checked.`,
+    if (violated) findings.push(makeFinding({ ctx, ruleId: ID, severity: "warn", message: `Local figure/table link target${missing.length === 1 ? " is" : "s are"} absent from the authored ID and a[name] inventory: ${missing.map(id => JSON.stringify(id)).join(", ")}. Location and page identify the containing block; printed numbers and author intent are not checked.`,
       page: block!.page, keyType: "block", key: blockKey(block!), nodeKey: block!.nodeKey, sid: group.sid,
       fragmentIndex: block!.fragmentIndex, boxScreen: target.boxScreen, source: sourceOf(snapshot, group.sid), value: missing.length, threshold, unit: "references" }));
   }

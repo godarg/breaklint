@@ -2,7 +2,7 @@ import type { Finding, Report } from "../core/types.ts";
 import { summaryLine } from "./mandatory.ts";
 import { emptyStateSentence, infraLines } from "./infra.ts";
 import { VALIDATION_RULES_BY_ID } from "../rules/index.ts";
-import { projectDecisions } from "./decisions.ts";
+import { COVERAGE_COUNT_NOTICE, coverageAccounting, coverageAccountingText, projectDecisions } from "./decisions.ts";
 
 const ESC = "\u001b[";
 const RESET = `${ESC}0m`;
@@ -94,6 +94,8 @@ export function renderConsole(report: Report, opts: { colour?: boolean } = {}): 
   out.push("");
 
   const decisions = projectDecisions(report);
+  out.push(`Coverage counts: ${coverageAccountingText(coverageAccounting(report.documents.flatMap(doc => Object.values(doc.coverage))))}.`,
+    COVERAGE_COUNT_NOTICE, "");
   if (decisions.nextChecks.length > 0) {
     out.push("Next checks (navigation, not tested fixes)");
     for (const [index, check] of decisions.nextChecks.entries()) {
@@ -165,7 +167,7 @@ export function renderConsole(report: Report, opts: { colour?: boolean } = {}): 
           const ratioPct = cov.coverage === null ? "not applicable" : `${(cov.coverage * 100).toFixed(0)}%`;
           const floorPct = `${(cov.floor * 100).toFixed(0)}%`;
           out.push(`  rule       ${ruleId} in ${doc.path}`);
-          out.push(`  measured   ${cov.measured} of ${cov.candidates} candidates (${ratioPct}); required floor ${floorPct}`);
+          out.push(`  measured   ${coverageAccountingText(coverageAccounting([cov]))}; coverage ${ratioPct}; required floor ${floorPct}`);
           out.push(`  reason     ${reasonStr}`);
           out.push(`  options    - Inspect the document for unsupported constructs or environment limits`);
           out.push(`             - If this document intentionally uses unsupported elements, disable the check with:`);

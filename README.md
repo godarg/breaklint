@@ -34,9 +34,13 @@ error svg/text-overflows-viewport  page 5
 inputs found: 1 · pages analysed: 5 · rules run: 12 · rules that measured something: 10 · not measured: 1 · verdict: findings · mode: demo · fail-on: error · gate triggered by: error
 ```
 
-The two figure checks are opt-in warnings. They require an authored figure/ID inventory;
-complex figure bodies and ambiguous references are counted as declined. Free-text numbering,
-page-number references, and pagination cause are outside these checks. The hand-written demo
+Two figure and two table checks are opt-in warnings. Figures require a source-bound body and
+caption inventory; supported bodies include a single image, inline SVG or source-matched table,
+measured separately from the wrapper. Table captions use their authored before/after order and
+the first/last actual cell-box body page, including bodies spanning pages. Local figure/table links resolve authored IDs and legacy `<a name>` targets,
+with IDs taking precedence. Table continuations require exact source row/cell membership and
+concrete cell boxes. Unsupported structures and ambiguous references remain explicit declines.
+Free-text numbering, printed page references and pagination cause are outside these checks. The hand-written demo
 has no original HTML to inventory: default `--demo` still exits 1; `--profile strict --demo` now exits 4
 because those requested figure checks cannot establish their source measurements.
 
@@ -53,6 +57,11 @@ kind of fixture it used in its own `source` field rather than leaving you to gue
 at your own HTML and the same chain measures a real page.
 
 ## Install
+
+This checkout documents the **unreleased 0.10.0 candidate**. The npm commands below install
+the published release; candidate-only checks require the corresponding reviewed candidate package.
+The [bounded human example evaluation](docs/evaluation-0.10.md) is recorded. Publication,
+fresh report-surface review and final independent acceptance remain pending.
 
 ```bash
 npm i -D breaklint
@@ -111,13 +120,14 @@ previous version to compare to.
 
 ## What is checked
 
-Fifteen rules. Twelve of them run by default: two can fail a build, ten more are advisory unless
-you ask for more, with `--fail-on warn`. The thirteenth — `layout/half-empty-page` — is
-experimental, never moves an exit code at all, and since 0.6.0 is not active in the default
-profile: measured on a 40-document corpus built to exercise it, it fired on 37 of them, because
-its quantity saturates well below a full page. It is still registered, documented and
-configurable, and `--profile strict`, `--only layout/half-empty-page` or
-`{"rules": {"layout/half-empty-page": true}}` each turn it back on.
+Seventeen rules are registered in the candidate. Twelve run by default: two can fail a build;
+ten more are advisory unless you request `--fail-on warn`. Five are off by default: the two
+figure checks, the two table continuation checks and experimental `layout/half-empty-page`.
+Strict mode enables all seventeen. Half-empty-page never gates, even with `--fail-on warn`.
+It now checks remaining space against twice a recorded line height, accepts low coverage at a natural
+document ending, and declines low coverage at an observed forced ending when there is no late
+start. A late start can still warn. These guards do not establish author intent or the cause of
+an avoidable gap. Net fill remains glyph/visual-band coverage rather than line-box occupancy.
 
 That split is not caution, it is the burden of proof: only two rules compare directly measured
 quantities against a structural boundary.
@@ -137,8 +147,10 @@ quantities against a structural boundary.
 | [`type/short-last-line`](docs/rules/type-short-last-line.md) | width of a paragraph's closing line | warn |
 | [`type/excessive-word-spacing`](docs/rules/type-excessive-word-spacing.md) | word gaps against the natural space | warn |
 | [`artifact/local-uri`](docs/rules/artifact-local-uri.md) | `file:` URIs and build-machine paths left in the artefact | warn |
-| [`figure/caption-separated`](docs/rules/figure-caption-separated.md) | a standard single-image figure body and its caption on different pages | warn, **off by default** |
-| [`figure/dangling-reference`](docs/rules/figure-dangling-reference.md) | local Figure/Fig./Abbildung/Abb. links with missing authored IDs | warn, **off by default** |
+| [`figure/caption-separated`](docs/rules/figure-caption-separated.md) | a measured image/SVG or source-matched table body separated from its caption | warn, **off by default** |
+| [`figure/dangling-reference`](docs/rules/figure-dangling-reference.md) | local figure/table links with missing authored IDs or legacy named anchors | warn, **off by default** |
+| [`layout/table-header-not-repeated`](docs/rules/layout-table-header-not-repeated.md) | an existing header absent from a continuation with visible data | warn, **off by default** |
+| [`layout/table-column-drift`](docs/rules/layout-table-column-drift.md) | continuation cell edges against the first visible header's tracks | warn, **off by default** |
 
 **No threshold in this project is calibrated.** `calibrated: false` appears in the type, in
 every finding and on every rule page. There is no corpus of real documents with human-checked
@@ -217,7 +229,9 @@ origin, paginates it, assembles and validates the snapshot, runs the rules, and 
 the report. `checker-crashed` remains a real exit-3 path for injected driver failures, apparatus
 interference and process-boundary faults; it is not a placeholder for an unbuilt live path.
 M3-0's SVG validation and calibration foundation exists in the repository, but empirical threshold
-calibration and a human-labelled real corpus remain unfinished. Packaging and the first npm release
+calibration and a representative human-labelled real corpus remain unfinished. The
+[ten selected human-reviewed examples](docs/evaluation-0.10.md) establish a narrower evaluation.
+Packaging and the first npm release
 are complete; the post-release trust work and remaining validation boundaries are tracked in
 `docs/status.md`.
 
@@ -245,7 +259,10 @@ breaklint --format json --out report.json chapter-*.html
 breaklint --fail-on warn manual.html     # gate on the heuristics too, deliberately
 breaklint --profile strict manual.html   # warnings gate; every rule requires full coverage
 breaklint --only layout/widow,layout/orphan book.html
-breaklint --only layout/half-empty-page report.html   # ask for the one rule that is off by default
+breaklint --only layout/half-empty-page report.html   # experimental whitespace review
+breaklint --only figure/caption-separated,figure/dangling-reference manual.html
+breaklint --only layout/table-header-not-repeated,layout/table-column-drift --fail-on warn \
+  --format json --out table-report.json manual.html
 breaklint --disable layout/hyphen-across-page report.html
 breaklint --out-dir build/evidence book.html   # where the page PNGs and the checked PDF go
 ```
@@ -289,6 +306,12 @@ cannot be overridden. The complete contract, profiles, examples and generated sc
 [`docs/configuration.md`](docs/configuration.md). JavaScript configuration would mean executing
 code from a foreign repository inside CI, so it is intentionally unsupported.
 
+Coverage totals count **rule-candidate evaluations**, not unique pages, elements or defects.
+The same table can be evaluated by both continuation checks. Applicable unmeasured evaluations
+are separated from not-applicable targets and unavailable tool capabilities outside the coverage
+denominator. Each finding remains separate unless evidence establishes a shared cause; a shared
+rule ID does not establish one. Repair advice is marked tested or untested.
+
 The HTML reporter is a self-contained evidence view, not a second source of truth. Its header
 distinguishes clean, findings, checker failure and insufficient coverage in words; findings reflow
 without a horizontal table on mobile; print uses an A4 layout. What CI verifies about these
@@ -297,7 +320,9 @@ cell for decoded pixels, contrast, accessibility and fragmentation. A human revi
 a passing round by a rostered reviewer in the review ledger, bound to the current inputs; see its
 latest round and [`docs/releasing.md`](docs/releasing.md).
 <!-- review-state -->
-For 0.9.0 the current record is round 6: four fresh Claude Opus reviews (actual model
+The following is historical 0.9.0 surface-review evidence, not acceptance of the changed 0.10.0
+surfaces. The candidate needs a new input-bound review. For 0.9.0 the record is round 6: four fresh
+Claude Opus reviews (actual model
 `claude-opus-5-5`) passed all 32 cells on the source after the platform inventory correction,
 under the Founder's release-specific AI delegation of 2026-10-04 and targeted-completion
 instruction of 2026-10-07. Native receipts bind 222 image reads (24 full screens, 168 viewport

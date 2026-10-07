@@ -129,7 +129,7 @@
               }
             }
           ],
-          "description": "A page is filled well below what its content box allows."
+          "description": "A page has low glyph/visual-band coverage and remaining vertical room, or starts unusually far down."
         },
         "layout/orphaned-continuation-page": {
           "oneOf": [
@@ -323,7 +323,7 @@
               }
             }
           ],
-          "description": "A standard figure's single measured image body and its caption have a page distance above the configured allowance."
+          "description": "A standard figure's measured image or source-matched table body and its caption exceed the page-distance allowance."
         },
         "figure/dangling-reference": {
           "oneOf": [
@@ -343,7 +343,39 @@
               }
             }
           ],
-          "description": "A source block contains a local Figure/Fig./Abbildung/Abb. link whose missing authored targets exceed the configured allowance."
+          "description": "A source block contains a local figure or table link whose missing authored fragment targets exceed the configured allowance."
+        },
+        "layout/table-header-not-repeated": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {}
+            }
+          ],
+          "description": "An existing visible table header is absent from a measured continuation with data rows."
+        },
+        "layout/table-column-drift": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxColumnDriftPx": {
+                  "type": "number",
+                  "minimum": 0,
+                  "default": 2
+                }
+              }
+            }
+          ],
+          "description": "Continuation data-cell edges differ from the first visible header's measured column tracks."
         }
       }
     },
@@ -436,6 +468,18 @@
           "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
         },
         "figure/dangling-reference": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "layout/table-header-not-repeated": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "May raise the active profile floor; runtime rejects lowering a stricter profile."
+        },
+        "layout/table-column-drift": {
           "type": "number",
           "minimum": 0.5,
           "maximum": 1,
@@ -533,6 +577,16 @@
                 "maximum": 1
               },
               "figure/dangling-reference": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "layout/table-header-not-repeated": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              "layout/table-column-drift": {
                 "type": "number",
                 "minimum": 1,
                 "maximum": 1

@@ -33,6 +33,8 @@ export const ENV_IDS = [
   "env/figure-index-unavailable",
   "env/figure-body-unsupported",
   "env/figure-reference-ambiguous",
+  "env/table-index-unavailable",
+  "env/table-structure-unsupported",
 ] as const;
 export type EnvId = (typeof ENV_IDS)[number];
 
@@ -322,9 +324,9 @@ export const READABLE_REPORT_SCHEMA_VERSIONS: readonly number[] = [4, 5];
  * inventory and separately measured body fragments. Readers retain 5: absent figure data stays
  * unknown and enabled figure rules decline it. Schemas before 5 are refused.
  */
-export const SNAPSHOT_SCHEMA_VERSION = 6;
+export const SNAPSHOT_SCHEMA_VERSION = 7;
 /** Old snapshots retain their old inventory limits; new rules decline absent figure data. */
-export const READABLE_SNAPSHOT_SCHEMA_VERSIONS: readonly number[] = [5, 6];
+export const READABLE_SNAPSHOT_SCHEMA_VERSIONS: readonly number[] = [5, 6, 7];
 
 const asSet = <T extends string>(values: readonly T[]): ReadonlySet<string> => new Set(values);
 

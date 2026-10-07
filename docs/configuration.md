@@ -83,8 +83,8 @@ There are exactly two profiles:
 
 | profile | finding gate | coverage floors | rules enabled |
 |---|---|---|---|
-| `default` | `error` | by severity: error 1, warning 0.5, info 0 | every rule except the off-by-default `layout/half-empty-page` |
-| `strict` | `warn` | 1 for every rule | every rule, `layout/half-empty-page` included |
+| `default` | `error` | by severity: error 1, warning 0.5, info 0 | 12 of 17 rules; half-empty-page, both figure checks and both table checks are off |
+| `strict` | `warn` | 1 for every rule | all 17 rules, including the five optional checks; experimental half-empty-page never gates |
 
 `strict` is a real preset, not a label. A config-file `failOn` can replace its warning gate and a
 CLI `--fail-on` can replace the file. Coverage is different: `coverageFloors` can equal or raise
@@ -109,7 +109,7 @@ memory on long documents; it is not a page-count or memory guarantee.
 
 A rule value is either `true`, `false`, or an options object. `false` disables the rule; any other
 value enables it — `true`, and equally an options object, including an empty one. For the rules that
-run by default this is invisible; for the off-by-default `layout/half-empty-page` it means that
+run by default this is invisible; for any of the five off-by-default rules it means that
 configuring an option also turns the rule on (see [limitations](limitations.md)), and a
 `{"rules": {"layout/half-empty-page": false}}` still turns it off under `strict`. The complete rule
 and option surface, including types and defaults, is in the generated
@@ -127,6 +127,20 @@ for either rule is rejected. Profiles cannot change them either.
 For `type/spaced-hyphen` and `type/straight-quotes`, `excludeTags` is a list of HTML tag names such
 as `samp` or `span`. It is not a CSS selector list. Values are lower-cased, deduplicated and sorted
 before use and fingerprinting. The older misleading name `excludeSelectors` is not accepted.
+
+The optional table checks are `layout/table-header-not-repeated` (enablement only) and
+`layout/table-column-drift` (`maxColumnDriftPx`, default 2 CSS px). The latter accepts a finite
+non-negative number as a chosen warning tolerance. It does not relax the source-membership or
+geometry requirements. For example:
+
+```json
+{
+  "rules": {
+    "layout/table-header-not-repeated": true,
+    "layout/table-column-drift": { "maxColumnDriftPx": 2 }
+  }
+}
+```
 
 ## What the JSON report proves
 
@@ -148,7 +162,7 @@ The fingerprint is computed over canonicalised effective semantics with the doma
 report format, observed runtime counters and absolute machine paths. Reordering object keys or
 set-like values therefore does not change it; changing an effective option does.
 
-Report schema and snapshot schema evolve independently. The document report remains schema 5 (readers accept 4 and 5); the emitted measurement snapshot is schema 6, and Configuration Contract remains v1. Snapshot 6 adds the optional figure inventory. Legacy Snapshot 5 remains readable with its existing required block/line fields, but an absent inventory explicitly declines enabled figure checks. Unknown snapshot stamps and malformed required legacy fields remain refused. The demo migration preserves its unknown figure inventory rather than inventing complete source facts.
+Report schema and snapshot schema evolve independently. The document report remains schema 5 (readers accept 4 and 5); the candidate emits Snapshot 7, and Configuration Contract remains v1. Snapshot 7 adds the optional table inventory with source rows/cells and actual printed fragments, including unsupported-flow witnesses. Readers accept Snapshot 5, 6 and 7 with their required block/line fields. Missing figure or table inventories explicitly decline the corresponding enabled checks. The optional legacy named-anchor inventory supplements authored IDs; an older inventory without it cannot prove that a target absent from IDs is missing. Unknown stamps and malformed present data remain refused. A hand-written snapshot must not invent a complete source inventory.
 
 `figure/caption-separated` and `figure/dangling-reference` are warning checks, off in the default profile. Strict mode and explicit enablement run them. Their allowance options `maxPageDistance` and `maxMissingTargets` default to 0 and accept only safe integers from 0 through 9007199254740991. These are heuristic allowances, not configurable proof-source error thresholds. Effective values and their config/profile/CLI origins remain in the canonical configuration.
 

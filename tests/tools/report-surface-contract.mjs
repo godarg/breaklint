@@ -276,7 +276,7 @@ function assertDelegation(round, label) {
   assert.match(delegation.date ?? "", /^\d{4}-\d{2}-\d{2}$/u, `${label}: delegation date missing`);
   assertUtcOrDate(delegation.date, `${label}: delegation date invalid`);
   assert.ok(typeof delegation.sessionQuote === "string" && delegation.sessionQuote.trim().length > 0, `${label}: delegation session quote missing`);
-  assert.equal(delegation.release, "0.9.0", `${label}: delegation must be for release 0.9.0`);
+  assert.match(delegation.release ?? "", /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u, `${label}: delegation must name a concrete stable release version`);
   assert.equal(delegation.revoked, false, `${label}: delegation is revoked or not explicitly active`);
   assert.equal(round.record, "current", `${label}: a delegated review must be a current record`);
   if (round.reviewedAt !== null) {
@@ -647,13 +647,23 @@ function assertDelegatedImageBinding(latest, manifest) {
   }
 }
 
+/** Historical delegations retain their scope; a latest delegated pass names this bound package. */
+export function assertCurrentDelegationRelease(latest, reviewInputRoot = DEFAULT_REVIEW_INPUT_ROOT) {
+  if (!latest.reviewers.some((reviewer) => reviewer.kind === "delegated-ai")) return;
+  const candidate = JSON.parse(readFileSync(join(reviewInputRoot, "package.json"), "utf8"));
+  assert.ok(typeof candidate.version === "string" && candidate.version.length > 0, "bound package version missing");
+  assert.equal(latest.delegation?.release, candidate.version,
+    `delegation release ${latest.delegation?.release ?? "missing"} does not match bound package version ${candidate.version}`);
+}
+
 /** Strict sight gate; delegatedAI is distinct from a human pass and never authenticates identity. */
-export function assessSightGate(ledger, manifest, currentFingerprint) {
+export function assessSightGate(ledger, manifest, currentFingerprint, reviewInputRoot = DEFAULT_REVIEW_INPUT_ROOT) {
   validateReviewLedger(ledger, { cellCount: manifest.artifacts.length });
   const latest = ledger.rounds.at(-1);
   assert.equal(latest.outcome, "pass", describeLatestRound(ledger, manifest, currentFingerprint));
   assert.equal(latest.binding.reviewInputFingerprint, currentFingerprint, "sight review ledger is bound to a different source/input revision");
   assertEnvironmentAndArtifactBinding(latest, manifest);
+  assertCurrentDelegationRelease(latest, reviewInputRoot);
   assertDelegatedImageBinding(latest, manifest);
   return { latest, reviewKind: summarizeLatestRound(ledger).humanPass ? "human" : "delegatedAI" };
 }

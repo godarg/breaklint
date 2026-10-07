@@ -18,7 +18,8 @@ function clone(report: Report): Report {
 
 // This presentation fixture keeps its original 13-rule baseline. New figure checks require
 // authored inventory; the source-less handwritten demo cannot fabricate that coverage.
-const SURFACE_BASELINE_RULES = ALL_RULES.filter(rule => !rule.id.startsWith("figure/"));
+const SURFACE_BASELINE_RULES = ALL_RULES.filter(rule => !rule.id.startsWith("figure/")
+  && !["layout/table-header-not-repeated", "layout/table-column-drift"].includes(rule.id));
 function findingsBase(): Report {
   const parsed = JSON.parse(readFileSync(new URL("../../examples/demo-snapshot.json", import.meta.url), "utf8")) as {
     snapshot: Snapshot;

@@ -1,4 +1,28 @@
-import type { Finding, NotMeasured, Report } from "../core/types.ts";
+import type { Finding, NotMeasured, Report, RuleCoverage } from "../core/types.ts";
+import { IS } from "../core/enums.ts";
+
+/** Coverage counts are rule evaluations, not a census of unique document objects. */
+export function coverageAccounting(rows: readonly RuleCoverage[]) {
+  const counts = { candidates: 0, measured: 0, applicableUnmeasured: 0, notApplicable: 0, toolUnavailable: 0 };
+  for (const row of rows) {
+    counts.candidates += row.candidates;
+    counts.measured += row.measured;
+    for (const decline of row.notMeasured) {
+      if (IS.nonApplicableEnvId.has(decline.reason)) counts.notApplicable += decline.count;
+      else if (IS.toolCapabilityEnvId.has(decline.reason)) counts.toolUnavailable += decline.count;
+      else counts.applicableUnmeasured += decline.count;
+    }
+  }
+  return counts;
+}
+
+export function coverageAccountingText(counts: ReturnType<typeof coverageAccounting>): string {
+  return `${counts.measured} of ${counts.candidates} applicable rule-candidate evaluations measured; ` +
+    `${counts.applicableUnmeasured} applicable evaluations not measured; ` +
+    `outside coverage base: ${counts.notApplicable} not applicable, ${counts.toolUnavailable} unavailable tool capability`;
+}
+
+export const COVERAGE_COUNT_NOTICE = "Counts are rule-candidate evaluations, not unique document objects. Document-level diagnostics are listed separately.";
 
 export interface DeclineReason {
   document: string;
@@ -98,8 +122,8 @@ export function projectDecisions(report: Report): ReportDecisions {
   for (const shortfall of shortfalls) {
     nextChecks.push({
       kind: "coverage", title: `Inspect coverage for ${shortfall.ruleId}`,
-      detail: `${shortfall.document}: ${shortfall.coverage.measured}/${shortfall.coverage.candidates} candidates measured; ` +
-        `${shortfall.coverage.notMeasuredCount} not measured; floor ${shortfall.coverage.floor}.`,
+      detail: `${shortfall.document}: ${coverageAccountingText(coverageAccounting([shortfall.coverage]))}; ` +
+        `required floor ${shortfall.coverage.floor * 100}%.`,
       findingIndex: null,
     });
   }

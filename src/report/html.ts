@@ -207,9 +207,9 @@ type HtmlCoverageRow = ReturnType<typeof buildHtmlReportModel>["coverage"][numbe
 
 const COVERAGE_COLUMNS = `<tr>
     <th scope="col" class="rule">Rule</th>
-    <th scope="col" class="num">Candidates</th>
+    <th scope="col" class="num">Applicable</th>
     <th scope="col" class="num">Measured</th>
-    <th scope="col" class="num">Not measured</th>
+    <th scope="col" class="num">Unmeasured</th>
     <th scope="col" class="num">Coverage</th>
     <th scope="col" class="num">Floor</th>
     <th scope="col" class="result">Result</th>
@@ -266,7 +266,7 @@ ${model.coverage.map((document) => document.rows.length === 0
   return `<section class="coverage-section" aria-labelledby="coverage-heading">
 <div class="section-heading">
   <h2 id="coverage-heading">Coverage details</h2>
-  <p class="section-lead">Coverage is reported for every rule and document, including zero-candidate rules.</p>
+  <p class="section-lead">Coverage is reported for every rule with a recorded row, including zero-candidate rules. Each row counts applicable rule-candidate evaluations. Unmeasured counts stay within that coverage base. Not-applicable and unavailable-tool-capability declines are outside the base and remain in Declined candidates. These are evaluations, not unique document objects.</p>
 </div>
 ${documents}
 </section>`;

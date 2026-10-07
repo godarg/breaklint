@@ -473,17 +473,46 @@ export function missingSnapshotFields(snapshot: Snapshot): string[] {
     const box = (value: unknown): boolean => record(value) && ["x", "y", "width", "height"].every(key => typeof value[key] === "number" && Number.isFinite(value[key])) && Number(value.width) >= 0 && Number(value.height) >= 0;
     if (!record(index) || typeof index.complete !== "boolean" || !record(index.ids)
       || !Object.values(index.ids).every(count => Number.isSafeInteger(count) && count > 0)
+      || (index.namedAnchors !== undefined && (!record(index.namedAnchors)
+        || !Object.values(index.namedAnchors).every(count => Number.isSafeInteger(count) && count > 0)))
       || !Array.isArray(index.figures) || !Array.isArray(index.referenceBlocks)) missing.add("FigureIndex.inventory");
     else {
       for (const figure of index.figures) {
         if (!record(figure) || !sid(figure.sid) || !Array.isArray(figure.captionSids) || !figure.captionSids.every(sid)
-          || (figure.body !== null && (!record(figure.body) || !["img", "svg"].includes(String(figure.body.tag)) || !sid(figure.body.identity)))
+          || (figure.captionPosition !== undefined && ![null, "before", "after"].includes(figure.captionPosition))
+          || (figure.body !== null && (!record(figure.body) || !["img", "svg", "table"].includes(String(figure.body.tag)) || !sid(figure.body.identity)
+            || (figure.body.tag === "table" && !sid(figure.body.tableSid))))
           || !Array.isArray(figure.bodyFragments)) { missing.add("FigureIndex.figure"); continue; }
         for (const body of figure.bodyFragments) if (!record(body) || !Number.isSafeInteger(body.page) || Number(body.page) < 1
           || !snapshot.pages.some(page => page.pageNumber === body.page) || !box(body.box) || typeof body.visible !== "boolean" || !sid(body.identity)) missing.add("FigureIndex.bodyFragment");
       }
       for (const group of index.referenceBlocks) if (!record(group) || !sid(group.sid) || !Array.isArray(group.references)
         || !group.references.every(ref => record(ref) && typeof ref.href === "string" && ref.href.startsWith("#") && (ref.targetId === null || sid(ref.targetId)))) missing.add("FigureIndex.referenceBlock");
+    }
+  }
+  if (snapshot.tableIndex !== undefined) {
+    const index = snapshot.tableIndex;
+    const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
+    const address = (value: unknown): boolean => value === null || (typeof value === "string" && value.length > 0);
+    const box = (value: unknown): boolean => record(value) && ["x", "y", "width", "height"].every(key =>
+      typeof value[key] === "number" && Number.isFinite(value[key])) && Number(value.width) >= 0 && Number(value.height) >= 0;
+    const cell = (value: unknown): boolean => record(value) && address(value.sid) && ["th", "td"].includes(String(value.tag))
+      && typeof value.text === "string" && Number.isSafeInteger(value.colSpan) && Number(value.colSpan) >= 1
+      && Number.isSafeInteger(value.rowSpan) && Number(value.rowSpan) >= 1;
+    const row = (value: unknown, rendered: boolean): boolean => record(value) && address(value.sid) && Array.isArray(value.cells)
+      && value.cells.every(value => cell(value) && (!rendered || (record(value) && box(value.box) && typeof value.visible === "boolean")));
+    if (!record(index) || typeof index.complete !== "boolean" || !Array.isArray(index.tables)) missing.add("TableIndex.inventory");
+    else for (const table of index.tables) {
+      if (!record(table) || typeof table.sid !== "string" || !table.sid || !Array.isArray(table.headerRowSids)
+        || !table.headerRowSids.every(sid => typeof sid === "string" && sid.length > 0)
+        || !Array.isArray(table.rows) || !table.rows.every(value => row(value, false)) || !Array.isArray(table.fragments)) {
+        missing.add("TableIndex.table"); continue;
+      }
+      for (const fragment of table.fragments) if (!record(fragment) || !Number.isSafeInteger(fragment.page)
+        || !snapshot.pages.some(page => page.pageNumber === fragment.page) || !box(fragment.box)
+        || ![null, "env/multicolumn", "env/vertical-writing"].includes(fragment.flowReason)
+        || typeof fragment.visible !== "boolean" || !Array.isArray(fragment.rows) || !fragment.rows.every(value => row(value, true)))
+        missing.add("TableIndex.fragment");
     }
   }
   return [...missing].sort();

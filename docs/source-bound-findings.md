@@ -9,7 +9,7 @@ are deliberately not exported. Document renderer peers remain optional for scree
 | Contract | Version | Boundary |
 |---|---:|---|
 | Document report | 5 | Findings, positive/declined evaluations, artifact/source/evidence identity; readers accept 4 and 5 |
-| Measured snapshot | 6 | Adds authored figure/caption relations, separately measured image bodies and local figure-link groups. Legacy Snapshot 5 remains readable for existing rules; absent inventory declines enabled figure rules. |
+| Measured snapshot | 7 | Adds source-bound table rows/cells, printed fragments and flow witnesses. Readers accept Snapshot 5, 6 and 7; missing inventories decline the enabled checks. Figure inventories can include legacy named anchors and authored caption order for cell-bound table bodies. |
 | Configuration | 1 | Existing generated `breaklint/config.schema.json` |
 | Producer record | `studio-producer-record-v1` | Host-launched producer, FD 3, captured bytes |
 | Declared source manifest | 1 | Matching-byte declaration; never producer authority |
@@ -92,7 +92,7 @@ public package through a fixed Node bridge:
 python3 _tools/breaklint_layout_report.py <product-directory> \
   --breaklint <consumer>/node_modules/breaklint \
   --out-dir <private-report-directory> \
-  --output-path build/13-what-a-red-light-is-worth.html
+  --output-path build/chapter.html
 ```
 
 Repeated `--output-path` selects existing multi-file inputs. Expected outputs are checked; this is
@@ -155,6 +155,10 @@ unmatchable and not-sufficiently-measured. Resolution needs the same provable lo
 positive compatible measurement of all parts, not merely no new finding. Actual Git ancestry is
 checked for different commits; matching opaque revision labels are insufficient. See
 [revision comparison](revision-comparison.md) for the closed identity and embedded-font boundary.
+
+The comparison API still requires compatible checker versions and measurement contracts.
+A separately bound 0.9.0/0.10.0 experiment on identical input bytes can show changed behavior;
+it is not an API-compatible proof that a source repair resolved a target.
 
 System/fallback font identity cannot currently prove a repair. Public-corpus renderer failures remain
 explicit infrastructure/nonmeasurement, and rules remain uncalibrated. Additional chapters of the

@@ -446,6 +446,11 @@ A delegated AI record carries the release-specific Founder delegation, actual mo
 from the native runner output, prompt/output hashes, a native receipt with image count, and
 the exact path and SHA-256 of every assigned full-page PNG, tile and printed-page raster.
 The strict gate checks the complete received-image inventory and never calls this a human pass.
+Its latest delegated round must also name the package version in the bound review-input root;
+valid historical release-specific delegations stay on record and cannot approve changed inputs.
+Preparing a render, an image inventory or a pending round is not a review. Append a new round
+only with the actual outcome, native model and image-read receipts after the reviewer has
+inspected the frozen artifacts. A pending template contains no passing cells or invented model.
 See `docs/releasing.md` for the closed receipt fields and the trust limits of this record. The line the
 verifier prints and appends to the GitHub job summary ("Report-surface review ledger") names every
 reviewer of the latest round with its kind and counts the cells a rostered human passed; it says

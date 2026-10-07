@@ -90,7 +90,7 @@ describe("page-fill rules", () => {
     assert.equal(
       tail.findings[0]!.message,
       "Page 4 carries only content continued from an earlier page, which ends there, and its net fill " +
-        "is 6.0 %; threshold 50 %. The break into it was an overflow, not a request.",
+        "is 6.0 %; threshold 50 %. Paginator opening: overflow (break-token). The avoidable cause and author intent are unknown.",
     );
     assert.equal(measurementsOf(tail.evaluations, "pg4").violated, true);
   });
@@ -441,17 +441,17 @@ describe("page-fill rules", () => {
     const report = run(corpusSnapshot("half-empty-trigger"), halfEmptyPage);
     assert.equal(report.findings.length, 1);
     const message = report.findings[0]!.message;
-    assert.equal(
-      message,
-      "Page 1 is 5.0 % filled; threshold 60 %. Experimental: net fill sums the glyph boxes of text, " +
-        "not its line boxes, so a page a reader calls full can read below this threshold.",
-    );
+    assert.match(message, /^Page 1 has 5\.0 % glyph\/visual-band coverage; threshold 60 %/u);
+    // Independent geometry: 606 px content height * (1 - .2) = 484.8 px.
+    assert.match(message, /Bottom space: 484\.80 CSS px/u);
+    assert.match(message, /glyph\/visual-band coverage is not line-box occupancy/u);
     assert.doesNotMatch(message, /ceiling|0\.086|0\.686/u);
-    // The same sentence on the last page, after the likely-intended note.
+    // A late start remains reviewable on the last page; do not invent an intent label.
     const lastPage = corpusSnapshot("half-empty-trigger-foot-line");
     lastPage.pages[0]!.isLast = true;
     const lastMessage = run(lastPage, halfEmptyPage).findings[0]!.message;
-    assert.match(lastMessage, /^Page 1 is 4\.9 % filled; threshold 60 %\. This is the last page and carries no continuation — likely intended\. Experimental: net fill sums the glyph boxes/u);
+    assert.match(lastMessage, /^Page 1 starts 94\.0 % down/u);
+    assert.match(lastMessage, /author intent are unknown/u);
     assert.doesNotMatch(lastMessage, /ceiling|0\.086|0\.686/u);
   });
 

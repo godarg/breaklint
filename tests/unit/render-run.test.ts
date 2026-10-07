@@ -37,7 +37,7 @@ import {
   type RenderDependencies,
   BROWSER_CLOSE_TIMEOUT_MS,
 } from "../../src/acquire/render-run.ts";
-import { captureProcessTreeOwnership, ownServerLifecycle, terminateProcessTree, type PageLike } from "../../src/acquire/browser.ts";
+import { captureProcessTreeOwnership, ownServerLifecycle, terminateProcessTree, type PageLike, type CdpSessionLike } from "../../src/acquire/browser.ts";
 import type { EvidenceOutcome } from "../../src/render/evidence.ts";
 import { writeEvidencePng, type Rasterizer } from "../../src/render/rasterizer.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
@@ -55,6 +55,11 @@ const OPTIONS = {
   network: { mode: "offline" as const, allowed: [] },
   locale: "de-DE",
 };
+
+/** Explicit supported CDP boundary for mocks whose intended failure happens after network setup. */
+const emptyNetworkSession = async (): Promise<CdpSessionLike> => ({
+  on() {}, async send<R>() { return {} as R; }, async detach() {},
+});
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -264,7 +269,7 @@ describe("the live path fails closed at its process boundary", () => {
     const page = {
       async goto() {}, async setContent() {}, async waitForFunction() {}, async emulateMediaType() {},
       async setViewport() {}, async pdf() { return new Uint8Array(); }, on() {},
-      async evaluateOnNewDocument() {}, async setRequestInterception() {},
+      async evaluateOnNewDocument() {}, async setRequestInterception() {}, createCDPSession: emptyNetworkSession,
       async evaluate(source: string) {
         if (source.includes("domNodes:")) return { pages: 0, domNodes: MAX_DOM_NODES + 1 };
         if (source.includes("lockPagination(")) apparatusCalls += 1;
@@ -690,7 +695,7 @@ describe("the live path fails closed at its process boundary", () => {
       async pdf() { return new Uint8Array(); },
       on() {},
       async evaluateOnNewDocument() {},
-      async setRequestInterception() {},
+      async setRequestInterception() {}, createCDPSession: emptyNetworkSession,
       async close() {},
     };
     const result = await renderDocuments(["README.md", "README.md"], { ...OPTIONS, documentTimeoutMs: 25 }, {
@@ -719,6 +724,34 @@ describe("the live path fails closed at its process boundary", () => {
     ));
     assert.throws(() => process.kill(pid, 0), /ESRCH/u);
     assert.equal(existsSync(profile), false);
+  });
+
+  it("joins and detaches a network session whose enable resolves after document timeout", async () => {
+    let networkDetached = 0, pagesClosed = 0, contextsClosed = 0;
+    const page: PageLike = {
+      async goto() { throw new Error("aborted network setup must not navigate"); },
+      async setContent() {}, async evaluate() { throw new Error("not reached"); },
+      async waitForFunction() {}, async emulateMediaType() {}, async setViewport() {},
+      async pdf() { return new Uint8Array(); }, on() {}, async evaluateOnNewDocument() {},
+      async setRequestInterception() {}, async close() { pagesClosed += 1; },
+      async createCDPSession() { return { on() {}, async send<R>(method: string) {
+        if (method === "Network.enable") await wait(45);
+        return {} as R;
+      }, async detach() { networkDetached += 1; } }; },
+    };
+    const result = await renderDocuments(["README.md"], OPTIONS, {
+      documentTimeoutMs: 20,
+      async launchBrowser() { return { executablePath: "/fake", detail: "", browser: {
+        async newPage() { throw new Error("default context forbidden"); },
+        async createBrowserContext() { return { async newPage() { return page; }, async close() { contextsClosed += 1; } }; },
+        async version() { return "Fake/1"; }, async close() {},
+      } }; },
+      async openRasterizer() { return { rasterizer: null, detail: "unit" }; },
+    });
+    assert.equal(networkDetached, 1, "late Network.enable escaped owned session cleanup");
+    assert.equal(pagesClosed, 1); assert.equal(contextsClosed, 1);
+    assert.equal(result.documents[0]!.snapshot, null);
+    assert.ok(result.documents[0]!.infrastructure.some(event => event.measured?.stage === "document-timeout"));
   });
 
   it("joins and closes a context that resolves only after the timeout abort", async () => {
@@ -878,7 +911,7 @@ describe("the live path fails closed at its process boundary", () => {
       async pdf() { return new Uint8Array(); },
       on() {},
       async evaluateOnNewDocument() {},
-      async setRequestInterception() {},
+      async setRequestInterception() {}, createCDPSession: emptyNetworkSession,
       async close() {},
     };
     const dependencies: RenderDependencies = {
@@ -939,7 +972,7 @@ describe("the live path fails closed at its process boundary", () => {
         throw new Error("measurement boundary failed after page ownership was established");
       }, async waitForFunction() {},
       async emulateMediaType() {}, async setViewport() {}, async pdf() { return new Uint8Array(); },
-      on() {}, async evaluateOnNewDocument() {}, async setRequestInterception() {},
+      on() {}, async evaluateOnNewDocument() {}, async setRequestInterception() {}, createCDPSession: emptyNetworkSession,
       async close() { throw new Error("page close rejected"); },
     } as unknown as PageLike;
     try {

@@ -129,6 +129,7 @@ function snapshot(parts: {
   svg?: SvgRecord[];
   uriRefs?: Snapshot["uriRefs"];
   figureIndex?: Snapshot["figureIndex"];
+  tableIndex?: Snapshot["tableIndex"];
 }): Snapshot {
   return {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
@@ -157,6 +158,7 @@ function snapshot(parts: {
       },
     },
     ...(parts.figureIndex === undefined ? {} : { figureIndex: parts.figureIndex }),
+    ...(parts.tableIndex === undefined ? {} : { tableIndex: parts.tableIndex }),
     pages: parts.pages ?? [page(1)],
     blocks: parts.blocks ?? [],
     textLines: parts.textLines ?? [],
@@ -1027,6 +1029,24 @@ export function loadCorpus(): CorpusEntry[] {
         ],
       }),
     },
+    // Independent cell/row oracle: two source rows, fixed tracks, optional repeated head.
+    ...["layout/table-header-not-repeated", "layout/table-column-drift"].flatMap(id =>
+      [true, false].map((trigger): CorpusEntry => {
+        const header = { sid: "t-head", cells: ["Name", "Value"].map((text, i) => ({ sid: `h${i}`, tag: "th", text, colSpan: 1, rowSpan: 1 })) };
+        const data = { sid: "t-data", cells: ["Alpha", "1"].map((text, i) => ({ sid: `d${i}`, tag: "td", text, colSpan: 1, rowSpan: 1 })) };
+        const render = (row: typeof header, shift = 0) => ({ ...row, cells: row.cells.map((cell, i) => ({ ...cell, visible: true,
+          box: box(48 + i * 180 + (i ? shift : 0), 48, 180 - (i ? shift : 0), 24) })) });
+        const repeated = id === "layout/table-column-drift" || !trigger;
+        return { name: `${id.split("/")[1]}-${trigger ? "trigger" : "clean"}`, about: id, kind: trigger ? "trigger" : "clean",
+          complication: "Cell edges and source membership are authored here, independently of the continuation predicates.",
+          snapshot: snapshot({ pages: [page(1), page(2)], blocks: [block("table", { tag: "table", page: 1, fragmentCount: 2 }), block("table-next", { tag: "table", sid: "s-table", page: 2, fragmentIndex: 1, fragmentCount: 2 })],
+            tableIndex: { complete: true, tables: [{ sid: "s-table", headerRowSids: ["t-head"], rows: [header, data], fragments: [
+              { page: 1, flowReason: null, visible: true, box: box(48, 48, 360, 24), rows: [render(header)] },
+              { page: 2, flowReason: null, visible: true, box: box(48, 48, 360, 48), rows: [...(repeated ? [render(header)] : []), render(data, trigger && id.endsWith("drift") ? 32 : 0)] },
+            ] }] },
+          }),
+        };
+      })),
     // Independent hand-written source/placement controls for the conservative figure rules.
     ...[true, false].map((separated): CorpusEntry => ({
       name: separated ? "caption-separated-trigger" : "caption-together-clean", kind: separated ? "trigger" : "clean", about: "figure/caption-separated",
@@ -1041,7 +1061,7 @@ export function loadCorpus(): CorpusEntry[] {
       name: missing ? "figure-reference-trigger" : "figure-reference-clean", kind: missing ? "trigger" : "clean", about: "figure/dangling-reference",
       complication: "Reference identity is the containing source block; inline target IDs come from the complete authored inventory.",
       snapshot: snapshot({ blocks: [block("reference", { authorId: "reference" })],
-        figureIndex: { complete: true, ids: missing ? {} : { plot: 1 }, figures: [], referenceBlocks: [{ sid: "s-reference", references: [{ href: "#plot", targetId: "plot" }] }] },
+        figureIndex: { complete: true, ids: missing ? {} : { plot: 1 }, namedAnchors: {}, figures: [], referenceBlocks: [{ sid: "s-reference", references: [{ href: "#plot", targetId: "plot" }] }] },
       }),
     })),
   ];

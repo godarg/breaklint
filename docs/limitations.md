@@ -20,7 +20,8 @@ claiming that the default is adequate for that document size on a particular mac
 
 ## Why exactly two rules may fail a build
 
-Eleven of the thirteen released rules compare a chosen threshold against a real measurement. A
+Fifteen of the seventeen candidate rules are warnings; their observations require a reader judgment
+or a chosen tolerance rather than an error-level proof. A
 chosen number can be wrong for your document without anything being wrong with the
 measurement, so those rules do not gate by default. Two rules compare a directly measured quantity
 against a boundary that is not chosen at all — and only those two gate.
@@ -62,7 +63,7 @@ rule that satisfies none of the three is at most a warning, however confident it
 
 This distinction matters because the word "uncalibrated" is doing two jobs elsewhere in this
 project. It means: no corpus of human-labelled documents backs this number. That is true of all
-thirteen released thresholds, including the two error rules — and it does not disqualify them, because their
+seventeen registered candidate rules, including the two error rules — and it does not disqualify them, because their
 numbers are not up for calibration in the first place. A block taller than the page fits on no
 page; the threshold is the page. What calibration would decide is *where to draw a chosen line*,
 and A, B and C are exactly the cases where no line was chosen.
@@ -89,8 +90,10 @@ snapshot fixtures moved to schema 3 in 0.2.3, when `inkCollected` was added, and
 
 ### What coverage is a ratio OF, and the two things it is not
 
-Coverage answers a question about the DOCUMENT: of the targets this rule ought to have judged,
-how many did it judge? Two kinds of decline are therefore not in the denominator, and both are
+Coverage answers a per-rule question about the DOCUMENT: of the candidates this rule ought to
+have judged, how many did it judge? Cross-rule totals sum rule-candidate evaluations, not unique
+objects or independent defects. A table evaluated by two rules contributes to both. Applicable
+unmeasured evaluations are displayed separately from not-applicable and unavailable-tool counts. Two kinds of decline are therefore not in the denominator, and both are
 enumerated in `src/core/enums.ts` rather than inferred from how a reason is spelt.
 
 **A capability represented only in research code** (`TOOL_CAPABILITY_ENV_IDS`). The SVG ink passes
@@ -136,7 +139,7 @@ exception to cover the second kind turns a test red.
 **Two research rules are not product rules in this build.** `svg/text-clipped` and
 `svg/text-ink-collision` need isolated, stable SVG pixel passes, which remain M3 work. Their modules,
 fixtures and renderer lab are retained so the work is not erased, but they are absent from
-`ALL_RULES`, configuration, SARIF and the demo. The released rule count is thirteen.
+`ALL_RULES`, configuration, SARIF and the demo. The candidate registers seventeen rules; these two research modules are not among them.
 `svg/text-overflows-viewport` needs only geometry and does measure.
 
 **Complex SVG paint is detected but not geometrically solved in this build.** `querySelectorAll`
@@ -185,10 +188,12 @@ SVG whose own or ancestor CSS transform geometry is nontrivial (`transform`, the
 `env/svg-viewport-geometry-unsupported`. Ordinary axis-aligned SVG roots remain measured. A later
 content-quad implementation needs its own transform-aware live proof.
 
-**Every threshold is uncalibrated.** There is no corpus of real documents with human-checked truth
-behind any of the thirteen released numbers. The fixtures show that each rule does what it says; they do not
+**Every threshold is uncalibrated.** A [human evaluation of ten selected real pages](evaluation-0.10.md)
+now supplies bounded labels and feedback. It does not establish a representative truth corpus
+behind the seventeen candidate rules. The fixtures show that each rule does what it says; they do not
 show that what it says is the right thing to say about your document. That is the difference between
-a verified implementation and a validated one, and only the first is claimed. `calibrated: false`
+bounded implementation/renderer validation and accuracy across independent real documents;
+only the named bounded checks and selected human examples are claimed. `calibrated: false`
 travels in the type, in every finding and on every rule page for that reason.
 
 **A document whose paginator could not place its content is not measured at all.** Paged.js
@@ -298,10 +303,12 @@ The longer, measurement-by-measurement account of what has been established and 
 
 ## The break cause of a page boundary
 
-A `forced` boundary is a decision the author made, so `layout/widow` declines the fragment that
-opens the page after it, `layout/orphan` the fragment that closes the page before it and
-`layout/orphaned-continuation-page` the page after it (`env/forced-break`, counted against
-coverage), and `layout/half-empty-page` does not call a last page it opened "likely intended".
+A `forced` boundary records a decision made by Paged.js; its rationale and author intent are
+unknown without verified source/design evidence. `layout/widow` declines the fragment opening
+after it, `layout/orphan` the fragment closing before it and `layout/orphaned-continuation-page`
+the page after it (`env/forced-break`, counted against coverage). Experimental half-empty-page
+also declines an outgoing forced low-coverage case when it has no late start. A natural document
+ending is measured without a low-coverage warning. Neither outcome labels author intent.
 
 **The cause is the decision Paged.js' `shouldBreak()` took, evaluated again at the break token.**
 When a page is laid out, Paged.js 0.4.3 hands the collector a break token naming the node of its
@@ -480,7 +487,7 @@ reports it:
 - **Margin-box content.** A widow, an oversized block or an unfilled band inside a running header or
   footer is not judged. Generated margin content (`@top-center { content: "…" }`) never was.
 - **A running element keeps exactly one record**: the in-flow original Paged.js leaves in the page
-  content with an inline `display: none`. Snapshot 6 records each block's computed `display` and how
+  content with an inline `display: none`. Snapshot 7 retains each block's computed `display` and how
   many margin-box copies of it Paged.js printed (`marginCopies`), so the block rules that could
   select the original — `layout/unbreakable-block-too-tall`, `layout/heading-at-page-bottom`,
   `type/excessive-word-spacing` — record it as `excluded` with the reason
@@ -638,7 +645,7 @@ decline is what remains once that join can join fragments.
 **Naming an off-by-default rule in a config file turns it on, even with only options.** `rules` is
 read as "the caller has an opinion about this rule": `false` disables, anything else enables, and
 that includes an options object such as `{ "layout/half-empty-page": { "minNetFill": 0.4 } }`. For
-the twelve rules that are on anyway this is invisible; for the one that is not, it means tuning it
+the twelve rules that are on anyway this is invisible; for the five that are not, it means tuning one
 also activates it. That is the intended reading — configuring a rule you do not want is not a
 thing anyone does — but it is not obvious, so it is written down.
 
@@ -650,8 +657,12 @@ which the font and the leading set. Measured on full pages that are not the last
 (Chromium 141 on Linux, Paged.js 0.4.3, the machine's default serif and sans-serif; not re-measured
 on the current Chrome that CI runs): 0.58–0.72 at `line-height: 1.5`, 0.51–0.54 at 2, 0.34–0.36 at
 3 (12 pt on A5 and 11 pt on A4). Both page-fill rules read this quantity. `layout/half-empty-page`
-cannot separate a full page from a sparse one near its 0.60 threshold, and stays experimental and
-off by default. `layout/orphaned-continuation-page` judges only a page whose content ends on it:
+now also checks bottom space against twice the smallest positive line height recorded for a visible
+boxed block on the page. Low coverage with less room than those two line heights does not warn. Natural
+document-end low coverage is accepted, and outgoing forced low coverage without a late start
+declines. A late start can still warn; unavailable line height does not invent a measurement.
+These are bounded guards, not a new fill quantity or proof of avoidability. The rule stays
+experimental, default-off and non-gating. `layout/orphaned-continuation-page` judges only a page whose content ends on it:
 the next page does not open with its text running on, because a page whose text runs on and opens
 the next page stopped for want of room. On a page it does judge it still reads net fill, so at
 `line-height: 3` every such page falls below its 0.50 threshold however full it is and whatever
@@ -667,7 +678,7 @@ not in this release. None of these readings is a calibration.
 snapshot records a block's lines from every text node beneath it and carries no parent link, so a
 wrapper and the paragraph inside it hold the same line boxes. `layout/widow` and `layout/orphan`
 count a line as a block's own when the collector saw text on it whose nearest block container is
-that block (`TextLine.ownText`, Snapshot 6), and count only the run of the block's own lines next to
+that block (`TextLine.ownText`, retained in Snapshot 7), and count only the run of the block's own lines next to
 the break. The run ends at an in-flow nested block and passes over a float, a positioned box or an
 inline-level box beside the block's text, which the recorded `display`, `float` and `position` tell
 apart; and a run is judged only when the run on the other side of the break, in the block's
@@ -728,6 +739,37 @@ reported as measured with a largest factor of 0.
 
 ## Conservative figure checks
 
-The two figure checks are warnings and off by default. No calibration or complete figure model is claimed. Caption separation supports one authored image or inline SVG with positively visible geometry, one measured body page and one visible caption fragment. It never substitutes a figure wrapper for an image. Multiple/split/hidden/mismatched bodies, several captions, missing source addressing or unsupported flow decline explicitly. SVG body visibility requires a visible painted primitive; use-only/empty SVGs may be declined. A measured split does not establish the break cause, author intent, or that a keep remedy will fit.
+The two figure checks are warnings and off by default. No calibration or complete figure model is claimed. Caption separation supports one authored image or inline SVG with positively visible geometry,
+or one source-matched table with actual visible-cell unions, and one visible caption fragment.
+An image body requires one body page; a table may span pages and uses authored caption order
+to compare the first or last body page. Missing order or ambiguous table membership declines. It never substitutes a figure wrapper for an image. Multiple bodies, split image bodies, hidden/mismatched geometry, several captions, missing
+source addressing or unsupported flow decline explicitly. SVG body visibility requires a visible painted primitive; use-only/empty SVGs may be declined. A measured split does not establish the break cause, author intent, or that a keep remedy will fit.
 
-Dangling references check only fragment-only hrefs labelled Figure/Fig./Abbildung/Abb. plus a number. All authored IDs are inventoried, including inline IDs; duplicate IDs or malformed fragment encoding decline. One candidate/finding aggregates a containing source block. It does not prove printed numbering, exact link placement within that block, external-link validity or target visibility. Script-bearing/base-URI source cannot be treated as a complete authored inventory. Snapshot 6 adds the inventory; absent data in legacy Snapshot 5 remains a decline for enabled figure rules. Source and delivered-document claims retain the existing producer/evidence requirements.
+Dangling references check fragment-only hrefs labelled Figure/Fig./Abbildung/Abb. or
+Table/Tbl./Tabelle/Tab. plus a number. All authored IDs are inventoried, including inline IDs;
+legacy `<a name>` targets are used only when no ID has that name. Duplicate targets or malformed
+fragment encoding decline. A stored figure inventory lacking named anchors cannot prove that
+a target absent from IDs is missing; that block declines. One candidate/finding aggregates a
+containing source block. Printed numbering, exact inline link placement, external links and target
+visibility remain outside scope. Script-bearing/base-URI figure source still declines. Missing
+legacy inventories remain nonmeasurements. Source/delivery claims keep their existing requirements.
+
+SVG body identity uses a full normalized content hash. Only observed paginator/parser metadata,
+comments and non-text formatting nodes are normalized; meaningful SVG text whitespace and authored
+drawing/style/content fields remain bound. Authored ownership of the normalized paginator
+`data-ref` or `data-next-break-before` fields makes the source inventory unavailable rather
+than discarding potentially meaningful source semantics. Source/runtime mismatch declines, and a wrapper box
+cannot substitute for a painted body.
+
+## Bounded table continuation checks
+
+The two table checks are warnings, default-off and uncalibrated. They require a visible existing
+header, exact row/cell membership and order, unchanged content, unit spans and measured cells.
+Source-script presence alone does not prevent this bounded measurement, but an unknown runtime
+table, a missing source row or changed content does. Missing inventory, headerless tables, split
+data rows, spanning cells, multicolumn/vertical flow and unusable geometry decline. An authored
+`thead` or an initial contiguous all-`th` row run supplies the header; a data row never does.
+The header check observes lost column context. The drift check observes changed cell tracks
+relative to each fragment's origin, with a chosen 2 CSS px default tolerance. Neither proves
+author intent or a particular CSS cause. Repeated-header and column-width repair suggestions
+are untested; validate row preservation, wrapping and overflow after any change.

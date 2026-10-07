@@ -1245,7 +1245,7 @@ const latestRound = describeLatestRound(ledger, manifest, currentReviewInput.fin
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Report-surface review ledger\n\n${latestRound}.\n\n${REVIEWER_AUTHENTICATION_NOTE}\n\n`);
 }
-const sightReview = mode === "local" ? assessSightGate(ledger, manifest, currentReviewInput.fingerprint) : null;
+const sightReview = mode === "local" ? assessSightGate(ledger, manifest, currentReviewInput.fingerprint, reviewInputRoot) : null;
 
 if (mode === "technical") {
   process.stdout.write(

@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.10.0 — TBD-at-tag
+
+The candidate changes judgments on unchanged inputs and adds two optional checks. A bounded human
+example evaluation is recorded; frozen-candidate acceptance and publication are pending.
+
+- Add `layout/table-header-not-repeated` and `layout/table-column-drift`. Both require an
+  existing visible authored header, exact source row/cell membership and content, unit spans,
+  concrete cell geometry and supported horizontal single-column flow. Missing inventories,
+  spanning/split rows and unsupported flow decline; no header is invented. Both are warnings,
+  default-off and uncalibrated; suggested repairs are untested.
+- Emit Snapshot 7 with the table inventory and printed flow witnesses. Read Snapshot 5, 6 and 7;
+  absent legacy inventories decline enabled checks. Report 5 (readers accept Report 4 and 5),
+  context pack 2, comparison 1 and Configuration Contract 1 remain unchanged.
+- Recognize local Table/Tbl./Tabelle/Tab. links alongside figure conventions. Honor legacy
+  `<a name>` fragment anchors with authored IDs taking precedence. An older inventory lacking
+  named anchors cannot prove a missing target and declines the ambiguous block.
+- Extend caption separation to source-matched table bodies. Union actual visible cell boxes on
+  every body page and use authored caption order to compare its first or last boundary page.
+  Missing order, ambiguous membership and unsupported flow remain declines; improved
+  measurability is separate from finding a new defect.
+- Bind inline SVG figure bodies with a full normalized content hash, preserving meaningful SVG
+  text whitespace and authored drawing/style fields. Normalize only witnessed paginator/parser
+  metadata changes; never substitute a wrapper box for the body. Source-script figure inventory
+  remains unavailable. Table checks can still measure script-bearing source only when the full
+  source/runtime table inventory, row/cell membership and content match.
+- Guard experimental half-empty-page warnings with remaining space versus twice a recorded line height.
+  Accept low coverage at a natural document ending; decline low coverage at a forced paginator
+  ending when no late start is measured. Late starts remain advisory. Heading and continuation
+  messages name the paginator observation and leave cause and author intent unknown.
+- Separate applicable unmeasured evaluations from not-applicable and unavailable-capability
+  counts in console, HTML and Markdown. Totals count rule-candidate evaluations, not unique
+  objects; repeated rule IDs do not establish a shared cause. Canonical JSON remains unchanged.
+- Repair the CDP font-loading boundary while retaining acquisition, quiescence, declared-font
+  and geometry gates. A successfully acquired font is not proof that the later document gates pass.
+
+All 17 registered rules retain `calibrated: false`; 12 are enabled by default. A bounded human
+evaluation of ten selected real pages supplied six defect and four acceptable/intended labels.
+Header-only table context and reader-impact wording were refined; no threshold was fitted to
+these pages and no rule or profile became calibrated. See `docs/evaluation-0.10.md` for scope
+and limits.
+
 ## 0.9.0 — 2026-10-07
 
 Behavior on unchanged documents:

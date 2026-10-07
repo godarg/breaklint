@@ -1424,3 +1424,24 @@ all three lie outside the actual `REVIEW_INPUT_ROOTS` in `report-surface-contrac
 rendered review input, ledger, production code, rule default, schema, version or gate changes.
 No population precision/recall, exhaustive three-family hit review or blind product A/B pass
 is inferred from publication.
+
+## 2026-10-07 — 0.10 usefulness candidate and actual human evaluation
+
+The maintainer evaluated all ten bound real examples: six defects and four acceptable/intended
+pages. Missing continuation headers are confirmed; a header-only fragment should be kept with
+the first data row. Nearly identical column widths require modest impact wording. A correct
+caption remains separate from an independently defective table continuation. The answers are
+preserved privately with exact image, input and canonical report bindings; no human labels
+were inferred from model opinions or elapsed time.
+
+The candidate adds two optional table checks, concrete SVG/table caption measurement,
+legacy named anchors, contextual half-empty judgments and clearer coverage accounting.
+Snapshot 7 genuinely adds row/cell/fragment inventory; readers retain 5/6/7. Report 5 remains
+canonical. Twelve checks remain enabled by default; five remain optional, all uncalibrated.
+The final feedback-specific controls recorded two real reds and 24 passing focused leaves,
+including an ordinary negative control for a header already beside its first data row.
+
+The four frozen unchanged-input comparison runs retained 215 byte-identical page PNGs.
+This is a bounded behavior study through the actual published producer/engine boundary, not
+stock CLI equivalence, a blind holdout or population accuracy. Fresh final gates, current
+surface review, independent acceptance, publication and consumer updates remain pending.

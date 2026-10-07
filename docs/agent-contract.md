@@ -52,28 +52,42 @@ A warning never establishes an objective defect, and no threshold here has been 
 a corpus of real documents with human-checked truth. Never sacrifice document design or readability
 to satisfy one.
 
-What separates the two `error` rules from the eleven warnings is `measurement.proofSource`, not
+What separates the two `error` rules from the fifteen candidate warnings is `measurement.proofSource`, not
 calibration: their threshold is structural — zero occurrences, or the page box itself — rather than
 chosen. `svg/text-overflows-viewport` and `layout/unbreakable-block-too-tall` are the two, and they
 are the only rules that gate by default. See `docs/limitations.md` for what "uncalibrated" carries.
 
-### `layout/half-empty-page` saturates
-- **What it measures:** `netFill` merges the client rectangles of the page's text runs and of its
-  replaced elements (`img`, `svg`, `canvas`, `video`, `table`), clips them to the content box, and
-  divides the summed band height by the content box height (`src/measure/snapshot.ts`). Half-leading
-  falls between the bands and no element margin ever enters the rectangles, so the quantity is
-  systematically smaller than the fill a reader perceives. Full pages of prose at
-  `line-height: 1.5` read 0.58–0.72 with this collector, and less with more leading — against a
-  threshold of 0.60, so some full pages fall below it. There is no fixed ceiling to reason from.
-- **Consequence:** the rule fires on pages a reader would call full — measured on a 40-document
-  corpus built to exercise it, 37 of 40. It is `experimental`, never gates, and since 0.6.0 is not
-  active in the default profile, so a default run does not emit it at all. The name promises a
-  visual property; the measurement is a different quantity, and this paragraph is the only warning
-  you get.
-- **Agent Rule:** **never** inflate `font-size`, inject filler text, or stretch `line-height` to
-  resolve `layout/half-empty-page`. If a page is the natural end of a document or section, leave it
-  alone. You will only see this rule at all if the run asked for it (`profile: "strict"`,
-  `rules: { "layout/half-empty-page": true }`, or `--only`).
+### Whitespace findings need a cause check
+
+`netFill` is glyph/visual-band coverage, not line-box occupancy. Historical collector experiments
+found full prose pages below the 0.60 threshold; those readings are not current population accuracy.
+The candidate compares remaining bottom space with twice the smallest recorded positive line height.
+Low coverage at a natural document ending does not warn; low coverage at an outgoing forced ending
+without a late start declines. A late start can still warn. The rule is experimental, default-off
+and never gates.
+
+Read the paginator break kind and measurement before proposing a change. A forced break records
+Paged.js's decision; it does not prove author intent. Heading and isolated continuation warnings
+likewise leave cause/intent unknown. Acceptable chapter endings, title/part pages and deliberate
+spacing need human/source context. Do not inflate fonts, stretch leading or add filler to satisfy
+a fill ratio. Verify the following image, table or keep chain before trying a small change, then
+check both pages and downstream layout. Suggestions remain untested unless the report says otherwise.
+
+### Coverage and optional checks
+
+Coverage totals sum applicable rule-candidate evaluations, not unique objects. Not-applicable
+exclusions and unavailable tool capabilities are outside the denominator; applicable declines
+remain inside it. A shared rule ID does not prove a shared cause. JSON retains canonical counts.
+
+Strict enables all 17 registered checks. Default enables 12; half-empty-page, both figure and both
+table checks are off. Legacy snapshots lacking their source inventories explicitly decline.
+A missing target is not proved by an old ID inventory that lacks legacy named anchors. Table
+checks require exact source/runtime row/cell membership and content, visible existing headers,
+unit spans and supported flow; they do not invent headers or accept a wrapper as cell geometry.
+
+No actual human labels have yet been received for the candidate's planned example evaluation.
+Selected-example labels, rules adjusted from those labels, bounded validation and population
+calibration must be reported separately. `calibrated: false` remains the contract.
 
 ---
 

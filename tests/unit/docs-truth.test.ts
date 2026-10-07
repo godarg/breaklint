@@ -186,6 +186,28 @@ describe("schema stamps in the shipped documents", () => {
   });
 });
 
+it("reads complete arbitrary-length snapshot reader lists without accepting a prefix", () => {
+  // This independent grammar oracle deliberately uses four noncontiguous versions, not the
+  // package's current set or values produced by the reader under test.
+  const oracle = { ...stamps, snapshot: 8, readableSnapshots: [2, 4, 6, 8] };
+  const valid = [
+    "Readers accept Snapshot 2 and 4 and 6 and 8.",
+    "Readers accept Snapshot 2, 4, 6 and 8.",
+    "Readers accept Snapshot 2, 4, 6, and 8.",
+    "Snapshots 2 or 4 or 6 or 8 are readable.",
+  ];
+  for (const text of valid) assert.deepEqual(scanText("x.md", text, oracle), [], text);
+  const invalid = [
+    "Readers accept Snapshot 2, 4 and 8.",                  // omitted reader
+    "Readers accept Snapshot 2, 4, 6 and 8 and 9.",         // unsupported tail
+    "Readers accept Snapshot 2, 4, 6, 6 and 8.",            // duplicate
+    "Readers accept Snapshot 2 and 4 and 6.",               // supported prefix only
+  ];
+  for (const text of invalid) assert.equal(scanText("x.md", text, oracle).length, 1, text);
+  assert.equal(scanText("x.md", "Readers accept Snapshot 2, 4, 6 and 8; Snapshot 9 records geometry.", oracle).length, 1,
+    "a valid reader claim must not hide a separate stale current-state claim");
+});
+
 it("reads actual snapshot compatibility and refuses an unsupported readable stamp", () => {
   const actual = stamps as Stamps & { readableSnapshots?: number[] };
   assert.ok(Array.isArray(actual.readableSnapshots), "the child build did not report its snapshot readers");

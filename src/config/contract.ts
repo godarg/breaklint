@@ -76,7 +76,7 @@ export interface ProfileDefinition {
  * The threshold was NOT lowered instead. 0.60 is uncalibrated; replacing it with a second
  * uncalibrated number would move the noise rather than account for it.
  */
-export const OFF_BY_DEFAULT_RULE_IDS: ReadonlySet<string> = new Set(["layout/half-empty-page", "figure/caption-separated", "figure/dangling-reference"]);
+export const OFF_BY_DEFAULT_RULE_IDS: ReadonlySet<string> = new Set(["layout/half-empty-page", "figure/caption-separated", "figure/dangling-reference", "layout/table-header-not-repeated", "layout/table-column-drift"]);
 
 export const PROFILES: Readonly<Record<ProfileName, ProfileDefinition>> = Object.freeze({
   default: Object.freeze({
