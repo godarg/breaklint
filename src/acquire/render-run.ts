@@ -827,6 +827,7 @@ export async function configureNetwork(
   localOrigin: string,
   options: RenderOptions,
   blocked: { count: number },
+  omittedDeploymentRoutes: ReadonlySet<string> = new Set(),
 ): Promise<NetworkTracker> {
   const allowed = normalisedAllowedOrigins(options);
   const tracker: NetworkTracker = {
@@ -881,16 +882,23 @@ export async function configureNetwork(
       // A cancelled, unread body of an observed loopback deny response is not an unknown
       // transport failure. Chromium emits this for the fixture's Fetch of a denied sibling.
       // Keep the request pending until this terminal event and retain the server's403 record.
-      // Only ambient Fetch/XHR can take this path: fonts, images, styles/scripts/media,
-      // remote requests, missing responses and failed successful responses remain fatal.
-      let deniedAmbientCancellation = false;
+      // In standalone files the existing asset-closure policy also identifies omitted static,
+      // origin-relative deployment styles/scripts. Only those exact source-declared routes can
+      // share this path; relative/dynamic required resources and fonts retain their own vetoes.
+      // Remote requests, missing responses and failed successful responses remain fatal.
+      let knownDenyCancellation = false;
       if (failed && pending?.responseStatus === 403 && pending.responseUrl === pending.url &&
-          ["fetch", "xhr"].includes(pending.resourceType) && event.canceled === true &&
-          event.errorText === "net::ERR_ABORTED") {
-        try { deniedAmbientCancellation = new URL(pending.url).origin === localOrigin; }
+          event.canceled === true && event.errorText === "net::ERR_ABORTED") {
+        try {
+          const uri = new URL(pending.url);
+          const ambient = ["fetch", "xhr"].includes(pending.resourceType);
+          const omittedDeployment = ["stylesheet", "script"].includes(pending.resourceType) &&
+            omittedDeploymentRoutes.has(uri.pathname);
+          knownDenyCancellation = uri.origin === localOrigin && (ambient || omittedDeployment);
+        }
         catch { /* Malformed resource identity cannot establish the local-deny exception. */ }
       }
-      if (failed && !deniedAmbientCancellation) lifecycleError(`transport failed: ${typeof event.errorText === "string" ? event.errorText : "unknown failure"}`);
+      if (failed && !knownDenyCancellation) lifecycleError(`transport failed: ${typeof event.errorText === "string" ? event.errorText : "unknown failure"}`);
       activity();
     };
     session.on("Network.loadingFinished", payload => terminal(payload, false));
@@ -1634,6 +1642,7 @@ async function openContentPage(
   installCollector: boolean,
   signal: AbortSignal,
   observeNetwork?: (network: NetworkTracker) => void,
+  omittedDeploymentRoutes: ReadonlySet<string> = new Set(),
 ): Promise<OpenedContentPage> {
   if (!context.browser.createBrowserContext) {
     throw new Error("the browser driver exposes no isolated browser-context boundary");
@@ -1730,7 +1739,7 @@ async function openContentPage(
     await page.evaluateOnNewDocument(primitivesSource(apparatusCapability));
     await page.evaluateOnNewDocument(integritySourceWithCapability(expectedSids, apparatusCapability));
     network = await abortable(
-      trackOwnership(configureNetwork(ownedPage, origin, context.options, context.blocked), async lateNetwork => {
+      trackOwnership(configureNetwork(ownedPage, origin, context.options, context.blocked, omittedDeploymentRoutes), async lateNetwork => {
         await withTimeout(lateNetwork.close(), BROWSER_CLOSE_TIMEOUT_MS, "late network session.detach");
       }), signal, "configureNetwork",
     );
@@ -1969,7 +1978,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     let controlSignature: ControlSignature | null = null;
     if (context.options.sourceMapInjection) {
       served.select("control");
-      const controlOpened = await openContentPage(context, served.origin, served.documentRoute, [], false, signal, observeNetwork);
+      const controlOpened = await openContentPage(context, served.origin, served.documentRoute, [], false, signal, observeNetwork, externalDeploymentRequiredRoutes);
       try {
         await controlOpened.page.evaluate<void>(freezeSource(controlOpened.apparatusCapability));
         const controlStable = await awaitStableLayout({
@@ -2001,6 +2010,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       true,
       signal,
       observeNetwork,
+      externalDeploymentRequiredRoutes,
     );
     openedMain = opened;
     const page = opened.page;

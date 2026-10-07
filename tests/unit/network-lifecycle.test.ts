@@ -32,8 +32,8 @@ const request = (uri = url): RequestLike => ({ url: () => uri, continue: async (
 const start = (page: Page, id: string, uri = url, extra: Record<string, unknown> = {}) =>
   page.session.emit("Network.requestWillBeSent", { requestId: id, type: "Font", request: { url: uri }, ...extra });
 const finish = (page: Page, id: string) => page.session.emit("Network.loadingFinished", { requestId: id });
-const setup = async (page = new Page()) => ({ page, tracker: await configureNetwork(page as unknown as PageLike,
-  "http://127.0.0.1:1234", options, { count: 0 }) });
+const setup = async (page = new Page(), deploymentDeniedRoutes: ReadonlySet<string> = new Set()) => ({ page, tracker: await configureNetwork(page as unknown as PageLike,
+  "http://127.0.0.1:1234", options, { count: 0 }, deploymentDeniedRoutes) });
 const close = async (tracker: Awaited<ReturnType<typeof configureNetwork>>) => {
   // Added lifecycle cleanup is tested directly without hiding an absent production boundary.
   await (tracker as typeof tracker & { close: () => Promise<void> }).close();
@@ -88,17 +88,24 @@ describe("public CDP network lifecycle", () => {
       assert.equal(await awaitNetworkQuiet(tracker, 350), false);
     } finally { if ("close" in tracker) await close(tracker); }
   });
-  it("settles a cancelled local Fetch only after its observed loopback deny response", async () => {
-    const { page, tracker } = await setup();
-    try {
-      start(page, "denied-fetch", url, { type: "Fetch" });
-      assert.equal(await awaitNetworkQuiet(tracker, 35), false, "a known URL is not terminal evidence");
-      page.session.emit("Network.responseReceived", { requestId: "denied-fetch", response: { status: 403, url } });
-      page.session.emit("Network.loadingFailed", { requestId: "denied-fetch", errorText: "net::ERR_ABORTED", canceled: true });
-      assert.equal(tracker.inFlight.size, 0);
-      assert.deepEqual(tracker.errors, []);
-      assert.equal(await awaitNetworkQuiet(tracker, 350), true);
-    } finally { await close(tracker); }
+  it("settles observed loopback deny cancellations only for ambient or source-declared omitted deployment requests", async () => {
+    for (const control of [
+      { type: "Fetch", route: "/fonts/original.woff2", declared: false },
+      { type: "Stylesheet", route: "/styles.css", declared: true },
+      { type: "Script", route: "/assets/nav.js", declared: true },
+    ]) {
+      const uri = "http://127.0.0.1:1234" + control.route;
+      const { page, tracker } = await setup(new Page(), new Set(control.declared ? [control.route] : []));
+      try {
+        start(page, "denied", uri, { type: control.type });
+        assert.equal(await awaitNetworkQuiet(tracker, 35), false, "a known route is not terminal evidence");
+        page.session.emit("Network.responseReceived", { requestId: "denied", response: { status: 403, url: uri } });
+        page.session.emit("Network.loadingFailed", { requestId: "denied", errorText: "net::ERR_ABORTED", canceled: true });
+        assert.equal(tracker.inFlight.size, 0);
+        assert.deepEqual(tracker.errors, [], JSON.stringify(control));
+        assert.equal(await awaitNetworkQuiet(tracker, 350), true);
+      } finally { await close(tracker); }
+    }
   });
   it("keeps other cancellation and resource failure cases fatal", async () => {
     for (const control of [
@@ -108,8 +115,12 @@ describe("public CDP network lifecycle", () => {
       { type: "Font", uri: url, status: 403, canceled: true, errorText: "net::ERR_ABORTED" },
       { type: "Fetch", uri: url, status: 403, canceled: false, errorText: "net::ERR_FAILED" },
       { type: "Fetch", uri: url, status: null, canceled: true, errorText: "net::ERR_ABORTED" },
+      { type: "Script", uri: url, status: 403, canceled: true, errorText: "net::ERR_ABORTED" },
+      { type: "Script", uri: url, status: 403, canceled: true, errorText: "net::ERR_ABORTED", declared: ["/other.js"] },
+      { type: "Font", uri: url, status: 403, canceled: true, errorText: "net::ERR_ABORTED", declared: ["/fonts/original.woff2"] },
+      { type: "Stylesheet", uri: url, status: 200, canceled: true, errorText: "net::ERR_ABORTED", declared: ["/fonts/original.woff2"] },
     ]) {
-      const { page, tracker } = await setup();
+      const { page, tracker } = await setup(new Page(), new Set(control.declared ?? []));
       try {
         start(page, "negative", control.uri, { type: control.type });
         if (control.status !== null) page.session.emit("Network.responseReceived", { requestId: "negative", response: { status: control.status, url: control.uri } });

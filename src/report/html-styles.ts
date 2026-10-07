@@ -155,8 +155,9 @@ export const REPORT_HTML_STYLES = String.raw`
   @media (max-width: 64rem) {
     .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .run-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    /* A 768 px tablet has 720 px for seven columns; the longest rule name alone needs 198 px. */
-    .coverage-table th, .coverage-table td { padding-inline: var(--bl-space-2); }
+    /* Seven columns, including the explicit Unmeasured heading, must fit a 720 px tablet column.
+       Match print's compact padding while preserving unbroken rule-name segments and numbers. */
+    .coverage-table th, .coverage-table td { padding-inline: .375rem; }
     .coverage-table thead th { font-size: .6875rem; letter-spacing: .02em; }
   }
   @media (max-width: 30rem) {

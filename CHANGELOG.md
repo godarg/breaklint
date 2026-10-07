@@ -35,10 +35,15 @@ example evaluation is recorded; frozen-candidate acceptance and publication are 
 - Repair the CDP font-loading boundary while retaining acquisition, quiescence, declared-font
   and geometry gates. A successfully acquired font is not proof that the later document gates pass.
   A cancelled local Fetch/XHR of a denied sibling is accepted only after the same CDP request ID
-  records the loopback403 response and its terminal `ERR_ABORTED` cancellation. Pending requests,
-  required layout resources, failed successful responses and remote transport failures still block.
+  records the loopback403 response and its terminal `ERR_ABORTED` cancellation. Source-discovered
+  omitted static deployment styles/scripts with those same exact observations settle according
+  to the existing standalone resource policy. This does not accept undeclared
+  or dynamically missing layout dependencies. Pending requests, required layout resources, failed successful responses and remote transport failures still block.
   Failed-resource diagnostics identify observed logical routes/statuses without host directories
   or URL credentials, queries and fragments.
+- Keep coverage-table edges aligned on the measured 768px tablet surface after the explicit
+  `Unmeasured` heading made its intrinsic width exceed the content column. Compact cell padding
+  preserves whole rule-name segments, numeric alignment and the separate print-specific padding.
 
 All 17 registered rules retain `calibrated: false`; 12 are enabled by default. A bounded human
 evaluation of ten selected real pages supplied six defect and four acceptable/intended labels.

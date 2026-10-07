@@ -779,8 +779,11 @@ are untested; validate row preservation, wrapping and overflow after any change.
 Transport completion uses public CDP request IDs, including redirect hops; a Puppeteer request
 object or repeated URL is not proof of completion. An unconsumed local denied Fetch can produce
 a terminal `Network.loadingFailed` after its HTTP403 response. This narrowly observed case is
-accepted only for same-origin Fetch/XHR, with the same request's observed403 response and a
-cancelled `net::ERR_ABORTED` terminal event. It stays pending until that event. Other transport
+accepted for same-origin Fetch/XHR, or a static origin-relative stylesheet/script route that the
+existing standalone asset-closure policy has independently classified as an omitted deployment
+asset. The latter set comes from source discovery, never user configuration or a dynamic request.
+Both require the same request's observed403 response and a cancelled `net::ERR_ABORTED` terminal
+event. It stays pending until that event. Other transport
 failures, malformed or unjoined observations, remote requests and failed successful responses
 remain fatal. Local required-resource roles and the independent font/image geometry barriers
 still apply. This does not establish author intent or excuse an incomplete resource body.
