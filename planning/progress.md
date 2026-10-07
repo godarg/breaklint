@@ -1473,3 +1473,18 @@ and exactly one in the unmodified positive PDF. The fixed literal is seven, not 
 renderer-derived expected value. All earlier mutation reds remain preserved. No visual reviewer
 was called against the preceding source binding; final full technical and mutation gates remain
 required before a fresh frozen-input sight review.
+
+
+## 2026-10-07 — current 0.10 sight review failed, release blocked
+
+Round7 preserves four fresh delegated AI calls on the same frozen macOS render:209 received
+image payloads, with source/native transformation receipts and actual model claude-opus-5-5.
+The original verdicts are clean PASS, findings PASS, infrastructure FAIL and
+insufficient-coverage FAIL. One HIGH finds23 applicable versus20 measured plus2 displayed
+unmeasured evaluations in the handwritten insufficient-coverage state. No cause is inferred
+from the image alone. Four desktop cells remain not-reviewed because only downscaled full
+screens were available there; readable desktop viewport tiles are required for the next round.
+Two medium and28 low presentation findings have explicit follow-up/accepted-risk dispositions.
+All original six ledger rounds remain structurally unchanged. Release is blocked pending the
+HIGH correction, arithmetic negative control and one fresh bounded sight review; no human
+or Ubuntu visual acceptance is claimed.

@@ -58,10 +58,11 @@ at your own HTML and the same chain measures a real page.
 
 ## Install
 
-This checkout documents the **unreleased 0.10.0 candidate**. The npm commands below install
-the published release; candidate-only checks require the corresponding reviewed candidate package.
-The [bounded human example evaluation](docs/evaluation-0.10.md) is recorded. Publication,
-fresh report-surface review and final independent acceptance remain pending.
+This documentation describes **version 0.10.0**. The npm command below installs the registry's
+current `latest`; check the installed version with `npx breaklint --version`. Publication and
+verification records are in [status](docs/status.md), and the release procedure is in
+[releasing](docs/releasing.md). The [bounded human example evaluation](docs/evaluation-0.10.md)
+records what the selected real examples establish and what remains unknown.
 
 ```bash
 npm i -D breaklint
@@ -120,7 +121,7 @@ previous version to compare to.
 
 ## What is checked
 
-Seventeen rules are registered in the candidate. Twelve run by default: two can fail a build;
+Seventeen rules are registered in 0.10.0. Twelve run by default: two can fail a build;
 ten more are advisory unless you request `--fail-on warn`. Five are off by default: the two
 figure checks, the two table continuation checks and experimental `layout/half-empty-page`.
 Strict mode enables all seventeen. Half-empty-page never gates, even with `--fail-on warn`.

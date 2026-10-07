@@ -2,8 +2,9 @@
 
 ## 0.10.0 — 2026-10-07
 
-The candidate changes judgments on unchanged inputs and adds two optional checks. A bounded human
-example evaluation is recorded; frozen-candidate acceptance and publication are pending.
+This version changes judgments on unchanged inputs and adds two optional checks. The bounded
+human example evaluation is recorded in `docs/evaluation-0.10.md`; publication and verification
+records are kept separately in `docs/status.md`.
 
 - Add `layout/table-header-not-repeated` and `layout/table-column-drift`. Both require an
   existing visible authored header, exact source row/cell membership and content, unit spans,
