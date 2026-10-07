@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, it } from "node:test";
 
@@ -514,10 +515,17 @@ describe("report-surface human review gate", () => {
     assert.equal(cells.length, 32);
     assert.ok(cells.every((cell) => cell.status === "pass" && cell.reviewer === "@Founder"));
 
-    // The new delegated round does not replace or become a historical human review.
+    // Appended delegated rounds preserve the complete first five records, including the human history.
+    const priorFive = { ...ledger, rounds: ledger.rounds.slice(0, 5) };
+    assert.equal(priorFive.rounds.length, 5);
+    assert.equal(createHash("sha256").update(JSON.stringify(priorFive.rounds)).digest("hex"),
+      "ffd3ec0c86794e1f0a9ad869aee54636345dbe86bea9c5de71918f944cf03225");
+    assert.equal(validateReviewLedger(priorFive).rounds, 5);
+
     const current = validateReviewLedger(ledger);
-    assert.equal(current.rounds, 5);
-    assert.equal(current.latest.round, 5);
+    assert.ok(current.rounds >= 5, "the five existing review rounds must remain");
+    assert.equal(current.rounds, ledger.rounds.length);
+    assert.equal(current.latest.round, ledger.rounds.length);
     assert.equal(current.latest.record, "current");
     assert.equal(current.latest.outcome, "pass");
     assert.deepEqual(current.latest.reviewers.map(({ kind, handle }) => ({ kind, handle })), [

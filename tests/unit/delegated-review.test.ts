@@ -129,9 +129,15 @@ describe("delegated AI sight review", () => {
     assert.equal(sha(JSON.stringify(historical.rounds)), "d16be7667cdbb2dbb7437ff9824c813b4529a07823302d3ded87c1bd1e9aa573");
     assert.equal(contract.validateReviewLedger(historical).rounds, 4);
 
+    const priorFive = { ...ledger, rounds: ledger.rounds.slice(0, 5) };
+    assert.equal(priorFive.rounds.length, 5);
+    assert.equal(sha(JSON.stringify(priorFive.rounds)), "ffd3ec0c86794e1f0a9ad869aee54636345dbe86bea9c5de71918f944cf03225");
+    assert.equal(contract.validateReviewLedger(priorFive).rounds, 5);
+
     const current = contract.validateReviewLedger(ledger);
-    assert.equal(current.rounds, 5);
-    assert.equal(current.latest.round, 5);
+    assert.ok(current.rounds >= 5, "the five existing review rounds must remain");
+    assert.equal(current.rounds, ledger.rounds.length);
+    assert.equal(current.latest.round, ledger.rounds.length);
     assert.ok(current.latest.reviewers.every((reviewer) => reviewer.kind === "delegated-ai"));
     assert.equal(current.latest.delegation?.release, "0.9.0");
     const summary = contract.summarizeLatestRound(ledger);
