@@ -44,6 +44,8 @@ example evaluation is recorded; frozen-candidate acceptance and publication are 
 - Keep coverage-table edges aligned on the measured 768px tablet surface after the explicit
   `Unmeasured` heading made its intrinsic width exceed the content column. Compact cell padding
   preserves whole rule-name segments, numeric alignment and the separate print-specific padding.
+  On the 390px mobile surface, shared weighted tracks also keep that whole heading aligned with
+  its counts, without reducing the existing label size.
 
 All 17 registered rules retain `calibrated: false`; 12 are enabled by default. A bounded human
 evaluation of ten selected real pages supplied six defect and four acceptable/intended labels.

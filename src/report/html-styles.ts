@@ -169,12 +169,12 @@ export const REPORT_HTML_STYLES = String.raw`
        template — rule and result on the first line, the five numbers below — so every column still
        aligns across rows and with its header, and nothing scrolls sideways. */
     .coverage-table, .coverage-table thead, .coverage-table tbody, .coverage-table caption { display: block; }
-    .coverage-table tr { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: var(--bl-space-2); row-gap: var(--bl-space-1); padding-block: var(--bl-space-2); border-block-end: var(--bl-border-thin) solid var(--bl-color-divider); }
+    .coverage-table tr { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .9fr) minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, .8fr); column-gap: var(--bl-space-2); row-gap: var(--bl-space-1); padding-block: var(--bl-space-2); border-block-end: var(--bl-border-thin) solid var(--bl-color-divider); }
     .coverage-table thead tr { border-block-end: var(--bl-border-strong) solid var(--bl-color-fg-primary); }
     .coverage-table th, .coverage-table td, .coverage-table thead th { padding: 0; border: 0; }
-    /* Five value columns share 366 CSS px: header labels must fit a 67 px column, or a right-aligned
-       label overflows past its column edge (measured: MEASURED at .75rem overran by 5.7 px, and
-       CANDIDATES, whole since the soft hyphen went, by 6.7 px at .6875rem). */
+    /* Five value columns share 366 CSS px. Use the same weighted tracks in every row: UNMEASURED
+       overran an equal 67 px track by 5.44 px, while FLOOR needs less room. Keep whole labels
+       readable at the existing size and align each header with its numeric column. */
     .coverage-table thead th { font-size: .625rem; letter-spacing: 0; }
     .coverage-table tbody th[scope="row"] { padding-inline-start: var(--bl-space-2); }
     .coverage-table thead .rule { padding-inline-start: var(--bl-space-2); }
