@@ -535,7 +535,30 @@ describe("no input becomes a command, an option or a workflow command", () => {
   });
 });
 
+/** Independent CLI runs have different UUIDs; keep every stable identity byte and all prose. */
+function withoutFindingRunUuid(markdown: string): string {
+  return markdown.replace(/^### [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=:\d+:[0-9a-f]{64} — )/gmu, "### <run>");
+}
+
 describe("the projections are breaklint's own, from one run", () => {
+  it("Markdown comparison preserves fingerprint, index and every message and remedy byte", () => {
+    const first = "00000000-0000-4000-8000-000000000001";
+    const second = "00000000-0000-4000-8000-000000000002";
+    const fingerprint = "a".repeat(64);
+    const original = `### ${first}:0:${fingerprint} — layout/widow, page 2\n\nMessage: Keep this text.\nRemediation: Inspect this block.\n`;
+    const anotherRun = original.replace(first, second);
+    assert.equal(withoutFindingRunUuid(original), withoutFindingRunUuid(anotherRun));
+    for (const changed of [
+      anotherRun.replace(fingerprint, "b".repeat(64)),
+      anotherRun.replace(":0:", ":1:"),
+      anotherRun.replace("Keep this text.", "Changed text."),
+      anotherRun.replace("Inspect this block.", "Changed remedy."),
+    ]) assert.notEqual(withoutFindingRunUuid(original), withoutFindingRunUuid(changed));
+    const nonHeading = `Remediation: ${first}:0:${fingerprint} — literal source text.`;
+    assert.equal(withoutFindingRunUuid(nonHeading), nonHeading);
+  });
+
+
   it("publishes SARIF, JUnit and Markdown equal to the CLI's own formats, and valid", BASH_GLOBSTAR_REQUIRED, () => {
     const workspace = mkdtempSync(join(scratch, "ws-"));
     const run = runAction({ workspace, inputs: { paths: "doc.html" }, env: { FAKE_BEHAVIOUR: "demo" } });
@@ -557,12 +580,19 @@ describe("the projections are breaklint's own, from one run", () => {
     assert.equal(untimed(junit), untimed(own("junit")), "the Action's JUnit differs from `breaklint --format junit`");
     const markdown = readFileSync(run.outputs["markdown-file"]!, "utf8");
     assert.deepEqual(markdownProblems(markdown, "findings"), []);
-    assert.equal(markdown, own("markdown"), "the Action's Markdown differs from `breaklint --format markdown`");
+    assert.equal(withoutFindingRunUuid(markdown), withoutFindingRunUuid(own("markdown")), "the Action's Markdown differs from `breaklint --format markdown`");
     assert.ok(run.summary.startsWith(markdown.trimEnd()), "the step summary does not open with the report");
     assert.match(run.summary, /breaklint exit \*\*1\*\* \(at least one non-experimental finding reached the threshold\) — this step fails on exits 1, 2, 3, 4\./u);
     assert.match(run.stdout, /verdict: findings/u, "the console projection is not in the log");
-    const report = JSON.parse(readFileSync(run.outputs["report-json"]!, "utf8")) as { exitCode: number };
+    const report = JSON.parse(readFileSync(run.outputs["report-json"]!, "utf8")) as {
+      exitCode: number; runId: string; findings: { runFindingId: string; fingerprint: string }[];
+    };
     assert.equal(report.exitCode, 1);
+    const headingIds = [...markdown.matchAll(/^### ([0-9a-f-]{36}:\d+:[0-9a-f]{64}) — /gmu)].map(match => match[1]);
+    assert.deepEqual(headingIds, report.findings.map(finding => finding.runFindingId), "Action Markdown IDs must match its own canonical JSON");
+    for (const [index, finding] of report.findings.entries()) {
+      assert.equal(finding.runFindingId, `${report.runId}:${index}:${finding.fingerprint}`);
+    }
   });
 
   it("names every file in its outputs and hands breaklint the files it was asked to write", BASH_GLOBSTAR_REQUIRED, () => {
