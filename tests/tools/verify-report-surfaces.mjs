@@ -1196,11 +1196,48 @@ assert.ok(fontMutationControl, "PDF font mutation control did not run");
 // gained real-shaped evidence names that wrap on a phone (infrastructure and insufficient-coverage
 // mobile 14 -> 15 tiles each). 27 page rasters when remediation and note text took the 72ch
 // measure (findings 7 -> 8).
-// 30 page rasters and 168 viewport tiles in the 0.9.0 layout with explicit declines and the
-// current coverage rows, independently measured 2026-10-07: clean 3/20, findings 9/48,
-// infrastructure 9/50, insufficient-coverage 9/50 (page rasters/tiles).
-assert.deepEqual(manifest.physicalArtifacts, { screens: 24, screenTiles: 168, pdfs: 4, rasterPages: 30 },
-  "the report-surface inventory must be exactly 24 screens with 168 viewport tiles, 4 PDFs and 30 PDF page rasters");
+// The 2026-10-07 macOS measurement was clean 3/20, findings 9/48, infrastructure 9/50,
+// insufficient-coverage 9/50 (page rasters/tiles). Its 30-page total was incorrectly used as a
+// universal pin. The Linux diagnostic https://github.com/godarg/breaklint/actions/runs/37597727752
+// measured clean 3/20, findings 8/48, infrastructure 9/50, insufficient-coverage 9/50 on
+// 2026-10-07 with Google Chrome 154.0.8037.57, Node 24.21.0 and Poppler 24.02.0. Independent
+// pdfinfo and PNG membership/hash/dimensions confirmed its 29 pages; the final universal pin was
+// its only failure. Each supported platform now has a fixed per-state oracle. No manifest-derived
+// expectation, range, or fallback can conceal a changed state split or a longer report.
+const EXPECTED_PRINT_PAGES_BY_PLATFORM = Object.freeze({
+  darwin: Object.freeze({ clean: 3, findings: 9, infrastructure: 9, "insufficient-coverage": 9 }),
+  linux: Object.freeze({ clean: 3, findings: 8, infrastructure: 9, "insufficient-coverage": 9 }),
+});
+
+function assertSurfaceInventory(inventory, platform) {
+  assert.ok(Object.hasOwn(EXPECTED_PRINT_PAGES_BY_PLATFORM, platform), `unsupported report-surface platform: ${platform}`);
+  const expectedPages = EXPECTED_PRINT_PAGES_BY_PLATFORM[platform];
+  const pdfs = inventory.artifacts.filter((artifact) => artifact.kind === "pdf");
+  assert.equal(pdfs.length, 4, "the report-surface inventory must contain exactly four PDF cells");
+  const actualPages = Object.fromEntries(pdfs.map((artifact) => [artifact.cell.split("/")[1], artifact.pages]));
+  assert.deepEqual(actualPages, expectedPages, `${platform}: print page inventory must match every fixed state`);
+  const rasterPages = Object.values(expectedPages).reduce((sum, pages) => sum + pages, 0);
+  assert.deepEqual(inventory.physicalArtifacts, { screens: 24, screenTiles: 168, pdfs: 4, rasterPages },
+    `${platform}: the report-surface inventory must be exactly 24 screens with 168 viewport tiles, 4 PDFs and ${rasterPages} PDF page rasters`);
+}
+
+assertSurfaceInventory(manifest, process.platform);
+// Mutate only a copy of the measured inventory, never a render artifact. Updating the total with
+// the missing/extra page makes the state oracle, rather than an inconsistent total, reject it.
+for (const delta of [-1, 1]) {
+  const changed = structuredClone(manifest);
+  changed.artifacts.find((artifact) => artifact.cell === "print/findings/pdf").pages += delta;
+  changed.physicalArtifacts.rasterPages += delta;
+  assert.throws(() => assertSurfaceInventory(changed, process.platform), /print page inventory/u,
+    `a ${delta < 0 ? "missing" : "extra"} findings page passed the fixed state inventory`);
+}
+const redistributed = structuredClone(manifest);
+redistributed.artifacts.find((artifact) => artifact.cell === "print/findings/pdf").pages += 1;
+redistributed.artifacts.find((artifact) => artifact.cell === "print/infrastructure/pdf").pages -= 1;
+assert.throws(() => assertSurfaceInventory(redistributed, process.platform), /print page inventory/u,
+  "a changed state split with an unchanged total passed the fixed state inventory");
+assert.throws(() => assertSurfaceInventory(manifest, "unsupported-control"), /unsupported report-surface platform/u,
+  "an unregistered platform passed the fixed inventory");
 
 const latestRound = describeLatestRound(ledger, manifest, currentReviewInput.fingerprint);
 // The review ledger's state belongs where a release reader looks, not only in a log line. The line
