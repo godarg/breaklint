@@ -1461,3 +1461,15 @@ step before rendering; its exact subcommand cause remains unknown and its eviden
 The second attempt separated and bounded prerequisites and successfully rendered/independently
 counted the unchanged candidate. This supplies no AI or human visual review. A new full local
 technical gate, fresh delegated sight review and final release acceptance remain required.
+
+
+### 0.10 caveat mutation oracle
+
+The full technical32-cell matrix passed on6823173. Its subsequent physical-mutation suite
+correctly rejected the damaged advice report but stopped because a historical test literal
+expected eight caveats. The six-card fixture now generates six duplicates plus the one global
+caveat. Independent Poppler text extraction counted seven in the deliberately damaged PDF
+and exactly one in the unmodified positive PDF. The fixed literal is seven, not a range or a
+renderer-derived expected value. All earlier mutation reds remain preserved. No visual reviewer
+was called against the preceding source binding; final full technical and mutation gates remain
+required before a fresh frozen-input sight review.

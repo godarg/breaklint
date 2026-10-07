@@ -144,7 +144,7 @@ const SURFACE_CONTROLS = {
   "broken-landmarks": { screen: `nav[aria-label="Report contents"] { display: none !important; }` },
   // The skip link leaves the keyboard order.
   "broken-skip-link": { screen: `.skip-link { display: none !important; }` },
-  // The per-finding sentence comes back: seven repetitions of one caveat in small print.
+  // The per-finding sentence comes back: six additional repetitions of the global caveat.
   "broken-untested-repeat": { print: `@media print { .finding-remediation::after { content: "Untested: no trigger/remedied pair in this package shows this advice removing this finding."; display: block; } }` },
   // The marker falls back to muted small print.
   "broken-untested-marker": {
