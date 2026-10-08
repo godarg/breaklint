@@ -37,6 +37,104 @@ Current service status comes from the [release workflow](https://github.com/goda
 `npm view breaklint version dist-tags dist.integrity`. Preparation records cannot establish
 current registry state. The historical 0.9.0 measurements below keep their original date and scope.
 
+## Release v0.10.0: published 2026-10-08
+
+⛔ Supersedes the publication-state claims in earlier preparation records only. Their original
+failures, pending statements and dates remain historical evidence.
+
+The [release workflow, run 37730851901](https://github.com/godarg/breaklint/actions/runs/37730851901),
+attempt 2, completed successfully with all four jobs on 2026-10-08. The annotated `v0.10.0`
+tag object `5785b5dd6cf7414166023d56a0ac26a957896e91` points to merged release commit
+`65be7f0dd6f763eeb2d49c273a8d46c0ae4347a7`;
+[main CI run 37729516326](https://github.com/godarg/breaklint/actions/runs/37729516326)
+also completed successfully. The validated tarball was published by that workflow and attached
+to the [GitHub Release](https://github.com/godarg/breaklint/releases/tag/v0.10.0).
+
+Registry/GitHub readback on 2026-10-08 at 06:48 UTC measured `breaklint@0.10.0`,
+`latest` = `0.10.0`, and identical package archives: **625,421 bytes**, SHA-256
+`474c4196952697aba09ddfb758796461c90d7f979fdca187a904349642fb82b8`.
+The registry integrity is
+`sha512-hiIm9x/ezqhjJfEXhb5iCnUiab18NyTQjtsP6fsbn+9RI1dTuWuDqVBtvWQrgHLAc8+m8xRIFqFUS5EpylLEuA==`.
+The retained provenance contract bound the SLSA payload to this exact tag, commit and archive.
+These are dated measurements; query npm and the linked workflow for a later service state.
+
+This checkpoint and the corrected README rule count and Changelog date are postpublication
+GitHub documentation updates. They do not replace the immutable 0.10.0 package or move its tag;
+the npm package retains the documentation bytes originally published with that archive.
+
+Separate fresh registry consumers on Node **22.13.0** and **24.21.0** each completed 19 native
+commands with their expected exits. At three stages per runtime, complete 209-member byte
+inventories and root/hidden lock identities matched the registry archive. The actual
+`npm audit signatures --json` runs at all three stages per runtime exited 0 with both
+`invalid` and `missing` empty. CLI version/demo, installed public API, README/configuration/schema
+documentation contracts and the two corpus documents were exercised. Corpus checker exits were 0; the finding-bearing demo retained exit 1.
+These actual checker exits are distinct from the outer contract commands completing successfully;
+no clean exit was inferred from execution completion. Signature verification is separate from the earlier provenance-payload binding.
+
+The gate chain ran on frozen candidate commit
+`58d0ac718396229c570a77064f39f9afa8f1adc6`; the published tag resolves to merged commit
+`65be7f0dd6f763eeb2d49c273a8d46c0ae4347a7`. A native Git comparison measured the same tree
+`a4bb10ee429a25222b3a15a4260cd2f28b5c0357` for both commits. This tree identity connects the
+measured candidate gates to the immutable published source without treating the two commit IDs
+as interchangeable. The candidate gate chain completed all **19** steps: 768 unit tests, 934 aggregate
+tests, 116 live tests in 13 suites, 83 rule mutants across 17 rules, 34 report-surface mutants
+and the 32-cell surface contract. Strict local surface verification and the 31-command packed
+consumer matrix also completed with expected exits. The complete first independent static code
+audit recorded FAIL with one HIGH; its table-span failure was reproduced and repaired. An
+invalid timed-out second attempt supplies no verdict. A separately scoped independent follow-up
+on the unchanged final release source returned PASS with two low advisories. The original
+failure, timeout and accepted limitations remain distinct from the technical gate results;
+static review did not execute Node or inspect the private product rasters.
+
+The maintainer's [bounded ten-example evaluation](evaluation-0.10.md) supplied
+six defects and four acceptable/intended labels. There is no independent holdout, no fitted threshold and no
+population-accuracy claim; all 17 rules retain `calibrated: false`, with 12 enabled by default.
+Four actual postpublication runs through the same documented private producer/renderer/engine
+boundary retained **215 byte-identical page PNGs** with the same HTML, resources, renderer
+environment, page counts and effective configuration fingerprints. The selected E1–E10 event
+inventories and evaluations remained unchanged; current report remedies and reader-impact text
+include the feedback refinements. The first arm retained exit 4, including unavailable figure
+inventory and a page-evidence capability limitation; the other three retained exit 1 with
+findings. Nonmeasured and excluded evaluations remain explicit even when exit 4 does not apply.
+This is bounded unchanged-layout readback, not stock CLI/API orchestration equivalence or
+proof that every candidate was measured. The three earlier positive scratch repair trials were
+not rerun with the published package, and no delivered product file was replaced.
+
+Integration readback later on 2026-10-08 measured the following separate outcomes:
+
+- The [published-tag Action smoke, run 37740665593](https://github.com/godarg/breaklint/actions/runs/37740665593)
+  succeeded on Node 22.13.0 and 24.21.0. Both jobs downloaded `godarg/breaklint@v0.10.0`
+  at commit `65be7f0`, returned checker exit 0 and `clean` on the same self-authored four-page
+  fixture, and retained canonical reports for 12 default checks. An earlier diagnostic run
+  failed because its contract checkout path was relative to a different working directory;
+  the diagnostic argument was corrected without changing the published package or tag.
+- The [German](https://dargel-solutions.de/breaklint/) and
+  [English](https://dargel-solutions.de/en/breaklint/) website pages were deployed from website
+  commit `8d0830f`. The canonical Cloudflare production deployment finished at 07:06 UTC;
+  the 07:17 UTC API readback identified that commit, GitHub/main source and successful stages.
+  A later native production check passed its 71 URL/status expectations. Eight production
+  screenshots were captured; the coordinator's AI inspection is a contributor sight check,
+  not human review or independent acceptance. Both measured mobile pages had viewport and
+  scroll widths of 390px.
+- The local DS OS development consumer was updated to the verified registry package at
+  its own commit `b341761`. The unchanged consumer E2E suite reported 46 passed and four
+  original skips, with 45 retained reports: 42 `clean` and three `insufficient-coverage`.
+  Its native engineering finish completed with exit 0. This was a local advisory consumer
+  update; no DS OS push or deployment was performed.
+
+- The local Studio consumer completed its native engineering finish at 07:26 UTC with exit 0.
+  Its ten-product batch produced all ten reports and returned batch exit 3: five product
+  runs exited 4, three exited 1 and two exited 3. Eight runs reached pagination, totaling 786
+  pages and 199 findings. The two infrastructure-stopped runs retain their unstable-render
+  failure; loading the actual fonts did not bypass the geometry boundary. The private profile
+  enabled both figure and both table checks while leaving experimental half-empty-page disabled.
+  These reports use positive scratch-produced inputs, with source/resource and installed-package
+  byte joins; they do not establish identity with delivered PDFs or authorization to repair them.
+
+Registry publication and these bounded integration runs do not establish an all-product clean
+result, human report-surface review or population calibration. The separate round 8 delegated AI report-surface review and
+its explicit presentation advisories retain the scope described above.
+
 ## Release v0.9.0: published 2026-10-07
 
 ⛔ Supersedes the publication-state part of the preparation record below. The preparation and older release records remain historical evidence.

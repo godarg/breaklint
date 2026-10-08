@@ -1527,3 +1527,69 @@ All seven previous ledger rounds are structurally preserved; the new passing rou
 as round 8 with new receipt filenames. This is delegated AI local-image sight evidence, not
 human surface review, Ubuntu visual acceptance or publication. Full exact-candidate gates,
 final packed consumers and independent code acceptance remain separate required proofs.
+
+## 2026-10-08 — published 0.10.0 checkpoint
+
+⛔ Supersedes publication-pending claims above only through the following dated measurements;
+their failures, review limits and original preparation records remain unchanged.
+
+Release workflow [37730851901](https://github.com/godarg/breaklint/actions/runs/37730851901),
+attempt 2, completed all four jobs. Annotated tag `v0.10.0` points to merged source `65be7f0`,
+whose main CI also passed. Registry/GitHub readback measured `latest` and installed version
+`0.10.0`, identical 625,421-byte archives, SHA-256
+`474c4196952697aba09ddfb758796461c90d7f979fdca187a904349642fb82b8`, and provenance bound to
+the tag/commit/archive. Two fresh registry consumers on Node 22.13.0 and 24.21.0 each completed
+19 native commands with expected exits, complete 209-member and lock joins at three stages,
+and actual signature audits with empty invalid/missing arrays at every stage. The exact
+release-source chain passed 19 gates, strict local surfaces and 31 packed-consumer commands.
+
+Independent acceptance retains the complete first static FAIL, the reproduced/repaired
+table-span HIGH, an invalid timed-out attempt and a separately scoped PASS follow-up with two
+low advisories. Gate results and static acceptance do not establish a universal layout oracle.
+The ten actual human labels remain six defects and four acceptable/intended pages, without an
+independent holdout or population calibration. All rules remain uncalibrated.
+
+Four published-package runs on the frozen unchanged real-product inputs preserved all 215
+original page PNGs, HTML/resource/environment identities and effective config fingerprints.
+The selected example events and evaluations remain unchanged; current remedies and reader-impact
+text reflect actual feedback. Their checker exits are 4/1/1/1, not a four-product clean pass.
+Individual nonmeasurements/exclusions remain visible. The private producer/engine seam does not
+establish stock CLI/API orchestration equivalence; the historical scratch repairs were not
+rerun with the published package. No delivered product bytes were replaced.
+
+Website deployment, published-tag Action smoke and local Studio/DS OS updates remain pending at
+this checkpoint. Package publication and report sight evidence do not close those integration
+tasks. See [the dated status record](../docs/status.md#release-v0100-published-2026-10-08) for
+full package integrity, measurement boundaries and historical review distinctions.
+
+
+## 2026-10-08 — publication integration readback and documentation correction
+
+⛔ Supersedes the integration-pending claims in the earlier dated checkpoint only through the
+following actual measurements. The earlier record and its static review remain preserved.
+
+Registry corpus checker exits were 0 for both corpus documents on both tested runtimes; the
+finding-bearing demo retained exit 1. The reviewed release gates ran on candidate `58d0ac7`,
+while the immutable release tag resolves to merge `65be7f0`. A native Git tree comparison
+measured identical tree `a4bb10ee429a25222b3a15a4260cd2f28b5c0357`. The documentation successor
+corrects these two truth-duty findings from its predecessor's PASS/one medium/one low review;
+it does not rewrite that review or change the published package.
+
+Published-tag Action smoke run 37740665593 passed on both Node 22.13.0 and 24.21.0 at the
+actual tag commit, with clean four-page reports and 12 default checks. Website production
+commit `8d0830f` was read back from Cloudflare and the public DE/EN pages; a native production
+check passed 71 URL/status expectations. Eight production screenshots received contributor AI
+inspection, separate from independent acceptance or human evaluation.
+
+The local DS OS consumer at `b341761` completed its native finish: the unchanged E2E suite
+reported 46 passed/four original skips and 45 reports (42 clean/three insufficient). No push
+or deployment was performed. The Studio consumer's native finish completed at 07:26 UTC;
+its ten-product batch returned exit 3 with all ten reports (five exits 4, three exits 1,
+two exits 3). Eight paginated runs measured 786 pages and 199 findings. Its optional figure
+and table checks were enabled; half-empty-page remained disabled. Unstable renders still
+stop after successful font acquisition, and product delivery identity was not measured.
+
+No all-product pass, human surface review, stock CLI/API equivalence, independent holdout or
+population calibration follows from these bounded integration results. The four frozen example
+arms remain a separate 215-page unchanged-layout comparison. Current source documentation
+corrections do not replace the immutable npm documentation bytes or move the release tag.
