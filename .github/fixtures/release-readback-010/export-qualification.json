@@ -1,0 +1,6 @@
+{
+  "qualification": "Release readback is actual. Command receipt home paths are labelled redactions; private originals remain preserved. Published npm bytes are copied unchanged. This temporary PR performs post-release registry and Action testing only.",
+  "receiptOriginalSHA256": "fb83753b4fd8f97bc70e487a1dc34c3abbe9fb1718f13bd9434c634bbc3462a4",
+  "receiptExportSHA256": "3b263a67e46a5a3a03f0f4cde7105cadf883f5a232554324aded49c6ffe00d79",
+  "releaseCommit": "65be7f0dd6f763eeb2d49c273a8d46c0ae4347a7"
+}

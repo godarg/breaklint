@@ -1,0 +1,94 @@
+# PRIVATE PROPOSAL ONLY: never apply before Root's actual publication readback.
+# Root must supply .github/fixtures/release-readback-010/{readback-result.json,
+# registry-package.tgz,breaklint-0.10.0.tgz,native-command-receipts.json} from actual
+# successful collector output. Export command receipts with labelled path redaction
+# if needed; retain native labels/exits and private original hashes. No home paths.
+# Also copy both prepared helpers to scripts/post-release/ on the own temporary PR.
+# Root records actual Action download-log SHA and closes the PR without merge.
+name: post-release 0.10 registry and Action smoke
+on:
+  pull_request:
+    paths:
+      - .github/workflows/post-release-010-smoke.yml
+      - .github/fixtures/release-readback-010/**
+      - scripts/post-release/**
+permissions:
+  contents: read
+jobs:
+  registry-consumer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22.13.0", "24.21.0"]
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: "1"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Require measured release binding before consumer execution
+        id: binding
+        run: |
+          mkdir .post-release
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          value = json.loads(Path('.github/fixtures/release-readback-010/readback-result.json').read_text())
+          assert value['status'] == 'READBACKS_MATCH'
+          assert value['version'] == value['registryLatest'] == '0.10.0'
+          assert re.fullmatch('[0-9a-f]{40}', value['releaseCommit'])
+          Path('.post-release/input-readback.json').write_text(json.dumps(value, indent=2)+'\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write('commit='+value['releaseCommit']+'\n')
+          PY
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.binding.outputs.commit }}
+          path: released-contract
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Run actual registry consumer, locks, members, signatures and public interfaces
+        run: |
+          python3 scripts/post-release/run-registry-consumers.py \
+            --readback-result .github/fixtures/release-readback-010/readback-result.json \
+            --contract-root released-contract \
+            --member-helper scripts/post-release/verify_installed_members.py \
+            --chrome /usr/bin/google-chrome \
+            --runtime '${{ matrix.node }}' "$(command -v node)" "$(command -v npm)" \
+            --matrix-part --out .post-release/registry-consumer
+      - name: Run actual published Action tag with its default registry install
+        id: published
+        uses: godarg/breaklint@v0.10.0
+        with:
+          paths: released-contract/tests/fixtures/action/clean.html
+          output-dir: .post-release/action-report
+      - name: Bind Action outputs and canonical report
+        env:
+          ACTION_VERSION: ${{ steps.published.outputs.breaklint-version }}
+          ACTION_EXIT: ${{ steps.published.outputs.exit-code }}
+          ACTION_VERDICT: ${{ steps.published.outputs.verdict }}
+          ACTION_REPORT: ${{ steps.published.outputs.report-json }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync,writeFileSync} from 'node:fs';
+          const {ACTION_VERSION:version,ACTION_EXIT:code,ACTION_VERDICT:verdict,ACTION_REPORT:path}=process.env;
+          assert.equal(version,'0.10.0');assert.equal(code,'0');assert.equal(verdict,'clean');assert.ok(path);
+          const report=JSON.parse(readFileSync(path,'utf8'));
+          assert.equal(report.schemaVersion,5);assert.equal(report.tool.version,'0.10.0');
+          assert.equal(report.exitCode,0);assert.equal(report.runVerdict,'clean');
+          assert.ok(Number.isInteger(report.pagesAnalysed)&&report.pagesAnalysed>0);
+          assert.ok(Number.isInteger(report.rulesRun)&&report.rulesRun>0);
+          writeFileSync('.post-release/action-output-binding.json',JSON.stringify({version,code,verdict,path,
+            qualification:'Remote Action download-log SHA still requires Root collection.'},null,2)+'\n');
+          NODE
+      - name: Preserve original receipts on success and failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: post-release-010-node-${{ matrix.node }}
+          path: .post-release/
+          include-hidden-files: true
+          if-no-files-found: error

@@ -1,0 +1,246 @@
+[
+  {
+    "label": "contract-head",
+    "argv": [
+      "git",
+      "-C",
+      "<private-home>/Codebase/breaklint",
+      "rev-parse",
+      "HEAD"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "430dcdd77305984293c3bd82ede114b28c32ccd17ba9bd716019b628c195663b",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "contract-clean",
+    "argv": [
+      "git",
+      "-C",
+      "<private-home>/Codebase/breaklint",
+      "diff",
+      "--quiet",
+      "HEAD",
+      "--",
+      "tests/tools/registry-provenance-contract.mjs",
+      ".github/workflows/release.yml",
+      "package.json"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "remote-tag-ref",
+    "argv": [
+      "gh",
+      "api",
+      "repos/godarg/breaklint/git/ref/tags/v0.10.0"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "22d18a7c45cfef0155427db67bcfb1a4ae49c3b2f339734f4e1e21b2b6916229",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "remote-tag-object",
+    "argv": [
+      "gh",
+      "api",
+      "repos/godarg/breaklint/git/tags/5785b5dd6cf7414166023d56a0ac26a957896e91"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "bfdc35269e20ea36e31b5adae81afde87c579cee939e1bf026642e50171548a2",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "remote-main-ref",
+    "argv": [
+      "gh",
+      "api",
+      "repos/godarg/breaklint/git/ref/heads/main"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "f8474d46b1372ef0bb903f2a5afd0f26e9a20045cc844ef4b42c57b30f2f6709",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "exact-main-ci",
+    "argv": [
+      "gh",
+      "api",
+      "repos/godarg/breaklint/actions/workflows/ci.yml/runs?head_sha=65be7f0dd6f763eeb2d49c273a8d46c0ae4347a7&status=completed&per_page=100"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "512b0f9886edbc9b82787aaf411965e2befe8e9331b4fe2408b944e266dd5534",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "release-workflow-runs",
+    "argv": [
+      "gh",
+      "api",
+      "repos/godarg/breaklint/actions/workflows/release.yml/runs?head_sha=65be7f0dd6f763eeb2d49c273a8d46c0ae4347a7&status=completed&per_page=100"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "bb9d3279e8ff9918314b7d15ac27c3a1b0ea532329139603213e10c7951f6176",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "release-workflow-jobs",
+    "argv": [
+      "gh",
+      "api",
+      "repos/godarg/breaklint/actions/runs/37730851901/jobs?per_page=100"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "93cb5b03747f59ddba2beb8661c73ada6514c94db32b36e7a74ff6c8dc401783",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "github-release",
+    "argv": [
+      "gh",
+      "api",
+      "repos/godarg/breaklint/releases/tags/v0.10.0"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "31f1011f017dcae47b2cda103cd8fd28cb7343fb380e2d37f9012c7e8697a950",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "download-breaklint-0.10.0.tgz",
+    "argv": [
+      "gh",
+      "release",
+      "download",
+      "v0.10.0",
+      "--repo",
+      "godarg/breaklint",
+      "--pattern",
+      "breaklint-0.10.0.tgz",
+      "--dir",
+      "<private-home>/Codebase/Dargel Solutions/04_AI_Infrastructure/Quality/work_items/WI-20261007-breaklint-usefulness/execution/released-registry-readback-r02"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "download-breaklint-0.10.0.tgz.sha256",
+    "argv": [
+      "gh",
+      "release",
+      "download",
+      "v0.10.0",
+      "--repo",
+      "godarg/breaklint",
+      "--pattern",
+      "breaklint-0.10.0.tgz.sha256",
+      "--dir",
+      "<private-home>/Codebase/Dargel Solutions/04_AI_Infrastructure/Quality/work_items/WI-20261007-breaklint-usefulness/execution/released-registry-readback-r02"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "download-breaklint-0.10.0.tgz.sri",
+    "argv": [
+      "gh",
+      "release",
+      "download",
+      "v0.10.0",
+      "--repo",
+      "godarg/breaklint",
+      "--pattern",
+      "breaklint-0.10.0.tgz.sri",
+      "--dir",
+      "<private-home>/Codebase/Dargel Solutions/04_AI_Infrastructure/Quality/work_items/WI-20261007-breaklint-usefulness/execution/released-registry-readback-r02"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "npm-version-metadata",
+    "argv": [
+      "npm",
+      "view",
+      "breaklint@0.10.0",
+      "version",
+      "dist.integrity",
+      "dist.tarball",
+      "dist.signatures",
+      "dist.attestations",
+      "gitHead",
+      "--json",
+      "--registry=https://registry.npmjs.org"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "5798c1d9ada111d60b0341ef26f1726df617b90663cdd0cb4d538b0c2de609aa",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "npm-dist-tags",
+    "argv": [
+      "npm",
+      "view",
+      "breaklint",
+      "dist-tags",
+      "--json",
+      "--registry=https://registry.npmjs.org"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "572c4cecd2a7473231a9551466cb638d6c7ef77bb2eb014dde88b9504f22e72d",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "registry-tarball-fetch",
+    "argv": [
+      "curl",
+      "--fail",
+      "--location",
+      "--silent",
+      "--show-error",
+      "--max-time",
+      "30",
+      "--output",
+      "<private-home>/Codebase/Dargel Solutions/04_AI_Infrastructure/Quality/work_items/WI-20261007-breaklint-usefulness/execution/released-registry-readback-r02/registry-package.tgz",
+      "https://registry.npmjs.org/breaklint/-/breaklint-0.10.0.tgz"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "registry-attestations-fetch",
+    "argv": [
+      "curl",
+      "--fail",
+      "--location",
+      "--silent",
+      "--show-error",
+      "--max-time",
+      "30",
+      "--output",
+      "<private-home>/Codebase/Dargel Solutions/04_AI_Infrastructure/Quality/work_items/WI-20261007-breaklint-usefulness/execution/released-registry-readback-r02/registry-attestations.json",
+      "https://registry.npmjs.org/-/npm/v1/attestations/breaklint@0.10.0"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "provenance-semantic-contract",
+    "argv": [
+      "node",
+      "<private-home>/Codebase/breaklint/tests/tools/registry-provenance-contract.mjs",
+      "--verify",
+      "<private-home>/Codebase/Dargel Solutions/04_AI_Infrastructure/Quality/work_items/WI-20261007-breaklint-usefulness/execution/released-registry-readback-r02/registry-metadata.json",
+      "<private-home>/Codebase/Dargel Solutions/04_AI_Infrastructure/Quality/work_items/WI-20261007-breaklint-usefulness/execution/released-registry-readback-r02/registry-attestations.json"
+    ],
+    "nativeExit": 0,
+    "stdoutSHA256": "34839ea4be0fa573b07b1890846c7e8ab393470db22b1d129aef56aa1c2add56",
+    "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]
