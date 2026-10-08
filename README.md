@@ -70,7 +70,8 @@ Clean registry consumers on Node 22.13.0 and 24.21.0 matched the released packag
 Four frozen real-product readbacks retained all 215 original page PNGs; one still exited 4
 for insufficient measurement and three exited 1 with findings. See the dated
 [publication and limitations checkpoint](docs/status.md#release-v0100-published-2026-10-08)
-for package identity, review scope and integration work still pending at that checkpoint.
+for package identity, review scope and the separately measured Action, website and local
+consumer integration outcomes.
 
 ```bash
 npm i -D breaklint

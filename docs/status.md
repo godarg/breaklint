@@ -67,11 +67,16 @@ commands with their expected exits. At three stages per runtime, complete 209-me
 inventories and root/hidden lock identities matched the registry archive. The actual
 `npm audit signatures --json` runs at all three stages per runtime exited 0 with both
 `invalid` and `missing` empty. CLI version/demo, installed public API, README/configuration/schema
-documentation contracts and a real authored document were exercised. The finding-bearing demo
-and document retained their expected nonzero exits; no clean exit was inferred from execution
-completion. Signature verification is separate from the earlier provenance-payload binding.
+documentation contracts and the two corpus documents were exercised. Corpus checker exits were 0; the finding-bearing demo retained exit 1.
+These actual checker exits are distinct from the outer contract commands completing successfully;
+no clean exit was inferred from execution completion. Signature verification is separate from the earlier provenance-payload binding.
 
-The exact release-source gate chain completed all **19** steps: 768 unit tests, 934 aggregate
+The gate chain ran on frozen candidate commit
+`58d0ac718396229c570a77064f39f9afa8f1adc6`; the published tag resolves to merged commit
+`65be7f0dd6f763eeb2d49c273a8d46c0ae4347a7`. A native Git comparison measured the same tree
+`a4bb10ee429a25222b3a15a4260cd2f28b5c0357` for both commits. This tree identity connects the
+measured candidate gates to the immutable published source without treating the two commit IDs
+as interchangeable. The candidate gate chain completed all **19** steps: 768 unit tests, 934 aggregate
 tests, 116 live tests in 13 suites, 83 rule mutants across 17 rules, 34 report-surface mutants
 and the 32-cell surface contract. Strict local surface verification and the 31-command packed
 consumer matrix also completed with expected exits. The complete first independent static code
@@ -95,11 +100,40 @@ This is bounded unchanged-layout readback, not stock CLI/API orchestration equiv
 proof that every candidate was measured. The three earlier positive scratch repair trials were
 not rerun with the published package, and no delivered product file was replaced.
 
-Website deployment, published-tag Action smoke, Studio and DS OS consumer updates remain pending
-at this dated checkpoint. Registry publication does not establish their completion, an
-all-product clean result, human report-surface review or population calibration. The separate
-round 8 delegated AI report-surface review and its explicit presentation advisories retain the
-scope described above.
+Integration readback later on 2026-10-08 measured the following separate outcomes:
+
+- The [published-tag Action smoke, run 37740665593](https://github.com/godarg/breaklint/actions/runs/37740665593)
+  succeeded on Node 22.13.0 and 24.21.0. Both jobs downloaded `godarg/breaklint@v0.10.0`
+  at commit `65be7f0`, returned checker exit 0 and `clean` on the same self-authored four-page
+  fixture, and retained canonical reports for 12 default checks. An earlier diagnostic run
+  failed because its contract checkout path was relative to a different working directory;
+  the diagnostic argument was corrected without changing the published package or tag.
+- The [German](https://dargel-solutions.de/breaklint/) and
+  [English](https://dargel-solutions.de/en/breaklint/) website pages were deployed from website
+  commit `8d0830f`. The canonical Cloudflare production deployment finished at 07:06 UTC;
+  the 07:17 UTC API readback identified that commit, GitHub/main source and successful stages.
+  A later native production check passed its 71 URL/status expectations. Eight production
+  screenshots were captured; the coordinator's AI inspection is a contributor sight check,
+  not human review or independent acceptance. Both measured mobile pages had viewport and
+  scroll widths of 390px.
+- The local DS OS development consumer was updated to the verified registry package at
+  its own commit `b341761`. The unchanged consumer E2E suite reported 46 passed and four
+  original skips, with 45 retained reports: 42 `clean` and three `insufficient-coverage`.
+  Its native engineering finish completed with exit 0. This was a local advisory consumer
+  update; no DS OS push or deployment was performed.
+
+- The local Studio consumer completed its native engineering finish at 07:26 UTC with exit 0.
+  Its ten-product batch produced all ten reports and returned batch exit 3: five product
+  runs exited 4, three exited 1 and two exited 3. Eight runs reached pagination, totaling 786
+  pages and 199 findings. The two infrastructure-stopped runs retain their unstable-render
+  failure; loading the actual fonts did not bypass the geometry boundary. The private profile
+  enabled both figure and both table checks while leaving experimental half-empty-page disabled.
+  These reports use positive scratch-produced inputs, with source/resource and installed-package
+  byte joins; they do not establish identity with delivered PDFs or authorization to repair them.
+
+Registry publication and these bounded integration runs do not establish an all-product clean
+result, human report-surface review or population calibration. The separate round 8 delegated AI report-surface review and
+its explicit presentation advisories retain the scope described above.
 
 ## Release v0.9.0: published 2026-10-07
 

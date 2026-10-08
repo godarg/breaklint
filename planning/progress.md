@@ -1561,3 +1561,35 @@ Website deployment, published-tag Action smoke and local Studio/DS OS updates re
 this checkpoint. Package publication and report sight evidence do not close those integration
 tasks. See [the dated status record](../docs/status.md#release-v0100-published-2026-10-08) for
 full package integrity, measurement boundaries and historical review distinctions.
+
+
+## 2026-10-08 — publication integration readback and documentation correction
+
+⛔ Supersedes the integration-pending claims in the earlier dated checkpoint only through the
+following actual measurements. The earlier record and its static review remain preserved.
+
+Registry corpus checker exits were 0 for both corpus documents on both tested runtimes; the
+finding-bearing demo retained exit 1. The reviewed release gates ran on candidate `58d0ac7`,
+while the immutable release tag resolves to merge `65be7f0`. A native Git tree comparison
+measured identical tree `a4bb10ee429a25222b3a15a4260cd2f28b5c0357`. The documentation successor
+corrects these two truth-duty findings from its predecessor's PASS/one medium/one low review;
+it does not rewrite that review or change the published package.
+
+Published-tag Action smoke run 37740665593 passed on both Node 22.13.0 and 24.21.0 at the
+actual tag commit, with clean four-page reports and 12 default checks. Website production
+commit `8d0830f` was read back from Cloudflare and the public DE/EN pages; a native production
+check passed 71 URL/status expectations. Eight production screenshots received contributor AI
+inspection, separate from independent acceptance or human evaluation.
+
+The local DS OS consumer at `b341761` completed its native finish: the unchanged E2E suite
+reported 46 passed/four original skips and 45 reports (42 clean/three insufficient). No push
+or deployment was performed. The Studio consumer's native finish completed at 07:26 UTC;
+its ten-product batch returned exit 3 with all ten reports (five exits 4, three exits 1,
+two exits 3). Eight paginated runs measured 786 pages and 199 findings. Its optional figure
+and table checks were enabled; half-empty-page remained disabled. Unstable renders still
+stop after successful font acquisition, and product delivery identity was not measured.
+
+No all-product pass, human surface review, stock CLI/API equivalence, independent holdout or
+population calibration follows from these bounded integration results. The four frozen example
+arms remain a separate 215-page unchanged-layout comparison. Current source documentation
+corrections do not replace the immutable npm documentation bytes or move the release tag.
