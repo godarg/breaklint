@@ -58,6 +58,10 @@ The registry integrity is
 The retained provenance contract bound the SLSA payload to this exact tag, commit and archive.
 These are dated measurements; query npm and the linked workflow for a later service state.
 
+This checkpoint and the corrected README rule count and Changelog date are postpublication
+GitHub documentation updates. They do not replace the immutable 0.10.0 package or move its tag;
+the npm package retains the documentation bytes originally published with that archive.
+
 Separate fresh registry consumers on Node **22.13.0** and **24.21.0** each completed 19 native
 commands with their expected exits. At three stages per runtime, complete 209-member byte
 inventories and root/hidden lock identities matched the registry archive. The actual
