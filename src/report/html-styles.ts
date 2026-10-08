@@ -155,8 +155,9 @@ export const REPORT_HTML_STYLES = String.raw`
   @media (max-width: 64rem) {
     .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .run-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    /* A 768 px tablet has 720 px for seven columns; the longest rule name alone needs 198 px. */
-    .coverage-table th, .coverage-table td { padding-inline: var(--bl-space-2); }
+    /* Seven columns, including the explicit Unmeasured heading, must fit a 720 px tablet column.
+       Match print's compact padding while preserving unbroken rule-name segments and numbers. */
+    .coverage-table th, .coverage-table td { padding-inline: .375rem; }
     .coverage-table thead th { font-size: .6875rem; letter-spacing: .02em; }
   }
   @media (max-width: 30rem) {
@@ -168,12 +169,12 @@ export const REPORT_HTML_STYLES = String.raw`
        template — rule and result on the first line, the five numbers below — so every column still
        aligns across rows and with its header, and nothing scrolls sideways. */
     .coverage-table, .coverage-table thead, .coverage-table tbody, .coverage-table caption { display: block; }
-    .coverage-table tr { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: var(--bl-space-2); row-gap: var(--bl-space-1); padding-block: var(--bl-space-2); border-block-end: var(--bl-border-thin) solid var(--bl-color-divider); }
+    .coverage-table tr { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .9fr) minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, .8fr); column-gap: var(--bl-space-2); row-gap: var(--bl-space-1); padding-block: var(--bl-space-2); border-block-end: var(--bl-border-thin) solid var(--bl-color-divider); }
     .coverage-table thead tr { border-block-end: var(--bl-border-strong) solid var(--bl-color-fg-primary); }
     .coverage-table th, .coverage-table td, .coverage-table thead th { padding: 0; border: 0; }
-    /* Five value columns share 366 CSS px: header labels must fit a 67 px column, or a right-aligned
-       label overflows past its column edge (measured: MEASURED at .75rem overran by 5.7 px, and
-       CANDIDATES, whole since the soft hyphen went, by 6.7 px at .6875rem). */
+    /* Five value columns share 366 CSS px. Use the same weighted tracks in every row: UNMEASURED
+       overran an equal 67 px track by 5.44 px, while FLOOR needs less room. Keep whole labels
+       readable at the existing size and align each header with its numeric column. */
     .coverage-table thead th { font-size: .625rem; letter-spacing: 0; }
     .coverage-table tbody th[scope="row"] { padding-inline-start: var(--bl-space-2); }
     .coverage-table thead .rule { padding-inline-start: var(--bl-space-2); }
@@ -204,6 +205,9 @@ export const REPORT_HTML_STYLES = String.raw`
     .summary-grid > div:first-child dd { overflow-wrap: normal; font-size: var(--bl-font-size-base); white-space: nowrap; word-break: normal; }
     .summary-grid > div:first-child small { white-space: normal; }
     .run-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    /* Each fact is one label/value unit. A grid fragment otherwise left SOURCE and CONFIGURATION
+       labels at the end of one page and their values alone at the top of the next. */
+    .run-facts > div { break-inside: avoid; }
     .finding-list { gap: var(--bl-space-4); }
     /* Block flow, not a grid: a grid item that fragments is stretched to its unfragmented grid
        area, and Blink handed the surplus a repeated table header creates to the continuation

@@ -137,7 +137,9 @@ export const headingAtPageBottom = defineRule(
           message:
             `This heading ends page ${block.page} with ${remainingInLines.toFixed(2)} of its own ` +
             `line heights left; the threshold is ${minLineHeights}. Heuristic: the threshold is a ` +
-            `chosen default, not a calibrated one.`,
+            `chosen default, not a calibrated one. Paginator ending: ${page.outgoingBreakCause.kind} ` +
+            `(${page.outgoingBreakCause.determinedBy}). The cause and author intent are unknown; ` +
+            `inspect the following page before applying a keep.`,
           page: block.page,
           keyType: "block",
           key: blockKey({ authorId: block.authorId, blockSignature: block.blockSignature }),

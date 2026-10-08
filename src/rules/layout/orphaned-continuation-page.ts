@@ -182,7 +182,8 @@ export const orphanedContinuationPage = defineRule(
         evaluations.push(targetEvaluation({ ruleId: "layout/orphaned-continuation-page", keyType: "page", nodeKey: page.nodeKey, sid: null, boxScreen: page.contentBox, status: "not-measured", reason: "env/parity-blank-page" }));
         continue;
       }
-      // A page the author forced open is a decision. Judging its fill reports the intent back.
+      // Paged observed a forced opening. Its rationale is unknown; a forced transition alone
+      // does not establish avoidable continuation or author intent.
       if (page.incomingBreakCause.kind === "forced") {
         notMeasured.push(
           declined({ scope: "page", ruleId: "layout/orphaned-continuation-page", reason: "env/forced-break" }),
@@ -212,7 +213,8 @@ export const orphanedContinuationPage = defineRule(
           message:
             `Page ${page.pageNumber} carries only content continued from an earlier page, which ends ` +
             `there, and its net fill is ${(page.fill.net * 100).toFixed(1)} %; threshold ` +
-            `${(maxNetFill * 100).toFixed(0)} %. The break into it was an overflow, not a request.`,
+            `${(maxNetFill * 100).toFixed(0)} %. Paginator opening: ${page.incomingBreakCause.kind} ` +
+            `(${page.incomingBreakCause.determinedBy}). The avoidable cause and author intent are unknown.`,
           page: page.pageNumber,
           keyType: "page",
           key: key.key,

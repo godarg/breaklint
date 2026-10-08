@@ -381,13 +381,42 @@ export interface FigureBodyFragment {
 export interface FigureIndex {
   complete: boolean;
   ids: Record<string, number>;
+  /** Snapshot 7: legacy HTML a[name] targets, separate because IDs take precedence. */
+  namedAnchors?: Record<string, number>;
   figures: {
     sid: string;
     captionSids: string[];
-    body: { tag: "img" | "svg"; identity: string } | null;
+    body: { tag: "img" | "svg" | "table"; identity: string; tableSid?: string } | null;
+    /** Authored ordering, not an author-intent inference; required for table captions. */
+    captionPosition?: "before" | "after" | null;
     bodyFragments: FigureBodyFragment[];
   }[];
   referenceBlocks: { sid: string; references: { href: string; targetId: string | null }[] }[];
+}
+
+/** Snapshot 7: source rows and their concrete cell boxes on each printed table fragment. */
+export interface TableCell {
+  sid: string | null;
+  tag: string;
+  text: string;
+  colSpan: number;
+  rowSpan: number;
+}
+export interface TableRow {
+  sid: string | null;
+  cells: TableCell[];
+}
+export interface TableFragment {
+  /** Measured on the table and its paginated ancestors, not inferred from its wrapper box. */
+  flowReason: "env/multicolumn" | "env/vertical-writing" | null;
+  page: number;
+  box: Box;
+  visible: boolean;
+  rows: { sid: string | null; cells: (TableCell & { box: Box; visible: boolean })[] }[];
+}
+export interface TableIndex {
+  complete: boolean;
+  tables: { sid: string; headerRowSids: string[]; rows: TableRow[]; fragments: TableFragment[] }[];
 }
 
 export interface Snapshot {
@@ -434,6 +463,8 @@ export interface Snapshot {
   };
   /** Absent on stored Snapshot 5: enabled figure rules explicitly decline the unknown inventory. */
   figureIndex?: FigureIndex;
+  /** Legacy snapshots lack this inventory; enabled table checks decline, never guess. */
+  tableIndex?: TableIndex;
   pages: PageRecord[];
   blocks: BlockRecord[];
   textLines: TextLine[];
@@ -448,7 +479,7 @@ export interface Measurement {
   value: number;
   threshold: number;
   unit: string;
-  /** Always false in v1: no rule has a corpus of >= 30 real documents behind its threshold. */
+  /** Population calibration is not established. Limited human evaluation is separate evidence. */
   calibrated: false;
   proofSource: ProofSource | null;
 }

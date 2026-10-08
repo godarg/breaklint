@@ -234,15 +234,21 @@ function unitsOf(text) {
 }
 
 function readableSetOk(unit, stamps) {
+  // Read the entire list, including repeated conjunctions and Oxford commas. A two-member
+  // prefix of a longer claim is not the declared reader set. Keep duplicate members so a
+  // repeated stamp fails exact-set equality rather than silently disappearing.
+  const list = String.raw`\d+(?:(?:,\s*(?:(?:and|or)\s+)?|\s+(?:and|or)\s+)\d+)+`;
+  const prefix = String.raw`\b(?:readers?|reads?|accepts?|accepted|readable)\b[^.;]{0,40}?`;
+  const suffix = String.raw`\s+(?:are|remain|stay)\s+readable\b`;
   // Explicit snapshot wording must not be read as the report set by the generic grammar.
-  const snapshot = /\b(?:readers?|reads?|accepts?|accepted|readable)\b[^.;]{0,40}?Snapshots?[- ]?(\d+)((?:,\s*\d+)*)\s*(?:and|or)\s*(\d+)/iu.exec(unit)
-    ?? /\bSnapshots?[- ]?(\d+)((?:,\s*\d+)*)\s*(?:and|or)\s*(\d+)\s+(?:are|remain|stay)\s+readable\b/iu.exec(unit);
-  const match = snapshot ?? /\b(?:readers?|reads?|accepts?|accepted|readable)\b[^.;]{0,40}?(?:Report[- ]?)?(\d+)((?:,\s*\d+)*)\s*(?:and|or)\s*(\d+)/iu.exec(unit)
-    ?? /\bReports?[- ]?(\d+)((?:,\s*\d+)*)\s*(?:and|or)\s*(\d+)\s+(?:are|remain|stay)\s+readable\b/iu.exec(unit);
+  const snapshot = new RegExp(`${prefix}Snapshots?[- ]?(${list})`, "iu").exec(unit)
+    ?? new RegExp(String.raw`\bSnapshots?[- ]?(${list})${suffix}`, "iu").exec(unit);
+  const match = snapshot ?? new RegExp(`${prefix}(?:Report[- ]?)?(${list})`, "iu").exec(unit)
+    ?? new RegExp(String.raw`\bReports?[- ]?(${list})${suffix}`, "iu").exec(unit);
   if (!match) return null;
   const kind = snapshot ? "snapshot" : "report";
   const expected = snapshot ? stamps.readableSnapshots : stamps.readable;
-  const numbers = [match[1], ...match[2].split(",").map(s => s.trim()).filter(Boolean), match[3]].map(Number).sort((a, b) => a - b);
+  const numbers = [...match[1].matchAll(/\d+/gu)].map(member => Number(member[0])).sort((a, b) => a - b);
   return { kind, expected, numbers, ok: JSON.stringify(numbers) === JSON.stringify(expected), start: match.index, end: match.index + match[0].length };
 }
 

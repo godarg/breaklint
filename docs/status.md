@@ -4,6 +4,39 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
+## Version 0.10.0: behavior and bounded evaluation
+
+Version 0.10.0 registers 17 rules, with 12 enabled by default. Two new default-off table
+checks compare existing header context and concrete continuation-cell tracks. Figure checks now
+support proven inline-SVG body identity, cell-bound table bodies with authored caption order,
+and legacy named anchors, and recognize table-reference
+conventions. Experimental whitespace checks retain their limited role: observed paginator behavior
+is reported separately from unknown cause and author intent. Coverage text separates applicable
+rule-candidate evaluations from exclusions and unavailable tool capabilities.
+
+Snapshot 7 adds a source-bound table inventory and printed flow witnesses. Readers accept Snapshot
+5, 6 and 7, declining missing inventories for the checks that need them. Report 5 (readers accept
+Report 4 and 5), context pack 2, comparison 1 and Configuration Contract 1 remain unchanged.
+
+The font-loading boundary repair preserves quiescence, declared-font and geometry checks. Successful
+font acquisition does not mean an entire product passed. Infrastructure failures remain exit 3;
+unsupported structures remain explicit nonmeasurements. No complete all-product pass is claimed.
+
+No rule or profile is human-calibrated, and every rule retains `calibrated: false`. Bounded
+fixture/renderer validation, [human example labels](evaluation-0.10.md) and population calibration
+are distinct claims.
+The maintainer supplied actual feedback on all ten bound examples; it refines table context
+and reader-impact wording. The changed report surfaces have a new delegated AI review: round 8
+passes 32 cells with 263 qualified native image reads by actual model `claude-opus-5-5`, following
+an honestly retained round 7 FAIL and measured correction. Four medium and 27 low presentation
+findings remain explicitly disposed. This is local-image AI sight evidence, separate from human
+example evaluation, code acceptance, package identity and publication.
+
+Current service status comes from the [release workflow](https://github.com/godarg/breaklint/actions/workflows/release.yml),
+[GitHub Releases](https://github.com/godarg/breaklint/releases) and
+`npm view breaklint version dist-tags dist.integrity`. Preparation records cannot establish
+current registry state. The historical 0.9.0 measurements below keep their original date and scope.
+
 ## Release v0.9.0: published 2026-10-07
 
 ⛔ Supersedes the publication-state part of the preparation record below. The preparation and older release records remain historical evidence.
@@ -38,8 +71,8 @@ none is calibrated. Strict enables the new checks and can now end with exit 4 wh
 source or supported figure measurements are unavailable, including non-image figure bodies,
 unsupported source constructs or `--no-source-map`. The authored target inventory covers
 `id`, not legacy `<a name>` targets. The outside-coverage next-check count wording also remains
-a known limitation; JSON keeps the separate accounted values. These accepted audit advisories
-remain open as G-142, G-143 and G-144 in [the work register](../planning/open-work.md).
+a known limitation; JSON keeps the separate accounted values. These were accepted release advisories
+recorded as G-142, G-143 and G-144 in [the work register](../planning/open-work.md).
 
 The maintainer's focused completion authorization of 2026-10-07 governs this release. Publication
 does not establish the former exhaustive all-product precision/recall study, blind A/B,
@@ -50,7 +83,7 @@ population calibration or completion of the wider product repair work.
 This record was written before publication; query npm and the GitHub Release for current
 publication state. The candidate adds two source-bound, opt-in figure
 warning checks and clearer next-check navigation with counted declined candidates. It has
-15 registered rules and retains 12 default checks; none is calibrated. Snapshot 6 adds a
+15 registered rules and retains 12 default checks; none is calibrated. In 0.9.0, Snapshot 6 added a
 figure/ID inventory; legacy Snapshot 5 remains readable for existing checks, with explicit declines
 when requested figure measurements are unavailable. Report 5, context pack 2 and Configuration
 Contract 1 retain their stamps.
@@ -495,8 +528,8 @@ GitHub assets.
 
 | | |
 |---|---|
-| 15 registered rules as pure functions over a snapshot | `src/rules/` |
-| Mutation guard | 15/15 registered rules kill all five mutants each (75/75), each on a fixture that actually triggers it |
+| 17 registered rules as pure functions over a snapshot | `src/rules/` |
+| Mutation guard | 17/17 registered rules kill all 83 applicable mutants on triggering fixtures: five controls each for 16 numeric rules, three concrete controls for the categorical table-header rule; empty numeric perturbation sets are not tests |
 | False-alarm corpus | every clean fixture stays silent, every trigger fixture fires and is attributed correctly |
 | Exit matrix | 28 rows over all five exit codes, all nine `failOn` rows and every precedence edge; each row asserts on exit code **and** verdict **and** `gateTriggeredBy` |
 | Configuration Contract v1 | fail-closed JSON; real `default` and `strict` profiles; defaults < profile < config < CLI; raise-only coverage; proof-source-A thresholds locked; every effective leaf carries provenance and a SHA-256 fingerprint in the canonical JSON report; generated schema drift and process-boundary exit 2 are tested |
@@ -536,7 +569,7 @@ exit 1 and `no measurement report was written`; with it, exit 0 with no promoted
 the machine-checked figures marker below; every scalar and every empty object or array counts as
 one leaf, and no path appears in one run and not the other.
 
-<!-- breaklint-status-figures-v1 unitTests=726 aggregateTests=888 liveTests=112 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
+<!-- breaklint-status-figures-v1 unitTests=768 aggregateTests=934 liveTests=116 liveReportLeaves=226 s1RasterDiffPx=200 s1ForeignRasterDiffPx=200 -->
 
 The number of leaves that DIFFER between two runs is not a constant of this tool, and saying "one"
 flatly was wrong. It is one when nothing outside the run changes: a wall-clock time (90 ms against

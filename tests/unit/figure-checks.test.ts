@@ -23,6 +23,23 @@ it("indexes source captions, inline duplicate IDs and local reference groups", (
   assert.deepEqual(model.figureIndex.referenceBlocks.flatMap(g => g.references.map(r => r.targetId)), ["plot", "missing-a", "missing-b", "repeated"]);
 });
 
+it("inventories named anchors and table references with ID precedence and honest legacy coverage", () => {
+  const html = '<a name="old"></a><a id="both" name="both"></a><a name="both"></a><p><a href="#old">Abbildung 1</a> <a href="#both">Table 2</a> <a href="#absent">Tab. 3</a></p>';
+  const index = buildSourceModel(injectSourceIds(html, "legacy-anchors.html").html, "legacy-anchors.html").figureIndex;
+  assert.deepEqual({ ...index.ids }, { both: 1 });
+  assert.deepEqual({ ...index.namedAnchors }, { old: 1, both: 2 });
+  assert.deepEqual(index.referenceBlocks.flatMap(g => g.references.map(r => r.targetId)), ["old", "both", "absent"]);
+  const snapshot = sample("figure-reference-trigger");
+  snapshot.figureIndex!.ids = index.ids; snapshot.figureIndex!.namedAnchors = index.namedAnchors!;
+  snapshot.figureIndex!.referenceBlocks[0]!.references = index.referenceBlocks[0]!.references;
+  const result = judge(snapshot, "figure/dangling-reference");
+  assert.equal(result.findings.length, 1); assert.equal(result.findings[0]!.measurement.value, 1);
+  assert.match(result.findings[0]!.message, /"absent"/u); assert.doesNotMatch(result.findings[0]!.message, /"old"|"both"/u);
+  snapshot.schemaVersion = 6; delete snapshot.figureIndex!.namedAnchors;
+  const legacy = judge(snapshot, "figure/dangling-reference");
+  assert.deepEqual(legacy.findings, []); assert.equal(legacy.coverage["figure/dangling-reference"]!.measured, 0);
+});
+
 it("registers useful figure checks as warning and default-off", () => {
   const config = resolveConfig({ file: {}, cli: {} });
   for (const id of ["figure/caption-separated", "figure/dangling-reference"]) {
@@ -206,6 +223,26 @@ it("normalizes only proven paginator break metadata while preserving authored SV
   }
   const html = '<figure><svg data-next-break-before="page"><text>BODY</text></svg><figcaption>Figure 1</figcaption></figure>';
   assert.equal(buildSourceModel(injectSourceIds(html, "authored-metadata.html").html, "authored-metadata.html").figureIndex.complete, false);
+});
+it("declines authored ownership of paginator data-ref instead of discarding source semantics", () => {
+  const authored = '<figure><svg data-ref="author"><style>svg[data-ref="author"] text { fill: red }</style><text>BODY</text></svg><figcaption>Figure 1</figcaption></figure>';
+  const model = buildSourceModel(injectSourceIds(authored, "owned-metadata.html").html, "owned-metadata.html");
+  assert.equal(model.figureIndex.complete, false);
+  const ordinary = buildSourceModel(injectSourceIds(authored.replace(' data-ref="author"', ''), "ordinary.html").html, "ordinary.html");
+  assert.equal(ordinary.figureIndex.complete, true);
+});
+
+it("matches proven Paged SVG formatting changes without weakening the drawing witness", () => {
+  // Independently authored source/live strings model the observed Parser transformations.
+  const source = '<svg height="80" width="160">\n<!-- editing note -->\n<defs><marker id="arrow"><path d="M0 0 L4 2 L0 4"/></marker></defs>\n<text xml:space="preserve">A  B<tspan> </tspan>C</text>\n</svg>';
+  const paged = '<svg data-ref="nonce" width="160" height="80"><defs><marker data-id="arrow" id="arrow"><path d="M0 0 L4 2 L0 4"></path></marker></defs><text xml:space="preserve">A  B<tspan> </tspan>C</text></svg>';
+  const expected = figureBodyIdentity("svg", null, source);
+  assert.equal(figureBodyIdentity("svg", null, paged), expected);
+  for (const changed of [
+    paged.replace("A  B", "A B"), paged.replace("<tspan> </tspan>", "<tspan></tspan>"),
+    paged.replace("M0 0 L4 2 L0 4", "M0 0 L5 2 L0 4"),
+    paged.replace('data-id="arrow"', 'data-id="other"'),
+  ]) assert.notEqual(figureBodyIdentity("svg", null, changed), expected);
 });
 
 it("declines multicolumn figure flow even when the caption's own computed columns are auto", () => {

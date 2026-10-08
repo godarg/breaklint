@@ -785,12 +785,35 @@ function normalisedAllowedOrigins(options: RenderOptions): Set<string> {
   return result;
 }
 
+/** A diagnostic label from an observed resource, without host directories or URL payloads. */
+export function resourceFailureDetail(
+  resource: Pick<ResourceRecord, "resolvedUri" | "status">,
+  logicalRoute?: string,
+): string {
+  let identity = "[unavailable resource identity]";
+  if (logicalRoute) {
+    // The serving layer owns this route; it is not a host pathname or an inferred CDP identity.
+    identity = logicalRoute.split(/[?#]/u, 1)[0] ?? identity;
+  } else {
+    try {
+      const url = new URL(resource.resolvedUri);
+      if (url.protocol === "file:") identity = basename(fileURLToPath(url));
+      else if (url.protocol === "artifact:") identity = `artifact:${url.pathname}`;
+      else if (["http:", "https:"].includes(url.protocol)) identity = `${url.origin}${url.pathname}`;
+      else identity = `${url.protocol}[payload withheld]`;
+    } catch { /* Unknown identity stays explicit; failed acquisition is not excused. */ }
+  }
+  return `${identity} (${resource.status ?? "unknown status"})`;
+}
+
 interface NetworkTracker {
   resources: ResourceRecord[];
   /** Browser-observed fetch roles, including local server requests and dynamic stylesheet loads. */
   localRequestRoles: Map<string, Set<string>>;
   redirects: { from: string; to: string; status: number }[];
-  inFlight: Set<RequestLike>;
+  /** One page-owned public CDP session: requestId identifies a transport across redirect hops. */
+  inFlight: Map<string, { url: string; resourceType: string; responseStatus?: number; responseUrl?: string }>;
+  close(): Promise<void>;
   pendingBodies: Set<Promise<void>>;
   afterRendered: boolean;
   activityAfterRendered: number;
@@ -799,124 +822,210 @@ interface NetworkTracker {
   errors: string[];
 }
 
-async function configureNetwork(
+export async function configureNetwork(
   page: PageLike,
   localOrigin: string,
   options: RenderOptions,
   blocked: { count: number },
+  omittedDeploymentRoutes: ReadonlySet<string> = new Set(),
 ): Promise<NetworkTracker> {
   const allowed = normalisedAllowedOrigins(options);
   const tracker: NetworkTracker = {
-    resources: [], localRequestRoles: new Map(), redirects: [], inFlight: new Set(), pendingBodies: new Set(), afterRendered: false,
+    resources: [], localRequestRoles: new Map(), redirects: [], inFlight: new Map(), close: async () => {}, pendingBodies: new Set(), afterRendered: false,
     activityAfterRendered: 0, loadedBytes: 0, limitExceeded: null, errors: [],
   };
+  if (!page.createCDPSession) throw new Error("the browser driver exposes no CDP network lifecycle session");
+  const session = await page.createCDPSession();
+  let closing = false;
+  tracker.close = async () => {
+    if (closing) return;
+    closing = true;
+    await session.detach();
+  };
+  try {
+    if (!session.on) throw new Error("the browser driver exposes no CDP network lifecycle events");
+    const activity = (): void => { if (tracker.afterRendered) tracker.activityAfterRendered += 1; };
+    const lifecycleError = (detail: string): void => { tracker.errors.push(`network lifecycle ${detail}`); activity(); };
+    session.on("Network.requestWillBeSent", (payload: unknown) => {
+      const event = payload as { requestId?: unknown; request?: { url?: unknown }; type?: unknown; redirectResponse?: unknown } | null;
+      if (!event || typeof event.requestId !== "string" || typeof event.request?.url !== "string") {
+        lifecycleError("request event is malformed"); return;
+      }
+      // CDP reuses requestId for a redirect chain. A new hop replaces its predecessor but stays
+      // pending; neither Puppeteer object identity nor a shared URL establishes transport identity.
+      if (tracker.inFlight.has(event.requestId) && !event.redirectResponse) {
+        lifecycleError("duplicate request ID without a redirect hop");
+      }
+      tracker.inFlight.set(event.requestId, { url: event.request.url,
+        resourceType: typeof event.type === "string" ? event.type.toLowerCase() : "unknown" });
+      activity();
+    });
+    session.on("Network.responseReceived", payload => {
+      const event = payload as { requestId?: unknown; response?: { status?: unknown; url?: unknown } } | null;
+      if (!event || typeof event.requestId !== "string" || !event.response ||
+          typeof event.response.status !== "number" || !Number.isInteger(event.response.status) ||
+          event.response.status < 100 || event.response.status > 599 || typeof event.response.url !== "string") {
+        lifecycleError("response event is malformed"); return;
+      }
+      const pending = tracker.inFlight.get(event.requestId);
+      if (!pending) { lifecycleError("response event has no observed request"); return; }
+      pending.responseStatus = event.response.status;
+      pending.responseUrl = event.response.url;
+      activity();
+    });
+    const terminal = (payload: unknown, failed: boolean): void => {
+      const event = payload as { requestId?: unknown; errorText?: unknown; canceled?: unknown } | null;
+      if (!event || typeof event.requestId !== "string") { lifecycleError("terminal event is malformed"); return; }
+      const pending = tracker.inFlight.get(event.requestId);
+      if (!pending) lifecycleError("terminal event has no observed request");
+      tracker.inFlight.delete(event.requestId);
+      // A cancelled, unread body of an observed loopback deny response is not an unknown
+      // transport failure. Chromium emits this for the fixture's Fetch of a denied sibling.
+      // Keep the request pending until this terminal event and retain the server's403 record.
+      // In standalone files the existing asset-closure policy also identifies omitted static,
+      // origin-relative deployment styles/scripts. Only those exact source-declared routes can
+      // share this path; relative/dynamic required resources and fonts retain their own vetoes.
+      // Remote requests, missing responses and failed successful responses remain fatal.
+      let knownDenyCancellation = false;
+      if (failed && pending?.responseStatus === 403 && pending.responseUrl === pending.url &&
+          event.canceled === true && event.errorText === "net::ERR_ABORTED") {
+        try {
+          const uri = new URL(pending.url);
+          const ambient = ["fetch", "xhr"].includes(pending.resourceType);
+          const omittedDeployment = ["stylesheet", "script"].includes(pending.resourceType) &&
+            omittedDeploymentRoutes.has(uri.pathname);
+          knownDenyCancellation = uri.origin === localOrigin && (ambient || omittedDeployment);
+        }
+        catch { /* Malformed resource identity cannot establish the local-deny exception. */ }
+      }
+      if (failed && !knownDenyCancellation) lifecycleError(`transport failed: ${typeof event.errorText === "string" ? event.errorText : "unknown failure"}`);
+      activity();
+    };
+    session.on("Network.loadingFinished", payload => terminal(payload, false));
+    session.on("Network.loadingFailed", payload => terminal(payload, true));
+    session.on("Disconnected", () => { if (!closing) lifecycleError("session disconnected before acquisition completed"); });
+    await session.send("Network.enable");
+  } catch (error) {
+    try { await tracker.close(); }
+    catch (cleanupError) { throw new Error(`${String(error)}; network session cleanup failed: ${String(cleanupError)}`); }
+    throw error;
+  }
   const records = new Map<RequestLike, ResourceRecord>();
-  if (!page.setRequestInterception) throw new Error("the browser driver exposes no request-interception boundary");
-  await page.setRequestInterception(true);
-  page.on("request", (payload: unknown) => {
-    const request = payload as RequestLike;
-    tracker.inFlight.add(request);
-    if (tracker.afterRendered) tracker.activityAfterRendered += 1;
-    let permit = false;
-    try {
-      const url = new URL(request.url());
-      if (url.origin === localOrigin) {
-        const roles = tracker.localRequestRoles.get(url.pathname) ?? new Set<string>();
-        // Puppeteer's resource type records the request role independently of its filename.
-        // Unknown drivers decline the ambient exemption instead of silently accepting a failure.
-        roles.add((request as RequestLike & { resourceType?: () => string }).resourceType?.() ?? "unknown");
-        tracker.localRequestRoles.set(url.pathname, roles);
-      }
-      permit =
-        url.origin === localOrigin ||
-        ["data:", "blob:", "about:"].includes(url.protocol) ||
-        (options.network.mode === "allowlist" && allowed.has(url.origin));
-      if (url.origin !== localOrigin && !["data:", "blob:", "about:"].includes(url.protocol)) {
-        const record: ResourceRecord = {
-          requestedUri: url.href,
-          resolvedUri: url.href,
-          scheme: url.protocol.replace(/:$/u, ""),
-          origin: url.origin === "null" ? `${url.protocol}//` : url.origin,
-          status: null,
-          bytes: null,
-          sha256: null,
-          outcome: permit ? "failed" : "blocked",
-        };
-        tracker.resources.push(record);
-        records.set(request, record);
-      }
-    } catch {
-      permit = false;
-    }
-    if (permit) void request.continue();
-    else {
-      blocked.count += 1;
-      const record = records.get(request);
-      if (record) { record.bytes = 0; record.outcome = "blocked"; }
-      void request.abort("blockedbyclient");
-    }
-  });
-  page.on("requestfinished", (payload: unknown) => {
-    const request = payload as RequestLike;
-    tracker.inFlight.delete(request);
-    if (tracker.afterRendered) tracker.activityAfterRendered += 1;
-    const record = records.get(request);
-    if (!record) return;
-    const response = request.response?.();
-    if (!response) { record.outcome = "failed"; tracker.errors.push(`no response for ${record.requestedUri}`); return; }
-    const bodyTask = (async () => {
+  try {
+    if (!page.setRequestInterception) throw new Error("the browser driver exposes no request-interception boundary");
+    await page.setRequestInterception(true);
+  } catch (error) {
+    try { await tracker.close(); }
+    catch (cleanupError) { throw new Error(`${String(error)}; network session cleanup failed: ${String(cleanupError)}`); }
+    throw error;
+  }
+  try {
+    page.on("request", (payload: unknown) => {
+      const request = payload as RequestLike;
+      if (tracker.afterRendered) tracker.activityAfterRendered += 1;
+      let permit = false;
       try {
-        const status = response.status();
-        if (status >= 300 && status < 400) {
-          record.status = status; record.bytes = 0; record.resolvedUri = response.url();
-          record.sha256 = createHash("sha256").update(new Uint8Array()).digest("hex");
-          record.outcome = "loaded";
-          return;
+        const url = new URL(request.url());
+        if (url.origin === localOrigin) {
+          const roles = tracker.localRequestRoles.get(url.pathname) ?? new Set<string>();
+          // Puppeteer's resource type records the request role independently of its filename.
+          // Unknown drivers decline the ambient exemption instead of silently accepting a failure.
+          roles.add((request as RequestLike & { resourceType?: () => string }).resourceType?.() ?? "unknown");
+          tracker.localRequestRoles.set(url.pathname, roles);
         }
-        const declared = Number(response.headers?.()["content-length"] ?? "NaN");
-        if (Number.isFinite(declared) && declared > MAX_RESOURCE_BYTES) {
-          tracker.limitExceeded = {
-            maxResourceBytes: MAX_RESOURCE_BYTES, resourceBytes: declared, resource: response.url(),
+        permit =
+          url.origin === localOrigin ||
+          ["data:", "blob:", "about:"].includes(url.protocol) ||
+          (options.network.mode === "allowlist" && allowed.has(url.origin));
+        if (url.origin !== localOrigin && !["data:", "blob:", "about:"].includes(url.protocol)) {
+          const record: ResourceRecord = {
+            requestedUri: url.href,
+            resolvedUri: url.href,
+            scheme: url.protocol.replace(/:$/u, ""),
+            origin: url.origin === "null" ? `${url.protocol}//` : url.origin,
+            status: null,
+            bytes: null,
+            sha256: null,
+            outcome: permit ? "failed" : "blocked",
           };
-          record.status = status; record.bytes = declared; record.resolvedUri = response.url(); record.outcome = "failed";
-          return;
+          tracker.resources.push(record);
+          records.set(request, record);
         }
-        const body = await response.buffer();
-        record.status = status;
-        record.bytes = body.length;
-        record.resolvedUri = response.url();
-        record.sha256 = createHash("sha256").update(body).digest("hex");
-        record.outcome = "loaded";
-        tracker.loadedBytes += body.length;
-        if (body.length > MAX_RESOURCE_BYTES || tracker.loadedBytes > MAX_RESOURCE_BYTES) {
-          tracker.limitExceeded = {
-            maxResourceBytes: MAX_RESOURCE_BYTES, resourceBytes: tracker.loadedBytes, resource: response.url(),
-          };
-        }
-        const chain = request.redirectChain?.() ?? [];
-        const hops = [...chain, request];
-        for (let index = 0; index + 1 < hops.length; index += 1) {
-          const fromRequest = hops[index]!;
-          const fromResponse = fromRequest.response?.();
-          if (!fromResponse) continue;
-          tracker.redirects.push({ from: fromRequest.url(), to: hops[index + 1]!.url(), status: fromResponse.status() });
-        }
-      } catch (error) {
-        record.outcome = "failed";
-        tracker.errors.push(`response body unreadable for ${record.requestedUri}: ${error instanceof Error ? error.message : String(error)}`);
+      } catch {
+        permit = false;
       }
-    })();
-    tracker.pendingBodies.add(bodyTask);
-    void bodyTask.finally(() => tracker.pendingBodies.delete(bodyTask));
-  });
-  page.on("requestfailed", (payload: unknown) => {
-    const request = payload as RequestLike;
-    tracker.inFlight.delete(request);
-    if (tracker.afterRendered) tracker.activityAfterRendered += 1;
-    const record = records.get(request);
-    if (record && record.outcome !== "blocked") record.outcome = "failed";
-  });
-  return tracker;
+      if (permit) void request.continue();
+      else {
+        blocked.count += 1;
+        const record = records.get(request);
+        if (record) { record.bytes = 0; record.outcome = "blocked"; }
+        void request.abort("blockedbyclient");
+      }
+    });
+    page.on("requestfinished", (payload: unknown) => {
+      const request = payload as RequestLike;
+      if (tracker.afterRendered) tracker.activityAfterRendered += 1;
+      const record = records.get(request);
+      if (!record) return;
+      const response = request.response?.();
+      if (!response) { record.outcome = "failed"; tracker.errors.push(`no response for ${record.requestedUri}`); return; }
+      const bodyTask = (async () => {
+        try {
+          const status = response.status();
+          if (status >= 300 && status < 400) {
+            record.status = status; record.bytes = 0; record.resolvedUri = response.url();
+            record.sha256 = createHash("sha256").update(new Uint8Array()).digest("hex");
+            record.outcome = "loaded";
+            return;
+          }
+          const declared = Number(response.headers?.()["content-length"] ?? "NaN");
+          if (Number.isFinite(declared) && declared > MAX_RESOURCE_BYTES) {
+            tracker.limitExceeded = {
+              maxResourceBytes: MAX_RESOURCE_BYTES, resourceBytes: declared, resource: response.url(),
+            };
+            record.status = status; record.bytes = declared; record.resolvedUri = response.url(); record.outcome = "failed";
+            return;
+          }
+          const body = await response.buffer();
+          record.status = status;
+          record.bytes = body.length;
+          record.resolvedUri = response.url();
+          record.sha256 = createHash("sha256").update(body).digest("hex");
+          record.outcome = "loaded";
+          tracker.loadedBytes += body.length;
+          if (body.length > MAX_RESOURCE_BYTES || tracker.loadedBytes > MAX_RESOURCE_BYTES) {
+            tracker.limitExceeded = {
+              maxResourceBytes: MAX_RESOURCE_BYTES, resourceBytes: tracker.loadedBytes, resource: response.url(),
+            };
+          }
+          const chain = request.redirectChain?.() ?? [];
+          const hops = [...chain, request];
+          for (let index = 0; index + 1 < hops.length; index += 1) {
+            const fromRequest = hops[index]!;
+            const fromResponse = fromRequest.response?.();
+            if (!fromResponse) continue;
+            tracker.redirects.push({ from: fromRequest.url(), to: hops[index + 1]!.url(), status: fromResponse.status() });
+          }
+        } catch (error) {
+          record.outcome = "failed";
+          tracker.errors.push(`response body unreadable for ${record.requestedUri}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      })();
+      tracker.pendingBodies.add(bodyTask);
+      void bodyTask.finally(() => tracker.pendingBodies.delete(bodyTask));
+    });
+    page.on("requestfailed", (payload: unknown) => {
+      const request = payload as RequestLike;
+      if (tracker.afterRendered) tracker.activityAfterRendered += 1;
+      const record = records.get(request);
+      if (record && record.outcome !== "blocked") record.outcome = "failed";
+    });
+    return tracker;
+  } catch (error) {
+    try { await tracker.close(); }
+    catch (cleanupError) { throw new Error(`${String(error)}; network session cleanup failed: ${String(cleanupError)}`); }
+    throw error;
+  }
 }
 
 async function crossCheckPage(page: PageLike): Promise<ReturnType<typeof compareGeometry>> {
@@ -1460,7 +1569,7 @@ export const PAGINATION_PREVIEW_SOURCE = `(async () => {
   }
 })()`;
 
-async function awaitNetworkQuiet(
+export async function awaitNetworkQuiet(
   tracker: NetworkTracker,
   timeoutMs = PAGINATION_TIMEOUT_MS,
   signal?: AbortSignal,
@@ -1469,10 +1578,11 @@ async function awaitNetworkQuiet(
   let lastActivity = tracker.activityAfterRendered;
   while (Date.now() < deadline) {
     if (signal?.aborted) throw new AcquisitionAborted("acquisition aborted during network quiet");
+    if (tracker.errors.length > 0) return false;
     if (tracker.inFlight.size === 0 && tracker.pendingBodies.size === 0) {
       const pause = new Promise<void>((resolveWait) => setTimeout(resolveWait, 250));
       await (signal ? abortable(pause, signal, "network quiet stable window") : pause);
-      if (tracker.inFlight.size === 0 && tracker.pendingBodies.size === 0 && tracker.activityAfterRendered === lastActivity) {
+      if (tracker.inFlight.size === 0 && tracker.pendingBodies.size === 0 && tracker.errors.length === 0 && tracker.activityAfterRendered === lastActivity) {
         return true;
       }
       lastActivity = tracker.activityAfterRendered;
@@ -1532,6 +1642,7 @@ async function openContentPage(
   installCollector: boolean,
   signal: AbortSignal,
   observeNetwork?: (network: NetworkTracker) => void,
+  omittedDeploymentRoutes: ReadonlySet<string> = new Set(),
 ): Promise<OpenedContentPage> {
   if (!context.browser.createBrowserContext) {
     throw new Error("the browser driver exposes no isolated browser-context boundary");
@@ -1540,6 +1651,7 @@ async function openContentPage(
   let page: PageLike | null = null;
   let ownedPage: PageLike | null = null;
   let closed = false;
+  let network: NetworkTracker | null = null;
   const pendingOwnership: Promise<void>[] = [];
   const closeLatePage = async (latePage: PageLike): Promise<void> => {
     try { await withTimeout(latePage.close(), BROWSER_CLOSE_TIMEOUT_MS, "late content page.close"); }
@@ -1578,6 +1690,10 @@ async function openContentPage(
   const close = async (): Promise<void> => {
     if (closed) return;
     const errors: string[] = [];
+    if (network) {
+      try { await withTimeout(network.close(), BROWSER_CLOSE_TIMEOUT_MS, "network session.detach"); }
+      catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
+    }
     if (page) {
       try { await withTimeout(releaseCapturedFontIdentity(page), BROWSER_CLOSE_TIMEOUT_MS, "font session.detach"); }
       catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
@@ -1622,7 +1738,11 @@ async function openContentPage(
     if (!page.evaluateOnNewDocument) throw new Error("the browser driver exposes no on-new-document primitive boundary");
     await page.evaluateOnNewDocument(primitivesSource(apparatusCapability));
     await page.evaluateOnNewDocument(integritySourceWithCapability(expectedSids, apparatusCapability));
-    const network = await configureNetwork(page, origin, context.options, context.blocked);
+    network = await abortable(
+      trackOwnership(configureNetwork(ownedPage, origin, context.options, context.blocked, omittedDeploymentRoutes), async lateNetwork => {
+        await withTimeout(lateNetwork.close(), BROWSER_CLOSE_TIMEOUT_MS, "late network session.detach");
+      }), signal, "configureNetwork",
+    );
     observeNetwork?.(network);
     await prepareCapturedFontIdentity(page);
     await page.setViewport({ width: 1000, height: 800, deviceScaleFactor: 1 });
@@ -1714,12 +1834,12 @@ async function openContentPage(
         kind: "document-not-quiescent",
         detail: "network activity did not settle after afterRendered",
         measured: { stage: "post-pagination", inFlight: network.inFlight.size, pendingBodies: network.pendingBodies.size,
-          inFlightKinds: [...network.inFlight].map(request => {
-            const kind = (request as RequestLike & { resourceType?: () => string }).resourceType?.() ?? "unknown";
+          inFlightKinds: [...network.inFlight.values()].map(request => {
+            const kind = request.resourceType;
             return ["font", "document", "stylesheet", "image", "script", "other"].includes(kind) ? kind : "unknown";
           }),
-          inFlightSchemes: [...network.inFlight].map(request => {
-            try { const scheme = new URL(request.url()).protocol; return ["http:", "https:", "blob:", "data:", "about:"].includes(scheme) ? scheme : "unknown"; }
+          inFlightSchemes: [...network.inFlight.values()].map(request => {
+            try { const scheme = new URL(request.url).protocol; return ["http:", "https:", "blob:", "data:", "about:"].includes(scheme) ? scheme : "unknown"; }
             catch { return "unknown"; }
           }),
         },
@@ -1858,7 +1978,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     let controlSignature: ControlSignature | null = null;
     if (context.options.sourceMapInjection) {
       served.select("control");
-      const controlOpened = await openContentPage(context, served.origin, served.documentRoute, [], false, signal, observeNetwork);
+      const controlOpened = await openContentPage(context, served.origin, served.documentRoute, [], false, signal, observeNetwork, externalDeploymentRequiredRoutes);
       try {
         await controlOpened.page.evaluate<void>(freezeSource(controlOpened.apparatusCapability));
         const controlStable = await awaitStableLayout({
@@ -1890,6 +2010,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       true,
       signal,
       observeNetwork,
+      externalDeploymentRequiredRoutes,
     );
     openedMain = opened;
     const page = opened.page;
@@ -2102,7 +2223,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
         acquisition: { inputIdentity: identity, resources },
         infrastructure: [{
           kind: "source-acquisition-failed",
-          detail: `required document resource request failed: ${failedRequiredResources.slice(0, 4).map((resource) => `${resource.resolvedUri} (${resource.status})`).join(", ")}`,
+          detail: `required document resource request failed: ${failedRequiredResources.slice(0, 4).map(resource => resourceFailureDetail(resource, served.resourceRoutes.get(resource))).join(", ")}`,
           measured: { stage: "resource-request", failures: failedRequiredResources.length },
         }],
       };
@@ -2282,7 +2403,8 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
     }];
     if (failedRequests.length > 0) failureEvents.push({
       kind: "source-acquisition-failed",
-      detail: "document resource acquisition did not complete; typed request outcomes are retained",
+      detail: `document resource acquisition did not complete; typed request outcomes are retained: ${
+        failedRequests.slice(0, 4).map(resource => resourceFailureDetail(resource, served.resourceRoutes.get(resource))).join(", ")}`,
       measured: { stage: "resource-request", failures: failedRequests.length },
     });
     return {

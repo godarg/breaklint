@@ -38,6 +38,7 @@ import type { InjectionResult } from "../source/inject.ts";
 import { coordinateAtUtf8Byte } from "../source/bytes.ts";
 import { isNotRendered } from "../rules/shared.ts";
 import { buildFigureIndex, figureBodyIdentity } from "../source/figure-index.ts";
+import { buildTableIndex, measuredTableBodyFragments } from "../source/table-index.ts";
 
 type Node = DefaultTreeAdapterMap["node"];
 type Element = DefaultTreeAdapterMap["element"];
@@ -74,6 +75,7 @@ export interface SourceModel {
   uriRefs: Omit<UriRef, "nodeKey" | "requested">[];
   scriptBearing: boolean;
   figureIndex: NonNullable<Snapshot["figureIndex"]>;
+  tableIndex: NonNullable<Snapshot["tableIndex"]>;
 }
 
 const SOURCE_BLOCK_TAGS = new Set([
@@ -284,7 +286,7 @@ export function buildSourceModel(
   for (const sheet of additionalCss) {
     uriRefs.push(...cssUriParts(sheet.text, sheet.origin, distributionRoot, "style-sheet"));
   }
-  return { blocks, orderedBlocks, runs, uriRefs, scriptBearing, figureIndex: buildFigureIndex(document) };
+  return { blocks, orderedBlocks, runs, uriRefs, scriptBearing, figureIndex: buildFigureIndex(document), tableIndex: buildTableIndex(document) };
 }
 
 export interface ControlSignature {
@@ -392,6 +394,7 @@ export interface RawSnapshot {
   requestedUrls: string[];
   fontFamilies: string[];
   figureBodies?: { sid: string; tag: string; authorId: string | null; value: string; page: number; box: BlockRecord["box"]; visible: boolean }[];
+  tables?: (import("../core/types.ts").TableFragment & { sid: string | null })[];
   control: ControlSignature;
 }
 
@@ -1102,7 +1105,27 @@ export const SNAPSHOT_SOURCE = `(() => {
             && (part.tagName.toLowerCase() === "image" || visiblePaint(style.fill, style.fillOpacity) || strokePainted(style));
         })) });
   }));
-  return { pages, blocks, textLines, svg, figureBodies,
+  const tables = [];
+  pagesEls.forEach((page, pageIndex) => P.all(page, "table").forEach((table) => {
+    if (!inFlow(table)) return;
+    let flowReason = null;
+    for (let at = table; at && at !== page; at = P.parent(at)) {
+      const style = P.style(at, null);
+      if (style.writingMode && style.writingMode !== "horizontal-tb") { flowReason = "env/vertical-writing"; break; }
+      if (style.columnCount && style.columnCount !== "auto" && style.columnCount !== "1") { flowReason = "env/multicolumn"; break; }
+    }
+    const rows = P.all(table, "tr").filter(row => P.closest(row, "table") === table).map(row => ({
+      sid: P.attr(row, "data-bl-sid"),
+      cells: P.all(row, "td,th").filter(cell => P.closest(cell, "tr") === row && P.closest(cell, "table") === table).map(cell => ({
+        sid: P.attr(cell, "data-bl-sid"), tag: cell.tagName.toLowerCase(),
+        text: (P.text(cell) || "").replace(/\\s+/gu, " ").trim(), box: box(cell), visible: P.painted(cell) === true,
+        colSpan: P.attr(cell, "colspan") === null ? 1 : Number(P.attr(cell, "colspan")),
+        rowSpan: P.attr(cell, "rowspan") === null ? 1 : Number(P.attr(cell, "rowspan")),
+      })),
+    }));
+    tables.push({ sid: P.attr(table, "data-bl-sid"), page: pageIndex + 1, box: box(table), visible: P.painted(table) === true, flowReason, rows });
+  }));
+  return { pages, blocks, textLines, svg, figureBodies, tables,
     requestedUrls: performance.getEntriesByType("resource").map((e) => e.name),
     fontFamilies: [...fonts].filter(Boolean).sort(),
     control: (${CONTROL_SIGNATURE_SOURCE}) };
@@ -1494,6 +1517,16 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
       hasFigureSource(figure.sid) && figure.captionSids.every(hasFigureSource)) &&
     input.sourceModel.figureIndex.referenceBlocks.every(block => hasFigureSource(block.sid));
 
+  // HTML rowspan="0" is valid row-group growth, not a unit span. Raw authored values can also
+  // be NaN, zero or fractional even when the browser recovers. Snapshot 7 represents positive
+  // integer spans only. Decline this optional inventory rather than poisoning unrelated rules
+  // or replacing an unsupported span with 1; present malformed snapshots are still refused.
+  const representableSpans = (rows: readonly { cells: readonly { colSpan: number; rowSpan: number }[] }[]): boolean =>
+    rows.every(row => row.cells.every(cell => [cell.colSpan, cell.rowSpan].every(span => Number.isSafeInteger(span) && span >= 1)));
+  const tableIndexAvailable = input.sourceMapInjection && input.raw.tables !== undefined &&
+    input.sourceModel.tableIndex.tables.every(table => representableSpans(table.rows)) &&
+    input.raw.tables.every(table => representableSpans(table.rows));
+
   return {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     meta: {
@@ -1529,10 +1562,19 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
       ...input.sourceModel.figureIndex,
       complete: input.sourceMapInjection && input.sourceModel.figureIndex.complete && !input.sourceModel.scriptBearing && input.raw.figureBodies !== undefined,
       figures: input.sourceModel.figureIndex.figures.map(figure => ({ ...figure,
-        bodyFragments: (input.raw.figureBodies ?? []).filter(body => body.sid === figure.sid).map(body => ({
+        bodyFragments: figure.body?.tag === "table" ? measuredTableBodyFragments({
+          fragments: (input.raw.tables ?? []).filter(table => table.sid === figure.body?.tableSid),
+        }, figure.body.identity) : (input.raw.figureBodies ?? []).filter(body => body.sid === figure.sid).map(body => ({
           page: body.page, box: body.box, visible: body.visible,
           identity: figureBodyIdentity(body.tag, body.authorId, body.value),
         })),
+      })),
+    } } : {}),
+    ...(tableIndexAvailable ? { tableIndex: {
+      complete: input.sourceModel.tableIndex.complete && input.raw.tables!.every(table =>
+        table.sid !== null && input.sourceModel.tableIndex.tables.some(source => source.sid === table.sid)),
+      tables: input.sourceModel.tableIndex.tables.map(table => ({ ...table,
+        fragments: input.raw.tables!.filter(fragment => fragment.sid === table.sid),
       })),
     } } : {}),
     pages,

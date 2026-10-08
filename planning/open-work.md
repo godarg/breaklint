@@ -1,5 +1,44 @@
 # Open work — triage of the 2026-09-24 known-gap register
 
+## 2026-10-07 — bounded 0.10 candidate and actual human feedback
+
+⛔ Supersedes the older blanket parking of human example evaluation for this explicitly
+authorized bounded scope only. Historical stopped packages and failed reviews remain retained.
+Exact-candidate gates, independent code acceptance and publication are separate from the
+human example evaluation and delegated AI surface sight evidence.
+
+| existing item | current candidate evidence | remaining boundary |
+|---|---|---|
+| G-125 | Optional source-bound header-continuation check, independently authored live/PDF controls and actual human confirmation on selected real pages. Header-only initial fragments now name the first data page. | Spans, split rows, absent headers and unsupported flow decline. No blanket table support or tested universal repair. |
+| G-126 | Optional measured column-edge comparison with shared source membership. Human feedback distinguishes nearly identical tracks from a materially disruptive change. | The 2 CSS px default remains a review tolerance; displacement alone does not establish reader impact or author intent. |
+| G-129/G-142 | Concrete normalized SVG witnesses and source-matched multi-page table bodies reduce actual nonmeasurement. Caption order chooses the first/last body boundary. | Script/base figure inventories, ambiguous bodies and unsupported flow still decline. Strict can legitimately remain exit 4; that boundary is not erased. |
+| G-143 | Authored named anchors, ID precedence, duplicate/legacy nonmeasurement and source-bound controls implemented. | Old inventories without named anchors cannot prove a missing target. |
+| G-144 | Applicable declines, outside-denominator targets and unavailable capabilities have separate primary wording. Round 8 supplies complete fresh delegated AI sight evidence. | Canonical JSON remains unchanged. Secondary-stat units and per-decline base markers remain advisory follow-up; no universal clarity claim. |
+
+The ten selected human-reviewed examples, their adjustments and limits are described in
+[`docs/evaluation-0.10.md`](../docs/evaluation-0.10.md). They establish neither a population
+metric nor an independent blind holdout. Separated code introductions, numbering, printed
+page references and broad raster-resolution checks remain outside this release.
+
+| new item | current evidence | disposition |
+|---|---|---|
+| G-145 | Real font transport reached 25 CDP completions and zero pending requests while the previous Puppeteer object set retained 18 stale objects. | Request-ID lifecycle repair has independent held-request/redirect/failure controls. Font, quiet and geometry gates remain required; a later genuine geometry refusal is not bypassed. |
+| G-146 | Low glyph-band fill warned on nearly full pages, an accepted title page and a natural short document ending. | Experimental half-empty check now uses recorded line-height bottom-space context, explicit forced-break nonmeasurement and natural-end guard. Actual human labels confirm these selected examples only. |
+| G-147 | Authored `data-ref` can affect SVG CSS selectors but would be discarded by paginator-metadata normalization. | Independent authored selector control red before, green after: refuse source ownership instead of asserting body equality. Ordinary SVG control remains measurable. |
+
+### Round 8 advisory dispositions, measured 2026-10-07
+
+All 32 surface cells pass with no BLOCKER/HIGH. Four medium and 27 low findings are retained
+with explicit follow-up or accepted-risk dispositions. The following successor work consolidates
+the recurring presentation costs; it does not turn separate findings into one proven cause.
+
+| new item | bounded observation | disposition |
+|---|---|---|
+| G-148 | Primary evaluation accounting is correct, but the secondary `Not measured` stat lacks a unit, zero-candidate rows say `Coverage met`, and decline entries lack inside/outside-base labels. | Follow-up: explicit units and recorded base categories; unknown categories must stay unknown. No denominator change. |
+| G-149 | Infrastructure/coverage failures explicitly show non-clean exits 3/4, while `Gate triggered by none` refers to the finding gate and can confuse readers. | Follow-up: state-qualified finding-gate wording and table-local partial-run qualifiers. No false clean outcome was observed. |
+| G-150 | Handwritten surface fixtures show unresolved ambiguity without a named partner and synthetic evidence filenames without their binding basis. | Follow-up: clear fixture provenance, partner and evidence/failure context. Actual product binding correctness is not established by those strings. |
+| G-151 | Native tiles and A4 pages remain legible, but internal identifier wraps, mixed type roles, redundant tail labels, unlabelled short continuations and a collapsed printed disclosure cost navigation. | Low follow-up/accepted risk for the frozen release. No ideal print, interaction, human or Ubuntu sight claim. |
+
 Triage date: 2026-09-24. Tree: `db0e4c0` (= `origin/main`, v0.6.0 + 10 commits).
 Method: six independent triage agents (T1–T6), each re-verifying its register items against the
 code with file:line citations, and by measurement where it was cheap. The register was treated as

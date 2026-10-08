@@ -1,7 +1,7 @@
 import type { Report } from "../core/types.ts";
 import { LABELS, mandatoryFacts } from "./mandatory.ts";
 import { emptyStateSentence, infraLines } from "./infra.ts";
-import { projectDecisions } from "./decisions.ts";
+import { COVERAGE_COUNT_NOTICE, coverageAccounting, coverageAccountingText, projectDecisions } from "./decisions.ts";
 import { VALIDATION_RULES_BY_ID } from "../rules/index.ts";
 
 function text(value: string): string {
@@ -25,6 +25,8 @@ export function renderMarkdown(report: Report): string {
   out.push(`| ${LABELS.mode} | ${f.mode} |`);
   out.push(`| ${LABELS.failOn} | ${f.failOn} |`);
   out.push(`| ${LABELS.gateTriggeredBy} | ${f.gateTriggeredBy} |`, "");
+  out.push(`Coverage counts: ${coverageAccountingText(coverageAccounting(report.documents.flatMap(doc => Object.values(doc.coverage))))}.`,
+    "", COVERAGE_COUNT_NOTICE, "");
 
   const decisions = projectDecisions(report);
   if (decisions.nextChecks.length > 0) {
@@ -85,12 +87,13 @@ export function renderMarkdown(report: Report): string {
   // Coverage is printed even when it is complete. A reader who only sees it when it is short
   // cannot tell "complete" from "not reported".
   out.push("## Coverage", "");
-  out.push("| rule | candidates | measured | not measured | floor | ok |", "|---|---|---|---|---|---|");
+  out.push("The coverage base contains applicable evaluations. Outside-base declines remain in the counted reasons above.", "");
+  out.push("| rule | applicable base | measured | applicable not measured | floor | ok |", "|---|---|---|---|---|---|");
   for (const doc of report.documents) {
     for (const [ruleId, c] of Object.entries(doc.coverage)) {
       out.push(
-        `| \`${ruleId}\` | ${c.candidates} | ${c.measured} | ${c.notMeasuredCount} | ` +
-          `${c.floor} | ${c.ok ? "yes" : "**no**"} |`,
+        `| \`${ruleId}\` | ${c.candidates} | ${c.measured} | ${coverageAccounting([c]).applicableUnmeasured} | ` +
+          `${c.floor * 100}% | ${c.ok ? "yes" : "**no**"} |`,
       );
     }
   }

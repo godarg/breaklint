@@ -34,6 +34,7 @@ import { localUri } from "./artifact/local-uri.ts";
 
 import { captionSeparated } from "./figure/caption-separated.ts";
 import { danglingReference } from "./figure/dangling-reference.ts";
+import { tableHeaderNotRepeated, tableColumnDrift } from "./layout/table-continuation.ts";
 
 export const ALL_RULES: readonly Rule[] = Object.freeze([
   widow,
@@ -51,6 +52,8 @@ export const ALL_RULES: readonly Rule[] = Object.freeze([
   localUri,
   captionSeparated,
   danglingReference,
+  tableHeaderNotRepeated,
+  tableColumnDrift,
 ]);
 
 const seen = new Set<string>();

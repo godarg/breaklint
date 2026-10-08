@@ -44,13 +44,14 @@ export function latestBindingStatus(ledger: ReviewLedger, manifest: unknown, cur
 };
 export function describeLatestRound(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): string;
 export function assessHumanGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): ReviewRound;
-export function assessSightGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string): { latest: ReviewRound; reviewKind: "human" | "delegatedAI" };
+export function assertCurrentDelegationRelease(latest: ReviewRound, reviewInputRoot?: string): void;
+export function assessSightGate(ledger: ReviewLedger, manifest: unknown, currentFingerprint: string, reviewInputRoot?: string): { latest: ReviewRound; reviewKind: "human" | "delegatedAI" };
 
 export interface FounderSightDelegation {
   founder: "@Founder";
   date: string;
   sessionQuote: string;
-  release: "0.9.0";
+  release: string;
   revoked: false;
 }
 export interface DelegatedAIReviewer {

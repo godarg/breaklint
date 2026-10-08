@@ -80,7 +80,8 @@ const controls = [
   { name: "broken-end-mark", state: "infrastructure", expect: /infrastructure: the final page lacks the end mark/u },
   { name: "broken-landmarks", state: "clean", expect: /accessibility contract failed: navigation landmark missing/u },
   { name: "broken-skip-link", state: "clean", expect: /accessibility contract failed: first Tab stop is not the skip link/u },
-  { name: "broken-untested-repeat", state: "findings", expect: /untested-advice caveat appears 8 times in the PDF/u },
+  // Six authored cards plus the one global caveat: independently counted by Poppler.
+  { name: "broken-untested-repeat", state: "findings", expect: /untested-advice caveat appears 7 times in the PDF/u },
   { name: "broken-untested-marker", state: "findings", expect: /untested marker is not set in body-text colour/u },
   {
     name: "broken-soft-contrast",

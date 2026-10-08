@@ -25,7 +25,20 @@ published repair from this change set and binds the child CLI to the actual cons
 run `33320332110` completed the Node 22.13/24 consumer matrix, npm provenance verification and
 GitHub Release creation on 2026-08-30.
 
-0.9.0 is a minor pre-1.0 release because it adds checks and changes the measurement snapshot.
+Version 0.10.0 is a minor pre-1.0 change: it adds two optional table checks
+and changes judgments on unchanged documents. Snapshot 7 adds table row/cell and printed-fragment
+inventory. Readers accept Snapshot 5, 6 and 7; missing legacy inventory declines enabled checks.
+Optional legacy named-anchor data cannot be assumed present in old figure inventories. Report 5
+(readers accept Report 4 and 5), context pack 2, comparison 1 and Configuration Contract 1 remain
+unchanged. Consumers must not manufacture complete inventories to migrate snapshots.
+
+The candidate requires actual human feedback on its bound before/after examples before dependent
+calibration and publication. This evaluation is separate from report-surface sight review; an AI
+surface reviewer cannot supply Founder example labels. No global calibrated claim follows from a
+small selected evaluation. The final record must name examples, selection, labels, adjustments,
+validation data and any absence of an independent holdout.
+
+0.9.0 was a minor pre-1.0 release because it adds checks and changes the measurement snapshot.
 Snapshot 5 → 6 adds an optional authored figure/ID inventory and concrete image-body witnesses.
 Legacy Snapshot 5 remains readable for the existing checks; requested figure checks count
 an absent or incomplete inventory as declined and cannot produce a clean result from it. A
@@ -73,10 +86,12 @@ workflow passes it as `NODE_AUTH_TOKEN` only to the publish step.
 
 ## Before creating the tag
 
-For the focused 0.9.0 release, complete preparation and review on a frozen candidate branch
-before merging its pull request. This avoids successive release-only commits on `main` while
-retaining the same source, environment, artifact and pixel bindings. The maintainer authorized
-this targeted completion on 2026-10-07; see `planning/finish-0.9.md`.
+Complete preparation and review on a frozen candidate branch before merging its pull request.
+For 0.10.0, actual human feedback on all ten bound examples is recorded in
+`docs/evaluation-0.10.md`. Round 8 supplies fresh delegated AI surface sight evidence, separate
+from those human labels. Preserve all
+source, environment, artifact and pixel bindings, including historical failed attempts. The
+0.9.0 completion record in `planning/finish-0.9.md` is historical, not approval of the candidate.
 
 1. **Prepare the candidate:** version all package/workflow references, date the changelog,
    generate rule documentation and schema, and run the ordered local gates below. Run the
@@ -92,7 +107,7 @@ this targeted completion on 2026-10-07; see `planning/finish-0.9.md`.
    Then `npm run test:report-surfaces:local` must pass on the exact input binding.
 4. **Push and merge the pull request after green CI.** The merge must preserve the candidate's
    reviewed inputs. Query `ci.yml` on the exact resulting `main` commit and verify success.
-5. **Push the annotated tag `v0.9.0` on that exact commit.** The workflow publishes and verifies
+5. **Push a new annotated tag `vX.Y.Z` matching the approved version on that exact commit.** The workflow publishes and verifies
    registry integrity, provenance and release assets. Measure those service results before
    recording publication or updating consumers and the live website.
 
@@ -166,9 +181,15 @@ bind the current input fingerprint, declared environment, rendered artifacts, sc
 and complete physical inventory. `assessHumanGate` remains human-only: only `@Brand`, `@Neo` or
 `@Founder` can pass it. An ordinary `agent` entry never passes a cell.
 
-Ledger schema 6 additionally permits `kind: "delegated-ai"` for the explicitly delegated 0.9.0
-sight review. The round must carry the Founder's release-specific delegation: `founder: "@Founder"`,
-date, verbatim session quote, `release: "0.9.0"` and `revoked: false`. The reviewer must have a
+Ledger schema 6 additionally permits `kind: "delegated-ai"` for a sight review explicitly
+delegated by the Founder for that release. The round carries `founder: "@Founder"`, the date,
+verbatim session quote, a concrete stable release version (for example `release: "0.10.0"`)
+and `revoked: false`. A version field records the scope of the actual session authorization;
+it cannot grant authorization. The strict sight gate requires the latest delegated round's
+release to equal `package.json.version` in the bound review-input root. Historical 0.9.0
+rounds keep their original delegation and bytes; their votes do not approve a later release.
+This version-specific validation uses the existing schema-6 fields without a schema migration.
+The reviewer must have a
 nonhuman handle, a recorded nonUNKNOWN `actual_model`, prompt/output SHA-256 hashes, and a native
 receipt with path, SHA-256 and exact image count. Its closed `receivedImages` entries contain
 exact `{path, sha256}` pairs for **every assigned full screen PNG, every screen tile and every A4
@@ -223,7 +244,8 @@ finding list and an owner, instead of red and unread. The findings and their add
 carried in that release's follow-up register.
 
 <!-- review-state -->
-For 0.9.0 the current record is round 6: four fresh Claude Opus reviews (actual model
+The following describes historical 0.9.0 evidence; it is not acceptance of the changed candidate
+surfaces. For 0.9.0 the record is round 6: four fresh Claude Opus reviews (actual model
 `claude-opus-5-5`) passed all 32 cells on the source after the platform inventory correction,
 under the Founder's release-specific AI delegation of 2026-10-04 and targeted-completion
 instruction of 2026-10-07. Native receipts bind 222 image reads (24 full screens, 168 viewport

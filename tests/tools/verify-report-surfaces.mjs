@@ -764,14 +764,14 @@ function independentlyNormalizeScreenPixels(bytes) {
 }
 
 /**
- * Tablet and mobile cells ship viewport-height tiles. Each is re-cut here from the independently
+ * Every screen cell ships viewport-height tiles. Each is re-cut here from the independently
  * decoded full page and must match byte for byte in normalized RGBA: a tile can add no pixel the
  * fingerprinted full page does not already bind.
  */
 function independentlyCheckTiles(artifact, decodedFullPage, tilePath = (tile) => resolve(output, tile.path)) {
   const viewport = artifact.cell.split("/")[3];
   const viewportHeight = manifest.reviewEnvironment.viewports[viewport].height;
-  const expected = viewport === "desktop" ? 0 : Math.ceil(artifact.dimensions.height / viewportHeight);
+  const expected = Math.ceil(artifact.dimensions.height / viewportHeight);
   assert.equal(artifact.tiles.length, expected, `${artifact.cell}: expected ${expected} viewport-height tiles`);
   const width = decodedFullPage.decoded.width;
   for (const [index, tile] of artifact.tiles.entries()) {
@@ -1204,9 +1204,21 @@ assert.ok(fontMutationControl, "PDF font mutation control did not run");
 // pdfinfo and PNG membership/hash/dimensions confirmed its 29 pages; the final universal pin was
 // its only failure. Each supported platform now has a fixed per-state oracle. No manifest-derived
 // expectation, range, or fallback can conceal a changed state split or a longer report.
+// These preceding counts are the historical 0.9.0 matrix. The 0.10.0 presentation has six
+// findings after its natural document ending is accepted, with clarified coverage wording and
+// atomic printed run-fact label/value pairs. Independent pdfinfo, pypdf, physical PNG membership
+// and SHA/dimension checks measured 3/8/8/8 pages and 158 viewport tiles on macOS on 2026-10-07.
+// Linux run https://github.com/godarg/breaklint/actions/runs/37679854862 measured the same fixed
+// per-state pages and tile count from the unchanged candidate, with native renderer/oracle exit0.
+// The first diagnostic run timed out before rendering; it supplies no oracle and remains retained.
+// The round7 HIGH repair records the previously missing handwritten widow decline and adds
+// readable desktop tiles to every screen cell. Independent macOS filesystem/IHDR/pdfinfo/pypdf
+// and Linux run https://github.com/godarg/breaklint/actions/runs/37686731564 measured 212 tiles
+// and the same fixed3/8/8/8 pages on2026-10-07. The212 expectation is a physical observation,
+// not a renderer-manifest-derived count. The preceding158 count remains historical evidence.
 const EXPECTED_PRINT_PAGES_BY_PLATFORM = Object.freeze({
-  darwin: Object.freeze({ clean: 3, findings: 9, infrastructure: 9, "insufficient-coverage": 9 }),
-  linux: Object.freeze({ clean: 3, findings: 8, infrastructure: 9, "insufficient-coverage": 9 }),
+  darwin: Object.freeze({ clean: 3, findings: 8, infrastructure: 8, "insufficient-coverage": 8 }),
+  linux: Object.freeze({ clean: 3, findings: 8, infrastructure: 8, "insufficient-coverage": 8 }),
 });
 
 function assertSurfaceInventory(inventory, platform) {
@@ -1217,8 +1229,8 @@ function assertSurfaceInventory(inventory, platform) {
   const actualPages = Object.fromEntries(pdfs.map((artifact) => [artifact.cell.split("/")[1], artifact.pages]));
   assert.deepEqual(actualPages, expectedPages, `${platform}: print page inventory must match every fixed state`);
   const rasterPages = Object.values(expectedPages).reduce((sum, pages) => sum + pages, 0);
-  assert.deepEqual(inventory.physicalArtifacts, { screens: 24, screenTiles: 168, pdfs: 4, rasterPages },
-    `${platform}: the report-surface inventory must be exactly 24 screens with 168 viewport tiles, 4 PDFs and ${rasterPages} PDF page rasters`);
+  assert.deepEqual(inventory.physicalArtifacts, { screens: 24, screenTiles: 212, pdfs: 4, rasterPages },
+    `${platform}: the report-surface inventory must be exactly 24 screens with 212 viewport tiles, 4 PDFs and ${rasterPages} PDF page rasters`);
 }
 
 assertSurfaceInventory(manifest, process.platform);
@@ -1245,7 +1257,7 @@ const latestRound = describeLatestRound(ledger, manifest, currentReviewInput.fin
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Report-surface review ledger\n\n${latestRound}.\n\n${REVIEWER_AUTHENTICATION_NOTE}\n\n`);
 }
-const sightReview = mode === "local" ? assessSightGate(ledger, manifest, currentReviewInput.fingerprint) : null;
+const sightReview = mode === "local" ? assessSightGate(ledger, manifest, currentReviewInput.fingerprint, reviewInputRoot) : null;
 
 if (mode === "technical") {
   process.stdout.write(

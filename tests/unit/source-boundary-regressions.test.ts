@@ -227,7 +227,7 @@ describe("independent source boundary regressions", { concurrency: false }, () =
             assert.equal(doc.findings[0]?.originalSource.integrity?.role, "authoring");
           } else {
             assert.notEqual(doc.verdict, "clean", `${kind} must not be clean after its required stylesheet was blocked`);
-            assert.notEqual(result.report.exitCode, 0);
+            assert.equal(result.report.exitCode, 3, "a failed required stylesheet must remain an infrastructure stop");
             assert.ok(doc.infrastructure.some(event => event.kind === "source-acquisition-failed" && event.detail.includes(kind === "dynamic-favicon-css" ? "favicon.ico" : "absent.css")));
           }
         }

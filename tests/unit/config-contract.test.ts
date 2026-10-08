@@ -103,13 +103,13 @@ describe("Configuration Contract v1", () => {
    * notion of "enabled" but the rule list an engine would actually run (`activeRules`) and its
    * complement (`disabledRuleIds`), which is what a report prints.
    */
-  it("keeps the three off-by-default rules disabled while preserving explicit enablement", () => {
+  it("keeps the five off-by-default rules disabled while preserving explicit enablement", () => {
     const OFF = "layout/half-empty-page";
 
     const defaults = resolve();
     assert.equal(defaults.activeRules.some((rule) => rule.id === OFF), false, "default profile still runs it");
-    assert.deepEqual(defaults.disabledRuleIds, [OFF, "figure/caption-separated", "figure/dangling-reference"], "three measured registry rules are off by default");
-    assert.equal(defaults.activeRules.length, ALL_RULES.length - 3);
+    assert.deepEqual(defaults.disabledRuleIds, [OFF, "figure/caption-separated", "figure/dangling-reference", "layout/table-header-not-repeated", "layout/table-column-drift"], "five measured registry rules are off by default");
+    assert.equal(defaults.activeRules.length, ALL_RULES.length - 5);
     assert.equal(defaults.sources[configPointer("rules", OFF, "enabled")], "default");
 
     const strict = resolve({ profile: "strict" });
@@ -131,7 +131,7 @@ describe("Configuration Contract v1", () => {
 
     // Naming the rule with only OPTIONS turns it on too. `rules` reads as "the caller has an
     // opinion about this rule": false disables, anything else enables. For the twelve rules that
-    // run anyway this is invisible; for the one that does not, tuning it also activates it. That
+    // run anyway this is invisible; for the five that do not, tuning one also activates it. That
     // is the intended reading, and it is pinned here so it stays a decision rather than a surprise.
     const byOptionsOnly = resolve({ rules: { [OFF]: { minNetFill: 0.4 } } });
     assert.equal(byOptionsOnly.activeRules.some((rule) => rule.id === OFF), true, "an options object must not leave the rule off");
@@ -250,7 +250,7 @@ describe("Configuration Contract v1", () => {
     assert.deepEqual(ruleSchemas.properties["svg/text-overflows-viewport"]!.oneOf[1]!.properties, {});
     assert.ok(ruleSchemas.properties["type/straight-quotes"]!.oneOf[1]!.properties!.excludeTags);
     assert.equal(ruleSchemas.properties["type/straight-quotes"]!.oneOf[1]!.properties!.excludeSelectors, undefined);
-    assert.equal(ALL_RULES.length, 15, "the independent rule-count literal changed; audit the schema surface");
+    assert.equal(ALL_RULES.length, 17, "the independent rule-count literal changed; audit the schema surface");
     assert.equal(ruleSchemas.properties["svg/text-clipped"], undefined, "a research-only rule entered the public schema");
     assert.equal(ruleSchemas.properties["svg/text-ink-collision"], undefined, "a research-only rule entered the public schema");
   });

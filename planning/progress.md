@@ -1424,3 +1424,106 @@ all three lie outside the actual `REVIEW_INPUT_ROOTS` in `report-surface-contrac
 rendered review input, ledger, production code, rule default, schema, version or gate changes.
 No population precision/recall, exhaustive three-family hit review or blind product A/B pass
 is inferred from publication.
+
+## 2026-10-07 — 0.10 usefulness candidate and actual human evaluation
+
+The maintainer evaluated all ten bound real examples: six defects and four acceptable/intended
+pages. Missing continuation headers are confirmed; a header-only fragment should be kept with
+the first data row. Nearly identical column widths require modest impact wording. A correct
+caption remains separate from an independently defective table continuation. The answers are
+preserved privately with exact image, input and canonical report bindings; no human labels
+were inferred from model opinions or elapsed time.
+
+The candidate adds two optional table checks, concrete SVG/table caption measurement,
+legacy named anchors, contextual half-empty judgments and clearer coverage accounting.
+Snapshot 7 genuinely adds row/cell/fragment inventory; readers retain 5/6/7. Report 5 remains
+canonical. Twelve checks remain enabled by default; five remain optional, all uncalibrated.
+The final feedback-specific controls recorded two real reds and 24 passing focused leaves,
+including an ordinary negative control for a header already beside its first data row.
+
+The four frozen unchanged-input comparison runs retained 215 byte-identical page PNGs.
+This is a bounded behavior study through the actual published producer/engine boundary, not
+stock CLI equivalence, a blind holdout or population accuracy. Fresh final gates, current
+surface review, independent acceptance, publication and consumer updates remain pending.
+
+
+## 2026-10-07 — independent 0.10 report inventory
+
+The changed six-finding presentation, coverage labels and atomic printed run-fact pairs measure
+24 whole screens, 158 viewport tiles, four PDFs and 27 A4 page rasters. Independent pdfinfo and
+pypdf count clean/findings/infrastructure/insufficient-coverage as 3/8/8/8 on macOS and in
+[Linux diagnostic run 37679854862](https://github.com/godarg/breaklint/actions/runs/37679854862).
+Actual PNG membership, dimensions and hashes join both inventories; expected values remain
+fixed per platform/state. The missing/extra-page, unchanged-total redistribution and unknown-
+platform negative controls remain. The old 0.9 inventory is historical evidence, not a
+0.10 oracle. First Linux attempt 37677161097 timed out at a combined quiet prerequisite
+step before rendering; its exact subcommand cause remains unknown and its evidence is retained.
+The second attempt separated and bounded prerequisites and successfully rendered/independently
+counted the unchanged candidate. This supplies no AI or human visual review. A new full local
+technical gate, fresh delegated sight review and final release acceptance remain required.
+
+
+### 0.10 caveat mutation oracle
+
+The full technical32-cell matrix passed on6823173. Its subsequent physical-mutation suite
+correctly rejected the damaged advice report but stopped because a historical test literal
+expected eight caveats. The six-card fixture now generates six duplicates plus the one global
+caveat. Independent Poppler text extraction counted seven in the deliberately damaged PDF
+and exactly one in the unmodified positive PDF. The fixed literal is seven, not a range or a
+renderer-derived expected value. All earlier mutation reds remain preserved. No visual reviewer
+was called against the preceding source binding; final full technical and mutation gates remain
+required before a fresh frozen-input sight review.
+
+
+## 2026-10-07 — current 0.10 sight review failed, release blocked
+
+Round7 preserves four fresh delegated AI calls on the same frozen macOS render:209 received
+image payloads, with source/native transformation receipts and actual model claude-opus-5-5.
+The original verdicts are clean PASS, findings PASS, infrastructure FAIL and
+insufficient-coverage FAIL. One HIGH finds23 applicable versus20 measured plus2 displayed
+unmeasured evaluations in the handwritten insufficient-coverage state. No cause is inferred
+from the image alone. Four desktop cells remain not-reviewed because only downscaled full
+screens were available there; readable desktop viewport tiles are required for the next round.
+Two medium and28 low presentation findings have explicit follow-up/accepted-risk dispositions.
+All original six ledger rounds remain structurally unchanged. Release is blocked pending the
+HIGH correction, arithmetic negative control and one fresh bounded sight review; no human
+or Ubuntu visual acceptance is claimed.
+
+### Bounded round7 HIGH correction
+
+The handwritten insufficient-coverage fixture had a scalar decline count without a recorded
+reason. Two new arithmetic/projection tests fail on the unchanged old fixture and pass after
+its explicitly authored multicolumn decline is present in both rule and document accounts.
+The independent outside-base5/3/2 control remains green; all ten navigation leaves and
+typecheck pass. Production rule-engine and report projection code are unchanged.
+
+All screen viewports now include full-height legible tiles. Independent filesystem/IHDR,
+pdfinfo and pypdf observations measure24 screens,212 tiles,four PDFs and27 printed-page
+rasters on macOS and [Linux run37686731564](https://github.com/godarg/breaklint/actions/runs/37686731564).
+The print-state counts remain3/8/8/8. The old158 tile pin actually rejects this new physical
+inventory; the fixed expectation is updated from those independent measurements. Missing,
+extra and redistributed-page, unknown-platform, gallery membership and one-pixel recut
+negative controls remain. Fresh technical, mutation, sight and final release gates are pending.
+
+## 2026-10-07 — repaired current report sight review, round 8
+
+⛔ Supersedes the round 7 HIGH and incomplete desktop sight status only through the following
+measured repair and fresh review. Round 7 and its original receipts remain unchanged.
+
+At committed source `3ca25437`, input fingerprint `01609709`, the complete technical surface
+gate, 34 expected-red surface mutants and selfcheck each finished with native Exit 0. The
+handwritten fixture repair has two real focused failures before and ten navigation tests green
+after; its separate outside-base control remains green. Independent Mac and Linux inventories
+measure 24 screens, 212 tiles, four PDFs and 27 A4 pages (3/8/8/8).
+
+Four fresh independent read-only Opus state calls then returned PASS, actual model
+`claude-opus-5-5`, CLI 2.1.292. Qualified native image receipts contain 35/74/76/78 reads:
+263 total, including every full screen, viewport tile and A4 raster. All 32 cells pass; none
+remains unreviewed. There are zero BLOCKER/HIGH, four medium and 27 low findings. Root read
+the original answers, per-image details, visible assistant text, limitations and native carrier
+joins, and explicitly disposed every advisory. G-148–G-151 record consolidated successor work.
+
+All seven previous ledger rounds are structurally preserved; the new passing round is appended
+as round 8 with new receipt filenames. This is delegated AI local-image sight evidence, not
+human surface review, Ubuntu visual acceptance or publication. Full exact-candidate gates,
+final packed consumers and independent code acceptance remain separate required proofs.

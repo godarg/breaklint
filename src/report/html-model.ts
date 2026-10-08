@@ -3,6 +3,7 @@ import type { RunVerdict, Severity } from "../core/enums.ts";
 import { mandatoryFacts } from "./mandatory.ts";
 import { infraLines } from "./infra.ts";
 import { VALIDATION_RULES_BY_ID } from "../rules/index.ts";
+import { COVERAGE_COUNT_NOTICE, coverageAccounting, coverageAccountingText } from "./decisions.ts";
 
 /** The two rules whose severity is `error`: disabling one removes the only default gate this tool has. */
 const GATING_RULE_IDS = new Set(["svg/text-overflows-viewport", "layout/unbreakable-block-too-tall"]);
@@ -226,7 +227,7 @@ function coverageRow(
     ruleId,
     candidates: coverage.candidates,
     measured: coverage.measured,
-    notMeasured: coverage.notMeasuredCount,
+    notMeasured: coverageAccounting([coverage]).applicableUnmeasured,
     ratio: coverage.coverage === null ? "Not applicable" : `${formatNumber(coverage.coverage * 100)}%`,
     floor: `${formatNumber(coverage.floor * 100)}%`,
     ok: coverage.ok,
@@ -253,12 +254,14 @@ export function buildHtmlReportModel(report: Report): HtmlReportModel {
   const shortfallCount = flatCoverage.filter((row) => !row.ok).length;
   const candidates = flatCoverage.reduce((sum, row) => sum + row.candidates, 0);
   const measured = flatCoverage.reduce((sum, row) => sum + row.measured, 0);
+  const accounting = coverageAccounting(report.documents.flatMap(document => Object.values(document.coverage)));
+  const accountingDetail = `${coverageAccountingText(accounting)}. ${COVERAGE_COUNT_NOTICE}`;
   const coverageTrust = report.runVerdict === "infrastructure"
     ? {
         label: "Not trustworthy",
         detail: candidates === 0
-          ? "No trusted candidate coverage; the checker failed before trust could be established"
-          : `Partial measurement only: ${measured} of ${candidates} candidates measured before the checker failed`,
+          ? `No trusted candidate coverage; the checker failed before trust could be established. ${accountingDetail}`
+          : `Partial measurement only, before the checker failed: ${accountingDetail}`,
         shortfallCount,
         candidates,
         measured,
@@ -267,10 +270,10 @@ export function buildHtmlReportModel(report: Report): HtmlReportModel {
     ? {
         label: shortfallCount > 0 ? "Below required floor" : "Not established",
         detail: shortfallCount > 0
-          ? `${shortfallCount} rule check${shortfallCount === 1 ? "" : "s"} below the configured floor`
+          ? `${shortfallCount} rule check${shortfallCount === 1 ? "" : "s"} below the configured floor. ${accountingDetail}`
           : candidates === 0
-            ? "No candidate coverage was established; no rule measured a candidate"
-            : `Only ${measured} of ${candidates} candidates were measured; coverage was not established`,
+            ? `No candidate coverage was established; no rule measured a candidate. ${accountingDetail}`
+            : `Coverage was not established. ${accountingDetail}`,
         shortfallCount,
         candidates,
         measured,
@@ -278,7 +281,7 @@ export function buildHtmlReportModel(report: Report): HtmlReportModel {
     : shortfallCount > 0
     ? {
         label: "Below required floor",
-        detail: `${shortfallCount} rule check${shortfallCount === 1 ? "" : "s"} below the configured floor`,
+        detail: `${shortfallCount} rule check${shortfallCount === 1 ? "" : "s"} below the configured floor. ${accountingDetail}`,
         shortfallCount,
         candidates,
         measured,
@@ -286,14 +289,14 @@ export function buildHtmlReportModel(report: Report): HtmlReportModel {
     : candidates === 0
       ? {
           label: "Coverage met",
-          detail: "No applicable candidates",
+          detail: `No applicable candidates. ${accountingDetail}`,
           shortfallCount,
           candidates,
           measured,
         }
       : {
           label: "Coverage met",
-          detail: `${measured} of ${candidates} candidates measured`,
+          detail: accountingDetail,
           shortfallCount,
           candidates,
           measured,

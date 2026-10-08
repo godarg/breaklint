@@ -19,6 +19,11 @@ assertion on the threshold alone kills two of five mutants, and the three surviv
 dangerous ones: a rule that emits nothing, a rule with an inverted comparator, and a rule that
 attributes its findings to the wrong id.
 
+Numeric rules receive those five controls. An option-free categorical rule needs a concrete
+predicate-witness mutation, rather than empty numeric perturbation sets. The table-header check
+swaps source-matched repeated-header presence in a positive snapshot copy and also checks emission
+and rule identity. Any other option-free rule without a registered control fails the guard loudly.
+
 ## Severity
 
 A rule may carry `error` only with a named proof source. There are three classes — a geometric

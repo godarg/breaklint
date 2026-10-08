@@ -19,7 +19,7 @@ import { detectCollision } from "../../src/source/collision.ts";
 import { loadCorpus } from "../fixtures/corpus.ts";
 import { runDocument } from "../../src/core/engine.ts";
 import { coverageFloorMap, resolveConfig } from "../../src/config/resolve.ts";
-import { SNAPSHOT_SCHEMA_VERSION } from "../../src/core/enums.ts";
+import { SNAPSHOT_SCHEMA_VERSION, READABLE_SNAPSHOT_SCHEMA_VERSIONS } from "../../src/core/enums.ts";
 import type { Snapshot } from "../../src/core/types.ts";
 
 describe("the live snapshot seam", () => {
@@ -359,7 +359,7 @@ describe("the live snapshot seam", () => {
   });
 });
 
-describe("the engine judges only a snapshot of its own stamp", () => {
+describe("the engine honors its explicit snapshot reader contract", () => {
   /**
    * Snapshot 5 grew required fields before its release. A stamp-5 snapshot written before them —
    * without `float`, `position`, `boundaryHyphen` or a line's `ownText` — carries the right stamp and
@@ -381,6 +381,7 @@ describe("the engine judges only a snapshot of its own stamp", () => {
     ];
     for (const [field, remove] of strip) {
       const old = structuredClone(current);
+      old.schemaVersion = 5;
       remove(old);
       const report = runDocument({ path: "doc.html", snapshot: old, infrastructure: [] }, engine).report;
       assert.equal(report.verdict, "infrastructure", `a snapshot without ${field} was judged`);
@@ -390,20 +391,37 @@ describe("the engine judges only a snapshot of its own stamp", () => {
   });
 
   /**
-   * The rules read fields Snapshot 5 added (`BlockRecord.display`, `marginCopies`). A snapshot of
-   * another stamp lacks them, and a rule reading an absent field misjudges rather than fails: an
-   * undefined `display` is not "contents", so every box-less block would pass as unrendered. The
-   * engine refuses such a snapshot (exit 3) instead of judging it.
+   * The rules read fields Snapshot 5 added (`BlockRecord.display`, `marginCopies`). A snapshot
+   * predating those required fields lacks them, and a rule reading an absent field misjudges
+   * rather than fails: an undefined `display` is not "contents", so every box-less block would pass as unrendered. The
+   * engine accepts only its explicit reader set and refuses malformed required fields (exit 3).
    */
-  it("refuses a snapshot of another stamp, and runs the rules on its own", () => {
+  it("refuses an unsupported stamp and judges the three supported stamps", () => {
     const config = resolveConfig({ file: {}, cli: {} });
     const engine = { failOn: config.failOn, activeRules: config.activeRules, optionsByRule: config.optionsByRule, coverageFloors: coverageFloorMap(config) };
     const current = structuredClone(loadCorpus().find((item) => item.name === "too-tall-trigger")!.snapshot);
     assert.equal(current.schemaVersion, SNAPSHOT_SCHEMA_VERSION);
-    assert.equal(SNAPSHOT_SCHEMA_VERSION, 6);
+    assert.equal(SNAPSHOT_SCHEMA_VERSION, 7);
+    assert.deepEqual(READABLE_SNAPSHOT_SCHEMA_VERSIONS, [5, 6, 7]);
     const judged = runDocument({ path: "doc.html", snapshot: current, infrastructure: [] }, engine).report;
     assert.ok(judged.findings.length > 0, "premise: the current-stamp snapshot is judged");
-    for (const stamp of [4, 7]) {
+    for (const stamp of [5, 6]) {
+      const legacy = { ...structuredClone(current), schemaVersion: stamp };
+      delete legacy.figureIndex;
+      delete legacy.tableIndex;
+      const report = runDocument({ path: "doc.html", snapshot: legacy, infrastructure: [] }, engine).report;
+      assert.equal(report.verdict, judged.verdict, `supported schema ${stamp} lost the existing rules`);
+      assert.deepEqual(report.findings.map(finding => finding.ruleId), judged.findings.map(finding => finding.ruleId));
+      const requested = resolveConfig({ file: {}, cli: { only: ["layout/table-header-not-repeated"] } });
+      const missingInventory = runDocument({ path: "doc.html", snapshot: legacy, infrastructure: [] }, {
+        failOn: requested.failOn, activeRules: requested.activeRules, optionsByRule: requested.optionsByRule,
+        coverageFloors: coverageFloorMap(requested),
+      }).report;
+      assert.equal(missingInventory.verdict, "insufficient-coverage", `schema ${stamp} invented a table inventory`);
+      assert.deepEqual(missingInventory.findings, []);
+      assert.equal(missingInventory.notMeasured[0]?.reason, "env/table-index-unavailable");
+    }
+    for (const stamp of [4, 8]) {
       const old = { ...structuredClone(current), schemaVersion: stamp };
       const report = runDocument({ path: "doc.html", snapshot: old, infrastructure: [] }, engine).report;
       assert.equal(report.verdict, "infrastructure", `a schema ${stamp} snapshot was judged`);

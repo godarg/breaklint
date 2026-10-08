@@ -53,6 +53,8 @@ export interface ResponseLike {
 }
 
 export interface CdpSessionLike {
+  /** Public CDP events; absent event measurement cannot certify network quiescence. */
+  on?(event: string, handler: (payload: unknown) => void): void;
   send<R = unknown>(method: string, params?: Record<string, unknown>): Promise<R>;
   detach(): Promise<void>;
 }

@@ -446,6 +446,11 @@ A delegated AI record carries the release-specific Founder delegation, actual mo
 from the native runner output, prompt/output hashes, a native receipt with image count, and
 the exact path and SHA-256 of every assigned full-page PNG, tile and printed-page raster.
 The strict gate checks the complete received-image inventory and never calls this a human pass.
+Its latest delegated round must also name the package version in the bound review-input root;
+valid historical release-specific delegations stay on record and cannot approve changed inputs.
+Preparing a render, an image inventory or a pending round is not a review. Append a new round
+only with the actual outcome, native model and image-read receipts after the reviewer has
+inspected the frozen artifacts. A pending template contains no passing cells or invented model.
 See `docs/releasing.md` for the closed receipt fields and the trust limits of this record. The line the
 verifier prints and appends to the GitHub job summary ("Report-surface review ledger") names every
 reviewer of the latest round with its kind and counts the cells a rostered human passed; it says
@@ -492,8 +497,25 @@ the same decoded pixels as its full-page PNG. The complete matrix also has 24 fu
 four PDFs. Measured on 2026-10-07, their page counts are 3/9/9/9 on macOS and 3/8/9/9
 on Linux, in state order clean/findings/infrastructure/insufficient-coverage: 30 and 29 page
 rasters respectively. Independent `pdfinfo` and canonical PNG membership confirm both inventories.
+The preceding values describe the historical 0.9.0 matrix. The initial 0.10.0 presentation's
+independent physical measurements on 2026-10-07 recorded 158 tiles and 3/8/8/8 printed pages
+on both macOS and Linux (27 page rasters). The [Linux diagnostic](https://github.com/godarg/breaklint/actions/runs/37679854862)
+rendered all 32 cells and passed its independent inventory oracle; it is technical evidence,
+not a visual review. The original first diagnostic timeout is retained as incomplete infrastructure.
+Round7's original delegated review failed on a contradictory handwritten insufficient-coverage
+fixture and left four desktop cells unread at their downscaled size. The fixture now records its
+missing applicable decline, and every screen viewport includes legible tiles. Independent macOS
+and [Linux measurements](https://github.com/godarg/breaklint/actions/runs/37686731564) count
+212 tiles and the same 27 printed pages. The arithmetic is23=20+3 applicable evaluations, with
+the affected widow row2=1+1; the new fixture reason is explicitly authored presentation data.
+This correction changes no production threshold or rule-engine accounting. The failed review
+remains on record. The fresh frozen-input second review is round 8: all 32 cells pass, with
+263 qualified native image reads and actual model `claude-opus-5-5`. Four medium and 27 low
+findings remain explicitly disposed; this is delegated AI local-image sight evidence, without
+human or Ubuntu visual acceptance. The strict gate must still verify the actual current binding.
 The verifier pins each platform and state separately; it does not derive its expected count from
-the renderer manifest. Long mobile pages cannot be judged at fit-to-window scale; their viewport-height tiles can.
+the renderer manifest. Long desktop, tablet and mobile pages cannot be judged at fit-to-window
+scale; every screen cell therefore supplies viewport-height tiles.
 The verifier re-cuts every tile from the independently decoded full page and
 requires the normalized RGBA to match, so tiles add no unbound pixel. `review-gallery.html` in the
 same directory presents every full page, tile and printed page per state; it is what a reviewer

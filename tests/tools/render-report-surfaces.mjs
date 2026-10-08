@@ -144,7 +144,7 @@ const SURFACE_CONTROLS = {
   "broken-landmarks": { screen: `nav[aria-label="Report contents"] { display: none !important; }` },
   // The skip link leaves the keyboard order.
   "broken-skip-link": { screen: `.skip-link { display: none !important; }` },
-  // The per-finding sentence comes back: seven repetitions of one caveat in small print.
+  // The per-finding sentence comes back: six additional repetitions of the global caveat.
   "broken-untested-repeat": { print: `@media print { .finding-remediation::after { content: "Untested: no trigger/remedied pair in this package shows this advice removing this finding."; display: block; } }` },
   // The marker falls back to muted small print.
   "broken-untested-marker": {
@@ -625,7 +625,7 @@ function writeReviewGallery(artifacts) {
 <style>body{margin:0;padding:1rem 1.5rem;font:14px/1.4 system-ui,sans-serif;background:#ddd;color:#111}h2{margin:2rem 0 .5rem;font-size:1.4rem}h3{font-size:.9rem;margin:1rem 0 .4rem}
 .strip{display:flex;gap:.75rem;overflow-x:auto;align-items:flex-start;padding-bottom:.5rem}figure{margin:0;flex:none}figcaption{font-size:.75rem;color:#444}
 img{display:block;border:1px solid #999;background:#fff}.desktop img{width:720px}.tablet img{width:384px}.mobile img{width:390px}.print img{width:300px}</style></head>
-<body><h1>Report-surface review gallery</h1><p>Every screen cell as viewport-height tiles (tablet and mobile) or its full page (desktop), and every printed page. Tiles are cut from the same decoded pixels as the fingerprinted full-page PNG. Open an image for its natural size; the manifest binds every file.</p>
+<body><h1>Report-surface review gallery</h1><p>Every screen cell as viewport-height tiles, including desktop, and every printed page. Tiles are cut from the same decoded pixels as the fingerprinted full-page PNG. Open an image for its natural size; the manifest binds every file.</p>
 ${sections}</body></html>
 `;
   writeFileSync(join(OUTPUT, "review-gallery.html"), html);
@@ -1282,7 +1282,7 @@ try {
           // the pixels.
           semantics.fonts = await resolvedRoleFonts(page, cdp, `${state}/${theme}/${viewport}`);
           semantics.accessibility = await accessibilitySemantics(page, cdp, `${state}/${theme}/${viewport}`);
-          const tiles = viewport === "desktop" ? [] : writeViewportTiles(path, `${state}--${theme}--${viewport}`, dimensions.height);
+          const tiles = writeViewportTiles(path, `${state}--${theme}--${viewport}`, dimensions.height);
           const artifactSha256 = sha256(path);
           const pixels = normalizedScreenPixels(path);
           const screenshotDimensions = { width: pixels.width, height: pixels.height };

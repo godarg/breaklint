@@ -3,11 +3,13 @@ import { describe, it } from "node:test";
 import { parse, type DefaultTreeAdapterMap } from "parse5";
 
 import type { Report } from "../../src/core/types.ts";
+import { IS } from "../../src/core/enums.ts";
 import { renderConsole } from "../../src/report/console.ts";
 import { renderHtml } from "../../src/report/html.ts";
 import { renderMarkdown } from "../../src/report/markdown.ts";
 import { render } from "../../src/report/index.ts";
-import { findingsReportState } from "../fixtures/report-states.ts";
+import { canonicalReportStates, findingsReportState, insufficientCoverageReportState } from "../fixtures/report-states.ts";
+import { buildHtmlReportModel } from "../../src/report/html-model.ts";
 
 type HtmlNode = DefaultTreeAdapterMap["node"];
 type HtmlElement = DefaultTreeAdapterMap["element"];
@@ -55,6 +57,11 @@ function assertFindingNavigationTargets(className: string, expectedLinks: number
 // This tests navigation and disclosure, not whether a layout rule should emit these findings.
 function navigationReport(): Report {
   const report = findingsReportState();
+  // This hand-written navigation oracle has five findings; newly registered rules must
+  // not turn its inherited source-less fixture into an unrelated coverage-failure state.
+  report.runVerdict = "findings";
+  report.exitCode = 1;
+  report.documents[0]!.verdict = "findings";
   const seed = report.findings[0]!;
   const rules = ["layout/widow", "layout/widow", "layout/orphan", "type/straight-quotes", "layout/half-empty-page"];
   report.findings = rules.map((ruleId, index) => ({
@@ -79,7 +86,80 @@ function navigationReport(): Report {
   return report;
 }
 
+// Independent presentation arithmetic: three applicable SVG/widow evaluations are measured,
+// two applicable widow evaluations are declined, and two SVG evaluations leave coverage.
+// The document-level count is deliberately unrelated to those rule accounts.
+function coverageAccountingReport(): Report {
+  const report = navigationReport();
+  const nonApplicable = { scope: "block" as const, ruleId: "svg/text-overflows-viewport", reason: "env/svg-overflow-visible" as const, target: null, count: 1 };
+  const toolUnavailable = { scope: "block" as const, ruleId: "svg/text-overflows-viewport", reason: "env/pixel-oracle-unavailable" as const, target: null, count: 1 };
+  const applicable = { scope: "block" as const, ruleId: "layout/widow", reason: "env/multicolumn" as const, target: null, count: 2 };
+  report.documents[0]!.coverage = {
+    "svg/text-overflows-viewport": { candidates: 1, measured: 1, notMeasured: [nonApplicable, toolUnavailable], notMeasuredCount: 2, coverage: 1, floor: 1, ok: true },
+    "layout/widow": { candidates: 4, measured: 2, notMeasured: [applicable], notMeasuredCount: 2, coverage: 0.5, floor: 1, ok: false },
+  };
+  report.documents[0]!.notMeasured = [nonApplicable, toolUnavailable, applicable,
+    { scope: "document", ruleId: null, reason: "env/vertical-writing", target: null, count: 9 }];
+  report.runVerdict = "insufficient-coverage";
+  report.exitCode = 4;
+  report.documents[0]!.verdict = "insufficient-coverage";
+  return report;
+}
+
 describe("human report navigation", () => {
+  it("keeps every canonical presentation state's candidates and recorded declines accountable", () => {
+    for (const [state, report] of Object.entries(canonicalReportStates())) {
+      for (const document of report.documents) {
+        for (const [ruleId, row] of Object.entries(document.coverage)) {
+          const declined = row.notMeasured.reduce((sum, item) => sum + item.count, 0);
+          assert.equal(row.notMeasuredCount, declined, `${state}/${ruleId}: counted declines need recorded reasons`);
+          const applicable = row.notMeasured.filter(item => !IS.nonApplicableEnvId.has(item.reason)
+            && !IS.toolCapabilityEnvId.has(item.reason)).reduce((sum, item) => sum + item.count, 0);
+          assert.equal(row.candidates, row.measured + applicable, `${state}/${ruleId}: applicable = measured + applicable unmeasured`);
+          for (const item of row.notMeasured) {
+            assert.ok(document.notMeasured.some(recorded => JSON.stringify(recorded) === JSON.stringify(item)),
+              `${state}/${ruleId}: the document decline list must include the coverage reason`);
+          }
+        }
+      }
+    }
+  });
+
+  it("shows the handwritten insufficient-coverage scene as23=20+3 and widow2=1+1", () => {
+    // Independent arithmetic of this declared scene, not values obtained from any projection.
+    // The adjacent five/three/two oracle separately covers outside-base exclusions.
+    const report = insufficientCoverageReportState();
+    const original = JSON.stringify(report);
+    for (const output of [renderConsole(report), textContent(parse(renderHtml(report))), renderMarkdown(report)]) {
+      assert.match(output, /20 of 23 applicable rule-candidate evaluations measured; 3 applicable evaluations not measured/u);
+      assert.match(output, /1 of 2 applicable rule-candidate evaluations measured; 1 applicable evaluations not measured/u);
+      assert.match(output, /env\/multicolumn/u);
+      assert.doesNotMatch(output, /Reason verbatim: none declared/u);
+    }
+    const row = buildHtmlReportModel(report).coverage[0]!.rows.find(item => item.ruleId === "layout/widow")!;
+    assert.deepEqual([row.candidates, row.measured, row.notMeasured], [2, 1, 1]);
+    assert.equal(report.documents[0]!.notMeasured.reduce((sum, item) => sum + item.count, 0), 3);
+    assert.equal(JSON.stringify(report), original, "Projection cannot repair or mutate the canonical scene");
+  });
+
+  it("distinguishes applicable rule evaluations from outside-coverage declines without summing document objects", () => {
+    const report = coverageAccountingReport();
+    const original = JSON.stringify(report);
+    for (const output of [renderConsole(report), textContent(parse(renderHtml(report))), renderMarkdown(report)]) {
+      assert.match(output, /rule-candidate evaluations, not unique document objects/u);
+      assert.match(output, /3 of 5 applicable rule-candidate evaluations measured/u);
+      assert.match(output, /2 applicable evaluations not measured/u);
+      assert.match(output, /outside coverage base: 1 not applicable, 1 unavailable tool capability/u);
+      assert.match(output, /2 of 4 applicable rule-candidate evaluations measured; 2 applicable evaluations not measured; outside coverage base: 0 not applicable, 0 unavailable tool capability; required floor 100%/u);
+      assert.doesNotMatch(output, /floor 1\./u);
+    }
+    const svgRow = buildHtmlReportModel(report).coverage[0]!.rows.find(row => row.ruleId === "svg/text-overflows-viewport")!;
+    assert.equal(svgRow.candidates, 1);
+    assert.equal(svgRow.measured, 1);
+    assert.equal(svgRow.notMeasured, 0, "The unmeasured coverage cell must exclude the two outside-base evaluations");
+    assert.equal(JSON.stringify(report), original, "Presentation must preserve all canonical counts and reasons");
+  });
+
   it("targets a heading or section from every next-check link", () => {
     assertFindingNavigationTargets("next-check-list", 3);
   });

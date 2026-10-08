@@ -2,7 +2,9 @@
  * The mutation guard.
  *
  * A test suite that passes tells you nothing until you know it can fail. This tool breaks each
- * rule on purpose, five ways, and requires that the assertion notices every time.
+ * rule on purpose with applicable perturbations, and requires that the assertion notices
+ * every time. Numeric rules have five controls; the categorical repeated-header rule has
+ * an actual header-presence control instead of three empty numeric perturbation sets.
  *
  * What counts as noticing is the whole point, and it is narrower than it looks. An assertion on
  * the *threshold* is not enough: measured against five mutants, a threshold-only test kills
@@ -28,6 +30,7 @@ export type MutantName =
   | "threshold-shifted"
   | "threshold-multiplied"
   | "rule-id-swapped"
+  | "header-presence-swapped"
   | "isolation-pass-swapped";
 
 /** The observable triple. Anything coarser lets the dangerous mutants through. */
@@ -105,6 +108,21 @@ export function mutate(rule: Rule, mutant: MutantName, observedValues: readonly 
         },
       ];
 
+    case "header-presence-swapped":
+      return [{ ...rule, run: (snapshot, context) => {
+        const copy = structuredClone(snapshot);
+        for (const table of copy.tableIndex?.tables ?? []) {
+          const heads = new Set(table.headerRowSids);
+          const sourceHeads = table.fragments[0]?.rows.filter(row => heads.has(row.sid!)) ?? [];
+          for (const fragment of table.fragments.slice(1)) {
+            const present = fragment.rows.some(row => heads.has(row.sid!));
+            fragment.rows = present ? fragment.rows.filter(row => !heads.has(row.sid!))
+              : [...structuredClone(sourceHeads), ...fragment.rows];
+          }
+        }
+        return rule.run(copy, context);
+      } }];
+
     case "isolation-pass-swapped":
       // Only meaningful for the two ink rules: T against T0, S against F. This is the guard
       // against the `<defs>` mistake, which reported every clipped graphic as fully destroyed.
@@ -148,8 +166,14 @@ function swapInkPasses(snapshot: Snapshot): Snapshot {
   };
 }
 
-/** The five that apply to every released rule; legacy ink handling remains for lab imports only. */
+/** Applicable controls; unknown option-free rules fail loudly instead of getting empty mutants. */
 export function mutantsFor(rule: Rule): MutantName[] {
+  if (rule.id === "layout/table-header-not-repeated") {
+    return ["emits-nothing", "header-presence-swapped", "rule-id-swapped"];
+  }
+  if (!Object.values(rule.defaultOptions).some(value => typeof value === "number")) {
+    throw new Error(`No applicable predicate mutation is registered for option-free rule ${rule.id}`);
+  }
   const base: MutantName[] = [
     "emits-nothing",
     "comparator-inverted",
@@ -256,7 +280,7 @@ if (invokedDirectly) {
   // drift this guard exists to catch, in the guard itself. The scenario was caught elsewhere, by
   // the false-alarm corpus in `npm test` — but a guard whose own summary line cannot notice a
   // missing rule should not be the thing anyone reads to decide the rules are covered.
-  const EXPECTED_RULE_COUNT = 15;
+  const EXPECTED_RULE_COUNT = 17;
   const clean = reports.filter((r) => r.survived.length === 0 && r.triggerFixture).length;
   console.log(`\n${clean}/${EXPECTED_RULE_COUNT} rules killed every mutant on a fixture that actually triggers them.`);
   if (reports.length !== EXPECTED_RULE_COUNT) {
