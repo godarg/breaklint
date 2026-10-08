@@ -53,7 +53,7 @@ jobs:
         run: |
           python3 scripts/post-release/run-registry-consumers.py \
             --readback-result .github/fixtures/release-readback-010/readback-result.json \
-            --contract-root released-contract \
+            --contract-root "$GITHUB_WORKSPACE/released-contract" \
             --member-helper scripts/post-release/verify_installed_members.py \
             --chrome /usr/bin/google-chrome \
             --runtime '${{ matrix.node }}' "$(command -v node)" "$(command -v npm)" \
