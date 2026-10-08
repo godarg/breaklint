@@ -1,10 +1,14 @@
 # Changelog
 
-## 0.10.0 — 2026-10-07
+## 0.10.0 — 2026-10-08
 
 This version changes judgments on unchanged inputs and adds two optional checks. The bounded
 human example evaluation is recorded in `docs/evaluation-0.10.md`; publication and verification
 records are kept separately in `docs/status.md`.
+
+Published by release workflow run 37730851901, attempt 2, on 2026-10-08. The dated
+status checkpoint distinguishes registry/package verification, bounded human evaluation
+and unchanged-input readbacks from still-pending integration completion.
 
 - Add `layout/table-header-not-repeated` and `layout/table-column-drift`. Both require an
   existing visible authored header, exact source row/cell membership and content, unit spans,

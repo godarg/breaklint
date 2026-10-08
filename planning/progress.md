@@ -1527,3 +1527,37 @@ All seven previous ledger rounds are structurally preserved; the new passing rou
 as round 8 with new receipt filenames. This is delegated AI local-image sight evidence, not
 human surface review, Ubuntu visual acceptance or publication. Full exact-candidate gates,
 final packed consumers and independent code acceptance remain separate required proofs.
+
+## 2026-10-08 — published 0.10.0 checkpoint
+
+⛔ Supersedes publication-pending claims above only through the following dated measurements;
+their failures, review limits and original preparation records remain unchanged.
+
+Release workflow [37730851901](https://github.com/godarg/breaklint/actions/runs/37730851901),
+attempt 2, completed all four jobs. Annotated tag `v0.10.0` points to merged source `65be7f0`,
+whose main CI also passed. Registry/GitHub readback measured `latest` and installed version
+`0.10.0`, identical 625,421-byte archives, SHA-256
+`474c4196952697aba09ddfb758796461c90d7f979fdca187a904349642fb82b8`, and provenance bound to
+the tag/commit/archive. Two fresh registry consumers on Node 22.13.0 and 24.21.0 each completed
+19 native commands with expected exits, complete 209-member and lock joins at three stages,
+and actual signature audits with empty invalid/missing arrays at every stage. The exact
+release-source chain passed 19 gates, strict local surfaces and 31 packed-consumer commands.
+
+Independent acceptance retains the complete first static FAIL, the reproduced/repaired
+table-span HIGH, an invalid timed-out attempt and a separately scoped PASS follow-up with two
+low advisories. Gate results and static acceptance do not establish a universal layout oracle.
+The ten actual human labels remain six defects and four acceptable/intended pages, without an
+independent holdout or population calibration. All rules remain uncalibrated.
+
+Four published-package runs on the frozen unchanged real-product inputs preserved all 215
+original page PNGs, HTML/resource/environment identities and effective config fingerprints.
+The selected example events and evaluations remain unchanged; current remedies and reader-impact
+text reflect actual feedback. Their checker exits are 4/1/1/1, not a four-product clean pass.
+Individual nonmeasurements/exclusions remain visible. The private producer/engine seam does not
+establish stock CLI/API orchestration equivalence; the historical scratch repairs were not
+rerun with the published package. No delivered product bytes were replaced.
+
+Website deployment, published-tag Action smoke and local Studio/DS OS updates remain pending at
+this checkpoint. Package publication and report sight evidence do not close those integration
+tasks. See [the dated status record](../docs/status.md#release-v0100-published-2026-10-08) for
+full package integrity, measurement boundaries and historical review distinctions.

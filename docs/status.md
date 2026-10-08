@@ -37,6 +37,66 @@ Current service status comes from the [release workflow](https://github.com/goda
 `npm view breaklint version dist-tags dist.integrity`. Preparation records cannot establish
 current registry state. The historical 0.9.0 measurements below keep their original date and scope.
 
+## Release v0.10.0: published 2026-10-08
+
+⛔ Supersedes the publication-state claims in earlier preparation records only. Their original
+failures, pending statements and dates remain historical evidence.
+
+The [release workflow, run 37730851901](https://github.com/godarg/breaklint/actions/runs/37730851901),
+attempt 2, completed successfully with all four jobs on 2026-10-08. The annotated `v0.10.0`
+tag object `5785b5dd6cf7414166023d56a0ac26a957896e91` points to merged release commit
+`65be7f0dd6f763eeb2d49c273a8d46c0ae4347a7`;
+[main CI run 37729516326](https://github.com/godarg/breaklint/actions/runs/37729516326)
+also completed successfully. The validated tarball was published by that workflow and attached
+to the [GitHub Release](https://github.com/godarg/breaklint/releases/tag/v0.10.0).
+
+Registry/GitHub readback on 2026-10-08 at 06:48 UTC measured `breaklint@0.10.0`,
+`latest` = `0.10.0`, and identical package archives: **625,421 bytes**, SHA-256
+`474c4196952697aba09ddfb758796461c90d7f979fdca187a904349642fb82b8`.
+The registry integrity is
+`sha512-hiIm9x/ezqhjJfEXhb5iCnUiab18NyTQjtsP6fsbn+9RI1dTuWuDqVBtvWQrgHLAc8+m8xRIFqFUS5EpylLEuA==`.
+The retained provenance contract bound the SLSA payload to this exact tag, commit and archive.
+These are dated measurements; query npm and the linked workflow for a later service state.
+
+Separate fresh registry consumers on Node **22.13.0** and **24.21.0** each completed 19 native
+commands with their expected exits. At three stages per runtime, complete 209-member byte
+inventories and root/hidden lock identities matched the registry archive. The actual
+`npm audit signatures --json` runs at all three stages per runtime exited 0 with both
+`invalid` and `missing` empty. CLI version/demo, installed public API, README/configuration/schema
+documentation contracts and a real authored document were exercised. The finding-bearing demo
+and document retained their expected nonzero exits; no clean exit was inferred from execution
+completion. Signature verification is separate from the earlier provenance-payload binding.
+
+The exact release-source gate chain completed all **19** steps: 768 unit tests, 934 aggregate
+tests, 116 live tests in 13 suites, 83 rule mutants across 17 rules, 34 report-surface mutants
+and the 32-cell surface contract. Strict local surface verification and the 31-command packed
+consumer matrix also completed with expected exits. The complete first independent static code
+audit recorded FAIL with one HIGH; its table-span failure was reproduced and repaired. An
+invalid timed-out second attempt supplies no verdict. A separately scoped independent follow-up
+on the unchanged final release source returned PASS with two low advisories. The original
+failure, timeout and accepted limitations remain distinct from the technical gate results;
+static review did not execute Node or inspect the private product rasters.
+
+The maintainer's [bounded ten-example evaluation](evaluation-0.10.md) supplied
+six defects and four acceptable/intended labels. There is no independent holdout, no fitted threshold and no
+population-accuracy claim; all 17 rules retain `calibrated: false`, with 12 enabled by default.
+Four actual postpublication runs through the same documented private producer/renderer/engine
+boundary retained **215 byte-identical page PNGs** with the same HTML, resources, renderer
+environment, page counts and effective configuration fingerprints. The selected E1–E10 event
+inventories and evaluations remained unchanged; current report remedies and reader-impact text
+include the feedback refinements. The first arm retained exit 4, including unavailable figure
+inventory and a page-evidence capability limitation; the other three retained exit 1 with
+findings. Nonmeasured and excluded evaluations remain explicit even when exit 4 does not apply.
+This is bounded unchanged-layout readback, not stock CLI/API orchestration equivalence or
+proof that every candidate was measured. The three earlier positive scratch repair trials were
+not rerun with the published package, and no delivered product file was replaced.
+
+Website deployment, published-tag Action smoke, Studio and DS OS consumer updates remain pending
+at this dated checkpoint. Registry publication does not establish their completion, an
+all-product clean result, human report-surface review or population calibration. The separate
+round 8 delegated AI report-surface review and its explicit presentation advisories retain the
+scope described above.
+
 ## Release v0.9.0: published 2026-10-07
 
 ⛔ Supersedes the publication-state part of the preparation record below. The preparation and older release records remain historical evidence.

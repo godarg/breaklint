@@ -64,6 +64,14 @@ verification records are in [status](docs/status.md), and the release procedure 
 [releasing](docs/releasing.md). The [bounded human example evaluation](docs/evaluation-0.10.md)
 records what the selected real examples establish and what remains unknown.
 
+Publication checkpoint, **2026-10-08**: `breaklint@0.10.0` and `latest` were read back from
+npm after the successful [release workflow](https://github.com/godarg/breaklint/actions/runs/37730851901).
+Clean registry consumers on Node 22.13.0 and 24.21.0 matched the released package bytes.
+Four frozen real-product readbacks retained all 215 original page PNGs; one still exited 4
+for insufficient measurement and three exited 1 with findings. See the dated
+[publication and limitations checkpoint](docs/status.md#release-v0100-published-2026-10-08)
+for package identity, review scope and integration work still pending at that checkpoint.
+
 ```bash
 npm i -D breaklint
 ```
@@ -391,7 +399,7 @@ The useful report is the page where human judgement and the checker disagree. An
 public, unpaid [community test](docs/community-testing.md); there is no application or selection.
 Use only material you may publish. Security findings still go through [`SECURITY.md`](SECURITY.md),
 never a public issue. Community reports are additional QA, not blind annotations or calibration
-evidence, and all fifteen released rules remain `calibrated: false`.
+evidence, and all seventeen released rules remain `calibrated: false`.
 
 ## License
 
