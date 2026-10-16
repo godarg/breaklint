@@ -1,5 +1,7 @@
 # Handoff — breaklint 0.7.0
 
+⛔ Historical handoff: 0.7.0 was tagged (`v0.7.0`) and published to npm after this was written, so the status line below is no longer current. Current state: `docs/status.md`; next handoff: `planning/handoff-v0.8.0.md`.
+
 Status: **release-prepared; not yet tagged.** The owner still has two things to do: merge the
 integration PR, and have a rostered human carry out a genuine report-surface review. Nothing has
 been published, tagged, or merged to `main` from this session.
