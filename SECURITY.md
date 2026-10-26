@@ -92,6 +92,40 @@ compatible stable release without the chain, an advisory reaches the installed r
 bundle/import surface changes, or Node/browser support changes. Any replacement must pass the full
 live, visual, consumer, licence, advisory and release-integrity gates before the pin moves.
 
+## Advisory exception: the puppeteer-core 25.8.0 consumer pin
+
+GHSA-mrhx-c7xc-m3w5 (zod below 4.6.6, high, uncontrolled memory use while validating oversized
+collections) entered the GitHub Advisory Database on 2026-10-23. puppeteer-core 25.8.0 through
+25.12.0 pin `chromium-bidi` 17.0.2, which requires zod 3, and every zod 3 release is in the affected
+range; 25.13.0 is the first version whose chain admits a fixed zod. Released breaklint still points
+consumers at 25.8.0 in three places: the Action installs exactly `puppeteer-core@25.8.0`, the
+documented install commands name it, and the peer range `>=25.8.0 <26` admits it.
+
+breaklint drives Chrome over the Chrome DevTools Protocol. Its one launch in
+`src/acquire/browser.ts` sets no `protocol` option, and in puppeteer-core 25.8.0 `chromium-bidi` is
+imported only by its BiDi-over-CDP module, which is loaded dynamically for a `webDriverBiDi` session
+alone. breaklint's runs therefore never load zod. The published runtime graph (parse5, entities)
+carries no advisory, and this repository's development lockfile resolves a chain with a fixed zod
+and audits clean.
+
+This is a time-bounded acceptance for the consumer pin, not a claim that the chain is harmless. The
+pin moves with the next release, through the same full gates named above: the Action and the
+documented installs move to a puppeteer-core version whose tree audits clean, the peer floor rises
+to at least 25.13.0, and the packed-consumer steps of CI and the release workflow follow. Re-review
+is due with that release and no later than **2026-11-24**, or earlier if breaklint starts a
+WebDriver BiDi session or the advisory is shown to reach the CDP path.
+
+## Advisory drift
+
+Advisories reach the dependency graph without a commit here. `npm run test:advisories` audits the
+published runtime graph and the complete development graph and separates three outcomes: no
+advisory (exit 0), an advisory (exit 1, naming each package, its GHSA ids, the chain that pulls it
+in and whether a fix exists within the declared ranges) and an audit that did not run because the
+registry was unreachable or the time limit passed (exit 75, never 0). With Dependabot security
+updates enabled for the repository, `.github/dependabot.yml` makes them lockfile-only pull requests:
+they move locked versions inside the declared ranges, never change a range or a consumer pin, run
+the complete CI and are never merged automatically.
+
 ## Scope
 
 In scope: anything that lets a checked document escape the sandbox, read files outside the run,
