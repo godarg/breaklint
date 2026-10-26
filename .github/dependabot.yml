@@ -1,0 +1,32 @@
+# Dependabot: security updates only, as lockfile-only pull requests.
+#
+# `npm run test:advisories` fails when either dependency graph carries a known advisory. Advisories
+# arrive without a commit here, so the gate turns red on an unchanged tree, and until this file the
+# lockfile then had to be moved by hand (2026-08-30, 2026-09-03, 2026-09-30, 2026-10-24). With this
+# file and the repository's Dependabot security updates switched on, GitHub proposes that change
+# itself as a pull request, which runs the complete CI like any other and is never merged
+# automatically.
+#
+# lockfile-only: Dependabot may move a locked version inside the ranges package.json already
+# allows and never edits package.json. The peer range and the pins the Action and the docs install
+# are release decisions (SECURITY.md). A fix that needs a range change therefore produces no pull
+# request and stays maintainer work. tests/tools/dependency-audit.mjs fails if this entry or its
+# strategy goes missing.
+#
+# open-pull-requests-limit: 0 switches version updates off; security updates have their own limit
+# and are not affected by it. The schedule is required by the file format and only governs the
+# version updates that the limit switches off. One group collects simultaneous security fixes into
+# one pull request.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    versioning-strategy: "lockfile-only"
+    open-pull-requests-limit: 0
+    groups:
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"

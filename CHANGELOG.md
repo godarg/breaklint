@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+Development and CI only; nothing in the published package changed.
+
+- Correction to the 0.2.0 entry, which said the runtime and full development graphs "audit to zero
+  known advisories": that was true when written and stopped holding for the development graph on
+  2026-10-23, when GHSA-mrhx-c7xc-m3w5 (zod below 4.6.6, reached through puppeteer-core 25.8.0 →
+  chromium-bidi 17) and four fast-uri advisories below 3.1.9 were published. The runtime graph was
+  not affected. The lockfile now resolves puppeteer-core 25.16.0 (zod 4.6.7) and fast-uri 3.1.9;
+  package.json is unchanged. The consumer pin `puppeteer-core@25.8.0` moves with the next release;
+  `SECURITY.md` records the interim disposition and why breaklint's CDP launch never loads zod.
+- `npm run test:advisories` separates an advisory (exit 1, now naming each package, its GHSA ids,
+  the chain that pulls it in and whether a fix exists) from an audit that did not run (exit 75:
+  unreachable registry, unparseable answer or its time limit), which it previously reported as an
+  advisory. Each npm audit call is time-limited. A self-test classifies recorded npm outputs and
+  runs real npm audit against a closed loopback port.
+- `.github/dependabot.yml` configures Dependabot security updates as lockfile-only pull requests;
+  version updates stay off. The advisory check fails if the configuration or its strategy is
+  removed.
+
 ## 0.10.0 — 2026-10-08
 
 This version changes judgments on unchanged inputs and adds two optional checks. The bounded

@@ -1,0 +1,26 @@
+{
+  "recorded": "npm 10.9.8, `npm audit --omit=dev --json` on 2026-10-26 (published runtime graph: parse5, entities)",
+  "status": 0,
+  "report": {
+    "auditReportVersion": 2,
+    "vulnerabilities": {},
+    "metadata": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      },
+      "dependencies": {
+        "prod": 3,
+        "dev": 96,
+        "optional": 39,
+        "peer": 0,
+        "peerOptional": 0,
+        "total": 98
+      }
+    }
+  }
+}

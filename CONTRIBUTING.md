@@ -68,7 +68,9 @@ This is the gate `AGENTS.md` refers to. It is `.github/workflows/ci.yml` in the 
 and `tests/unit/workflow-gates.test.ts` fails when the `npm run` steps below and the workflow's
 disagree. Run it from a clean checkout on Node 24 with all live prerequisites present: Chrome,
 poppler's `pdftoppm`, python3 with `fontTools`, gitleaks 8.30.1 on `PATH`, and network access for
-the advisory audit and the packed-consumer install.
+the advisory audit and the packed-consumer install. Without a reachable registry
+`npm run test:advisories` ends with exit 75: the audit did not run, which is neither a finding nor
+a pass.
 
 ```bash
 npm ci --no-audit --no-fund

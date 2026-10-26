@@ -1,0 +1,11 @@
+{
+  "recorded": "npm 10.9.8, `npm audit --json --registry=http://127.0.0.1:<closed port>/` on 2026-10-26; the port number is replaced by PORT",
+  "status": 1,
+  "report": {
+    "message": "request to http://127.0.0.1:PORT/-/npm/v1/security/audits/quick failed, reason: connect ECONNREFUSED 127.0.0.1:PORT",
+    "error": {
+      "summary": "",
+      "detail": ""
+    }
+  }
+}
