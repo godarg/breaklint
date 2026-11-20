@@ -74,6 +74,7 @@ export interface SourceModel {
   runs: SourceRunModel[];
   uriRefs: Omit<UriRef, "nodeKey" | "requested">[];
   scriptBearing: boolean;
+  elementCount?: number;
   figureIndex: NonNullable<Snapshot["figureIndex"]>;
   figureIndexStructuralComplete?: boolean;
   tableIndex: NonNullable<Snapshot["tableIndex"]>;
@@ -215,6 +216,7 @@ export function buildSourceModel(
   const runs: SourceRunModel[] = [];
   const uriRefs: SourceModel["uriRefs"] = [];
   let scriptBearing = false;
+  let elementCount = 0;
 
   const walk = (
     node: Node,
@@ -224,6 +226,7 @@ export function buildSourceModel(
     inheritedLang: string,
   ): void => {
     if (isElement(node)) {
+      elementCount += 1;
       const attrs = attrsOf(node);
       const sid = attrs["data-bl-sid"] ?? currentSid;
       const lang = attrs.lang ?? inheritedLang;
@@ -290,7 +293,7 @@ export function buildSourceModel(
   }
   const figureDetail = buildFigureIndexDetail(document);
   return {
-    blocks, orderedBlocks, runs, uriRefs, scriptBearing,
+    blocks, orderedBlocks, runs, uriRefs, scriptBearing, elementCount,
     figureIndex: figureDetail.index,
     figureIndexStructuralComplete: figureDetail.structuralComplete,
     tableIndex: buildTableIndex(document),

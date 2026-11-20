@@ -100,7 +100,8 @@ describe("Paket 1: runtime-verified figure index", () => {
       }],
       referenceBlocks: model.figureIndex.referenceBlocks.map(g => ({ sid: g.sid, references: g.references.map(r => ({ ...r })) })),
     };
-    assert.equal(runtimeFigureTreeMatches(model.figureIndex, matching), true);
+    assert.equal(runtimeFigureTreeMatches(model.figureIndex, { ...matching, elementCount: model.elementCount }, model.elementCount), true);
+    assert.equal(runtimeFigureTreeMatches(model.figureIndex, { ...matching, elementCount: (model.elementCount ?? 0) + 1 }, model.elementCount), false);
     assert.equal(runtimeFigureTreeMatches(model.figureIndex, { ...matching, ids: { ...matching.ids, injectedByScript: 1 } }), false);
     assert.equal(runtimeFigureTreeMatches(model.figureIndex, {
       ...matching,

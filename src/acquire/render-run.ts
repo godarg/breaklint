@@ -1178,6 +1178,7 @@ interface RawRuntimeFigureTree {
   }[];
   referenceBlocks: { sid: string; references: { href: string; targetId: string | null }[] }[];
   prePaginationScriptMutations?: number;
+  elementCount?: number;
 }
 
 class FontLoadFailure extends Error {}
@@ -1423,17 +1424,21 @@ function integritySourceWithCapability(expectedSids: readonly string[], capabili
   return `(() => {
     const P = window.__blPrimitives;
     const expected = ${JSON.stringify(expectedSids)};
-    let sidMutations = 0, prePaginationScriptMutations = 0, paginationStarted = false, late = false, mutationRecordsAfterRendered = 0, paginationPreviewCalls = 0;
+    let sidMutations = 0, prePaginationScriptMutations = 0, parseDone = false, paginationStarted = false, late = false, mutationRecordsAfterRendered = 0, paginationPreviewCalls = 0;
+    const microtask = queueMicrotask;
+    P.on(document, "DOMContentLoaded", () => { microtask(() => { parseDone = true; }); });
     const Observer = MutationObserver;
     const observer = new Observer((records) => {
       for (const record of records) {
         const type = P.mutationType(record);
         if (late) mutationRecordsAfterRendered += 1;
         else if (!paginationStarted) {
-          // During HTML parsing (readyState === "loading"), the browser emits childList insertions.
-          // Any attribute/characterData mutation, node removal, or any post-parse mutation before
-          // Paged.js begins is script activity and vetoes runtime figure-index verification.
-          if (P.readyState() !== "loading" || type !== "childList" || P.mutationRemovedCount(record) > 0) {
+          // During streamed HTML parsing, Blink emits childList insertions and characterData
+          // chunk-appends when a text node straddles a network buffer boundary. Neither removes
+          // nodes or mutates attributes; after DOMContentLoaded's microtask any mutation is script
+          // activity, and any synchronous parse-time element/figure/reference mutation is caught
+          // by exact element-count and figure-tree fingerprint parity before pagination.
+          if (parseDone || type === "attributes" || P.mutationRemovedCount(record) > 0) {
             prePaginationScriptMutations += 1;
           }
         }
@@ -1538,15 +1543,19 @@ function prePaginationFigureProbeSource(capability: string): string {
   };
   walk(document.documentElement, null, null, false, false);
   for (const figure of figures) if (bodyCounts.get(figure) !== 1) figure.body = null;
-  return { ids, namedAnchors, figures, referenceBlocks: [...refGroups.values()], prePaginationScriptMutations };
+  return { ids, namedAnchors, figures, referenceBlocks: [...refGroups.values()], prePaginationScriptMutations, elementCount: P.all(document, "*").length };
 })()`;
 }
 
 export function runtimeFigureTreeMatches(
   staticIndex: NonNullable<DocumentInput["snapshot"]>["figureIndex"],
   raw: RawRuntimeFigureTree | null,
+  expectedElementCount?: number,
 ): boolean {
   if (!staticIndex || !raw) return false;
+  if (expectedElementCount !== undefined && raw.elementCount !== undefined && raw.elementCount !== expectedElementCount) {
+    return false;
+  }
   const runtimeIndex = {
     ids: raw.ids,
     namedAnchors: raw.namedAnchors,
@@ -2470,7 +2479,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       opened.prePaginationScriptMutations === 0 &&
       integrityAtSnapshot.mutationRecordsAfterRendered === opened.postPaginationMutations &&
       integrityAtSnapshot.sidMutations === 0 &&
-      runtimeFigureTreeMatches(sourceModel.figureIndex, opened.prePaginationFigureTree);
+      runtimeFigureTreeMatches(sourceModel.figureIndex, opened.prePaginationFigureTree, sourceModel.elementCount);
     const snapshot = assembleSnapshot({
       raw,
       collector,
