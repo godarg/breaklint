@@ -1,0 +1,205 @@
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, relative, resolve as resolvePath } from "node:path";
+
+import { compareReports, type ReportComparison } from "../api/compare.ts";
+import { createContextPack } from "../api/context.ts";
+import { writeReportBundle } from "../api/bundle.ts";
+import { UsageError } from "../config/resolve.ts";
+import type { Report } from "../core/types.ts";
+import type { PublicScreenReport } from "../web/types.ts";
+import { err, notice, out } from "./out.ts";
+
+export const CLI_SUBCOMMANDS = new Set(["compare", "context", "bundle"]);
+
+function readJsonFile(path: string, label: string): unknown {
+  if (!existsSync(path)) throw new UsageError(`${label} not found: ${path}`);
+  if (!statSync(path).isFile()) throw new UsageError(`${label} is not a regular file: ${path}`);
+  try {
+    return JSON.parse(readFileSync(path, "utf8")) as unknown;
+  } catch (error) {
+    throw new UsageError(`${label} is not valid JSON (${path}): ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function parsePositiveInt(raw: string | undefined, flag: string): number {
+  if (raw === undefined || !/^[0-9]+$/u.test(raw)) throw new UsageError(`${flag} requires a positive integer.`);
+  const n = Number(raw);
+  if (!Number.isSafeInteger(n) || n < 1) throw new UsageError(`${flag} requires a positive integer.`);
+  return n;
+}
+
+function emitJson(payload: unknown, outFile: string | undefined, kind: string): void {
+  const rendered = `${JSON.stringify(payload, null, 2)}\n`;
+  if (outFile) {
+    mkdirSync(dirname(resolvePath(outFile)), { recursive: true });
+    writeFileSync(outFile, rendered);
+    notice(`breaklint: ${kind} written to ${relative(process.cwd(), outFile)}\n`);
+  } else {
+    out(rendered);
+  }
+}
+
+function subcommandHelp(name: string): string {
+  if (name === "compare") {
+    return `usage: breaklint compare <before.json> <after.json> [--out <file>]\n\nCompares two compatible canonical breaklint document reports (schema 4 or 5) and emits a canonical JSON comparison.\n`;
+  }
+  if (name === "context") {
+    return `usage: breaklint context <report.json> [--out <file>] [--max-findings <n>] [--max-text <n>] [--comparison <file>]\n\nBuilds a bounded AI/reader context pack from a canonical document or screen report.\n`;
+  }
+  return `usage: breaklint bundle <report.json> --out-dir <dir> [--evidence-dir <dir>] [--title <text>] [--theme light|dark] [--comparison <file>] [--max-findings <n>]\n\nWrites a self-contained offline report bundle (report.json, context.json, bundle.json, report.html, verified assets).\n`;
+}
+
+export async function runSubcommand(name: string, argv: readonly string[]): Promise<number> {
+  try {
+    if (argv.includes("--help") || argv.includes("-h")) {
+      out(subcommandHelp(name));
+      return 0;
+    }
+
+    if (name === "compare") {
+      const files: string[] = [];
+      let outFile: string | undefined;
+      for (let i = 0; i < argv.length; i += 1) {
+        const arg = argv[i] ?? "";
+        if (arg === "--out") {
+          const val = argv[++i];
+          if (!val) throw new UsageError("--out needs a value.");
+          outFile = val;
+        } else if (arg.startsWith("-")) {
+          throw new UsageError(`unknown option ${arg} for compare. Try breaklint compare --help.`);
+        } else {
+          files.push(arg);
+        }
+      }
+      if (files.length !== 2) {
+        throw new UsageError("compare requires exactly two report files: breaklint compare <before.json> <after.json>");
+      }
+      const before = readJsonFile(files[0]!, "before report") as Report;
+      const after = readJsonFile(files[1]!, "after report") as Report;
+      let comparison: ReportComparison;
+      try {
+        comparison = await compareReports(before, after);
+      } catch (error) {
+        throw new UsageError(`compare failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      emitJson(comparison, outFile, "comparison");
+      return 0;
+    }
+
+    if (name === "context") {
+      const files: string[] = [];
+      let outFile: string | undefined;
+      let maxFindings: number | undefined;
+      let maxTextPerField: number | undefined;
+      let comparisonPath: string | undefined;
+      for (let i = 0; i < argv.length; i += 1) {
+        const arg = argv[i] ?? "";
+        if (arg === "--out") {
+          const val = argv[++i];
+          if (!val) throw new UsageError("--out needs a value.");
+          outFile = val;
+        } else if (arg === "--max-findings") {
+          maxFindings = parsePositiveInt(argv[++i], "--max-findings");
+        } else if (arg === "--max-text") {
+          maxTextPerField = parsePositiveInt(argv[++i], "--max-text");
+        } else if (arg === "--comparison") {
+          const val = argv[++i];
+          if (!val) throw new UsageError("--comparison needs a value.");
+          comparisonPath = val;
+        } else if (arg.startsWith("-")) {
+          throw new UsageError(`unknown option ${arg} for context. Try breaklint context --help.`);
+        } else {
+          files.push(arg);
+        }
+      }
+      if (files.length !== 1) {
+        throw new UsageError("context requires exactly one report file: breaklint context <report.json>");
+      }
+      const report = readJsonFile(files[0]!, "report");
+      const comparison = comparisonPath ? (readJsonFile(comparisonPath, "comparison") as ReportComparison) : undefined;
+      let pack;
+      try {
+        pack = createContextPack(report, {
+          ...(maxFindings === undefined ? {} : { maxFindings }),
+          ...(maxTextPerField === undefined ? {} : { maxTextPerField }),
+          ...(comparison === undefined ? {} : { comparison }),
+        });
+      } catch (error) {
+        throw new UsageError(`context failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      emitJson(pack, outFile, "context pack");
+      return 0;
+    }
+
+    if (name === "bundle") {
+      const files: string[] = [];
+      let outDir: string | undefined;
+      let evidenceDir: string | undefined;
+      let title: string | undefined;
+      let theme: "light" | "dark" | undefined;
+      let comparisonPath: string | undefined;
+      let maxFindings: number | undefined;
+      for (let i = 0; i < argv.length; i += 1) {
+        const arg = argv[i] ?? "";
+        if (arg === "--out-dir") {
+          const val = argv[++i];
+          if (!val) throw new UsageError("--out-dir needs a value.");
+          outDir = val;
+        } else if (arg === "--evidence-dir") {
+          const val = argv[++i];
+          if (!val) throw new UsageError("--evidence-dir needs a value.");
+          evidenceDir = val;
+        } else if (arg === "--title") {
+          const val = argv[++i];
+          if (!val) throw new UsageError("--title needs a value.");
+          title = val;
+        } else if (arg === "--theme") {
+          const val = argv[++i];
+          if (val !== "light" && val !== "dark") throw new UsageError("--theme must be light or dark.");
+          theme = val;
+        } else if (arg === "--comparison") {
+          const val = argv[++i];
+          if (!val) throw new UsageError("--comparison needs a value.");
+          comparisonPath = val;
+        } else if (arg === "--max-findings") {
+          maxFindings = parsePositiveInt(argv[++i], "--max-findings");
+        } else if (arg.startsWith("-")) {
+          throw new UsageError(`unknown option ${arg} for bundle. Try breaklint bundle --help.`);
+        } else {
+          files.push(arg);
+        }
+      }
+      if (files.length !== 1) {
+        throw new UsageError("bundle requires exactly one report file: breaklint bundle <report.json> --out-dir <dir>");
+      }
+      if (!outDir) {
+        throw new UsageError("bundle requires --out-dir <dir>.");
+      }
+      const report = readJsonFile(files[0]!, "report") as Report | PublicScreenReport;
+      const comparison = comparisonPath ? (readJsonFile(comparisonPath, "comparison") as ReportComparison) : undefined;
+      let result;
+      try {
+        result = writeReportBundle(report, {
+          outDir,
+          ...(evidenceDir === undefined ? {} : { evidenceDir }),
+          ...(title === undefined ? {} : { title }),
+          ...(theme === undefined ? {} : { theme }),
+          ...(comparison === undefined ? {} : { comparison }),
+          ...(maxFindings === undefined ? {} : { maxFindings }),
+        });
+      } catch (error) {
+        throw new UsageError(`bundle failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      notice(`breaklint: bundle written to ${relative(process.cwd(), result.outDir) || "."} (${result.assets.length} verified asset${result.assets.length === 1 ? "" : "s"})\n`);
+      return 0;
+    }
+
+    throw new UsageError(`unknown subcommand ${name}`);
+  } catch (error) {
+    if (error instanceof UsageError) {
+      err(`breaklint: ${error.message}\n`);
+      return 2;
+    }
+    throw error;
+  }
+}

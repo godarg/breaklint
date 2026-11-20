@@ -237,7 +237,7 @@ describe("HTML Report Surface v2", () => {
     assert.match(findingsHtmlForPaths(), /<span class="path-id"><span>1f5788f1e439-0001-demo-472f73b732bb5453-page-002\.png<\/span><\/span>/u,
       "the matrix carries a real-shaped evidence name, one segment without a slash");
     const findingsHtml = renderHtml(findingsReportState());
-    assert.match(findingsHtml, /<a href="evidence\/surface-demo-page-001\.png"><span class="path-id"><span>evidence\/<\/span><wbr><span>surface-demo-page-001\.png<\/span><\/span><\/a>/u,
+    assert.match(findingsHtml, /<a href="evidence\/surface-demo-page-002\.png"><span class="path-id"><span>evidence\/<\/span><wbr><span>surface-demo-page-002\.png<\/span><\/span><\/a>/u,
       "an evidence path may break only after its slash, never at a hyphen");
     assert.match(REPORT_HTML_STYLES, /\.rule-id wbr, \.cli-flag wbr \{ display: none; \}/u, "print removes even the slash break");
     const gating = buildHtmlReportModel(findingsReportState()).coverage[0]!.rows.find((row) => row.ruleId === "layout/unbreakable-block-too-tall")!;

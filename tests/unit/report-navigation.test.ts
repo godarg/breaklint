@@ -132,7 +132,7 @@ describe("human report navigation", () => {
     const original = JSON.stringify(report);
     for (const output of [renderConsole(report), textContent(parse(renderHtml(report))), renderMarkdown(report)]) {
       assert.match(output, /20 of 23 applicable rule-candidate evaluations measured; 3 applicable evaluations not measured/u);
-      assert.match(output, /1 of 2 applicable rule-candidate evaluations measured; 1 applicable evaluations not measured/u);
+      assert.match(output, /1 of 2 applicable rule-candidate evaluations measured; 1 applicable evaluation not measured/u);
       assert.match(output, /env\/multicolumn/u);
       assert.doesNotMatch(output, /Reason verbatim: none declared/u);
     }
@@ -175,9 +175,9 @@ describe("human report navigation", () => {
     const items = elements(list).filter((node) => node.tagName === "li");
     assert.equal(items.length, 3);
     const expected = [
-      { reason: "env/vertical-writing", count: 4, rule: "no rule", scope: "document" },
-      { reason: "env/forced-break", count: 1, rule: "layout/widow", scope: "block" },
-      { reason: "env/multicolumn", count: 5, rule: "layout/widow", scope: "block" },
+      { reason: "env/vertical-writing", count: 4, rule: "no rule", scope: "document", base: "outside rule base" },
+      { reason: "env/forced-break", count: 1, rule: "layout/widow", scope: "block", base: "in coverage base" },
+      { reason: "env/multicolumn", count: 5, rule: "layout/widow", scope: "block", base: "in coverage base" },
     ];
     for (const row of expected) {
       const item = items.find((node) => textContent(node).includes(row.reason));
@@ -185,7 +185,7 @@ describe("human report navigation", () => {
       const countLabels = elements(item).filter((node) => attribute(node, "class") === "decline-count");
       assert.equal(countLabels.length, 1, `${row.reason} needs one explicit count label`);
       assert.equal(textContent(countLabels[0]!), `Count ${row.count}`);
-      assert.equal(textContent(item), `Count ${row.count} · examples/demo.html · ${row.rule} · ${row.scope} · ${row.reason}`);
+      assert.equal(textContent(item), `Count ${row.count} · examples/demo.html · ${row.rule} · ${row.scope} · ${row.reason} · ${row.base}`);
     }
     const styles = nodes.filter((node) => node.tagName === "style").map(textContent).join("\n");
     assert.match(styles, /\.decline-count\s*\{[^}]*white-space:\s*nowrap\s*;/u);

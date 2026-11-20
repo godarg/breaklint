@@ -189,7 +189,7 @@ jobs:
             --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl"
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           npm install --no-audit --no-fund --save-exact \
-            pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
+            pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.16.0
           node "$GITHUB_WORKSPACE/tests/tools/real-document-gate.mjs" \
             --cli "$PWD/node_modules/breaklint/dist/cli/index.js" \
             --cwd "$PWD"

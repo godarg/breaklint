@@ -660,7 +660,7 @@ function coverageRowAnchors(words) {
   return words
     // A rule id is namespace/name, each at least two characters: "n/a" in a value column is not.
     .filter((word) => /^[a-z][a-z0-9]+\/[a-z][a-z0-9-]+$/u.test(word.text))
-    .filter((id) => words.some((word) => /^(?:met|floor)$/u.test(word.text) && Math.abs(word.yMin - id.yMin) < 2 && word.xMin > id.xMax))
+    .filter((id) => words.some((word) => /^(?:met|floor|candidates)$/u.test(word.text) && Math.abs(word.yMin - id.yMin) < 2 && word.xMin > id.xMax))
     .sort((a, b) => a.yMin - b.yMin);
 }
 

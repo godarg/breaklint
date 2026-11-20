@@ -227,7 +227,7 @@ jobs:
             --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl" --release
           node "$GITHUB_WORKSPACE/tests/tools/installed-config-contract.mjs"
           npm install --no-audit --no-fund --save-exact \
-            pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
+            pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.16.0
           npm install --no-audit --no-fund --save-exact @playwright/test@1.62.1 typescript@5.9.2
           node "$GITHUB_WORKSPACE/tests/tools/installed-api-contract.mjs"
           node "$GITHUB_WORKSPACE/tests/tools/real-document-gate.mjs" \
@@ -436,7 +436,7 @@ jobs:
           node "$GITHUB_WORKSPACE/tests/tools/docs-truth.mjs" --package "$registry_consumer/node_modules/breaklint" \
             --pending "$GITHUB_WORKSPACE/tests/tools/docs-truth-pending.jsonl" --release
           npm install --no-audit --no-fund --save-exact \
-            pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0 \
+            pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.16.0 \
             @playwright/test@1.62.1 typescript@5.9.2
           node "$GITHUB_WORKSPACE/tests/tools/installed-api-contract.mjs"
           node "$GITHUB_WORKSPACE/tests/tools/real-document-gate.mjs" \

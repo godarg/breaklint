@@ -349,7 +349,7 @@ The information contract and the reproducible 32-cell screen/print review are do
 
 Node 22.13 or newer, on macOS or Linux. The floor is exact because `pdfjs-dist@6.2.108` requires
 Node 22.13 or Node 24, and the release gate installs the packed package on both Node 22.13 and 24.
-A live run additionally needs a Chromium-based browser, `puppeteer-core` at `>=25.8.0 <26` (the
+A live run additionally needs a Chromium-based browser, `puppeteer-core` at `>=25.16.0 <26` (the
 declared peer range) and `pagedjs@0.4.3`. `pdfjs-dist` is what rasterises the produced PDF to bind evidence to findings; a
 run without it still measures and still reports, but the findings carry no evidence and the report
 says so rather than pretending otherwise. Poppler's `pdftoppm` is **not** used by the tool at all: the live test suite uses
@@ -357,7 +357,7 @@ it as an independent rasteriser, so that Chrome is not both the producer and the
 every PDF. It is never shipped and never called at check time.
 
 ```bash
-npm i -D puppeteer-core@^25.8.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
+npm i -D puppeteer-core@^25.16.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
 ```
 
 ## Running foreign HTML

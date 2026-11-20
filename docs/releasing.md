@@ -160,7 +160,7 @@ npx breaklint --demo > demo.out; echo "exit $?"          # exit 1
 node "$repo/tests/tools/readme-demo-contract.mjs" --consumer .
 node "$repo/tests/tools/docs-truth.mjs" --package node_modules/breaklint --pending "$repo/tests/tools/docs-truth-pending.jsonl"
 node "$repo/tests/tools/installed-config-contract.mjs"
-npm i --no-audit --no-fund --save-exact pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.8.0
+npm i --no-audit --no-fund --save-exact pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.16.0
 node "$repo/tests/tools/real-document-gate.mjs" --cli "$PWD/node_modules/breaklint/dist/cli/index.js" --cwd "$PWD"
 cd "$repo"
 ```

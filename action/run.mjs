@@ -58,7 +58,7 @@ const ACTION_PACKAGE = JSON.parse(readFileSync(join(HERE, "..", "package.json"),
  * holds both, and `package.json`'s `peerDependencies`, against this list.
  */
 export const PEERS = Object.freeze([
-  ["puppeteer-core", "25.8.0"],
+  ["puppeteer-core", "25.16.0"],
   ["pagedjs", "0.4.3"],
   ["pdfjs-dist", "6.2.108"],
 ]);

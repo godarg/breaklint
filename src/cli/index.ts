@@ -26,6 +26,7 @@ import type { DocumentInput } from "../core/engine.ts";
 import { coverageFloorMap, resolveConfig, toReportConfig, UsageError } from "../config/resolve.ts";
 import { render } from "../report/index.ts";
 import { parseArgs } from "./args.ts";
+import { CLI_SUBCOMMANDS, runSubcommand } from "./subcommands.ts";
 import type { Snapshot } from "../core/types.ts";
 import type { RenderEnvironment } from "../acquire/render-run.ts";
 import { err, flushOutput, notice, out } from "./out.ts";
@@ -40,6 +41,9 @@ export function unionSnapshotInterventions(
 }
 
 export async function main(argv: string[]): Promise<number> {
+  if (argv.length > 0 && CLI_SUBCOMMANDS.has(argv[0]!)) {
+    return runSubcommand(argv[0]!, argv.slice(1));
+  }
   let args;
   try {
     args = parseArgs(argv);
@@ -229,6 +233,9 @@ function helpText(): string {
 usage
   breaklint [options] <file.html> [more.html ...]
   breaklint --demo
+  breaklint compare <before.json> <after.json> [--out <file>]
+  breaklint context <report.json> [--out <file>] [--max-findings <n>] [--max-text <n>] [--comparison <file>]
+  breaklint bundle <report.json> --out-dir <dir> [--evidence-dir <dir>] [--title <text>] [--theme light|dark] [--comparison <file>]
 
   There is no directory recursion and no glob expansion in the tool. Use the shell:
       breaklint docs/**/*.html
