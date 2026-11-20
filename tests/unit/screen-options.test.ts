@@ -47,4 +47,30 @@ describe("screen checkPage options", () => {
     assert.throws(() => validateCheckPageOptions({ ...base(), geometry: { maxTargets: "50" } }), /must be a number/);
     assert.throws(() => validateCheckPageOptions({ ...base(), sourceBinding: { kind: "host-build-container", root: "/tmp/project", receiptPath: ".breaklint-build/receipt.json", compiledBuildSelector: "meta", compiledBuildAttribute: "content", containers: [], status: "bound" } }), /unknown field/);
   });
+
+  it("validates v2 exception scopes and opt-in screen rules identically at runtime and in JSON Schema", () => {
+    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(SCREEN_OPTIONS_SCHEMA);
+    const valid = {
+      ...base(),
+      geometry: {
+        allowedScrollContainers: [{ selector: ".grid", reason: "wide grid", scope: "suite" }],
+        intentionalOverlays: [{ selector: ".modal", reason: "dialog", scope: "scenario" }],
+        rules: { smallText: { minFontSizePx: 11 }, smallTouchTarget: true },
+      },
+    };
+    const parsed = validateCheckPageOptions(valid);
+    assert.equal(parsed.geometry?.allowedScrollContainers?.[0]?.scope, "suite");
+    assert.deepEqual(parsed.geometry?.rules, { smallText: { minFontSizePx: 11 }, smallTouchTarget: true });
+    assert.equal(validate(valid), true, JSON.stringify(validate.errors));
+
+    for (const invalid of [
+      { ...base(), geometry: { allowedScrollContainers: [{ selector: ".x", reason: "r", scope: "global" }] } },
+      { ...base(), geometry: { rules: { smallText: { minFontSizePx: 2 } } } },
+      { ...base(), geometry: { rules: { smallTouchTarget: { minSizePx: 200 } } } },
+      { ...base(), geometry: { rules: { unknownRule: true } } },
+    ]) {
+      assert.throws(() => validateCheckPageOptions(invalid));
+      assert.equal(validate(invalid), false);
+    }
+  });
 });

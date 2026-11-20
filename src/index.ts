@@ -17,5 +17,11 @@ export { renderReport, writeReportBundle } from "./api/bundle.ts";
 export type { RenderReportOptions, WriteReportBundleOptions, ReportBundleResult } from "./api/bundle.ts";
 export { checkPage } from "./api/check-page.ts";
 export { SCREEN_OPTIONS_SCHEMA } from "./web/options.ts";
-export type { StructuralPage, CheckPageOptions, PublicScreenReport, ScreenCheckResult, ScreenTargetEvaluation, ScreenFinding, ScreenInfrastructureEvent, ScreenArtifact, ScreenCoverage, NamedScreenException } from "./web/types.ts";
+export { SCREEN_REPORT_SCHEMA_VERSION, READABLE_SCREEN_REPORT_SCHEMA_VERSIONS } from "./web/types.ts";
+export type {
+  StructuralPage, CheckPageOptions, PublicScreenReport, ScreenCheckResult,
+  ScreenTargetEvaluation, ScreenFinding, ScreenInfrastructureEvent, ScreenArtifact,
+  ScreenCoverage, NamedScreenException, ScreenRuleId, ScreenOptInRules,
+  ScreenDriftDetail, HostBuildContainerBinding, HostBuildContainer,
+} from "./web/types.ts";
 export type { DocumentFontIdentity } from "./core/types.ts";

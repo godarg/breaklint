@@ -1,7 +1,7 @@
 import { closeSync, constants, lstatSync, mkdirSync, openSync, writeFileSync, writeSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import type { Evidence, Finding, Report } from "../core/types.ts";
-import type { PublicScreenReport, ScreenFinding } from "../web/types.ts";
+import { READABLE_SCREEN_REPORT_SCHEMA_VERSIONS, type PublicScreenReport, type ScreenFinding } from "../web/types.ts";
 import type { ReportComparison } from "./compare.ts";
 import { captureBoundedSourceFile, sha256Bytes } from "../source/bytes.ts";
 import { createContextPack, type ContextFinding, type CreateContextPackOptions } from "./context.ts";
@@ -190,7 +190,7 @@ function findingCard(report: Report, finding: Finding, index: number, assets: As
 /** Script-free, offline HTML from a canonical document report (schema 4 or 5) or a screen report. It does not make evidence navigable by itself. */
 export function renderReport(report: Report | unknown, options: RenderReportOptions = {}): string {
   const context = createContextPack(report, options);
-  const isScreen = context.canonicalReport.schemaVersion === 1 && context.canonicalReport.profileKind === "screen";
+  const isScreen = READABLE_SCREEN_REPORT_SCHEMA_VERSIONS.includes(context.canonicalReport.schemaVersion as number) && context.canonicalReport.profileKind === "screen";
   const legacy = !isScreen && (!READABLE_REPORT_SCHEMA_VERSIONS.includes(context.canonicalReport.schemaVersion as number) || context.canonicalReport.profileKind !== "document");
   const title = options.title ?? "breaklint report";
   const theme = options.theme ?? "light";
@@ -263,13 +263,22 @@ function screenFindingCard(report: PublicScreenReport, finding: ScreenFinding, i
   const scale = report.scope.viewport.deviceScaleFactor;
   const width = artifact.widthPx && scale > 0 ? artifact.widthPx / scale : 0;
   const height = artifact.heightPx && scale > 0 ? artifact.heightPx / scale : 0;
-  const x = box ? box.x + (artifact.capture === "full-page" ? finding.target.scroll.x : 0) : 0;
-  const y = box ? box.y + (artifact.capture === "full-page" ? finding.target.scroll.y : 0) : 0;
+  const addScroll = artifact.capture === "full-page" && finding.target.coordinateSystem !== "css-document-pixels";
+  const x = box ? box.x + (addScroll ? finding.target.scroll.x : 0) : 0;
+  const y = box ? box.y + (addScroll ? finding.target.scroll.y : 0) : 0;
   const left = Math.max(0, x), top = Math.max(0, y);
   const right = Math.min(width, x + (box?.width ?? 0)), bottom = Math.min(height, y + (box?.height ?? 0));
   const outline = box && width > 0 && height > 0 && right > left && bottom > top
     ? `<span class="target-outline" aria-hidden="true" style="left:${left / width * 100}%;top:${top / height * 100}%;width:${(right - left) / width * 100}%;height:${(bottom - top) / height * 100}%"></span>` : "";
   const evidence = asset ? `<figure style="position:relative;margin:1rem 0"><img style="display:block;width:100%" src="${esc(asset.href)}" alt="Verified screen evidence with marked visible target">${outline}</figure><a href="${esc(asset.href)}">Open verified full screen surface</a><p>Visible intersection of the target box; coordinates: ${esc(finding.target.coordinateSystem)}. Capture: ${esc(artifact.capture)}.</p>` : "Evidence unavailable or failed integrity verification.";
-  const repair = finding.ruleId === "web/unexpected-horizontal-overflow" ? "Inspect the named container width, minimum width and child sizing. Constrain the overflowing child to the available width; retain an explicit scroll container where wider content is intentional." : "Inspect the clipping ancestor and the target box. Increase the available size or restore an intentional scroll path so the content is reachable.";
+  const repairByRule: Record<ScreenFinding["ruleId"], string> = {
+    "web/unexpected-horizontal-overflow": "Inspect the named container width, minimum width and child sizing. Constrain the overflowing child to the available width; retain an explicit scroll container where wider content is intentional.",
+    "web/content-clipped": "Inspect the clipping ancestor and the target box. Increase the available size or restore an intentional scroll path so the content is reachable.",
+    "web/sibling-overlap": "Inspect layout spacing, negative margins, grid/flex placement or absolute positioning between the overlapping siblings; name intentional overlays explicitly.",
+    "web/svg-text-overflows-viewport": "Inspect the SVG viewBox, font size, or text positioning so the rendered <text> bounding box stays inside the SVG viewport.",
+    "web/small-text": "Increase the computed font size above the configured minimum threshold (uncalibrated heuristic).",
+    "web/small-touch-target": "Increase the interactive control's hit area (padding, min-width, min-height) above the configured minimum dimension (uncalibrated heuristic).",
+  };
+  const repair = repairByRule[finding.ruleId] ?? "Inspect the target geometry and rerun the same scenario and viewport.";
   return `<article class="finding ${esc(finding.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(finding.severity)} · ${esc(finding.ruleId)}</p><h2>${esc(finding.id)}</h2><dl><div><dt>Measured / threshold</dt><dd>${esc(finding.measurement.value)} / ${esc(finding.measurement.threshold)} ${esc(finding.measurement.unit)}</dd></div><div><dt>Scenario / route</dt><dd>${esc(report.scope.scenario)} · ${esc(report.scope.url)}</dd></div><div><dt>Viewport</dt><dd>${report.scope.viewport.width}×${report.scope.viewport.height}</dd></div><div><dt>Target</dt><dd>${esc(finding.target.selector)}</dd></div><div><dt>Source</dt><dd>${esc(source?.status ?? "unknown")} ${source?.file ? displayPath(source.file) : ""}</dd></div></dl><p><strong>Observation:</strong> geometry recorded for the target; a shared cause is not established.</p><p><strong>Repair option:</strong> ${repair}</p><p><strong>Next check:</strong> rerun the same scenario and viewport and inspect adjacent content for follow-up effects.</p><div class="evidence">${evidence}</div><p><a href="#finding-navigation">Back to findings</a></p></article>`;
 }

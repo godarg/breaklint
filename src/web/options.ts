@@ -1,7 +1,11 @@
-import type { CheckPageOptions, HostBuildContainerBinding, NamedScreenException } from "./types.ts";
+import type { CheckPageOptions, HostBuildContainerBinding, NamedScreenException, ScreenOptInRules } from "./types.ts";
 
 const MAX_TARGETS = 5_000;
 const MAX_TIMEOUT_MS = 15_000;
+const MIN_FONT_SIZE_BOUND_MIN = 4;
+const MIN_FONT_SIZE_BOUND_MAX = 72;
+const MIN_TOUCH_SIZE_BOUND_MIN = 8;
+const MIN_TOUCH_SIZE_BOUND_MAX = 96;
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
 const keys = (value: Record<string, unknown>, allowed: readonly string[], label: string): void => {
   const unknown = Object.keys(value).filter((key) => !allowed.includes(key));
@@ -16,9 +20,60 @@ function exceptions(value: unknown, label: string): readonly NamedScreenExceptio
   if (!Array.isArray(value) || value.length > 100) throw new TypeError(`${label} must be a bounded array`);
   return value.map((entry, index) => {
     if (!isRecord(entry)) throw new TypeError(`${label}[${index}] must be an object`);
-    keys(entry, ["selector", "reason"], `${label}[${index}]`);
-    return { selector: string(entry.selector, `${label}[${index}].selector`), reason: string(entry.reason, `${label}[${index}].reason`) };
+    keys(entry, ["selector", "reason", "scope"], `${label}[${index}]`);
+    const scope = entry.scope;
+    if (scope !== undefined && scope !== "scenario" && scope !== "suite") {
+      throw new TypeError(`${label}[${index}].scope must be scenario or suite`);
+    }
+    return {
+      selector: string(entry.selector, `${label}[${index}].selector`),
+      reason: string(entry.reason, `${label}[${index}].reason`),
+      ...(scope !== undefined ? { scope } : {}),
+    };
   });
+}
+function optInRules(value: unknown): ScreenOptInRules | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) throw new TypeError("geometry.rules must be an object");
+  keys(value, ["smallText", "smallTouchTarget"], "geometry.rules");
+  const out: ScreenOptInRules = {};
+  if (value.smallText !== undefined) {
+    if (typeof value.smallText === "boolean") {
+      out.smallText = value.smallText;
+    } else if (isRecord(value.smallText)) {
+      keys(value.smallText, ["minFontSizePx"], "geometry.rules.smallText");
+      if (value.smallText.minFontSizePx !== undefined) {
+        const px = value.smallText.minFontSizePx;
+        if (typeof px !== "number" || !Number.isFinite(px) || px < MIN_FONT_SIZE_BOUND_MIN || px > MIN_FONT_SIZE_BOUND_MAX) {
+          throw new TypeError(`geometry.rules.smallText.minFontSizePx must be a number from ${MIN_FONT_SIZE_BOUND_MIN} to ${MIN_FONT_SIZE_BOUND_MAX}`);
+        }
+        out.smallText = { minFontSizePx: px };
+      } else {
+        out.smallText = {};
+      }
+    } else {
+      throw new TypeError("geometry.rules.smallText must be a boolean or object");
+    }
+  }
+  if (value.smallTouchTarget !== undefined) {
+    if (typeof value.smallTouchTarget === "boolean") {
+      out.smallTouchTarget = value.smallTouchTarget;
+    } else if (isRecord(value.smallTouchTarget)) {
+      keys(value.smallTouchTarget, ["minSizePx"], "geometry.rules.smallTouchTarget");
+      if (value.smallTouchTarget.minSizePx !== undefined) {
+        const px = value.smallTouchTarget.minSizePx;
+        if (typeof px !== "number" || !Number.isFinite(px) || px < MIN_TOUCH_SIZE_BOUND_MIN || px > MIN_TOUCH_SIZE_BOUND_MAX) {
+          throw new TypeError(`geometry.rules.smallTouchTarget.minSizePx must be a number from ${MIN_TOUCH_SIZE_BOUND_MIN} to ${MIN_TOUCH_SIZE_BOUND_MAX}`);
+        }
+        out.smallTouchTarget = { minSizePx: px };
+      } else {
+        out.smallTouchTarget = {};
+      }
+    } else {
+      throw new TypeError("geometry.rules.smallTouchTarget must be a boolean or object");
+    }
+  }
+  return out;
 }
 function binding(value: unknown): HostBuildContainerBinding | undefined {
   if (value === undefined) return undefined;
@@ -50,7 +105,7 @@ export function validateCheckPageOptions(value: unknown): CheckPageOptions {
   let geometry: CheckPageOptions["geometry"];
   if (value.geometry !== undefined) {
     if (!isRecord(value.geometry)) throw new TypeError("geometry must be an object");
-    keys(value.geometry, ["allowedScrollContainers", "intentionalOverlays", "maxTargets", "stabilizationTimeoutMs"], "geometry");
+    keys(value.geometry, ["allowedScrollContainers", "intentionalOverlays", "maxTargets", "stabilizationTimeoutMs", "rules"], "geometry");
     if (value.geometry.maxTargets !== undefined && typeof value.geometry.maxTargets !== "number") throw new TypeError("geometry.maxTargets must be a number");
     if (value.geometry.stabilizationTimeoutMs !== undefined && typeof value.geometry.stabilizationTimeoutMs !== "number") throw new TypeError("geometry.stabilizationTimeoutMs must be a number");
     const maxTargets: number | undefined = value.geometry.maxTargets;
@@ -59,7 +114,14 @@ export function validateCheckPageOptions(value: unknown): CheckPageOptions {
     if (stabilizationTimeoutMs !== undefined && (!Number.isInteger(stabilizationTimeoutMs) || stabilizationTimeoutMs < 0 || stabilizationTimeoutMs > MAX_TIMEOUT_MS)) throw new TypeError(`geometry.stabilizationTimeoutMs must be an integer from 0 to ${MAX_TIMEOUT_MS}`);
     const allowedScrollContainers = exceptions(value.geometry.allowedScrollContainers, "geometry.allowedScrollContainers");
     const intentionalOverlays = exceptions(value.geometry.intentionalOverlays, "geometry.intentionalOverlays");
-    geometry = { ...(allowedScrollContainers !== undefined ? { allowedScrollContainers } : {}), ...(intentionalOverlays !== undefined ? { intentionalOverlays } : {}), ...(maxTargets !== undefined ? { maxTargets } : {}), ...(stabilizationTimeoutMs !== undefined ? { stabilizationTimeoutMs } : {}) };
+    const rules = optInRules(value.geometry.rules);
+    geometry = {
+      ...(allowedScrollContainers !== undefined ? { allowedScrollContainers } : {}),
+      ...(intentionalOverlays !== undefined ? { intentionalOverlays } : {}),
+      ...(maxTargets !== undefined ? { maxTargets } : {}),
+      ...(stabilizationTimeoutMs !== undefined ? { stabilizationTimeoutMs } : {}),
+      ...(rules !== undefined ? { rules } : {}),
+    };
   }
   const optionalId = (name: "projectId" | "documentId" | "runId"): string | undefined => value[name] === undefined ? undefined : string(value[name], name, 256);
   const projectId = optionalId("projectId"), documentId = optionalId("documentId"), runId = optionalId("runId"), sourceBinding = binding(value.sourceBinding);
@@ -72,7 +134,25 @@ const text = (maxLength: number) => ({ type: "string", minLength: 1, maxLength, 
 
 const EXCEPTION_SCHEMA = {
   type: "object", additionalProperties: false, required: ["selector", "reason"],
-  properties: { selector: text(512), reason: text(512) },
+  properties: { selector: text(512), reason: text(512), scope: { enum: ["scenario", "suite"] } },
+} as const;
+
+const SCREEN_RULES_SCHEMA = {
+  type: "object", additionalProperties: false,
+  properties: {
+    smallText: {
+      oneOf: [
+        { type: "boolean" },
+        { type: "object", additionalProperties: false, properties: { minFontSizePx: { type: "number", minimum: MIN_FONT_SIZE_BOUND_MIN, maximum: MIN_FONT_SIZE_BOUND_MAX } } },
+      ],
+    },
+    smallTouchTarget: {
+      oneOf: [
+        { type: "boolean" },
+        { type: "object", additionalProperties: false, properties: { minSizePx: { type: "number", minimum: MIN_TOUCH_SIZE_BOUND_MIN, maximum: MIN_TOUCH_SIZE_BOUND_MAX } } },
+      ],
+    },
+  },
 } as const;
 
 /** Static projection of validateCheckPageOptions. Keep it closed: consumers use it preflight. */
@@ -83,7 +163,7 @@ export const SCREEN_OPTIONS_SCHEMA: Readonly<Record<string, unknown>> = Object.f
     scenario: text(512), projectId: text(256),
     documentId: text(256), runId: text(256),
     output: { type: "object", additionalProperties: false, required: ["dir", "screenshot"], properties: { dir: text(4096), screenshot: { enum: ["viewport", "full-page"] } } },
-    geometry: { type: "object", additionalProperties: false, properties: { allowedScrollContainers: { type: "array", maxItems: 100, items: EXCEPTION_SCHEMA }, intentionalOverlays: { type: "array", maxItems: 100, items: EXCEPTION_SCHEMA }, maxTargets: { type: "integer", minimum: 1, maximum: MAX_TARGETS }, stabilizationTimeoutMs: { type: "integer", minimum: 0, maximum: MAX_TIMEOUT_MS } } },
+    geometry: { type: "object", additionalProperties: false, properties: { allowedScrollContainers: { type: "array", maxItems: 100, items: EXCEPTION_SCHEMA }, intentionalOverlays: { type: "array", maxItems: 100, items: EXCEPTION_SCHEMA }, maxTargets: { type: "integer", minimum: 1, maximum: MAX_TARGETS }, stabilizationTimeoutMs: { type: "integer", minimum: 0, maximum: MAX_TIMEOUT_MS }, rules: SCREEN_RULES_SCHEMA } },
     sourceBinding: { type: "object", additionalProperties: false, required: ["kind", "root", "receiptPath", "compiledBuildSelector", "compiledBuildAttribute", "containers"], properties: { kind: { const: "host-build-container" }, root: text(4096), receiptPath: text(512), buildOutputReceiptPath: text(512), compiledBuildSelector: text(512), compiledBuildAttribute: text(512), containers: { type: "array", maxItems: 200, items: { type: "object", additionalProperties: false, required: ["selector", "file"], properties: { selector: text(512), file: text(512) } } } } },
   },
 });
