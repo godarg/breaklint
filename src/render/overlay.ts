@@ -224,10 +224,12 @@ const OVERLAY_TEMPLATE = `(() => {
           // browser was shown to move them. The bound refuses them rather than depend on that.
           const relativeY = y - areaBox.y;
           const maxAdvance = token.length * 1.2 + 2;
-          // A continuation container can end exactly at the area boundary. That observed edge
-          // lies inside the physical page box; its mark is checked against the actual PDF later.
-          // Never extend this exception to the footnote area, where a clipped note is G-100.
-          const observedAreaEdge = side === "end" && rect.bottom === areaBox.bottom &&
+          // A continuation container can end at the area boundary, or a split wrapper can open with
+          // zero height right at the bottom edge of the content area before its children begin on
+          // the next page. That observed edge lies inside the physical page box; its mark is still
+          // checked against the actual PDF later. Never extend this to the footnote area (G-100).
+          const atAreaBottom = Math.abs(y - areaBox.bottom) <= 0.5;
+          const observedAreaEdge = ((side === "end" && atAreaBottom) || (side === "start" && rect.height === 0 && atAreaBottom)) &&
             P.closest(el, ".pagedjs_footnote_area") === null && y + 1 <= pageBox.bottom;
           if (
             x < pageBox.left || x + maxAdvance > pageBox.right || y < pageBox.top || y > pageBox.bottom ||

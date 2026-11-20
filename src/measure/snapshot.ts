@@ -37,7 +37,7 @@ import type { BreakCauseCascadeHint } from "../core/enums.ts";
 import type { InjectionResult } from "../source/inject.ts";
 import { coordinateAtUtf8Byte } from "../source/bytes.ts";
 import { isNotRendered } from "../rules/shared.ts";
-import { buildFigureIndex, figureBodyIdentity } from "../source/figure-index.ts";
+import { buildFigureIndexDetail, figureBodyIdentity, isExecutableScript } from "../source/figure-index.ts";
 import { buildTableIndex, measuredTableBodyFragments } from "../source/table-index.ts";
 
 type Node = DefaultTreeAdapterMap["node"];
@@ -75,6 +75,7 @@ export interface SourceModel {
   uriRefs: Omit<UriRef, "nodeKey" | "requested">[];
   scriptBearing: boolean;
   figureIndex: NonNullable<Snapshot["figureIndex"]>;
+  figureIndexStructuralComplete?: boolean;
   tableIndex: NonNullable<Snapshot["tableIndex"]>;
 }
 
@@ -226,7 +227,8 @@ export function buildSourceModel(
       const attrs = attrsOf(node);
       const sid = attrs["data-bl-sid"] ?? currentSid;
       const lang = attrs.lang ?? inheritedLang;
-      if (node.tagName.toLowerCase() === "script" || Object.keys(attrs).some((name) => /^on[a-z]/u.test(name))) {
+      if ((node.tagName.toLowerCase() === "script" && isExecutableScript(attrs))
+        || Object.keys(attrs).some((name) => /^on[a-z]/u.test(name))) {
         scriptBearing = true;
       }
       const ownSid = attrs["data-bl-sid"] ?? null;
@@ -286,7 +288,13 @@ export function buildSourceModel(
   for (const sheet of additionalCss) {
     uriRefs.push(...cssUriParts(sheet.text, sheet.origin, distributionRoot, "style-sheet"));
   }
-  return { blocks, orderedBlocks, runs, uriRefs, scriptBearing, figureIndex: buildFigureIndex(document), tableIndex: buildTableIndex(document) };
+  const figureDetail = buildFigureIndexDetail(document);
+  return {
+    blocks, orderedBlocks, runs, uriRefs, scriptBearing,
+    figureIndex: figureDetail.index,
+    figureIndexStructuralComplete: figureDetail.structuralComplete,
+    tableIndex: buildTableIndex(document),
+  };
 }
 
 export interface ControlSignature {
@@ -1156,6 +1164,11 @@ export interface AssembleSnapshotInput {
   /** Partial producer-bound original leaves; sourceMap always describes the inspected input. */
   originalSourceMap?: Record<string, SourceRef>;
   originalSourceAmbiguity?: Record<string, SourceRef[]>;
+  /**
+   * Runtime proof that a script-bearing document produced zero DOM mutations and preserved the
+   * exact static figure/ID/anchor/reference-link tree before and after pagination.
+   */
+  runtimeFigureVerification?: { verified: boolean };
 }
 
 export interface SnapshotInvariantValidation {
@@ -1511,8 +1524,10 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
   // running. An absent inventory is an explicit decline for enabled figure rules.
   const hasFigureSource = (sid: string): boolean =>
     sid.length > 0 && Object.hasOwn(input.sourceMap, sid) && input.sourceMap[sid] !== undefined;
-  const figureIndexAvailable = input.sourceMapInjection && input.sourceModel.figureIndex.complete &&
-    !input.sourceModel.scriptBearing &&
+  const figureScriptsVerified = !input.sourceModel.scriptBearing || input.runtimeFigureVerification?.verified === true;
+  const figureStructurallyComplete = input.sourceModel.figureIndex.complete
+    || (input.sourceModel.figureIndexStructuralComplete === true && figureScriptsVerified);
+  const figureIndexAvailable = input.sourceMapInjection && figureStructurallyComplete && figureScriptsVerified &&
     input.sourceModel.figureIndex.figures.every(figure =>
       hasFigureSource(figure.sid) && figure.captionSids.every(hasFigureSource)) &&
     input.sourceModel.figureIndex.referenceBlocks.every(block => hasFigureSource(block.sid));
@@ -1560,7 +1575,7 @@ export function assembleSnapshot(input: AssembleSnapshotInput): Snapshot {
     },
     ...(figureIndexAvailable ? { figureIndex: {
       ...input.sourceModel.figureIndex,
-      complete: input.sourceMapInjection && input.sourceModel.figureIndex.complete && !input.sourceModel.scriptBearing && input.raw.figureBodies !== undefined,
+      complete: input.sourceMapInjection && figureStructurallyComplete && figureScriptsVerified && input.raw.figureBodies !== undefined,
       figures: input.sourceModel.figureIndex.figures.map(figure => ({ ...figure,
         bodyFragments: figure.body?.tag === "table" ? measuredTableBodyFragments({
           fragments: (input.raw.tables ?? []).filter(table => table.sid === figure.body?.tableSid),

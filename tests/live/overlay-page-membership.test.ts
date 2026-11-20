@@ -71,10 +71,12 @@ const DEFERRED_FIXTURE = `<!doctype html><html lang="en"><head><meta charset="ut
   .escaped-child { position: absolute; left: 1800px; top: 0; }
   .pagedjs_footnote_area { position: absolute; top: 1000px; height: 40px; overflow: hidden; }
   .clipped-note { position: absolute; top: 39px; height: 20px; }
+  .zero-height-bottom { position: absolute; left: 0; top: 994px; width: 733px; height: 0; }
 </style></head><body>
   <div class="pagedjs_page"><div class="pagedjs_sheet"><div class="pagedjs_pagebox"><div class="pagedjs_area">
     <div class="pagedjs_page_content">
       <section class="continued" data-bl-sid="continued"><p>visible first fragment</p></section>
+      <div class="zero-height-bottom" data-bl-sid="zero-height-bottom"></div>
       <div class="deferred" data-bl-sid="deferred"><p data-bl-sid="deferred-child">next page only</p></div>
       <div class="deferred" data-bl-sid="deferred-later">two pages later</div>
       <div class="deferred" data-bl-sid="clipped-note">same SID as the separately clipped footnote</div>
@@ -215,6 +217,10 @@ describe("evidence overlay page membership, live", () => {
       const installation = await installOverlay(current);
       assert.ok(installation.marks.some((mark) => mark.page === 1 && mark.sid === "continued" && mark.side === "end"),
         "the measured continuation boundary was refused despite lying on the physical page");
+      assert.ok(installation.marks.some((mark) => mark.page === 1 && mark.sid === "zero-height-bottom" && mark.side === "start"),
+        "a zero-height opening wrapper flush with areaBox.bottom must be placed inside the physical page");
+      assert.equal(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "zero-height-bottom"), false,
+        "a zero-height opening wrapper flush with areaBox.bottom must not emit env/evidence-fragment-outside-page");
       assert.equal(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "deferred"), false,
         "the next-page clone remained a phantom fragment of page 1");
       assert.equal(installation.unplacedMarks.some((mark) => mark.page === 1 && mark.sid === "deferred-child"), false,

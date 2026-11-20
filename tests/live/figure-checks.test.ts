@@ -77,5 +77,41 @@ it("local href groups through the real source/evidence/CLI path", () => {
   assert.equal(report.findings[0]!.evidence.bindsFinding, true);
   assert.ok(report.documents[0]!.notMeasured.some(n => n.reason === "env/figure-reference-ambiguous" && n.count === oracle.declined));
 });
+it("runtime-verifies figure index for data/inert scripts and fails closed on DOM-mutating scripts", () => {
+  const inertDir = join(root, "runtime-inert"); mkdirSync(inertDir);
+  symlinkSync(join(repo, "node_modules"), join(inertDir, "node_modules"));
+  writeFileSync(join(inertDir, "doc.html"), `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Inert Script Figure</title>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article"}</script>
+<style>@page { size: 120mm 140mm; margin: 10mm; } body { font: 14px/1.5 serif; } figure { margin: 0; } figcaption { break-before: page; }</style></head>
+<body><p>See <a href="#fig-1">Figure 1</a> and <a href="#missing-fig" onclick="void 0">Figure 2</a>.</p>
+<figure id="fig-1"><svg width="100" height="80"><rect width="100" height="80" fill="#eee"/></svg><figcaption>Figure 1: Inert test</figcaption></figure>
+<script>window.__inertFlag = 1;</script></body></html>`);
+  const inertRun = spawnSync(process.execPath, [
+    join(repo, "dist/cli/index.js"), "--only", "figure/caption-separated,figure/dangling-reference",
+    "--fail-on", "warn", "--format", "json", "--out", "report.json", "--out-dir", "evidence", "doc.html",
+  ], { cwd: inertDir, encoding: "utf8", timeout: 300_000 });
+  assert.equal(inertRun.status, 1, `${inertRun.stdout}${inertRun.stderr}`);
+  const inertReport = JSON.parse(readFileSync(join(inertDir, "report.json"), "utf8")) as Report;
+  assert.equal(inertReport.documents[0]!.coverage["figure/caption-separated"]!.measured, 1);
+  assert.equal(inertReport.documents[0]!.coverage["figure/dangling-reference"]!.measured, 1);
+  assert.equal(inertReport.findings.filter(f => f.ruleId === "figure/caption-separated").length, 1);
+  assert.equal(inertReport.findings.filter(f => f.ruleId === "figure/dangling-reference").length, 1);
+  assert.equal(inertReport.documents[0]!.notMeasured.some(n => n.reason === "env/figure-index-unavailable"), false);
+
+  const mutDir = join(root, "runtime-mutating"); mkdirSync(mutDir);
+  symlinkSync(join(repo, "node_modules"), join(mutDir, "node_modules"));
+  writeFileSync(join(mutDir, "doc.html"), `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Mutating Script Figure</title>
+<style>@page { size: 120mm 140mm; margin: 10mm; } body { font: 14px/1.5 serif; }</style></head>
+<body><p>See <a href="#fig-1">Figure 1</a>.</p>
+<figure id="fig-1"><svg width="80" height="60"><rect width="80" height="60" fill="#eee"/></svg><figcaption>Figure 1</figcaption></figure>
+<script>const p = document.createElement("p"); p.id = "injected-target"; document.body.appendChild(p);</script></body></html>`);
+  const mutRun = spawnSync(process.execPath, [
+    join(repo, "dist/cli/index.js"), "--only", "figure/dangling-reference",
+    "--fail-on", "warn", "--format", "json", "--out", "report.json", "--out-dir", "evidence", "doc.html",
+  ], { cwd: mutDir, encoding: "utf8", timeout: 300_000 });
+  assert.equal(mutRun.status, 4, `mutating script must decline figure index: ${mutRun.stdout}${mutRun.stderr}`);
+  const mutReport = JSON.parse(readFileSync(join(mutDir, "report.json"), "utf8")) as Report;
+  assert.ok(mutReport.documents[0]!.notMeasured.some(n => n.reason === "env/figure-index-unavailable"));
+});
 after(() => { if (process.env.BREAKLINT_FIGURE_LIVE_KEEP !== "1") rmSync(root, { recursive: true, force: true }); });
 });

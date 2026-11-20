@@ -170,6 +170,8 @@ export interface EvidenceOptions {
   dpi?: number;
   /** `--no-evidence-binding`. Off means: no overlay at all, and every binding is false. */
   binding: boolean;
+  /** 1-based page numbers confirmed blank in the measured snapshot (e.g. Paged.js parity blanks, G-78). */
+  blankPages?: ReadonlySet<number>;
 }
 
 export interface EvidenceOutcome {
@@ -481,6 +483,7 @@ export async function produceEvidence(input: ProduceEvidenceInput): Promise<Evid
       errorsAtStart,
       held: { key: deliveredKey, pages: deliveredPages },
       conformance,
+      textPages,
     });
   } finally {
     await release(rasterizer, deliveredKey);
@@ -708,6 +711,7 @@ interface FinishInput {
   /** Set when the delivered PDF is already rasterised and held under this key. */
   held?: { key: string; pages: RasterPage[] };
   conformance?: MarkConformance | null;
+  textPages?: readonly PdfTextPage[] | null;
 }
 
 /**
@@ -787,14 +791,36 @@ async function finish(input: FinishInput): Promise<EvidenceOutcome> {
         // A SID bound on another page cannot lend its evidence to an entirely unplaced fragment.
         const hasUnplacedTarget = unplacedHere.some(mark =>
           !input.marks.some(placed => placed.page === i + 1 && placed.sid === mark.sid));
-        const pageBound =
+        const hasVerifiedDocumentConformance = input.conformance !== null && input.conformance !== undefined &&
+          input.conformance.divergentPages === 0 &&
+          [...input.conformance.byPage.values()].some(
+            pageConf => pageConf.referenceFrom !== "none" && !pageConf.divergent &&
+              pageConf.targetsTotal > 0 && pageConf.targetsBound === pageConf.targetsTotal,
+          );
+        const blankPdfHasNoMarks = (input.textPages?.[i]?.items ?? []).every(
+          item => !/^BLSID\d+[AE]$/u.test(item.text.replace(/\s+/gu, "")),
+        );
+        // G-78: a confirmed parity-blank page carries zero flow blocks and zero marks. When the
+        // rest of the document has verified mark conformance, zero raster diff, zero unplaced
+        // marks on this page, and no stray mark tokens in the PDF page, the blank page itself is
+        // verified rather than failing required page coverage. An all-blank document or a
+        // non-blank page without source blocks remains unverified.
+        const verifiedBlankPage =
           input.bindingPossible &&
-          !hasUnplacedTarget &&
-          perPage !== null &&
-          perPage.referenceFrom !== "none" &&
-          !perPage.divergent &&
-          perPage.targetsTotal > 0 &&
-          perPage.targetsBound === perPage.targetsTotal;
+          options.blankPages?.has(i + 1) === true &&
+          unplacedHere.length === 0 &&
+          perPage === null &&
+          hasVerifiedDocumentConformance &&
+          blankPdfHasNoMarks;
+        const pageBound =
+          verifiedBlankPage ||
+          (input.bindingPossible &&
+            !hasUnplacedTarget &&
+            perPage !== null &&
+            perPage.referenceFrom !== "none" &&
+            !perPage.divergent &&
+            perPage.targetsTotal > 0 &&
+            perPage.targetsBound === perPage.targetsTotal);
         evidence.push({
           key: `${options.documentKey}#${i + 1}`,
           page: i + 1,

@@ -55,12 +55,30 @@ function rowMatches(source: TableRow, rendered: TableFragment["rows"][number]): 
   return source.sid === rendered.sid && source.cells.length === rendered.cells.length && source.cells.every((cell, i) => {
     const other = rendered.cells[i]!;
     return cell.sid === other.sid && cell.tag === other.tag && normal(cell.text) === normal(other.text)
-      && cell.colSpan === 1 && cell.rowSpan === 1 && other.colSpan === 1 && other.rowSpan === 1;
+      && Number.isSafeInteger(cell.colSpan) && cell.colSpan >= 1
+      && cell.colSpan === other.colSpan && cell.rowSpan === 1 && other.rowSpan === 1;
   });
+}
+/** Regular column-grid width across all rows when every row uses rowSpan === 1; null if irregular. */
+export function tableGridColumns(table: Pick<Table, "rows">): number | null {
+  if (!table.rows.length) return null;
+  let width: number | null = null;
+  for (const row of table.rows) {
+    if (!row.cells.length) return null;
+    let sum = 0;
+    for (const cell of row.cells) {
+      if (!Number.isSafeInteger(cell.colSpan) || cell.colSpan < 1 || cell.rowSpan !== 1) return null;
+      sum += cell.colSpan;
+    }
+    if (width === null) width = sum;
+    else if (sum !== width) return null;
+  }
+  return width && width > 0 ? width : null;
 }
 /** Membership/order are checked against source, not inferred from similar-looking wrapper boxes. */
 export function sourceTableMatches(table: Table): boolean {
   if (!table.rows.length || table.rows.some(row => !row.sid || !row.cells.length || row.cells.some(cell => !cell.sid))) return false;
+  if (tableGridColumns(table) === null) return false;
   const rows = new Map(table.rows.map(row => [row.sid, row]));
   if (rows.size !== table.rows.length) return false;
   const heads = new Set(table.headerRowSids);

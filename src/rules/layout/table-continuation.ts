@@ -1,4 +1,4 @@
-import { sourceTableMatches } from "../../source/table-index.ts";
+import { sourceTableMatches, tableGridColumns } from "../../source/table-index.ts";
 import { defineRule } from "../../core/rule.ts";
 import { blockKey } from "../../core/fingerprint.ts";
 import type { Snapshot, TableFragment, TableIndex } from "../../core/types.ts";
@@ -35,11 +35,24 @@ function check(snapshot: Snapshot, ctx: Parameters<typeof makeFinding>[0]["ctx"]
       if (!hidden) { candidates += 1; notMeasured.push(declined({ scope: "block", ruleId: id, reason })); }
       continue;
     }
-    const columns = table.rows[0]?.cells.length ?? 0;
+    const gridColumns = tableGridColumns(table);
     const leadDataRows = lead?.rows.filter(row => !table.headerRowSids.includes(row.sid!)).length ?? 0;
     const firstDataPage = fragments.find(f => f.rows.some(row => !table.headerRowSids.includes(row.sid!)))?.page;
-    const unsupported = !sourceTableMatches(table) || !lead || !table.headerRowSids.length || !visibleHeader(table, lead)
-      || table.rows.some(row => row.cells.length !== columns)
+    const leadHeaderRows = lead ? lead.rows.filter(row => table.headerRowSids.includes(row.sid!)) : [];
+    const unspannedHeader = gridColumns !== null
+      ? [...leadHeaderRows].reverse().find(row => row.cells.length === gridColumns && row.cells.every(cell => cell.colSpan === 1))
+      : undefined;
+    const simpleSpanLayoutMatches = leadHeaderRows.length > 0 && gridColumns !== null && (() => {
+      const ref = leadHeaderRows[leadHeaderRows.length - 1]!;
+      const refSpans = ref.cells.map(c => c.colSpan);
+      return fragments.every(f => f.rows.filter(row => !table.headerRowSids.includes(row.sid!)).every(row =>
+        (row.cells.length === 1 && row.cells[0]!.colSpan === gridColumns) ||
+        (row.cells.length === refSpans.length && row.cells.every((c, idx) => c.colSpan === refSpans[idx]))
+      ));
+    })();
+    const columnTracksUnavailable = id === COLUMNS && !unspannedHeader && !simpleSpanLayoutMatches;
+    const unsupported = !sourceTableMatches(table) || gridColumns === null || !lead || !table.headerRowSids.length
+      || !visibleHeader(table, lead) || columnTracksUnavailable
       || fragments.some(f => f.rows.filter(row => !table.headerRowSids.includes(row.sid!))
         .some(row => row.cells.some(cell => !cell.visible || cell.box.width <= 0 || cell.box.height <= 0)));
     for (const [at, fragment] of fragments.entries()) {
@@ -56,14 +69,35 @@ function check(snapshot: Snapshot, ctx: Parameters<typeof makeFinding>[0]["ctx"]
       measured += 1;
       const dataRows = fragment.rows.filter(row => !table.headerRowSids.includes(row.sid!));
       const headPresent = visibleHeader(table, fragment);
-      const reference = lead!.rows.find(row => table.headerRowSids.includes(row.sid!))!;
       // Local tracks survive page stacking. Compare both edges, never font or wrapper width.
       let maxDelta = 0;
-      for (const row of dataRows) for (const [i, cell] of row.cells.entries()) {
-        const first = reference.cells[i]!;
-        const left = (cell.box.x - fragment.box.x) - (first.box.x - lead!.box.x);
-        const right = (cell.box.x + cell.box.width - fragment.box.x) - (first.box.x + first.box.width - lead!.box.x);
-        maxDelta = Math.max(maxDelta, Math.abs(left), Math.abs(right));
+      if (id === COLUMNS) {
+        const refRow = unspannedHeader ?? leadHeaderRows[leadHeaderRows.length - 1]!;
+        const refLefts = refRow.cells.map(c => c.box.x - lead!.box.x);
+        const refRights = refRow.cells.map(c => c.box.x + c.box.width - lead!.box.x);
+        for (const row of dataRows) {
+          if (unspannedHeader) {
+            let colStart = 0;
+            for (const cell of row.cells) {
+              const colEnd = colStart + cell.colSpan - 1;
+              const left = (cell.box.x - fragment.box.x) - refLefts[colStart]!;
+              const right = (cell.box.x + cell.box.width - fragment.box.x) - refRights[colEnd]!;
+              maxDelta = Math.max(maxDelta, Math.abs(left), Math.abs(right));
+              colStart += cell.colSpan;
+            }
+          } else if (row.cells.length === 1 && row.cells[0]!.colSpan === gridColumns) {
+            const cell = row.cells[0]!;
+            const left = (cell.box.x - fragment.box.x) - refLefts[0]!;
+            const right = (cell.box.x + cell.box.width - fragment.box.x) - refRights[refRights.length - 1]!;
+            maxDelta = Math.max(maxDelta, Math.abs(left), Math.abs(right));
+          } else {
+            for (const [i, cell] of row.cells.entries()) {
+              const left = (cell.box.x - fragment.box.x) - refLefts[i]!;
+              const right = (cell.box.x + cell.box.width - fragment.box.x) - refRights[i]!;
+              maxDelta = Math.max(maxDelta, Math.abs(left), Math.abs(right));
+            }
+          }
+        }
       }
       const threshold = id === COLUMNS ? Number(ctx.options.maxColumnDriftPx ?? 2) : 0;
       const violated = at > 0 && dataRows.length > 0 && (id === HEADER ? !headPresent : maxDelta > threshold);

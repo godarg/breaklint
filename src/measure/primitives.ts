@@ -215,6 +215,9 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const groupingRulesGet = typeof CSSGroupingRule === "undefined" ? null : getter(CSSGroupingRule.prototype, "cssRules");
   const mutationTypeGet = getter(MutationRecord.prototype, "type");
   const mutationAttributeNameGet = getter(MutationRecord.prototype, "attributeName");
+  const mutationRemovedNodesGet = getter(MutationRecord.prototype, "removedNodes");
+  const readyStateGet = getter(Document.prototype, "readyState");
+  const offsetParentGet = getter(HTMLElement.prototype, "offsetParent");
   let integrity = null;
   let collector = null;
   let pagedCapture = null;
@@ -277,6 +280,7 @@ const PRIMITIVES_TEMPLATE = `(() => {
         integrity = call.call(freezeFn, Object, value);
       },
       integrityArmLate: (capability) => { requireCapability(capability); return integrity.armLate(); },
+      integrityMarkPaginationStart: (capability) => { requireCapability(capability); return integrity.markPaginationStart ? integrity.markPaginationStart() : false; },
       integrityRecordPreview: (capability) => { requireCapability(capability); return integrity.recordPreview(); },
       integrityStatus: (capability) => { requireCapability(capability); return integrity.status(); },
       installCollector: (capability, nonce, value) => {
@@ -333,6 +337,9 @@ const PRIMITIVES_TEMPLATE = `(() => {
       },
       mutationType: (record) => call.call(mutationTypeGet, record),
       mutationAttributeName: (record) => call.call(mutationAttributeNameGet, record),
+      mutationRemovedCount: (record) => { const list = mutationRemovedNodesGet ? call.call(mutationRemovedNodesGet, record) : null; return list ? list.length : 0; },
+      readyState: () => (readyStateGet ? call.call(readyStateGet, document) : "complete"),
+      offsetParent: (el) => (offsetParentGet && el instanceof HTMLElement ? call.call(offsetParentGet, el) : null),
       randomToken: () => {
         const words = new Uint32Array(4);
         call.call(randomValuesFn, window.crypto, words);
@@ -538,9 +545,9 @@ export const PRIMITIVES_CHECK = `(() => {
   for (const name of ["fontsReady", "fontFaces", "fontStatus", "fontFamily", "imageUri", "svgBounds",
     "outerHtml", "painted", "byId", "replaced", "canvas", "spaceAdvance", "styleSheets", "sheetHref", "sheetRules", "ruleCssText", "nestedRules",
     "rects", "setAttr", "setText", "nodeType", "parent", "next", "create", "append", "remove", "setCssText",
-    "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityRecordPreview",
+    "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityMarkPaginationStart", "integrityRecordPreview",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",
-    "publishFreeze", "publishOverlay", "mutationType", "mutationAttributeName", "randomToken", "startsWith"]) {
+    "publishFreeze", "publishOverlay", "mutationType", "mutationAttributeName", "mutationRemovedCount", "readyState", "offsetParent", "randomToken", "startsWith"]) {
     if (typeof p[name] !== "function") return { ok: false, reason: "captured primitive missing: " + name };
   }
   return { ok: true, reason: "" };

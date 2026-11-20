@@ -116,4 +116,46 @@ it("witnesses the last table row and separated caption independently in PDF text
     assert.equal(report.findings[0]!.evidence.bindsFinding, true);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+it("measures tables with regular full-width colspan separators and declines irregular colspan rows", async () => {
+  const root = mkdtempSync(join(tmpdir(), "breaklint-table-colspan-live-"));
+  try {
+    const rows = Array.from({ length: 22 }, (_, i) =>
+      i === 0 || i === 11
+        ? `<tr><td colspan="3"><strong>Section ${i === 0 ? "A" : "B"}</strong></td></tr>`
+        : `<tr><td>Row ${i}</td><td>${i * 10}</td><td>OK</td></tr>`,
+    ).join("\n");
+    const regularHtml = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Regular Colspan</title>
+<style>@page { size: 120mm 135mm; margin: 10mm; } body { font: 13px/1.4 serif; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th, td { border: 1px solid #333; padding: 5px; }</style></head>
+<body><h1>Regular Colspan Table</h1>
+<table><thead><tr><th colspan="2">Identity</th><th>Status</th></tr><tr><th>Name</th><th>Metric</th><th>Flag</th></tr></thead>
+<tbody>${rows}</tbody></table></body></html>`;
+    const regularPath = join(root, "regular.html");
+    writeFileSync(regularPath, regularHtml);
+    const rendered = await renderDocuments([regularPath], {
+      outDir: root, evidenceBinding: true, sourceMapInjection: true, locale: "en-US", network: { mode: "offline", allowed: [] },
+    });
+    assert.equal(rendered.fatal, null);
+    const input = rendered.documents[0]!;
+    assert.ok(input.snapshot);
+    const report = runDocument(input, { activeRules: [tableHeaderNotRepeated, tableColumnDrift], optionsByRule: {}, coverageFloors: {}, failOn: "warn" }).report;
+    assert.equal(report.coverage[tableHeaderNotRepeated.id]!.notMeasuredCount, 0, JSON.stringify(report.notMeasured));
+    assert.ok(report.coverage[tableHeaderNotRepeated.id]!.measured >= 2);
+    assert.equal(report.coverage[tableColumnDrift.id]!.notMeasuredCount, 0, JSON.stringify(report.notMeasured));
+    assert.equal(report.findings.filter(f => f.ruleId === tableColumnDrift.id).length, 0);
+
+    const irregularHtml = regularHtml.replace('<tr><td colspan="3"><strong>Section A</strong></td></tr>', '<tr><td colspan="2">Irregular</td></tr>');
+    const irregularPath = join(root, "irregular.html");
+    writeFileSync(irregularPath, irregularHtml);
+    const irrRendered = await renderDocuments([irregularPath], {
+      outDir: root, evidenceBinding: true, sourceMapInjection: true, locale: "en-US", network: { mode: "offline", allowed: [] },
+    });
+    assert.equal(irrRendered.fatal, null);
+    const irrReport = runDocument(irrRendered.documents[0]!, { activeRules: [tableHeaderNotRepeated, tableColumnDrift], optionsByRule: {}, coverageFloors: {}, failOn: "warn" }).report;
+    assert.equal(irrReport.verdict, "insufficient-coverage");
+    assert.ok(irrReport.notMeasured.some(n => n.reason === "env/table-structure-unsupported"));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 });

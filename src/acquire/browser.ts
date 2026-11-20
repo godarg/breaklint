@@ -42,6 +42,7 @@ export interface RequestLike {
   failure?(): { errorText?: string } | null;
   continue(): Promise<void>;
   abort(errorCode?: string): Promise<void>;
+  respond?(response: { status: number; headers?: Record<string, string>; body?: string | Buffer }): Promise<void>;
 }
 
 export interface ResponseLike {

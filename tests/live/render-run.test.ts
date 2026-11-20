@@ -1163,21 +1163,17 @@ describe("the M2d live production chain", () => {
     assert.deepEqual(unplacedMarks(document), [], "the evidence overlay tried to mark the running-header clone");
     const blankEvidence = document.evidence?.find((page) => page.page === 2);
     assert.equal(blankEvidence?.conformance, null, "premise: the blank page has no mark to bind");
-    // Everything below needs a browser whose PDF carries the marks (CI's current Chrome). Pages 1
-    // and 3 bind. Page 2 cannot: a page without a single mark never binds, and required evidence
-    // is complete only when EVERY page binds, so any document with a parity-blank page ends
-    // insufficient-coverage (exit 4) under evidence binding — on this fixture and on live-chain.html
-    // alike. That is the evidence contract as it stands, not a defect of the margin-box repair; it
-    // is recorded in docs/limitations.md. When that contract changes, this assertion must change
-    // with it, deliberately.
+    // G-78: pages 1 and 3 bind via mark conformance, and page 2 is a confirmed parity-blank page
+    // with zero flow blocks, zero unplaced marks, zero stray mark tokens in the PDF page, and
+    // verified document-level mark conformance. Under v0.11.0 evidence binding, all 3 pages bind
+    // and the clean document completes at exit 0.
     assert.deepEqual(
       { status: outcome.report.evidenceCoverage?.status, boundPages: outcome.report.evidenceCoverage?.boundPages },
-      { status: "partial", boundPages: 2 },
+      { status: "complete", boundPages: 3 },
       `evidence: ${JSON.stringify(outcome.report.evidenceCoverage)}`,
     );
-    assert.deepEqual(document.evidence?.map((page) => page.bindsFinding), [true, false, true]);
-    assert.equal(outcome.report.exitReason, "evidence/required-page-binding-incomplete");
-    assert.equal(exitCodeFor(outcome.report.verdict), 4);
+    assert.deepEqual(document.evidence?.map((page) => page.bindsFinding), [true, true, true]);
+    assert.equal(exitCodeFor(outcome.report.verdict), 0);
   });
 
   /**
@@ -1252,6 +1248,49 @@ describe("the M2d live production chain", () => {
     for (const index of [27, 28]) {
       const outcome = withProfile(result!.documents[index]!);
       assert.equal(exitCodeFor(outcome.report.verdict), 0, `document ${index}: ${outcome.report.exitReason}`);
+    }
+  });
+
+  it("verifies parity-blank pages (G-78), tolerates post-PDF OOF grid spans, and isolates explicit favicon fetches", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const root = mkdtempSync(join(tmpdir(), "breaklint-paket1-live-"));
+    try {
+      const blankAndOof = join(root, "parity-blank-and-oof.html");
+      const gridRows = Array.from({ length: 16 }, (_, i) =>
+        `<div class="row"><div class="annot"><span class="seg-n">${i + 1}</span><span>Clause ${i + 1}: Alpha beta gamma delta epsilon zeta eta theta iota kappa lambda.</span></div><div class="note">Note ${i + 1}</div></div>`,
+      ).join("\n");
+      writeFileSync(blankAndOof, `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Parity Blank & OOF</title>
+<style>
+  @page { size: 120mm 140mm; margin: 12mm; }
+  body { font: 13px/1.45 serif; }
+  .chapter-two { break-before: recto; }
+  .row { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .annot { position: relative; padding-left: 18px; }
+  .seg-n { position: absolute; left: 0; top: 1px; font-size: 10px; }
+</style></head><body>
+<h1>Chapter One</h1><p>First page content before a forced recto chapter start.</p>
+<section class="chapter-two"><h1>Chapter Two</h1>${gridRows}</section>
+</body></html>`);
+      const rendered = await renderDocuments([blankAndOof], options(join(root, "ev-ok")));
+      assert.equal(rendered.fatal, null);
+      const doc = rendered.documents[0]!;
+      assert.ok(doc.snapshot, JSON.stringify(doc.infrastructure));
+      assert.equal(doc.infrastructure.some((e) => e.kind === "render-unstable"), false, JSON.stringify(doc.infrastructure));
+      const blankPage = doc.snapshot.pages.find((p) => p.blank);
+      assert.ok(blankPage, "fixture must produce a parity-blank verso page");
+      const blankEvidence = doc.evidence?.find((e) => e.page === blankPage.pageNumber);
+      assert.equal(blankEvidence?.bindsFinding, true, `G-78 blank page ${blankPage.pageNumber} must bind`);
+      assert.equal(blankEvidence?.pdfConformance, "verified");
+
+      const explicitFavicon = join(root, "explicit-favicon.html");
+      writeFileSync(explicitFavicon, `<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="icon" href="/favicon.ico"></head><body><p>Explicit missing icon</p></body></html>`);
+      const favRendered = await renderDocuments([explicitFavicon], options(join(root, "ev-fav")));
+      const favDoc = favRendered.documents[0]!;
+      const failedFav = favDoc.infrastructure.some((e) => e.kind === "source-acquisition-failed") ||
+        (favDoc.snapshot?.resources.some((r) => r.requestedUri.endsWith("/favicon.ico") && r.outcome !== "loaded") ?? false);
+      assert.equal(failedFav, true, "explicitly linked missing /favicon.ico must never be silently swallowed as 204");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });
