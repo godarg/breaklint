@@ -390,6 +390,19 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
           svgViewportOverflow = Math.max(svgViewportOverflow, viewport.left - domRect.left, domRect.right - viewport.right, viewport.top - domRect.top, domRect.bottom - viewport.bottom);
         }
       }
+      // A non-text SVG target (a shape, an <image>, a <g>) that an enclosing SVG viewport cuts is
+      // drawing, not clipped content: web/content-clipped does not apply to it (reported as
+      // excluded rule/target-not-applicable rather than a silent measured 0). Text and its
+      // <tspan>/<textPath> belong to web/svg-text-overflows-viewport.
+      let svgViewportCut = false;
+      if (state === "candidate" && svgInterior && !isSvgText && !node.closest("text")) {
+        for (let part = node.parentElement; part instanceof SVGElement && !svgViewportCut; part = part.parentElement) {
+          if (!(part instanceof SVGSVGElement) || getComputedStyle(part).overflow === "visible") continue;
+          const viewport = svgViewport(part);
+          if (!viewport) { state = "not-measured"; reason = "evidence/svg-viewport-unavailable"; break; }
+          svgViewportCut = contained(new DOMRect(viewport.left, viewport.top, viewport.right - viewport.left, viewport.bottom - viewport.top), domRect) !== "none";
+        }
+      }
       let ancestor: Element | null = node.parentElement;
       if (isSvgText || svgInterior) while (ancestor instanceof SVGElement) ancestor = ancestor.parentElement;
       while (state === "candidate" && ancestor) {
@@ -468,7 +481,7 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
           // Inside an <svg>, scrollWidth is in CSS pixels and clientWidth in user units; the pair
           // measures viewBox scaling, not overflow. SVG content is web/svg-text-overflows-viewport's.
           horizontalOverflow: svgInterior ? 0 : Math.max(0, node.scrollWidth - node.clientWidth), svgInterior,
-          allowedScroll: isSelf(node, options.allowed), clipByAllowed, overlay,
+          allowedScroll: isSelf(node, options.allowed), clipByAllowed, svgViewportCut, overlay,
           sourceContainer: containerIndex(node), scroll: { x: sx, y: sy },
         },
       };

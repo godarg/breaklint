@@ -581,6 +581,22 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.ok(svgFinding(r, "#nested"), JSON.stringify(r.evaluations.filter((e) => e.target.selector === "#nested")));
     for (const selector of ["#partly", "#outside", "#padded", "#scaled-cut", "#nested"]) assert.equal(clipFinding(r, selector), undefined, selector);
 
+    // Shapes and images cut by the SVG viewport are drawing, not clipped content: web/content-clipped
+    // reports them as not applicable instead of a silent measured 0; a shape inside the viewport
+    // stays measured.
+    const shapes = await inspect(
+      '<div><svg width="100" height="40"><rect id="rect-cut" x="50" y="0" width="200" height="20" fill="red"/><rect id="rect-in" x="0" y="0" width="20" height="20" fill="blue"/></svg></div>' +
+      '<div><svg width="100" height="40"><image id="image-cut" x="50" y="0" width="200" height="30" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%2210%22%3E%3Crect width=%2210%22 height=%2210%22/%3E%3C/svg%3E"/></svg></div>',
+      "svg-shape-viewport",
+    );
+    const clipEvaluation = (selector: string) => shapes.report.evaluations.find((e) => e.ruleId === "web/content-clipped" && e.target.selector === selector);
+    for (const selector of ["#rect-cut", "#image-cut"]) {
+      const evaluation = clipEvaluation(selector);
+      assert.deepEqual([evaluation?.status, evaluation?.reason], ["excluded", "rule/target-not-applicable"], `${selector} ${JSON.stringify(evaluation)}`);
+    }
+    assert.deepEqual([clipEvaluation("#rect-in")?.status, clipEvaluation("#rect-in")?.measurements[0]?.value], ["measured", 0]);
+    assert.equal(shapes.report.findings.length, 0, JSON.stringify(shapes.report.findings));
+
     // overflow:visible draws the text: the SVG rule does not apply, an outer HTML clip still does.
     const visible = await inspect(
       '<div><svg width="100" height="40" style="overflow:visible"><text id="drawn" x="70" y="24" font-size="20">WayTooWideLabel</text></svg></div>' +

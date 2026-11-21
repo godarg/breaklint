@@ -25,6 +25,8 @@ export type RawTarget = {
   allowedScroll: boolean;
   /** The clipping recorded in `clipped` is caused by a named allowed scroll container (the target or an ancestor). */
   clipByAllowed: boolean;
+  /** Non-text SVG target cut by an enclosing SVG viewport: web/content-clipped does not apply. */
+  svgViewportCut: boolean;
   overlay: boolean; sourceContainer: number | null; scroll: { x: number; y: number };
 };
 export type RawSampleSignature = {
@@ -59,7 +61,7 @@ export function digestBrowserSample(sampled: BrowserRawSample, siblingOverlap: b
     target.paintSignature, target.ancestorSignatureComplete, target.box?.x ?? null, target.box?.y ?? null, target.box?.width ?? null, target.box?.height ?? null,
     target.state, target.reason, target.paint, target.transform, target.horizontalOverflow, target.clipped,
     ...(siblingOverlap ? [target.siblingOverlapPx] : []), target.svgTextOverflowPx, target.svgClipped, target.svgInterior, target.fontSizePx, target.hasDirectText, target.isInteractiveControl,
-    ...(siblingOverlap ? [target.siblingEligible] : []), target.allowedScroll, target.clipByAllowed, target.overlay, target.sourceContainer,
+    ...(siblingOverlap ? [target.siblingEligible] : []), target.allowedScroll, target.clipByAllowed, target.svgViewportCut, target.overlay, target.sourceContainer,
   ]));
   return { ...sampled, signature: { ...sampled.signature, targetDigest }, targets };
 }

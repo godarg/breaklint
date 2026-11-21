@@ -47,7 +47,8 @@ run) with structured `capture.driftDetails` on drift (a text change records only
 evaluations (including healthy, excluded, and not-measured targets), coverage counts, and typed
 events. Screen profile v2 checks unexpected horizontal overflow, content visibly cut by rectangular
 `overflow: hidden` or `clip` ancestors, SVG text overflowing its viewport
-(`web/svg-text-overflows-viewport`), and the opt-in warnings `web/sibling-overlap` (visible HTML
+(`web/svg-text-overflows-viewport`; a shape or image that the SVG viewport cuts is drawing, so
+`web/content-clipped` reports it as excluded `rule/target-not-applicable`), and the opt-in warnings `web/sibling-overlap` (visible HTML
 sibling overlap, `rules.siblingOverlap: true`), `web/small-text` and `web/small-touch-target`. Without
 its opt-in, the sibling pass does not run and its fields do not take part in the capture stability
 check. `web/small-text` compares the computed `font-size` of elements with their own text (a
