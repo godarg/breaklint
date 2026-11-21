@@ -48,7 +48,11 @@ events. Screen profile v2 checks unexpected horizontal overflow, content visibly
 sibling overlap, `rules.siblingOverlap: true`), `web/small-text` and `web/small-touch-target`. Without
 its opt-in, the sibling pass does not run and its fields do not take part in the capture stability
 check. Absolutely positioned siblings are not excluded wholesale; name an intended overlay such as a
-badge in `intentionalOverlays`. `failOn` (`"warn"` by default, or `"error"`) is the lowest finding
+badge in `intentionalOverlays`. An intentional overlay exempts its subtree. An allowed scroll
+container exempts only its own horizontal overflow and the clipping it causes (content it cuts or
+scrolls out of view); its descendants are still measured. An exception that matches `html` or `body`
+would exempt the whole page: it emits `screen-exception-too-broad` and the run is
+`insufficient-coverage`. `failOn` (`"warn"` by default, or `"error"`) is the lowest finding
 severity that turns the verdict into `findings`; with `"error"`, warnings stay in the report without
 failing the run. CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`,
 `hwb()`, `color(...)`), semi-transparent opacity (`0 < opacity < 1`), `filter`, and `backdrop-filter`

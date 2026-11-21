@@ -83,6 +83,56 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.ok(result.report.evaluations.some((entry) => entry.reason === "target/allowed-scroll-container"));
   });
 
+  it("excludes only an allowed scroll container's own overflow and its clipping, keeps measuring descendants, and fails closed on html/body", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    // Negative control: an allowed scroll container on body would exempt every paragraph.
+    const paragraphs = '<p id="p1">First paragraph.</p><p id="p2">Second paragraph.</p><p id="p3">Third paragraph.</p>';
+    for (const [field, selector] of [["allowedScrollContainers", "body"], ["allowedScrollContainers", "html"], ["intentionalOverlays", "body"]] as const) {
+      const broad = await inspect(paragraphs, `broad-${field}-${selector}`, { [field]: [{ selector, reason: "too broad" }] });
+      assert.equal(broad.ok, false, `${field} ${selector}`);
+      assert.equal(broad.report.runVerdict, "insufficient-coverage", `${field} ${selector}`);
+      assert.ok(broad.report.events.some((e) => e.kind === "screen-exception-too-broad" && e.detail.includes(selector)), `${field} ${selector}: ${JSON.stringify(broad.report.events)}`);
+    }
+
+    // Positive control: inside an allowed <main> scroller, a child that overflows itself and a
+    // grandchild cut by a non-allowed clipping box are still defects.
+    const scroller = await inspect(
+      '<main id="main" style="display:block;width:300px;overflow-x:auto">' +
+      '<div id="kid" style="width:200px"><div style="width:500px;height:20px">wide inner content</div></div>' +
+      '<div id="clipbox" style="width:150px;overflow:hidden;white-space:nowrap"><div id="cut" style="width:400px">clipped by a non-allowed box</div></div>' +
+      "</main>",
+      "allowed-main-scroller",
+      { allowedScrollContainers: [{ selector: "#main", reason: "page scroller" }] },
+    );
+    assert.equal(scroller.report.runVerdict, "findings", JSON.stringify(scroller.report.evaluations.filter((e) => e.target.selector.startsWith("#")).map((e) => [e.target.selector, e.ruleId, e.status, e.reason])));
+    assert.ok(scroller.report.findings.some((f) => f.ruleId === "web/unexpected-horizontal-overflow" && f.target.selector === "#kid"));
+    assert.ok(scroller.report.findings.some((f) => f.ruleId === "web/content-clipped" && f.target.selector === "#cut"));
+    // The container's own horizontal overflow stays exempt.
+    assert.ok(scroller.report.evaluations.some((e) => e.target.selector === "#main" && e.ruleId === "web/unexpected-horizontal-overflow" && e.status === "excluded" && e.reason === "target/allowed-scroll-container"));
+    assert.equal(scroller.report.events.some((e) => e.kind === "screen-exception-too-broad"), false);
+
+    // A legitimate horizontal scroll list stays clean; its items are measured.
+    const items = [1, 2, 3, 4, 5, 6].map((n) => `<li id="item-${n}" style="flex:0 0 120px">Item ${n}</li>`).join("");
+    const list = await inspect(
+      `<ul id="list" style="display:flex;overflow-x:auto;width:300px;margin:0;padding:0;list-style:none">${items}</ul>`,
+      "legit-scroll-list",
+      { allowedScrollContainers: [{ selector: "#list", reason: "carousel" }] },
+    );
+    assert.equal(list.report.runVerdict, "clean", JSON.stringify(list.report.evaluations.filter((e) => e.status !== "measured" && e.target.selector.startsWith("#")).map((e) => [e.target.selector, e.ruleId, e.status, e.reason])));
+    assert.ok(list.report.evaluations.some((e) => e.target.selector === "#item-1" && e.ruleId === "web/unexpected-horizontal-overflow" && e.status === "measured"));
+    // A clipping strip (overflow:hidden carousel): items it cuts or hides are exempt as clipped by it.
+    const strip = await inspect(
+      `<ul id="list" style="display:flex;overflow:hidden;width:300px;margin:0;padding:0;list-style:none">${items}</ul>`,
+      "legit-clipping-strip",
+      { allowedScrollContainers: [{ selector: "#list", reason: "carousel" }] },
+    );
+    assert.equal(strip.report.runVerdict, "clean", JSON.stringify(strip.report.evaluations.filter((e) => e.status !== "measured" && e.target.selector.startsWith("#")).map((e) => [e.target.selector, e.ruleId, e.status, e.reason])));
+    for (const id of ["#item-3", "#item-4"]) {
+      assert.ok(strip.report.evaluations.some((e) => e.target.selector === id && e.ruleId === "web/content-clipped" && e.status === "excluded" && e.reason === "target/allowed-scroll-container"), id);
+      assert.ok(strip.report.evaluations.some((e) => e.target.selector === id && e.ruleId === "web/unexpected-horizontal-overflow" && e.status === "measured"), id);
+    }
+  });
+
   it("finds visible content cut by an overflow:hidden rectangle", async (t) => {
     if (missingBrowser && optional) return t.skip("missing browser");
     const result = await inspect('<div id="clip" style="width:200px;overflow:hidden"><div id="cut" style="width:500px">clipped text</div></div>', "clipping");

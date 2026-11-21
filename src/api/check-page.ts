@@ -178,6 +178,11 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
     const matchCount = (selectors: string[]): number[] => selectors.map((s) => { try { return document.querySelectorAll(s).length; } catch { return -1; } });
     const allowedCounts = matchCount(options.allowed), overlayCounts = matchCount(options.overlays);
     const isMatch = (node: Element, selectors: string[]): boolean => selectors.some((s) => { try { return node.matches(s) || !!node.closest(s); } catch { return false; } });
+    // An allowed scroll container exempts only itself (its own horizontal overflow) and the
+    // clipping it causes; its descendants stay measured.
+    const isSelf = (node: Element, selectors: string[]): boolean => selectors.some((s) => { try { return node.matches(s); } catch { return false; } });
+    // An exception that matches the document root or body exempts the whole page.
+    const rootMatch = (selectors: string[]): boolean[] => selectors.map((s) => { try { return document.documentElement.matches(s) || !!document.body?.matches(s); } catch { return false; } });
     const containerIndex = (node: Element): number | null => { for (let i = 0; i < options.containers.length; i++) { try { if (node.closest(options.containers[i]!)) return i; } catch { return null; } } return null; };
 
     const visibleArea = options.fullPage
@@ -302,7 +307,8 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       const hasDirectText = directTextNodes.some((t) => (t.textContent ?? "").trim().length > 0);
       const ownClip = [style.overflow, style.overflowX, style.overflowY].some((value) => value === "hidden" || value === "clip");
       let clipped: "none" | "partial" | "outside" = "none";
-      if (state === "candidate" && ownClip && box && directTextNodes.some((text) => { const range = document.createRange(); range.selectNodeContents(text); return [...range.getClientRects()].some((textRect) => contained(domRect, textRect) !== "none"); })) clipped = "partial";
+      let clipByAllowed = false;
+      if (state === "candidate" && ownClip && box && directTextNodes.some((text) => { const range = document.createRange(); range.selectNodeContents(text); return [...range.getClientRects()].some((textRect) => contained(domRect, textRect) !== "none"); })) { clipped = "partial"; clipByAllowed = isSelf(node, options.allowed); }
       // SVG text is measured against the SVG viewports that clip it (content box of the outer
       // <svg>, x/y/width/height of a nested <svg>), in client CSS pixels, before the generic
       // ancestor classification. Clipping by an SVG viewport is decided by that rule alone (one
@@ -319,7 +325,19 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       }
       let ancestor: Element | null = node.parentElement;
       if (isSvgText) while (ancestor instanceof SVGElement) ancestor = ancestor.parentElement;
-      while (state === "candidate" && ancestor) { const ps = getComputedStyle(ancestor); const clip = [ps.overflow, ps.overflowX, ps.overflowY].some((v) => v === "hidden" || v === "clip"); if (clip && box) { const outcome = contained(ancestor.getBoundingClientRect(), domRect); if (outcome !== "none") { clipped = outcome; if (outcome === "outside") { state = "not-measured"; reason = "evidence/target-clipped-outside"; } break; } } ancestor = ancestor.parentElement; }
+      while (state === "candidate" && ancestor) {
+        const ps = getComputedStyle(ancestor); const clip = [ps.overflow, ps.overflowX, ps.overflowY].some((v) => v === "hidden" || v === "clip");
+        if (clip && box) {
+          const outcome = contained(ancestor.getBoundingClientRect(), domRect);
+          if (outcome !== "none") {
+            clipped = outcome; clipByAllowed = isSelf(ancestor, options.allowed);
+            // Content scrolled out of an allowed scroll container is intended, not missing evidence.
+            if (outcome === "outside" && !clipByAllowed) { state = "not-measured"; reason = "evidence/target-clipped-outside"; }
+            break;
+          }
+        }
+        ancestor = ancestor.parentElement;
+      }
 
       const chain = [node, ...(() => { const out: Element[] = []; let x = node.parentElement; while (x) { out.push(x); x = x.parentElement; } return out; })()];
       const targetPaintSignature = paintValues(style);
@@ -383,7 +401,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
           // Inside an <svg>, scrollWidth is in CSS pixels and clientWidth in user units; the pair
           // measures viewBox scaling, not overflow. SVG content is web/svg-text-overflows-viewport's.
           horizontalOverflow: svgInterior ? 0 : Math.max(0, node.scrollWidth - node.clientWidth), svgInterior,
-          allowedScroll: isMatch(node, options.allowed), overlay,
+          allowedScroll: isSelf(node, options.allowed), clipByAllowed, overlay,
           sourceContainer: containerIndex(node), scroll: { x: sx, y: sy },
         },
       };
@@ -461,7 +479,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       document: [document.documentElement.scrollWidth, document.documentElement.scrollHeight, document.documentElement.clientWidth, document.documentElement.clientHeight, nodes.length],
       fonts: document.fonts?.status ?? "unsupported",
     };
-    return { signature, fontsReady: document.fonts?.status === "loaded", deviceScaleFactor: devicePixelRatio, candidates: nodes.length, omittedCount: capped ? nodes.length - selected.length : 0, signatureTextComplete, ancestorSignatureComplete, exceptions: { allowed: allowedCounts, overlay: overlayCounts }, targets };
+    return { signature, fontsReady: document.fonts?.status === "loaded", deviceScaleFactor: devicePixelRatio, candidates: nodes.length, omittedCount: capped ? nodes.length - selected.length : 0, signatureTextComplete, ancestorSignatureComplete, exceptions: { allowed: allowedCounts, overlay: overlayCounts, allowedRoot: rootMatch(options.allowed), overlayRoot: rootMatch(options.overlays) }, targets };
   }, input);
 
   return digestBrowserSample(sampled, input.siblingOverlap);
@@ -599,8 +617,14 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const bindingStable = bindingBefore.status === "verified-container-only" && bindingAfter.status === "verified-container-only" && bindingBefore.detail === bindingAfter.detail && domBuildId === domBuildIdAfter;
   if (!bindingStable) events.push({ kind: "source-binding-unavailable", detail: bindingAfter.detail ?? bindingBefore.detail ?? "host build container binding unavailable or changed during capture" });
 
-  for (const [kind, entries, counts] of [["allowed-scroll-container", allowedEntries, settled.exceptions.allowed], ["intentional-overlay", overlayEntries, settled.exceptions.overlay]] as const) {
+  let rootException = false;
+  for (const [kind, entries, counts, roots] of [["allowed-scroll-container", allowedEntries, settled.exceptions.allowed, settled.exceptions.allowedRoot], ["intentional-overlay", overlayEntries, settled.exceptions.overlay, settled.exceptions.overlayRoot]] as const) {
     entries.forEach((entry, index) => {
+      if (roots[index] === true) {
+        // Regardless of scope: an exception on html/body exempts the page, so no clean claim.
+        rootException = true;
+        events.push({ kind: "screen-exception-too-broad", detail: `${kind} ${entry.selector} matches the document root or body` });
+      }
       if ((counts[index] ?? 0) <= 0 && entry.scope === "scenario") {
         events.push({ kind: "screen-exception-unused", detail: `${kind} ${entry.selector} matched no current target` });
       }
@@ -627,7 +651,7 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const excluded = evaluations.filter((entry) => entry.status === "excluded").length;
   const notMeasured = evaluations.filter((entry) => entry.status === "not-measured").length;
   // A page with candidates but no measurements has no positive observation to support Clean.
-  const insufficient = !stableCapture || settled.omittedCount > 0 || notMeasured > 0 || measured === 0;
+  const insufficient = !stableCapture || settled.omittedCount > 0 || notMeasured > 0 || measured === 0 || rootException;
   const verdict: RunVerdict = infrastructure.some((entry) => entry.fatal) ? "infrastructure" : insufficient ? "insufficient-coverage" : gatingFindings > 0 ? "findings" : "clean";
   const viewport = page.viewportSize();
   const browserVersion = await Promise.resolve(page.context().browser()?.version() ?? null);

@@ -65,24 +65,26 @@ export function evaluateScreenTargets(targets: readonly RawTarget[], ctx: Screen
   const evaluations: ScreenTargetEvaluation[] = [];
   let i = 0;
   for (const raw of targets) {
-    const exceptionReason = raw.overlay ? "target/intentional-overlay" : raw.allowedScroll ? "target/allowed-scroll-container" : null;
-    const exceptionStatus = exceptionReason !== null ? ("excluded" as const) : null;
+    // An overlay exempts its subtree from both rules. An allowed scroll container exempts only its
+    // own horizontal overflow and the clipping it causes; its descendants stay measured.
+    const overflowReason = raw.overlay ? "target/intentional-overlay" : raw.allowedScroll ? "target/allowed-scroll-container" : null;
+    const clipReason = raw.overlay ? "target/intentional-overlay" : raw.clipByAllowed ? "target/allowed-scroll-container" : null;
     // 1. web/unexpected-horizontal-overflow
     evaluations.push(buildEvaluation(
       raw, "web/unexpected-horizontal-overflow", i++, binding, stableCapture, artifactPath,
       { name: "horizontal-overflow", value: raw.horizontalOverflow, unit: "css-px", operator: ">", threshold: 0, calibrated: false },
-      raw.state === "candidate" && !raw.svgInterior && !raw.overlay && !raw.allowedScroll && raw.horizontalOverflow > 0,
-      raw.svgInterior ? "rule/target-not-applicable" : exceptionReason,
-      raw.svgInterior ? "excluded" : exceptionStatus,
+      raw.state === "candidate" && !raw.svgInterior && overflowReason === null && raw.horizontalOverflow > 0,
+      raw.svgInterior ? "rule/target-not-applicable" : overflowReason,
+      raw.svgInterior || overflowReason !== null ? "excluded" : null,
     ));
     // 2. web/content-clipped
     const clippedVal = raw.clipped === "partial" ? 1 : 0;
     evaluations.push(buildEvaluation(
       raw, "web/content-clipped", i++, binding, stableCapture, artifactPath,
       { name: "clipped-content", value: clippedVal, unit: "count", operator: ">", threshold: 0, calibrated: false },
-      raw.state === "candidate" && !raw.overlay && !raw.allowedScroll && clippedVal > 0,
-      exceptionReason,
-      exceptionStatus,
+      raw.state === "candidate" && clipReason === null && clippedVal > 0,
+      clipReason,
+      clipReason !== null ? "excluded" : null,
     ));
     // 3. Opt-in web/sibling-overlap (HTML elements only; SVG shapes overlap by design)
     if (ctx.siblingOverlap && !raw.isSvg) {

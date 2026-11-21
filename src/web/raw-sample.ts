@@ -20,7 +20,11 @@ export type RawTarget = {
   box: { x: number; y: number; width: number; height: number } | null;
   coordinateSystem: "css-viewport-pixels" | "css-document-pixels";
   state: "candidate" | "excluded" | "not-measured"; reason: string | null; paint: string | null;
-  transform: string | null; clipped: "none" | "partial" | "outside"; horizontalOverflow: number; allowedScroll: boolean;
+  transform: string | null; clipped: "none" | "partial" | "outside"; horizontalOverflow: number;
+  /** The target itself is a named allowed scroll container (descendants are not). */
+  allowedScroll: boolean;
+  /** The clipping recorded in `clipped` is caused by a named allowed scroll container (the target or an ancestor). */
+  clipByAllowed: boolean;
   overlay: boolean; sourceContainer: number | null; scroll: { x: number; y: number };
 };
 export type RawSampleSignature = {
@@ -34,7 +38,7 @@ export type RawSampleSignature = {
 export type RawSample = {
   signature: RawSampleSignature; fontsReady: boolean; deviceScaleFactor: number; candidates: number; omittedCount: number;
   signatureTextComplete: boolean; ancestorSignatureComplete: boolean;
-  exceptions: { allowed: number[]; overlay: number[] }; targets: RawTarget[];
+  exceptions: { allowed: number[]; overlay: number[]; allowedRoot: boolean[]; overlayRoot: boolean[] }; targets: RawTarget[];
 };
 export type BrowserRawTarget = Omit<RawTarget, "directTextSha256"> & { directText: string | null };
 export type BrowserRawSample = Omit<RawSample, "targets"> & { targets: BrowserRawTarget[] };
@@ -53,7 +57,7 @@ export function digestBrowserSample(sampled: BrowserRawSample, siblingOverlap: b
     target.paintSignature, target.ancestorSignatureComplete, target.box?.x ?? null, target.box?.y ?? null, target.box?.width ?? null, target.box?.height ?? null,
     target.state, target.reason, target.paint, target.transform, target.horizontalOverflow, target.clipped,
     ...(siblingOverlap ? [target.siblingOverlapPx] : []), target.svgTextOverflowPx, target.svgClipped, target.svgInterior, target.fontSizePx, target.hasDirectText, target.isInteractiveControl,
-    ...(siblingOverlap ? [target.siblingEligible] : []), target.allowedScroll, target.overlay, target.sourceContainer,
+    ...(siblingOverlap ? [target.siblingEligible] : []), target.allowedScroll, target.clipByAllowed, target.overlay, target.sourceContainer,
   ]));
   return { ...sampled, signature: { ...sampled.signature, targetDigest }, targets };
 }
