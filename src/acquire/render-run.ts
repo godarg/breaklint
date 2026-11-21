@@ -1660,21 +1660,114 @@ function parseBoxEntry(entry: string): BoxEntry | null {
   return { tag: entry.slice(0, colon), x: nums[0]!, y: nums[1]!, width: nums[2]!, height: nums[3]! };
 }
 
+/** Geometry-relevant computed styles of an out-of-flow candidate, read before and after page.pdf(). */
+export interface OofStyle {
+  position: string; left: string; top: string; right: string; bottom: string;
+  transform: string; translate: string; marginLeft: string; marginTop: string;
+}
+export interface OofFact {
+  /** Index in the freeze `boxes` enumeration (every non-`display:none` element of every page). */
+  index: number;
+  pageIndex: number;
+  /** Boxes index of the offsetParent, null when it is not inside a page. */
+  parentIndex: number | null;
+  box: { x: number; y: number; width: number; height: number };
+  parent: { x: number; y: number; borderLeft: number; borderTop: number } | null;
+  content: { x: number; y: number };
+  style: OofStyle;
+  /** After the PDF only: the same element object, and the same offsetParent object, as before. */
+  sameNode?: boolean;
+  sameParent?: boolean;
+}
+export interface OofFacts { pageHeights: number[]; elements: OofFact[] }
+
+/**
+ * Facts about every absolutely positioned candidate inside page content (no source id, not in a
+ * footnote area or margin box). Mode "before" stashes the element and offsetParent identities in
+ * the primitive closure; mode "after" compares against them, so identity is never re-derived from
+ * an index alone.
+ */
+function oofFactsSource(capability: string, mode: "before" | "after"): string {
+  return `(() => {
+    const P = window.__blPrimitives;
+    const pages = P.all(document, ".pagedjs_page");
+    const pageHeights = pages.map((page) => P.rect(page).height);
+    const indexOf = new Map();
+    const candidates = [];
+    let idx = 0;
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+      for (const el of P.all(pages[pageIndex], "*")) {
+        const s = P.style(el, null);
+        if (s.display === "none") continue;
+        indexOf.set(el, idx);
+        if (s.position === "absolute" && !P.hasAttr(el, "data-bl-sid") && P.closest(el, ".pagedjs_page_content") !== null &&
+            P.closest(el, ".pagedjs_footnote_area") === null && P.closest(el, ".pagedjs_margin") === null) {
+          candidates.push({ el, index: idx, pageIndex, s });
+        }
+        idx += 1;
+      }
+    }
+    const stashed = ${JSON.stringify(mode)} === "after" ? P.stashedOofNodes(${JSON.stringify(capability)}) : null;
+    const nodes = [];
+    const elements = candidates.map((c, i) => {
+      const parent = P.offsetParent(c.el);
+      const parentIndex = parent && indexOf.has(parent) ? indexOf.get(parent) : null;
+      const content = P.rect(P.closest(c.el, ".pagedjs_page_content"));
+      const parentRect = parent ? P.rect(parent) : null;
+      const parentStyle = parent ? P.style(parent, null) : null;
+      const b = P.rect(c.el);
+      const round = (n) => Math.round(n * 100) / 100;
+      const fact = {
+        index: c.index, pageIndex: c.pageIndex, parentIndex,
+        box: { x: round(b.x), y: round(b.y), width: round(b.width), height: round(b.height) },
+        parent: parentRect ? { x: parentRect.x, y: parentRect.y,
+          borderLeft: parseFloat(parentStyle.borderLeftWidth) || 0, borderTop: parseFloat(parentStyle.borderTopWidth) || 0 } : null,
+        content: { x: content.x, y: content.y },
+        style: { position: c.s.position, left: c.s.left, top: c.s.top, right: c.s.right, bottom: c.s.bottom,
+          transform: c.s.transform, translate: c.s.translate || "none", marginLeft: c.s.marginLeft, marginTop: c.s.marginTop },
+      };
+      nodes.push({ el: c.el, parent });
+      if (stashed) {
+        const prior = stashed.find((entry) => entry.index === c.index);
+        fact.sameNode = !!prior && prior.el === c.el;
+        fact.sameParent = !!prior && prior.parent === parent;
+      }
+      return fact;
+    });
+    if (!stashed) P.stashOofNodes(${JSON.stringify(capability)}, nodes.map((n, i) => ({ index: elements[i].index, el: n.el, parent: n.parent })));
+    return { pageHeights, elements };
+  })()`;
+}
+
+export async function readOofFacts(page: PageLike, capability: string, mode: "before" | "after"): Promise<OofFacts> {
+  return page.evaluate<OofFacts>(oofFactsSource(capability, mode));
+}
+
+const OOF_ROUNDING_ALLOWANCE_PX = 2.5;
+/** Sum of the print rounding of the page heights before `pageIndex` (A4: 0.48 px per page). */
+function printRoundingSum(pageHeights: readonly number[], pageIndex: number): number {
+  let sum = 0;
+  for (let k = 0; k < pageIndex && k < pageHeights.length; k += 1) sum += Math.abs(Math.round(pageHeights[k]!) - pageHeights[k]!);
+  return sum;
+}
+
 /**
  * Chrome Blink's LayoutNG can retain a stale screen-space coordinate on out-of-flow
  * `position: absolute` elements inside `.pagedjs_page_content` immediately after `page.pdf()`
  * leaves print media, dropping the page's fragmentainer offset while the PDF itself, the element's
  * containing block (`offsetParent`), its box dimensions and its resolved CSS `top`/`left` remain
- * completely unchanged. Verify every single drifted index strictly before accepting it.
+ * completely unchanged. This pure decision accepts a `boxes` drift as that artifact only when every
+ * drifted entry is such an element whose identity, offsetParent and geometry styles (offsets,
+ * transform, translate, margins) are the same object/values before and after the same PDF, whose
+ * position before the PDF follows from its CSS offsets, and whose upward shift equals its page
+ * content origin within the actual print rounding of the preceding page heights + 2.5 px. Every
+ * element on one page must shift by the same amount (CDX-20, CODE-PRINT-4/5).
  */
-async function isVerifiedPostPdfOofCoordinateArtifact(
-  page: PageLike,
-  beforeBoxesRaw: string,
-  afterBoxesRaw: string,
-): Promise<boolean> {
-  const beforeEntries = beforeBoxesRaw === "" ? [] : beforeBoxesRaw.split(";");
-  const afterEntries = afterBoxesRaw === "" ? [] : afterBoxesRaw.split(";");
+export function judgePostPdfOofDrift(input: { beforeBoxes: string; afterBoxes: string; before: OofFacts; after: OofFacts }): boolean {
+  const beforeEntries = input.beforeBoxes === "" ? [] : input.beforeBoxes.split(";");
+  const afterEntries = input.afterBoxes === "" ? [] : input.afterBoxes.split(";");
   if (beforeEntries.length === 0 || beforeEntries.length !== afterEntries.length) return false;
+  if (input.before.pageHeights.length !== input.after.pageHeights.length) return false;
   const drifted: { index: number; before: BoxEntry; after: BoxEntry }[] = [];
   for (let i = 0; i < beforeEntries.length; i += 1) {
     if (beforeEntries[i] === afterEntries[i]) continue;
@@ -1686,76 +1779,34 @@ async function isVerifiedPostPdfOofCoordinateArtifact(
     drifted.push({ index: i, before, after });
   }
   if (drifted.length === 0) return false;
-  const driftedIndices = drifted.map(item => item.index);
-  const details = await page.evaluate<
-    { ok: boolean }
-  >(`((driftedInput) => {
-    const P = window.__blPrimitives;
-    const pages = P.all(document, ".pagedjs_page");
-    const indexSet = new Set(driftedInput.map(d => d.index));
-    const elToIndex = new Map();
-    const indexToEl = new Map();
-    const indexToPage = new Map();
-    const pageToIndex = new Map();
-    let idx = 0;
-    for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
-      const pageEl = pages[pageIndex];
-      pageToIndex.set(pageEl, pageIndex);
-      for (const el of P.all(pageEl, "*")) {
-        const s = P.style(el, null);
-        if (s.display === "none") continue;
-        elToIndex.set(el, idx);
-        if (indexSet.has(idx)) { indexToEl.set(idx, el); indexToPage.set(idx, pageEl); }
-        idx += 1;
-      }
-    }
-    const pageDyByPage = new Map();
-    for (const item of driftedInput) {
-      const el = indexToEl.get(item.index);
-      const pageEl = indexToPage.get(item.index);
-      if (!el || !pageEl) return { ok: false };
-      if (P.hasAttr(el, "data-bl-sid")) return { ok: false };
-      if (P.closest(el, ".pagedjs_footnote_area") !== null || P.closest(el, ".pagedjs_margin") !== null) return { ok: false };
-      const content = P.closest(el, ".pagedjs_page_content");
-      if (!content) return { ok: false };
-      const style = P.style(el, null);
-      if (style.position !== "absolute") return { ok: false };
-      const parent = P.offsetParent(el);
-      if (!parent || P.closest(parent, ".pagedjs_page_content") !== content) return { ok: false };
-      const parentIdx = elToIndex.get(parent);
-      if (parentIdx === undefined || indexSet.has(parentIdx)) return { ok: false };
-      const parentRect = P.rect(parent);
-      const parentStyle = P.style(parent, null);
-      const contentRect = P.rect(content);
-      const pageIndex = pageToIndex.get(pageEl) ?? 0;
-      const leftPx = parseFloat(style.left);
-      const topPx = parseFloat(style.top);
-      const bl = parseFloat(parentStyle.borderLeftWidth) || 0;
-      const bt = parseFloat(parentStyle.borderTopWidth) || 0;
-      if (!Number.isFinite(leftPx) || !Number.isFinite(topPx)) return { ok: false };
-      const expectedX = parentRect.x + bl + leftPx;
-      const expectedY = parentRect.y + bt + topPx;
-      if (Math.abs(expectedX - item.before.x) > 2 || Math.abs(expectedY - item.before.y) > 2) return { ok: false };
-      const dx = item.before.x - item.after.x;
-      const dy = item.before.y - item.after.y;
-      // Chrome's print-mode fragmentainer rounds subpixel CSS page heights (e.g. A4 1122.52 px ->
-      // 1123 px), so pageIndex preceding pages accumulate up to <= 1 px/page difference between
-      // screen contentRect.y and the print fragmentainer's Y origin, while all drifted OOF elements
-      // on the same page lose the identical fragmentainer Y offset.
-      const maxPrintRoundingDrift = pageIndex * 1.0 + 2.5;
-      if (Math.abs(dx - contentRect.x) > 1.5 || Math.abs(dy - contentRect.y) > maxPrintRoundingDrift) {
-        return { ok: false };
-      }
-      const prevPageDy = pageDyByPage.get(pageEl);
-      if (prevPageDy === undefined) {
-        pageDyByPage.set(pageEl, dy);
-      } else if (Math.abs(dy - prevPageDy) > 0.5) {
-        return { ok: false };
-      }
-    }
-    return { ok: true };
-  })(${JSON.stringify(drifted)})`);
-  return details.ok === true;
+  const driftedIndices = new Set(drifted.map(item => item.index));
+  const beforeFacts = new Map(input.before.elements.map(fact => [fact.index, fact]));
+  const afterFacts = new Map(input.after.elements.map(fact => [fact.index, fact]));
+  const dyByPage = new Map<number, number>();
+  const styleKeys: (keyof OofStyle)[] = ["position", "left", "top", "right", "bottom", "transform", "translate", "marginLeft", "marginTop"];
+  for (const item of drifted) {
+    const before = beforeFacts.get(item.index);
+    const after = afterFacts.get(item.index);
+    if (!before || !after || after.sameNode !== true || after.sameParent !== true) return false;
+    if (before.pageIndex !== after.pageIndex || before.style.position !== "absolute") return false;
+    if (styleKeys.some(key => before.style[key] !== after.style[key])) return false;
+    if (before.parentIndex === null || before.parentIndex !== after.parentIndex || driftedIndices.has(before.parentIndex)) return false;
+    if (!before.parent) return false;
+    const left = Number.parseFloat(before.style.left);
+    const top = Number.parseFloat(before.style.top);
+    if (!Number.isFinite(left) || !Number.isFinite(top)) return false;
+    const expectedX = before.parent.x + before.parent.borderLeft + left;
+    const expectedY = before.parent.y + before.parent.borderTop + top;
+    if (Math.abs(expectedX - item.before.x) > 2 || Math.abs(expectedY - item.before.y) > 2) return false;
+    const dx = item.before.x - item.after.x;
+    const dy = item.before.y - item.after.y;
+    const allowance = printRoundingSum(input.before.pageHeights, before.pageIndex) + OOF_ROUNDING_ALLOWANCE_PX;
+    if (Math.abs(dx - before.content.x) > 1.5 || Math.abs(dy - before.content.y) > allowance) return false;
+    const prior = dyByPage.get(before.pageIndex);
+    if (prior === undefined) dyByPage.set(before.pageIndex, dy);
+    else if (Math.abs(dy - prior) > 0.5) return false;
+  }
+  return true;
 }
 
 export function integrityStatusSource(capability: string): string {
@@ -2708,8 +2759,10 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       // the PDF the print-media reflow has already happened and the residue is gone -- measured:
       // the same probe run either side of one `page.pdf()` reported 3 elements and then 0.
       const residueBefore = await fragmentainerResidue(page);
+      const oofBefore = await readOofFacts(page, opened.apparatusCapability, "before");
       const pdf = await page.pdf({ printBackground: true, preferCSSPageSize: true });
       const afterParts = await sampleParts(page);
+      const oofAfter = await readOofFacts(page, opened.apparatusCapability, "after");
       const afterIntegrity = await page.evaluate<RuntimeIntegrityStatus>(integrityStatusSource(opened.apparatusCapability));
       const afterSidIssues = validateRuntimeSidState(expectedSids, afterIntegrity);
       const drifted = driftedComponents(beforeParts, afterParts);
@@ -2721,7 +2774,7 @@ async function acquireOne(path: string, ordinal: number, context: AcquireContext
       let changed = drifted.length > 0 || nonBoxChanged;
       if (changed && !nonBoxChanged && residueBefore.count === 0 &&
           drifted.length === 1 && drifted[0] === "boxes") {
-        if (await isVerifiedPostPdfOofCoordinateArtifact(page, beforeParts.boxes, afterParts.boxes)) {
+        if (judgePostPdfOofDrift({ beforeBoxes: beforeParts.boxes, afterBoxes: afterParts.boxes, before: oofBefore, after: oofAfter })) {
           changed = false;
         }
       }

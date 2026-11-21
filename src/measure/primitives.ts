@@ -220,6 +220,7 @@ const PRIMITIVES_TEMPLATE = `(() => {
   const takeRecordsFn = MutationObserver.prototype.takeRecords;
   const offsetParentGet = getter(HTMLElement.prototype, "offsetParent");
   let integrity = null;
+  let oofNodes = null;
   let collector = null;
   let pagedCapture = null;
   const capturePaged = (value) => {
@@ -338,6 +339,9 @@ const PRIMITIVES_TEMPLATE = `(() => {
           value, writable: false, configurable: false, enumerable: false,
         });
       },
+      // Node identities of the out-of-flow candidates read before page.pdf(); compared after it.
+      stashOofNodes: (capability, nodes) => { requireCapability(capability); oofNodes = nodes; return true; },
+      stashedOofNodes: (capability) => { requireCapability(capability); return oofNodes; },
       mutationType: (record) => call.call(mutationTypeGet, record),
       mutationAttributeName: (record) => call.call(mutationAttributeNameGet, record),
       mutationRemovedCount: (record) => { const list = mutationRemovedNodesGet ? call.call(mutationRemovedNodesGet, record) : null; return list ? list.length : 0; },
@@ -551,7 +555,7 @@ export const PRIMITIVES_CHECK = `(() => {
     "rects", "setAttr", "setText", "nodeType", "parent", "next", "create", "append", "remove", "setCssText",
     "setStyle", "on", "invoke0", "installIntegrity", "integrityArmLate", "integrityMarkPaginationStart", "integrityRecordPreview", "integrityMarkOwn", "integrityPreviewFigureTree",
     "integrityStatus", "installCollector", "collectorResult", "lockPagination", "lockPreviewer",
-    "publishFreeze", "publishOverlay", "mutationType", "mutationAttributeName", "mutationRemovedCount", "mutationAddedNodes", "mutationTakeRecords", "offsetParent", "randomToken", "startsWith"]) {
+    "publishFreeze", "publishOverlay", "stashOofNodes", "stashedOofNodes", "mutationType", "mutationAttributeName", "mutationRemovedCount", "mutationAddedNodes", "mutationTakeRecords", "offsetParent", "randomToken", "startsWith"]) {
     if (typeof p[name] !== "function") return { ok: false, reason: "captured primitive missing: " + name };
   }
   return { ok: true, reason: "" };
