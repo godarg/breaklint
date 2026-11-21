@@ -1380,4 +1380,29 @@ matchMedia("print").addEventListener("change", e => { if (e.matches && !once && 
       rmSync(root, { recursive: true, force: true });
     }
   });
+  it("answers 204 only for the undeclared default /favicon.ico request, never for a dynamically declared icon (P6)", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const root = mkdtempSync(join(tmpdir(), "breaklint-p6-live-"));
+    try {
+      const failedIcon = (doc: DocumentInput, suffix: string) => doc.infrastructure.some((e) => e.kind === "source-acquisition-failed") ||
+        (doc.snapshot?.resources.some((r) => r.requestedUri.endsWith(suffix) && r.outcome !== "loaded") ?? false);
+      // Positive control: no icon declared anywhere. The browser's default request is answered
+      // with 204 and the document renders without a resource failure.
+      const plain = join(root, "plain.html");
+      writeFileSync(plain, `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>No icon</title></head><body><p>No icon declared.</p></body></html>`);
+      const plainDoc = (await renderDocuments([plain], options(join(root, "ev-plain")))).documents[0]!;
+      assert.ok(plainDoc.snapshot, JSON.stringify(plainDoc.infrastructure));
+      assert.equal(failedIcon(plainDoc, "/favicon.ico"), false, JSON.stringify(plainDoc.infrastructure));
+      // Negative controls: an icon link added by script at runtime, with and without a query.
+      for (const [name, href] of [["dynamic-query", "/favicon.ico?v=2"], ["dynamic-exact", "/favicon.ico"]] as const) {
+        const path = join(root, `${name}.html`);
+        writeFileSync(path, `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Dynamic icon</title></head><body><p>Icon added by script.</p>
+<script>const link = document.createElement("link"); link.rel = "icon"; link.href = ${JSON.stringify(href)}; document.head.appendChild(link);</script></body></html>`);
+        const doc = (await renderDocuments([path], options(join(root, `ev-${name}`)))).documents[0]!;
+        assert.equal(failedIcon(doc, "/favicon.ico"), true, `${name}: a declared missing icon must never be swallowed as 204: ${JSON.stringify(doc.infrastructure)}`);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

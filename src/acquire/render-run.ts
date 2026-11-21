@@ -823,6 +823,22 @@ interface NetworkTracker {
   errors: string[];
 }
 
+const FAVICON_DECLARATION_TIMEOUT_MS = 5_000;
+/** True when a live `<link rel~="icon">` resolves to exactly `href` (fail-closed on any error). */
+function iconDeclaredSource(href: string): string {
+  return `(() => {
+    const P = window.__blPrimitives;
+    for (const link of P.all(document, "link")) {
+      const rel = String(P.attr(link, "rel") || "").toLowerCase().split(/\\s+/u);
+      if (rel.indexOf("icon") < 0) continue;
+      const value = P.attr(link, "href");
+      if (value === null) continue;
+      try { if (new URL(value, document.baseURI).href === ${JSON.stringify(href)}) return true; } catch (_) { return true; }
+    }
+    return false;
+  })()`;
+}
+
 export async function configureNetwork(
   page: PageLike,
   localOrigin: string,
@@ -935,7 +951,11 @@ export async function configureNetwork(
           // stylesheet/script/image/fetch and never named in HTML/CSS) receive 204 No Content
           // rather than failing as a 403 local-resource error. Explicitly referenced assets and
           // dynamic stylesheet/script/image loads at /favicon.ico stay strictly fail-closed.
-          if (url.pathname === "/favicon.ico" && !explicitlyReferencedRoutes.has("/favicon.ico") &&
+          // Only the browser's own default request qualifies: exactly /favicon.ico, no query or
+          // fragment, and no icon link in the live DOM resolving to it (checked when it arrives,
+          // so script-inserted declarations count too). Anything else takes the regular path.
+          if (url.pathname === "/favicon.ico" && url.search === "" && url.hash === "" &&
+              !explicitlyReferencedRoutes.has("/favicon.ico") &&
               resourceType === "other" && typeof request.respond === "function") {
             respondEmptyFavicon = true;
           } else {
@@ -967,7 +987,20 @@ export async function configureNetwork(
       } catch {
         permit = false;
       }
-      if (respondEmptyFavicon) void request.respond!({ status: 204, body: "" });
+      if (respondEmptyFavicon) {
+        const href = request.url();
+        void (async () => {
+          let declared = true;
+          try { declared = await withTimeout(page.evaluate<boolean>(iconDeclaredSource(href)), FAVICON_DECLARATION_TIMEOUT_MS, "favicon declaration probe"); }
+          catch { declared = true; }
+          if (!declared) { void request.respond!({ status: 204, body: "" }); return; }
+          // A declared icon is a document resource like any other.
+          const roles = tracker.localRequestRoles.get("/favicon.ico") ?? new Set<string>();
+          roles.add("other");
+          tracker.localRequestRoles.set("/favicon.ico", roles);
+          void request.continue();
+        })();
+      }
       else if (permit) void request.continue();
       else {
         blocked.count += 1;
