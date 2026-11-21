@@ -33,7 +33,10 @@ const result = await checkPage(page, {
 
 The option object is closed: unknown fields, unbounded target counts, malformed exception records,
 and any trust/network value other than the two literals above are rejected before the adapter calls
-the page. `SCREEN_OPTIONS_SCHEMA` is the matching exported input schema for tooling.
+the page. Every selector (exceptions, `sourceBinding.compiledBuildSelector` and
+`sourceBinding.containers`) is then parsed once in the page before the first sample; a selector the
+browser cannot parse rejects with a `TypeError` naming the option field, whatever its `scope`.
+`SCREEN_OPTIONS_SCHEMA` is the matching exported input schema for tooling.
 
 Screen reports are discriminated by `profileKind: "screen"` and emit `schemaVersion: 2` (readers
 accept Screen 1 and 2); they do not contain Paged.js pages or PDF coordinates. They record the

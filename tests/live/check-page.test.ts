@@ -133,6 +133,36 @@ describe("screen checkPage host-page adapter, live", () => {
     }
   });
 
+  it("rejects a selector the browser cannot parse before the first sample, with the option field path, regardless of scope", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    const binding = (overrides: Record<string, unknown>) => ({
+      sourceBinding: { kind: "host-build-container", root: output, receiptPath: "receipt.json", compiledBuildSelector: 'meta[name="build"]', compiledBuildAttribute: "content", containers: [{ selector: "main", file: "src/Main.tsx" }], ...overrides },
+    });
+    // Chrome auto-closes "[role=dialog" (valid, matches nothing); these selectors throw a SyntaxError.
+    const cases: [Record<string, unknown>, Record<string, unknown>, string][] = [
+      [{ intentionalOverlays: [{ selector: "[", reason: "modal", scope: "suite" }] }, {}, "geometry.intentionalOverlays[0].selector"],
+      [{ allowedScrollContainers: [{ selector: ".grid", reason: "grid" }, { selector: "div:has(", reason: "typo", scope: "suite" }] }, {}, "geometry.allowedScrollContainers[1].selector"],
+      [{ intentionalOverlays: [{ selector: "a:nope", reason: "modal" }] }, {}, "geometry.intentionalOverlays[0].selector"],
+      [{}, binding({ containers: [{ selector: "main", file: "a.tsx" }, { selector: "section[", file: "b.tsx" }] }), "sourceBinding.containers[1].selector"],
+      [{}, binding({ compiledBuildSelector: "meta >" }), "sourceBinding.compiledBuildSelector"],
+    ];
+    for (const [geometry, extra, field] of cases) {
+      const page = await open('<main><p id="only">content</p></main>');
+      const calls: string[] = [];
+      const host = hostPage(page, 640);
+      const counted: StructuralPage = { ...host, evaluate: ((fn: (...args: unknown[]) => unknown, ...args: unknown[]) => { calls.push(String(fn).slice(0, 40)); return host.evaluate(fn, ...args); }) as StructuralPage["evaluate"], screenshot: async () => { calls.push("screenshot"); return host.screenshot(); } };
+      try {
+        await assert.rejects(
+          checkPage(counted, { trust: "host-controlled-page", networkPolicy: "host-owned", scenario: "invalid-selector", output: { dir: output, screenshot: "viewport" }, geometry, ...extra }),
+          (error: unknown) => error instanceof TypeError && error.message.includes(field) && /selector/u.test(error.message),
+          field,
+        );
+        // Exactly one browser call (the preflight); no sample and no screenshot were taken.
+        assert.equal(calls.length, 1, `${field}: ${JSON.stringify(calls)}`);
+      } finally { await page.close(); }
+    }
+  });
+
   it("finds visible content cut by an overflow:hidden rectangle", async (t) => {
     if (missingBrowser && optional) return t.skip("missing browser");
     const result = await inspect('<div id="clip" style="width:200px;overflow:hidden"><div id="cut" style="width:500px">clipped text</div></div>', "clipping");

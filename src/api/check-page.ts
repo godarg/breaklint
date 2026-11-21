@@ -11,6 +11,7 @@ import { digestBrowserSample, sha, stable, type BrowserRawSample, type BrowserRa
 import { verifyBinding, type Binding } from "../web/receipt.ts";
 import {
   SCREEN_REPORT_SCHEMA_VERSION,
+  type CheckPageOptions,
   type HostBuildContainerBinding,
   type PublicScreenReport,
   type ScreenCheckResult,
@@ -491,9 +492,35 @@ async function readDomBuildId(page: StructuralPage, binding: HostBuildContainerB
   return page.evaluate((b) => { try { return document.querySelector(b.selector)?.getAttribute(b.attribute) ?? null; } catch { return null; } }, { selector: binding.compiledBuildSelector, attribute: binding.compiledBuildAttribute });
 }
 
+/**
+ * Every selector the run will hand to the browser, with its option field path. The browser's
+ * selector grammar decides validity (Chrome closes an unterminated "[attr" itself), so the check
+ * runs in the page, once, before the first sample.
+ */
+function selectorFields(options: CheckPageOptions): { field: string; selector: string }[] {
+  return [
+    ...(options.geometry?.allowedScrollContainers ?? []).map((entry, index) => ({ field: `geometry.allowedScrollContainers[${index}].selector`, selector: entry.selector })),
+    ...(options.geometry?.intentionalOverlays ?? []).map((entry, index) => ({ field: `geometry.intentionalOverlays[${index}].selector`, selector: entry.selector })),
+    ...(options.sourceBinding ? [{ field: "sourceBinding.compiledBuildSelector", selector: options.sourceBinding.compiledBuildSelector }] : []),
+    ...(options.sourceBinding?.containers ?? []).map((entry, index) => ({ field: `sourceBinding.containers[${index}].selector`, selector: entry.selector })),
+  ];
+}
+
+/** Throws a TypeError naming the first option field whose selector the page cannot parse. */
+async function preflightSelectors(page: StructuralPage, options: CheckPageOptions): Promise<void> {
+  const fields = selectorFields(options);
+  if (fields.length === 0) return;
+  const invalid = await page.evaluate((selectors: string[]) => {
+    for (let i = 0; i < selectors.length; i++) { try { document.querySelector(selectors[i]!); } catch { return i; } }
+    return -1;
+  }, fields.map((entry) => entry.selector));
+  if (invalid >= 0) throw new TypeError(`${fields[invalid]!.field} is not a valid selector in this page`);
+}
+
 /** Observe one existing host-owned page; it never navigates, mutates, closes, or imports a driver. */
 export async function checkPage(page: StructuralPage, rawOptions: unknown): Promise<ScreenCheckResult> {
   const options = validateCheckPageOptions(rawOptions);
+  await preflightSelectors(page, options);
   const runId = options.runId ?? randomUUID();
   const timeout = options.geometry?.stabilizationTimeoutMs ?? 2_000;
   const maxTargets = options.geometry?.maxTargets ?? 2_000;
