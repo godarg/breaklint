@@ -170,7 +170,7 @@ describe("delegated AI sight review", () => {
   it("binds every delegated round to its release by table, and the latest round to this package version", () => {
     const ledger = JSON.parse(readFileSync(LEDGER_URL, "utf8")) as ReviewLedger;
     // {round: release}. A new delegated round adds one row here; it needs no new code.
-    const RELEASE_BY_ROUND: Readonly<Record<number, string>> = { 5: "0.9.0", 6: "0.9.0", 7: "0.10.0", 8: "0.10.0", 9: "0.11.0" };
+    const RELEASE_BY_ROUND: Readonly<Record<number, string>> = { 5: "0.9.0", 6: "0.9.0", 7: "0.10.0", 8: "0.10.0", 9: "0.11.0", 10: "0.11.1" };
     for (const round of ledger.rounds) {
       if (!round.delegation) continue;
       assert.ok(Object.hasOwn(RELEASE_BY_ROUND, round.round), `delegated round ${round.round} has no row in the {round: release} table`);
@@ -205,7 +205,10 @@ describe("review-ledger contract for rounds after 9", () => {
   const realLedger = () => JSON.parse(readFileSync(LEDGER_URL, "utf8")) as ReviewLedger;
   /** The nine recorded rounds plus a round 10 cloned from round 9 in the new delegation shape. */
   function withRound10(change: (round: ReviewLedger["rounds"][number]) => void = () => {}) {
+    // The recorded rounds 1-9 plus a synthetic round 10, independent of the round 10 the real
+    // ledger now records.
     const ledger = realLedger();
+    ledger.rounds = ledger.rounds.slice(0, 9);
     const round = structuredClone(ledger.rounds[8]!);
     round.round = 10;
     round.delegation = { founder: "@Founder", date: round.delegation!.date, sessionQuoteSha256: sha("verbatim session quote"), statement: NEUTRAL, release: "0.11.1", revoked: false } as unknown as NonNullable<typeof round.delegation>;

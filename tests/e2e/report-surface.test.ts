@@ -556,7 +556,8 @@ describe("report-surface rostered review gate", () => {
   it("enforces the release join at the strict sight gate before accepting image bindings", () => {
     const { ledger, manifest, fingerprint } = boundPassingFixture();
     const latest = ledger.rounds.at(-1)!;
-    const historicalAI = committedLedger().rounds.at(-1)!;
+    // Round 9 is the last delegated round recorded in the legacy delegation shape.
+    const historicalAI = committedLedger().rounds[8]!;
     const reviewer = structuredClone(historicalAI.reviewers[0]!);
     latest.reviewers = [reviewer];
     latest.delegation = { ...historicalAI.delegation!, date: "2026-09-20", release: "0.0.0" };
