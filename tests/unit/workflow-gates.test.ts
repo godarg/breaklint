@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { conditionKeys, executablePart, jobsOf, stepsOf } from "../tools/release-workflow-contract.mjs";
+import { checkReleaseWorkflow, conditionKeys, executablePart, jobsOf, stepsOf } from "../tools/release-workflow-contract.mjs";
 import type { WorkflowLine } from "../tools/release-workflow-contract.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
@@ -249,5 +249,81 @@ describe("workflow gates", () => {
           "a green step over nothing. The class is held by tests/fixtures/fragmentainer-residue.html in the live suite.",
       );
     }
+  });
+
+  /*
+   * 0.11.0 was tagged and never reached npm. setup-node's `registry-url` wrote an .npmrc that reads
+   * NODE_AUTH_TOKEN, the publish step passed a repository secret in it, and when that token no
+   * longer authorised the PUT npm answered E404 after the OIDC provenance signature had already
+   * succeeded. From 0.11.1 the publish job holds no token at all: npm trusted publishing (OIDC)
+   * is the only credential, with an npm that supports it pinned in that job alone.
+   */
+  describe("the release publishes through npm trusted publishing (OIDC) only", () => {
+    const RELEASE = ".github/workflows/release.yml";
+    const realFiles = () => ({
+      workflowText: readFileSync(new URL(`../../${RELEASE}`, import.meta.url), "utf8"),
+      manifest: JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as unknown,
+      lock: JSON.parse(readFileSync(new URL("../../package-lock.json", import.meta.url), "utf8")) as unknown,
+    });
+
+    it("the publish job configures no token, names the registry explicitly and pins npm >= 11.5.1 only there", () => {
+      const lines = readLines(RELEASE);
+      const jobs = jobsOf(lines);
+      const publish = jobs.find((job) => job.name === "publish");
+      assert.ok(publish, `${RELEASE} has no publish job; this guard has lost its subject`);
+      const executable = publish.lines.map(({ text }) => executablePart(text));
+      assert.deepEqual(executable.filter((line) => /^\s*registry-url\s*:/u.test(line)), [], "setup-node in the publish job writes a token-reading .npmrc");
+      assert.deepEqual(
+        lines.filter((line) => /NODE_AUTH_TOKEN|NPM_TOKEN|\bsecrets\./u.test(executablePart(line)) && !/^\s*unset NODE_AUTH_TOKEN\s*$/u.test(line)),
+        [],
+        "the release workflow configures a token",
+      );
+      const runs = workflowRunLines(publish.lines.map(({ text }) => text).join("\n"));
+      const publishes = runs.filter((line) => /\bnpm publish\b/u.test(line));
+      assert.equal(publishes.length, 1, `the publish job runs npm publish ${publishes.length} times`);
+      const command = publishes[0]!;
+      assert.match(command, /--registry=https:\/\/registry\.npmjs\.org(?:\s|$)/u, "npm publish does not name the registry explicitly");
+      assert.match(command, /--access public(?:\s|$)/u);
+      assert.doesNotMatch(command, /[|;&]/u, "something is chained after npm publish");
+      const unset = runs.indexOf("unset NODE_AUTH_TOKEN");
+      assert.ok(unset !== -1 && unset < runs.indexOf(command), "NODE_AUTH_TOKEN is not unset before npm publish");
+      const pin = runs.indexOf('npm install -g "npm@$NPM_VERSION"');
+      assert.ok(pin !== -1 && pin < runs.indexOf(command), "the publish job does not pin npm before publishing");
+      assert.ok(runs.includes('test "$(npm -v)" = "$NPM_VERSION"'), "the publish job does not verify the pinned npm");
+      const version = executable.map((line) => /^ {6}NPM_VERSION:\s*(\d+)\.(\d+)\.(\d+)\s*$/u.exec(line)).find(Boolean);
+      assert.ok(version, "the publish job declares no NPM_VERSION");
+      const [major, minor, patch] = version.slice(1).map(Number) as [number, number, number];
+      assert.ok(major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1))), "trusted publishing needs npm >= 11.5.1");
+      for (const job of jobs.filter((candidate) => candidate.name !== "publish")) {
+        assert.deepEqual(
+          job.lines.filter(({ text }) => /NPM_VERSION|install -g "?npm@/u.test(executablePart(text))).map(({ text }) => text.trim()),
+          [],
+          `job ${job.name} pins npm; the consumer arms keep the npm their Node ships`,
+        );
+      }
+    });
+
+    it("the release-workflow contract rejects a token publish, a registry-url and a missing pin in the publish job", () => {
+      const real = realFiles();
+      assert.deepEqual(checkReleaseWorkflow(real).issues, [], "the real release workflow fails its own contract");
+      const text = real.workflowText;
+      const publishIf = "        if: steps.registry.outputs.publish_needed == 'true'\n";
+      const setupNode = /( {6}- uses: actions\/setup-node@\S+.*\n {8}with:\n {10}node-version: 24\n)(?![\s\S]*\n {2}publish:\n)/u;
+      assert.ok(text.includes(publishIf), "the publish step has moved; this guard has lost its subject");
+      assert.match(text, setupNode, "the publish job's setup-node has moved; this guard has lost its subject");
+      const cases: [string, string, RegExp][] = [
+        ["a token passed to the publish step", text.replace(publishIf, `${publishIf}        env:\n          NODE_AUTH_TOKEN: \${{ secrets.NPM_TOKEN }}\n`), /reads a repository secret|NODE_AUTH_TOKEN may only be unset/u],
+        ["registry-url in the publish job", text.replace(setupNode, "$1          registry-url: https://registry.npmjs.org\n"), /must not set registry-url/u],
+        ["npm publish without an explicit registry", text.replace(/ --registry=https:\/\/registry\.npmjs\.org(?=\s*\n)/u, ""), /must name --registry=https:\/\/registry\.npmjs\.org/u],
+        ["npm publish without unsetting NODE_AUTH_TOKEN", text.replace(/^ *unset NODE_AUTH_TOKEN\n/mu, ""), /unset NODE_AUTH_TOKEN before npm publish/u],
+        ["no npm pin in the publish job", text.replace(/^ *npm install -g "npm@\$NPM_VERSION"\n/mu, ""), /must pin npm/u],
+        ["an npm too old for trusted publishing", text.replace(/^( {6}NPM_VERSION: )\S+$/mu, "$111.5.0"), /npm >= 11\.5\.1/u],
+      ];
+      for (const [name, mutated, expected] of cases) {
+        assert.notEqual(mutated, text, `mutation "${name}" changed nothing; this guard has lost its subject`);
+        const issues = checkReleaseWorkflow({ ...real, workflowText: mutated }).issues.join("\n");
+        assert.match(issues, expected, `the contract accepted ${name}:\n${issues}`);
+      }
+    });
   });
 });

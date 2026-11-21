@@ -248,6 +248,12 @@ jobs:
           test "$code" -eq 3 || { echo "expected exit 3, got $code"; cat out.txt err.txt; exit 1; }
           grep -q "install:" err.txt || { echo "no install command on stderr"; cat err.txt; exit 1; }
 
+  # npm trusted publishing (OIDC) is the only credential this job holds. No repository secret, no
+  # setup-node `registry-url` (it writes an .npmrc that reads NODE_AUTH_TOKEN, and npm falls back
+  # to that token when OIDC fails: the 0.11.0 publish signed its provenance and then failed the PUT
+  # with E404), and NODE_AUTH_TOKEN unset in the publish step itself. Trusted publishing needs npm
+  # >= 11.5.1, so this job, and only this one, pins npm; the clean consumers keep the npm their Node
+  # ships. tests/tools/release-workflow-contract.mjs fails on any token configuration here.
   publish:
     name: publish the validated bytes and create the GitHub Release
     needs: [validate-pack, clean-consumer]
@@ -256,6 +262,8 @@ jobs:
       contents: write
       actions: read
       id-token: write
+    env:
+      NPM_VERSION: 11.21.2
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -263,8 +271,11 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
           cache: npm
+      - name: pin an npm that supports trusted publishing (OIDC)
+        run: |
+          npm install -g "npm@$NPM_VERSION"
+          test "$(npm -v)" = "$NPM_VERSION"
       - name: the triggering tag, this workflow's pin, package.json and the lock name one version
         run: node tests/tools/release-workflow-contract.mjs --derive-env
       - name: download the bytes accepted by both clean consumers
@@ -368,11 +379,11 @@ jobs:
             echo "publish_needed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: publish exactly the validated tarball with provenance
+      - name: publish exactly the validated tarball through npm trusted publishing (OIDC)
         if: steps.registry.outputs.publish_needed == 'true'
-        run: npm publish "./$PACKAGE_FILE" --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          unset NODE_AUTH_TOKEN
+          npm publish "./$PACKAGE_FILE" --provenance --access public --registry=https://registry.npmjs.org
 
       - name: verify registry integrity, provenance-bound Git commit and signatures
         env:

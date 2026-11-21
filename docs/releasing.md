@@ -91,12 +91,18 @@ report-bundle output. Renderer peers remain optional for screen-only consumers.
 
 ## One-time repository prerequisites
 
-- GitHub repository secret `NPM_TOKEN`, scoped to publishing this package.
-- GitHub Actions allowed to request an OIDC identity token for npm provenance.
+- A trusted publisher for `breaklint` on npmjs.com (package settings): GitHub Actions, owner
+  `godarg`, repository `breaklint`, workflow file name `release.yml`, no environment. npm
+  publishes through it with the job's OIDC identity token; the workflow holds no npm token.
+- GitHub Actions allowed to request an OIDC identity token (`id-token: write` on the publish job).
 - The default branch is `main`; `ci.yml` runs on every push to it.
 
-Never put the npm token in a file, a command-line argument, a log or a Markdown document. The
-workflow passes it as `NODE_AUTH_TOKEN` only to the publish step.
+The publish job configures no token: no repository secret, no `registry-url` in setup-node (it
+would write an `.npmrc` that reads `NODE_AUTH_TOKEN`), `NODE_AUTH_TOKEN` unset in the publish
+step, and an explicit `--registry=https://registry.npmjs.org`. Trusted publishing needs npm
+11.5.1 or later, so that job pins npm (`NPM_VERSION`) and verifies the pin; the clean consumers
+keep the npm their Node ships. `tests/tools/release-workflow-contract.mjs` fails on any token
+configuration in `release.yml`.
 
 ## Before creating the tag
 
@@ -380,7 +386,7 @@ The release workflow then:
    README's demo excerpt and the installed docs' schema stamps against the installed code;
 7. proves the ref is an annotated tag (with a lightweight-tag negative control), then proves
    tag/version, exact `origin/main` SHA and successful main CI;
-8. publishes that tarball with provenance;
+8. publishes that tarball with provenance through npm trusted publishing (OIDC), without a token;
 9. waits until npm exposes the version, compares `dist.integrity`, binds the package digest and Git
    commit through the signed SLSA provenance, runs npm signature verification and installs the
    registry version in a final consumer;

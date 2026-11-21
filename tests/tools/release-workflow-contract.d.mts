@@ -13,3 +13,16 @@ export function executablePart(line: string): string;
 export function jobsOf(lines: string[]): WorkflowJob[];
 export function stepsOf(jobLines: WorkflowLine[]): WorkflowLine[][];
 export function conditionKeys(step: WorkflowLine[]): { number: number; key: string }[];
+
+export interface ReleaseWorkflowFiles {
+  workflowText: string;
+  manifest: unknown;
+  lock: unknown;
+}
+
+export function checkReleaseWorkflow(files: ReleaseWorkflowFiles): {
+  valid: boolean;
+  issues: string[];
+  version: string | null;
+  tag: string | null;
+};
