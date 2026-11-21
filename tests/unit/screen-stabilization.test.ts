@@ -43,10 +43,12 @@ interface StubPlan {
   fonts?: (index: number) => string;
   changing?: boolean;
   screenshotHangs?: boolean;
+  /** The option-selector preflight (an evaluate over the selector list) never resolves. */
+  preflightHangs?: boolean;
 }
 
-function stubPage(plan: StubPlan): { page: StructuralPage; calls: { samples: number; screenshots: number } } {
-  const calls = { samples: 0, screenshots: 0 };
+function stubPage(plan: StubPlan): { page: StructuralPage; calls: { samples: number; screenshots: number; preflights: number } } {
+  const calls = { samples: 0, screenshots: 0, preflights: 0 };
   const delay = <T>(ms: number, value: T): Promise<T> => ms === Infinity ? new Promise<T>(() => undefined) : new Promise<T>((resolve) => setTimeout(() => resolve(value), ms));
   const page: StructuralPage = {
     evaluate: (async (fn: (...args: unknown[]) => unknown, arg?: unknown) => {
@@ -54,6 +56,7 @@ function stubPage(plan: StubPlan): { page: StructuralPage; calls: { samples: num
         const index = calls.samples++;
         return delay(plan.sampleDelayMs?.(index) ?? 0, sample(index, plan.fonts?.(index) ?? "loaded", plan.changing === true));
       }
+      if (Array.isArray(arg)) { calls.preflights++; return plan.preflightHangs ? new Promise<number>(() => undefined) : -1; }
       const source = String(fn);
       if (source.includes("requestAnimationFrame")) return delay(1, true);
       if (source.includes("document.fonts")) return true;
@@ -151,6 +154,21 @@ describe("screen checkPage stabilization budget", () => {
     assert.equal(result.report.artifact.relativePath, null);
     assert.ok(result.report.infrastructure.some((e) => e.kind === "screen-sample-timeout" && e.fatal), JSON.stringify(result.report.infrastructure));
     assert.equal(result.report.evaluations.length, 0);
+  });
+
+  it("bounds the selector preflight too: a hanging page with configured selectors still returns an infrastructure report", async () => {
+    const { page, calls } = stubPage({ preflightHangs: true });
+    const withSelectors = { ...options("hanging-preflight", 0), geometry: { stabilizationTimeoutMs: 0, allowedScrollContainers: [{ selector: "#grid", reason: "data grid" }] } };
+    const result = await bounded(checkPage(page, withSelectors), 20_000);
+    assert.equal(calls.preflights, 1);
+    assert.equal(result.ok, false);
+    assert.equal(result.report.runVerdict, "infrastructure");
+    assert.equal(calls.samples, 0, "nothing is sampled after a preflight that did not finish");
+    assert.equal(calls.screenshots, 0);
+    assert.equal(result.report.artifact.relativePath, null);
+    assert.ok(result.report.infrastructure.some((e) => e.kind === "screen-preflight-timeout" && e.fatal), JSON.stringify(result.report.infrastructure));
+    assert.equal(result.report.evaluations.length, 0);
+    assert.deepEqual(result.report.coverage.allowedScrollContainers.map((entry) => [entry.selector, entry.count]), [["#grid", 0]]);
   });
 
   it("bounds the screenshot on its own", async () => {

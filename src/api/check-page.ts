@@ -579,7 +579,6 @@ async function preflightSelectors(page: StructuralPage, options: CheckPageOption
 /** Observe one existing host-owned page; it never navigates, mutates, closes, or imports a driver. */
 export async function checkPage(page: StructuralPage, rawOptions: unknown): Promise<ScreenCheckResult> {
   const options = validateCheckPageOptions(rawOptions);
-  await preflightSelectors(page, options);
   const runId = options.runId ?? randomUUID();
   const timeout = options.geometry?.stabilizationTimeoutMs ?? 2_000;
   const maxTargets = options.geometry?.maxTargets ?? 2_000;
@@ -634,21 +633,11 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   });
   const emptyArtifact = { kind: "png" as const, relativePath: null, sha256: null, byteLength: null, widthPx: null, heightPx: null, capture: options.output.screenshot, coordinateSystem: fullPage ? "css-document-pixels" as const : "css-viewport-pixels-with-scroll" as const };
 
-  // Phases outside the stabilization budget (first sample, screenshot, post-capture check) carry
-  // their own bound, so a hanging driver still yields a report.
+  // Phases outside the stabilization budget (selector preflight, first sample, screenshot,
+  // post-capture check) carry their own bound, so a hanging driver still yields a report.
   const phaseBoundMs = Math.max(PHASE_BOUND_FLOOR_MS, PHASE_BOUND_FACTOR * timeout);
-  // stabilizationTimeoutMs 0 keeps its 0.10 meaning: fonts and layout are not awaited, which is a
-  // timeout (no clean claim), and no drift is claimed without two differing samples.
-  const fonts = timeout === 0
-    ? { value: null, timedOut: true }
-    : await withTimeout(page.evaluate(async () => { if (!document.fonts) return false; await document.fonts.ready; return document.fonts.status === "loaded"; }), timeout);
-
-  const firstStart = performance.now();
-  const first = await withTimeout(samplePage(page, sampleInput), phaseBoundMs);
-  const firstSampleMs = Math.round(performance.now() - firstStart);
-  if (first.value === null) {
-    // No sample, no observation: no screenshot is taken and nothing is evaluated.
-    infrastructure.push({ kind: "screen-sample-timeout", detail: `the first page sample did not finish within ${phaseBoundMs} ms`, fatal: true });
+  // No sample, no observation: no screenshot is taken and nothing is evaluated.
+  const noSampleReport = async (firstSampleMs: number): Promise<ScreenCheckResult> => {
     const report: PublicScreenReport = {
       ...await reportHead("infrastructure", 0),
       targetInventory: { complete: false, omittedCount: 0, reason: "screen/no-sample" },
@@ -661,6 +650,26 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
       artifact: emptyArtifact, evaluations: [], findings: [], infrastructure, events,
     };
     return { ok: false, report };
+  };
+  // An invalid option selector still throws a TypeError; a preflight that does not finish is
+  // an infrastructure result like a first sample that does not arrive.
+  const preflight = await withTimeout(preflightSelectors(page, options).then(() => true), phaseBoundMs);
+  if (preflight.timedOut) {
+    infrastructure.push({ kind: "screen-preflight-timeout", detail: `the option selector preflight did not finish within ${phaseBoundMs} ms`, fatal: true });
+    return noSampleReport(0);
+  }
+  // stabilizationTimeoutMs 0 keeps its 0.10 meaning: fonts and layout are not awaited, which is a
+  // timeout (no clean claim), and no drift is claimed without two differing samples.
+  const fonts = timeout === 0
+    ? { value: null, timedOut: true }
+    : await withTimeout(page.evaluate(async () => { if (!document.fonts) return false; await document.fonts.ready; return document.fonts.status === "loaded"; }), timeout);
+
+  const firstStart = performance.now();
+  const first = await withTimeout(samplePage(page, sampleInput), phaseBoundMs);
+  const firstSampleMs = Math.round(performance.now() - firstStart);
+  if (first.value === null) {
+    infrastructure.push({ kind: "screen-sample-timeout", detail: `the first page sample did not finish within ${phaseBoundMs} ms`, fatal: true });
+    return noSampleReport(firstSampleMs);
   }
 
   // Stabilization: two consecutive identical samples, while document fonts are not loading. The
