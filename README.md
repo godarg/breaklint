@@ -337,18 +337,17 @@ cell for decoded pixels, contrast, accessibility and fragmentation. A human revi
 a passing round by a rostered reviewer in the review ledger, bound to the current inputs; see its
 latest round and [`docs/releasing.md`](docs/releasing.md).
 <!-- review-state -->
-For 0.10.0 the current record is round 8: four fresh Claude Opus reviews, actual model
+For 0.11.0 the current record is round 9: four fresh Claude Opus reviews, actual model
 `claude-opus-5-5`, passed all 32 cells under the Founder's release-specific AI delegation
-of 2026-10-07. Native receipts bind 263 image reads: 24 full screens, 212 desktop/tablet/mobile
-tiles and 27 A4 page rasters. The four PDF cells were judged through all matching rasters.
-Round 7 remains recorded as FAIL: contradictory handwritten fixture counts and missing desktop
-tiles were corrected with actual red/green tests and independently measured physical inventory.
-This is delegated AI sight evidence. Four medium and 27 low findings have explicit accepted-risk
-or follow-up dispositions; unitless secondary stats, decline-base labels, finding-gate wording,
-synthetic evidence context, identifier wrapping and paper navigation remain presentation limits.
-Fine-text judgment rests on native viewport tiles and A4 rasters. The local sight review does not
-establish human or Ubuntu visual review. Independent Mac and Linux technical inventories agree
-on 212 tiles and 3/8/8/8 printed pages. JSON remains canonical.
+of 2026-11-21. Native receipts bind 265 image reads: 24 full screens, 214 desktop/tablet/mobile
+tiles and 27 A4 page rasters (3/8/8/8 pages). The four PDF cells were judged through all matching
+rasters. Rounds 1–8 and their receipts remain preserved unchanged in the ledger.
+This is delegated AI sight evidence, not a human surface pass. Three medium and 22 low advisory
+findings have explicit non-blocking layout/wrapping dispositions (mobile stacked coverage-table
+header, A4 keep-together card page balance, long identifier/hash wrapping, desktop remediation
+measure width, and repeated print tail labels); zero blocker or high findings were reported.
+Fine-text judgment rests on native viewport tiles and A4 rasters. The local macOS arm64 Node 24
+sight review does not establish human or Ubuntu visual review. JSON remains canonical.
 The information contract and the reproducible 32-cell screen/print review are documented in
 [`docs/reporting.md`](docs/reporting.md).
 

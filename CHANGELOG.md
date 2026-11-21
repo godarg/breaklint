@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.11.0 — TBD-at-tag
+## 0.11.0 — 2026-11-21
 
 Print measurement improvements, Screen Profile v2 (`PublicScreenReport` schema 2), CLI subcommands
 for existing public APIs, Round-8 report-surface follow-ups (`G-148`–`G-151`), and the

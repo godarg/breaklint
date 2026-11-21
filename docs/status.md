@@ -4,7 +4,7 @@ This page exists because the alternative is worse. A layout checker whose green 
 nothing is more dangerous than no checker at all, so what has been measured and what has not is
 stated here rather than left to be inferred from a passing test suite.
 
-## Version 0.11.0: candidate scope (release preparation)
+## Version 0.11.0: print coverage, Screen Profile v2, and CLI subcommands
 
 Version 0.11.0 keeps the 17 registered print rules (12 enabled by default), Report 5 (readers accept
 Report 4 and 5), context pack 2, comparison 1 and Configuration Contract 1 unchanged. Snapshot 7
@@ -26,17 +26,22 @@ footnote isolation and refusing genuine overflows below `areaBox.bottom + 0.5`).
 
 Screen profile v2 (`checkPage`, `schemaVersion: 2`): CSS Color 4 alpha parsing (`oklch()`,
 `oklab()`, `lab()`, `lch()`, `hwb()`, `color(...)`), geometry-correct paint evaluation under
-semi-transparent opacity (`0 < opacity < 1`), `filter`, and `backdrop-filter` (`opacity: 0`, masks,
-clip-paths, unsupported transforms and running animations remain `not-measured`), stabilization loop
-with structured `capture.driftDetails`, framework-agnostic build output receipts (`schemaVersion: 2`
-alongside legacy Next.js `schemaVersion: 1`), full-page target coverage (`css-document-pixels`),
-`web/sibling-overlap`, `web/svg-text-overflows-viewport`, opt-in `web/small-text` and
-`web/small-touch-target`, and `scope: "scenario" | "suite"` on named screen exceptions.
+semi-transparent opacity (`0 < opacity < 1`), `filter`, and `backdrop-filter` (`opacity: 0`,
+`filter: opacity(0)`, masks, clip-paths, unsupported transforms and running animations remain
+`not-measured`), stabilization loop with structured `capture.driftDetails` (with sanitized URLs),
+framework-agnostic build output receipts (`schemaVersion: 2` alongside legacy Next.js
+`schemaVersion: 1`), full-page target coverage (`css-document-pixels`), `web/sibling-overlap`,
+`web/svg-text-overflows-viewport`, opt-in `web/small-text` and `web/small-touch-target`, and
+`scope: "scenario" | "suite"` on named screen exceptions.
 
 CLI & surfaces: adds `breaklint compare`, `breaklint context`, and `breaklint bundle`; addresses
 Round-8 report follow-ups (`G-148`–`G-151`); raises the `puppeteer-core` peer floor to
 `>=25.16.0 <26` and consumer pin to `puppeteer-core@25.16.0`. No rule or profile is human-calibrated
-(`calibrated: false` everywhere). Report-surface sight review for 0.11.0 is pending before tagging.
+(`calibrated: false` everywhere). The changed report surfaces passed delegated AI sight review in
+ledger round 9 (2026-11-21): four fresh independent `claude-opus-5-5` sessions passed all 32 cells
+with 265 verified native image reads (0 blocker, 0 high, 3 medium, 22 low advisory findings) under
+the Founder's release-specific delegation; this is delegated AI local-image sight evidence on macOS
+arm64 Node 24, not a human surface pass or Ubuntu visual review.
 
 ## Version 0.10.0: behavior and bounded evaluation
 
