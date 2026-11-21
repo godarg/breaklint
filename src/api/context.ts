@@ -4,7 +4,7 @@
  * untrusted and the only recheck operations are this finite enum.
  */
 import type { Finding, Report, StableTargetIdentity } from "../core/types.ts";
-import { READABLE_SCREEN_REPORT_SCHEMA_VERSIONS, type PublicScreenReport, type ScreenFinding } from "../web/types.ts";
+import { READABLE_SCREEN_REPORT_SCHEMA_VERSIONS, type ReadableScreenReport, type ScreenFinding } from "../web/types.ts";
 import type { ReportComparison } from "./compare.ts";
 import { READABLE_REPORT_SCHEMA_VERSIONS } from "../core/enums.ts";
 
@@ -249,7 +249,7 @@ function card(report: Report, finding: Finding, maxText: number): ContextFinding
   };
 }
 
-function screenCard(report: PublicScreenReport, finding: ScreenFinding, maxText: number): ScreenContextFinding {
+function screenCard(report: ReadableScreenReport, finding: ScreenFinding, maxText: number): ScreenContextFinding {
   const source = report.evaluations.find((evaluation) => evaluation.id === finding.evaluationId)?.source ?? { status: "unknown" as const, method: null, file: null };
   return {
     id: finding.id, stableIdentity: report.evaluations.find((entry) => entry.id === finding.evaluationId)?.stableIdentity ?? { status: "unavailable", value: null, candidates: [] }, ruleId: finding.ruleId, severity: finding.severity,
@@ -284,7 +284,7 @@ export function createContextPack(report: unknown, options: CreateContextPackOpt
   const maxText = Number.isInteger(requestedText) ? Math.min(MAX_TEXT, Math.max(80, requestedText)) : 400;
   if (options.comparison && options.comparison.afterRunId !== runId) throw new Error("comparison does not refer to this current report");
   if (READABLE_SCREEN_REPORT_SCHEMA_VERSIONS.includes(schemaVersion as number) && profileKind === "screen" && Array.isArray(raw?.findings) && Array.isArray(raw?.evaluations) && asRecord(raw?.scope)) {
-    const typed = report as PublicScreenReport;
+    const typed = report as ReadableScreenReport;
     const sorted = [...typed.findings].sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || a.id.localeCompare(b.id));
     // Targets the inventory itself dropped are omitted too; leaving them out of the count is the
     // silence this projection exists to prevent.

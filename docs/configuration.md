@@ -21,39 +21,76 @@ const result = await checkPage(page, {
   networkPolicy: "host-owned",
   scenario: "signed-in-dashboard",
   output: { dir: "artifacts/breaklint", screenshot: "viewport" },
+  failOn: "warn",
   geometry: {
     stabilizationTimeoutMs: 500,
     allowedScrollContainers: [{ selector: "[data-grid]", reason: "wide data grid", scope: "suite" }],
     intentionalOverlays: [{ selector: "[role=dialog]", reason: "open modal" }],
-    rules: { smallText: true, smallTouchTarget: true },
+    rules: { siblingOverlap: true, smallText: true, smallTouchTarget: true },
   },
 });
 ```
 
 The option object is closed: unknown fields, unbounded target counts, malformed exception records,
 and any trust/network value other than the two literals above are rejected before the adapter calls
-the page. `SCREEN_OPTIONS_SCHEMA` is the matching exported input schema for tooling.
+the page. Every selector (exceptions, `sourceBinding.compiledBuildSelector` and
+`sourceBinding.containers`) is then parsed once in the page before the first sample; a selector the
+browser cannot parse rejects with a `TypeError` naming the option field, whatever its `scope`.
+`SCREEN_OPTIONS_SCHEMA` is the matching exported input schema for tooling.
 
 Screen reports are discriminated by `profileKind: "screen"` and emit `schemaVersion: 2` (readers
 accept Screen 1 and 2); they do not contain Paged.js pages or PDF coordinates. They record the
 sanitized route, current viewport and coordinate system (`css-viewport-pixels` for viewport captures
 or `css-document-pixels` for `"full-page"` captures), browser version, before/stable/after capture
-signatures with structured `capture.driftDetails` on drift, actual PNG hash and dimensions, target
+signatures (keyed with a per-run secret that is not in the report, so they compare only within one
+run) with structured `capture.driftDetails` on drift (a text change records only the text lengths), actual PNG hash and dimensions, target
 evaluations (including healthy, excluded, and not-measured targets), coverage counts, and typed
 events. Screen profile v2 checks unexpected horizontal overflow, content visibly cut by rectangular
-`overflow: hidden` or `clip` ancestors, visible HTML sibling overlap (`web/sibling-overlap`), SVG text
-overflowing its viewport (`web/svg-text-overflows-viewport`), and opt-in `web/small-text` /
-`web/small-touch-target` warnings. CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`,
+`overflow: hidden` or `clip` ancestors, SVG text overflowing its viewport
+(`web/svg-text-overflows-viewport`), and the opt-in warnings `web/sibling-overlap` (visible HTML
+sibling overlap, `rules.siblingOverlap: true`), `web/small-text` and `web/small-touch-target`. Without
+its opt-in, the sibling pass does not run and its fields do not take part in the capture stability
+check. `web/small-text` compares the computed `font-size` of elements with their own text (a
+`display: contents` wrapper is placed by the line boxes of its text); scaling by an SVG `viewBox` or
+a CSS `transform` is not applied, so scaled text can be reported too small or missed.
+`web/small-touch-target` is a size heuristic, not a WCAG 2.5.8 check: an inline link surrounded by
+running text is exempt, while a link that is the only text of its block, such as a navigation list
+item, is measured. Absolutely positioned siblings are not excluded wholesale; name an intended overlay such as a
+badge in `intentionalOverlays`. An intentional overlay exempts its subtree. An allowed scroll
+container exempts only its own horizontal overflow and the clipping it causes (content it cuts or
+scrolls out of view); its descendants are still measured. An exception that matches `html` or `body`
+would exempt the whole page: it emits `screen-exception-too-broad` and the run is
+`insufficient-coverage`. `failOn` (`"warn"` by default, or `"error"`) is the lowest finding
+severity that turns the verdict into `findings`; with `"error"`, warnings stay in the report without
+failing the run. CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`,
 `hwb()`, `color(...)`), semi-transparent opacity (`0 < opacity < 1`), `filter`, and `backdrop-filter`
 are measured normally for geometry; `opacity: 0`, masks, clip-paths, unsupported transforms, and
-running animations stay excluded or `not-measured`. Ordinary vertical scrolling and general visual
+running animations stay excluded or `not-measured`.
+
+`stabilizationTimeoutMs` (default 2000) bounds the wait for document fonts and, starting after the
+first sample (its duration is `capture.firstSampleMs`), the wait for two consecutive identical
+samples taken while no font is loading. A budget that runs out (`screen-stabilization-timeout`), the
+20-sample attempt limit (`screen-stabilization-attempt-limit`), fonts still loading
+(`screen-fonts-not-ready`) and samples that really differed (`screen-capture-drift`) are reported
+separately; `capture.stabilizationEndedBy` names how the loop ended. Each prevents a clean claim.
+`0` keeps its 0.10 meaning: nothing is awaited, which is reported as a timeout. The first sample,
+the screenshot and the sample after it each have their own bound of the larger of 10 s and five
+times `stabilizationTimeoutMs`; without a first sample the run ends as `infrastructure` without a
+screenshot. Ordinary vertical scrolling and general visual
 occlusion are outside this measurement contract.
 
 Visible source containers can optionally be verified against a host build receipt (Next.js output
 receipt version 1 or framework-agnostic output receipt version 2). This does not
 accept a caller claim of being bound: breaklint captures the receipt and its declared root-relative
 source/config/lock files before and after the screenshot, checks every digest and inventory digest,
-then checks the rendered build ID meta element. A verified result is only
+then checks the rendered build ID meta element and the output build ID the page renders in
+`sourceBinding.compiledOutputAttribute` (on the same element) against the output receipt. Without
+that rendered output ID, or when it differs, the binding stays `declared`: two builds of the same
+sources share the source build ID. With output receipt version 2 the page can only render its
+output ID when the receipt names a `buildMarkerPath`: without it the `buildId` must equal
+`filesSha256`, a digest over the output files, so a page among those files cannot contain it and the
+binding can never become verified. Existing version-2 bindings without `buildMarkerPath` or without
+`compiledOutputAttribute` report `declared` from 0.11.1 on. A verified result is only
 `verified-container-only` via `build-bound-component-container`; it is never an exact source-line
 claim. Missing, stale, or changed proof remains declared/unknown with a typed event.
 

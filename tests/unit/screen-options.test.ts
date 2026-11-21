@@ -20,9 +20,9 @@ describe("screen checkPage options", () => {
     const candidate = {
       ...base(), projectId: "ds-os", documentId: "dashboard", runId: "run-1",
       geometry: { intentionalOverlays: [{ selector: "[role=dialog]", reason: "modal" }], maxTargets: 20, stabilizationTimeoutMs: 100 },
-      sourceBinding: { kind: "host-build-container", root: "/tmp/project", receiptPath: ".breaklint-build/receipt.json", compiledBuildSelector: "meta[name=breaklint-build]", compiledBuildAttribute: "content", containers: [{ selector: "[data-breaklint-source]", file: "src/components/Shell.tsx" }] },
+      sourceBinding: { kind: "host-build-container", root: "/tmp/project", receiptPath: ".breaklint-build/receipt.json", compiledBuildSelector: "meta[name=breaklint-build]", compiledBuildAttribute: "content", compiledOutputAttribute: "data-output-build", containers: [{ selector: "[data-breaklint-source]", file: "src/components/Shell.tsx" }] },
     };
-    assert.doesNotThrow(() => validateCheckPageOptions(candidate));
+    assert.equal(validateCheckPageOptions(candidate).sourceBinding?.compiledOutputAttribute, "data-output-build");
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(SCREEN_OPTIONS_SCHEMA);
     assert.equal(validate(candidate), true, JSON.stringify(validate.errors));
   });
@@ -71,6 +71,28 @@ describe("screen checkPage options", () => {
     ]) {
       assert.throws(() => validateCheckPageOptions(invalid));
       assert.equal(validate(invalid), false);
+    }
+  });
+  it("accepts the sibling-overlap opt-in and the checkPage failOn gate identically at runtime and in JSON Schema", () => {
+    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(SCREEN_OPTIONS_SCHEMA);
+    for (const candidate of [
+      { ...base(), failOn: "error", geometry: { rules: { siblingOverlap: true } } },
+      { ...base(), failOn: "warn", geometry: { rules: { siblingOverlap: false, smallText: true } } },
+    ]) {
+      const parsed = validateCheckPageOptions(candidate);
+      assert.equal(parsed.failOn, candidate.failOn);
+      assert.equal(parsed.geometry?.rules?.siblingOverlap, candidate.geometry.rules.siblingOverlap);
+      assert.equal(validate(candidate), true, JSON.stringify(validate.errors));
+    }
+    assert.equal(validateCheckPageOptions(base()).failOn, undefined);
+    for (const invalid of [
+      { ...base(), failOn: "never" },
+      { ...base(), failOn: "info" },
+      { ...base(), geometry: { rules: { siblingOverlap: "yes" } } },
+      { ...base(), geometry: { rules: { siblingOverlap: { thresholdPx: 4 } } } },
+    ]) {
+      assert.throws(() => validateCheckPageOptions(invalid), TypeError);
+      assert.equal(validate(invalid), false, JSON.stringify(invalid));
     }
   });
 });

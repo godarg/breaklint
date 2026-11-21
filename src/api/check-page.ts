@@ -1,11 +1,14 @@
 /** Public host-page adapter. It observes an already-opened page and writes only its PNG artifact. */
 
-import { createHash, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { captureBoundedSourceFile, sha256Bytes } from "../source/bytes.ts";
-import { EXIT_CODE_BY_VERDICT, type RunVerdict, type Severity } from "../core/enums.ts";
+import { EXIT_CODE_BY_VERDICT, type RunVerdict } from "../core/enums.ts";
+import { MAX_DRIFT_DETAILS, computeScreenDriftDetails, summarizeDriftDetails } from "../web/drift.ts";
+import { evaluateScreenTargets, screenFindings } from "../web/evaluate.ts";
 import { validateCheckPageOptions } from "../web/options.ts";
+import { digestBrowserSample, sha, stable, type BrowserRawSample, type BrowserRawTarget, type RawSample, type RawSampleSignature } from "../web/raw-sample.ts";
+import { verifyBinding, type Binding } from "../web/receipt.ts";
 import {
   SCREEN_REPORT_SCHEMA_VERSION,
   type CheckPageOptions,
@@ -13,36 +16,48 @@ import {
   type PublicScreenReport,
   type ScreenCheckResult,
   type ScreenDriftDetail,
-  type ScreenFinding,
   type ScreenInfrastructureEvent,
-  type ScreenMeasurement,
   type ScreenRuleId,
-  type ScreenTargetEvaluation,
   type StructuralPage,
 } from "../web/types.ts";
 
-const sha = (value: string | Uint8Array): string => createHash("sha256").update(value).digest("hex");
-const stable = (value: unknown): string => JSON.stringify(value);
-const MAX_RECEIPT_BYTES = 1_000_000;
-const MAX_SOURCE_BYTES = 50 * 1024 * 1024;
-const MAX_SOURCE_TOTAL = 250 * 1024 * 1024;
-const MAX_OUTPUT_FILES = 10_000;
-const MAX_OUTPUT_TOTAL = 512 * 1024 * 1024;
+export { computeScreenDriftDetails } from "../web/drift.ts";
+export { verifyOutputReceipt } from "../web/receipt.ts";
+
 const MAX_SIGNATURE_TEXT_BYTES = 1_024 * 1_024;
 const MAX_SIGNATURE_ANCESTORS = 64;
 const MAX_STABILIZATION_ATTEMPTS = 20;
-const MAX_DRIFT_DETAILS = 10;
+const PHASE_BOUND_FLOOR_MS = 10_000;
+const PHASE_BOUND_FACTOR = 5;
 const DEFAULT_SMALL_TEXT_PX = 12;
 const DEFAULT_SMALL_TOUCH_PX = 24;
-const SIBLING_OVERLAP_THRESHOLD_PX = 2;
-const SVG_TEXT_OVERFLOW_THRESHOLD_PX = 1;
 
 const CSS_COLOR_SPACES = new Set([
   "srgb", "srgb-linear", "display-p3", "a98-rgb", "prophoto-rgb", "rec2020", "xyz", "xyz-d50", "xyz-d65",
 ]);
 
 const COLOR_NUM_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/u;
-const COLOR_CHANNEL_RE = /^(?:none|[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?(?:%|deg|rad|grad|turn)?)$/u;
+// Channel grammar per color function (CSS Color 4): n = number, p = percentage, a = angle (hue
+// only), x = none. Legacy comma syntax exists only for rgb()/hsl() and has no `none`.
+const COLOR_CHANNELS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["rgb", ["npx", "npx", "npx"]], ["rgba", ["npx", "npx", "npx"]], ["hsl", ["nax", "npx", "npx"]], ["hsla", ["nax", "npx", "npx"]],
+  ["hwb", ["nax", "npx", "npx"]], ["lab", ["npx", "npx", "npx"]], ["oklab", ["npx", "npx", "npx"]], ["lch", ["npx", "npx", "nax"]],
+  ["oklch", ["npx", "npx", "nax"]], ["color", ["npx", "npx", "npx"]],
+]);
+const LEGACY_COLOR_CHANNELS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["rgb", ["np", "np", "np"]], ["rgba", ["np", "np", "np"]], ["hsl", ["na", "p", "p"]], ["hsla", ["na", "p", "p"]],
+]);
+
+function colorChannelKind(token: string): string | null {
+  if (token === "none") return "x";
+  if (token.endsWith("%")) return COLOR_NUM_RE.test(token.slice(0, -1)) ? "p" : null;
+  const angle = /^(.*?)(?:deg|grad|rad|turn)$/u.exec(token);
+  if (angle) return COLOR_NUM_RE.test(angle[1]!) ? "a" : null;
+  return COLOR_NUM_RE.test(token) ? "n" : null;
+}
+function colorChannelsValid(tokens: readonly string[], kinds: readonly string[]): boolean {
+  return tokens.length === kinds.length && tokens.every((token, index) => { const kind = colorChannelKind(token); return kind !== null && kinds[index]!.includes(kind); });
+}
 
 function parseAlphaToken(token: string): number | null {
   const trimmed = token.trim().toLowerCase();
@@ -59,8 +74,10 @@ function parseAlphaToken(token: string): number | null {
 }
 
 /**
- * Parses the alpha channel (0..1) of a CSS Color 3 or CSS Color 4 computed color string.
- * Returns null for unrecognized or non-solid paint syntax (e.g. url(#gradient)), failing closed.
+ * Parses the alpha channel (0..1) of a CSS Color 3 or CSS Color 4 computed color string, with the
+ * channel grammar of each color function (an angle is only a hue). Returns null for unrecognized or
+ * non-solid paint syntax (e.g. url(#gradient)), failing closed. The in-page sampler carries a copy
+ * of this parser; a live differential test keeps both on one table.
  */
 export function parseCssColorAlpha(color: string): number | null {
   const trimmed = color.trim().toLowerCase();
@@ -69,64 +86,26 @@ export function parseCssColorAlpha(color: string): number | null {
   if (!fnMatch) return null;
   const fn = fnMatch[1]!;
   const body = fnMatch[2]!.trim();
-  if (fn === "rgb" || fn === "rgba" || fn === "hsl" || fn === "hsla") {
-    if (body.includes(",")) {
-      const parts = body.split(",").map((s) => s.trim());
-      if (parts.some((p) => p === "")) return null;
-      if (parts.length !== 3 && parts.length !== 4) return null;
-      if (!parts.slice(0, 3).every((p) => COLOR_CHANNEL_RE.test(p))) return null;
-      return parts.length === 4 ? parseAlphaToken(parts[3]!) : 1;
-    }
-    const slashParts = body.split("/");
-    if (slashParts.length > 2) return null;
-    const channels = slashParts[0]!.trim().split(/\s+/u).filter(Boolean);
-    if (channels.length !== 3 || !channels.every((c) => COLOR_CHANNEL_RE.test(c))) return null;
-    return slashParts.length === 2 ? parseAlphaToken(slashParts[1]!) : 1;
+  const modern = COLOR_CHANNELS.get(fn);
+  if (!modern) return null;
+  if (body.includes(",")) {
+    const legacy = LEGACY_COLOR_CHANNELS.get(fn);
+    if (!legacy) return null;
+    const parts = body.split(",").map((part) => part.trim());
+    if (parts.length !== 3 && parts.length !== 4) return null;
+    if (!colorChannelsValid(parts.slice(0, 3), legacy)) return null;
+    return parts.length === 4 ? parseAlphaToken(parts[3]!) : 1;
   }
-  if (fn === "hwb" || fn === "lab" || fn === "lch" || fn === "oklab" || fn === "oklch") {
-    const slashParts = body.split("/");
-    if (slashParts.length > 2) return null;
-    const channels = slashParts[0]!.trim().split(/\s+/u).filter(Boolean);
-    if (channels.length !== 3 || !channels.every((c) => COLOR_CHANNEL_RE.test(c))) return null;
-    return slashParts.length === 2 ? parseAlphaToken(slashParts[1]!) : 1;
-  }
+  const slashParts = body.split("/");
+  if (slashParts.length > 2) return null;
+  let tokens = slashParts[0]!.trim().split(/\s+/u).filter(Boolean);
   if (fn === "color") {
-    const slashParts = body.split("/");
-    if (slashParts.length > 2) return null;
-    const tokens = slashParts[0]!.trim().split(/\s+/u).filter(Boolean);
-    if (tokens.length !== 4 || !CSS_COLOR_SPACES.has(tokens[0]!) || !tokens.slice(1).every((c) => COLOR_CHANNEL_RE.test(c))) return null;
-    return slashParts.length === 2 ? parseAlphaToken(slashParts[1]!) : 1;
+    if (!CSS_COLOR_SPACES.has(tokens[0] ?? "")) return null;
+    tokens = tokens.slice(1);
   }
-  return null;
+  if (!colorChannelsValid(tokens, modern)) return null;
+  return slashParts.length === 2 ? parseAlphaToken(slashParts[1]!) : 1;
 }
-
-type RawTarget = {
-  selector: string; domPath: string; tag: string; id: string; className: string; textLength: number; directTextSha256: string | null;
-  hasDirectText: boolean; isSvg: boolean; isSvgText: boolean; isInteractiveControl: boolean; siblingEligible: boolean;
-  fontSizePx: number; siblingOverlapPx: number; svgTextOverflowPx: number;
-  paintSignature: string; ancestorSignatureComplete: boolean;
-  box: { x: number; y: number; width: number; height: number } | null;
-  coordinateSystem: "css-viewport-pixels" | "css-document-pixels";
-  state: "candidate" | "excluded" | "not-measured"; reason: string | null; paint: string | null;
-  transform: string | null; clipped: "none" | "partial" | "outside"; horizontalOverflow: number; allowedScroll: boolean;
-  overlay: boolean; sourceContainer: number | null; scroll: { x: number; y: number };
-};
-type RawSampleSignature = {
-  url: string;
-  viewport: [number, number, number];
-  scroll: [number, number];
-  document: [number, number, number, number, number];
-  fonts: string;
-  targetDigest?: string;
-};
-type RawSample = {
-  signature: RawSampleSignature; fontsReady: boolean; deviceScaleFactor: number; candidates: number; omittedCount: number;
-  signatureTextComplete: boolean; ancestorSignatureComplete: boolean;
-  exceptions: { allowed: number[]; overlay: number[] }; targets: RawTarget[];
-};
-type BrowserRawTarget = Omit<RawTarget, "directTextSha256"> & { directText: string | null };
-type BrowserRawSample = Omit<RawSample, "targets"> & { targets: BrowserRawTarget[] };
-type Binding = { status: "verified-container-only" | "declared" | "unknown"; files: Set<string>; containerFiles: Map<number, string>; detail: string | null };
 
 function pngSize(bytes: Uint8Array): { widthPx: number; heightPx: number } | null {
   if (bytes.length < 24 || Buffer.from(bytes.subarray(0, 8)).compare(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) !== 0) return null;
@@ -136,165 +115,17 @@ function safeUrl(raw: string): string {
   try { const url = new URL(raw); url.search = ""; url.hash = ""; return url.toString(); }
   catch { return "about:invalid"; }
 }
-function sourcePath(path: string): boolean {
-  return !!path && !path.includes("\\") && !path.includes("\0") && !path.startsWith("/") && path.split("/").every((part) => part && part !== "." && part !== ".." && part !== "__proto__" && part !== "constructor" && part !== "prototype");
-}
-function canonicalFiles(files: Record<string, { sha256: string; byteLength: number; role: string }>): string {
-  return JSON.stringify(Object.entries(files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([file, entry]) => [file, entry.sha256, entry.byteLength, entry.role]));
-}
-function receiptFiles(value: unknown, allowedRoles: readonly string[], label: string, maxFiles: number, maxTotal: number): Record<string, { sha256: string; byteLength: number; role: string }> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} files are invalid`);
-  const entries = Object.entries(value as Record<string, unknown>); if (entries.length === 0 || entries.length > maxFiles) throw new Error(`${label} file inventory is invalid`);
-  const normalized: Record<string, { sha256: string; byteLength: number; role: string }> = Object.create(null); let total = 0;
-  for (const [file, candidate] of entries) {
-    if (!sourcePath(file) || !candidate || typeof candidate !== "object" || Array.isArray(candidate)) throw new Error(`${label} file path is invalid`);
-    const entry = candidate as Record<string, unknown>; const byteLength = entry.byteLength;
-    if (Object.keys(entry).some((key) => !["sha256", "byteLength", "role"].includes(key)) || typeof entry.sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(entry.sha256) || typeof byteLength !== "number" || !Number.isSafeInteger(byteLength) || byteLength < 0 || byteLength > MAX_SOURCE_BYTES || !allowedRoles.includes(String(entry.role))) throw new Error(`invalid ${label} file entry`);
-    total += byteLength; if (total > maxTotal) throw new Error(`${label} byte budget exceeded`);
-    normalized[file] = { sha256: entry.sha256, byteLength, role: String(entry.role) };
-  }
-  if (Object.keys(normalized).length === 0) throw new Error(`${label} file inventory is invalid`);
-  return normalized;
-}
-
-/**
- * Verifies compiled output receipts in either schemaVersion 1 (Next.js `.next/BUILD_ID`) or
- * schemaVersion 2 (framework-agnostic output directory manifest with optional `buildMarkerPath`).
- */
-export function verifyOutputReceipt(input: HostBuildContainerBinding, sourceBuildId: string): void {
-  if (!input.buildOutputReceiptPath) throw new Error("build output receipt path is required for verified host binding");
-  if (!sourcePath(input.buildOutputReceiptPath)) throw new Error("unsafe build output receipt path");
-  const raw = captureBoundedSourceFile(input.root, input.buildOutputReceiptPath, MAX_RECEIPT_BYTES, "screen build output receipt");
-  const receipt: unknown = JSON.parse(raw.toString("utf8"));
-  if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) throw new Error("build output receipt is not an object");
-  const value = receipt as Record<string, unknown>;
-
-  if (value.schemaVersion === 1) {
-    if (Object.keys(value).some((key) => !["schemaVersion", "sourceBuildId", "nextBuildId", "files", "filesSha256"].includes(key)) || value.sourceBuildId !== sourceBuildId || typeof value.nextBuildId !== "string" || !/^[A-Za-z0-9_-]{1,256}$/u.test(value.nextBuildId) || typeof value.filesSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.filesSha256)) throw new Error("invalid build output receipt schema");
-    const files = receiptFiles(value.files, ["build-output"], "build output receipt", MAX_OUTPUT_FILES, MAX_OUTPUT_TOTAL);
-    if (!Object.hasOwn(files, ".next/BUILD_ID") || sha(canonicalFiles(files)) !== value.filesSha256) throw new Error("invalid build output receipt inventory");
-    if (captureBoundedSourceFile(input.root, ".next/BUILD_ID", 512, "screen compiled build id").toString("utf8").trim() !== value.nextBuildId) throw new Error("compiled BUILD_ID does not match output receipt");
-    for (const [file, entry] of Object.entries(files)) {
-      const bytes = captureBoundedSourceFile(input.root, file, MAX_SOURCE_BYTES, "screen build output");
-      if (bytes.length !== entry.byteLength || sha256Bytes(bytes) !== entry.sha256) throw new Error(`build output mismatch: ${file}`);
-    }
-    return;
-  }
-
-  if (value.schemaVersion === 2) {
-    if (Object.keys(value).some((key) => !["schemaVersion", "sourceBuildId", "buildId", "buildMarkerPath", "files", "filesSha256"].includes(key)) || value.sourceBuildId !== sourceBuildId || typeof value.buildId !== "string" || !/^[A-Za-z0-9_.:-]{1,256}$/u.test(value.buildId) || typeof value.filesSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.filesSha256)) throw new Error("invalid build output receipt schema");
-    const files = receiptFiles(value.files, ["build-output"], "build output receipt", MAX_OUTPUT_FILES, MAX_OUTPUT_TOTAL);
-    if (sha(canonicalFiles(files)) !== value.filesSha256) throw new Error("invalid build output receipt inventory");
-    if (value.buildMarkerPath !== undefined) {
-      if (typeof value.buildMarkerPath !== "string" || !sourcePath(value.buildMarkerPath) || !Object.hasOwn(files, value.buildMarkerPath)) {
-        throw new Error("invalid build marker path in output receipt");
-      }
-      if (captureBoundedSourceFile(input.root, value.buildMarkerPath, 512, "screen compiled build marker").toString("utf8").trim() !== value.buildId) {
-        throw new Error("compiled build marker does not match output receipt");
-      }
-    } else if (value.buildId !== value.filesSha256) {
-      throw new Error("generic output receipt buildId must equal filesSha256 when buildMarkerPath is omitted");
-    }
-    for (const [file, entry] of Object.entries(files)) {
-      const bytes = captureBoundedSourceFile(input.root, file, MAX_SOURCE_BYTES, "screen build output");
-      if (bytes.length !== entry.byteLength || sha256Bytes(bytes) !== entry.sha256) throw new Error(`build output mismatch: ${file}`);
-    }
-    return;
-  }
-
-  throw new Error("invalid build output receipt schema");
-}
-
-function verifyBinding(input: HostBuildContainerBinding | undefined, domBuildId: string | null): Binding {
-  if (!input) return { status: "unknown", files: new Set(), containerFiles: new Map(), detail: null };
-  try {
-    if (!sourcePath(input.receiptPath)) throw new Error("unsafe receipt path");
-    const raw = captureBoundedSourceFile(input.root, input.receiptPath, MAX_RECEIPT_BYTES, "screen build receipt");
-    const receipt: unknown = JSON.parse(raw.toString("utf8"));
-    if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) throw new Error("receipt is not an object");
-    const value = receipt as Record<string, unknown>;
-    if (Object.keys(value).some((key) => !["schemaVersion", "buildId", "files", "filesSha256"].includes(key)) || value.schemaVersion !== 1 || typeof value.buildId !== "string" || !/^[a-f0-9]{64}$/u.test(value.buildId) || typeof value.filesSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.filesSha256) || !value.files || typeof value.files !== "object" || Array.isArray(value.files)) throw new Error("invalid receipt schema");
-    if (value.buildId !== value.filesSha256) throw new Error("receipt build id must equal file inventory digest");
-    if (domBuildId !== value.buildId) throw new Error("compiled build id does not match receipt");
-    const normalized = receiptFiles(value.files, ["source", "config", "lock"], "receipt", 2_000, MAX_SOURCE_TOTAL);
-    for (const [file, entry] of Object.entries(normalized)) {
-      const bytes = captureBoundedSourceFile(input.root, file, MAX_SOURCE_BYTES, "screen build source");
-      if (bytes.length !== entry.byteLength || sha256Bytes(bytes) !== entry.sha256) throw new Error(`receipt source mismatch: ${file}`);
-    }
-    if (sha(canonicalFiles(normalized)) !== value.filesSha256) throw new Error("receipt inventory digest mismatch");
-    verifyOutputReceipt(input, value.buildId);
-    for (const container of input.containers) if (!Object.hasOwn(normalized, container.file)) throw new Error(`container file absent from receipt: ${container.file}`);
-    return { status: "verified-container-only", files: new Set(Object.keys(normalized)), containerFiles: new Map(input.containers.map((container, index) => [index, container.file])), detail: null };
-  } catch (error) { return { status: "declared", files: new Set(), containerFiles: new Map(), detail: error instanceof Error ? error.message : String(error) }; }
-}
-
-/** Computes a bounded list of concrete field/selector changes between two screen capture samples. */
-export function computeScreenDriftDetails(
-  first: Pick<RawSample, "signature" | "targets">,
-  second: Pick<RawSample, "signature" | "targets">,
-  phase: "pre-screenshot" | "post-screenshot",
-): ScreenDriftDetail[] {
-  const details: ScreenDriftDetail[] = [];
-  const push = (field: string, selector: string | null, before: string | number | null, after: string | number | null): void => {
-    if (details.length < MAX_DRIFT_DETAILS) details.push({ phase, field, selector, before, after });
-  };
-  if (first.signature.url !== second.signature.url) push("url", null, first.signature.url, second.signature.url);
-  if (JSON.stringify(first.signature.viewport) !== JSON.stringify(second.signature.viewport)) push("viewport", null, JSON.stringify(first.signature.viewport), JSON.stringify(second.signature.viewport));
-  if (JSON.stringify(first.signature.scroll) !== JSON.stringify(second.signature.scroll)) push("scroll", null, JSON.stringify(first.signature.scroll), JSON.stringify(second.signature.scroll));
-  if (JSON.stringify(first.signature.document) !== JSON.stringify(second.signature.document)) push("document", null, JSON.stringify(first.signature.document), JSON.stringify(second.signature.document));
-  if (first.signature.fonts !== second.signature.fonts) push("fonts", null, first.signature.fonts, second.signature.fonts);
-  if (first.targets.length !== second.targets.length) push("targetCount", null, first.targets.length, second.targets.length);
-
-  const byPath = new Map(first.targets.map((t) => [t.domPath, t]));
-  const secondPaths = new Set<string>();
-  for (const curr of second.targets) {
-    if (details.length >= MAX_DRIFT_DETAILS) break;
-    secondPaths.add(curr.domPath);
-    const prev = byPath.get(curr.domPath);
-    if (!prev) {
-      push("target-added", curr.selector, null, curr.domPath);
-      continue;
-    }
-    if (JSON.stringify(prev.box) !== JSON.stringify(curr.box)) {
-      push("box", curr.selector, prev.box ? `${prev.box.x},${prev.box.y},${prev.box.width}x${prev.box.height}` : null, curr.box ? `${curr.box.x},${curr.box.y},${curr.box.width}x${curr.box.height}` : null);
-    } else if (prev.state !== curr.state || prev.reason !== curr.reason) {
-      push("state", curr.selector, `${prev.state}:${prev.reason ?? ""}`, `${curr.state}:${curr.reason ?? ""}`);
-    } else if (prev.directTextSha256 !== curr.directTextSha256 || prev.textLength !== curr.textLength) {
-      push("text", curr.selector, prev.directTextSha256 ?? prev.textLength, curr.directTextSha256 ?? curr.textLength);
-    } else if (prev.horizontalOverflow !== curr.horizontalOverflow) {
-      push("horizontalOverflow", curr.selector, prev.horizontalOverflow, curr.horizontalOverflow);
-    } else if (prev.clipped !== curr.clipped) {
-      push("clipped", curr.selector, prev.clipped, curr.clipped);
-    } else if (prev.siblingOverlapPx !== curr.siblingOverlapPx) {
-      push("siblingOverlap", curr.selector, prev.siblingOverlapPx, curr.siblingOverlapPx);
-    } else if (prev.svgTextOverflowPx !== curr.svgTextOverflowPx) {
-      push("svgTextOverflow", curr.selector, prev.svgTextOverflowPx, curr.svgTextOverflowPx);
-    } else if (prev.paintSignature !== curr.paintSignature) {
-      push("paint", curr.selector, sha(prev.paintSignature).slice(0, 12), sha(curr.paintSignature).slice(0, 12));
-    }
-  }
-  if (details.length < MAX_DRIFT_DETAILS) {
-    for (const prev of first.targets) {
-      if (details.length >= MAX_DRIFT_DETAILS) break;
-      if (!secondPaths.has(prev.domPath)) push("target-removed", prev.selector, prev.domPath, null);
-    }
-  }
-  return details;
-}
-
-function summarizeDriftDetails(details: readonly ScreenDriftDetail[]): string {
-  if (details.length === 0) return "DOM/layout/viewport/scroll signature changed around screenshot";
-  const parts = details.slice(0, 5).map((d) => `${d.phase}:${d.field}${d.selector ? `(${d.selector})` : ""}`);
-  return `DOM/layout/viewport/scroll signature changed around screenshot [${parts.join(", ")}${details.length > 5 ? `, +${details.length - 5} more` : ""}]`;
-}
-
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<{ value: T | null; timedOut: boolean }> {
   let timer: NodeJS.Timeout | null = null;
   try { const value = await Promise.race([promise, new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), timeoutMs); })]); return { value, timedOut: value === null }; }
   finally { if (timer) clearTimeout(timer); }
 }
 
-async function samplePage(page: StructuralPage, input: { maxTargets: number; allowed: string[]; overlays: string[]; containers: string[]; fullPage: boolean }): Promise<RawSample> {
+/** Private sampler input. `colorProbe` lets the differential test run the in-page color parser on a table. */
+export interface SampleInput { maxTargets: number; allowed: string[]; overlays: string[]; containers: string[]; fullPage: boolean; siblingOverlap: boolean; colorProbe?: string[] }
+
+/** One in-page sample of the host page. Exported for tests only; not part of the public index. */
+export async function samplePage(page: StructuralPage, input: SampleInput): Promise<RawSample> {
   const sampled: BrowserRawSample = await page.evaluate(async (options) => {
     type Box = { x: number; y: number; width: number; height: number };
     const sx = window.scrollX;
@@ -312,9 +143,27 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
     const domPath = (node: Element): string => { const parts: string[] = []; let cur: Element | null = node; while (cur && parts.length < 16) { const parentElement: Element | null = cur.parentElement; const i = parentElement ? [...parentElement.children].indexOf(cur) + 1 : 1; parts.push(`${cur.tagName.toLowerCase()}:nth-child(${i})`); cur = parentElement; } return parts.reverse().join(">"); };
     const selector = (node: Element, fallback: string): string => node.id ? `#${CSS.escape(node.id)}` : fallback;
 
+    // Copy of parseCssColorAlpha (no closure can cross into the page); the live differential test
+    // runs both on one table through SampleInput.colorProbe.
     const colorSpaces = new Set(["srgb", "srgb-linear", "display-p3", "a98-rgb", "prophoto-rgb", "rec2020", "xyz", "xyz-d50", "xyz-d65"]);
     const colorNumRe = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/u;
-    const colorChannelRe = /^(?:none|[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?(?:%|deg|rad|grad|turn)?)$/u;
+    const colorChannels = new Map<string, readonly string[]>([
+      ["rgb", ["npx", "npx", "npx"]], ["rgba", ["npx", "npx", "npx"]], ["hsl", ["nax", "npx", "npx"]], ["hsla", ["nax", "npx", "npx"]],
+      ["hwb", ["nax", "npx", "npx"]], ["lab", ["npx", "npx", "npx"]], ["oklab", ["npx", "npx", "npx"]], ["lch", ["npx", "npx", "nax"]],
+      ["oklch", ["npx", "npx", "nax"]], ["color", ["npx", "npx", "npx"]],
+    ]);
+    const legacyColorChannels = new Map<string, readonly string[]>([
+      ["rgb", ["np", "np", "np"]], ["rgba", ["np", "np", "np"]], ["hsl", ["na", "p", "p"]], ["hsla", ["na", "p", "p"]],
+    ]);
+    const channelKind = (token: string): string | null => {
+      if (token === "none") return "x";
+      if (token.endsWith("%")) return colorNumRe.test(token.slice(0, -1)) ? "p" : null;
+      const angle = /^(.*?)(?:deg|grad|rad|turn)$/u.exec(token);
+      if (angle) return colorNumRe.test(angle[1]!) ? "a" : null;
+      return colorNumRe.test(token) ? "n" : null;
+    };
+    const channelsValid = (tokens: readonly string[], kinds: readonly string[]): boolean =>
+      tokens.length === kinds.length && tokens.every((token, index) => { const kind = channelKind(token); return kind !== null && kinds[index]!.includes(kind); });
     const parseAlphaToken = (token: string): number | null => {
       const t = token.trim().toLowerCase();
       if (t === "none") return 0;
@@ -334,38 +183,32 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       const fnMatch = /^([a-z]+)\(([^()]+)\)$/u.exec(trimmed);
       if (!fnMatch) return null;
       const fn = fnMatch[1]!; const body = fnMatch[2]!.trim();
-      if (fn === "rgb" || fn === "rgba" || fn === "hsl" || fn === "hsla") {
-        if (body.includes(",")) {
-          const parts = body.split(",").map((s) => s.trim());
-          if (parts.some((p) => p === "")) return null;
-          if (parts.length !== 3 && parts.length !== 4) return null;
-          if (!parts.slice(0, 3).every((p) => colorChannelRe.test(p))) return null;
-          return parts.length === 4 ? parseAlphaToken(parts[3]!) : 1;
-        }
-        const sp = body.split("/"); if (sp.length > 2) return null;
-        const ch = sp[0]!.trim().split(/\s+/u).filter(Boolean);
-        if (ch.length !== 3 || !ch.every((c) => colorChannelRe.test(c))) return null;
-        return sp.length === 2 ? parseAlphaToken(sp[1]!) : 1;
+      const modern = colorChannels.get(fn);
+      if (!modern) return null;
+      if (body.includes(",")) {
+        const legacy = legacyColorChannels.get(fn);
+        if (!legacy) return null;
+        const parts = body.split(",").map((part) => part.trim());
+        if (parts.length !== 3 && parts.length !== 4) return null;
+        if (!channelsValid(parts.slice(0, 3), legacy)) return null;
+        return parts.length === 4 ? parseAlphaToken(parts[3]!) : 1;
       }
-      if (fn === "hwb" || fn === "lab" || fn === "lch" || fn === "oklab" || fn === "oklch") {
-        const sp = body.split("/"); if (sp.length > 2) return null;
-        const ch = sp[0]!.trim().split(/\s+/u).filter(Boolean);
-        if (ch.length !== 3 || !ch.every((c) => colorChannelRe.test(c))) return null;
-        return sp.length === 2 ? parseAlphaToken(sp[1]!) : 1;
-      }
-      if (fn === "color") {
-        const sp = body.split("/"); if (sp.length > 2) return null;
-        const tokens = sp[0]!.trim().split(/\s+/u).filter(Boolean);
-        if (tokens.length !== 4 || !colorSpaces.has(tokens[0]!) || !tokens.slice(1).every((c) => colorChannelRe.test(c))) return null;
-        return sp.length === 2 ? parseAlphaToken(sp[1]!) : 1;
-      }
-      return null;
+      const sp = body.split("/"); if (sp.length > 2) return null;
+      let tokens = sp[0]!.trim().split(/\s+/u).filter(Boolean);
+      if (fn === "color") { if (!colorSpaces.has(tokens[0] ?? "")) return null; tokens = tokens.slice(1); }
+      if (!channelsValid(tokens, modern)) return null;
+      return sp.length === 2 ? parseAlphaToken(sp[1]!) : 1;
     };
     const svgPaintAlpha = (paint: string, opacity: string): number | null => { if (paint.trim() === "none") return 0; const paintAlpha = alpha(paint); const componentOpacity = Number(opacity); return paintAlpha === null || !Number.isFinite(componentOpacity) || componentOpacity < 0 || componentOpacity > 1 ? null : paintAlpha * componentOpacity; };
     const transform = (style: CSSStyleDeclaration): string | null => { const v = style.transform; if (v === "none") return null; const match = v.match(/^matrix\(([^)]+)\)$/u); if (!match) return "unsupported-transform"; const n = match[1]!.split(",").map(Number); return n.length === 6 && Number.isFinite(n[0]) && Number.isFinite(n[3]) && n[0]! > 0 && n[3]! > 0 && n[1] === 0 && n[2] === 0 ? null : "unsupported-transform"; };
     const matchCount = (selectors: string[]): number[] => selectors.map((s) => { try { return document.querySelectorAll(s).length; } catch { return -1; } });
     const allowedCounts = matchCount(options.allowed), overlayCounts = matchCount(options.overlays);
     const isMatch = (node: Element, selectors: string[]): boolean => selectors.some((s) => { try { return node.matches(s) || !!node.closest(s); } catch { return false; } });
+    // An allowed scroll container exempts only itself (its own horizontal overflow) and the
+    // clipping it causes; its descendants stay measured.
+    const isSelf = (node: Element, selectors: string[]): boolean => selectors.some((s) => { try { return node.matches(s); } catch { return false; } });
+    // An exception that matches the document root or body exempts the whole page.
+    const rootMatch = (selectors: string[]): boolean[] => selectors.map((s) => { try { return document.documentElement.matches(s) || !!document.body?.matches(s); } catch { return false; } });
     const containerIndex = (node: Element): number | null => { for (let i = 0; i < options.containers.length; i++) { try { if (node.closest(options.containers[i]!)) return i; } catch { return null; } } return null; };
 
     const visibleArea = options.fullPage
@@ -378,6 +221,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
 
     const INTERACTIVE_TAGS = new Set(["button", "select", "textarea", "summary"]);
     const INTERACTIVE_ROLES = new Set(["button", "link", "checkbox", "radio", "switch", "tab"]);
+    const RUNNING_TEXT_INTERACTIVE = 'a[href], button, [role="link"], [role="button"]';
     const REPLACED_TAGS = new Set(["img", "video", "canvas", "input", "button", "select", "textarea", "iframe", "svg"]);
 
     const isInteractiveControl = (node: Element, tag: string): boolean => {
@@ -386,13 +230,98 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       const role = (node.getAttribute("role") ?? "").trim().toLowerCase();
       if (INTERACTIVE_ROLES.has(role)) return true;
       if (tag === "a" && node.hasAttribute("href")) {
-        // Inline links inside running prose paragraphs are exempt from minimum touch-target size.
-        const st = getComputedStyle(node);
-        const insideProse = !!node.closest("p, li, dd, blockquote, td, th");
-        if (insideProse && st.display === "inline") return false;
-        return true;
+        // An inline link surrounded by running text is exempt from the minimum touch-target size,
+        // whatever its container's tag; a link that is the only text of its block (a navigation
+        // list item) or stands among other links only (an inline navigation row) is measured.
+        return !(getComputedStyle(node).display === "inline" && inRunningText(node));
       }
       return false;
+    };
+    const inRunningText = (node: Element): boolean => {
+      let block = node.parentElement;
+      while (block && ["inline", "contents"].includes(getComputedStyle(block).display)) block = block.parentElement;
+      if (!block) return false;
+      // Running text is visible text of the block outside any interactive element: the labels of
+      // neighbouring links or buttons (a row of inline navigation links) are not running text.
+      const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+      for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+        if (node.contains(text) || (text.textContent ?? "").trim().length === 0) continue;
+        const owner = text.parentElement?.closest(RUNNING_TEXT_INTERACTIVE) ?? null;
+        if (owner === null || !block.contains(owner)) return true;
+      }
+      return false;
+    };
+    // An element with display: contents has no box of its own, but its direct text renders: its
+    // geometry is the union of that text's line boxes (null without visible direct text).
+    const contentsTextRect = (node: Element, style: CSSStyleDeclaration): DOMRect | null => {
+      if (style.display !== "contents") return null;
+      const rects = [...node.childNodes].filter((child) => child.nodeType === Node.TEXT_NODE && (child.textContent ?? "").trim().length > 0).flatMap((text) => {
+        const range = document.createRange(); range.selectNodeContents(text); return [...range.getClientRects()];
+      }).filter((rect) => rect.width > 0 && rect.height > 0);
+      if (rects.length === 0) return null;
+      const left = Math.min(...rects.map((r) => r.left)), top = Math.min(...rects.map((r) => r.top));
+      return new DOMRect(left, top, Math.max(...rects.map((r) => r.right)) - left, Math.max(...rects.map((r) => r.bottom)) - top);
+    };
+
+    // Content the browser does not render: the body of a closed <details> (its first direct
+    // <summary> stays rendered; every closed ancestor counts) and the contents of an element with
+    // content-visibility: hidden. display: contents is not a reason by itself (its children render).
+    const notRendered = (node: Element): boolean => {
+      let child: Element = node;
+      for (let ancestor = node.parentElement; ancestor; child = ancestor, ancestor = ancestor.parentElement) {
+        if (ancestor instanceof HTMLDetailsElement && !ancestor.open) {
+          const summary = [...ancestor.children].find((candidate) => candidate.tagName === "SUMMARY");
+          if (child !== summary) return true;
+        }
+        if (getComputedStyle(ancestor).contentVisibility === "hidden") return true;
+      }
+      return false;
+    };
+    // content-visibility: auto skips painting contents away from the viewport; a full-page capture
+    // does not paint them either, so inside the capture area they are not rendered evidence.
+    const skippedByContentVisibilityAuto = (node: Element): boolean => {
+      let ancestor = node.parentElement;
+      while (ancestor && getComputedStyle(ancestor).contentVisibility !== "auto") ancestor = ancestor.parentElement;
+      if (!ancestor || typeof node.checkVisibility !== "function") return false;
+      return node.checkVisibility() && !node.checkVisibility({ contentVisibilityAuto: true });
+    };
+
+    // Effective opacity of a target: opacity and every filter opacity() multiplied along the
+    // ancestor chain. null when a value is not a finite number in [0, 1] (fail closed).
+    const filterOpacityRe = /opacity\(\s*([^)]*?)\s*\)/giu;
+    const effectiveOpacity = (node: Element): number | null => {
+      let product = 1;
+      for (let part: Element | null = node; part; part = part.parentElement) {
+        const ps = getComputedStyle(part);
+        const op = Number(ps.opacity);
+        if (!Number.isFinite(op) || op < 0 || op > 1) return null;
+        product *= op;
+        for (const match of ps.filter.matchAll(filterOpacityRe)) {
+          const raw = match[1]!;
+          const value = raw.endsWith("%") ? Number(raw.slice(0, -1)) / 100 : Number(raw);
+          if (raw === "" || !Number.isFinite(value) || value < 0) return null;
+          product *= Math.min(1, value);
+        }
+      }
+      return product;
+    };
+
+    // The clipping viewport of an <svg> in client CSS pixels: the content box of an outer <svg>;
+    // for a nested <svg>, its x/y/width/height mapped through the parent's screen CTM. null when
+    // the browser cannot provide the mapping.
+    const svgViewport = (svg: SVGSVGElement): { left: number; top: number; right: number; bottom: number } | null => {
+      const owner = svg.ownerSVGElement;
+      if (!owner) {
+        const r = svg.getBoundingClientRect(); const st = getComputedStyle(svg);
+        const px = (v: string): number => Number.parseFloat(v) || 0;
+        return { left: r.left + px(st.borderLeftWidth) + px(st.paddingLeft), top: r.top + px(st.borderTopWidth) + px(st.paddingTop), right: r.right - px(st.borderRightWidth) - px(st.paddingRight), bottom: r.bottom - px(st.borderBottomWidth) - px(st.paddingBottom) };
+      }
+      const ctm = owner.getScreenCTM();
+      if (!ctm) return null;
+      const x = svg.x.animVal.value, y = svg.y.animVal.value, w = svg.width.animVal.value, h = svg.height.animVal.value;
+      const corners = [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].map(([cx, cy]) => [ctm.a * cx! + ctm.c * cy! + ctm.e, ctm.b * cx! + ctm.d * cy! + ctm.f]);
+      const xs = corners.map((c) => c[0]!), ys = corners.map((c) => c[1]!);
+      return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
     };
 
     const rectsByNode = new Map<Element, DOMRect>();
@@ -400,8 +329,9 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
     const statesByNode = new Map<Element, "candidate" | "excluded" | "not-measured">();
     const overlayByNode = new Map<Element, boolean>();
     for (const node of selected) {
-      rectsByNode.set(node, node.getBoundingClientRect());
-      stylesByNode.set(node, getComputedStyle(node));
+      const style = getComputedStyle(node);
+      rectsByNode.set(node, contentsTextRect(node, style) ?? node.getBoundingClientRect());
+      stylesByNode.set(node, style);
       overlayByNode.set(node, isMatch(node, options.overlays));
     }
 
@@ -415,20 +345,53 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       const tag = node.tagName.toLowerCase();
       const isSvg = node instanceof SVGElement;
       const isSvgText = isSvg && tag === "text";
+      const svgInterior = node instanceof SVGElement && (node as SVGElement).ownerSVGElement !== null;
       const overlay = overlayByNode.get(node) ?? false;
 
       let state: "candidate" | "excluded" | "not-measured" = "candidate"; let reason: string | null = null; let paint: string | null = null;
-      if (style.display === "none" || style.visibility === "hidden" || !!node.closest("dialog:not([open])")) { state = "excluded"; reason = "target/not-rendered"; }
+      if (style.display === "none" || style.visibility === "hidden" || !!node.closest("dialog:not([open])") || notRendered(node)) { state = "excluded"; reason = "target/not-rendered"; }
+      else if (effectiveOpacity(node) === 0) { state = "excluded"; reason = "target/not-visible"; }
       else if (style.position === "absolute" && box && box.width <= 1 && box.height <= 1 && (style.clip !== "auto" || style.clipPath !== "none")) { state = "excluded"; reason = "target/visually-hidden"; }
       else if (!box || box.width === 0 || box.height === 0 || contained(visibleArea, checkRect) === "outside") { state = "excluded"; reason = "target/off-viewport"; }
+      else if (skippedByContentVisibilityAuto(node)) { state = "excluded"; reason = "target/not-rendered"; }
 
       const directTextNodes = [...node.childNodes].filter((child): child is Text => child.nodeType === Node.TEXT_NODE);
       const hasDirectText = directTextNodes.some((t) => (t.textContent ?? "").trim().length > 0);
       const ownClip = [style.overflow, style.overflowX, style.overflowY].some((value) => value === "hidden" || value === "clip");
       let clipped: "none" | "partial" | "outside" = "none";
-      if (state === "candidate" && ownClip && box && directTextNodes.some((text) => { const range = document.createRange(); range.selectNodeContents(text); return [...range.getClientRects()].some((textRect) => contained(domRect, textRect) !== "none"); })) clipped = "partial";
+      let clipByAllowed = false;
+      if (state === "candidate" && ownClip && box && directTextNodes.some((text) => { const range = document.createRange(); range.selectNodeContents(text); return [...range.getClientRects()].some((textRect) => contained(domRect, textRect) !== "none"); })) { clipped = "partial"; clipByAllowed = isSelf(node, options.allowed); }
+      // SVG text is measured against the SVG viewports that clip it (content box of the outer
+      // <svg>, x/y/width/height of a nested <svg>), in client CSS pixels, before the generic
+      // ancestor classification. Clipping by an SVG viewport is decided by that rule alone (one
+      // defect, one finding): for every target inside an <svg> (the <text> itself, its <tspan> and
+      // <textPath>, which belong to it, and <g>/shapes, which are not clipped content) the generic
+      // check skips SVG ancestors. HTML ancestors stay with the generic web/content-clipped check.
+      let svgViewportOverflow = 0; let svgClipped = false;
+      if (state === "candidate" && isSvgText) {
+        for (let part = node.parentElement; part instanceof SVGElement; part = part.parentElement) {
+          if (!(part instanceof SVGSVGElement) || getComputedStyle(part).overflow === "visible") continue;
+          const viewport = svgViewport(part);
+          if (!viewport) { state = "not-measured"; reason = "evidence/svg-viewport-unavailable"; break; }
+          svgClipped = true;
+          svgViewportOverflow = Math.max(svgViewportOverflow, viewport.left - domRect.left, domRect.right - viewport.right, viewport.top - domRect.top, domRect.bottom - viewport.bottom);
+        }
+      }
       let ancestor: Element | null = node.parentElement;
-      while (state === "candidate" && ancestor) { const ps = getComputedStyle(ancestor); const clip = [ps.overflow, ps.overflowX, ps.overflowY].some((v) => v === "hidden" || v === "clip"); if (clip && box) { const outcome = contained(ancestor.getBoundingClientRect(), domRect); if (outcome !== "none") { clipped = outcome; if (outcome === "outside") { state = "not-measured"; reason = "evidence/target-clipped-outside"; } break; } } ancestor = ancestor.parentElement; }
+      if (isSvgText || svgInterior) while (ancestor instanceof SVGElement) ancestor = ancestor.parentElement;
+      while (state === "candidate" && ancestor) {
+        const ps = getComputedStyle(ancestor); const clip = [ps.overflow, ps.overflowX, ps.overflowY].some((v) => v === "hidden" || v === "clip");
+        if (clip && box) {
+          const outcome = contained(ancestor.getBoundingClientRect(), domRect);
+          if (outcome !== "none") {
+            clipped = outcome; clipByAllowed = isSelf(ancestor, options.allowed);
+            // Content scrolled out of an allowed scroll container is intended, not missing evidence.
+            if (outcome === "outside" && !clipByAllowed) { state = "not-measured"; reason = "evidence/target-clipped-outside"; }
+            break;
+          }
+        }
+        ancestor = ancestor.parentElement;
+      }
 
       const chain = [node, ...(() => { const out: Element[] = []; let x = node.parentElement; while (x) { out.push(x); x = x.parentElement; } return out; })()];
       const targetPaintSignature = paintValues(style);
@@ -436,18 +399,13 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       const targetAncestorSignatureComplete = chain.length <= 65;
       if (!targetAncestorSignatureComplete) ancestorSignatureComplete = false;
 
+      if (state === "candidate" && effectiveOpacity(node) === null) {
+        state = "not-measured"; reason = "evidence/paint-unsupported"; paint = reason;
+      }
       if (state === "candidate") {
-        let effectiveOpacity = 1;
         for (const part of chain) {
           const ps = getComputedStyle(part);
-          const op = Number(ps.opacity);
-          if (!Number.isFinite(op) || op < 0 || op > 1) {
-            state = "not-measured"; reason = "evidence/paint-unsupported"; paint = reason; break;
-          }
-          effectiveOpacity *= op;
-          if (effectiveOpacity === 0 || /\bopacity\(\s*0+(?:\.0+)?%?\s*\)/iu.test(ps.filter)) {
-            state = "not-measured"; reason = "evidence/target-not-visible"; paint = reason; break;
-          }
+          // Effective opacity 0 was excluded above as target/not-visible.
           // Geometry rules remain valid under semi-transparent opacity (0 < opacity < 1), filter,
           // and backdrop-filter; only geometry-altering masks, clip-paths, unsupported transforms,
           // and running animations stay not-measured.
@@ -476,17 +434,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       }
       statesByNode.set(node, state);
 
-      let svgTextOverflowPx = 0;
-      if (state === "candidate" && isSvgText) {
-        const ownerSvg = (node as SVGTextElement).ownerSVGElement;
-        if (ownerSvg) {
-          const svgRect = ownerSvg.getBoundingClientRect();
-          if (svgRect.width > 0 && svgRect.height > 0) {
-            svgTextOverflowPx = Math.max(0, svgRect.left - domRect.left, domRect.right - svgRect.right, svgRect.top - domRect.top, domRect.bottom - svgRect.bottom);
-            svgTextOverflowPx = Math.round(svgTextOverflowPx * 100) / 100;
-          }
-        }
-      }
+      const svgTextOverflowPx = state === "candidate" && svgClipped ? Math.round(Math.max(0, svgViewportOverflow) * 100) / 100 : 0;
 
       const fontSizePx = Number.parseFloat(style.fontSize) || 0;
       const className = typeof node.className === "string" ? node.className : node.getAttribute("class") ?? "";
@@ -500,26 +448,31 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
           selector: selector(node, fallback), domPath: path, tag, id: node.id, className,
           textLength: node.textContent?.length ?? 0, directText: includeDirectText ? directText : null,
           hasDirectText, isSvg, isSvgText, isInteractiveControl: isInteractiveControl(node, tag), siblingEligible: false,
-          fontSizePx: Math.round(fontSizePx * 100) / 100, siblingOverlapPx: 0, svgTextOverflowPx,
+          fontSizePx: Math.round(fontSizePx * 100) / 100, siblingOverlapPx: 0, svgTextOverflowPx, svgClipped,
           paintSignature: JSON.stringify([targetPaintSignature, ancestorSignature]),
           ancestorSignatureComplete: targetAncestorSignatureComplete, box, coordinateSystem: coordSystem,
           state, reason, paint, transform: transform(style), clipped,
-          horizontalOverflow: Math.max(0, node.scrollWidth - node.clientWidth),
-          allowedScroll: isMatch(node, options.allowed), overlay,
+          // Inside an <svg>, scrollWidth is in CSS pixels and clientWidth in user units; the pair
+          // measures viewBox scaling, not overflow. SVG content is web/svg-text-overflows-viewport's.
+          horizontalOverflow: svgInterior ? 0 : Math.max(0, node.scrollWidth - node.clientWidth), svgInterior,
+          allowedScroll: isSelf(node, options.allowed), clipByAllowed, overlay,
           sourceContainer: containerIndex(node), scroll: { x: sx, y: sy },
         },
       };
     }));
 
-    // Second pass: compute direct HTML sibling overlap depth (excluding SVG internals,
-    // intentional overlays, fixed/sticky chrome, and pointer-events:none decorative layers).
+    // Second pass (only when web/sibling-overlap is opted in): compute direct HTML sibling overlap
+    // depth (excluding SVG internals, intentional overlays, fixed/sticky chrome, and
+    // pointer-events:none decorative layers). A wrapper whose only content is a replaced
+    // descendant (an image card) is content; position:absolute is deliberately not excluded.
+    const REPLACED_SELECTOR = [...REPLACED_TAGS].join(",");
     const siblingEligible = (node: Element, rec: BrowserRawTarget): boolean => {
       if (rec.isSvg || rec.state !== "candidate" || rec.overlay || !rec.box || rec.box.width <= 0 || rec.box.height <= 0) return false;
       if (node.closest("svg")) return false;
       const st = stylesByNode.get(node);
       if (!st) return false;
       if (st.position === "fixed" || st.position === "sticky" || st.pointerEvents === "none") return false;
-      const hasContent = (node.textContent?.trim().length ?? 0) > 0 || REPLACED_TAGS.has(rec.tag);
+      const hasContent = (node.textContent?.trim().length ?? 0) > 0 || REPLACED_TAGS.has(rec.tag) || node.querySelector(REPLACED_SELECTOR) !== null;
       return hasContent;
     };
     const fragmentRects = (node: Element, st: CSSStyleDeclaration, fallback: DOMRect): readonly DOMRect[] => {
@@ -530,7 +483,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       return [fallback];
     };
     const byParent = new Map<Element, { node: Element; rec: BrowserRawTarget; rect: DOMRect; rects: readonly DOMRect[] }[]>();
-    for (const item of rawRecords) {
+    for (const item of options.siblingOverlap ? rawRecords : []) {
       if (!siblingEligible(item.node, item.record)) continue;
       item.record.siblingEligible = true;
       const parent = item.node.parentElement;
@@ -580,62 +533,47 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       document: [document.documentElement.scrollWidth, document.documentElement.scrollHeight, document.documentElement.clientWidth, document.documentElement.clientHeight, nodes.length],
       fonts: document.fonts?.status ?? "unsupported",
     };
-    return { signature, fontsReady: document.fonts?.status === "loaded", deviceScaleFactor: devicePixelRatio, candidates: nodes.length, omittedCount: capped ? nodes.length - selected.length : 0, signatureTextComplete, ancestorSignatureComplete, exceptions: { allowed: allowedCounts, overlay: overlayCounts }, targets };
+    return { signature, fontsReady: document.fonts?.status === "loaded", deviceScaleFactor: devicePixelRatio, candidates: nodes.length, omittedCount: capped ? nodes.length - selected.length : 0, signatureTextComplete, ancestorSignatureComplete, exceptions: { allowed: allowedCounts, overlay: overlayCounts, allowedRoot: rootMatch(options.allowed), overlayRoot: rootMatch(options.overlays) }, targets, ...(options.colorProbe ? { colorProbe: options.colorProbe.map(alpha) } : {}) };
   }, input);
 
-  // Direct text crosses this private host boundary only to become a digest. It is never
-  // retained in the public report, artifact, events, or evidence metadata.
-  const targets = sampled.targets.map(({ directText, ...target }) => ({ ...target, directTextSha256: directText === null ? null : sha(directText) }));
-  const targetDigest = JSON.stringify(targets.map((target) => [
-    target.selector, target.domPath, target.tag, target.id, target.className, target.textLength, target.directTextSha256,
-    target.paintSignature, target.ancestorSignatureComplete, target.box?.x ?? null, target.box?.y ?? null, target.box?.width ?? null, target.box?.height ?? null,
-    target.state, target.reason, target.paint, target.transform, target.horizontalOverflow, target.clipped,
-    target.siblingOverlapPx, target.svgTextOverflowPx, target.fontSizePx, target.hasDirectText, target.isInteractiveControl, target.siblingEligible,
-    target.allowedScroll, target.overlay, target.sourceContainer,
-  ]));
-  return { ...sampled, signature: { ...sampled.signature, targetDigest }, targets };
+  return digestBrowserSample(sampled, input.siblingOverlap);
 }
 
-function buildSourceRef(raw: RawTarget, binding: Binding): ScreenTargetEvaluation["source"] {
-  const sourceFile = raw.sourceContainer === null ? null : binding.containerFiles.get(raw.sourceContainer) ?? null;
-  return sourceFile !== null && binding.status === "verified-container-only"
-    ? { status: "verified-container-only", method: "build-bound-component-container", file: sourceFile }
-    : { status: binding.status === "declared" ? "declared" : "unknown", method: null, file: null };
+/** The rendered source and output build ids the host declared; null each when unbound, absent, or unreadable. */
+type DomBuildIds = { buildId: string | null; outputId: string | null };
+async function readDomBuildIds(page: StructuralPage, binding: HostBuildContainerBinding | undefined): Promise<DomBuildIds> {
+  if (!binding) return { buildId: null, outputId: null };
+  return page.evaluate((b) => {
+    try {
+      const element = document.querySelector(b.selector);
+      return { buildId: element?.getAttribute(b.attribute) ?? null, outputId: b.outputAttribute === null ? null : element?.getAttribute(b.outputAttribute) ?? null };
+    } catch { return { buildId: null, outputId: null }; }
+  }, { selector: binding.compiledBuildSelector, attribute: binding.compiledBuildAttribute, outputAttribute: binding.compiledOutputAttribute ?? null });
 }
 
-function buildEvaluation(
-  raw: RawTarget,
-  ruleId: ScreenRuleId,
-  index: number,
-  binding: Binding,
-  stableCapture: boolean,
-  artifactPath: string | null,
-  measurement: ScreenMeasurement,
-  violated: boolean,
-  overrideReason: string | null = null,
-  overrideStatus: "excluded" | null = null,
-): ScreenTargetEvaluation {
-  const status = raw.state === "candidate" ? (overrideStatus ?? "measured") : raw.state;
-  const reason = raw.state === "candidate" ? overrideReason : raw.reason;
-  return {
-    id: `screen-evaluation-${index}-${ruleId}`,
-    ruleId,
-    target: { selector: raw.selector, domPath: raw.domPath, tag: raw.tag, box: raw.box, coordinateSystem: raw.coordinateSystem, scroll: raw.scroll },
-    status,
-    reason,
-    measurements: [measurement],
-    predicate: { connective: "single", violated: status === "measured" ? violated : null },
-    evidenceBound: status === "measured" && stableCapture && artifactPath !== null && binding.status !== "declared",
-    source: buildSourceRef(raw, binding),
-    stableIdentity: { status: "unavailable", value: null, candidates: [], identityContract: "logical-source-value-v1", canonicalization: "canonical-node-v1" },
-  };
+/**
+ * Every selector the run will hand to the browser, with its option field path. The browser's
+ * selector grammar decides validity (Chrome closes an unterminated "[attr" itself), so the check
+ * runs in the page, once, before the first sample.
+ */
+function selectorFields(options: CheckPageOptions): { field: string; selector: string }[] {
+  return [
+    ...(options.geometry?.allowedScrollContainers ?? []).map((entry, index) => ({ field: `geometry.allowedScrollContainers[${index}].selector`, selector: entry.selector })),
+    ...(options.geometry?.intentionalOverlays ?? []).map((entry, index) => ({ field: `geometry.intentionalOverlays[${index}].selector`, selector: entry.selector })),
+    ...(options.sourceBinding ? [{ field: "sourceBinding.compiledBuildSelector", selector: options.sourceBinding.compiledBuildSelector }] : []),
+    ...(options.sourceBinding?.containers ?? []).map((entry, index) => ({ field: `sourceBinding.containers[${index}].selector`, selector: entry.selector })),
+  ];
 }
 
-function severityForScreenRule(ruleId: ScreenRuleId): Severity {
-  if (ruleId === "web/unexpected-horizontal-overflow" || ruleId === "web/content-clipped" || ruleId === "web/svg-text-overflows-viewport") {
-    return "error";
-  }
-  return "warn";
+/** Throws a TypeError naming the first option field whose selector the page cannot parse. */
+async function preflightSelectors(page: StructuralPage, options: CheckPageOptions): Promise<void> {
+  const fields = selectorFields(options);
+  if (fields.length === 0) return;
+  const invalid = await page.evaluate((selectors: string[]) => {
+    for (let i = 0; i < selectors.length; i++) { try { document.querySelector(selectors[i]!); } catch { return i; } }
+    return -1;
+  }, fields.map((entry) => entry.selector));
+  if (invalid >= 0) throw new TypeError(`${fields[invalid]!.field} is not a valid selector in this page`);
 }
 
 /** Observe one existing host-owned page; it never navigates, mutates, closes, or imports a driver. */
@@ -651,6 +589,8 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const overlays = overlayEntries.map((x) => x.selector);
   const containers = options.sourceBinding?.containers.map((x) => x.selector) ?? [];
 
+  const siblingOverlapEnabled = options.geometry?.rules?.siblingOverlap === true;
+  const failOn = options.failOn ?? "warn";
   const smallTextOpt = options.geometry?.rules?.smallText;
   const smallTextEnabled = smallTextOpt !== undefined && smallTextOpt !== false;
   const smallTextThreshold = typeof smallTextOpt === "object" && smallTextOpt.minFontSizePx !== undefined ? smallTextOpt.minFontSizePx : DEFAULT_SMALL_TEXT_PX;
@@ -661,7 +601,7 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const rulesEnabled: ScreenRuleId[] = [
     "web/unexpected-horizontal-overflow",
     "web/content-clipped",
-    "web/sibling-overlap",
+    ...(siblingOverlapEnabled ? ["web/sibling-overlap" as const] : []),
     "web/svg-text-overflows-viewport",
     ...(smallTextEnabled ? ["web/small-text" as const] : []),
     ...(smallTouchEnabled ? ["web/small-touch-target" as const] : []),
@@ -669,198 +609,12 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
 
   const infrastructure: ScreenInfrastructureEvent[] = [];
   const events: { kind: string; detail: string }[] = [];
-  const sampleInput = { maxTargets, allowed, overlays, containers, fullPage };
+  const sampleInput = { maxTargets, allowed, overlays, containers, fullPage, siblingOverlap: siblingOverlapEnabled };
 
-  const deadline = Date.now() + timeout;
-  const fonts = await withTimeout(
-    page.evaluate(async () => { if (!document.fonts) return false; await document.fonts.ready; return document.fonts.status === "loaded"; }),
-    timeout,
-  );
-
-  // Stabilization loop: wait for 2 consecutive identical samples within stabilizationTimeoutMs.
-  let before = await samplePage(page, sampleInput);
-  let settled = before;
-  let stabilized = false;
-  let stabilizationTimedOut = false;
-  let stabilizationAttempts = 0;
-  let prev = before;
-  let prevHash = sha(stable(prev.signature));
-  for (let attempt = 1; attempt <= MAX_STABILIZATION_ATTEMPTS; attempt++) {
-    const remainingForRaf = deadline - Date.now();
-    if (remainingForRaf <= 0) {
-      stabilizationTimedOut = true;
-      break;
-    }
-    const raf = await withTimeout(
-      page.evaluate(() => new Promise<boolean>((resolve) => requestAnimationFrame(() => resolve(true)))),
-      remainingForRaf,
-    );
-    if (raf.timedOut) {
-      stabilizationTimedOut = true;
-      break;
-    }
-    const remainingForSample = deadline - Date.now();
-    if (remainingForSample <= 0) {
-      stabilizationTimedOut = true;
-      break;
-    }
-    const sampledCurr = await withTimeout(samplePage(page, sampleInput), remainingForSample);
-    if (sampledCurr.timedOut || sampledCurr.value === null) {
-      stabilizationTimedOut = true;
-      break;
-    }
-    const curr = sampledCurr.value;
-    const currHash = sha(stable(curr.signature));
-    stabilizationAttempts = attempt;
-    if (currHash === prevHash) {
-      before = prev;
-      settled = curr;
-      stabilized = true;
-      break;
-    }
-    before = prev;
-    settled = curr;
-    if (Date.now() >= deadline) {
-      stabilizationTimedOut = true;
-      break;
-    }
-    prev = curr;
-    prevHash = currHash;
-  }
-
-  const domBuildId = options.sourceBinding ? await page.evaluate((binding) => { try { return document.querySelector(binding.selector)?.getAttribute(binding.attribute) ?? null; } catch { return null; } }, { selector: options.sourceBinding.compiledBuildSelector, attribute: options.sourceBinding.compiledBuildAttribute }) : null;
-  const bindingBefore = verifyBinding(options.sourceBinding, domBuildId);
-  const bytes = await page.screenshot({ fullPage });
-  const after = await samplePage(page, sampleInput);
-  const domBuildIdAfter = options.sourceBinding ? await page.evaluate((binding) => { try { return document.querySelector(binding.selector)?.getAttribute(binding.attribute) ?? null; } catch { return null; } }, { selector: options.sourceBinding.compiledBuildSelector, attribute: options.sourceBinding.compiledBuildAttribute }) : null;
-  const bindingAfter = verifyBinding(options.sourceBinding, domBuildIdAfter);
-
-  const captureBefore = sha(stable(before.signature));
-  const captureStable = sha(stable(settled.signature));
-  const captureAfter = sha(stable(after.signature));
-  const postScreenshotDrifted = captureStable !== captureAfter;
-  const drifted = !stabilized || postScreenshotDrifted;
-
-  const driftDetails: ScreenDriftDetail[] = [
-    ...(!stabilized ? computeScreenDriftDetails(before, settled, "pre-screenshot") : []),
-    ...(postScreenshotDrifted ? computeScreenDriftDetails(settled, after, "post-screenshot") : []),
-  ].slice(0, MAX_DRIFT_DETAILS);
-
-  const timedOut = fonts.timedOut || stabilizationTimedOut;
-  const completeSignature = before.signatureTextComplete && settled.signatureTextComplete && after.signatureTextComplete && before.ancestorSignatureComplete && settled.ancestorSignatureComplete && after.ancestorSignatureComplete;
-  const stableCapture = !timedOut && !drifted && completeSignature;
-
-  if (timedOut) infrastructure.push({ kind: "screen-font-layout-timeout", detail: "document fonts/layout did not settle within the configured bound", fatal: false });
-  if (drifted) infrastructure.push({ kind: "screen-capture-drift", detail: summarizeDriftDetails(driftDetails), fatal: false });
-  if (!before.signatureTextComplete || !settled.signatureTextComplete || !after.signatureTextComplete) infrastructure.push({ kind: "screen-dom-signature-incomplete", detail: `direct child text exceeded the ${MAX_SIGNATURE_TEXT_BYTES}-byte capture bound or browser hashing was unavailable`, fatal: false });
-  if (!before.ancestorSignatureComplete || !settled.ancestorSignatureComplete || !after.ancestorSignatureComplete) infrastructure.push({ kind: "screen-paint-signature-incomplete", detail: `a target ancestor chain exceeded the ${MAX_SIGNATURE_ANCESTORS}-ancestor capture bound`, fatal: false });
-
-  const bindingStable = bindingBefore.status === "verified-container-only" && bindingAfter.status === "verified-container-only" && bindingBefore.detail === bindingAfter.detail && domBuildId === domBuildIdAfter;
-  if (!bindingStable) events.push({ kind: "source-binding-unavailable", detail: bindingAfter.detail ?? bindingBefore.detail ?? "host build container binding unavailable or changed during capture" });
-
-  for (const [kind, entries, counts] of [["allowed-scroll-container", allowedEntries, settled.exceptions.allowed], ["intentional-overlay", overlayEntries, settled.exceptions.overlay]] as const) {
-    entries.forEach((entry, index) => {
-      if ((counts[index] ?? 0) <= 0 && entry.scope === "scenario") {
-        events.push({ kind: "screen-exception-unused", detail: `${kind} ${entry.selector} matched no current target` });
-      }
-    });
-  }
-
-  const artifactDir = join(options.output.dir, "evidence"); mkdirSync(artifactDir, { recursive: true });
-  // runId is public report data, not a filesystem component. Hash it before naming an artifact.
-  const relativePath = `evidence/screen-${sha(runId).slice(0, 32)}.png`; writeFileSync(join(options.output.dir, relativePath), bytes);
-  const dimensions = pngSize(bytes); if (!dimensions) infrastructure.push({ kind: "screen-screenshot-invalid", detail: "host screenshot was not a PNG with IHDR dimensions", fatal: true });
-
-  const evaluations: ScreenTargetEvaluation[] = [];
-  let i = 0;
-  const effectiveBinding: Binding = bindingStable ? bindingAfter : { status: options.sourceBinding ? "declared" : "unknown", files: new Set(), containerFiles: new Map(), detail: bindingAfter.detail };
-
-  for (const raw of settled.targets) {
-    const exceptionReason = raw.overlay ? "target/intentional-overlay" : raw.allowedScroll ? "target/allowed-scroll-container" : null;
-    const exceptionStatus = exceptionReason !== null ? ("excluded" as const) : null;
-    // 1. web/unexpected-horizontal-overflow
-    evaluations.push(buildEvaluation(
-      raw, "web/unexpected-horizontal-overflow", i++, effectiveBinding, stableCapture, relativePath,
-      { name: "horizontal-overflow", value: raw.horizontalOverflow, unit: "css-px", operator: ">", threshold: 0, calibrated: false },
-      raw.state === "candidate" && !raw.overlay && !raw.allowedScroll && raw.horizontalOverflow > 0,
-      exceptionReason,
-      exceptionStatus,
-    ));
-    // 2. web/content-clipped
-    const clippedVal = raw.clipped === "partial" ? 1 : 0;
-    evaluations.push(buildEvaluation(
-      raw, "web/content-clipped", i++, effectiveBinding, stableCapture, relativePath,
-      { name: "clipped-content", value: clippedVal, unit: "count", operator: ">", threshold: 0, calibrated: false },
-      raw.state === "candidate" && !raw.overlay && !raw.allowedScroll && clippedVal > 0,
-      exceptionReason,
-      exceptionStatus,
-    ));
-    // 3. web/sibling-overlap (HTML elements only; SVG shapes overlap by design)
-    if (!raw.isSvg) {
-      const siblingExcluded = !raw.siblingEligible;
-      const siblingReason = raw.overlay
-        ? "target/intentional-overlay"
-        : siblingExcluded
-          ? "rule/target-not-applicable"
-          : null;
-      evaluations.push(buildEvaluation(
-        raw, "web/sibling-overlap", i++, effectiveBinding, stableCapture, relativePath,
-        { name: "sibling-overlap-depth", value: raw.siblingOverlapPx, unit: "css-px", operator: ">", threshold: SIBLING_OVERLAP_THRESHOLD_PX, calibrated: false },
-        raw.state === "candidate" && raw.siblingEligible && !raw.overlay && raw.siblingOverlapPx > SIBLING_OVERLAP_THRESHOLD_PX,
-        siblingReason,
-        siblingExcluded || raw.overlay ? "excluded" : null,
-      ));
-    }
-    // 4. web/svg-text-overflows-viewport (SVG <text> targets)
-    if (raw.isSvgText) {
-      evaluations.push(buildEvaluation(
-        raw, "web/svg-text-overflows-viewport", i++, effectiveBinding, stableCapture, relativePath,
-        { name: "svg-text-overflow", value: raw.svgTextOverflowPx, unit: "css-px", operator: ">", threshold: SVG_TEXT_OVERFLOW_THRESHOLD_PX, calibrated: false },
-        raw.state === "candidate" && raw.svgTextOverflowPx > SVG_TEXT_OVERFLOW_THRESHOLD_PX,
-      ));
-    }
-    // 5. Opt-in web/small-text
-    if (smallTextEnabled && raw.hasDirectText) {
-      evaluations.push(buildEvaluation(
-        raw, "web/small-text", i++, effectiveBinding, stableCapture, relativePath,
-        { name: "font-size", value: raw.fontSizePx, unit: "css-px", operator: "<", threshold: smallTextThreshold, calibrated: false },
-        raw.state === "candidate" && raw.fontSizePx > 0 && raw.fontSizePx < smallTextThreshold,
-      ));
-    }
-    // 6. Opt-in web/small-touch-target
-    if (smallTouchEnabled && raw.isInteractiveControl) {
-      const minDim = raw.box ? Math.round(Math.min(raw.box.width, raw.box.height) * 100) / 100 : null;
-      evaluations.push(buildEvaluation(
-        raw, "web/small-touch-target", i++, effectiveBinding, stableCapture, relativePath,
-        { name: "touch-target-min-dimension", value: minDim, unit: "css-px", operator: "<", threshold: smallTouchThreshold, calibrated: false },
-        raw.state === "candidate" && minDim !== null && minDim < smallTouchThreshold,
-      ));
-    }
-  }
-
-  const findings: ScreenFinding[] = evaluations.filter((entry) => entry.predicate.violated === true).map((entry, index) => ({
-    id: `screen-finding-${index}-${sha(entry.id).slice(0, 12)}`,
-    ruleId: entry.ruleId,
-    severity: severityForScreenRule(entry.ruleId),
-    target: entry.target,
-    measurement: entry.measurements[0]!,
-    evaluationId: entry.id,
-    evidence: { bindsFinding: entry.evidenceBound, screenshot: relativePath },
-    repair: { nextCheck: "rerun-same-scenario-and-viewport" },
-  }));
-
-  const measured = evaluations.filter((entry) => entry.status === "measured").length;
-  const excluded = evaluations.filter((entry) => entry.status === "excluded").length;
-  const notMeasured = evaluations.filter((entry) => entry.status === "not-measured").length;
-  // A page with candidates but no measurements has no positive observation to support Clean.
-  const insufficient = !stableCapture || settled.omittedCount > 0 || notMeasured > 0 || measured === 0;
-  const verdict: RunVerdict = infrastructure.some((entry) => entry.fatal) ? "infrastructure" : insufficient ? "insufficient-coverage" : findings.length ? "findings" : "clean";
   const viewport = page.viewportSize();
-  const browserVersion = await Promise.resolve(page.context().browser()?.version() ?? null);
-
-  const report: PublicScreenReport = {
+  const reportHead = async (verdict: RunVerdict, deviceScaleFactor: number) => ({
     schemaVersion: SCREEN_REPORT_SCHEMA_VERSION,
-    profileKind: "screen",
+    profileKind: "screen" as const,
     runId,
     runVerdict: verdict,
     exitCode: EXIT_CODE_BY_VERDICT[verdict],
@@ -869,12 +623,180 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
       documentId: options.documentId ?? null,
       scenario: options.scenario,
       url: safeUrl(page.url()),
-      viewport: { width: viewport?.width ?? 0, height: viewport?.height ?? 0, deviceScaleFactor: settled.deviceScaleFactor },
-      browserVersion,
+      viewport: { width: viewport?.width ?? 0, height: viewport?.height ?? 0, deviceScaleFactor },
+      browserVersion: await Promise.resolve(page.context().browser()?.version() ?? null),
     },
-    trust: "host-controlled-page",
-    networkPolicy: "host-owned",
+    trust: "host-controlled-page" as const,
+    networkPolicy: "host-owned" as const,
+    failOn,
     rulesEnabled,
+  });
+  const emptyArtifact = { kind: "png" as const, relativePath: null, sha256: null, byteLength: null, widthPx: null, heightPx: null, capture: options.output.screenshot, coordinateSystem: fullPage ? "css-document-pixels" as const : "css-viewport-pixels-with-scroll" as const };
+
+  // Phases outside the stabilization budget (selector preflight, first sample, screenshot,
+  // post-capture check) carry their own bound, so a hanging driver still yields a report.
+  const phaseBoundMs = Math.max(PHASE_BOUND_FLOOR_MS, PHASE_BOUND_FACTOR * timeout);
+  // No sample, no observation: no screenshot is taken and nothing is evaluated.
+  const noSampleReport = async (firstSampleMs: number): Promise<ScreenCheckResult> => {
+    const report: PublicScreenReport = {
+      ...await reportHead("infrastructure", 0),
+      targetInventory: { complete: false, omittedCount: 0, reason: "screen/no-sample" },
+      coverage: {
+        candidates: 0, measured: 0, excluded: 0, notMeasured: 0,
+        allowedScrollContainers: allowedEntries.map((entry) => ({ ...entry, count: 0 })),
+        intentionalOverlays: overlayEntries.map((entry) => ({ ...entry, count: 0 })),
+      },
+      capture: { before: "", stable: "", after: "", fontsReady: false, timedOut: true, drifted: false, stabilized: false, stabilizationAttempts: 0, stabilizationEndedBy: "timeout", firstSampleMs, driftDetails: [] },
+      artifact: emptyArtifact, evaluations: [], findings: [], infrastructure, events,
+    };
+    return { ok: false, report };
+  };
+  // An invalid option selector still throws a TypeError; a preflight that does not finish is
+  // an infrastructure result like a first sample that does not arrive.
+  const preflight = await withTimeout(preflightSelectors(page, options).then(() => true), phaseBoundMs);
+  if (preflight.timedOut) {
+    infrastructure.push({ kind: "screen-preflight-timeout", detail: `the option selector preflight did not finish within ${phaseBoundMs} ms`, fatal: true });
+    return noSampleReport(0);
+  }
+  // stabilizationTimeoutMs 0 keeps its 0.10 meaning: fonts and layout are not awaited, which is a
+  // timeout (no clean claim), and no drift is claimed without two differing samples.
+  const fonts = timeout === 0
+    ? { value: null, timedOut: true }
+    : await withTimeout(page.evaluate(async () => { if (!document.fonts) return false; await document.fonts.ready; return document.fonts.status === "loaded"; }), timeout);
+
+  const firstStart = performance.now();
+  const first = await withTimeout(samplePage(page, sampleInput), phaseBoundMs);
+  const firstSampleMs = Math.round(performance.now() - firstStart);
+  if (first.value === null) {
+    infrastructure.push({ kind: "screen-sample-timeout", detail: `the first page sample did not finish within ${phaseBoundMs} ms`, fatal: true });
+    return noSampleReport(firstSampleMs);
+  }
+
+  // Stabilization: two consecutive identical samples, while document fonts are not loading. The
+  // monotonic deadline starts after the first sample, whose duration the report records.
+  let before = first.value;
+  let settled = before;
+  let stabilized = false;
+  let endedBy: "stable" | "timeout" | "attempt-limit" = "timeout";
+  let stabilizationAttempts = 0;
+  let lastPairDiffered = false;
+  let prev = before;
+  let prevHash = sha(stable(prev.signature));
+  const stabilizationStart = performance.now();
+  const deadline = stabilizationStart + timeout;
+  for (;;) {
+    if (stabilizationAttempts >= MAX_STABILIZATION_ATTEMPTS) { endedBy = "attempt-limit"; break; }
+    const remainingForRaf = deadline - performance.now();
+    if (remainingForRaf <= 0) { endedBy = "timeout"; break; }
+    const raf = await withTimeout(page.evaluate(() => new Promise<boolean>((resolve) => requestAnimationFrame(() => resolve(true)))), remainingForRaf);
+    if (raf.timedOut) { endedBy = "timeout"; break; }
+    const remainingForSample = deadline - performance.now();
+    if (remainingForSample <= 0) { endedBy = "timeout"; break; }
+    const sampledCurr = await withTimeout(samplePage(page, sampleInput), remainingForSample);
+    if (sampledCurr.value === null) { endedBy = "timeout"; break; }
+    stabilizationAttempts++;
+    const curr = sampledCurr.value;
+    const currHash = sha(stable(curr.signature));
+    before = prev;
+    settled = curr;
+    lastPairDiffered = currHash !== prevHash;
+    if (!lastPairDiffered && curr.signature.fonts !== "loading") { stabilized = true; endedBy = "stable"; break; }
+    prev = curr;
+    prevHash = currHash;
+  }
+  const stabilizationMs = Math.round(performance.now() - stabilizationStart);
+  const stabilizationTimedOut = !stabilized && endedBy === "timeout";
+
+  const readBuildIds = async (): Promise<DomBuildIds> => (await withTimeout(readDomBuildIds(page, options.sourceBinding), phaseBoundMs)).value ?? { buildId: null, outputId: null };
+  const domIds = await readBuildIds();
+  const bindingBefore = verifyBinding(options.sourceBinding, domIds.buildId, domIds.outputId);
+  const shot = await withTimeout(page.screenshot({ fullPage }), phaseBoundMs);
+  const bytes = shot.value;
+  if (bytes === null) infrastructure.push({ kind: "screen-screenshot-timeout", detail: `the host screenshot did not finish within ${phaseBoundMs} ms`, fatal: true });
+  const afterSample = bytes === null ? null : await withTimeout(samplePage(page, sampleInput), phaseBoundMs);
+  const after = afterSample?.value ?? null;
+  const postCaptureTimedOut = afterSample !== null && after === null;
+  if (postCaptureTimedOut) infrastructure.push({ kind: "screen-post-capture-timeout", detail: `the sample after the screenshot did not finish within ${phaseBoundMs} ms`, fatal: false });
+  const domIdsAfter = await readBuildIds();
+  const bindingAfter = verifyBinding(options.sourceBinding, domIdsAfter.buildId, domIdsAfter.outputId);
+
+  // Public capture digests are keyed with a per-run secret that never leaves this call: they compare
+  // samples within the run, but a reader cannot test guessed page text against them.
+  const captureKey = randomBytes(32);
+  const captureDigest = (sample: RawSample): string => createHmac("sha256", captureKey).update(stable(sample.signature)).digest("hex");
+  const captureBefore = captureDigest(before);
+  const captureStable = captureDigest(settled);
+  const captureAfter = after === null ? "" : captureDigest(after);
+  const postScreenshotDrifted = after !== null && captureStable !== captureAfter;
+  // Drift means two samples really differed; a budget that ran out before a second sample is a timeout.
+  const preScreenshotDrifted = !stabilized && lastPairDiffered;
+  const drifted = preScreenshotDrifted || postScreenshotDrifted;
+
+  const driftDetails: ScreenDriftDetail[] = [
+    ...(preScreenshotDrifted ? computeScreenDriftDetails(before, settled, "pre-screenshot") : []),
+    ...(postScreenshotDrifted && after !== null ? computeScreenDriftDetails(settled, after, "post-screenshot") : []),
+  ].slice(0, MAX_DRIFT_DETAILS);
+
+  const samples = after === null ? [before, settled] : [before, settled, after];
+  const fontsAllReady = samples.every((sample) => sample.fontsReady);
+  const timedOut = fonts.timedOut || stabilizationTimedOut || postCaptureTimedOut;
+  const completeSignature = samples.every((sample) => sample.signatureTextComplete && sample.ancestorSignatureComplete);
+  const stableCapture = stabilized && !timedOut && !drifted && completeSignature && fontsAllReady && after !== null;
+
+  if (fonts.timedOut) infrastructure.push({ kind: "screen-font-layout-timeout", detail: timeout === 0 ? "stabilizationTimeoutMs is 0: document fonts and layout were not awaited" : `document.fonts.ready did not resolve within ${timeout} ms`, fatal: false });
+  if (stabilizationTimedOut && timeout > 0) infrastructure.push({ kind: "screen-stabilization-timeout", detail: `no two consecutive identical samples within ${timeout} ms after the first sample (first sample ${firstSampleMs} ms, ${stabilizationAttempts} further samples)`, fatal: false });
+  if (endedBy === "attempt-limit") infrastructure.push({ kind: "screen-stabilization-attempt-limit", detail: `no two consecutive identical samples within the ${MAX_STABILIZATION_ATTEMPTS}-sample attempt limit (${stabilizationMs} of ${timeout} ms used)`, fatal: false });
+  if (!fontsAllReady && !fonts.timedOut) infrastructure.push({ kind: "screen-fonts-not-ready", detail: "document fonts were still loading in a compared sample", fatal: false });
+  if (drifted) infrastructure.push({ kind: "screen-capture-drift", detail: summarizeDriftDetails(driftDetails), fatal: false });
+  if (!samples.every((sample) => sample.signatureTextComplete)) infrastructure.push({ kind: "screen-dom-signature-incomplete", detail: `direct child text exceeded the ${MAX_SIGNATURE_TEXT_BYTES}-byte capture bound or browser hashing was unavailable`, fatal: false });
+  if (!samples.every((sample) => sample.ancestorSignatureComplete)) infrastructure.push({ kind: "screen-paint-signature-incomplete", detail: `a target ancestor chain exceeded the ${MAX_SIGNATURE_ANCESTORS}-ancestor capture bound`, fatal: false });
+
+  const bindingStable = bindingBefore.status === "verified-container-only" && bindingAfter.status === "verified-container-only" && bindingBefore.detail === bindingAfter.detail && domIds.buildId === domIdsAfter.buildId && domIds.outputId === domIdsAfter.outputId;
+  if (!bindingStable) events.push({ kind: "source-binding-unavailable", detail: bindingAfter.detail ?? bindingBefore.detail ?? "host build container binding unavailable or changed during capture" });
+
+  let rootException = false;
+  for (const [kind, entries, counts, roots] of [["allowed-scroll-container", allowedEntries, settled.exceptions.allowed, settled.exceptions.allowedRoot], ["intentional-overlay", overlayEntries, settled.exceptions.overlay, settled.exceptions.overlayRoot]] as const) {
+    entries.forEach((entry, index) => {
+      if (roots[index] === true) {
+        // Regardless of scope: an exception on html/body exempts the page, so no clean claim.
+        rootException = true;
+        events.push({ kind: "screen-exception-too-broad", detail: `${kind} ${entry.selector} matches the document root or body` });
+      }
+      if ((counts[index] ?? 0) <= 0 && entry.scope === "scenario") {
+        events.push({ kind: "screen-exception-unused", detail: `${kind} ${entry.selector} matched no current target` });
+      }
+    });
+  }
+
+  // runId is public report data, not a filesystem component. Hash it before naming an artifact.
+  let relativePath: string | null = null;
+  let dimensions: { widthPx: number; heightPx: number } | null = null;
+  if (bytes !== null) {
+    const artifactDir = join(options.output.dir, "evidence"); mkdirSync(artifactDir, { recursive: true });
+    relativePath = `evidence/screen-${sha(runId).slice(0, 32)}.png`; writeFileSync(join(options.output.dir, relativePath), bytes);
+    dimensions = pngSize(bytes); if (!dimensions) infrastructure.push({ kind: "screen-screenshot-invalid", detail: "host screenshot was not a PNG with IHDR dimensions", fatal: true });
+  }
+
+  const effectiveBinding: Binding = bindingStable ? bindingAfter : { status: options.sourceBinding ? "declared" : "unknown", files: new Set(), containerFiles: new Map(), detail: bindingAfter.detail };
+  const evaluations = evaluateScreenTargets(settled.targets, {
+    binding: effectiveBinding, stableCapture, artifactPath: relativePath,
+    siblingOverlap: siblingOverlapEnabled,
+    smallText: { enabled: smallTextEnabled, thresholdPx: smallTextThreshold },
+    smallTouch: { enabled: smallTouchEnabled, thresholdPx: smallTouchThreshold },
+  });
+  const findings = screenFindings(evaluations, relativePath);
+  // The gate mirrors the print profile: `error` lets warnings stay visible without failing the run.
+  const gatingFindings = findings.filter((finding) => failOn === "warn" || finding.severity === "error").length;
+
+  const measured = evaluations.filter((entry) => entry.status === "measured").length;
+  const excluded = evaluations.filter((entry) => entry.status === "excluded").length;
+  const notMeasured = evaluations.filter((entry) => entry.status === "not-measured").length;
+  // A page with candidates but no measurements has no positive observation to support Clean.
+  const insufficient = !stableCapture || settled.omittedCount > 0 || notMeasured > 0 || measured === 0 || rootException;
+  const verdict: RunVerdict = infrastructure.some((entry) => entry.fatal) ? "infrastructure" : insufficient ? "insufficient-coverage" : gatingFindings > 0 ? "findings" : "clean";
+
+  const report: PublicScreenReport = {
+    ...await reportHead(verdict, settled.deviceScaleFactor),
     targetInventory: {
       complete: settled.omittedCount === 0 && completeSignature,
       omittedCount: settled.omittedCount,
@@ -892,23 +814,23 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
       before: captureBefore,
       stable: captureStable,
       after: captureAfter,
-      fontsReady: fonts.value === true && settled.fontsReady,
+      fontsReady: fonts.value === true && fontsAllReady,
       timedOut,
       drifted,
       stabilized,
       stabilizationAttempts,
+      stabilizationEndedBy: endedBy,
+      firstSampleMs,
       driftDetails,
     },
-    artifact: {
-      kind: "png",
-      relativePath: dimensions ? relativePath : null,
-      sha256: dimensions ? sha(bytes) : null,
-      byteLength: dimensions ? bytes.length : null,
-      widthPx: dimensions?.widthPx ?? null,
-      heightPx: dimensions?.heightPx ?? null,
-      capture: options.output.screenshot,
-      coordinateSystem: fullPage ? "css-document-pixels" : "css-viewport-pixels-with-scroll",
-    },
+    artifact: bytes !== null && dimensions ? {
+      ...emptyArtifact,
+      relativePath,
+      sha256: sha(bytes),
+      byteLength: bytes.length,
+      widthPx: dimensions.widthPx,
+      heightPx: dimensions.heightPx,
+    } : emptyArtifact,
     evaluations,
     findings,
     infrastructure,

@@ -6,7 +6,7 @@ import { createContextPack } from "../api/context.ts";
 import { writeReportBundle } from "../api/bundle.ts";
 import { UsageError } from "../config/resolve.ts";
 import type { Report } from "../core/types.ts";
-import type { PublicScreenReport } from "../web/types.ts";
+import type { ReadableScreenReport } from "../web/types.ts";
 import { err, notice, out } from "./out.ts";
 
 export const CLI_SUBCOMMANDS = new Set(["compare", "context", "bundle"]);
@@ -229,7 +229,7 @@ export async function runSubcommand(name: string, argv: readonly string[]): Prom
       if (!outDir) {
         throw new UsageError("bundle requires --out-dir <dir>.");
       }
-      const report = readJsonFile(files[0]!, "report") as Report | PublicScreenReport;
+      const report = readJsonFile(files[0]!, "report") as Report | ReadableScreenReport;
       const comparison = comparisonPath ? validateComparisonInput(readJsonFile(comparisonPath, "comparison"), "comparison") : undefined;
       let result;
       try {
