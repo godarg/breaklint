@@ -105,7 +105,10 @@ export function evaluateScreenTargets(targets: readonly RawTarget[], ctx: Screen
       evaluations.push(buildEvaluation(
         raw, "web/svg-text-overflows-viewport", i++, binding, stableCapture, artifactPath,
         { name: "svg-text-overflow", value: raw.svgTextOverflowPx, unit: "css-px", operator: ">", threshold: SVG_TEXT_OVERFLOW_THRESHOLD_PX, calibrated: false },
-        raw.state === "candidate" && raw.svgTextOverflowPx > SVG_TEXT_OVERFLOW_THRESHOLD_PX,
+        raw.state === "candidate" && raw.svgClipped && raw.svgTextOverflowPx > SVG_TEXT_OVERFLOW_THRESHOLD_PX,
+        // overflow: visible on every enclosing <svg>: the text is drawn, the rule does not apply.
+        raw.svgClipped ? null : "rule/target-not-applicable",
+        raw.svgClipped ? null : "excluded",
       ));
     }
     // 5. Opt-in web/small-text

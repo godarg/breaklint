@@ -250,6 +250,24 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       return product;
     };
 
+    // The clipping viewport of an <svg> in client CSS pixels: the content box of an outer <svg>;
+    // for a nested <svg>, its x/y/width/height mapped through the parent's screen CTM. null when
+    // the browser cannot provide the mapping.
+    const svgViewport = (svg: SVGSVGElement): { left: number; top: number; right: number; bottom: number } | null => {
+      const owner = svg.ownerSVGElement;
+      if (!owner) {
+        const r = svg.getBoundingClientRect(); const st = getComputedStyle(svg);
+        const px = (v: string): number => Number.parseFloat(v) || 0;
+        return { left: r.left + px(st.borderLeftWidth) + px(st.paddingLeft), top: r.top + px(st.borderTopWidth) + px(st.paddingTop), right: r.right - px(st.borderRightWidth) - px(st.paddingRight), bottom: r.bottom - px(st.borderBottomWidth) - px(st.paddingBottom) };
+      }
+      const ctm = owner.getScreenCTM();
+      if (!ctm) return null;
+      const x = svg.x.animVal.value, y = svg.y.animVal.value, w = svg.width.animVal.value, h = svg.height.animVal.value;
+      const corners = [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].map(([cx, cy]) => [ctm.a * cx! + ctm.c * cy! + ctm.e, ctm.b * cx! + ctm.d * cy! + ctm.f]);
+      const xs = corners.map((c) => c[0]!), ys = corners.map((c) => c[1]!);
+      return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+    };
+
     const rectsByNode = new Map<Element, DOMRect>();
     const stylesByNode = new Map<Element, CSSStyleDeclaration>();
     const statesByNode = new Map<Element, "candidate" | "excluded" | "not-measured">();
@@ -284,7 +302,22 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       const ownClip = [style.overflow, style.overflowX, style.overflowY].some((value) => value === "hidden" || value === "clip");
       let clipped: "none" | "partial" | "outside" = "none";
       if (state === "candidate" && ownClip && box && directTextNodes.some((text) => { const range = document.createRange(); range.selectNodeContents(text); return [...range.getClientRects()].some((textRect) => contained(domRect, textRect) !== "none"); })) clipped = "partial";
+      // SVG text is measured against the SVG viewports that clip it (content box of the outer
+      // <svg>, x/y/width/height of a nested <svg>), in client CSS pixels, before the generic
+      // ancestor classification. Clipping by an SVG viewport is decided by that rule alone (one
+      // defect, one finding); HTML ancestors stay with the generic web/content-clipped check.
+      let svgViewportOverflow = 0; let svgClipped = false;
+      if (state === "candidate" && isSvgText) {
+        for (let part = node.parentElement; part instanceof SVGElement; part = part.parentElement) {
+          if (!(part instanceof SVGSVGElement) || getComputedStyle(part).overflow === "visible") continue;
+          const viewport = svgViewport(part);
+          if (!viewport) { state = "not-measured"; reason = "evidence/svg-viewport-unavailable"; break; }
+          svgClipped = true;
+          svgViewportOverflow = Math.max(svgViewportOverflow, viewport.left - domRect.left, domRect.right - viewport.right, viewport.top - domRect.top, domRect.bottom - viewport.bottom);
+        }
+      }
       let ancestor: Element | null = node.parentElement;
+      if (isSvgText) while (ancestor instanceof SVGElement) ancestor = ancestor.parentElement;
       while (state === "candidate" && ancestor) { const ps = getComputedStyle(ancestor); const clip = [ps.overflow, ps.overflowX, ps.overflowY].some((v) => v === "hidden" || v === "clip"); if (clip && box) { const outcome = contained(ancestor.getBoundingClientRect(), domRect); if (outcome !== "none") { clipped = outcome; if (outcome === "outside") { state = "not-measured"; reason = "evidence/target-clipped-outside"; } break; } } ancestor = ancestor.parentElement; }
 
       const chain = [node, ...(() => { const out: Element[] = []; let x = node.parentElement; while (x) { out.push(x); x = x.parentElement; } return out; })()];
@@ -328,17 +361,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       }
       statesByNode.set(node, state);
 
-      let svgTextOverflowPx = 0;
-      if (state === "candidate" && isSvgText) {
-        const ownerSvg = (node as SVGTextElement).ownerSVGElement;
-        if (ownerSvg) {
-          const svgRect = ownerSvg.getBoundingClientRect();
-          if (svgRect.width > 0 && svgRect.height > 0) {
-            svgTextOverflowPx = Math.max(0, svgRect.left - domRect.left, domRect.right - svgRect.right, svgRect.top - domRect.top, domRect.bottom - svgRect.bottom);
-            svgTextOverflowPx = Math.round(svgTextOverflowPx * 100) / 100;
-          }
-        }
-      }
+      const svgTextOverflowPx = state === "candidate" && svgClipped ? Math.round(Math.max(0, svgViewportOverflow) * 100) / 100 : 0;
 
       const fontSizePx = Number.parseFloat(style.fontSize) || 0;
       const className = typeof node.className === "string" ? node.className : node.getAttribute("class") ?? "";
@@ -352,7 +375,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
           selector: selector(node, fallback), domPath: path, tag, id: node.id, className,
           textLength: node.textContent?.length ?? 0, directText: includeDirectText ? directText : null,
           hasDirectText, isSvg, isSvgText, isInteractiveControl: isInteractiveControl(node, tag), siblingEligible: false,
-          fontSizePx: Math.round(fontSizePx * 100) / 100, siblingOverlapPx: 0, svgTextOverflowPx,
+          fontSizePx: Math.round(fontSizePx * 100) / 100, siblingOverlapPx: 0, svgTextOverflowPx, svgClipped,
           paintSignature: JSON.stringify([targetPaintSignature, ancestorSignature]),
           ancestorSignatureComplete: targetAncestorSignatureComplete, box, coordinateSystem: coordSystem,
           state, reason, paint, transform: transform(style), clipped,

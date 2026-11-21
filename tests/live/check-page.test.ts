@@ -332,6 +332,50 @@ describe("screen checkPage host-page adapter, live", () => {
     } finally { await page.close(); }
   });
 
+  it("measures SVG text against its clipping SVG viewport, once per defect, and declines overflow:visible", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    type Report = Awaited<ReturnType<typeof inspect>>["report"];
+    const svgFinding = (report: Report, selector: string) => report.findings.find((f) => f.ruleId === "web/svg-text-overflows-viewport" && f.target.selector === selector);
+    const clipFinding = (report: Report, selector: string) => report.findings.find((f) => f.ruleId === "web/content-clipped" && f.target.selector === selector);
+    const mono = 'font-family="monospace" font-size="16"';
+
+    const result = await inspect(
+      // Default overflow:hidden SVG, label partly outside: one defect, one finding.
+      '<div><svg width="100" height="40"><text id="partly" x="70" y="24" font-size="20">WayTooWideLabel</text></svg></div>' +
+      // Label completely outside the SVG viewport but inside the page.
+      '<div><svg width="100" height="40"><text id="outside" x="150" y="20" font-size="16">Gone</text></svg></div>' +
+      // Border and padding: the viewport is the content box; text in the padding is cut.
+      `<div><svg width="100" height="40" style="padding:10px;border:5px solid #888"><text id="padded" x="80" y="20" ${mono}>ABC</text></svg></div>` +
+      // Up-scaled viewBox: fits inside, measured in CSS pixels.
+      '<div><svg width="400" height="80" viewBox="0 0 100 20"><text id="scaled-fits" x="2" y="12" font-size="8">Readable heading</text></svg></div>' +
+      '<div><svg width="400" height="80" viewBox="0 0 100 20"><text id="scaled-cut" x="60" y="12" font-size="8">Readable heading</text></svg></div>' +
+      // Nested SVG: its own x/y/width/height viewport clips.
+      '<div><svg width="200" height="100" viewBox="0 0 100 50"><svg x="10" y="10" width="40" height="20"><text id="nested" x="20" y="15" font-size="10">NESTED</text></svg></svg></div>',
+      "svg-text-viewport",
+    );
+    const r = result.report;
+    assert.ok(svgFinding(r, "#partly"));
+    assert.equal(clipFinding(r, "#partly"), undefined, "the same defect must not also be reported as web/content-clipped");
+    assert.ok(svgFinding(r, "#outside"), JSON.stringify(r.evaluations.filter((e) => e.target.selector === "#outside")));
+    assert.ok(svgFinding(r, "#padded"), JSON.stringify(r.evaluations.filter((e) => e.target.selector === "#padded")));
+    assert.equal(svgFinding(r, "#scaled-fits"), undefined);
+    assert.ok(Number(svgFinding(r, "#scaled-cut")?.measurement.value) > 20, "overflow is reported in CSS pixels of the scaled viewport");
+    assert.ok(svgFinding(r, "#nested"), JSON.stringify(r.evaluations.filter((e) => e.target.selector === "#nested")));
+    for (const selector of ["#partly", "#outside", "#padded", "#scaled-cut", "#nested"]) assert.equal(clipFinding(r, selector), undefined, selector);
+
+    // overflow:visible draws the text: the SVG rule does not apply, an outer HTML clip still does.
+    const visible = await inspect(
+      '<div><svg width="100" height="40" style="overflow:visible"><text id="drawn" x="70" y="24" font-size="20">WayTooWideLabel</text></svg></div>' +
+      '<div style="width:120px;overflow:hidden"><svg width="100" height="40" style="overflow:visible"><text id="html-cut" x="70" y="24" font-size="20">WayTooWideLabel</text></svg></div>',
+      "svg-text-overflow-visible",
+    );
+    const v = visible.report;
+    assert.ok(v.evaluations.some((e) => e.ruleId === "web/svg-text-overflows-viewport" && e.target.selector === "#drawn" && e.status === "excluded" && e.reason === "rule/target-not-applicable"));
+    assert.equal(v.findings.some((f) => f.target.selector === "#drawn"), false, JSON.stringify(v.findings));
+    assert.equal(svgFinding(v, "#html-cut"), undefined);
+    assert.ok(clipFinding(v, "#html-cut"), "an outer HTML clip stays measurable");
+  });
+
   it("measures below-the-fold targets in full-page screenshot mode using css-document-pixels", async (t) => {
     if (missingBrowser && optional) return t.skip("missing browser");
     const page = await open('<div style="height:650px">above fold spacer</div><div id="below-wide" style="width:300px;height:40px"><div style="width:900px;height:30px">below fold overflow</div></div>');
