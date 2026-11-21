@@ -5,8 +5,8 @@ opened: horizontal overflow, content cut off by its container, SVG text outside 
 on request, overlapping siblings, small text and small touch targets. It measures the rendered
 page in CSS pixels; it does not paginate and makes no page or PDF claims.
 
-Screen checks are new in 0.11 and **uncalibrated**: start in report mode, read what they find on
-your pages, then turn the result into an assertion.
+Screen checks are **uncalibrated** (0.11 extended their rules and options): start in report mode,
+read what they find on your pages, then turn the result into an assertion.
 
 ## A test in two steps
 
@@ -27,8 +27,8 @@ test('account overview', async ({ page }, testInfo) => {
     contentType: 'application/json',
   });
 
-  expect(ok).toBe(true);                    // step 1, report mode: breaklint could judge the page
-  // expect(report.runVerdict).toBe('clean'); // step 2, gate: no finding at or above failOn
+  expect(ok).toBe(true);                    // step 1, report mode: passes even with findings
+  // expect(report.runVerdict).toBe('clean'); // step 2, gate: fails on any finding at or above failOn
 });
 ```
 
@@ -76,8 +76,9 @@ The two size thresholds can be set: `geometry.rules.smallText: { minFontSizePx: 
 `geometry.rules.smallTouchTarget: { minSizePx: 8–96 }`; `true` uses 12 px and 24 px. Every threshold is
 uncalibrated and recorded in each measurement.
 
-- **Overflow** is measured on HTML boxes. Elements inside an `<svg>` are judged only by the SVG
-  text rule, and one clipped label gives one finding.
+- **Overflow** is measured on HTML boxes and the outer `<svg>`, not on elements inside it. SVG
+  text is judged against its SVG viewport, and one clipped label gives one finding. SVG content cut
+  only by its SVG viewport is not `content-clipped`; clipping by an HTML ancestor is reported.
 - **Sibling overlap** is off by default because intentional layering is common. Name an intended
   overlay, such as a badge, in `intentionalOverlays`.
 - **Small text** reads the computed font size; scaling through an SVG `viewBox` or a CSS
@@ -135,8 +136,8 @@ in it, before and after the screenshot, and the page renders both the build ID
 (`compiledBuildAttribute`) and the output ID (`compiledOutputAttribute`) on the element
 `compiledBuildSelector` selects. Without the rendered output ID, or when it differs, the binding
 stays `declared`: two builds of the same sources share a build ID. With an output receipt of
-version 2, the page can render its output ID only if the receipt names a `buildMarkerPath`;
-without one, the binding cannot be verified. [`source-bound-findings.md`](source-bound-findings.md)
+version 2, name a `buildMarkerPath`. Without one, the receipt's `buildId` must equal its
+`filesSha256`, and the page must render that hash, which a page listed in `files` cannot hold. [`source-bound-findings.md`](source-bound-findings.md)
 describes the receipts.
 
 ## Reports

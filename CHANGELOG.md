@@ -12,8 +12,8 @@ published to npm, so the Action pinned to `@v0.11.0` fails with its default inst
   request no longer stops a run.
 - Table and figure checks work on real manuals: tables with `colspan` group rows and grouped
   headers, and responsive figures with several image variants.
-- Layout checks for existing pages in Playwright with `checkPage`: SVG labels join overflow and
-  clipped content, plus opt-in checks for overlap, small text and small touch targets.
+- `checkPage` for Playwright now also reports SVG labels cut off by their viewport, measures full
+  pages, can opt in to overlap, small-text and touch-target checks, and gates with `failOn`.
 
 ### Upgrading from 0.10
 
@@ -33,6 +33,10 @@ published to npm, so the Action pinned to `@v0.11.0` fails with its default inst
   renders in the new `sourceBinding.compiledOutputAttribute`. Without it, existing bindings report
   `declared`. With an output receipt of version 2, name a `buildMarkerPath` so the page can render
   that ID; without one, the receipt's build ID must equal its `filesSha256`.
+- **Stabilization:** `checkPage` now waits for two identical layout samples, and
+  `stabilizationTimeoutMs` (default 2000) bounds that whole loop, not only the wait for fonts. Let
+  loading states and animations finish before calling it; a page still moving ends as
+  `screen-stabilization-timeout` and `insufficient-coverage`.
 - **Releases** are published only through npm Trusted Publishing, each with provenance.
 
 ### Print
@@ -61,8 +65,9 @@ published to npm, so the Action pinned to `@v0.11.0` fails with its default inst
   SVG viewport that clips it, including nested SVGs; one clipped label is one finding.
 - New opt-in rules: `web/sibling-overlap` (`geometry.rules.siblingOverlap: true`),
   `web/small-text` and `web/small-touch-target`.
-- `checkPage` takes `failOn`: `"warn"` by default, which keeps the 0.10 verdict; `"error"` keeps
-  warnings in the report without the verdict `findings`.
+- `checkPage` takes `failOn`: `"warn"` by default, the 0.10 rule (any finding makes the verdict
+  `findings`, though new default rules can add findings); `"error"` keeps warnings in the report
+  without the verdict `findings`.
 - Full-page coverage, and exceptions scoped to a scenario or a suite.
 - Content that is not rendered is excluded instead of judged: the body of a closed `<details>`,
   content the browser skips under `content-visibility`, and elements with an effective opacity
