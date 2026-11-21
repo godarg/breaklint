@@ -4,21 +4,21 @@
   "state": "insufficient-coverage",
   "requestedModel": "opus",
   "actual_model": "claude-opus-5-5",
-  "nativeSessionId": "009b018d-63d5-4be5-9f4d-6cb1883f774d",
-  "nativePID": 14318,
+  "nativeSessionId": "1bf28159-cabe-42a3-b2fc-e00e9e061d7f",
+  "nativePID": 25355,
   "directExit": 0,
-  "nativeEndedUTC": "2026-11-21T10:19:47.990Z",
+  "nativeEndedUTC": "2026-11-21T10:43:42.850Z",
   "nativeCLIRecordedVersion": "2.1.326",
   "nativeStream": {
-    "bytes": 34234105,
-    "sha256": "6c223562db850e94595007d81ef962b9c2211296b8268205eb64af0709fae333"
+    "bytes": 34240058,
+    "sha256": "99134493dcb0f4549c2857843e76502685e9c27e3101620df55a9f838d86dd59"
   },
   "nativeStderr": {
     "bytes": 0,
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "promptSha256": "6649966a5c4ecd06fdf5bbab81dc380ea6a2626a9fa15e1b8e7e7edfdf61249b",
-  "outputSha256": "6c223562db850e94595007d81ef962b9c2211296b8268205eb64af0709fae333",
+  "outputSha256": "99134493dcb0f4549c2857843e76502685e9c27e3101620df55a9f838d86dd59",
   "imageCount": 78,
   "imageReads": [
     {
@@ -29,18 +29,18 @@
         1440,
         7760
       ],
-      "toolCallId": "toolu_01FQsRc6Jkx5ooHuZSzbZzCd",
+      "toolCallId": "toolu_01CoKyKinski4JdVcN3Nd8qY",
       "toolUse": {
-        "line": 2,
-        "byteOffset": 5607,
-        "bytes": 1167,
-        "sha256": "edc303c2708fac6cbc80a2cc57c979110067360ef52c5de08c55113d3ea37481"
+        "line": 3,
+        "byteOffset": 7512,
+        "bytes": 1166,
+        "sha256": "96c1212ca1538a07144c7763b8adf934e3dd01fe47c2d36389a2b9f63331e164"
       },
       "toolResult": {
-        "line": 3,
-        "byteOffset": 6774,
+        "line": 4,
+        "byteOffset": 8678,
         "bytes": 745006,
-        "sha256": "f51f4e4f49a829632e19d299e362355d016418864c0a2f0b986c4f7b7e0ea767"
+        "sha256": "392a2068d987093501ceb284d8dc86217d019e6f4b57d0b7ef2c5efe240206b8"
       },
       "nativePayloadBytes": 279107,
       "nativePayloadSha256": "3a095367ff049b752df10f7924fad41d99b09f63d0427a2f9ac2ffc62f18121a",
@@ -61,18 +61,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_01UbsjwdZaPSGUoRTydF8gq1",
+      "toolCallId": "toolu_017dL8nRwfr3cgP3RJjHbdDA",
       "toolUse": {
-        "line": 5,
-        "byteOffset": 752148,
-        "bytes": 1185,
-        "sha256": "e863b77c3a82387071be9dede8a1fc854d75d280941644fae0350134532831b4"
+        "line": 6,
+        "byteOffset": 754052,
+        "bytes": 1184,
+        "sha256": "95414fd8269120ef21d69e3b2433bd7124a1b90c1f415d5105d77c8a0f06f11a"
       },
       "toolResult": {
-        "line": 6,
-        "byteOffset": 753333,
+        "line": 7,
+        "byteOffset": 755236,
         "bytes": 425902,
-        "sha256": "b6934c9d08637fd74d4bdf3e4d71c946cf5f2680174cb9cec51e6c45878b39b9"
+        "sha256": "4d558e39dfa8277490917420b42904e0dcd9a168d9ae73c365c257f09f3855cb"
       },
       "nativePayloadBytes": 159442,
       "nativePayloadSha256": "52585b2db43fe85d8e9dbc0693f07b8773344920de99f172ee8560971389b7d2",
@@ -93,18 +93,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_01QbfMo5jpveYGaFTAkge93T",
+      "toolCallId": "toolu_0139SsgonmHkPpwAiMUswRde",
       "toolUse": {
-        "line": 7,
-        "byteOffset": 1179235,
-        "bytes": 1185,
-        "sha256": "a38c1e5f7208c02d0e06dede67446dd2adab038a2fdc3391c8d7c0f523a999d9"
+        "line": 8,
+        "byteOffset": 1181138,
+        "bytes": 1184,
+        "sha256": "22c24ea7bcb3af15e4bb7cf8e3cb2bf5445013e5df39b11a3745a47d1bbebefc"
       },
       "toolResult": {
-        "line": 8,
-        "byteOffset": 1180420,
+        "line": 9,
+        "byteOffset": 1182322,
         "bytes": 604262,
-        "sha256": "4f651e1e44f5b9b69c0489dc52efa6799858f404527db92eecf9cb45b6a3845f"
+        "sha256": "5f422eac06530c7dca91ba5b7ff371e6c02742cea4589eb31aeb94799fa333b7"
       },
       "nativePayloadBytes": 226329,
       "nativePayloadSha256": "8a1ee9a4d34ae8cf7c8142ed64f6684d444abd284122bbe24267287de5b81ec0",
@@ -125,18 +125,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_01HEXAdY8y7V69Xg1nqQxDjS",
+      "toolCallId": "toolu_015Ykm6x7WSV3fZDi3GBPbCY",
       "toolUse": {
-        "line": 9,
-        "byteOffset": 1784682,
-        "bytes": 1185,
-        "sha256": "93829663ea0c88216d1ca5fdb1bca54df6a002de8cf024b83c95cf50dbd2544a"
+        "line": 10,
+        "byteOffset": 1786584,
+        "bytes": 1184,
+        "sha256": "d785c7406fd156d70a3f934d4e40b8cb53cc60cca759443884844819f0d3a443"
       },
       "toolResult": {
-        "line": 10,
-        "byteOffset": 1785867,
+        "line": 11,
+        "byteOffset": 1787768,
         "bytes": 671630,
-        "sha256": "b6c7fa53bda084932f67bf2312cbd82938a331f9b09844f4eae4a39ba59edb94"
+        "sha256": "101af58bb44dd5fad00a94014ee592a1d69fcccc82db1d6ce0748cf87f9eed6e"
       },
       "nativePayloadBytes": 251590,
       "nativePayloadSha256": "3c64b53176a7b1da741a7dab936f706ca84dcd56c4473f5132a72d4590c16671",
@@ -157,18 +157,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_01BtmVXz7SBjqRRTESbcaevd",
+      "toolCallId": "toolu_01Uvp2NuHR59mkaAS1Qt1oDR",
       "toolUse": {
-        "line": 11,
-        "byteOffset": 2457497,
-        "bytes": 1185,
-        "sha256": "ac09bd84e73bbeca3118477f53d9c262f63b320efd4f046d34bdd20414388a00"
+        "line": 12,
+        "byteOffset": 2459398,
+        "bytes": 1184,
+        "sha256": "1fb9b1a0a2c909072bee4cd2090f503712699603f4acc415cd22dcaa2e49b428"
       },
       "toolResult": {
-        "line": 12,
-        "byteOffset": 2458682,
+        "line": 13,
+        "byteOffset": 2460582,
         "bytes": 622254,
-        "sha256": "9bb63885ee141d4cfc6ebdd0ad60e66d0ddf43e2bce9c665922f039160b7c467"
+        "sha256": "2889db6b103e687adf8c115a4e252e9235825523f029e5e1ca2c4ed1697c5fcb"
       },
       "nativePayloadBytes": 233075,
       "nativePayloadSha256": "a8371112147598ec94048f6860818c891c6f58938e7227edac498c6c0cae6a29",
@@ -189,18 +189,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_01GUP83ufxDrqq6gWpEucJWT",
+      "toolCallId": "toolu_01YCr4owAK6mecFZa67VmG4w",
       "toolUse": {
-        "line": 13,
-        "byteOffset": 3080936,
-        "bytes": 1185,
-        "sha256": "c9dbec267ea364400fefb4a35041c576cbc2889c43ad982e606aaee1e3e3229a"
+        "line": 14,
+        "byteOffset": 3082836,
+        "bytes": 1184,
+        "sha256": "39a8a68e04df9dfed5009e5c0a7e189d927ad9eb88110f006d199b47d396dbbd"
       },
       "toolResult": {
-        "line": 14,
-        "byteOffset": 3082121,
+        "line": 15,
+        "byteOffset": 3084020,
         "bytes": 609550,
-        "sha256": "36319377614b67af16448e664d563520cb0bda267f62d7953dbe2764a8ddbb6d"
+        "sha256": "b34614b34d88e94c74a23c91a510164260ecea471e03a3bca1ad7bd03b129f8e"
       },
       "nativePayloadBytes": 228312,
       "nativePayloadSha256": "d2db528056b7a6c863fc8adb8caab18cea86f26df0f6175897438b7e8aea4416",
@@ -221,18 +221,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_01WcSoMPKiecn5yh5SAwDye3",
+      "toolCallId": "toolu_01AFUu4oZaTbWY4BBjwax9Xj",
       "toolUse": {
-        "line": 15,
-        "byteOffset": 3691671,
-        "bytes": 1185,
-        "sha256": "c71144cb46afef9b8c3ffdc9913399433d1af5a0818646a96a04483fa8b177e1"
+        "line": 16,
+        "byteOffset": 3693570,
+        "bytes": 1184,
+        "sha256": "5cfa99481e696fed53ef1cbb3f162c5a9f313b72023f482bc5c47a24d6b81e64"
       },
       "toolResult": {
-        "line": 16,
-        "byteOffset": 3692856,
+        "line": 17,
+        "byteOffset": 3694754,
         "bytes": 562518,
-        "sha256": "c2441ab60ebc4c6ea8dcabb27ced6c8726059af7f1c9992a364d303f0c117020"
+        "sha256": "837f0bce4a3d449e734cac97868e6870c8c316ed6fbb8cc69f4a89024dbc38d7"
       },
       "nativePayloadBytes": 210674,
       "nativePayloadSha256": "f9ea7bd89db10586b7a6638b4c4c0e55667d60fc59a8251e06572ce8dcd29876",
@@ -253,18 +253,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_01TmoWw5epwy44sbfeTBfyS1",
+      "toolCallId": "toolu_0184uBixKFqkHev47vXaJeoK",
       "toolUse": {
-        "line": 17,
-        "byteOffset": 4255374,
-        "bytes": 1185,
-        "sha256": "9f633ba32272fbe2c3c4569b987383d7cb9f7cded374a575102b6b52a2bbaaff"
+        "line": 18,
+        "byteOffset": 4257272,
+        "bytes": 1184,
+        "sha256": "6913f86d69b701c3e5ee5680d943316798e9d00f3bd532a529baea2729766e10"
       },
       "toolResult": {
-        "line": 18,
-        "byteOffset": 4256559,
+        "line": 19,
+        "byteOffset": 4258456,
         "bytes": 714854,
-        "sha256": "960a870e154bf9601567ed1f0a5e286f0fbe72b81841029b35dedd9bb85a4816"
+        "sha256": "04e7f10cecef2764d79a143d65114eef502bbab439b8a2b556a838a059af7e96"
       },
       "nativePayloadBytes": 267801,
       "nativePayloadSha256": "135349a07357d53230b1b08f45d953bd72c2a80ce81185e59d62869ad9a2afa5",
@@ -285,18 +285,18 @@
         1440,
         760
       ],
-      "toolCallId": "toolu_01QWWiRFRUdPh3iJtjZDYKWV",
+      "toolCallId": "toolu_01Ekb3K7dLaxbPhZZFyeFmSj",
       "toolUse": {
-        "line": 19,
-        "byteOffset": 4971413,
-        "bytes": 1185,
-        "sha256": "09b9e4e29355d8b9b2703728cb10478eb625d1655eae6aae5c727f9f314e0100"
+        "line": 20,
+        "byteOffset": 4973310,
+        "bytes": 1184,
+        "sha256": "61cf24835f7995c8b646e43588f561f9c0229fb50554cdb90f04e71d06de7688"
       },
       "toolResult": {
         "line": 21,
-        "byteOffset": 4973071,
+        "byteOffset": 4974494,
         "bytes": 404156,
-        "sha256": "e60ccf3534a1dc03cfbd065e33ee85ff9b501cd002b74e37cd60521caa7f9ca3"
+        "sha256": "9f12c9a519ea902f986864bae5b41007075a4a1ae4b9c885c6a785f94002259d"
       },
       "nativePayloadBytes": 151290,
       "nativePayloadSha256": "f80400a87ab0277e00683afdfeae816bf9d26ef903a141bc4976a4a9825508ea",
@@ -317,18 +317,18 @@
         768,
         8412
       ],
-      "toolCallId": "toolu_012FTjLz48DfJNnm84yNaYeE",
+      "toolCallId": "toolu_01L8CD6g1ZXjXZ9XFwbQdMQf",
       "toolUse": {
-        "line": 23,
-        "byteOffset": 5379053,
+        "line": 24,
+        "byteOffset": 5381040,
         "bytes": 1164,
-        "sha256": "8c2e0abdc5bfe94591800e9b9446faa47455cb8b2741beee6627f5ffb7756ed4"
+        "sha256": "14bfbc17121d569dae1122a1ddb6604c24d62438b46692a6fc6104f482822327"
       },
       "toolResult": {
-        "line": 24,
-        "byteOffset": 5380217,
+        "line": 25,
+        "byteOffset": 5382204,
         "bytes": 600381,
-        "sha256": "fc2a73d9f77efba785cae019d26b39d090cb85cee1cc05175a292bbb3e1c27d1"
+        "sha256": "99720efa84201528a5941d12cbbcdc581a4d099dda0547da28eeffbacd8aa046"
       },
       "nativePayloadBytes": 224873,
       "nativePayloadSha256": "e059502f2680e14b654c4cd20acf90f3a2782621a9ee67247c6810a6739cc0bd",
@@ -349,18 +349,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_01XDdoyMJ8Rf5z6A1HoCuV8S",
+      "toolCallId": "toolu_01W4DzTjCa3v9riyobezxKCz",
       "toolUse": {
-        "line": 26,
-        "byteOffset": 5980965,
+        "line": 27,
+        "byteOffset": 5982952,
         "bytes": 1182,
-        "sha256": "bd048566e64fa2b6e536d8c1eaf7a8ca085924409df189f53b04e4ac35d533d6"
+        "sha256": "e971ce3235ab80325767e0df173f6f3307856f5e3ed56fcde9d84582c8543053"
       },
       "toolResult": {
-        "line": 27,
-        "byteOffset": 5982147,
+        "line": 28,
+        "byteOffset": 5984134,
         "bytes": 375692,
-        "sha256": "ed5854a9fa7e0d4577bc19adb39ee9ff2aee738a3f2617f37268ea716ea31ab2"
+        "sha256": "2e39472c788063d95fbe1c285543f3c84f4c8cfa4f6ea9ea70f8cd087c379ab2"
       },
       "nativePayloadBytes": 140614,
       "nativePayloadSha256": "3b71d4df837702a39dcad6e6a041f17e4ab147ee9de2c06972d24ae4847ed584",
@@ -381,18 +381,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_017vf69mCC5WE5Nj4W94exT1",
+      "toolCallId": "toolu_018VCBfroF7ryDbi79d66sFx",
       "toolUse": {
-        "line": 28,
-        "byteOffset": 6357839,
+        "line": 29,
+        "byteOffset": 6359826,
         "bytes": 1182,
-        "sha256": "67fa7545f9203cd9e41f71fd1eaf0e6a84db878ad2c2d018fdaf3b783b4f67e5"
+        "sha256": "ee361a49bb9a58d6102917c50d58ec8b6529e8e3097e600ba89e42d643f4d9a9"
       },
       "toolResult": {
-        "line": 29,
-        "byteOffset": 6359021,
+        "line": 30,
+        "byteOffset": 6361008,
         "bytes": 472836,
-        "sha256": "b5b3ba9901a4ea41fbb94ed6ef7e51bfab8d99314ac3d50a2bde3a3f0f0151bf"
+        "sha256": "c69577afa7ed7320206b9a0bf41b3c2b2bc4fc219bdd693d4b06b2b4ab8ad49b"
       },
       "nativePayloadBytes": 177044,
       "nativePayloadSha256": "98d45ddbd2f2763396ef88850315f7f3795af651039c11994200aa12f3ac5660",
@@ -413,18 +413,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_013J2owW8QYqQUsj4mRvjy9X",
+      "toolCallId": "toolu_01ABX3STLAz8CyPt8juEiRL6",
       "toolUse": {
-        "line": 30,
-        "byteOffset": 6831857,
+        "line": 31,
+        "byteOffset": 6833844,
         "bytes": 1182,
-        "sha256": "7f2357cc51aa57baef6ff1590921d7863d9a13207630740d916474726246aefc"
+        "sha256": "b5f26bcb059ae8ab96856e65fa12b61d3a943f011760ad3b92642be5399714ff"
       },
       "toolResult": {
-        "line": 31,
-        "byteOffset": 6833039,
+        "line": 32,
+        "byteOffset": 6835026,
         "bytes": 496236,
-        "sha256": "b50591869c5c728bb81a239483984e2c5083d2bf1b97ce0b3a2bcd56858d4684"
+        "sha256": "ca869135cb7dcc1d1f205af45c49a1e51fbdc6bf9a69a909ad38861a1b8dde00"
       },
       "nativePayloadBytes": 185820,
       "nativePayloadSha256": "803e1aba7a7061c41bff43d9a19bbc263bf86f02c5e1b25af6a93fa51d96709c",
@@ -445,18 +445,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_01VfDsczxdaFx5FAKemKBMig",
+      "toolCallId": "toolu_016LysLkuDaQA79FPmqAzut4",
       "toolUse": {
-        "line": 32,
-        "byteOffset": 7329275,
+        "line": 33,
+        "byteOffset": 7331262,
         "bytes": 1182,
-        "sha256": "556437704c545bd4b397aac9fe6a939076483c69bcbdaa10fbb6d88d7ef00127"
+        "sha256": "3fb36d566e6aeca744ff85c4e92138c5dd134830fea0602c7567e057557322e4"
       },
       "toolResult": {
-        "line": 33,
-        "byteOffset": 7330457,
+        "line": 34,
+        "byteOffset": 7332444,
         "bytes": 708780,
-        "sha256": "21892141a8e8b629acd1a9bc44ec8a30aace28358df2d4cf8a3d21fd998826ec"
+        "sha256": "7979732d0166326d13e57952f1508f6f6987a1a23fcc6083e82a32c16e240e84"
       },
       "nativePayloadBytes": 265522,
       "nativePayloadSha256": "babc2cebad8e22540d8a3f7e5824108ad718c5f0f23acc6d7f1bd217f512f8b8",
@@ -477,18 +477,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_01L918upjFJbh9TaCb7JCxmF",
+      "toolCallId": "toolu_01W57Yv8Mb3acERHtMekPwPX",
       "toolUse": {
-        "line": 34,
-        "byteOffset": 8039237,
+        "line": 35,
+        "byteOffset": 8041224,
         "bytes": 1182,
-        "sha256": "42359cb12785bf165ac19b3adabcd25048d9703ec135c609b064ea26e6c93ad2"
+        "sha256": "e6dee48df5ea1d3473c35694e29330bcb9a37e6c9f89ad1395e7c56c75718f67"
       },
       "toolResult": {
-        "line": 35,
-        "byteOffset": 8040419,
+        "line": 36,
+        "byteOffset": 8042406,
         "bytes": 632788,
-        "sha256": "7a84b069a42572f34ae9bd7ad48c106f13b9cb4dea71c0b8f6c58fcbd041c808"
+        "sha256": "42ebd84e336ed2e5f6d13ef5da6ccc601221586766e2af9a2d61bc7ebba2100b"
       },
       "nativePayloadBytes": 237026,
       "nativePayloadSha256": "e43bef6dac071deaa7dada901fa9def976053a265d79ff1b4cca765f7dd6d507",
@@ -509,18 +509,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_019DrgD4PrfDq4zokK4BBzUZ",
+      "toolCallId": "toolu_01J7QCygogiR7Wumrn1co86w",
       "toolUse": {
-        "line": 36,
-        "byteOffset": 8673207,
+        "line": 37,
+        "byteOffset": 8675194,
         "bytes": 1182,
-        "sha256": "4051a33a19fbcb7c51fce70163b19e51f036b224b19ef981016d355813646e5e"
+        "sha256": "681d69d0f5794046a471ee121dbd381a49f9bf79dea85ccd211e9f080bc32dc5"
       },
       "toolResult": {
-        "line": 37,
-        "byteOffset": 8674389,
+        "line": 38,
+        "byteOffset": 8676376,
         "bytes": 547268,
-        "sha256": "28913488db58d7bc12310c3f334dc4f525a0e63953113eb55ecbc03caa26e3d9"
+        "sha256": "df61054b50f42c9b7a6e84d56e9d979ba11ad168a50b91c4dbbb88b0a78ed796"
       },
       "nativePayloadBytes": 204956,
       "nativePayloadSha256": "6300b4e8d06ea823bc776df27aa2591787a179e5f4ac125da48692d398fba63f",
@@ -541,18 +541,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_01T6oWAPrgaGMmtaKqte82KN",
+      "toolCallId": "toolu_01QcBeETqQyfth93TvoTp2cs",
       "toolUse": {
-        "line": 38,
-        "byteOffset": 9221657,
+        "line": 39,
+        "byteOffset": 9223644,
         "bytes": 1182,
-        "sha256": "a63518955d04d85fef22acb4cee0f9ff3256af53cd303100a7ee65083b0d32dd"
+        "sha256": "9900140ee4dad1457ec7f2425c78bc2f3c4aca44704550f235e9f161093f758a"
       },
       "toolResult": {
-        "line": 39,
-        "byteOffset": 9222839,
+        "line": 40,
+        "byteOffset": 9224826,
         "bytes": 534276,
-        "sha256": "ff9674b3080815e308f8233e36e3f8f3d83827a0d771bd1b6cf63b46005890d1"
+        "sha256": "5111654bad23da156e84c29adf069c08604c522742b5590ff43dd6cd99a5b493"
       },
       "nativePayloadBytes": 200085,
       "nativePayloadSha256": "305288adcffd017ff013873fd5afa9a8bcb4802154c93e2c1a993cc7d60ac189",
@@ -573,18 +573,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_01Kj2YwiWd64267Hx9qCwRZA",
+      "toolCallId": "toolu_015MCA2cLb9iLBq14WsetRg1",
       "toolUse": {
-        "line": 40,
-        "byteOffset": 9757115,
+        "line": 41,
+        "byteOffset": 9759102,
         "bytes": 1182,
-        "sha256": "72a91e57c10721ac4f0b6e686711d3d12b145709ef749c15fb2c63e4977659ee"
+        "sha256": "9ceb9290204ffb03fc1d4d9398712818cbfd602ce5549ffe391f5767efd9649a"
       },
       "toolResult": {
-        "line": 41,
-        "byteOffset": 9758297,
+        "line": 42,
+        "byteOffset": 9760284,
         "bytes": 616468,
-        "sha256": "8b64e3775e69944f1774a1baba0d625705a38db08b52c0ad75011e3cd34b4889"
+        "sha256": "14fc05998655da77e8e0ac3d6701975844d41e562188b3a8cf387be01de51f44"
       },
       "nativePayloadBytes": 230906,
       "nativePayloadSha256": "47b607e2870dba1397c883994ac031d1306b74b983d587ace0b50598564ad62f",
@@ -605,18 +605,18 @@
         768,
         220
       ],
-      "toolCallId": "toolu_01PgNidJttyM2buayKnLRnTR",
+      "toolCallId": "toolu_01QbQQPG8BnyfNQjRY5mQXJ4",
       "toolUse": {
-        "line": 42,
-        "byteOffset": 10374765,
+        "line": 43,
+        "byteOffset": 10376752,
         "bytes": 1182,
-        "sha256": "2e68ca06f3991dc81ef37bc4d0e6a0f9818f3630eb80b676ebbe595cf27c21fb"
+        "sha256": "2cf28a170d3e3d0f233d0a88a656f73b7a29f55c37d3ff2d156795181d118539"
       },
       "toolResult": {
         "line": 44,
-        "byteOffset": 10376420,
+        "byteOffset": 10377934,
         "bytes": 92713,
-        "sha256": "3b48b83190b0164a5ab9a5f46dfebff102312722407baca6581c514381173e7f"
+        "sha256": "55bfd2e3dc347f7bf50cbe2490b98ba3735f7ce20bdf559cd7db0389c2770800"
       },
       "nativePayloadBytes": 34498,
       "nativePayloadSha256": "f0735cc9335cb38d0ef70e22568ef19b7b072b89212ad618aff528988fedfc9d",
@@ -637,18 +637,18 @@
         390,
         12341
       ],
-      "toolCallId": "toolu_018Q4tfeS9raCxQfMPydLZuh",
+      "toolCallId": "toolu_01HR997xzz9iXVuE55W1gN6A",
       "toolUse": {
-        "line": 45,
-        "byteOffset": 10469133,
+        "line": 46,
+        "byteOffset": 10471120,
         "bytes": 1165,
-        "sha256": "ad5c349ad82eb0ac2065d895062db7a12693c41e2edc00ef4462a73ca971db96"
+        "sha256": "fc62fcdfa2720e89f03998584306360c6905cc1b1db7e23fc4e812d21ab3c27a"
       },
       "toolResult": {
-        "line": 46,
-        "byteOffset": 10470298,
+        "line": 47,
+        "byteOffset": 10472285,
         "bytes": 303469,
-        "sha256": "8611d3568ea32363a8b40b62087e3244e2f5891dbfcfef8e2afa7bace0b502bf"
+        "sha256": "ef7e50f693b0665b8233aeb8cde6714da492bef17853cb94450460058d382c3c"
       },
       "nativePayloadBytes": 113532,
       "nativePayloadSha256": "14ff0e0932bce96f558d6b341f9d2cc8bb0d19a57fcf11640f2f450135d54b72",
@@ -669,18 +669,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01BQ8dfAkF88iokeGEneeJnd",
+      "toolCallId": "toolu_01MqMmsvK6kotSZdxTsLEria",
       "toolUse": {
-        "line": 48,
-        "byteOffset": 10774134,
+        "line": 49,
+        "byteOffset": 10776121,
         "bytes": 1183,
-        "sha256": "f157763da256e21ac31acdbd06b9c4d83003a27be68d742ca69ebb283ce9f9d4"
+        "sha256": "dfae44af2a9dbca5412a7252d2f59257c4ae75266821450773db4a754a6d6654"
       },
       "toolResult": {
-        "line": 49,
-        "byteOffset": 10775317,
+        "line": 50,
+        "byteOffset": 10777304,
         "bytes": 265641,
-        "sha256": "5be89640933ec72f1de13e9b1178ec7675f53dcf6aaddd4c13c2906e0f46fd97"
+        "sha256": "8282101798ad54bcd30c673e780f5254dd8df63dcb7646f046fdbfd21828acbc"
       },
       "nativePayloadBytes": 99346,
       "nativePayloadSha256": "acef4fc9a547352fdb86b49a3a707694b963d85e3ef96218b9b95b498abe0de5",
@@ -701,18 +701,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_015iJjiZD9UJD3miUWs3nDP1",
+      "toolCallId": "toolu_01VCQLwunPSfkhjtBRKdQeKv",
       "toolUse": {
-        "line": 50,
-        "byteOffset": 11040958,
+        "line": 51,
+        "byteOffset": 11042945,
         "bytes": 1183,
-        "sha256": "e63edbfad602e798b505c1b92219c971afe484ad1657cee239ae340049031663"
+        "sha256": "823e874622ffd79349e4080944b51b919848de881f4b0a320cf8f14ee3ad61de"
       },
       "toolResult": {
-        "line": 51,
-        "byteOffset": 11042141,
+        "line": 52,
+        "byteOffset": 11044128,
         "bytes": 139457,
-        "sha256": "6f3ef6360e425b1e35ef319d73f42003760427834da6b987516fa961346344b0"
+        "sha256": "c1afe4830dfb67aee69b087e5f4f9ab47fdfc60441ad8ce8f4c58fd3fa6e2b24"
       },
       "nativePayloadBytes": 52027,
       "nativePayloadSha256": "0ca9e4d90abfc62725685aa9389b038790e3e672442407388a4a120a63e5866f",
@@ -733,18 +733,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_019VNYuan2BEY5r7Lh7N8gjJ",
+      "toolCallId": "toolu_01RUzuDHspz6TukYcFB1HWzF",
       "toolUse": {
-        "line": 52,
-        "byteOffset": 11181598,
+        "line": 53,
+        "byteOffset": 11183585,
         "bytes": 1183,
-        "sha256": "79514261292ea48e934b2d50b0d414610bdad788d2eb260a7653d8297a9c526b"
+        "sha256": "e5177757c8d91124a67cb52b501f5576b7bcce0407f4bf0237ff705aad1b2b18"
       },
       "toolResult": {
-        "line": 53,
-        "byteOffset": 11182781,
+        "line": 54,
+        "byteOffset": 11184768,
         "bytes": 309122,
-        "sha256": "e1484fc1a933879c4b16481bddfc831c39f5058a6385d74eb162035d12929f19"
+        "sha256": "832eadd2401b2f4497b848776bebf71ba8fabff1ccc8a344e572fc43eb8c4ac1"
       },
       "nativePayloadBytes": 115652,
       "nativePayloadSha256": "28072d3911a908e98819c1918b895c06dc6e0cf22151d7c894b5f44e28274530",
@@ -765,18 +765,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01RXicACB5WjBSv6aVea9rZ3",
+      "toolCallId": "toolu_01EW2sQXkBasbxDoJSgExBa2",
       "toolUse": {
-        "line": 54,
-        "byteOffset": 11491903,
+        "line": 55,
+        "byteOffset": 11493890,
         "bytes": 1183,
-        "sha256": "7773f7895bf922931d854bee9e075402400a2307049f4cccf84eaef9f1f48875"
+        "sha256": "d2e05e37fb631285baac7aec9ac73f9d31e9f9eebe03774b8946bf8cd03f98b1"
       },
       "toolResult": {
-        "line": 55,
-        "byteOffset": 11493086,
+        "line": 56,
+        "byteOffset": 11495073,
         "bytes": 304066,
-        "sha256": "e1e846a0486e3c18b6a697f0a9563b775b19957c94cd95a747d390fbffb94053"
+        "sha256": "a385a869986a6a9fc0bd1bd71f4ac00d55ffa450631880e81189ae82899fd38d"
       },
       "nativePayloadBytes": 113755,
       "nativePayloadSha256": "4337e97c1206b37438953ea6d1333d8700ea5c0db7741ad0fcf712ae4293caa6",
@@ -797,18 +797,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01GUedn85NWiKCn8SvsUVJm4",
+      "toolCallId": "toolu_01Ko94KhMLVvTTeUeh8Lm1ES",
       "toolUse": {
-        "line": 56,
-        "byteOffset": 11797152,
+        "line": 57,
+        "byteOffset": 11799139,
         "bytes": 1183,
-        "sha256": "56f05c2034f79605e314be1184b81e6e75cdaaac9094ab0265d9f2e04e3ade31"
+        "sha256": "92c1846e566069efd78d9d5d675baab21fc86eed4d677b35cc347c1c265858d3"
       },
       "toolResult": {
-        "line": 57,
-        "byteOffset": 11798335,
+        "line": 58,
+        "byteOffset": 11800322,
         "bytes": 295386,
-        "sha256": "ac206d91f563649d58f7f2bc2ea8c5a6a95ea0a6e5eceee19e8fd521c2f28a27"
+        "sha256": "2ea520ebe3463295daf258efea44b8d5f10a7274943a2549c0695648c49514c5"
       },
       "nativePayloadBytes": 110501,
       "nativePayloadSha256": "f62251024af0ba2501eb1e71622bde91e51a6242e091bbad8ebf6c0d677282e1",
@@ -829,18 +829,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01YNbKkJT7ekJG9x3EHTS3oF",
+      "toolCallId": "toolu_017QxXN6kUQxMP34S1PHyyYV",
       "toolUse": {
-        "line": 58,
-        "byteOffset": 12093721,
+        "line": 59,
+        "byteOffset": 12095708,
         "bytes": 1183,
-        "sha256": "13d0cca070fca1033f2a633ca922592fcf140f9d4525eafac346a1282b2aa1e5"
+        "sha256": "71bd4ace8ce332dde9308fc09815e7dbcfcc2974132e030de49f50656893be5c"
       },
       "toolResult": {
-        "line": 59,
-        "byteOffset": 12094904,
+        "line": 60,
+        "byteOffset": 12096891,
         "bytes": 413202,
-        "sha256": "afe7f87f34f6c80818a013739fa14988859dd2cfd90263aa26ed1f9a9cc97be9"
+        "sha256": "ac6d51e340a6a918d3a93fac2165d6e3c5c562b8ebce3b0e9786e70d157feb90"
       },
       "nativePayloadBytes": 154681,
       "nativePayloadSha256": "5f711425c4618b7455dcf17d8fe9f477887fd134a43ab4905701a157f063095d",
@@ -861,18 +861,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01HSBnmh4uryx9zs8Q4n1sv3",
+      "toolCallId": "toolu_015pmymEjuJEEq7BuzHtYYmS",
       "toolUse": {
-        "line": 60,
-        "byteOffset": 12508106,
+        "line": 61,
+        "byteOffset": 12510093,
         "bytes": 1183,
-        "sha256": "d3cc6cb1b1c533fba29506d11730dd381113194c9436bac061ed4107add3d0d9"
+        "sha256": "64ae28ba86166c8e0bfbf254d39e78ed60c52165664b91b3a574bf6736ab18bc"
       },
       "toolResult": {
-        "line": 61,
-        "byteOffset": 12509289,
+        "line": 62,
+        "byteOffset": 12511276,
         "bytes": 329650,
-        "sha256": "4033a220cfd47391549271adb4f9075e03206b3ad3ef3f422b3f10e37c6c54d5"
+        "sha256": "95cc859f5baca3be26675623cca7637fd6da766590f2f642dc8850a3e250e653"
       },
       "nativePayloadBytes": 123349,
       "nativePayloadSha256": "c370e95ba332006162e42dc36286e49954d3f2960a3281da3c85ec0e6b615859",
@@ -893,18 +893,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_0111zA6aSPsrAPDqMeEk6eDN",
+      "toolCallId": "toolu_01J5sxy4cNu2sQe3rqZLciS6",
       "toolUse": {
-        "line": 62,
-        "byteOffset": 12838939,
+        "line": 63,
+        "byteOffset": 12840926,
         "bytes": 1181,
-        "sha256": "827a42c3d8463d985b4f819a8002e970c72de52cd7ecc4f1154eb911ace99785"
+        "sha256": "fd754b7cb6c1fd742766e309064e73f90cf42e5c01fcf2bf8137a14ee64c1f8c"
       },
       "toolResult": {
-        "line": 63,
-        "byteOffset": 12840120,
+        "line": 64,
+        "byteOffset": 12842107,
         "bytes": 296218,
-        "sha256": "52f9228ecdb5621d5d601b8df27cdf9f529e21328ee248df9da9ed9fbc20231f"
+        "sha256": "27540329e280bc3268ef625f940fce64e142533bfacc562d6ee3c4914fc6ee56"
       },
       "nativePayloadBytes": 110814,
       "nativePayloadSha256": "d1614114a8d86d313de207d52acf845023202be2c7638c338ad400e93acdad1b",
@@ -925,18 +925,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01AACyyuPHqtKD5kNugGe7pN",
+      "toolCallId": "toolu_01JUz1sWbDrSQcuavswfy3Wz",
       "toolUse": {
-        "line": 64,
-        "byteOffset": 13136338,
+        "line": 65,
+        "byteOffset": 13138325,
         "bytes": 1181,
-        "sha256": "b5949e26ad86641f9efb1aa4cb3298dd6625d284badb24e19b0326e97b882f03"
+        "sha256": "3b8831e1ec7d6a0637c2966effb9e3b4f87adac721a1127081025e88accf6a6b"
       },
       "toolResult": {
-        "line": 65,
-        "byteOffset": 13137519,
+        "line": 66,
+        "byteOffset": 13139506,
         "bytes": 389706,
-        "sha256": "b750c0f74e93add522f264c09cf3b945f931fbb0817d351dbb48a9b576dc562e"
+        "sha256": "cd71df83a3cc8715f14a62e80354a868eb79fda8d8edc1840a24ea08369b04a4"
       },
       "nativePayloadBytes": 145871,
       "nativePayloadSha256": "8d540760378bab5a5d08aac0bd72dfb2cc2d9bceff77d5d349eb3b70d329fc18",
@@ -957,18 +957,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01FekSKD3BSejrbMT5Ki8i97",
+      "toolCallId": "toolu_01WG8x7HhQePArxtJs5XJC2w",
       "toolUse": {
-        "line": 66,
-        "byteOffset": 13527225,
+        "line": 67,
+        "byteOffset": 13529212,
         "bytes": 1181,
-        "sha256": "7cf5f068b4ae02aa8a80325fa03dd576cd4e0769a3c54030b034624008488461"
+        "sha256": "dfc1c64f2028e1310065c8d47dab2a33c4a5948745a6d31666ca1e05a2f2320c"
       },
       "toolResult": {
-        "line": 67,
-        "byteOffset": 13528406,
+        "line": 68,
+        "byteOffset": 13530393,
         "bytes": 261593,
-        "sha256": "df4b71a9619dcd0ec1752ca07f63d477fb0cf9bfce6e0d35a3a256f4b34139fc"
+        "sha256": "e8595cfcb8df328876fc0373f3b732ebd1bcbd0edbea22c07cca70aa8e5b2168"
       },
       "nativePayloadBytes": 97829,
       "nativePayloadSha256": "6641be444b7c5cbcf69bf8915362774d1c935bd2eeedcf1febcf2c30f9b83a2d",
@@ -989,18 +989,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01PJN7SsvXBLWx97gEqaaW7D",
+      "toolCallId": "toolu_01RHawVCQFrus2LWfrNdgsuJ",
       "toolUse": {
-        "line": 68,
-        "byteOffset": 13789999,
+        "line": 69,
+        "byteOffset": 13791986,
         "bytes": 1181,
-        "sha256": "80a8598de0bf4bb9b97030984f4cbd0dcd129ee8d54190a398a06a652ffcdf89"
+        "sha256": "a2b33e5bb6b9da333d8bcc0a6d01a3d4d63d5ff2de48fe40919d11c36ee368b1"
       },
       "toolResult": {
-        "line": 69,
-        "byteOffset": 13791180,
+        "line": 70,
+        "byteOffset": 13793167,
         "bytes": 295122,
-        "sha256": "cfb71af1fe861af3aadeed10df792d5435282d4823f44de7067c161ea4373c63"
+        "sha256": "ea977891ff4a2db6e34362adac5315b7893dbc263f83260bdb3420d4277cd3d9"
       },
       "nativePayloadBytes": 110401,
       "nativePayloadSha256": "a6f835bf0138dcf14ac6d7525eff889b126e6818c491eec88c44d951133e2016",
@@ -1021,18 +1021,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_018kQDG516u8QqWvvHRhysiT",
+      "toolCallId": "toolu_019BuF4qhM7wjQNsSFhpVXmc",
       "toolUse": {
-        "line": 70,
-        "byteOffset": 14086302,
+        "line": 71,
+        "byteOffset": 14088289,
         "bytes": 1181,
-        "sha256": "d8f1c01a6aabce89bde197c40da8733704a6adaaea5710ae2234092078734e9d"
+        "sha256": "44353f173f1f0eac56e8e35a93391b1b6ad7fa043bd47ade355c88df9cc5c16b"
       },
       "toolResult": {
-        "line": 71,
-        "byteOffset": 14087483,
+        "line": 72,
+        "byteOffset": 14089470,
         "bytes": 253873,
-        "sha256": "b84b8a259773248833fd56dfdd9e524ceaeb9536f59567a8a873678a30ac2eb9"
+        "sha256": "0ba6e0b3a2f3b37f70c23d2ce35a8ae6f1c3d0f2985c2eff6705f45fbe0b0727"
       },
       "nativePayloadBytes": 94933,
       "nativePayloadSha256": "deae0a9cc98ee60557dcca3452025bfdc026713a533c8df9fcc0291b7d380fb0",
@@ -1053,18 +1053,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01LgU5ayTTAVmcjdNTSTNkaY",
+      "toolCallId": "toolu_018yvkkdzbSsH4q82ZebmkcZ",
       "toolUse": {
-        "line": 72,
-        "byteOffset": 14341356,
+        "line": 73,
+        "byteOffset": 14343343,
         "bytes": 1181,
-        "sha256": "5645bb2eacee83c722faf213b1a6bf83f0fe8f672a9dde9ac8d9c975f8fdf000"
+        "sha256": "6037f887d168ca580448af380ad68090e4b26af7aa587dc704bc71f274984d56"
       },
       "toolResult": {
-        "line": 73,
-        "byteOffset": 14342537,
+        "line": 74,
+        "byteOffset": 14344524,
         "bytes": 401802,
-        "sha256": "0872a329e0626aba311af520b5cd70c9317b7128372b709a15b1c67f402d4738"
+        "sha256": "024bcd31daf1d864a764a7135338162e6b696c8e08d2caf23a8e8185bd3e76f2"
       },
       "nativePayloadBytes": 150407,
       "nativePayloadSha256": "f08d2f09172ef7c52eb9971ac2b023a19d095c7c50e210539564c95a2e81beca",
@@ -1085,18 +1085,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01LmynjE4dRYJVUzJ9z4JDHr",
+      "toolCallId": "toolu_01AcFb9c26Fe96R5KqgwVzQe",
       "toolUse": {
-        "line": 74,
-        "byteOffset": 14744339,
+        "line": 75,
+        "byteOffset": 14746326,
         "bytes": 1181,
-        "sha256": "e01952183e98002754f128e771ba2f501df4ce3cbd9a19d92a7d2b97a0a0a34a"
+        "sha256": "623b9b0a7d1eb10b8902c677fd3cfa844947d7aa380ce266d67cbe89c1524e6f"
       },
       "toolResult": {
-        "line": 75,
-        "byteOffset": 14745520,
+        "line": 76,
+        "byteOffset": 14747507,
         "bytes": 331394,
-        "sha256": "9f5db39523280c5a83403ca420d3560b2d78c250b104fed6b6f451ef36b2e364"
+        "sha256": "0680a3d3490e2477d5e792b092eb3308c6c6021ce595a8d44c3876c4ec491cc7"
       },
       "nativePayloadBytes": 124003,
       "nativePayloadSha256": "40f19110c4edc5369637fab78cc381d96a2edb44f18d812331abc9eb00a0458a",
@@ -1117,18 +1117,18 @@
         390,
         525
       ],
-      "toolCallId": "toolu_0129LY7FH4U1frSpdRH3w5xj",
+      "toolCallId": "toolu_01JPM7JcnTBNn7YGruUmUyR3",
       "toolUse": {
-        "line": 76,
-        "byteOffset": 15076914,
+        "line": 77,
+        "byteOffset": 15078901,
         "bytes": 1181,
-        "sha256": "7d9627d28515d54b00ac642e12e9d9474b6cf1a32458c72f26330a0d4a68342b"
+        "sha256": "f25dbafa38aee460fde79997f0e3671745a198663373d4e7b331d904f43c8f8d"
       },
       "toolResult": {
         "line": 78,
-        "byteOffset": 15078568,
+        "byteOffset": 15080082,
         "bytes": 163377,
-        "sha256": "874301aa5a7f8c23bc6b9d88f30f7aaaa1adab554284b36c0532726e8bfe2e40"
+        "sha256": "6af292d8d04253e28e3d8eeafc8ed26ef626467598b7c6ab898e1a3227647505"
       },
       "nativePayloadBytes": 60997,
       "nativePayloadSha256": "25de3d4be4b2bd736c0c163cda1e754420af6432c1541259fdeddd155441213a",
@@ -1149,18 +1149,18 @@
         1440,
         7760
       ],
-      "toolCallId": "toolu_01F7a72cRWqfE2aLBB1658TQ",
+      "toolCallId": "toolu_01RL8sUXvFsBQPB9kuvJjasG",
       "toolUse": {
         "line": 82,
-        "byteOffset": 15244339,
+        "byteOffset": 15245910,
         "bytes": 1162,
-        "sha256": "965de0f12373299575b9e462f4d80ceaa900bf21f139aa4cb93055b831aaf0ce"
+        "sha256": "274462fc125e94c7fca785fa7c43e3ce98104080107f2630d4c58d33a49bd957"
       },
       "toolResult": {
         "line": 83,
-        "byteOffset": 15245501,
+        "byteOffset": 15247072,
         "bytes": 794046,
-        "sha256": "238deebc7e9301280f72867e44e44d9d79ccdbd74ba63c9b0fadb68f886b74f4"
+        "sha256": "743b0f67e58eced39b80567f6f15726811e68a5d4482ce6ee28d1d3d19e89285"
       },
       "nativePayloadBytes": 297498,
       "nativePayloadSha256": "887fb535e2f79a71bdfa1f72afdc2308cb7d2060cd34f57d93f48248c5da8f80",
@@ -1181,18 +1181,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_012n2GNGvNXgLo46fTD6a3wC",
+      "toolCallId": "toolu_011PXcgpZU4h5HKvwKExdWFc",
       "toolUse": {
         "line": 85,
-        "byteOffset": 16039915,
+        "byteOffset": 16041486,
         "bytes": 1180,
-        "sha256": "99ec39b6238a5e14ed6641e09ce5a23c8711b9e9f97a8e946c70386f53ee251a"
+        "sha256": "d4ed70ab56396753b9e981fd1f86b2c8ce2eede2cfdac924e66f57bea66b7a49"
       },
       "toolResult": {
         "line": 86,
-        "byteOffset": 16041095,
+        "byteOffset": 16042666,
         "bytes": 417830,
-        "sha256": "7cd77581a96fac362f6b16c0dbc2c31b8fc8c1aa3a0514ce8d52917bfda4180d"
+        "sha256": "9c95c2b8ad10e7963a4922873ea5a0624e667f58469ef7c1b06d99c9f4a2738a"
       },
       "nativePayloadBytes": 156415,
       "nativePayloadSha256": "bf75f316ad6a161d80f8ebd16912a779a0d23948a0525d05a93f35a309c6421f",
@@ -1213,18 +1213,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_013baex44u6Sw5Ryi9hp1iMU",
+      "toolCallId": "toolu_016MSEqehUu94DE9b85yrLxg",
       "toolUse": {
         "line": 87,
-        "byteOffset": 16458925,
+        "byteOffset": 16460496,
         "bytes": 1180,
-        "sha256": "77a8e6f2bc01a4723aa0f620dfa41149fd63d169235a7762580d6a14a1e6b1d9"
+        "sha256": "069db00eb3ba6143a31d6fed4d50cd55438e1e568928a2e0b7b5363a985d8272"
       },
       "toolResult": {
         "line": 88,
-        "byteOffset": 16460105,
+        "byteOffset": 16461676,
         "bytes": 597422,
-        "sha256": "f77d5b389270085a6bbc3e70db1e17806f77ab07c447c02f9f2173a33838d15a"
+        "sha256": "5473c61d2f0d0d26ea8760157e48f8ee3bfe37bdba43750d36bf131e2418145e"
       },
       "nativePayloadBytes": 223762,
       "nativePayloadSha256": "0011ac86a108be0905fbfeb3929f451cc9861843998e5c5540e195cb80f14234",
@@ -1245,18 +1245,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_01AjsYNkiU7WSmEBk48fDeHV",
+      "toolCallId": "toolu_013BBP8Ffaw6pQjELA5ajA17",
       "toolUse": {
         "line": 89,
-        "byteOffset": 17057527,
+        "byteOffset": 17059098,
         "bytes": 1180,
-        "sha256": "96e3d8059a33d13c36ef90c7cb0fd540e2cb67b93d6ffbd7682e14e31b1d41d2"
+        "sha256": "1d5c564dd4fff9eade2c4e981f3eb75e71400542dacf8e97c298ed2907fb2605"
       },
       "toolResult": {
         "line": 90,
-        "byteOffset": 17058707,
+        "byteOffset": 17060278,
         "bytes": 669958,
-        "sha256": "c6b5a730d34e6d0a4389006b3e80cca3aa3ace5d33d4fcd9ffbf564a5d1b3756"
+        "sha256": "0772bf8c3eb205e22c7e419cdbc6a2aff011cf75f4537efb5edef1ae705d76b1"
       },
       "nativePayloadBytes": 250963,
       "nativePayloadSha256": "5ebb89d545ba62e486e3a0a15bc1680bacbeebf9726a14cde0a86139976b1d01",
@@ -1277,18 +1277,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_01Ti3cEq6dx2UjQynRnme8qH",
+      "toolCallId": "toolu_018Z6CR8VXDDiKeyzX6kZ7s1",
       "toolUse": {
         "line": 91,
-        "byteOffset": 17728665,
+        "byteOffset": 17730236,
         "bytes": 1180,
-        "sha256": "3c750d6a0e9ed72d8710d88ed7d2fdd55e3b3b0753d94f1a629c3c9b75ea52dd"
+        "sha256": "d5446fe59d7fc1797d8cc7fac03999c7439aaa0f78a75ad5219c869d64bd5fa7"
       },
       "toolResult": {
         "line": 92,
-        "byteOffset": 17729845,
+        "byteOffset": 17731416,
         "bytes": 617238,
-        "sha256": "1273e3d6b3ce0c8eafd55df5614a08d7042fc0c788021dc2063a9fb1eb777811"
+        "sha256": "6e0bf3a504f4c6615cd66c55cf8d74bd278abfc5d86c72cad3f6fde663397468"
       },
       "nativePayloadBytes": 231195,
       "nativePayloadSha256": "fdd9ad37fd4a229ac31fbe8217d33423ec5849e234078a52c8f028cd337344d1",
@@ -1309,18 +1309,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_01BoD6Q5CdkH9V7SVK9gRLtv",
+      "toolCallId": "toolu_01VDWHm8m213BPhs9uY7ufJY",
       "toolUse": {
         "line": 93,
-        "byteOffset": 18347083,
+        "byteOffset": 18348654,
         "bytes": 1180,
-        "sha256": "77ffcd3163f165999e39e1c21d07d0af23da34c5a39f299bec3e786661cb0c3c"
+        "sha256": "ad7f3bd579ca0f9d422f07364433f3d0359e46fed554f7037a3e2154ab0a62dd"
       },
       "toolResult": {
         "line": 94,
-        "byteOffset": 18348263,
+        "byteOffset": 18349834,
         "bytes": 604446,
-        "sha256": "9f4f01ab9e067a67db975f5f76238bcf59d9c14caf5d0887bc603306bdedb293"
+        "sha256": "c0bcbed3afa7b78520ffafd170365477f4927a813dba0b70bdac7b604e146f07"
       },
       "nativePayloadBytes": 226397,
       "nativePayloadSha256": "f7449eca89d3d457d9f3c8e95ad878172b9c6ea0553c32483fcc9a6ac1ecadd8",
@@ -1341,18 +1341,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_01GVmgVB3Jevbu8dcUEsUaGp",
+      "toolCallId": "toolu_01Prk1MdduoYVc41vraDrgLE",
       "toolUse": {
         "line": 95,
-        "byteOffset": 18952709,
+        "byteOffset": 18954280,
         "bytes": 1180,
-        "sha256": "233706b73cb38fd297b559970c4eaf85b916fb7d4fdc56b68cdf08ec9e13b4e6"
+        "sha256": "54cd72d42c426ca6944c4b9f50f564f3a95b385e635de94de335c74546f2022c"
       },
       "toolResult": {
         "line": 96,
-        "byteOffset": 18953889,
+        "byteOffset": 18955460,
         "bytes": 557574,
-        "sha256": "34e94dec40f47d6ae275aa562c05ae4e33daa1c5885f30051e825f199722f1d1"
+        "sha256": "f69bfc003c397225187162d9b8b5e2ba2a267a532ff2bad14cee6a08536d9ec8"
       },
       "nativePayloadBytes": 208819,
       "nativePayloadSha256": "c0c6f74919890f29057eba7ed9d11a750d3abb4c968c6cdc927498f0ddb27281",
@@ -1373,18 +1373,18 @@
         1440,
         1000
       ],
-      "toolCallId": "toolu_01F45wdfheNqo4MLn6pnrqjG",
+      "toolCallId": "toolu_01AnwwgtqFED33kQg5a9dfd9",
       "toolUse": {
         "line": 97,
-        "byteOffset": 19511463,
+        "byteOffset": 19513034,
         "bytes": 1180,
-        "sha256": "8816495b19598936b4675e4f45245fb58b35f9cce999f59fa4927f8daaec6dc4"
+        "sha256": "bcbcd8f7f5659fdc8697dc59d6d999b3e59aad8b3f9666f5966163ae6dbc7e37"
       },
       "toolResult": {
         "line": 98,
-        "byteOffset": 19512643,
+        "byteOffset": 19514214,
         "bytes": 709614,
-        "sha256": "162a8c79d26bd1c1d19adabdfa9b678f8b34484f92cb9bfb2f7a9a48b64bd3ee"
+        "sha256": "1d973575cde8c4c3c880f54690b5beb9232ec342b2fdcd773fb7402338fcf43d"
       },
       "nativePayloadBytes": 265836,
       "nativePayloadSha256": "f933d4548b9a3d90a6b1b6ff7b02cc4a4ff716cfd09893f687a498eae64126ad",
@@ -1405,18 +1405,18 @@
         1440,
         760
       ],
-      "toolCallId": "toolu_01RvSKBTCTrrAxeY6exVF9RK",
+      "toolCallId": "toolu_01G9Rb6xjRoPJNrSAvCxhR1j",
       "toolUse": {
         "line": 99,
-        "byteOffset": 20222257,
+        "byteOffset": 20223828,
         "bytes": 1180,
-        "sha256": "466d2d220ded399230de559ecd13021e303e93ebf7e728bfe7ac1bee34d455f2"
+        "sha256": "4853e1c3092c3b55df17673c8d1a27a7e43ad3c2a00792a26adb62f7840c35d0"
       },
       "toolResult": {
         "line": 100,
-        "byteOffset": 20223437,
+        "byteOffset": 20225008,
         "bytes": 397692,
-        "sha256": "7aefdc395725e688e06b1d77aa99dcff401f04610c046573043e4b76e0b93d95"
+        "sha256": "d9c01534b4bfdfa297879faac66e3513e642c780a76971c80d091a7b3b9f2b1a"
       },
       "nativePayloadBytes": 148865,
       "nativePayloadSha256": "f39db0d8866816b86081bb58f3127e629e12927bf287d38ef076642ea7f6ca2b",
@@ -1437,18 +1437,18 @@
         768,
         8412
       ],
-      "toolCallId": "toolu_018bZ4y1BbAraw5BrAtKHMPq",
+      "toolCallId": "toolu_01X7jogtonVfzFbgENJPH6wM",
       "toolUse": {
-        "line": 102,
-        "byteOffset": 20622043,
+        "line": 103,
+        "byteOffset": 20624114,
         "bytes": 1163,
-        "sha256": "fde8836d84f06620fefb2899048d129f757c637efd4611888a8372e1d5fe9dd0"
+        "sha256": "5d8e527a4cfdd2666402ba1aacaaf14bf04805c9ce2d3c73380d5d381cb33326"
       },
       "toolResult": {
-        "line": 103,
-        "byteOffset": 20623206,
+        "line": 104,
+        "byteOffset": 20625277,
         "bytes": 641973,
-        "sha256": "1b4dd9b792dfd548618ef4aeab392d86e45e23810468bc140c9856d0116da064"
+        "sha256": "381c9df9fdaaa87a08ccd9409f853c47dde5aa8fd59fa7226a5288d1d2595b43"
       },
       "nativePayloadBytes": 240469,
       "nativePayloadSha256": "a9588422d487ea614eb0ee66c0a2ce0800704c48853c0844cfc221675547505a",
@@ -1469,18 +1469,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_01VELpJSDCc9eLe1LXJuZdJM",
+      "toolCallId": "toolu_01Jfy8iAhF6dKsiQCLWHm3iB",
       "toolUse": {
-        "line": 105,
-        "byteOffset": 21265546,
+        "line": 106,
+        "byteOffset": 21267617,
         "bytes": 1181,
-        "sha256": "e16f7ca289e46ce36c2825f8e7115d08df25cc0a1415e62d29d77c1180e7a48f"
+        "sha256": "79a7c31f592eda135dcb54ddeae3f80328b1ebfa1355a75eb501be58a3ff4a41"
       },
       "toolResult": {
-        "line": 106,
-        "byteOffset": 21266727,
+        "line": 107,
+        "byteOffset": 21268798,
         "bytes": 367196,
-        "sha256": "3fc7b22efca2209d528f5305d1e9e395c71a36a43cb10026ebe29c846612b354"
+        "sha256": "1736a22524ce94f7101ca8a8a6921da219ee2ecf71199e2a6d7be7a6cba92352"
       },
       "nativePayloadBytes": 137429,
       "nativePayloadSha256": "b12f938fdfa4c53d88d00e42d8d049b25c17a85fd505fe5139c727297ea85ccb",
@@ -1501,18 +1501,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_01DQJsJ9VQCnWxtYKMYJ7AzB",
+      "toolCallId": "toolu_01JH7wnKk3NtM2RW7KCV8sKa",
       "toolUse": {
-        "line": 107,
-        "byteOffset": 21633923,
+        "line": 108,
+        "byteOffset": 21635994,
         "bytes": 1181,
-        "sha256": "39e1fbca19e7ed252c00279e8768c25521c823d54ec331fa69e10df7f73fd98d"
+        "sha256": "f623f463d1c0f3ec5964304d93cad6c4fbc8d2ebc8103e899c7717a589057f18"
       },
       "toolResult": {
-        "line": 108,
-        "byteOffset": 21635104,
+        "line": 109,
+        "byteOffset": 21637175,
         "bytes": 465036,
-        "sha256": "9dcdf49cc4e0d2562d3629e6809cb6963ff55c113e009333e8c83977fc03b0ec"
+        "sha256": "742af04463cfeaa7442e84689cf08a3d54b61dc443817eb7fc44ba33c602b5be"
       },
       "nativePayloadBytes": 174118,
       "nativePayloadSha256": "ed1b17c6de018a7322a9073472de2710583af04a25704ca05ab22c63337470e8",
@@ -1533,18 +1533,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_019hzUY2E24SFN1FAarkkyUj",
+      "toolCallId": "toolu_01BQ2Ww3X5ftcHmQ7wxTyadH",
       "toolUse": {
-        "line": 109,
-        "byteOffset": 22100140,
+        "line": 110,
+        "byteOffset": 22102211,
         "bytes": 1181,
-        "sha256": "8eca48adcd7422bb2fdd97ba34179a50a2151d40be1d573b865ffba946540b9e"
+        "sha256": "2828328b87f07aaaf59fa8818cc1462a61244e1c24becaf2930b070c91a94601"
       },
       "toolResult": {
-        "line": 110,
-        "byteOffset": 22101321,
+        "line": 111,
+        "byteOffset": 22103392,
         "bytes": 494052,
-        "sha256": "c30f57c0c6b23cb2e2ea381225b9cf32efa623a2261a520242a8c097574c4201"
+        "sha256": "73f6604da88e8aa43335a89c1ddf2ba7be6ddd3576a9587ffb0253d5851beb48"
       },
       "nativePayloadBytes": 185001,
       "nativePayloadSha256": "434ecc5b593745b233209fc0ab2acbe757b91089dd9f017699f6a662deb88f66",
@@ -1565,18 +1565,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_01FqQKZZPt2zvhvm3iECBU2d",
+      "toolCallId": "toolu_01MmZPPqcReWQGdmFHhbLuQ8",
       "toolUse": {
-        "line": 111,
-        "byteOffset": 22595373,
+        "line": 112,
+        "byteOffset": 22597444,
         "bytes": 1181,
-        "sha256": "dac75876fcf5417d5212099f4340175b5680e4a9aa333988546f3fddec3fb7da"
+        "sha256": "6a13c14d4ff91e255d3d1c825f415508a034dba62201943d40fba93639c98394"
       },
       "toolResult": {
-        "line": 112,
-        "byteOffset": 22596554,
+        "line": 113,
+        "byteOffset": 22598625,
         "bytes": 704732,
-        "sha256": "c6a3b1357c8b6d7edde1ddece5d5610922811570fcf4b8fdf2c57c40b44dddc1"
+        "sha256": "dde8097b31c0f3cff58b0f7275cdd2a3ab458450fb4ce37f469303b8638109d2"
       },
       "nativePayloadBytes": 264005,
       "nativePayloadSha256": "d0c04eab1942c88358529bc95786740e2a23f60eec191c6f0f0fd3c5d95e9a0d",
@@ -1597,18 +1597,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_01CcKonoYRgycutC8R4tfHHy",
+      "toolCallId": "toolu_01EdfidYGpnwZvWYWdFpPCWQ",
       "toolUse": {
-        "line": 113,
-        "byteOffset": 23301286,
+        "line": 114,
+        "byteOffset": 23303357,
         "bytes": 1181,
-        "sha256": "934ef6c37517a219514a5f0584b63bf888eead65e5017084faba401bfe24048d"
+        "sha256": "4946d2bae45801d588b5fb03c1f40c3cf63cd4b0632caa01e1b410da11e5952e"
       },
       "toolResult": {
-        "line": 114,
-        "byteOffset": 23302467,
+        "line": 115,
+        "byteOffset": 23304538,
         "bytes": 628588,
-        "sha256": "df08c126025471115b8f343d07eabf875a5ce90bfcc91e0928fc7e5a7bdb84b1"
+        "sha256": "dc0b73444d40b5fec0d0b9f9ae521dfbfdd5bd78ea54085ade422aa18377e066"
       },
       "nativePayloadBytes": 235450,
       "nativePayloadSha256": "243ba1dbfc0f7d2f96401221ae1c0a5ec760d539792ca108260d5b7c3c0f1be4",
@@ -1629,18 +1629,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_01D6XsHrfiixzUaKf2PaDYXJ",
+      "toolCallId": "toolu_01ANKcCH7Vi6YipQ5okb16HV",
       "toolUse": {
-        "line": 115,
-        "byteOffset": 23931055,
+        "line": 116,
+        "byteOffset": 23933126,
         "bytes": 1181,
-        "sha256": "40a6be352f52abb1928c74e5bb57945abb150dadae8fb948efa5846bd85bb335"
+        "sha256": "0fca2439478d02e100dce85eeac2ba87cc3c6222bf692a6fe65cb4930bcdaf09"
       },
       "toolResult": {
-        "line": 116,
-        "byteOffset": 23932236,
+        "line": 117,
+        "byteOffset": 23934307,
         "bytes": 542348,
-        "sha256": "02c822be44538eb24e9bd39828004ddf8cbd409ecaf4c908f7f5c9e73e935d1a"
+        "sha256": "3c022b5945a16c461d0fd0e92ebe6e15f4d7dcf699ef19bcb99b34d73e2657d2"
       },
       "nativePayloadBytes": 203111,
       "nativePayloadSha256": "3e84de593b2b871a794ebab87cea6aab8b57bef39419e368c711c686951d5c2a",
@@ -1661,18 +1661,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_01WF6SisPDxhFmmgfUycG73U",
+      "toolCallId": "toolu_01MtQY84ud9xgdxZuPRfQ726",
       "toolUse": {
-        "line": 117,
-        "byteOffset": 24474584,
+        "line": 118,
+        "byteOffset": 24476655,
         "bytes": 1181,
-        "sha256": "66b5a14e31a55332f8c6ab84f5ce15c51efd79775bb913d63f0733efbe3e2d85"
+        "sha256": "bbf042393da91ddefd9449dc81db10e524a20b118d5bf4ac86fc2c455b792061"
       },
       "toolResult": {
-        "line": 118,
-        "byteOffset": 24475765,
+        "line": 119,
+        "byteOffset": 24477836,
         "bytes": 529308,
-        "sha256": "0741649f75f7879336e319c49383d6b649175dc9c187654ae1eec0407c50f15f"
+        "sha256": "c8fa25e823dbb2c48ac46fab8f535f2692988196ee20432da04094726333a141"
       },
       "nativePayloadBytes": 198220,
       "nativePayloadSha256": "20a67f6e7b10f4afb989ac198dba6d3810195a3e25c57b07ec77b7ec340792d5",
@@ -1693,18 +1693,18 @@
         768,
         1024
       ],
-      "toolCallId": "toolu_01MVF7ztQfe7s61qaNMzj6cX",
+      "toolCallId": "toolu_0195igtAqkzgsj6dwJwqAebA",
       "toolUse": {
-        "line": 119,
-        "byteOffset": 25005073,
+        "line": 120,
+        "byteOffset": 25007144,
         "bytes": 1181,
-        "sha256": "ef5c77efcb867c0059a5972b116e5bd162a432b74afe4dd50aa2e10623a2f31a"
+        "sha256": "36870298436462efb0f65a926c816681111f0bf19640a623327bb4ff5ba36b34"
       },
       "toolResult": {
-        "line": 120,
-        "byteOffset": 25006254,
+        "line": 121,
+        "byteOffset": 25008325,
         "bytes": 609060,
-        "sha256": "aa872e6c5046edd33d6cb07b734626612ef4feefd9fd100856dd335b1f476a5d"
+        "sha256": "b1598dad08d2c3b27316429ee9d1ce89b9601c0a1ced3c8b17268ee6d715cc60"
       },
       "nativePayloadBytes": 228127,
       "nativePayloadSha256": "c6b1d4e7e2b39bdda6c399227349375294530bcd0ff1803b02e4efa43ba6a360",
@@ -1725,18 +1725,18 @@
         768,
         220
       ],
-      "toolCallId": "toolu_01HVMLHeDHSdAGNAiaFhkMZ5",
+      "toolCallId": "toolu_01LB6xZ5YWfFFqqvCiSdho4X",
       "toolUse": {
-        "line": 121,
-        "byteOffset": 25615314,
+        "line": 122,
+        "byteOffset": 25617385,
         "bytes": 1181,
-        "sha256": "217b20d26ad23f84e13563d9e282c61807b89be0e29f059b0b352c63ad354ba6"
+        "sha256": "828b0eac1fe8dc3e217018884fa635c368d4732a5702f447d94c08a950875d64"
       },
       "toolResult": {
-        "line": 122,
-        "byteOffset": 25616495,
+        "line": 123,
+        "byteOffset": 25618566,
         "bytes": 90921,
-        "sha256": "2160ed92d46188ab14ea73955eeac4bbc77ed1f7cfbd96e712441245bd92a5e8"
+        "sha256": "14a918ae1fa29ad9c3bb965c2ed9bb4026061819a9c2b52c4e2e608f450d9c8c"
       },
       "nativePayloadBytes": 33826,
       "nativePayloadSha256": "ef214f0ad808c32232c4512d8dbe08b3a81fbcaf22587281cfc0a1d3244a49b0",
@@ -1757,18 +1757,18 @@
         390,
         12341
       ],
-      "toolCallId": "toolu_01TMTRJYt2uZxEvAbwEz5f9z",
+      "toolCallId": "toolu_014jnmeZzoJWSXFQrk8nHCv6",
       "toolUse": {
-        "line": 123,
-        "byteOffset": 25707416,
+        "line": 124,
+        "byteOffset": 25709487,
         "bytes": 1163,
-        "sha256": "5e9732daaabffcd544b28922cc2bf3bdb5dc6ad249736e0835fc7bf756e8e9d7"
+        "sha256": "f0541fa6d0ec713a5f9b689929bc01c2dd02c87834fba80a3c890c7cf9fc9624"
       },
       "toolResult": {
-        "line": 124,
-        "byteOffset": 25708579,
+        "line": 125,
+        "byteOffset": 25710650,
         "bytes": 321437,
-        "sha256": "8782be09ff7ce3f08d9866dccf3f234dd5a59e54b516c7a2266124a14cb3bf89"
+        "sha256": "282679c46981e1648313123f30df94248696616a9e5b6c4617fd12e4cf1172db"
       },
       "nativePayloadBytes": 120268,
       "nativePayloadSha256": "7c058e2e8b143dfeb47b42952515b4fa9bf63ce570b68c21079b7a44f5298641",
@@ -1789,18 +1789,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01GKWDpxBYBmD2qAZbypP1eW",
+      "toolCallId": "toolu_01YGKGZ8nJePSzZzewjFctQ7",
       "toolUse": {
-        "line": 126,
-        "byteOffset": 26030383,
+        "line": 127,
+        "byteOffset": 26032454,
         "bytes": 1181,
-        "sha256": "57c782a1eed14df4d7b6b319e834e1962671cbf863179e961572fb4016c8cca5"
+        "sha256": "95b3b340faf0f02756cf9da2b506119e43a89329bef450385ac1ff6522e840f4"
       },
       "toolResult": {
-        "line": 127,
-        "byteOffset": 26031564,
+        "line": 128,
+        "byteOffset": 26033635,
         "bytes": 260097,
-        "sha256": "cdceba7ca187b917e14f9bef61fd0ab8ff7bb145d48643a7de2c69de1d8f7a6a"
+        "sha256": "9da9a428696db9b8114e5d759fa66787e17353a19438e55a01c35c05f585252a"
       },
       "nativePayloadBytes": 97268,
       "nativePayloadSha256": "8f89302c444431a1dc463c23ae3a83dcee88c73c4525db6f61c47f9db02c3795",
@@ -1821,18 +1821,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_018LEvJHKNhHAE7XA8rdc9xr",
+      "toolCallId": "toolu_01TbJEuP64QpZLRuUPGuKvU9",
       "toolUse": {
-        "line": 128,
-        "byteOffset": 26291661,
+        "line": 129,
+        "byteOffset": 26293732,
         "bytes": 1181,
-        "sha256": "bb79875f0f8cf098556176f61112c629010cbbc93d6fa13833a5cde81426f869"
+        "sha256": "6cd32e3dfd4c558fdadfc6f85cd5d654842bd64cd9426c888e198c80152b3e05"
       },
       "toolResult": {
-        "line": 129,
-        "byteOffset": 26292842,
+        "line": 130,
+        "byteOffset": 26294913,
         "bytes": 137177,
-        "sha256": "ccbb0e7ebe480cba5a3c9137217c8a53dc0d0c0e5be1a2f0427471437d83e41d"
+        "sha256": "d37c19c6154684906d381f77784f02fc541a55cd90b3627c5d145a42fe2ba1f3"
       },
       "nativePayloadBytes": 51173,
       "nativePayloadSha256": "dc7993013e119f6f0781b2d156f6a3c34652285661aaf0a12637da3a18a774cf",
@@ -1853,18 +1853,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_015LiKFZVcw8wQnUaB3u3TJH",
+      "toolCallId": "toolu_0132ZQw4hBphFShRCFs1MT8G",
       "toolUse": {
-        "line": 130,
-        "byteOffset": 26430019,
+        "line": 131,
+        "byteOffset": 26432090,
         "bytes": 1181,
-        "sha256": "d27c28823d1e8083a5860cf3a116fe717134a5ea7e21410f7f87e803c630e0b4"
+        "sha256": "62d3d46b0bdac8cf5dff8fb946f53000bf78175cfe0ff43497c104e8e6aa7e66"
       },
       "toolResult": {
-        "line": 131,
-        "byteOffset": 26431200,
+        "line": 132,
+        "byteOffset": 26433271,
         "bytes": 305634,
-        "sha256": "dd5ecdb6ee58a2769e15a2206e094f833437c52b7adc7e62026ac1724aa64094"
+        "sha256": "6b7eeea4de21ce3297e7d0fc8f0b68b3a98a913daaa35af3195a270adb14ec87"
       },
       "nativePayloadBytes": 114343,
       "nativePayloadSha256": "866fcc06455d7b4bd5ad75008b2553f016376dfc7d18535e00487ded27e3f2d8",
@@ -1885,18 +1885,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01R5mLgiFrqCvtj5LrPv2VWn",
+      "toolCallId": "toolu_01LvUHsUe8FBzk9V8BfhvVWS",
       "toolUse": {
-        "line": 132,
-        "byteOffset": 26736834,
+        "line": 133,
+        "byteOffset": 26738905,
         "bytes": 1181,
-        "sha256": "235bc8f3ba75cdacdfe4cfe507342aaeaf45ae38f245127a02c9dd6dee98f36d"
+        "sha256": "d46c2d7394be1e62beaa512d8c94b341d05e966ae9c2f6abae46d5fe21427231"
       },
       "toolResult": {
-        "line": 133,
-        "byteOffset": 26738015,
+        "line": 134,
+        "byteOffset": 26740086,
         "bytes": 300098,
-        "sha256": "a96b2acb444caa501d5c169c6d36fc7d84389d872fc5cf2b5d77dd05bd613898"
+        "sha256": "672c6b95fdc140db1d57e3b895c52a532f7ec8fe53763fee237b77dec6ffe441"
       },
       "nativePayloadBytes": 112268,
       "nativePayloadSha256": "67d32e64e296989bb27157a47e00699c26606f55ef571c2db3acce8fef925bf6",
@@ -1917,18 +1917,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01SPGTrbRshoFrGq7uCcKFtp",
+      "toolCallId": "toolu_01YDX5tFZaPD3NxFDGeEpr4a",
       "toolUse": {
-        "line": 134,
-        "byteOffset": 27038113,
+        "line": 135,
+        "byteOffset": 27040184,
         "bytes": 1181,
-        "sha256": "f6bfc32cadec25ab4ca2a21c95bca1c3962de48c652a12a1ed21d1412a34045b"
+        "sha256": "7061fe0464b568163690c73282d5cca7e669c86c4ac2dcaed6f4c21e243bd604"
       },
       "toolResult": {
-        "line": 135,
-        "byteOffset": 27039294,
+        "line": 136,
+        "byteOffset": 27041365,
         "bytes": 293106,
-        "sha256": "69784fcbe589bf49a450eab230741bc7bc5807abd89396954251ba7c2761369d"
+        "sha256": "661f6fa8eaef7a475506d813b01c04dcc48b178c80246cb2e8212c8e3a9e7574"
       },
       "nativePayloadBytes": 109645,
       "nativePayloadSha256": "fe3c76eb15c0e85ce1fccef859cad264b772283b045ab84315c73ec823d0820e",
@@ -1949,18 +1949,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01WTHqFPMne7HzeoxmucAaos",
+      "toolCallId": "toolu_01YY9oqP78cPj7xynWEpjymK",
       "toolUse": {
-        "line": 136,
-        "byteOffset": 27332400,
+        "line": 137,
+        "byteOffset": 27334471,
         "bytes": 1181,
-        "sha256": "2281b5c68315741d7485ef8c78ca0f7a3d02dbb0486de1b4fa85947273a7de09"
+        "sha256": "e4c22fefccf5d30a845af80c1f9ccef53ebbce2213298ef96df360ef934ecb1f"
       },
       "toolResult": {
-        "line": 137,
-        "byteOffset": 27333581,
+        "line": 138,
+        "byteOffset": 27335652,
         "bytes": 410658,
-        "sha256": "f384f92cabcac7f1e9cf64eb92f9781f1defaffaac265348f946bf9300986d8c"
+        "sha256": "0f77bfd124b5fee7ed0cdc0088086dde115f49db57e67d2ad5c86166fc3c2bb3"
       },
       "nativePayloadBytes": 153727,
       "nativePayloadSha256": "256ada2f88b28d8b57f771f0c8e8e8c54f0e28a3d28f150795e85a187695af6e",
@@ -1981,18 +1981,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01QtkKwgE9xJdEdi3m4NGveP",
+      "toolCallId": "toolu_01NU5tAPFmBjwqQvrSeQSDHH",
       "toolUse": {
-        "line": 138,
-        "byteOffset": 27744239,
+        "line": 139,
+        "byteOffset": 27746310,
         "bytes": 1181,
-        "sha256": "47a4740146908d01a7b985e99f4f2086d7c071c3b6d6fe65d5b0921a0c89101a"
+        "sha256": "1248741f2085152b3ba75d8a8a4666387a59ff898791a1b395fe29babd79113c"
       },
       "toolResult": {
-        "line": 139,
-        "byteOffset": 27745420,
+        "line": 140,
+        "byteOffset": 27747491,
         "bytes": 328762,
-        "sha256": "2c0836e5ca727829f1f13353a70e8c9d7f9d254ff095f0d3354b47222ca830fb"
+        "sha256": "cdc55dc1d1819ecffe1d1c6ee2db0bde65be9846dc2d50192f4e98a6696d2912"
       },
       "nativePayloadBytes": 123017,
       "nativePayloadSha256": "f0f65d890742d7440201113d9e766f62f646908ef4ea3920fa34fcfc693cc616",
@@ -2013,18 +2013,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01FSwEjeLo4axPfJZp4YF9JU",
+      "toolCallId": "toolu_01XUc42C2eRSckZndRAxFQ3b",
       "toolUse": {
         "line": 141,
-        "byteOffset": 28074655,
+        "byteOffset": 28076253,
         "bytes": 1179,
-        "sha256": "0082484dcc54831fac4365dad1d5f081241fdbd64b200c3de2e73854f69244cf"
+        "sha256": "24ea86bb0744f63758df9d3a520015a0ae41e6154232ee6b620a011b2860ebb1"
       },
       "toolResult": {
         "line": 142,
-        "byteOffset": 28075834,
+        "byteOffset": 28077432,
         "bytes": 293410,
-        "sha256": "cb3773457a9d64826b969978a59d2352881e544898fc8181ddc0c9aeb01a581f"
+        "sha256": "7c70d1043ed67b6cba87a29fa0b801d60fe382ca5b19d8b736292ec0035db009"
       },
       "nativePayloadBytes": 109761,
       "nativePayloadSha256": "de86e0f7dffa4ce79f4798870e3fca47485b1d2c328684b82e5c399764da108c",
@@ -2045,18 +2045,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01GYHX3wGjatftPFKUPpMvoM",
+      "toolCallId": "toolu_01BEk8JZ4ogFom4W1RrXXSMA",
       "toolUse": {
         "line": 143,
-        "byteOffset": 28369244,
+        "byteOffset": 28370842,
         "bytes": 1179,
-        "sha256": "fb175b6c4ba50c5e4d833ede2e115b618d6e7240ba2315a7ea78748a30f22adb"
+        "sha256": "fbb559a5269d365fe3ffc22af93bf9429d8c23c8780c36112c8279163d6b0ae9"
       },
       "toolResult": {
         "line": 144,
-        "byteOffset": 28370423,
+        "byteOffset": 28372021,
         "bytes": 387330,
-        "sha256": "d5b479da57b780607f9857451c711902d014a4d508a4c2c45e9dab48770c59e4"
+        "sha256": "6b07899d2e83b6c94331b4095fb91bae6c08b891a3924197536d0d6c3f0dd756"
       },
       "nativePayloadBytes": 144979,
       "nativePayloadSha256": "6b4ed10548710bdc0a74c6c222547b950b4a37e329e08c2ad54060d05b7898e4",
@@ -2077,18 +2077,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_015gNdhnXsgCfLNyBEh3yKLK",
+      "toolCallId": "toolu_015PtiU213BsFQaKEs8YGz9Y",
       "toolUse": {
         "line": 145,
-        "byteOffset": 28757753,
+        "byteOffset": 28759351,
         "bytes": 1179,
-        "sha256": "b029cdadb40fbe10fab30cfedfd5f12e0aa29664e59a8fc3292902a666a11747"
+        "sha256": "1e3d7c34c0d8d1e5f8d39f3e594aca2aea4c64e252844f8c66a4e0fba1282983"
       },
       "toolResult": {
         "line": 146,
-        "byteOffset": 28758932,
+        "byteOffset": 28760530,
         "bytes": 259729,
-        "sha256": "4486ef910620937b2d9e6e1e0f2a76e9cb9f55d25be918d8cc8e554745a94aba"
+        "sha256": "96aa691d6f84765b0b00333c6b43655975ff0ca871fe59bdd2c9871958dea81e"
       },
       "nativePayloadBytes": 97131,
       "nativePayloadSha256": "3e93bcbdd18f696a493b565ac6169cae0f95692e101c1954aea8bb00b3a6b2aa",
@@ -2109,18 +2109,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01AMc73GHBQSH9h5hUzjARaq",
+      "toolCallId": "toolu_011uPtTngxttd2r49DVRCJED",
       "toolUse": {
         "line": 147,
-        "byteOffset": 29018661,
+        "byteOffset": 29020259,
         "bytes": 1179,
-        "sha256": "d7cd2d4339f88aaaa4c82db03a0d78b8844a43ecec48724d271dc0e37e6d30d9"
+        "sha256": "1e3468edf2654720085614b6a33dc02f3bfbec511cd70977e93602c467e9e5d9"
       },
       "toolResult": {
         "line": 148,
-        "byteOffset": 29019840,
+        "byteOffset": 29021438,
         "bytes": 292122,
-        "sha256": "44b0330b0e80365b608ef09725a2af5a6378c83caf078143f4e78231dff0004d"
+        "sha256": "a987151b789c14f8920b9e104addb3c88c67bae1876de8b428c06e20b5833caa"
       },
       "nativePayloadBytes": 109277,
       "nativePayloadSha256": "89c05542754a84c94f62021511bf7238aec01dc9433e265b7bcf9f956a420383",
@@ -2141,18 +2141,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01TAUcK5XVMUgGuWnJ5jyf2P",
+      "toolCallId": "toolu_016moN2YosC8r79vRStNAZs4",
       "toolUse": {
         "line": 149,
-        "byteOffset": 29311962,
+        "byteOffset": 29313560,
         "bytes": 1179,
-        "sha256": "6645ae912bd297f5e5695a41a83d307b0581f7811ea4c7ffb03eb3c5e2d09d72"
+        "sha256": "44b0dd09a6d4dfd2afd4402fa1f1baec711b32f558b66937254481a7a15ef057"
       },
       "toolResult": {
         "line": 150,
-        "byteOffset": 29313141,
+        "byteOffset": 29314739,
         "bytes": 251609,
-        "sha256": "a326abfc6bbe537d1fa220fa7ea945e5dac6f61d3ef9e210d990ed642443bdbe"
+        "sha256": "c3df41b6f243dfed12eb402c27aaa06aae8ddc86985ce1549ba3774f5fc204d4"
       },
       "nativePayloadBytes": 94085,
       "nativePayloadSha256": "171f1c87e06ef039abe4f9d100f44c7b65e270e76fad4173ac873868f894092a",
@@ -2173,18 +2173,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_013efnuR2dK8BDQCRFX69dJg",
+      "toolCallId": "toolu_01CyCA47XnqR3XKDA9HimJLB",
       "toolUse": {
         "line": 151,
-        "byteOffset": 29564750,
+        "byteOffset": 29566348,
         "bytes": 1179,
-        "sha256": "a9fdebe69bd6f726ea789e7a02931ca77e1d1452c4ccae68f6101fa7bb2836e3"
+        "sha256": "f53c68fb62216807c6879e40b298f8d7f186709c96d53ea0d320d53e870a56c6"
       },
       "toolResult": {
         "line": 152,
-        "byteOffset": 29565929,
+        "byteOffset": 29567527,
         "bytes": 399650,
-        "sha256": "a0876c219a6698e464342f8f5ddeee10a4f7bea1a85c37c1dde2552c7d5e836e"
+        "sha256": "5a3952d042bb520120e5b86db15c8b9393ab546a1ecee0c570f751cb1002c157"
       },
       "nativePayloadBytes": 149601,
       "nativePayloadSha256": "2339e9a576bfe50a18063dce98a255ece364fda836b1ba827e113507aa9c4bc4",
@@ -2205,18 +2205,18 @@
         390,
         844
       ],
-      "toolCallId": "toolu_01C6Un5NdpW84ZtXxqMmP9o8",
+      "toolCallId": "toolu_019H9Lo6KxEMaurD88kRcPRd",
       "toolUse": {
         "line": 153,
-        "byteOffset": 29965579,
+        "byteOffset": 29967177,
         "bytes": 1179,
-        "sha256": "13e2986d9478a8e1d4c2a2d0be5752b4f6a8c4f86c4f7bfeb0cfeff49695e331"
+        "sha256": "d20ec4da13be3514f1844205bc0cbc645769541e5be4f7a4e124b1beb6ba08ef"
       },
       "toolResult": {
         "line": 154,
-        "byteOffset": 29966758,
+        "byteOffset": 29968356,
         "bytes": 326594,
-        "sha256": "8e2ada7b8356fc62020fb80573f10464fa3c0773c203cae44ca9d2e2e5daf436"
+        "sha256": "07403e74888659e228e05125b29734def2576935a4a83b417d234e9367f96e74"
       },
       "nativePayloadBytes": 122203,
       "nativePayloadSha256": "d2927c2bc2e1a2eabdb8f963d72d8ef969031c1509e4a5f5de72135f0ac1ca38",
@@ -2237,18 +2237,18 @@
         390,
         525
       ],
-      "toolCallId": "toolu_01Ev1JxqSUBQgm8K39uoKUQA",
+      "toolCallId": "toolu_014JQoxhqxQ2R3Bupbzjo7kV",
       "toolUse": {
         "line": 155,
-        "byteOffset": 30293352,
+        "byteOffset": 30294950,
         "bytes": 1179,
-        "sha256": "158b8ec15cb904e7fdb7afb2864b101c332d994c68dd8a9320091ff283cdbf3d"
+        "sha256": "c4814abd1c3113efff22cd7552c340843787ed2c61f0fd0ee30803f31747c983"
       },
       "toolResult": {
         "line": 156,
-        "byteOffset": 30294531,
+        "byteOffset": 30296129,
         "bytes": 161817,
-        "sha256": "6c72fb0a8ddb086c3a4b232cea78c8d0d5bfad390c44daf8ed5979f7ff96dc8b"
+        "sha256": "f66f6ec69c09342951cbca4f471ac3978301efbde3edfc02bfb4433854278a34"
       },
       "nativePayloadBytes": 60413,
       "nativePayloadSha256": "46d542ef2da9fae85d2780c935f4f7a29a99ac155fd930e0aa6adab28ce45832",
@@ -2269,18 +2269,18 @@
         909,
         1287
       ],
-      "toolCallId": "toolu_01WX3ZvNNLZ3JCH2XJigrenQ",
+      "toolCallId": "toolu_01NM77XCMuquabi1F7MzFtmF",
       "toolUse": {
-        "line": 157,
-        "byteOffset": 30456348,
+        "line": 158,
+        "byteOffset": 30458419,
         "bytes": 1155,
-        "sha256": "6ba6cf7688ce537eac04122678356843936a8ba71ef13a7c8ab67ac9943e8046"
+        "sha256": "6dd01a8a0bfd9f878019690117cd27e234360fbd8cd262024abf1e6f149d178b"
       },
       "toolResult": {
-        "line": 158,
-        "byteOffset": 30457503,
+        "line": 159,
+        "byteOffset": 30459574,
         "bytes": 341108,
-        "sha256": "9b8a6bedd6588a2fe2821182afa5be8a790b8c49aaf2f90b4f089a7721c973da"
+        "sha256": "7cbd6c7c88f30fe89b571a5de6dcc1ec35ac5f0ab316539fbb9dbc4afe31a0af"
       },
       "nativePayloadBytes": 127647,
       "nativePayloadSha256": "c5aacf1c525cebdbf1dddf44abc4dceed1c0c9d917aa2dc89d46b87d2540d4e8",
@@ -2301,18 +2301,18 @@
         909,
         1287
       ],
-      "toolCallId": "toolu_01CWznyZY6yparExBoTGRZDs",
+      "toolCallId": "toolu_015uCCr2X2XLwzi22enbM9cd",
       "toolUse": {
-        "line": 159,
-        "byteOffset": 30798611,
+        "line": 160,
+        "byteOffset": 30800682,
         "bytes": 1155,
-        "sha256": "3234c134634e2b6584b0d1d069bae926817e1389b24631972368c67248425953"
+        "sha256": "513cace46100f3da248df5a0a31c9f016042111595f236ec955682196530c6bd"
       },
       "toolResult": {
-        "line": 160,
-        "byteOffset": 30799766,
+        "line": 161,
+        "byteOffset": 30801837,
         "bytes": 481820,
-        "sha256": "5a815993c7594a09331d5825165f90fffbe7b39f2226369c400e6deef30d89a0"
+        "sha256": "3198975d869693c63bc44fc37c4f9753c663981b195b5d525dca90e22f10b832"
       },
       "nativePayloadBytes": 180412,
       "nativePayloadSha256": "3ea21b1fdb0ec620c6255011cdf478960330e2622873722e86dfcac881934380",
@@ -2333,18 +2333,18 @@
         909,
         1287
       ],
-      "toolCallId": "toolu_014jVfgvNBCZUotX7H6nGPha",
+      "toolCallId": "toolu_013rw7zv6whKETfmPFVSmNBE",
       "toolUse": {
-        "line": 161,
-        "byteOffset": 31281586,
+        "line": 162,
+        "byteOffset": 31283657,
         "bytes": 1155,
-        "sha256": "a0390d5fb2b8d37fbb09f3260e2dd5a100f68e605811e244d829836d7f12e5b3"
+        "sha256": "bf55924b3f621fa99da351241a8912194b1b42243dd4eb8bf04b8284299d595c"
       },
       "toolResult": {
-        "line": 162,
-        "byteOffset": 31282741,
+        "line": 163,
+        "byteOffset": 31284812,
         "bytes": 521892,
-        "sha256": "ea4b4327dcd48cfb2725c0170a3b0ac4b053f1a9320bccbc3cf61fe53e897ae1"
+        "sha256": "3f731a70cec57bd1a2d8b42b63c365ada769dbf46966406c71f4203e5e6c5f5a"
       },
       "nativePayloadBytes": 195440,
       "nativePayloadSha256": "b11a965f5543beac50ebfea8d1b95c0ff3c95036a83e94d423d6a4baa14ebdb8",
@@ -2365,18 +2365,18 @@
         909,
         1287
       ],
-      "toolCallId": "toolu_01RUVAxySCDTT4WsvUmysF45",
+      "toolCallId": "toolu_01MkoDvSAwyQHbwttYqH334t",
       "toolUse": {
-        "line": 163,
-        "byteOffset": 31804633,
+        "line": 164,
+        "byteOffset": 31806704,
         "bytes": 1155,
-        "sha256": "f5fd49b6d562d26caa058f056a9af44e0e283902b0666fa79cc5e97dd3c832f2"
+        "sha256": "777508bc698e110f8a772410d3f1b430be843fa3cdcd0382cebcb3f226f14961"
       },
       "toolResult": {
-        "line": 164,
-        "byteOffset": 31805788,
+        "line": 165,
+        "byteOffset": 31807859,
         "bytes": 398676,
-        "sha256": "cbc8303374586910c05def7e75ce729616c8bc01ecde25ba3335be0870439053"
+        "sha256": "1d28516f74838bd3db521c47af54ff3a75a1a360292e660bc76a5ba8ab73a560"
       },
       "nativePayloadBytes": 149233,
       "nativePayloadSha256": "2e7bfe7307dedf16897e00c5ea6ab8304a94fbff8a1a0418dc1bab988e71fc76",
@@ -2397,18 +2397,18 @@
         909,
         1287
       ],
-      "toolCallId": "toolu_01JaUedSQyLyrS7GvzpgzVYo",
+      "toolCallId": "toolu_01RNAQL4AhvM7TbDzsv99fn5",
       "toolUse": {
-        "line": 165,
-        "byteOffset": 32204464,
+        "line": 166,
+        "byteOffset": 32206535,
         "bytes": 1155,
-        "sha256": "dc82231b9b37d5bd05f8150aa6c53ea8acb8adc252d10bf75ae5d31319bb122f"
+        "sha256": "b7592076ac048ff848626f26275436892d324790cad6f04f91e9eff6e4a259b0"
       },
       "toolResult": {
-        "line": 166,
-        "byteOffset": 32205619,
+        "line": 167,
+        "byteOffset": 32207690,
         "bytes": 472252,
-        "sha256": "d91ba256e3c8fd996719ba156965f81ef2629e4825b7a5882a35def1d0a066a5"
+        "sha256": "17ab19621698e4be44619ff1ee9c9c837c1b34c56ce28ebb5f821e9ca5edfd11"
       },
       "nativePayloadBytes": 176824,
       "nativePayloadSha256": "cb74b270d1cee1b595220589332fa80cf5452f3652c92cd01beafbeee61e5e27",
@@ -2429,18 +2429,18 @@
         909,
         1287
       ],
-      "toolCallId": "toolu_01LYUT5fCJvryFK38Gh9KrVZ",
+      "toolCallId": "toolu_015r2VwzLcgYfYxw5cyFMX2c",
       "toolUse": {
-        "line": 167,
-        "byteOffset": 32677871,
+        "line": 168,
+        "byteOffset": 32679942,
         "bytes": 1155,
-        "sha256": "2d113596bc45fc661f8f084efdf52b6a3550d807e63d73a06f2a96fd48af0899"
+        "sha256": "020320aeeeae83a567d9c918b8609e7bf97f863d220abff89b3c7e3b3e976b9a"
       },
       "toolResult": {
-        "line": 168,
-        "byteOffset": 32679026,
+        "line": 169,
+        "byteOffset": 32681097,
         "bytes": 494276,
-        "sha256": "a264e0b1d0514a0e3230a405b769b6d69d1cf17d95c95acca7ce4f0261302bd1"
+        "sha256": "8182e5f828cbee01c4088919c521a4ce4f508d854101600bf7be334048bfd2c8"
       },
       "nativePayloadBytes": 185083,
       "nativePayloadSha256": "7162e32a298d2958fd21b0d3b9a7371decc9ab4a82b8bb9cb04aab1292c68dbd",
@@ -2461,18 +2461,18 @@
         909,
         1287
       ],
-      "toolCallId": "toolu_01KoH4J9db42cs9JmNPZKo8W",
+      "toolCallId": "toolu_01DTb53ZLAs2iCii4EBrQcr7",
       "toolUse": {
-        "line": 169,
-        "byteOffset": 33173302,
+        "line": 170,
+        "byteOffset": 33175373,
         "bytes": 1155,
-        "sha256": "11670af35e56b3a36deec1c70014666c18fff7d5c86e42a2a431595f9b1ba633"
+        "sha256": "f24a8f6f801cd25a9882ff0317dad7dbb77813f39516f9e31da8625d0b280921"
       },
       "toolResult": {
-        "line": 170,
-        "byteOffset": 33174457,
+        "line": 171,
+        "byteOffset": 33176528,
         "bytes": 511764,
-        "sha256": "7de2ac5f274ab428a7dc6b17a1468eb685b2764b5daa2caaa9f15cf06f615775"
+        "sha256": "8458b73e101672a38ce73f1a0749be1173cd57f04f8cbc07e4d37d9a10a26bac"
       },
       "nativePayloadBytes": 191641,
       "nativePayloadSha256": "0687ebed6b7b4faf7707029998a52944855fd77602cd40f54f0585c984ada47a",
@@ -2493,18 +2493,18 @@
         909,
         1287
       ],
-      "toolCallId": "toolu_01BYBp5FWye5CqUdxrHotq6v",
+      "toolCallId": "toolu_01SyZMe8UPXMtHpkp7gopifa",
       "toolUse": {
-        "line": 171,
-        "byteOffset": 33686221,
+        "line": 172,
+        "byteOffset": 33688292,
         "bytes": 1155,
-        "sha256": "55f96e8fd7a60ebe2384a7c738d1e3aef05d2299256a5e8ec7cb735957a17f12"
+        "sha256": "729250910474bfa6a59bb2b653267422e112d31d1a2be3f072cb24fdfb4915c5"
       },
       "toolResult": {
-        "line": 172,
-        "byteOffset": 33687376,
+        "line": 173,
+        "byteOffset": 33689447,
         "bytes": 522572,
-        "sha256": "0495646f7d01d88e694e74b5f8f992a0642775562433325230149b404b5a71d6"
+        "sha256": "932e38947cd1f0353719df22e51e3ecf7a2edfb2b50363f3e1581f123bf55980"
       },
       "nativePayloadBytes": 195694,
       "nativePayloadSha256": "67c3eb1b20a241d3685432d88346d8a000e7de1787113fd132342835c02dedca",

@@ -39,9 +39,10 @@ Round-8 report follow-ups (`G-148`–`G-151`); raises the `puppeteer-core` peer 
 `>=25.16.0 <26` and consumer pin to `puppeteer-core@25.16.0`. No rule or profile is human-calibrated
 (`calibrated: false` everywhere). The changed report surfaces passed delegated AI sight review in
 ledger round 9 (2026-11-21): four fresh independent `claude-opus-5-5` sessions passed all 32 cells
-with 265 verified native image reads (0 blocker, 0 high, 3 medium, 22 low advisory findings) under
+with 265 verified native image reads (0 blocker, 0 high, 6 medium, 21 low advisory findings) under
 the Founder's release-specific delegation; this is delegated AI local-image sight evidence on macOS
-arm64 Node 24, not a human surface pass or Ubuntu visual review.
+arm64 Node 24 (214 viewport tiles vs. Linux CI 212 tiles, identical 3/8/8/8 A4 pages), not a human
+surface pass or Ubuntu visual review.
 
 ## Version 0.10.0: behavior and bounded evaluation
 

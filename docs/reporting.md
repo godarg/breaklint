@@ -733,9 +733,10 @@ For 0.11.0 the current record is round 9: four fresh Claude Opus reviews (actual
 2026-11-21. Native receipts bind 265 image reads (24 full screens, 214 desktop/tablet/mobile
 viewport tiles and 27 A4 page rasters across 3/8/8/8 pages); the four PDF cells were judged
 through every matching raster. Rounds 1–8 remain preserved unchanged.
-This is delegated AI sight review, not human review. Three medium and 22 low advisory findings
+This is delegated AI sight review, not human review. Six medium and 21 low advisory findings
 have explicit non-blocking dispositions (mobile two-row coverage header, A4 keep-together card
 page balance, long identifier/hash wrapping, desktop remediation measure width, and print tail
 labels); zero blocker or high findings were reported. Fine-text judgement rests on native
 viewport tiles and A4 rasters. This local macOS arm64 Node 24 sight review does not establish
-human or Ubuntu visual review. JSON remains canonical.
+human or Ubuntu visual review; Linux CI technical verification separately confirms 212 viewport
+tiles and 3/8/8/8 A4 pages versus macOS 214 tiles and 3/8/8/8 pages. JSON remains canonical.

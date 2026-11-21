@@ -1218,24 +1218,29 @@ assert.ok(fontMutationControl, "PDF font mutation control did not run");
 // not a renderer-manifest-derived count. The preceding158 count remains historical evidence.
 // 0.11.0 (G-148..G-151): explicit decline units, zero-candidate labels ("No candidates"),
 // base-category tags, state-qualified finding gates, and mono slash-wrapped rule IDs in Next checks
-// and Declined candidates measured 214 viewport tiles and unchanged 3/8/8/8 (27) PDF pages on macOS
-// on 2026-11-20. Linux CI must re-confirm this physical observation on PR before release tagging.
+// and Declined candidates measured 214 viewport tiles on macOS and 212 viewport tiles on Linux CI
+// (ubuntu-latest run 44894380636, 2026-11-21), with unchanged 3/8/8/8 (27) PDF pages on both.
 const EXPECTED_PRINT_PAGES_BY_PLATFORM = Object.freeze({
   darwin: Object.freeze({ clean: 3, findings: 8, infrastructure: 8, "insufficient-coverage": 8 }),
   linux: Object.freeze({ clean: 3, findings: 8, infrastructure: 8, "insufficient-coverage": 8 }),
 });
-const EXPECTED_SCREEN_TILES = 214;
+const EXPECTED_SCREEN_TILES_BY_PLATFORM = Object.freeze({
+  darwin: 214,
+  linux: 212,
+});
 
 function assertSurfaceInventory(inventory, platform) {
   assert.ok(Object.hasOwn(EXPECTED_PRINT_PAGES_BY_PLATFORM, platform), `unsupported report-surface platform: ${platform}`);
+  assert.ok(Object.hasOwn(EXPECTED_SCREEN_TILES_BY_PLATFORM, platform), `unsupported report-surface tile platform: ${platform}`);
   const expectedPages = EXPECTED_PRINT_PAGES_BY_PLATFORM[platform];
+  const expectedTiles = EXPECTED_SCREEN_TILES_BY_PLATFORM[platform];
   const pdfs = inventory.artifacts.filter((artifact) => artifact.kind === "pdf");
   assert.equal(pdfs.length, 4, "the report-surface inventory must contain exactly four PDF cells");
   const actualPages = Object.fromEntries(pdfs.map((artifact) => [artifact.cell.split("/")[1], artifact.pages]));
   assert.deepEqual(actualPages, expectedPages, `${platform}: print page inventory must match every fixed state`);
   const rasterPages = Object.values(expectedPages).reduce((sum, pages) => sum + pages, 0);
-  assert.deepEqual(inventory.physicalArtifacts, { screens: 24, screenTiles: EXPECTED_SCREEN_TILES, pdfs: 4, rasterPages },
-    `${platform}: the report-surface inventory must be exactly 24 screens with ${EXPECTED_SCREEN_TILES} viewport tiles, 4 PDFs and ${rasterPages} PDF page rasters`);
+  assert.deepEqual(inventory.physicalArtifacts, { screens: 24, screenTiles: expectedTiles, pdfs: 4, rasterPages },
+    `${platform}: the report-surface inventory must be exactly 24 screens with ${expectedTiles} viewport tiles, 4 PDFs and ${rasterPages} PDF page rasters`);
 }
 
 assertSurfaceInventory(manifest, process.platform);

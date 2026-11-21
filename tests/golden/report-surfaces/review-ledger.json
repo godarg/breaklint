@@ -9046,17 +9046,17 @@
       "round": 9,
       "record": "current",
       "outcome": "pass",
-      "reviewedAt": "2026-11-21T10:19:47.990Z",
+      "reviewedAt": "2026-11-21T10:45:30.962Z",
       "reviewers": [
         {
           "handle": "@ClaudeOpus-clean",
           "kind": "delegated-ai",
           "actual_model": "claude-opus-5-5",
           "promptSha256": "36572aa420c57499a61133811ee362acb221afe88ae416a9a743726f4816f631",
-          "outputSha256": "2b4e6fea905c539b08e0da71bb3cc5a0e9a3c366c585443228778ba93921f201",
+          "outputSha256": "83684ecdd6ffffd2cf09f426ad4e2669f2f023b1139807dbd71965b4266bc7e1",
           "nativeReceipt": {
             "path": "tests/golden/report-surfaces/delegated-ai-011-round9-clean-native-receipt.json",
-            "sha256": "d66bf67642153f6079dfa6493cc53c9226811bafa81db99dfb5f634a4b1c0044",
+            "sha256": "f4261210683748fd0afc7299de1ac9827086495c91d9207252c8d825c812c0e5",
             "imageCount": 35
           },
           "receivedImages": [
@@ -9207,10 +9207,10 @@
           "kind": "delegated-ai",
           "actual_model": "claude-opus-5-5",
           "promptSha256": "7344d271c74e733fe3e62ae15c6f297917e1f2688b72cc13117d6c8523502d5d",
-          "outputSha256": "98bb0dfce83b96380a436d2e4bd5e2137856aa6d090f6bbb62b22e8dbefd46f3",
+          "outputSha256": "97c2d7eae96b2392903b63eaaf07d1810fc56a28e886a231f7d68aa9292f0470",
           "nativeReceipt": {
             "path": "tests/golden/report-surfaces/delegated-ai-011-round9-findings-native-receipt.json",
-            "sha256": "c7972b1b41bff57375f06d8e7edfa21b8d38b0325bf85d315ed8b6b0e07cd26f",
+            "sha256": "4bb140b261123392265bd1e61c4edad120545f2f0055a23bb0bab69556c4aa73",
             "imageCount": 74
           },
           "receivedImages": [
@@ -9517,10 +9517,10 @@
           "kind": "delegated-ai",
           "actual_model": "claude-opus-5-5",
           "promptSha256": "fc621659d0b0b93a042020a824c43ac0649f647373535c8e6246b41bade2de4c",
-          "outputSha256": "8712535e07718bff7f2c1140c3b32cbb99fc1a0a4574815904332904c40cb906",
+          "outputSha256": "13fade2a0325334438580fe7d5e3db62bb3444e2b51719d4b740f5e6d5834964",
           "nativeReceipt": {
             "path": "tests/golden/report-surfaces/delegated-ai-011-round9-infrastructure-native-receipt.json",
-            "sha256": "5cff21045cd06b6e06793e4094f3575c3b28fceb0c2a9c25910292c6009279ba",
+            "sha256": "be81f2c504209d5cb91a968bb2b4184846f695a102d001b86be73bfbf9f8fc6a",
             "imageCount": 78
           },
           "receivedImages": [
@@ -9843,10 +9843,10 @@
           "kind": "delegated-ai",
           "actual_model": "claude-opus-5-5",
           "promptSha256": "6649966a5c4ecd06fdf5bbab81dc380ea6a2626a9fa15e1b8e7e7edfdf61249b",
-          "outputSha256": "6c223562db850e94595007d81ef962b9c2211296b8268205eb64af0709fae333",
+          "outputSha256": "99134493dcb0f4549c2857843e76502685e9c27e3101620df55a9f838d86dd59",
           "nativeReceipt": {
             "path": "tests/golden/report-surfaces/delegated-ai-011-round9-insufficient-coverage-native-receipt.json",
-            "sha256": "dee6cc596491db5eae0d1dde03b8c4354c08b2e8f134bb457eb89b4675bdc25d",
+            "sha256": "306ff16c7e486ebc361eb70f90e7cdcb5a54254243a0ad53f042556ecb81d3f9",
             "imageCount": 78
           },
           "receivedImages": [
@@ -10173,8 +10173,8 @@
         "revoked": false
       },
       "binding": {
-        "reviewInputFingerprint": "f2628e4876528ab75aa1758b60c8e73aa6f3c63a2b07aebafe1c0c3f05e2bb0a",
-        "renderManifestGeneratedAt": "2026-11-21T10:14:09.046Z",
+        "reviewInputFingerprint": "258b1b022d83ad9870ee8d906b4917c314e2a7fe88c250d791f21967652285b3",
+        "renderManifestGeneratedAt": "2026-11-21T10:38:19.955Z",
         "reviewEnvironment": {
           "reviewArtifactContractVersion": 4,
           "screenPixelContractVersion": 1,
@@ -10231,17 +10231,17 @@
       "findings": {
         "blocker": 0,
         "high": 0,
-        "medium": 3,
-        "low": 22
+        "medium": 6,
+        "low": 21
       },
-      "note": "Delegated AI review of every assigned full screen PNG, viewport tile, and complete A4 page raster for breaklint 0.11.0. PDF cells judged through their matching rasters. No human pass or provider authentication claim. Original rounds 1-8 and their receipts remain preserved unchanged. Four fresh independent state reviewers at actual claude-opus-5-5 report PASS with 32/32 cells pass, 265 exact native image reads and 0 BLOCKER / 0 HIGH / 3 MEDIUM / 22 LOW advisory findings (all explicitly documented as non-blocking layout/wrapping polish). This is delegated AI local-image sight evidence on macOS arm64 Node 24, not a human surface pass, Ubuntu sight claim, global calibration, or overall publication acceptance.",
+      "note": "Delegated AI review of every assigned full screen PNG, viewport tile, and complete A4 page raster for breaklint 0.11.0 (bound after recording Linux CI tile inventory 212 vs macOS 214). PDF cells judged through their matching rasters. No human pass or provider authentication claim. Original rounds 1-8 and their receipts remain preserved unchanged. Four fresh independent state reviewers at actual claude-opus-5-5 report PASS with 32/32 cells pass, 265 exact native image reads and 0 BLOCKER / 0 HIGH / 6 MEDIUM / 21 LOW advisory findings (all explicitly documented as non-blocking layout/wrapping polish). This is delegated AI local-image sight evidence on macOS arm64 Node 24, not a human surface pass, Ubuntu sight claim, global calibration, or overall publication acceptance.",
       "cells": {
         "screen/clean/light/desktop": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-clean",
-          "reviewedAt": "2026-11-21T10:19:00.509Z",
-          "note": "Full page and tile 01: hero with breaklint, v0.11.0 · report schema 5 · run 3f6c1a2e…, the PASS · EXIT 0 badge, the 'Clean run' H1 and 'Gate effect: Build passes (exit 0)', all sharp and high-contrast; the five-link nav is complete; the Run summary has 4 counter cards (Coverage met / 0 / 0 / 0) and a 4-column metadata grid. Tile 02: the 3-line configuration hash wraps cleanly inside its column; the Measurement apparatus card (geometry-cross-check-passed, measured context through tolerancePx=0.05), the empty Findings box and both declined-candidate entries each fit on one line. Tile 03: the 13-row coverage table has clear columns, right-aligned numbers and correct n/a and 'No candidates' rows; the footer reads 'End of report … JSON remains the canonical report.' Nothing is clipped or overlapping; the only low items are the tall Coverage-trust card next to the empty counter cards and the hash wrap.",
-          "reviewArtifactFingerprint": "7495250192103ef4c749c1c1bbd251fbdaac17baa1660dd1328e021c1a482fca",
+          "reviewedAt": "2026-11-21T10:45:30.962Z",
+          "note": "Full page and tiles 01-03: in the header, PASS · EXIT 0, 'Clean run' and 'Build passes (exit 0)' are clearly legible, with the version and run ID right-aligned and not clipped. The four stat cards line up in one row. ERRORS/WARNINGS/INFORMATION show 0 but stretch to the height of the long Coverage trust text and are mostly empty (low). The 4-column metadata grid is aligned and the configuration hash wraps into 3 lines inside its column. Tile 02: the Measurement apparatus, Findings ('Nothing reached the gate') and Declined candidates sections are cleanly separated and each declined entry fits on one line. Tile 03: the coverage table has 13 rows, right-aligned numbers, 'n/a'/'No candidates' for the two zero-candidate rules, and the footer shows the run ID.",
+          "reviewArtifactFingerprint": "ee2dd72e1502152fdfe3b9b87154843596c9dcb41589c5488d38a4ab9f96bf36",
           "reviewedArtifacts": [
             "clean--light--desktop.png",
             "clean--light--desktop--tile-01.png",
@@ -10254,9 +10254,9 @@
         "screen/clean/light/tablet": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-clean",
-          "reviewedAt": "2026-11-21T10:19:00.509Z",
-          "note": "Tile 01: the hero meta line fits on one line, the gate sentence wraps to 2 lines, and the counter cards switch to a 2x2 grid with the Coverage-trust text fully visible. Tile 02: a 2-column metadata grid with the hash on 2 lines; the Measurement apparatus card wraps cleanly. Tile 03: the declined-candidate entries wrap ('· in coverage base', 'env/ parity-blank-page'); in the 7-column coverage table 'layout/unbreakable-block-too-tall', 'layout/heading-at-page-bottom' and 'layout/orphaned-continuation-page' break after the '/', but all columns including RESULT stay inside the viewport. Tile 04: the last 5 rows and the footer are complete. No horizontal overflow.",
-          "reviewArtifactFingerprint": "85d7c25107500e634b7c9cc1ef755f2c0bb589d048ad76d81e0a62e3053fd15c",
+          "reviewedAt": "2026-11-21T10:45:30.962Z",
+          "note": "Tile 01: the header puts breaklint, the version and the run ID on one line without clipping. The stat cards switch to a 2x2 grid, and the 0-value cards are tall but empty (low). Tile 02: the metadata grid has 2 columns and the configuration hash wraps into 2 lines. The Apparatus box text wraps correctly. Tile 03: the declined entries wrap at 'env/' + 'parity-blank-page', and in the coverage table 'layout/unbreakable-block-too-tall', 'layout/heading-at-page-bottom' and 'layout/orphaned-continuation-page' wrap after '/' (low). All 7 columns stay visible, nothing scrolls horizontally, and 'Coverage met'/'No candidates' are not clipped. Tile 04: the last 5 rows and the footer are complete.",
+          "reviewArtifactFingerprint": "479cb3f722e6c34187ed6c37a26beba741b4c3137f32ba3f115e54737f749b9a",
           "reviewedArtifacts": [
             "clean--light--tablet.png",
             "clean--light--tablet--tile-01.png",
@@ -10270,9 +10270,9 @@
         "screen/clean/light/mobile": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-clean",
-          "reviewedAt": "2026-11-21T10:19:00.509Z",
-          "note": "Tile 01: the meta line and run id wrap over 2 lines, the PASS · EXIT 0 badge and 'Clean run' are intact, and the nav wraps to 3 lines. Tiles 02–03: counters and metadata stack in a single column, all labels and values are readable, the hash wraps to 2 lines and the apparatus card wraps without clipping. Tile 04: the Findings empty state is intact; the declined entries wrap over 3 lines each, breaking inside the identifiers. Tiles 05–06: the coverage table switches to a stacked row layout (rule + result in the first line, numbers in the second). Every value is visible, but the two-row header with RESULT directly above FLOOR at the right edge is ambiguous at first glance (medium). Footer complete; no horizontal overflow.",
-          "reviewArtifactFingerprint": "4422dacab4a1d1e18e581dbf12def549dcea698026c675132cf3cac343019e12",
+          "reviewedAt": "2026-11-21T10:45:30.962Z",
+          "note": "Tile 01: the header wraps version and run ID onto two lines, the PASS badge and 'Clean run' are legible, and the nav wraps onto 3 lines. Tile 02: ERRORS, WARNINGS and INFORMATION stack as single cards, each showing 0, and the metadata switches to one column. Tile 03: the configuration hash breaks into 2 lines and the Apparatus box wraps cleanly with no overflow. Tile 04: Findings and Declined candidates are legible, and the identifiers break at '/' (low). Tiles 05-06: the coverage table switches to a stacked layout with the rule name and Result on top and the numbers below. The two-row header (RESULT above FLOOR) is harder to read (low). Values are complete and not clipped, and the footer is complete.",
+          "reviewArtifactFingerprint": "672e8949814a7abf60fe483abddf78c7208afe816145b59d20ad724788c3c8ab",
           "reviewedArtifacts": [
             "clean--light--mobile.png",
             "clean--light--mobile--tile-01.png",
@@ -10288,9 +10288,9 @@
         "screen/clean/dark/desktop": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-clean",
-          "reviewedAt": "2026-11-21T10:19:00.509Z",
-          "note": "Full page and tile 01: same structure as the light version; white text on near-black with clear contrast, the lime accent bar and PASS · EXIT 0 badge visible, the counter cards in dark grey with readable 0 values. Tile 02: the metadata grid, the 3-line hash, the apparatus card on a slightly lighter surface and both declined entries all readable; the muted grey explanatory text is still adequately legible. Tile 03: the coverage table has a white header rule, thin row separators and bold Result cells; the footer is complete. No clipping or contrast failures.",
-          "reviewArtifactFingerprint": "3781d1b5b6f353444267061e2a69d097292e9210f2d7960b147d2a6d6a734cf9",
+          "reviewedAt": "2026-11-21T10:45:30.962Z",
+          "note": "The full page and tiles 01-03 have the same layout as light desktop. Text is light on a near-black background with high contrast, and secondary text (section intros, 'Document verdict: clean') is muted but readable. The green accent bar and the white header frame are clearly visible, and the empty stat cards differ clearly from the background. Tile 03: the coverage table lines are subtle but visible, the 'Coverage met'/'No candidates' result cells are bold and white, and the footer is complete.",
+          "reviewArtifactFingerprint": "dbb0231ba13012f05111cc3eba51f5a9fca5e5f66b142446cdfbf20e991de45b",
           "reviewedArtifacts": [
             "clean--dark--desktop.png",
             "clean--dark--desktop--tile-01.png",
@@ -10303,9 +10303,9 @@
         "screen/clean/dark/tablet": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-clean",
-          "reviewedAt": "2026-11-21T10:19:00.509Z",
-          "note": "Tile 01: the hero and 2x2 counter grid match the light tablet layout with good contrast. Tile 02: metadata grid, hash and apparatus card are readable; the Findings empty state is visible. Tile 03: the declined entries and the coverage table wrap the same way as in light mode (rule identifiers break after the '/'); every column stays within the viewport. Tile 04: the final rows and the 2-line footer are complete. Same low wrap items as light; no defects.",
-          "reviewArtifactFingerprint": "f255bf1f99d06d5c7e0261581490100267e9a2c6d4c835691c8882d8353998bb",
+          "reviewedAt": "2026-11-21T10:45:30.962Z",
+          "note": "Tiles 01-04 have the same layout as light tablet: 2x2 stat cards, 2-column metadata, and the hash in 2 lines. Contrast is good across all text, including the gray uppercase labels (VERDICT, GATE TRIGGERED BY ...). Tile 03 shows the same '/' wrapping of long rule IDs and the env/ identifier as in light (low). All columns are visible and nothing is clipped, and tile 04 shows the last rows and the footer complete.",
+          "reviewArtifactFingerprint": "8198aa71ce2134e378c35d0f0b88f3dfdeb4eb5e887e5732c86af0950ca49c33",
           "reviewedArtifacts": [
             "clean--dark--tablet.png",
             "clean--dark--tablet--tile-01.png",
@@ -10319,9 +10319,9 @@
         "screen/clean/dark/mobile": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-clean",
-          "reviewedAt": "2026-11-21T10:19:00.509Z",
-          "note": "Tile 01: the wrapped meta line, badge, 'Clean run' and 3-line nav are readable on the dark background. Tiles 02–03: the stacked counter cards in dark grey and the single-column metadata are readable; the hash wraps to 2 lines; the apparatus card is intact. Tile 04: Findings and the declined entries wrap over 3 lines each. Tiles 05–06: the same stacked coverage table as light mobile; all values are visible and correct, with the same ambiguous two-row header (RESULT above FLOOR, medium). Footer complete; no overflow.",
-          "reviewArtifactFingerprint": "ca853e6d4cef828775fdab7cba3251f7009c376f6d75590abd9402f45edda0e2",
+          "reviewedAt": "2026-11-21T10:45:30.962Z",
+          "note": "Tiles 01-06 have the same layout as light mobile. The header frame and green bar are visible, and the PASS badge outline is readable. Stat cards are stacked and the metadata is in one column. The Apparatus box border is subtle but recognisable, and the 'Nothing reached the gate' box is legible. Tiles 05-06: the stacked coverage table is complete with legible numbers. The same RESULT/FLOOR header roughness as in light applies (low), and the footer is complete.",
+          "reviewArtifactFingerprint": "bf3731c0d1edc4e1098cd4361d911c8f12d6933e1575b903b576d455edbe7e7b",
           "reviewedArtifacts": [
             "clean--dark--mobile.png",
             "clean--dark--mobile--tile-01.png",
@@ -10337,13 +10337,13 @@
         "print/clean/pdf": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-clean",
-          "reviewedAt": "2026-11-21T10:19:00.509Z",
-          "note": "Judged from the 3 A4 rasters. Page 1: hero with badge, H1, Gate effect, the Run summary counter cards and the first two metadata rows; footer 'Page 1 of 3'; no running header on the first page (expected for a page with a hero). Page 2: running header 'breaklint · Clean run · exit 0 | run 3f6c1a2e…', the rest of the metadata grid (hash on 4 lines, 'FINDING GATE CANDIDATE' label on 2 lines with its value lower than its neighbours), the apparatus card, Findings, and the first declined entry; footer 'Page 2 of 3'. Page 3: running header, the second declined entry, the full 13-row coverage table on a single page, 'End of report' and 'Page 3 of 3'. No content lost and no clipping; the metadata grid split across pages 1–2 and the declined list split across pages 2–3 are low pagination items.",
-          "reviewArtifactFingerprint": "433b717e5d3a06ccbb40d802078423747e558dba5f5309959b833cbe85d0f640",
+          "reviewedAt": "2026-11-21T10:45:30.962Z",
+          "note": "I judged this through the 3 A4 page rasters. Page 1: the header with PASS · EXIT 0, 'Clean run' and 'Build passes (exit 0)' is complete. The stat cards are in a row, but the Coverage trust text runs to 14 narrow lines, so the 0-value cards are very tall (low). The metadata grid stops after the 'Inputs found / Rules run' row, leaving about 130px empty, and 'Page 1 of 3' is in the bottom right. Page 2: the running header 'breaklint · Clean run · exit 0' / run ID is shown, and the remaining metadata continues (split grid = medium). 'FINDING GATE CANDIDATE' wraps over two lines and the hash breaks into 4 lines (low). Apparatus, Findings and the first declined entry follow, then 'Page 2 of 3'. Page 3: the second declined entry is separated from the first (part of the medium item). The coverage table has all 13 rows without clipping, the 'End of report' footer is present, and the page shows 'Page 3 of 3'.",
+          "reviewArtifactFingerprint": "1e407b0cd8f23ce51eb84073eab65c0faf5971fd29096c4c13488acee12a384c",
           "reviewedArtifacts": [
             "clean--a4.pdf"
           ],
-          "reviewedRawSha256": "302589b451eb86c6398ff7e2e79a35b1a60bdda12a6fd32a440466d3f1826c8a",
+          "reviewedRawSha256": "706246843500ebffc9c0230ad000013e4f0ab7fa3d9533e5fc15aca4d70657f8",
           "reviewedPages": [
             1,
             2,
@@ -10353,9 +10353,9 @@
         "print/clean/raster-set": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-clean",
-          "reviewedAt": "2026-11-21T10:19:00.509Z",
-          "note": "The set has 3 pages (clean--a4-page-1..3), consistently numbered 'Page n of 3' in the bottom right, with matching running headers on pages 2–3. Page margins are even, no content touches the page edge, and the table columns (APPLICABLE…RESULT) fit the print width with every rule identifier on one line. Content and order match the screen versions exactly (same run ID, same values, same section order). Remaining low items: about 12% of page 1 left blank before the grid break, the tall Coverage-trust card with its 14-line mono text, and the 4-line hash.",
-          "reviewArtifactFingerprint": "8c43a59139448682e2b03b61bc366d6e6c436a3deb875abd0a19a7bdef60da88",
+          "reviewedAt": "2026-11-21T10:45:30.962Z",
+          "note": "The raster set is complete with 3 pages, matching the 'Page X of 3' numbering. Page 1 has no running header, which looks like a deliberate cover page; pages 2-3 carry it consistently. Content matches the screen surfaces: the same verdict, counts, configuration hash, 13 coverage rows, floors (100% for unbreakable-block-too-tall and svg/text-overflows-viewport, otherwise 50%) and the run ID in the footer. Nothing is clipped at the page edges. Roughness is limited to the page-break placement (medium) and label/hash wrapping (low).",
+          "reviewArtifactFingerprint": "7c151fb291c4bc9b707f6f5e479031afab998186f508cbfac8876b3b51c40749",
           "reviewedArtifacts": [
             "clean--a4-page-1.png",
             "clean--a4-page-2.png",
@@ -10375,9 +10375,9 @@
         "screen/findings/light/desktop": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-findings",
-          "reviewedAt": "2026-11-21T10:19:42.663Z",
-          "note": "Tile 01: the hero has a rust left rule, a 'FAIL · EXIT 1' chip, the serif headline 'Findings block this run' and 'GATE EFFECT Build fails (exit 1).' The run ID header line fits on one row. The four summary cards (Coverage met / 2 / 4 / 0) line up, and the metadata grid shows VERDICT findings, GATE TRIGGERED BY error, FAIL-ON error, MODE demo. Tile 02 has the configuration hash wrapped to 3 lines in the right column, Next checks with 3 teal underlined links, and the untested-remediation callout. Tiles 03–06 show cards 01–06: severity labels are black WARNING or rust ERROR with a matching top border, an EXPERIMENTAL chip on 03, a two-column data grid with units, and grey remediation boxes with an 'untested' chip. In those boxes the text column stops at about 560 px while the box is full width (low). The longest evidence path on card 03 fits on one line. Tiles 07–08: Declined candidates (2 × Count 1) and the 13-row coverage table have right-aligned numbers and bold Result values. The 'End of report' footer is intact. No clipping or overlap.",
-          "reviewArtifactFingerprint": "a8bf315d92a155bb3d32aa9bad22f1acefa80d5bcaa19c7f4994131c20c71943",
+          "reviewedAt": "2026-11-21T10:43:32.391Z",
+          "note": "Tile 01: hero with red accent bar, FAIL · EXIT 1 badge, 'Findings block this run', gate effect 'Build fails (exit 1)', nav with Findings (6), and summary tiles Coverage met / 2 / 4 / 0. Tiles 02–06: metadata grid (configuration hash wraps to 3 lines), three Next-checks links, untested-advice callout, and cards 01–06 with WARNING in black, ERROR in rust, and an EXPERIMENTAL tag on card 03. All units are present (1 line/2 lines, 848 px/606 px, 0.12/0.6 fill ratio, 72 px/0 px, occurrences). Remediation text spans only about half of the grey box width (low). The long evidence filename on card 03 fits on one line. Tiles 07–08: Declined candidates (2 × Count 1), the 13-row coverage table with right-aligned numbers, and the End-of-report footer; no clipping.",
+          "reviewArtifactFingerprint": "153080e358cb6f1368b29a498079938d413ab7403d6b553115f52d310b16210e",
           "reviewedArtifacts": [
             "findings--light--desktop.png",
             "findings--light--desktop--tile-01.png",
@@ -10395,9 +10395,9 @@
         "screen/findings/light/tablet": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-findings",
-          "reviewedAt": "2026-11-21T10:19:42.663Z",
-          "note": "Tile 01: in the hero, the 'breaklint v0.11.0 · report schema 5 · run …' line fits on one row. The summary cards reflow to 2×2 (Coverage met + Errors 2 on top, Warnings 4 + Information 0 below) without truncation. Tile 02: the metadata grid goes to 2 columns, the configuration hash wraps to 2 lines, and the Next checks links stay on one line each. Tiles 03–07: the cards keep a two-column data grid. 'Unknown — no source location was measured' wraps cleanly onto 2 lines. Evidence paths on cards 02 and 03 wrap after the '·' separator and after 'evidence/' (low). The ERROR cards keep the rust label and border. Tile 08: the coverage table fits the width. 'layout/unbreakable-block-too-tall', 'heading-at-page-bottom' and 'orphaned-continuation-page' wrap after 'layout/' (low), and the numbers and Result column stay aligned. Footer present.",
-          "reviewArtifactFingerprint": "1253ea6c3818c627576f9bd3370ce9f0cf87367cf45b9262cde4abf248273b03",
+          "reviewedAt": "2026-11-21T10:43:32.391Z",
+          "note": "Tile 01: the header puts breaklint and version/run on one line; the summary tiles form a 2×2 grid. Tile 02: the metadata grid has two columns and the configuration hash wraps to 2 lines. Tiles 03–07: on cards 01–06, the SOURCE value 'Unknown — no source location was measured' wraps to 2 lines without overlap. Evidence filenames wrap at 'evidence/' (low), and the Ambiguity line stays readable. Tile 08: long rule IDs in the coverage table (layout/unbreakable-block-too-tall, heading-at-page-bottom, orphaned-continuation-page) wrap at the slash while the numeric columns stay aligned; the footer is complete.",
+          "reviewArtifactFingerprint": "62e46a9a44a4eb8f86ab06155cb7eb80787b44e074cfa686f9ea6d3e0d5c260e",
           "reviewedArtifacts": [
             "findings--light--tablet.png",
             "findings--light--tablet--tile-01.png",
@@ -10415,9 +10415,9 @@
         "screen/findings/light/mobile": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-findings",
-          "reviewedAt": "2026-11-21T10:19:42.663Z",
-          "note": "Tile 01: the run ID line wraps to 2 lines inside the hero, the headline stays legible at 2 lines, and the nav links wrap to 2 rows. Tiles 02–03: the summary cards stack one per row, the metadata list is single-column, and the configuration hash wraps to 2 lines without overflow. The Next-check links break after 'layout/' and 'svg/' (low). Tiles 04–11: all six cards are single-column with every label/value pair visible. Card 02 and 04 headings wrap ('layout/ unbreakable-block-too-tall ·' / 'page 2'). Remediation boxes reflow to the full card width, the long evidence filename on card 03 wraps across 3 lines, and nothing is cut at the right edge. Tiles 12–14: the Declined list wraps its env IDs. The coverage table uses a stacked two-row layout (rule + Result / five numbers), which is legible but takes a moment to map (low). The footer ends cleanly.",
-          "reviewArtifactFingerprint": "6aed0c6b7f4b800edd5449b598d91db64810a7d0a71e3867415e91821f579e5e",
+          "reviewedAt": "2026-11-21T10:43:32.391Z",
+          "note": "Tiles 01–03: the hero header stacks, the nav wraps onto two lines, the Errors/Warnings/Information tiles stack vertically, and the metadata is a single column with the hash wrapped to 2 lines. The Next-checks links wrap at the rule-ID slash. Tiles 04–12: all six cards use a single column with readable remediation text and correct units. The rule ID on card 02 wraps to 'layout/ unbreakable-block-too-tall ·' and evidence filenames break over 2–3 lines (low). Tiles 13–14: the coverage table uses a stacked two-row layout (rule and result on top, numbers below) with a two-row header (low). The values match desktop and the footer is complete.",
+          "reviewArtifactFingerprint": "edcf3dcdcc32a3460b1fa0920a6ddaef3260b76afaf36ec6f4bcdd44e46beb20",
           "reviewedArtifacts": [
             "findings--light--mobile.png",
             "findings--light--mobile--tile-01.png",
@@ -10441,9 +10441,9 @@
         "screen/findings/dark/desktop": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-findings",
-          "reviewedAt": "2026-11-21T10:19:42.663Z",
-          "note": "Tile 01: the dark hero has a white frame, an orange left rule, a white serif headline and a clearly outlined 'FAIL · EXIT 1' chip. Summary cards on #1c1c1c read well (Coverage met / 2 / 4 / 0), with muted-grey small caps labels still above the legibility threshold. Tile 02: the Next-check links are light cyan with good contrast, and the untested callout has a white left rule. Tiles 03–06: ERROR labels and top borders are orange (#ff8a50-ish) and clearly separate from the white WARNING cards. Remediation boxes are a slightly lighter panel with white text, the 'untested' chip is outlined in white, evidence links are cyan, and the grey 'No evidence artifact' text is legible. Tiles 07–08: the coverage table has white rules and bold white Result values. Layout matches light desktop pixel for pixel, including the ~560 px remediation text column (low). No contrast or overlap defects.",
-          "reviewArtifactFingerprint": "9b5ae26d7fcbe5fac6295f5bd3ad2c1eac9cb294164df3e49595d7892202f8b7",
+          "reviewedAt": "2026-11-21T10:43:32.391Z",
+          "note": "Tile 01: dark hero with orange accent bar, white headline, FAIL · EXIT 1 badge, and summary tiles 2/4/0 at good contrast. Tiles 02–06: links in light cyan, ERROR label and card top borders in orange, and the remediation box in a slightly lighter dark grey. The muted Note and Evidence label text is readable. Units and values are the same as light desktop. Tiles 07–08: Declined candidates, the coverage table with white bold Result column, and the footer, with no clipping or contrast failure. Same low issue as light: remediation text uses half the box width.",
+          "reviewArtifactFingerprint": "af2907bf87c889eea7c757309c780b2aa53e10d8f972362ad13ead8068341caa",
           "reviewedArtifacts": [
             "findings--dark--desktop.png",
             "findings--dark--desktop--tile-01.png",
@@ -10461,9 +10461,9 @@
         "screen/findings/dark/tablet": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-findings",
-          "reviewedAt": "2026-11-21T10:19:42.663Z",
-          "note": "Tile 01: the dark hero and the 2×2 summary cards match the light tablet layout, and the orange rule and white frame render cleanly. Tile 02: the metadata grid is 2 columns, the hash wraps to 2 lines, and the cyan links are legible. Tiles 03–07: cards 01–06 have 2-column data grids. 'Unknown — no source location was measured' wraps to 2 lines. Evidence paths wrap after '·' and 'evidence/' (low). Note and remediation panels keep enough contrast against the card background. Tile 08: the coverage table wraps the same three 'layout/' rule IDs (low), with numeric columns aligned and Result in bold white. The footer is legible in muted grey. Nothing is clipped.",
-          "reviewArtifactFingerprint": "695d12a8d6d7f75565500f4900784c3dc6d20dc627768c81aee021c3251c4d8d",
+          "reviewedAt": "2026-11-21T10:43:32.391Z",
+          "note": "Tiles 01–02: the dark header and 2×2 summary tiles render cleanly, and the metadata grid matches light tablet. Tiles 03–07: cards 01–06 have readable dark remediation boxes, cyan evidence links wrapping at 'evidence/', and the EXPERIMENTAL tag visible on card 03. Tile 08: the coverage table wraps long rule IDs at the slash in the same way as light tablet, and the numbers stay aligned. Footer is present.",
+          "reviewArtifactFingerprint": "553e7d99643a3434510c9044f98f77ecf370b9213ce6d1def73c44035675d647",
           "reviewedArtifacts": [
             "findings--dark--tablet.png",
             "findings--dark--tablet--tile-01.png",
@@ -10481,9 +10481,9 @@
         "screen/findings/dark/mobile": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-findings",
-          "reviewedAt": "2026-11-21T10:19:42.663Z",
-          "note": "Tile 01: the hero inside its white frame wraps the run ID to 2 lines, the headline is white serif, and the nav takes 2 rows. Tiles 02–03: the stacked summary cards and single-column metadata are legible, and the hash wraps to 2 lines. Tiles 04–11: six single-column cards with orange ERROR labels on 02/04. Wrapped headings and remediation text fit inside the card padding, card 03's evidence filename wraps over 3 cyan lines, and no text runs past the card's right border. Tiles 12–14: the Declined list and the stacked coverage table (rule + Result row, numbers row) match light mobile, and the two-row header mapping is a low item. The 'End of report' footer is complete.",
-          "reviewArtifactFingerprint": "db5c3ad0e80b1c601e547ed10716cac8f5f7accc5f7ed4291a9f277dfd30ac2c",
+          "reviewedAt": "2026-11-21T10:43:32.391Z",
+          "note": "Tiles 01–04: the stacked hero, two-line nav and single-column summary/metadata match light mobile, with readable contrast on dark tiles. Tiles 05–12: the card 02 title wraps to three lines ('layout/ / unbreakable-block-too-tall · / page 2'); evidence filenames wrap over 2–3 lines in cyan (low). Remediation boxes and the Note box are legible. Tiles 13–14: the stacked coverage table with its two-row header (low), values matching the other surfaces, and the complete footer.",
+          "reviewArtifactFingerprint": "4a063802da4ff933de1ee8b5105c61570c0bd56136ca3e6cfcb8cd3d7e919b60",
           "reviewedArtifacts": [
             "findings--dark--mobile.png",
             "findings--dark--mobile--tile-01.png",
@@ -10507,13 +10507,13 @@
         "print/findings/pdf": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-findings",
-          "reviewedAt": "2026-11-21T10:19:42.663Z",
-          "note": "Judged from the 8 A4 rasters. Every page has a 'Page N of 8' footer. Pages 2–8 carry a running header ('breaklint · Findings block this run · exit 1' / run ID); page 1, the title page, intentionally has none. Page 1 shows the hero, Run summary cards and the first 2 metadata rows. Page 2 has the remaining metadata, Next checks (links in bold black for print) and the untested callout, with about 33% of the page left blank. Pages 3–5 hold one card each (01 WARNING, 02 ERROR in rust, 03 WARNING EXPERIMENTAL) with a 3-column data grid and a 'FINDING NN · rule · REMEDIATION AND EVIDENCE' sub-label, each leaving 30–40% blank (medium, uneven pagination). Page 6 holds card 04 plus the header and data of card 05. Page 7 continues 05's remediation under its continuation label, then card 06 and the start of Declined candidates. Page 8 finishes Declined, the full 13-row coverage table and End of report. No clipped text, and no missing pages, headers or footers.",
-          "reviewArtifactFingerprint": "9670bb9cc8f2e016d332c338c4379adea50e7358784a7c98016d35ec56421bbb",
+          "reviewedAt": "2026-11-21T10:43:32.391Z",
+          "note": "Judged through the 8 A4 rasters. The PDF is complete: 'Page N of 8' footers on all pages, and a running header ('breaklint · Findings block this run · exit 1' / run id) on pages 2–8 (page 1 has the full hero instead). Verdict, gate effect, and Errors 2 / Warnings 4 / Information 0 are on page 1. All 6 findings are on pages 3–7 with units, untested remediation markers and evidence, and the coverage table with footer is on page 8. Medium: pages 2–5 are largely empty because each finding starts on a new page, and the metadata grid splits across pages 1 and 2.",
+          "reviewArtifactFingerprint": "15336da12ef1907091578eecd505d97cd7ae899981bf2af25d3542282a687812",
           "reviewedArtifacts": [
             "findings--a4.pdf"
           ],
-          "reviewedRawSha256": "ad80ae551a12554777192a16e5a916617e99dd9fe9e743ffb97cfa8614056cd0",
+          "reviewedRawSha256": "6f1e236d37fbc918639f314c18a43145a7e6e3435ad76ac7e431a24ee7e97915",
           "reviewedPages": [
             1,
             2,
@@ -10528,9 +10528,9 @@
         "print/findings/raster-set": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-findings",
-          "reviewedAt": "2026-11-21T10:19:42.663Z",
-          "note": "The raster set has 8 sequential A4 pages, numbered 'Page 1 of 8' to 'Page 8 of 8' with no gaps, and pages 2–8 carry a consistent running header. Facts match the screen rasters exactly: 2 errors, 4 warnings, 0 information, findings 01–06 with the same measured/threshold units, proof sources (A / None declared), evidence filenames, the ambiguity note on 02, the high-frequency note on 03, and the coverage table values (80% on half-empty-page and orphaned-continuation-page, n/a on the two zero-candidate rules). Print-only roughness: the 4-line wrap of the configuration hash on page 2 (low), the metadata grid split across pages 1–2 (low), the Declined list split across pages 7–8 (low), and uneven whitespace from the per-finding page breaks (medium). Contrast is fully legible in black on white, with rust severity accents.",
-          "reviewArtifactFingerprint": "cc332342715dae5e2152ef795552456f2e8022ae90287576ff00d5dd238fc265",
+          "reviewedAt": "2026-11-21T10:43:32.391Z",
+          "note": "Page 1: hero, summary tiles and the first two metadata rows. Page 2: the remaining metadata (hash wrapped to 4 lines, low), Next checks and the Findings intro, with the lower half empty. Pages 3–5: one card each (01 widow, 02 unbreakable-block, 03 half-empty with EXPERIMENTAL tag), each with a 3-column field grid and a 'FINDING 0N · rule · REMEDIATION AND EVIDENCE' label. Page 6: cards 04 and 05. Page 7: the labelled continuation of card 05, card 06, and the start of Declined candidates. Page 8: second declined item, the 13-row coverage table with no clipping, and the End-of-report footer. No overlap or illegible text.",
+          "reviewArtifactFingerprint": "c9df81d1c9b5df07b904e05ed8b5a1460c7c0e598204f95482bc1d607a010feb",
           "reviewedArtifacts": [
             "findings--a4-page-1.png",
             "findings--a4-page-2.png",
@@ -10565,9 +10565,9 @@
         "screen/infrastructure/light/desktop": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-infrastructure",
-          "reviewedAt": "2026-11-21T10:19:26.836Z",
-          "note": "Tile 01 shows the masthead with red accent bar, 'ERROR · EXIT 3' chip, 'Checker failed' headline, Gate effect 'Build fails (exit 3)', the full one-line nav including Findings (6), and the 4-up summary (Not trustworthy / 2 / 4 / 0); tile 02 has the meta grid with config hash wrapping to 3 lines, Next checks with linked rule IDs, and the checker-crashed box (stage=evidence; pagesCompleted=2). Tiles 03–07 render findings 01–06 with two-column DOCUMENT/SOURCE/MEASURED/THRESHOLD/CALIBRATION/PROOF SOURCE grids, untested chips, EXPERIMENTAL badge and red ERROR accents, all unclipped; remediation text runs at a narrow measure leaving empty grey space on the right (low). Tile 08 ends the 13-row coverage table and the 'End of report' footer; the 'Findings' heading cut at the tile 02/03 seam is only a capture boundary and is whole in the full-page raster.",
-          "reviewArtifactFingerprint": "8fb559fb9fbb6b9eeace592b35db06657372a30547d9d69406500e55c91fefad",
+          "reviewedAt": "2026-11-21T10:43:35.689Z",
+          "note": "Tile 01: the hero shows breaklint v0.11.0 · report schema 5 · run 3f6c1a2e…, an ERROR · EXIT 3 badge, the 'Checker failed' title, a dark-red rule and 'Build fails (exit 3)'. The 6-link nav sits on one row, and the Run summary has 4 cards: Not trustworthy, 2, 4, 0. The count cards are mostly empty because they stretch to the long trust text (low). Tile 02: the configuration hash wraps to 3 lines in its column (low). Next checks and the Checker failure callout, with the checker-crashed box, are clear. Tiles 03–07: findings 01–06 have clear WARNING/ERROR (red) labels, the EXPERIMENTAL tag on 03, 2-column metadata and correct units (line(s), px, fill ratio, occurrence(s)). The Remediation and Note text stops at about 55% of the grey box width, leaving a large empty right area (medium). Tiles 07–08: Declined candidates (2), then the coverage table with 13 rows, all columns right-aligned, 'No candidates' on the 2 zero rows, and the end-of-report footer. No clipping.",
+          "reviewArtifactFingerprint": "0237f015bfd6ff50dfba1fa075f4f55ea31f97f03eff63436629ed943d744d49",
           "reviewedArtifacts": [
             "infrastructure--light--desktop.png",
             "infrastructure--light--desktop--tile-01.png",
@@ -10585,9 +10585,9 @@
         "screen/infrastructure/light/tablet": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-infrastructure",
-          "reviewedAt": "2026-11-21T10:19:26.836Z",
-          "note": "Tile 01 nav wraps to two lines (Coverage details on line 2) and the summary reflows to 2×2 cards with the Coverage Trust paragraph fully visible; tile 02 meta grid is 2-column with the config hash on 2 lines. Tiles 03–08 show all six findings; the source value 'Unknown — no source location was measured' and long evidence paths wrap cleanly onto a second line without overflow. Tile 08 shows the coverage table with layout/unbreakable-block-too-tall, heading-at-page-bottom and orphaned-continuation-page breaking after the slash (low), numeric columns right-aligned, and the full footer; tile 09 is an empty background strip.",
-          "reviewArtifactFingerprint": "fdbb029aae126b43d26d3bcade3abc52ea38827d0c9403697be93c7b3282724a",
+          "reviewedAt": "2026-11-21T10:43:35.689Z",
+          "note": "Tile 01: the hero meta line fits on one row at 768 px. The nav wraps to 2 rows (Coverage details alone on row 2). The summary cards form a 2×2 grid. Tile 02: the metadata grid has 2 columns; the configuration hash wraps to 2 lines. Tiles 03–07: finding cards keep the 2-column metadata, 'Unknown — no source location was measured' wraps to 2 lines, and remediation text now fills most of the box. The long evidence path wraps cleanly onto its own line. Tile 08: the coverage table fits the width. Three rule ids wrap at '/' (unbreakable-block-too-tall, heading-at-page-bottom, orphaned-continuation-page) (low); values stay aligned. Tile 09 is blank page background, the tail. No overflow.",
+          "reviewArtifactFingerprint": "71d90586779cb5c44fcd6c926aa618237f097baf42bfca8801d249511136ba9d",
           "reviewedArtifacts": [
             "infrastructure--light--tablet.png",
             "infrastructure--light--tablet--tile-01.png",
@@ -10606,9 +10606,9 @@
         "screen/infrastructure/light/mobile": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-infrastructure",
-          "reviewedAt": "2026-11-21T10:19:26.836Z",
-          "note": "Tile 01 masthead wraps the run ID onto its own line and the nav to three lines with no clipping; tiles 02–03 stack ERRORS 2 / WARNINGS 4 / INFORMATION 0 and the single-column meta list, and Next checks links wrap at the slash (layout/ / unbreakable-block-too-tall). Tiles 04–12 render the checker-failed callout, the untested-advice block and findings 01–06 single-column with MEASURED/THRESHOLD pairs and units intact, and remediation boxes are fully contained. Tiles 13–15 show declined candidates and the coverage table re-laid out as rule plus result on one row and numbers below, under a two-row header (low roughness but legible), ending in the footer with the run ID.",
-          "reviewArtifactFingerprint": "4c58b2c07a94cded8bb24dd1b5b297c5bbd9bed2d8ec94bd8b72e07e55eecd54",
+          "reviewedAt": "2026-11-21T10:43:35.689Z",
+          "note": "Tile 01: the hero meta line wraps to 2 lines; the title, badge and gate effect are all legible. The nav wraps to 3 rows. Tiles 02–03: the summary cards and metadata stack into a single column, and the configuration hash wraps to 2 lines. The next-check links break inside the code identifiers at '/' (low). Tiles 04–12: finding cards are single-column, with long rule ids such as 'layout/ unbreakable-block-too-tall · page 2' wrapping to 3 lines. Remediation boxes are full width and readable, and evidence paths wrap cleanly. Tiles 13–14: coverage uses a stacked 2-line row (rule and result, then the numbers). The header puts FLOOR under RESULT, legible but harder to map (low). Tile 15: the end-of-report footer is intact. No horizontal overflow.",
+          "reviewArtifactFingerprint": "27de3ce707a0b6cfcb8a7e9812e8fd54120f18d636a365e3f0e0759e6f57f61e",
           "reviewedArtifacts": [
             "infrastructure--light--mobile.png",
             "infrastructure--light--mobile--tile-01.png",
@@ -10633,9 +10633,9 @@
         "screen/infrastructure/dark/desktop": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-infrastructure",
-          "reviewedAt": "2026-11-21T10:19:26.836Z",
-          "note": "Tile 01 shows the dark masthead with orange accent bar, white 'Checker failed' headline and bordered ERROR · EXIT 3 chip, all with high contrast; summary cards are dark grey with a white top rule on Coverage Trust. Tiles 02–07 match the light layout: cyan links and evidence paths, orange ERROR labels and card top borders, and light-grey secondary text ('Navigation only…', 'Partial findings only…') stays readable against #111-ish background, with untested chips outlined in white. Tile 08 coverage table rows and 'Coverage met'/'No candidates' labels are bold white and legible, and the footer is present.",
-          "reviewArtifactFingerprint": "1886cb069f66e09db62f7af475997d60f8d8197166592594c22510f69c9cb452",
+          "reviewedAt": "2026-11-21T10:43:35.689Z",
+          "note": "Tile 01: on near-black, the hero has a white border and an orange accent rule, and the title, badge and gate effect are high-contrast white. The summary cards are dark grey with readable white numerals. Tile 02: the next-check links are light blue and underlined. The checker-failure callout has an orange left rule and is readable. Tiles 03–07: the ERROR labels and top borders are orange, WARNING is white, and metadata labels are muted grey but legible. Remediation boxes are dark grey and show the same ~55% text column with an empty right area as light mode (medium). Evidence links are cyan and legible. Tiles 07–08: the coverage table has grey row rules on dark and bold white result text. The footer is present. Layout matches light desktop exactly.",
+          "reviewArtifactFingerprint": "a433b30e69967dcb0a506fe2f096182e2dcb30ef26c40c22c96103c24a4448da",
           "reviewedArtifacts": [
             "infrastructure--dark--desktop.png",
             "infrastructure--dark--desktop--tile-01.png",
@@ -10653,9 +10653,9 @@
         "screen/infrastructure/dark/tablet": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-infrastructure",
-          "reviewedAt": "2026-11-21T10:19:26.836Z",
-          "note": "Tile 01 matches the light tablet reflow (two-line nav, 2×2 summary cards) with good dark-mode contrast. Tiles 02–08 render the meta grid, Next checks, checker-crashed box and findings 01–06; wrapped source and evidence values stay inside cards, and the remediation/Note boxes are distinguishable as dark-grey panels with a white left rule. Tile 08 shows the full coverage table with the same slash-wrapped long rule IDs as light (low) and the footer; tile 09 is an empty dark strip.",
-          "reviewArtifactFingerprint": "6df6aef82e768ec2ae574ac0715c7353e181806154b50e35118b0c61aa401fc9",
+          "reviewedAt": "2026-11-21T10:43:35.689Z",
+          "note": "Tiles 01–02: the same structure as light tablet: a one-line meta row, a 2-row nav, a 2×2 summary grid and the 2-line config hash. Contrast holds: white on #111, muted grey labels readable. Tiles 03–07: the orange ERROR labels and borders on findings 02/04, the EXPERIMENTAL tag on 03 and the untested chips are all distinct. Source text wraps to 2 lines without clipping, and the cyan evidence links wrap cleanly. Tile 08: the coverage table shows the same 3 wrapped rule ids at '/' (low); values stay aligned. Tile 09 is a blank dark tail. No contrast or overflow defects.",
+          "reviewArtifactFingerprint": "45a6c5cfd4a26e43cd4ee9878c4abc0ab05ba36edd62fc9334246f488c5395fc",
           "reviewedArtifacts": [
             "infrastructure--dark--tablet.png",
             "infrastructure--dark--tablet--tile-01.png",
@@ -10674,9 +10674,9 @@
         "screen/infrastructure/dark/mobile": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-infrastructure",
-          "reviewedAt": "2026-11-21T10:19:26.836Z",
-          "note": "Tiles 01–03 show the stacked masthead, three-line nav, stacked summary cards and meta list in dark mode with no clipping, and the config hash wraps to 2 lines. Tiles 04–12 present all six findings single-column; the orange ERROR accent on findings 02/04 and the EXPERIMENTAL badge on 03 are clear, and cyan evidence links wrap at '/' and '-' boundaries. Tiles 13–15 show declined candidates, the stacked coverage table (two-row header, low) and the footer, matching the light mobile layout one-for-one.",
-          "reviewArtifactFingerprint": "5dc600ec3986191b6c592f57094d8c8346c2d856dc435dc66b3bfdca0db5e234",
+          "reviewedAt": "2026-11-21T10:43:35.689Z",
+          "note": "Tiles 01–03: the hero (orange rule, white border), 3-row nav, stacked summary cards and single-column metadata are all legible on dark. Next-check links are light blue and break inside identifiers (low). Tiles 04–12: finding cards are single-column, with orange ERROR on 02/04 and white WARNING on the others. The dark-grey remediation boxes have readable white text, and the cyan evidence links wrap cleanly. Tiles 13–14: the stacked coverage rows have the same awkward FLOOR-under-RESULT header (low); values are readable. Tile 15: the footer with the run id is intact. Light and dark mobile match.",
+          "reviewArtifactFingerprint": "e0be39af3614d930be0bb5060f396a3fcfb1ed7872d70b2e4947c86dd75e4623",
           "reviewedArtifacts": [
             "infrastructure--dark--mobile.png",
             "infrastructure--dark--mobile--tile-01.png",
@@ -10701,13 +10701,13 @@
         "print/infrastructure/pdf": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-infrastructure",
-          "reviewedAt": "2026-11-21T10:19:26.836Z",
-          "note": "Judged through the 8 A4 rasters: page 1 opens with the masthead (no running header, which suits a cover-style first page), 'Checker failed', Gate effect and Run summary, and pages 2–8 each carry the running header 'breaklint · Checker failed · exit 3 / run 3f6c1a2e-…'. Every page has a 'Page N of 8' footer and the sequence 1–8 is complete with no missing pages. Findings 01–04 and 06 each sit whole on their pages with a 3-column metadata grid; finding 05 is split, with the card on page 6 and remediation/evidence on page 7 under a 'FINDING 05 · type/spaced-hyphen · REMEDIATION AND EVIDENCE' continuation label (low). Page 8 completes the coverage table, all 13 rows unclipped, plus the end-of-report line.",
-          "reviewArtifactFingerprint": "55644170a4450277f0a2c9836d822161e5109042eb119f5a5580d79462832117",
+          "reviewedAt": "2026-11-21T10:43:35.689Z",
+          "note": "Judged from the 8 A4 rasters. Page 1 has the bordered hero with a dark-red rule, 'Checker failed', the run meta on one line and 'Build fails (exit 3)'. The 4 summary cards are present; the count cards are tall and empty (low). There is a 'Page 1 of 8' footer. Pages 2–8 each carry a running header ('breaklint · Checker failed · exit 3' with the run id) and a 'Page N of 8' footer. Page 2: the metadata grid continues from page 1 (split, low), the config hash wraps to 4 lines, then Next checks and Checker failure. Pages 3–6: one finding card per page with a 3-column metadata grid and the 'FINDING 0x · rule · REMEDIATION AND EVIDENCE' sublabel; ERROR labels are dark red. Page 7 holds the continuation of finding 05, labelled correctly, then finding 06 and the start of Declined candidates. Page 8 has the second declined item, the full 13-row coverage table on one page and End of report. Nothing is clipped; navigation chrome is correctly left out of print.",
+          "reviewArtifactFingerprint": "a25f5e77a9a895813da491bcab945967a46635b0dc0e91bf52d17d0948eaf4dc",
           "reviewedArtifacts": [
             "infrastructure--a4.pdf"
           ],
-          "reviewedRawSha256": "597acd1dce7a82f4e27359c21717d179f1545cac25030ea928c1bf676c6af233",
+          "reviewedRawSha256": "727c39bc3fbaa32cefa821055908ae51056b1009bb2d26349d0db091a50b0ca3",
           "reviewedPages": [
             1,
             2,
@@ -10722,9 +10722,9 @@
         "print/infrastructure/raster-set": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-infrastructure",
-          "reviewedAt": "2026-11-21T10:19:26.836Z",
-          "note": "The raster set is complete (pages 1–8) and matches the 'Page N of 8' footers. Content matches the screen surfaces: same counts (2 errors / 4 warnings / 0 information), the same partial-coverage sentence (20 of 22), same six findings with identical measured/threshold units, same declined candidates and the 13-row coverage table. Layout roughness is low only: the page 1 Coverage Trust card is a narrow 14-line mono column beside empty count tiles, the page 2 'FINDING GATE CANDIDATE' label and config hash wrap, keep-together cards leave large bottom whitespace on pages 2, 4 and 5, and the declined-candidate list splits across pages 7→8. Nothing is clipped and no text is illegible.",
-          "reviewArtifactFingerprint": "90207c18bc651229cc2117207160fb9e65593bd0748f0c084803e5a185c7e6bf",
+          "reviewedAt": "2026-11-21T10:43:35.689Z",
+          "note": "All 8 page rasters are present and numbered 1–8, matching the 'Page N of 8' footers, with no missing or blank pages. Headers on pages 2–8 and footers on pages 1–8 are consistent. The content matches the screen surfaces: the same verdict, counts (2/4/0), 6 findings with the same units and thresholds, 2 declined candidates and 13 coverage rows. Unlike the desktop screen, print remediation text fills about 75% of its box. Pages 2, 4 and 5 are only about 55–75% filled because whole finding cards are kept together and push to the next page (low), and the tail label on cards that are not split is redundant (low). The 05 split across pages 6–7 is handled cleanly with its continuation label.",
+          "reviewArtifactFingerprint": "1ae1b699b0f16a4010c83e769f17b26c73f80d77ebf7f918f76b6a01a2a3f7b8",
           "reviewedArtifacts": [
             "infrastructure--a4-page-1.png",
             "infrastructure--a4-page-2.png",
@@ -10759,9 +10759,9 @@
         "screen/insufficient-coverage/light/desktop": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-insufficient-coverage",
-          "reviewedAt": "2026-11-21T10:19:47.990Z",
-          "note": "Tile 01: masthead with run ID, the 'INCOMPLETE · EXIT 4' badge, the headline, 'Build fails (exit 4)', a 6-link nav and Run summary tiles (Coverage trust 'Below required floor', Errors 2, Warnings 4, Information 0). Tiles 02-03: the metadata grid (13 rules run, 11 measured, 3 declines, configuration hash on 3 lines), Next checks 1-3 and the red-ruled contract callout with the --disable hint. Tiles 03-07: six finding cards (01 WARNING widow, 02 ERROR unbreakable 848/606 px, 03 WARNING+EXPERIMENTAL half-empty 0.12/0.6 fill ratio, 04 ERROR svg 72/0 px, 05 spaced-hyphen 2/0 occurrences, 06 local-uri 1/0 occurrences). Each card has a two-column fact grid, an 'untested' remediation box and an Evidence line. Nothing is clipped, but the remediation text fills only about half the box width (low). Tile 08: the 13-row coverage table has the layout/widow 'Below floor' row in red with a left accent, followed by the 'End of report' footer.",
-          "reviewArtifactFingerprint": "fda73892a04dde7b68c195e8f7d64402078f67c433c45b624ce1278a11518361",
+          "reviewedAt": "2026-11-21T10:43:42.850Z",
+          "note": "Tile 01: the hero shows breaklint v0.11.0 · report schema 5 · run 3f6c1a2e…, the INCOMPLETE · EXIT 4 chip, the headline 'Not enough was measured' and the gate effect 'Build fails (exit 4).'. The 4-card run summary has empty ERRORS/WARNINGS/INFORMATION cards that are as tall as the long COVERAGE TRUST text (low). Tiles 02-03: the metadata grid (verdict insufficient-coverage, GATE TRIGGERED BY none (finding gate), a 3-line configuration hash), 3 next checks and the red-bordered contract callout for layout/widow 1 of 2 (50%), floor 100%, env/multicolumn. Tiles 03-07: 6 finding cards (01-06), each with an untested remediation badge, units 1 line/2 lines, 848 px/606 px, 0.12/0.6 fill ratio, 72 px/0 px and occurrences, and no clipping. The long evidence path in finding 03 fits on one line. Tile 08: the coverage table has 13 rows with layout/widow 'Below floor' in red and a left accent bar, then the end-of-report footer.",
+          "reviewArtifactFingerprint": "e3d65f53be8756d5ffefd3961813574a66bfdd1b99ea8eefc904a0f3a1c1bc82",
           "reviewedArtifacts": [
             "insufficient-coverage--light--desktop.png",
             "insufficient-coverage--light--desktop--tile-01.png",
@@ -10779,9 +10779,9 @@
         "screen/insufficient-coverage/light/tablet": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-insufficient-coverage",
-          "reviewedAt": "2026-11-21T10:19:47.990Z",
-          "note": "Tile 01: the masthead collapses to a single meta line, the nav wraps to 2 rows cleanly, and the summary tiles reflow 2x2. Tile 02: the metadata grid is 2 columns and the hash wraps over 2 lines. Tiles 03-08: in the finding cards the 'Unknown — no source location was measured' value wraps to 2 lines without overlap, and the long evidence path breaks after 'evidence/'. Tiles 08-09: the declined-candidate bullets wrap cleanly, all 7 table columns fit, and two rule names wrap at the slash (low). 'Below floor' stays red, and the footer is intact.",
-          "reviewArtifactFingerprint": "8d46952f3c3b005eb7d4e4e62bd09619852edbdd489be33b5ae1d362a64a349a",
+          "reviewedAt": "2026-11-21T10:43:42.850Z",
+          "note": "Tile 01: the run id fits on one line beside 'breaklint', the nav wraps to 2 rows, and the summary cards form a 2x2 grid with the COVERAGE TRUST card much taller than ERRORS (low). Tile 02: the metadata grid has 2 columns and the configuration hash wraps cleanly over 2 lines. Tiles 03-08: the finding cards use 2 field columns, and the SOURCE value wraps to 'Unknown — no source location was / measured' without overflow. The finding 02 evidence filename and the finding 03 long evidence path wrap inside the card. Tiles 08-09: Declined candidates wrap env/parity-blank-page. In the coverage table, layout/unbreakable-block-too-tall, heading-at-page-bottom and orphaned-continuation-page break after '/' (low). All columns stay inside the viewport and 'Below floor' stays red.",
+          "reviewArtifactFingerprint": "2c74ae51495d92d04f3c5ab4b569ddbfab54044a8a1289bf41c3dbc42cda6d7c",
           "reviewedArtifacts": [
             "insufficient-coverage--light--tablet.png",
             "insufficient-coverage--light--tablet--tile-01.png",
@@ -10800,9 +10800,9 @@
         "screen/insufficient-coverage/light/mobile": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-insufficient-coverage",
-          "reviewedAt": "2026-11-21T10:19:47.990Z",
-          "note": "Tiles 01-03: the masthead stacks version and run ID over 2 lines, the nav wraps to 3 rows, and the summary tiles stack in one column with values legible. Tiles 04-05: the Next checks link and the contract callout wrap identifiers at the slash with no overflow. Tiles 05-13: finding cards switch to a single-column fact list. Title 02 wraps to 3 lines ('layout/ / unbreakable-block-too-tall · / page 2', low), and the remediation boxes fill the card width. Tiles 14-15: the coverage table uses a stacked row layout (rule plus result on top, numbers below) under a two-row header (low). 'Below floor' is red, and nothing is cut off at the 390 px edge.",
-          "reviewArtifactFingerprint": "42be02ac48db9028c7c52dba0d66e0ac8c46284ca531d3e4559e3884dbf08bee",
+          "reviewedAt": "2026-11-21T10:43:42.850Z",
+          "note": "Tile 01: the run id wraps under the version line, the headline sits on 2 lines, the gate effect is visible and the nav uses 3 rows. Tiles 02-03: the summary cards stack (ERRORS 2, WARNINGS 4, INFORMATION 0) and the metadata becomes a single column with the hash on 2 lines. Tile 04: the contract callout wraps 'examples/ demo.html' and the --disable layout/widow option text. Tiles 05-13: finding fields stack in one column, the title 'layout/ unbreakable-block-too-tall · page 2' wraps over 3 lines (low), the remediation boxes fit, and the long evidence path wraps inside the card. Tiles 13-15: Declined candidates break the IDs at hyphens (low). The coverage table uses a stacked layout with a 2-row header (RULE…RESULT / APPLICABLE…FLOOR) that takes a moment to map (low), but every number is readable. The footer is complete.",
+          "reviewArtifactFingerprint": "df4c81832f86f612137057b459ada0a5aada8b7779d0dd47d8fd6939466e27da",
           "reviewedArtifacts": [
             "insufficient-coverage--light--mobile.png",
             "insufficient-coverage--light--mobile--tile-01.png",
@@ -10827,9 +10827,9 @@
         "screen/insufficient-coverage/dark/desktop": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-insufficient-coverage",
-          "reviewedAt": "2026-11-21T10:19:47.990Z",
-          "note": "Tile 01: light text on a near-black background with high contrast. The masthead has a white left bar, and the badge and headline are clearly legible. Tile 02: the orange-ruled contract callout and the light-blue link in Next checks stand out well. Tiles 03-07: ERROR labels and card top rules are orange and WARNING cards are white-ruled. The 'untested' pills are outlined, remediation boxes are dark grey with readable text, and evidence links are light blue. Tile 08: the table's 'Below floor' is orange and the gridlines are subtle but visible. Layout matches light desktop, including the low remediation-width item.",
-          "reviewArtifactFingerprint": "706c159b9e1ea3789783116fc318a6133c33dca3bb63ba4cea79e91579c6ec0d",
+          "reviewedAt": "2026-11-21T10:43:42.850Z",
+          "note": "Tile 01: the dark hero has a white border and left bar, and the light headline is strongly legible. The COVERAGE TRUST card has a white top rule, the other cards have grey rules, and the card heights are equally uneven as in light mode (low). Tiles 02-03: the link in next check 3 is light blue, the contract callout has an orange left border, and muted grey helper text stays readable. Tiles 03-07: ERROR labels and top borders are orange, WARNING cards have white top borders, the EXPERIMENTAL and untested badges are outlined, and the evidence links are light blue. The remediation and note boxes on dark grey keep enough contrast. Tile 08: the table shows 'Below floor' in orange with an orange accent bar, the other results are bold white, and nothing is clipped.",
+          "reviewArtifactFingerprint": "b39cc435d1078e2249ff16170a15124d37670ebe0d9db123e760be30d0fb7e2c",
           "reviewedArtifacts": [
             "insufficient-coverage--dark--desktop.png",
             "insufficient-coverage--dark--desktop--tile-01.png",
@@ -10847,9 +10847,9 @@
         "screen/insufficient-coverage/dark/tablet": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-insufficient-coverage",
-          "reviewedAt": "2026-11-21T10:19:47.990Z",
-          "note": "Tiles 01-02: the dark masthead, 2-row nav, 2x2 summary tiles and 2-column metadata grid match light tablet one to one. Tiles 03-08: the orange accent appears on the contract callout and on ERROR cards 02/04. Muted grey labels (DOCUMENT, SOURCE, MEASURED) stay legible against the card background. Tiles 08-09: the table fits the width with slash-wrapped rule names (low), and 'Below floor' is orange. The footer is fully visible.",
-          "reviewArtifactFingerprint": "ea2d2ab26617acc59465644b7b76150553d109755b1b3366a1e4da1295776425",
+          "reviewedAt": "2026-11-21T10:43:42.850Z",
+          "note": "Tiles 01-02: the dark hero matches the light tablet layout: one-line run id, 2-row nav, 2x2 summary cards and a 2-line configuration hash. Tiles 03-08: the orange callout border and orange ERROR card borders hold up well against the dark background. The 2-column finding fields wrap SOURCE onto 2 lines, and the light-blue evidence links wrap inside the cards. Tiles 08-09: Declined candidates and the coverage table wrap rule IDs after '/' exactly as in light mode (low). 'Below floor' is orange, and the footer 'End of report… JSON remains the canonical report.' is intact.",
+          "reviewArtifactFingerprint": "c6754af9a52d14268d8caec9e9f9c248b1b4ab8c691d1528d193f17ff2b6b920",
           "reviewedArtifacts": [
             "insufficient-coverage--dark--tablet.png",
             "insufficient-coverage--dark--tablet--tile-01.png",
@@ -10868,9 +10868,9 @@
         "screen/insufficient-coverage/dark/mobile": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-insufficient-coverage",
-          "reviewedAt": "2026-11-21T10:19:47.990Z",
-          "note": "Tiles 01-04: the stacked masthead, 3-row nav and single-column summary tiles all read well on dark. Tiles 04-05: the light-blue Next checks link wraps at the slash, and the orange-ruled callout is fully contained. Tiles 05-13: the six cards stack in a single column, the 'untested' pills and grey remediation boxes are legible, and the evidence path wraps over 3 lines without clipping. Tiles 14-15: the stacked coverage table shows orange 'Below floor' for layout/widow, then the footer; the two-row header is the same low item as light mobile.",
-          "reviewArtifactFingerprint": "c9ef93370577675ba4bd4bca98c646f18add7d6f68b1e7794b84eebc2ac21d61",
+          "reviewedAt": "2026-11-21T10:43:42.850Z",
+          "note": "Tiles 01-04: the dark hero, 3-row nav, stacked summary cards, single-column metadata and 2-line hash all match the light mobile layout. The contract callout with its orange border and the light-blue next-check link are legible. Tiles 05-13: findings 01-06 stack their fields, the untested badges are outlined, the orange ERROR headers stand out, and the long evidence paths wrap inside the cards without horizontal overflow. Tiles 13-15: Declined candidates break the IDs at hyphens. The stacked coverage table has the same 2-row header mapping as light mobile (low), 'Below floor' is orange, and the footer is complete.",
+          "reviewArtifactFingerprint": "721432afa1c350baec387bca8acb06f96d9de69014ac78e7ae7c579aafe77dc9",
           "reviewedArtifacts": [
             "insufficient-coverage--dark--mobile.png",
             "insufficient-coverage--dark--mobile--tile-01.png",
@@ -10895,13 +10895,13 @@
         "print/insufficient-coverage/pdf": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-insufficient-coverage",
-          "reviewedAt": "2026-11-21T10:19:47.990Z",
-          "note": "Page 1: the masthead carries the badge, headline and 'Build fails (exit 4)', plus Run summary tiles and the first 2 metadata rows. The Coverage trust card is much taller than the empty count tiles (low), and the page has a 'Page 1 of 8' footer. Page 2 starts with the running header ('breaklint · Not enough was measured · exit 4' on the left, run ID on the right), then the rest of the metadata grid (grid break, low), Next checks and the contract callout. Pages 3-6: findings 01-05 use a 3-column fact grid and the print tail labels ('FINDING 0X … REMEDIATION AND EVIDENCE'). Pages 4 and 5 each hold one card and leave a large blank bottom area (medium). Card 05 continues from page 6 to page 7 with a clean break before its remediation. Pages 7-8: card 06, Declined candidates, and the full 13-row coverage table with dark-red 'Below floor'. The End-of-report line appears on page 8, and running headers and 'Page N of 8' footers are present on every page.",
-          "reviewArtifactFingerprint": "8b7f38341a0ee97ecde3ccb54530ff77c230c24a15dd1f8838c5397daed761c8",
+          "reviewedAt": "2026-11-21T10:43:42.850Z",
+          "note": "Judged through the 8 A4 rasters. Page 1 contains the full hero (version, schema and run id on one line, INCOMPLETE · EXIT 4, headline, 'Build fails (exit 4).'), the run summary cards, where the empty ERRORS/WARNINGS/INFORMATION cards stretch to the tall COVERAGE TRUST text (low), and the first 2 metadata rows. Each page 2-8 has the running header 'breaklint · Not enough was measured · exit 4' with the run id on the right and the footer 'Page N of 8'. On page 2 the configuration hash wraps over 4 lines (low), followed by next checks and the contract callout. Findings 01-04 each start on their own page, with 3-column fields and 'FINDING 0N · rule · REMEDIATION AND EVIDENCE' sub-labels, leaving about 15-35% blank space at the bottom of pages 3-5 (low). Finding 05 splits from page 6 to page 7 with a continuation label. Page 8 holds the remaining declined candidates and the full 13-row coverage table, where 'Below floor' is in dark red, then the end-of-report line.",
+          "reviewArtifactFingerprint": "e77bd9cfd09e066d7b732f72d08dc1c380a85fbe5bba2efafdaf5ff0e4bbafca",
           "reviewedArtifacts": [
             "insufficient-coverage--a4.pdf"
           ],
-          "reviewedRawSha256": "626e233c26bb8d05a0721ae111b8963d5d55a905c52c0051b81bd3f911518eda",
+          "reviewedRawSha256": "7ef610429b8a5d87553fd1d608e15c5295c18a931fb0da3c6c4a4a2d58846fe8",
           "reviewedPages": [
             1,
             2,
@@ -10916,9 +10916,9 @@
         "print/insufficient-coverage/raster-set": {
           "status": "pass",
           "reviewer": "@ClaudeOpus-insufficient-coverage",
-          "reviewedAt": "2026-11-21T10:19:47.990Z",
-          "note": "All 8 A4 rasters are present and numbered 1-8 to match the 'Page N of 8' footers. Nothing is clipped at the margins, and text and code identifiers are crisp at raster resolution. Content and order match the screen surfaces: the same verdict, counts (2 errors / 4 warnings / 0 info), findings 01-06 with matching units, the 3 declined candidates and the coverage table values. Visually, print drops the screen nav and uses black evidence text instead of link colour, which suits print. The only issues are the medium whitespace on pages 4-5 and the low grid break between pages 1 and 2.",
-          "reviewArtifactFingerprint": "d1a6caf84ce0ebfeb70845651a48e043ff3640a08c3fa7cbd7a941b1ec4f7094",
+          "reviewedAt": "2026-11-21T10:43:42.850Z",
+          "note": "The raster set is complete and in order: a4-page-1 to a4-page-8 match the 'Page 1 of 8' to 'Page 8 of 8' footers, with no missing or duplicated page. Its content matches the screen surfaces: same verdict, same 6 findings with the same units, the 3 declined candidates and the 13-row coverage table. Text is crisp and the margins are consistent. Print uses black evidence links and light-beige remediation boxes, which stay legible. Running headers and page footers are on every page from 2 to 8, and page 1 carries the hero instead of a running header.",
+          "reviewArtifactFingerprint": "9575b8071bdc28c1a4a96641fd5b29a337ff5069705b99baf01f1c46b7f21e70",
           "reviewedArtifacts": [
             "insufficient-coverage--a4-page-1.png",
             "insufficient-coverage--a4-page-2.png",
