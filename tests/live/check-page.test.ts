@@ -565,6 +565,21 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.equal(v.findings.some((f) => f.target.selector === "#drawn"), false, JSON.stringify(v.findings));
     assert.equal(svgFinding(v, "#html-cut"), undefined);
     assert.ok(clipFinding(v, "#html-cut"), "an outer HTML clip stays measurable");
+
+    // <tspan>/<textPath> belong to their <text>; <g> and shapes are not clipped content. One
+    // label defect stays one finding, also for the multi-line labels chart libraries emit, and a
+    // label entirely outside the viewport does not make the run insufficient.
+    const oneDefect = async (html: string, scenario: string, selector: string) => {
+      const res = await inspect(html, scenario);
+      const dump = JSON.stringify({ verdict: res.report.runVerdict, findings: res.report.findings.map((f) => [f.severity, f.ruleId, f.target.selector]), notMeasured: res.report.evaluations.filter((e) => e.status === "not-measured").map((e) => [e.target.selector, e.ruleId, e.reason]) });
+      assert.equal(res.report.runVerdict, "findings", `${scenario} ${dump}`);
+      assert.equal(res.report.findings.length, 1, `${scenario} ${dump}`);
+      assert.ok(svgFinding(res.report, selector), `${scenario} ${dump}`);
+    };
+    await oneDefect('<svg width="120" height="60" viewBox="0 0 120 60"><g><text id="lbl" x="60" y="30" text-anchor="middle"><tspan id="sp" x="60" dy="0.71em">A very long axis label value</tspan></text></g></svg>', "svg-tspan-chart-label", "#lbl");
+    await oneDefect('<svg width="100" height="40"><text id="tsp-partly" x="0" y="20"><tspan id="tsp-partly-span">This label is far too long for the box</tspan></text></svg>', "svg-tspan-partly", "#tsp-partly");
+    await oneDefect('<svg width="100" height="40"><text id="tsp-outside" x="200" y="20"><tspan id="tsp-outside-span">Gone</tspan></text></svg>', "svg-tspan-outside", "#tsp-outside");
+    await oneDefect('<svg width="100" height="40"><defs><path id="arc" d="M 0 20 L 400 20"/></defs><text id="on-path"><textPath id="on-path-span" href="#arc">A label along a path that runs out</textPath></text></svg>', "svg-textpath", "#on-path");
   });
 
   it("does not measure SVG content with scrollWidth for web/unexpected-horizontal-overflow, while real HTML overflow next to it is found", async (t) => {

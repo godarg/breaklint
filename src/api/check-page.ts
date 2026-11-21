@@ -359,7 +359,9 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
       // SVG text is measured against the SVG viewports that clip it (content box of the outer
       // <svg>, x/y/width/height of a nested <svg>), in client CSS pixels, before the generic
       // ancestor classification. Clipping by an SVG viewport is decided by that rule alone (one
-      // defect, one finding); HTML ancestors stay with the generic web/content-clipped check.
+      // defect, one finding): for every target inside an <svg> (the <text> itself, its <tspan> and
+      // <textPath>, which belong to it, and <g>/shapes, which are not clipped content) the generic
+      // check skips SVG ancestors. HTML ancestors stay with the generic web/content-clipped check.
       let svgViewportOverflow = 0; let svgClipped = false;
       if (state === "candidate" && isSvgText) {
         for (let part = node.parentElement; part instanceof SVGElement; part = part.parentElement) {
@@ -371,7 +373,7 @@ export async function samplePage(page: StructuralPage, input: SampleInput): Prom
         }
       }
       let ancestor: Element | null = node.parentElement;
-      if (isSvgText) while (ancestor instanceof SVGElement) ancestor = ancestor.parentElement;
+      if (isSvgText || svgInterior) while (ancestor instanceof SVGElement) ancestor = ancestor.parentElement;
       while (state === "candidate" && ancestor) {
         const ps = getComputedStyle(ancestor); const clip = [ps.overflow, ps.overflowX, ps.overflowY].some((v) => v === "hidden" || v === "clip");
         if (clip && box) {
