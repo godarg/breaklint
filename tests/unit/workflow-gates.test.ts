@@ -326,4 +326,79 @@ describe("workflow gates", () => {
       }
     });
   });
+
+  /*
+   * GitHub forces Node-20 actions onto Node 24 with a deprecation warning in every run, and they
+   * stop working without a commit here once the Node-20 runtime is removed. Each `uses:` names a
+   * full commit SHA and the exact release it is, one SHA per action across all workflows and the
+   * CI recipe users copy. A job without timeout-minutes may hold a runner for six hours.
+   */
+  describe("pinned Node-24 actions and bounded jobs", () => {
+    const FILES = [
+      ".github/workflows/ci.yml",
+      ".github/workflows/release.yml",
+      ".github/workflows/community-intake.yml",
+      ".github/workflows/m3-1-attest.yml",
+      "docs/ci-recipe.md",
+    ] as const;
+    // The releases pinned until 0.11.0, each measured from its own action.yml: `using: node20`.
+    const NODE20: Record<string, string> = {
+      "11d5960a326750d5838078e36cf38b85af677262": "actions/checkout v4.4.0",
+      "49933ea5288caeca8642d1e84afbd3f7d6820020": "actions/setup-node v4.4.0",
+      "ea165f8d65b6e75b540449e92b4886f43607fa02": "actions/upload-artifact v4.6.2",
+      "d3f86a106a0bac45b974a628896c90dbdf5c8093": "actions/download-artifact v4.3.0",
+    };
+    const usesOf = (path: string) => readLines(path).flatMap((line, index) => {
+      const match = /^\s*(?:-\s+)?uses:\s*(\S+?)@(\S+)(?:\s+#\s*(.*))?$/u.exec(line);
+      return match && !match[1]!.startsWith("./") && !match[1]!.startsWith("godarg/breaklint")
+        ? [{ at: `${path}:${index + 1}`, action: match[1]!, ref: match[2]!, comment: match[3]?.trim() ?? "" }]
+        : [];
+    });
+
+    it("every remote action is pinned to a full SHA with its exact release, one SHA per action, none a Node-20 release", () => {
+      const uses = FILES.flatMap(usesOf);
+      assert.ok(uses.length >= 20, `only ${uses.length} uses: lines found; this guard has lost its subject`);
+      const bySha = new Map<string, string>();
+      for (const { at, action, ref, comment } of uses) {
+        assert.equal(NODE20[ref], undefined, `${at}: ${action}@${ref} is ${NODE20[ref]}, which runs on Node 20`);
+        assert.match(ref, /^[0-9a-f]{40}$/u, `${at}: ${action} is not pinned to a full commit SHA`);
+        assert.match(comment, /^v\d+\.\d+\.\d+$/u, `${at}: ${action}@${ref} does not name its exact release (# vX.Y.Z), it says "${comment}"`);
+        const key = `${action}@${ref}`;
+        const named = bySha.get(key);
+        assert.ok(named === undefined || named === comment, `${at}: ${key} is called ${comment} here and ${named} elsewhere`);
+        bySha.set(key, comment);
+      }
+      const shasPerAction = new Map<string, Set<string>>();
+      for (const { action, ref } of uses) shasPerAction.set(action, (shasPerAction.get(action) ?? new Set()).add(ref));
+      for (const [action, shas] of shasPerAction) assert.equal(shas.size, 1, `${action} is pinned to ${shas.size} different SHAs: ${[...shas].join(", ")}`);
+    });
+
+    it("every job of every workflow sets timeout-minutes, and the publish job's covers its registry wait", () => {
+      for (const path of FILES.filter((file) => file.endsWith(".yml"))) {
+        const jobs = jobsOf(readLines(path));
+        assert.ok(jobs.length > 0, `${path} has no jobs; this guard has lost its subject`);
+        for (const job of jobs) {
+          const limit = job.lines.map(({ text }) => /^ {4}timeout-minutes:\s*(\d+)\s*$/u.exec(text)).find(Boolean);
+          assert.ok(limit, `${path} job ${job.name} sets no timeout-minutes; the default holds a runner for 360 minutes`);
+          assert.ok(Number(limit[1]) <= 60, `${path} job ${job.name}: timeout-minutes ${limit[1]} is no bound`);
+        }
+      }
+      // The oracle is the publish job's own polling loop, not a number copied here.
+      const publish = jobsOf(readLines(".github/workflows/release.yml")).find((job) => job.name === "publish");
+      assert.ok(publish, "release.yml has no publish job");
+      const body = publish.lines.map(({ text }) => text).join("\n");
+      const attempts = /for attempt in \$\(seq 1 (\d+)\)/u.exec(body);
+      const pause = /^\s*sleep (\d+)\s*$/mu.exec(body);
+      assert.ok(attempts && pause, "the publish job's registry polling loop has moved; this guard has lost its subject");
+      const waitMinutes = (Number(attempts[1]) * Number(pause[1])) / 60;
+      const limit = Number(/^ {4}timeout-minutes:\s*(\d+)/mu.exec(body)?.[1]);
+      assert.ok(limit >= waitMinutes + 15, `publish timeout-minutes ${limit} does not cover the ${waitMinutes}-minute registry wait plus installation, signature check and consumer gate`);
+    });
+
+    it("the publish job, which can write releases and request an OIDC token, restores no dependency cache", () => {
+      const publish = jobsOf(readLines(".github/workflows/release.yml")).find((job) => job.name === "publish");
+      assert.ok(publish, "release.yml has no publish job");
+      assert.deepEqual(publish.lines.filter(({ text }) => /^\s*cache\s*:/u.test(executablePart(text))).map(({ number, text }) => `${number}: ${text.trim()}`), []);
+    });
+  });
 });
