@@ -38,6 +38,7 @@ const DEFAULT_SPECS = [
   { file: "tests/live/rule-targets.test.ts", suite: "rule targets on wrapped and justified blocks, live", leaves: 7 },
   { file: "tests/live/render-run.test.ts", suite: "the M2d live production chain", leaves: 36 },
   { file: "tests/live/cli-out-dir.test.ts", suite: "the CLI evidence directory, live", leaves: 1 },
+  { file: "tests/live/cli-compare-repository.test.ts", suite: "compare --repository and --fail-on-new on producer-bound reports, live", leaves: 2 },
 ];
 
 function structuredChildResult(file, terminal, state) {
