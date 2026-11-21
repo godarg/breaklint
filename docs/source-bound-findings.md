@@ -121,17 +121,21 @@ the scenario; the adapter records current route, viewport, browser and screensho
 authority. Document text cannot authorize new network access.
 
 The `web-geometry-v2` semantics (`PublicScreenReport` schema 2; readers accept Screen 1 and 2) cover
-unexpected horizontal overflow, content cut by rectangular clipping ancestors, visible HTML sibling
-overlap (`web/sibling-overlap`), SVG text extending past its viewport (`web/svg-text-overflows-viewport`),
-and opt-in typography/touch-target advisories (`web/small-text`, `web/small-touch-target`). When
+unexpected horizontal overflow (HTML boxes; content inside an `<svg>` is not measured by
+`scrollWidth`), content cut by rectangular clipping ancestors, SVG text extending past the SVG
+viewport that clips it (`web/svg-text-overflows-viewport`; with `overflow: visible` the rule does not
+apply), and the opt-in advisories `web/sibling-overlap`, `web/small-text` and `web/small-touch-target`. When
 `output.screenshot` is `"full-page"`, targets across the full document height are measured in
 `css-document-pixels`; viewport screenshots measure the visible viewport in `css-viewport-pixels`.
 Named allowed scroll containers and intentional overlays retain reasons, match counts, and optional
-`scope: "scenario" | "suite"` metadata. Hidden/off-viewport nodes are exclusions, not positive repairs;
+`scope: "scenario" | "suite"` metadata. Hidden/off-viewport nodes and content that is not rendered
+(the body of a closed `<details>`, contents of `content-visibility: hidden`, and contents that
+`content-visibility: auto` leaves unpainted in the capture) are exclusions, not positive repairs;
 inert/ARIA alone do not hide geometry. CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`,
 `hwb()`, `color(...)`) are parsed for alpha visibility; semi-transparent opacity (`0 < opacity < 1`),
-`filter`, and `backdrop-filter` do not disqualify geometry rules, while `opacity: 0` stays
-`evidence/target-not-visible`. Non-axis-aligned transforms, masks, clip-paths, active animations,
+`filter`, and `backdrop-filter` do not disqualify geometry rules, while an effective opacity of 0
+(`opacity` and `filter: opacity()` multiplied along the ancestors) is excluded as
+`target/not-visible`. Non-axis-aligned transforms, masks, clip-paths, active animations,
 capture drift (reported via `capture.driftDetails` after the bounded stabilization loop), font timeout,
 and truncated inventory prevent a clean claim.
 
