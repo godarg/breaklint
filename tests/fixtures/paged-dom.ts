@@ -304,6 +304,7 @@ export function fakePrimitives(document: FakeNode, hooks: {
     ruleCssText: () => "",
     nestedRules: () => [],
     integrityArmLate: () => undefined,
+    on: () => undefined,
     registerPagedHandler: (_capability: string, handler: unknown) => hooks.registerPagedHandler?.(handler),
     installCollector: (_capability: string, _nonce: string, result: () => unknown) => hooks.installCollector?.(result),
     installIntegrity: (_capability: string, value: unknown) => hooks.installIntegrity?.(value),

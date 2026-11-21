@@ -591,7 +591,12 @@ describe("report-surface human review gate", () => {
     assert.equal(createHash("sha256").update(JSON.stringify(ledger.rounds.slice(0, 6))).digest("hex"),
       "5526ecc6f4c90e49c9572e9999495750e93ccd0bb131b688618bf42f16d9a074",
       "the complete six historical rounds remain unchanged");
-    assert.equal(current.latest.delegation?.release, ledger.rounds.length === 6 ? "0.9.0" :
+    if (ledger.rounds.length >= 8) {
+      assert.equal(createHash("sha256").update(JSON.stringify(ledger.rounds.slice(0, 8))).digest("hex"),
+        "7a5aac35065f6da75b0f15a65b8c2860718adb312058bfdfc59205a0a368f3a2",
+        "the complete eight historical rounds remain unchanged");
+    }
+    assert.equal(current.latest.delegation?.release, ledger.rounds.length === 6 ? "0.9.0" : ledger.rounds.length === 8 ? "0.10.0" :
       (JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string }).version);
     const summary = summarizeLatestRound(ledger);
     assert.equal(summary.passingCells, 32);
