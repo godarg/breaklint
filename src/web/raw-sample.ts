@@ -39,6 +39,8 @@ export type RawSample = {
   signature: RawSampleSignature; fontsReady: boolean; deviceScaleFactor: number; candidates: number; omittedCount: number;
   signatureTextComplete: boolean; ancestorSignatureComplete: boolean;
   exceptions: { allowed: number[]; overlay: number[]; allowedRoot: boolean[]; overlayRoot: boolean[] }; targets: RawTarget[];
+  /** Test-only: the in-page color parser applied to SampleInput.colorProbe. */
+  colorProbe?: (number | null)[];
 };
 export type BrowserRawTarget = Omit<RawTarget, "directTextSha256"> & { directText: string | null };
 export type BrowserRawSample = Omit<RawSample, "targets"> & { targets: BrowserRawTarget[] };

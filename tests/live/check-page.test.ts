@@ -7,7 +7,7 @@ import { after, before, describe, it } from "node:test";
 
 import { launchBrowser, resolveBrowser, type BrowserLike, type PageLike } from "../../src/acquire/browser.ts";
 import { cleanupBrowserProfile, closeBrowserBounded } from "../../src/acquire/render-run.ts";
-import { checkPage } from "../../src/api/check-page.ts";
+import { checkPage, parseCssColorAlpha, samplePage } from "../../src/api/check-page.ts";
 import type { StructuralPage } from "../../src/web/types.ts";
 
 const REPO = new URL("../..", import.meta.url).pathname;
@@ -161,6 +161,32 @@ describe("screen checkPage host-page adapter, live", () => {
         assert.equal(calls.length, 1, `${field}: ${JSON.stringify(calls)}`);
       } finally { await page.close(); }
     }
+  });
+
+  it("parses the same color table identically in the exported parser and in the in-page sampler, with channels validated per function", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    // [color, expected alpha]: null = unrecognized, fail closed.
+    const table: [string, number | null][] = [
+      ["transparent", 0], ["rgb(10, 20, 30)", 1], ["rgba(10, 20, 30, 0.4)", 0.4], ["rgb(10 20 30 / 50%)", 0.5], ["rgb(none 20 30)", 1],
+      ["rgb(10% 20% 30% / none)", 0], ["hsl(120 40% 50% / 0.25)", 0.25], ["hsl(120deg 40% 50%)", 1], ["hsl(0.5turn, 40%, 50%)", 1],
+      ["hwb(200 10% 20%)", 1], ["hwb(3rad 10% 20% / .5)", 0.5], ["lab(55% 20 -30 / 80%)", 0.8], ["lch(55% 40 240deg)", 1],
+      ["oklab(0.6 0.1 -0.1 / 0)", 0], ["oklch(0.7 0.15 1turn / 0.75)", 0.75], ["color(srgb 0.2 0.4 0.6)", 1], ["color(display-p3 1 50% 0 / 50%)", 0.5],
+      // Angles are hues: never an RGB, Lab, color() or saturation/lightness channel.
+      ["rgb(10deg 20 30)", null], ["rgb(10, 20deg, 30)", null], ["rgba(10 20 30turn / 1)", null], ["hsl(120 40deg 50%)", null],
+      ["hwb(200 10% 20rad)", null], ["lab(50% 20deg 0)", null], ["oklab(0.5 0.1 1grad)", null], ["lch(55deg 40 240)", null],
+      ["oklch(0.7 1turn 180)", null], ["color(srgb 1deg 0 0)", null],
+      // Legacy comma syntax has no `none`; legacy hsl needs percentages.
+      ["rgb(none, 20, 30)", null], ["hsl(120, 40, 50)", null],
+      ["url(#grad)", null], ["rgb(foo bar baz)", null], ["oklch(0.7 0.15 180 / 1.5)", null], ["rgb(255, 0, 0, )", null],
+    ];
+    const page = await open("<p>colors</p>");
+    try {
+      const sampled = await samplePage(hostPage(page, 640), { maxTargets: 10, allowed: [], overlays: [], containers: [], fullPage: false, siblingOverlap: false, colorProbe: table.map(([color]) => color) });
+      const inPage = sampled.colorProbe ?? [];
+      const exported = table.map(([color]) => parseCssColorAlpha(color));
+      assert.deepEqual(inPage, exported, "in-page and exported parser disagree");
+      assert.deepEqual(exported, table.map(([, expected]) => expected), JSON.stringify(table.map(([color], i) => [color, exported[i]])));
+    } finally { await page.close(); }
   });
 
   it("finds visible content cut by an overflow:hidden rectangle", async (t) => {

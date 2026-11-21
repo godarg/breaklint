@@ -29,7 +29,7 @@ const DEFAULT_SPECS = [
   { file: "tests/live/network-lifecycle.test.ts", suite: "CDP lifecycle at the real HTTP boundary", leaves: 1 },
   { file: "tests/live/figure-checks.test.ts", suite: "source-bound figure checks, live", leaves: 7 },
   { file: "tests/live/evidence.test.ts", suite: "evidence path, live", leaves: 18 },
-  { file: "tests/live/check-page.test.ts", suite: "screen checkPage host-page adapter, live", leaves: 17 },
+  { file: "tests/live/check-page.test.ts", suite: "screen checkPage host-page adapter, live", leaves: 18 },
   { file: "tests/live/overlay-page-membership.test.ts", suite: "evidence overlay page membership, live", leaves: 2 },
   { file: "tests/live/measure.test.ts", suite: "the measurement probe, live", leaves: 8 },
   { file: "tests/live/breaks.test.ts", suite: "the collector, live", leaves: 22 },

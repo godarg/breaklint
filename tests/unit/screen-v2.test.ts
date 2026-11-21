@@ -48,6 +48,9 @@ describe("Paket 2: CSS Color 4 alpha parser", () => {
     assert.equal(parseCssColorAlpha("rgb(foo bar baz)"), null);
     assert.equal(parseCssColorAlpha("oklch(not a color)"), null);
     assert.equal(parseCssColorAlpha("color(srgb foo bar baz / 0.5)"), null);
+    // An angle is only a hue (CDX-10): never an RGB channel.
+    assert.equal(parseCssColorAlpha("rgb(10deg 20 30)"), null);
+    assert.equal(parseCssColorAlpha("hsl(120deg 40% 50%)"), 1);
   });
 });
 

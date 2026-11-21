@@ -37,7 +37,27 @@ const CSS_COLOR_SPACES = new Set([
 ]);
 
 const COLOR_NUM_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/u;
-const COLOR_CHANNEL_RE = /^(?:none|[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?(?:%|deg|rad|grad|turn)?)$/u;
+// Channel grammar per color function (CSS Color 4): n = number, p = percentage, a = angle (hue
+// only), x = none. Legacy comma syntax exists only for rgb()/hsl() and has no `none`.
+const COLOR_CHANNELS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["rgb", ["npx", "npx", "npx"]], ["rgba", ["npx", "npx", "npx"]], ["hsl", ["nax", "npx", "npx"]], ["hsla", ["nax", "npx", "npx"]],
+  ["hwb", ["nax", "npx", "npx"]], ["lab", ["npx", "npx", "npx"]], ["oklab", ["npx", "npx", "npx"]], ["lch", ["npx", "npx", "nax"]],
+  ["oklch", ["npx", "npx", "nax"]], ["color", ["npx", "npx", "npx"]],
+]);
+const LEGACY_COLOR_CHANNELS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["rgb", ["np", "np", "np"]], ["rgba", ["np", "np", "np"]], ["hsl", ["na", "p", "p"]], ["hsla", ["na", "p", "p"]],
+]);
+
+function colorChannelKind(token: string): string | null {
+  if (token === "none") return "x";
+  if (token.endsWith("%")) return COLOR_NUM_RE.test(token.slice(0, -1)) ? "p" : null;
+  const angle = /^(.*?)(?:deg|grad|rad|turn)$/u.exec(token);
+  if (angle) return COLOR_NUM_RE.test(angle[1]!) ? "a" : null;
+  return COLOR_NUM_RE.test(token) ? "n" : null;
+}
+function colorChannelsValid(tokens: readonly string[], kinds: readonly string[]): boolean {
+  return tokens.length === kinds.length && tokens.every((token, index) => { const kind = colorChannelKind(token); return kind !== null && kinds[index]!.includes(kind); });
+}
 
 function parseAlphaToken(token: string): number | null {
   const trimmed = token.trim().toLowerCase();
@@ -54,8 +74,10 @@ function parseAlphaToken(token: string): number | null {
 }
 
 /**
- * Parses the alpha channel (0..1) of a CSS Color 3 or CSS Color 4 computed color string.
- * Returns null for unrecognized or non-solid paint syntax (e.g. url(#gradient)), failing closed.
+ * Parses the alpha channel (0..1) of a CSS Color 3 or CSS Color 4 computed color string, with the
+ * channel grammar of each color function (an angle is only a hue). Returns null for unrecognized or
+ * non-solid paint syntax (e.g. url(#gradient)), failing closed. The in-page sampler carries a copy
+ * of this parser; a live differential test keeps both on one table.
  */
 export function parseCssColorAlpha(color: string): number | null {
   const trimmed = color.trim().toLowerCase();
@@ -64,35 +86,25 @@ export function parseCssColorAlpha(color: string): number | null {
   if (!fnMatch) return null;
   const fn = fnMatch[1]!;
   const body = fnMatch[2]!.trim();
-  if (fn === "rgb" || fn === "rgba" || fn === "hsl" || fn === "hsla") {
-    if (body.includes(",")) {
-      const parts = body.split(",").map((s) => s.trim());
-      if (parts.some((p) => p === "")) return null;
-      if (parts.length !== 3 && parts.length !== 4) return null;
-      if (!parts.slice(0, 3).every((p) => COLOR_CHANNEL_RE.test(p))) return null;
-      return parts.length === 4 ? parseAlphaToken(parts[3]!) : 1;
-    }
-    const slashParts = body.split("/");
-    if (slashParts.length > 2) return null;
-    const channels = slashParts[0]!.trim().split(/\s+/u).filter(Boolean);
-    if (channels.length !== 3 || !channels.every((c) => COLOR_CHANNEL_RE.test(c))) return null;
-    return slashParts.length === 2 ? parseAlphaToken(slashParts[1]!) : 1;
+  const modern = COLOR_CHANNELS.get(fn);
+  if (!modern) return null;
+  if (body.includes(",")) {
+    const legacy = LEGACY_COLOR_CHANNELS.get(fn);
+    if (!legacy) return null;
+    const parts = body.split(",").map((part) => part.trim());
+    if (parts.length !== 3 && parts.length !== 4) return null;
+    if (!colorChannelsValid(parts.slice(0, 3), legacy)) return null;
+    return parts.length === 4 ? parseAlphaToken(parts[3]!) : 1;
   }
-  if (fn === "hwb" || fn === "lab" || fn === "lch" || fn === "oklab" || fn === "oklch") {
-    const slashParts = body.split("/");
-    if (slashParts.length > 2) return null;
-    const channels = slashParts[0]!.trim().split(/\s+/u).filter(Boolean);
-    if (channels.length !== 3 || !channels.every((c) => COLOR_CHANNEL_RE.test(c))) return null;
-    return slashParts.length === 2 ? parseAlphaToken(slashParts[1]!) : 1;
-  }
+  const slashParts = body.split("/");
+  if (slashParts.length > 2) return null;
+  let tokens = slashParts[0]!.trim().split(/\s+/u).filter(Boolean);
   if (fn === "color") {
-    const slashParts = body.split("/");
-    if (slashParts.length > 2) return null;
-    const tokens = slashParts[0]!.trim().split(/\s+/u).filter(Boolean);
-    if (tokens.length !== 4 || !CSS_COLOR_SPACES.has(tokens[0]!) || !tokens.slice(1).every((c) => COLOR_CHANNEL_RE.test(c))) return null;
-    return slashParts.length === 2 ? parseAlphaToken(slashParts[1]!) : 1;
+    if (!CSS_COLOR_SPACES.has(tokens[0] ?? "")) return null;
+    tokens = tokens.slice(1);
   }
-  return null;
+  if (!colorChannelsValid(tokens, modern)) return null;
+  return slashParts.length === 2 ? parseAlphaToken(slashParts[1]!) : 1;
 }
 
 function pngSize(bytes: Uint8Array): { widthPx: number; heightPx: number } | null {
@@ -109,7 +121,11 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<{
   finally { if (timer) clearTimeout(timer); }
 }
 
-async function samplePage(page: StructuralPage, input: { maxTargets: number; allowed: string[]; overlays: string[]; containers: string[]; fullPage: boolean; siblingOverlap: boolean }): Promise<RawSample> {
+/** Private sampler input. `colorProbe` lets the differential test run the in-page color parser on a table. */
+export interface SampleInput { maxTargets: number; allowed: string[]; overlays: string[]; containers: string[]; fullPage: boolean; siblingOverlap: boolean; colorProbe?: string[] }
+
+/** One in-page sample of the host page. Exported for tests only; not part of the public index. */
+export async function samplePage(page: StructuralPage, input: SampleInput): Promise<RawSample> {
   const sampled: BrowserRawSample = await page.evaluate(async (options) => {
     type Box = { x: number; y: number; width: number; height: number };
     const sx = window.scrollX;
@@ -127,9 +143,27 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
     const domPath = (node: Element): string => { const parts: string[] = []; let cur: Element | null = node; while (cur && parts.length < 16) { const parentElement: Element | null = cur.parentElement; const i = parentElement ? [...parentElement.children].indexOf(cur) + 1 : 1; parts.push(`${cur.tagName.toLowerCase()}:nth-child(${i})`); cur = parentElement; } return parts.reverse().join(">"); };
     const selector = (node: Element, fallback: string): string => node.id ? `#${CSS.escape(node.id)}` : fallback;
 
+    // Copy of parseCssColorAlpha (no closure can cross into the page); the live differential test
+    // runs both on one table through SampleInput.colorProbe.
     const colorSpaces = new Set(["srgb", "srgb-linear", "display-p3", "a98-rgb", "prophoto-rgb", "rec2020", "xyz", "xyz-d50", "xyz-d65"]);
     const colorNumRe = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/u;
-    const colorChannelRe = /^(?:none|[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?(?:%|deg|rad|grad|turn)?)$/u;
+    const colorChannels = new Map<string, readonly string[]>([
+      ["rgb", ["npx", "npx", "npx"]], ["rgba", ["npx", "npx", "npx"]], ["hsl", ["nax", "npx", "npx"]], ["hsla", ["nax", "npx", "npx"]],
+      ["hwb", ["nax", "npx", "npx"]], ["lab", ["npx", "npx", "npx"]], ["oklab", ["npx", "npx", "npx"]], ["lch", ["npx", "npx", "nax"]],
+      ["oklch", ["npx", "npx", "nax"]], ["color", ["npx", "npx", "npx"]],
+    ]);
+    const legacyColorChannels = new Map<string, readonly string[]>([
+      ["rgb", ["np", "np", "np"]], ["rgba", ["np", "np", "np"]], ["hsl", ["na", "p", "p"]], ["hsla", ["na", "p", "p"]],
+    ]);
+    const channelKind = (token: string): string | null => {
+      if (token === "none") return "x";
+      if (token.endsWith("%")) return colorNumRe.test(token.slice(0, -1)) ? "p" : null;
+      const angle = /^(.*?)(?:deg|grad|rad|turn)$/u.exec(token);
+      if (angle) return colorNumRe.test(angle[1]!) ? "a" : null;
+      return colorNumRe.test(token) ? "n" : null;
+    };
+    const channelsValid = (tokens: readonly string[], kinds: readonly string[]): boolean =>
+      tokens.length === kinds.length && tokens.every((token, index) => { const kind = channelKind(token); return kind !== null && kinds[index]!.includes(kind); });
     const parseAlphaToken = (token: string): number | null => {
       const t = token.trim().toLowerCase();
       if (t === "none") return 0;
@@ -149,32 +183,21 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       const fnMatch = /^([a-z]+)\(([^()]+)\)$/u.exec(trimmed);
       if (!fnMatch) return null;
       const fn = fnMatch[1]!; const body = fnMatch[2]!.trim();
-      if (fn === "rgb" || fn === "rgba" || fn === "hsl" || fn === "hsla") {
-        if (body.includes(",")) {
-          const parts = body.split(",").map((s) => s.trim());
-          if (parts.some((p) => p === "")) return null;
-          if (parts.length !== 3 && parts.length !== 4) return null;
-          if (!parts.slice(0, 3).every((p) => colorChannelRe.test(p))) return null;
-          return parts.length === 4 ? parseAlphaToken(parts[3]!) : 1;
-        }
-        const sp = body.split("/"); if (sp.length > 2) return null;
-        const ch = sp[0]!.trim().split(/\s+/u).filter(Boolean);
-        if (ch.length !== 3 || !ch.every((c) => colorChannelRe.test(c))) return null;
-        return sp.length === 2 ? parseAlphaToken(sp[1]!) : 1;
+      const modern = colorChannels.get(fn);
+      if (!modern) return null;
+      if (body.includes(",")) {
+        const legacy = legacyColorChannels.get(fn);
+        if (!legacy) return null;
+        const parts = body.split(",").map((part) => part.trim());
+        if (parts.length !== 3 && parts.length !== 4) return null;
+        if (!channelsValid(parts.slice(0, 3), legacy)) return null;
+        return parts.length === 4 ? parseAlphaToken(parts[3]!) : 1;
       }
-      if (fn === "hwb" || fn === "lab" || fn === "lch" || fn === "oklab" || fn === "oklch") {
-        const sp = body.split("/"); if (sp.length > 2) return null;
-        const ch = sp[0]!.trim().split(/\s+/u).filter(Boolean);
-        if (ch.length !== 3 || !ch.every((c) => colorChannelRe.test(c))) return null;
-        return sp.length === 2 ? parseAlphaToken(sp[1]!) : 1;
-      }
-      if (fn === "color") {
-        const sp = body.split("/"); if (sp.length > 2) return null;
-        const tokens = sp[0]!.trim().split(/\s+/u).filter(Boolean);
-        if (tokens.length !== 4 || !colorSpaces.has(tokens[0]!) || !tokens.slice(1).every((c) => colorChannelRe.test(c))) return null;
-        return sp.length === 2 ? parseAlphaToken(sp[1]!) : 1;
-      }
-      return null;
+      const sp = body.split("/"); if (sp.length > 2) return null;
+      let tokens = sp[0]!.trim().split(/\s+/u).filter(Boolean);
+      if (fn === "color") { if (!colorSpaces.has(tokens[0] ?? "")) return null; tokens = tokens.slice(1); }
+      if (!channelsValid(tokens, modern)) return null;
+      return sp.length === 2 ? parseAlphaToken(sp[1]!) : 1;
     };
     const svgPaintAlpha = (paint: string, opacity: string): number | null => { if (paint.trim() === "none") return 0; const paintAlpha = alpha(paint); const componentOpacity = Number(opacity); return paintAlpha === null || !Number.isFinite(componentOpacity) || componentOpacity < 0 || componentOpacity > 1 ? null : paintAlpha * componentOpacity; };
     const transform = (style: CSSStyleDeclaration): string | null => { const v = style.transform; if (v === "none") return null; const match = v.match(/^matrix\(([^)]+)\)$/u); if (!match) return "unsupported-transform"; const n = match[1]!.split(",").map(Number); return n.length === 6 && Number.isFinite(n[0]) && Number.isFinite(n[3]) && n[0]! > 0 && n[3]! > 0 && n[1] === 0 && n[2] === 0 ? null : "unsupported-transform"; };
@@ -482,7 +505,7 @@ async function samplePage(page: StructuralPage, input: { maxTargets: number; all
       document: [document.documentElement.scrollWidth, document.documentElement.scrollHeight, document.documentElement.clientWidth, document.documentElement.clientHeight, nodes.length],
       fonts: document.fonts?.status ?? "unsupported",
     };
-    return { signature, fontsReady: document.fonts?.status === "loaded", deviceScaleFactor: devicePixelRatio, candidates: nodes.length, omittedCount: capped ? nodes.length - selected.length : 0, signatureTextComplete, ancestorSignatureComplete, exceptions: { allowed: allowedCounts, overlay: overlayCounts, allowedRoot: rootMatch(options.allowed), overlayRoot: rootMatch(options.overlays) }, targets };
+    return { signature, fontsReady: document.fonts?.status === "loaded", deviceScaleFactor: devicePixelRatio, candidates: nodes.length, omittedCount: capped ? nodes.length - selected.length : 0, signatureTextComplete, ancestorSignatureComplete, exceptions: { allowed: allowedCounts, overlay: overlayCounts, allowedRoot: rootMatch(options.allowed), overlayRoot: rootMatch(options.overlays) }, targets, ...(options.colorProbe ? { colorProbe: options.colorProbe.map(alpha) } : {}) };
   }, input);
 
   return digestBrowserSample(sampled, input.siblingOverlap);
