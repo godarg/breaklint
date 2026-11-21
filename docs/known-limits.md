@@ -101,4 +101,4 @@ repair, and reduced coverage is never a repair.
 ## Where the reasoning lives
 
 The argument behind the two error rules and the record of each release's limits are maintainer
-documents in the [source repository](https://github.com/godarg/breaklint/tree/main/maintainers).
+documents in the [source repository](https://github.com/godarg/breaklint/tree/v0.11.1/maintainers).

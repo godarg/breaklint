@@ -87,7 +87,7 @@ checks require exact source/runtime row/cell membership and content, visible exi
 supported flow; they do not invent headers or accept a wrapper as cell geometry.
 
 Ten selected examples received human labels; the maintainers record their selection, results and
-limits in [`maintainers/evaluation-0.10.md`](https://github.com/godarg/breaklint/blob/main/maintainers/evaluation-0.10.md).
+limits in [`maintainers/evaluation-0.10.md`](https://github.com/godarg/breaklint/blob/v0.11.1/maintainers/evaluation-0.10.md).
 Selected-example labels, rules adjusted from those labels, bounded validation and population
 calibration must be reported separately. `calibrated: false` remains the contract.
 

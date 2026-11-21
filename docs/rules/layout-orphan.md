@@ -23,7 +23,7 @@ The mirror of `layout/widow`, with the same permanent ceiling of `warn` for the 
   [`layout/widow`](layout-widow.md): a `<section>` whose second paragraph moved whole to the next
   page is not reported for its first paragraph's last line.
 - The known false alarms of `layout/widow` apply here too; see the
-  [measurement record](https://github.com/godarg/breaklint/blob/main/maintainers/rule-notes/layout-orphan.md).
+  [measurement record](https://github.com/godarg/breaklint/blob/v0.11.1/maintainers/rule-notes/layout-orphan.md).
 
 ## Remediation
 

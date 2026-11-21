@@ -84,7 +84,7 @@ and the installed package gains public producer, screen, comparison and report-b
 Configuration Contract 1 remains separate and unchanged. Consumers of Report 3 must migrate when
 adopting 0.5.0;
 source identity, declared provenance and verified original positions are separate fields.
-The screen report is its own version-1 contract and contains no document-page semantics.
+0.5.0 introduced the screen report as its own version-1 contract, with no document-page semantics.
 
 The clean consumers also run `tests/tools/installed-api-contract.mjs` with their own installed
 package: ESM, Node require(ESM), strict TypeScript, a real existing Playwright page and canonical
@@ -179,7 +179,7 @@ npm i "$repo/$tgz" --no-audit --no-fund
 npx breaklint --version                                  # prints the package.json version
 npx breaklint --demo > demo.out; echo "exit $?"          # exit 1
 node "$repo/tests/tools/readme-demo-contract.mjs" --consumer .
-node "$repo/tests/tools/docs-truth.mjs" --package node_modules/breaklint --pending "$repo/tests/tools/docs-truth-pending.jsonl"
+node "$repo/tests/tools/docs-truth.mjs" --package node_modules/breaklint --pending "$repo/tests/tools/docs-truth-pending.jsonl" --maintainers "$repo/maintainers"
 node "$repo/tests/tools/installed-config-contract.mjs"
 npm i --no-audit --no-fund --save-exact pagedjs@0.4.3 pdfjs-dist@6.2.108 puppeteer-core@25.16.0
 node "$repo/tests/tools/real-document-gate.mjs" --cli "$PWD/node_modules/breaklint/dist/cli/index.js" --cwd "$PWD"

@@ -81,4 +81,4 @@ A continuation page holds only a tiny trailing fragment of an earlier block. Tig
 ```
 
 Illustrative: the advice ships `tested: false`. The maintainers' record of the measurements behind this rule is
-[in the source repository](https://github.com/godarg/breaklint/blob/main/maintainers/rule-notes/layout-orphaned-continuation-page.md).
+[in the source repository](https://github.com/godarg/breaklint/blob/v0.11.1/maintainers/rule-notes/layout-orphaned-continuation-page.md).

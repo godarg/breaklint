@@ -17,12 +17,15 @@ import { checkPage } from 'breaklint';
 test('account overview', async ({ page }, testInfo) => {
   await page.goto('/account');              // navigation, sign-in and data setup stay yours
   const { ok, report } = await checkPage(page, {
-    trust: 'host-controlled-page',
-    networkPolicy: 'host-owned',
+    trust: 'host-controlled-page',          // required: your test owns this page
+    networkPolicy: 'host-owned',            // required: your test controls its network
     scenario: 'account-overview',
     output: { dir: testInfo.outputPath('breaklint'), screenshot: 'viewport' },
   });
-  await testInfo.attach('breaklint.json', { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
+  await testInfo.attach('breaklint.json', {
+    body: JSON.stringify(report, null, 2),
+    contentType: 'application/json',
+  });
 
   expect(ok).toBe(true);                    // step 1, report mode: breaklint could judge the page
   // expect(report.runVerdict).toBe('clean'); // step 2, gate: no finding at or above failOn
@@ -65,12 +68,12 @@ parse is rejected with a `TypeError` naming the field, before the first measurem
 | `web/unexpected-horizontal-overflow` | on | error | an element's content is wider than its box (overflow > 0 px) |
 | `web/content-clipped` | on | error | visible content is cut by an ancestor with `overflow: hidden` or `clip` |
 | `web/svg-text-overflows-viewport` | on | error | SVG text extends more than 1 px beyond the SVG viewport that clips it |
-| `web/sibling-overlap` | opt-in: `rules.siblingOverlap: true` | warn | two visible HTML siblings overlap by more than 2 px |
-| `web/small-text` | opt-in: `rules.smallText` | warn | computed `font-size` of an element with its own text is below 12 px |
-| `web/small-touch-target` | opt-in: `rules.smallTouchTarget` | warn | a link or control is smaller than 24 px in either dimension |
+| `web/sibling-overlap` | opt-in: `geometry.rules.siblingOverlap: true` | warn | two visible HTML siblings overlap by more than 2 px |
+| `web/small-text` | opt-in: `geometry.rules.smallText` | warn | computed `font-size` of an element with its own text is below 12 px |
+| `web/small-touch-target` | opt-in: `geometry.rules.smallTouchTarget` | warn | a link or control is smaller than 24 px in either dimension |
 
-The two size thresholds can be set: `smallText: { minFontSizePx: 4–72 }` and
-`smallTouchTarget: { minSizePx: 8–96 }`; `true` uses 12 px and 24 px. Every threshold is
+The two size thresholds can be set: `geometry.rules.smallText: { minFontSizePx: 4–72 }` and
+`geometry.rules.smallTouchTarget: { minSizePx: 8–96 }`; `true` uses 12 px and 24 px. Every threshold is
 uncalibrated and recorded in each measurement.
 
 - **Overflow** is measured on HTML boxes. Elements inside an `<svg>` are judged only by the SVG

@@ -45,7 +45,7 @@ run with exit 4 rather than a guessed result.
 ## Calibration
 
 `calibrated: false`. The zero boundary is structural, not a fitted threshold; the maintainers'
-[validation architecture](https://github.com/godarg/breaklint/blob/main/maintainers/validation/architecture.md)
+[validation architecture](https://github.com/godarg/breaklint/blob/v0.11.1/maintainers/validation/architecture.md)
 describes how it is checked against an independent geometry implementation.
 
 ## Remediation

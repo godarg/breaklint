@@ -62,6 +62,9 @@
  *     `peerDependencies` does not declare fails: a caret spec must denote exactly the declared range,
  *     an exact version must lie inside it, and a peer named without a version fails too.
  * The oracle for the second is the `package.json` of the package under test, never this file.
+ * Also in the shipped documents: every versioned link or Action ref into this repository must name
+ * `v<package version>` (never `main`), and the shipped documents and CHANGELOG.md must name no
+ * review persona, no "Founder", no rostered review called human and no internal system name.
  *
  * `--maintainers <dir>` adds every Markdown file under that directory (the repository's
  * `maintainers/`, which npm does not ship) to the stamp check, so a moved page cannot go stale
@@ -69,8 +72,9 @@
  *
  * KNOWN LIMITS, accepted: the history grammar is a heuristic over English. A sentence can take one
  * of its forms and still be false ("Live reports have used Report 4 since 0.5.0" passes form 3a),
- * and a stamp named in a shape no pattern reads — "schema version 4", "v4 reports", a number in a
- * code block — is not seen at all. What it does guarantee is that a stale current-state sentence in
+ * and a stamp named in a shape no pattern reads — "v4 reports", a number in a code block — is not
+ * seen at all. "schema version 4" and "a version-4 contract" are read, with the kind of the nearest
+ * kind word before them. What it does guarantee is that a stale current-state sentence in
  * the shapes these documents actually use fails, and that every exception is visible in its text.
  */
 
@@ -169,10 +173,13 @@ const KIND_WORDS = [
 
 /** The kind a bare "schema N" belongs to: the nearest kind word before it, in its unit or paragraph. */
 function kindBefore(text, index) {
+  // Nearest by where the kind word ENDS: "screen report" ends where its "report" ends, and the
+  // tie keeps the earlier, more specific entry of KIND_WORDS, so it reads as a screen report.
   let best = null;
   for (const { kind, pattern } of KIND_WORDS) {
     for (const match of text.slice(0, index).matchAll(pattern)) {
-      if (!best || match.index > best.index) best = { kind, index: match.index };
+      const end = match.index + match[0].length;
+      if (!best || end > best.end) best = { kind, end };
     }
   }
   return best?.kind ?? null;
@@ -203,10 +210,15 @@ function mentionsIn(unit, paragraph, unitOffset) {
       add(kind, Number(match[1]), at, match.index);
     }
   }
-  for (const match of unit.matchAll(/\bschema[- ](\d+)\b/giu)) {
-    const at = match.index + match[0].length - match[1].length;
-    if (taken.has(at)) continue;
-    add(kindBefore(paragraph, unitOffset + match.index) ?? kindBefore(unit, match.index), Number(match[1]), at, match.index);
+  // Bare stamps whose kind is the nearest kind word before them: "schema 2", "schema version 2",
+  // "a version-1 contract" (the DOC-1 sentence "The screen report is its own version-1 contract").
+  for (const re of [/\bschema[- ](\d+)\b/giu, /\bschema\s+version[- ]?(\d+)\b/giu, /\b(?:version|v)[- ]?(\d+)(?=[- ]contract\b)/giu]) {
+    for (const match of unit.matchAll(re)) {
+      const at = match.index + match[0].length - match[1].length;
+      if (taken.has(at)) continue;
+      taken.add(at);
+      add(kindBefore(paragraph, unitOffset + match.index) ?? kindBefore(unit, match.index), Number(match[1]), at, match.index);
+    }
   }
   // Contract tables: `| Document report | 5 | … |`.
   const row = /^\|\s*([^|]+?)\s*\|\s*`?(\d+)`?\s*(?:each\s*)?\|/u.exec(unit);
@@ -359,6 +371,48 @@ export function statusIssues(file, text) {
   return issues;
 }
 
+/**
+ * Links and Action refs into this repository that name a version must name the package's own tag.
+ * npm resolves relative links against the default branch, so shipped pages link absolutely; a
+ * link to `main` moves away from the version it was written for, and a link to an older tag keeps
+ * a superseded page in front of the reader.
+ */
+const REPOSITORY_REF = /(?:github\.com\/godarg\/breaklint\/(?:blob|tree)\/|raw\.githubusercontent\.com\/godarg\/breaklint\/|\bgodarg\/breaklint@)(main|master|v\d+\.\d+\.\d+)(?![\w.-])/gu;
+
+export function pinIssues(file, text, packageVersion) {
+  const issues = [];
+  const wanted = `v${packageVersion}`;
+  for (const [index, line] of text.replace(/\r\n/gu, "\n").split("\n").entries()) {
+    for (const match of line.matchAll(REPOSITORY_REF)) {
+      if (match[1] !== wanted) issues.push(`${file}:${index + 1}: links to ${match[0]}, but a shipped page of ${packageVersion} must pin ${wanted}`);
+    }
+  }
+  return issues;
+}
+
+/**
+ * Names that belong to the maintainer's own organisation, and review roles stated as people, in
+ * any file npm ships with the package — CHANGELOG.md included. A rostered review role is a role,
+ * whoever or whatever holds it; calling its pass "human" claims what the ledger cannot show.
+ */
+const INTERNAL_NAMES = [
+  { re: /@(?:Neo|Brand|Prog|Fin|Doc|Sci|Mark|Ops|Founder)\b/u, label: "a review persona handle" },
+  { re: /\bFounder\b/u, label: "\"Founder\" (say: the maintainer)" },
+  { re: /\bhuman\s+(?:pass|gate)\b|\brostered\s+human\b/iu, label: "a rostered review called human" },
+  { re: /\bDargel\b/u, label: "the maintainer's business name" },
+  { re: /\bDS_OS\b|\bkleingewerbe\b|\bDigital Product Studio\b/iu, label: "an internal system name" },
+];
+
+export function internalNameIssues(file, text) {
+  const issues = [];
+  for (const [index, line] of text.replace(/\r\n/gu, "\n").split("\n").entries()) {
+    for (const { re, label } of INTERNAL_NAMES) {
+      if (re.test(line)) issues.push(`${file}:${index + 1}: names ${label} in a shipped file: ${line.trim()}`);
+    }
+  }
+  return issues;
+}
+
 const PEERS = ["puppeteer-core", "pagedjs", "pdfjs-dist"];
 const INSTALL = /\b(?:npm\s+(?:i|install|add)|pnpm\s+(?:add|i|install)|yarn\s+add)\b/u;
 
@@ -451,11 +505,17 @@ export function checkDocsTruth({ packageDir, docsRoot = packageDir, extra = [], 
   const files = [...shipped, ...extra.map((path) => resolve(path)), ...maintainerDocs];
   const issues = [];
   if (maintainers && maintainerDocs.length === 0) issues.push(`--maintainers ${maintainers} holds no Markdown file; nothing there was checked`);
-  const peers = JSON.parse(readFileSync(join(resolve(packageDir), "package.json"), "utf8")).peerDependencies ?? {};
+  const manifest = JSON.parse(readFileSync(join(resolve(packageDir), "package.json"), "utf8"));
+  const peers = manifest.peerDependencies ?? {};
   for (const path of shipped) {
     const text = readFileSync(path, "utf8");
     const name = relative(root, path);
-    issues.push(...statusIssues(name, text), ...peerCommandIssues(name, text, peers));
+    issues.push(...statusIssues(name, text), ...peerCommandIssues(name, text, peers), ...pinIssues(name, text, manifest.version));
+  }
+  // The changelog ships too. Its entries state changes, so it is exempt from the stamp grammar,
+  // but not from the names a user has no use for.
+  for (const path of [...shipped, join(root, "CHANGELOG.md")].filter((file) => existsSync(file))) {
+    issues.push(...internalNameIssues(relative(root, path), readFileSync(path, "utf8")));
   }
   // One entry absorbs exactly one issue: same file, kind, number and exact sentence.
   const pendingLeft = new Set(pending.map((_, i) => i));

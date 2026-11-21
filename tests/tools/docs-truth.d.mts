@@ -43,6 +43,10 @@ export function specInterval(spec: string): { min: number[]; max: number[] | nul
 
 export function peerCommandIssues(file: string, text: string, peers: Record<string, string>): string[];
 
+export function pinIssues(file: string, text: string, packageVersion: string): string[];
+
+export function internalNameIssues(file: string, text: string): string[];
+
 export function checkDocsTruth(input: {
   packageDir: string;
   docsRoot?: string;

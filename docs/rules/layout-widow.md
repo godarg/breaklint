@@ -24,7 +24,7 @@ The earlier justification for the downgrade was itself unmeasured: *in 230 runs 
 - Only the block's own lines count, and only the run the break split; a `<section>` is not judged
   by its paragraph's lines, and unrecorded elements (custom elements) are not judged.
 - Nested inline layouts (a `<p>` in an `inline-block` span) can miscount lines; see the
-  [measurement record](https://github.com/godarg/breaklint/blob/main/maintainers/rule-notes/layout-widow.md).
+  [measurement record](https://github.com/godarg/breaklint/blob/v0.11.1/maintainers/rule-notes/layout-widow.md).
 
 ## Remediation
 

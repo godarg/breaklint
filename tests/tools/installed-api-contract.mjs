@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -38,4 +38,13 @@ try {
 } finally { await browser.close(); }
 writeFileSync("public-api-types.mts", `import type { Page } from '@playwright/test';\nimport { checkPage, writeReportBundle } from 'breaklint';\ndeclare const page: Page;\nconst result = await checkPage(page, {trust:'host-controlled-page',networkPolicy:'host-owned',scenario:'types',output:{dir:'out',screenshot:'viewport'}});\nawait writeReportBundle(result.report, {outDir:'out'});\n`);
 execFileSync(process.execPath, [require.resolve("typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--target", "ES2022", "--module", "NodeNext", "--moduleResolution", "NodeNext", "public-api-types.mts"], { stdio: "inherit" });
-console.log("installed public API contract passed (ESM, require, TypeScript, real Playwright page, canonical bundle)");
+// The shipped Playwright example, run as the README tells a user to: copied out of the installed
+// package into an ES-module project, with this consumer's @playwright/test, against the same
+// existing Chrome. Nothing else ran it, so it could break and still ship.
+const example = resolve("playwright-example");
+mkdirSync(example, { recursive: true });
+cpSync(resolve("node_modules/breaklint/examples/playwright"), resolve(example, "examples/playwright"), { recursive: true });
+writeFileSync(resolve(example, "package.json"), `${JSON.stringify({ name: "breaklint-playwright-example", private: true, type: "module" })}\n`);
+writeFileSync(resolve(example, "playwright.config.mjs"), `export default { testDir: "examples/playwright", use: { launchOptions: { executablePath: ${JSON.stringify(executablePath)} } } };\n`);
+execFileSync(process.execPath, [require.resolve("@playwright/test/cli"), "test", "--config", resolve(example, "playwright.config.mjs"), "--reporter=line"], { cwd: example, stdio: "inherit" });
+console.log("installed public API contract passed (ESM, require, TypeScript, real Playwright page, canonical bundle, shipped example)");
