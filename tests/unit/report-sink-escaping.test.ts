@@ -21,6 +21,8 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { renderReport, writeReportBundle } from "../../src/api/bundle.ts";
+import { renderHtml } from "../../src/report/html.ts";
+import type { Report } from "../../src/core/types.ts";
 
 const FIXTURES = fileURLToPath(new URL("../fixtures/reports/", import.meta.url));
 const INJECTED = /<[a-z]+ data-inject|data-inject="[^"]*"\s*>/u;
@@ -100,6 +102,45 @@ describe("C6: report values are escaped where the bundle view writes them", () =
       assert.doesNotMatch(html, /7; drop/u);
       assert.match(html, /diagnostic page unavailable/u);
     }
+  });
+
+  it("an exit code that is not one of the documented codes is shown as unavailable (both paths)", () => {
+    for (const exitCode of [7, 1.5, -1, "0", tag("exit")]) {
+      const report = JSON.parse(readFileSync(join(FIXTURES, "report5-v0.10.0-demo.json"), "utf8")) as Record<string, any>;
+      report.exitCode = exitCode;
+      for (const html of [renderReport(report), bundleHtml(report)]) {
+        assert.match(html, /Verdict \/ exit<\/dt><dd>findings \/ unavailable<\/dd>/u, `exit code ${JSON.stringify(exitCode)}`);
+        assert.doesNotMatch(html, INJECTED);
+      }
+    }
+    const valid = JSON.parse(readFileSync(join(FIXTURES, "report5-v0.10.0-demo.json"), "utf8")) as Record<string, any>;
+    assert.match(renderReport(valid), /Verdict \/ exit<\/dt><dd>findings \/ 1<\/dd>/u);
+  });
+
+  it("the CLI HTML report writes a number only when it is a finite number (renderHtml)", () => {
+    // The CLI renders its own run, so a foreign value cannot normally reach it. The sink is the
+    // same anyway: a count field is never written into the markup as it arrived.
+    const report = JSON.parse(readFileSync(join(FIXTURES, "report5-v0.10.0-demo.json"), "utf8")) as Record<string, any>;
+    report.summary.error = tag("summary-error");
+    report.summary.warn = tag("summary-warn");
+    report.summary.info = Number.NaN;
+    report.schemaVersion = tag("schema");
+    report.exitCode = tag("exit");
+    report.inputsFound = tag("inputs");
+    report.pagesAnalysed = tag("pages");
+    report.rulesRun = tag("rules");
+    report.measuredRules = tag("measured-rules");
+    report.findings[0].page = tag("finding-page");
+    const firstRule = Object.keys(report.documents[0].coverage)[0]!;
+    report.documents[0].coverage[firstRule].candidates = tag("candidates");
+    report.documents[0].coverage[firstRule].measured = tag("measured");
+    report.documents[0].notMeasured.push({ scope: "document", ruleId: firstRule, reason: "env/table-structure-unsupported", count: tag("decline-count") });
+    const html = renderHtml(report as unknown as Report);
+    assert.doesNotMatch(html, INJECTED);
+    assert.match(html, /<dt>Errors<\/dt><dd>unavailable<\/dd>/u);
+    assert.match(html, /<dt>Information<\/dt><dd>unavailable<\/dd>/u);
+    assert.match(html, /EXIT unavailable/u);
+    assert.match(html, /report schema unavailable/u);
   });
 
   it("title and theme options are escaped in text and attribute position", () => {

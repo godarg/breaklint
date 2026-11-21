@@ -27,7 +27,7 @@ export function cssString(value: string, maxCodePoints = 64): string {
  * box and its 703 px layout contract are untouched). Page 1 carries the full header instead.
  */
 function renderPageMargins(report: Report, title: string): string {
-  const head = cssString(`breaklint · ${title} · exit ${report.exitCode}`, 80);
+  const head = cssString(`breaklint · ${title} · exit ${exitCode(report.exitCode)}`, 80);
   const run = cssString(`run ${report.runId}`, 52);
   return `
   @page {
@@ -41,6 +41,15 @@ function renderPageMargins(report: Report, title: string): string {
   }
 `;
 }
+
+/**
+ * A value the report types as a number, written only when it is one and finite; anything else is
+ * "unavailable". The CLI renders the report it just produced, but the sink does not rely on that:
+ * a count is never written into the markup as it arrived (the bundle view has the same sink).
+ */
+const num = (value: unknown): string => typeof value === "number" && Number.isFinite(value) ? String(value) : "unavailable";
+/** An exit code only when it is one of the documented codes 0–4. */
+const exitCode = (value: unknown): string => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 4 ? String(value) : "unavailable";
 
 const esc = (value: unknown): string =>
   String(value)
@@ -124,7 +133,7 @@ function renderCoverageAlert(model: ReturnType<typeof buildHtmlReportModel>): st
     ? `<p>The run declared insufficient coverage without a per-rule shortfall. Inspect the canonical JSON report.</p>`
     : `<ul class="coverage-shortfall-list">${shortfalls.map((row) => `<li class="coverage-shortfall-item">
       <p><strong>Rule:</strong> ${ruleIdCode(row.ruleId)} in <span class="mono">${pathText(row.document)}</span></p>
-      <p><strong>Measurement:</strong> ${row.measured} of ${row.candidates} candidates measured (${esc(row.ratio)}); required floor ${esc(row.floor)}</p>
+      <p><strong>Measurement:</strong> ${num(row.measured)} of ${num(row.candidates)} candidates measured (${esc(row.ratio)}); required floor ${esc(row.floor)}</p>
       <p><strong>Reason verbatim:</strong> <code>${esc(row.reasons.join(", ") || "none declared")}</code></p>
       <p><strong>Options:</strong></p>
       <ul>
@@ -160,7 +169,7 @@ ${model.findings.map((finding, index) => `<li>
     <span class="severity ${esc(finding.severity)}">${esc(finding.severityLabel)}</span>
     ${finding.experimental ? `<span class="experimental">Experimental</span>` : ""}
   </div>
-  <h3 id="${esc(finding.id)}-title">${ruleIdCode(finding.ruleId)} · page ${finding.page}</h3>
+  <h3 id="${esc(finding.id)}-title">${ruleIdCode(finding.ruleId)} · page ${num(finding.page)}</h3>
   <p class="finding-message">${esc(finding.message)}</p>
   </div>
   <dl class="finding-facts">
@@ -222,9 +231,9 @@ function renderCoverageRow(row: HtmlCoverageRow): string {
   const resultLabel = !row.ok ? "Below floor" : row.candidates === 0 ? "No candidates" : "Coverage met";
   return `<tr id="${esc(row.id)}"${row.ok ? "" : ` class="short"`}>
     <th scope="row" class="rule">${ruleIdCode(row.ruleId)}</th>
-    <td class="num">${row.candidates}</td>
-    <td class="num">${row.measured}</td>
-    <td class="num">${row.notMeasured}</td>
+    <td class="num">${num(row.candidates)}</td>
+    <td class="num">${num(row.measured)}</td>
+    <td class="num">${num(row.notMeasured)}</td>
     <td class="num">${ratio}</td>
     <td class="num">${esc(row.floor)}</td>
     <td class="result"><span class="coverage-result${row.ok ? "" : " short"}">${resultLabel}</span></td>
@@ -345,7 +354,7 @@ function renderDeclines(decisions: ReportDecisions): string {
 <h2 id="declines-heading">Declined candidates</h2>
 <p class="section-lead">Counted reasons remain visible even when coverage meets its floor. These are recorded reasons a measurement was not made, not layout findings.</p>
 <ul class="decline-list">
-${decisions.declines.map((decline) => `<li><span class="decline-count"><strong>Count ${decline.count}</strong></span> · ${pathText(decline.document)} · ${decline.ruleId === null ? "no rule" : ruleIdCode(decline.ruleId)} · ${esc(decline.scope)} · ${ruleIdCode(decline.reason)} · <span class="decline-base">${esc(decline.baseCategory)}</span></li>`).join("\n")}
+${decisions.declines.map((decline) => `<li><span class="decline-count"><strong>Count ${num(decline.count)}</strong></span> · ${pathText(decline.document)} · ${decline.ruleId === null ? "no rule" : ruleIdCode(decline.ruleId)} · ${esc(decline.scope)} · ${ruleIdCode(decline.reason)} · <span class="decline-base">${esc(decline.baseCategory)}</span></li>`).join("\n")}
 </ul>
 </section>`;
 }
@@ -368,8 +377,8 @@ export function renderHtml(report: Report): string {
 <a class="skip-link" href="#report">Skip to the report</a>
 <div class="report-shell">
 <header class="report-header state-${esc(model.status.key)}" aria-labelledby="report-title">
-  <div class="tool-line"><strong>${esc(report.tool.name)}</strong><span>v${esc(report.tool.version)} · report schema ${report.schemaVersion} · run <span class="run-id">${esc(report.runId)}</span></span></div>
-  <span class="state-marker">${esc(model.status.marker)} · EXIT ${report.exitCode}</span>
+  <div class="tool-line"><strong>${esc(report.tool.name)}</strong><span>v${esc(report.tool.version)} · report schema ${num(report.schemaVersion)} · run <span class="run-id">${esc(report.runId)}</span></span></div>
+  <span class="state-marker">${esc(model.status.marker)} · EXIT ${exitCode(report.exitCode)}</span>
   <h1 id="report-title">${esc(model.status.title)}</h1>
   <p class="status-sentence">${esc(model.status.sentence)}</p>
   <p class="gate-effect"><span>Gate effect</span><strong>${esc(model.status.gate)}</strong></p>
@@ -380,20 +389,20 @@ ${renderContents(model, decisions)}
 <h2 id="summary-heading">Run summary</h2>
 <dl class="summary-grid">
   <div><dt>Coverage trust</dt><dd>${esc(model.coverageTrust.label)}<small>${esc(model.coverageTrust.detail)}</small></dd></div>
-  <div><dt>Errors</dt><dd>${model.severity.error}</dd></div>
-  <div><dt>Warnings</dt><dd>${model.severity.warn}</dd></div>
-  <div><dt>Information</dt><dd>${model.severity.info}</dd></div>
+  <div><dt>Errors</dt><dd>${num(model.severity.error)}</dd></div>
+  <div><dt>Warnings</dt><dd>${num(model.severity.warn)}</dd></div>
+  <div><dt>Information</dt><dd>${num(model.severity.info)}</dd></div>
 </dl>
 <dl class="run-facts">
   <div><dt>${esc(LABELS.runVerdict)}</dt><dd>${esc(f.runVerdict)}</dd></div>
   <div><dt>${esc(LABELS.gateTriggeredBy)}</dt><dd>${model.status.partial && f.gateTriggeredBy === "none" ? "none (finding gate)" : esc(f.gateTriggeredBy)}</dd></div>
   <div><dt>${esc(LABELS.failOn)}</dt><dd>${esc(f.failOn)}</dd></div>
   <div><dt>${esc(LABELS.mode)}</dt><dd>${esc(f.mode)}</dd></div>
-  <div><dt>${esc(LABELS.inputsFound)}</dt><dd>${f.inputsFound}</dd></div>
-  <div><dt>${esc(LABELS.pagesAnalysed)}</dt><dd>${f.pagesAnalysed}</dd></div>
-  <div><dt>${esc(LABELS.rulesRun)}</dt><dd>${f.rulesRun}</dd></div>
-  <div><dt>${esc(LABELS.measuredRules)}</dt><dd>${f.measuredRules}</dd></div>
-  <div><dt>${esc(LABELS.notMeasuredTotal)}</dt><dd>${f.notMeasuredTotal} ${f.notMeasuredTotal === 1 ? "decline" : "declines"}</dd></div>
+  <div><dt>${esc(LABELS.inputsFound)}</dt><dd>${num(f.inputsFound)}</dd></div>
+  <div><dt>${esc(LABELS.pagesAnalysed)}</dt><dd>${num(f.pagesAnalysed)}</dd></div>
+  <div><dt>${esc(LABELS.rulesRun)}</dt><dd>${num(f.rulesRun)}</dd></div>
+  <div><dt>${esc(LABELS.measuredRules)}</dt><dd>${num(f.measuredRules)}</dd></div>
+  <div><dt>${esc(LABELS.notMeasuredTotal)}</dt><dd>${num(f.notMeasuredTotal)} ${f.notMeasuredTotal === 1 ? "decline" : "declines"}</dd></div>
   <div><dt>Finding gate candidate</dt><dd>${esc(report.summary.gateCandidate ?? "none")}</dd></div>
   <div><dt>Source</dt><dd>${esc(report.source)}</dd></div>
   <div><dt>Configuration</dt><dd class="mono">${esc(report.config.fingerprint)}</dd></div>

@@ -1,4 +1,5 @@
-import { closeSync, constants, lstatSync, mkdirSync, openSync, writeFileSync, writeSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { closeSync, constants, lstatSync, mkdirSync, openSync, renameSync, rmSync, writeSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import type { Evidence, Finding, Report } from "../core/types.ts";
 import { READABLE_SCREEN_REPORT_SCHEMA_VERSIONS, type ReadableScreenReport, type ScreenFinding } from "../web/types.ts";
@@ -7,6 +8,7 @@ import { captureBoundedSourceFile, sha256Bytes } from "../source/bytes.ts";
 import { createContextPack, type ContextFinding, type CreateContextPackOptions } from "./context.ts";
 import { READABLE_REPORT_SCHEMA_VERSIONS } from "../core/enums.ts";
 import { bundleColor, bundleToken, bundleTokenDeclarations } from "../report/html-tokens.ts";
+import { physicalPath } from "./output-path.ts";
 
 export interface RenderReportOptions extends CreateContextPackOptions { title?: string; theme?: "light" | "dark"; comparison?: ReportComparison; }
 export interface WriteReportBundleOptions extends RenderReportOptions { outDir: string; evidenceDir?: string; }
@@ -18,11 +20,14 @@ export interface ReportBundleResult { outDir: string; reportPath: string; htmlPa
  * its types are only a claim: a `page` that is a string was once written into the markup as is.
  *   esc   text and attribute values (every attribute here is double-quoted)
  *   num   a value the report types as a number: shown only when it is one and finite
+ *         (an exit code only when it is one of the documented codes, `exitCode`)
  *   href  a link target: only the bundle's own verified asset paths and in-page anchors
  */
 const esc = (value: unknown): string => String(value ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, "�").replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
 const finiteNumber = (value: unknown): number | null => typeof value === "number" && Number.isFinite(value) ? value : null;
 const num = (value: unknown): string => { const n = finiteNumber(value); return n === null ? "unavailable" : String(n); };
+/** An exit code is shown only when it is one of the documented codes 0–4; a finite 7 is not one. */
+const exitCode = (value: unknown): string => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 4 ? String(value) : "unavailable";
 const href = (value: string): string => /^(?:assets\/[a-f0-9]{64}\.(?:png|pdf)|bundle\.json|#finding(?:-navigation|-[1-9][0-9]*))$/u.test(value) ? esc(value) : "#";
 const MAX_ASSET_BYTES = 64 * 1024 * 1024;
 
@@ -82,22 +87,43 @@ function capturedAsset(sourceRoot: string, leaf: string, maxBytes: number): Buff
   catch { return null; }
 }
 
+/**
+ * Replaces one file of the bundle, never writing into what is already there. The API accepts a
+ * used output directory (updating a bundle in place is legitimate), and a file in it may be a hard
+ * link: opening it with O_TRUNC wrote through the link into the other name's file. So the bytes go
+ * to a new temporary file (O_EXCL) and a rename replaces the directory entry; a hard-linked old
+ * entry keeps its bytes under its other name. A symlink at the leaf is refused, not replaced.
+ */
+function replaceFile(directory: string, name: string, bytes: Buffer, mode: number): void {
+  const target = join(directory, name);
+  let leaf: ReturnType<typeof lstatSync> | null = null;
+  try { leaf = lstatSync(target); } catch { leaf = null; }
+  if (leaf?.isSymbolicLink()) throw Object.assign(new Error(`report bundle file is a symbolic link: ${target}`), { code: "ELOOP" });
+  if (leaf && !leaf.isFile()) throw Object.assign(new Error(`report bundle file is not a regular file: ${target}`), { code: "EISDIR" });
+  const temporary = join(directory, `.${name}.${process.pid}-${randomBytes(6).toString("hex")}.breaklint-tmp`);
+  try {
+    const fd = openSync(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, mode);
+    try {
+      let offset = 0;
+      while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset);
+    } finally { closeSync(fd); }
+    renameSync(temporary, target);
+  } catch (error) {
+    rmSync(temporary, { force: true });
+    throw error;
+  }
+}
+
 function writeCapturedAsset(targetRoot: string, name: string, bytes: Buffer): void {
   const assets = join(targetRoot, "assets");
   const directory = lstatSync(assets);
   if (!directory.isDirectory() || directory.isSymbolicLink()) throw new Error("report asset directory is not a regular directory");
-  const target = join(assets, name);
-  const fd = openSync(target, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o600);
-  try {
-    let offset = 0;
-    while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset);
-  } finally { closeSync(fd); }
+  replaceFile(assets, name, bytes, 0o600);
 }
 
 /** Top-level bundle files: like assets, a pre-existing symlink at the leaf is refused, not followed. */
 function writeBundleFile(targetRoot: string, name: string, content: string): void {
-  const fd = openSync(join(targetRoot, name), constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o666);
-  try { writeFileSync(fd, content, "utf8"); } finally { closeSync(fd); }
+  replaceFile(targetRoot, name, Buffer.from(content, "utf8"), 0o666);
 }
 
 function evidenceAsset(evidence: Evidence, sourceRoot: string, targetRoot: string): Asset | null {
@@ -201,15 +227,18 @@ function findingCard(report: Report, finding: Finding, index: number, assets: As
 /** Script-free, offline HTML from a canonical document report (schema 4 or 5) or a screen report. It does not make evidence navigable by itself. */
 export function renderReport(report: Report | unknown, options: RenderReportOptions = {}): string {
   const context = createContextPack(report, options);
-  const isScreen = READABLE_SCREEN_REPORT_SCHEMA_VERSIONS.includes(context.canonicalReport.schemaVersion as number) && context.canonicalReport.profileKind === "screen";
-  const legacy = !isScreen && (!READABLE_REPORT_SCHEMA_VERSIONS.includes(context.canonicalReport.schemaVersion as number) || context.canonicalReport.profileKind !== "document");
+  // The context pack already decided whether this report can be projected; a stamped report
+  // without the parts the projection reads is "legacy or invalid" there, and so it is here.
+  const invalid = context.selection.reason === "legacy-or-invalid-report-cannot-establish-source-or-repair-claims";
+  const isScreen = !invalid && READABLE_SCREEN_REPORT_SCHEMA_VERSIONS.includes(context.canonicalReport.schemaVersion as number) && context.canonicalReport.profileKind === "screen";
+  const legacy = invalid || !isScreen && (!READABLE_REPORT_SCHEMA_VERSIONS.includes(context.canonicalReport.schemaVersion as number) || context.canonicalReport.profileKind !== "document");
   const title = options.title ?? "breaklint report";
   const theme = options.theme ?? "light";
   if (options.comparison && options.comparison.afterRunId !== context.canonicalReport.runId) throw new Error("comparison does not refer to this current report");
   const comparison = options.comparison ? `<section class="state"><h2>Repair comparison</h2><p>Before ${esc(options.comparison.beforeRunId)} → after ${esc(options.comparison.afterRunId)}</p><dl>${(["new", "persisting", "resolved", "unmatchable", "not-sufficiently-measured"] as const).map(status => `<div><dt>${status}</dt><dd>${options.comparison!.results.filter(item => item.status === status).length}</dd></div>`).join("")}</dl><ul>${options.comparison.results.map(item => `<li>${esc(item.beforeRunFindingId ?? item.afterRunFindingIds.join(", "))}: ${esc(item.status)} — ${esc(item.reasons.join(", "))}</li>`).join("")}</ul><p>Absent or reduced measurement is not a repair. Identical removal and recreation between observations cannot be distinguished.</p></section>` : "";
   const documentFindings = context.findings.filter((item): item is ContextFinding => "runFindingId" in item);
   const screenCards = context.findings.filter((item) => "id" in item).map((item, index) => `<article class="finding ${esc(item.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(item.severity)} · ${esc(item.ruleId)}</p><h2>${esc(item.id)}</h2><p>${esc(item.observation)}</p><dl><div><dt>Measured</dt><dd>${num(item.measurement.value)} ${esc(item.measurement.unit ?? "")}</dd></div><div><dt>Scenario / route</dt><dd>${esc(item.scope.scenario)} · ${esc(item.scope.route)} · ${esc(item.scope.viewport)}</dd></div><div><dt>Target</dt><dd>${esc(item.scope.targetRef)} · ${esc(item.scope.coordinateSystem)}</dd></div><div><dt>Source</dt><dd>${esc(item.source.status)} ${item.source.file ? displayPath(item.source.file) : ""}</dd></div><div><dt>Evidence</dt><dd>${item.evidence.bindsFinding ? esc(item.evidence.screenshot ?? "bound asset unavailable") : "not bound"}</dd></div></dl><p><strong>Next check:</strong> rerun the same scenario and viewport after a bounded repair.</p><p><a href="#finding-navigation">Back to findings</a></p></article>`).join("");
-  const runState = `<dl class="run-state"><div><dt>Verdict / exit</dt><dd>${esc(context.run.verdict ?? "unavailable")} / ${esc(context.run.exitCode ?? "unavailable")}</dd></div><div><dt>Infrastructure events</dt><dd>${num(context.run.infrastructureCount)}</dd></div><div><dt>Not measured</dt><dd>${num(context.run.notMeasuredCount)}</dd></div></dl>`;
+  const runState = `<dl class="run-state"><div><dt>Verdict / exit</dt><dd>${esc(context.run.verdict ?? "unavailable")} / ${exitCode(context.run.exitCode)}</dd></div><div><dt>Infrastructure events</dt><dd>${num(context.run.infrastructureCount)}</dd></div><div><dt>Not measured</dt><dd>${num(context.run.notMeasuredCount)}</dd></div></dl>`;
   const diagnostics = context.diagnostics.items.length === 0 ? "" : `<section class="diagnostics" aria-labelledby="diagnostics-heading"><h2 id="diagnostics-heading">Infrastructure and nonmeasurement</h2><ul>${context.diagnostics.items.map((item) => `<li><code>${esc(item.kind)}</code>: ${esc(item.reason)}${item.context ? ` · ${esc(item.context)}` : ""}</li>`).join("")}</ul>${context.diagnostics.omittedCount ? `<p>${num(context.diagnostics.omittedCount)} additional diagnostic entries omitted from this bounded view; inspect canonical JSON.</p>` : ""}</section>`;
   const navigation = `<nav id="finding-navigation" aria-label="Finding navigation">${context.findings.map((item, index) => `<a href="#finding-${index + 1}">${index + 1}. ${esc(item.severity)} ${esc(item.ruleId)}</a>`).join(" · ")}</nav>`;
   const cards = legacy ? `<section class="state"><h2>Legacy or invalid report</h2><p>Source verification and repair claims are unavailable for this report shape. Inspect canonical JSON with a compatible breaklint version.</p>${runState}</section>` : `<section class="state ${context.selection.complete ? "complete" : "incomplete"}"><h2>${context.selection.complete ? "Measured report" : "Incomplete report"}</h2><p>${context.selection.complete ? "The bounded context includes all recorded findings." : `Do not treat absence as repair. ${esc(context.selection.reason)}; omitted findings: ${num(context.selection.omittedCount)}.`}</p>${runState}</section><section class="cards"><p class="section-label">Prioritized findings</p>${navigation}${isScreen ? screenCards : documentFindings.map((item, index) => `<article class="finding ${esc(item.severity)}" id="finding-${index + 1}"><p class="eyebrow">${esc(item.severity)} · ${esc(item.ruleId)}</p><h2>${esc(item.runFindingId)}</h2><p>${esc(item.observation)}</p><dl><div><dt>Measured</dt><dd>${num(item.measurement.value)} ${esc(item.measurement.unit)}</dd></div><div><dt>Threshold</dt><dd>${num(item.measurement.threshold)} ${esc(item.measurement.unit)}</dd></div><div><dt>Scope</dt><dd>${esc(item.scope.document)} · diagnostic page ${num(item.scope.page)} · ${esc(item.scope.coordinateSystem)}</dd></div><div><dt>Original source range</dt><dd>${contextOrigin(item)}</dd></div></dl><p><strong>Canonical evaluation:</strong> ${esc(contextEvaluation(item))}</p><p><strong>Repair option:</strong> ${item.repair.options.length ? item.repair.options.map(esc).join(" ") : "No concrete verified-source repair option is available."}</p><p><strong>Next check:</strong> inspect source and evidence, then recheck after a bounded repair.</p><p><a href="#finding-navigation">Back to findings</a></p></article>`).join("") || "<p>No finding cards were recorded. Infrastructure and nonmeasurement counts remain above.</p>"}</section>`;
@@ -220,7 +249,9 @@ export function renderReport(report: Report | unknown, options: RenderReportOpti
 export function writeReportBundle(report: Report | ReadableScreenReport, options: WriteReportBundleOptions): ReportBundleResult {
   // A non-object cannot be a report; it was once noticed only after the output directory existed.
   if (report === null || typeof report !== "object" || Array.isArray(report)) throw new TypeError("writeReportBundle requires a report object");
-  const root = resolve(options.outDir);
+  // Resolved as the file system resolves it, so `link/../dir` is the directory beside the link's
+  // target that a caller's own check (and the CLI's empty-directory check) looked at.
+  const root = physicalPath(options.outDir);
   if (options.comparison) {
     if (options.comparison.afterRunId !== report.runId) throw new Error("comparison does not refer to this current report");
   }
@@ -262,7 +293,11 @@ export function writeReportBundle(report: Report | ReadableScreenReport, options
   writeBundleFile(root, "bundle.json", JSON.stringify(bundleEvidence, null, 2) + "\n");
   writeBundleFile(root, "context.json", JSON.stringify({ ...contextPack, bundleEvidence }, null, 2) + "\n");
   writeBundleFile(root, "report.html", html);
-  return { outDir: root, reportPath: join(root, "report.json"), htmlPath: join(root, "report.html"), contextPath: join(root, "context.json"), assets: [...assets.values()].map((asset) => asset.href) };
+  // The paths are reported as the caller wrote them (resolved) unless that spelling names a
+  // different directory than the one written, which only a `..` after a symlink does.
+  const lexical = resolve(options.outDir);
+  const shown = physicalPath(lexical) === root ? lexical : root;
+  return { outDir: shown, reportPath: join(shown, "report.json"), htmlPath: join(shown, "report.html"), contextPath: join(shown, "context.json"), assets: [...assets.values()].map((asset) => asset.href) };
 }
 
 function screenFindingCard(report: ReadableScreenReport, finding: ScreenFinding, index: number, assets: AssetMap, evidenceDir: string | undefined, root: string): string {
