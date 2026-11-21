@@ -25,10 +25,16 @@ export interface GithubReleaseState {
   tagName: string;
   isDraft: boolean;
   assets: Record<string, string>;
+  /** The release text GitHub serves; compared with `notes` once the release is published. */
+  body?: string;
 }
+
+/** Equal release notes, ignoring CRLF line ends and surrounding whitespace. */
+export function sameNotes(a: unknown, b: unknown): boolean;
 
 export function planGithubRelease(input: {
   tag: string;
   release: GithubReleaseState | null;
   local: Record<string, string>;
+  notes: string;
 }): { action: "create" | "complete-draft" | "verified"; upload: string[] };

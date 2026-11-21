@@ -14,6 +14,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { changelogSection, classifyLookup, decideRegistry, planGithubRelease } from "../tools/release-recovery.mjs";
+import type { RegistryLookup } from "../tools/release-recovery.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const CHANGELOG = readFileSync(new URL("../../CHANGELOG.md", import.meta.url), "utf8");
@@ -123,9 +124,9 @@ describe("release recovery", () => {
     // propagates. npm versions are immutable, so a second publish can only fail, and the GitHub
     // Release step would be skipped again.
     const sleep = async () => {};
-    const sequence = (...states: string[]) => {
+    const sequence = (...states: ("absent" | "present")[]) => {
       let index = 0;
-      return async () => ({ state: states[Math.min(index++, states.length - 1)]! });
+      return async (): Promise<RegistryLookup> => ({ state: states[Math.min(index++, states.length - 1)]! });
     };
     await assert.rejects(
       decideRegistry({ lookup: sequence("present", "absent"), verify: async () => false, attempts: 4, sleep }),
