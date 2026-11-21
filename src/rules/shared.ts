@@ -17,6 +17,7 @@ export function declined(input: {
   reason: EnvId;
   count?: number;
   target?: NotMeasured["target"];
+  detail?: string | null | undefined;
 }): NotMeasured {
   return {
     scope: input.scope,
@@ -24,6 +25,7 @@ export function declined(input: {
     reason: input.reason,
     target: input.count && input.count > 1 ? null : (input.target ?? null),
     count: input.count ?? 1,
+    ...(input.detail ? { detail: input.detail } : {}),
   };
 }
 

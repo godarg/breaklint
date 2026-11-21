@@ -12,7 +12,7 @@ export const danglingReference = defineRule({
   remediation: { advice: "Check the missing fragment targets named in the finding. Correct the local href or add the intended unique authored ID or legacy a[name] anchor. IDs take precedence over named anchors. The location identifies the containing source block, not the exact inline link. This check does not validate printed numbers, external references, or the target's visibility.", tested: false },
 }, (snapshot, ctx) => {
   const index = snapshot.figureIndex;
-  if (!index?.complete) return unavailable(ID);
+  if (!index?.complete) return unavailable(ID, snapshot.figureIndexDecline);
   const findings = []; const notMeasured = []; const evaluations = [];
   let candidates = 0; let measured = 0;
   for (const group of index.referenceBlocks) {

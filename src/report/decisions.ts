@@ -1,3 +1,4 @@
+import { mergeDeclineDetail } from "../core/rule.ts";
 import type { Finding, NotMeasured, Report, RuleCoverage } from "../core/types.ts";
 import { IS } from "../core/enums.ts";
 
@@ -38,6 +39,8 @@ export interface DeclineReason {
   reason: NotMeasured["reason"];
   count: number;
   baseCategory: DeclineBaseCategory;
+  /** Observed sub-cause(s) from the JSON decline rows, when any were recorded. */
+  detail?: string;
 }
 
 function classifyDeclineBase(entry: Pick<NotMeasured, "ruleId" | "reason">): DeclineBaseCategory {
@@ -90,10 +93,14 @@ export function projectDecisions(report: Report): ReportDecisions {
     for (const entry of document.notMeasured) {
       const key = JSON.stringify([document.path, entry.ruleId, entry.scope, entry.reason]);
       const existing = declinesByKey.get(key);
-      if (existing) existing.count += entry.count;
-      else declinesByKey.set(key, {
+      if (existing) {
+        existing.count += entry.count;
+        const detail = mergeDeclineDetail(existing.detail, entry.detail);
+        if (detail) existing.detail = detail;
+      } else declinesByKey.set(key, {
         document: document.path, ruleId: entry.ruleId, scope: entry.scope,
         reason: entry.reason, count: entry.count, baseCategory: classifyDeclineBase(entry),
+        ...(entry.detail ? { detail: entry.detail } : {}),
       });
     }
   }

@@ -16,8 +16,11 @@ import { after, before, describe, it, type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
-  cleanupBrowserProfile, closeBrowserBounded, renderDocuments, type RenderOptions, type RenderResult,
+  cleanupBrowserProfile, closeBrowserBounded, integritySource, judgePostPdfOofDrift, paginationApparatusSource,
+  paginationBundleSource, PAGINATION_PREVIEW_SOURCE, readOofFacts, renderDocuments, type RenderOptions, type RenderResult,
 } from "../../src/acquire/render-run.ts";
+import { freezeSource, sampleParts } from "../../src/measure/freeze.ts";
+import { PRIMITIVES_SOURCE, TEST_PRIMITIVES_CAPABILITY } from "../../src/measure/primitives.ts";
 import { openRasterizer } from "../../src/render/rasterizer.ts";
 import { exitCodeFor, runDocument } from "../../src/core/engine.ts";
 import { launchBrowser, resolveBrowser, resolvePackageRoot } from "../../src/acquire/browser.ts";
@@ -1289,6 +1292,115 @@ describe("the M2d live production chain", () => {
       const failedFav = favDoc.infrastructure.some((e) => e.kind === "source-acquisition-failed") ||
         (favDoc.snapshot?.resources.some((r) => r.requestedUri.endsWith("/favicon.ico") && r.outcome !== "loaded") ?? false);
       assert.equal(failedFav, true, "explicitly linked missing /favicon.ico must never be silently swallowed as 204");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  it("accepts the post-PDF OOF coordinate artifact only with unchanged identity and geometry styles (P4)", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const root = mkdtempSync(join(tmpdir(), "breaklint-p4-live-"));
+    try {
+      const marks = (n: number) => Array.from({ length: n }, (_, i) =>
+        `<section class="pg"><div class="holder"><span class="mark" id="m${i}">${i + 1}</span><p>Page ${i + 1}. Alpha beta gamma delta epsilon zeta eta theta iota kappa lambda.</p></div></section>`).join("\n");
+      const css = `@page { size: A4; margin: 20mm; } body { font: 13px/1.45 serif; } .pg { break-after: page; }
+.holder { position: relative; padding-left: 24px; } .mark { position: absolute; left: 0; top: 1px; font-size: 10px; }`;
+      // Positive control: A4 (1122.52 CSS px per page, rounded per page in print), 42 pages, one
+      // absolutely positioned element on each page.
+      const positive = join(root, "oof-a4-42.html");
+      writeFileSync(positive, `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>OOF A4</title><style>${css}</style></head><body>${marks(42)}</body></html>`);
+      const ok = await renderDocuments([positive], options(join(root, "ev-positive")));
+      assert.equal(ok.fatal, null);
+      const okDoc = ok.documents[0]!;
+      assert.ok(okDoc.snapshot, JSON.stringify(okDoc.infrastructure));
+      assert.ok(okDoc.snapshot.pages.length >= 40, `pages: ${okDoc.snapshot.pages.length}`);
+      assert.equal(okDoc.infrastructure.some((e) => e.kind === "render-unstable"), false, JSON.stringify(okDoc.infrastructure));
+      // Negative control: a CSSOM rule inserted while the PDF is produced moves the element by
+      // exactly the page-content offset. No DOM mutation record, same size, same CSS left/top:
+      // only the transform changed. This must stay render-unstable.
+      const negative = join(root, "oof-cssom.html");
+      writeFileSync(negative, `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>OOF CSSOM</title><style>${css}</style></head><body>${marks(1)}
+<script>
+let c = null; const poll = setInterval(() => { const el = document.querySelector(".pagedjs_page_content"); if (el) { c = el.getBoundingClientRect(); clearInterval(poll); } }, 20);
+let once = false;
+matchMedia("print").addEventListener("change", e => { if (e.matches && !once && c) { once = true;
+  const sheets = document.styleSheets; const sheet = sheets[sheets.length - 1];
+  sheet.insertRule("#m0 { transform: translate(" + (-c.x) + "px," + (-c.y) + "px) !important; }", sheet.cssRules.length); } });
+</script></body></html>`);
+      const bad = await renderDocuments([negative], options(join(root, "ev-negative")));
+      assert.equal(bad.fatal, null);
+      const badDoc = bad.documents[0]!;
+      const unstable = badDoc.infrastructure.find((e) => e.kind === "render-unstable");
+      assert.ok(unstable, `a CSSOM transform during PDF production must not pass as the OOF artifact: ${JSON.stringify(badDoc.infrastructure)}`);
+      assert.deepEqual((unstable.measured as { driftedComponents?: string[] }).driftedComponents, ["boxes"]);
+
+      // The facts pipeline on a real paginated page, one page.pdf() in between: every candidate is
+      // found with stable identity and unchanged styles, and its CSS offsets explain its position.
+      // The browser available here does not reproduce the stale-coordinate artifact itself
+      // (measured: with the tolerance disabled the 42-page control stays clean), so a synthetic
+      // shift by each page's content origin is applied to the real facts and must be accepted.
+      const pagedjs = readFileSync(join(resolvePackageRoot("pagedjs", REPO)!, "dist", "paged.js"), "utf8");
+      const launched = await launchBrowser(REPO);
+      assert.ok(launched.browser, launched.detail);
+      try {
+        const page = await launched.browser.newPage();
+        await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(PRIMITIVES_SOURCE);
+        await (page as unknown as { evaluateOnNewDocument(s: string): Promise<unknown> }).evaluateOnNewDocument(integritySource([]));
+        await page.goto(`data:text/html,${encodeURIComponent(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>OOF facts</title><style>${css}</style></head><body>${marks(42)}</body></html>`)}`, { waitUntil: "load", timeout: 30_000 });
+        await page.evaluate<void>(paginationBundleSource(pagedjs));
+        await page.evaluate<void>(paginationApparatusSource(TEST_PRIMITIVES_CAPABILITY));
+        assert.equal((await page.evaluate<{ paginationError: string | null }>(PAGINATION_PREVIEW_SOURCE)).paginationError, null);
+        await page.evaluate<void>(freezeSource(TEST_PRIMITIVES_CAPABILITY));
+        const beforeParts = await sampleParts(page);
+        const before = await readOofFacts(page, TEST_PRIMITIVES_CAPABILITY, "before");
+        await page.pdf({ printBackground: true, preferCSSPageSize: true });
+        const afterParts = await sampleParts(page);
+        const afterFacts = await readOofFacts(page, TEST_PRIMITIVES_CAPABILITY, "after");
+        assert.ok(before.pageHeights.length >= 40);
+        assert.equal(before.elements.length, before.pageHeights.length, "one absolutely positioned candidate per page");
+        assert.ok(afterFacts.elements.every((f) => f.sameNode === true && f.sameParent === true));
+        assert.deepEqual(afterFacts.elements.map((f) => f.style), before.elements.map((f) => f.style));
+        assert.equal(beforeParts.boxes, afterParts.boxes, "this browser kept every box across the PDF");
+        const entries = beforeParts.boxes.split(";");
+        const shifted = entries.map((entry, index) => {
+          const fact = before.elements.find((f) => f.index === index);
+          if (!fact) return entry;
+          const [tag, rest] = [entry.slice(0, entry.indexOf(":")), entry.slice(entry.indexOf(":") + 1)];
+          const [x, y, w, h] = rest.split(",").map(Number) as [number, number, number, number];
+          return `${tag}:${x - fact.content.x},${y - fact.content.y},${w},${h}`;
+        }).join(";");
+        assert.equal(judgePostPdfOofDrift({ beforeBoxes: beforeParts.boxes, afterBoxes: shifted, before, after: afterFacts }), true);
+        // Same real facts, but the shift on the last page exceeds the actual rounding allowance.
+        const last = before.elements.at(-1)!;
+        const tooFar = shifted.split(";").map((entry, index) => index !== last.index ? entry
+          : entry.replace(/^([^:]+):([^,]+),([^,]+),/u, (_m, tag: string, x: string, y: string) => `${tag}:${x},${Number(y) - 40},`)).join(";");
+        assert.equal(judgePostPdfOofDrift({ beforeBoxes: beforeParts.boxes, afterBoxes: tooFar, before, after: afterFacts }), false);
+        await page.close();
+      } finally { await launched.browser.close(); }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  it("answers 204 only for the undeclared default /favicon.ico request, never for a dynamically declared icon (P6)", async (t) => {
+    if (missing.length > 0 && optional) return t.skip(`missing: ${missing.join(", ")}`);
+    const root = mkdtempSync(join(tmpdir(), "breaklint-p6-live-"));
+    try {
+      const failedIcon = (doc: DocumentInput, suffix: string) => doc.infrastructure.some((e) => e.kind === "source-acquisition-failed") ||
+        (doc.snapshot?.resources.some((r) => r.requestedUri.endsWith(suffix) && r.outcome !== "loaded") ?? false);
+      // Positive control: no icon declared anywhere. The browser's default request is answered
+      // with 204 and the document renders without a resource failure.
+      const plain = join(root, "plain.html");
+      writeFileSync(plain, `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>No icon</title></head><body><p>No icon declared.</p></body></html>`);
+      const plainDoc = (await renderDocuments([plain], options(join(root, "ev-plain")))).documents[0]!;
+      assert.ok(plainDoc.snapshot, JSON.stringify(plainDoc.infrastructure));
+      assert.equal(failedIcon(plainDoc, "/favicon.ico"), false, JSON.stringify(plainDoc.infrastructure));
+      // Negative controls: an icon link added by script at runtime, with and without a query.
+      for (const [name, href] of [["dynamic-query", "/favicon.ico?v=2"], ["dynamic-exact", "/favicon.ico"]] as const) {
+        const path = join(root, `${name}.html`);
+        writeFileSync(path, `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Dynamic icon</title></head><body><p>Icon added by script.</p>
+<script>const link = document.createElement("link"); link.rel = "icon"; link.href = ${JSON.stringify(href)}; document.head.appendChild(link);</script></body></html>`);
+        const doc = (await renderDocuments([path], options(join(root, `ev-${name}`)))).documents[0]!;
+        assert.equal(failedIcon(doc, "/favicon.ico"), true, `${name}: a declared missing icon must never be swallowed as 204: ${JSON.stringify(doc.infrastructure)}`);
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

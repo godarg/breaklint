@@ -107,6 +107,33 @@ const DEFERRED_FIXTURE = `<!doctype html><html lang="en"><head><meta charset="ut
   </div></div></div></div>
 </body></html>`;
 
+// P7 (CDX-21): the 0.5 px sub-pixel allowance below areaBox.bottom is reserved for fragments
+// Paged.js marked as split (data-split-to on the fragment that continues, data-split-from or
+// data-split-to on a zero-height split wrapper). An ordinary block ending 0.4 px below the area
+// is a real overflow. The 1 px mark envelope above areaBox.bottom stays separate and unchanged.
+const ROUNDING_FIXTURE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+  body { margin: 0; }
+  .pagedjs_page { position: relative; width: 794px; height: 1123px; }
+  .pagedjs_pagebox { position: relative; width: 794px; height: 1123px; }
+  .pagedjs_page_content { position: relative; width: 733px; height: 994px; }
+  .end-04 { position: absolute; left: 0; top: 950px; width: 300px; height: 44.4px; }
+  .zero-03 { position: absolute; left: 0; top: 994.3px; width: 300px; height: 0; }
+  .end-in-band { position: absolute; left: 400px; top: 950px; width: 300px; height: 43.6px; }
+  .pagedjs_footnote_area { position: absolute; top: 954px; height: 40.4px; }
+  .note-04 { position: absolute; left: 0; top: 0; width: 200px; height: 40.4px; }
+</style></head><body>
+  <div class="pagedjs_page"><div class="pagedjs_sheet"><div class="pagedjs_pagebox"><div class="pagedjs_area">
+    <div class="pagedjs_page_content">
+      <div class="end-04" data-bl-sid="split-end" data-split-to="t1">continues on the next page</div>
+      <div class="end-04" data-bl-sid="plain-end">ends 0.4 px below the content area</div>
+      <div class="zero-03" data-bl-sid="split-wrapper" data-split-from="t2"></div>
+      <div class="zero-03" data-bl-sid="plain-zero"></div>
+      <div class="end-in-band" data-bl-sid="in-band-end">ends 0.4 px inside the content area</div>
+    </div>
+    <div class="pagedjs_footnote_area"><aside class="note-04" data-bl-sid="split-note" data-split-to="t3">footnote</aside></div>
+  </div></div></div></div>
+</body></html>`;
+
 describe("evidence overlay page membership, live", () => {
   let server: Server | null = null;
   let origin = "";
@@ -120,7 +147,7 @@ describe("evidence overlay page membership, live", () => {
     }
     server = createServer((request, response) => {
       response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      response.end(request.url === "/deferred.html" ? DEFERRED_FIXTURE : FIXTURE);
+      response.end(request.url === "/deferred.html" ? DEFERRED_FIXTURE : request.url === "/rounding.html" ? ROUNDING_FIXTURE : FIXTURE);
     });
     await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
     const address = server.address();
@@ -261,6 +288,30 @@ describe("evidence overlay page membership, live", () => {
       assert.deepEqual(await readbackViolations(current), []);
       assert.equal(await detachOverlay(current), 3);
       assert.equal(await removeOverlay(current), 0);
+    } finally {
+      await current.close();
+    }
+  });
+  it("keeps the 0.5 px rounding allowance for proven split fragments only (P7)", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    const current = await page("/rounding.html");
+    try {
+      const installation = await installOverlay(current);
+      const placed = (sid: string, side: string) => installation.marks.some((mark) => mark.sid === sid && mark.side === side);
+      const refused = (sid: string) => installation.unplacedMarks.filter((mark) => mark.sid === sid).map((mark) => mark.side).sort();
+      // Positive controls: a fragment Paged.js split to the next page, and a zero-height split wrapper.
+      assert.ok(placed("split-end", "end"), "a split fragment's end edge 0.4 px below areaBox is rounding");
+      assert.ok(placed("split-wrapper", "start") && placed("split-wrapper", "end"), "a zero-height split wrapper 0.3 px below areaBox is rounding");
+      // The separate 1 px mark envelope inside the area is unchanged for any element.
+      assert.ok(placed("in-band-end", "end"), "an end edge inside the final 1 px band keeps its mark");
+      // Negative controls: an ordinary end edge and an unsplit zero-height box past the area bottom.
+      assert.deepEqual(refused("plain-end"), ["end"], "an unfragmented block ending 0.4 px below areaBox overflows");
+      assert.deepEqual(refused("plain-zero"), ["end", "start"], "a zero-height box without split evidence gets no rounding");
+      // Footnotes never get the allowance, split or not (G-100).
+      assert.deepEqual(refused("split-note"), ["end"], "a footnote edge past areaBox stays refused");
+      assert.deepEqual(await readbackViolations(current), []);
+      await detachOverlay(current);
+      await removeOverlay(current);
     } finally {
       await current.close();
     }

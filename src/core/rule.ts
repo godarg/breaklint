@@ -350,6 +350,14 @@ export function defineRule(meta: RuleMeta, run: Rule["run"]): Rule {
 }
 
 /** Aggregates `notMeasured` rows so a long document produces counts, not tens of thousands of rows. */
+/** Distinct observed sub-causes of one aggregated decline, in first-seen order, at most three. */
+export function mergeDeclineDetail(a: string | undefined, b: string | undefined): string | undefined {
+  const parts = [...(a ? a.split("; ") : []), ...(b ? b.split("; ") : [])].filter(part => part !== "…");
+  const unique = [...new Set(parts)];
+  if (unique.length === 0) return undefined;
+  return unique.length > 3 ? [...unique.slice(0, 3), "…"].join("; ") : unique.join("; ");
+}
+
 export function aggregateNotMeasured(rows: NotMeasured[]): NotMeasured[] {
   const byKey = new Map<string, NotMeasured>();
   for (const row of rows) {
@@ -360,6 +368,8 @@ export function aggregateNotMeasured(rows: NotMeasured[]): NotMeasured[] {
       // Once aggregated the row no longer points at one object, and saying which one it was
       // would be a guess. The contract requires `target: null` past count 1.
       existing.target = null;
+      const detail = mergeDeclineDetail(existing.detail, row.detail);
+      if (detail) existing.detail = detail;
     } else {
       byKey.set(key, { ...row });
     }

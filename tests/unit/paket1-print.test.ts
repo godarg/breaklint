@@ -188,8 +188,11 @@ describe("Paket 1: tables with simple regular colspan rows", () => {
   });
 
   it("declines irregular colspan sums and rowspan > 1 explicitly", () => {
-    for (const snap of [makeColspanSnapshot({ irregular: true }), makeColspanSnapshot({ rowSpan: 2 })]) {
-      assert.equal(sourceTableMatches(snap.tableIndex!.tables[0]!), false);
+    for (const [name, snap] of [["irregular", makeColspanSnapshot({ irregular: true })], ["rowspan", makeColspanSnapshot({ rowSpan: 2 })]] as const) {
+      // 0.11.1 (P1): grid regularity is no longer part of the source match (ragged figure tables
+      // stay measurable); the continuation rules decline an irregular grid via tableGridColumns().
+      if (name === "irregular") assert.equal(tableGridColumns(snap.tableIndex!.tables[0]!), null);
+      else assert.equal(sourceTableMatches(snap.tableIndex!.tables[0]!), false);
       const report = runDocument({ path: "t.html", snapshot: snap, infrastructure: [] }, { activeRules: [headerRule, driftRule], optionsByRule: {}, coverageFloors: {}, failOn: "warn" }).report;
       assert.equal(report.verdict, "insufficient-coverage");
       assert.equal(report.findings.length, 0);
@@ -309,8 +312,50 @@ describe("Paket 1: G-78 parity-blank page evidence verification", () => {
         options: { outDir, documentKey: "incontent", binding: true, blankPages: new Set([2]), blankPageContentBoxes: contentBoxes },
       });
       assert.equal(inContentText.evidence[1]!.bindsFinding, false);
+
+      // P8a (CODE-PRINT-3): a text item that STARTS in the left margin (15 mm, content box from
+      // 20 mm) but runs across the content area must not leave the blank page verified. The whole
+      // range [x, x + width] from pdf.js is checked, not only the origin.
+      const ptPerMm = 72 / 25.4;
+      const crossing = await produceEvidence({
+        page: fakePage(marks),
+        closePage: async () => {},
+        rasterizer: fakeRasterizer([textPages[0]!, { pageNumber: 2, widthPt: 595, heightPt: 842,
+          items: [{ text: "Hanging indent running across the body", x: 15 * ptPerMm, y: inContentY, width: 120 * ptPerMm } as { text: string; x: number; y: number }] }]),
+        options: { outDir, documentKey: "crossing", binding: true, blankPages: new Set([2]), blankPageContentBoxes: contentBoxes },
+      });
+      assert.equal(crossing.evidence[1]!.bindsFinding, false);
+      assert.notEqual(crossing.evidence[1]!.pdfConformance, "verified");
+      // Positive control: a short margin note that ends before the content box stays allowed.
+      const marginNote = await produceEvidence({
+        page: fakePage(marks),
+        closePage: async () => {},
+        rasterizer: fakeRasterizer([textPages[0]!, { pageNumber: 2, widthPt: 595, heightPt: 842,
+          items: [{ text: "§", x: 15 * ptPerMm, y: inContentY, width: 3 * ptPerMm } as { text: string; x: number; y: number }] }]),
+        options: { outDir, documentKey: "marginnote", binding: true, blankPages: new Set([2]), blankPageContentBoxes: contentBoxes },
+      });
+      assert.equal(marginNote.evidence[1]!.bindsFinding, true);
+      assert.equal(marginNote.evidence[1]!.pdfConformance, "verified");
     } finally {
       rmSync(outDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("P5: figure index declines carry the observed sub-cause", () => {
+  it("names script mutations and keeps the env/figure-index-unavailable code", () => {
+    const withScript = '<!doctype html><html><body><p><a href="#f1">Figure 1</a></p><figure id="f1"><svg width="40" height="20"><text>A</text></svg><figcaption>Figure 1</figcaption></figure><script>void 0</script></body></html>';
+    const input = baseAssembleInput(withScript, false);
+    input.runtimeFigureVerification = { verified: false, detail: "script mutated DOM: 3 records before pagination" };
+    const snapshot = assembleSnapshot(input);
+    assert.equal(snapshot.figureIndex, undefined);
+    const rule = RULES_BY_ID.get("figure/dangling-reference")!;
+    const report = runDocument({ path: "s.html", snapshot, infrastructure: [] }, { activeRules: [rule], optionsByRule: {}, coverageFloors: {}, failOn: "warn" }).report;
+    assert.equal(report.notMeasured[0]!.reason, "env/figure-index-unavailable");
+    assert.equal(report.notMeasured[0]!.detail, "script mutated DOM: 3 records before pagination");
+    // Without source-id injection the decline names that, not a script.
+    const off = assembleSnapshot({ ...baseAssembleInput(withScript, true), sourceMapInjection: false });
+    const offReport = runDocument({ path: "s.html", snapshot: off, infrastructure: [] }, { activeRules: [rule], optionsByRule: {}, coverageFloors: {}, failOn: "warn" }).report;
+    assert.equal(offReport.notMeasured[0]!.detail, "source-id injection is off");
   });
 });

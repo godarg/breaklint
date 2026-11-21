@@ -64,3 +64,25 @@ it("records authored table and caption ordering without inferring design intent"
     assert.equal(index.figures[0]!.captionPosition, order);
   }
 });
+it("keeps a ragged figure table (unequal row lengths, all colspan 1) measurable, as 0.10.0 did (P1)", async () => {
+  const { sourceTableMatches, tableGridColumns } = await import("../../src/source/table-index.ts");
+  const snapshot = sample(3);
+  const table = snapshot.tableIndex!.tables[0]!;
+  // Row 1 has two cells, row 2 (a sum row) only one: HTML allows this, the grid is irregular.
+  const extra = { sid: "c1b", tag: "td", text: "Row 1 b", colSpan: 1, rowSpan: 1 };
+  table.rows[0]!.cells.push(extra);
+  table.fragments[0]!.rows[0]!.cells.push({ ...extra, box: { x: 170, y: 48, width: 120, height: 24 }, visible: true });
+  assert.equal(tableGridColumns(table), null);
+  assert.equal(sourceTableMatches(table), true);
+  const report = judge(snapshot);
+  assert.equal(report.coverage[captionSeparated.id]!.measured, 1);
+  assert.equal(report.findings.length, 1);
+  assert.equal(report.verdict, "findings");
+  // Membership, order, text and spans are still compared against source.
+  const changed = structuredClone(snapshot); changed.tableIndex!.tables[0]!.fragments[0]!.rows[0]!.cells[1]!.text = "Altered";
+  assert.equal(sourceTableMatches(changed.tableIndex!.tables[0]!), false);
+  const spanned = structuredClone(snapshot); spanned.tableIndex!.tables[0]!.fragments[0]!.rows[0]!.cells[1]!.colSpan = 2;
+  assert.equal(sourceTableMatches(spanned.tableIndex!.tables[0]!), false);
+  const reordered = structuredClone(snapshot); const t = reordered.tableIndex!.tables[0]!; t.rows.reverse();
+  assert.equal(sourceTableMatches(t), false);
+});

@@ -75,6 +75,8 @@ export interface PdfTextItem {
   text: string;
   x: number;
   y: number;
+  /** Advance width in PDF points as pdf.js reports it; absent from older producers of this shape. */
+  width?: number;
 }
 
 export interface PdfTextPage {
@@ -208,7 +210,7 @@ window.__blText = async (bytes) => {
       pages.push({
         heightPt: viewport.height,
         items: content.items.filter((it) => it.str !== undefined)
-          .map((it) => ({ text: it.str, x: it.transform[4], y: it.transform[5] })),
+          .map((it) => ({ text: it.str, x: it.transform[4], y: it.transform[5], width: it.width })),
       });
     }
     return pages;
