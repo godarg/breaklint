@@ -53,7 +53,7 @@ export function severityForScreenRule(ruleId: ScreenRuleId): Severity {
 export interface ScreenEvaluationContext {
   binding: Binding;
   stableCapture: boolean;
-  artifactPath: string;
+  artifactPath: string | null;
   siblingOverlap: boolean;
   smallText: { enabled: boolean; thresholdPx: number };
   smallTouch: { enabled: boolean; thresholdPx: number };
@@ -135,7 +135,7 @@ export function evaluateScreenTargets(targets: readonly RawTarget[], ctx: Screen
 }
 
 /** One finding per violated evaluation, in evaluation order. */
-export function screenFindings(evaluations: readonly ScreenTargetEvaluation[], artifactPath: string): ScreenFinding[] {
+export function screenFindings(evaluations: readonly ScreenTargetEvaluation[], artifactPath: string | null): ScreenFinding[] {
   return evaluations.filter((entry) => entry.predicate.violated === true).map((entry, index) => ({
     id: `screen-finding-${index}-${sha(entry.id).slice(0, 12)}`,
     ruleId: entry.ruleId,

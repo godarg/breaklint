@@ -182,6 +182,10 @@ export interface PublicScreenReport {
     drifted: boolean;
     stabilized?: boolean;
     stabilizationAttempts?: number;
+    /** Why the stabilization loop ended: two identical samples, the time budget, or the attempt limit (0.11.1). */
+    stabilizationEndedBy?: "stable" | "timeout" | "attempt-limit";
+    /** Duration of the first page sample in ms; the stabilization budget starts after it (0.11.1). */
+    firstSampleMs?: number;
     driftDetails?: ScreenDriftDetail[];
   };
   artifact: ScreenArtifact;

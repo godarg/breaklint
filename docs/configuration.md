@@ -60,7 +60,18 @@ severity that turns the verdict into `findings`; with `"error"`, warnings stay i
 failing the run. CSS Color 4 solid colors (`oklch()`, `oklab()`, `lab()`, `lch()`,
 `hwb()`, `color(...)`), semi-transparent opacity (`0 < opacity < 1`), `filter`, and `backdrop-filter`
 are measured normally for geometry; `opacity: 0`, masks, clip-paths, unsupported transforms, and
-running animations stay excluded or `not-measured`. Ordinary vertical scrolling and general visual
+running animations stay excluded or `not-measured`.
+
+`stabilizationTimeoutMs` (default 2000) bounds the wait for document fonts and, starting after the
+first sample (its duration is `capture.firstSampleMs`), the wait for two consecutive identical
+samples taken while no font is loading. A budget that runs out (`screen-stabilization-timeout`), the
+20-sample attempt limit (`screen-stabilization-attempt-limit`), fonts still loading
+(`screen-fonts-not-ready`) and samples that really differed (`screen-capture-drift`) are reported
+separately; `capture.stabilizationEndedBy` names how the loop ended. Each prevents a clean claim.
+`0` keeps its 0.10 meaning: nothing is awaited, which is reported as a timeout. The first sample,
+the screenshot and the sample after it each have their own bound of the larger of 10 s and five
+times `stabilizationTimeoutMs`; without a first sample the run ends as `infrastructure` without a
+screenshot. Ordinary vertical scrolling and general visual
 occlusion are outside this measurement contract.
 
 Visible source containers can optionally be verified against a host build receipt (Next.js output

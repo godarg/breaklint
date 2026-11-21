@@ -27,6 +27,8 @@ export { verifyOutputReceipt } from "../web/receipt.ts";
 const MAX_SIGNATURE_TEXT_BYTES = 1_024 * 1_024;
 const MAX_SIGNATURE_ANCESTORS = 64;
 const MAX_STABILIZATION_ATTEMPTS = 20;
+const PHASE_BOUND_FLOOR_MS = 10_000;
+const PHASE_BOUND_FACTOR = 5;
 const DEFAULT_SMALL_TEXT_PX = 12;
 const DEFAULT_SMALL_TOUCH_PX = 24;
 
@@ -553,68 +555,103 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const events: { kind: string; detail: string }[] = [];
   const sampleInput = { maxTargets, allowed, overlays, containers, fullPage, siblingOverlap: siblingOverlapEnabled };
 
-  const deadline = Date.now() + timeout;
-  const fonts = await withTimeout(
-    page.evaluate(async () => { if (!document.fonts) return false; await document.fonts.ready; return document.fonts.status === "loaded"; }),
-    timeout,
-  );
+  const viewport = page.viewportSize();
+  const reportHead = async (verdict: RunVerdict, deviceScaleFactor: number) => ({
+    schemaVersion: SCREEN_REPORT_SCHEMA_VERSION,
+    profileKind: "screen" as const,
+    runId,
+    runVerdict: verdict,
+    exitCode: EXIT_CODE_BY_VERDICT[verdict],
+    scope: {
+      projectId: options.projectId ?? null,
+      documentId: options.documentId ?? null,
+      scenario: options.scenario,
+      url: safeUrl(page.url()),
+      viewport: { width: viewport?.width ?? 0, height: viewport?.height ?? 0, deviceScaleFactor },
+      browserVersion: await Promise.resolve(page.context().browser()?.version() ?? null),
+    },
+    trust: "host-controlled-page" as const,
+    networkPolicy: "host-owned" as const,
+    failOn,
+    rulesEnabled,
+  });
+  const emptyArtifact = { kind: "png" as const, relativePath: null, sha256: null, byteLength: null, widthPx: null, heightPx: null, capture: options.output.screenshot, coordinateSystem: fullPage ? "css-document-pixels" as const : "css-viewport-pixels-with-scroll" as const };
 
-  // Stabilization loop: wait for 2 consecutive identical samples within stabilizationTimeoutMs.
-  let before = await samplePage(page, sampleInput);
+  // Phases outside the stabilization budget (first sample, screenshot, post-capture check) carry
+  // their own bound, so a hanging driver still yields a report.
+  const phaseBoundMs = Math.max(PHASE_BOUND_FLOOR_MS, PHASE_BOUND_FACTOR * timeout);
+  // stabilizationTimeoutMs 0 keeps its 0.10 meaning: fonts and layout are not awaited, which is a
+  // timeout (no clean claim), and no drift is claimed without two differing samples.
+  const fonts = timeout === 0
+    ? { value: null, timedOut: true }
+    : await withTimeout(page.evaluate(async () => { if (!document.fonts) return false; await document.fonts.ready; return document.fonts.status === "loaded"; }), timeout);
+
+  const firstStart = performance.now();
+  const first = await withTimeout(samplePage(page, sampleInput), phaseBoundMs);
+  const firstSampleMs = Math.round(performance.now() - firstStart);
+  if (first.value === null) {
+    // No sample, no observation: no screenshot is taken and nothing is evaluated.
+    infrastructure.push({ kind: "screen-sample-timeout", detail: `the first page sample did not finish within ${phaseBoundMs} ms`, fatal: true });
+    const report: PublicScreenReport = {
+      ...await reportHead("infrastructure", 0),
+      targetInventory: { complete: false, omittedCount: 0, reason: "screen/no-sample" },
+      coverage: {
+        candidates: 0, measured: 0, excluded: 0, notMeasured: 0,
+        allowedScrollContainers: allowedEntries.map((entry) => ({ ...entry, count: 0 })),
+        intentionalOverlays: overlayEntries.map((entry) => ({ ...entry, count: 0 })),
+      },
+      capture: { before: "", stable: "", after: "", fontsReady: false, timedOut: true, drifted: false, stabilized: false, stabilizationAttempts: 0, stabilizationEndedBy: "timeout", firstSampleMs, driftDetails: [] },
+      artifact: emptyArtifact, evaluations: [], findings: [], infrastructure, events,
+    };
+    return { ok: false, report };
+  }
+
+  // Stabilization: two consecutive identical samples, while document fonts are not loading. The
+  // monotonic deadline starts after the first sample, whose duration the report records.
+  let before = first.value;
   let settled = before;
   let stabilized = false;
-  let stabilizationTimedOut = false;
+  let endedBy: "stable" | "timeout" | "attempt-limit" = "timeout";
   let stabilizationAttempts = 0;
+  let lastPairDiffered = false;
   let prev = before;
   let prevHash = sha(stable(prev.signature));
-  for (let attempt = 1; attempt <= MAX_STABILIZATION_ATTEMPTS; attempt++) {
-    const remainingForRaf = deadline - Date.now();
-    if (remainingForRaf <= 0) {
-      stabilizationTimedOut = true;
-      break;
-    }
-    const raf = await withTimeout(
-      page.evaluate(() => new Promise<boolean>((resolve) => requestAnimationFrame(() => resolve(true)))),
-      remainingForRaf,
-    );
-    if (raf.timedOut) {
-      stabilizationTimedOut = true;
-      break;
-    }
-    const remainingForSample = deadline - Date.now();
-    if (remainingForSample <= 0) {
-      stabilizationTimedOut = true;
-      break;
-    }
+  const stabilizationStart = performance.now();
+  const deadline = stabilizationStart + timeout;
+  for (;;) {
+    if (stabilizationAttempts >= MAX_STABILIZATION_ATTEMPTS) { endedBy = "attempt-limit"; break; }
+    const remainingForRaf = deadline - performance.now();
+    if (remainingForRaf <= 0) { endedBy = "timeout"; break; }
+    const raf = await withTimeout(page.evaluate(() => new Promise<boolean>((resolve) => requestAnimationFrame(() => resolve(true)))), remainingForRaf);
+    if (raf.timedOut) { endedBy = "timeout"; break; }
+    const remainingForSample = deadline - performance.now();
+    if (remainingForSample <= 0) { endedBy = "timeout"; break; }
     const sampledCurr = await withTimeout(samplePage(page, sampleInput), remainingForSample);
-    if (sampledCurr.timedOut || sampledCurr.value === null) {
-      stabilizationTimedOut = true;
-      break;
-    }
+    if (sampledCurr.value === null) { endedBy = "timeout"; break; }
+    stabilizationAttempts++;
     const curr = sampledCurr.value;
     const currHash = sha(stable(curr.signature));
-    stabilizationAttempts = attempt;
-    if (currHash === prevHash) {
-      before = prev;
-      settled = curr;
-      stabilized = true;
-      break;
-    }
     before = prev;
     settled = curr;
-    if (Date.now() >= deadline) {
-      stabilizationTimedOut = true;
-      break;
-    }
+    lastPairDiffered = currHash !== prevHash;
+    if (!lastPairDiffered && curr.signature.fonts !== "loading") { stabilized = true; endedBy = "stable"; break; }
     prev = curr;
     prevHash = currHash;
   }
+  const stabilizationMs = Math.round(performance.now() - stabilizationStart);
+  const stabilizationTimedOut = !stabilized && endedBy === "timeout";
 
-  const domBuildId = await readDomBuildId(page, options.sourceBinding);
+  const readBuildId = async (): Promise<string | null> => (await withTimeout(readDomBuildId(page, options.sourceBinding), phaseBoundMs)).value;
+  const domBuildId = await readBuildId();
   const bindingBefore = verifyBinding(options.sourceBinding, domBuildId);
-  const bytes = await page.screenshot({ fullPage });
-  const after = await samplePage(page, sampleInput);
-  const domBuildIdAfter = await readDomBuildId(page, options.sourceBinding);
+  const shot = await withTimeout(page.screenshot({ fullPage }), phaseBoundMs);
+  const bytes = shot.value;
+  if (bytes === null) infrastructure.push({ kind: "screen-screenshot-timeout", detail: `the host screenshot did not finish within ${phaseBoundMs} ms`, fatal: true });
+  const afterSample = bytes === null ? null : await withTimeout(samplePage(page, sampleInput), phaseBoundMs);
+  const after = afterSample?.value ?? null;
+  const postCaptureTimedOut = afterSample !== null && after === null;
+  if (postCaptureTimedOut) infrastructure.push({ kind: "screen-post-capture-timeout", detail: `the sample after the screenshot did not finish within ${phaseBoundMs} ms`, fatal: false });
+  const domBuildIdAfter = await readBuildId();
   const bindingAfter = verifyBinding(options.sourceBinding, domBuildIdAfter);
 
   // Public capture digests are keyed with a per-run secret that never leaves this call: they compare
@@ -623,23 +660,30 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const captureDigest = (sample: RawSample): string => createHmac("sha256", captureKey).update(stable(sample.signature)).digest("hex");
   const captureBefore = captureDigest(before);
   const captureStable = captureDigest(settled);
-  const captureAfter = captureDigest(after);
-  const postScreenshotDrifted = captureStable !== captureAfter;
-  const drifted = !stabilized || postScreenshotDrifted;
+  const captureAfter = after === null ? "" : captureDigest(after);
+  const postScreenshotDrifted = after !== null && captureStable !== captureAfter;
+  // Drift means two samples really differed; a budget that ran out before a second sample is a timeout.
+  const preScreenshotDrifted = !stabilized && lastPairDiffered;
+  const drifted = preScreenshotDrifted || postScreenshotDrifted;
 
   const driftDetails: ScreenDriftDetail[] = [
-    ...(!stabilized ? computeScreenDriftDetails(before, settled, "pre-screenshot") : []),
-    ...(postScreenshotDrifted ? computeScreenDriftDetails(settled, after, "post-screenshot") : []),
+    ...(preScreenshotDrifted ? computeScreenDriftDetails(before, settled, "pre-screenshot") : []),
+    ...(postScreenshotDrifted && after !== null ? computeScreenDriftDetails(settled, after, "post-screenshot") : []),
   ].slice(0, MAX_DRIFT_DETAILS);
 
-  const timedOut = fonts.timedOut || stabilizationTimedOut;
-  const completeSignature = before.signatureTextComplete && settled.signatureTextComplete && after.signatureTextComplete && before.ancestorSignatureComplete && settled.ancestorSignatureComplete && after.ancestorSignatureComplete;
-  const stableCapture = !timedOut && !drifted && completeSignature;
+  const samples = after === null ? [before, settled] : [before, settled, after];
+  const fontsAllReady = samples.every((sample) => sample.fontsReady);
+  const timedOut = fonts.timedOut || stabilizationTimedOut || postCaptureTimedOut;
+  const completeSignature = samples.every((sample) => sample.signatureTextComplete && sample.ancestorSignatureComplete);
+  const stableCapture = stabilized && !timedOut && !drifted && completeSignature && fontsAllReady && after !== null;
 
-  if (timedOut) infrastructure.push({ kind: "screen-font-layout-timeout", detail: "document fonts/layout did not settle within the configured bound", fatal: false });
+  if (fonts.timedOut) infrastructure.push({ kind: "screen-font-layout-timeout", detail: timeout === 0 ? "stabilizationTimeoutMs is 0: document fonts and layout were not awaited" : `document.fonts.ready did not resolve within ${timeout} ms`, fatal: false });
+  if (stabilizationTimedOut && timeout > 0) infrastructure.push({ kind: "screen-stabilization-timeout", detail: `no two consecutive identical samples within ${timeout} ms after the first sample (first sample ${firstSampleMs} ms, ${stabilizationAttempts} further samples)`, fatal: false });
+  if (endedBy === "attempt-limit") infrastructure.push({ kind: "screen-stabilization-attempt-limit", detail: `no two consecutive identical samples within the ${MAX_STABILIZATION_ATTEMPTS}-sample attempt limit (${stabilizationMs} of ${timeout} ms used)`, fatal: false });
+  if (!fontsAllReady && !fonts.timedOut) infrastructure.push({ kind: "screen-fonts-not-ready", detail: "document fonts were still loading in a compared sample", fatal: false });
   if (drifted) infrastructure.push({ kind: "screen-capture-drift", detail: summarizeDriftDetails(driftDetails), fatal: false });
-  if (!before.signatureTextComplete || !settled.signatureTextComplete || !after.signatureTextComplete) infrastructure.push({ kind: "screen-dom-signature-incomplete", detail: `direct child text exceeded the ${MAX_SIGNATURE_TEXT_BYTES}-byte capture bound or browser hashing was unavailable`, fatal: false });
-  if (!before.ancestorSignatureComplete || !settled.ancestorSignatureComplete || !after.ancestorSignatureComplete) infrastructure.push({ kind: "screen-paint-signature-incomplete", detail: `a target ancestor chain exceeded the ${MAX_SIGNATURE_ANCESTORS}-ancestor capture bound`, fatal: false });
+  if (!samples.every((sample) => sample.signatureTextComplete)) infrastructure.push({ kind: "screen-dom-signature-incomplete", detail: `direct child text exceeded the ${MAX_SIGNATURE_TEXT_BYTES}-byte capture bound or browser hashing was unavailable`, fatal: false });
+  if (!samples.every((sample) => sample.ancestorSignatureComplete)) infrastructure.push({ kind: "screen-paint-signature-incomplete", detail: `a target ancestor chain exceeded the ${MAX_SIGNATURE_ANCESTORS}-ancestor capture bound`, fatal: false });
 
   const bindingStable = bindingBefore.status === "verified-container-only" && bindingAfter.status === "verified-container-only" && bindingBefore.detail === bindingAfter.detail && domBuildId === domBuildIdAfter;
   if (!bindingStable) events.push({ kind: "source-binding-unavailable", detail: bindingAfter.detail ?? bindingBefore.detail ?? "host build container binding unavailable or changed during capture" });
@@ -658,10 +702,14 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
     });
   }
 
-  const artifactDir = join(options.output.dir, "evidence"); mkdirSync(artifactDir, { recursive: true });
   // runId is public report data, not a filesystem component. Hash it before naming an artifact.
-  const relativePath = `evidence/screen-${sha(runId).slice(0, 32)}.png`; writeFileSync(join(options.output.dir, relativePath), bytes);
-  const dimensions = pngSize(bytes); if (!dimensions) infrastructure.push({ kind: "screen-screenshot-invalid", detail: "host screenshot was not a PNG with IHDR dimensions", fatal: true });
+  let relativePath: string | null = null;
+  let dimensions: { widthPx: number; heightPx: number } | null = null;
+  if (bytes !== null) {
+    const artifactDir = join(options.output.dir, "evidence"); mkdirSync(artifactDir, { recursive: true });
+    relativePath = `evidence/screen-${sha(runId).slice(0, 32)}.png`; writeFileSync(join(options.output.dir, relativePath), bytes);
+    dimensions = pngSize(bytes); if (!dimensions) infrastructure.push({ kind: "screen-screenshot-invalid", detail: "host screenshot was not a PNG with IHDR dimensions", fatal: true });
+  }
 
   const effectiveBinding: Binding = bindingStable ? bindingAfter : { status: options.sourceBinding ? "declared" : "unknown", files: new Set(), containerFiles: new Map(), detail: bindingAfter.detail };
   const evaluations = evaluateScreenTargets(settled.targets, {
@@ -680,27 +728,9 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   // A page with candidates but no measurements has no positive observation to support Clean.
   const insufficient = !stableCapture || settled.omittedCount > 0 || notMeasured > 0 || measured === 0 || rootException;
   const verdict: RunVerdict = infrastructure.some((entry) => entry.fatal) ? "infrastructure" : insufficient ? "insufficient-coverage" : gatingFindings > 0 ? "findings" : "clean";
-  const viewport = page.viewportSize();
-  const browserVersion = await Promise.resolve(page.context().browser()?.version() ?? null);
 
   const report: PublicScreenReport = {
-    schemaVersion: SCREEN_REPORT_SCHEMA_VERSION,
-    profileKind: "screen",
-    runId,
-    runVerdict: verdict,
-    exitCode: EXIT_CODE_BY_VERDICT[verdict],
-    scope: {
-      projectId: options.projectId ?? null,
-      documentId: options.documentId ?? null,
-      scenario: options.scenario,
-      url: safeUrl(page.url()),
-      viewport: { width: viewport?.width ?? 0, height: viewport?.height ?? 0, deviceScaleFactor: settled.deviceScaleFactor },
-      browserVersion,
-    },
-    trust: "host-controlled-page",
-    networkPolicy: "host-owned",
-    failOn,
-    rulesEnabled,
+    ...await reportHead(verdict, settled.deviceScaleFactor),
     targetInventory: {
       complete: settled.omittedCount === 0 && completeSignature,
       omittedCount: settled.omittedCount,
@@ -718,23 +748,23 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
       before: captureBefore,
       stable: captureStable,
       after: captureAfter,
-      fontsReady: fonts.value === true && settled.fontsReady,
+      fontsReady: fonts.value === true && fontsAllReady,
       timedOut,
       drifted,
       stabilized,
       stabilizationAttempts,
+      stabilizationEndedBy: endedBy,
+      firstSampleMs,
       driftDetails,
     },
-    artifact: {
-      kind: "png",
-      relativePath: dimensions ? relativePath : null,
-      sha256: dimensions ? sha(bytes) : null,
-      byteLength: dimensions ? bytes.length : null,
-      widthPx: dimensions?.widthPx ?? null,
-      heightPx: dimensions?.heightPx ?? null,
-      capture: options.output.screenshot,
-      coordinateSystem: fullPage ? "css-document-pixels" : "css-viewport-pixels-with-scroll",
-    },
+    artifact: bytes !== null && dimensions ? {
+      ...emptyArtifact,
+      relativePath,
+      sha256: sha(bytes),
+      byteLength: bytes.length,
+      widthPx: dimensions.widthPx,
+      heightPx: dimensions.heightPx,
+    } : emptyArtifact,
     evaluations,
     findings,
     infrastructure,
