@@ -2,17 +2,19 @@
 
 Find page-break and layout bugs in HTML-to-PDF output (Paged.js) and in your Playwright pages — measured on the rendered page, with source locations and CI-ready exit codes.
 
-breaklint paginates your HTML itself, with Paged.js 0.4.3 in Chrome. If your PDF comes from
-another engine (Chrome's own print, WeasyPrint, Prince), its page breaks can differ from what
-breaklint measured.
-
 It reports what a browser preview hides: widows and orphans, blocks too tall for a page, tables that lose their header, clipped SVG labels.
+
+breaklint paginates with its own Paged.js 0.4.3 in Chrome; a PDF from Chrome's print, WeasyPrint
+or Prince can break pages differently.
 
 [![npm](https://img.shields.io/npm/v/breaklint.svg)](https://www.npmjs.com/package/breaklint)
 [![ci](https://github.com/godarg/breaklint/actions/workflows/ci.yml/badge.svg)](https://github.com/godarg/breaklint/actions/workflows/ci.yml)
 [![licence](https://img.shields.io/npm/l/breaklint.svg)](https://github.com/godarg/breaklint/blob/v0.11.1/LICENSE)
 
-![Before: page 2 of a sample report is empty below its heading; a table marked break-inside: avoid is 2013 px tall on a 650 px page, exit 1. After: the table breaks between rows, page 1 holds heading and rows, exit 0.](https://raw.githubusercontent.com/godarg/breaklint/v0.11.1/assets/breaklint-before-after.png)
+![Before: a table that must not break leaves printed page 2 empty, exit 1. After: it breaks between rows, exit 0.](https://raw.githubusercontent.com/godarg/breaklint/v0.11.1/assets/breaklint-before-after.png)
+
+*Before:* a `break-inside: avoid` table, 2013 px tall on a 650 px page, leaves page 2 empty below
+its heading; exit 1. *After:* its rows may break; exit 0.
 
 ## Try it
 
@@ -20,22 +22,20 @@ It reports what a browser preview hides: widows and orphans, blocks too tall for
 npx breaklint --demo
 ```
 
-It needs no browser: the real rules run over a stored page snapshot that contains findings on
-purpose, so the demo ends with exit 1. Below is one of its five findings and the closing counters,
-shortened where marked `…`, copied from that command's output:
+No browser needed: the rules run over a stored snapshot with planted bugs, so the demo
+exits 1. One of its five findings and the counter line, as printed (`…` marks cuts):
 
 ```
 error svg/text-overflows-viewport  page 5
   measured   72 px; threshold 0 px (uncalibrated)
   detail     This text extends 72.00 px beyond the SVG viewport …
-  remedy     … Enlarge the SVG 'viewBox' or its width/height …
   …
 
-… · pages analysed: 5 · rules run: 12 · … · verdict: findings · …
+inputs found: 1 · pages analysed: 5 · rules run: 12 · …
 ```
 
-**No threshold is calibrated.** Fixtures show that each rule does what it says, not that its
-threshold suits your documents. Every finding says `uncalibrated`.
+**No threshold is calibrated:** fixtures show that each rule does what it says, not that its
+threshold suits your documents.
 
 ## Install
 
@@ -46,9 +46,8 @@ npm i -D breaklint puppeteer-core@^25.16.0 pagedjs@0.4.3 pdfjs-dist@6.2.108
 ```
 
 breaklint finds an installed Chrome or Chromium; otherwise set
-`BREAKLINT_CHROME=/path/to/chrome`. For `checkPage` in Playwright tests, `npm i -D breaklint` is
-enough; the browser is Playwright's. `--demo` needs only `breaklint`; without `pdfjs-dist`,
-findings carry no page image.
+`BREAKLINT_CHROME=/path/to/chrome`. For `checkPage`, `npm i -D breaklint` is enough; the browser
+is Playwright's. `--demo` needs only `breaklint`; without `pdfjs-dist`, findings carry no page image.
 
 ## Check HTML for PDF
 
@@ -57,16 +56,25 @@ npx breaklint dist/print/*.html      # the shell expands the glob
 npx breaklint --format json --out report.json book.html
 ```
 
-`--format` also takes html, sarif, junit and markdown. A finding names the file and line of its
-element in your HTML, except for elements the paginator creates. Each run writes one PNG per page
-and the checked PDF to `./breaklint-report`; `--out-dir` moves it. Options, profiles and
-`breaklint.config.json`:
+A finding names its element's file and line in your HTML (not for elements the paginator
+creates), as in the run behind the image (`…` marks cuts):
+
+```
+error layout/unbreakable-block-too-tall  page 2
+  …
+  source     …/before.html:24
+```
+
+**Typography is checked as German (`de-DE`) by default.** For English, pass `--locale en-US` or
+set `"locale"` in `breaklint.config.json`; the `type/*` rules skip text in another `lang`.
+
+`--format` also takes html, sarif, junit and markdown. Each run writes one PNG per page and the
+checked PDF to `./breaklint-report`; `--out-dir` moves it. Options and profiles:
 [configuration](https://github.com/godarg/breaklint/blob/v0.11.1/docs/configuration.md).
 
 ## Check Playwright pages
 
-`checkPage` measures a page your Playwright test has already opened and signed in to. It does not
-navigate or close the page.
+`checkPage` measures a page your Playwright test has opened; it never navigates or closes it.
 
 ```ts
 import { test, expect } from '@playwright/test';
@@ -76,24 +84,22 @@ test('dashboard layout', async ({ page }, testInfo) => {
   await page.goto('/dashboard');
   const { ok, report } = await checkPage(page, {
     trust: 'host-controlled-page',   // required: your test owns this page
-    networkPolicy: 'host-owned',     // required: your test owns the network
+    networkPolicy: 'host-owned',     // required: your test controls its network
     scenario: 'dashboard',
     output: { dir: testInfo.outputPath('breaklint'), screenshot: 'viewport' },
-    failOn: 'error',
+    failOn: 'error',                 // errors gate; warnings stay in the report
   });
   await testInfo.attach('breaklint.json', {
     body: JSON.stringify(report, null, 2),
     contentType: 'application/json',
   });
-  // report mode: measured enough to judge
-  expect(ok).toBe(true);
-  // gate mode: no finding at or above failOn
-  // expect(report.runVerdict).toBe('clean');
+  expect(ok, 'breaklint could not measure the page').toBe(true);
+  // ok is true with findings too; this line fails the test on them:
+  expect(report.runVerdict, 'findings: see breaklint.json').toBe('clean');
 });
 ```
 
-Screen checks are new and uncalibrated: start in report mode, read the findings, then switch to
-the gate. Runnable example:
+Screen checks are uncalibrated: for a first run, drop the last line and read the findings. Runnable example:
 [`examples/playwright/`](https://github.com/godarg/breaklint/blob/v0.11.1/examples/playwright/layout.spec.ts);
 options, rules and exceptions: [screen checks](https://github.com/godarg/breaklint/blob/v0.11.1/docs/screen-checks.md).
 
@@ -127,7 +133,7 @@ Screen (`checkPage`): `web/unexpected-horizontal-overflow`, `web/content-clipped
 `web/svg-text-overflows-viewport` are errors and on by default; `web/sibling-overlap`,
 `web/small-text` (under 12 px) and `web/small-touch-target` (under 24 px) are opt-in warnings.
 
-Documentation index: [docs](https://github.com/godarg/breaklint/blob/v0.11.1/docs/README.md).
+All docs: [index](https://github.com/godarg/breaklint/blob/v0.11.1/docs/README.md).
 
 ## CI and GitHub Action
 
@@ -138,8 +144,8 @@ Documentation index: [docs](https://github.com/godarg/breaklint/blob/v0.11.1/doc
       dist/print/**/*.html
 ```
 
-The Action fails the step on breaklint's exit code and writes SARIF, JUnit and a step summary.
-Its path expansion needs Bash 4 or newer with globstar.
+The Action fails the step on breaklint's exit code and writes SARIF, JUnit and a step summary;
+it needs Bash 4 or newer with globstar.
 [CI recipe](https://github.com/godarg/breaklint/blob/v0.11.1/docs/ci-recipe.md): workflow,
 permissions, pinning.
 
@@ -148,7 +154,7 @@ permissions, pinning.
 | code | meaning |
 |---|---|
 | 0 | checked, coverage met, nothing reached the threshold |
-| 1 | a finding reached the threshold |
+| 1 | a finding reached the threshold (experimental print rules never gate) |
 | 2 | invalid invocation or input; no report is written |
 | 3 | infrastructure: renderer, font, pagination or output failed |
 | 4 | too little was measured to judge |
@@ -160,9 +166,8 @@ permissions, pinning.
 ## Untrusted HTML
 
 breaklint runs the document's scripts in Chrome (fresh profile, sandbox on) and blocks page
-requests except to its own loopback origin. That is not an egress control: WebSocket, WebRTC and
-the browser's own traffic are not covered. Check untrusted HTML in a container without network
-access; see [SECURITY.md](https://github.com/godarg/breaklint/blob/v0.11.1/SECURITY.md).
+requests except to its own loopback origin. That is no egress control: WebSocket, WebRTC and the
+browser's own traffic pass. Check untrusted HTML in a container without network; see [SECURITY.md](https://github.com/godarg/breaklint/blob/v0.11.1/SECURITY.md).
 
 ## Limits
 
@@ -170,24 +175,24 @@ access; see [SECURITY.md](https://github.com/godarg/breaklint/blob/v0.11.1/SECUR
 - **Paged.js 0.4.3 is the measured paginator.** Any other installed version ends with exit 3.
 - **Footnotes.** A document using Paged.js footnotes ends with exit 3.
 - **macOS and Linux.** Live runs do not work on Windows.
-- **Fonts must load.** A font that fails to load stops the run instead of producing phantom findings.
+- **Fonts must load.** A failed font stops the run instead of producing phantom findings.
 - **Isolate foreign HTML.** The request blocking protects against mistakes, not against attacks.
 
-Not a PDF validator, visual diff or prose linter: use veraPDF, BackstopJS or vale for those. More
+Not a PDF validator, visual diff or prose linter (see veraPDF, BackstopJS, vale). More
 limits: [known limits](https://github.com/godarg/breaklint/blob/v0.11.1/docs/known-limits.md).
 
 ## How this was made
 
-breaklint was written with AI assistance: code, tests and documentation. Rules that cite a CSS
-specification or the German orthography rules were checked against the published text, and their
-behaviour against measurements in a real browser. breaklint contains no language model and sends
+breaklint was written with AI assistance: code, tests and documentation. Rules citing a CSS
+specification or the German orthography rules were checked against the published text and
+against measurements in a real browser. breaklint contains no language model and sends
 no document anywhere.
 
 ## Help calibrate it
 
 Found a page where breaklint and your eye disagree? The
 [community test](https://github.com/godarg/breaklint/blob/v0.11.1/docs/community-testing.md) takes
-about ten minutes; use only material you may publish.
+about ten minutes; use only publishable material.
 
 ## License
 
