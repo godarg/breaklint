@@ -28,7 +28,7 @@ function sample(index: number, fonts: string, changing: boolean): unknown {
     hasDirectText: true, isSvg: false, isSvgText: false, isInteractiveControl: false, siblingEligible: false, fontSizePx: 16, siblingOverlapPx: 0,
     svgTextOverflowPx: 0, svgClipped: false, svgInterior: false, paintSignature: "p", ancestorSignatureComplete: true,
     box: { x: 0, y: 0, width: changing ? 100 + index : 100, height: 20 }, coordinateSystem: "css-viewport-pixels", state: "candidate", reason: null, paint: null,
-    transform: null, clipped: "none", horizontalOverflow: 0, allowedScroll: false, clipByAllowed: false, overlay: false, sourceContainer: null, scroll: { x: 0, y: 0 },
+    transform: null, clipped: "none", horizontalOverflow: 0, allowedScroll: false, clipByAllowed: false, svgViewportCut: false, overlay: false, sourceContainer: null, scroll: { x: 0, y: 0 },
   };
   return {
     signature: { url: "https://host.test/page", viewport: [640, 400, 1], scroll: [0, 0], document: [640, 400, 640, 400, 3], fonts },

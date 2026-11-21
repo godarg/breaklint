@@ -47,7 +47,8 @@ run) with structured `capture.driftDetails` on drift (a text change records only
 evaluations (including healthy, excluded, and not-measured targets), coverage counts, and typed
 events. Screen profile v2 checks unexpected horizontal overflow, content visibly cut by rectangular
 `overflow: hidden` or `clip` ancestors, SVG text overflowing its viewport
-(`web/svg-text-overflows-viewport`), and the opt-in warnings `web/sibling-overlap` (visible HTML
+(`web/svg-text-overflows-viewport`; a shape or image that the SVG viewport cuts is drawing, so
+`web/content-clipped` reports it as excluded `rule/target-not-applicable`), and the opt-in warnings `web/sibling-overlap` (visible HTML
 sibling overlap, `rules.siblingOverlap: true`), `web/small-text` and `web/small-touch-target`. Without
 its opt-in, the sibling pass does not run and its fields do not take part in the capture stability
 check. `web/small-text` compares the computed `font-size` of elements with their own text (a
@@ -55,7 +56,10 @@ check. `web/small-text` compares the computed `font-size` of elements with their
 a CSS `transform` is not applied, so scaled text can be reported too small or missed.
 `web/small-touch-target` is a size heuristic, not a WCAG 2.5.8 check: an inline link surrounded by
 running text is exempt, while a link that is the only text of its block, such as a navigation list
-item, is measured. Absolutely positioned siblings are not excluded wholesale; name an intended overlay such as a
+item, is measured. Running text is text with at least one letter or digit outside links and buttons,
+so a row of links divided only by separators (`|`, `›`, `·`) such as a footer link row is measured,
+and so is every link inside a navigation landmark (`nav`, `role="navigation"`), such as a
+breadcrumb with a plain current-page item. Absolutely positioned siblings are not excluded wholesale; name an intended overlay such as a
 badge in `intentionalOverlays`. An intentional overlay exempts its subtree. An allowed scroll
 container exempts only its own horizontal overflow and the clipping it causes (content it cuts or
 scrolls out of view); its descendants are still measured. An exception that matches `html` or `body`

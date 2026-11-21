@@ -132,7 +132,7 @@ describe("Paket 2: screen capture drift diff & schemaVersion 2 context/bundle co
       fontSizePx: 16, siblingOverlapPx: 0, svgTextOverflowPx: 0, svgClipped: false, svgInterior: false, paintSignature: "p1", ancestorSignatureComplete: true,
       box: { x: 0, y: 0, width: 100, height: 40 }, coordinateSystem: "css-viewport-pixels" as const,
       state: "candidate" as const, reason: null, paint: null, transform: null, clipped: "none" as const,
-      horizontalOverflow: 0, allowedScroll: false, clipByAllowed: false, overlay: false, sourceContainer: null, scroll: { x: 0, y: 0 },
+      horizontalOverflow: 0, allowedScroll: false, clipByAllowed: false, svgViewportCut: false, overlay: false, sourceContainer: null, scroll: { x: 0, y: 0 },
     };
     const first = {
       signature: { url: "http://127.0.0.1/", viewport: [640, 400, 1] as [number, number, number], scroll: [0, 0] as [number, number], document: [640, 400, 640, 400, 2] as [number, number, number, number, number], fonts: "loaded" },
@@ -154,7 +154,7 @@ describe("Paket 2: screen capture drift diff & schemaVersion 2 context/bundle co
       fontSizePx: 16, siblingOverlapPx: 0, svgTextOverflowPx: 0, svgClipped: false, svgInterior: false, paintSignature: "p1", ancestorSignatureComplete: true,
       box: { x: 0, y: 0, width: 100, height: 20 }, coordinateSystem: "css-viewport-pixels" as const,
       state: "candidate" as const, reason: null, paint: null, transform: null, clipped: "none" as const,
-      horizontalOverflow: 0, allowedScroll: false, clipByAllowed: false, overlay: false, sourceContainer: null, scroll: { x: 0, y: 0 },
+      horizontalOverflow: 0, allowedScroll: false, clipByAllowed: false, svgViewportCut: false, overlay: false, sourceContainer: null, scroll: { x: 0, y: 0 },
     };
     const signature = { url: "http://127.0.0.1/", viewport: [640, 400, 1] as [number, number, number], scroll: [0, 0] as [number, number], document: [640, 400, 640, 400, 3] as [number, number, number, number, number], fonts: "loaded" };
     const diff = computeScreenDriftDetails(

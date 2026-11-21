@@ -217,6 +217,21 @@ describe("screen checkPage host-page adapter, live", () => {
     );
     const navMarked = JSON.stringify(nav.report.evaluations.filter((e) => e.target.selector.startsWith("#") && e.ruleId === "web/small-touch-target").map((e) => [e.target.selector, e.status, e.measurements[0]?.value]));
     for (const id of ["#row-1", "#row-2", "#bar-1", "#bar-2", "#bar-3", "#btn-link"]) assert.ok(nav.report.findings.some((f) => f.ruleId === "web/small-touch-target" && f.target.selector === id), `${id} ${navMarked}`);
+
+    // Separators between links (|, ›, ·) are not running text: a pipe row, a breadcrumb (whose
+    // plain current-page item sits in a navigation landmark) and a footer link row are measured;
+    // two links inside a sentence stay exempt.
+    const rows = await inspect(
+      '<nav><a id="pipe-1" href="#a" style="font-size:10px">Home</a> | <a id="pipe-2" href="#b" style="font-size:10px">About</a></nav>' +
+      '<nav><a id="crumb-1" href="#c" style="font-size:10px">Home</a> \u203a <a id="crumb-2" href="#d" style="font-size:10px">Docs</a> \u203a <span>Page</span></nav>' +
+      '<footer><a id="foot-1" href="#e" style="font-size:10px">Impressum</a> \u00b7 <a id="foot-2" href="#f" style="font-size:10px">Datenschutz</a></footer>' +
+      '<p>See <a id="sent-1" href="#g" style="font-size:10px">docs</a> and <a id="sent-2" href="#h" style="font-size:10px">faq</a>.</p>',
+      "small-touch-separator-rows",
+      { rules: { smallTouchTarget: true } },
+    );
+    const rowsMarked = JSON.stringify(rows.report.evaluations.filter((e) => e.target.selector.startsWith("#") && e.ruleId === "web/small-touch-target").map((e) => [e.target.selector, e.status, e.measurements[0]?.value]));
+    for (const id of ["#pipe-1", "#pipe-2", "#crumb-1", "#crumb-2", "#foot-1", "#foot-2"]) assert.ok(rows.report.findings.some((f) => f.ruleId === "web/small-touch-target" && f.severity === "warn" && f.target.selector === id), `${id} ${rowsMarked}`);
+    for (const id of ["#sent-1", "#sent-2"]) assert.equal(rows.report.evaluations.some((e) => e.ruleId === "web/small-touch-target" && e.target.selector === id), false, `${id} ${rowsMarked}`);
   });
 
   it("binds verified-container-only only to the output id the opened page renders, before and after capture", async (t) => {
@@ -565,6 +580,22 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.ok(Number(svgFinding(r, "#scaled-cut")?.measurement.value) > 20, "overflow is reported in CSS pixels of the scaled viewport");
     assert.ok(svgFinding(r, "#nested"), JSON.stringify(r.evaluations.filter((e) => e.target.selector === "#nested")));
     for (const selector of ["#partly", "#outside", "#padded", "#scaled-cut", "#nested"]) assert.equal(clipFinding(r, selector), undefined, selector);
+
+    // Shapes and images cut by the SVG viewport are drawing, not clipped content: web/content-clipped
+    // reports them as not applicable instead of a silent measured 0; a shape inside the viewport
+    // stays measured.
+    const shapes = await inspect(
+      '<div><svg width="100" height="40"><rect id="rect-cut" x="50" y="0" width="200" height="20" fill="red"/><rect id="rect-in" x="0" y="0" width="20" height="20" fill="blue"/></svg></div>' +
+      '<div><svg width="100" height="40"><image id="image-cut" x="50" y="0" width="200" height="30" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%2210%22%3E%3Crect width=%2210%22 height=%2210%22/%3E%3C/svg%3E"/></svg></div>',
+      "svg-shape-viewport",
+    );
+    const clipEvaluation = (selector: string) => shapes.report.evaluations.find((e) => e.ruleId === "web/content-clipped" && e.target.selector === selector);
+    for (const selector of ["#rect-cut", "#image-cut"]) {
+      const evaluation = clipEvaluation(selector);
+      assert.deepEqual([evaluation?.status, evaluation?.reason], ["excluded", "rule/target-not-applicable"], `${selector} ${JSON.stringify(evaluation)}`);
+    }
+    assert.deepEqual([clipEvaluation("#rect-in")?.status, clipEvaluation("#rect-in")?.measurements[0]?.value], ["measured", 0]);
+    assert.equal(shapes.report.findings.length, 0, JSON.stringify(shapes.report.findings));
 
     // overflow:visible draws the text: the SVG rule does not apply, an outer HTML clip still does.
     const visible = await inspect(

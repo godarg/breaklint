@@ -68,7 +68,10 @@ export function evaluateScreenTargets(targets: readonly RawTarget[], ctx: Screen
     // An overlay exempts its subtree from both rules. An allowed scroll container exempts only its
     // own horizontal overflow and the clipping it causes; its descendants stay measured.
     const overflowReason = raw.overlay ? "target/intentional-overlay" : raw.allowedScroll ? "target/allowed-scroll-container" : null;
-    const clipReason = raw.overlay ? "target/intentional-overlay" : raw.clipByAllowed ? "target/allowed-scroll-container" : null;
+    // A non-text SVG target cut only by an SVG viewport is drawing, not clipped content; clipping
+    // by an HTML ancestor stays measured.
+    const clipReason = raw.overlay ? "target/intentional-overlay" : raw.clipByAllowed ? "target/allowed-scroll-container"
+      : raw.svgViewportCut && raw.clipped === "none" ? "rule/target-not-applicable" : null;
     // 1. web/unexpected-horizontal-overflow
     evaluations.push(buildEvaluation(
       raw, "web/unexpected-horizontal-overflow", i++, binding, stableCapture, artifactPath,
