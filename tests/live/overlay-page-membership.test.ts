@@ -70,7 +70,9 @@ const DEFERRED_FIXTURE = `<!doctype html><html lang="en"><head><meta charset="ut
   .visible-keep { position: relative; break-inside: avoid; }
   .escaped-child { position: absolute; left: 1800px; top: 0; }
   .pagedjs_footnote_area { position: absolute; top: 1000px; height: 40px; overflow: hidden; }
+  .pagedjs_footnote_area.in-band { top: 954px; height: 40px; overflow: hidden; }
   .clipped-note { position: absolute; top: 39px; height: 20px; }
+  .footnote-inner-band { position: absolute; left: 0; top: 0; width: 200px; height: 39.5px; }
   .zero-height-bottom { position: absolute; left: 0; top: 994px; width: 733px; height: 0; }
   .zero-height-inner-band { position: absolute; left: 0; top: 993.3px; width: 733px; height: 0; }
   .inner-band-end { position: absolute; left: 0; top: 950px; width: 733px; height: 43.25px; }
@@ -101,6 +103,7 @@ const DEFERRED_FIXTURE = `<!doctype html><html lang="en"><head><meta charset="ut
   </div></div></div></div>
   <div class="pagedjs_page"><div class="pagedjs_sheet"><div class="pagedjs_pagebox"><div class="pagedjs_area">
     <div class="pagedjs_page_content"><div data-bl-sid="deferred-later">two pages later</div></div>
+    <div class="pagedjs_footnote_area in-band"><aside class="footnote-inner-band" data-bl-sid="footnote-inner-band">footnote ending 0.5px inside areaBox</aside></div>
   </div></div></div></div>
 </body></html>`;
 
@@ -252,6 +255,9 @@ describe("evidence overlay page membership, live", () => {
       assert.deepEqual(installation.unplacedMarks.filter((mark) => mark.page === 1 && mark.sid === "clipped-note")
         .map((mark) => mark.side), ["start", "end"],
       "the side-lane clone may be excluded, but both marks of the separate clipped footnote must remain unplaced");
+      assert.deepEqual(installation.unplacedMarks.filter((mark) => mark.page === 3 && mark.sid === "footnote-inner-band")
+        .map((mark) => mark.side), ["end"],
+      "G-100: a footnote edge inside the final 1 px band of areaBox must stay refused by notInFootnote");
       assert.deepEqual(await readbackViolations(current), []);
       assert.equal(await detachOverlay(current), 3);
       assert.equal(await removeOverlay(current), 0);

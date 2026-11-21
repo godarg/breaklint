@@ -293,8 +293,12 @@ it("measures responsive dual-body figures when exactly one authored variant rend
   assert.equal(samePageResult.coverage["figure/caption-separated"]?.measured, 1);
   assert.deepEqual(samePageResult.findings, []);
 
-  // Fail-closed controls: 0 visible, 2 visible, hidden-not-display-none, dropped candidate, identity mismatch, contradictory nonRendered+visible
-  for (const mode of ["none-visible", "both-visible", "opacity-hidden", "dropped-candidate", "unknown-identity", "contradictory-nonrendered"] as const) {
+  // Fail-closed controls: 0 visible, 2 visible, hidden-not-display-none, dropped candidate, extra/duplicate nonRendered copies, identity mismatch, contradictory nonRendered+visible
+  for (const mode of [
+    "none-visible", "both-visible", "opacity-hidden", "dropped-candidate",
+    "extra-active-nonrendered", "extra-hidden-nonrendered",
+    "unknown-identity", "contradictory-nonrendered",
+  ] as const) {
     const snap = structuredClone(separated);
     const f = snap.figureIndex!.figures[0]!;
     if (mode === "none-visible") {
@@ -306,10 +310,73 @@ it("measures responsive dual-body figures when exactly one authored variant rend
       delete f.bodyFragments[1]!.nonRendered;
     } else if (mode === "dropped-candidate") {
       f.bodyFragments = [f.bodyFragments[0]!];
+    } else if (mode === "extra-active-nonrendered") {
+      f.bodyFragments.push({ page: 2, box: { x: 0, y: 0, width: 0, height: 0 }, visible: false, nonRendered: true, identity: wide!.identity });
+    } else if (mode === "extra-hidden-nonrendered") {
+      f.bodyFragments.push({ page: 2, box: { x: 0, y: 0, width: 0, height: 0 }, visible: false, nonRendered: true, identity: narrow!.identity });
     } else if (mode === "unknown-identity") {
       f.bodyFragments[1]!.identity = "svgbody:tampered";
     } else if (mode === "contradictory-nonrendered") {
       f.bodyFragments[1]!.visible = true;
+    }
+    const res = judge(snap, "figure/caption-separated");
+    assert.deepEqual(res.findings, [], mode);
+    assert.equal(res.coverage["figure/caption-separated"]?.measured, 0, mode);
+    assert.ok(res.notMeasured.every(n => n.reason === "env/figure-body-unsupported"), mode);
+  }
+
+  // Single-body contradictory nonRendered+visible declines cleanly
+  const singleContradiction = sample("caption-separated-trigger");
+  singleContradiction.figureIndex!.figures[0]!.bodyFragments[0]!.nonRendered = true;
+  const singleRes = judge(singleContradiction, "figure/caption-separated");
+  assert.deepEqual(singleRes.findings, []);
+  assert.equal(singleRes.coverage["figure/caption-separated"]?.measured, 0);
+  assert.ok(singleRes.notMeasured.every(n => n.reason === "env/figure-body-unsupported"));
+
+  // Table + nonRendered SVG candidate: contradictory visible+nonRendered or mixed fragments decline cleanly
+  const tableBase = sample("caption-separated-trigger");
+  const tf = tableBase.figureIndex!.figures[0]!;
+  tf.body = null;
+  tf.bodyCandidates = [{ tag: "table", identity: "table:t1", tableSid: "t1" }, narrow!];
+  tf.captionPosition = "after";
+  tf.bodyFragments = [{ page: 1, box: { x: 0, y: 0, width: 0, height: 0 }, visible: false, nonRendered: true, identity: narrow!.identity }];
+  tableBase.tableIndex = {
+    complete: true,
+    tables: [{
+      sid: "t1",
+      headerRowSids: ["r1"],
+      rows: [
+        { sid: "r1", cells: [{ sid: "c1", tag: "th", text: "H", colSpan: 1, rowSpan: 1 }] },
+        { sid: "r2", cells: [{ sid: "c2", tag: "td", text: "V", colSpan: 1, rowSpan: 1 }] },
+      ],
+      fragments: [{
+        page: 1,
+        box: { x: 48, y: 48, width: 100, height: 60 },
+        visible: true,
+        flowReason: null,
+        rows: [
+          { sid: "r1", cells: [{ sid: "c1", tag: "th", text: "H", colSpan: 1, rowSpan: 1, box: { x: 48, y: 48, width: 100, height: 30 }, visible: true }] },
+          { sid: "r2", cells: [{ sid: "c2", tag: "td", text: "V", colSpan: 1, rowSpan: 1, box: { x: 48, y: 78, width: 100, height: 30 }, visible: true }] },
+        ],
+      }],
+    }],
+  };
+  assert.equal(judge(tableBase, "figure/caption-separated").coverage["figure/caption-separated"]?.measured, 1);
+  for (const mode of ["table-contradictory-nonrendered", "table-mixed-nonrendered"] as const) {
+    const snap = structuredClone(tableBase);
+    if (mode === "table-contradictory-nonrendered") {
+      snap.tableIndex!.tables[0]!.fragments[0]!.nonRendered = true;
+    } else {
+      snap.tableIndex!.tables[0]!.fragments = [
+        {
+          page: 1, box: { x: 48, y: 48, width: 100, height: 30 }, visible: true, flowReason: null,
+          rows: [{ sid: "r1", cells: [{ sid: "c1", tag: "th", text: "H", colSpan: 1, rowSpan: 1, box: { x: 48, y: 48, width: 100, height: 30 }, visible: true }] }],
+        },
+        {
+          page: 2, box: { x: 0, y: 0, width: 0, height: 0 }, visible: false, nonRendered: true, flowReason: null,
+          rows: [{ sid: "r2", cells: [{ sid: "c2", tag: "td", text: "V", colSpan: 1, rowSpan: 1, box: { x: 0, y: 0, width: 0, height: 0 }, visible: false }] }],
+        },
+      ];
     }
     const res = judge(snap, "figure/caption-separated");
     assert.deepEqual(res.findings, [], mode);

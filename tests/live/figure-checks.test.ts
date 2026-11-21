@@ -159,6 +159,25 @@ it("measures responsive dual-SVG figures when one variant is display:none and fa
 <body>${bodyHtml}</body></html>`, 4);
   assert.equal(opacityHidden.documents[0]!.coverage["figure/caption-separated"]!.measured, 0);
   assert.ok(opacityHidden.documents[0]!.notMeasured.some(n => n.reason === "env/figure-body-unsupported"));
+
+  // Mixed responsive controls: table visible + display:none SVG, SVG visible + display:none table, and caption-between-candidates decline
+  const tableVisible = runInline("responsive-table-visible", `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Responsive Table Visible</title>
+<style>@page { size: 120mm 140mm; margin: 10mm; } body { font: 14px/1.5 serif; } figure { margin: 0; } .fig-narrow { display: none; } figcaption { break-before: page; }</style></head>
+<body><figure id="resp-tbl"><table class="fig-wide"><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table><svg class="fig-narrow" width="80" height="120"><rect width="80" height="120" fill="#ccc"/><text x="10" y="30">NARROW</text></svg><figcaption>Figure 2: Table visible</figcaption></figure></body></html>`, 1);
+  assert.equal(tableVisible.documents[0]!.coverage["figure/caption-separated"]!.measured, 1);
+  assert.equal(tableVisible.findings.length, 1);
+
+  const svgVisibleTableHidden = runInline("responsive-svg-table-hidden", `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Responsive SVG Table Hidden</title>
+<style>@page { size: 120mm 140mm; margin: 10mm; } body { font: 14px/1.5 serif; } figure { margin: 0; } .fig-narrow { display: none; } figcaption { break-before: page; }</style></head>
+<body><figure id="resp-svg-tbl"><svg class="fig-wide" width="160" height="70"><rect width="160" height="70" fill="#ddd"/><text x="10" y="30">WIDE</text></svg><table class="fig-narrow"><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table><figcaption>Figure 3: SVG visible</figcaption></figure></body></html>`, 1);
+  assert.equal(svgVisibleTableHidden.documents[0]!.coverage["figure/caption-separated"]!.measured, 1);
+  assert.equal(svgVisibleTableHidden.findings.length, 1);
+
+  const captionBetween = runInline("responsive-caption-between", `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Responsive Caption Between</title>
+<style>@page { size: 120mm 140mm; margin: 10mm; } body { font: 14px/1.5 serif; } figure { margin: 0; } .fig-narrow { display: none; } figcaption { break-before: page; }</style></head>
+<body><figure id="resp-between"><table class="fig-wide"><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table><figcaption>Figure 4: Caption between</figcaption><svg class="fig-narrow" width="80" height="120"><rect width="80" height="120" fill="#ccc"/><text x="10" y="30">NARROW</text></svg></figure></body></html>`, 4);
+  assert.equal(captionBetween.documents[0]!.coverage["figure/caption-separated"]!.measured, 0);
+  assert.ok(captionBetween.documents[0]!.notMeasured.some(n => n.reason === "env/figure-body-unsupported"));
 });
 after(() => { if (process.env.BREAKLINT_FIGURE_LIVE_KEEP !== "1") rmSync(root, { recursive: true, force: true }); });
 });

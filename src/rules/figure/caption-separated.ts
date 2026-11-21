@@ -56,8 +56,16 @@ function resolveFigureBody(
     for (const candidate of tableCandidates) {
       const table = snapshot.tableIndex.tables.find(item => item.sid === candidate.tableSid);
       if (!table || table.fragments.length === 0) return { body: null, table: null, fragments: [] };
+      if (table.fragments.some(fragment => fragment.nonRendered === true && fragment.visible)) {
+        return { body: null, table: null, fragments: [] };
+      }
       const allNonRendered = table.fragments.every(fragment => fragment.nonRendered === true && !fragment.visible);
-      if (!allNonRendered) renderedTables.push({ candidate, table });
+      if (!allNonRendered) {
+        if (table.fragments.some(fragment => fragment.nonRendered === true)) {
+          return { body: null, table: null, fragments: [] };
+        }
+        renderedTables.push({ candidate, table });
+      }
     }
   }
   if (renderedImgSvg.length + renderedTables.length !== 1) {
@@ -67,7 +75,7 @@ function resolveFigureBody(
     const activeFragment = renderedImgSvg[0]!;
     for (const [identity, authoredCount] of authoredImgSvgCount) {
       const neededNonRendered = authoredCount - (identity === activeFragment.identity ? 1 : 0);
-      if ((nonRenderedById.get(identity) ?? 0) < neededNonRendered) {
+      if ((nonRenderedById.get(identity) ?? 0) !== neededNonRendered) {
         return { body: null, table: null, fragments: [] };
       }
     }
@@ -76,7 +84,7 @@ function resolveFigureBody(
     return { body: activeCandidate, table: null, fragments: [activeFragment] };
   }
   for (const [identity, authoredCount] of authoredImgSvgCount) {
-    if ((nonRenderedById.get(identity) ?? 0) < authoredCount) {
+    if ((nonRenderedById.get(identity) ?? 0) !== authoredCount) {
       return { body: null, table: null, fragments: [] };
     }
   }
@@ -110,13 +118,14 @@ export const captionSeparated = defineRule({
     const box = caption ? renderedBox(snapshot, caption) : null;
     const inside = bodies.length > 0 && bodies.every(body => {
       const page = snapshot.pages.find(p => p.pageNumber === body.page);
-      return page && body.visible && body.box.width > 0 && body.box.height > 0 && body.identity === activeBody?.identity
+      return page && body.visible && body.nonRendered !== true && body.box.width > 0 && body.box.height > 0 && body.identity === activeBody?.identity
         && body.box.x >= page.contentBox.x - SNAPSHOT_ROUNDING_PX && body.box.y >= page.contentBox.y - SNAPSHOT_ROUNDING_PX
         && body.box.x + body.box.width <= page.contentBox.x + page.contentBox.width + SNAPSHOT_ROUNDING_PX
         && body.box.y + body.box.height <= page.contentBox.y + page.contentBox.height + SNAPSHOT_ROUNDING_PX;
     });
     const tableUnsupported = isTable && (!table || !sourceTableMatches(table)
       || !["before", "after"].includes(figure.captionPosition ?? "")
+      || table.fragments.some(fragment => fragment.nonRendered === true)
       || new Set(bodies.map(body => body.page)).size !== bodies.length
       || table.fragments.some(fragment => fragment.visible && !bodies.some(body => body.page === fragment.page)));
     const unsupported = figure.captionSids.length !== 1 || !activeBody || (!isTable && bodies.length !== 1)

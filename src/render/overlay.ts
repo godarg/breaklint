@@ -234,7 +234,7 @@ const OVERLAY_TEMPLATE = `(() => {
           const notInFootnote = P.closest(el, ".pagedjs_footnote_area") === null;
           const atAreaBottom = Math.abs(y - areaBox.bottom) <= 0.5;
           const observedAreaEdge = notInFootnote && y + 1 <= pageBox.bottom && (
-            relativeY <= areaBox.height ||
+            y <= areaBox.bottom ||
             (atAreaBottom && (side === "end" || (side === "start" && rect.height === 0)))
           );
           if (
