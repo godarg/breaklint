@@ -1,6 +1,6 @@
 /** Public host-page adapter. It observes an already-opened page and writes only its PNG artifact. */
 
-import { randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { EXIT_CODE_BY_VERDICT, type RunVerdict } from "../core/enums.ts";
@@ -572,9 +572,13 @@ export async function checkPage(page: StructuralPage, rawOptions: unknown): Prom
   const domBuildIdAfter = await readDomBuildId(page, options.sourceBinding);
   const bindingAfter = verifyBinding(options.sourceBinding, domBuildIdAfter);
 
-  const captureBefore = sha(stable(before.signature));
-  const captureStable = sha(stable(settled.signature));
-  const captureAfter = sha(stable(after.signature));
+  // Public capture digests are keyed with a per-run secret that never leaves this call: they compare
+  // samples within the run, but a reader cannot test guessed page text against them.
+  const captureKey = randomBytes(32);
+  const captureDigest = (sample: RawSample): string => createHmac("sha256", captureKey).update(stable(sample.signature)).digest("hex");
+  const captureBefore = captureDigest(before);
+  const captureStable = captureDigest(settled);
+  const captureAfter = captureDigest(after);
   const postScreenshotDrifted = captureStable !== captureAfter;
   const drifted = !stabilized || postScreenshotDrifted;
 

@@ -39,7 +39,8 @@ Screen reports are discriminated by `profileKind: "screen"` and emit `schemaVers
 accept Screen 1 and 2); they do not contain Paged.js pages or PDF coordinates. They record the
 sanitized route, current viewport and coordinate system (`css-viewport-pixels` for viewport captures
 or `css-document-pixels` for `"full-page"` captures), browser version, before/stable/after capture
-signatures with structured `capture.driftDetails` on drift, actual PNG hash and dimensions, target
+signatures (keyed with a per-run secret that is not in the report, so they compare only within one
+run) with structured `capture.driftDetails` on drift (a text change records only the text lengths), actual PNG hash and dimensions, target
 evaluations (including healthy, excluded, and not-measured targets), coverage counts, and typed
 events. Screen profile v2 checks unexpected horizontal overflow, content visibly cut by rectangular
 `overflow: hidden` or `clip` ancestors, SVG text overflowing its viewport

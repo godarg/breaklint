@@ -144,6 +144,24 @@ describe("Paket 2: screen capture drift diff & schemaVersion 2 context/bundle co
     assert.equal(diff.some((d) => d.field === "box" && d.selector === "#card" && d.before === "0,0,100x40" && d.after === "0,0,220x40"), true);
   });
 
+  it("records a text change as a marker with lengths, never as a digest of the text", () => {
+    const target = {
+      selector: "#bal", domPath: "html:nth-child(1)>body:nth-child(2)>p:nth-child(1)", tag: "p", id: "bal", className: "",
+      textLength: 20, directTextSha256: sha("Balance: 1234.56 EUR"), hasDirectText: true, isSvg: false, isSvgText: false, isInteractiveControl: false, siblingEligible: false,
+      fontSizePx: 16, siblingOverlapPx: 0, svgTextOverflowPx: 0, svgClipped: false, svgInterior: false, paintSignature: "p1", ancestorSignatureComplete: true,
+      box: { x: 0, y: 0, width: 100, height: 20 }, coordinateSystem: "css-viewport-pixels" as const,
+      state: "candidate" as const, reason: null, paint: null, transform: null, clipped: "none" as const,
+      horizontalOverflow: 0, allowedScroll: false, overlay: false, sourceContainer: null, scroll: { x: 0, y: 0 },
+    };
+    const signature = { url: "http://127.0.0.1/", viewport: [640, 400, 1] as [number, number, number], scroll: [0, 0] as [number, number], document: [640, 400, 640, 400, 3] as [number, number, number, number, number], fonts: "loaded" };
+    const diff = computeScreenDriftDetails(
+      { signature, targets: [target] },
+      { signature, targets: [{ ...target, directTextSha256: sha("Balance: 1299.00 EUR") }] },
+      "post-screenshot",
+    );
+    assert.deepEqual(diff, [{ phase: "post-screenshot", field: "text", selector: "#bal", before: 20, after: 20 }]);
+  });
+
   it("reads schemaVersion 2 screen reports in createContextPack and renderReport", () => {
     const report: PublicScreenReport = {
       schemaVersion: SCREEN_REPORT_SCHEMA_VERSION,

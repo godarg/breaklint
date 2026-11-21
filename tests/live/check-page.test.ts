@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -195,6 +196,34 @@ describe("screen checkPage host-page adapter, live", () => {
     assert.equal(hidden.ok, false);
     assert.equal(hidden.report.runVerdict, "insufficient-coverage");
     assert.equal(hidden.report.coverage.measured, 0);
+  });
+
+  it("never publishes a digest of page text: text drift records lengths only and capture digests are keyed per run", async (t) => {
+    if (missingBrowser && optional) return t.skip("missing browser");
+    const first = "Balance: 1234.56 EUR";
+    const second = "Balance: 1299.00 EUR";
+    assert.equal(first.length, second.length);
+    const page = await open(`<p id="bal">${first}</p>`);
+    try {
+      const result = await checkPage(hostPage(page, 640, async (rawPage) => {
+        await rawPage.evaluate((text) => { const target = document.querySelector("#bal"); if (target) target.textContent = text; }, second);
+      }), { trust: "host-controlled-page", networkPolicy: "host-owned", scenario: "text-drift-privacy", output: { dir: output, screenshot: "viewport" } });
+      const detail = result.report.capture.driftDetails?.find((d) => d.field === "text" && d.selector === "#bal");
+      assert.deepEqual(detail && { before: detail.before, after: detail.after }, { before: first.length, after: second.length });
+      const json = JSON.stringify(result.report);
+      for (const text of [first, second]) {
+        const digest = createHash("sha256").update(text).digest("hex");
+        assert.equal(json.includes(digest), false, `sha256 of ${JSON.stringify(text)} in the public report`);
+        assert.equal(json.includes(digest.slice(0, 12)), false, `sha256 prefix of ${JSON.stringify(text)} in the public report`);
+      }
+    } finally { await page.close(); }
+
+    // The same static page twice: equal within a run, unlinkable across runs.
+    const runA = await inspect('<p id="static">Balance: 1234.56 EUR</p>', "keyed-capture-a");
+    const runB = await inspect('<p id="static">Balance: 1234.56 EUR</p>', "keyed-capture-a");
+    assert.equal(runA.report.capture.before, runA.report.capture.stable);
+    assert.equal(runA.report.capture.stable, runA.report.capture.after);
+    assert.notEqual(runA.report.capture.stable, runB.report.capture.stable);
   });
 
   it("keeps an active animation observable but unbound and not successful", async (t) => {

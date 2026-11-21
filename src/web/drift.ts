@@ -37,7 +37,9 @@ export function computeScreenDriftDetails(
     } else if (prev.state !== curr.state || prev.reason !== curr.reason) {
       push("state", curr.selector, `${prev.state}:${prev.reason ?? ""}`, `${curr.state}:${curr.reason ?? ""}`);
     } else if (prev.directTextSha256 !== curr.directTextSha256 || prev.textLength !== curr.textLength) {
-      push("text", curr.selector, prev.directTextSha256 ?? prev.textLength, curr.directTextSha256 ?? curr.textLength);
+      // The field name is the change marker; only lengths are public. A text digest would let a
+      // reader recover short page text (amounts, names) by dictionary search.
+      push("text", curr.selector, prev.textLength, curr.textLength);
     } else if (prev.horizontalOverflow !== curr.horizontalOverflow) {
       push("horizontalOverflow", curr.selector, prev.horizontalOverflow, curr.horizontalOverflow);
     } else if (prev.clipped !== curr.clipped) {
