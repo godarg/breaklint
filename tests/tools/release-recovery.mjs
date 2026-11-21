@@ -23,14 +23,18 @@
  *                                     integrity and provenance verify (no publish). The provenance
  *                                     lookup is retried in a bounded window, because the registry
  *                                     serves attestations minutes after the version. Any other
- *                                     lookup failure never becomes "publish".
+ *                                     lookup failure never becomes "publish", and neither does an
+ *                                     E404 after the version was once served (a propagating
+ *                                     registry can answer both ways; npm versions are immutable).
  *   --github-release <tag> --notes-file <f> <asset>...
  *                                     no release: create it. A draft (what `gh release create`
  *                                     leaves when an upload fails): verify the assets it has
- *                                     byte for byte, upload only the missing ones, publish it. A
- *                                     published release: every asset present and byte-identical,
- *                                     else fail. Nothing is ever overwritten or deleted, and every
- *                                     write is followed by a byte-for-byte read-back.
+ *                                     byte for byte, upload only the missing ones, publish it with
+ *                                     the notes. A published release: every asset present and
+ *                                     byte-identical and its notes equal to the tag commit's
+ *                                     CHANGELOG section, else fail. Nothing is ever overwritten or
+ *                                     deleted, and every write is followed by a read-back of the
+ *                                     bytes and the notes.
  *
  * `--self-test` runs the pure decisions over constructed states, then the real script over a real
  * temporary Git repository and over stand-in `gh`/`npm` executables on PATH, and prints how many
@@ -126,16 +130,28 @@ export function classifyLookup({ status, stdout, stderr }, version) {
  */
 export async function decideRegistry({ lookup, verify, attempts, sleep }) {
   let failure = null;
+  // Once npm has served the version, it exists: an E404 after that is a propagating registry, not
+  // an absent version, and a publish would only hit the immutable version and skip the release.
+  let served = false;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const result = await lookup();
-    if (result.state === "absent") return { publishNeeded: true, attempts: attempt };
-    if (result.state === "present") {
+    if (result.state === "absent" && !served) return { publishNeeded: true, attempts: attempt };
+    if (result.state === "absent") {
+      failure = { kind: "flapped" };
+    } else if (result.state === "present") {
+      served = true;
       if (await verify(result)) return { publishNeeded: false, attempts: attempt };
       failure = { kind: "provenance" };
     } else {
       failure = { kind: "lookup", reason: result.reason };
     }
     if (attempt < attempts) await sleep();
+  }
+  if (served && failure?.kind !== "provenance") {
+    throw new Error(
+      `the version was present on npm and later answered E404 or not at all, in ${attempts} attempts; it is never ` +
+        "published again (npm versions are immutable): inspect it, then rerun the failed jobs",
+    );
   }
   if (failure?.kind === "provenance") {
     throw new Error(`the provenance of the published version did not verify in ${attempts} attempts; npm versions are immutable, inspect it before anything else`);
@@ -205,11 +221,17 @@ async function registryDecide() {
 
 // --- GitHub Release ------------------------------------------------------------------------------
 
+/** Notes as GitHub may store them: line ends and surrounding blank lines are not content. */
+export const sameNotes = (a, b) => typeof a === "string" && typeof b === "string" &&
+  a.replace(/\r\n/gu, "\n").trim() === b.replace(/\r\n/gu, "\n").trim();
+
 /**
  * What to do with the GitHub Release of `tag`. `local` and `release.assets` map asset names to
- * SHA-256 hex digests of their bytes.
+ * SHA-256 hex digests of their bytes; `notes` is the tag commit's CHANGELOG section and
+ * `release.body` the text GitHub serves.
  */
-export function planGithubRelease({ tag, release, local }) {
+export function planGithubRelease({ tag, release, local, notes }) {
+  if (typeof notes !== "string" || notes.trim() === "") throw new Error("planGithubRelease needs the release notes the tag commit's CHANGELOG carries");
   const names = Object.keys(local);
   if (release === null) return { action: "create", upload: names };
   if (release.tagName !== tag) throw new Error(`the existing release belongs to tag ${release.tagName}, not ${tag}`);
@@ -221,6 +243,12 @@ export function planGithubRelease({ tag, release, local }) {
   if (release.isDraft) return { action: "complete-draft", upload: missing };
   if (missing.length > 0) {
     throw new Error(`the published release ${tag} lacks ${missing.join(", ")}; this workflow never leaves that state, so inspect it by hand`);
+  }
+  if (!sameNotes(release.body, notes)) {
+    throw new Error(
+      `the notes of the published release ${tag} differ from the tag commit's CHANGELOG section; this workflow never edits a ` +
+        "published release, so compare them by hand and restore the section (gh release edit --notes-file)",
+    );
   }
   return { action: "verified", upload: [] };
 }
@@ -239,7 +267,7 @@ function mustGh(args) {
 
 /** The release as GitHub serves it, each asset's bytes downloaded and hashed; null if none exists. */
 function readRelease(tag, scratch) {
-  const view = gh(["release", "view", tag, "--json", "tagName,isDraft,assets"]);
+  const view = gh(["release", "view", tag, "--json", "tagName,isDraft,assets,body"]);
   if (view.status !== 0) {
     if (/release not found/iu.test(view.stderr)) return null;
     throw new Error(`gh release view ${tag} failed (${view.status}):\n${view.stderr}`);
@@ -251,16 +279,17 @@ function readRelease(tag, scratch) {
     mustGh(["release", "download", tag, "--pattern", name, "--dir", dir]);
     assets[name] = sha256(readFileSync(join(dir, name)));
   }
-  return { tagName: json.tagName, isDraft: Boolean(json.isDraft), assets };
+  return { tagName: json.tagName, isDraft: Boolean(json.isDraft), assets, body: typeof json.body === "string" ? json.body : "" };
 }
 
 function githubRelease(tag, notesFile, assetPaths) {
   const local = Object.fromEntries(assetPaths.map((path) => [basename(path), sha256(readFileSync(path))]));
+  const notes = readFileSync(notesFile, "utf8");
   const pathOf = Object.fromEntries(assetPaths.map((path) => [basename(path), path]));
   const title = `${PACKAGE} ${tag.replace(/^v/u, "")}`;
   const scratch = mkdtempSync(join(tmpdir(), "breaklint-release-"));
   try {
-    const plan = planGithubRelease({ tag, release: readRelease(tag, scratch), local });
+    const plan = planGithubRelease({ tag, release: readRelease(tag, scratch), local, notes });
     if (plan.action === "create") {
       mustGh(["release", "create", tag, ...assetPaths, "--verify-tag", "--notes-file", notesFile, "--title", title]);
     } else if (plan.action === "complete-draft") {
@@ -268,9 +297,9 @@ function githubRelease(tag, notesFile, assetPaths) {
       mustGh(["release", "edit", tag, "--draft=false", "--notes-file", notesFile, "--title", title]);
     }
     // Read back what GitHub now serves: whatever was written must be exactly the validated bytes.
-    const after = planGithubRelease({ tag, release: readRelease(tag, scratch), local });
+    const after = planGithubRelease({ tag, release: readRelease(tag, scratch), local, notes });
     if (after.action !== "verified") throw new Error(`after "${plan.action}" the release ${tag} is still not complete (${after.action})`);
-    process.stdout.write(`GitHub Release ${tag}: ${plan.action === "verified" ? "already complete" : plan.action}; ${Object.keys(local).length} assets byte-identical to the validated artifact\n`);
+    process.stdout.write(`GitHub Release ${tag}: ${plan.action === "verified" ? "already complete" : plan.action}; ${Object.keys(local).length} assets byte-identical to the validated artifact, notes equal to the CHANGELOG section\n`);
   } catch (error) {
     process.stderr.write(`GitHub Release ${tag}: ${error.message}\n`);
     process.exitCode = 1;
@@ -295,7 +324,7 @@ if (group !== "release") { process.stderr.write("unexpected " + args.join(" "));
 if (verb === "view") {
   save();
   if (!state.release) { process.stderr.write("release not found\\n"); process.exit(1); }
-  process.stdout.write(JSON.stringify({ tagName: state.release.tagName, isDraft: state.release.isDraft,
+  process.stdout.write(JSON.stringify({ tagName: state.release.tagName, isDraft: state.release.isDraft, body: state.release.body ?? "",
     assets: Object.keys(state.release.assets).map((name) => ({ name })) }));
 } else if (verb === "download") {
   const name = rest[rest.indexOf("--pattern") + 1];
@@ -303,15 +332,16 @@ if (verb === "view") {
   fs.writeFileSync(path.join(dir, name), Buffer.from(state.release.assets[name], "base64"));
   save();
 } else if (verb === "create") {
-  state.release = { tagName: tag, isDraft: false, assets: {} };
-  for (const f of files(rest)) state.release.assets[path.basename(f)] = fs.readFileSync(f).toString("base64");
   state.notes = fs.readFileSync(rest[rest.indexOf("--notes-file") + 1], "utf8");
+  state.release = { tagName: tag, isDraft: false, assets: {}, body: state.notes.trimEnd() };
+  for (const f of files(rest)) state.release.assets[path.basename(f)] = fs.readFileSync(f).toString("base64");
   save();
 } else if (verb === "upload") {
   for (const f of files(rest)) state.release.assets[path.basename(f)] = fs.readFileSync(f).toString("base64");
   save();
 } else if (verb === "edit") {
   if (rest.includes("--draft=false")) state.release.isDraft = false;
+  if (rest.includes("--notes-file")) state.release.body = fs.readFileSync(rest[rest.indexOf("--notes-file") + 1], "utf8");
   save();
 } else { process.stderr.write("unexpected " + args.join(" ")); process.exit(2); }
 `;
@@ -347,6 +377,18 @@ async function runSelfTest() {
   const notes = changelogSection(changelog, released[1]);
   ok(notes.trim().length > 0 && !/^## /mu.test(notes) && changelog.includes(notes.trim()), "the real CHANGELOG section was not returned exactly");
   rejects(() => changelogSection(changelog, "0.0.99"), /has no "## 0\.0\.99/u, "notes for a version without a section");
+  // The section a tag of THIS tree would publish: the package version's, not the first dated one.
+  // While it says TBD-at-tag the notes must be refused, which is what stops a tag cut too early.
+  const packageVersion = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).version;
+  const own = new RegExp(`^## ${escapeRegExp(packageVersion)} — (.*)$`, "mu").exec(changelog);
+  ok(own, `the real CHANGELOG has no section for package version ${packageVersion}`);
+  if (own[1] === "TBD-at-tag") {
+    rejects(() => changelogSection(changelog, packageVersion), /still dated TBD-at-tag/u, `notes for package version ${packageVersion}, still TBD-at-tag`);
+    process.stdout.write(`package version ${packageVersion}: CHANGELOG section is TBD-at-tag, release notes refused (date it in its own commit, then tag)\n`);
+  } else {
+    ok(changelogSection(changelog, packageVersion).trim().length > 0, `the ${packageVersion} section is empty`);
+    process.stdout.write(`package version ${packageVersion}: CHANGELOG section dated ${own[1]}, release notes read\n`);
+  }
   rejects(() => changelogSection("## 1.2.3 — TBD-at-tag\n\nx\n", "1.2.3"), /still dated TBD-at-tag/u, "notes from an undated section");
   rejects(() => changelogSection("## 1.2.3 — soon\n\nx\n", "1.2.3"), /not YYYY-MM-DD/u, "notes from a section dated with a word");
   rejects(() => changelogSection("## 1.2.3 — 2026-01-01\n\n## 1.2.2 — 2025-12-01\n\nx\n", "1.2.3"), /section is empty/u, "an empty section");
@@ -356,15 +398,18 @@ async function runSelfTest() {
   // GitHub Release states.
   const local = { "a.tgz": "1".repeat(64), "a.tgz.sha256": "2".repeat(64), "a.tgz.sri": "3".repeat(64) };
   const names = Object.keys(local);
-  assert.deepEqual(planGithubRelease({ tag: "v1.0.0", release: null, local }), { action: "create", upload: names });
-  assert.deepEqual(planGithubRelease({ tag: "v1.0.0", release: { tagName: "v1.0.0", isDraft: true, assets: { "a.tgz": local["a.tgz"] } }, local }), { action: "complete-draft", upload: names.slice(1) });
-  assert.deepEqual(planGithubRelease({ tag: "v1.0.0", release: { tagName: "v1.0.0", isDraft: false, assets: { ...local } }, local }), { action: "verified", upload: [] });
+  const planned = (release) => planGithubRelease({ tag: "v1.0.0", release, local, notes: "First.\n" });
+  assert.deepEqual(planned(null), { action: "create", upload: names });
+  assert.deepEqual(planned({ tagName: "v1.0.0", isDraft: true, assets: { "a.tgz": local["a.tgz"] } }), { action: "complete-draft", upload: names.slice(1) });
+  assert.deepEqual(planned({ tagName: "v1.0.0", isDraft: false, assets: { ...local }, body: "First." }), { action: "verified", upload: [] });
   checks += 3;
-  rejects(() => planGithubRelease({ tag: "v1.0.0", release: { tagName: "v1.0.0", isDraft: false, assets: { ...local, "a.tgz": "9".repeat(64) } }, local }), /differs from the validated artifact/u, "a complete release with other bytes");
-  rejects(() => planGithubRelease({ tag: "v1.0.0", release: { tagName: "v1.0.0", isDraft: true, assets: { "a.tgz.sri": "9".repeat(64) } }, local }), /differs from the validated artifact/u, "a draft with other bytes");
-  rejects(() => planGithubRelease({ tag: "v1.0.0", release: { tagName: "v1.0.0", isDraft: false, assets: { "a.tgz": local["a.tgz"] } }, local }), /published release v1\.0\.0 lacks/u, "a published release with missing assets");
-  rejects(() => planGithubRelease({ tag: "v1.0.0", release: { tagName: "v1.0.0", isDraft: true, assets: { ...local, "x.zip": "4".repeat(64) } }, local }), /did not validate: x\.zip/u, "a release with a foreign asset");
-  rejects(() => planGithubRelease({ tag: "v1.0.0", release: { tagName: "v1.0.1", isDraft: false, assets: { ...local } }, local }), /belongs to tag v1\.0\.1/u, "another tag's release");
+  rejects(() => planned({ tagName: "v1.0.0", isDraft: false, assets: { ...local, "a.tgz": "9".repeat(64) } }), /differs from the validated artifact/u, "a complete release with other bytes");
+  rejects(() => planned({ tagName: "v1.0.0", isDraft: true, assets: { "a.tgz.sri": "9".repeat(64) } }), /differs from the validated artifact/u, "a draft with other bytes");
+  rejects(() => planned({ tagName: "v1.0.0", isDraft: false, assets: { "a.tgz": local["a.tgz"] } }), /published release v1\.0\.0 lacks/u, "a published release with missing assets");
+  rejects(() => planned({ tagName: "v1.0.0", isDraft: false, assets: { ...local }, body: "Edited by hand." }), /notes of the published release v1\.0\.0 differ/u, "a published release with other notes");
+  rejects(() => planGithubRelease({ tag: "v1.0.0", release: null, local, notes: "" }), /needs the release notes/u, "a release plan without notes");
+  rejects(() => planned({ tagName: "v1.0.0", isDraft: true, assets: { ...local, "x.zip": "4".repeat(64) } }), /did not validate: x\.zip/u, "a release with a foreign asset");
+  rejects(() => planned({ tagName: "v1.0.1", isDraft: false, assets: { ...local }, body: "First." }), /belongs to tag v1\.0\.1/u, "another tag's release");
 
   // Registry decisions.
   ok(classifyLookup({ status: 1, stdout: "", stderr: "npm error code E404\n" }, "1.0.0").state === "absent", "E404 is not absent");
@@ -388,6 +433,9 @@ async function runSelfTest() {
   checks += 3;
   await rejectsAsync(decideRegistry({ lookup: async () => ({ state: "present" }), verify: async () => false, attempts: 4, sleep }), /did not verify in 4 attempts/u, "provenance that never verifies");
   await rejectsAsync(decideRegistry({ lookup: async () => ({ state: "error", reason: "ETIMEDOUT" }), verify: async () => true, attempts: 4, sleep }), /lookup failed in 4 attempts: ETIMEDOUT/u, "a lookup that never answers");
+  let flaps = 0;
+  await rejectsAsync(decideRegistry({ lookup: async () => ((flaps += 1) === 1 ? { state: "present" } : { state: "absent" }), verify: async () => false, attempts: 4, sleep }),
+    /was present on npm and later answered E404/u, "an E404 after the version was served");
 
   const scratch = mkdtempSync(join(tmpdir(), "breaklint-recovery-self-test-"));
   try {
@@ -459,12 +507,14 @@ async function runSelfTest() {
     r = releaseRun({ tagName: "v1.0.0", isDraft: true, assets: { [basename(assets[0])]: b64(assets[0]) } });
     ok(r.result.status === 0 && r.writes.join() === "upload,edit" && !r.state.release.isDraft, `a draft: expected upload then edit, got ${r.writes} ${r.result.stderr}`);
     ok(r.state.calls.find(([, verb]) => verb === "upload").slice(3).map((path) => basename(path)).join() === "breaklint-1.0.0.tgz.sha256,breaklint-1.0.0.tgz.sri", "a draft: something other than the missing assets was uploaded");
-    r = releaseRun({ tagName: "v1.0.0", isDraft: false, assets: allAssets() });
+    ok(r.state.release.body === "First.\n", "a draft: its notes were not replaced by the CHANGELOG section");
+    r = releaseRun({ tagName: "v1.0.0", isDraft: false, assets: allAssets(), body: "First." });
     ok(r.result.status === 0 && r.writes.length === 0, `a complete release: expected no write, got ${r.writes} ${r.result.stderr}`);
     for (const [name, release, pattern] of [
       ["a complete release with other bytes", { tagName: "v1.0.0", isDraft: false, assets: { ...allAssets(), [basename(assets[0])]: Buffer.from("other").toString("base64") } }, /differs from the validated artifact/u],
       ["a published release missing an asset", { tagName: "v1.0.0", isDraft: false, assets: { [basename(assets[0])]: b64(assets[0]) } }, /lacks/u],
       ["a draft with a foreign asset", { tagName: "v1.0.0", isDraft: true, assets: { "notes.zip": "eA==" } }, /did not validate: notes\.zip/u],
+      ["a published release with other notes", { tagName: "v1.0.0", isDraft: false, assets: allAssets(), body: "Notes edited by hand." }, /notes of the published release v1\.0\.0 differ/u],
     ]) {
       r = releaseRun(release);
       assert.equal(r.result.status, 1, `self-test: ${name} passed --github-release`);

@@ -26,6 +26,7 @@ export function assertReviewEnvironment(environment: unknown, label: string, opt
 export function assertObservedEnvironment(observed: unknown, label: string): void;
 export const REVIEW_TIME_SKEW_MS: number;
 export function validateReviewLedger(ledger: unknown, options?: { cellCount?: number; now?: number }): { rounds: number; latest: ReviewRound };
+export const LAST_HUMAN_KIND_ROUND: number;
 export function isRosteredReviewer(reviewer: unknown): boolean;
 export function summarizeLatestRound(ledger: ReviewLedger): {
   latest: ReviewRound;
@@ -84,7 +85,7 @@ export interface ReviewRound {
   record: "current" | "historical" | "historical-reconstruction";
   outcome: "pass" | "fail" | "pending";
   reviewedAt: string | null;
-  reviewers: ({ handle: string | null; kind: "human" | "agent" | "not-recorded"; model?: string } | DelegatedAIReviewer)[];
+  reviewers: ({ handle: string | null; kind: "human" | "rostered" | "agent" | "not-recorded"; model?: string } | DelegatedAIReviewer)[];
   delegation?: FounderSightDelegation;
   binding: null | { reviewInputFingerprint: string; renderManifestGeneratedAt: string; reviewEnvironment: Record<string, unknown> };
   findings: { blocker: number; high: number; medium: number; low: number };

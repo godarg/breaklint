@@ -23,7 +23,7 @@
  *      shows `…`, which stands for at least one character the CLI printed there; every quoted line
  *      keeps at least 16 characters of its own. Lines of the finding that the excerpt leaves out are
  *      marked by a line that is only `…`, at the place where they are missing;
- *   4. "one of its N findings": N is the number of finding headers the CLI printed.
+ *   4. "One of its N findings": N is the number of finding headers the CLI printed.
  * The README shows long lines shortened because npm and GitHub render a code block with a
  * horizontal scrollbar, which put the remedy out of sight. Every shortening says so in the text.
  *
@@ -41,7 +41,8 @@ import { fileURLToPath } from "node:url";
 /** Finding header lines of the console format: `<severity> <rule-id>  page <n>`. */
 export const FINDING_HEADER = /^(error|warn|info) +[a-z]+\/[a-z0-9-]+ +page \d+$/u;
 const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
-const EXCERPT = /Below is one of its ([a-z]+) findings and the closing counters,\s+shortened where marked\s+`…`,\s+copied from that\s+command's output:\n\n```\n([\s\S]*?)\n```\n/u;
+// The sentence must say that the excerpt is the printed output and that `…` marks every cut.
+const EXCERPT = /One of its ([a-z]+) findings and the counter line,\s+as printed\s+\(`…` marks cuts\):\n\n```\n([\s\S]*?)\n```\n/u;
 const ELLIPSIS = "…";
 /** A quoted line keeps at least this many characters of its own besides indentation and `…`. */
 const MIN_QUOTED = 16;
@@ -167,7 +168,7 @@ export function corruptions(readmeText) {
   return [
     { name: `one character of quoted line ${quoted + 1}`, text: withExcerpt(lines.map((line, i) => (i === quoted ? flip(line) : line))) },
     { name: "one character of the counter line", text: withExcerpt(lines.map((line, i) => (i === lines.length - 1 ? flip(line) : line))) },
-    { name: "the finding-count word", text: readmeText.replace(whole, whole.replace(`one of its ${countWord} findings`, `one of its ${nextWord} findings`)) },
+    { name: "the finding-count word", text: readmeText.replace(whole, whole.replace(`One of its ${countWord} findings`, `One of its ${nextWord} findings`)) },
   ];
 }
 

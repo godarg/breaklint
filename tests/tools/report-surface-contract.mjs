@@ -231,9 +231,10 @@ export function assertObservedEnvironment(observed, label) {
 
 /**
  * The closed roster of rostered reviewer roles. A cell counts toward the roster gate only when it
- * passed under one of these handles AND its round lists that handle as `kind: "human"` — the
- * ledger's field value for a rostered handle, kept so rounds 1–9 stay byte-identical. The value
- * records which handle was written, not that a person reviewed: a handle is a role in this
+ * passed under one of these handles AND its round lists that handle as a rostered kind: `"human"`
+ * in rounds 1–9, the value they were recorded with and keep byte for byte, and the neutral
+ * `"rostered"` in every later round (`LAST_HUMAN_KIND_ROUND`). The value records which handle was
+ * written, not that a person reviewed: a handle is a role in this
  * maintainer's workflow and may be operated by an agent. The roster is a code constant on purpose:
  * a role is added or removed by a reviewed change to this file, never by a ledger edit, so a
  * reviewer cannot admit itself by writing the very ledger its review is recorded in.
@@ -252,17 +253,26 @@ export const REVIEWER_AUTHENTICATION_NOTE =
   "stands behind a handle rests on repository access control and on review of the ledger diff, not on this gate. Delegated AI receipt/model/image fields are " +
   "record bindings, not authentication of a provider or proof that the reviewer perceived the images.";
 
+/** The last round whose rostered reviewers carry the historical kind "human"; later rounds say "rostered". */
+export const LAST_HUMAN_KIND_ROUND = 9;
+
 const AGENT_HANDLE = /^@[A-Za-z0-9][A-Za-z0-9_.-]{0,38}$/u;
 const REVIEWER_FIELDS = Object.freeze({
   human: Object.freeze(["handle", "kind"]),
+  rostered: Object.freeze(["handle", "kind"]),
   agent: Object.freeze(["handle", "kind", "model"]),
   "delegated-ai": Object.freeze(["handle", "kind", "actual_model", "promptSha256", "outputSha256", "nativeReceipt", "receivedImages"]),
   "not-recorded": Object.freeze(["handle", "kind"]),
 });
 
-/** True only for a reviewer entry that carries a rostered role handle (ledger kind "human"). */
+const ROSTERED_KINDS = Object.freeze(["human", "rostered"]);
+
+/**
+ * True only for a reviewer entry that carries a rostered role handle under a rostered kind ("human"
+ * in rounds 1–9, "rostered" after; which kind a round may use is checked by validateReviewLedger).
+ */
 export function isRosteredReviewer(reviewer) {
-  return reviewer?.kind === "human" && ROSTERED_REVIEW_ROLES.includes(reviewer.handle);
+  return ROSTERED_KINDS.includes(reviewer?.kind) && ROSTERED_REVIEW_ROLES.includes(reviewer.handle);
 }
 
 function assertClosedFields(value, fields, label) {
@@ -346,15 +356,21 @@ function assertDelegatedReviewer(reviewer, label, roundNumber) {
  */
 function assertReviewer(reviewer, label, roundNumber) {
   assert.ok(reviewer && typeof reviewer === "object", `${label}: reviewer entry missing`);
-  assert.ok(Object.hasOwn(REVIEWER_FIELDS, reviewer.kind ?? ""), `${label}: reviewer kind must be human (a rostered role handle), agent or not-recorded; delegated-ai requires an explicit Founder delegation`);
+  assert.ok(Object.hasOwn(REVIEWER_FIELDS, reviewer.kind ?? ""), `${label}: reviewer kind must be human or rostered (a rostered role handle; "rostered" after round ${LAST_HUMAN_KIND_ROUND}), agent or not-recorded; delegated-ai requires an explicit Founder delegation`);
+  const rostered = ROSTERED_KINDS.includes(reviewer.kind);
+  if (rostered && roundNumber > LAST_HUMAN_KIND_ROUND) {
+    assert.equal(reviewer.kind, "rostered", `${label}: rounds after ${LAST_HUMAN_KIND_ROUND} record a rostered role handle as kind "rostered", not "human"`);
+  } else if (rostered) {
+    assert.equal(reviewer.kind, "human", `${label}: rounds 1-${LAST_HUMAN_KIND_ROUND} keep their recorded kind "human"; kind "rostered" starts with round ${LAST_HUMAN_KIND_ROUND + 1}`);
+  }
   const allowed = REVIEWER_FIELDS[reviewer.kind];
   const unknown = Object.keys(reviewer).filter((field) => !allowed.includes(field));
-  assert.deepEqual(unknown, [], `${label}: a ${reviewer.kind === "human" ? 'rostered (kind "human")' : reviewer.kind} reviewer carries only ${allowed.join(" and ")}; unknown field ${unknown.join(", ")}` +
-    (reviewer.kind === "human" && unknown.includes("model") ? " (a rostered reviewer does not carry a model label)" : ""));
+  assert.deepEqual(unknown, [], `${label}: a ${rostered ? `rostered (kind "${reviewer.kind}")` : reviewer.kind} reviewer carries only ${allowed.join(" and ")}; unknown field ${unknown.join(", ")}` +
+    (rostered && unknown.includes("model") ? " (a rostered reviewer does not carry a model label)" : ""));
   if (reviewer.kind === "delegated-ai") {
     assertDelegatedReviewer(reviewer, label, roundNumber);
     assertClosedFields(reviewer, allowed, label);
-  } else if (reviewer.kind === "human") {
+  } else if (rostered) {
     assert.ok(ROSTERED_REVIEW_ROLES.includes(reviewer.handle),
       `${label}: ${JSON.stringify(reviewer.handle)} is not a rostered reviewer role (${ROSTERED_REVIEW_ROLES.join(", ")}); ` +
         "the roster changes only by a reviewed code change to tests/tools/report-surface-contract.mjs");
@@ -392,7 +408,7 @@ function assertReviewCell(cellId, cell, round, label) {
   assert.ok(reviewer, `${label}: ${cellId} reviewer ${cell.reviewer} is not a reviewer of this round`);
   if (cell.status === "pass") {
     assert.ok(isRosteredReviewer(reviewer) || reviewer.kind === "delegated-ai",
-      `${label}: ${cellId} passed under ${cell.reviewer}, ${reviewer.kind === "human" ? "an unrostered" : reviewer.kind === "agent" ? "an agent" : "a not-recorded"} reviewer; a pass is recorded only by a rostered reviewer ` +
+      `${label}: ${cellId} passed under ${cell.reviewer}, ${ROSTERED_KINDS.includes(reviewer.kind) ? "an unrostered" : reviewer.kind === "agent" ? "an agent" : "a not-recorded"} reviewer; a pass is recorded only by a rostered reviewer ` +
         `(${ROSTERED_REVIEW_ROLES.join(", ")}), and an agent may record a failed cell or a round note but never a pass`);
   }
   assert.match(cell.reviewArtifactFingerprint ?? "", SHA256, `${label}: ${cellId} stable review fingerprint missing`);

@@ -11,6 +11,8 @@ not establish. Exit 3 means the checker could not finish; exit 4 that too little
   `layout/unbreakable-block-too-tall` and `svg/text-overflows-viewport`.
 - **Remediation advice is untested.** No test shows a suggested change removing its finding. Run
   breaklint again after any repair.
+- **Typography is checked in one language.** The `type/*` rules follow `locale` (default `de-DE`;
+  `--locale en-US` for English) and skip text whose `lang` differs.
 
 ## Environment
 
@@ -23,8 +25,7 @@ not establish. Exit 3 means the checker could not finish; exit 4 that too little
   findings, so a declared font that fails to load stops the run. Rendering varies across machines;
   page images are evidence, not a baseline.
 - **Images.** A failed image decode is tolerated only when the HTML declares a positive `width` and
-  `height` and the rendered box matches both. Anything else stops the
-  run, because absent pixels can change the layout.
+  `height` and the rendered box matches both; anything else stops the run.
 - **Time and memory.** One document may take 600000 ms by default (`--document-timeout-ms`,
   30000–1800000); reaching it ends with exit 3. Expect roughly 16 MiB of memory per page.
 
@@ -72,20 +73,20 @@ Widow, orphan and continuation-page checks need to know whether a page break was
 evaluates Paged.js' own break decision at the point where the next page starts. A break the
 paginator forced (`break-before`, `break-after`, a change of named page) is the author's choice,
 so the fragments next to it are declined as `env/forced-break` and counted against coverage. The
-reason or intent behind a forced break stays unknown, an element hidden with `display: none` that
-carries `page:` still forces a break.
+reason behind a forced break stays unknown. An element hidden with `display: none` that carries
+`page:` still forces a break.
 
 ## Screen checks (Playwright)
 
-Screen checks are new in 0.11 and uncalibrated; start in report mode.
+Screen checks are uncalibrated; start in report mode.
 
 - **Not rendered means not measured.** Hidden and off-viewport elements, the body of a closed
   `<details>`, content under `content-visibility: hidden`, and elements whose effective opacity is
   0 are excluded, never reported as fine.
 - **No clean claim** with non-axis-aligned transforms, masks, clip paths, active animations (other
   than of shadows and box colours), capture drift, a font timeout or a truncated inventory.
-- **Overflow** is measured on HTML boxes; content inside an `<svg>` is judged only by the SVG text
-  rule.
+- **Overflow** is measured on HTML boxes, not inside an `<svg>`; SVG text is judged against its
+  viewport, and clipping by an HTML ancestor is still reported.
 - **Small text and touch targets** are measured in CSS pixels; scaling through an SVG `viewBox` or
   a transform is not taken into account.
 - **Overlap between siblings** is off by default (`geometry.rules.siblingOverlap`), because

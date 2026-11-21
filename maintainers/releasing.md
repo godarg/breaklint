@@ -114,8 +114,8 @@ from those human labels. Preserve all
 source, environment, artifact and pixel bindings, including historical failed attempts. The
 0.9.0 completion record (kept outside this repository) is historical, not approval of the candidate.
 
-1. **Prepare the candidate:** version all package/workflow references, date the changelog,
-   generate rule documentation and schema, and run the ordered local gates below. Run the
+1. **Prepare the candidate:** version all package/workflow references, head the changelog
+   section `## X.Y.Z — TBD-at-tag` (the date is set in step 5), generate rule documentation and schema, and run the ordered local gates below. Run the
    packed consumers from foreign working directories on Node 22.13 and 24.
 2. **Review the complete report matrix:** follow `maintainers/report-review.md`, *Review package*.
    A rostered human or the explicitly delegated AI reviewer must actually inspect every
@@ -127,8 +127,12 @@ source, environment, artifact and pixel bindings, including historical failed at
    record, audit the declared scope and real gate evidence, and resolve every blocker/high.
    Then `npm run test:report-surfaces:local` must pass on the exact input binding.
 4. **Push and merge the pull request after green CI.** The merge must preserve the candidate's
-   reviewed inputs. Query `ci.yml` on the exact resulting `main` commit and verify success.
-5. **Push a new annotated tag `vX.Y.Z` matching the approved version on that exact commit.** The workflow publishes and verifies
+   reviewed inputs.
+5. **Date the changelog in its own commit on `main`:** replace `TBD-at-tag` with the release
+   date (`## X.Y.Z — YYYY-MM-DD`) and change nothing else; `CHANGELOG.md` is not a review input.
+   Push it to `main`, query `ci.yml` on exactly that commit and verify success.
+6. **Push a new annotated tag `vX.Y.Z` matching the approved version on that dated commit, and on
+   no other.** The workflow publishes and verifies
    registry integrity, provenance and release assets. Measure those service results before
    recording publication or updating consumers and the live website.
 
@@ -366,7 +370,7 @@ only.
 ## Publishing
 
 The release-prep commit carries the heading `## X.Y.Z — TBD-at-tag`, because the release date is
-not known when it is written. Steps 5 to 7 of *Before creating the tag* date it, let CI go green
+not known when it is written. Steps 5 and 6 of *Before creating the tag* date it, let CI go green
 on exactly the dated commit, and tag that commit and no other. Create and push the annotated tag
 only then:
 

@@ -41,6 +41,7 @@ import {
   assertCurrentDelegationRelease,
   describeLatestRound,
   isMeasurableBrowserVersion,
+  isRosteredReviewer,
   latestBindingStatus,
   summarizeLatestRound,
   validateReviewLedger,
@@ -505,6 +506,44 @@ describe("report-surface rostered review gate", () => {
     }
   });
 
+  it("records a rostered reviewer as kind \"rostered\" after round 9 and keeps rounds 1-9 as recorded", () => {
+    // Codex acceptance 0.11.1 (D6): the ledger value "human" names a role handle, not a person.
+    // Rounds 1-9 keep the value they were recorded with, byte for byte; later rounds use the
+    // neutral "rostered", and "human" is no longer accepted there.
+    const ledger = committedLedger();
+    const historical = JSON.stringify(ledger.rounds);
+    const later = structuredClone(ledger.rounds.at(-1)!);
+    later.round = ledger.rounds.length + 1;
+    const { sessionQuote, ...delegation } = later.delegation as typeof later.delegation & { sessionQuote?: string };
+    later.delegation = {
+      ...delegation,
+      sessionQuoteSha256: createHash("sha256").update(sessionQuote ?? "synthetic").digest("hex"),
+      statement: DELEGATION_STATEMENT,
+    } as NonNullable<typeof later.delegation>;
+    for (const reviewer of later.reviewers) {
+      const receipt = (reviewer as { nativeReceipt?: { path: string } }).nativeReceipt;
+      if (receipt) receipt.path = `${EXTERNAL_RECEIPT_PREFIX}synthetic/${receipt.path.split("/").at(-1)}`;
+    }
+    later.note = "Synthetic later round with a rostered reviewer beside the delegated ones.";
+    const withKind = (kind: string) => {
+      const next = structuredClone(ledger);
+      const round = structuredClone(later);
+      round.reviewers = [...round.reviewers, { kind, handle: "@Founder" } as ReviewRound["reviewers"][number]];
+      next.rounds.push(round);
+      return next;
+    };
+    assert.ok(ledger.rounds.length >= 9, "the committed ledger lost rounds");
+    const accepted = validateReviewLedger(withKind("rostered"));
+    assert.ok(accepted.latest.reviewers.some((reviewer) => isRosteredReviewer(reviewer) && reviewer.handle === "@Founder"),
+      "a kind \"rostered\" role handle in a later round is not counted as rostered");
+    assert.throws(() => validateReviewLedger(withKind("human")), /rounds after 9 record a rostered role handle as kind "rostered", not "human"/u);
+    const relabelled = structuredClone(ledger);
+    (relabelled.rounds[2]!.reviewers[0] as { kind: string }).kind = "rostered";
+    assert.throws(() => validateReviewLedger(relabelled), /rounds 1-9 keep their recorded kind "human"/u);
+    assert.equal(JSON.stringify(ledger.rounds), historical, "a historical round was rewritten");
+    assert.deepEqual(ledger.rounds.slice(0, 9).flatMap((round) => round.reviewers.map(({ kind }) => kind)).filter((kind) => kind === "human"), ["human", "human", "human"]);
+  });
+
   it("binds a latest delegated review to the package version of the actual review root", () => {
     const latest = structuredClone(committedLedger().rounds.at(-1)!);
     const version = (JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string }).version;
@@ -679,7 +718,7 @@ describe("report-surface rostered review gate", () => {
     // E-I: agent only, nobody, no kind, a null model on a rostered entry, not-recorded beside an agent.
     assert.throws(probe([agent], "@Bot"), /passed under @Bot, an agent reviewer/u);
     assert.throws(probe([], "@Bot"), /reviewer @Bot is not a reviewer of this round/u);
-    assert.throws(probe([{ handle: "@Neo" }], "@Neo"), /reviewer kind must be human \(a rostered role handle\), agent or not-recorded/u);
+    assert.throws(probe([{ handle: "@Neo" }], "@Neo"), /reviewer kind must be human or rostered \(a rostered role handle; "rostered" after round 9\), agent or not-recorded/u);
     assert.throws(probe([{ kind: "human", handle: "@Neo", model: null }], "@Neo"), /does not carry a model label/u);
     assert.throws(probe([{ kind: "not-recorded", handle: null }, agent], "@Bot"), /passed under @Bot, an agent reviewer/u);
 

@@ -39,12 +39,16 @@ try {
 writeFileSync("public-api-types.mts", `import type { Page } from '@playwright/test';\nimport { checkPage, writeReportBundle } from 'breaklint';\ndeclare const page: Page;\nconst result = await checkPage(page, {trust:'host-controlled-page',networkPolicy:'host-owned',scenario:'types',output:{dir:'out',screenshot:'viewport'}});\nawait writeReportBundle(result.report, {outDir:'out'});\n`);
 execFileSync(process.execPath, [require.resolve("typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--target", "ES2022", "--module", "NodeNext", "--moduleResolution", "NodeNext", "public-api-types.mts"], { stdio: "inherit" });
 // The shipped Playwright example, run as the README tells a user to: copied out of the installed
-// package into an ES-module project, with this consumer's @playwright/test, against the same
-// existing Chrome. Nothing else ran it, so it could break and still ship.
-const example = resolve("playwright-example");
-mkdirSync(example, { recursive: true });
-cpSync(resolve("node_modules/breaklint/examples/playwright"), resolve(example, "examples/playwright"), { recursive: true });
-writeFileSync(resolve(example, "package.json"), `${JSON.stringify({ name: "breaklint-playwright-example", private: true, type: "module" })}\n`);
-writeFileSync(resolve(example, "playwright.config.mjs"), `export default { testDir: "examples/playwright", use: { launchOptions: { executablePath: ${JSON.stringify(executablePath)} } } };\n`);
-execFileSync(process.execPath, [require.resolve("@playwright/test/cli"), "test", "--config", resolve(example, "playwright.config.mjs"), "--reporter=line"], { cwd: example, stdio: "inherit" });
-console.log("installed public API contract passed (ESM, require, TypeScript, real Playwright page, canonical bundle, shipped example)");
+// package, with this consumer's @playwright/test, against the same existing Chrome. Nothing else
+// ran it, so it could break and still ship. It runs twice: in an ES-module project and in the
+// CommonJS project `npm init -y` creates (no "type"), where an example that reads import.meta
+// finds no test at all (acceptance of 0.11.1).
+for (const [name, type] of [["playwright-example-esm", "module"], ["playwright-example-cjs", undefined]]) {
+  const example = resolve(name);
+  mkdirSync(example, { recursive: true });
+  cpSync(resolve("node_modules/breaklint/examples/playwright"), resolve(example, "examples/playwright"), { recursive: true });
+  writeFileSync(resolve(example, "package.json"), `${JSON.stringify({ name: `breaklint-${name}`, version: "1.0.0", private: true, ...(type ? { type } : {}) })}\n`);
+  writeFileSync(resolve(example, "playwright.config.mjs"), `export default { testDir: "examples/playwright", use: { launchOptions: { executablePath: ${JSON.stringify(executablePath)} } } };\n`);
+  execFileSync(process.execPath, [require.resolve("@playwright/test/cli"), "test", "--config", resolve(example, "playwright.config.mjs"), "--reporter=line"], { cwd: example, stdio: "inherit" });
+}
+console.log("installed public API contract passed (ESM, require, TypeScript, real Playwright page, canonical bundle, shipped example in an ES-module and a CommonJS project)");
